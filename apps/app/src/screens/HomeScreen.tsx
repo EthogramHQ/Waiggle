@@ -103,7 +103,8 @@ function MemberHome({ id, name }: { id: string; name: string }) {
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <Screen header={<TopNav />} title={t('home.greeting', { name })}>
+    // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
+    <Screen header={<TopNav />} title={t('home.greeting', { name })} pageTitle={null}>
       {/* Un état vide qui invite à agir, plutôt qu'une page blanche (voir docs/design/miel.md). */}
       <Surface variant="grouped" padding="xxl" gap="lg">
         <Stack align="center">

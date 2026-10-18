@@ -4,5 +4,5 @@ import { NotFoundState } from './states'
 
 export function NotFoundScreen() {
   const { t } = useTranslation()
-  return <NotFoundState title={t('errors.notFound')} />
+  return <NotFoundState title={t('states.notFoundTitle')} message={t('errors.notFound')} />
 }

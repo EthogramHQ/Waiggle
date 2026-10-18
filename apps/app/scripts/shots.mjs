@@ -156,7 +156,8 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
   if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
   // Une page dont le chargement échoue, pour photographier l'état « erreur ».
-  if (pathname === '/v1/members/erreur') return json(500, { error: { code: 'internal', message: '' } })
+  if (pathname === '/v1/members/erreur')
+    return json(500, { error: { code: 'internal', message: '' } })
   const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
   if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
   const media = pathname.match(/^\/media\/visuals\/([0-9a-f-]+)\.webp$/)

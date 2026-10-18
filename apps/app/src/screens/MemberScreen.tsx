@@ -5,6 +5,7 @@ import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
+import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { TopNav } from '../navigation/TopNav'
@@ -15,7 +16,7 @@ import { MemberHeader } from '../ui/MemberHeader'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { Text } from '../ui/Text'
-import { errorKey, LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function MemberScreen({ id }: { id: string }) {
   const { t } = useTranslation()
@@ -23,15 +24,23 @@ export function MemberScreen({ id }: { id: string }) {
   // Pas de session : aucune requête (la page d'un membre est réservée aux membres).
   const member = useMember(id, Boolean(session))
 
-  if (isPending) return <LoadingScreen />
-  if (!session) return <SignedOutScreen />
+  if (isPending) return <LoadingScreen width="page" />
+  if (!session) return <SignedOutScreen width="page" />
   if (member.error) {
     if (errorKey(member.error) === 'notFound') {
-      return <NotFoundState title={t('member.notFoundTitle')} message={t('member.notFound')} />
+      return (
+        <NotFoundState
+          width="page"
+          title={t('member.notFoundTitle')}
+          message={t('member.notFound')}
+        />
+      )
     }
-    return <LoadErrorScreen error={member.error} onRetry={() => void member.refetch()} />
+    return (
+      <LoadErrorScreen error={member.error} onRetry={() => void member.refetch()} width="page" />
+    )
   }
-  if (!member.data) return <LoadingScreen />
+  if (!member.data) return <LoadingScreen width="page" />
   return <MemberView member={member.data} />
 }
 

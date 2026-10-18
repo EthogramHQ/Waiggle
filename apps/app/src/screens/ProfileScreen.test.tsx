@@ -16,9 +16,10 @@ jest.mock('../profile/api', () => ({
   uploadAvatar: jest.fn(),
   pickAvatar: jest.fn(),
 }))
+const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: jest.fn(), replace: mockReplace, canGoBack: () => false }),
 }))
 
 let session: ReturnType<typeof mockSession>
@@ -29,6 +30,7 @@ beforeEach(() => {
   jest.mocked(updateProfile).mockReset()
   jest.mocked(uploadAvatar).mockReset()
   jest.mocked(pickAvatar).mockReset()
+  mockReplace.mockReset()
 })
 
 describe('ProfileScreen', () => {
@@ -111,6 +113,16 @@ describe('ProfileScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Changer la photo' }))
 
     expect(await screen.findByText('L’image dépasse 5 Mo.')).toBeTruthy()
+  })
+
+  it('offers to go back to the account when the profile cannot load', async () => {
+    jest.mocked(getMe).mockRejectedValue(new Error('réseau coupé'))
+    await renderWithProviders(<ProfileScreen />)
+
+    // Arrivé directement sur la page, sans page précédente : « Revenir » mène au compte.
+    await fireEvent.press(await screen.findByRole('button', { name: 'Revenir' }))
+
+    expect(mockReplace).toHaveBeenCalledWith('/account')
   })
 
   it('asks a visitor to sign in', async () => {

@@ -44,7 +44,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   }
 
   return (
-    <Screen>
+    <Screen pageTitle={t('leaving.title')}>
       {/* La porte vers l'extérieur : des anneaux de lumière autour d'une flèche. */}
       <PortalRings />
       {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se

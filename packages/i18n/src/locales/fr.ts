@@ -14,7 +14,6 @@ export const fr = {
     loading: 'Chargement…',
     crashed: 'Cette page n’a pas pu s’afficher.',
     retry: 'Réessayer',
-    pageTitle: '{{page}} | {{appName}}',
     back: 'Retour',
     cancel: 'Annuler',
     remove: 'Retirer {{item}}',
@@ -296,6 +295,11 @@ export const fr = {
   states: {
     errorTitle: 'Cette page n’a pas pu se charger',
     signedOutTitle: 'Réservé aux membres',
+    notFoundTitle: 'Page introuvable',
+    notMineTitle: 'Ce projet n’est pas à toi',
+    back: 'Revenir',
+    home: 'Retour à l’accueil',
+    seeProject: 'Voir le projet',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
@@ -334,7 +338,7 @@ export const fr = {
     unsupportedMediaType: 'Ce type de fichier n’est pas accepté.',
     unavailable: '{{appName}} reçoit beaucoup de demandes en ce moment. Réessaie dans un instant.',
     tooManyVisuals: 'Six photos au plus par projet. Retires-en une pour en ajouter une autre.',
-    internal: 'Une erreur inattendue est survenue.',
+    internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

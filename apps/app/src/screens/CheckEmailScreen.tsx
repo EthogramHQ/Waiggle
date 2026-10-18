@@ -25,7 +25,7 @@ export function CheckEmailScreen() {
   const hydrated = useHydrated()
 
   return (
-    <Screen>
+    <Screen pageTitle={t('auth.checkEmail.title')}>
       <Stack align="center">
         <Emblem icon="envelope-simple" />
       </Stack>

@@ -11,7 +11,8 @@ jest.mock('../accounts/api', () => ({
   downloadMyData: jest.fn(),
 }))
 const mockReplace = jest.fn()
-// La barre de navigation des états (chargement, erreur) lit le profil : on le remplace aussi.
+// Les états partagés (screens/states.tsx) importent la barre de navigation, qui importe le module du
+// profil : on le remplace aussi, comme dans les autres tests d'écran.
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',

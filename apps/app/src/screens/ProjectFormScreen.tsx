@@ -20,7 +20,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import type { ApiResult } from '../api/errors'
+import { type ApiResult, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -57,7 +57,13 @@ import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
 import { VisualEditor, type VisualEditorLabels, type VisualTile } from '../ui/VisualEditor'
-import { errorKey, LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  NotMineState,
+  SignedOutScreen,
+} from './states'
 
 type ScreenProps = {
   id?: string | undefined
@@ -87,13 +93,7 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
     return <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} />
   }
   if (!project.data) return <LoadingScreen />
-  if (!project.data.isMine) {
-    return (
-      <Screen>
-        <Notice message={t('project.page.notMine')} />
-      </Screen>
-    )
-  }
+  if (!project.data.isMine) return <NotMineState projectId={project.data.id} />
   return (
     <ProjectFormView
       initial={formFromProject(project.data)}
@@ -499,6 +499,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   if (!wide) {
     return (
       <Screen
+        pageTitle={title}
         stickyHeader
         notice={message ? <Notice message={message} /> : null}
         header={

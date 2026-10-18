@@ -50,7 +50,8 @@ describe('Button', () => {
     await fireEvent.press(button)
 
     expect(onPress).not.toHaveBeenCalled()
-    expect(button.props.accessibilityState).toMatchObject({ disabled: true, busy: true })
+    expect(button).toBeDisabled()
+    expect(button).toBeBusy()
   })
 })
 
@@ -191,9 +192,8 @@ describe('Thumbnails', () => {
       <Thumbnails items={[tile(1), tile(2), tile(3)]} selected={0} onSelect={onSelect} />,
     )
 
-    const first = screen.getByRole('button', { name: 'Photo 1 sur 3' })
-    expect(first.props.accessibilityState).toMatchObject({ selected: true })
-    await fireEvent.press(screen.getByRole('button', { name: 'Photo 2 sur 3' }))
+    expect(screen.getByRole('tab', { name: 'Photo 1 sur 3' })).toBeSelected()
+    await fireEvent.press(screen.getByRole('tab', { name: 'Photo 2 sur 3' }))
 
     expect(onSelect).toHaveBeenCalledWith(1)
   })
@@ -258,12 +258,11 @@ describe('VisualEditor', () => {
       />,
     )
 
-    const disabled = (name: string) =>
-      screen.getByRole('button', { name }).props.accessibilityState?.disabled
-    expect(disabled('Avancer la photo 1')).toBe(true)
-    expect(disabled('Reculer la photo 2')).toBe(true)
-    expect(disabled('Mettre la photo 1 en couverture')).toBe(true)
-    expect(disabled('Reculer la photo 1')).toBeFalsy()
+    const button = (name: string) => screen.getByRole('button', { name })
+    expect(button('Avancer la photo 1')).toBeDisabled()
+    expect(button('Reculer la photo 2')).toBeDisabled()
+    expect(button('Mettre la photo 1 en couverture')).toBeDisabled()
+    expect(button('Reculer la photo 1')).toBeEnabled()
   })
 
   it('stops offering to add photos once the gallery is full', async () => {
@@ -272,9 +271,7 @@ describe('VisualEditor', () => {
       <VisualEditor labels={labels} gallery={full} max={6} portrait={null} {...actions()} />,
     )
 
-    expect(
-      screen.getByRole('button', { name: 'Ajouter une photo' }).props.accessibilityState,
-    ).toMatchObject({ disabled: true })
+    expect(screen.getByRole('button', { name: 'Ajouter une photo' })).toBeDisabled()
   })
 
   it('offers to choose a vertical cover, then to replace or remove it', async () => {
@@ -437,9 +434,7 @@ describe('Button while loading', () => {
   it('keeps its name and announces that it is busy', async () => {
     await renderWithProviders(<Button label="Publier" onPress={() => {}} loading />)
 
-    expect(screen.getByRole('button', { name: 'Publier' }).props.accessibilityState).toMatchObject({
-      busy: true,
-    })
+    expect(screen.getByRole('button', { name: 'Publier' })).toBeBusy()
   })
 })
 

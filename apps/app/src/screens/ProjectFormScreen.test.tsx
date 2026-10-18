@@ -200,16 +200,12 @@ describe('ProjectFormScreen, photos of a new project', () => {
 
     expect(await screen.findByText('Préparation de la photo…')).toBeTruthy()
     const publish = screen.getByRole('button', { name: 'Publier' })
-    expect(publish.props.accessibilityState).toMatchObject({ disabled: true })
+    expect(publish).toBeDisabled()
     await fireEvent.press(publish)
     expect(createProject).not.toHaveBeenCalled()
 
     finish(picked('a'))
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Publier' }).props.accessibilityState,
-      ).toMatchObject({ disabled: false }),
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publier' })).toBeEnabled())
     expect(screen.queryByText('Préparation de la photo…')).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
     await waitFor(() =>
@@ -224,9 +220,7 @@ describe('ProjectFormScreen, photos of a new project', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Ajouter une photo' }))
 
     expect(screen.queryByText('Préparation de la photo…')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Publier' }).props.accessibilityState).toMatchObject({
-      disabled: false,
-    })
+    expect(screen.getByRole('button', { name: 'Publier' })).toBeEnabled()
   })
 
   it('publishes the project anyway when a photo fails, and says so on the edit page', async () => {

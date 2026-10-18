@@ -5,7 +5,7 @@ import { SignInScreen } from './SignInScreen'
 
 jest.mock('../accounts/api', () => ({ signIn: jest.fn() }))
 const mockReplace = jest.fn()
-let mockParams: { next?: string } = {}
+let mockParams: { next?: string | string[] } = {}
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
   useLocalSearchParams: () => mockParams,
@@ -49,14 +49,24 @@ describe('SignInScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/members/u2')
   })
 
-  it('never sends the member to another site after signing in', async () => {
+  it('never sends the member to another site, or to the leaving page, after signing in', async () => {
     signInMock.mockResolvedValue({ ok: true })
-    mockParams = { next: '//faux.example/connexion' }
-    await renderWithI18n(<SignInScreen />)
+    for (const next of [
+      '//faux.example/connexion',
+      'javascript:alert(1)',
+      '/out?url=https://faux-waiggle.example',
+      // Un paramètre répété : seul le premier compte.
+      ['//faux.example', '/members/u2'],
+    ]) {
+      mockReplace.mockReset()
+      mockParams = { next }
+      const { unmount } = await renderWithI18n(<SignInScreen />)
 
-    await submit()
+      await submit()
 
-    expect(mockReplace).toHaveBeenCalledWith('/')
+      expect(mockReplace).toHaveBeenCalledWith('/')
+      await unmount()
+    }
   })
 
   it('says when the email or password is wrong', async () => {

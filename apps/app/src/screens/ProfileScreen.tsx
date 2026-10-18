@@ -145,6 +145,7 @@ function ProfileForm({ me }: { me: Me }) {
 
   return (
     <Screen
+      pageTitle={t('profile.title')}
       // Sur téléphone, « Annuler » et « Enregistrer » restent en haut, à portée de pouce ; sur
       // ordinateur, la barre de navigation en haut et les deux boutons sous le formulaire.
       header={

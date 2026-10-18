@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
+import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
@@ -37,7 +38,7 @@ import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useLayout } from '../ui/theme/layout'
-import { errorKey, LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function ProjectScreen({ id }: { id: string }) {
   const { t } = useTranslation()
@@ -45,22 +46,25 @@ export function ProjectScreen({ id }: { id: string }) {
   // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
   const project = useProject(id, Boolean(session))
 
-  if (isPending) return <LoadingScreen />
-  if (!session) return <SignedOutScreen />
+  if (isPending) return <LoadingScreen width="page" />
+  if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
     // n'a pas le droit de le voir n'apprend même pas qu'il existe.
     if (errorKey(project.error) === 'notFound') {
       return (
         <NotFoundState
+          width="page"
           title={t('project.page.notFoundTitle')}
           message={t('project.page.notFound')}
         />
       )
     }
-    return <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} />
+    return (
+      <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width="page" />
+    )
   }
-  if (!project.data) return <LoadingScreen />
+  if (!project.data) return <LoadingScreen width="page" />
   return <ProjectView project={project.data} />
 }
 

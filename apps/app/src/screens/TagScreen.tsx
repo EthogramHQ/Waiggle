@@ -17,10 +17,11 @@ export function TagScreen({ slug }: { slug: string }) {
   const tag = useTag(slug, Boolean(session))
   const back = useGoBack('/')
 
-  if (isPending) return <LoadingScreen />
-  if (!session) return <SignedOutScreen />
-  if (tag.error) return <LoadErrorScreen error={tag.error} onRetry={() => void tag.refetch()} />
-  if (!tag.data) return <LoadingScreen />
+  if (isPending) return <LoadingScreen width="page" />
+  if (!session) return <SignedOutScreen width="page" />
+  if (tag.error)
+    return <LoadErrorScreen error={tag.error} onRetry={() => void tag.refetch()} width="page" />
+  if (!tag.data) return <LoadingScreen width="page" />
   return (
     <Screen
       width="page"

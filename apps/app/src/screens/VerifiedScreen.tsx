@@ -13,7 +13,7 @@ export function VerifiedScreen() {
   const router = useRouter()
 
   return (
-    <Screen>
+    <Screen pageTitle={t('auth.verified.title')}>
       <Stack align="center">
         <Emblem icon="check" />
       </Stack>

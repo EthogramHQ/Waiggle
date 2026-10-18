@@ -12,7 +12,6 @@ export const en: Translation = {
     loading: 'Loading…',
     crashed: 'This page could not be displayed.',
     retry: 'Try again',
-    pageTitle: '{{page}} | {{appName}}',
     back: 'Back',
     cancel: 'Cancel',
     remove: 'Remove {{item}}',
@@ -290,6 +289,11 @@ export const en: Translation = {
   states: {
     errorTitle: 'This page could not load',
     signedOutTitle: 'Members only',
+    notFoundTitle: 'Page not found',
+    notMineTitle: 'This project is not yours',
+    back: 'Go back',
+    home: 'Back to home',
+    seeProject: 'See the project',
   },
   leaving: {
     title: 'You are leaving {{appName}}',
@@ -327,7 +331,7 @@ export const en: Translation = {
     unsupportedMediaType: 'This type of file is not accepted.',
     unavailable: '{{appName}} is very busy right now. Try again in a moment.',
     tooManyVisuals: 'Six photos at most per project. Remove one to add another.',
-    internal: 'Something went wrong.',
+    internal: 'Something went wrong. Try again in a moment.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }
