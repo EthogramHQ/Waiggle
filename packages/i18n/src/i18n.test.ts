@@ -108,6 +108,13 @@ describe('fill', () => {
     expect(fill('Bonjour {{ name }}{{missing}}', { name: 'Léa' })).toBe('Bonjour Léa')
   })
 
+  // Le nom d'un membre arrive dans les e-mails : un {{…}} qu'il a tapé reste tel quel.
+  it('shows the given values as typed, even when they contain {{…}}', () => {
+    expect(fill('{{name}}, {{appName}}', { name: '{{appName}} {{name}} $&' })).toBe(
+      `{{appName}} {{name}} $&, ${appName}`,
+    )
+  })
+
   it('never fills in what every JavaScript object inherits', () => {
     expect(fill('[{{constructor}}][{{toString}}][{{__proto__}}]')).toBe('[][][]')
   })
