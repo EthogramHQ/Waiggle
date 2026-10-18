@@ -3,9 +3,9 @@
 // Pourquoi ? Un lien peut mentir sur sa destination : le texte « le site officiel » peut mener
 // ailleurs. Ici, le membre voit l'adresse réelle, et le nom du site en clair, avant de décider.
 import { publicHttpsUrl } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { PortalRings } from '../ui/Illustrations'
@@ -26,7 +26,8 @@ const safeTarget = (value: string | undefined): URL | null => (value ? publicHtt
 
 export function LeavingScreen({ url }: { url: string | undefined }) {
   const { t } = useTranslation()
-  const router = useRouter()
+  // Sans page précédente (lien ouvert dans un nouvel onglet), « Revenir » mène à l'accueil.
+  const back = useGoBack('/')
   const target = safeTarget(url)
   // Sur le web, la page est préparée sans connaître l'adresse (elle est dans l'URL du visiteur) :
   // on n'affiche la destination qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
@@ -37,7 +38,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
     return (
       <Screen title={t('leaving.title')}>
         <Notice message={t('leaving.invalid')} />
-        <Button label={t('leaving.back')} variant="secondary" onPress={() => router.back()} />
+        <Button label={t('leaving.back')} variant="secondary" onPress={back} />
       </Screen>
     )
   }
@@ -91,7 +92,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
         icon="arrow-up-right"
         onPress={() => void Linking.openURL(target.href)}
       />
-      <Button label={t('leaving.back')} variant="secondary" onPress={() => router.back()} />
+      <Button label={t('leaving.back')} variant="secondary" onPress={back} />
     </Screen>
   )
 }

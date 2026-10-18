@@ -21,6 +21,7 @@ jest.mock('../members/api', () => {
 })
 const mockPush = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn(), canGoBack: () => true }),
 }))
 

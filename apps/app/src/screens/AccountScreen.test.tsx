@@ -18,7 +18,10 @@ jest.mock('../api/media', () => ({
 }))
 const mockReplace = jest.fn()
 const mockPush = jest.fn()
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: mockReplace }) }))
+jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+}))
 
 const lea = { user: { name: 'Léa', email: 'lea@example.com' } }
 

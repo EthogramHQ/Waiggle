@@ -7,13 +7,13 @@ import {
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import { ApiError, type ApiErrorKey } from '../api/errors'
+import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
+import { useGoBack } from '../navigation/useGoBack'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { type ProfileFormErrors, parseTools, toProfileUpdate } from '../profile/form'
 import { useMe, useSetMe } from '../profile/hooks'
@@ -28,32 +28,20 @@ import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
+import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function ProfileScreen() {
-  const { t } = useTranslation()
-  const router = useRouter()
   const { data: session, isPending } = useSession()
   const me = useMe(Boolean(session))
 
-  if (isPending) return <Screen title={t('common.loading')}>{null}</Screen>
-  if (!session) {
-    return (
-      <Screen title={t('profile.title')}>
-        <Notice tone="info" message={t('errors.unauthorized')} />
-        <Button label={t('home.signIn')} onPress={() => router.replace('/sign-in')} />
-      </Screen>
-    )
-  }
+  if (isPending) return <LoadingScreen />
+  if (!session) return <SignedOutScreen />
   if (me.error) {
-    // L'erreur levée par getMe porte la clé du message (voir ApiError dans api/client.ts).
-    const key = me.error instanceof ApiError ? me.error.key : 'internal'
     return (
-      <Screen title={t('profile.title')}>
-        <Notice message={t(`errors.${key}`)} />
-      </Screen>
+      <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} fallback="/account" />
     )
   }
-  if (!me.data) return <Screen title={t('common.loading')}>{null}</Screen>
+  if (!me.data) return <LoadingScreen />
   // Le formulaire n'est affiché qu'une fois le profil chargé : il part ainsi des bonnes valeurs.
   return <ProfileForm me={me.data} />
 }
@@ -62,7 +50,6 @@ type Message = { text: string; ok: boolean } | null
 
 function ProfileForm({ me }: { me: Me }) {
   const { t } = useTranslation()
-  const router = useRouter()
   const wide = useLayout().sizeClass === 'wide'
   const { refetch: refetchSession } = useSession()
   const setMe = useSetMe()
@@ -149,7 +136,7 @@ function ProfileForm({ me }: { me: Me }) {
           max: errors.tools === 'tooManyTools' ? FAVORITE_TOOLS_MAX : TOOL_MAX_LENGTH,
         })
 
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/account'))
+  const back = useGoBack('/account')
   const save = { label: t('profile.save'), onPress: () => void onSave(), loading: busy === 'save' }
 
   const notice = message ? (

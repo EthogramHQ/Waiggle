@@ -20,6 +20,7 @@ import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
+import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { WelcomeHero } from '../ui/WelcomeHero'
 import { Wordmark } from '../ui/Wordmark'
@@ -85,6 +86,15 @@ function VisitorHome() {
           {t('home.membersOnly')}
         </Text>
       </Row>
+      {/* Sur téléphone, pas de scène à gauche : le lien vers le code source se place ici. */}
+      {wide ? null : (
+        <Row gap="xs" justify="center" wrap>
+          <Text variant="caption" tone="muted">
+            {t('home.openSource')}
+          </Text>
+          <TextLink label={t('home.seeCode')} onPress={() => openOutside(sourceUrl)} />
+        </Row>
+      )}
     </Screen>
   )
 }

@@ -91,8 +91,11 @@ export function Button({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
-        // Les lecteurs d'écran annoncent « désactivé » ou « occupé ».
-        accessibilityState={{ disabled: inactive, busy: loading }}
+        // Les lecteurs d'écran annoncent « désactivé » ou « occupé ». Les propriétés aria-… sont les
+        // seules que react-native-web transmet au navigateur (accessibilityState y est ignoré) ;
+        // React Native les lit aussi sur téléphone.
+        aria-disabled={inactive}
+        aria-busy={loading}
         disabled={inactive}
         onPress={onPress}
         onPressIn={() => {

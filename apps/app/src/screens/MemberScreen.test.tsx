@@ -25,6 +25,7 @@ jest.mock('../members/api', () => {
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
@@ -97,7 +98,22 @@ describe('MemberScreen', () => {
     mockSession(null)
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeTruthy()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Se connecter' }))
     expect(getMember).not.toHaveBeenCalled()
+    // Une fois connecté, il reviendra sur cette page.
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/sign-in',
+      params: { next: '/page/actuelle' },
+    })
+  })
+
+  it('offers to try again when the page could not load', async () => {
+    jest.mocked(getMember).mockRejectedValueOnce(new Error('réseau coupé'))
+    jest.mocked(getMember).mockResolvedValueOnce(leaPage)
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    expect(await screen.findByRole('header', { name: leaPage.name })).toBeTruthy()
   })
 })

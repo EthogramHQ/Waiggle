@@ -5,10 +5,11 @@
 //
 // Sur un grand écran, un écran peut montrer une « scène » (`hero`) à gauche et son contenu dans une
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
-import { borders, layout, space } from '@ruche/brand'
+import { appName, borders, layout, space } from '@ruche/brand'
+import Head from 'expo-router/head'
 import { type ReactNode, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ScrollView, View } from 'react-native'
+import { Platform, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
@@ -21,6 +22,11 @@ import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   title?: string
+  /**
+   * Le nom de la page dans l'onglet du navigateur (« Carnet de cafés | Waiggle »), quand il diffère
+   * du titre affiché ou que l'écran n'a pas de titre (la page d'un projet, d'un membre).
+   */
+  pageTitle?: string
   /** Une phrase sous le titre. */
   subtitle?: string
   children: ReactNode
@@ -54,6 +60,7 @@ type Props = {
 
 export function Screen({
   title,
+  pageTitle,
   subtitle,
   children,
   header,
@@ -96,9 +103,20 @@ export function Screen({
     </>
   )
 
+  // Le nom de l'onglet : « Page | Waiggle », ou le seul nom de l'appli (l'accueil).
+  const tabPage = pageTitle ?? title
+  const tabTitle = tabPage ? t('common.pageTitle', { page: tabPage }) : appName
+
   return (
     // overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement horizontal).
     <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
+      {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
+          téléphone, il n'y a pas d'onglet : rien à faire. */}
+      {Platform.OS === 'web' ? (
+        <Head>
+          <title>{tabTitle}</title>
+        </Head>
+      ) : null}
       {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
       {pinned ? (
         // La barre fixe, hors de la zone qui défile. Son fond plein cache le contenu qui passe dessous.

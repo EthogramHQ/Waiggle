@@ -32,7 +32,7 @@ export function Thumbnails({ items, selected, onSelect }: Props) {
             key={key}
             accessibilityRole="button"
             accessibilityLabel={image.label}
-            accessibilityState={{ selected: isSelected }}
+            aria-selected={isSelected}
             onPress={() => onSelect(index)}
             style={{
               width: SIZE,

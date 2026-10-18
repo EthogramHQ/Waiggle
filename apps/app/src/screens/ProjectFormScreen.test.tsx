@@ -29,6 +29,7 @@ jest.mock('../api/media', () => ({
 }))
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: jest.fn(), replace: mockReplace, back: jest.fn() }),
 }))
 

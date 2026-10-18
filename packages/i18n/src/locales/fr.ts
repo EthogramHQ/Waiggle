@@ -14,6 +14,7 @@ export const fr = {
     loading: 'Chargement…',
     crashed: 'Cette page n’a pas pu s’afficher.',
     retry: 'Réessayer',
+    pageTitle: '{{page}} | {{appName}}',
     back: 'Retour',
     cancel: 'Annuler',
     remove: 'Retirer {{item}}',
@@ -94,6 +95,7 @@ export const fr = {
   },
   account: {
     title: 'Réglages',
+    about: { title: 'À propos' },
     signOut: 'Me déconnecter',
     editProfile: 'Modifier mon profil',
     language: {
@@ -290,6 +292,10 @@ export const fr = {
   tag: {
     subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
     empty: 'Aucun projet public pour l’instant.',
+  },
+  states: {
+    errorTitle: 'Cette page n’a pas pu se charger',
+    signedOutTitle: 'Réservé aux membres',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',

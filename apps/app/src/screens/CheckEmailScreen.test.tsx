@@ -7,6 +7,7 @@ import { CheckEmailScreen } from './CheckEmailScreen'
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ replace: jest.fn() }),
   useLocalSearchParams: jest.fn(),
 }))

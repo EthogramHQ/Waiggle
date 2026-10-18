@@ -17,6 +17,7 @@ import { ProjectGrid } from './ProjectGrid'
 import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
+import { StateMessage } from './StateMessage'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
 import { TagInput } from './TagInput'
@@ -439,6 +440,36 @@ describe('Button while loading', () => {
     expect(screen.getByRole('button', { name: 'Publier' }).props.accessibilityState).toMatchObject({
       busy: true,
     })
+  })
+})
+
+describe('StateMessage', () => {
+  it('says what happened and offers a way out', async () => {
+    const retry = jest.fn()
+    await renderWithProviders(
+      <StateMessage
+        kind="error"
+        title="Cette page n’a pas pu se charger"
+        message="Une erreur inattendue est survenue."
+        actions={[
+          { label: 'Réessayer', onPress: retry },
+          { label: 'Revenir', onPress: () => {} },
+        ]}
+      />,
+    )
+
+    expect(screen.getByRole('header', { name: 'Cette page n’a pas pu se charger' })).toBeTruthy()
+    expect(screen.getByText('Une erreur inattendue est survenue.')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(retry).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy()
+  })
+
+  it('needs no title while loading', async () => {
+    await renderWithProviders(<StateMessage kind="loading" message="Chargement…" />)
+
+    expect(screen.getByText('Chargement…')).toBeTruthy()
+    expect(screen.queryByRole('header')).toBeNull()
   })
 })
 

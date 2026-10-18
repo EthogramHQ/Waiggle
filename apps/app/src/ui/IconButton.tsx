@@ -55,7 +55,7 @@ export function IconButton({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ disabled }}
+        aria-disabled={disabled}
         disabled={disabled}
         onPress={onPress}
         onPressIn={() => {

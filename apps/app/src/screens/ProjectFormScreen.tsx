@@ -20,9 +20,10 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import { ApiError, type ApiResult } from '../api/errors'
+import type { ApiResult } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
+import { useGoBack } from '../navigation/useGoBack'
 import { parseTools } from '../profile/form'
 import {
   createProject,
@@ -56,6 +57,7 @@ import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
 import { VisualEditor, type VisualEditorLabels, type VisualTile } from '../ui/VisualEditor'
+import { errorKey, LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 type ScreenProps = {
   id?: string | undefined
@@ -65,31 +67,26 @@ type ScreenProps = {
 
 export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   const { t } = useTranslation()
-  const router = useRouter()
   const { data: session, isPending } = useSession()
   // En modification, on part du projet existant ; en création, il n'y a rien à charger.
   const project = useProject(id ?? '', Boolean(session && id))
 
-  if (isPending) return <Screen title={t('common.loading')}>{null}</Screen>
-  if (!session) {
-    return (
-      <Screen>
-        <Notice tone="info" message={t('errors.unauthorized')} />
-        <Button label={t('home.signIn')} onPress={() => router.replace('/sign-in')} />
-      </Screen>
-    )
-  }
+  if (isPending) return <LoadingScreen />
+  if (!session) return <SignedOutScreen />
   if (!id) return <ProjectFormView initial={emptyProjectForm} />
 
   if (project.error) {
-    const key = project.error instanceof ApiError ? project.error.key : 'internal'
-    return (
-      <Screen>
-        <Notice message={key === 'notFound' ? t('project.page.notFound') : t(`errors.${key}`)} />
-      </Screen>
-    )
+    if (errorKey(project.error) === 'notFound') {
+      return (
+        <NotFoundState
+          title={t('project.page.notFoundTitle')}
+          message={t('project.page.notFound')}
+        />
+      )
+    }
+    return <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} />
   }
-  if (!project.data) return <Screen title={t('common.loading')}>{null}</Screen>
+  if (!project.data) return <LoadingScreen />
   if (!project.data.isMine) {
     return (
       <Screen>
@@ -350,7 +347,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   // L'adresse de démo est vérifiée pendant la frappe : le membre sait tout de suite si elle ira.
   const demoOk = form.demoUrl.trim() !== '' && publicHttpsUrl(form.demoUrl.trim()) !== null
   const hasRecipe = form.tools.trim() !== '' || form.timeSpent !== null || form.prompts.length > 0
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  const back = useGoBack('/')
   const submit = {
     label: projectId ? t('project.edit.submit') : t('project.new.submit'),
     onPress: () => void onSubmit(),

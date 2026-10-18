@@ -16,7 +16,10 @@ jest.mock('../profile/api', () => ({
   uploadAvatar: jest.fn(),
   pickAvatar: jest.fn(),
 }))
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }) }))
+jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+}))
 
 let session: ReturnType<typeof mockSession>
 
@@ -114,7 +117,7 @@ describe('ProfileScreen', () => {
     mockSession(null)
     await renderWithProviders(<ProfileScreen />)
 
-    expect(screen.getByText('Connecte-toi pour continuer.')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
     expect(getMe).not.toHaveBeenCalled()
   })
 

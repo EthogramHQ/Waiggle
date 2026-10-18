@@ -17,6 +17,7 @@ jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
 }))
 
@@ -172,7 +173,7 @@ describe('ProjectScreen', () => {
     mockSession(null)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(screen.getByText('Connecte-toi pour continuer.')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
     expect(getProject).not.toHaveBeenCalled()
   })
 })

@@ -12,6 +12,7 @@ export const en: Translation = {
     loading: 'Loading…',
     crashed: 'This page could not be displayed.',
     retry: 'Try again',
+    pageTitle: '{{page}} | {{appName}}',
     back: 'Back',
     cancel: 'Cancel',
     remove: 'Remove {{item}}',
@@ -89,6 +90,7 @@ export const en: Translation = {
     },
   },
   account: {
+    about: { title: 'About' },
     title: 'Settings',
     signOut: 'Sign out',
     editProfile: 'Edit my profile',
@@ -284,6 +286,10 @@ export const en: Translation = {
   tag: {
     subtitle: 'The public projects made with this tool, newest first.',
     empty: 'No public project yet.',
+  },
+  states: {
+    errorTitle: 'This page could not load',
+    signedOutTitle: 'Members only',
   },
   leaving: {
     title: 'You are leaving {{appName}}',

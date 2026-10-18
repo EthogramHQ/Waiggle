@@ -11,6 +11,7 @@ const mockSetParams = jest.fn()
 // Les paramètres de l'adresse de la page (/sign-up?code=…), modifiables test par test.
 let mockParams: Record<string, string> = {}
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: jest.fn(), setParams: mockSetParams }),
   useLocalSearchParams: () => mockParams,
 }))
