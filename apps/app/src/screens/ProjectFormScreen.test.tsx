@@ -47,6 +47,20 @@ beforeEach(() => {
 })
 
 describe('ProjectFormScreen, publishing', () => {
+  it('points to the fields to fix, and drops that hint once they are fixed', async () => {
+    await renderWithProviders(<ProjectFormScreen />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
+    expect(screen.getByText('Vérifie les champs en rouge.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Titre'), 'Mon agent de recettes')
+    expect(screen.queryByText('Donne un titre à ton projet.')).toBeNull()
+    expect(screen.getByText('Vérifie les champs en rouge.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Le pitch, en une phrase'), 'Un menu malin.')
+    expect(screen.queryByText('Vérifie les champs en rouge.')).toBeNull()
+  })
+
   it('publishes a project and opens its page', async () => {
     jest.mocked(createProject).mockResolvedValue({ ok: true, data: recipesProject })
     await renderWithProviders(<ProjectFormScreen />)

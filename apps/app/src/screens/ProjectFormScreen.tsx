@@ -280,10 +280,20 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
    * champ, et la valeur doit avoir le type de ce champ (TypeScript refuse un statut inconnu…).
    * `{ ...previous, [key]: value }` : une copie de l'objet, avec ce seul champ remplacé.
    */
+  const checkFields = t('project.errors.checkFields')
   const change =
     <K extends keyof ProjectForm>(key: K) =>
-    (value: ProjectForm[K]) =>
-      setForm((previous) => ({ ...previous, [key]: value }))
+    (value: ProjectForm[K]) => {
+      const next = { ...form, [key]: value }
+      setForm(next)
+      // Après un premier refus, les erreurs suivent la frappe : un champ corrigé n'est plus en rouge,
+      // et le message général disparaît quand il ne reste plus rien à corriger.
+      if (Object.keys(errors).length > 0) {
+        const checked = toProjectChanges(next)
+        setErrors(checked.ok ? {} : checked.errors)
+        if (checked.ok) setMessage((current) => (current === checkFields ? null : current))
+      }
+    }
 
   const errorText = (key: string | undefined) =>
     key && t(`project.errors.${key}` as 'project.errors.titleRequired', { max: limits[key] })
@@ -297,7 +307,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
     if (!checked.ok) {
       setErrors(checked.errors)
       // Le champ en erreur peut être loin de l'écran : un message général le signale aussi.
-      setMessage(t('errors.validation'))
+      setMessage(checkFields)
       return
     }
     setErrors({})

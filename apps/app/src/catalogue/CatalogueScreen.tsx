@@ -241,11 +241,12 @@ export function CatalogueScreen() {
           cancel={{ label: l.cancel, onPress: () => {} }}
           action={{ label: l.publish, onPress: () => {} }}
         />
-        {/* Un titre trop long s'abrège ; « Annuler » et l'action restent entiers. */}
+        {/* Un titre long passe sur deux lignes ; « Annuler » et l'action restent entiers. S'il n'y
+            a pas la place (petit écran, grand texte), le titre passe sous les deux boutons. */}
         <SheetHeader
           title={l.longSheetTitle}
           cancel={{ label: l.cancel, onPress: () => {} }}
-          action={{ label: l.publish, onPress: () => {} }}
+          action={{ label: l.save, onPress: () => {} }}
         />
         {/* Un mot sans espace plus large que l'écran se coupe au lieu de déborder. */}
         <Text variant="title2" align="center" breakAnywhere>

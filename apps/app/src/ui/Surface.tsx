@@ -90,6 +90,16 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
       borderBottomLeftRadius: style.borderBottomLeftRadius,
       borderBottomRightRadius: style.borderBottomRightRadius,
     }
+    // Les couches sont posées à l'intérieur de la bordure : leur arrondi est plus petit de l'épaisseur
+    // de la bordure, sinon un fin croissant clair apparaît dans chaque coin.
+    const border = typeof style.borderWidth === 'number' ? style.borderWidth : 0
+    const inset = (radius: ViewStyle['borderRadius']) =>
+      typeof radius === 'number' ? Math.max(0, radius - border) : radius
+    const layerCorners = {
+      borderRadius: inset(corners.borderRadius),
+      borderBottomLeftRadius: inset(corners.borderBottomLeftRadius),
+      borderBottomRightRadius: inset(corners.borderBottomRightRadius),
+    }
     return (
       <View style={{ ...corners, ...(boxShadow ? { boxShadow } : null), alignSelf }}>
         <View style={{ ...inner, overflow: 'hidden' }}>
@@ -98,9 +108,9 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
             tint={scheme === 'night' ? 'dark' : 'light'}
             // Les couches reprennent les coins arrondis : sur le web, une couche floutée n'est pas
             // rognée par l'arrondi de son parent, et ses coins carrés dépasseraient.
-            style={[StyleSheet.absoluteFill, corners]}
+            style={[StyleSheet.absoluteFill, layerCorners]}
           />
-          <View style={[StyleSheet.absoluteFill, corners, { backgroundColor }]} />
+          <View style={[StyleSheet.absoluteFill, layerCorners, { backgroundColor }]} />
           {children}
         </View>
       </View>

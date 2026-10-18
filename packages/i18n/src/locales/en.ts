@@ -256,6 +256,7 @@ export const en: Translation = {
       notMine: 'Only the author can edit this project.',
     },
     errors: {
+      checkFields: 'Check the fields in red.',
       titleRequired: 'Give your project a title.',
       titleTooLong: 'The title must be at most {{max}} characters long.',
       pitchRequired: 'Sum up your project in one sentence.',

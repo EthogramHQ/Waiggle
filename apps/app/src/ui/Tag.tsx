@@ -27,7 +27,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
   const content = (
-    <Text variant="callout" weight={600} breakAnywhere>
+    // align="center" : un nom long qui passe sur deux lignes reste centré dans sa pastille.
+    <Text variant="callout" weight={600} align="center" breakAnywhere>
       {label}
     </Text>
   )
