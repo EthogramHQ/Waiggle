@@ -14,10 +14,12 @@
     "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm arch --check && pnpm typecheck && pnpm test",
+    "arch": "node scripts/architecture.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "esbuild": "0.28.2",
     "turbo": "2.11.7",
     "typescript": "7.0.2"
   }
