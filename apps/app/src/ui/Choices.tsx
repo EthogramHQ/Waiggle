@@ -1,7 +1,7 @@
 // Une question à choix unique (statut, visibilité…) : une rangée de pastilles dont une seule est
 // cochée, en miel. Les lecteurs d'écran l'annoncent comme un groupe de boutons radio, ce qui permet
 // aussi aux tests de retrouver chaque choix par son nom : getByRole('radio', { name: 'Testable' }).
-import { borders, radii, space } from '@ruche/brand'
+import { borders, layout, radii, space } from '@ruche/brand'
 import { Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
@@ -43,7 +43,7 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: space.xs,
-                minHeight: 40,
+                minHeight: layout.touchTarget,
                 paddingHorizontal: space.lg,
                 borderRadius: radii.pill,
                 borderWidth: borders.strong,

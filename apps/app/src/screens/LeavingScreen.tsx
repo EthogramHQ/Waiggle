@@ -46,12 +46,20 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
     <Screen>
       {/* La porte vers l'extérieur : des anneaux de lumière autour d'une flèche. */}
       <PortalRings />
-      <Stack gap="xs" align="center">
-        <Text variant="callout" weight={600} tone="secondary" accessibilityRole="header">
+      {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se
+          coupe au lieu de sortir de l'écran. */}
+      <Stack gap="xs" align="stretch">
+        <Text
+          variant="callout"
+          weight={600}
+          tone="secondary"
+          align="center"
+          accessibilityRole="header"
+        >
           {t('leaving.title')}
         </Text>
         {/* Le nom du site, en grand : c'est lui qu'on doit reconnaître (ou pas). */}
-        <Text variant="title2" align="center">
+        <Text variant="title2" align="center" breakAnywhere>
           {target.host}
         </Text>
       </Stack>
@@ -62,7 +70,9 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
         {/* L'adresse complète, telle qu'elle sera ouverte : un nom de site écrit avec des lettres d'un
             autre alphabet y apparaît sous sa forme réelle (« xn--… »), ou il a été refusé plus haut. */}
         <Surface variant="grouped" padding="lg">
-          <Text selectable>{target.href}</Text>
+          <Text selectable breakAnywhere>
+            {target.href}
+          </Text>
         </Surface>
       </Stack>
       <Surface variant="grouped" padding="lg">

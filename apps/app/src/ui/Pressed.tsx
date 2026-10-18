@@ -1,6 +1,6 @@
 // Rend touchable un contenu qui n'est pas un bouton (un avatar, une carte), avec un nom pour les
 // lecteurs d'écran. Il s'enfonce légèrement sous le doigt, comme les boutons.
-import { pressScale } from '@ruche/brand'
+import { layout, pressScale } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { Pressable } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -27,6 +27,12 @@ export function Pressed({ label, onPress, children, role = 'button' }: Props) {
         }}
         onPressOut={() => {
           scale.value = spring(1)
+        }}
+        // Au moins 44 points de côté à toucher, même pour un contenu plus petit (le logo).
+        style={{
+          minHeight: layout.touchTarget,
+          minWidth: layout.touchTarget,
+          justifyContent: 'center',
         }}
       >
         {children}

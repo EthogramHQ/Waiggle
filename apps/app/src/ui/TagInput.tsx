@@ -94,30 +94,44 @@ export function TagInput({
                     alignItems: 'center',
                     gap: space.xs,
                     paddingLeft: space.lg,
-                    paddingRight: space.xs,
-                    minHeight: 40,
+                    minHeight: layout.touchTarget,
+                    // Jamais plus large que la ligne : un nom très long passe à la ligne, et la croix
+                    // pour le retirer reste visible et touchable.
+                    maxWidth: '100%',
                     borderRadius: radii.pill,
                     backgroundColor: colors.honeySoft,
                   }}
                 >
-                  <Text variant="callout" weight={600}>
-                    {item}
-                  </Text>
+                  <View style={{ flexShrink: 1, minWidth: 0 }}>
+                    <Text variant="callout" weight={600} breakAnywhere>
+                      {item}
+                    </Text>
+                  </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={removeLabel(item)}
                     onPress={() => remove(i)}
-                    hitSlop={6}
+                    // La zone à toucher fait 44 points ; le rond dessiné à l'intérieur, 28.
                     style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: radii.pill,
+                      width: layout.touchTarget,
+                      height: layout.touchTarget,
+                      flexShrink: 0,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: colors.surface,
                     }}
                   >
-                    <Icon name="x" size={14} tone="muted" />
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: radii.pill,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: colors.surface,
+                      }}
+                    >
+                      <Icon name="x" size={14} tone="muted" />
+                    </View>
                   </Pressable>
                 </View>
               ))}

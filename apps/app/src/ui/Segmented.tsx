@@ -1,7 +1,7 @@
 // Un contrôle segmenté : deux à quatre choix côte à côte dans une capsule, le choix actif en blanc
 // plein (la « goutte »). Sert pour l'apparence (Automatique / Jour / Nuit) ou la langue.
 // Annoncé comme un groupe de boutons radio, comme Choices.
-import { radii, space } from '@ruche/brand'
+import { borders, layout, radii, space } from '@ruche/brand'
 import { Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
@@ -39,11 +39,12 @@ export function Segmented<T extends string>({
       accessibilityLabel={label}
       style={{
         flexDirection: 'row',
-        padding: space.xs,
-        gap: space.xs,
+        // Une capsule fine autour des choix : chaque choix garde ses 44 points à toucher.
+        padding: space.xxs,
+        gap: space.xxs,
         borderRadius: radii.pill,
         backgroundColor: colors.surfaceGrouped,
-        borderWidth: 1,
+        borderWidth: borders.hairline,
         borderColor: colors.line,
         alignSelf: fill ? 'stretch' : 'flex-start',
       }}
@@ -63,7 +64,8 @@ export function Segmented<T extends string>({
               gap: space.xs,
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: 40,
+              minHeight: layout.touchTarget,
+              minWidth: layout.touchTarget,
               paddingHorizontal: space.md,
               borderRadius: radii.pill,
               ...(checked

@@ -5,7 +5,7 @@
 //
 // Sur un grand écran, un écran peut montrer une « scène » (`hero`) à gauche et son contenu dans une
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
-import { layout, space } from '@ruche/brand'
+import { borders, layout, space } from '@ruche/brand'
 import { type ReactNode, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ScrollView, View } from 'react-native'
@@ -26,6 +26,17 @@ type Props = {
   children: ReactNode
   /** Une barre tout en haut (la navigation sur ordinateur, l'en-tête d'un formulaire). */
   header?: ReactNode
+  /**
+   * La barre du haut reste en place pendant que le contenu défile (l'en-tête « Annuler / Publier »
+   * d'un formulaire sur téléphone : l'action reste à portée de pouce).
+   */
+  stickyHeader?: boolean
+  /**
+   * Un message à garder en vue, sous la barre fixe (le résultat de « Publier », une erreur) : il
+   * apparaît là où se trouve le bouton, même si le membre a appuyé depuis le haut d'un long
+   * formulaire. Sans barre fixe, il se place en tête du contenu.
+   */
+  notice?: ReactNode
   /** Affiche un bouton « Retour » en haut à gauche. */
   onBack?: () => void
   /**
@@ -46,6 +57,8 @@ export function Screen({
   subtitle,
   children,
   header,
+  stickyHeader = false,
+  notice,
   onBack,
   width = 'form',
   hero,
@@ -63,6 +76,7 @@ export function Screen({
   useBrowserLanguage()
 
   const withHero = hero !== undefined && sizeClass === 'wide'
+  const pinned = header !== undefined && stickyHeader
   // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
   const body = (
     <>
@@ -77,26 +91,48 @@ export function Screen({
           {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
         </View>
       ) : null}
+      {pinned ? null : notice}
       {children}
     </>
   )
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    // overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement horizontal).
+    <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
       {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
+      {pinned ? (
+        // La barre fixe, hors de la zone qui défile. Son fond plein cache le contenu qui passe dessous.
+        <View
+          style={{
+            paddingTop: insets.top + space.sm,
+            paddingBottom: space.sm,
+            paddingHorizontal: padding,
+            alignItems: 'center',
+            backgroundColor: colors.background,
+            borderBottomWidth: borders.hairline,
+            borderBottomColor: colors.line,
+          }}
+        >
+          <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}>
+            {header}
+            {notice}
+          </View>
+        </View>
+      ) : null}
       {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
           alignItems: 'center',
-          paddingTop: insets.top + space.lg,
+          // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
+          paddingTop: (pinned ? 0 : insets.top) + space.lg,
           paddingBottom: insets.bottom + space.huge,
           paddingHorizontal: padding,
           gap: space.xl,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        {header ? (
+        {header && !pinned ? (
           <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero) }}>{header}</View>
         ) : null}
         {withHero ? (

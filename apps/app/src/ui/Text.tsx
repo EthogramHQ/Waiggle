@@ -3,7 +3,12 @@
 // projet, une légende) et pas à quoi il ressemble : pour changer tous les titres, on change le jeton.
 import { type FontWeight, maxTextScale, type TextVariant, textStyles } from '@ruche/brand'
 import type { ReactNode } from 'react'
-import { Text as NativeText, type TextProps as NativeTextProps } from 'react-native'
+import {
+  Text as NativeText,
+  type TextProps as NativeTextProps,
+  Platform,
+  type TextStyle,
+} from 'react-native'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -19,6 +24,11 @@ export type Tone =
   | 'onDanger'
   | 'disabled'
   | 'status'
+
+// Sur le web, un mot sans espace plus large que l'écran déborde ; « overflow-wrap: anywhere » le
+// coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
+// Native : on la déclare donc ici, une fois.
+const breakAnywhereStyle = (Platform.OS === 'web' ? { overflowWrap: 'anywhere' } : {}) as TextStyle
 
 const toneColor = {
   default: 'text',
@@ -46,6 +56,11 @@ export type TextProps = {
   underline?: boolean
   /** Agrandissement maximal avec le réglage de taille de l'appareil (2 par défaut). */
   maxScale?: number
+  /**
+   * Coupe un mot trop long n'importe où plutôt que de le laisser dépasser de l'écran (une adresse
+   * de site, un nom sans espace).
+   */
+  breakAnywhere?: boolean
 } & Pick<
   NativeTextProps,
   | 'numberOfLines'
@@ -70,6 +85,7 @@ export function Text({
   tabular = false,
   underline = false,
   maxScale = maxTextScale,
+  breakAnywhere = false,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
@@ -92,6 +108,7 @@ export function Text({
         ...(align ? { textAlign: align } : null),
         ...(tabular ? { fontVariant: ['tabular-nums'] as const } : null),
         ...(underline ? { textDecorationLine: 'underline' as const } : null),
+        ...(breakAnywhere ? breakAnywhereStyle : null),
       }}
       {...rest}
     >

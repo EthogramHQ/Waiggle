@@ -261,6 +261,7 @@ export const fr = {
       notMine: 'Seul l’auteur peut modifier ce projet.',
     },
     errors: {
+      checkFields: 'Vérifie les champs en rouge.',
       titleRequired: 'Donne un titre à ton projet.',
       titleTooLong: 'Le titre doit faire au plus {{max}} caractères.',
       pitchRequired: 'Résume ton projet en une phrase.',

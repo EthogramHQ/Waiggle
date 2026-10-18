@@ -7,7 +7,7 @@
 // Sous le doigt, le bouton s'enfonce légèrement avec un ressort (voir theme/motion.ts).
 // Pendant une action en cours (loading), il est désactivé pour éviter les doubles envois.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
-import { ActivityIndicator, Pressable, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
 import { Text, type Tone } from './Text'
@@ -128,16 +128,38 @@ export function Button({
           ]
         }}
       >
+        {/* Pendant le chargement, le libellé reste en place mais invisible et l'indicateur se pose
+            par-dessus : le bouton garde sa largeur, et ce qui l'entoure (le titre d'un en-tête)
+            ne saute pas. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: space.sm,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 1,
+            opacity: loading ? 0 : 1,
+          }}
+        >
+          {/* flexShrink: 0 : l'icône garde sa taille quand le libellé passe sur deux lignes. */}
+          {icon ? (
+            <View style={{ flexShrink: 0 }}>
+              <Icon name={icon} size={20} tone={tone} />
+            </View>
+          ) : null}
+          {/* selectable={false} : un double-clic n'y surligne pas de texte. breakAnywhere : un nom de
+              site très long (« Continuer vers … ») se coupe au lieu de sortir du bouton. */}
+          <Text variant="button" tone={tone} align="center" selectable={false} breakAnywhere>
+            {label}
+          </Text>
+        </View>
         {loading ? (
-          <ActivityIndicator color={colors.textMuted} />
-        ) : (
-          <>
-            {icon ? <Icon name={icon} size={20} tone={tone} /> : null}
-            <Text variant="button" tone={tone} align="center">
-              {label}
-            </Text>
-          </>
-        )}
+          <View
+            style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+          >
+            <ActivityIndicator color={colors.textMuted} />
+          </View>
+        ) : null}
       </Pressable>
     </Animated.View>
   )

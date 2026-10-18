@@ -1,6 +1,6 @@
 // Une étiquette d'outil ou de modèle (« Claude », « Python »). Touchée, elle mène à la page de
 // l'étiquette ; sans `onPress`, c'est une simple pastille.
-import { borders, radii, space } from '@ruche/brand'
+import { borders, layout, radii, space } from '@ruche/brand'
 import { Pressable, View, type ViewStyle } from 'react-native'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -16,6 +16,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
   const { colors } = useTheme()
   const box: ViewStyle = {
     alignSelf: 'flex-start',
+    // Jamais plus large que la ligne : un nom d'outil très long passe à la ligne.
+    maxWidth: '100%',
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: space.lg,
@@ -25,7 +27,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
   const content = (
-    <Text variant="callout" weight={600}>
+    // align="center" : un nom long qui passe sur deux lignes reste centré dans sa pastille.
+    <Text variant="callout" weight={600} align="center" breakAnywhere>
       {label}
     </Text>
   )
@@ -35,12 +38,18 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
       accessibilityRole="link"
       accessibilityLabel={label}
       onPress={onPress}
-      // La pastille fait 36 points de haut : hitSlop agrandit la zone à toucher à 44 points,
-      // sans changer son dessin.
-      hitSlop={4}
-      style={({ pressed }) => [box, pressed && { backgroundColor: colors.honeySoft }]}
+      // La pastille dessinée fait 36 points de haut ; la zone à toucher autour d'elle, 44.
+      style={{
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
+        minHeight: layout.touchTarget,
+        minWidth: layout.touchTarget,
+        justifyContent: 'center',
+      }}
     >
-      {content}
+      {({ pressed }) => (
+        <View style={[box, pressed && { backgroundColor: colors.honeySoft }]}>{content}</View>
+      )}
     </Pressable>
   )
 }

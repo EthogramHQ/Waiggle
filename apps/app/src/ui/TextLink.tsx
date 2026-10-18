@@ -1,5 +1,6 @@
 // Un lien en texte souligné, pour une action secondaire dans une phrase ou sous un formulaire
 // (« Créer un compte », « Changer d'adresse »). Pour l'action principale : un Button.
+import { layout } from '@ruche/brand'
 import { Pressable } from 'react-native'
 import { Text, type Tone } from './Text'
 
@@ -17,9 +18,14 @@ export function TextLink({ label, onPress, tone = 'default', role = 'link' }: Pr
       accessibilityRole={role}
       accessibilityLabel={label}
       onPress={onPress}
-      // hitSlop agrandit la zone qu'on peut toucher autour du texte, sans changer son allure.
-      hitSlop={10}
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      // La zone à toucher fait au moins 44 points de côté, même autour d'un mot court. (hitSlop, qui
+      // agrandit la zone sans changer l'allure, est ignoré sur le web : on donne donc une vraie taille.)
+      style={({ pressed }) => ({
+        minHeight: layout.touchTarget,
+        minWidth: layout.touchTarget,
+        justifyContent: 'center',
+        opacity: pressed ? 0.6 : 1,
+      })}
     >
       <Text variant="callout" weight={700} tone={tone} underline>
         {label}
