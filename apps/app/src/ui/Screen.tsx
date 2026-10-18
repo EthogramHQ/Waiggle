@@ -124,14 +124,16 @@ export function Screen({
       ) : null}
       {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
       {pinned ? (
-        // La barre fixe, hors de la zone qui défile. Son fond plein cache le contenu qui passe dessous.
+        // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
+        // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
+        // s'arrête plus net sous la barre.
         <View
           style={{
             paddingTop: insets.top + space.sm,
             paddingBottom: space.sm,
             paddingHorizontal: padding,
             alignItems: 'center',
-            backgroundColor: colors.background,
+            backgroundColor: colors.sheet,
             borderBottomWidth: borders.hairline,
             borderBottomColor: colors.line,
           }}
@@ -155,8 +157,10 @@ export function Screen({
         }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
+            change pas de taille d'une page à l'autre. */}
         {header && !pinned ? (
-          <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero) }}>{header}</View>
+          <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
         ) : null}
         {withHero ? (
           // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
@@ -165,17 +169,19 @@ export function Screen({
               width: '100%',
               maxWidth: layout.maxContentWidth,
               flexGrow: 1,
-              flexDirection: 'row',
+              // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+              // mais s'affiche à droite de la scène.
+              flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: space.huge,
             }}
           >
-            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
             <View style={{ width: layout.formWidth - 80 }}>
               <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
                 {body}
               </Surface>
             </View>
+            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
           </View>
         ) : (
           <View

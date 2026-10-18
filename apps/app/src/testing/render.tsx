@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react-native'
 import type { ReactElement } from 'react'
 import { I18nextProvider } from 'react-i18next'
+import { Dimensions } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useSession } from '../accounts/api'
 import { createI18n } from '../i18n'
@@ -59,4 +60,16 @@ export const mockSession = (data: { user: Record<string, unknown> } | null, isPe
     .mocked(useSession)
     .mockReturnValue({ data, isPending, refetch } as unknown as ReturnType<typeof useSession>)
   return { refetch }
+}
+
+/**
+ * Le temps d'un test, une fenêtre d'ordinateur (1440 × 900) au lieu du téléphone de jest.setup.ts :
+ * pour vérifier ce qui n'existe que sur grand écran (barre du haut, colonnes). Renvoie la fonction
+ * qui remet le téléphone, à appeler à la fin du test.
+ */
+export const setDesktopWindow = () => {
+  const desktop = { width: 1440, height: 900, scale: 2, fontScale: 1 }
+  const phoneWindow = { width: 390, height: 844, scale: 3, fontScale: 1 }
+  Dimensions.set({ window: desktop, screen: desktop })
+  return () => Dimensions.set({ window: phoneWindow, screen: phoneWindow })
 }

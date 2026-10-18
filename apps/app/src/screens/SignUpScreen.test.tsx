@@ -24,7 +24,7 @@ const fillForm = async (password = 'correct-horse-battery', inviteCode = 'miel-2
   await fireEvent.changeText(screen.getByLabelText('Prénom ou pseudo'), 'Léa')
   await fireEvent.changeText(screen.getByLabelText('Adresse e-mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), password)
-  await fireEvent.press(screen.getByRole('button', { name: 'Créer mon compte' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Créer un compte' }))
 }
 
 beforeEach(() => {
@@ -35,9 +35,13 @@ beforeEach(() => {
 })
 
 describe('SignUpScreen', () => {
-  it('counts down the characters the password still needs', async () => {
+  it('counts down the characters the password still needs, once typing has started', async () => {
     await renderWithI18n(<SignUpScreen />)
-    expect(screen.getByLabelText('Encore 12 caractères')).toBeTruthy()
+    // Avant la première lettre : une simple consigne, pas encore un décompte.
+    expect(screen.getByLabelText('Au moins 12 caractères.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'a')
+    expect(screen.getByLabelText('Encore 11 caractères')).toBeTruthy()
 
     await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'abeilles-d')
     expect(screen.getByLabelText('Encore 2 caractères')).toBeTruthy()

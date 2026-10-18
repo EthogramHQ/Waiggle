@@ -525,7 +525,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   return (
     <Screen
       width="page"
-      header={<TopNav />}
+      header={<TopNav hideNewProject />}
       title={title}
       {...(projectId ? null : { subtitle: t('project.new.subtitle') })}
     >

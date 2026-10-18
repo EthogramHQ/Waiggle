@@ -3,7 +3,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { deleteProject, getProject } from '../projects/api'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
-import { mockSession, renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { ProjectScreen } from './ProjectScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -171,5 +171,18 @@ describe('ProjectScreen', () => {
 
     expect(screen.getByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
     expect(getProject).not.toHaveBeenCalled()
+  })
+
+  it('on a computer, puts the title above the columns and offers to publish a project', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(screen.getAllByRole('header', { name: 'Mon agent de recettes' })).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'Publier un projet' })).toBeTruthy()
+    } finally {
+      restore()
+    }
   })
 })

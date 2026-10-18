@@ -14,7 +14,7 @@ import { safeNext } from '../navigation/next'
 import { firstParam } from '../navigation/params'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
-import { Icon } from '../ui/Icon'
+import { Hint } from '../ui/Hint'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { Row } from '../ui/Stack'
@@ -97,12 +97,7 @@ export function SignInScreen() {
         </Text>
         <TextLink label={t('auth.signIn.createOne')} onPress={() => router.replace('/sign-up')} />
       </Row>
-      <Row gap="sm" justify="center">
-        <Icon name="lock-simple" size={16} tone="muted" />
-        <Text variant="caption" tone="muted" align="center">
-          {t('home.membersOnly')}
-        </Text>
-      </Row>
+      <Hint icon="lock-simple" text={t('home.membersOnly')} />
     </Screen>
   )
 }

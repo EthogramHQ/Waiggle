@@ -10,7 +10,7 @@
 // - les caractères invisibles (écrits par exemple « &#x202E; ») sont retirés de l'affichage ;
 // - l'imbrication est bornée : un texte piégé (« >>>>>… » mille fois) ne fait pas planter la page.
 
-import { radii, space, textStyles } from '@ruche/brand'
+import { radii, readableWidth, space, textStyles } from '@ruche/brand'
 import { publicHttpsUrl, removeForbiddenCharacters } from '@ruche/contracts'
 import { lexer, type Token } from 'marked'
 import { Fragment, type ReactNode, useMemo } from 'react'
@@ -209,9 +209,13 @@ export function Markdown({ text, onLinkPress }: Props) {
 // Pas de bordure colorée sur le côté des citations : un fond doux suffit à les distinguer.
 const makeStyles = ({ colors }: Theme) => {
   const body = textStyles.body
-  const heading = textStyles.heading
+  // Les titres d'une description sont d'un niveau plus bas que le titre de section « Description »
+  // qui les précède : headline, pas heading.
+  const heading = textStyles.headline
   return StyleSheet.create({
-    root: { gap: space.md },
+    // readableWidth : une ligne d'environ 70 caractères, même sur un grand écran (au-delà, l'œil
+    // peine à retrouver le début de la ligne suivante).
+    root: { gap: space.md, maxWidth: readableWidth },
     text: {
       fontFamily: fontName(body.family, body.weight),
       fontSize: body.size,

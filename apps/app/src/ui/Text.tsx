@@ -1,7 +1,13 @@
 // Le texte de l'appli. Tout texte affiché passe par ce composant, qui choisit la police, la taille et
 // la couleur à partir des jetons de @ruche/brand. Un écran dit ce qu'est le texte (un titre de
 // projet, une légende) et pas à quoi il ressemble : pour changer tous les titres, on change le jeton.
-import { type FontWeight, maxTextScale, type TextVariant, textStyles } from '@ruche/brand'
+import {
+  type FontWeight,
+  maxTextScale,
+  readableWidth,
+  type TextVariant,
+  textStyles,
+} from '@ruche/brand'
 import type { ReactNode } from 'react'
 import {
   Text as NativeText,
@@ -61,6 +67,8 @@ export type TextProps = {
    * de site, un nom sans espace).
    */
   breakAnywhere?: boolean
+  /** Une ligne de longueur confortable (readableWidth), même sur un grand écran. */
+  readable?: boolean
 } & Pick<
   NativeTextProps,
   | 'numberOfLines'
@@ -86,6 +94,7 @@ export function Text({
   underline = false,
   maxScale = maxTextScale,
   breakAnywhere = false,
+  readable = false,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
@@ -109,6 +118,7 @@ export function Text({
         ...(tabular ? { fontVariant: ['tabular-nums'] as const } : null),
         ...(underline ? { textDecorationLine: 'underline' as const } : null),
         ...(breakAnywhere ? breakAnywhereStyle : null),
+        ...(readable ? { maxWidth: readableWidth } : null),
       }}
       {...rest}
     >

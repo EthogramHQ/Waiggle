@@ -64,26 +64,18 @@ export function IconButton({
         onPressOut={() => {
           scale.value = spring(1)
         }}
-        style={(state) => {
-          const focused = 'focused' in state && state.focused === true
-          return [
-            {
-              width: diameter,
-              height: diameter,
-              borderRadius: radii.pill,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            look.box,
-            disabled && { opacity: 0.55 },
-            focused && {
-              outlineColor: colors.focusRing,
-              outlineWidth: borders.focus,
-              outlineStyle: 'solid',
-              outlineOffset: borders.focus,
-            },
-          ]
-        }}
+        // Le contour du focus clavier est commun à tous les éléments : voir app/+html.tsx.
+        style={[
+          {
+            width: diameter,
+            height: diameter,
+            borderRadius: radii.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          look.box,
+          disabled && { opacity: 0.55 },
+        ]}
       >
         <Icon name={icon} size={size === 'large' ? 28 : 22} tone={look.tone} />
       </Pressable>

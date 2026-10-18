@@ -115,6 +115,28 @@ const session = {
   session: { id: 's1', userId: leaMe.id, expiresAt: '2099-01-01T00:00:00.000Z' },
   user: { ...leaMe, image: null, updatedAt: leaMe.createdAt },
 }
+// Un projet aux contenus très longs, pour vérifier que rien ne déborde ni ne s'étale.
+const longProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000bb',
+  title:
+    'Un assistant qui range les photos de vacances par lieu, par personne et par moment de la journée',
+  pitch:
+    'Il regarde chaque photo, reconnaît les visages que tu lui as présentés, devine le lieu et propose des albums que tu peux partager en un geste avec ta famille.',
+  description: Array.from(
+    { length: 6 },
+    (_, i) =>
+      `## Étape ${i + 1}\n\nUne longue explication, avec assez de mots pour remplir plusieurs lignes et voir où la ligne se coupe sur un grand écran, ce qui ne doit jamais dépasser une longueur confortable pour la lecture, environ soixante-dix caractères.`,
+  ).join('\n\n'),
+  demoUrl: 'https://une-tres-longue-adresse-de-demonstration-pour-voir-les-coupures.example.org',
+  tools: [
+    {
+      label: 'gpt-4o-mini-2024-07-18-instruct-previews',
+      slug: 'gpt-4o-mini-2024-07-18-instruct-previews',
+    },
+    { label: 'Claude Code', slug: 'claude-code' },
+  ],
+}
 // Le projet d'un autre membre, ouvert en modification : l'état « Ce projet n'est pas à toi ».
 const notMineProject = {
   ...recipesProject,
@@ -160,6 +182,7 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, recipesProject)
   if (pathname === `/v1/projects/${photosProject.id}`) return json(200, photosProject)
   if (pathname === `/v1/projects/${notMineProject.id}`) return json(200, notMineProject)
+  if (pathname === `/v1/projects/${longProject.id}`) return json(200, longProject)
   if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
   if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
   // Une page dont le chargement échoue, pour photographier l'état « erreur ».
@@ -209,6 +232,9 @@ const pages = [
   // wait : l'appli réessaie deux fois une lecture ratée (environ 3 s) avant d'afficher l'erreur.
   { name: 'erreur', path: '/members/erreur', signedIn: true, wait: 4500 },
   { name: 'adresse-inconnue', path: '/nulle-part', signedIn: false },
+  { name: 'adresse-verifiee', path: '/verified', signedIn: true },
+  // Des contenus très longs : titre, description, outils, adresse de démo.
+  { name: 'projet-long', path: `/projects/${longProject.id}`, signedIn: true, fullPage: true },
   { name: 'pas-a-moi', path: `/projects/${notMineProject.id}/edit`, signedIn: true },
   // Un projet qui n'existe pas (ou privé) : l'API simulée répond « introuvable ».
   {
@@ -287,7 +313,7 @@ async function layoutReport() {
     })
     await context.route(`${apiUrl}/**`, fakeApi(signedIn))
     const page = await context.newPage()
-    for (const shot of pages.filter((p) => p.signedIn === signedIn && p.name !== 'catalogue')) {
+    for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
       lines.push(`## ${shot.name} (${shot.path})`, '')
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
@@ -303,11 +329,28 @@ async function layoutReport() {
           const visible = (r) => r.width > 0 && r.height > 0
           const small = [...document.querySelectorAll(interactive)]
             .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            // Un lien au milieu d'un paragraphe (display: inline) suit la hauteur de la ligne : les
+            // règles d'accessibilité (WCAG 2.5.8) l'exemptent de la taille minimale.
+            .filter(({ el }) => getComputedStyle(el).display !== 'inline')
             .filter(({ r }) => visible(r) && (r.width < 44 || r.height < 44))
             .map(({ el, r }) => `${nameOf(el)} (${Math.round(r.width)} × ${Math.round(r.height)})`)
+          // Un élément qui dépasse mais qu'un parent rogne (overflow: hidden, comme la lumière
+          // d'ambiance) ne se voit pas : on ne le signale pas.
+          const clipped = (el) => {
+            for (let p = el.parentElement; p; p = p.parentElement) {
+              const style = getComputedStyle(p)
+              if (style.overflowX !== 'visible' || style.overflow === 'hidden') {
+                const r = p.getBoundingClientRect()
+                if (r.right <= width + 1 && r.left >= -1) return true
+              }
+            }
+            return false
+          }
           const outside = [...document.querySelectorAll('body *')]
             .map((el) => ({ el, r: el.getBoundingClientRect() }))
-            .filter(({ r }) => visible(r) && (r.right > width + 1 || r.left < -1))
+            .filter(
+              ({ el, r }) => visible(r) && (r.right > width + 1 || r.left < -1) && !clipped(el),
+            )
             .map(({ el }) => nameOf(el))
           return {
             scroll: document.documentElement.scrollWidth - width,
@@ -360,7 +403,8 @@ for (const device of devices) {
           const height = await page.evaluate(() =>
             Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
           )
-          await page.setViewportSize({ ...device.viewport, height: Math.min(height, 8000) })
+          // Plafond large (le catalogue fait plus de 14 000 points à 320) : au-delà, Chromium refuse.
+          await page.setViewportSize({ ...device.viewport, height: Math.min(height, 16000) })
           await page.waitForTimeout(300)
         }
         await page.screenshot({ path: join(out, `${shot.name}-${device.name}-${scheme.name}.png`) })

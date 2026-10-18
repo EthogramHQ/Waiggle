@@ -1,6 +1,8 @@
 // L'en-tête de la page d'un membre : son avatar, son nom, sa bio et ses outils favoris, chacun
 // menant à la page de son étiquette.
+import { readableWidth } from '@ruche/brand'
 import type { ReactNode } from 'react'
+import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import type { ImageSource } from './image'
 import { Stack } from './Stack'
@@ -28,10 +30,13 @@ export function MemberHeader({ name, avatar, bio, toolsTitle, tools, action }: P
         <Text variant="title1" align="center" accessibilityRole="header" breakAnywhere>
           {name}
         </Text>
+        {/* La bio garde une longueur de ligne confortable (readableWidth), centrée sous le nom. */}
         {bio ? (
-          <Text tone="secondary" align="center">
-            {bio}
-          </Text>
+          <View style={{ maxWidth: readableWidth, alignSelf: 'center' }}>
+            <Text tone="secondary" align="center">
+              {bio}
+            </Text>
+          </View>
         ) : null}
       </Stack>
       {tools.length > 0 ? (

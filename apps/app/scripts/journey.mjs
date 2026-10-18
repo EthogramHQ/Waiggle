@@ -168,7 +168,7 @@ const signUp = async (someone, name) => {
   await page.getByLabel('Adresse e-mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)
-  await page.getByRole('button', { name: 'Créer mon compte' }).click()
+  await page.getByRole('button', { name: 'Créer un compte' }).click()
   await page.waitForURL(/\/check-email/)
   // Le lien connecte au compte, puis mène à la page « Adresse vérifiée ».
   await open(page, await verificationLink(email))

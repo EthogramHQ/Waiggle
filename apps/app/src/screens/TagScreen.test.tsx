@@ -64,6 +64,7 @@ describe('TagScreen', () => {
     await renderWithProviders(<TagScreen slug="secret" />)
 
     expect(await screen.findByRole('header', { name: 'secret' })).toBeTruthy()
-    expect(screen.getByText('Aucun projet public pour l’instant.')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Encore aucun projet ici' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Publier un projet' })).toBeTruthy()
   })
 })

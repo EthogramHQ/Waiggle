@@ -41,7 +41,6 @@ export const en: Translation = {
       email: 'Email address',
       password: 'Password',
       passwordHint: 'At least {{min}} characters.',
-      passwordMin: '{{min}} characters minimum',
       inviteCode: 'Invite code',
       inviteCodeHint: 'Ask the person who invited you for it.',
     },
@@ -51,9 +50,9 @@ export const en: Translation = {
       done: 'Good, your password is long enough.',
     },
     signUp: {
-      title: 'Create your account',
+      title: 'Create an account',
       subtitle: 'The people close to you will know you by your display name.',
-      submit: 'Create my account',
+      submit: 'Create an account',
       haveAccount: 'I already have an account',
     },
     signIn: {
@@ -72,7 +71,7 @@ export const en: Translation = {
     },
     verified: {
       title: 'Email verified',
-      body: 'Your account is active. You can now sign in, here or in the app.',
+      body: 'Your account is active: welcome to {{appName}}!',
       continue: 'Continue',
     },
     errors: {
@@ -90,7 +89,7 @@ export const en: Translation = {
   },
   account: {
     about: { title: 'About' },
-    title: 'Settings',
+    title: 'My account',
     signOut: 'Sign out',
     editProfile: 'Edit my profile',
     language: {
@@ -174,13 +173,13 @@ export const en: Translation = {
       public: 'Public',
       publicHint: 'Visible to signed-in members. When private, it is your draft.',
       demoUrl: 'Demo link (optional)',
-      demoUrlHint: 'An https address, for example https://my-project.vercel.app',
+      demoUrlHint: 'An https address, for example https://myproject.vercel.app',
       demoUrlOk: 'Good: a public website over https.',
       recipe: 'Add the recipe',
       recipeHint: 'Tools, time spent, key prompts: optional',
       tools: 'Tools and models used',
       toolsLimit: '{{max}} at most',
-      toolsPlaceholder: 'Add a tool or a model',
+      toolsPlaceholder: 'Add a tool',
       timeSpent: 'Time spent',
       prompts: 'Key prompts (optional)',
       promptsHint: '{{max}} at most. They are shown as they are.',
@@ -284,7 +283,8 @@ export const en: Translation = {
   },
   tag: {
     subtitle: 'The public projects made with this tool, newest first.',
-    empty: 'No public project yet.',
+    emptyTitle: 'No project here yet',
+    empty: 'No public project made with this tool yet. Yours may be the first.',
   },
   states: {
     errorTitle: 'This page could not load',

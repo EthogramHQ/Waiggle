@@ -9,7 +9,7 @@ import {
   uploadVisual,
 } from '../projects/api'
 import { photo, projectWithPhotos, recipesProject } from '../testing/projects'
-import { mockSession, renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { ProjectFormScreen } from './ProjectFormScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -348,5 +348,17 @@ describe('ProjectFormScreen, editing', () => {
 
     expect(await screen.findByText('Seul l’auteur peut modifier ce projet.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+  })
+
+  it('on a computer, does not offer to publish another project from the form', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(<ProjectFormScreen />)
+
+      expect(await screen.findByRole('button', { name: 'Publier' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Publier un projet' })).toBeNull()
+    } finally {
+      restore()
+    }
   })
 })

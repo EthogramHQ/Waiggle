@@ -125,6 +125,9 @@ export function TextField({
         paddingTop: space.md,
         paddingBottom: space.sm,
         gap: space.xxs,
+        // Dans un groupe, le champ n'a pas de cadre à lui : quand il est choisi, sa ligne prend un
+        // fond doux (en plus de son libellé en couleur), pour qu'on voie où l'on tape.
+        ...(inGroup && focused ? { backgroundColor: colors.honeySoft } : null),
       }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.sm }}>
@@ -180,10 +183,11 @@ export function TextField({
             accessibilityRole="button"
             accessibilityLabel={revealed ? t('common.hidePassword') : t('common.showPassword')}
             onPress={() => setRevealed((previous) => !previous)}
-            hitSlop={8}
             style={{
               width: layout.touchTarget,
               height: layout.touchTarget,
+              // Rond : l'anneau de focus clavier suit sa forme.
+              borderRadius: radii.pill,
               alignItems: 'center',
               justifyContent: 'center',
             }}

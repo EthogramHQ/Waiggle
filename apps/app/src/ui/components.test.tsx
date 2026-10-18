@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
+import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { Notice } from './Notice'
@@ -18,6 +19,7 @@ import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
 import { StateMessage } from './StateMessage'
+import { Step } from './StepNumber'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
 import { TagInput } from './TagInput'
@@ -435,6 +437,33 @@ describe('Button while loading', () => {
     await renderWithProviders(<Button label="Publier" onPress={() => {}} loading />)
 
     expect(screen.getByRole('button', { name: 'Publier' })).toBeBusy()
+  })
+})
+
+describe('Hint', () => {
+  it('reads as its text alone, the icon being decorative', async () => {
+    await renderWithProviders(<Hint icon="lock-simple" text="Réservé aux membres connectés." />)
+
+    expect(screen.getByText('Réservé aux membres connectés.')).toBeTruthy()
+    // L'icône n'est pas annoncée : ni image, ni bouton, rien d'autre que le texte.
+    expect(screen.queryByRole('image')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('Step', () => {
+  it('shows its number, its control and what comes below', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Step value={1} control={<Button label="Télécharger mes données" onPress={onPress} />}>
+        <Text>Un fichier avec tout ton contenu.</Text>
+      </Step>,
+    )
+
+    expect(screen.getByText('1')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Télécharger mes données' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Un fichier avec tout ton contenu.')).toBeTruthy()
   })
 })
 

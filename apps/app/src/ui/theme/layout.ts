@@ -1,7 +1,7 @@
 // La taille de l'écran, rangée en trois familles : téléphone (compact), tablette ou petite fenêtre
 // (medium), ordinateur (wide). Les composants de mise en page s'en servent pour passer d'une colonne
 // à plusieurs ; les écrans n'ont pas à mesurer la fenêtre eux-mêmes.
-import { layout } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import { useWindowDimensions } from 'react-native'
 import { useHydrated } from './hydration'
 
@@ -24,5 +24,11 @@ export const useLayout = () => {
   const width = hydrated ? window.width : 0
   const height = hydrated ? window.height : 0
   const sizeClass = sizeClassFor(width)
-  return { width, height, sizeClass, padding: layout.screenPadding[sizeClass] }
+  const padding = layout.screenPadding[sizeClass]
+  // Les deux colonnes (principale et latérale) tiennent-elles côte à côte ? Leur largeur de base,
+  // l'écart entre elles (celui de Columns) et les marges de l'écran, sans dépasser la largeur max.
+  const columns =
+    Math.min(width - 2 * padding, layout.maxContentWidth) >=
+    layout.mainColumn + layout.sideColumn + space.xxl
+  return { width, height, sizeClass, padding, columns }
 }

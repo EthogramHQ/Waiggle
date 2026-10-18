@@ -25,6 +25,7 @@ import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
+import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -44,7 +45,7 @@ import { SheetHeader } from '../ui/SheetHeader'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
-import { StepNumber } from '../ui/StepNumber'
+import { Step, StepNumber } from '../ui/StepNumber'
 import { Surface } from '../ui/Surface'
 import { Switch } from '../ui/Switch'
 import { Tag } from '../ui/Tag'
@@ -255,6 +256,12 @@ export function CatalogueScreen() {
           actions={[{ label: l.home, onPress: () => {} }]}
         />
         <StateMessage
+          kind="empty"
+          title={l.stateEmptyTitle}
+          message={l.stateEmpty}
+          actions={[{ label: l.publish, onPress: () => {} }]}
+        />
+        <StateMessage
           kind="signedOut"
           title={l.stateSignedOutTitle}
           message={l.stateSignedOut}
@@ -286,7 +293,14 @@ export function CatalogueScreen() {
         <Button label={l.longHost} icon="arrow-up-right" onPress={() => {}} />
         <TagSample l={l} />
         <VisualEditorSample l={l} />
+        {/* Sans photo : pas de rangée vide entre la consigne et le bouton. */}
+        <VisualEditorSample l={l} empty />
+        {/* La jauge vide (discrète), en cours, puis remplie. */}
+        <HoneyMeter value={0} max={12} label={l.meterEmpty} />
         <HoneyMeter value={9} max={12} label={l.meter} />
+        <HoneyMeter value={12} max={12} label={l.meterDone} />
+        <Hint icon="lock-simple" text={l.stateSignedOut} />
+        <Hint icon="globe-simple" text={l.longHint} />
         <Disclosure title={l.recipe} hint={l.recipeHint}>
           <Text tone="secondary">{l.plain}</Text>
         </Disclosure>
@@ -296,6 +310,15 @@ export function CatalogueScreen() {
             <Text>{l.step}</Text>
           </Stack>
         </Row>
+        {/* Une étape complète : le numéro centré sur le bouton, la précision alignée dessous. */}
+        <Step
+          value={2}
+          control={<Button label={l.download} variant="secondary" onPress={() => {}} />}
+        >
+          <Text variant="caption" tone="muted">
+            {l.longHint}
+          </Text>
+        </Step>
         <Row gap="sm" wrap>
           <TextLink label={l.createAccount} onPress={() => {}} />
           <TextLink label={l.cancel} onPress={() => {}} role="button" />
@@ -402,6 +425,8 @@ export function CatalogueScreen() {
           <Honeycomb />
         </Stack>
         <Constellation height={260} />
+        {/* La scène d'accueil sur ordinateur : le centre reste libre pour le logo. */}
+        <Constellation height={420} layout="scene" />
       </Section>
 
       <Section title={l.icons}>
@@ -527,9 +552,9 @@ function Fields({ l }: { l: Labels }) {
 }
 
 /** L'éditeur de visuels, avec trois photos d'exemple (leurs résumés flous) qu'on peut réordonner. */
-function VisualEditorSample({ l }: { l: Labels }) {
-  const [order, setOrder] = useState([samples.cafe, samples.papillon, samples.cafe])
-  const [portrait, setPortrait] = useState<string | null>(samples.papillon)
+function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }) {
+  const [order, setOrder] = useState(empty ? [] : [samples.cafe, samples.papillon, samples.cafe])
+  const [portrait, setPortrait] = useState<string | null>(empty ? null : samples.papillon)
   const move = (from: number, to: number) =>
     setOrder((list) => {
       const copy = [...list]

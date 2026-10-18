@@ -17,10 +17,12 @@ export function VerifiedScreen() {
       <Stack align="center">
         <Emblem icon="check" />
       </Stack>
-      <Text variant="title2" accessibilityRole="header">
+      <Text variant="title2" align="center" accessibilityRole="header">
         {t('auth.verified.title')}
       </Text>
-      <Text tone="secondary">{t('auth.verified.body')}</Text>
+      <Text tone="secondary" align="center">
+        {t('auth.verified.body')}
+      </Text>
       <Button label={t('auth.verified.continue')} onPress={() => router.replace('/')} />
     </Screen>
   )

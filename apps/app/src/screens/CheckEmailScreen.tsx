@@ -29,12 +29,12 @@ export function CheckEmailScreen() {
       <Stack align="center">
         <Emblem icon="envelope-simple" />
       </Stack>
-      <Text variant="title2" accessibilityRole="header">
+      <Text variant="title2" align="center" accessibilityRole="header">
         {t('auth.checkEmail.title')}
       </Text>
       {hydrated ? (
         <>
-          <Text tone="secondary">
+          <Text tone="secondary" align="center">
             {email ? t('auth.checkEmail.body', { email }) : t('auth.checkEmail.bodyNoEmail')}
           </Text>
           <Notice tone="info" message={t('auth.checkEmail.locked')} />

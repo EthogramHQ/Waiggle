@@ -53,13 +53,24 @@ const tiles: Tile[] = [
   { icon: 'smiley', left: '44%', top: '66%', size: 56, rotate: -12, look: 'light', phase: 0.8 },
 ]
 
+// Dans la scène d'accueil sur ordinateur, le centre porte le logo et sa bulle : la tuile du bas,
+// qui passait dessous et apparaissait en fantôme, se range sous la bulle, à droite.
+const sceneTiles: Tile[] = tiles.map((tile) =>
+  tile.icon === 'smiley' ? { ...tile, left: '60%', top: '84%' } : tile,
+)
+
 // Une boucle de flottement dure huit secondes : assez lent pour apaiser, pas pour endormir.
 const FLOAT_PERIOD = 8000
 const FLOAT_HEIGHT = 8 // en points
 
-type Props = { height: number; children?: ReactNode }
+type Props = {
+  height: number
+  children?: ReactNode
+  /** band : une bande décorative (téléphone) ; scene : la scène d'accueil, le centre laissé libre. */
+  layout?: 'band' | 'scene'
+}
 
-export function Constellation({ height, children }: Props) {
+export function Constellation({ height, children, layout = 'band' }: Props) {
   const calm = useCalmMotion()
   const t = useSharedValue(0)
   useEffect(() => {
@@ -73,7 +84,7 @@ export function Constellation({ height, children }: Props) {
         importantForAccessibility="no-hide-descendants"
         style={{ position: 'absolute', inset: 0 }}
       >
-        {tiles.map((tile) => (
+        {(layout === 'scene' ? sceneTiles : tiles).map((tile) => (
           <FloatingTile key={tile.icon} tile={tile} t={t} still={calm} />
         ))}
       </View>

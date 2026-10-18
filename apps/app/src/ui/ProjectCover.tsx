@@ -2,7 +2,7 @@
 // et son résumé flou (ThumbHash) affiché le temps qu'elle arrive. Sans photo : la lumière miel,
 // avec le titre écrit dessus en grand, pour que chaque projet ait une couverture chaleureuse
 // plutôt qu'un cadre vide.
-import { honeyLight, type Radius, radii, space } from '@ruche/brand'
+import { honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
@@ -20,17 +20,22 @@ export type CoverImage = {
   label: string
 }
 
+/** hero : grande (ordinateur) ; band : bande basse (sans photo, téléphone) ; portrait : haute. */
+export type CoverShape = keyof typeof layout.cover
+
 type Props = {
   title?: string
-  height: number
+  /** La hauteur, par une forme (jetons de @ruche/brand) ou en points (cartes, aperçus). */
+  height: number | CoverShape
   radius?: Radius
   image?: CoverImage | null
   /** Ce qui se pose sur la couverture (boutons ronds, panneau de verre). */
   children?: ReactNode
 }
 
-export function ProjectCover({ title, height, radius = 'sheet', image, children }: Props) {
+export function ProjectCover({ title, height: size, radius = 'sheet', image, children }: Props) {
   const { scheme, colors } = useTheme()
+  const height = typeof size === 'number' ? size : layout.cover[size]
   const id = `cover-${scheme}`
   return (
     <View style={{ height, borderRadius: radii[radius], overflow: 'hidden', alignSelf: 'stretch' }}>
