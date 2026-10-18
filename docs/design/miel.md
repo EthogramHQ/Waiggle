@@ -71,6 +71,17 @@ centaines à la fois, figeait le navigateur. Le vrai flou est donc réservé au 
 quelques-uns par écran. Sur Android, le vrai flou demande de désigner à l'avance ce qu'il faut
 flouter : en attendant de le brancher, le verre y est un peu plus opaque, sans flou.
 
+Sur le web, le flou est une couche posée sous la couleur de la matière, pas à sa place : le flou du
+navigateur impose sa propre teinte, trop claire pour garder le texte lisible. Chaque couche reprend
+les coins arrondis de la surface.
+
+## Les formulaires sur téléphone
+
+Un formulaire long garde son en-tête « Annuler / titre / action » en haut de l'écran pendant qu'on
+fait défiler (`Screen` avec `stickyHeader`, en-tête `SheetHeader`). Le message qui suit l'action
+(« Profil enregistré », une erreur) s'affiche juste sous cet en-tête (`notice`), là où se trouve le
+bouton qu'on vient de toucher. Exemples : captures `publier-telephone-*` et `profil-telephone-*`.
+
 ## La lumière d'ambiance
 
 `AmbientLight`, la signature de Miel. Derrière l'écran, une grande lueur prend la couleur du visuel

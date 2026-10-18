@@ -31,6 +31,12 @@ type Props = {
    * d'un formulaire sur téléphone : l'action reste à portée de pouce).
    */
   stickyHeader?: boolean
+  /**
+   * Un message à garder en vue, sous la barre fixe (le résultat de « Publier », une erreur) : il
+   * apparaît là où se trouve le bouton, même si le membre a appuyé depuis le haut d'un long
+   * formulaire. Sans barre fixe, il se place en tête du contenu.
+   */
+  notice?: ReactNode
   /** Affiche un bouton « Retour » en haut à gauche. */
   onBack?: () => void
   /**
@@ -52,6 +58,7 @@ export function Screen({
   children,
   header,
   stickyHeader = false,
+  notice,
   onBack,
   width = 'form',
   hero,
@@ -69,6 +76,7 @@ export function Screen({
   useBrowserLanguage()
 
   const withHero = hero !== undefined && sizeClass === 'wide'
+  const pinned = header !== undefined && stickyHeader
   // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
   const body = (
     <>
@@ -83,11 +91,11 @@ export function Screen({
           {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
         </View>
       ) : null}
+      {pinned ? null : notice}
       {children}
     </>
   )
 
-  const pinned = header !== undefined && stickyHeader
   return (
     // overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement horizontal).
     <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
@@ -105,7 +113,10 @@ export function Screen({
             borderBottomColor: colors.line,
           }}
         >
-          <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero) }}>{header}</View>
+          <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}>
+            {header}
+            {notice}
+          </View>
         </View>
       ) : null}
       {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}

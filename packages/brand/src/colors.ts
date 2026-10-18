@@ -134,6 +134,8 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'textMuted', on: 'surfaceGrouped', min: 4.5 },
   { text: 'textPlaceholder', on: 'surface', min: 4.5 },
   // Le panneau de verre des cartes de projet et des pages en deux colonnes (Surface « panel »).
+  // Mesuré posé sur le fond de page : c'est le cas courant. Sur une image ou une lumière vive, le
+  // contraste réel dépend de l'image ; le flou et la densité du verre le protègent, sans garantie.
   { text: 'text', on: 'panel', min: 4.5 },
   { text: 'textSecondary', on: 'panel', min: 4.5 },
   { text: 'textMuted', on: 'panel', min: 4.5 },

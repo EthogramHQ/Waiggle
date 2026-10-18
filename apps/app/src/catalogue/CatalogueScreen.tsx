@@ -251,6 +251,8 @@ export function CatalogueScreen() {
         <Text variant="title2" align="center" breakAnywhere>
           {l.longHost}
         </Text>
+        <Tag label={l.longHost} onPress={() => {}} />
+        <Button label={l.longHost} icon="arrow-up-right" onPress={() => {}} />
         <TagSample l={l} />
         <VisualEditorSample l={l} />
         <HoneyMeter value={9} max={12} label={l.meter} />

@@ -16,6 +16,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
   const { colors } = useTheme()
   const box: ViewStyle = {
     alignSelf: 'flex-start',
+    // Jamais plus large que la ligne : un nom d'outil très long passe à la ligne.
+    maxWidth: '100%',
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: space.lg,
@@ -25,7 +27,7 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
   const content = (
-    <Text variant="callout" weight={600}>
+    <Text variant="callout" weight={600} breakAnywhere>
       {label}
     </Text>
   )
@@ -36,7 +38,13 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
       accessibilityLabel={label}
       onPress={onPress}
       // La pastille dessinée fait 36 points de haut ; la zone à toucher autour d'elle, 44.
-      style={{ alignSelf: 'flex-start', minHeight: layout.touchTarget, justifyContent: 'center' }}
+      style={{
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
+        minHeight: layout.touchTarget,
+        minWidth: layout.touchTarget,
+        justifyContent: 'center',
+      }}
     >
       {({ pressed }) => (
         <View style={[box, pressed && { backgroundColor: colors.honeySoft }]}>{content}</View>

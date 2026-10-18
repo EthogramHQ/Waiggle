@@ -6,9 +6,11 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
+import { Choices } from './Choices'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { Notice } from './Notice'
+import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
 import { ProjectGrid } from './ProjectGrid'
@@ -17,8 +19,10 @@ import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
+import { TagInput } from './TagInput'
 import { Text } from './Text'
 import { FieldGroup, TextField } from './TextField'
+import { TextLink } from './TextLink'
 import { Thumbnails } from './Thumbnails'
 import { fontFiles, fontName } from './theme/fonts'
 import { VisualEditor, type VisualEditorLabels, type VisualTile } from './VisualEditor'
@@ -348,6 +352,96 @@ describe('Tag', () => {
   })
 })
 
+describe('Choices', () => {
+  it('is a group of radio buttons, one checked, that changes on press', async () => {
+    const Sample = () => {
+      const [value, setValue] = useState<'idea' | 'done'>('idea')
+      return (
+        <Choices
+          label="Où en est-il ?"
+          options={[
+            { value: 'idea', label: 'Idée' },
+            { value: 'done', label: 'Terminé' },
+          ]}
+          value={value}
+          onChange={setValue}
+        />
+      )
+    }
+    await renderWithProviders(<Sample />)
+    expect(screen.getByRole('radio', { name: 'Idée', checked: true })).toBeTruthy()
+
+    await fireEvent.press(screen.getByRole('radio', { name: 'Terminé' }))
+
+    expect(screen.getByRole('radio', { name: 'Terminé', checked: true })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Idée', checked: false })).toBeTruthy()
+  })
+})
+
+describe('TagInput', () => {
+  it('adds a word typed before a comma, and removes it with its named button', async () => {
+    const Sample = () => {
+      const [values, setValues] = useState(['Claude'])
+      return (
+        <TagInput
+          label="Outils"
+          values={values}
+          onChange={setValues}
+          placeholder="Ajouter un outil"
+          removeLabel={(item) => `Retirer ${item}`}
+        />
+      )
+    }
+    await renderWithProviders(<Sample />)
+
+    await fireEvent.changeText(screen.getByPlaceholderText('Ajouter un outil'), 'Python,')
+    expect(screen.getByRole('button', { name: 'Retirer Python' })).toBeTruthy()
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Retirer Claude' }))
+    expect(screen.queryByRole('button', { name: 'Retirer Claude' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Retirer Python' })).toBeTruthy()
+  })
+})
+
+describe('TextLink', () => {
+  it('is a link by default, or a button when it acts in place', async () => {
+    const onPress = jest.fn()
+    const { rerender } = await renderWithProviders(
+      <TextLink label="Créer un compte" onPress={onPress} />,
+    )
+    await fireEvent.press(screen.getByRole('link', { name: 'Créer un compte' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+
+    await rerender(<TextLink label="Annuler" onPress={onPress} role="button" />)
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy()
+  })
+})
+
+describe('Pressed', () => {
+  it('makes any content pressable under a name, as a button or a link', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Pressed label="Mon compte" onPress={onPress} role="link">
+        <Text>L</Text>
+      </Pressed>,
+    )
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Mon compte' }))
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Button while loading', () => {
+  it('keeps its name and announces that it is busy', async () => {
+    await renderWithProviders(<Button label="Publier" onPress={() => {}} loading />)
+
+    expect(screen.getByRole('button', { name: 'Publier' }).props.accessibilityState).toMatchObject({
+      busy: true,
+    })
+  })
+})
+
 describe('SheetHeader', () => {
   it('offers to cancel and to run the main action, under a title', async () => {
     const cancel = jest.fn()
@@ -371,13 +465,30 @@ describe('SheetHeader', () => {
 describe('Screen', () => {
   it('shows a sticky header once, above the content', async () => {
     await renderWithProviders(
-      <Screen stickyHeader header={<Text accessibilityRole="header">Barre</Text>}>
+      <Screen ambient={false} stickyHeader header={<Text accessibilityRole="header">Barre</Text>}>
         <Text>Contenu</Text>
       </Screen>,
     )
 
     expect(screen.getAllByRole('header', { name: 'Barre' })).toHaveLength(1)
     expect(screen.getByText('Contenu')).toBeTruthy()
+  })
+
+  it('keeps its message in view, once, whether or not the header is sticky', async () => {
+    for (const stickyHeader of [true, false]) {
+      const { unmount } = await renderWithProviders(
+        <Screen
+          ambient={false}
+          stickyHeader={stickyHeader}
+          header={<Text>Barre</Text>}
+          notice={<Notice message="Enregistré." />}
+        >
+          <Text>Contenu</Text>
+        </Screen>,
+      )
+      expect(screen.getAllByRole('alert')).toHaveLength(1)
+      await unmount()
+    }
   })
 })
 

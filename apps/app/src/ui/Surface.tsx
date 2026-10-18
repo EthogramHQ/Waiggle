@@ -96,9 +96,11 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
           <BlurView
             intensity={blur}
             tint={scheme === 'night' ? 'dark' : 'light'}
-            style={StyleSheet.absoluteFill}
+            // Les couches reprennent les coins arrondis : sur le web, une couche floutée n'est pas
+            // rognée par l'arrondi de son parent, et ses coins carrés dépasseraient.
+            style={[StyleSheet.absoluteFill, corners]}
           />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor }]} />
+          <View style={[StyleSheet.absoluteFill, corners, { backgroundColor }]} />
           {children}
         </View>
       </View>

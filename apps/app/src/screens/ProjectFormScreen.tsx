@@ -296,6 +296,8 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
     const checked = toProjectChanges(form)
     if (!checked.ok) {
       setErrors(checked.errors)
+      // Le champ en erreur peut être loin de l'écran : un message général le signale aussi.
+      setMessage(t('errors.validation'))
       return
     }
     setErrors({})
@@ -481,7 +483,8 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
           ) : null}
         </Stack>
       </Disclosure>
-      {message ? <Notice message={message} /> : null}
+      {/* Sur téléphone, le message est dans la barre fixe (voir plus bas). */}
+      {wide && message ? <Notice message={message} /> : null}
     </>
   )
 
@@ -490,6 +493,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
     return (
       <Screen
         stickyHeader
+        notice={message ? <Notice message={message} /> : null}
         header={
           <SheetHeader
             title={title}

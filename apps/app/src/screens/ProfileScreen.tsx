@@ -152,6 +152,10 @@ function ProfileForm({ me }: { me: Me }) {
   const back = () => (router.canGoBack() ? router.back() : router.replace('/account'))
   const save = { label: t('profile.save'), onPress: () => void onSave(), loading: busy === 'save' }
 
+  const notice = message ? (
+    <Notice tone={message.ok ? 'success' : 'error'} message={message.text} />
+  ) : null
+
   return (
     <Screen
       // Sur téléphone, « Annuler » et « Enregistrer » restent en haut, à portée de pouce ; sur
@@ -168,6 +172,7 @@ function ProfileForm({ me }: { me: Me }) {
         )
       }
       stickyHeader={!wide}
+      {...(wide ? null : { notice })}
       {...(wide ? { title: t('profile.title') } : null)}
     >
       <Stack gap="md" align="center">
@@ -227,7 +232,8 @@ function ProfileForm({ me }: { me: Me }) {
         error={toolsError || undefined}
       />
 
-      {message ? <Notice tone={message.ok ? 'success' : 'error'} message={message.text} /> : null}
+      {/* Sur téléphone, le message est dans la barre fixe, en vue du bouton « Enregistrer ». */}
+      {wide && notice}
       {wide ? (
         <Row gap="md" justify="end">
           <Button label={t('common.cancel')} variant="secondary" onPress={back} />

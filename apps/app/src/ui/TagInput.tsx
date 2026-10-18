@@ -95,13 +95,18 @@ export function TagInput({
                     gap: space.xs,
                     paddingLeft: space.lg,
                     minHeight: layout.touchTarget,
+                    // Jamais plus large que la ligne : un nom très long passe à la ligne, et la croix
+                    // pour le retirer reste visible et touchable.
+                    maxWidth: '100%',
                     borderRadius: radii.pill,
                     backgroundColor: colors.honeySoft,
                   }}
                 >
-                  <Text variant="callout" weight={600}>
-                    {item}
-                  </Text>
+                  <View style={{ flexShrink: 1, minWidth: 0 }}>
+                    <Text variant="callout" weight={600} breakAnywhere>
+                      {item}
+                    </Text>
+                  </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={removeLabel(item)}
@@ -110,6 +115,7 @@ export function TagInput({
                     style={{
                       width: layout.touchTarget,
                       height: layout.touchTarget,
+                      flexShrink: 0,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
