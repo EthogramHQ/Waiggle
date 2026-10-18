@@ -45,7 +45,7 @@ import { SheetHeader } from '../ui/SheetHeader'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
-import { StepNumber } from '../ui/StepNumber'
+import { Step, StepNumber } from '../ui/StepNumber'
 import { Surface } from '../ui/Surface'
 import { Switch } from '../ui/Switch'
 import { Tag } from '../ui/Tag'
@@ -310,6 +310,15 @@ export function CatalogueScreen() {
             <Text>{l.step}</Text>
           </Stack>
         </Row>
+        {/* Une étape complète : le numéro centré sur le bouton, la précision alignée dessous. */}
+        <Step
+          value={2}
+          control={<Button label={l.download} variant="secondary" onPress={() => {}} />}
+        >
+          <Text variant="caption" tone="muted">
+            {l.longHint}
+          </Text>
+        </Step>
         <Row gap="sm" wrap>
           <TextLink label={l.createAccount} onPress={() => {}} />
           <TextLink label={l.cancel} onPress={() => {}} role="button" />

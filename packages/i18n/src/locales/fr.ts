@@ -188,7 +188,7 @@ export const fr = {
       recipeHint: 'Outils, temps passé, prompts clés : facultatif',
       tools: 'Outils et modèles utilisés',
       toolsLimit: '{{max}} au plus',
-      toolsPlaceholder: 'Ajouter un outil ou un modèle',
+      toolsPlaceholder: 'Ajouter un outil',
       timeSpent: 'Temps passé',
       prompts: 'Prompts clés (facultatif)',
       promptsHint: '{{max}} au plus. Ils sont affichés tels quels.',

@@ -179,7 +179,7 @@ export const en: Translation = {
       recipeHint: 'Tools, time spent, key prompts: optional',
       tools: 'Tools and models used',
       toolsLimit: '{{max}} at most',
-      toolsPlaceholder: 'Add a tool or a model',
+      toolsPlaceholder: 'Add a tool',
       timeSpent: 'Time spent',
       prompts: 'Key prompts (optional)',
       promptsHint: '{{max}} at most. They are shown as they are.',

@@ -19,6 +19,7 @@ import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
 import { StateMessage } from './StateMessage'
+import { Step } from './StepNumber'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
 import { TagInput } from './TagInput'
@@ -447,6 +448,22 @@ describe('Hint', () => {
     // L'icône n'est pas annoncée : ni image, ni bouton, rien d'autre que le texte.
     expect(screen.queryByRole('image')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('Step', () => {
+  it('shows its number, its control and what comes below', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Step value={1} control={<Button label="Télécharger mes données" onPress={onPress} />}>
+        <Text>Un fichier avec tout ton contenu.</Text>
+      </Step>,
+    )
+
+    expect(screen.getByText('1')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Télécharger mes données' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Un fichier avec tout ton contenu.')).toBeTruthy()
   })
 })
 

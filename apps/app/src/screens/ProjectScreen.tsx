@@ -198,7 +198,7 @@ function ProjectView({ project }: { project: Project }) {
       {project.visibility === 'private' ? (
         <Notice tone="info" message={t('project.page.private')} />
       ) : null}
-      <Text variant="headline" tone="secondary" weight={400}>
+      <Text variant="headline" tone="secondary" weight={400} readable>
         {project.pitch}
       </Text>
       {project.demoUrl ? (

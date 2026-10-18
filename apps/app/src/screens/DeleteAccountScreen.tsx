@@ -12,8 +12,8 @@ import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Row, Stack } from '../ui/Stack'
-import { StepNumber } from '../ui/StepNumber'
+import { Row } from '../ui/Stack'
+import { Step } from '../ui/StepNumber'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
@@ -77,32 +77,29 @@ export function DeleteAccountScreen() {
         />
       </ListGroup>
 
-      {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. Chaque numéro est
-          centré sur le bouton ou le champ de son étape (align="center"), les précisions viennent
-          dessous. */}
-      <Stack gap="sm">
-        <Row gap="md" align="center">
-          <StepNumber value={1} />
-          <Stack grow>
-            <Button
-              label={t('account.export.button')}
-              variant="secondary"
-              icon="download-simple"
-              onPress={() => void onExport()}
-              loading={busy === 'export'}
-            />
-          </Stack>
-        </Row>
+      {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}
+      <Step
+        value={1}
+        control={
+          <Button
+            label={t('account.export.button')}
+            variant="secondary"
+            icon="download-simple"
+            onPress={() => void onExport()}
+            loading={busy === 'export'}
+          />
+        }
+      >
         <Text variant="caption" tone="muted">
           {t('account.delete.exportHint')}
         </Text>
         {exportMessage ? (
           <Notice tone={exportMessage.ok ? 'success' : 'error'} message={exportMessage.text} />
         ) : null}
-      </Stack>
-      <Row gap="md" align="center">
-        <StepNumber value={2} />
-        <Stack gap="sm" grow>
+      </Step>
+      <Step
+        value={2}
+        control={
           <TextField
             label={t('account.delete.password')}
             value={password}
@@ -111,8 +108,8 @@ export function DeleteAccountScreen() {
             autoComplete="current-password"
             error={error ?? undefined}
           />
-        </Stack>
-      </Row>
+        }
+      />
 
       <Row gap="sm" justify="center">
         <Icon name="warning" size={18} tone="danger" />
