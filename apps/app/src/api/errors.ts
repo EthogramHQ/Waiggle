@@ -44,3 +44,7 @@ export class ApiError extends Error {
     super(key)
   }
 }
+
+/** La clé du message d'une erreur venue de l'API (« notFound », « rateLimited »…), ou « internal ». */
+export const errorKey = (error: unknown): ApiErrorKey =>
+  error instanceof ApiError ? error.key : 'internal'

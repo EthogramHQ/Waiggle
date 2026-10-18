@@ -20,7 +20,10 @@ export function Thumbnails({ items, selected, onSelect }: Props) {
   const { colors } = useTheme()
   return (
     // ScrollView horizontal : la bande défile si les vignettes dépassent la largeur de l'écran.
+    // « tablist » / « tab » : une rangée d'onglets dont un seul est choisi. C'est le rôle qui permet
+    // d'annoncer « sélectionné » (aria-selected), sur le web comme sur téléphone.
     <ScrollView
+      accessibilityRole="tablist"
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: space.sm, paddingVertical: space.xs }}
@@ -30,9 +33,9 @@ export function Thumbnails({ items, selected, onSelect }: Props) {
         return (
           <Pressable
             key={key}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel={image.label}
-            accessibilityState={{ selected: isSelected }}
+            aria-selected={isSelected}
             onPress={() => onSelect(index)}
             style={{
               width: SIZE,

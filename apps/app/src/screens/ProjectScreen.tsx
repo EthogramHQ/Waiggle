@@ -11,10 +11,11 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import { ApiError } from '../api/errors'
+import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
+import { useGoBack } from '../navigation/useGoBack'
 import { deleteProject } from '../projects/api'
 import { hostOf, shortDate } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
@@ -25,7 +26,6 @@ import { Columns } from '../ui/Columns'
 import { Dialog } from '../ui/Dialog'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { Honeycomb } from '../ui/Illustrations'
 import { Markdown } from '../ui/Markdown'
 import { Notice } from '../ui/Notice'
 import { Pressed } from '../ui/Pressed'
@@ -38,55 +38,34 @@ import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useLayout } from '../ui/theme/layout'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function ProjectScreen({ id }: { id: string }) {
   const { t } = useTranslation()
-  const router = useRouter()
   const { data: session, isPending } = useSession()
   // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
   const project = useProject(id, Boolean(session))
 
-  if (isPending) return <Screen title={t('common.loading')}>{null}</Screen>
-  if (!session) {
-    return (
-      <Screen>
-        <Notice tone="info" message={t('errors.unauthorized')} />
-        <Button label={t('home.signIn')} onPress={() => router.replace('/sign-in')} />
-      </Screen>
-    )
-  }
+  if (isPending) return <LoadingScreen width="page" />
+  if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
-    const key = project.error instanceof ApiError ? project.error.key : 'internal'
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
     // n'a pas le droit de le voir n'apprend même pas qu'il existe.
-    if (key === 'notFound') return <ProjectNotFound />
+    if (errorKey(project.error) === 'notFound') {
+      return (
+        <NotFoundState
+          width="page"
+          title={t('project.page.notFoundTitle')}
+          message={t('project.page.notFound')}
+        />
+      )
+    }
     return (
-      <Screen>
-        <Notice message={t(`errors.${key}`)} />
-      </Screen>
+      <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width="page" />
     )
   }
-  if (!project.data) return <Screen title={t('common.loading')}>{null}</Screen>
+  if (!project.data) return <LoadingScreen width="page" />
   return <ProjectView project={project.data} />
-}
-
-function ProjectNotFound() {
-  const { t } = useTranslation()
-  const router = useRouter()
-  return (
-    <Screen>
-      <Honeycomb />
-      <Stack gap="sm">
-        <Text variant="title2" align="center" accessibilityRole="header">
-          {t('project.page.notFoundTitle')}
-        </Text>
-        <Text tone="secondary" align="center">
-          {t('project.page.notFound')}
-        </Text>
-      </Stack>
-      <Button label={t('project.page.home')} onPress={() => router.replace('/')} />
-    </Screen>
-  )
 }
 
 function ProjectView({ project }: { project: Project }) {
@@ -103,7 +82,7 @@ function ProjectView({ project }: { project: Project }) {
   const [error, setError] = useState<string | null>(null)
 
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  const back = useGoBack('/')
 
   const onDelete = async () => {
     setBusy(true)
@@ -333,7 +312,13 @@ function ProjectView({ project }: { project: Project }) {
 
   if (wide) {
     return (
-      <Screen width="page" header={<TopNav />} onBack={back} thumbhash={thumbhash}>
+      <Screen
+        width="page"
+        header={<TopNav />}
+        onBack={back}
+        thumbhash={thumbhash}
+        pageTitle={project.title}
+      >
         <Columns
           main={
             <>
@@ -354,7 +339,7 @@ function ProjectView({ project }: { project: Project }) {
     )
   }
   return (
-    <Screen thumbhash={thumbhash}>
+    <Screen thumbhash={thumbhash} pageTitle={project.title}>
       {cover}
       {thumbnails}
       {info}

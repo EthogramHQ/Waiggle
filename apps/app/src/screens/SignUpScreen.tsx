@@ -17,6 +17,7 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Notice } from '../ui/Notice'
@@ -33,6 +34,7 @@ const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 export function SignUpScreen() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
+  const back = useGoBack('/')
   const openOutside = useOpenOutside()
 
   // useState garde une valeur qui change (ce que tape le membre) et redessine l'écran à chaque
@@ -96,7 +98,7 @@ export function SignUpScreen() {
     <Screen
       title={t('auth.signUp.title')}
       subtitle={t('auth.signUp.subtitle')}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      onBack={back}
       hero={
         <WelcomeHero
           tagline={t('home.tagline')}

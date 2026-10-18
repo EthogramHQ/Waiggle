@@ -34,7 +34,7 @@ export function Disclosure({ title, hint, icon = 'plus', initiallyOpen = false, 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={title}
-        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
         onPress={() => setOpen((previous) => !previous)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg }}
       >

@@ -17,6 +17,7 @@ jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
 }))
 
@@ -135,20 +136,18 @@ describe('ProjectScreen', () => {
 
     // Les tests affichent un téléphone (390 points de large) : la couverture verticale est en grand.
     expect(await screen.findByLabelText('Couverture verticale')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Photo 1 sur 3' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Photo 3 sur 3' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Photo 1 sur 3' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Photo 3 sur 3' })).toBeTruthy()
   })
 
   it('shows a photo in large when its thumbnail is touched', async () => {
     jest.mocked(getProject).mockResolvedValue(projectWithPhotos)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    const second = await screen.findByRole('button', { name: 'Photo 2 sur 3' })
+    const second = await screen.findByRole('tab', { name: 'Photo 2 sur 3' })
     await fireEvent.press(second)
 
-    expect(
-      screen.getByRole('button', { name: 'Photo 2 sur 3' }).props.accessibilityState,
-    ).toMatchObject({ selected: true })
+    expect(screen.getByRole('tab', { name: 'Photo 2 sur 3' })).toBeSelected()
     expect(screen.queryByLabelText('Couverture verticale')).toBeNull()
   })
 
@@ -156,9 +155,7 @@ describe('ProjectScreen', () => {
     jest.mocked(getProject).mockResolvedValue({ ...projectWithPhotos, portraitCover: null })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(
-      (await screen.findByRole('button', { name: 'Photo 1 sur 3' })).props.accessibilityState,
-    ).toMatchObject({ selected: true })
+    expect(await screen.findByRole('tab', { name: 'Photo 1 sur 3' })).toBeSelected()
   })
 
   it('shows no thumbnails for a project without photos', async () => {
@@ -172,7 +169,7 @@ describe('ProjectScreen', () => {
     mockSession(null)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(screen.getByText('Connecte-toi pour continuer.')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
     expect(getProject).not.toHaveBeenCalled()
   })
 })

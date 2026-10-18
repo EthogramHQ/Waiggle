@@ -89,6 +89,7 @@ export const en: Translation = {
     },
   },
   account: {
+    about: { title: 'About' },
     title: 'Settings',
     signOut: 'Sign out',
     editProfile: 'Edit my profile',
@@ -285,6 +286,16 @@ export const en: Translation = {
     subtitle: 'The public projects made with this tool, newest first.',
     empty: 'No public project yet.',
   },
+  states: {
+    errorTitle: 'This page could not load',
+    signedOutTitle: 'Members only',
+    notFoundTitle: 'Page not found',
+    notMineTitle: 'This project is not yours',
+    back: 'Go back',
+    home: 'Back to home',
+    seeProject: 'See the project',
+    expired: 'Your session has expired. Sign in again to continue.',
+  },
   leaving: {
     title: 'You are leaving {{appName}}',
     body: 'This link leads to another website. {{appName}} does not check its content: do not enter personal information there if in doubt.',
@@ -321,7 +332,7 @@ export const en: Translation = {
     unsupportedMediaType: 'This type of file is not accepted.',
     unavailable: '{{appName}} is very busy right now. Try again in a moment.',
     tooManyVisuals: 'Six photos at most per project. Remove one to add another.',
-    internal: 'Something went wrong.',
+    internal: 'Something went wrong. Try again in a moment.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }

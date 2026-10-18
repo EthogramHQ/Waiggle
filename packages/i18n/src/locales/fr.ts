@@ -94,6 +94,7 @@ export const fr = {
   },
   account: {
     title: 'Réglages',
+    about: { title: 'À propos' },
     signOut: 'Me déconnecter',
     editProfile: 'Modifier mon profil',
     language: {
@@ -291,6 +292,16 @@ export const fr = {
     subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
     empty: 'Aucun projet public pour l’instant.',
   },
+  states: {
+    errorTitle: 'Cette page n’a pas pu se charger',
+    signedOutTitle: 'Réservé aux membres',
+    notFoundTitle: 'Page introuvable',
+    notMineTitle: 'Ce projet n’est pas à toi',
+    back: 'Revenir',
+    home: 'Retour à l’accueil',
+    seeProject: 'Voir le projet',
+    expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
+  },
   leaving: {
     title: 'Tu quittes {{appName}}',
     body: 'Ce lien mène vers un autre site. {{appName}} ne vérifie pas son contenu : n’y entre pas d’informations personnelles si tu as un doute.',
@@ -328,7 +339,7 @@ export const fr = {
     unsupportedMediaType: 'Ce type de fichier n’est pas accepté.',
     unavailable: '{{appName}} reçoit beaucoup de demandes en ce moment. Réessaie dans un instant.',
     tooManyVisuals: 'Six photos au plus par projet. Retires-en une pour en ajouter une autre.',
-    internal: 'Une erreur inattendue est survenue.',
+    internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

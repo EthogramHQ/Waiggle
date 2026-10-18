@@ -34,7 +34,8 @@ export function Switch({ label, value, onValueChange, hint, disabled = false }: 
     <Pressable
       accessibilityRole="switch"
       accessibilityLabel={label}
-      accessibilityState={{ checked: value, disabled }}
+      aria-checked={value}
+      aria-disabled={disabled}
       disabled={disabled}
       onPress={() => onValueChange(!value)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}

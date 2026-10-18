@@ -115,6 +115,12 @@ const session = {
   session: { id: 's1', userId: leaMe.id, expiresAt: '2099-01-01T00:00:00.000Z' },
   user: { ...leaMe, image: null, updatedAt: leaMe.createdAt },
 }
+// Le projet d'un autre membre, ouvert en modification : l'état « Ce projet n'est pas à toi ».
+const notMineProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000aa',
+  isMine: false,
+}
 // Le même projet, avec ses photos, sous un autre identifiant : on photographie les deux pages.
 const photosProject = { ...projectWithPhotos, id: '7c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f' }
 // La page de Léa, vue par elle-même (avec son brouillon privé), et la page d'une étiquette.
@@ -153,8 +159,12 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === '/v1/me') return json(200, leaMe)
   if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, recipesProject)
   if (pathname === `/v1/projects/${photosProject.id}`) return json(200, photosProject)
+  if (pathname === `/v1/projects/${notMineProject.id}`) return json(200, notMineProject)
   if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
   if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
+  // Une page dont le chargement échoue, pour photographier l'état « erreur ».
+  if (pathname === '/v1/members/erreur')
+    return json(500, { error: { code: 'internal', message: '' } })
   const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
   if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
   const media = pathname.match(/^\/media\/visuals\/([0-9a-f-]+)\.webp$/)
@@ -193,6 +203,13 @@ const pages = [
   { name: 'membre', path: `/members/${leaMe.id}`, signedIn: true, fullPage: true },
   { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
+  // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
+  // adresse qui ne mène nulle part.
+  { name: 'visiteur-projet', path: project, signedIn: false },
+  // wait : l'appli réessaie deux fois une lecture ratée (environ 3 s) avant d'afficher l'erreur.
+  { name: 'erreur', path: '/members/erreur', signedIn: true, wait: 4500 },
+  { name: 'adresse-inconnue', path: '/nulle-part', signedIn: false },
+  { name: 'pas-a-moi', path: `/projects/${notMineProject.id}/edit`, signedIn: true },
   // Un projet qui n'existe pas (ou privé) : l'API simulée répond « introuvable ».
   {
     name: 'projet-introuvable',
@@ -275,7 +292,7 @@ async function layoutReport() {
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
-        await page.waitForTimeout(600)
+        await page.waitForTimeout(shot.wait ?? 600)
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
         const found = await page.evaluate(() => {
           const width = window.innerWidth
@@ -336,7 +353,7 @@ for (const device of devices) {
       for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
         await page.setViewportSize(device.viewport)
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
-        await page.waitForTimeout(600) // le temps des ressorts et des fondus
+        await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
         if (shot.fullPage) {
           // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
           // agrandit la fenêtre à la hauteur de son contenu.

@@ -162,7 +162,8 @@ export function ListRow({
     <Pressable
       accessibilityRole={isChoice ? 'radio' : 'button'}
       accessibilityLabel={label}
-      accessibilityState={{ disabled, ...(isChoice ? { checked: selected } : null) }}
+      aria-disabled={disabled}
+      {...(isChoice ? { 'aria-checked': selected === true } : null)}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => (pressed ? { backgroundColor: colors.surfaceGrouped } : null)}

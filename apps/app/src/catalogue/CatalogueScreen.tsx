@@ -42,6 +42,7 @@ import { Screen } from '../ui/Screen'
 import { Segmented } from '../ui/Segmented'
 import { SheetHeader } from '../ui/SheetHeader'
 import { Row, Stack } from '../ui/Stack'
+import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
 import { StepNumber } from '../ui/StepNumber'
 import { Surface } from '../ui/Surface'
@@ -233,6 +234,35 @@ export function CatalogueScreen() {
           <ListRow label={l.signOut} trailing="sign-out" onPress={() => {}} />
           <ListRow label={l.deleteAccount} tone="danger" trailing="trash" onPress={() => {}} />
         </ListGroup>
+      </Section>
+
+      {/* Les états d'une page qui n'a pas (encore) son contenu : toujours une issue. */}
+      <Section title={l.states}>
+        <StateMessage kind="loading" message={l.stateLoading} />
+        <StateMessage
+          kind="error"
+          title={l.stateErrorTitle}
+          message={l.stateError}
+          actions={[
+            { label: l.retry, onPress: () => {} },
+            { label: l.goBack, onPress: () => {} },
+          ]}
+        />
+        <StateMessage
+          kind="notFound"
+          title={l.stateNotFoundTitle}
+          message={l.stateNotFound}
+          actions={[{ label: l.home, onPress: () => {} }]}
+        />
+        <StateMessage
+          kind="signedOut"
+          title={l.stateSignedOutTitle}
+          message={l.stateSignedOut}
+          actions={[
+            { label: l.signIn, onPress: () => {} },
+            { label: l.signUp, onPress: () => {} },
+          ]}
+        />
       </Section>
 
       <Section title={l.forms}>

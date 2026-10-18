@@ -5,7 +5,11 @@ import { SignInScreen } from './SignInScreen'
 
 jest.mock('../accounts/api', () => ({ signIn: jest.fn() }))
 const mockReplace = jest.fn()
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), replace: mockReplace }) }))
+let mockParams: { next?: string | string[] } = {}
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
+  useLocalSearchParams: () => mockParams,
+}))
 
 const signInMock = jest.mocked(signIn)
 
@@ -18,6 +22,7 @@ const submit = async () => {
 beforeEach(() => {
   signInMock.mockReset()
   mockReplace.mockReset()
+  mockParams = {}
 })
 
 describe('SignInScreen', () => {
@@ -32,6 +37,36 @@ describe('SignInScreen', () => {
       password: 'correct-horse-battery',
     })
     expect(mockReplace).toHaveBeenCalledWith('/')
+  })
+
+  it('returns to the page that asked for a sign-in', async () => {
+    signInMock.mockResolvedValue({ ok: true })
+    mockParams = { next: '/members/u2' }
+    await renderWithI18n(<SignInScreen />)
+
+    await submit()
+
+    expect(mockReplace).toHaveBeenCalledWith('/members/u2')
+  })
+
+  it('never sends the member to another site, or to the leaving page, after signing in', async () => {
+    signInMock.mockResolvedValue({ ok: true })
+    for (const next of [
+      '//faux.example/connexion',
+      'javascript:alert(1)',
+      '/out?url=https://faux-waiggle.example',
+      // Un paramètre répété : seul le premier compte.
+      ['//faux.example', '/members/u2'],
+    ]) {
+      mockReplace.mockReset()
+      mockParams = { next }
+      const { unmount } = await renderWithI18n(<SignInScreen />)
+
+      await submit()
+
+      expect(mockReplace).toHaveBeenCalledWith('/')
+      await unmount()
+    }
   })
 
   it('says when the email or password is wrong', async () => {

@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { deleteAccount, downloadMyData, useSession } from '../accounts/api'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -16,6 +17,7 @@ import { StepNumber } from '../ui/StepNumber'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
+import { LoadingScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -29,17 +31,10 @@ export function DeleteAccountScreen() {
   const [exportMessage, setExportMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null)
 
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/account'))
+  const back = useGoBack('/account')
 
-  if (isPending) return <Screen title={t('common.loading')}>{null}</Screen>
-  if (!data) {
-    return (
-      <Screen title={t('account.delete.screenTitle')}>
-        <Notice tone="info" message={t('errors.unauthorized')} />
-        <Button label={t('home.signIn')} onPress={() => router.replace('/sign-in')} />
-      </Screen>
-    )
-  }
+  if (isPending) return <LoadingScreen />
+  if (!data) return <SignedOutScreen />
 
   const onExport = async () => {
     setBusy('export')

@@ -1,5 +1,7 @@
 // Page « Réglages » : qui est connecté, profil, langue, apparence, export des données,
 // déconnexion. La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
+
+import { sourceUrl } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
 import { useRouter } from 'expo-router'
@@ -7,7 +9,9 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { downloadMyData, signOut, useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
+import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
+import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
 import { useChooseLanguage } from '../profile/useChooseLanguage'
 import { Avatar } from '../ui/Avatar'
@@ -22,6 +26,7 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import type { Appearance } from '../ui/theme/appearance'
 import { useTheme } from '../ui/theme/ThemeProvider'
+import { LoadingScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -41,21 +46,15 @@ export function AccountScreen() {
   const toSource = useMediaSources()
   const { current, choose } = useChooseLanguage()
   const { appearance, setAppearance } = useTheme()
+  const openOutside = useOpenOutside()
   const [exportMessage, setExportMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [exporting, setExporting] = useState(false)
 
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  const back = useGoBack('/')
 
-  if (isPending) return <Screen title={t('common.loading')}>{null}</Screen>
-  // Personne de connecté : on propose de se connecter.
-  if (!data) {
-    return (
-      <Screen title={t('account.title')}>
-        <Notice tone="info" message={t('errors.unauthorized')} />
-        <Button label={t('home.signIn')} onPress={() => router.replace('/sign-in')} />
-      </Screen>
-    )
-  }
+  if (isPending) return <LoadingScreen />
+  // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
+  if (!data) return <SignedOutScreen />
 
   const onSignOut = async () => {
     await signOut()
@@ -156,6 +155,16 @@ export function AccountScreen() {
           tone="danger"
           trailing="trash"
           onPress={() => router.push('/account/delete')}
+        />
+      </ListGroup>
+
+      {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
+          un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
+      <ListGroup title={t('account.about.title')} footer={t('home.openSource')}>
+        <ListRow
+          label={t('home.seeCode')}
+          trailing="arrow-up-right"
+          onPress={() => openOutside(sourceUrl)}
         />
       </ListGroup>
     </Screen>

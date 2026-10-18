@@ -37,7 +37,7 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
               key={option.value}
               accessibilityRole="radio"
               accessibilityLabel={option.label}
-              accessibilityState={{ checked }}
+              aria-checked={checked}
               onPress={() => onChange(option.value)}
               style={({ pressed }) => ({
                 flexDirection: 'row',

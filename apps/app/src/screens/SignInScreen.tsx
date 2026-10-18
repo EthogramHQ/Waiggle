@@ -3,13 +3,16 @@
 
 import { sourceUrl } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, SignInRequest } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { signIn } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { useOpenOutside } from '../navigation/links'
+import { safeNext } from '../navigation/next'
+import { firstParam } from '../navigation/params'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { Notice } from '../ui/Notice'
@@ -27,6 +30,10 @@ export function SignInScreen() {
   const { t } = useTranslation()
   const router = useRouter()
   const openOutside = useOpenOutside()
+  const back = useGoBack('/')
+  // useLocalSearchParams : les paramètres de l'adresse (?next=/members/abc). La page où revenir
+  // après la connexion, seulement si c'est bien une page de l'appli (voir navigation/next.ts).
+  const next = safeNext(firstParam(useLocalSearchParams<{ next?: string | string[] }>().next))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -45,7 +52,7 @@ export function SignInScreen() {
     const result = await signIn(parsed.data)
     setLoading(false)
     // replace (et non push) : le bouton « retour » ne ramènera pas sur l'écran de connexion.
-    if (result.ok) router.replace('/')
+    if (result.ok) router.replace(next ?? '/')
     else setError(result.error)
   }
 
@@ -53,7 +60,7 @@ export function SignInScreen() {
     <Screen
       title={t('auth.signIn.title')}
       subtitle={t('auth.signIn.subtitle')}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      onBack={back}
       hero={
         <WelcomeHero
           tagline={t('home.tagline')}

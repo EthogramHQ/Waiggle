@@ -7,13 +7,23 @@ import { LeavingScreen } from './LeavingScreen'
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 const mockBack = jest.fn()
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: mockBack }),
+  usePathname: () => '/page/actuelle',
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }))
 
+const mockReplace = jest.fn()
+let mockCanGoBack = true
 let openURL: jest.SpyInstance
 beforeEach(() => {
   openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
   mockBack.mockReset()
+  mockReplace.mockReset()
+  mockCanGoBack = true
 })
 afterEach(() => openURL.mockRestore())
 
@@ -47,6 +57,16 @@ describe('LeavingScreen', () => {
 
     expect(mockBack).toHaveBeenCalled()
     expect(openURL).not.toHaveBeenCalled()
+  })
+
+  it('goes home when there is no page to go back to (link opened in a new tab)', async () => {
+    mockCanGoBack = false
+    await renderWithProviders(<LeavingScreen url="https://recettes.example.com" />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Revenir' }))
+
+    expect(mockBack).not.toHaveBeenCalled()
+    expect(mockReplace).toHaveBeenCalledWith('/')
   })
 
   it('refuses local machines and disguised addresses', async () => {

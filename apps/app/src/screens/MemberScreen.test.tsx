@@ -25,6 +25,7 @@ jest.mock('../members/api', () => {
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
+  usePathname: () => '/page/actuelle',
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
@@ -97,7 +98,55 @@ describe('MemberScreen', () => {
     mockSession(null)
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    expect(await screen.findByRole('button', { name: 'Se connecter' })).toBeTruthy()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Se connecter' }))
     expect(getMember).not.toHaveBeenCalled()
+    // Une fois connecté, il reviendra sur cette page.
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/sign-in',
+      params: { next: '/page/actuelle' },
+    })
+  })
+
+  it('also offers a visitor to create an account', async () => {
+    mockSession(null)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Créer un compte' }))
+
+    expect(mockPush).toHaveBeenCalledWith('/sign-up')
+  })
+
+  it('offers to sign in again when the session expired on the way', async () => {
+    jest.mocked(getMember).mockRejectedValue(new ApiError('unauthorized'))
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    expect(await screen.findByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
+    expect(screen.getByText('Ta session a expiré. Reconnecte-toi pour continuer.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Se connecter' })).toBeTruthy()
+  })
+
+  it('shows that it is trying again until the new answer arrives', async () => {
+    jest.mocked(getMember).mockRejectedValueOnce(new Error('réseau coupé'))
+    // La deuxième demande reste en attente : on regarde le bouton pendant ce temps.
+    jest.mocked(getMember).mockReturnValueOnce(new Promise(() => {}))
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    // Sans donnée déjà reçue, la nouvelle tentative remet la page en chargement : le membre voit
+    // que sa demande est partie.
+    expect(await screen.findByText('Chargement…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
+  })
+
+  it('offers to try again when the page could not load', async () => {
+    jest.mocked(getMember).mockRejectedValueOnce(new Error('réseau coupé'))
+    jest.mocked(getMember).mockResolvedValueOnce(leaPage)
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    expect(await screen.findByRole('header', { name: leaPage.name })).toBeTruthy()
   })
 })
