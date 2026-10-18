@@ -32,6 +32,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile # échoue si pnpm-lock.yaml n'est pas à jour
       - run: pnpm lint
+      # Les frontières entre les parties du projet, et le schéma docs/architecture/dependances.md à jour.
+      - run: pnpm arch --check
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build

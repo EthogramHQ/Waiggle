@@ -4,12 +4,21 @@
 //
 // Usage : pnpm --filter @ruche/app shots            (construit l'appli puis photographie)
 //         pnpm --filter @ruche/app shots --no-build (réutilise la dernière construction)
+//         pnpm --filter @ruche/app shots --no-build --layout (mesure la mise en page à 9 largeurs)
 // Les images arrivent dans apps/app/shots/ (non enregistré dans Git).
 //
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
 // d'exemple que les tests (src/testing/). Node lit ces fichiers TypeScript directement.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { createServer } from 'node:http'
 import { dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -198,6 +207,76 @@ const schemes = [
   { name: 'jour', colorScheme: 'light' },
   { name: 'nuit', colorScheme: 'dark' },
 ]
+
+// --layout : au lieu des captures habituelles, chaque page est mesurée à neuf largeurs d'écran, du
+// petit téléphone au grand écran. Le rapport (shots/layout/rapport.md) signale ce qui dépasse de la
+// largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
+// par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification.
+if (process.argv.includes('--layout')) {
+  await layoutReport()
+  server.close()
+  process.exit(0)
+}
+
+async function layoutReport() {
+  const widths = [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920]
+  const dir = join(out, 'layout')
+  rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
+  const browser = await chromium.launch()
+  const lines = ['# Mise en page à plusieurs largeurs', '']
+  for (const signedIn of [false, true]) {
+    const context = await browser.newContext({
+      locale: 'fr-FR',
+      viewport: { width: 390, height: 844 },
+    })
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn))
+    const page = await context.newPage()
+    for (const shot of pages.filter((p) => p.signedIn === signedIn && p.name !== 'catalogue')) {
+      lines.push(`## ${shot.name} (${shot.path})`, '')
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        await page.goto(base + shot.path, { waitUntil: 'networkidle' })
+        await page.waitForTimeout(600)
+        // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
+        const found = await page.evaluate(() => {
+          const width = window.innerWidth
+          const interactive =
+            'button, a, input, textarea, select, [role=button], [role=link], [role=switch], [role=radio], [role=checkbox], [role=tab]'
+          const nameOf = (el) =>
+            (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 40)
+          const visible = (r) => r.width > 0 && r.height > 0
+          const small = [...document.querySelectorAll(interactive)]
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => visible(r) && (r.width < 44 || r.height < 44))
+            .map(({ el, r }) => `${nameOf(el)} (${Math.round(r.width)} × ${Math.round(r.height)})`)
+          const outside = [...document.querySelectorAll('body *')]
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter(({ r }) => visible(r) && (r.right > width + 1 || r.left < -1))
+            .map(({ el }) => nameOf(el))
+          return {
+            scroll: document.documentElement.scrollWidth - width,
+            small: [...new Set(small)],
+            outside: [...new Set(outside)].slice(0, 5),
+          }
+        })
+        await page.screenshot({ path: join(dir, `${shot.name}-${width}.png`), fullPage: true })
+        const notes = []
+        if (found.scroll > 0) notes.push(`défilement horizontal de ${found.scroll} px`)
+        if (found.outside.length > 0) notes.push(`hors de l'écran : ${found.outside.join(' ; ')}`)
+        if (found.small.length > 0) notes.push(`zones à toucher < 44 : ${found.small.join(' ; ')}`)
+        lines.push(
+          `- **${width} px** : ${notes.length > 0 ? notes.join(' — ') : 'rien à signaler'}`,
+        )
+      }
+      lines.push('')
+    }
+    await context.close()
+  }
+  await browser.close()
+  writeFileSync(join(dir, 'rapport.md'), `${lines.join('\n')}\n`)
+  console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
+}
 
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })

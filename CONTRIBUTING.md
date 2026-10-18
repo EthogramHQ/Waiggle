@@ -20,6 +20,7 @@ infra/              Docker Compose (PostgreSQL + pgvector, API, Caddy + appli we
 docs/scenarios/     Scénarios d'usage par phase, écrits avant le code.
 docs/design/        Le design « Miel » : où vit chaque décision et comment la changer.
 docs/adr/           Décisions d'architecture.
+docs/architecture/  Le schéma des dépendances entre parties du projet (fabriqué par pnpm arch).
 docs/ops/           Le serveur : mise en route, déploiement, sauvegardes (serveur.md).
 ```
 
@@ -30,7 +31,8 @@ est empaquetée en un seul fichier par esbuild pour la production.
 
 ```bash
 pnpm install
-pnpm check                       # lint + types + tests, à lancer avant chaque commit
+pnpm check                       # lint + architecture + types + tests, avant chaque commit
+pnpm arch                        # vérifie les frontières entre parties, redessine le schéma
 pnpm lint:fix                    # formatage et corrections Biome
 pnpm --filter @ruche/api dev     # API sur http://localhost:3000 (/health, /openapi.json)
 pnpm --filter @ruche/app web     # appli dans le navigateur (catalogue des composants : /catalogue)
