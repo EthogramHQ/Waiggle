@@ -12,7 +12,9 @@ import { Notice } from './Notice'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
 import { ProjectGrid } from './ProjectGrid'
+import { Screen } from './Screen'
 import { Segmented } from './Segmented'
+import { SheetHeader } from './SheetHeader'
 import { Switch } from './Switch'
 import { Tag } from './Tag'
 import { Text } from './Text'
@@ -343,6 +345,39 @@ describe('Tag', () => {
 
     await rerender(<Tag label="Claude Code" />)
     expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
+describe('SheetHeader', () => {
+  it('offers to cancel and to run the main action, under a title', async () => {
+    const cancel = jest.fn()
+    const publish = jest.fn()
+    await renderWithProviders(
+      <SheetHeader
+        title="Nouveau projet"
+        cancel={{ label: 'Annuler', onPress: cancel }}
+        action={{ label: 'Publier', onPress: publish }}
+      />,
+    )
+
+    expect(screen.getByRole('header', { name: 'Nouveau projet' })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(publish).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Screen', () => {
+  it('shows a sticky header once, above the content', async () => {
+    await renderWithProviders(
+      <Screen stickyHeader header={<Text accessibilityRole="header">Barre</Text>}>
+        <Text>Contenu</Text>
+      </Screen>,
+    )
+
+    expect(screen.getAllByRole('header', { name: 'Barre' })).toHaveLength(1)
+    expect(screen.getByText('Contenu')).toBeTruthy()
   })
 })
 

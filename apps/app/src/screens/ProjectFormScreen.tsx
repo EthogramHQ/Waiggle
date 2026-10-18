@@ -489,6 +489,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   if (!wide) {
     return (
       <Screen
+        stickyHeader
         header={
           <SheetHeader
             title={title}

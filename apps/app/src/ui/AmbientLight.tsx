@@ -58,7 +58,9 @@ export function AmbientLight({ thumbhash }: Props) {
   const strength = scheme === 'night' ? 0.55 : 0.6
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    // overflow: 'hidden' rogne ce qui déborde : sans lui, la lumière agrandit la page et, sur le
+    // web, fait apparaître une barre de défilement horizontale.
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
       <Tilt>
         {/* Deux couches : l'extérieure fixe l'intensité, l'intérieure respire. */}
         <View style={{ position: 'absolute', inset: BLEED, opacity: strength }}>

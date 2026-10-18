@@ -94,8 +94,7 @@ export function TagInput({
                     alignItems: 'center',
                     gap: space.xs,
                     paddingLeft: space.lg,
-                    paddingRight: space.xs,
-                    minHeight: 40,
+                    minHeight: layout.touchTarget,
                     borderRadius: radii.pill,
                     backgroundColor: colors.honeySoft,
                   }}
@@ -107,17 +106,26 @@ export function TagInput({
                     accessibilityRole="button"
                     accessibilityLabel={removeLabel(item)}
                     onPress={() => remove(i)}
-                    hitSlop={6}
+                    // La zone à toucher fait 44 points ; le rond dessiné à l'intérieur, 28.
                     style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: radii.pill,
+                      width: layout.touchTarget,
+                      height: layout.touchTarget,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: colors.surface,
                     }}
                   >
-                    <Icon name="x" size={14} tone="muted" />
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: radii.pill,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: colors.surface,
+                      }}
+                    >
+                      <Icon name="x" size={14} tone="muted" />
+                    </View>
                   </Pressable>
                 </View>
               ))}

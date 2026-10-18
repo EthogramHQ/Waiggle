@@ -14,17 +14,20 @@ type Props = {
 }
 
 export function SheetHeader({ title, cancel, action }: Props) {
+  // Les deux côtés gardent la largeur de leur texte (« Annuler », « Enregistrer » ne sont jamais
+  // coupés) ; le titre prend la place qui reste et s'abrège avec « … » s'il est trop long.
+  // minWidth: 0 autorise le titre à devenir plus étroit que son texte.
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-      <View style={{ flex: 1, alignItems: 'flex-start' }}>
+      <View style={{ flexShrink: 0 }}>
         <TextLink label={cancel.label} onPress={cancel.onPress} role="button" />
       </View>
-      <View style={{ flex: 2 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="headline" align="center" accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
       </View>
-      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+      <View style={{ flexShrink: 0 }}>
         <Button
           label={action.label}
           size="compact"

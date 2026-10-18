@@ -133,6 +133,10 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'textMuted', on: 'surface', min: 4.5 },
   { text: 'textMuted', on: 'surfaceGrouped', min: 4.5 },
   { text: 'textPlaceholder', on: 'surface', min: 4.5 },
+  // Le panneau de verre des cartes de projet et des pages en deux colonnes (Surface « panel »).
+  { text: 'text', on: 'panel', min: 4.5 },
+  { text: 'textSecondary', on: 'panel', min: 4.5 },
+  { text: 'textMuted', on: 'panel', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
   { text: 'onHoney', on: 'honeyPressed', min: 4.5 },
   { text: 'statusText', on: 'honeySoft', min: 4.5 },

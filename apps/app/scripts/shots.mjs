@@ -5,6 +5,7 @@
 // Usage : pnpm --filter @ruche/app shots            (construit l'appli puis photographie)
 //         pnpm --filter @ruche/app shots --no-build (réutilise la dernière construction)
 //         pnpm --filter @ruche/app shots --no-build --layout (mesure la mise en page à 9 largeurs)
+//         pnpm --filter @ruche/app shots --no-build --explore parcours.mjs (essais au clic, voir plus bas)
 // Les images arrivent dans apps/app/shots/ (non enregistré dans Git).
 //
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
@@ -21,7 +22,7 @@ import {
 } from 'node:fs'
 import { createServer } from 'node:http'
 import { dirname, extname, join, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { leaMe } from '../src/testing/fixtures.ts'
 import {
@@ -212,6 +213,43 @@ const schemes = [
 // petit téléphone au grand écran. Le rapport (shots/layout/rapport.md) signale ce qui dépasse de la
 // largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
 // par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification.
+// --explore <script.mjs> : l'appli tourne sur les mêmes données simulées, et le navigateur est confié
+// à un script écrit pour l'occasion (par l'agent de relecture du design, hors du dépôt). Il y clique,
+// tape, appuie deux fois, navigue au clavier… pour vérifier le comportement des boutons et les cas
+// inhabituels, pas seulement l'allure. Le script exporte une fonction par défaut qui reçoit :
+// - base : l'adresse de l'appli ; paths : l'adresse de chaque page photographiée, par son nom ;
+// - open(signedIn, options) : un contexte de navigateur Playwright (visiteur ou Léa connectée),
+//   avec l'API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse (erreur, lenteur).
+// - apiUrl : l'adresse de l'API simulée.
+const exploreAt = process.argv.indexOf('--explore')
+if (exploreAt !== -1) {
+  const script = process.argv[exploreAt + 1]
+  if (!script) throw new Error('--explore attend le chemin du script à lancer')
+  const browser = await chromium.launch()
+  const open = async (signedIn, options = {}) => {
+    const context = await browser.newContext({
+      locale: 'fr-FR',
+      viewport: { width: 390, height: 844 },
+      ...options,
+    })
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn))
+    return context
+  }
+  try {
+    const { default: explore } = await import(pathToFileURL(resolve(script)).href)
+    await explore({
+      base,
+      open,
+      apiUrl,
+      paths: Object.fromEntries(pages.map((p) => [p.name, p.path])),
+    })
+  } finally {
+    await browser.close()
+    server.close()
+  }
+  process.exit(0)
+}
+
 if (process.argv.includes('--layout')) {
   await layoutReport()
   server.close()

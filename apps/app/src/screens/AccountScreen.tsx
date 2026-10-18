@@ -12,11 +12,11 @@ import { useMe } from '../profile/hooks'
 import { useChooseLanguage } from '../profile/useChooseLanguage'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
+import type { IconName } from '../ui/Icon'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Segmented } from '../ui/Segmented'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -25,6 +25,13 @@ import { useTheme } from '../ui/theme/ThemeProvider'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
+
+// Les trois apparences proposées, avec leur icône.
+const appearances: { value: Appearance; icon: IconName }[] = [
+  { value: 'auto', icon: 'circle-half' },
+  { value: 'day', icon: 'sun' },
+  { value: 'night', icon: 'moon' },
+]
 
 export function AccountScreen() {
   const { t } = useTranslation()
@@ -100,19 +107,18 @@ export function AccountScreen() {
         ))}
       </ListGroup>
 
-      <ListGroup title={t('account.appearance.title')} footer={t('account.appearance.hint')}>
-        <Stack padding="md">
-          <Segmented<Appearance>
-            label={t('account.appearance.title')}
-            options={[
-              { value: 'auto', label: t('account.appearance.auto'), icon: 'circle-half' },
-              { value: 'day', label: t('account.appearance.day'), icon: 'sun' },
-              { value: 'night', label: t('account.appearance.night'), icon: 'moon' },
-            ]}
-            value={appearance}
-            onChange={setAppearance}
+      {/* Une liste à cocher, comme la langue : les trois libellés tiennent même sur un petit
+          téléphone, quelle que soit la taille du texte. */}
+      <ListGroup title={t('account.appearance.title')} footer={t('account.appearance.hint')} radio>
+        {appearances.map(({ value, icon }) => (
+          <ListRow
+            key={value}
+            label={t(`account.appearance.${value}`)}
+            icon={icon}
+            selected={value === appearance}
+            onPress={() => setAppearance(value)}
           />
-        </Stack>
+        ))}
       </ListGroup>
 
       <ListGroup title={t('account.data.title')}>

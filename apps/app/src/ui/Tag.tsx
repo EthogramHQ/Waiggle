@@ -1,6 +1,6 @@
 // Une étiquette d'outil ou de modèle (« Claude », « Python »). Touchée, elle mène à la page de
 // l'étiquette ; sans `onPress`, c'est une simple pastille.
-import { borders, radii, space } from '@ruche/brand'
+import { borders, layout, radii, space } from '@ruche/brand'
 import { Pressable, View, type ViewStyle } from 'react-native'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -35,12 +35,12 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
       accessibilityRole="link"
       accessibilityLabel={label}
       onPress={onPress}
-      // La pastille fait 36 points de haut : hitSlop agrandit la zone à toucher à 44 points,
-      // sans changer son dessin.
-      hitSlop={4}
-      style={({ pressed }) => [box, pressed && { backgroundColor: colors.honeySoft }]}
+      // La pastille dessinée fait 36 points de haut ; la zone à toucher autour d'elle, 44.
+      style={{ alignSelf: 'flex-start', minHeight: layout.touchTarget, justifyContent: 'center' }}
     >
-      {content}
+      {({ pressed }) => (
+        <View style={[box, pressed && { backgroundColor: colors.honeySoft }]}>{content}</View>
+      )}
     </Pressable>
   )
 }

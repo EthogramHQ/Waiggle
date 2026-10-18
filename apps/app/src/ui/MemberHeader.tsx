@@ -22,8 +22,10 @@ export function MemberHeader({ name, avatar, bio, toolsTitle, tools, action }: P
   return (
     <Stack gap="lg" align="center">
       <Avatar name={name} source={avatar} label={name} size={96} />
-      <Stack gap="sm" align="center">
-        <Text variant="title1" align="center" accessibilityRole="header">
+      {/* align="stretch" : le nom et la bio prennent toute la largeur et se replient, même un nom
+          très long sans espace. */}
+      <Stack gap="sm" align="stretch">
+        <Text variant="title1" align="center" accessibilityRole="header" breakAnywhere>
           {name}
         </Text>
         {bio ? (

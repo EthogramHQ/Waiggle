@@ -10,7 +10,7 @@
 import { type Radius, radii, type Space, space } from '@ruche/brand'
 import { BlurView } from 'expo-blur'
 import type { ReactNode } from 'react'
-import { Platform, View, type ViewStyle } from 'react-native'
+import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useTheme } from './theme/ThemeProvider'
 
 export type SurfaceVariant = 'plain' | 'grouped' | 'glass' | 'panel' | 'sheet'
@@ -79,9 +79,12 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
   }
 
   if (blur > 0 && realBlur) {
-    // Deux couches : l'extérieure porte l'ombre, l'intérieure le flou. Le flou doit être rogné aux
-    // coins arrondis (overflow: 'hidden'), ce qui rognerait aussi l'ombre s'ils étaient ensemble.
-    const { boxShadow, alignSelf, ...inner } = style
+    // Deux boîtes : l'extérieure porte l'ombre, l'intérieure rogne aux coins arrondis
+    // (overflow: 'hidden'), ce qui rognerait aussi l'ombre si elles étaient ensemble.
+    // Dans l'intérieure, trois couches empilées : le flou, puis la couleur de la matière, puis le
+    // contenu. La couleur est une couche à part car, sur le web, le flou impose sa propre teinte à
+    // la place de la couleur qu'on lui donne : le texte posé dessus manquait alors de contraste.
+    const { boxShadow, alignSelf, backgroundColor, ...inner } = style
     const corners = {
       borderRadius: style.borderRadius,
       borderBottomLeftRadius: style.borderBottomLeftRadius,
@@ -89,13 +92,15 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
     }
     return (
       <View style={{ ...corners, ...(boxShadow ? { boxShadow } : null), alignSelf }}>
-        <BlurView
-          intensity={blur}
-          tint={scheme === 'night' ? 'dark' : 'light'}
-          style={{ ...inner, overflow: 'hidden' }}
-        >
+        <View style={{ ...inner, overflow: 'hidden' }}>
+          <BlurView
+            intensity={blur}
+            tint={scheme === 'night' ? 'dark' : 'light'}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor }]} />
           {children}
-        </BlurView>
+        </View>
       </View>
     )
   }

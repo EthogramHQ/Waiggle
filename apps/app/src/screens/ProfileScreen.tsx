@@ -167,6 +167,7 @@ function ProfileForm({ me }: { me: Me }) {
           />
         )
       }
+      stickyHeader={!wide}
       {...(wide ? { title: t('profile.title') } : null)}
     >
       <Stack gap="md" align="center">
