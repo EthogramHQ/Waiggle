@@ -9,7 +9,11 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
     "test": {
+      "dependsOn": ["transit"],
       "outputs": []
     },
     "dev": {

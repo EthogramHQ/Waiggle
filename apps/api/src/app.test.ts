@@ -46,7 +46,7 @@ describe('unknown routes', () => {
 
     expect(res.status).toBe(404)
     expect(res.headers.get('content-language')).toBe('fr')
-    expect(body.error).toEqual({ code: 'not_found', message: "Cette page n'existe pas." })
+    expect(body.error).toEqual({ code: 'not_found', message: 'Cette page n’existe pas.' })
   })
 
   it('answer in English when the client prefers it', async () => {
