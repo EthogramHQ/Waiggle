@@ -1,0 +1,166 @@
+# Les services qui font tourner l'appli sur un serveur, chacun dans son conteneur.
+#
+# Sur le serveur : jamais lancé à la main, mais par les scripts de infra/ (voir infra/lib.sh et
+# docs/ops/serveur.md). Les images y sont téléchargées depuis ghcr.io, déjà construites par GitHub.
+#
+# Sur son ordinateur, pour tout essayer comme en production (https://localhost) :
+#   cp infra/.env.example infra/.env     # puis renseigner les secrets
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# Les valeurs ${...} viennent de infra/site.env (les adresses publiques), du fichier des secrets
+# et de la version déployée (deployed.env, écrit par infra/deploy.sh). « ${NOM:-défaut} » prend la
+# valeur par défaut si NOM est absent.
+name: ruche
+
+services:
+  # Base de données PostgreSQL, avec l'extension pgvector pour la future recherche sémantique.
+  db:
+    image: pgvector/pgvector:0.8.7-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ruche}
+      POSTGRES_USER: ${POSTGRES_USER:-ruche}
+      # « :? » arrête tout avec ce message si le mot de passe n'est pas défini.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définir POSTGRES_PASSWORD dans le fichier des secrets}
+    volumes:
+      - db-data:/var/lib/postgresql/data # les données survivent au redémarrage du conteneur
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Mémoire maximale : la base ne peut pas priver le reste du serveur de toute sa mémoire.
+    mem_limit: 1g
+    # Pouvoirs spéciaux de Linux (« capabilities ») : seulement ceux dont PostgreSQL a besoin au
+    # démarrage, pour préparer son dossier puis passer à son propre utilisateur.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    # Aucun programme du conteneur ne peut obtenir plus de droits qu'au démarrage.
+    security_opt:
+      - no-new-privileges:true
+    # Nombre maximal de programmes : une erreur qui en lancerait sans fin ne bloque pas le serveur.
+    pids_limit: 256
+    networks:
+      - backend
+
+  # L'API. Sur le serveur : l'image publiée pour la version déployée, désignée par son empreinte
+  # (API_IMAGE=ghcr.io/…@sha256:…, vérifiée avant le déploiement). Sur son ordinateur : construite
+  # à partir du Dockerfile du dépôt (« --build »).
+  api:
+    image: ${API_IMAGE:-ruche-api:local}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Version affichée par /health : on vérifie après chaque déploiement que c'est la bonne.
+      APP_VERSION: ${RUCHE_VERSION:-local}
+      # « db » est le nom du service de base de données ci-dessus : Docker le relie tout seul.
+      DATABASE_URL: postgres://${POSTGRES_USER:-ruche}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ruche}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Définir BETTER_AUTH_SECRET dans le fichier des secrets}
+      # Adresses publiques de l'API (liens des e-mails) et de l'appli (seule origine autorisée).
+      PUBLIC_API_URL: https://${API_DOMAIN:-api.localhost}
+      APP_URL: https://${APP_DOMAIN:-localhost}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-console}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      SCALEWAY_SECRET_KEY: ${SCALEWAY_SECRET_KEY:-}
+      SCALEWAY_PROJECT_ID: ${SCALEWAY_PROJECT_ID:-}
+      SCALEWAY_REGION: ${SCALEWAY_REGION:-fr-par}
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-no-reply@example.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
+      # E-mails écrits dans les logs au lieu d'être envoyés : refusé en production, sauf pour
+      # essayer (voir infra/.env.example).
+      ALLOW_CONSOLE_MAIL: ${ALLOW_CONSOLE_MAIL:-}
+      # Le code d'invitation demandé à l'inscription : sans lui, l'API refuse de démarrer.
+      SIGNUP_INVITE_CODE: ${SIGNUP_INVITE_CODE:?Définir SIGNUP_INVITE_CODE dans le fichier des secrets}
+      MEDIA_DIR: /app/media
+    volumes:
+      # Les avatars des membres. Sauvegardés avec la base de données (infra/backup.sh).
+      - media-data:/app/media
+    # Système de fichiers en lecture seule : seuls le volume des avatars et /tmp (en mémoire)
+    # sont modifiables. Un attaquant ne pourrait rien installer dans le conteneur.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Aucun des pouvoirs spéciaux de Linux (« capabilities ») : l'API n'en a besoin d'aucun.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Mémoire maximale : si l'API déraille, elle seule redémarre, la base de données est épargnée.
+    mem_limit: 1g
+    pids_limit: 256
+    depends_on:
+      db:
+        condition: service_healthy # attend que la base réponde avant de démarrer
+    networks:
+      - backend
+      - web
+
+  # La porte d'entrée : Caddy et l'appli web (infra/web/Dockerfile, infra/Caddyfile). Il gère le
+  # HTTPS (certificats automatiques), sert l'appli et transmet les requêtes de l'API.
+  web:
+    image: ${WEB_IMAGE:-ruche-web:local}
+    build:
+      context: ..
+      dockerfile: infra/web/Dockerfile
+      args:
+        APP_DOMAIN: ${APP_DOMAIN:-localhost}
+        API_DOMAIN: ${API_DOMAIN:-api.localhost}
+    restart: unless-stopped
+    # Les seuls ports ouverts sur Internet : 80 (HTTP, qui renvoie vers HTTPS) et 443 (HTTPS,
+    # en TCP et en UDP pour HTTP/3).
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      API_DOMAIN: ${API_DOMAIN:-api.localhost}
+    volumes:
+      # Les certificats HTTPS : gardés d'une version à l'autre, sinon il faudrait les redemander.
+      - caddy-data:/data
+      - caddy-config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Caddy tourne avec son propre utilisateur, sans aucun pouvoir spécial (voir
+    # infra/web/Dockerfile). Sous Linux, les ports en dessous de 1024 (80, 443) sont réservés à
+    # root : ce réglage, valable dans ce conteneur seulement, les ouvre à tous ses programmes.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - web
+
+networks:
+  # Réseau interne : la base n'est joignable que par l'API, jamais depuis Internet.
+  backend:
+    internal: true
+  # Réseau de la porte d'entrée, en IPv4 et en IPv6. Sans IPv6 ici, Docker relaierait les
+  # visiteurs IPv6 en leur donnant à tous la même adresse : la limitation de débit les
+  # confondrait (5 échecs de connexion d'un seul bloqueraient tous les autres).
+  web:
+    enable_ipv6: true
+
+volumes:
+  db-data:
+  media-data:
+  caddy-data:
+  caddy-config:

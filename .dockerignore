@@ -1,0 +1,23 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.expo
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+# Rien de local ni de personnel dans ce qui part vers Docker : base de développement, captures,
+# fichiers du serveur.
+**/.data
+apps/app/shots
+apps/app/dist-shots
+**/secrets.env
+**/deployed.env
+**/*.db.dump
+**/*.media.tar.gz
+**/*.partiel
+**/coverage
+**/*.local.md
+**/*.local.json

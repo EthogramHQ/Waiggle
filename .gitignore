@@ -1,0 +1,43 @@
+# Dépendances
+node_modules/
+
+# Builds
+dist/
+.turbo/
+web-build/
+
+# Expo
+.expo/
+expo-env.d.ts
+ios/
+android/
+
+# Secrets : jamais dans le dépôt
+.env
+.env.*
+!.env.example
+# Fichiers du serveur (voir docs/ops/serveur.md), au cas où l'un d'eux serait copié ici
+secrets.env
+deployed.env
+*.db.dump
+*.media.tar.gz
+*.partiel
+
+# Outils et système
+coverage/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Réglages et notes personnels, propres à chaque poste
+**/*.local.md
+**/*.local.json
+
+# Base de données locale de développement (PGlite)
+.data/
+
+# Captures d’écran automatiques (scripts/shots.mjs)
+apps/app/shots/
+apps/app/dist-shots/

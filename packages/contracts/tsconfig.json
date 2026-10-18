@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // « DOM » apporte les types des outils standard du web, comme la classe URL : les contrats
+    // s'en servent, et ils tournent partout où elle existe (navigateur, Node, appli Expo).
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"]
+}

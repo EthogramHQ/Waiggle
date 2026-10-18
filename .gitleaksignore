@@ -1,0 +1,6 @@
+# Faux positifs reconnus par l'outil de recherche de secrets (gitleaks), un par ligne.
+# Chaque ligne désigne une trouvaille précise : commit, fichier, règle, ligne.
+#
+# Résumé d'image (ThumbHash) d'un exemple du catalogue des composants, pas une clé. Les versions
+# suivantes du fichier portent le commentaire « gitleaks:allow » sur la ligne.
+49556f80da1f90ec618a250fc0eaa5fe55fff7d5:apps/app/src/catalogue/CatalogueScreen.tsx:generic-api-key:48

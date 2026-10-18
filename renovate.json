@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor", "docker:pinDigests"],
+  "timezone": "Europe/Paris",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Expo SDK upgrades are done deliberately with `expo install --fix`, not by Renovate.",
+      "matchPackageNames": [
+        "expo",
+        "expo-*",
+        "jest-expo",
+        "react",
+        "react-dom",
+        "react-native",
+        "react-native-*",
+        "@types/react"
+      ],
+      "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    },
+    {
+      "description": "Better Auth packages pin each other exactly (and the app pins @better-auth/utils to satisfy @better-auth/core's peer): update them together.",
+      "matchPackageNames": ["better-auth", "@better-auth/*", "better-call"],
+      "groupName": "better-auth"
+    }
+  ]
+}

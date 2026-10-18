@@ -1,0 +1,42 @@
+packages:
+  - apps/*
+  - apps/api/runtime
+  - packages/*
+
+# Only these dependencies may run install scripts (supply-chain protection).
+onlyBuiltDependencies:
+  - esbuild
+
+# Install scripts we reviewed and deliberately do not run (prebuilt binaries are used instead).
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - unrs-resolver
+
+# Versions imposées à une dépendance indirecte, pour un correctif de sécurité que son parent n'a pas
+# encore adopté. Chacune est vérifiée (tests, migrations, captures) et retirée dès que le parent suit.
+overrides:
+  # uuid < 11.1.1 (GHSA-w5hq-g745-h8pq), amené par xcode via les plugins de configuration d'Expo.
+  # xcode fait require('uuid').v4() : la version 11 garde cette forme (CommonJS).
+  uuid@<11.1.1: 11.1.1
+  # esbuild <= 0.24.2 (GHSA-67mh-4wv8-2f99), amené par @esbuild-kit/core-utils via drizzle-kit, qui
+  # n'utilise que la transformation de code, pas le serveur de développement visé par la faille.
+  '@esbuild-kit/core-utils>esbuild': 0.25.12
+
+# Failles acceptées après examen. Chacune a sa raison, et on la revérifie à chaque mise à jour du SDK Expo.
+auditConfig:
+  ignoreGhsas:
+    # node-forge, via l'outil en ligne de commande d'Expo (certificats du serveur de développement).
+    # Absent de l'appli et de l'API ; pas encore de correctif.
+    - GHSA-86w9-cpqp-85rv
+    # braces, via Jest (recherche de nos propres fichiers de test). Outil de test seulement ; pas encore
+    # de correctif.
+    - GHSA-vfj7-8cjw-p6xm
+    # sprintf-js, via la couverture de code de Jest (js-yaml 3 lit nos propres fichiers de
+    # configuration). Outil de test seulement ; pas encore de correctif.
+    - GHSA-hp3w-g68c-fv3c
+    # decode-uri-component <= 0.4.2, via query-string 7 dans expo-router : présent dans l'appli web. Un
+    # lien piégé peut figer l'onglet de la personne qui l'ouvre (rien côté serveur, aucune donnée
+    # exposée). La version corrigée 0.5.0 n'existe qu'en module ESM, que query-string 7 charge avec
+    # require() : l'imposer casserait la navigation. Disparaît avec le SDK Expo 58, dont expo-router ne
+    # dépend plus de query-string.
+    - GHSA-vcc3-ghjq-m6fr

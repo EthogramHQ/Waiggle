@@ -1,0 +1,38 @@
+{
+  "name": "@ruche/api",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --sourcemap --outfile=dist/index.js --external:@ruche/db/pglite --external:pg-native --external:sharp --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "start": "node --enable-source-maps dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "auth:schema": "auth generate --config scripts/auth-schema.config.ts --output ../../packages/db/src/schema/auth.ts --yes"
+  },
+  "dependencies": {
+    "@better-auth/expo": "1.7.7",
+    "@hono/node-server": "2.1.4",
+    "@hono/zod-openapi": "1.6.3",
+    "@ruche/brand": "workspace:*",
+    "@ruche/contracts": "workspace:*",
+    "@ruche/db": "workspace:*",
+    "@ruche/i18n": "workspace:*",
+    "better-auth": "1.7.7",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.13",
+    "sharp": "0.35.5",
+    "thumbhash": "0.1.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "auth": "1.7.7",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

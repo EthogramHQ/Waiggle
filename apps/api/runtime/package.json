@@ -1,0 +1,11 @@
+{
+  "name": "@ruche/api-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "description": "Runtime dependencies of the API Docker image that cannot be bundled by esbuild (native code).",
+  "type": "module",
+  "dependencies": {
+    "sharp": "0.35.5"
+  }
+}

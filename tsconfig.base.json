@@ -1,0 +1,27 @@
+// Réglages TypeScript communs à tous les paquets (chacun les reprend avec "extends").
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Version de JavaScript visée et fonctions disponibles (Node 22+ et navigateurs récents).
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    // Modules modernes (import/export), résolus comme le ferait un outil d'assemblage (bundler).
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    // Mode strict : TypeScript refuse les zones floues (valeur peut-être absente, type implicite…).
+    "strict": true,
+    // tableau[i] peut être `undefined` si i dépasse la taille : TypeScript oblige à le prévoir.
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    // Une propriété optionnelle ne peut pas recevoir `undefined` explicitement : plus de rigueur.
+    "exactOptionalPropertyTypes": true,
+    // Oblige à écrire `import type` pour ce qui n'est qu'un type : le code produit reste minimal.
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    // Ne revérifie pas les types des bibliothèques installées : plus rapide.
+    "skipLibCheck": true,
+    // TypeScript ne fait que vérifier ; la transformation en JavaScript est faite par d'autres outils.
+    "noEmit": true
+  }
+}

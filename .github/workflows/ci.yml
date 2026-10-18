@@ -1,0 +1,216 @@
+# Intégration continue : GitHub lance ces vérifications à chaque envoi sur main
+# et sur chaque pull request. Une pull request n'est fusionnée que si tout est vert.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Droits minimaux : la CI peut lire le code, rien de plus.
+permissions:
+  contents: read
+
+# Si on pousse deux fois de suite sur une pull request, la vérification précédente est annulée.
+# Sur main, chaque commit a son propre groupe : aucune fusion n'est annulée, chacune publie ses
+# images.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  # Lint, types, tests et construction de l'API et de l'appli web.
+  check:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4 # version de pnpm lue dans package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile # échoue si pnpm-lock.yaml n'est pas à jour
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      # Le catalogue des composants est un outil de développement : dans l'appli publiée, sa page
+      # doit rester « introuvable ».
+      - run: test -f apps/app/dist/catalogue.html && ! grep -q "Catalogue des composants" apps/app/dist/catalogue.html
+      # Le Caddyfile du serveur convient-il à l'appli construite ? (voir infra/web/check-web.mjs)
+      - run: node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
+      # Relecture des scripts du serveur : shellcheck repère les erreurs classiques du shell
+      # (guillemets oubliés, variables vides…). Il est déjà installé sur les machines de GitHub.
+      - run: shellcheck -x infra/*.sh infra/server/*.sh
+
+  # Photographie l'appli web (catalogue des composants et écrans, sur téléphone et ordinateur, de
+  # jour et de nuit) et joint les images à la vérification : page de la vérification, rubrique
+  # « Artifacts », fichier « captures ». Pour relire un changement d'interface sans lancer l'appli.
+  # Échoue aussi si une page affiche une erreur (par exemple un écart entre le serveur et le navigateur).
+  shots:
+    name: Screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # si le navigateur se bloque, on n'attend pas des heures
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ruche/app exec playwright install --with-deps chromium
+      - run: pnpm --filter @ruche/app shots
+      - uses: actions/upload-artifact@v4
+        if: always() # même en cas d'échec : les images aident à comprendre pourquoi
+        with:
+          name: captures
+          path: apps/app/shots/
+          retention-days: 14
+
+  # Cherche des secrets (mots de passe, clés) oubliés dans tout l'historique Git.
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tout l'historique, pas seulement le dernier commit
+      # gitleaks lancé directement dans son conteneur officiel, sur tout l'historique.
+      # (L'action GitHub ne savait pas analyser le tout premier commit du dépôt.)
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --verbose
+
+  # Signale les failles connues dans les dépendances (exceptions justifiées dans pnpm-workspace.yaml).
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false # rien n'est installé ici, donc rien à mettre en cache
+      - run: pnpm audit --audit-level high
+
+  # Construit l'image Docker de l'API, puis la démarre comme en production pour un test
+  # « de fumée » de bout en bout (voir infra/smoke-test.sh).
+  docker:
+    name: API image builds and runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -f apps/api/Dockerfile -t ruche-api:ci .
+      - run: infra/smoke-test.sh ruche-api:ci
+
+  # La pile de production au complet (base, API, porte d'entrée web), lancée avec le vrai
+  # docker-compose.yml et les vrais scripts du serveur : pages, en-têtes de sécurité, sauvegarde
+  # et restauration, puis une visite dans un vrai navigateur (voir infra/stack-test.sh).
+  stack:
+    name: Production stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # l'essai de deploy.sh simule un dépôt Git avec son historique
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Pour la visite dans le navigateur (apps/app/scripts/site-check.mjs).
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ruche/app exec playwright install --with-deps chromium
+      - run: infra/stack-test.sh
+      # Si le parcours d'un membre s'arrête, ses captures d'écran aident à comprendre pourquoi.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: parcours
+          path: journey-*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Publie les images de l'API et de la porte d'entrée web sur ghcr.io. Seulement après une fusion
+  # sur main, et seulement si toutes les vérifications ci-dessus sont vertes. Le serveur les
+  # télécharge ensuite (infra/deploy.sh) : il ne construit rien lui-même.
+  # Ce job peut écrire des images : ses actions sont épinglées par l'empreinte de leur code (le
+  # commentaire donne la version), pour qu'une action modifiée en douce ne puisse pas en profiter.
+  publish:
+    name: Publish images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, shots, secrets, audit, docker, stack]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # publier les images sur ghcr.io
+      id-token: write # signer l'attestation de provenance
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false # le jeton de GitHub ne reste pas dans .git/config
+      # Les adresses publiques et le préfixe des images, lus dans infra/site.env. On vérifie leur
+      # forme avant de s'en servir : chaque réglage une seule fois, et seulement des caractères
+      # de noms de domaine et d'images (une valeur piégée ne peut pas ajouter de lignes).
+      - name: Read infra/site.env
+        id: site
+        shell: bash
+        run: |
+          set -euo pipefail
+          read_value() {
+            [ "$(grep -c "^$1=" infra/site.env)" = 1 ] || { echo "$1 : une et une seule ligne attendue" >&2; exit 1; }
+            sed -n "s/^$1=//p" infra/site.env
+          }
+          app=$(read_value APP_DOMAIN); api=$(read_value API_DOMAIN); prefix=$(read_value IMAGE_PREFIX)
+          [[ $app =~ ^[a-z0-9.-]+$ ]] || { echo "APP_DOMAIN invalide"; exit 1; }
+          [[ $api =~ ^[a-z0-9.-]+$ ]] || { echo "API_DOMAIN invalide"; exit 1; }
+          [[ $prefix =~ ^ghcr\.io/[a-z0-9._/-]+$ ]] || { echo "IMAGE_PREFIX invalide"; exit 1; }
+          { echo "app=$app"; echo "api=$api"; echo "prefix=$prefix"; } >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # jeton temporaire fourni par GitHub, aucun secret à créer
+      - name: API image
+        id: api
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.site.outputs.prefix }}-api:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+      # L'attestation de provenance : une preuve signée que cette image a été construite par cette
+      # CI, à partir de ce commit. Vérifiable avec : gh attestation verify oci://<image> -R <dépôt>
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.site.outputs.prefix }}-api
+          subject-digest: ${{ steps.api.outputs.digest }}
+          push-to-registry: true
+      - name: Web image
+        id: web
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/web/Dockerfile
+          push: true
+          build-args: |
+            APP_DOMAIN=${{ steps.site.outputs.app }}
+            API_DOMAIN=${{ steps.site.outputs.api }}
+          tags: ${{ steps.site.outputs.prefix }}-web:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.site.outputs.prefix }}-web
+          subject-digest: ${{ steps.web.outputs.digest }}
+          push-to-registry: true

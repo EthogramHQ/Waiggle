@@ -1,0 +1,121 @@
+# Caddy : la porte d'entrée du serveur. C'est le seul programme joignable depuis Internet.
+# - Il obtient et renouvelle tout seul les certificats HTTPS (le cadenas du navigateur).
+# - Sur le domaine de l'appli (waiggle.io), il sert les fichiers de l'appli web, déjà construite.
+# - Sur le domaine de l'API (api.waiggle.io), il transmet les requêtes à l'API.
+# Les domaines viennent de infra/site.env. {$NOM:défaut} lit une variable d'environnement ;
+# sans elle, Caddy prend la valeur par défaut : localhost, pour essayer sur son ordinateur.
+#
+# Ce fichier est copié dans l'image « web » (infra/web/Dockerfile). Le modifier, c'est donc
+# publier une nouvelle version, comme pour le code.
+
+# Réglages généraux.
+{
+	# Caddy peut recevoir de nouveaux réglages par une petite API interne. On ne s'en sert pas
+	# (on redémarre le conteneur à la place) : on la coupe, c'est une porte de moins.
+	admin off
+}
+
+# Les en-têtes de sécurité de l'appli web, regroupés dans un « snippet » (un morceau réutilisable).
+(app_security) {
+	header {
+		# HSTS : le navigateur retient pendant un an de n'utiliser que HTTPS pour ce site.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Le navigateur ne devine pas le type d'un fichier : un texte n'est jamais exécuté comme du code.
+		X-Content-Type-Options "nosniff"
+		# Vers un autre site, on n'envoie que le nom du site d'origine, pas l'adresse de la page.
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Aucun autre site ne peut afficher l'appli dans un cadre (contre le « clickjacking »).
+		X-Frame-Options "DENY"
+		Cross-Origin-Opener-Policy "same-origin"
+		# L'appli web n'utilise ni la caméra, ni le micro, ni la position.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# CSP (Content Security Policy) : la liste de ce que la page a le droit de charger.
+		# Si un jour un texte piégé arrivait à s'insérer dans la page, le navigateur refuserait
+		# d'exécuter son code. Dans l'ordre :
+		# - par défaut, rien d'autre que le site lui-même ('self') ;
+		# - les scripts : ceux du site, plus le seul petit script écrit dans la page par Expo,
+		#   reconnu à son empreinte (sha256). infra/web/check-web.mjs vérifie cette empreinte à
+		#   chaque construction : si Expo change ce script, la construction échoue ;
+		# - les styles écrits dans la page par React Native Web ('unsafe-inline') ;
+		# - les images du site, de l'API (avatars) et celles fabriquées dans la page (data:, blob:) ;
+		# - les appels réseau : le site, l'API, et les copies d'images fabriquées dans la page (blob:).
+		#   Avant d'envoyer une photo, l'appli relit l'image réduite sur l'appareil (media/pick.ts) :
+		#   sans blob:, le navigateur refusait cette lecture, et l'envoi échouait. Une adresse blob:
+		#   ne mène qu'à la mémoire de la page elle-même, jamais vers un autre site ;
+		# - aucun cadre, aucun plugin, aucun formulaire vers un autre site.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-67fhrP0+BkBqmgGGXTtgiVO/9EQs3QruYNU/7fnRkI8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://{$API_DOMAIN:api.localhost}; font-src 'self'; connect-src 'self' blob: https://{$API_DOMAIN:api.localhost}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+		# Caddy n'annonce pas son nom.
+		-Server
+	}
+}
+
+# L'appli web.
+{$APP_DOMAIN:localhost} {
+	import app_security
+	# Compresse les réponses : les pages et le code arrivent plus vite.
+	encode zstd gzip
+	# Le dossier des fichiers de l'appli, dans l'image.
+	root * /srv/app
+
+	# Cache du navigateur. Les fichiers de /_expo/static et /assets ont une empreinte dans leur
+	# nom, qui change à chaque modification : le navigateur peut les garder un an. Les pages,
+	# elles, sont toujours redemandées, pour que chacun ait la dernière version.
+	@immutable path /_expo/static/* /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@mutable not path /_expo/static/* /assets/*
+	header @mutable Cache-Control "no-cache"
+
+	# Trouver le fichier d'une adresse. « route » garde l'ordre d'écriture des règles.
+	route {
+		# 0. Le plan du site d'Expo Router (/_sitemap) est un outil de développement : en ligne,
+		#    il est « introuvable », comme le catalogue des composants.
+		@sitemap path /_sitemap /_sitemap.html
+		error @sitemap 404
+		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
+		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
+		try_files {path} {path}.html {path}/index.html
+		# 2. Les pages à paramètre sont construites une seule fois, sous le nom du paramètre :
+		#    /projects/0192abcd → projects/[id].html. Les « [^/.]+ » n'acceptent ni barre ni point :
+		#    une page déjà trouvée à l'étape 1 (/projects/new.html) n'est pas réécrite.
+		#    Une nouvelle page à paramètre dans l'appli ? Ajouter sa règle ici :
+		#    infra/web/check-web.mjs fait échouer la construction tant qu'elle manque.
+		@project_edit path_regexp ^/projects/[^/.]+/edit$
+		rewrite @project_edit /projects/[id]/edit.html
+		@project path_regexp ^/projects/[^/.]+$
+		rewrite @project /projects/[id].html
+		@member path_regexp ^/members/[^/.]+$
+		rewrite @member /members/[id].html
+		@tag path_regexp ^/tags/[^/.]+$
+		rewrite @tag /tags/[slug].html
+		file_server
+	}
+
+	# Une adresse inconnue : la page « introuvable » de l'appli, avec le code 404.
+	# Les réponses d'erreur repartent de zéro : on y remet les en-têtes de sécurité.
+	handle_errors 404 {
+		import app_security
+		header Cache-Control "no-cache"
+		rewrite * /+not-found.html
+		file_server
+	}
+}
+
+# www.waiggle.io renvoie vers waiggle.io.
+www.{$APP_DOMAIN:localhost} {
+	redir https://{$APP_DOMAIN:localhost}{uri} permanent
+}
+
+# L'API. Ses en-têtes de sécurité sont posés par l'API elle-même (apps/api/src/app.ts).
+{$API_DOMAIN:api.localhost} {
+	encode zstd gzip
+	header -Server
+	# Aucune requête de plus de 6 Mo n'atteint l'API (la plus grosse légitime : un avatar de 5 Mo).
+	request_body {
+		max_size 6MB
+	}
+	reverse_proxy api:3000 {
+		# Adresse IP réelle du visiteur, utilisée par la limitation de débit.
+		# header_up REMPLACE toute valeur envoyée par le visiteur : il ne peut pas la falsifier.
+		header_up X-Real-IP {remote_host}
+	}
+}
