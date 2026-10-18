@@ -4,6 +4,10 @@
 // fasse en une seule ligne.
 // `as const` en bas du fichier fige les valeurs pour que TypeScript en déduise la forme exacte.
 // Ton : on tutoie, comme entre proches.
+// Typographie française : une espace insécable fine (U+202F) avant « ? », « ! » et « ; », une espace
+// insécable (U+00A0) avant « : » et à l'intérieur des guillemets, et l'apostrophe typographique (’).
+// Ces espaces sont invisibles ici, mais elles empêchent un « ? » ou un « » » de se retrouver seul en
+// début de ligne. Un test (src/typography.test.ts) vérifie qu'aucun texte ne les oublie.
 export const fr = {
   common: {
     language: 'Langue',
@@ -20,15 +24,18 @@ export const fr = {
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
   },
+  nav: {
+    newProject: 'Nouveau projet',
+  },
   home: {
     title: 'Bienvenue sur {{appName}}',
     tagline: 'Montre à tes proches ce que tu construis avec l’IA.',
     comingSoon: 'Le fil arrive bientôt.',
     comingSoonBody:
-      'Tu y verras les projets de tes proches. En attendant, publie le tien : il sera prêt pour eux.',
-    greeting: 'Bonjour {{name}} !',
+      'Tu y verras les projets de tes proches. En attendant, publie le tien : il sera prêt pour eux.',
+    greeting: 'Bonjour {{name}} !',
     signUp: 'Créer un compte',
-    signIn: 'Se connecter',
+    signIn: 'Me connecter',
     haveAccount: 'J’ai déjà un compte',
     account: 'Mon compte',
     publish: 'Publier un projet',
@@ -53,16 +60,16 @@ export const fr = {
       done: 'C’est bon, ton mot de passe est assez long.',
     },
     signUp: {
-      title: 'Créer ton compte',
+      title: 'Créer un compte',
       subtitle: 'Tes proches te reconnaîtront à ton nom affiché.',
-      submit: 'Créer mon compte',
+      submit: 'Créer un compte',
       haveAccount: 'J’ai déjà un compte',
     },
     signIn: {
       title: 'Te revoilà',
       subtitle: 'Connecte-toi pour retrouver les projets de tes proches.',
       submit: 'Me connecter',
-      noAccount: 'Pas encore de compte ?',
+      noAccount: 'Pas encore de compte ?',
       createOne: 'Créer un compte',
     },
     checkEmail: {
@@ -74,7 +81,7 @@ export const fr = {
     },
     verified: {
       title: 'Adresse vérifiée',
-      body: 'Ton compte est actif. Tu peux maintenant te connecter, ici ou dans l’appli.',
+      body: 'Ton compte est actif : bienvenue sur {{appName}} !',
       continue: 'Continuer',
     },
     errors: {
@@ -84,7 +91,7 @@ export const fr = {
       passwordTooLong: 'Le mot de passe doit faire au plus {{max}} caractères.',
       invalidCredentials: 'Adresse e-mail ou mot de passe incorrect.',
       emailNotVerified:
-        'Ton adresse n’est pas encore vérifiée : nous venons de te renvoyer le lien par e-mail.',
+        'Ton adresse n’est pas encore vérifiée : nous venons de te renvoyer le lien par e-mail.',
       tooManyAttempts: 'Trop de tentatives. Réessaie dans quelques minutes.',
       inviteRequired: 'Indique le code d’invitation que tu as reçu.',
       inviteInvalid:
@@ -93,7 +100,7 @@ export const fr = {
     },
   },
   account: {
-    title: 'Réglages',
+    title: 'Mon compte',
     about: { title: 'À propos' },
     signOut: 'Me déconnecter',
     editProfile: 'Modifier mon profil',
@@ -106,7 +113,7 @@ export const fr = {
       auto: 'Automatique',
       day: 'Jour',
       night: 'Nuit',
-      hint: 'Sur cet appareil seulement. « Automatique » suit le réglage de ton appareil.',
+      hint: 'Sur cet appareil seulement. « Automatique » suit le réglage de ton appareil.',
     },
     data: { title: 'Mes données' },
     export: {
@@ -174,15 +181,15 @@ export const fr = {
       title: 'Titre',
       pitch: 'Le pitch, en une phrase',
       description: 'Description',
-      descriptionHint: 'Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…).',
-      status: 'Où en est-il ?',
+      descriptionHint: 'Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…).',
+      status: 'Où en est-il ?',
       public: 'Public',
       publicHint: 'Visible par les membres connectés. En privé, il te sert de brouillon.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://mon-projet.vercel.app',
-      demoUrlOk: 'C’est bon : un site public en https.',
+      demoUrlOk: 'C’est bon : un site public en https.',
       recipe: 'Ajouter la recette',
-      recipeHint: 'Outils, temps passé, prompts clés : facultatif',
+      recipeHint: 'Outils, temps passé, prompts clés : facultatif',
       tools: 'Outils et modèles utilisés',
       toolsLimit: '{{max}} au plus',
       toolsPlaceholder: 'Ajouter un outil ou un modèle',
@@ -229,7 +236,7 @@ export const fr = {
       remove: 'Retirer la photo {{number}}',
       portrait: 'Couverture verticale (téléphone)',
       portraitHint:
-        'Facultative, plus haute que large : affichée sur téléphone. Sans elle, la première photo est recadrée au centre.',
+        'Facultative, plus haute que large : affichée sur téléphone. Sans elle, la première photo est recadrée au centre.',
       choosePortrait: 'Choisir une couverture verticale',
       replacePortrait: 'Remplacer la couverture verticale',
       removePortrait: 'Retirer la couverture verticale',
@@ -243,7 +250,7 @@ export const fr = {
       published: 'publié le {{date}}',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
-      private: 'Privé : visible par toi seulement',
+      private: 'Privé : visible par toi seulement',
       tryDemo: 'Tester la démo',
       noDemo: 'Pas encore de démo',
       recipe: 'La recette',
@@ -252,7 +259,7 @@ export const fr = {
       prompts: 'Prompts clés',
       edit: 'Modifier',
       delete: 'Supprimer',
-      deleteTitle: 'Supprimer « {{title}} » ?',
+      deleteTitle: 'Supprimer « {{title}} » ?',
       deleteConfirm:
         'Le projet, sa description, sa recette et ses photos disparaissent tout de suite. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer le projet',
@@ -290,7 +297,9 @@ export const fr = {
   },
   tag: {
     subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
-    empty: 'Aucun projet public pour l’instant.',
+    emptyTitle: 'Encore aucun projet ici',
+    empty:
+      'Aucun projet public fait avec cet outil pour l’instant. Le tien sera peut-être le premier.',
   },
   states: {
     errorTitle: 'Cette page n’a pas pu se charger',
@@ -304,13 +313,13 @@ export const fr = {
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
-    body: 'Ce lien mène vers un autre site. {{appName}} ne vérifie pas son contenu : n’y entre pas d’informations personnelles si tu as un doute.',
+    body: 'Ce lien mène vers un autre site. {{appName}} ne vérifie pas son contenu : n’y entre pas d’informations personnelles si tu as un doute.',
     destination: 'Destination',
     safety: 'Ce site n’est pas sur {{appName}}. N’y saisis jamais ton mot de passe {{appName}}.',
     continue: 'Continuer vers {{host}}',
     back: 'Revenir',
     invalid:
-      'Ce lien ne peut pas être ouvert : seules les adresses https vers un site public sont acceptées.',
+      'Ce lien ne peut pas être ouvert : seules les adresses https vers un site public sont acceptées.',
   },
   email: {
     footer: '{{appName}}, le réseau des projets IA entre proches.',
@@ -324,13 +333,13 @@ export const fr = {
     },
     existingAccount: {
       subject: 'Tentative d’inscription sur {{appName}}',
-      body: 'Quelqu’un vient d’essayer de créer un compte avec ton adresse. Tu as déjà un compte : il te suffit de te connecter.',
+      body: 'Quelqu’un vient d’essayer de créer un compte avec ton adresse. Tu as déjà un compte : il te suffit de te connecter.',
       button: 'Me connecter',
-      ignore: 'Si ce n’était pas toi, tu n’as rien à faire : ton compte est en sécurité.',
+      ignore: 'Si ce n’était pas toi, tu n’as rien à faire : ton compte est en sécurité.',
     },
   },
   errors: {
-    notFound: "Cette page n'existe pas.",
+    notFound: 'Cette page n’existe pas.',
     validation: 'Certaines informations sont invalides.',
     unauthorized: 'Connecte-toi pour continuer.',
     forbidden: 'Cette action n’est pas autorisée.',

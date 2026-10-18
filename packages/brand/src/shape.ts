@@ -53,5 +53,7 @@ export const layout = {
   mainColumn: 560, // largeur minimale de la colonne principale avant de passer en pile
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
   touchTarget: 44, // taille minimale d'une zone à toucher du doigt
+  chipHeight: 36, // hauteur dessinée d'une étiquette (sa zone à toucher, autour, fait 44)
+  chipControl: 28, // rond du bouton « retirer » posé dans une étiquette
   controlHeight: { regular: 52, compact: 44 }, // hauteur des boutons et des champs
 } as const

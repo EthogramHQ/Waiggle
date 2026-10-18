@@ -98,7 +98,7 @@ describe('MemberScreen', () => {
     mockSession(null)
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Se connecter' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Me connecter' }))
     expect(getMember).not.toHaveBeenCalled()
     // Une fois connecté, il reviendra sur cette page.
     expect(mockPush).toHaveBeenCalledWith({
@@ -123,7 +123,7 @@ describe('MemberScreen', () => {
     expect(await screen.findByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
     expect(screen.getByText('Ta session a expiré. Reconnecte-toi pour continuer.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Se connecter' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Me connecter' })).toBeTruthy()
   })
 
   it('shows that it is trying again until the new answer arrives', async () => {

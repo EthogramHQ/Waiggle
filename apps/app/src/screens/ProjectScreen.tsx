@@ -24,6 +24,7 @@ import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
 import { Dialog } from '../ui/Dialog'
+import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
@@ -74,7 +75,11 @@ function ProjectView({ project }: { project: Project }) {
   const openOutside = useOpenOutside()
   const forgetProject = useForgetProject()
   const toSource = useMediaSources()
-  const wide = useLayout().sizeClass === 'wide'
+  const { sizeClass } = useLayout()
+  // large : tablette et ordinateur, où la page passe en colonnes (la latérale va dessous si la
+  // place manque) ; wide : ordinateur seulement.
+  const large = sizeClass !== 'compact'
+  const wide = sizeClass === 'wide'
   // La photo de la galerie choisie dans les vignettes ; null : la couverture par défaut.
   const [selected, setSelected] = useState<number | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -103,7 +108,7 @@ function ProjectView({ project }: { project: Project }) {
   const gallery = project.visuals
   const photoLabel = (index: number) =>
     t('project.visuals.photo', { number: index + 1, total: gallery.length })
-  const portrait = wide ? null : project.portraitCover
+  const portrait = large ? null : project.portraitCover
   const shown: { visual: ProjectVisual; label: string } | null =
     selected !== null && gallery[selected]
       ? { visual: gallery[selected], label: photoLabel(selected) }
@@ -134,8 +139,9 @@ function ProjectView({ project }: { project: Project }) {
   // Sur téléphone, une couverture verticale a besoin de hauteur pour ne pas être trop recadrée.
   const cover = (
     <ProjectCover
-      height={wide ? 520 : shown?.visual === portrait && portrait ? 480 : 240}
-      radius={wide ? 'tile' : 'sheet'}
+      // Sans photo, la couverture n'est qu'une lumière miel : pas la peine qu'elle soit très haute.
+      height={large ? (shown ? 520 : 240) : shown?.visual === portrait && portrait ? 480 : 240}
+      radius={large ? 'tile' : 'sheet'}
       image={
         shown
           ? {
@@ -146,7 +152,7 @@ function ProjectView({ project }: { project: Project }) {
           : null
       }
     >
-      {wide ? null : (
+      {large ? null : (
         <Row padding="lg">
           <IconButton icon="arrow-left" label={t('common.back')} onPress={back} />
         </Row>
@@ -160,9 +166,12 @@ function ProjectView({ project }: { project: Project }) {
         label={t(`project.status.${project.status}`)}
         strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
       />
-      <Text variant={wide ? 'display' : 'title2'} accessibilityRole="header">
-        {project.title}
-      </Text>
+      {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
+      {large ? null : (
+        <Text variant="title2" accessibilityRole="header">
+          {project.title}
+        </Text>
+      )}
       <Pressed
         label={t('member.open', { name: project.author.name })}
         role="link"
@@ -199,12 +208,10 @@ function ProjectView({ project }: { project: Project }) {
             onPress={() => openOutside(project.demoUrl ?? '')}
           />
           {/* On annonce toujours le site extérieur, avant même la page d'avertissement. */}
-          <Row gap="xs" justify="center">
-            <Icon name="globe-simple" size={14} tone="muted" />
-            <Text variant="caption" tone="muted">
-              {t('project.page.external', { host: hostOf(project.demoUrl) })}
-            </Text>
-          </Row>
+          <Hint
+            icon="globe-simple"
+            text={t('project.page.external', { host: hostOf(project.demoUrl) })}
+          />
         </Stack>
       ) : (
         <Text tone="muted">{t('project.page.noDemo')}</Text>
@@ -310,7 +317,7 @@ function ProjectView({ project }: { project: Project }) {
   // La lumière d'ambiance prend la couleur de la photo affichée (sans photo : la lumière miel).
   const thumbhash = shown?.visual.thumbhash ?? null
 
-  if (wide) {
+  if (large) {
     return (
       <Screen
         width="page"
@@ -319,6 +326,11 @@ function ProjectView({ project }: { project: Project }) {
         thumbhash={thumbhash}
         pageTitle={project.title}
       >
+        {/* Le titre au-dessus des colonnes, sur toute la largeur : dans la colonne latérale, un
+            titre long passait sur sept lignes. */}
+        <Text variant={wide ? 'display' : 'title1'} accessibilityRole="header">
+          {project.title}
+        </Text>
         <Columns
           main={
             <>

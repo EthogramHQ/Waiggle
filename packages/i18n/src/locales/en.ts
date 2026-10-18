@@ -18,6 +18,9 @@ export const en: Translation = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
   },
+  nav: {
+    newProject: 'New project',
+  },
   home: {
     title: 'Welcome to {{appName}}',
     tagline: 'Show the people close to you what you build with AI.',
@@ -72,7 +75,7 @@ export const en: Translation = {
     },
     verified: {
       title: 'Email verified',
-      body: 'Your account is active. You can now sign in, here or in the app.',
+      body: 'Your account is active: welcome to {{appName}}!',
       continue: 'Continue',
     },
     errors: {
@@ -284,7 +287,8 @@ export const en: Translation = {
   },
   tag: {
     subtitle: 'The public projects made with this tool, newest first.',
-    empty: 'No public project yet.',
+    emptyTitle: 'No project here yet',
+    empty: 'No public project made with this tool yet. Yours may be the first.',
   },
   states: {
     errorTitle: 'This page could not load',

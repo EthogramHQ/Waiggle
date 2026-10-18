@@ -96,7 +96,13 @@ export function AmbientLight({ thumbhash }: Props) {
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id={`veil${id}`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset={0} stopColor={colors.background} stopOpacity={0.15} />
+            {/* La nuit, le voile est plus présent dès le haut : sous une lumière vive, les petits
+                textes discrets passaient sous le contraste minimal. */}
+            <Stop
+              offset={0}
+              stopColor={colors.background}
+              stopOpacity={scheme === 'night' ? 0.35 : 0.15}
+            />
             <Stop offset={0.6} stopColor={colors.background} stopOpacity={0.75} />
             <Stop offset={0.9} stopColor={colors.background} stopOpacity={1} />
           </LinearGradient>

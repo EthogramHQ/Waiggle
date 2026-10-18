@@ -11,3 +11,10 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // fournies par ces bibliothèques, où une animation arrive tout de suite à sa valeur finale.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'))
 require('react-native-reanimated').setUpTests()
+
+// La fenêtre des tests est celle d'un téléphone (390 × 844 points), comme les captures « téléphone ».
+// Par défaut, React Native prend 750 points de large, ce qui est déjà une tablette pour l'appli
+// (barre de navigation, colonnes) : les tests d'écran décrivent le téléphone, sauf mention contraire.
+const { Dimensions } = require('react-native')
+const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+Dimensions.set({ window: phone, screen: phone })

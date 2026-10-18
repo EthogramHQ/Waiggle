@@ -20,7 +20,7 @@ export function WelcomeHero({ tagline, source }: Props) {
   const { colors, shadows } = useTheme()
   return (
     <View style={{ gap: space.xl }}>
-      <Constellation height={560}>
+      <Constellation height={560} layout="scene">
         <View
           style={{
             width: BUBBLE,

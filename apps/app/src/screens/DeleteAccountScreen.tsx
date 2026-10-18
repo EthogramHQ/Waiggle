@@ -97,7 +97,7 @@ export function DeleteAccountScreen() {
         </Stack>
       </Row>
       <Row gap="md" align="start">
-        <StepNumber value={2} />
+        <StepNumber value={2} beside="field" />
         <Stack gap="sm" grow>
           <TextField
             label={t('account.delete.password')}

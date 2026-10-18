@@ -5,6 +5,7 @@
 // Tous ont la même barre en haut et la même largeur que la page qu'ils remplacent (`width`) : la
 // mise en page ne saute pas quand le chargement devient le contenu, ou une erreur.
 import { type Href, usePathname, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { TopNav } from '../navigation/TopNav'
@@ -21,12 +22,27 @@ type Width = 'form' | 'page'
  */
 export function LoadingScreen({ width = 'form' }: { width?: Width }) {
   const { t } = useTranslation()
+  const back = useGoBack('/')
+  // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
+  // « Revenir » apparaît, pour ne jamais laisser le membre sans issue.
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_LOADING_MS)
+    return () => clearTimeout(timer)
+  }, [])
   return (
     <Screen header={<TopNav />} width={width}>
-      <StateMessage kind="loading" message={t('common.loading')} />
+      <StateMessage
+        kind="loading"
+        message={t('common.loading')}
+        actions={slow ? [{ label: t('states.back'), onPress: back, variant: 'secondary' }] : []}
+      />
     </Screen>
   )
 }
+
+/** Au-delà de ce délai, un chargement est jugé long. */
+const SLOW_LOADING_MS = 4000
 
 /**
  * Une page réservée aux membres, vue par un visiteur. « Se connecter » revient ensuite sur cette

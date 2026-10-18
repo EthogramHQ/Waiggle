@@ -7,12 +7,12 @@ entre deux parties : c'est le moment de se demander si elle est voulue.
 ```mermaid
 flowchart LR
   subgraph appli["apps/app (iOS, Android, web)"]
+    n0["pages"]
     n5["appels API"]
     n7["réglages"]
     n2["composants"]
     n4["navigation"]
     n1["écrans"]
-    n0["pages"]
     n3["catalogue"]
   end
   subgraph api["apps/api (serveur)"]
@@ -74,6 +74,7 @@ flowchart LR
   n0 --> n4
   n0 --> n7
   n0 --> n1
+  n0 --> n18
   n0 --> n17
   n7 --> n17
   n1 --> n5

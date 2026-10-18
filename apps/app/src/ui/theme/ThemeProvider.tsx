@@ -97,7 +97,10 @@ export function ThemeProvider({ children, appearance: forced }: Props) {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return
     document.documentElement.style.colorScheme = scheme === 'night' ? 'dark' : 'light'
     document.body.style.backgroundColor = theme.colors.background
-  }, [scheme, theme.colors.background])
+    // La couleur de l'anneau de focus (dessiné par une seule règle CSS, dans app/+html.tsx) : une
+    // « variable CSS » que la règle lit, et qui suit le thème choisi dans l'appli.
+    document.documentElement.style.setProperty('--focus-ring', theme.colors.focusRing)
+  }, [scheme, theme.colors.background, theme.colors.focusRing])
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
 }

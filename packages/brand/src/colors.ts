@@ -139,6 +139,8 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'text', on: 'panel', min: 4.5 },
   { text: 'textSecondary', on: 'panel', min: 4.5 },
   { text: 'textMuted', on: 'panel', min: 4.5 },
+  // La barre fixe des formulaires sur téléphone (fond « feuille »).
+  { text: 'text', on: 'sheet', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
   { text: 'onHoney', on: 'honeyPressed', min: 4.5 },
   { text: 'statusText', on: 'honeySoft', min: 4.5 },

@@ -18,7 +18,7 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     alignSelf: 'flex-start',
     // Jamais plus large que la ligne : un nom d'outil très long passe à la ligne.
     maxWidth: '100%',
-    minHeight: 36,
+    minHeight: layout.chipHeight,
     justifyContent: 'center',
     paddingHorizontal: space.lg,
     borderRadius: radii.pill,

@@ -13,7 +13,7 @@ import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
-import { Icon } from '../ui/Icon'
+import { Hint } from '../ui/Hint'
 import { Emblem } from '../ui/Illustrations'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { Screen } from '../ui/Screen'
@@ -80,12 +80,7 @@ function VisitorHome() {
           onPress={() => router.push('/sign-in')}
         />
       </Stack>
-      <Row gap="sm" justify="center">
-        <Icon name="lock-simple" size={16} tone="muted" />
-        <Text variant="caption" tone="muted" align="center">
-          {t('home.membersOnly')}
-        </Text>
-      </Row>
+      <Hint icon="lock-simple" text={t('home.membersOnly')} />
       {/* Sur téléphone, pas de scène à gauche : le lien vers le code source se place ici. */}
       {wide ? null : (
         <Row gap="xs" justify="center" wrap>

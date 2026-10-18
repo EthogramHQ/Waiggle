@@ -69,99 +69,108 @@ export function VisualEditor({
 }: Props) {
   const last = gallery.length - 1
   return (
-    <Surface variant="grouped" padding="lg" gap="lg">
-      <Stack gap="xs">
-        <Text variant="headline">{labels.gallery}</Text>
-        <Text variant="callout" tone="muted">
-          {labels.galleryHint}
-        </Text>
+    // Deux sections (la galerie, la couverture verticale), plus espacées entre elles (xxl) que les
+    // éléments d'une même section (lg) : on voit d'un coup d'œil ce qui va ensemble.
+    <Surface variant="grouped" padding="lg" gap="xxl">
+      <Stack gap="lg">
+        <Stack gap="xs">
+          <Text variant="headline">{labels.gallery}</Text>
+          <Text variant="callout" tone="muted">
+            {labels.galleryHint}
+          </Text>
+        </Stack>
+        {/* Sans photo, pas de rangée vide : elle ajoutait un double écart avant le bouton. */}
+        {gallery.length > 0 ? (
+          <Stack direction="row" gap="md" wrap>
+            {gallery.map(({ key, image }, index) => {
+              const number = index + 1
+              return (
+                <Stack key={key} gap="sm" align="center">
+                  <Picture image={image} width={TILE} height={TILE}>
+                    {index === 0 ? (
+                      <View style={{ position: 'absolute', top: space.xs, left: space.xs }}>
+                        <StatusPill label={labels.cover} strong />
+                      </View>
+                    ) : null}
+                  </Picture>
+                  <Row gap="xs">
+                    <IconButton
+                      icon="caret-left"
+                      variant="plain"
+                      label={labels.earlier(number)}
+                      onPress={() => onMove(index, -1)}
+                      disabled={busy || index === 0}
+                    />
+                    <IconButton
+                      icon="caret-right"
+                      variant="plain"
+                      label={labels.later(number)}
+                      onPress={() => onMove(index, 1)}
+                      disabled={busy || index === last}
+                    />
+                  </Row>
+                  <Row gap="xs">
+                    <IconButton
+                      icon="star"
+                      variant="plain"
+                      label={labels.makeCover(number)}
+                      onPress={() => onMakeCover(index)}
+                      disabled={busy || index === 0}
+                    />
+                    <IconButton
+                      icon="trash"
+                      variant="plain"
+                      label={labels.remove(number)}
+                      onPress={() => onRemove(index)}
+                      disabled={busy}
+                    />
+                  </Row>
+                </Stack>
+              )
+            })}
+          </Stack>
+        ) : null}
+        <Button
+          label={labels.add}
+          variant="secondary"
+          icon="image"
+          onPress={onAdd}
+          loading={busy}
+          disabled={gallery.length >= max}
+        />
       </Stack>
-      <Stack direction="row" gap="md" wrap>
-        {gallery.map(({ key, image }, index) => {
-          const number = index + 1
-          return (
-            <Stack key={key} gap="sm" align="center">
-              <Picture image={image} width={TILE} height={TILE}>
-                {index === 0 ? (
-                  <View style={{ position: 'absolute', top: space.xs, left: space.xs }}>
-                    <StatusPill label={labels.cover} strong />
-                  </View>
-                ) : null}
-              </Picture>
-              <Row gap="xs">
-                <IconButton
-                  icon="caret-left"
-                  variant="plain"
-                  label={labels.earlier(number)}
-                  onPress={() => onMove(index, -1)}
-                  disabled={busy || index === 0}
-                />
-                <IconButton
-                  icon="caret-right"
-                  variant="plain"
-                  label={labels.later(number)}
-                  onPress={() => onMove(index, 1)}
-                  disabled={busy || index === last}
-                />
-              </Row>
-              <Row gap="xs">
-                <IconButton
-                  icon="star"
-                  variant="plain"
-                  label={labels.makeCover(number)}
-                  onPress={() => onMakeCover(index)}
-                  disabled={busy || index === 0}
-                />
-                <IconButton
-                  icon="trash"
-                  variant="plain"
-                  label={labels.remove(number)}
-                  onPress={() => onRemove(index)}
-                  disabled={busy}
-                />
-              </Row>
-            </Stack>
-          )
-        })}
-      </Stack>
-      <Button
-        label={labels.add}
-        variant="secondary"
-        icon="image"
-        onPress={onAdd}
-        loading={busy}
-        disabled={gallery.length >= max}
-      />
 
-      <Stack gap="xs">
-        <Text variant="headline">{labels.portrait}</Text>
-        <Text variant="callout" tone="muted">
-          {labels.portraitHint}
-        </Text>
-      </Stack>
-      <Row gap="lg" align="center">
-        {portrait ? <Picture image={portrait.image} width={TILE * 0.5625} height={TILE} /> : null}
-        <Stack gap="sm" grow>
-          <Button
-            label={portrait ? labels.replacePortrait : labels.choosePortrait}
-            variant="secondary"
-            size="compact"
-            icon="device-mobile"
-            onPress={onPickPortrait}
-            disabled={busy}
-          />
-          {portrait ? (
+      <Stack gap="lg">
+        <Stack gap="xs">
+          <Text variant="headline">{labels.portrait}</Text>
+          <Text variant="callout" tone="muted">
+            {labels.portraitHint}
+          </Text>
+        </Stack>
+        <Row gap="lg" align="center">
+          {portrait ? <Picture image={portrait.image} width={TILE * 0.5625} height={TILE} /> : null}
+          <Stack gap="sm" grow>
             <Button
-              label={labels.removePortrait}
+              label={portrait ? labels.replacePortrait : labels.choosePortrait}
               variant="secondary"
               size="compact"
-              icon="trash"
-              onPress={onRemovePortrait}
+              icon="device-mobile"
+              onPress={onPickPortrait}
               disabled={busy}
             />
-          ) : null}
-        </Stack>
-      </Row>
+            {portrait ? (
+              <Button
+                label={labels.removePortrait}
+                variant="secondary"
+                size="compact"
+                icon="trash"
+                onPress={onRemovePortrait}
+                disabled={busy}
+              />
+            ) : null}
+          </Stack>
+        </Row>
+      </Stack>
     </Surface>
   )
 }

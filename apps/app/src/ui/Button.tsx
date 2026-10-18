@@ -104,9 +104,9 @@ export function Button({
         onPressOut={() => {
           scale.value = spring(1)
         }}
-        // Le style peut dépendre de l'état : appuyé, et sur ordinateur, choisi au clavier (focused).
+        // Le style dépend de l'état « appuyé ». Le contour du focus clavier, lui, est commun à tous
+        // les éléments touchables : une règle CSS dans app/+html.tsx (« :focus-visible »).
         style={(state) => {
-          const focused = 'focused' in state && state.focused === true
           return [
             {
               minHeight: layout.controlHeight[size],
@@ -122,12 +122,6 @@ export function Button({
             state.pressed && look.pressed,
             inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
             inactive && !inactiveHoney && { opacity: 0.55 },
-            focused && {
-              outlineColor: colors.focusRing,
-              outlineWidth: borders.focus,
-              outlineStyle: 'solid',
-              outlineOffset: borders.focus,
-            },
           ]
         }}
       >

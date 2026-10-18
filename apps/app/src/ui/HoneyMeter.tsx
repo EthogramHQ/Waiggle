@@ -36,7 +36,12 @@ export function HoneyMeter({ value, max, label }: Props) {
           </Svg>
         ))}
       </View>
-      <Text variant="caption" weight={700} tone={done ? 'success' : 'accent'}>
+      {/* Discrète tant que la jauge est vide, ambre pendant la saisie, verte une fois remplie. */}
+      <Text
+        variant="caption"
+        weight={value === 0 ? 400 : 700}
+        tone={done ? 'success' : value === 0 ? 'muted' : 'accent'}
+      >
         {label}
       </Text>
     </View>

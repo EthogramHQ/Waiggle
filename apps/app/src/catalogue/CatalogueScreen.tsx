@@ -25,6 +25,7 @@ import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
+import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -287,6 +288,7 @@ export function CatalogueScreen() {
         <TagSample l={l} />
         <VisualEditorSample l={l} />
         <HoneyMeter value={9} max={12} label={l.meter} />
+        <Hint icon="lock-simple" text={l.stateSignedOut} />
         <Disclosure title={l.recipe} hint={l.recipeHint}>
           <Text tone="secondary">{l.plain}</Text>
         </Disclosure>

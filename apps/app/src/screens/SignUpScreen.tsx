@@ -152,10 +152,14 @@ export function SignUpScreen() {
         <HoneyMeter
           value={Array.from(password).length}
           max={PASSWORD_MIN_LENGTH}
+          // Avant la première lettre, une simple consigne : « Encore 12 caractères » en couleur aurait
+          // l'air d'un reproche alors que rien n'est encore tapé.
           label={
-            missing > 0
-              ? t('auth.passwordMeter.remaining', { count: missing })
-              : t('auth.passwordMeter.done')
+            password.length === 0
+              ? t('auth.fields.passwordHint', lengths)
+              : missing > 0
+                ? t('auth.passwordMeter.remaining', { count: missing })
+                : t('auth.passwordMeter.done')
           }
         />
       </Stack>

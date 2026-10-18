@@ -122,8 +122,8 @@ export function TagInput({
                   >
                     <View
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: layout.chipControl,
+                        height: layout.chipControl,
                         borderRadius: radii.pill,
                         alignItems: 'center',
                         justifyContent: 'center',

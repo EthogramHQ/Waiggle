@@ -1,15 +1,16 @@
-// L'état d'une page qui n'a pas (encore) son contenu : chargement, erreur, page introuvable, ou
-// page réservée aux membres. Toujours la même allure, et toujours une issue : un état dit ce qui se
+// L'état d'une page qui n'a pas (encore) son contenu : chargement, erreur, page introuvable, page
+// réservée aux membres, ou liste vide (qui invite à agir). Toujours la même allure, et toujours une issue : un état dit ce qui se
 // passe et propose quoi faire ensuite (« Réessayer », « Revenir », « Me connecter »).
 import { layout, space } from '@ruche/brand'
-import { ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
 import { Emblem, Honeycomb } from './Illustrations'
 import { Stack } from './Stack'
 import { Text } from './Text'
+import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
-export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut'
+export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty'
 
 /** Une issue : un bouton, éventuellement en chargement (« Réessayer » pendant la nouvelle tentative). */
 type Action = { label: string; onPress: () => void; variant?: ButtonVariant; loading?: boolean }
@@ -26,6 +27,12 @@ type Props = {
 
 export function StateMessage({ kind, title, message, actions = [] }: Props) {
   const { colors } = useTheme()
+  const { height } = useLayout()
+  // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand).
+  const { fontScale } = useWindowDimensions()
+  // Quand la place manque (écran bas, texte très agrandi), l'image s'efface : le titre, le message
+  // et les issues restent sur le premier écran, sans avoir à faire défiler.
+  const cramped = fontScale >= 1.5 || (height > 0 && height < 600)
   // L'image qui accompagne l'état : une indication de chargement, la ruche vide pour « introuvable »,
   // une tuile de miel avec une icône pour l'erreur et la page réservée.
   const picture =
@@ -35,7 +42,9 @@ export function StateMessage({ kind, title, message, actions = [] }: Props) {
     ) : kind === 'notFound' ? (
       <Honeycomb />
     ) : (
-      <Emblem icon={kind === 'error' ? 'warning-circle' : 'lock-simple'} />
+      <Emblem
+        icon={kind === 'error' ? 'warning-circle' : kind === 'empty' ? 'sparkle' : 'lock-simple'}
+      />
     )
 
   return (
@@ -43,7 +52,9 @@ export function StateMessage({ kind, title, message, actions = [] }: Props) {
     // n'auraient pas de sens. align="stretch" : les textes prennent cette largeur et se replient.
     <View style={{ width: '100%', maxWidth: layout.formWidth, alignSelf: 'center' }}>
       <Stack gap="xl" align="stretch">
-        <View style={{ alignItems: 'center', paddingVertical: space.lg }}>{picture}</View>
+        {kind === 'loading' || !cramped ? (
+          <View style={{ alignItems: 'center', paddingVertical: space.lg }}>{picture}</View>
+        ) : null}
         <Stack gap="sm" align="stretch">
           {title ? (
             <Text variant="title2" align="center" accessibilityRole="header">

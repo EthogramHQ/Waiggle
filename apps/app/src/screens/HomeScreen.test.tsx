@@ -10,7 +10,10 @@ import { HomeScreen } from './HomeScreen'
 jest.mock('../profile/api', () => ({ getMe: jest.fn(), updateProfile: jest.fn() }))
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 const mockPush = jest.fn()
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: jest.fn() }) }))
+jest.mock('expo-router', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+}))
 
 beforeEach(() => {
   mockSession(null)
@@ -60,7 +63,7 @@ describe('HomeScreen', () => {
     mockSession({ user: { name: 'Léa' } })
     await renderWithI18n(<HomeScreen />)
 
-    expect(screen.getByText('Bonjour Léa !')).toBeTruthy()
+    expect(screen.getByText('Bonjour Léa !')).toBeTruthy()
     expect(screen.getByText('Le fil arrive bientôt.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Créer un compte' })).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Mon compte' }))

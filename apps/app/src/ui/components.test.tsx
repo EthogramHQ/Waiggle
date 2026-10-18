@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
+import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { Notice } from './Notice'
@@ -435,6 +436,14 @@ describe('Button while loading', () => {
     await renderWithProviders(<Button label="Publier" onPress={() => {}} loading />)
 
     expect(screen.getByRole('button', { name: 'Publier' })).toBeBusy()
+  })
+})
+
+describe('Hint', () => {
+  it('reads as its text alone, the icon being decorative', async () => {
+    await renderWithProviders(<Hint icon="lock-simple" text="Réservé aux membres connectés." />)
+
+    expect(screen.getByText('Réservé aux membres connectés.')).toBeTruthy()
   })
 })
 
