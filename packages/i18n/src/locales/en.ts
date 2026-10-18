@@ -294,6 +294,7 @@ export const en: Translation = {
     back: 'Go back',
     home: 'Back to home',
     seeProject: 'See the project',
+    expired: 'Your session has expired. Sign in again to continue.',
   },
   leaving: {
     title: 'You are leaving {{appName}}',

@@ -32,7 +32,14 @@ export function LoadingScreen({ width = 'form' }: { width?: Width }) {
  * Une page réservée aux membres, vue par un visiteur. « Se connecter » revient ensuite sur cette
  * même page (paramètre `next`, vérifié par la page de connexion : voir navigation/next.ts).
  */
-export function SignedOutScreen({ width = 'form' }: { width?: Width }) {
+export function SignedOutScreen({
+  width = 'form',
+  expired = false,
+}: {
+  width?: Width
+  /** La session a expiré pendant la visite : on le dit, plutôt que « réservé aux membres ». */
+  expired?: boolean
+}) {
   const { t } = useTranslation()
   const router = useRouter()
   // usePathname : le chemin de la page affichée (« /members/abc »).
@@ -42,7 +49,7 @@ export function SignedOutScreen({ width = 'form' }: { width?: Width }) {
       <StateMessage
         kind="signedOut"
         title={t('states.signedOutTitle')}
-        message={t('home.membersOnly')}
+        message={expired ? t('states.expired') : t('home.membersOnly')}
         actions={[
           {
             label: t('home.signIn'),
@@ -77,7 +84,7 @@ export function LoadErrorScreen({
   const { t } = useTranslation()
   const back = useGoBack(fallback)
   const key = errorKey(error)
-  if (key === 'unauthorized') return <SignedOutScreen width={width} />
+  if (key === 'unauthorized') return <SignedOutScreen width={width} expired />
   return (
     <Screen header={<TopNav />} width={width} pageTitle={t('states.errorTitle')}>
       <StateMessage
@@ -118,11 +125,11 @@ export function NotFoundState({
 }
 
 /** Un membre ouvre la modification d'un projet qui n'est pas le sien : il peut le voir, pas le changer. */
-export function NotMineState({ projectId }: { projectId: string }) {
+export function NotMineState({ projectId, width = 'form' }: { projectId: string; width?: Width }) {
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <Screen header={<TopNav />} pageTitle={t('states.notMineTitle')}>
+    <Screen header={<TopNav />} width={width} pageTitle={t('states.notMineTitle')}>
       <StateMessage
         kind="signedOut"
         title={t('states.notMineTitle')}

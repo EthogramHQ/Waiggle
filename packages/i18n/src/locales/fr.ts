@@ -300,6 +300,7 @@ export const fr = {
     back: 'Revenir',
     home: 'Retour à l’accueil',
     seeProject: 'Voir le projet',
+    expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',

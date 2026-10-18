@@ -121,6 +121,7 @@ describe('MemberScreen', () => {
     await renderWithProviders(<MemberScreen id="u2" />)
 
     expect(await screen.findByRole('header', { name: 'Réservé aux membres' })).toBeTruthy()
+    expect(screen.getByText('Ta session a expiré. Reconnecte-toi pour continuer.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Se connecter' })).toBeTruthy()
   })

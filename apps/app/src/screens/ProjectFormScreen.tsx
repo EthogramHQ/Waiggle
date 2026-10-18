@@ -76,24 +76,30 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   const { data: session, isPending } = useSession()
   // En modification, on part du projet existant ; en création, il n'y a rien à charger.
   const project = useProject(id ?? '', Boolean(session && id))
+  // Sur ordinateur, le formulaire occupe toute la largeur : ses états aussi, pour que la barre du
+  // haut ne change pas de largeur quand le formulaire arrive.
+  const width = useLayout().sizeClass === 'wide' ? 'page' : 'form'
 
-  if (isPending) return <LoadingScreen />
-  if (!session) return <SignedOutScreen />
+  if (isPending) return <LoadingScreen width={width} />
+  if (!session) return <SignedOutScreen width={width} />
   if (!id) return <ProjectFormView initial={emptyProjectForm} />
 
   if (project.error) {
     if (errorKey(project.error) === 'notFound') {
       return (
         <NotFoundState
+          width={width}
           title={t('project.page.notFoundTitle')}
           message={t('project.page.notFound')}
         />
       )
     }
-    return <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} />
+    return (
+      <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width={width} />
+    )
   }
-  if (!project.data) return <LoadingScreen />
-  if (!project.data.isMine) return <NotMineState projectId={project.data.id} />
+  if (!project.data) return <LoadingScreen width={width} />
+  if (!project.data.isMine) return <NotMineState projectId={project.data.id} width={width} />
   return (
     <ProjectFormView
       initial={formFromProject(project.data)}
