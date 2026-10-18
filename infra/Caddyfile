@@ -36,7 +36,9 @@
 		# - les scripts : ceux du site, plus le seul petit script écrit dans la page par Expo,
 		#   reconnu à son empreinte (sha256). infra/web/check-web.mjs vérifie cette empreinte à
 		#   chaque construction : si Expo change ce script, la construction échoue ;
-		# - les styles écrits dans la page par React Native Web ('unsafe-inline') ;
+		# - les styles écrits dans la page par React Native Web, et la feuille fixe du squelette
+		#   HTML (apps/app/src/ui/theme/document.ts : fond avant démarrage, anneau de focus)
+		#   ('unsafe-inline') ;
 		# - les images du site, de l'API (avatars) et celles fabriquées dans la page (data:, blob:) ;
 		# - les appels réseau : le site, l'API, et les copies d'images fabriquées dans la page (blob:).
 		#   Avant d'envoyer une photo, l'appli relit l'image réduite sur l'appareil (media/pick.ts) :

@@ -63,7 +63,7 @@ describe('HomeScreen', () => {
     mockSession({ user: { name: 'Léa' } })
     await renderWithI18n(<HomeScreen />)
 
-    expect(screen.getByText('Bonjour Léa !')).toBeTruthy()
+    expect(screen.getByText('Bonjour Léa\u202f!')).toBeTruthy()
     expect(screen.getByText('Le fil arrive bientôt.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Créer un compte' })).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Mon compte' }))

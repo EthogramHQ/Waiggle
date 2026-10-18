@@ -27,8 +27,9 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
   const content = (
-    // align="center" : un nom long qui passe sur deux lignes reste centré dans sa pastille.
-    <Text variant="callout" weight={600} align="center" breakAnywhere>
+    // Un nom très long tient sur une ligne, abrégé par « … » : la pastille garde sa forme. Le nom
+    // complet reste lu par les lecteurs d'écran (accessibilityLabel) et présent dans la page.
+    <Text variant="callout" weight={600} numberOfLines={1}>
       {label}
     </Text>
   )

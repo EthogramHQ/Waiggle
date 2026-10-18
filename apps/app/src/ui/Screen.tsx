@@ -169,17 +169,19 @@ export function Screen({
               width: '100%',
               maxWidth: layout.maxContentWidth,
               flexGrow: 1,
-              flexDirection: 'row',
+              // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+              // mais s'affiche à droite de la scène.
+              flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: space.huge,
             }}
           >
-            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
             <View style={{ width: layout.formWidth - 80 }}>
               <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
                 {body}
               </Surface>
             </View>
+            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
           </View>
         ) : (
           <View

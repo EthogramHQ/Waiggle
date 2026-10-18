@@ -145,7 +145,6 @@ export function SignUpScreen() {
           onChangeText={setPassword}
           secureTextEntry // masque les caractères tapés (un bouton permet de les afficher)
           autoComplete="new-password" // les gestionnaires de mots de passe proposent d'en générer un
-          aside={t('auth.fields.passwordMin', lengths)}
           error={fieldMessage(fieldErrors.password)}
         />
         {/* Une alvéole par caractère exigé : on voit d'un coup d'œil ce qu'il reste à taper. */}

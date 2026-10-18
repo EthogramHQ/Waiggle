@@ -6,6 +6,7 @@ import { Children, Fragment, type ReactNode } from 'react'
 import { Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
+import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
 type GroupProps = {
@@ -166,6 +167,8 @@ export function ListRow({
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       disabled={disabled}
       onPress={onPress}
+      // Le groupe rogne ce qui dépasse : l'anneau de focus se dessine à l'intérieur de la ligne.
+      {...insetFocus}
       style={({ pressed }) => (pressed ? { backgroundColor: colors.surfaceGrouped } : null)}
     >
       {content}

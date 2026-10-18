@@ -144,6 +144,9 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'onHoney', on: 'honey', min: 4.5 },
   { text: 'onHoney', on: 'honeyPressed', min: 4.5 },
   { text: 'statusText', on: 'honeySoft', min: 4.5 },
+  // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
+  { text: 'text', on: 'honeySoft', min: 4.5 },
+  { text: 'amberText', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'background', min: 4.5 },
   { text: 'amber', on: 'background', min: 3 },
   { text: 'dangerText', on: 'background', min: 4.5 },

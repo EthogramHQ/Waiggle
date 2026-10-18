@@ -5,6 +5,7 @@ import { borders, layout, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import { Pressable, ScrollView } from 'react-native'
 import type { CoverImage } from './ProjectCover'
+import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -35,6 +36,8 @@ export function Thumbnails({ items, selected, onSelect }: Props) {
             key={key}
             accessibilityRole="tab"
             accessibilityLabel={image.label}
+            // La bande défile et rogne ses bords : l'anneau de focus se dessine à l'intérieur.
+            {...insetFocus}
             aria-selected={isSelected}
             onPress={() => onSelect(index)}
             style={{

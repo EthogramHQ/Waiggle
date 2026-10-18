@@ -75,9 +75,10 @@ function ProjectView({ project }: { project: Project }) {
   const openOutside = useOpenOutside()
   const forgetProject = useForgetProject()
   const toSource = useMediaSources()
-  const { sizeClass } = useLayout()
-  // large : tablette et ordinateur, où la page passe en colonnes (la latérale va dessous si la
-  // place manque) ; wide : ordinateur seulement.
+  const { sizeClass, columns } = useLayout()
+  // large : tablette et ordinateur (barre du haut, retour hors de la couverture) ; wide : ordinateur ;
+  // columns : les deux colonnes tiennent côte à côte. Sinon (téléphone, tablette en portrait), la
+  // page garde l'ordre du téléphone, où « Tester la démo » vient juste après la couverture.
   const large = sizeClass !== 'compact'
   const wide = sizeClass === 'wide'
   // La photo de la galerie choisie dans les vignettes ; null : la couverture par défaut.
@@ -139,8 +140,8 @@ function ProjectView({ project }: { project: Project }) {
   // Sur téléphone, une couverture verticale a besoin de hauteur pour ne pas être trop recadrée.
   const cover = (
     <ProjectCover
-      // Sans photo, la couverture n'est qu'une lumière miel : pas la peine qu'elle soit très haute.
-      height={large ? (shown ? 520 : 240) : shown?.visual === portrait && portrait ? 480 : 240}
+      // Sans photo, la couverture n'est qu'une lumière miel : une bande basse suffit.
+      height={!shown ? 'band' : columns ? 'hero' : shown.visual === portrait ? 'portrait' : 'band'}
       radius={large ? 'tile' : 'sheet'}
       image={
         shown
@@ -167,8 +168,8 @@ function ProjectView({ project }: { project: Project }) {
         strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
       />
       {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
-      {large ? null : (
-        <Text variant="title2" accessibilityRole="header">
+      {columns ? null : (
+        <Text variant="title2" accessibilityRole="header" breakAnywhere>
           {project.title}
         </Text>
       )}
@@ -317,7 +318,7 @@ function ProjectView({ project }: { project: Project }) {
   // La lumière d'ambiance prend la couleur de la photo affichée (sans photo : la lumière miel).
   const thumbhash = shown?.visual.thumbhash ?? null
 
-  if (large) {
+  if (columns) {
     return (
       <Screen
         width="page"
@@ -328,7 +329,7 @@ function ProjectView({ project }: { project: Project }) {
       >
         {/* Le titre au-dessus des colonnes, sur toute la largeur : dans la colonne latérale, un
             titre long passait sur sept lignes. */}
-        <Text variant={wide ? 'display' : 'title1'} accessibilityRole="header">
+        <Text variant={wide ? 'display' : 'title1'} accessibilityRole="header" breakAnywhere>
           {project.title}
         </Text>
         <Columns
@@ -351,7 +352,12 @@ function ProjectView({ project }: { project: Project }) {
     )
   }
   return (
-    <Screen thumbhash={thumbhash} pageTitle={project.title}>
+    <Screen
+      thumbhash={thumbhash}
+      pageTitle={project.title}
+      // Sur tablette : toute la largeur, la barre du haut, et le retour hors de la couverture.
+      {...(large ? { width: 'page' as const, header: <TopNav />, onBack: back } : null)}
+    >
       {cover}
       {thumbnails}
       {info}

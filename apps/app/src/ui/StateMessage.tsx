@@ -28,7 +28,8 @@ type Props = {
 export function StateMessage({ kind, title, message, actions = [] }: Props) {
   const { colors } = useTheme()
   const { height } = useLayout()
-  // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand).
+  // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand). Sur le web,
+  // il vaut toujours 1 (le navigateur agrandit la page autrement) : pas d'écart d'hydratation.
   const { fontScale } = useWindowDimensions()
   // Quand la place manque (écran bas, texte très agrandi), l'image s'efface : le titre, le message
   // et les issues restent sur le premier écran, sans avoir à faire défiler.

@@ -1,5 +1,5 @@
 // Tests de la page d'un membre. L'API (members/api) est remplacée par de faux appels.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { getMember } from '../members/api'
 import { draftProject, leaPage, projectWithPhotos, summaryOf } from '../testing/projects'
@@ -148,5 +148,21 @@ describe('MemberScreen', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Réessayer' }))
 
     expect(await screen.findByRole('header', { name: leaPage.name })).toBeTruthy()
+  })
+
+  it('offers to go back when the page takes long to load', async () => {
+    // De fausses horloges : le test avance le temps lui-même, sans attendre 4 vraies secondes.
+    jest.useFakeTimers()
+    try {
+      jest.mocked(getMember).mockReturnValue(new Promise(() => {}))
+      await renderWithProviders(<MemberScreen id="u2" />)
+      expect(screen.queryByRole('button', { name: 'Revenir' })).toBeNull()
+
+      await act(() => jest.advanceTimersByTime(4000))
+
+      expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 })

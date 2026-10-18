@@ -444,6 +444,9 @@ describe('Hint', () => {
     await renderWithProviders(<Hint icon="lock-simple" text="Réservé aux membres connectés." />)
 
     expect(screen.getByText('Réservé aux membres connectés.')).toBeTruthy()
+    // L'icône n'est pas annoncée : ni image, ni bouton, rien d'autre que le texte.
+    expect(screen.queryByRole('image')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })
 

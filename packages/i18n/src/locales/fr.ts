@@ -24,9 +24,6 @@ export const fr = {
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
   },
-  nav: {
-    newProject: 'Nouveau projet',
-  },
   home: {
     title: 'Bienvenue sur {{appName}}',
     tagline: 'Montre à tes proches ce que tu construis avec l’IA.',
@@ -50,7 +47,6 @@ export const fr = {
       email: 'Adresse e-mail',
       password: 'Mot de passe',
       passwordHint: 'Au moins {{min}} caractères.',
-      passwordMin: '{{min}} caractères minimum',
       inviteCode: 'Code d’invitation',
       inviteCodeHint: 'Demande-le à la personne qui t’a invité·e.',
     },
@@ -186,7 +182,7 @@ export const fr = {
       public: 'Public',
       publicHint: 'Visible par les membres connectés. En privé, il te sert de brouillon.',
       demoUrl: 'Lien de démo (facultatif)',
-      demoUrlHint: 'Une adresse https, par exemple https://mon-projet.vercel.app',
+      demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
       recipe: 'Ajouter la recette',
       recipeHint: 'Outils, temps passé, prompts clés : facultatif',

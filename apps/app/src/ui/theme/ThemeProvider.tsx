@@ -100,7 +100,17 @@ export function ThemeProvider({ children, appearance: forced }: Props) {
     // La couleur de l'anneau de focus (dessiné par une seule règle CSS, dans app/+html.tsx) : une
     // « variable CSS » que la règle lit, et qui suit le thème choisi dans l'appli.
     document.documentElement.style.setProperty('--focus-ring', theme.colors.focusRing)
-  }, [scheme, theme.colors.background, theme.colors.focusRing])
+    // La page est dans son vrai thème : elle peut se montrer (voir documentCss, theme/document.ts).
+    if (hydrated) document.documentElement.setAttribute('data-hydrated', '')
+  }, [scheme, theme.colors.background, theme.colors.focusRing, hydrated])
+
+  // Filet de sécurité : si une page ne signalait jamais son hydratation, elle ne doit pas rester
+  // cachée de nuit (voir documentCss). Au bout de quelques secondes, on la montre quoi qu'il arrive.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    const timer = setTimeout(() => document.documentElement.setAttribute('data-hydrated', ''), 3000)
+    return () => clearTimeout(timer)
+  }, [])
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
 }

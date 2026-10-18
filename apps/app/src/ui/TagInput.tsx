@@ -42,6 +42,8 @@ export function TagInput({
 }: Props) {
   const { colors, shadows } = useTheme()
   const [draft, setDraft] = useState('')
+  // Le champ choisi (au doigt ou au clavier) : son cadre s'allume, comme celui d'un TextField.
+  const [focused, setFocused] = useState(false)
   const body = textStyles.body
 
   // La liste « validée » : sans le mot en cours de frappe, qui est envoyé en dernier (voir type()).
@@ -66,8 +68,12 @@ export function TagInput({
         style={{
           backgroundColor: colors.surface,
           borderRadius: radii.group,
-          borderWidth: error ? borders.strong : borders.hairline,
-          borderColor: error ? colors.dangerBorder : colors.groupBorder,
+          borderWidth: error || focused ? borders.strong : borders.hairline,
+          borderColor: error
+            ? colors.dangerBorder
+            : focused
+              ? colors.focusRing
+              : colors.groupBorder,
           boxShadow: shadows.soft,
           overflow: 'hidden',
         }}
@@ -154,7 +160,11 @@ export function TagInput({
             value={draft}
             onChangeText={type}
             onSubmitEditing={commit}
-            onBlur={commit}
+            onFocus={() => setFocused(true)}
+            onBlur={() => {
+              setFocused(false)
+              commit()
+            }}
             placeholder={placeholder}
             placeholderTextColor={colors.textPlaceholder}
             autoCapitalize="none"
