@@ -23,9 +23,15 @@ import { rowToSummary, selectMedia, selectProjects } from '../projects/load'
 
 /**
  * Ce que contient un curseur, une fois décodé : la date et l'identifiant du dernier projet de la
- * page. strictObject refuse tout champ de plus.
+ * page. strictObject refuse tout champ de plus. La date est bornée : PostgreSQL refuse l'an 0, et
+ * un curseur fabriqué avec cette date ferait échouer la requête (erreur 500) au lieu d'être refusé
+ * comme invalide (400). Aucun projet n'a été publié avant l'an 2000 (et la date ISO a toujours une
+ * année de quatre chiffres : comparer les textes suffit).
  */
-const CursorContent = z.strictObject({ at: z.iso.datetime(), id: ProjectId })
+const CursorContent = z.strictObject({
+  at: z.iso.datetime().refine((at) => at >= '2000', 'date trop ancienne'),
+  id: ProjectId,
+})
 type CursorContent = z.infer<typeof CursorContent>
 
 /**

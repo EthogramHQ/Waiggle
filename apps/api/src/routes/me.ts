@@ -3,7 +3,7 @@
 import { createRoute } from '@hono/zod-openapi'
 import { AccountExport, AVATAR_MAX_BYTES, Me, ProfileUpdate } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
@@ -240,9 +240,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Tous ses projets, privés compris (c'est lui qui regarde).
     const projects = await loadProjectsOf(db, user.id, user.id, publicApiUrl)
 
-    // Ce qu'il suit : l'identifiant et la date, rien de plus. Un projet suivi a pu devenir privé :
-    // son titre ne lui appartient pas. Ses abonnés, eux, ne font pas partie de ses données. Les
-    // deux requêtes partent de la clé primaire (follower_id, …).
+    // Ce qu'il suit : l'identifiant et la date, rien de plus. Ses abonnés, eux, ne font pas partie
+    // de ses données. Les deux requêtes partent de la clé primaire (follower_id, …).
+    // Un projet suivi devenu privé n'y figure pas (l'abonnement est gardé, mais ne montre plus
+    // rien) : sinon l'export dirait qu'il existe encore, alors qu'un projet supprimé disparaît.
     const followedMembers = await db
       .select({ id: schema.memberFollow.memberId, followedAt: schema.memberFollow.createdAt })
       .from(schema.memberFollow)
@@ -251,7 +252,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const followedProjects = await db
       .select({ id: schema.projectFollow.projectId, followedAt: schema.projectFollow.createdAt })
       .from(schema.projectFollow)
-      .where(eq(schema.projectFollow.followerId, user.id))
+      .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
+      .where(
+        and(eq(schema.projectFollow.followerId, user.id), eq(schema.project.visibility, 'public')),
+      )
       .orderBy(asc(schema.projectFollow.createdAt))
     const withDate = (follows: { id: string; followedAt: Date }[]) =>
       follows.map(({ id, followedAt }) => ({ id, followedAt: followedAt.toISOString() }))

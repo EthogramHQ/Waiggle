@@ -3,7 +3,7 @@
 // nombre sort d'ici.
 import type { FollowState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { type Column, eq, inArray, sql } from 'drizzle-orm'
+import { and, type Column, eq, inArray, sql } from 'drizzle-orm'
 
 type Reader = Pick<Database, 'select'>
 
@@ -92,6 +92,10 @@ export const projectFollowStates = async (
  * Suit-il au moins quelqu'un, membre ou projet ? Deux petites requêtes (« limit 1 » : la première
  * ligne trouvée suffit, inutile de les compter toutes), chacune servie par la clé primaire de sa
  * table, qui commence par follower_id.
+ *
+ * Un projet suivi qui est devenu privé ne compte pas : sinon, la réponse changerait selon qu'il est
+ * privé (encore compté) ou supprimé (plus compté), et trahirait qu'il existe encore. On ne garde
+ * que les projets publics (on ne peut pas suivre les siens, donc pas besoin d'autre cas).
  */
 export const followsAnyone = async (db: Reader, viewerId: string): Promise<boolean> => {
   const [member, project] = await Promise.all([
@@ -103,7 +107,10 @@ export const followsAnyone = async (db: Reader, viewerId: string): Promise<boole
     db
       .select({ id: schema.projectFollow.projectId })
       .from(schema.projectFollow)
-      .where(eq(schema.projectFollow.followerId, viewerId))
+      .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
+      .where(
+        and(eq(schema.projectFollow.followerId, viewerId), eq(schema.project.visibility, 'public')),
+      )
       .limit(1),
   ])
   return member.length > 0 || project.length > 0

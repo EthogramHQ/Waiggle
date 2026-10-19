@@ -331,6 +331,20 @@ describe('my data and my account', () => {
     expect(raw).not.toContain('max@example.com')
   })
 
+  it('leaves out a followed project gone private, as if it were deleted', async () => {
+    const followed = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    expect((await send('POST', `/v1/projects/${followed.id}/follow`, lea)).status).toBe(204)
+    expect(
+      (await send('PATCH', `/v1/projects/${followed.id}`, max, { visibility: 'private' })).status,
+    ).toBe(200)
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+
+    // L'abonnement existe encore en base, mais l'export n'en dit rien : il ne trahit pas le projet.
+    expect(AccountExport.parse(JSON.parse(raw)).follows.projects).toEqual([])
+    expect(raw).not.toContain(followed.id)
+  })
+
   it('exports no follow at all for a member who follows nobody', async () => {
     const mine = await publish()
     expect((await send('POST', `/v1/projects/${mine.id}/follow`, max)).status).toBe(204)

@@ -193,6 +193,21 @@ describe('the « following » feed', () => {
 
     expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
   })
+
+  it('reveals nothing about a followed project gone private: the same page as when it is deleted', async () => {
+    // Max ne suit qu'un projet de Léa. Qu'il devienne privé ou qu'il soit supprimé, Max reçoit la
+    // même page : rien ne lui dit que le projet existe encore.
+    const project = await publish(lea)
+    expect((await send('POST', `/v1/projects/${project.id}/follow`, max)).status).toBe(204)
+
+    await setVisibility(lea, project.id, 'private')
+    const whilePrivate = await readFollowing(max)
+    expect((await send('DELETE', `/v1/projects/${project.id}`, lea)).status).toBe(204)
+    const afterDeletion = await readFollowing(max)
+
+    expect(whilePrivate).toEqual(afterDeletion)
+    expect(whilePrivate).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+  })
 })
 
 describe('the « discover » feed', () => {
@@ -354,8 +369,17 @@ describe('reading a feed page by page', () => {
   })
 
   it('refuses a well-formed cursor whose content makes no sense', async () => {
-    // « aGVsbG8 » est bien du base64url, mais il ne contient que le mot « hello ».
-    for (const path of [followingPath('aGVsbG8'), discoverPath({ cursor: 'aGVsbG8' })]) {
+    // « aGVsbG8 » est bien du base64url, mais il ne contient que le mot « hello ». L'autre est un
+    // vrai curseur daté de l'an 0, une date que PostgreSQL refuse : il ne doit pas la recevoir.
+    const yearZero = Buffer.from(
+      JSON.stringify({ at: '0000-01-01T00:00:00Z', id: '00000000-0000-4000-8000-000000000000' }),
+    ).toString('base64url')
+    for (const path of [
+      followingPath('aGVsbG8'),
+      discoverPath({ cursor: 'aGVsbG8' }),
+      followingPath(yearZero),
+      discoverPath({ cursor: yearZero }),
+    ]) {
       const res = await send('GET', path, max)
       expect(res.status, path).toBe(400)
       expect(ErrorResponse.parse(await res.json()).error.code).toBe('validation')

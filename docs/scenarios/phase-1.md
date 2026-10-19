@@ -431,7 +431,8 @@ Règles détaillées :
 - **Suppression du compte** : ses abonnements, ses abonnés et ses notes disparaissent, et les
   nombres d'abonnés baissent d'autant.
 - **Export des données** : il comprend les membres et les projets suivis (identifiant et date), et
-  les notes (4b).
+  les notes (4b). Un projet suivi devenu privé n'y figure pas, comme s'il avait été supprimé :
+  l'export ne doit pas révéler qu'il existe encore.
 
 ## Tranche 5 — Réagir et commenter
 
