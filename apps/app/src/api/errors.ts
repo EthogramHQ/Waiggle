@@ -16,6 +16,7 @@ export type ApiErrorKey =
   | 'unavailable'
   | 'tooManyVisuals'
   | 'handleTaken'
+  | 'handleChangeLimit'
   | 'internal'
   | 'network'
 
@@ -34,19 +35,25 @@ const byStatus: Record<number, ApiErrorKey> = {
   409: 'tooManyVisuals',
   413: 'payloadTooLarge',
   415: 'unsupportedMediaType',
+  // 429 : « trop de demandes ». Aussi le 6e changement de pseudo du jour (handle_change_limit),
+  // qui a son propre message (réessayer demain, pas dans quelques minutes) : voir byCode.
   429: 'rateLimited',
   503: 'unavailable',
 }
 
 export const errorKeyForStatus = (status: number): ApiErrorKey => byStatus[status] ?? 'internal'
 
-/** Les statuts partagés par plusieurs refus : pour eux seuls, on lit le code du corps. */
-export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([409])
+/**
+ * Les statuts partagés par plusieurs refus : pour eux seuls, on lit le code du corps. Un 429 sans
+ * corps JSON (un serveur placé devant l'API) reste « trop de demandes ».
+ */
+export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([409, 429])
 
 // Code du corps (« handle_taken ») → message, pour les refus qu'un statut seul ne distingue pas.
 // Partial : seuls quelques codes sont listés ; les autres retombent sur le statut.
 const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   handle_taken: 'handleTaken',
+  handle_change_limit: 'handleChangeLimit',
   too_many_visuals: 'tooManyVisuals',
 }
 

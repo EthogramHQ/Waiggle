@@ -360,6 +360,9 @@ const fakeApi = (signedIn) => {
   // Ce que Léa change dans ce navigateur : ses réactions, et le nombre de commentaires ajoutés.
   const reactions = structuredClone(reactionsOf)
   const added = {}
+  // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
+  // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
+  let me = structuredClone(leaMe)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
   const withExtras = (project) => ({
     ...project,
@@ -375,15 +378,16 @@ const fakeApi = (signedIn) => {
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
     const method = route.request().method()
     // Enregistrer son profil (tranche 6a) : le pseudo de Max est déjà pris (409, comme l'API) ;
-    // le reste est accepté et renvoyé tel quel.
+    // le reste est accepté, gardé et renvoyé.
     if (pathname === '/v1/me' && method === 'PATCH') {
       const changes = JSON.parse(route.request().postData() ?? '{}')
       if (changes.handle === maxMember.handle) {
         return json(409, { error: { code: 'handle_taken', message: '' } })
       }
-      return json(200, { ...leaMe, ...changes })
+      me = { ...me, ...changes }
+      return json(200, me)
     }
-    if (pathname === '/v1/me') return json(200, leaMe)
+    if (pathname === '/v1/me') return json(200, me)
     // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
     // remplacer ces réponses par un refus).
     if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
@@ -464,7 +468,9 @@ const fakeApi = (signedIn) => {
       return json(200, withExtras(commentedProject))
     }
     if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
-    if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
+    if (pathname === `/v1/members/${leaMe.id}`) {
+      return json(200, { ...leaMember, name: me.name, handle: me.handle, bio: me.bio })
+    }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed())
@@ -536,6 +542,20 @@ const pages = [
       await page.getByLabel('Pseudo', { exact: true }).fill('max_durand')
       await page.getByRole('button', { name: 'Enregistrer' }).click()
       await page.getByText('Ce pseudo est déjà pris. Choisis-en un autre.').waitFor()
+    },
+  },
+  // Un nouveau pseudo enregistré : la confirmation rappelle que l'ancien reste réservé.
+  {
+    name: 'profil-pseudo-change',
+    path: '/profile',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      // L'API simulée garde le pseudo d'une largeur à l'autre (--layout) : on en change vraiment.
+      const field = page.getByLabel('Pseudo', { exact: true })
+      await field.fill((await field.inputValue()) === 'lea_moreau' ? 'lea_m' : 'lea_moreau')
+      await page.getByRole('button', { name: 'Enregistrer' }).click()
+      await page.getByText(/te reste réservé/).waitFor()
     },
   },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
@@ -670,6 +690,9 @@ async function layoutReport() {
     const page = await context.newPage()
     for (const shot of selected.filter((p) => p.signedIn === signedIn)) {
       lines.push(`## ${shot.name} (${shot.path})`, '')
+      // Une API simulée neuve par page, comme pour les captures.
+      await context.unroute(`${apiUrl}/**`)
+      await context.route(`${apiUrl}/**`, fakeApi(signedIn))
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
         feedScenario = shot.feed ?? 'following'
@@ -775,6 +798,10 @@ for (const device of devices) {
       // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
       page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
       for (const shot of shots) {
+        // Une API simulée neuve par page : ce qu'une page enregistre (un nouveau pseudo) ne se
+        // voit pas sur la suivante, et une capture ne dépend pas des pages prises avant elle.
+        await context.unroute(`${apiUrl}/**`)
+        await context.route(`${apiUrl}/**`, fakeApi(signedIn))
         await page.setViewportSize(device.viewport)
         feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
