@@ -115,6 +115,27 @@ const session = {
   session: { id: 's1', userId: leaMe.id, expiresAt: '2099-01-01T00:00:00.000Z' },
   user: { ...leaMe, image: null, updatedAt: leaMe.createdAt },
 }
+// Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
+// simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
+const note = (n, body, day) => ({
+  id: `0b1c2d3e-4f50-4a61-8b72-00000000000${n}`,
+  body,
+  createdAt: new Date(Date.UTC(2026, 9, day, 9)).toISOString(),
+})
+const recipesNotes = [
+  note(3, 'v2 : mode hors ligne. Les recettes se lisent même sans réseau, au fond du jardin.', 18),
+  note(2, 'Il propose maintenant un dessert quand il reste des fruits.', 15),
+  note(1, 'Première version en ligne : photographie ton frigo, il te dit quoi cuisiner.', 12),
+]
+// Le projet de Léa, vu par elle-même : son journal, avec « Supprimer » sur chaque note.
+const recipesShown = { ...recipesProject, notes: recipesNotes }
+// Une note de 1 000 caractères, et une adresse sans espace : rien ne doit déborder.
+const longNote = Array.from({ length: 20 }, () => 'Une note très longue, pour voir la coupure. ')
+  .join('')
+  .slice(0, 1000)
+  .trim()
+const urlNote =
+  'Le code est ici : https://github.com/lea-moreau/un-tres-long-nom-de-depot-pour-voir-les-coupures-de-ligne'
 // Un projet aux contenus très longs, pour vérifier que rien ne déborde ni ne s'étale.
 const longProject = {
   ...recipesProject,
@@ -136,15 +157,17 @@ const longProject = {
     },
     { label: 'Claude Code', slug: 'claude-code' },
   ],
+  notes: [note(5, longNote, 17), note(4, urlNote, 16)],
 }
-// Le projet d'un autre membre (Max) : le bouton « Suivre ce projet », et, ouvert en
-// modification, l'état « Ce projet n'est pas à toi ».
+// Le projet d'un autre membre (Max) : le bouton « Suivre ce projet », son journal (sans
+// « Supprimer »), et, ouvert en modification, l'état « Ce projet n'est pas à toi ».
 const notMineProject = {
   ...recipesProject,
   id: '00000000-0000-4000-8000-0000000000aa',
   author: { id: 'max-id', name: 'Max Durand', avatarUrl: null },
   isMine: false,
   followerCount: 2,
+  notes: recipesNotes.slice(1),
 }
 // Le même projet, avec ses photos, sous un autre identifiant : on photographie les deux pages.
 const photosProject = { ...projectWithPhotos, id: '7c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f' }
@@ -224,10 +247,25 @@ const maxMember = {
     .filter((item) => item.project.author.id === max.id)
     .map((item) => item.project),
 }
+// Le fil « Abonnements » mêle aux nouveaux projets les notes des projets suivis (tranche 4b) : une
+// note du tri des photos (avec sa couverture) tout en haut, une de l'agent de recettes (sans photo,
+// la lumière miel) plus bas. « Découvrir » ne montre jamais de note.
+const noteItem = (project, n, body, day) => ({
+  kind: 'note',
+  at: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
+  note: { ...note(n, body, day), createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString() },
+  project: summaryOf(project),
+})
+const followingItems = [
+  noteItem(fromOthers[0], 6, 'v2 : il reconnaît maintenant les visages de profil.', 19),
+  ...feedItems.slice(0, 2),
+  noteItem(fromOthers[1], 7, longNote, 17),
+  ...feedItems.slice(2),
+]
 const followingFeed = () =>
   feedScenario === 'nobody'
     ? { items: [], nextCursor: null, followsAnyone: false }
-    : { items: feedItems, nextCursor: 'suite', followsAnyone: true }
+    : { items: followingItems, nextCursor: 'suite', followsAnyone: true }
 
 const fakeApi = (signedIn) => async (route) => {
   const { pathname } = new URL(route.request().url())
@@ -236,7 +274,17 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
   if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
   if (pathname === '/v1/me') return json(200, leaMe)
-  if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, recipesProject)
+  // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
+  // remplacer ces réponses par un refus).
+  const method = route.request().method()
+  if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
+    const { body } = JSON.parse(route.request().postData() ?? '{}')
+    return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+  }
+  if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
+    return route.fulfill({ status: 204, body: '' })
+  }
+  if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, recipesShown)
   if (pathname === `/v1/projects/${photosProject.id}`) return json(200, photosProject)
   if (pathname === `/v1/projects/${notMineProject.id}`) return json(200, notMineProject)
   if (pathname === `/v1/projects/${longProject.id}`) return json(200, longProject)
@@ -277,6 +325,9 @@ const pages = [
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
   { name: 'projet', path: project, signedIn: true, fullPage: true },
+  // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note
+  // toute prête dans le champ du journal.
+  { name: 'projet-annonce', path: `${project}?annonce=testable`, signedIn: true, fullPage: true },
   { name: 'modifier', path: `${project}/edit`, signedIn: true, fullPage: true },
   // Le projet avec ses photos : couverture verticale sur téléphone, vignettes, éditeur des photos.
   { name: 'projet-photos', path: `/projects/${photosProject.id}`, signedIn: true, fullPage: true },

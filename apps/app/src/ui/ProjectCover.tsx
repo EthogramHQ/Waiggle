@@ -31,14 +31,33 @@ type Props = {
   image?: CoverImage | null
   /** Ce qui se pose sur la couverture (boutons ronds, panneau de verre). */
   children?: ReactNode
+  /**
+   * La hauteur devient un minimum : la couverture grandit pour remplir la place libre (la carte
+   * d'une note, rangée à côté de cartes de projet plus hautes).
+   */
+  grow?: boolean
 }
 
-export function ProjectCover({ title, height: size, radius = 'sheet', image, children }: Props) {
+export function ProjectCover({
+  title,
+  height: size,
+  radius = 'sheet',
+  image,
+  children,
+  grow = false,
+}: Props) {
   const { scheme, colors } = useTheme()
   const height = typeof size === 'number' ? size : layout.cover[size]
   const id = `cover-${scheme}`
   return (
-    <View style={{ height, borderRadius: radii[radius], overflow: 'hidden', alignSelf: 'stretch' }}>
+    <View
+      style={{
+        ...(grow ? { minHeight: height, flexGrow: 1 } : { height }),
+        borderRadius: radii[radius],
+        overflow: 'hidden',
+        alignSelf: 'stretch',
+      }}
+    >
       {image ? (
         <Image
           source={image.source}

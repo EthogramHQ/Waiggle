@@ -248,6 +248,7 @@ export const fr = {
       field: 'Ta note',
       hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
       submit: 'Publier la note',
+      required: 'Écris ta note avant de la publier.',
       published: 'Note publiée.',
       error: 'La note n’a pas pu être publiée. Réessaie.',
       delete: 'Supprimer la note',
@@ -360,7 +361,8 @@ export const fr = {
     quiet: 'Rien de neuf pour l’instant chez les personnes que tu suis.',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
-    followingCaption: 'Les nouveaux projets des personnes que tu suis.',
+    followingCaption:
+      'Les nouveaux projets des personnes que tu suis, et les notes des projets suivis.',
     discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption: 'Les projets à essayer : leurs auteurs attendent tes retours.',
     more: 'Afficher la suite',

@@ -15,6 +15,7 @@ import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
+import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
@@ -829,5 +830,86 @@ describe('NoteList', () => {
 
     expect(screen.queryAllByText(/./)).toHaveLength(0)
     expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('NoteComposer', () => {
+  const labels = {
+    open: 'Publier une note',
+    field: 'Ta note',
+    hint: 'Ce qui a changé.',
+    submit: 'Publier la note',
+    cancel: 'Annuler',
+  }
+  const handlers = () => ({
+    onOpen: jest.fn(),
+    onCancel: jest.fn(),
+    onChangeText: jest.fn(),
+    onSubmit: jest.fn(),
+  })
+
+  it('is a single button while closed, which asks to open the field', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open={false} value="" max={1000} labels={labels} {...on} />,
+    )
+
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+
+    expect(on.onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the field with its counter once open, then publishes or cancels', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} autoFocus={false} />,
+    )
+
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
+    expect(screen.getByText('2 / 1000')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(on.onSubmit).toHaveBeenCalledTimes(1)
+    expect(on.onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays busy while the note is on its way, without publishing it twice', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
+    )
+
+    const submit = screen.getByRole('button', { name: 'Publier la note' })
+    expect(submit).toBeBusy()
+    await fireEvent.press(submit)
+
+    expect(on.onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('announces a failed publication, above the text kept in the field', async () => {
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...handlers()} error="Raté." />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Raté.')
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
+  })
+
+  it('announces the published note once closed', async () => {
+    await renderWithProviders(
+      <NoteComposer
+        open={false}
+        value=""
+        max={1000}
+        labels={labels}
+        {...handlers()}
+        success="Note publiée."
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Note publiée.')
+    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
   })
 })
