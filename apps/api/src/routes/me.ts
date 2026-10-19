@@ -112,10 +112,16 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
   // Réponses d'erreur courantes, dans la langue du visiteur.
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
-  const tooMany = (c: Context<AppEnv>, retryAfterSeconds: number) => {
+  // `code` : « rate_limited » par défaut ; « handle_change_limit » pour le quota des pseudos, dont
+  // le message dit au membre qu'il pourra changer de pseudo demain (et non « trop de demandes »).
+  const tooMany = (
+    c: Context<AppEnv>,
+    retryAfterSeconds: number,
+    code: 'rate_limited' | 'handle_change_limit' = 'rate_limited',
+  ) => {
     // Retry-After : en-tête standard qui dit dans combien de secondes réessayer.
     c.header('Retry-After', String(retryAfterSeconds))
-    return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    return c.json(errorBody(languageOf(c), code), 429)
   }
 
   app.openapi(meRoute, async (c) => {
@@ -142,7 +148,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const changesHandle = handle !== undefined && handle !== (await currentHandle(db, user.id))
     if (changesHandle) {
       const handleDecision = await limiter.hit(memberCounterKeys(user.id).handle, handleRule)
-      if (!handleDecision.allowed) return tooMany(c, handleDecision.retryAfterSeconds)
+      if (!handleDecision.allowed) {
+        return tooMany(c, handleDecision.retryAfterSeconds, 'handle_change_limit')
+      }
     }
 
     // Tout le profil s'écrit dans une seule transaction : si le pseudo est pris, claimHandle lève
