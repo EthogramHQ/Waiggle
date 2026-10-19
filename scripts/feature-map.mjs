@@ -46,7 +46,7 @@ const features = [
     id: 'reagir',
     name: 'Réagir et commenter',
     tranche: 'Tranche 5',
-    lessons: [],
+    lessons: ['13 Réagir et commenter'],
     pages: null,
     routes: /^\w+ \/v1\/projects\/\{id\}\/(reactions|comments)(\/|$)/,
     tables: /^project_(reaction|comment)$/,
