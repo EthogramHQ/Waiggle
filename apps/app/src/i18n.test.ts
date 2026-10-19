@@ -23,7 +23,8 @@ describe('member content in translated texts', () => {
   it('shows a tool or a title containing {{appName}} as typed', () => {
     expect(t('common.remove', { item: 'Hello {{appName}}' })).toBe('Retirer Hello {{appName}}')
     expect(t('project.page.deleteTitle', { title: 'Mon {{appName}}' })).toBe(
-      'Supprimer « Mon {{appName}} » ?',
+      // Les espaces typographiques du français : une insécable (U+00A0) dans les guillemets, une fine (U+202F) avant le point d’interrogation.
+      'Supprimer «\u00a0Mon {{appName}}\u00a0»\u202f?',
     )
   })
 
