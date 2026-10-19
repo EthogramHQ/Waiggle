@@ -21,6 +21,7 @@ export const recipesProject: Project = {
   isMine: true,
   isFollowed: false,
   followerCount: 0,
+  notes: [],
   createdAt: '2026-10-12T08:00:00.000Z',
   updatedAt: '2026-10-12T08:00:00.000Z',
 }

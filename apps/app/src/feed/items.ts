@@ -2,5 +2,6 @@
 // même quand leurs tests remplacent les requêtes (feed/api.ts) par de faux résultats.
 import type { FeedItem } from '@ruche/contracts'
 
-/** L'identifiant d'un élément du fil (un projet aujourd'hui ; une note en tranche 4b). */
-export const feedItemId = (item: FeedItem) => item.project.id
+/** L'identifiant d'un élément du fil : celui du projet, ou celui de la note. */
+export const feedItemId = (item: FeedItem) =>
+  item.kind === 'note' ? item.note.id : item.project.id

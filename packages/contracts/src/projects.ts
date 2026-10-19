@@ -2,6 +2,7 @@
 // Les règles de texte (longueurs, caractères interdits) viennent de text.ts, comme pour le profil.
 import { z } from 'zod'
 import { FollowState } from './follows'
+import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
 import { FreeText, isCleanText, ShortLabel, uniqueIgnoringCase } from './text'
 
@@ -216,6 +217,8 @@ export const Project = z
     isMine: z.boolean(),
     /** Si le visiteur suit ce projet, et combien de membres le suivent (jamais leurs noms). */
     ...FollowState.shape,
+    /** Le journal : les notes de l'auteur, de la plus récente à la plus ancienne (20 au plus). */
+    notes: z.array(ProjectNote).max(PROJECT_NOTES_SHOWN),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
