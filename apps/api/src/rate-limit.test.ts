@@ -1,4 +1,4 @@
-import { createPgliteDb } from '@ruche/db/pglite'
+import { createTestPgliteDb } from '@ruche/db/pglite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createRateLimiter, type RateLimiter } from './rate-limit'
 
@@ -8,7 +8,7 @@ let limiter: RateLimiter
 let now = 1_000_000
 
 beforeEach(async () => {
-  const handle = await createPgliteDb()
+  const handle = await createTestPgliteDb()
   close = handle.close
   limiter = createRateLimiter(handle.db, () => now)
 })

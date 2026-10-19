@@ -37,6 +37,7 @@ pnpm lint:fix                    # formatage et corrections Biome
 pnpm --filter @ruche/api dev     # API sur http://localhost:3000 (/health, /openapi.json)
 pnpm --filter @ruche/app web     # appli dans le navigateur (catalogue des composants : /catalogue)
 pnpm --filter @ruche/app shots   # captures de l'appli : téléphone / ordinateur, jour / nuit
+pnpm --filter @ruche/app journey # le parcours d'un membre de bout en bout, sans Docker (PGlite)
 pnpm --filter @ruche/app icons   # régénère les icônes après un ajout dans scripts/icons.mts
 pnpm --filter <paquet> test      # tests d'un seul paquet
 infra/stack-test.sh              # la pile de production complète, comme en CI (Docker requis)

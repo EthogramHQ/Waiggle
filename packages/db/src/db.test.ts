@@ -3,7 +3,7 @@
 // pas besoin d'installer ni de lancer un serveur de base de données.
 import { sql } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
-import { createPgliteDb } from './pglite'
+import { createPgliteDb, createTestPgliteDb } from './pglite'
 import { user } from './schema'
 
 describe('migrations', () => {
@@ -32,5 +32,21 @@ describe('migrations', () => {
 
     expect(created?.language).toBe('fr')
     await close()
+  })
+})
+
+describe('test databases', () => {
+  it('start migrated and empty, and never share their rows', async () => {
+    const first = await createTestPgliteDb()
+    const second = await createTestPgliteDb()
+
+    // Les deux bases viennent du même modèle migré : la table existe, et ce qu'on écrit dans
+    // l'une n'apparaît pas dans l'autre.
+    await first.db.insert(user).values({ id: 'u1', name: 'Léa', email: 'lea@example.com' })
+    expect(await first.db.select({ id: user.id }).from(user)).toEqual([{ id: 'u1' }])
+    expect(await second.db.select({ id: user.id }).from(user)).toEqual([])
+
+    await first.close()
+    await second.close()
   })
 })

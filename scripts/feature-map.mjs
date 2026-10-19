@@ -21,13 +21,13 @@ const walk = (dir) =>
 // --- Les fonctionnalités, et ce qui leur appartient ---------------------------------------------
 
 // Chaque fonctionnalité dit quelles pages, routes et tables sont à elle (motifs sur leur nom), et
-// d'où elle vient : sa tranche dans docs/scenarios/phase-1.md, et sa leçon. null : rien de ce genre.
+// d'où elle vient : sa tranche dans docs/scenarios/phase-1.md. null : rien de ce genre. (Les leçons de
+// chaque fonctionnalité, écrites hors du dépôt, sont ajoutées par l'outil qui dessine la carte.)
 const features = [
   {
     id: 'comptes',
     name: 'Comptes',
     tranche: 'Tranche 1 · Mise en ligne',
-    lessons: ['01 Les comptes', '05 Le code d’invitation', '08 Les e-mails de compte'],
     pages: /^\/(sign-up|sign-in|check-email|verified|account\/delete)$/,
     routes: /^(ALL \/api\/auth)/,
     tables: /^(user|session|account|verification|rate_limit)$/,
@@ -36,7 +36,6 @@ const features = [
     id: 'profil',
     name: 'Profil et langue',
     tranche: 'Tranche 2',
-    lessons: ['02 Le profil'],
     pages: /^\/(profile|account)$/,
     routes: /^\w+ \/v1\/me(\/|$)/,
     tables: /^(profile|api_rate_limit)$/,
@@ -46,7 +45,6 @@ const features = [
     id: 'reagir',
     name: 'Réagir et commenter',
     tranche: 'Tranche 5',
-    lessons: ['13 Réagir et commenter'],
     pages: null,
     routes: /^\w+ \/v1\/projects\/\{id\}\/(reactions|comments)(\/|$)/,
     tables: /^project_(reaction|comment)$/,
@@ -55,7 +53,6 @@ const features = [
     id: 'projets',
     name: 'Projets',
     tranche: 'Tranche 3a',
-    lessons: ['03 Publier un projet'],
     pages: /^\/projects\//,
     routes: /^\w+ \/v1\/projects(\/\{id\})?$/,
     tables: /^project$/,
@@ -64,7 +61,6 @@ const features = [
     id: 'photos',
     name: 'Photos des projets',
     tranche: 'Tranche 3b-1',
-    lessons: ['07 Les photos des projets'],
     pages: null,
     routes: /^(\w+ \/v1\/projects\/\{id\}\/visuals|GET \/media)/,
     tables: /^project_media$/,
@@ -75,7 +71,6 @@ const features = [
     id: 'suivre',
     name: 'Suivre, le fil et les notes',
     tranche: 'Tranches 4a et 4b',
-    lessons: ['11 Suivre et le fil', '12 Les notes d’un projet'],
     pages: null,
     routes: /^\w+ \/v1\/(feed\/|(members|projects)\/\{id\}\/(follow$|notes))/,
     tables: /^((member|project)_follow|project_note)$/,
@@ -84,7 +79,6 @@ const features = [
     id: 'membres',
     name: 'Membres et étiquettes',
     tranche: 'Tranche 3b-2',
-    lessons: ['09 La page d’un membre et les étiquettes'],
     pages: /^\/(members|tags)\//,
     routes: /^\w+ \/v1\/(members|tags)\//,
     tables: null,
@@ -93,7 +87,6 @@ const features = [
     id: 'accueil',
     name: 'Accueil et liens sortants',
     tranche: 'Tranches 1 à 3',
-    lessons: ['03 Publier un projet (page d’avertissement)'],
     pages: /^\/(|out)$/,
     routes: null,
     tables: null,
@@ -102,7 +95,6 @@ const features = [
     id: 'design',
     name: 'Design Miel',
     tranche: 'Design Miel',
-    lessons: ['04 Le design Miel', '10 Le soin des détails'],
     pages: /^\/catalogue$/,
     routes: null,
     tables: null,
@@ -111,7 +103,6 @@ const features = [
     id: 'socle',
     name: 'Socle et mise en ligne',
     tranche: 'Phase 0 · Mise en ligne',
-    lessons: ['00 Le socle', '06 La mise en ligne'],
     pages: null,
     routes: /^GET \/health$/,
     tables: null,
@@ -268,8 +259,8 @@ const owner = (kind, value) => features.find((f) => f[kind]?.test(value))?.id ??
 const map = {
   generatedAt: new Date().toISOString().slice(0, 10),
   features: [
-    ...features.map(({ id, name, tranche, lessons }) => ({ id, name, tranche, lessons })),
-    { id: 'non-classe', name: 'Non classé', tranche: '', lessons: [] },
+    ...features.map(({ id, name, tranche }) => ({ id, name, tranche })),
+    { id: 'non-classe', name: 'Non classé', tranche: '' },
   ],
   pages: pages.map((p) => ({ ...p, feature: owner('pages', p.path) })),
   routes: routes

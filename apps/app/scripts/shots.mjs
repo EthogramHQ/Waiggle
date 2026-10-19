@@ -25,20 +25,9 @@
 //
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
 // d'exemple que les tests (src/testing/). Node lit ces fichiers TypeScript directement.
-import { spawnSync } from 'node:child_process'
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
-import { createServer } from 'node:http'
-import { createRequire } from 'node:module'
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { leaMe } from '../src/testing/fixtures.ts'
 import {
@@ -48,9 +37,8 @@ import {
   recipesProject,
   summaryOf,
 } from '../src/testing/projects.ts'
+import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const build = join(root, 'dist-shots')
 const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
 
@@ -111,123 +99,6 @@ const claimOut = () => {
   mkdirSync(out, { recursive: true })
   writeFileSync(join(out, '.shots'), '')
 }
-
-// Le tampon de la construction : le commit dont elle vient, suivi de « modifié » si la copie de
-// travail avait des changements pas encore enregistrés. Avec --no-build, on le compare à l'état
-// actuel, pour ne pas photographier sans le savoir un code ancien.
-const git = (...gitArgs) => {
-  const result = spawnSync('git', gitArgs, { cwd: root, encoding: 'utf8' })
-  return result.status === 0 ? result.stdout.trim() : null
-}
-const currentStamp = () => {
-  const head = git('rev-parse', 'HEAD')
-  if (!head) return 'inconnu' // pas de Git (archive du code, par exemple)
-  return git('status', '--porcelain') ? `${head} modifié` : head
-}
-const stampFile = join(build, '.commit')
-
-// Construit l'appli web, catalogue compris, puis écrit le tampon.
-// On lance la commande d'Expo avec Node directement (process.execPath), au lieu de « pnpm exec
-// expo » : sous Windows, pnpm est un script (pnpm.cmd) que spawnSync ne sait pas lancer sans
-// passer par l'interpréteur de commandes, et il échouait sans un mot. createRequire permet de
-// trouver un fichier d'un paquet installé (expo/bin/cli) comme le ferait un require().
-const buildSite = () => {
-  rmSync(build, { recursive: true, force: true })
-  const expo = createRequire(join(root, 'package.json')).resolve('expo/bin/cli')
-  const result = spawnSync(
-    process.execPath,
-    [expo, 'export', '--platform', 'web', '--output-dir', build],
-    { cwd: root, stdio: 'inherit', env: { ...process.env, EXPO_PUBLIC_CATALOGUE: '1' } },
-  )
-  if (result.error) fail(`Impossible de lancer la construction (expo) : ${result.error.message}`)
-  if (result.status !== 0) {
-    fail(
-      `La construction de l'appli web a échoué (code ${result.status ?? result.signal}) : voir les messages d'Expo ci-dessus.`,
-    )
-  }
-  writeFileSync(stampFile, `${currentStamp()}\n`)
-}
-
-// Avec --no-build : la construction existe-t-elle, et vient-elle du code actuel ?
-const checkStamp = () => {
-  if (!existsSync(join(build, 'index.html'))) {
-    fail(`Aucune construction dans ${build} : lance la commande une fois sans --no-build.`)
-  }
-  const built = existsSync(stampFile) ? readFileSync(stampFile, 'utf8').trim() : null
-  const now = currentStamp()
-  if (!built) {
-    console.warn(
-      'Attention : la construction n’a pas de tampon (dist-shots/.commit), on ne sait pas de quel code elle vient. Relance sans --no-build en cas de doute.',
-    )
-  } else if (built !== now) {
-    console.warn(
-      `Attention : la construction vient de ${built}, mais la copie de travail est à ${now}. Les captures risquent de montrer l'ancien code : relance sans --no-build.`,
-    )
-  } else if (now.endsWith('modifié')) {
-    console.warn(
-      'Note : la copie avait déjà des changements lors de la construction. Ceux faits depuis ne se voient pas dans le tampon : relance sans --no-build si tu as modifié l’appli.',
-    )
-  }
-}
-
-// 2. La servir comme le ferait un hébergeur : /sign-in renvoie sign-in.html.
-const types = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.ttf': 'font/ttf',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.json': 'application/json',
-}
-// Trouve le fichier d'une adresse. Les pages à paramètre (/projects/123) sont construites une seule
-// fois, sous le nom du paramètre (projects/[id].html) : un dossier ou fichier entre crochets
-// correspond à n'importe quel segment.
-const isFile = (path) => existsSync(path) && statSync(path).isFile()
-const isDir = (path) => existsSync(path) && statSync(path).isDirectory()
-const pageFor = (dir, segments) => {
-  if (segments.length === 0) return isFile(join(dir, 'index.html')) ? join(dir, 'index.html') : null
-  const [segment, ...rest] = segments
-  // Le segment correspond à son nom exact, ou à n'importe quel nom entre crochets ([id]).
-  const dynamic = readdirSync(dir)
-    .filter((name) => name.startsWith('['))
-    .map((name) => name.replace(/\.html$/, ''))
-  for (const name of new Set([segment, ...dynamic])) {
-    const path = join(dir, name)
-    if (rest.length === 0 && isFile(`${path}.html`)) return `${path}.html`
-    if (rest.length === 0 && isFile(path)) return path
-    if (isDir(path)) {
-      const found = pageFor(path, rest)
-      if (found) return found
-    }
-  }
-  return null
-}
-// Le fichier à servir pour une adresse, ou null si l'adresse est mal formée ou cherche à sortir
-// du dossier construit (« ../ », barre oblique inverse sous Windows, nom de lecteur « C: »).
-const fileFor = (url) => {
-  let path
-  try {
-    path = decodeURIComponent(new URL(url, 'http://x').pathname)
-  } catch {
-    return null // encodage invalide (« %E0%A4%A »)
-  }
-  const segments = path.split('/').filter((s) => s !== '' && s !== '.')
-  if (segments.some((s) => s === '..' || s.includes('\\') || s.includes(':'))) return null
-  const file = pageFor(build, segments) ?? join(build, '+not-found.html')
-  // Dernière vérification : le chemin final est bien dans le dossier construit.
-  return resolve(file).startsWith(resolve(build) + sep) ? file : null
-}
-const server = createServer((req, res) => {
-  const file = fileFor(req.url ?? '/')
-  if (!file) {
-    res.writeHead(400)
-    res.end()
-    return
-  }
-  res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' })
-  res.end(readFileSync(file))
-})
 
 // 3. Les réponses simulées de l'API, pour un visiteur ou pour Léa connectée.
 const session = {
@@ -708,6 +579,8 @@ if (has('--list')) {
 if (has('--no-build')) checkStamp()
 else buildSite()
 
+// La construction, servie comme par un hébergeur (dist-shots.mjs).
+const server = createSiteServer()
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}`
 
