@@ -3,7 +3,13 @@
 
 import { createRoute } from '@hono/zod-openapi'
 import { appName } from '@ruche/brand'
-import { AccountExport, AVATAR_MAX_BYTES, Me, ProfileUpdate } from '@ruche/contracts'
+import {
+  AccountExport,
+  AVATAR_MAX_BYTES,
+  HANDLE_CHANGES_PER_DAY,
+  Me,
+  ProfileUpdate,
+} from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
@@ -11,6 +17,8 @@ import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
 import { commentsOfAuthor } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
+import { claimHandle, HandleTakenError } from '../handles/claim'
+import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
 import { notesOfAuthor } from '../notes/load'
@@ -25,6 +33,8 @@ import { createRouter, errorResponse } from './router'
 const HOUR = 60 * 60 * 1000
 const profileRule: RateRule = { windowMs: HOUR, max: 30 }
 const avatarRule: RateRule = { windowMs: HOUR, max: 10 }
+// Changer de pseudo (tranche 6a) : 5 fois par 24 heures, en plus du quota du profil.
+const handleRule: RateRule = { windowMs: 24 * HOUR, max: HANDLE_CHANGES_PER_DAY }
 
 const meResponse = { description: 'The profile.', content: { 'application/json': { schema: Me } } }
 
@@ -49,6 +59,7 @@ const updateMeRoute = createRoute({
     200: meResponse,
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
+    409: errorResponse('Handle already taken, or still reserved for its former owner.'),
     429: errorResponse('Too many changes.'),
   },
 })
@@ -121,30 +132,56 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const decision = await limiter.hit(memberCounterKeys(user.id).profile, profileRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
-    // c.req.valid('json') : le corps de la requête, déjà vérifié par le schéma ProfileUpdate.
-    const { name, language, bio, favoriteTools } = c.req.valid('json')
+    // c.req.valid('json') : le corps de la requête, déjà vérifié par le schéma ProfileUpdate. Le
+    // pseudo y est déjà nettoyé (« @Ines » → « ines ») et de bonne forme.
+    const { name, handle, language, bio, favoriteTools } = c.req.valid('json')
 
-    // Le nom et la langue sont dans la table `user`…
-    if (name !== undefined || language !== undefined) {
-      await db
-        .update(schema.user)
-        // On n'écrit que ce qui a été envoyé : { name } seulement si name existe, etc.
-        .set({ ...(name !== undefined && { name }), ...(language !== undefined && { language }) })
-        .where(eq(schema.user.id, user.id))
+    // Un changement de pseudo a son propre quota (5 par jour), compté seulement s'il change :
+    // renvoyer son pseudo actuel avec le reste du profil n'en est pas un. Un essai sur un pseudo
+    // pris compte aussi : personne ne peut ainsi tester les pseudos sans fin.
+    const changesHandle = handle !== undefined && handle !== (await currentHandle(db, user.id))
+    if (changesHandle) {
+      const handleDecision = await limiter.hit(memberCounterKeys(user.id).handle, handleRule)
+      if (!handleDecision.allowed) return tooMany(c, handleDecision.retryAfterSeconds)
     }
-    // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
-    // encore, sinon la mettre à jour (insert … on conflict do update).
-    if (bio !== undefined || favoriteTools !== undefined) {
-      await db
-        .insert(schema.profile)
-        .values({ userId: user.id, bio: bio ?? '', favoriteTools: favoriteTools ?? [] })
-        .onConflictDoUpdate({
-          target: schema.profile.userId,
-          set: {
-            ...(bio !== undefined && { bio }),
-            ...(favoriteTools !== undefined && { favoriteTools }),
-          },
-        })
+
+    // Tout le profil s'écrit dans une seule transaction : si le pseudo est pris, claimHandle lève
+    // HandleTakenError, la transaction est annulée, et rien de la demande n'est enregistré.
+    try {
+      await db.transaction(async (tx) => {
+        if (handle !== undefined) await claimHandle(tx, user.id, handle, new Date())
+        // Le nom et la langue sont dans la table `user`…
+        if (name !== undefined || language !== undefined) {
+          await tx
+            .update(schema.user)
+            // On n'écrit que ce qui a été envoyé : { name } seulement si name existe, etc.
+            .set({
+              ...(name !== undefined && { name }),
+              ...(language !== undefined && { language }),
+            })
+            .where(eq(schema.user.id, user.id))
+        }
+        // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
+        // encore, sinon la mettre à jour (insert … on conflict do update).
+        if (bio !== undefined || favoriteTools !== undefined) {
+          await tx
+            .insert(schema.profile)
+            .values({ userId: user.id, bio: bio ?? '', favoriteTools: favoriteTools ?? [] })
+            .onConflictDoUpdate({
+              target: schema.profile.userId,
+              set: {
+                ...(bio !== undefined && { bio }),
+                ...(favoriteTools !== undefined && { favoriteTools }),
+              },
+            })
+        }
+      })
+    } catch (error) {
+      // Pris par un autre ou réservé : la même réponse, mot pour mot, pour ne pas dire lequel.
+      if (error instanceof HandleTakenError) {
+        return c.json(errorBody(languageOf(c), 'handle_taken'), 409)
+      }
+      throw error
     }
 
     const me = await loadMe(db, user.id, publicApiUrl)
@@ -274,6 +311,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // dit rien de lui (ni titre, ni texte d'un autre).
     const reactions = await reactionsOfMember(db, user.id)
     const comments = await commentsOfAuthor(db, user.id)
+    // Son ancien pseudo, s'il lui est encore réservé, avec la date où il redevient libre
+    // (tranche 6a). Le pseudo actuel est déjà dans `me`.
+    const formerHandle = await formerHandleOf(db, user.id, new Date())
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
@@ -282,6 +322,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       {
         exportedAt: new Date().toISOString(),
         user: me,
+        formerHandle,
         projects,
         notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },

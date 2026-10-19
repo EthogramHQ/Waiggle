@@ -7,6 +7,8 @@ import { and, eq } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { memberFollowState } from '../follows/load'
+import { ensureHandle } from '../handles/claim'
+import { currentHandleOf } from '../handles/load'
 import { mediaUrl } from '../profile/me'
 import { loadSummaries, visibleTo, withSlugs } from '../projects/load'
 import { createRouter, errorResponse } from './router'
@@ -42,19 +44,27 @@ export const memberRoutes = ({ db, publicApiUrl }: Deps) => {
     // « introuvable » sans interroger la base.
     if (!MemberId.safeParse(id).success) return notFound()
     // Seulement les colonnes publiques : l'e-mail, la langue ou les dates ne sont même pas lus.
+    // Le pseudo actuel vient par une jointure (index partiel member_handle_current_idx) ; jamais
+    // l'ancien, qui ne regarde que son propriétaire.
     const [row] = await db
       .select({
         id: schema.user.id,
         name: schema.user.name,
+        handle: schema.memberHandle.handle,
         bio: schema.profile.bio,
         favoriteTools: schema.profile.favoriteTools,
         avatarKey: schema.profile.avatarKey,
       })
       .from(schema.user)
       .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
+      .leftJoin(schema.memberHandle, currentHandleOf(schema.user.id))
       // Un compte jamais vérifié n'a pas de page : il ne peut ni se connecter ni publier.
       .where(and(eq(schema.user.id, id), eq(schema.user.emailVerified, true)))
     if (!row) return notFound()
+    // Un membre d'avant la tranche 6a, pas encore servi par le rattrapage : il reçoit son pseudo
+    // ici, en filet (ensureHandle lit lui-même sa langue, que cette route ne lit pas).
+    const handle = row.handle ?? (await ensureHandle(db, row.id))
+    if (handle === null) return notFound()
 
     // Ses projets que le visiteur peut voir : publics, et aussi privés si c'est sa propre page.
     // Puis son nombre d'abonnés, et si le visiteur en fait partie (une requête, voir follows/load.ts).
@@ -71,6 +81,7 @@ export const memberRoutes = ({ db, publicApiUrl }: Deps) => {
       Member.parse({
         id: row.id,
         name: row.name,
+        handle,
         avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
         bio: row.bio ?? '',
         favoriteTools: tools.map((label, i) => ({ label, slug: toolSlugs[i] ?? label })),

@@ -60,6 +60,8 @@ export const memberCounterKeys = (userId: string) => ({
   reaction: `reaction:${userId}`,
   // Publier et modifier un commentaire, tous les projets ensemble (tranche 5).
   comment: `comment:${userId}`,
+  // Changer de pseudo, essais sur un pseudo pris compris (tranche 6a).
+  handle: `handle:${userId}`,
 })
 
 /**
