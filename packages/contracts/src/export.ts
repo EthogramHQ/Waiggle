@@ -49,6 +49,11 @@ export const AccountExport = z
         body: z.string(),
         createdAt: z.iso.datetime(),
         editedAt: z.iso.datetime().nullable(),
+        /**
+         * Quand l'auteur du projet l'a masqué ; null s'il est visible. Une décision de modération
+         * sur le texte du membre est une donnée qui le concerne.
+         */
+        hiddenAt: z.iso.datetime().nullable(),
       }),
     ),
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

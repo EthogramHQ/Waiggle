@@ -459,6 +459,16 @@ Décisions de Louis :
 - **Ni les réactions ni les commentaires n'apparaissent dans les fils ou sur les cartes** : seulement
   sur la page du projet. L'auteur sera prévenu par les notifications (tranche 6).
 
+Décisions de Louis après les relectures (19/10/2026) :
+- **Un projet devenu privé, plus personne ne lit ce que les autres y ont laissé**, auteur du projet
+  compris : leurs commentaires et leurs réactions sont cachés à tous, puis reviennent si le projet
+  redevient public. Chacun garde ainsi la maîtrise de ce qu'il a écrit : rien n'est lu sans lui.
+- **Un seul « Répondre » par fil**, au bout du fil, et pas sur chaque commentaire : les réponses
+  vont toujours au bout du fil. Il n'apparaît pas sous un commentaire supprimé ou masqué.
+- **Des textes non genrés** pour le membre qui lit (« personne d'autre que toi » plutôt que « toi
+  seul »), notes comprises.
+- **Sur téléphone**, « Modifier » et « Supprimer » le projet viennent après les commentaires.
+
 **Réagir**
 - Étant donné un membre connecté, sur le projet public d'un autre
 - Quand il touche « Bravo »
@@ -473,8 +483,8 @@ Décisions de Louis :
   public d'un autre)
 - Quand il publie un commentaire (texte brut, 1 à 1 000 caractères)
 - Alors le commentaire apparaît en haut de la liste, avec son nom, sa photo et la date
-- Et un autre membre peut y répondre : la réponse s'affiche sous le commentaire, les réponses de la
-  plus ancienne à la plus récente
+- Et un autre membre peut y répondre, par « Répondre » au bout du fil : la réponse s'affiche sous
+  le commentaire, les réponses de la plus ancienne à la plus récente
 
 **Modifier et supprimer son commentaire**
 - Étant donné l'auteur d'un commentaire
@@ -501,12 +511,13 @@ Règles détaillées :
   supprimer le commentaire d'un autre, ou masquer sans être l'auteur du projet (y compris son propre
   commentaire : il le supprime plutôt) : « refusé » ; répondre à un commentaire d'un autre projet, à
   une réponse, à un commentaire supprimé ou à un commentaire masqué qu'on ne voit pas :
-  « introuvable ».
-- **Un projet privé** : seul son auteur voit ses commentaires et ses nombres de réactions. Les
-  réactions et les commentaires écrits quand il était public sont gardés, et reviennent s'il
-  redevient public.
+  « introuvable ». Un commentaire masqué qu'on ne voit pas est « introuvable » pour toute demande
+  (modifier, supprimer, masquer, démasquer, répondre), comme un commentaire inconnu.
+- **Un projet privé** : seul son auteur le voit, et il n'y voit que ses propres commentaires. Les
+  commentaires et les réactions des autres membres sont cachés à tous, auteur compris (nombres à
+  zéro) ; ils sont gardés, et reviennent si le projet redevient public.
 - **Le nombre de commentaires** affiché compte les racines et les réponses que tout le monde voit :
-  ni les masqués ni les supprimés.
+  ni les masqués, ni les supprimés, ni ceux d'un compte supprimé.
 - **Anti-abus**, par membre : 120 réactions (posées ou retirées) par heure ; 60 commentaires
   (publiés ou modifiés) par heure ; masquer et supprimer comptent comme des modifications du projet
   (60 par heure).
