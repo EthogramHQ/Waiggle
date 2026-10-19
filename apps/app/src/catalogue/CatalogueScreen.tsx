@@ -375,34 +375,37 @@ export function CatalogueScreen() {
       </Section>
 
       <Section title={l.memberLists}>
-        <MemberHeader
-          name="Léa Moreau"
-          handle="@lea_moreau"
-          avatar={null}
-          bio={l.memberBio}
-          toolsTitle={l.favoriteTools}
-          tools={[
-            { label: 'Claude Code', onPress: () => {} },
-            { label: 'Python', onPress: () => {} },
-          ]}
-          action={
-            <Button
-              label={l.editProfile}
-              variant="secondary"
-              icon="pencil-simple"
-              onPress={() => {}}
-            />
-          }
-        />
-        {/* Sans pseudo (un membre d'avant la tranche 6a, pas encore rattrapé), sans bio ni
+        {/* Les deux en-têtes bien séparés : on voit où l'un finit et où l'autre commence. */}
+        <Stack gap="huge">
+          <MemberHeader
+            name="Léa Moreau"
+            handle="@lea_moreau"
+            avatar={null}
+            bio={l.memberBio}
+            toolsTitle={l.favoriteTools}
+            tools={[
+              { label: 'Claude Code', onPress: () => {} },
+              { label: 'Python', onPress: () => {} },
+            ]}
+            action={
+              <Button
+                label={l.editProfile}
+                variant="secondary"
+                icon="pencil-simple"
+                onPress={() => {}}
+              />
+            }
+          />
+          {/* Sans pseudo (un membre d'avant la tranche 6a, pas encore rattrapé), sans bio ni
             outils : le nom reste seul sous la photo, sans trou. */}
-        <MemberHeader
-          name="Inès Martin"
-          avatar={null}
-          bio=""
-          toolsTitle={l.favoriteTools}
-          tools={[]}
-        />
+          <MemberHeader
+            name="Inès Martin"
+            avatar={null}
+            bio=""
+            toolsTitle={l.favoriteTools}
+            tools={[]}
+          />
+        </Stack>
         {/* Une grille de cartes-liens : une colonne sur téléphone, trois sur ordinateur. */}
         <ProjectGrid empty={l.emptyList}>
           <ProjectCard
