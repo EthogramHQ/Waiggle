@@ -36,6 +36,13 @@
       "when": 1792371731698,
       "tag": "0004_follows_and_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792378701578,
+      "tag": "0005_project_notes",
+      "breakpoints": true
     }
   ]
 }
