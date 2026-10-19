@@ -50,6 +50,13 @@
       "when": 1792392681283,
       "tag": "0006_reactions_and_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792446077198,
+      "tag": "0007_handles",
+      "breakpoints": true
     }
   ]
 }
