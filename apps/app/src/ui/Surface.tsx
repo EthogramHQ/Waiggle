@@ -23,6 +23,11 @@ type Props = {
   gap?: Space
   /** Occupe toute la largeur disponible (vrai par défaut). */
   fill?: boolean
+  /**
+   * Une feuille posée au centre de l'écran (une fenêtre de confirmation) plutôt que sortie du bas :
+   * ses quatre coins sont arrondis.
+   */
+  centered?: boolean
 }
 
 // Rayon et intensité du flou par matière (le flou va de 1 à 100 pour expo-blur).
@@ -38,7 +43,15 @@ const defaults = {
 // En attendant de le brancher écran par écran, le verre y est un peu plus opaque, sans flou.
 const realBlur = Platform.OS === 'ios' || Platform.OS === 'web'
 
-export function Surface({ children, variant = 'plain', radius, padding, gap, fill = true }: Props) {
+export function Surface({
+  children,
+  variant = 'plain',
+  radius,
+  padding,
+  gap,
+  fill = true,
+  centered = false,
+}: Props) {
   const { colors, shadows, scheme } = useTheme()
   const { blur, radius: defaultRadius } = defaults[variant]
 
@@ -71,8 +84,10 @@ export function Surface({ children, variant = 'plain', radius, padding, gap, fil
   const style: ViewStyle = {
     ...look[variant],
     borderRadius: radii[radius ?? defaultRadius],
-    // Une feuille n'est arrondie qu'en haut : elle sort du bas de l'écran.
-    ...(variant === 'sheet' ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : null),
+    // Une feuille n'est arrondie qu'en haut : elle sort du bas de l'écran. Posée au centre, non.
+    ...(variant === 'sheet' && !centered
+      ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
+      : null),
     ...(padding ? { padding: space[padding] } : null),
     ...(gap ? { gap: space[gap] } : null),
     ...(fill ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }),

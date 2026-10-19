@@ -548,6 +548,8 @@ export function CatalogueScreen() {
         <Surface variant="grouped" padding="xl" gap="lg">
           <NoteList notes={[]} empty={l.journalEmpty} onDelete={() => {}} />
         </Surface>
+        {/* Après une suppression : une confirmation discrète (role « status »). */}
+        <Notice tone="success" message={l.noteDeleted} polite />
         {/* Écrire une note : fermé, fermé juste après une publication, ouvert (vide, avec un texte,
             en cours d'envoi, texte manquant, envoi refusé). */}
         <NoteComposerSample l={l} open={false} />
@@ -663,29 +665,46 @@ function Fields({ l }: { l: Labels }) {
   return (
     <Columns
       main={
-        <FieldGroup>
+        <Stack gap="lg">
+          <FieldGroup>
+            <TextField
+              label={l.titleField}
+              value={title}
+              onChangeText={setTitle}
+              maxLength={80}
+              showCount
+            />
+            <TextField
+              label={l.pitchField}
+              value={pitch}
+              onChangeText={setPitch}
+              maxLength={140}
+              showCount
+            />
+            <TextField
+              label={l.descriptionField}
+              value=""
+              onChangeText={() => {}}
+              placeholder={l.placeholder}
+              multiline
+            />
+          </FieldGroup>
+          {/* Un compteur à la limite (ambre), puis au-delà d'une limite seulement affichée (rouge). */}
           <TextField
             label={l.titleField}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={80}
-            showCount
-          />
-          <TextField
-            label={l.pitchField}
-            value={pitch}
-            onChangeText={setPitch}
-            maxLength={140}
-            showCount
-          />
-          <TextField
-            label={l.descriptionField}
-            value=""
+            value={l.sampleTitle}
             onChangeText={() => {}}
-            placeholder={l.placeholder}
-            multiline
+            maxLength={l.sampleTitle.length}
+            showCount
           />
-        </FieldGroup>
+          <TextField
+            label={l.titleField}
+            value={l.sampleTitle}
+            onChangeText={() => {}}
+            limit={l.sampleTitle.length - 2}
+            showCount
+          />
+        </Stack>
       }
       side={<TextField label={l.demoField} value={url} onChangeText={setUrl} error={l.demoError} />}
     />

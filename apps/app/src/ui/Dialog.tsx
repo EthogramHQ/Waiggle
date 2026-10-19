@@ -64,7 +64,7 @@ export function Dialog({
           accessibilityViewIsModal // les lecteurs d'écran restent dans la fenêtre
           style={{ width: '100%', maxWidth: layout.formWidth - 120 }}
         >
-          <Surface variant="sheet" radius="sheet" padding="xxl" gap="lg">
+          <Surface variant="sheet" radius="sheet" padding="xxl" gap="lg" centered>
             {illustration ? <View style={{ alignItems: 'center' }}>{illustration}</View> : null}
             <Text variant="heading" align="center" accessibilityRole="header">
               {title}

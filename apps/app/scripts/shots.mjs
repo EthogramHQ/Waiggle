@@ -526,10 +526,11 @@ for (const device of devices) {
         const height = await page.evaluate(() =>
           Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
         )
-        // Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute (le catalogue en fait
-        // davantage sur téléphone) : on photographie alors la page en plusieurs morceaux
-        // (catalogue, catalogue-2…), en faisant défiler la zone qui défile entre deux captures.
-        const PART = 16000
+        // Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; près de cette limite,
+        // il laisse même des zones non peintes, sans erreur. Au-delà de 12 000 points (le
+        // catalogue, sur téléphone comme sur ordinateur), on photographie donc la page en
+        // plusieurs morceaux (catalogue, catalogue-2…), en faisant défiler la zone qui défile.
+        const PART = 12000
         await page.setViewportSize({ ...device.viewport, height: Math.min(height, PART) })
         await page.waitForTimeout(300)
         for (let part = 1; (part - 1) * PART < height; part++) {

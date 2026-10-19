@@ -6,7 +6,7 @@
 // Les boutons de suppression portent tous le même nom ; sur le web, chacun est en plus « décrit »
 // par le texte de sa note (aria-describedby) : le lecteur d'écran dit laquelle il supprime.
 // Quand une note disparaît, l'écran peut ramener le focus du clavier sur sa voisine (handle).
-import { borders, layout, radii, space, textStyles } from '@ruche/brand'
+import { borders, layout, radii, readableWidth, space, textStyles } from '@ruche/brand'
 import { type Ref, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
@@ -103,6 +103,9 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
                 flex: 1,
                 minWidth: 0,
                 gap: space.xxs,
+                // Sur un grand écran, la note garde une longueur de ligne confortable, et son bouton
+                // « Supprimer » reste près d'elle au lieu de partir au bout de la colonne.
+                maxWidth: readableWidth,
                 paddingBottom: last ? 0 : space.xl,
               }}
             >

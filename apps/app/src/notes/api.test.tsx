@@ -127,3 +127,44 @@ describe('useDeleteNote', () => {
     expect(journal()).toEqual(['Première version en ligne'])
   })
 })
+
+// Quand « Réessaie » ne servirait à rien, le hook dit pourquoi : l'écran choisit son message.
+describe('why sending a note failed', () => {
+  it('says the daily limit is reached when the API answers 429', async () => {
+    jest.mocked(request).mockResolvedValue({ ok: false, error: 'rateLimited' })
+    const { result } = await renderHook(() => usePublishNote(id), { wrapper })
+
+    await act(async () => {
+      await result.current.publish('Une de trop')
+    })
+
+    await waitFor(() => expect(result.current.reason).toBe('limited'))
+  })
+
+  it('says the session expired when the API answers 401, for publishing and deleting', async () => {
+    jest.mocked(request).mockResolvedValue({ ok: false, error: 'unauthorized' })
+    jest.mocked(requestWithoutBody).mockResolvedValue({ ok: false, error: 'unauthorized' })
+    const publishing = await renderHook(() => usePublishNote(id), { wrapper })
+    const deleting = await renderHook(() => useDeleteNote(id), { wrapper })
+
+    await act(async () => {
+      await publishing.result.current.publish('v2')
+      await deleting.result.current.remove(firstVersion.id)
+    })
+
+    await waitFor(() => expect(publishing.result.current.reason).toBe('expired'))
+    await waitFor(() => expect(deleting.result.current.reason).toBe('expired'))
+  })
+
+  it('gives no reason for an error that trying again can fix', async () => {
+    jest.mocked(request).mockResolvedValue({ ok: false, error: 'network' })
+    const { result } = await renderHook(() => usePublishNote(id), { wrapper })
+
+    await act(async () => {
+      await result.current.publish('v2')
+    })
+
+    await waitFor(() => expect(result.current.error).toBe(true))
+    expect(result.current.reason).toBeUndefined()
+  })
+})

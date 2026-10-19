@@ -6,9 +6,36 @@ import { PROJECT_NOTES_SHOWN, type Project, ProjectNote } from '@ruche/contracts
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { request, requestWithoutBody } from '../api/client'
-import { ApiError } from '../api/errors'
+import { ApiError, errorKey } from '../api/errors'
 import { feedQueryKey } from '../feed/api'
 import { projectQueryKey } from '../projects/hooks'
+
+/**
+ * Pourquoi le dernier envoi a échoué, quand « Réessaie » ne servirait à rien :
+ * - limited : la limite du jour est atteinte (30 notes par jour, réponse 429) ;
+ * - expired : la session a expiré (401), il faut se reconnecter.
+ * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
+ */
+export type NoteFailure = 'limited' | 'expired'
+
+const reasonOf = (error: unknown): NoteFailure | undefined => {
+  if (!error) return undefined
+  const key = errorKey(error)
+  return key === 'rateLimited' ? 'limited' : key === 'unauthorized' ? 'expired' : undefined
+}
+
+// Ce que rendent les hooks. `reason` est facultatif : un faux hook (dans les tests) peut s'en passer.
+type PublishState = {
+  publish: (body: string) => Promise<boolean>
+  pending: boolean
+  error: boolean
+  reason?: NoteFailure | undefined
+}
+type DeleteState = {
+  remove: (noteId: string) => Promise<boolean>
+  error: boolean
+  reason?: NoteFailure | undefined
+}
 
 // encodeURIComponent : les identifiants restent de simples morceaux de l'adresse (voir projects/api).
 const notesPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}/notes`
@@ -43,7 +70,7 @@ export const deleteNote = async (projectId: string, noteId: string): Promise<voi
  * marqués « à relire » : les abonnés (et le membre lui-même, ailleurs) la verront à leur prochain
  * passage.
  */
-export const usePublishNote = (projectId: string) => {
+export const usePublishNote = (projectId: string): PublishState => {
   const queryClient = useQueryClient()
   // useMutation : une écriture vers l'API, dont React Query suit l'état (en cours, échouée).
   const mutation = useMutation({
@@ -72,14 +99,20 @@ export const usePublishNote = (projectId: string) => {
     },
     [mutateAsync],
   )
-  return { publish, pending: mutation.isPending, error: mutation.isError }
+  const result: PublishState = {
+    publish,
+    pending: mutation.isPending,
+    error: mutation.isError,
+    reason: reasonOf(mutation.error),
+  }
+  return result
 }
 
 /**
  * Hook : supprimer une note de ce projet (après confirmation, demandée par l'écran). `remove`
  * renvoie vrai une fois la note supprimée : elle disparaît alors du journal en cache.
  */
-export const useDeleteNote = (projectId: string) => {
+export const useDeleteNote = (projectId: string): DeleteState => {
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: (noteId: string) => deleteNote(projectId, noteId),
@@ -103,5 +136,6 @@ export const useDeleteNote = (projectId: string) => {
     },
     [mutateAsync],
   )
-  return { remove, error: mutation.isError }
+  const result: DeleteState = { remove, error: mutation.isError, reason: reasonOf(mutation.error) }
+  return result
 }

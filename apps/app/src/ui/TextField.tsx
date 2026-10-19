@@ -9,7 +9,7 @@ import { Children, createContext, Fragment, type ReactNode, useContext, useState
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
 import { Icon } from './Icon'
-import { Text } from './Text'
+import { Text, type Tone } from './Text'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -38,6 +38,8 @@ type Props = {
   | 'autoCapitalize'
   | 'placeholder'
   | 'autoFocus'
+  | 'editable'
+  | 'onKeyPress'
 >
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.
@@ -117,7 +119,18 @@ export function TextField({
   const [revealed, setRevealed] = useState(false)
   const body = textStyles.body
   const max = limit ?? inputProps.maxLength
-  const counter = showCount && max ? `${Array.from(value).length} / ${max}` : aside
+  // Le compteur compte comme la limite : en « unités » de texte (value.length), comme maxLength et
+  // les schémas Zod de l'API. Un emoji en vaut souvent deux : compter en caractères affichait
+  // « 999 / 1000 » quand le champ refusait déjà la lettre suivante.
+  const counted = showCount && max ? value.length : null
+  const counter = counted !== null ? `${counted} / ${max}` : aside
+  // À la limite, le compteur prévient (ambre) ; au-delà (limite seulement affichée), il alerte.
+  const counterTone: Tone =
+    counted !== null && max && counted > max
+      ? 'danger'
+      : counted !== null && max && counted >= max
+        ? 'accent'
+        : 'muted'
 
   const row = (
     <View
@@ -136,7 +149,12 @@ export function TextField({
           {label}
         </Text>
         {counter ? (
-          <Text variant="caption" tone="muted" tabular>
+          <Text
+            variant="caption"
+            tone={counterTone}
+            weight={counterTone === 'muted' ? 400 : 700}
+            tabular
+          >
             {counter}
           </Text>
         ) : null}

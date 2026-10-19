@@ -6,9 +6,17 @@ import { Icon, type IconName, type IconTone } from './Icon'
 import { Text, type Tone } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
-type Props = { message: string; tone?: 'error' | 'info' | 'success' }
+type Props = {
+  message: string
+  tone?: 'error' | 'info' | 'success'
+  /**
+   * Une simple confirmation (« Note supprimée. ») : role « status », lu par les lecteurs d'écran
+   * sans couper ce qu'ils disaient, là où une alerte les interrompt.
+   */
+  polite?: boolean
+}
 
-export function Notice({ message, tone = 'error' }: Props) {
+export function Notice({ message, tone = 'error', polite = false }: Props) {
   const { colors } = useTheme()
   const looks: Record<
     NonNullable<Props['tone']>,
@@ -33,7 +41,7 @@ export function Notice({ message, tone = 'error' }: Props) {
     // accessible : le cadre est lu d'un seul tenant (l'icône est décorative, seul le texte compte).
     <View
       accessible
-      accessibilityRole="alert"
+      {...(polite ? { role: 'status' as const } : { accessibilityRole: 'alert' as const })}
       style={{
         flexDirection: 'row',
         gap: space.sm,

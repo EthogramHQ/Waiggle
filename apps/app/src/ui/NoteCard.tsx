@@ -35,7 +35,7 @@ type Props = {
 }
 
 // La couverture, en bande basse : assez pour reconnaître le projet, pas assez pour se confondre
-// avec une carte de projet. Dans une grille, elle grandit pour s'aligner sur ses voisines.
+// avec une carte de projet. Sa hauteur ne change jamais, même à côté de cartes plus hautes.
 const COVER_HEIGHT = 120
 // Au-delà, le texte se coupe (avec « … ») : la carte garde une taille raisonnable dans le fil.
 const BODY_LINES = 6
@@ -61,39 +61,72 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
         }}
       >
         {/* Rayon intérieur plus petit que celui de la carte, de l'épaisseur du bord blanc. */}
-        <ProjectCover height={COVER_HEIGHT} radius="group" image={image ?? null} grow />
-        <View style={{ paddingHorizontal: space.md, paddingBottom: space.md, gap: space.md }}>
-          <View style={{ gap: space.xxs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
-              <Icon name="megaphone-simple" size={16} tone="amber" />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="caption" weight={700} tone="accent">
-                  {t('feed.noteKicker')}
-                </Text>
+        <ProjectCover height={COVER_HEIGHT} radius="group" image={image ?? null} />
+        {/* Dans une grille, la place gagnée va au texte (flexGrow) ; l'auteur reste en bas. */}
+        <View
+          style={{
+            flexGrow: 1,
+            justifyContent: 'space-between',
+            paddingHorizontal: space.md,
+            paddingBottom: space.md,
+            gap: space.md,
+          }}
+        >
+          <View style={{ gap: space.md }}>
+            <View style={{ gap: space.xxs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                <Icon name="megaphone-simple" size={16} tone="amber" />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text variant="caption" weight={700} tone="accent">
+                    {t('feed.noteKicker')}
+                  </Text>
+                </View>
               </View>
+              <Text variant="headline" numberOfLines={2} breakAnywhere>
+                {project}
+              </Text>
             </View>
-            <Text variant="headline" numberOfLines={2} breakAnywhere>
-              {project}
-            </Text>
+            {/* Le texte de la note, souligné d'un trait de miel à gauche, comme une citation. */}
+            <View
+              style={{
+                borderLeftWidth: borders.quote,
+                borderLeftColor: colors.honey,
+                paddingLeft: space.md,
+              }}
+            >
+              <Text nativeID={bodyId} numberOfLines={BODY_LINES} breakAnywhere>
+                {body}
+              </Text>
+            </View>
           </View>
-          {/* Le texte de la note, souligné d'un trait de miel à gauche, comme une citation. */}
+          {/* L'auteur, puis la date. Quand la place manque (texte agrandi, nom long), la date passe
+              à la ligne et le nom se replie, au lieu d'être coupé. */}
           <View
             style={{
-              borderLeftWidth: borders.quote,
-              borderLeftColor: colors.honey,
-              paddingLeft: space.md,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              columnGap: space.sm,
+              rowGap: space.xxs,
             }}
           >
-            <Text nativeID={bodyId} numberOfLines={BODY_LINES} breakAnywhere>
-              {body}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Avatar name={author.name} source={author.avatar} label={author.name} size={28} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="callout" weight={700} numberOfLines={1}>
-                {author.name}
-              </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space.sm,
+                flexShrink: 1,
+                flexBasis: 'auto',
+                minWidth: 0,
+              }}
+            >
+              <Avatar name={author.name} source={author.avatar} label={author.name} size={28} />
+              <View style={{ flexShrink: 1, minWidth: 0 }}>
+                <Text variant="callout" weight={700} breakAnywhere>
+                  {author.name}
+                </Text>
+              </View>
             </View>
             <Text variant="caption" tone="muted">
               {when}

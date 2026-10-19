@@ -5,13 +5,15 @@
 //
 // Le focus du clavier ne se perd jamais : à l'ouverture, il va dans le champ ; à la fermeture
 // (publiée ou annulée), le bouton qu'on vient de toucher disparaît, et le focus revient sur
-// « Publier une note », à la même place, sans faire défiler la page.
+// « Publier une note », à la même place, sans faire défiler la page. Échap referme le champ (web).
+// Pendant l'envoi, le texte est figé et « Annuler » attend.
 // En blanc, jamais en miel : sur la page d'un projet, l'action miel est « Tester la démo ».
 import { space } from '@ruche/brand'
 import { useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
 import { Button } from './Button'
 import { focusWithoutScroll } from './focus'
+import { escapeCloses } from './keyboard'
 import { Notice } from './Notice'
 import { TextField } from './TextField'
 import { TextLink } from './TextLink'
@@ -106,6 +108,8 @@ export function NoteComposer({
   return (
     <View style={{ gap: space.md }}>
       <TextField
+        // Échap referme le champ, comme « Annuler » (web), sauf pendant l'envoi.
+        {...escapeCloses(onCancel, pending)}
         label={labels.field}
         value={value}
         onChangeText={onChangeText}
@@ -117,6 +121,8 @@ export function NoteComposer({
         autoCapitalize="sentences"
         // Le champ vient d'apparaître, à la demande du membre : on peut y écrire tout de suite.
         autoFocus={autoFocus}
+        // Pendant l'envoi, le texte ne bouge plus : ce qui part est ce qu'on voit.
+        editable={!pending}
       />
       {error ? <Notice message={error} /> : null}
       {/* « Annuler » en simple lien, comme dans l'en-tête des formulaires : on voit d'emblée lequel
@@ -130,7 +136,8 @@ export function NoteComposer({
           loading={pending}
           onPress={onSubmit}
         />
-        <TextLink label={labels.cancel} role="button" onPress={onCancel} />
+        {/* Pendant l'envoi, « Annuler » mentirait : la note part quand même. Il attend. */}
+        <TextLink label={labels.cancel} role="button" onPress={onCancel} disabled={pending} />
       </View>
     </View>
   )

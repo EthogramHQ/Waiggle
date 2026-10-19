@@ -912,4 +912,42 @@ describe('NoteComposer', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Note publiée.')
     expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
   })
+
+  it('freezes the text and waits to be cancelled while the note is on its way', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
+    )
+
+    expect(screen.getByLabelText('Ta note')).toHaveProp('editable', false)
+    const cancel = screen.getByRole('button', { name: 'Annuler' })
+    expect(cancel).toBeDisabled()
+    await fireEvent.press(cancel)
+    expect(on.onCancel).not.toHaveBeenCalled()
+  })
+})
+
+// --- Relectures de la 4b ---
+
+describe('TextField counter', () => {
+  it('counts like the limit does, an emoji taking two units', async () => {
+    // maxLength et les schémas de l'API comptent en unités de texte : « 🐝 » en vaut deux.
+    await renderWithProviders(
+      <TextField label="Ta note" value="🐝" onChangeText={() => {}} maxLength={1000} showCount />,
+    )
+
+    expect(screen.getByText('2 / 1000')).toBeTruthy()
+  })
+})
+
+describe('TextLink', () => {
+  it('can be disabled, and says so', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<TextLink label="Annuler" role="button" onPress={onPress} disabled />)
+
+    const link = screen.getByRole('button', { name: 'Annuler' })
+    expect(link).toBeDisabled()
+    await fireEvent.press(link)
+    expect(onPress).not.toHaveBeenCalled()
+  })
 })
