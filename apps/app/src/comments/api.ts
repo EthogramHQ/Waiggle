@@ -15,22 +15,27 @@ import {
 } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { request, requestWithoutBody } from '../api/client'
-import { ApiError, errorKey } from '../api/errors'
+import { ApiError, type ApiErrorKey, errorKey } from '../api/errors'
 import { projectQueryKey } from '../projects/hooks'
 
 /**
  * Pourquoi le dernier envoi a échoué, quand « Réessaie » ne servirait à rien :
  * - limited : la limite est atteinte (60 commentaires par heure, réponse 429) ;
- * - expired : la session a expiré (401), il faut se reconnecter.
+ * - expired : la session a expiré (401), il faut se reconnecter ;
+ * - gone : ce que l'on vise n'existe plus pour soi (404) : le commentaire auquel on répond a été
+ *   supprimé ou masqué entre-temps, par exemple.
  * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
  */
-export type CommentFailure = 'limited' | 'expired'
+export type CommentFailure = 'limited' | 'expired' | 'gone'
 
-const reasonOf = (error: unknown): CommentFailure | undefined => {
-  if (!error) return undefined
-  const key = errorKey(error)
-  return key === 'rateLimited' ? 'limited' : key === 'unauthorized' ? 'expired' : undefined
+const reasons: Partial<Record<ApiErrorKey, CommentFailure>> = {
+  rateLimited: 'limited',
+  unauthorized: 'expired',
+  notFound: 'gone',
 }
+
+const reasonOf = (error: unknown): CommentFailure | undefined =>
+  error ? reasons[errorKey(error)] : undefined
 
 // Ce que rendent les hooks d'écriture. `reason` est facultatif : un faux hook (dans les tests) peut
 // s'en passer.

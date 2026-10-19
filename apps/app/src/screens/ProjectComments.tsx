@@ -1,12 +1,13 @@
 // Les commentaires de la page d'un projet (tranche 5) : le titre « Commentaires (12) », le champ
 // pour en écrire un, puis les fils, du plus récent au plus ancien, chacun avec ses réponses.
-// Un membre répond à un commentaire (le champ s'ouvre au bout du fil), modifie ou supprime les siens
-// (après confirmation) ; l'auteur du projet masque ou démasque ceux des autres.
+// Un membre répond à un fil (« Répondre », une fois au bout du fil : le champ s'ouvre là), modifie
+// ou supprime ses commentaires (après confirmation) ; l'auteur du projet masque ou démasque ceux
+// des autres.
 //
 // Un composant à part, comme le journal : ses états (le texte en cours, la réponse ouverte, le
 // commentaire à supprimer) ne redessinent pas toute la page à chaque lettre tapée.
-// Le focus du clavier ne se perd jamais : un champ qui se referme le rend à l'action qui l'avait
-// ouvert (« Répondre », « Modifier ») ; après une suppression, il va sur le commentaire voisin.
+// Le focus du clavier ne se perd jamais : un champ qui se referme le rend au bouton qui l'avait
+// ouvert (« Répondre », « Modifier ») ; après une suppression, il va sur l'action voisine.
 import {
   COMMENT_MAX,
   type Comment,
@@ -15,7 +16,7 @@ import {
   type Project,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
@@ -29,23 +30,37 @@ import {
 } from '../comments/api'
 import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
+import { excerpt } from '../ui/CommentAction'
 import { type CommentAction, CommentCard, type CommentCardHandle } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
-import { CommentThread } from '../ui/CommentThread'
+import { CommentThread, type CommentThreadHandle } from '../ui/CommentThread'
 import { Dialog } from '../ui/Dialog'
 import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 
-// Les actions possibles sur un commentaire, dans leur ordre d'affichage.
-type ActionId = 'reply' | 'edit' | 'delete' | 'hide'
+// Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
+// au fil, pas au commentaire.)
+type ActionId = 'edit' | 'delete' | 'hide'
+
+// Où dire « Ton commentaire a été supprimé. » : à la place du commentaire disparu.
+// - une réponse : à sa place dans son fil ;
+// - une racine qui avait des réponses : juste sous « Commentaire supprimé » ;
+// - un fil entier (racine sans réponse) : à sa place dans la liste.
+type DeletedAt =
+  | { threadId: string; replyIndex: number | null }
+  | { threadIndex: number; threadId?: undefined }
 
 // La confirmation affichée après un geste, jusqu'au geste suivant. Celles qui concernent un fil
 // s'affichent au bout de ce fil, là où le membre regarde.
 type Done =
-  | { kind: 'published' | 'deleted' }
+  | { kind: 'published' }
+  | { kind: 'deleted'; at: DeletedAt }
   | { kind: 'replied' | 'saved' | 'hidden' | 'shown'; threadId: string }
+
+// Ce que le focus peut viser après une suppression : une action d'une carte, ou « Répondre ».
+type FocusTarget = { card: string } | { thread: string }
 
 export function Comments({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
@@ -56,13 +71,14 @@ export function Comments({ project }: { project: Project }) {
   const edit = useEditComment(project.id)
   const remove = useDeleteComment(project.id)
   const hide = useHideComment(project.id)
+  const isPrivate = project.visibility === 'private'
 
   // Un nouveau commentaire : le champ ouvert ou non, son texte, et le problème du texte s'il y en a un.
   const [composing, setComposing] = useState(false)
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | undefined>()
-  // Une réponse : le fil où elle ira (sa racine), et la carte dont on a touché « Répondre ».
-  const [replying, setReplying] = useState<{ rootId: string; fromId: string } | null>(null)
+  // Une réponse : le fil où elle ira (l'identifiant de sa racine).
+  const [replying, setReplying] = useState<string | null>(null)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyError, setReplyError] = useState<string | undefined>()
   // Les textes à jour, lus à la fin d'un envoi (la fonction en cours ne voit que les anciens).
@@ -80,38 +96,46 @@ export function Comments({ project }: { project: Project }) {
   const [editError, setEditError] = useState<string | undefined>()
   const [showEditError, setShowEditError] = useState(false)
   const saving = useRef(false)
-  // Le commentaire dont on demande confirmation de la suppression.
-  const [deleting, setDeleting] = useState<string | null>(null)
+  // Le commentaire dont on demande confirmation de la suppression, et s'il a des réponses (la
+  // fenêtre ne dit pas la même chose).
+  const [deleting, setDeleting] = useState<{ id: string; hasReplies: boolean } | null>(null)
   const [removing, setRemoving] = useState(false)
   const [showDeleteError, setShowDeleteError] = useState(false)
-  // Masquer : le commentaire dont le dernier changement a échoué, et ceux en cours d'envoi.
+  // Masquer : le commentaire dont le dernier changement a échoué, et ceux en cours d'envoi (leur
+  // bouton attend, « occupé »).
   const [hideFailed, setHideFailed] = useState<string | null>(null)
-  const hiding = useRef(new Set<string>())
+  const [hiding, setHiding] = useState<ReadonlySet<string>>(new Set())
+  const hidingNow = useRef(new Set<string>())
   const [done, setDone] = useState<Done | null>(null)
 
-  // Le focus du clavier. Chaque carte donne une poignée pour poser le focus sur une de ses actions.
+  // Le focus du clavier. Chaque carte donne une poignée pour poser le focus sur une de ses actions,
+  // chaque fil une poignée pour le poser sur « Répondre ».
   const cards = useRef(new Map<string, CommentCardHandle>())
+  const threadHandles = useRef(new Map<string, CommentThreadHandle>())
   // L'action à focaliser au prochain dessin (son bouton vient de revenir, champ refermé).
   const pendingFocus = useRef<{ id: string; action: ActionId } | null>(null)
-  // Après une suppression : les cartes voisines, à essayer dans l'ordre, une fois la fenêtre fermée.
-  const focusAfterClose = useRef<string[] | null>(null)
+  // Après une suppression : les actions voisines, à essayer dans l'ordre, une fois la fenêtre fermée.
+  const focusAfterClose = useRef<FocusTarget[] | null>(null)
 
   const threads: Comment[] = comments.data?.pages.flatMap((page) => page.items) ?? []
 
   /** Les actions permises sur ce commentaire, dans l'ordre d'affichage. */
   const actionIds = (comment: CommentReply): ActionId[] => {
-    const ids: ActionId[] = []
-    // On répond à un commentaire visible ; pas à un emplacement, ni à un commentaire masqué (sa
-    // réponse s'afficherait sous « Commentaire masqué » pour les autres).
-    if (comment.state === 'visible') ids.push('reply')
-    if (comment.isMine) ids.push('edit', 'delete')
+    if (comment.isMine) return ['edit', 'delete']
     // L'auteur du projet masque le commentaire d'un autre ; le sien, il le supprime plutôt.
-    else if (project.isMine && comment.state !== 'deleted') ids.push('hide')
-    return ids
+    if (project.isMine && comment.state !== 'deleted') return ['hide']
+    return []
   }
 
-  // Après chaque dessin : si un champ vient de se refermer, le focus revient sur l'action qui
-  // l'avait ouvert, revenue à sa place (sur le web ; ailleurs, rien à faire).
+  /**
+   * On répond à un fil dont la racine est visible : pas sous un emplacement (supprimé, ou masqué
+   * pour qui regarde), ni sous une racine masquée (la réponse s'afficherait sous « Commentaire
+   * masqué » pour les autres).
+   */
+  const canReply = (root: Comment) => root.state === 'visible' && root.author !== null
+
+  // Après chaque dessin : si un champ de modification vient de se refermer, le focus revient sur
+  // « Modifier », revenu à sa place (sur le web ; ailleurs, rien à faire).
   useEffect(() => {
     const target = pendingFocus.current
     if (!target) return
@@ -179,15 +203,15 @@ export function Comments({ project }: { project: Project }) {
   }
 
   // Le texte déjà tapé suit le champ s'il change de fil : rien de ce qui est écrit ne se perd.
-  const openReply = (rootId: string, fromId: string) => {
-    setReplying({ rootId, fromId })
+  const openReply = (rootId: string) => {
+    setReplying(rootId)
     setReplyError(undefined)
     if (postFrom === 'reply') setPostFrom(null)
     setDone(null)
   }
 
+  // Le champ se referme : le fil rend lui-même le focus à « Répondre » (CommentThread).
   const closeReply = () => {
-    if (replying) pendingFocus.current = { id: replying.fromId, action: 'reply' }
     setReplying(null)
     setReplyError(undefined)
     if (postFrom === 'reply') setPostFrom(null)
@@ -202,17 +226,16 @@ export function Comments({ project }: { project: Project }) {
     }
     sending.current = true
     setPostFrom('reply')
-    const target = replying
+    const rootId = replying
     const sent = replyDraft
     // Les réponses tiennent sur un seul niveau : on répond toujours à la racine du fil.
-    const ok = await post.post({ body, replyTo: target.rootId })
+    const ok = await post.post({ body, replyTo: rootId })
     sending.current = false
     if (!ok || latestReply.current !== sent) return
     changeReply('')
     setReplying(null)
     setPostFrom(null)
-    pendingFocus.current = { id: target.fromId, action: 'reply' }
-    setDone({ kind: 'replied', threadId: target.rootId })
+    setDone({ kind: 'replied', threadId: rootId })
   }
 
   // --- Modifier ---------------------------------------------------------------------------------
@@ -254,42 +277,66 @@ export function Comments({ project }: { project: Project }) {
 
   // --- Supprimer --------------------------------------------------------------------------------
 
-  /** Les cartes voisines de celle-ci qui ont des actions : d'abord les suivantes, puis les précédentes. */
-  const neighborsOf = (id: string) => {
-    const order = threads
-      .flatMap((root) => [root, ...root.replies])
-      .filter((c) => actionIds(c).length > 0)
-      .map((c) => c.id)
-    const at = order.indexOf(id)
-    if (at < 0) return order
-    return [...order.slice(at + 1), ...order.slice(0, at).reverse()]
+  /** Tout ce qui peut recevoir le focus, dans l'ordre de la page : actions des cartes, « Répondre ». */
+  const focusTargets = (): { key: string; target: FocusTarget }[] =>
+    threads.flatMap((root) => [
+      ...[root, ...root.replies]
+        .filter((c) => actionIds(c).length > 0)
+        .map((c) => ({ key: c.id, target: { card: c.id } })),
+      ...(canReply(root) ? [{ key: `reply:${root.id}`, target: { thread: root.id } }] : []),
+    ])
+
+  /** Les actions voisines de ce commentaire : d'abord les suivantes, puis les précédentes. */
+  const neighborsOf = (id: string): FocusTarget[] => {
+    const order = focusTargets()
+    const at = order.findIndex((item) => item.key === id)
+    if (at < 0) return order.map((item) => item.target)
+    return [...order.slice(at + 1), ...order.slice(0, at).reverse()].map((item) => item.target)
+  }
+
+  /** Où le commentaire supprimé laissera sa confirmation (voir DeletedAt). */
+  const deletedAt = (id: string): DeletedAt => {
+    const threadIndex = threads.findIndex((root) => root.id === id)
+    const root = threads[threadIndex]
+    if (root) return root.replies.length > 0 ? { threadId: id, replyIndex: null } : { threadIndex }
+    const thread = threads.find((r) => r.replies.some((reply) => reply.id === id))
+    return {
+      threadId: thread?.id ?? '',
+      replyIndex: thread ? thread.replies.findIndex((reply) => reply.id === id) : 0,
+    }
   }
 
   const confirmDelete = async () => {
     if (!deleting || removing) return
     setRemoving(true)
     setShowDeleteError(true)
-    const ok = await remove.remove(deleting)
+    // Calculé avant : une fois supprimé, le commentaire n'est plus dans la liste.
+    const at = deletedAt(deleting.id)
+    const neighbors = neighborsOf(deleting.id)
+    const ok = await remove.remove(deleting.id)
     setRemoving(false)
     // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
     if (!ok) return
     // Supprimé : ses boutons n'existent plus ; le focus ira sur un voisin, une fois la fenêtre
-    // refermée. « Commentaire supprimé. » le confirme.
-    focusAfterClose.current = neighborsOf(deleting)
-    setDone({ kind: 'deleted' })
+    // refermée. « Ton commentaire a été supprimé. » le confirme, à sa place.
+    focusAfterClose.current = neighbors
+    setDone({ kind: 'deleted', at })
     setDeleting(null)
   }
 
   // --- Masquer ----------------------------------------------------------------------------------
 
   const setHidden = async (comment: CommentReply, hidden: boolean, threadId: string) => {
-    // Un seul envoi à la fois par commentaire, même après un double clic.
-    if (hiding.current.has(comment.id)) return
-    hiding.current.add(comment.id)
+    // Un seul envoi à la fois par commentaire, même après un double clic (le drapeau est lu tout
+    // de suite ; l'état, lui, fait attendre le bouton au prochain dessin).
+    if (hidingNow.current.has(comment.id)) return
+    hidingNow.current.add(comment.id)
+    setHiding(new Set(hidingNow.current))
     setHideFailed(null)
     setDone(null)
     const ok = await hide.setHidden({ id: comment.id, hidden })
-    hiding.current.delete(comment.id)
+    hidingNow.current.delete(comment.id)
+    setHiding(new Set(hidingNow.current))
     if (!ok) {
       setHideFailed(comment.id)
       return
@@ -304,12 +351,6 @@ export function Comments({ project }: { project: Project }) {
 
   const actionOf = (id: ActionId, comment: CommentReply, rootId: string): CommentAction => {
     switch (id) {
-      case 'reply':
-        return {
-          label: t('project.comments.reply'),
-          icon: 'arrow-bend-up-left',
-          onPress: () => openReply(rootId, comment.id),
-        }
       case 'edit':
         return {
           label: t('project.comments.edit'),
@@ -326,7 +367,7 @@ export function Comments({ project }: { project: Project }) {
           onPress: () => {
             setShowDeleteError(false)
             setDone(null)
-            setDeleting(comment.id)
+            setDeleting({ id: comment.id, hasReplies: hasReplies(comment) })
           },
         }
       default: {
@@ -336,11 +377,32 @@ export function Comments({ project }: { project: Project }) {
           label: hidden ? t('project.comments.unhide') : t('project.comments.hide'),
           text: hidden ? t('project.comments.unhideShort') : t('project.comments.hideShort'),
           icon: hidden ? 'eye' : 'eye-slash',
+          pending: hiding.has(comment.id),
           onPress: () => void setHidden(comment, !hidden, rootId),
         }
       }
     }
   }
+
+  /** Ce que les lecteurs d'écran entendent après le nom d'une action : l'auteur, le début du texte. */
+  const describe = (comment: CommentReply) =>
+    comment.author
+      ? t('project.comments.about', { name: comment.author.name, text: excerpt(comment.body) })
+      : undefined
+
+  // L'aide du champ de modification : qui lira la nouvelle version.
+  const editHint = (comment: CommentReply) =>
+    isPrivate
+      ? t('project.comments.hintPrivate')
+      : comment.state === 'hidden'
+        ? t('project.comments.editHintHidden')
+        : t('project.comments.editHint')
+
+  // « Ton commentaire a été supprimé. » : lu sans interrompre (role « status »).
+  const deletedNotice = (
+    <Notice key="deleted" tone="success" message={t('project.comments.deleted')} polite />
+  )
+  const deleted = done?.kind === 'deleted' ? done.at : null
 
   const card = (comment: CommentReply, rootId: string, reply: boolean) => {
     const { author } = comment
@@ -362,10 +424,15 @@ export function Comments({ project }: { project: Project }) {
         when={shortDate(comment.createdAt, i18n.language)}
         body={comment.body}
         edited={comment.editedAt ? t('project.comments.edited') : undefined}
-        // Le bandeau, pour les deux auteurs qui lisent encore un commentaire masqué ; les autres
-        // ne voient qu'un emplacement, sans auteur.
+        // Le bandeau, pour les deux auteurs qui lisent encore un commentaire masqué : l'auteur du
+        // projet l'a masqué lui-même ; l'auteur du commentaire apprend que les autres ne le voient
+        // plus. Les autres ne voient qu'un emplacement, sans auteur.
         hidden={
-          comment.state === 'hidden' && author ? t('project.comments.hiddenBanner') : undefined
+          comment.state === 'hidden' && author
+            ? project.isMine
+              ? t('project.comments.hiddenByMe')
+              : t('project.comments.hiddenBanner')
+            : undefined
         }
         placeholder={
           comment.state === 'deleted'
@@ -373,6 +440,7 @@ export function Comments({ project }: { project: Project }) {
             : t('project.comments.hiddenPlaceholder')
         }
         actions={actionsOf(comment, rootId)}
+        description={describe(comment)}
         error={
           hideFailed === comment.id
             ? failure(hide.reason, t('project.comments.hideError'), t('errors.rateLimited'))
@@ -392,10 +460,11 @@ export function Comments({ project }: { project: Project }) {
               onSubmit={() => void submitEdit(rootId)}
               pending={edit.pending}
               max={COMMENT_MAX}
+              reveal
               labels={{
                 open: t('project.comments.edit'),
                 field: t('project.comments.field'),
-                hint: t('project.comments.hint'),
+                hint: editHint(comment),
                 submit: t('project.comments.editSubmit'),
                 cancel: t('common.cancel'),
               }}
@@ -413,113 +482,159 @@ export function Comments({ project }: { project: Project }) {
     )
   }
 
-  /** Ce qui vient au bout d'un fil : le champ de la réponse en cours, puis une confirmation. */
+  /** Le champ de la réponse en cours, s'il est ouvert dans ce fil. */
+  const composerOf = (root: Comment) =>
+    replying === root.id ? (
+      <NoteComposer
+        open
+        onOpen={() => {}}
+        onCancel={closeReply}
+        value={replyDraft}
+        onChangeText={changeReply}
+        onSubmit={() => void submitReply()}
+        pending={post.pending && postFrom === 'reply'}
+        max={COMMENT_MAX}
+        reveal
+        labels={{
+          open: t('project.comments.reply'),
+          field: t('project.comments.replyField'),
+          hint: isPrivate
+            ? t('project.comments.replyHintPrivate')
+            : t('project.comments.replyHint'),
+          submit: t('project.comments.replySubmit'),
+          cancel: t('common.cancel'),
+        }}
+        fieldError={replyError}
+        error={
+          postFrom === 'reply' && post.error
+            ? // 404 : le fil n'accepte plus de réponse (racine supprimée ou masquée entre-temps).
+              post.reason === 'gone'
+              ? t('project.comments.replyGone')
+              : failure(post.reason, t('project.comments.replyError'))
+            : undefined
+        }
+      />
+    ) : null
+
+  /** La confirmation qui vient au bout d'un fil, s'il y en a une. */
   const footerOf = (root: Comment) => {
-    const composer =
-      replying?.rootId === root.id ? (
-        <NoteComposer
-          open
-          onOpen={() => {}}
-          onCancel={closeReply}
-          value={replyDraft}
-          onChangeText={changeReply}
-          onSubmit={() => void submitReply()}
-          pending={post.pending && postFrom === 'reply'}
-          max={COMMENT_MAX}
-          labels={{
-            open: t('project.comments.reply'),
-            field: t('project.comments.replyField'),
-            hint: t('project.comments.replyHint'),
-            submit: t('project.comments.replySubmit'),
-            cancel: t('common.cancel'),
-          }}
-          fieldError={replyError}
-          error={
-            postFrom === 'reply' && post.error
-              ? failure(post.reason, t('project.comments.replyError'))
-              : undefined
-          }
-        />
-      ) : null
-    const message =
-      done && 'threadId' in done && done.threadId === root.id
-        ? {
-            replied: t('project.comments.replyPublished'),
-            saved: t('project.comments.saved'),
-            hidden: t('project.comments.hiddenDone'),
-            shown: t('project.comments.shownDone'),
-          }[done.kind]
-        : null
-    if (!composer && !message) return null
+    if (!done || !('threadId' in done) || done.threadId !== root.id) return null
+    const message = {
+      replied: t('project.comments.replyPublished'),
+      saved: t('project.comments.saved'),
+      hidden: t('project.comments.hiddenDone'),
+      shown: t('project.comments.shownDone'),
+    }[done.kind]
+    // polite : une confirmation se lit sans interrompre (role « status »).
+    return <Notice tone="success" message={message} polite />
+  }
+
+  const thread = (root: Comment) => {
+    const replies: ReactNode[] = root.replies.map((reply) => card(reply, root.id, true))
+    // Une réponse supprimée : la confirmation prend sa place dans le fil.
+    if (deleted?.threadId === root.id && deleted.replyIndex !== null) {
+      replies.splice(deleted.replyIndex, 0, deletedNotice)
+    }
     return (
-      <>
-        {composer}
-        {/* polite : une confirmation se lit sans interrompre (role « status »). */}
-        {message ? <Notice tone="success" message={message} polite /> : null}
-      </>
+      <CommentThread
+        key={root.id}
+        handle={(handle) => {
+          if (handle) threadHandles.current.set(root.id, handle)
+          else threadHandles.current.delete(root.id)
+        }}
+        root={
+          deleted?.threadId === root.id && deleted.replyIndex === null ? (
+            // La racine vient d'être supprimée ; ses réponses restent, sous l'emplacement.
+            <>
+              {card(root, root.id, false)}
+              {deletedNotice}
+            </>
+          ) : (
+            card(root, root.id, false)
+          )
+        }
+        replies={replies}
+        replyAction={
+          canReply(root)
+            ? {
+                id: 'reply',
+                label: t('project.comments.reply'),
+                icon: 'arrow-bend-up-left',
+                onPress: () => openReply(root.id),
+                // À quel commentaire on répond, pour les lecteurs d'écran (« Max : Super idée… »).
+                description: describe(root) ?? excerpt(root.body),
+              }
+            : undefined
+        }
+        composer={composerOf(root)}
+        footer={footerOf(root)}
+      />
     )
   }
 
   // --- La section -------------------------------------------------------------------------------
 
+  const threadNodes: ReactNode[] = threads.map(thread)
+  // Un fil entier supprimé : la confirmation prend sa place dans la liste (s'il en reste d'autres).
+  if (deleted && deleted.threadId === undefined && threads.length > 0) {
+    threadNodes.splice(deleted.threadIndex, 0, deletedNotice)
+  }
+  const expired = errorKey(comments.error) === 'unauthorized'
+
   const list = comments.isPending ? (
     <Text tone="muted">{t('project.comments.loading')}</Text>
   ) : comments.isError && threads.length === 0 ? (
     // La première page n'a pas pu se charger : on le dit, et on propose de réessayer. Le reste
-    // de la page (le projet, son journal) reste là.
+    // de la page (le projet, son journal) reste là. 401 : réessayer ne servirait à rien, il faut
+    // se reconnecter ; pas de bouton.
     <>
-      <Notice
-        message={
-          // 401 : réessayer ne servirait à rien, il faut se reconnecter.
-          errorKey(comments.error) === 'unauthorized'
-            ? t('states.expired')
-            : t('project.comments.loadError')
-        }
-      />
-      <Button
-        label={t('common.retry')}
-        variant="secondary"
-        size="compact"
-        onPress={() => void comments.refetch()}
-      />
+      <Notice message={expired ? t('states.expired') : t('project.comments.loadError')} />
+      {expired ? null : (
+        <Button
+          label={t('common.retry')}
+          variant="secondary"
+          size="compact"
+          onPress={() => void comments.refetch()}
+        />
+      )}
     </>
   ) : (
-    <CommentList
-      state={
-        comments.isFetchingNextPage
-          ? 'loading'
-          : comments.isFetchNextPageError
-            ? 'error'
-            : comments.hasNextPage
-              ? 'more'
-              : 'end'
-      }
-      onMore={() => {
-        // Une seule demande à la fois, même après un double clic.
-        if (!comments.isFetchingNextPage) void comments.fetchNextPage()
-      }}
-      moreLabel={t('project.comments.more')}
-      endLabel={t('project.comments.end')}
-      errorLabel={t('project.comments.moreError')}
-      retryLabel={t('common.retry')}
-      empty={t('project.comments.empty')}
-    >
-      {threads.map((root) => (
-        <CommentThread
-          key={root.id}
-          root={card(root, root.id, false)}
-          replies={root.replies.map((reply) => card(reply, root.id, true))}
-          footer={footerOf(root)}
-        />
-      ))}
-    </CommentList>
+    <>
+      {/* Le dernier commentaire vient d'être supprimé : la confirmation, puis la liste vide. */}
+      {deleted && threads.length === 0 ? deletedNotice : null}
+      <CommentList
+        state={
+          comments.isFetchingNextPage
+            ? 'loading'
+            : comments.isFetchNextPageError
+              ? 'error'
+              : comments.hasNextPage
+                ? 'more'
+                : 'end'
+        }
+        onMore={() => {
+          // Une seule demande à la fois, même après un double clic.
+          if (!comments.isFetchingNextPage) void comments.fetchNextPage()
+        }}
+        moreLabel={t('project.comments.more')}
+        endLabel={t('project.comments.end')}
+        errorLabel={t('project.comments.moreError')}
+        retryLabel={t('common.retry')}
+        empty={t('project.comments.empty')}
+      >
+        {threadNodes}
+      </CommentList>
+    </>
   )
   const empty = !comments.isPending && threads.length === 0
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
       <Text variant="heading" accessibilityRole="header">
-        {t('project.comments.title', { count: project.commentCount })}
+        {/* Sans commentaire, le titre seul : « (0) » n'apprend rien que la liste vide ne dise. */}
+        {project.commentCount > 0
+          ? t('project.comments.title', { count: project.commentCount })
+          : t('project.comments.titleNone')}
       </Text>
       {/* Pas encore de commentaire : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
@@ -542,12 +657,11 @@ export function Comments({ project }: { project: Project }) {
         max={COMMENT_MAX}
         labels={{
           open: t('project.comments.add'),
+          // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».
+          openShort: t('project.comments.addShort'),
           field: t('project.comments.field'),
-          // Sur un projet privé, personne d'autre ne lira le commentaire : on le dit.
-          hint:
-            project.visibility === 'private'
-              ? t('project.comments.hintPrivate')
-              : t('project.comments.hint'),
+          // L'aide dit qui lira : tous les membres, ou personne d'autre sur un projet privé.
+          hint: isPrivate ? t('project.comments.hintPrivate') : t('project.comments.hint'),
           submit: t('project.comments.submit'),
           cancel: t('common.cancel'),
         }}
@@ -559,16 +673,17 @@ export function Comments({ project }: { project: Project }) {
         }
         success={done?.kind === 'published' ? t('project.comments.published') : undefined}
       />
-      {/* Après une suppression : la confirmation, lue sans interrompre (role « status »). */}
-      {done?.kind === 'deleted' ? (
-        <Notice tone="success" message={t('project.comments.deleted')} polite />
-      ) : null}
       {empty ? null : list}
       {/* Supprimer un commentaire est définitif : une fenêtre demande confirmation. */}
       <Dialog
         visible={deleting !== null}
         title={t('project.comments.deleteTitle')}
-        message={t('project.comments.deleteBody')}
+        // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit.
+        message={
+          deleting?.hasReplies
+            ? t('project.comments.deleteBodyReplies')
+            : t('project.comments.deleteBody')
+        }
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
         onDismiss={() => {
           if (!removing) setDeleting(null)
@@ -579,7 +694,13 @@ export function Comments({ project }: { project: Project }) {
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
           if (candidates) {
             requestAnimationFrame(() => {
-              for (const id of candidates) if (cards.current.get(id)?.focusAction(0)) return
+              for (const target of candidates) {
+                const focused =
+                  'card' in target
+                    ? cards.current.get(target.card)?.focusAction(0)
+                    : threadHandles.current.get(target.thread)?.focusReply()
+                if (focused) return
+              }
             })
           }
         }}
@@ -610,3 +731,7 @@ export function Comments({ project }: { project: Project }) {
     </Surface>
   )
 }
+
+/** Ce commentaire est une racine qui a des réponses (une réponse n'a pas de champ `replies`). */
+const hasReplies = (comment: CommentReply | Comment) =>
+  'replies' in comment && comment.replies.length > 0

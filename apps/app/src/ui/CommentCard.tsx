@@ -1,26 +1,32 @@
 // Un commentaire sur la page d'un projet (tranche 5) : la photo et le nom de son auteur (un lien
 // vers sa page), la date, « modifié » s'il l'a été, puis le texte, brut, tel qu'écrit, sur plusieurs
-// lignes. Dessous, les actions permises au membre qui regarde, données par l'écran (« Répondre »,
-// « Modifier », « Supprimer », « Masquer ») : de simples boutons texte, sans menu à ouvrir.
+// lignes. Dessous, les actions permises au membre qui regarde, données par l'écran (« Modifier »,
+// « Supprimer », « Masquer ») : de simples boutons texte (CommentActionButton), sans menu à ouvrir.
+// « Répondre » n'est pas ici : il vient une seule fois, au bout du fil (CommentThread).
 //
 // Trois autres allures :
 // - masqué par l'auteur du projet : un bandeau le dit, au-dessus du texte, que seuls lui et l'auteur
 //   du commentaire lisent encore (`hidden`) ;
 // - un emplacement, sans auteur ni texte : « Commentaire supprimé », « Commentaire masqué »
-//   (`placeholder`), gardé parce que des réponses le suivent ;
+//   (`placeholder`), une ligne discrète gardée parce que des réponses le suivent ;
 // - en cours de modification : le champ (`editor`) prend la place du texte et des actions.
 //
-// Plusieurs commentaires ont chacun leur « Répondre » : sur le web, chaque action est en plus
-// « décrite » par le texte de son commentaire (aria-describedby), le lecteur d'écran dit lequel.
-// Quand une action disparaît (le champ de modification se referme), l'écran peut ramener le focus
-// du clavier sur elle (handle).
+// Plusieurs commentaires ont chacun leur « Supprimer » : chaque action est en plus « décrite » par
+// une courte phrase (`description` : l'auteur et le début du texte), et le lecteur d'écran dit
+// lequel. Quand une action disparaît (le champ de modification se referme), l'écran peut ramener
+// le focus du clavier sur elle (handle).
 import { layout, radii, space } from '@ruche/brand'
 import { type ReactNode, type Ref, useId, useImperativeHandle, useRef } from 'react'
-import { Platform, Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import { Avatar } from './Avatar'
-import { describedBy } from './aria'
+import {
+  ActionDescription,
+  type CommentAction,
+  CommentActionButton,
+  excerpt,
+} from './CommentAction'
 import { focusWithoutScroll } from './focus'
-import { Icon, type IconName } from './Icon'
+import { Icon } from './Icon'
 import type { ImageSource } from './image'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
@@ -28,22 +34,7 @@ import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Une action sur le commentaire. */
-export type CommentAction = {
-  /**
-   * Ce qui identifie l'action d'un dessin à l'autre (« hide » pour Masquer comme pour Démasquer) ;
-   * par défaut, sa place.
-   */
-  id?: string
-  /** Le nom lu (« Modifier le commentaire ») ; il contient le texte affiché. */
-  label: string
-  /** Le texte affiché, plus court (« Modifier ») ; par défaut, le nom lu. */
-  text?: string
-  icon?: IconName
-  /** danger : une action qui supprime, en rouge. */
-  tone?: 'default' | 'danger'
-  onPress: () => void
-}
+export type { CommentAction } from './CommentAction'
 
 /** Ce qu'un écran peut demander à la carte : poser le focus sur une action, par sa place. */
 export type CommentCardHandle = { focusAction: (index: number) => boolean }
@@ -60,11 +51,16 @@ type Props = {
   body: string
   /** « modifié », s'il l'a été. */
   edited?: string | undefined
-  /** Le bandeau d'un commentaire masqué (« Masqué par l'auteur du projet »), s'il l'est. */
+  /** Le bandeau d'un commentaire masqué (« Masqué par toi »), s'il l'est. */
   hidden?: string | undefined
   /** Ce qu'on lit à la place d'un commentaire sans auteur (« Commentaire supprimé »). */
   placeholder?: string | undefined
   actions?: CommentAction[]
+  /**
+   * Ce que les lecteurs d'écran entendent après le nom d'une action, pour savoir de quel
+   * commentaire il s'agit (« Max : Super idée… ») ; par défaut, le début du texte.
+   */
+  description?: string | undefined
   /** Une action a échoué : le message, sous les actions. */
   error?: string | undefined
   /** Le champ de modification, à la place du texte et des actions. */
@@ -74,8 +70,11 @@ type Props = {
   handle?: Ref<CommentCardHandle>
 }
 
-// La photo de l'auteur : un peu plus petite pour une réponse, posée en retrait sous son fil.
-const AVATAR = { root: 36, reply: 28 }
+/**
+ * La photo de l'auteur : un peu plus petite pour une réponse, posée en retrait sous son fil.
+ * Exportée : le trait des réponses (CommentThread) part sous le milieu de la photo de la racine.
+ */
+export const COMMENT_AVATAR = { root: 36, reply: 28 } as const
 
 export function CommentCard({
   author,
@@ -87,6 +86,7 @@ export function CommentCard({
   hidden,
   placeholder,
   actions = [],
+  description,
   error,
   editor,
   reply = false,
@@ -95,15 +95,17 @@ export function CommentCard({
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie les
-  // actions au texte qu'elles concernent.
-  const bodyId = useId()
+  // actions à la description du commentaire qu'elles concernent.
+  const descriptionId = useId()
   const buttons = useRef<(View | null)[]>([])
   useImperativeHandle(handle, () => ({
     focusAction: (index: number) => focusWithoutScroll(buttons.current[index]),
   }))
 
   if (!author) {
-    // Un emplacement : ni photo, ni nom, ni action ; seulement ce qu'il était, et sa date.
+    // Un emplacement : ni photo, ni nom, ni action ; une ligne discrète qui dit ce qu'il était, et
+    // sa date. Sans fond ni hauteur de bouton : on ne peut rien en faire, il ne doit pas en avoir
+    // l'air.
     return (
       <View
         style={{
@@ -112,17 +114,9 @@ export function CommentCard({
           alignItems: 'center',
           columnGap: space.sm,
           rowGap: space.xxs,
-          minHeight: layout.touchTarget,
-          paddingHorizontal: space.md,
-          paddingVertical: space.sm,
-          borderRadius: radii.small,
-          // Aussi large que son contenu : un emplacement reste discret.
-          alignSelf: 'flex-start',
-          maxWidth: '100%',
-          backgroundColor: colors.surfaceGrouped,
         }}
       >
-        <Icon name="chat-circle" size={18} tone="muted" />
+        <Icon name="chat-circle" size={16} tone="muted" />
         <Text variant="callout" tone="muted">
           {placeholder ?? ''}
         </Text>
@@ -133,7 +127,7 @@ export function CommentCard({
     )
   }
 
-  const size = reply ? AVATAR.reply : AVATAR.root
+  const size = reply ? COMMENT_AVATAR.reply : COMMENT_AVATAR.root
   // Sur un écran large, le texte s'aligne sous le nom, pas sous la photo ; sur téléphone, il
   // repart du bord : la place gagnée garde des lignes lisibles, même en retrait sous un fil et
   // avec un texte agrandi.
@@ -156,6 +150,7 @@ export function CommentCard({
       </View>
     </View>
   )
+  const described = description ?? excerpt(body)
 
   return (
     // Sans écart : la ligne du nom fait déjà 44 points de haut (la zone à toucher du lien).
@@ -205,7 +200,7 @@ export function CommentCard({
               gap: space.xs,
               paddingHorizontal: space.sm,
               paddingVertical: space.xxs,
-              borderRadius: radii.pill,
+              borderRadius: radii.small,
               backgroundColor: colors.surfaceGrouped,
             }}
           >
@@ -222,7 +217,7 @@ export function CommentCard({
             {/* Texte brut, affiché tel quel ; selectable : on peut le copier. Un mot très long
                 (une adresse) se coupe au lieu de sortir de l'écran ; readable : sur un grand
                 écran, la ligne garde une longueur confortable. */}
-            <Text nativeID={bodyId} selectable breakAnywhere readable>
+            <Text selectable breakAnywhere readable>
               {body}
             </Text>
             {actions.length > 0 ? (
@@ -236,15 +231,16 @@ export function CommentCard({
                   marginLeft: -space.sm,
                 }}
               >
+                <ActionDescription id={descriptionId} text={described} />
                 {actions.map((action, index) => (
-                  <ActionButton
-                    // L'identité de l'action : « Masquer » devient « Démasquer » sur le même bouton, qui
-                    // garde le focus du clavier, même si « Répondre » disparaît devant lui. Sans
+                  <CommentActionButton
+                    // L'identité de l'action : « Masquer » devient « Démasquer » sur le même bouton,
+                    // qui garde le focus du clavier, même si une action disparaît devant lui. Sans
                     // identifiant, la place en tient lieu.
                     key={action.id ?? index}
                     action={action}
-                    describedById={bodyId}
-                    hint={shorten(body, 80)}
+                    describedById={descriptionId}
+                    hint={described}
                     ref={(node) => {
                       buttons.current[index] = node
                     }}
@@ -258,59 +254,4 @@ export function CommentCard({
       </View>
     </View>
   )
-}
-
-/** Une action en simple texte (avec son icône), sur 44 points de haut. */
-function ActionButton({
-  action,
-  describedById,
-  hint,
-  ref,
-}: {
-  action: CommentAction
-  describedById: string
-  hint: string
-  ref: Ref<View>
-}) {
-  const { colors } = useTheme()
-  const danger = action.tone === 'danger'
-  return (
-    <Pressable
-      ref={ref}
-      accessibilityRole="button"
-      accessibilityLabel={action.label}
-      {...describedBy(describedById)}
-      // Sur le web, aria-describedby suffit ; ailleurs, l'indice dit de quel commentaire il s'agit.
-      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
-      onPress={action.onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: space.xs,
-        minHeight: layout.touchTarget,
-        minWidth: layout.touchTarget,
-        paddingHorizontal: space.sm,
-        borderRadius: radii.pill,
-        backgroundColor: pressed ? colors.surfaceGrouped : 'transparent',
-      })}
-    >
-      {action.icon ? (
-        <Icon name={action.icon} size={18} tone={danger ? 'danger' : 'secondary'} />
-      ) : null}
-      <Text
-        variant="callout"
-        weight={600}
-        tone={danger ? 'danger' : 'secondary'}
-        selectable={false}
-      >
-        {action.text ?? action.label}
-      </Text>
-    </Pressable>
-  )
-}
-
-/** Le début d'un texte, `max` caractères au plus (un emoji compte pour un), puis « … ». */
-const shorten = (text: string, max: number) => {
-  const chars = Array.from(text)
-  return chars.length > max ? `${chars.slice(0, max).join('')}…` : text
 }

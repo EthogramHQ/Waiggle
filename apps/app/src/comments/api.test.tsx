@@ -179,6 +179,19 @@ describe('usePostComment', () => {
     await waitFor(() => expect(result.current.reason).toBe('expired'))
   })
 
+  it('says the comment answered is gone when the API answers 404', async () => {
+    seed([zoeComment])
+    jest.mocked(request).mockResolvedValue({ ok: false, error: 'notFound' })
+    const { result } = await renderHook(() => usePostComment(id), { wrapper })
+
+    await act(async () => {
+      await result.current.post({ body: 'Trop tard', replyTo: zoeComment.id })
+    })
+
+    await waitFor(() => expect(result.current.reason).toBe('gone'))
+    expect(threads()).toEqual([['Ça marche aussi en anglais ?']])
+  })
+
   it('gives no reason for an error that trying again can fix', async () => {
     seed([])
     jest.mocked(request).mockResolvedValue({ ok: false, error: 'network' })

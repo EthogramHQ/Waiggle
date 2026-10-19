@@ -13,7 +13,7 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import { REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
+import { COMMENT_MAX, PROJECT_NOTE_MAX, REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -573,10 +573,11 @@ export function CatalogueScreen() {
         <ReactionSample l={l} mine={['useful', 'bravo']} />
         <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
         <ReactionSample l={l} mine={[]} readOnly />
-        {/* Les cartes d'un commentaire : vu par un autre membre (Répondre), le sien, modifié
-            (Répondre, Modifier, Supprimer), masqué vu par l'auteur du projet (Démasquer), un texte
-            long avec une adresse et un refus de l'API, en cours de modification, et les deux
-            emplacements sans auteur. */}
+        {/* Les cartes d'un commentaire : vu par un autre membre (sans action : « Répondre » est au
+            bout du fil), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
+            son auteur), masqué vu par l'auteur du projet (Démasquer), Masquer en cours d'envoi, un
+            texte long avec une adresse et un refus de l'API, en cours de modification, et les
+            deux emplacements sans auteur. */}
         <Surface variant="grouped" padding="xl" gap="xl">
           <CommentCard
             author={{ name: 'Max Durand', avatar: null }}
@@ -584,7 +585,6 @@ export function CatalogueScreen() {
             onAuthorPress={() => {}}
             when={l.commentWhen}
             body={l.commentBody}
-            actions={[{ label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} }]}
           />
           <CommentCard
             author={{ name: 'Inès Haddad', avatar: null }}
@@ -596,14 +596,46 @@ export function CatalogueScreen() {
             actions={mineActions(l)}
           />
           <CommentCard
+            author={{ name: 'Inès Haddad', avatar: null }}
+            authorLabel={l.inesPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentReply}
+            hidden={l.hiddenBanner}
+            actions={mineActions(l)}
+          />
+          <CommentCard
             author={{ name: 'Max Durand', avatar: null }}
             authorLabel={l.maxPage}
             onAuthorPress={() => {}}
             when={l.commentWhen}
             body={l.commentBody}
-            hidden={l.hiddenBanner}
+            hidden={l.hiddenByMe}
             actions={[
-              { label: l.unhideComment, text: l.unhideShort, icon: 'eye', onPress: () => {} },
+              {
+                id: 'hide',
+                label: l.unhideComment,
+                text: l.unhideShort,
+                icon: 'eye',
+                onPress: () => {},
+              },
+            ]}
+          />
+          <CommentCard
+            author={{ name: 'Max Durand', avatar: null }}
+            authorLabel={l.maxPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentBody}
+            actions={[
+              {
+                id: 'hide',
+                label: l.hideComment,
+                text: l.hideShort,
+                icon: 'eye-slash',
+                pending: true,
+                onPress: () => {},
+              },
             ]}
           />
           <CommentCard
@@ -613,8 +645,13 @@ export function CatalogueScreen() {
             when={l.commentWhen}
             body={l.commentLong}
             actions={[
-              { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
-              { label: l.hideComment, text: l.hideShort, icon: 'eye-slash', onPress: () => {} },
+              {
+                id: 'hide',
+                label: l.hideComment,
+                text: l.hideShort,
+                icon: 'eye-slash',
+                onPress: () => {},
+              },
             ]}
             error={l.hideError}
           />
@@ -627,7 +664,7 @@ export function CatalogueScreen() {
             editor={
               <ComposerSample
                 field={l.commentField}
-                hint={l.commentHint}
+                hint={l.editHintHidden}
                 submit={l.saveComment}
                 value={l.commentReply}
                 l={l}
@@ -637,8 +674,9 @@ export function CatalogueScreen() {
           <CommentCard author={null} when={l.commentWhen} body="" placeholder={l.deletedComment} />
           <CommentCard author={null} when={l.commentWhen} body="" placeholder={l.hiddenComment} />
         </Surface>
-        {/* La liste : un fil avec ses réponses et le champ d'une réponse ouvert, un fil sans
-            réponse, puis « Afficher la suite ». Ensuite : la suite qui arrive, la suite en échec,
+        {/* La liste : un fil avec ses réponses et le champ d'une réponse ouvert au bout, un fil
+            avec « Répondre » au bout, un fil sous « Commentaire supprimé » (sans « Répondre »),
+            puis « Afficher la suite ». Ensuite : la suite qui arrive, la suite en échec,
             « C'est tout », et la liste vide. */}
         <Surface variant="grouped" padding="xl" gap="lg">
           <CommentList
@@ -656,9 +694,6 @@ export function CatalogueScreen() {
                   onAuthorPress={() => {}}
                   when={l.commentWhen}
                   body={l.commentBody}
-                  actions={[
-                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
-                  ]}
                 />
               }
               replies={[
@@ -670,9 +705,6 @@ export function CatalogueScreen() {
                   onAuthorPress={() => {}}
                   when={l.commentWhen}
                   body={l.commentReply}
-                  actions={[
-                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
-                  ]}
                 />,
                 <CommentCard
                   key="lea"
@@ -685,7 +717,8 @@ export function CatalogueScreen() {
                   actions={mineActions(l)}
                 />,
               ]}
-              footer={
+              replyAction={replyAction(l)}
+              composer={
                 <ComposerSample
                   field={l.replyField}
                   hint={l.replyHint}
@@ -694,6 +727,18 @@ export function CatalogueScreen() {
                   l={l}
                 />
               }
+            />
+            <CommentThread
+              root={
+                <CommentCard
+                  author={{ name: 'Inès Haddad', avatar: null }}
+                  authorLabel={l.inesPage}
+                  onAuthorPress={() => {}}
+                  when={l.commentWhen}
+                  body={l.commentReply}
+                />
+              }
+              replyAction={replyAction(l)}
             />
             <CommentThread
               root={
@@ -712,9 +757,7 @@ export function CatalogueScreen() {
                   onAuthorPress={() => {}}
                   when={l.commentWhen}
                   body={l.commentReplyLea}
-                  actions={[
-                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
-                  ]}
+                  actions={mineActions(l)}
                 />
               }
             />
@@ -965,7 +1008,7 @@ function NoteComposerSample({
         onChangeText={() => {}}
         onSubmit={() => {}}
         pending={pending}
-        max={1000}
+        max={PROJECT_NOTE_MAX}
         labels={{
           open: l.addNote,
           field: l.noteField,
@@ -1015,13 +1058,26 @@ function ReactionSample({
   return readOnly ? (
     <ReactionBar items={items} readOnly caption={l.ownReactions} />
   ) : (
-    <ReactionBar items={items} onToggle={() => {}} {...(error ? { error } : null)} />
+    <ReactionBar
+      items={items}
+      onToggle={() => {}}
+      label={l.reactionGroup}
+      {...(error ? { error } : null)}
+    />
   )
 }
 
-/** Les actions de son propre commentaire : Répondre, Modifier, Supprimer. */
+/** « Répondre », au bout d'un fil. */
+const replyAction = (l: Labels) => ({
+  id: 'reply',
+  label: l.replyAction,
+  icon: 'arrow-bend-up-left' as const,
+  description: l.commentAbout,
+  onPress: () => {},
+})
+
+/** Les actions de son propre commentaire : Modifier, Supprimer. */
 const mineActions = (l: Labels) => [
-  { label: l.replyAction, icon: 'arrow-bend-up-left' as const, onPress: () => {} },
   { label: l.editComment, text: l.editShort, icon: 'pencil-simple' as const, onPress: () => {} },
   {
     label: l.deleteComment,
@@ -1054,7 +1110,7 @@ function ComposerSample({
       value={value}
       onChangeText={() => {}}
       onSubmit={() => {}}
-      max={1000}
+      max={COMMENT_MAX}
       labels={{ open: submit, field, hint, submit, cancel: l.cancel }}
       autoFocus={false}
     />

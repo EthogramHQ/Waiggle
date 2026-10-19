@@ -287,6 +287,7 @@ function ProjectView({ project }: { project: Project }) {
         <ReactionBar
           items={reactions}
           onToggle={reaction.toggle}
+          label={t('project.reactions.group')}
           error={
             reaction.expired
               ? t('states.expired')
@@ -452,9 +453,10 @@ function ProjectView({ project }: { project: Project }) {
       {recipe}
       {description}
       {journal}
-      {ownerActions}
-      {/* Les commentaires en dernier : la conversation vient après le projet et ses actions. */}
+      {/* La conversation vient après le projet ; « Modifier » et « Supprimer », que l'auteur
+          cherche moins souvent, ferment la page. */}
       {comments}
+      {ownerActions}
     </Screen>
   )
 }

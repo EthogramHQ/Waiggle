@@ -8,15 +8,20 @@
 // « Publier une note », à la même place, sans faire défiler la page. Échap referme le champ (web).
 // Pendant l'envoi, le texte est figé et « Annuler » attend.
 // En blanc, jamais en miel : sur la page d'un projet, l'action miel est « Tester la démo ».
+// Sur téléphone, le bouton fermé peut afficher un texte plus court (« Commenter »), son nom lu
+// restant complet (« Écrire un commentaire »). Ouvert à la demande du membre loin de ce qu'il
+// regardait (`reveal` : une réponse au bout d'un fil, une modification), le champ défile en vue.
 import { space } from '@ruche/brand'
 import { useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
 import { Button } from './Button'
-import { focusWithoutScroll } from './focus'
+import { focusWithoutScroll, revealWithoutJump } from './focus'
 import { escapeCloses } from './keyboard'
 import { Notice } from './Notice'
 import { TextField } from './TextField'
 import { TextLink } from './TextLink'
+import { useLayout } from './theme/layout'
+import { useCalmMotion } from './theme/motion'
 
 type Props = {
   open: boolean
@@ -32,6 +37,8 @@ type Props = {
   labels: {
     /** « Publier une note » */
     open: string
+    /** Le texte affiché sur téléphone, plus court (« Commenter ») ; le nom lu reste `open`. */
+    openShort?: string
     /** « Ta note » */
     field: string
     /** L'aide sous le champ. */
@@ -52,6 +59,11 @@ type Props = {
    * montre plusieurs à la fois : la page sauterait jusqu'au dernier.
    */
   autoFocus?: boolean
+  /**
+   * Le champ, une fois ouvert, défile en vue s'il est hors de l'écran (web) : pour un champ qui
+   * s'ouvre loin de là où l'on regardait. Seulement après un geste du membre.
+   */
+  reveal?: boolean
 }
 
 // Le peu du navigateur dont on a besoin ici : l'élément qui a le focus, et le corps de la page.
@@ -74,8 +86,12 @@ export function NoteComposer({
   error,
   success,
   autoFocus = true,
+  reveal = false,
 }: Props) {
+  const { sizeClass } = useLayout()
+  const calm = useCalmMotion()
   const openButton = useRef<View>(null)
+  const field = useRef<View>(null)
   // Ce que montrait le composant au dessin précédent : on ne bouge le focus qu'à une fermeture.
   const wasOpen = useRef(open)
   useEffect(() => {
@@ -85,13 +101,24 @@ export function NoteComposer({
     // est retombé sur la page. On le pose sur « Publier une note », revenu à la même place.
     if (closed && Platform.OS === 'web' && lostFocus()) focusWithoutScroll(openButton.current)
   }, [open])
+  // Ouvert (à l'apparition, ou après un appui sur le bouton) : si on l'a demandé, le champ vient
+  // dans l'écran, au dessin suivant (requestAnimationFrame), une fois sa place connue. Seulement
+  // à l'ouverture : changer de réglage d'animation ensuite ne fait pas défiler la page.
+  const calmNow = useRef(calm)
+  calmNow.current = calm
+  useEffect(() => {
+    if (!open || !reveal) return
+    const frame = requestAnimationFrame(() => revealWithoutJump(field.current, calmNow.current))
+    return () => cancelAnimationFrame(frame)
+  }, [open, reveal])
 
   if (!open) {
     return (
       <View style={{ gap: space.md, alignItems: 'flex-start' }}>
         <Button
           ref={openButton}
-          label={labels.open}
+          label={sizeClass === 'compact' && labels.openShort ? labels.openShort : labels.open}
+          spokenLabel={labels.open}
           icon="note-pencil"
           variant="secondary"
           size="compact"
@@ -108,7 +135,7 @@ export function NoteComposer({
     )
   }
   return (
-    <View style={{ gap: space.md }}>
+    <View ref={field} style={{ gap: space.md }}>
       <TextField
         // Échap referme le champ, comme « Annuler » (web), sauf pendant l'envoi.
         {...escapeCloses(onCancel, pending)}

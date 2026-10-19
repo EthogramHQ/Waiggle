@@ -130,7 +130,7 @@ export const fr = {
       followsItem: 'Tes abonnements et tes abonnés',
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
-        'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : les réponses des autres restent.',
+        'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
       exportHint:
         'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',
@@ -184,7 +184,8 @@ export const fr = {
       descriptionHint: 'Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…).',
       status: 'Où en est-il ?',
       public: 'Public',
-      publicHint: 'Visible par les membres connectés. En privé, il te sert de brouillon.',
+      publicHint:
+        'Visible par les membres connectés. En privé, il te sert de brouillon : les commentaires et les réactions reçus sont gardés, mais personne ne les voit.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
@@ -254,9 +255,9 @@ export const fr = {
       field: 'Ta note',
       hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
       hintPrivate:
-        'Ce projet est privé : toi seul vois ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
+        'Ce projet est privé : personne d’autre que toi ne voit ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
       emptyPrivate:
-        'Pas encore de note. Ce projet est privé : toi seul verras ses notes, jusqu’à ce que tu le rendes public.',
+        'Pas encore de note. Ce projet est privé : personne d’autre que toi ne verra ses notes, jusqu’à ce que tu le rendes public.',
       submit: 'Publier la note',
       required: 'Écris ta note avant de la publier.',
       hintAnnounce:
@@ -281,15 +282,20 @@ export const fr = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, réagi, {{count}}',
       own: 'Les réactions à ton projet',
+      group: 'Réagir à ce projet',
       error: 'Ta réaction n’a pas pu être enregistrée. Réessaie.',
     },
     comments: {
       title: 'Commentaires ({{count}})',
+      titleNone: 'Commentaires',
       empty: 'Pas encore de commentaire.',
       add: 'Écrire un commentaire',
+      addShort: 'Commenter',
       field: 'Ton commentaire',
-      hint: 'Les membres qui voient ce projet liront ton commentaire.',
-      hintPrivate: 'Ce projet est privé : toi seul liras ce commentaire.',
+      hint: 'Tous les membres connectés liront ton commentaire. L’auteur du projet peut le masquer.',
+      hintPrivate:
+        'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
+      about: '{{name}} : {{text}}',
       submit: 'Publier le commentaire',
       required: 'Écris ton commentaire avant de le publier.',
       published: 'Commentaire publié.',
@@ -297,13 +303,21 @@ export const fr = {
       limited: 'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
       reply: 'Répondre',
       replyField: 'Ta réponse',
-      replyHint: 'Ta réponse s’affichera dans ce fil, après les autres.',
+      replyHint:
+        'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; l’auteur du projet peut la masquer.',
+      replyHintPrivate:
+        'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient public, tous les membres la liront.',
       replySubmit: 'Publier la réponse',
       replyRequired: 'Écris ta réponse avant de la publier.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
+      replyGone: 'Ce fil n’accepte plus de réponse.',
       replyPublished: 'Réponse publiée.',
       edit: 'Modifier le commentaire',
       editShort: 'Modifier',
+      editHint:
+        'Tous les membres connectés liront la nouvelle version, marquée « modifié ». L’auteur du projet peut la masquer.',
+      editHintHidden:
+        'Ce commentaire est masqué : il ne reste visible que de toi et de l’auteur du projet.',
       editSubmit: 'Enregistrer',
       editError: 'Le commentaire n’a pas pu être modifié. Réessaie.',
       saved: 'Commentaire modifié.',
@@ -311,17 +325,19 @@ export const fr = {
       delete: 'Supprimer le commentaire',
       deleteShort: 'Supprimer',
       deleteTitle: 'Supprimer ce commentaire ?',
-      deleteBody:
-        'Il disparaîtra pour tout le monde. S’il a des réponses, elles restent, sous « Commentaire supprimé ».',
+      deleteBody: 'Il disparaîtra pour tout le monde.',
+      deleteBodyReplies:
+        'Ton texte et ton nom disparaîtront pour tout le monde. Les réponses restent, sous « Commentaire supprimé ».',
       confirmDelete: 'Supprimer',
       deleteError: 'Le commentaire n’a pas pu être supprimé. Réessaie.',
-      deleted: 'Commentaire supprimé.',
+      deleted: 'Ton commentaire a été supprimé.',
       hide: 'Masquer le commentaire',
       unhide: 'Démasquer le commentaire',
       hideShort: 'Masquer',
       unhideShort: 'Démasquer',
-      hiddenBanner: 'Masqué par l’auteur du projet',
-      hiddenDone: 'Commentaire masqué : seuls toi et son auteur le voyez encore.',
+      hiddenBanner: 'Masqué par l’auteur du projet : les autres membres ne le voient plus.',
+      hiddenByMe: 'Masqué par toi',
+      hiddenDone: 'Commentaire masqué : il ne reste visible que de son auteur et de toi.',
       shownDone: 'Commentaire de nouveau visible par tous.',
       hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
       deletedPlaceholder: 'Commentaire supprimé',
@@ -347,7 +363,7 @@ export const fr = {
       delete: 'Supprimer',
       deleteTitle: 'Supprimer « {{title}} » ?',
       deleteConfirm:
-        'Le projet, sa description, sa recette et ses photos disparaissent tout de suite. Impossible de revenir en arrière.',
+        'Le projet, sa description, sa recette, ses photos et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer le projet',
       notFoundTitle: 'Ce projet est introuvable',
       notFound: 'Il a peut-être été supprimé, ou le lien est incorrect.',
