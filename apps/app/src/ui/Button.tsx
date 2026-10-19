@@ -11,6 +11,7 @@
 // Avec `checked`, il devient un interrupteur (« Suivre » / « Suivi ») : le lecteur d'écran annonce
 // son état, activé ou non, au lieu d'un simple bouton.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
+import type { Ref } from 'react'
 import {
   ActivityIndicator,
   Platform,
@@ -41,6 +42,8 @@ type Props = {
   spokenLabel?: string
   /** Fait du bouton un interrupteur, activé ou non (role « switch »). */
   checked?: boolean
+  /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteComposer). */
+  ref?: Ref<View>
 }
 
 export function Button({
@@ -53,6 +56,7 @@ export function Button({
   disabled = false,
   spokenLabel,
   checked,
+  ref,
 }: Props) {
   const { colors, shadows } = useTheme()
   const inactive = disabled || loading
@@ -107,6 +111,7 @@ export function Button({
     // Deux couches : Animated.View porte l'enfoncement animé, Pressable reçoit le doigt.
     <Animated.View style={animated}>
       <Pressable
+        ref={ref}
         accessibilityRole={checked === undefined ? 'button' : 'switch'}
         accessibilityLabel={spokenLabel ?? label}
         aria-checked={checked}

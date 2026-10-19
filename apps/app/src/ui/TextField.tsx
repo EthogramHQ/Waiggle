@@ -37,6 +37,7 @@ type Props = {
   | 'maxLength'
   | 'autoCapitalize'
   | 'placeholder'
+  | 'autoFocus'
 >
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.

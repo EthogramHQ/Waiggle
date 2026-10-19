@@ -17,13 +17,33 @@ type Props = {
   /** Les boutons, de l'action principale à « Annuler ». */
   children: ReactNode
   onDismiss: () => void
+  /**
+   * Appelée une fois la fenêtre tout à fait disparue (web et iOS), après son fondu. C'est le moment
+   * de poser le focus ailleurs si l'élément qui l'avait ouverte n'existe plus (une note supprimée) :
+   * avant, la fenêtre garde le focus pour elle.
+   */
+  onClosed?: () => void
 }
 
-export function Dialog({ visible, title, message, illustration, children, onDismiss }: Props) {
+export function Dialog({
+  visible,
+  title,
+  message,
+  illustration,
+  children,
+  onDismiss,
+  onClosed,
+}: Props) {
   const { colors } = useTheme()
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap.
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}
+      {...(onClosed ? { onDismiss: onClosed } : null)}
+    >
       <View
         style={{
           flex: 1,
