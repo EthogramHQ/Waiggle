@@ -308,13 +308,15 @@ try {
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
   )
   console.log('  ok : Léa voit « Bravo » compté une fois')
+  // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
+  // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
   const samSays = 'Testé ce soir : une soupe parfaite.'
   await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
   await sam.page.getByLabel('Ton commentaire').fill(samSays)
   await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
   await sam.page.getByText('Commentaire publié.').waitFor()
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await lea.page.getByText(samSays).waitFor()
+  await lea.page.getByText(samSays, { exact: true }).waitFor()
   await lea.page.getByRole('button', { name: 'Répondre', exact: true }).click()
   await lea.page.getByLabel('Ta réponse').fill('Merci Sam, la version dessert arrive.')
   await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()
@@ -327,7 +329,7 @@ try {
   expectEqual('commentaires comptés', (await readProject(lea, projectId)).commentCount, 1)
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Masqué par l’auteur du projet').waitFor()
-  await sam.page.getByText(samSays).waitFor()
+  await sam.page.getByText(samSays, { exact: true }).waitFor()
   console.log('  ok : Sam voit son commentaire, marqué « masqué »')
   expectEqual(
     'commentaires, sans compte',
