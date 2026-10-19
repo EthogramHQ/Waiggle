@@ -5,7 +5,7 @@ import type { FollowState } from '@ruche/contracts'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { requestWithoutBody } from '../api/client'
-import { ApiError } from '../api/errors'
+import { ApiError, errorKey } from '../api/errors'
 import { feedQueryKey } from '../feed/api'
 import { projectQueryKey } from '../projects/hooks'
 
@@ -29,7 +29,8 @@ export const setFollow = async (target: Target, follow: boolean): Promise<void> 
 
 /**
  * Hook : `toggle` suit ou ne suit plus, selon l'état affiché à l'instant du toucher ; `error` dit si
- * le dernier changement a échoué.
+ * le dernier changement a échoué, et `expired` si c'est parce que la session a expiré (réessayer
+ * ne servirait à rien : il faut se reconnecter).
  */
 export const useFollow = (target: Target) => {
   const queryClient = useQueryClient()
@@ -74,5 +75,9 @@ export const useFollow = (target: Target) => {
     }
     mutate({ follow, previous })
   }, [queryClient, target.kind, target.id, mutate])
-  return { toggle, error: mutation.isError }
+  return {
+    toggle,
+    error: mutation.isError,
+    expired: mutation.isError && errorKey(mutation.error) === 'unauthorized',
+  }
 }

@@ -10,7 +10,7 @@
 import { sourceUrl } from '@ruche/brand'
 import { FEED_PAGE_SIZE, type FeedItem } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
@@ -23,11 +23,13 @@ import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
 import { FeedEnd } from '../ui/FeedEnd'
 import { Hint } from '../ui/Hint'
+import { IconButton } from '../ui/IconButton'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
+import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
-import { Segmented } from '../ui/Segmented'
+import { Segmented, type SegmentedHandle } from '../ui/Segmented'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
@@ -111,6 +113,14 @@ function MemberHome({ id, name }: { id: string; name: string }) {
   // Le fil choisi : « Abonnements » d'abord, puis « Découvrir » d'un toucher.
   const [feed, setFeed] = useState<FeedKind>('following')
   const compact = useLayout().sizeClass === 'compact'
+  // Le choix du fil, pour y ramener le focus du clavier quand un bouton change de fil.
+  const tabs = useRef<SegmentedHandle>(null)
+  const discover = () => {
+    setFeed('discover')
+    // Le bouton touché disparaît avec le fil vide : le focus va sur le choix « Découvrir ».
+    requestAnimationFrame(() => tabs.current?.focusChecked())
+  }
+  const myProjects = () => router.push({ pathname: '/members/[id]', params: { id } })
   return (
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
     <Screen
@@ -119,6 +129,8 @@ function MemberHome({ id, name }: { id: string; name: string }) {
       title={t('home.greeting', { name })}
       pageTitle={null}
     >
+      {/* Sur téléphone, une seule rangée : « Publier » en clair, ses projets et son compte en
+          icônes (avec leur nom pour les lecteurs d'écran). Le fil arrive ainsi plus haut. */}
       <Row gap="sm" wrap>
         <Button
           label={t('home.publish')}
@@ -126,22 +138,36 @@ function MemberHome({ id, name }: { id: string; name: string }) {
           size="compact"
           onPress={() => router.push('/projects/new')}
         />
-        <Button
-          label={t('home.myProjects')}
-          variant="secondary"
-          icon="squares-four"
-          size="compact"
-          onPress={() => router.push({ pathname: '/members/[id]', params: { id } })}
-        />
-        <Button
-          label={t('home.account')}
-          variant="secondary"
-          icon="user"
-          size="compact"
-          onPress={() => router.push('/account')}
-        />
+        {compact ? (
+          <>
+            <IconButton icon="squares-four" label={t('home.myProjects')} onPress={myProjects} />
+            <IconButton
+              icon="user"
+              label={t('home.account')}
+              onPress={() => router.push('/account')}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              label={t('home.myProjects')}
+              variant="secondary"
+              icon="squares-four"
+              size="compact"
+              onPress={myProjects}
+            />
+            <Button
+              label={t('home.account')}
+              variant="secondary"
+              icon="user"
+              size="compact"
+              onPress={() => router.push('/account')}
+            />
+          </>
+        )}
       </Row>
       <Segmented
+        handle={tabs}
         label={t('feed.label')}
         options={[
           { value: 'following', label: t('feed.tabs.following'), icon: 'users' },
@@ -152,11 +178,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
         // Sur téléphone, les deux choix se partagent la largeur ; plus large, ils gardent leur taille.
         fill={compact}
       />
-      {feed === 'following' ? (
-        <FollowingFeed onDiscover={() => setFeed('discover')} />
-      ) : (
-        <DiscoverFeed />
-      )}
+      {feed === 'following' ? <FollowingFeed onDiscover={discover} /> : <DiscoverFeed />}
     </Screen>
   )
 }
@@ -168,16 +190,24 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
   const items = feed.data?.pages.flatMap((page) => page.items) ?? []
   const news = useFeedNews('following', items[0])
 
-  if (feed.isError) return <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
-  if (!feed.data) return <StateMessage kind="loading" message={t('common.loading')} />
-  // Ne suivre personne n'est pas une erreur : on montre où trouver des personnes à suivre.
-  if (items.length === 0 && !feed.data.pages[0]?.followsAnyone) {
+  // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
+  // les cartes déjà lues (voir FeedList).
+  if (!feed.data) {
+    return feed.isError ? (
+      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+    ) : (
+      <StateMessage kind="loading" message={t('common.loading')} />
+    )
+  }
+  if (items.length === 0) {
+    // Ne suivre personne n'est pas une erreur, ni un fil calme : dans les deux cas, on montre où
+    // trouver des projets. En blanc : « Publier un projet », plus haut, reste la seule action miel.
+    const followsAnyone = feed.data.pages[0]?.followsAnyone
     return (
       <StateMessage
         kind="empty"
-        title={t('feed.nobodyTitle')}
-        message={t('feed.nobodyBody')}
-        // En blanc : « Publier un projet », plus haut, reste la seule action miel de l'écran.
+        title={followsAnyone ? undefined : t('feed.nobodyTitle')}
+        message={followsAnyone ? t('feed.quiet') : t('feed.nobodyBody')}
         actions={[{ label: t('feed.nobodyAction'), onPress: onDiscover, variant: 'secondary' }]}
       />
     )
@@ -213,10 +243,12 @@ function DiscoverFeed() {
         onChange={(value) => setTesters(value === 'testers')}
         fill={false}
       />
-      {feed.isError ? (
-        <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
-      ) : !feed.data ? (
-        <StateMessage kind="loading" message={t('common.loading')} />
+      {!feed.data ? (
+        feed.isError ? (
+          <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+        ) : (
+          <StateMessage kind="loading" message={t('common.loading')} />
+        )
       ) : (
         <FeedList
           feed={feed}
@@ -234,6 +266,11 @@ function DiscoverFeed() {
 type LoadedFeed = {
   hasNextPage: boolean
   isFetchingNextPage: boolean
+  /** La dernière demande de suite a échoué (les pages déjà lues restent). */
+  isFetchNextPageError?: boolean
+  /** La dernière relecture du fil a échoué (après le bandeau des nouveautés). */
+  isRefetchError?: boolean
+  error?: unknown
   fetchNextPage: () => Promise<unknown>
   refetch: () => Promise<unknown>
 }
@@ -266,6 +303,8 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
         onPress={() => feed.refetch()}
         caption={caption}
       />
+      {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
+      {feed.isRefetchError ? <Notice message={t(`errors.${errorKey(feed.error)}`)} /> : null}
       <ProjectGrid empty={empty}>
         {items.map((item) => (
           <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
@@ -273,10 +312,23 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
       </ProjectGrid>
       {items.length > 0 ? (
         <FeedEnd
-          state={feed.isFetchingNextPage ? 'loading' : feed.hasNextPage ? 'more' : 'end'}
+          state={
+            feed.isFetchingNextPage
+              ? 'loading'
+              : feed.isFetchNextPageError
+                ? 'error'
+                : feed.hasNextPage
+                  ? 'more'
+                  : 'end'
+          }
           moreLabel={t('feed.more')}
           endLabel={t('feed.end')}
-          onMore={() => void feed.fetchNextPage()}
+          errorLabel={t('feed.moreError')}
+          retryLabel={t('common.retry')}
+          // Une seule demande à la fois, même après un double clic.
+          onMore={() => {
+            if (!feed.isFetchingNextPage) void feed.fetchNextPage()
+          }}
         />
       ) : null}
     </Stack>

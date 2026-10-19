@@ -71,7 +71,7 @@ function MemberView({ member }: { member: Member }) {
         }))}
         action={
           member.isMe ? (
-            <Stack gap="md" align="center">
+            <Stack gap="sm" align="center">
               <FollowerCount text={followers} />
               <Button
                 label={t('account.editProfile')}
@@ -87,7 +87,10 @@ function MemberView({ member }: { member: Member }) {
               label={t('follow.member', { name: member.name })}
               text={member.isFollowed ? t('follow.following') : t('follow.follow')}
               caption={followers}
-              error={follow.error ? t('follow.error') : undefined}
+              layout="stacked"
+              error={
+                follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
+              }
             />
           )
         }

@@ -337,6 +337,7 @@ export const en: Translation = {
     discoverCaption: 'The latest projects published by members.',
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',
+    moreError: 'The rest of the feed could not load.',
     end: 'You’re all caught up',
     news_one: '{{count}} new item',
     news_other: '{{count}} new items',

@@ -231,7 +231,7 @@ describe('the « following » feed on the home screen', () => {
     expect(screen.getByRole('link', { name: 'Le carnet de jardin' })).toBeTruthy()
   })
 
-  it('says when the people followed have published nothing yet', async () => {
+  it('says when the people followed have published nothing yet, and leads to « discover »', async () => {
     mockFollowing({ items: [], followsAnyone: true })
     await renderMemberHome()
 
@@ -239,6 +239,24 @@ describe('the « following » feed on the home screen', () => {
       screen.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.'),
     ).toBeTruthy()
     expect(screen.queryByText('Tu ne suis personne pour l’instant')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Découvrir des projets' }))
+    expect(screen.getByRole('radio', { name: 'Découvrir', checked: true })).toBeTruthy()
+  })
+
+  it('keeps the cards already read when the next page fails, and offers to retry', async () => {
+    const following = mockFollowing({ nextCursor: 'abc' }, { hasNextPage: true })
+    jest.mocked(useFollowingFeed).mockReturnValue({
+      ...following,
+      isError: true,
+      isFetchNextPageError: true,
+      error: new Error('internal'),
+    } as unknown as ReturnType<typeof useFollowingFeed>)
+    await renderMemberHome()
+
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('alert')).toHaveTextContent('La suite du fil n’a pas pu se charger.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(following.fetchNextPage).toHaveBeenCalledTimes(1)
   })
 
   it('loads the next 20 on request', async () => {

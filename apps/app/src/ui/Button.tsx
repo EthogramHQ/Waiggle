@@ -5,11 +5,20 @@
 // - confirm   : la confirmation finale d'une suppression, en rouge plein ;
 // - glass     : un bouton posé sur une image ou une lumière d'ambiance.
 // Sous le doigt, le bouton s'enfonce légèrement avec un ressort (voir theme/motion.ts).
-// Pendant une action en cours (loading), il est désactivé pour éviter les doubles envois.
+// Pendant une action en cours (loading), il ignore les appuis pour éviter les doubles envois, mais
+// garde le focus du clavier : désactivé pour de bon, le navigateur le retirerait du parcours au
+// clavier, et le focus retomberait tout en haut de la page.
 // Avec `checked`, il devient un interrupteur (« Suivre » / « Suivi ») : le lecteur d'écran annonce
 // son état, activé ou non, au lieu d'un simple bouton.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native'
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
@@ -106,8 +115,13 @@ export function Button({
         // React Native les lit aussi sur téléphone.
         aria-disabled={inactive}
         aria-busy={loading}
-        disabled={inactive}
-        onPress={onPress}
+        // Sur le web, un bouton occupé reste dans le parcours au clavier (voir plus haut) ; sur
+        // téléphone, il n'y a pas ce souci : il est désactivé, et annoncé comme tel.
+        disabled={Platform.OS === 'web' ? disabled : inactive}
+        // Pendant le chargement, l'appui ne fait rien (le bouton reste pourtant focalisable).
+        onPress={() => {
+          if (!loading) onPress()
+        }}
         // Un interrupteur s'active aussi avec la barre d'espace sur le web (voir keyboard.ts).
         {...(checked === undefined ? null : spaceToggles(onPress, inactive))}
         onPressIn={() => {
@@ -131,6 +145,9 @@ export function Button({
               justifyContent: 'center',
             },
             look.box,
+            // Un interrupteur blanc activé (« Projet suivi ») prend une teinte miel légère : on voit
+            // son état d'un coup d'œil, pas seulement à son icône.
+            checked && variant === 'secondary' && { backgroundColor: colors.honeySoft },
             state.pressed && look.pressed,
             inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
             inactive && !inactiveHoney && { opacity: 0.55 },

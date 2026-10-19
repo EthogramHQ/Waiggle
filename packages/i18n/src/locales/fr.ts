@@ -349,6 +349,7 @@ export const fr = {
     discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption: 'Les projets à essayer : leurs auteurs attendent tes retours.',
     more: 'Afficher la suite',
+    moreError: 'La suite du fil n’a pas pu se charger.',
     end: 'Tu es à jour',
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',

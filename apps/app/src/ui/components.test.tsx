@@ -227,6 +227,23 @@ describe('FeedEnd', () => {
     expect(onMore).not.toHaveBeenCalled()
   })
 
+  it('says when the next page failed, and offers to retry', async () => {
+    const onMore = jest.fn()
+    await renderWithProviders(
+      <FeedEnd
+        state="error"
+        {...labels}
+        errorLabel="La suite du fil n’a pas pu se charger."
+        retryLabel="Réessayer"
+        onMore={onMore}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('La suite du fil n’a pas pu se charger.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(onMore).toHaveBeenCalledTimes(1)
+  })
+
   it('says the member is up to date at the end, with nothing left to press', async () => {
     await renderWithProviders(<FeedEnd state="end" {...labels} onMore={jest.fn()} />)
 

@@ -201,20 +201,6 @@ function ProjectView({ project }: { project: Project }) {
           </Stack>
         </Row>
       </Pressed>
-      {/* Suivre : seulement le projet d'un autre ; l'auteur voit seulement le nombre d'abonnés. */}
-      {project.isMine ? (
-        <FollowerCount text={followers} />
-      ) : (
-        <FollowButton
-          followed={project.isFollowed}
-          onPress={follow.toggle}
-          label={t('follow.project')}
-          text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
-          caption={followers}
-          error={follow.error ? t('follow.error') : undefined}
-          prominent={false}
-        />
-      )}
       {project.visibility === 'private' ? (
         <Notice tone="info" message={t('project.page.private')} />
       ) : null}
@@ -236,6 +222,23 @@ function ProjectView({ project }: { project: Project }) {
         </Stack>
       ) : (
         <Text tone="muted">{t('project.page.noDemo')}</Text>
+      )}
+      {/* Suivre, après la démo : on lit d'abord le projet, puis on décide de le suivre. Seulement le
+          projet d'un autre ; l'auteur voit seulement le nombre d'abonnés. */}
+      {project.isMine ? (
+        <FollowerCount text={followers} />
+      ) : (
+        <FollowButton
+          followed={project.isFollowed}
+          onPress={follow.toggle}
+          label={t('follow.project')}
+          text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+          caption={followers}
+          error={
+            follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
+          }
+          prominent={false}
+        />
       )}
     </Stack>
   )

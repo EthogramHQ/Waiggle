@@ -32,7 +32,8 @@ export function NewItemsBanner({ label, onPress, caption }: Props) {
       {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
       style={{
         minHeight: layout.controlHeight.compact,
-        alignItems: 'center',
+        // À gauche, comme le choix du fil et le reste de l'accueil.
+        alignItems: 'flex-start',
         justifyContent: 'center',
       }}
     >
@@ -46,7 +47,7 @@ export function NewItemsBanner({ label, onPress, caption }: Props) {
           size="compact"
         />
       ) : caption ? (
-        <Text variant="callout" tone="secondary" align="center">
+        <Text variant="callout" tone="secondary">
           {caption}
         </Text>
       ) : null}

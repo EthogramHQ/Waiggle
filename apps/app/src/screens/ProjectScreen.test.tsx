@@ -29,7 +29,10 @@ const mockToggle = jest.fn()
 
 beforeEach(() => {
   mockToggle.mockReset()
-  jest.mocked(useFollow).mockReset().mockReturnValue({ toggle: mockToggle, error: false })
+  jest
+    .mocked(useFollow)
+    .mockReset()
+    .mockReturnValue({ toggle: mockToggle, error: false, expired: false })
   mockSession({ user: { id: 'u1', name: 'Léa' } })
   jest.mocked(getProject).mockReset().mockResolvedValue(recipesProject)
   jest.mocked(deleteProject).mockReset()
@@ -233,7 +236,7 @@ describe('following a project from its page', () => {
 
   it('says so when the follow could not be saved', async () => {
     seenByMax({ isFollowed: false, followerCount: 2 })
-    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true })
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: false })
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

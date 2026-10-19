@@ -42,7 +42,10 @@ const mockToggle = jest.fn()
 beforeEach(() => {
   mockSession({ user: { id: 'u2', name: 'Max' } })
   mockToggle.mockReset()
-  jest.mocked(useFollow).mockReset().mockReturnValue({ toggle: mockToggle, error: false })
+  jest
+    .mocked(useFollow)
+    .mockReset()
+    .mockReturnValue({ toggle: mockToggle, error: false, expired: false })
   jest.mocked(getMember).mockReset().mockResolvedValue(leaPage)
   mockPush.mockReset()
   mockReplace.mockReset()
@@ -224,11 +227,20 @@ describe('following a member from her page', () => {
   })
 
   it('says so when the follow could not be saved', async () => {
-    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true })
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: false })
     await renderWithProviders(<MemberScreen id="u1" />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'L’abonnement n’a pas pu être enregistré. Réessaie.',
+    )
+  })
+
+  it('says to sign in again, not to retry, when the session expired', async () => {
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: true })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
   })
 })

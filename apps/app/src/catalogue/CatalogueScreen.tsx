@@ -462,6 +462,15 @@ export function CatalogueScreen() {
           caption={l.followers}
           error={l.followError}
         />
+        {/* Dans l'en-tête d'une page de membre : le nombre au-dessus, le tout centré. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          layout="stacked"
+        />
         {/* Le nombre d'abonnés seul, sur sa propre page. */}
         <FollowerCount text={l.followers} />
         {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
@@ -471,6 +480,14 @@ export function CatalogueScreen() {
         <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd
+          state="error"
+          moreLabel={l.showMore}
+          endLabel={l.upToDate}
+          errorLabel={l.moreError}
+          retryLabel={l.retry}
+          onMore={() => {}}
+        />
       </Section>
 
       <Section title={l.illustrations}>

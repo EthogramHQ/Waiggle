@@ -25,6 +25,11 @@ type Props = {
    * une autre l'est déjà (« Tester la démo » sur un projet) : une seule action miel par écran.
    */
   prominent?: boolean
+  /**
+   * row : le nombre à droite du bouton ; stacked : le nombre au-dessus, le tout centré (l'en-tête
+   * d'une page de membre, dans l'axe de l'avatar et du nom).
+   */
+  layout?: 'row' | 'stacked'
 }
 
 export function FollowButton({
@@ -35,21 +40,36 @@ export function FollowButton({
   caption,
   error,
   prominent = true,
+  layout = 'row',
 }: Props) {
+  const stacked = layout === 'stacked'
+  const button = (
+    <Button
+      label={text}
+      spokenLabel={label}
+      checked={followed}
+      onPress={onPress}
+      variant={followed || !prominent ? 'secondary' : 'primary'}
+      icon={followed ? 'check' : 'plus'}
+      size="compact"
+    />
+  )
   return (
-    <View style={{ gap: space.sm }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.md }}>
-        <Button
-          label={text}
-          spokenLabel={label}
-          checked={followed}
-          onPress={onPress}
-          variant={followed || !prominent ? 'secondary' : 'primary'}
-          icon={followed ? 'check' : 'plus'}
-          size="compact"
-        />
-        {caption ? <FollowerCount text={caption} /> : null}
-      </View>
+    <View style={{ gap: space.sm, alignItems: stacked ? 'center' : 'stretch' }}>
+      {stacked ? (
+        // Le nombre au-dessus : il ne bouge pas quand le bouton passe de « Suivre » à « Suivi ».
+        <>
+          {caption ? <FollowerCount text={caption} /> : null}
+          {button}
+        </>
+      ) : (
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.md }}
+        >
+          {button}
+          {caption ? <FollowerCount text={caption} /> : null}
+        </View>
+      )}
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
       {error ? <Notice message={error} /> : null}
     </View>
