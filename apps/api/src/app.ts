@@ -116,6 +116,8 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.use('/v1/*', (c, next) => {
     if (c.req.path === '/v1/me/avatar') return next()
     if (/^\/v1\/projects\/[^/]+\/visuals$/.test(c.req.path)) return next()
+    // Une note pèse au plus 1 000 caractères : la petite limite suffit largement.
+    if (/^\/v1\/projects\/[^/]+\/notes(\/|$)/.test(c.req.path)) return small(c, next)
     if (c.req.path === '/v1/projects' || c.req.path.startsWith('/v1/projects/')) {
       return projects(c, next)
     }

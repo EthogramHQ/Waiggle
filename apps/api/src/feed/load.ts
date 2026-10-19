@@ -13,6 +13,7 @@ import {
   type FeedItem,
   type FeedPage,
   type FollowingFeedPage,
+  PROJECT_NOTES_SHOWN,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, type Column, desc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm'
@@ -215,7 +216,16 @@ const selectFollowingEntries = (
   const recentNotes = db
     .select({ id: n.id, body: n.body, createdAt: n.createdAt })
     .from(n)
-    .where(and(eq(n.projectId, f.projectId), cursor ? after(cursor, n.createdAt, n.id) : undefined))
+    .where(
+      and(
+        eq(n.projectId, f.projectId),
+        cursor ? after(cursor, n.createdAt, n.id) : undefined,
+        // Seulement parmi les 20 notes les plus récentes du projet, celles de son journal : une note
+        // lisible par les abonnés doit toujours être visible, et supprimable, par son auteur. On
+        // compte les notes plus récentes que celle-ci (« newer ») : moins de 20, elle est au journal.
+        sql`(select count(*) from ${n} as newer where newer.project_id = ${n.projectId} and (newer.created_at, newer.id) > (${n.createdAt}, ${n.id})) < ${PROJECT_NOTES_SHOWN}`,
+      ),
+    )
     .orderBy(desc(n.createdAt), desc(n.id))
     .limit(FEED_PAGE_SIZE + 1)
     .as('recent_notes')

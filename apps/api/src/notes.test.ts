@@ -203,6 +203,15 @@ describe('publishing a note', () => {
       'v2\u0007', // caractère de contrôle (sonnerie)
       '‮v2', // retourne le sens du texte
       42, // pas un texte
+      // Des notes qui ne montreraient rien : un seul caractère qui ne dessine rien.
+      '‌',
+      '️',
+      '͏',
+      '᠋',
+      '឴',
+      '\u{1d159}',
+      '́',
+      '￼',
     ]) {
       const res = await postNote(project.id, lea, body)
       expect(res.status, JSON.stringify(body)).toBe(400)
@@ -362,6 +371,32 @@ describe('deleting a note', () => {
     await expectError(await deleteNote(maxProject.id, leaNote.id, max), 404, 'not_found')
 
     expect((await readProject(leaProject.id, lea)).notes).toEqual([leaNote])
+  })
+})
+
+describe('the order of the checks', () => {
+  // Les droits et le quota sont vérifiés avant de lire le texte. Cette règle tient à l'ordre dans
+  // lequel les vérifications sont branchées : ces tests envoient donc un texte invalide exprès.
+  it('refuses another member before reading the text, without telling a private project apart', async () => {
+    const shown = await publish(lea)
+    const draft = await publish(lea, { visibility: 'private' })
+    const unknown = '00000000-0000-4000-8000-000000000000'
+
+    for (const body of ['', 42]) {
+      expect((await postNote(shown.id, max, body)).status).toBe(403)
+      const hidden = await postNote(draft.id, max, body)
+      const missing = await postNote(unknown, max, body)
+      expect(hidden.status).toBe(404)
+      expect(await hidden.json()).toEqual(await missing.json())
+    }
+  })
+
+  it('counts even malformed requests in the daily limit', async () => {
+    const project = await publish(lea)
+    for (let i = 0; i < 30; i++) expect((await postNote(project.id, lea, '')).status).toBe(400)
+
+    // La 31e demande du jour, même valide, est refusée.
+    expect((await postNote(project.id, lea, 'Une vraie note')).status).toBe(429)
   })
 })
 

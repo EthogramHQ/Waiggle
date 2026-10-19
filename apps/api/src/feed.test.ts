@@ -574,6 +574,24 @@ describe('the notes of followed projects in the « following » feed', () => {
   })
 })
 
+describe('the notes of a project beyond its journal', () => {
+  it('brings only the 20 latest notes of a project, those its author still sees and can delete', async () => {
+    // Une note lisible par les abonnés doit rester visible, et supprimable, par son auteur : le fil
+    // s'en tient donc aux notes du journal (les 20 plus récentes).
+    const recipes = await publish(lea, { title: 'Mon agent de recettes' })
+    await followProject(recipes.id, max)
+    const notes: ProjectNote[] = []
+    for (let i = 0; i < 21; i++) notes.push(await postNote(lea, recipes.id, `Note ${i}`))
+
+    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
+    const seen = pages.flatMap(keys)
+
+    expect(seen).toHaveLength(20)
+    expect(seen).not.toContain(noteKey(notes[0] as ProjectNote)) // la plus ancienne
+    expect(seen[0]).toBe(noteKey(notes[20] as ProjectNote))
+  })
+})
+
 describe('notes in the « discover » feed', () => {
   it('never shows a note, only projects', async () => {
     const recipes = await publish(lea, { status: 'testable', demoUrl: 'https://demo.example.com' })
@@ -591,14 +609,19 @@ describe('notes in the « discover » feed', () => {
 
 describe('reading a feed of notes and projects page by page', () => {
   it('gives 25 notes and 20 projects in pages of 20, in order, without gaps or repeats', async () => {
-    // Max suit Léa (ses 20 nouveaux projets) et un projet de Zoé (ses 25 notes). Les deux
-    // alternent, deux heures d'écart chacun : sous les limites de 20 projets et 30 notes par jour.
+    // Max suit Léa (ses 20 nouveaux projets) et deux projets de Zoé (25 notes en tout, réparties :
+    // le fil ne montre que les 20 dernières notes d'un même projet, celles de son journal). Les
+    // deux sortes alternent, deux heures d'écart chacune : sous les limites de 20 projets et 30
+    // notes par jour.
     const garden = await publish(zoe, { title: 'Le carnet de jardin' })
+    const birds = await publish(zoe, { title: 'Les oiseaux du jardin' })
     await followProject(garden.id, max)
+    await followProject(birds.id, max)
     await followMember(leaId, max)
     const published: string[] = []
     for (let i = 0; i < 25; i++) {
-      published.push(noteKey(await postNote(zoe, garden.id, `Note ${i}`)))
+      const project = i % 2 === 0 ? garden : birds
+      published.push(noteKey(await postNote(zoe, project.id, `Note ${i}`)))
       if (i < 20) published.push(projectKey(await publish(lea, { title: `Projet ${i}` })))
     }
 

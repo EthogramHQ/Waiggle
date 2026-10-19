@@ -2,7 +2,7 @@
 // ligne »). Elles forment le journal du projet, et arrivent dans le fil des membres qui le suivent.
 // Modifier le projet lui-même (corriger une faute) ne fait rien remonter : seule une note le fait.
 import { z } from 'zod'
-import { isCleanText } from './text'
+import { VisibleFreeText } from './text'
 
 /** Une note fait au plus 1 000 caractères : quelques phrases, pas un article. */
 export const PROJECT_NOTE_MAX = 1_000
@@ -14,16 +14,10 @@ export const ProjectNoteId = z.uuid()
 
 /**
  * Le texte d'une note : du texte brut, affiché tel quel (pas de Markdown), sur plusieurs lignes
- * si besoin, sans caractères invisibles ni de contrôle, et jamais vide.
+ * si besoin, sans caractères interdits, et jamais vide ni fait seulement de caractères qui ne se
+ * voient pas.
  */
-export const NoteText = z
-  .string()
-  .trim()
-  .min(1)
-  .max(PROJECT_NOTE_MAX)
-  .refine((text) => isCleanText(text, { lineBreaks: true }), {
-    message: 'contains forbidden characters',
-  })
+export const NoteText = VisibleFreeText(PROJECT_NOTE_MAX)
 
 /** Ce que l'appli envoie pour publier une note (POST /v1/projects/{id}/notes). */
 export const NewProjectNote = z.object({ body: NoteText }).meta({ id: 'NewProjectNote' })
