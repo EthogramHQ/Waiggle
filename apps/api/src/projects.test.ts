@@ -519,6 +519,7 @@ describe('my reactions and comments in my data', () => {
         body: 'Mon avis corrigé',
         createdAt: root.createdAt,
         editedAt: new Date(Date.now()).toISOString(),
+        hiddenAt: null,
       },
       {
         projectId: maxProject.id,
@@ -527,6 +528,7 @@ describe('my reactions and comments in my data', () => {
         body: 'Ma réponse à Max',
         createdAt: reply.createdAt,
         editedAt: null,
+        hiddenAt: null,
       },
     ])
     expect(raw).not.toContain('Commentaire de Max')
