@@ -7,9 +7,12 @@ import { useState } from 'react'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
+import { FeedEnd } from './FeedEnd'
+import { FollowButton } from './FollowButton'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
+import { NewItemsBanner } from './NewItemsBanner'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -109,6 +112,102 @@ describe('Switch', () => {
     await fireEvent.press(screen.getByRole('switch', { name: 'Notifications' }))
 
     expect(onValueChange).toHaveBeenCalledWith(true)
+  })
+})
+
+describe('FollowButton', () => {
+  // Un interrupteur plutôt qu'un simple bouton : le lecteur d'écran annonce « Suivre Léa,
+  // interrupteur, désactivé », puis « activé » une fois qu'on la suit. Le nom reste le même ;
+  // seul le texte affiché change (« Suivre » → « Suivi »).
+  it('is a switch named after what it follows, unchecked until followed, and shows the count', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={onPress}
+        label="Suivre Léa"
+        text="Suivre"
+        caption="12 abonnés"
+      />,
+    )
+
+    const button = screen.getByRole('switch', { name: 'Suivre Léa' })
+    expect(button).not.toBeChecked()
+    expect(screen.getByText('Suivre')).toBeTruthy()
+    expect(screen.getByText('12 abonnés')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    await fireEvent.press(button)
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('is checked once followed, and shows so', async () => {
+    await renderWithProviders(
+      <FollowButton followed onPress={jest.fn()} label="Suivre Léa" text="Suivi" />,
+    )
+
+    expect(screen.getByRole('switch', { name: 'Suivre Léa' })).toBeChecked()
+    expect(screen.getByText('Suivi')).toBeTruthy()
+  })
+
+  it('reads out its error as soon as it appears', async () => {
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={jest.fn()}
+        label="Suivre Léa"
+        text="Suivre"
+        error="L’abonnement n’a pas pu être enregistré. Réessaie."
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'L’abonnement n’a pas pu être enregistré. Réessaie.',
+    )
+  })
+})
+
+describe('NewItemsBanner', () => {
+  it('is a button that shows the new items when touched', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<NewItemsBanner label="3 nouveautés" onPress={onPress} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: '3 nouveautés' }))
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('FeedEnd', () => {
+  const labels = { moreLabel: 'Afficher la suite', endLabel: 'Tu es à jour' }
+
+  it('offers to load what comes next', async () => {
+    const onMore = jest.fn()
+    await renderWithProviders(<FeedEnd state="more" {...labels} onMore={onMore} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Afficher la suite' }))
+
+    expect(onMore).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Tu es à jour')).toBeNull()
+  })
+
+  it('stays in place and busy while the next page loads, without asking for it twice', async () => {
+    const onMore = jest.fn()
+    await renderWithProviders(<FeedEnd state="loading" {...labels} onMore={onMore} />)
+
+    const button = screen.getByRole('button', { name: 'Afficher la suite' })
+    await fireEvent.press(button)
+
+    expect(button).toBeBusy()
+    expect(onMore).not.toHaveBeenCalled()
+  })
+
+  it('says the member is up to date at the end, with nothing left to press', async () => {
+    await renderWithProviders(<FeedEnd state="end" {...labels} onMore={jest.fn()} />)
+
+    expect(screen.getByText('Tu es à jour')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })
 
