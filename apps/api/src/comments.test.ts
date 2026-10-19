@@ -2,13 +2,15 @@
 // masquer un commentaire, et la liste des commentaires sur la page du projet. Scénario :
 // docs/scenarios/phase-1.md, « Précisions (tranche 5) ». Trois membres : Léa (l'autrice du
 // projet), Max (qui commente) et Zoé (une troisième, qui répond, et qui montre ce que voient les
-// autres). L'export des commentaires est testé dans projects.test.ts, avec le reste de l'export.
+// autres). L'export des commentaires est testé dans projects.test.ts, avec le reste de l'export ;
+// seule la date de masquage l'est ici, plus bas.
 //
 // Le temps est maîtrisé par le test, comme dans notes.test.ts : vi.useFakeTimers remplace l'horloge
 // de JavaScript (Date) par une fausse, qu'on avance à la main. Les commentaires ont ainsi des dates
 // distinctes et dans un ordre connu, et la limite de 60 commentaires par heure se vérifie sans
 // attendre. Seule Date est remplacée (toFake) : la base et les minuteries tournent normalement.
 import {
+  AccountExport,
   COMMENT_PAGE_SIZE,
   COMMENT_REPLIES_SHOWN,
   Comment,
@@ -524,13 +526,84 @@ describe('the list of comments', () => {
     await comment(project.id, max, 'Écrit quand il était public')
 
     await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'private' })
-    // Pendant qu'il est privé, seule l'autrice lit les commentaires ; Max ne peut plus rien y écrire.
-    expect(await threads(project.id, lea)).toEqual([['Écrit quand il était public']])
+    // Pendant qu'il est privé, personne ne lit ce que Max y a laissé, l'autrice comprise (décision
+    // du 19/10/2026) ; Max ne peut plus rien y écrire.
+    expect(await threads(project.id, lea)).toEqual([])
     expect((await send('GET', commentsPath(project.id), max)).status).toBe(404)
     expect((await postComment(project.id, max, 'Encore un')).status).toBe(404)
     await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'public' })
 
     expect(await threads(project.id, max)).toEqual([['Écrit quand il était public']])
+  })
+
+  it('shows the author of a private project her own comments only, and brings back the others once public', async () => {
+    const project = await publish(lea)
+    const fromMax = await comment(project.id, max, 'Avis de Max')
+    await comment(project.id, lea, 'Réponse de Léa', fromMax.id)
+    await comment(project.id, zoe, 'Réponse de Zoé', fromMax.id)
+    await comment(project.id, lea, 'Note de Léa')
+
+    await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'private' })
+
+    // Léa ne lit que ce qu'elle a écrit (décision du 19/10/2026). Sa réponse garde sa place : le
+    // commentaire de Max n'en est qu'un emplacement, sans auteur ni texte.
+    const res = await send('GET', commentsPath(project.id), lea)
+    const text = await res.text()
+    const page = CommentPage.parse(JSON.parse(text))
+    expect(page.items.map((c) => [show(c), ...c.replies.map(show)])).toEqual([
+      ['Note de Léa'],
+      ['(hidden)', 'Réponse de Léa'],
+    ])
+    expect(page.items[1]).toMatchObject({ id: fromMax.id, author: null, body: '', state: 'hidden' })
+    for (const secret of ['Avis de Max', 'Réponse de Zoé', maxId])
+      expect(text).not.toContain(secret)
+    // Le nombre affiché ne compte que ce qu'elle voit.
+    expect((await readProject(project.id, lea)).commentCount).toBe(2)
+
+    await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'public' })
+
+    for (const viewer of [lea, zoe]) {
+      expect(await threads(project.id, viewer)).toEqual([
+        ['Note de Léa'],
+        ['Avis de Max', 'Réponse de Léa', 'Réponse de Zoé'],
+      ])
+      expect((await readProject(project.id, viewer)).commentCount).toBe(4)
+    }
+  })
+
+  it('answers « not found » to the author of a private project for the comments of the others, as for unknown ones', async () => {
+    const project = await publish(lea)
+    const fromMax = await comment(project.id, max, 'Avis de Max')
+    const mine = await comment(project.id, lea, 'Note de Léa')
+    await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'private' })
+
+    // Elle ne le voit pas : pour elle, il n'existe pas, quoi qu'elle demande.
+    await expectSameNotFound(
+      await postComment(project.id, lea, 'Réponse', fromMax.id),
+      await postComment(project.id, lea, 'Réponse', UNKNOWN),
+    )
+    await expectSameNotFound(
+      await editComment(project.id, fromMax.id, lea, 'Corrigé'),
+      await editComment(project.id, UNKNOWN, lea, 'Corrigé'),
+    )
+    await expectSameNotFound(
+      await deleteComment(project.id, fromMax.id, lea),
+      await deleteComment(project.id, UNKNOWN, lea),
+    )
+    await expectSameNotFound(
+      await hide(project.id, fromMax.id, lea),
+      await hide(project.id, UNKNOWN, lea),
+    )
+    await expectSameNotFound(
+      await unhide(project.id, fromMax.id, lea),
+      await unhide(project.id, UNKNOWN, lea),
+    )
+    // Témoin : son propre commentaire, elle le modifie comme avant.
+    expect((await editComment(project.id, mine.id, lea, 'Note corrigée')).status).toBe(200)
+
+    // Rien n'a bougé : de retour en public, le commentaire de Max est intact et visible.
+    await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'public' })
+    expect(await threads(project.id, zoe)).toEqual([['Note corrigée'], ['Avis de Max']])
   })
 
   it('keeps the comments of each project apart', async () => {
@@ -855,9 +928,53 @@ describe('hiding a comment', () => {
     await expectError(await hide(project.id, fromZoe.id, max), 403, 'forbidden')
     // Son auteur ne démasque pas son propre commentaire : seule l'autrice du projet le peut.
     await expectError(await unhide(project.id, fromMax.id, max), 403, 'forbidden')
-    await expectError(await unhide(project.id, fromMax.id, zoe), 403, 'forbidden')
+    // Zoé ne voit pas le commentaire masqué de Max : pour elle, il n'existe pas (décision du
+    // 19/10/2026), la même réponse que pour un identifiant inconnu.
+    await expectSameNotFound(
+      await unhide(project.id, fromMax.id, zoe),
+      await unhide(project.id, UNKNOWN, zoe),
+    )
 
     expect(await threads(project.id, zoe)).toEqual([['Avis de Zoé']])
+  })
+
+  it('answers « not found » to a member who cannot see a hidden comment, whatever she asks, as for an unknown one', async () => {
+    const project = await publish(lea)
+    const hidden = await comment(project.id, max, 'Un commentaire déplacé')
+    const visible = await comment(project.id, max, 'Un commentaire visible')
+    await expectDone(await hide(project.id, hidden.id, lea))
+
+    // Un « refusé » dirait à Zoé qu'il existe un commentaire à cet identifiant (décision du
+    // 19/10/2026) : elle reçoit mot pour mot la réponse d'un identifiant inconnu.
+    await expectSameNotFound(
+      await editComment(project.id, hidden.id, zoe, 'Réécrit'),
+      await editComment(project.id, UNKNOWN, zoe, 'Réécrit'),
+    )
+    await expectSameNotFound(
+      await deleteComment(project.id, hidden.id, zoe),
+      await deleteComment(project.id, UNKNOWN, zoe),
+    )
+    await expectSameNotFound(
+      await hide(project.id, hidden.id, zoe),
+      await hide(project.id, UNKNOWN, zoe),
+    )
+    await expectSameNotFound(
+      await unhide(project.id, hidden.id, zoe),
+      await unhide(project.id, UNKNOWN, zoe),
+    )
+    await expectSameNotFound(
+      await postComment(project.id, zoe, 'Une réponse', hidden.id),
+      await postComment(project.id, zoe, 'Une réponse', UNKNOWN),
+    )
+    // Témoin : le commentaire visible d'un autre reste « refusé », pas « introuvable ».
+    await expectError(await editComment(project.id, visible.id, zoe, 'Réécrit'), 403, 'forbidden')
+    await expectError(await deleteComment(project.id, visible.id, zoe), 403, 'forbidden')
+    await expectError(await hide(project.id, visible.id, zoe), 403, 'forbidden')
+
+    expect(await threads(project.id, max)).toEqual([
+      ['Un commentaire visible'],
+      ['(hidden) Un commentaire déplacé'],
+    ])
   })
 
   it('is refused to the author of the project on her own comment: she deletes it instead', async () => {
@@ -1102,6 +1219,89 @@ describe('deleting an account', () => {
     // Les compteurs anti-abus portent l'identifiant du membre : ils partent avec son compte.
     const keys = (await ctx.db.select().from(schema.apiRateLimit)).map((row) => row.key)
     expect(keys.filter((key) => key.includes(maxId))).toEqual([])
+  })
+})
+
+describe('comments left without an author', () => {
+  // Un commentaire peut perdre son auteur sans passer par la suppression du compte : publié pendant
+  // qu'un compte disparaît (entre beforeDelete et la suppression, la base met author_id à null), ou
+  // compte effacé à la main dans la base. On le simule ici directement en SQL.
+  const orphan = (id: string) =>
+    ctx.db.execute(sql`update project_comment set author_id = null where id = ${id}`)
+
+  /** Des commentaires de Max dont trois perdent leur auteur, et ceux de Zoé, intacts. */
+  const withOrphans = async () => {
+    const project = await publish(lea)
+    const lone = await comment(project.id, max, 'Orphelin seul')
+    const answered = await comment(project.id, max, 'Orphelin avec réponse')
+    await comment(project.id, zoe, 'Réponse de Zoé', answered.id)
+    const fromZoe = await comment(project.id, zoe, 'Commentaire de Zoé')
+    const orphanReply = await comment(project.id, max, 'Réponse orpheline', fromZoe.id)
+    for (const { id } of [lone, answered, orphanReply]) await orphan(id)
+    return { project, answered }
+  }
+
+  it('are neither counted nor shown, except as « deleted comment » above replies', async () => {
+    const { project } = await withOrphans()
+
+    for (const viewer of [lea, zoe]) {
+      expect(await threads(project.id, viewer)).toEqual([
+        ['Commentaire de Zoé'],
+        ['(deleted)', 'Réponse de Zoé'],
+      ])
+      expect((await readProject(project.id, viewer)).commentCount).toBe(2)
+    }
+    const text = await (await send('GET', commentsPath(project.id), zoe)).text()
+    for (const secret of ['Orphelin', 'orpheline']) expect(text).not.toContain(secret)
+  })
+
+  it('are swept from the database once any account is deleted', async () => {
+    const { project, answered } = await withOrphans()
+    // Un « Commentaire supprimé » dont la seule réponse a perdu son auteur.
+    const thread = await comment(project.id, zoe, 'Racine de Zoé')
+    const lastReply = await comment(project.id, max, 'Dernière réponse orpheline', thread.id)
+    await expectDone(await deleteComment(project.id, thread.id, zoe))
+    await orphan(lastReply.id)
+
+    // N'importe quelle suppression de compte balaie les orphelins : ici, celle d'un autre membre.
+    const sam = await ctx.verifiedMember({
+      name: 'Sam',
+      email: 'sam@example.com',
+      password: 'sam-long-password',
+    })
+    await deleteAccount(sam, 'sam-long-password')
+
+    // La racine qui a une réponse d'un autre devient « Commentaire supprimé » ; le reste est
+    // effacé, et l'emplacement qui n'a plus de réponse aussi : aucun de leurs textes ne reste.
+    const left = await rows<{ id: string; body: string; deleted: boolean }>(
+      sql`select id, body, deleted_at is not null as deleted from project_comment order by body`,
+    )
+    expect(left.map((r) => r.body)).toEqual(['', 'Commentaire de Zoé', 'Réponse de Zoé'])
+    expect(left[0]).toEqual({ id: answered.id, body: '', deleted: true })
+    expect(await threads(project.id, zoe)).toEqual([
+      ['Commentaire de Zoé'],
+      ['(deleted)', 'Réponse de Zoé'],
+    ])
+  })
+})
+
+describe('my comments in my data', () => {
+  it('exports the date the author of the project hid my comment', async () => {
+    const project = await publish(lea)
+    const hidden = await comment(project.id, max, 'Commentaire masqué')
+    await comment(project.id, max, 'Commentaire visible')
+    later()
+    await expectDone(await hide(project.id, hidden.id, lea))
+    const hiddenAt = new Date(Date.now()).toISOString()
+
+    const res = await send('GET', '/v1/me/export', max)
+    expect(res.status).toBe(200)
+    const { comments } = AccountExport.parse(await res.json())
+
+    expect(comments.map((c) => [c.body, c.hiddenAt])).toEqual([
+      ['Commentaire masqué', hiddenAt],
+      ['Commentaire visible', null],
+    ])
   })
 })
 

@@ -4,7 +4,7 @@
 // droit de voir quel projet est décidé ailleurs (projects/load.ts).
 import { NO_REACTIONS, ReactionKind, type ReactionState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
 type Reader = Pick<Database, 'select'>
 
@@ -12,12 +12,19 @@ const r = schema.projectReaction
 
 /**
  * Les réactions de plusieurs projets, telles que les voit `viewerId`, en une seule requête quel que
- * soit leur nombre (et pas une par projet).
+ * soit leur nombre (et pas une par projet). Sur un projet privé, aucune : on ne réagit pas à son
+ * propre projet, ce sont donc toutes des réactions d'autres membres, cachées à tous, l'auteur du
+ * projet compris (décision du 19/10/2026). Elles sont gardées et reviennent si le projet redevient
+ * public.
  *
  * En SQL :
  *   select project_id, kind, count(*)::int, bool_or(member_id = $viewer)
- *   from project_reaction where project_id in (…) group by project_id, kind
+ *   from project_reaction inner join project on project.id = project_reaction.project_id
+ *   where project_id in (…) and project.visibility = 'public'
+ *   group by project_id, kind
  *
+ * La jointure (« inner join ») met à côté de chaque réaction la ligne de son projet, trouvée par
+ * la clé primaire de project, pour lire sa visibilité.
  * « group by » range les lignes en un groupe par projet et par type : count(*) compte les
  * réactions de chaque groupe, et bool_or dit si l'une d'elles est celle du membre qui regarde (voir
  * follows/load.ts). La clé primaire (project_id, member_id, kind) commence par project_id : elle
@@ -38,7 +45,8 @@ export const reactionStatesOf = async (
       mine: sql<boolean>`bool_or(${r.memberId} = ${viewerId})`,
     })
     .from(r)
-    .where(inArray(r.projectId, projectIds))
+    .innerJoin(schema.project, eq(schema.project.id, r.projectId))
+    .where(and(inArray(r.projectId, projectIds), eq(schema.project.visibility, 'public')))
     .groupBy(r.projectId, r.kind)
   for (const row of rows) {
     // Chaque projet part de « aucune réaction » : les cinq types sont présents, même à zéro.

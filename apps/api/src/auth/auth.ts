@@ -25,7 +25,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { eq } from 'drizzle-orm'
-import { eraseCommentsOf } from '../comments/erase'
+import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import type { Mailer } from '../email/mailer'
 import { existingAccountEmail, verificationEmail } from '../email/templates'
 import type { FileStorage } from '../media/storage'
@@ -164,13 +164,15 @@ export const createAuth = ({
           // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
           await eraseCommentsOf(db, user.id)
         },
-        // Juste après : on efface les fichiers eux-mêmes du stockage, et les compteurs anti-abus
-        // qui portent son identifiant.
+        // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
+        // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire
+        // publié pendant la suppression, entre beforeDelete et maintenant : voir comments/erase.ts).
         afterDelete: async (user) => {
           const keys = filesToDelete.get(user.id) ?? []
           filesToDelete.delete(user.id)
           for (const key of keys) await storage.delete(key)
           await deleteMemberCounters(db, user.id)
+          await sweepOrphanComments(db)
         },
       },
     },

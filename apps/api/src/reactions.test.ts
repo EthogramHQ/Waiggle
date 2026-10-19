@@ -272,14 +272,15 @@ describe('reacting to a project', () => {
     expect((await reactionsOf(draft.id, lea)).counts).toEqual(counts())
   })
 
-  it('keeps the reactions of a project gone private, shows them to its author only, and brings them back', async () => {
+  it('keeps the reactions of a project gone private, shows them to nobody, and brings them back', async () => {
     const project = await publish(lea)
     await react(project.id, 'bravo', max)
     await react(project.id, 'inspiring', zoe)
 
     await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'private' })
-    // Pendant qu'il est privé, seule l'autrice voit les nombres ; pour Max, le projet n'existe plus.
-    expect((await reactionsOf(project.id, lea)).counts).toEqual(counts({ bravo: 1, inspiring: 1 }))
+    // Pendant qu'il est privé, personne ne voit les réactions des autres, l'autrice comprise
+    // (décision du 19/10/2026) : les nombres sont à zéro. Pour Max, le projet n'existe plus.
+    expect(await reactionsOf(project.id, lea)).toEqual(NO_REACTIONS)
     expect((await send('GET', `/v1/projects/${project.id}`, max)).status).toBe(404)
     await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'public' })
 
