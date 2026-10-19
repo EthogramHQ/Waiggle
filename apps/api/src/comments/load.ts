@@ -12,7 +12,19 @@ import {
   type Project,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, type Column, desc, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  type Column,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mediaUrl } from '../profile/me'
@@ -41,33 +53,51 @@ const rowColumns = {
 }
 
 /**
- * Qui regarde la page, et d'où : le membre, et s'il est l'auteur du projet (qui voit les
- * commentaires qu'il a masqués, pour pouvoir les démasquer).
+ * Qui regarde la page, et d'où : le membre, s'il est l'auteur du projet (qui voit les commentaires
+ * qu'il a masqués, pour pouvoir les démasquer), et si le projet est privé (alors seul son auteur le
+ * voit, et il n'y lit que ses propres commentaires).
  */
-export type Viewer = { id: string; isProjectAuthor: boolean }
+export type Viewer = { id: string; isProjectAuthor: boolean; projectIsPrivate: boolean }
+
+/** Le Viewer d'un membre devant un projet qu'il a le droit de voir. */
+export const viewerOf = (
+  memberId: string,
+  project: { authorId: string; visibility: string },
+): Viewer => ({
+  id: memberId,
+  isProjectAuthor: project.authorId === memberId,
+  projectIsPrivate: project.visibility !== 'public',
+})
 
 /**
- * Le membre qui regarde voit-il encore le texte de ce commentaire masqué ? Oui s'il l'a écrit, ou
- * s'il est l'auteur du projet ; les autres ne le voient plus.
+ * La règle de visibilité d'un commentaire non supprimé, en un seul endroit (décisions de Louis du
+ * 19/10/2026, docs/scenarios/phase-1.md, tranche 5) : ce membre lit-il ce commentaire ?
+ * - sans auteur (compte disparu sans passer par l'API) : personne ;
+ * - sur un projet privé : seulement s'il l'a écrit. Ce que les autres ont laissé quand le projet
+ *   était public est gardé, mais personne ne le lit, l'auteur du projet compris : rien de ce
+ *   qu'ils ont écrit n'est lu sans eux. Tout revient si le projet redevient public ;
+ * - sur un projet public : tout le monde, sauf s'il est masqué ; un commentaire masqué reste lu
+ *   par son auteur et par l'auteur du projet.
  */
-const seesHidden = (row: Pick<CommentRow, 'authorId'>, viewer: Viewer) =>
-  viewer.isProjectAuthor || (row.authorId !== null && row.authorId === viewer.id)
-
-/** Une réponse est-elle montrée à ce membre ? (Une réponse n'est jamais « supprimée » : elle est effacée.) */
-const replyShown = (row: CommentRow, viewer: Viewer) =>
-  row.hiddenAt === null || seesHidden(row, viewer)
+export const sees = (row: Pick<CommentRow, 'authorId' | 'hiddenAt'>, viewer: Viewer) => {
+  if (row.authorId === null) return false
+  if (viewer.projectIsPrivate) return row.authorId === viewer.id
+  return row.hiddenAt === null || viewer.isProjectAuthor || row.authorId === viewer.id
+}
 
 /**
- * La même règle, écrite en SQL pour les colonnes d'une table de réponses (un « alias » de
- * project_comment, voir loadCommentPage).
+ * La même règle, écrite en SQL pour les colonnes de project_comment ou d'un de ses « alias » (la
+ * même table sous un autre nom, voir loadCommentPage). Elle doit dire exactement ce que dit `sees`.
  */
-const replyShownSql = (
+const seesSql = (
   table: { hiddenAt: Column; authorId: Column },
   viewer: Viewer,
-): SQL | undefined =>
-  viewer.isProjectAuthor
-    ? undefined // l'auteur du projet voit toutes les réponses, masquées comprises
-    : or(isNull(table.hiddenAt), eq(table.authorId, viewer.id))
+): SQL | undefined => {
+  // « author_id = $membre » écarte aussi les lignes sans auteur (null n'est égal à rien).
+  if (viewer.projectIsPrivate) return eq(table.authorId, viewer.id)
+  if (viewer.isProjectAuthor) return isNotNull(table.authorId) // masqués compris
+  return and(isNotNull(table.authorId), or(isNull(table.hiddenAt), eq(table.authorId, viewer.id)))
+}
 
 /**
  * Un commentaire tel que ce membre le voit (contrat `CommentReply`), ou null s'il ne le voit pas du
@@ -94,7 +124,8 @@ export const presentComment = (
   const author = row.authorId === null ? undefined : authors.get(row.authorId)
   // Sans auteur (compte disparu sans passer par l'API), il n'y a plus rien à montrer de lui.
   if (!author) return placeholder('deleted')
-  if (row.hiddenAt !== null && !seesHidden(row, viewer)) return placeholder('hidden')
+  // Masqué pour ce membre, ou laissé par un autre sur un projet devenu privé : sa place seulement.
+  if (!sees(row, viewer)) return placeholder('hidden')
   return {
     ...base,
     author,
@@ -170,14 +201,11 @@ export const loadCommentPage = async (
   // EXPLAIN l'a montré. Une sous-requête qui rend une valeur (« (select 1 … limit 1) ») est
   // toujours posée ligne par ligne.
   const reply = alias(c, 'reply')
-  const rootShown = and(
-    isNull(c.deletedAt),
-    viewer.isProjectAuthor ? undefined : or(isNull(c.hiddenAt), eq(c.authorId, viewer.id)),
-  )
+  const rootShown = and(isNull(c.deletedAt), seesSql(c, viewer))
   const firstShownReply = db
     .select({ one: sql`1` })
     .from(reply)
-    .where(and(eq(reply.rootId, c.id), replyShownSql(reply, viewer)))
+    .where(and(eq(reply.rootId, c.id), seesSql(reply, viewer)))
     .limit(1)
   const roots = await db
     .select(rowColumns)
@@ -218,7 +246,7 @@ export const loadCommentPage = async (
         deletedAt: reply.deletedAt,
       })
       .from(reply)
-      .where(and(eq(reply.rootId, c.id), replyShownSql(reply, viewer)))
+      .where(and(eq(reply.rootId, c.id), seesSql(reply, viewer)))
       .orderBy(asc(reply.createdAt), asc(reply.id))
       .limit(COMMENT_REPLIES_SHOWN)
       .as('shown')
@@ -263,7 +291,7 @@ export const loadCommentPage = async (
   const items = page.flatMap((root): Comment[] => {
     const replies = (repliesByRoot.get(root.id) ?? [])
       // Redit en JavaScript : la requête a déjà écarté les réponses qu'il ne voit pas.
-      .filter((row) => replyShown(row, viewer))
+      .filter((row) => sees(row, viewer))
       .flatMap((row) => presentComment(row, viewer, authors, false) ?? [])
     const shownRoot = presentComment(root, viewer, authors, replies.length > 0)
     return shownRoot ? [{ ...shownRoot, replies }] : []
@@ -283,11 +311,20 @@ export const loadCommentPage = async (
 
 /**
  * Le nombre de commentaires que tout le monde voit, pour plusieurs projets, en une requête : les
- * racines et les réponses, sans les masqués ni les supprimés. Le même nombre pour tous, les deux
- * auteurs compris.
+ * racines et les réponses, sans les masqués, les supprimés, ni ceux d'un compte disparu (sans
+ * auteur). Le même nombre pour tous, les deux auteurs compris. Sur un projet privé, que seul son
+ * auteur voit, il ne compte que ses propres commentaires : ceux des autres sont cachés à tous
+ * (voir `sees`).
  *
- * En SQL : select project_id, count(*)::int from project_comment where project_id in (…)
- * and hidden_at is null and deleted_at is null group by project_id. L'index
+ * En SQL :
+ *   select project_comment.project_id, count(*)::int from project_comment
+ *   inner join project on project.id = project_comment.project_id
+ *   where project_comment.project_id in (…) and hidden_at is null and deleted_at is null
+ *     and project_comment.author_id is not null
+ *     and (project.visibility = 'public' or project_comment.author_id = project.author_id)
+ *   group by project_comment.project_id
+ * La jointure (« inner join ») met à côté de chaque commentaire la ligne de son projet, trouvée
+ * par la clé primaire de project, pour lire sa visibilité et son auteur. L'index
  * project_comment_project_idx donne les commentaires de chaque projet de la liste.
  */
 export const commentCountsOf = async (
@@ -295,10 +332,20 @@ export const commentCountsOf = async (
   projectIds: string[],
 ): Promise<Map<string, number>> => {
   if (projectIds.length === 0) return new Map()
+  const p = schema.project
   const rows = await db
     .select({ projectId: c.projectId, count: sql<number>`count(*)::int` })
     .from(c)
-    .where(and(inArray(c.projectId, projectIds), isNull(c.hiddenAt), isNull(c.deletedAt)))
+    .innerJoin(p, eq(p.id, c.projectId))
+    .where(
+      and(
+        inArray(c.projectId, projectIds),
+        isNull(c.hiddenAt),
+        isNull(c.deletedAt),
+        isNotNull(c.authorId),
+        or(eq(p.visibility, 'public'), eq(c.authorId, p.authorId)),
+      ),
+    )
     .groupBy(c.projectId)
   return new Map(rows.map((row) => [row.projectId, row.count]))
 }
@@ -307,8 +354,10 @@ export const commentCountsOf = async (
  * Tous les commentaires d'un membre, des plus anciens aux plus récents, pour l'export de ses
  * données : racines et réponses, masqués compris (c'est son texte), sur tous les projets, même
  * devenus privés (le projet n'est donné que par son identifiant). Un commentaire qu'il a supprimé
- * n'y est plus : son texte est effacé et il n'a plus d'auteur. L'index project_comment_author_idx
- * trouve ses commentaires ; le tri se fait ensuite en mémoire (l'export est rare).
+ * n'y est plus : son texte est effacé et il n'a plus d'auteur. La date de masquage y est : il a le
+ * droit de savoir que l'auteur du projet a masqué son texte, et quand. L'index
+ * project_comment_author_idx trouve ses commentaires ; le tri se fait ensuite en mémoire (l'export
+ * est rare).
  */
 export const commentsOfAuthor = async (db: Reader, authorId: string) => {
   const rows = await db
@@ -319,6 +368,7 @@ export const commentsOfAuthor = async (db: Reader, authorId: string) => {
       body: c.body,
       createdAt: c.createdAt,
       editedAt: c.editedAt,
+      hiddenAt: c.hiddenAt,
     })
     .from(c)
     .where(and(eq(c.authorId, authorId), isNull(c.deletedAt)))
@@ -327,5 +377,6 @@ export const commentsOfAuthor = async (db: Reader, authorId: string) => {
     ...row,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
+    hiddenAt: row.hiddenAt?.toISOString() ?? null,
   }))
 }

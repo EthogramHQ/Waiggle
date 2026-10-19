@@ -21,7 +21,15 @@ import { and, eq, exists, isNotNull, isNull, not } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
-import { authorsOf, type CommentRow, loadCommentPage, presentComment } from '../comments/load'
+import {
+  authorsOf,
+  type CommentRow,
+  loadCommentPage,
+  presentComment,
+  sees,
+  type Viewer,
+  viewerOf,
+} from '../comments/load'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { visibleTo } from '../projects/load'
@@ -183,23 +191,27 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
     if (!ProjectId.safeParse(projectId).success) return null
     const [project] = await db
-      .select({ authorId: schema.project.authorId })
+      .select({ authorId: schema.project.authorId, visibility: schema.project.visibility })
       .from(schema.project)
       .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
-    return project ?? null
+    // Le projet, et qui le regarde (voir Viewer, comments/load.ts).
+    return project ? { ...project, viewer: viewerOf(userId, project) } : null
   }
 
   /**
-   * Un commentaire de ce projet, s'il existe et n'est pas supprimé : un commentaire d'un autre
-   * projet, même du même auteur, n'est pas trouvé à cette adresse. Lu par la clé primaire.
+   * Un commentaire de ce projet, s'il existe, n'est pas supprimé et si ce membre le voit (`sees`,
+   * comments/load.ts). Lu par la clé primaire. null dans tous les autres cas, la même réponse
+   * « introuvable » pour tous : un commentaire d'un autre projet, même du même auteur, n'est pas
+   * trouvé à cette adresse ; un commentaire masqué qu'on ne voit pas non plus (sinon un « refusé »
+   * dirait qu'il existe un commentaire à cet identifiant).
    */
-  const commentOf = async (projectId: string, commentId: string) => {
+  const commentOf = async (projectId: string, commentId: string, viewer: Viewer) => {
     if (!CommentId.safeParse(commentId).success) return null
     const [comment] = await db
       .select({ authorId: c.authorId, rootId: c.rootId, hiddenAt: c.hiddenAt })
       .from(c)
       .where(and(eq(c.id, commentId), eq(c.projectId, projectId), isNull(c.deletedAt)))
-    return comment ?? null
+    return comment && sees(comment, viewer) ? comment : null
   }
 
   /** Compte la demande dans un quota du membre ; renvoie le délai d'attente s'il est dépassé. */
@@ -216,13 +228,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const { id } = ctx.req.valid('param')
     const project = await projectOf(id, user.id)
     if (!project) return notFound(ctx)
-    const page = await loadCommentPage(
-      db,
-      id,
-      { id: user.id, isProjectAuthor: project.authorId === user.id },
-      cursor,
-      publicApiUrl,
-    )
+    const page = await loadCommentPage(db, id, project.viewer, cursor, publicApiUrl)
     // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
     return ctx.json(CommentPage.parse(page), 200)
   })
@@ -248,8 +254,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const wait = await overLimit(memberCounterKeys(user.id).comment, commentRule)
     if (wait !== null) return tooMany(ctx, wait)
     const projectId = ctx.req.param('id')
-    if (!(await projectOf(projectId, user.id))) return notFound(ctx)
-    const comment = await commentOf(projectId, ctx.req.param('commentId'))
+    const project = await projectOf(projectId, user.id)
+    if (!project) return notFound(ctx)
+    const comment = await commentOf(projectId, ctx.req.param('commentId'), project.viewer)
     if (!comment) return notFound(ctx)
     // Seul son auteur modifie un commentaire, pas même l'auteur du projet (qui peut le masquer).
     if (comment.authorId !== user.id) return forbidden(ctx)
@@ -262,11 +269,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const { id } = ctx.req.valid('param')
     // Le texte, vérifié par NewComment (et débarrassé des espaces de ses bords).
     const { body, replyTo } = ctx.req.valid('json')
-    // Le garde ci-dessus a compté la demande et vérifié le projet ; on relit son auteur (une petite
-    // requête), pour savoir si ce membre voit les commentaires masqués.
+    // Le garde ci-dessus a compté la demande et vérifié le projet ; on relit son auteur et sa
+    // visibilité (une petite requête), pour savoir quels commentaires ce membre voit.
     const project = await projectOf(id, user.id)
     if (!project) return notFound(ctx)
-    const viewer = { id: user.id, isProjectAuthor: project.authorId === user.id }
+    const { viewer } = project
 
     // L'identifiant est tiré par le serveur ; la date vient de l'horloge de JavaScript.
     const row: CommentRow & { projectId: string; rootId: string | null } = {
@@ -293,10 +300,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           .where(and(eq(c.id, replyTo), eq(c.projectId, id), isNull(c.deletedAt)))
           .for('share')
         // Introuvable : un commentaire inconnu, d'un autre projet, supprimé, une réponse (l'appli
-        // répond dans le même fil, à sa racine), ou un commentaire masqué que ce membre ne voit pas.
-        const hiddenFromViewer =
-          root?.hiddenAt != null && !viewer.isProjectAuthor && root.authorId !== viewer.id
-        if (!root || root.rootId !== null || hiddenFromViewer) return false
+        // répond dans le même fil, à sa racine), ou un commentaire que ce membre ne voit pas
+        // (masqué, ou laissé par un autre sur un projet devenu privé).
+        if (!root || root.rootId !== null || !sees(root, viewer)) return false
       }
       await tx.insert(c).values(row)
       return true
@@ -334,9 +340,14 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       })
     if (!row) return notFound(ctx)
     const authors = await authorsOf(db, [user.id], publicApiUrl)
-    // Son auteur voit toujours son commentaire, masqué ou non : savoir s'il est aussi l'auteur du
-    // projet ne change rien ici.
-    const shown = presentComment(row, { id: user.id, isProjectAuthor: false }, authors, false)
+    // Son auteur voit toujours son commentaire, masqué ou non, sur un projet public ou privé :
+    // savoir s'il est aussi l'auteur du projet, ou si le projet est privé, ne change rien ici.
+    const shown = presentComment(
+      row,
+      { id: user.id, isProjectAuthor: false, projectIsPrivate: false },
+      authors,
+      false,
+    )
     if (!shown) return notFound(ctx)
     return ctx.json(CommentReply.parse(shown), 200)
   })
@@ -347,8 +358,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const wait = await overLimit(memberCounterKeys(user.id).projectChange, changeRule)
     if (wait !== null) return tooMany(ctx, wait)
     const { id, commentId } = ctx.req.valid('param')
-    if (!(await projectOf(id, user.id))) return notFound(ctx)
-    const comment = await commentOf(id, commentId)
+    const project = await projectOf(id, user.id)
+    if (!project) return notFound(ctx)
+    const comment = await commentOf(id, commentId, project.viewer)
     if (!comment) return notFound(ctx)
     // Seul son auteur supprime un commentaire ; l'auteur du projet, lui, peut le masquer.
     if (comment.authorId !== user.id) return forbidden(ctx)
@@ -388,15 +400,16 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
 
   /**
    * Masquer et démasquer : les mêmes vérifications. Le quota d'abord, puis le projet, puis le
-   * commentaire ; seul l'auteur du projet le peut, et pas sur son propre commentaire (il le
-   * supprime plutôt). Renvoie null si tout va bien, sinon la réponse de refus.
+   * commentaire (introuvable s'il est masqué et que ce membre ne le voit pas, comme un inconnu) ;
+   * seul l'auteur du projet le peut, et pas sur son propre commentaire (il le supprime plutôt).
+   * Renvoie null si tout va bien, sinon la réponse de refus.
    */
   const checkHide = async (ctx: Context<AppEnv>, userId: string, id: string, commentId: string) => {
     const wait = await overLimit(memberCounterKeys(userId).projectChange, changeRule)
     if (wait !== null) return tooMany(ctx, wait)
     const project = await projectOf(id, userId)
     if (!project) return notFound(ctx)
-    const comment = await commentOf(id, commentId)
+    const comment = await commentOf(id, commentId, project.viewer)
     if (!comment) return notFound(ctx)
     if (project.authorId !== userId || comment.authorId === userId) return forbidden(ctx)
     return null
