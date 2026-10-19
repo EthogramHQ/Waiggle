@@ -231,6 +231,23 @@ export const en: Translation = {
       uploadFailed:
         'The project is published, but some photos could not be sent. Add them again here.',
     },
+    notes: {
+      title: 'Journal',
+      empty:
+        'No note yet. Tell how your project is going: your followers will see it in their feed.',
+      add: 'Post a note',
+      field: 'Your note',
+      hint: 'What changed, what you are preparing, what you are looking for. Your followers will see it in their feed.',
+      submit: 'Post the note',
+      published: 'Note posted.',
+      error: 'The note could not be posted. Try again.',
+      delete: 'Delete the note',
+      deleteTitle: 'Delete this note?',
+      deleteBody: 'It will disappear from the journal and from your followers’ feeds.',
+      confirmDelete: 'Delete',
+      deleteError: 'The note could not be deleted. Try again.',
+      statusPrefill: 'The project is now “{{status}}”.',
+    },
     page: {
       published: 'published on {{date}}',
       external: '{{host}}, a website outside {{appName}}',
@@ -337,6 +354,8 @@ export const en: Translation = {
     more: 'Show more',
     moreError: 'The rest of the feed could not load.',
     end: 'You’re all caught up',
+    noteLabel: 'Note by {{name}} on {{title}}',
+    noteKicker: 'New note',
     news_one: '{{count}} new item',
     news_other: '{{count}} new items',
     newsMany: '{{max}} or more new items',

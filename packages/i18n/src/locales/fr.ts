@@ -240,6 +240,23 @@ export const fr = {
       uploadFailed:
         'Le projet est publié, mais certaines photos n’ont pas pu être envoyées. Ajoute-les à nouveau ici.',
     },
+    notes: {
+      title: 'Journal',
+      empty:
+        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
+      add: 'Publier une note',
+      field: 'Ta note',
+      hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
+      submit: 'Publier la note',
+      published: 'Note publiée.',
+      error: 'La note n’a pas pu être publiée. Réessaie.',
+      delete: 'Supprimer la note',
+      deleteTitle: 'Supprimer cette note ?',
+      deleteBody: 'Elle disparaîtra du journal et des fils de tes abonnés.',
+      confirmDelete: 'Supprimer',
+      deleteError: 'La note n’a pas pu être supprimée. Réessaie.',
+      statusPrefill: 'Le projet passe en « {{status}} ».',
+    },
     page: {
       published: 'publié le {{date}}',
       external: '{{host}}, un site hors de {{appName}}',
@@ -349,6 +366,8 @@ export const fr = {
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
     end: 'Tu es à jour',
+    noteLabel: 'Note de {{name}} sur {{title}}',
+    noteKicker: 'Nouvelle note',
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',
     newsMany: '{{max}} nouveautés ou plus',
