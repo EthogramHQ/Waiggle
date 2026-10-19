@@ -66,7 +66,7 @@ export const checkStamp = () => {
     )
   } else if (built !== now) {
     console.warn(
-      `Attention : la construction vient de ${built}, mais la copie de travail est à ${now}. Les captures risquent de montrer l'ancien code : relance sans --no-build.`,
+      `Attention : la construction vient de ${built}, mais la copie de travail est à ${now}. Elle risque de montrer l'ancien code (captures, parcours) : relance sans --no-build.`,
     )
   } else if (now.endsWith('modifié')) {
     console.warn(
