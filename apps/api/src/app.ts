@@ -17,6 +17,7 @@ import { errorBody, languageOf } from './errors'
 import { describeError } from './log'
 import type { FileStorage } from './media/storage'
 import { createRateLimiter } from './rate-limit'
+import { commentRoutes } from './routes/comments'
 import { feedRoutes } from './routes/feed'
 import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
@@ -24,6 +25,7 @@ import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { noteRoutes } from './routes/notes'
 import { projectRoutes } from './routes/projects'
+import { reactionRoutes } from './routes/reactions'
 import { tagRoutes } from './routes/tags'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
@@ -91,7 +93,9 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
       origin: (origin) => (origin === appUrl ? origin : null),
       credentials: true,
       allowHeaders: ['Content-Type', 'Authorization'],
-      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      // PUT : réagir à un projet et masquer un commentaire (tranche 5), deux gestes qu'on peut
+      // répéter sans effet de plus.
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       // En-têtes de réponse que l'appli web a le droit de lire (Retry-After : dans combien de
       // secondes réessayer après un refus pour trop de demandes).
       exposeHeaders: ['Content-Disposition', 'Content-Language', 'Retry-After'],
@@ -116,8 +120,11 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.use('/v1/*', (c, next) => {
     if (c.req.path === '/v1/me/avatar') return next()
     if (/^\/v1\/projects\/[^/]+\/visuals$/.test(c.req.path)) return next()
-    // Une note pèse au plus 1 000 caractères : la petite limite suffit largement.
-    if (/^\/v1\/projects\/[^/]+\/notes(\/|$)/.test(c.req.path)) return small(c, next)
+    // Une note ou un commentaire pèse au plus 1 000 caractères, une réaction n'a pas de corps :
+    // la petite limite suffit largement.
+    if (/^\/v1\/projects\/[^/]+\/(notes|comments|reactions)(\/|$)/.test(c.req.path)) {
+      return small(c, next)
+    }
     if (c.req.path === '/v1/projects' || c.req.path.startsWith('/v1/projects/')) {
       return projects(c, next)
     }
@@ -154,6 +161,8 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', tagRoutes({ db, publicApiUrl }))
   app.route('/', followRoutes({ db, limiter }))
   app.route('/', noteRoutes({ db, limiter }))
+  app.route('/', reactionRoutes({ db, limiter }))
+  app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 

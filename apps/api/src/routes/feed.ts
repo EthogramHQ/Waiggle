@@ -6,8 +6,9 @@ import { DiscoverQuery, FeedPage, FeedQuery, FollowingFeedPage } from '@ruche/co
 import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
+import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
-import { decodeCursor, loadDiscoverFeed, loadFollowingFeed } from '../feed/load'
+import { loadDiscoverFeed, loadFollowingFeed } from '../feed/load'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -52,16 +53,6 @@ export const feedRoutes = ({ db, publicApiUrl }: Deps) => {
 
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
   const invalid = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'validation'), 400)
-
-  /**
-   * Le curseur reçu, décodé : 'none' sans curseur (la première page), 'invalid' s'il ne veut rien
-   * dire. Un curseur invalide est refusé, comme toute autre donnée invalide, plutôt que de
-   * renvoyer en silence la première page.
-   */
-  const readCursor = (cursor: string | undefined) => {
-    if (cursor === undefined) return null
-    return decodeCursor(cursor) ?? ('invalid' as const)
-  }
 
   app.openapi(followingRoute, async (c) => {
     const viewer = c.get('user')
