@@ -203,9 +203,9 @@ try {
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
-  const follow = sam.page.getByRole('switch', { name: 'Suivre Lea' })
-  await follow.click()
-  await waitFor('Léa suivie', async () => (await follow.getAttribute('aria-checked')) === 'true')
+  await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
+  // Une fois suivie, le nom lu reprend le texte affiché : « Suivi : Lea », activé.
+  await sam.page.getByRole('switch', { name: /^Suivi.*Lea$/, checked: true }).waitFor()
   const leaForSam = await (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
   expectEqual('Léa suivie par Sam', leaForSam.isFollowed, true)
   expectEqual('abonnés de Léa', leaForSam.followerCount, 1)

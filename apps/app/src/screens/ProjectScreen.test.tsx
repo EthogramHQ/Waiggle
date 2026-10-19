@@ -222,7 +222,8 @@ describe('following a project from its page', () => {
     seenByMax({ isFollowed: true, followerCount: 3 })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(await screen.findByRole('switch', { name: 'Suivre ce projet' })).toBeChecked()
+    // Une fois suivi, le nom lu reprend le texte affiché, pour la commande vocale.
+    expect(await screen.findByRole('switch', { name: 'Projet suivi' })).toBeChecked()
     expect(screen.getByText('Projet suivi')).toBeTruthy()
     expect(screen.getByText('3 abonnés')).toBeTruthy()
   })

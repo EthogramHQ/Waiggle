@@ -231,7 +231,8 @@ function ProjectView({ project }: { project: Project }) {
         <FollowButton
           followed={project.isFollowed}
           onPress={follow.toggle}
-          label={t('follow.project')}
+          // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (voir MemberScreen).
+          label={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
           text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
           caption={followers}
           error={

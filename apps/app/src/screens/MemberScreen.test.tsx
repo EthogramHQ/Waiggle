@@ -197,7 +197,8 @@ describe('following a member from her page', () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: true, followerCount: 13 })
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    const button = await screen.findByRole('switch', { name: 'Suivre Léa' })
+    // Une fois suivie, le nom lu reprend le texte affiché (« Suivi »), pour la commande vocale.
+    const button = await screen.findByRole('switch', { name: 'Suivi : Léa' })
     expect(button).toBeChecked()
     expect(screen.getByText('Suivi')).toBeTruthy()
     expect(screen.getByText('13 abonnés')).toBeTruthy()

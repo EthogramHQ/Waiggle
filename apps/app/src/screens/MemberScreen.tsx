@@ -84,7 +84,13 @@ function MemberView({ member }: { member: Member }) {
             <FollowButton
               followed={member.isFollowed}
               onPress={follow.toggle}
-              label={t('follow.member', { name: member.name })}
+              // Le nom lu contient toujours le texte affiché (« Suivi : Léa » quand on la suit) :
+              // dire « touche Suivi » à la commande vocale trouve bien ce bouton.
+              label={
+                member.isFollowed
+                  ? t('follow.memberFollowing', { name: member.name })
+                  : t('follow.member', { name: member.name })
+              }
               text={member.isFollowed ? t('follow.following') : t('follow.follow')}
               caption={followers}
               layout="stacked"

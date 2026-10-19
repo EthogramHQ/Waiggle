@@ -359,6 +359,7 @@ export const fr = {
     follow: 'Suivre',
     following: 'Suivi',
     member: 'Suivre {{name}}',
+    memberFollowing: 'Suivi : {{name}}',
     project: 'Suivre ce projet',
     projectFollowing: 'Projet suivi',
     followers_one: '{{count}} abonné',

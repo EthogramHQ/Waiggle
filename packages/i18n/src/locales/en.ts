@@ -347,6 +347,7 @@ export const en: Translation = {
     follow: 'Follow',
     following: 'Following',
     member: 'Follow {{name}}',
+    memberFollowing: 'Following {{name}}',
     project: 'Follow this project',
     projectFollowing: 'Following this project',
     followers_one: '{{count}} follower',
