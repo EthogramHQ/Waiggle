@@ -1,12 +1,14 @@
 // Donner et changer un pseudo (tranche 6a). Trois portes d'entrée :
 // - ensureHandle : un membre vérifié sans pseudo en reçoit un, fabriqué à partir de son nom
 //   (après la vérification de son adresse, et en filet dans « Mon profil » et sur sa page) ;
-// - backfillHandles : la même chose pour tous les membres d'avant la tranche, au démarrage ;
+// - backfillHandles : la même chose pour tous les membres d'avant la tranche, au démarrage
+//   (avec purgeExpiredHandles, qui efface les réservations finies) ;
 // - claimHandle : un membre choisit lui-même son pseudo (PATCH /v1/me).
 // La table member_handle est décrite dans packages/db/src/schema/handles.ts.
 import { type Database, schema } from '@ruche/db'
 import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
 import { and, asc, eq, inArray, isNotNull, isNull, lte, ne } from 'drizzle-orm'
+import { describeError } from '../log'
 import { currentHandle, currentHandleOf, reservationCutoff } from './load'
 import { handleBase, handleCandidates } from './suggest'
 
@@ -36,9 +38,9 @@ type Newcomer = { id: string; name: string; language: string }
  *    primaire). Un candidat sans ligne, ou dont la réservation est finie, est libre.
  * 2. On l'insère avec « on conflict do nothing … returning » : si un autre membre l'a pris entre
  *    la lecture et l'écriture (deux inscriptions au même instant), la base refuse le doublon sans
- *    erreur, et « returning » ne renvoie aucune ligne. On essaie alors le candidat suivant. Le même
- *    refus arrive si ce membre a reçu un pseudo entre-temps (deux appels simultanés pour lui :
- *    l'index unique partiel member_handle_current_idx) : on renvoie alors celui-là.
+ *    erreur, et « returning » ne renvoie aucune ligne. On essaie alors le candidat suivant. Si le
+ *    refus vient de l'index unique partiel member_handle_current_idx (ce membre a déjà un pseudo
+ *    actuel), on renvoie celui-là ; giveHandle, qui tient le verrou du membre, l'évite déjà.
  */
 const assignHandle = async (db: Database, member: Newcomer, now: Date): Promise<string> => {
   const base = handleBase(
@@ -83,9 +85,24 @@ const assignHandle = async (db: Database, member: Newcomer, now: Date): Promise<
  * Sûr si on l'appelle plusieurs fois, même en même temps (voir assignHandle).
  */
 export const ensureHandle = async (db: Database, userId: string): Promise<string | null> => {
+  // Le cas courant, sans transaction ni verrou : le membre a déjà son pseudo.
   const existing = await currentHandle(db, userId)
   if (existing) return existing
-  const [member] = await db
+  return giveHandle(db, userId, new Date())
+}
+
+/**
+ * Verrouille la ligne du membre dans `user` jusqu'à la fin de la transaction `tx`, et la renvoie
+ * (undefined : membre inconnu). Toute écriture de pseudo pour un membre passe par ce verrou :
+ * ensureHandle, le rattrapage et claimHandle passent donc l'un après l'autre pour un même membre.
+ *
+ * « for no key update » : un verrou sur la ligne, tenu jusqu'à la fin de la transaction. Un second
+ * verrou demandé sur la même ligne attend ici. Ce verrou-là (et non « for update ») laisse passer
+ * les écritures qui ne font que pointer vers le membre (un commentaire, une réaction), qui n'ont
+ * pas à attendre.
+ */
+const lockMember = async (tx: Database, userId: string) => {
+  const [member] = await tx
     .select({
       id: schema.user.id,
       name: schema.user.name,
@@ -94,9 +111,25 @@ export const ensureHandle = async (db: Database, userId: string): Promise<string
     })
     .from(schema.user)
     .where(eq(schema.user.id, userId))
-  if (!member?.emailVerified) return null
-  return assignHandle(db, member, new Date())
+    .for('no key update')
+  return member
 }
+
+/**
+ * Donne un pseudo à un membre vérifié qui n'en a pas, dans une petite transaction qui tient le
+ * verrou du membre (lockMember). Sans ce verrou, un changement de pseudo (PATCH /v1/me) qui croise
+ * ce filet pouvait écrire un second pseudo actuel : la base le refusait (index unique partiel
+ * member_handle_current_idx) et le membre recevait une erreur 500. Avec lui, le second arrivé
+ * attend le premier, puis relit le pseudo actuel : il le trouve, et ne fait rien.
+ */
+const giveHandle = (db: Database, userId: string, now: Date): Promise<string | null> =>
+  db.transaction(async (tx) => {
+    const member = await lockMember(tx, userId)
+    if (!member?.emailVerified) return null
+    const existing = await currentHandle(tx, userId)
+    if (existing) return existing
+    return assignHandle(tx, member, now)
+  })
 
 /**
  * Le rattrapage : donne un pseudo à chaque membre vérifié qui n'en a pas (les comptes d'avant la
@@ -107,18 +140,53 @@ export const ensureHandle = async (db: Database, userId: string): Promise<string
  * La requête : « user left join member_handle … where member_handle.handle is null », les membres
  * sans ligne de pseudo actuel (une « anti-jointure »). La jointure suit l'index partiel
  * member_handle_current_idx.
+ *
+ * Une panne pour un membre (une donnée inattendue, une erreur de la base) ne doit ni arrêter le
+ * démarrage de l'API, ni priver les suivants de leur pseudo : elle est notée dans les logs, avec
+ * l'identifiant du membre (jamais son nom ni son adresse, voir log.ts), et on passe au suivant.
+ * Il recevra son pseudo en filet, à sa prochaine visite, ou au prochain démarrage.
  */
 export const backfillHandles = async (db: Database): Promise<number> => {
   const members = await db
-    .select({ id: schema.user.id, name: schema.user.name, language: schema.user.language })
+    .select({ id: schema.user.id })
     .from(schema.user)
     .leftJoin(h, currentHandleOf(schema.user.id))
     .where(and(eq(schema.user.emailVerified, true), isNull(h.handle)))
     .orderBy(asc(schema.user.createdAt), asc(schema.user.id))
   const now = new Date()
+  let given = 0
   // Un membre après l'autre, et non tous à la fois : le numéro de chacun dépend des précédents.
-  for (const member of members) await assignHandle(db, member, now)
-  return members.length
+  // Chacun a sa propre transaction : la panne de l'un n'annule pas le pseudo des autres.
+  for (const member of members) {
+    try {
+      if (await giveHandle(db, member.id, now)) given += 1
+    } catch (error) {
+      console.error('Handle not given at startup', {
+        userId: member.id,
+        ...describeError(error, { method: 'STARTUP', path: 'backfillHandles' }),
+      })
+    }
+  }
+  return given
+}
+
+/**
+ * Efface les anciens pseudos dont la réservation est finie (libérés il y a 30 jours ou plus).
+ * Libres, ils l'étaient déjà pour les autres membres ; les effacer tient la promesse faite au
+ * membre : son ancien pseudo n'est pas gardé plus longtemps que la réservation. Lancé au démarrage
+ * de l'API, à côté du rattrapage. Renvoie le nombre de lignes effacées.
+ *
+ * La requête : « delete from member_handle where released_at <= limite ». Aucun index ne porte
+ * sur released_at : PostgreSQL lit toute la table. C'est voulu : une fois par démarrage, sur une
+ * petite table (un pseudo actuel par membre, au plus un ancien). Les pseudos actuels
+ * (released_at null) ne sont jamais concernés : « null <= une date » n'est pas vrai.
+ */
+export const purgeExpiredHandles = async (db: Database, now: Date): Promise<number> => {
+  const purged = await db
+    .delete(h)
+    .where(lte(h.releasedAt, reservationCutoff(now)))
+    .returning({ handle: h.handle })
+  return purged.length
 }
 
 /**
@@ -141,15 +209,9 @@ export const claimHandle = async (
   handle: string,
   now: Date,
 ): Promise<boolean> => {
-  // « for no key update » : un verrou sur la ligne du membre, tenu jusqu'à la fin de la
-  // transaction. Un second changement simultané de sa part attend ici. Ce verrou-là (et non « for
-  // update ») laisse passer les écritures qui ne font que pointer vers le membre (un commentaire,
-  // une réaction), qui n'ont pas à attendre.
-  await tx
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(eq(schema.user.id, userId))
-    .for('no key update')
+  // Le verrou du membre : un second changement simultané de sa part, ou un pseudo donné en filet
+  // (ensureHandle), attend la fin de cette transaction.
+  await lockMember(tx, userId)
 
   const current = await currentHandle(tx, userId)
   if (current === handle) return false
@@ -168,7 +230,9 @@ export const claimHandle = async (
     }
   }
 
-  // Ses anciens pseudos, sauf celui qu'il reprend peut-être (index member_handle_user_idx).
+  // Ses anciens pseudos, sauf celui qu'il reprend peut-être (index member_handle_user_idx). Ses
+  // réservations finies partent donc ici aussi : après un changement, il ne lui reste au plus que
+  // l'ancien pseudo qu'il vient de quitter.
   await tx.delete(h).where(and(eq(h.userId, userId), isNotNull(h.releasedAt), ne(h.handle, handle)))
   if (current) {
     await tx.update(h).set({ releasedAt: now }).where(eq(h.handle, current))

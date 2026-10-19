@@ -12,7 +12,8 @@ import {
   type Mailer,
 } from './email/mailer'
 import { loadEnv } from './env'
-import { backfillHandles } from './handles/claim'
+import { backfillHandles, purgeExpiredHandles } from './handles/claim'
+import { describeError } from './log'
 import { createDiskStorage } from './media/storage'
 
 const env = loadEnv(process.env)
@@ -56,11 +57,22 @@ const storage = createDiskStorage(env.mediaDir)
 
 const database = await openDatabase()
 
-// Les membres inscrits avant la tranche 6a n'ont pas de pseudo : ils en reçoivent un ici, après
-// les migrations et avant d'ouvrir le port (voir handles/claim.ts). Aux démarrages suivants, il n'y
-// a plus personne à servir et rien ne change.
-const handlesGiven = await backfillHandles(database.db)
-if (handlesGiven > 0) console.log(`Handles given to ${handlesGiven} existing members`)
+// L'entretien des pseudos, après les migrations et avant d'ouvrir le port (voir handles/claim.ts) :
+// les anciens pseudos dont la réservation est finie sont effacés, puis les membres inscrits avant
+// la tranche 6a reçoivent le leur. Aux démarrages suivants, il n'y a souvent plus rien à faire.
+// Rien de tout cela n'est indispensable pour servir les membres (chacun reçoit son pseudo en filet
+// à sa visite) : une panne ici est notée dans les logs, et l'API démarre quand même.
+try {
+  const handlesFreed = await purgeExpiredHandles(database.db, new Date())
+  if (handlesFreed > 0) console.log(`Expired handle reservations removed: ${handlesFreed}`)
+  const handlesGiven = await backfillHandles(database.db)
+  if (handlesGiven > 0) console.log(`Handles given to ${handlesGiven} existing members`)
+} catch (error) {
+  console.error(
+    'Handle upkeep failed at startup',
+    describeError(error, { method: 'STARTUP', path: 'handles' }),
+  )
+}
 
 // 4. L'authentification, puis l'application qui rassemble toutes les routes.
 const auth = createAuth({

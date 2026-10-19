@@ -1,8 +1,9 @@
 // Lire les pseudos (tranche 6a) : le pseudo actuel d'un membre, et l'ancien qui lui reste réservé.
-// Les écritures (donner, changer) sont dans claim.ts.
+// Les écritures (donner, changer) sont dans claim.ts ; seul formerHandleOf efface, en passant,
+// les réservations finies du membre.
 import { HANDLE_RESERVATION_DAYS } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, gt, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNotNull, isNull, lte, type SQL, sql } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 
 const h = schema.memberHandle
@@ -42,14 +43,20 @@ export const currentHandle = async (db: Database, userId: string): Promise<strin
  * L'ancien pseudo qui reste réservé à un membre, avec la date où il redevient libre ; null s'il
  * n'en a pas, ou si sa réservation est finie. Il n'y en a qu'un (claim.ts efface les précédents) ;
  * « order by … limit 1 » le garantit quand même. Index : member_handle_user_idx (user_id).
+ *
+ * Avant de lire, on efface ses anciens pseudos dont la réservation est finie (la seule écriture
+ * de ce fichier) : la durée promise est tenue dès que le membre regarde ses données, sans
+ * attendre le prochain démarrage (purgeExpiredHandles). Même index. Si le membre reprend ce
+ * pseudo au même instant (claimHandle remet released_at à null), PostgreSQL revérifie la
+ * condition sur la ligne à jour et ne l'efface pas.
  */
 export const formerHandleOf = async (db: Database, userId: string, now: Date) => {
+  const cutoff = reservationCutoff(now)
+  await db.delete(h).where(and(eq(h.userId, userId), lte(h.releasedAt, cutoff)))
   const [row] = await db
     .select({ handle: h.handle, releasedAt: h.releasedAt })
     .from(h)
-    .where(
-      and(eq(h.userId, userId), isNotNull(h.releasedAt), gt(h.releasedAt, reservationCutoff(now))),
-    )
+    .where(and(eq(h.userId, userId), isNotNull(h.releasedAt), gt(h.releasedAt, cutoff)))
     .orderBy(desc(h.releasedAt))
     .limit(1)
   if (!row?.releasedAt) return null
