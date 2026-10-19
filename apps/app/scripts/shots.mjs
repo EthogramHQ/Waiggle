@@ -537,8 +537,13 @@ for (const device of devices) {
           if (part > 1) {
             await page.evaluate(
               (top) => {
+                // Seulement une vraie zone de défilement (overflow auto ou scroll) : un bloc qui
+                // dépasse d'un pixel sans défiler était choisi à sa place, et la deuxième capture
+                // reprenait le haut de la page, à moitié peint.
                 const scrollers = [...document.querySelectorAll('div')].filter(
-                  (el) => el.scrollHeight > el.clientHeight,
+                  (el) =>
+                    el.scrollHeight > el.clientHeight &&
+                    ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
                 )
                 const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
                 if (main) main.scrollTop = top
