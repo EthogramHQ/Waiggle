@@ -129,6 +129,7 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
                     variant="plain"
                     label={deleteLabel ?? t('project.notes.delete')}
                     describedBy={bodyId}
+                    hint={note.body.length > 80 ? `${note.body.slice(0, 80)}…` : note.body}
                     onPress={() => onDelete(note.id)}
                   />
                 ) : null}

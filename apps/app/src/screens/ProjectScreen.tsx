@@ -433,6 +433,7 @@ function Journal({ project }: { project: Project }) {
   const [deleting, setDeleting] = useState<{ id: string; index: number } | null>(null)
   const [removing, setRemoving] = useState(false)
   // Une fois la note supprimée et la fenêtre refermée, le focus va sur la note qui a pris sa place.
+  const router = useRouter()
   const notesHandle = useRef<NoteListHandle>(null)
   const focusAfterClose = useRef<number | null>(null)
 
@@ -452,7 +453,9 @@ function Journal({ project }: { project: Project }) {
     setDraft(t('project.notes.statusPrefill', { status: t(`project.status.${status.data}`) }))
     setComposing(true)
     setPublished(false)
-  }, [hydrated, project.isMine, announced, t])
+    // On retire le paramètre de l'adresse : recharger la page ne rouvre pas le champ.
+    router.setParams?.({ annonce: undefined })
+  }, [hydrated, project.isMine, announced, t, router])
 
   const submit = async () => {
     if (sending.current) return

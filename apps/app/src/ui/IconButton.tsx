@@ -3,7 +3,7 @@
 // lui qui permet aux tests de retrouver le bouton.
 import { borders, layout, pressScale, radii } from '@ruche/brand'
 import type { Ref } from 'react'
-import { Pressable, type View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, type View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { Icon, type IconName, type IconTone } from './Icon'
@@ -24,6 +24,11 @@ type Props = {
    * boutons « Supprimer la note » se distinguent ainsi par la note qu'ils suppriment.
    */
   describedBy?: string
+  /**
+   * La même précision sur téléphone, où `aria-describedby` n'existe pas : un indice lu après le nom
+   * (« Supprimer la note », puis le début de la note).
+   */
+  hint?: string
   /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteList). */
   ref?: Ref<View>
 }
@@ -36,6 +41,7 @@ export function IconButton({
   size = 'regular',
   disabled = false,
   describedBy,
+  hint,
   ref,
 }: Props) {
   const { colors, shadows } = useTheme()
@@ -68,6 +74,8 @@ export function IconButton({
         accessibilityRole="button"
         accessibilityLabel={label}
         {...describedByProps(describedBy)}
+        // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle.
+        accessibilityHint={Platform.OS === 'web' ? undefined : hint}
         aria-disabled={disabled}
         disabled={disabled}
         onPress={onPress}
