@@ -538,7 +538,16 @@ const fakeApi = (signedIn) => {
       })
     }
     if (comments && method === 'POST') {
-      const { body } = JSON.parse(route.request().postData() ?? '{}')
+      const { body, replyTo } = JSON.parse(route.request().postData() ?? '{}')
+      // Comme la vraie API : on répond à une racine de ce projet, qu'on voit (pas un emplacement
+      // « Commentaire supprimé » ou « masqué »), sinon 404. Une réponse à une réponse aussi.
+      if (replyTo) {
+        const roots = (commentsOf[comments[1]] ?? []).flat()
+        const root = roots.find((c) => c.id === replyTo)
+        if (!root || root.state === 'deleted' || !root.author) {
+          return json(404, { error: { code: 'not_found', message: '' } })
+        }
+      }
       added[comments[1]] = (added[comments[1]] ?? 0) + 1
       return json(201, {
         ...comment(0, lea, body, 19, 9),

@@ -321,7 +321,8 @@ try {
   await lea.page.getByText('Réponse publiée.').waitFor()
   // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer.
   await lea.page.getByRole('button', { name: 'Masquer le commentaire' }).click()
-  await lea.page.getByText('Masqué par l’auteur du projet').waitFor()
+  // C'est elle qui l'a masqué : son bandeau le dit ainsi ; Sam lit « Masqué par l'auteur du projet ».
+  await lea.page.getByText('Masqué par toi').waitFor()
   // Un commentaire masqué ne compte plus : reste la réponse de Léa.
   expectEqual('commentaires comptés', (await readProject(lea, projectId)).commentCount, 1)
   await open(sam.page, `${appUrl}/projects/${projectId}`)
