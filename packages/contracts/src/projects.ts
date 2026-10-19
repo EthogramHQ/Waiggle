@@ -1,6 +1,7 @@
 // Formes des données d'un projet : ce qu'un membre peut publier ou modifier, et ce que l'API renvoie.
 // Les règles de texte (longueurs, caractères interdits) viennent de text.ts, comme pour le profil.
 import { z } from 'zod'
+import { FollowState } from './follows'
 import { TOOL_MAX_LENGTH } from './profile'
 import { FreeText, isCleanText, ShortLabel, uniqueIgnoringCase } from './text'
 
@@ -213,6 +214,8 @@ export const Project = z
     portraitCover: ProjectVisual.nullable(),
     /** Vrai si le membre qui regarde est l'auteur : l'appli affiche alors « Modifier ». */
     isMine: z.boolean(),
+    /** Si le visiteur suit ce projet, et combien de membres le suivent (jamais leurs noms). */
+    ...FollowState.shape,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

@@ -332,6 +332,7 @@ export const en: Translation = {
     unsupportedMediaType: 'This type of file is not accepted.',
     unavailable: '{{appName}} is very busy right now. Try again in a moment.',
     tooManyVisuals: 'Six photos at most per project. Remove one to add another.',
+    cannotFollowOwn: 'You can’t follow yourself or your own projects.',
     internal: 'Something went wrong. Try again in a moment.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },

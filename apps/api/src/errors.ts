@@ -15,6 +15,7 @@ const errorMessages = {
   unsupported_media_type: 'unsupportedMediaType',
   unavailable: 'unavailable',
   too_many_visuals: 'tooManyVisuals',
+  cannot_follow_own: 'cannotFollowOwn',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

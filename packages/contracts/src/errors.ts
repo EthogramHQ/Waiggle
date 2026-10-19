@@ -12,6 +12,7 @@ export const ErrorCode = z.enum([
   'unsupported_media_type',
   'unavailable',
   'too_many_visuals',
+  'cannot_follow_own',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

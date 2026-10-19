@@ -344,6 +344,7 @@ export const fr = {
     unsupportedMediaType: 'Ce type de fichier n’est pas accepté.',
     unavailable: '{{appName}} reçoit beaucoup de demandes en ce moment. Réessaie dans un instant.',
     tooManyVisuals: 'Six photos au plus par projet. Retires-en une pour en ajouter une autre.',
+    cannotFollowOwn: 'Tu ne peux pas te suivre toi-même, ni suivre tes propres projets.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },

@@ -142,6 +142,8 @@ describe('Project with its visuals', () => {
     timeSpent: null,
     prompts: [],
     isMine: true,
+    isFollowed: false,
+    followerCount: 0,
     createdAt: '2026-10-16T10:00:00.000Z',
     updatedAt: '2026-10-16T10:00:00.000Z',
   }
