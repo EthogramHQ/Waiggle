@@ -300,45 +300,47 @@ export function Comments({ project }: { project: Project }) {
   // --- Les cartes -------------------------------------------------------------------------------
 
   const actionsOf = (comment: CommentReply, rootId: string): CommentAction[] =>
-    actionIds(comment).map((id) => {
-      switch (id) {
-        case 'reply':
-          return {
-            label: t('project.comments.reply'),
-            icon: 'arrow-bend-up-left',
-            onPress: () => openReply(rootId, comment.id),
-          }
-        case 'edit':
-          return {
-            label: t('project.comments.edit'),
-            text: t('project.comments.editShort'),
-            icon: 'pencil-simple',
-            onPress: () => openEdit(comment),
-          }
-        case 'delete':
-          return {
-            label: t('project.comments.delete'),
-            text: t('project.comments.deleteShort'),
-            icon: 'trash',
-            tone: 'danger',
-            onPress: () => {
-              setShowDeleteError(false)
-              setDone(null)
-              setDeleting(comment.id)
-            },
-          }
-        default: {
-          // 'hide' : masquer, ou démasquer un commentaire déjà masqué.
-          const hidden = comment.state === 'hidden'
-          return {
-            label: hidden ? t('project.comments.unhide') : t('project.comments.hide'),
-            text: hidden ? t('project.comments.unhideShort') : t('project.comments.hideShort'),
-            icon: hidden ? 'eye' : 'eye-slash',
-            onPress: () => void setHidden(comment, !hidden, rootId),
-          }
+    actionIds(comment).map((id) => ({ id, ...actionOf(id, comment, rootId) }))
+
+  const actionOf = (id: ActionId, comment: CommentReply, rootId: string): CommentAction => {
+    switch (id) {
+      case 'reply':
+        return {
+          label: t('project.comments.reply'),
+          icon: 'arrow-bend-up-left',
+          onPress: () => openReply(rootId, comment.id),
+        }
+      case 'edit':
+        return {
+          label: t('project.comments.edit'),
+          text: t('project.comments.editShort'),
+          icon: 'pencil-simple',
+          onPress: () => openEdit(comment),
+        }
+      case 'delete':
+        return {
+          label: t('project.comments.delete'),
+          text: t('project.comments.deleteShort'),
+          icon: 'trash',
+          tone: 'danger',
+          onPress: () => {
+            setShowDeleteError(false)
+            setDone(null)
+            setDeleting(comment.id)
+          },
+        }
+      default: {
+        // 'hide' : masquer, ou démasquer un commentaire déjà masqué.
+        const hidden = comment.state === 'hidden'
+        return {
+          label: hidden ? t('project.comments.unhide') : t('project.comments.hide'),
+          text: hidden ? t('project.comments.unhideShort') : t('project.comments.hideShort'),
+          icon: hidden ? 'eye' : 'eye-slash',
+          onPress: () => void setHidden(comment, !hidden, rootId),
         }
       }
-    })
+    }
+  }
 
   const card = (comment: CommentReply, rootId: string, reply: boolean) => {
     const { author } = comment

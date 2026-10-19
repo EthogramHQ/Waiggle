@@ -30,6 +30,11 @@ import { useTheme } from './theme/ThemeProvider'
 
 /** Une action sur le commentaire. */
 export type CommentAction = {
+  /**
+   * Ce qui identifie l'action d'un dessin à l'autre (« hide » pour Masquer comme pour Démasquer) ;
+   * par défaut, sa place.
+   */
+  id?: string
   /** Le nom lu (« Modifier le commentaire ») ; il contient le texte affiché. */
   label: string
   /** Le texte affiché, plus court (« Modifier ») ; par défaut, le nom lu. */
@@ -233,10 +238,10 @@ export function CommentCard({
               >
                 {actions.map((action, index) => (
                   <ActionButton
-                    // La place de l'action : « Masquer » devient « Démasquer » au même endroit, et
-                    // garde le focus du clavier.
-                    // biome-ignore lint/suspicious/noArrayIndexKey: la place est l'identité voulue
-                    key={index}
+                    // L'identité de l'action : « Masquer » devient « Démasquer » sur le même bouton, qui
+                    // garde le focus du clavier, même si « Répondre » disparaît devant lui. Sans
+                    // identifiant, la place en tient lieu.
+                    key={action.id ?? index}
                     action={action}
                     describedById={bodyId}
                     hint={shorten(body, 80)}
