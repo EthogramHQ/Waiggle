@@ -13,7 +13,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/icons.mts",
-    "shots": "node scripts/shots.mjs"
+    "shots": "node scripts/shots.mjs",
+    "journey": "node scripts/journey-local.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.7",
