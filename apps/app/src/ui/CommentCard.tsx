@@ -109,6 +109,9 @@ export function CommentCard({
           paddingHorizontal: space.md,
           paddingVertical: space.sm,
           borderRadius: radii.small,
+          // Aussi large que son contenu : un emplacement reste discret.
+          alignSelf: 'flex-start',
+          maxWidth: '100%',
           backgroundColor: colors.surfaceGrouped,
         }}
       >
@@ -144,7 +147,8 @@ export function CommentCard({
   )
 
   return (
-    <View style={{ gap: space.xs }}>
+    // Sans écart : la ligne du nom fait déjà 44 points de haut (la zone à toucher du lien).
+    <View>
       {/* L'auteur, puis la date et « modifié ». Quand la place manque (texte agrandi, nom long),
           la date passe à la ligne au lieu d'être coupée. */}
       <View
