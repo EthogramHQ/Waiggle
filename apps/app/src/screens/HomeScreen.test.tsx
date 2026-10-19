@@ -294,11 +294,11 @@ describe('the news banner', () => {
     expect(screen.getByRole('button', { name: '1 nouveauté' })).toBeTruthy()
   })
 
-  it('says « more than 20 » when there are more new items than a page', async () => {
+  it('says « 20 or more » when a whole page of new items waits', async () => {
     mockNews({ count: 20, more: true })
     await renderMemberHome()
 
-    expect(screen.getByRole('button', { name: 'Plus de 20 nouveautés' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '20 nouveautés ou plus' })).toBeTruthy()
   })
 
   it('stays hidden when there is nothing new', async () => {

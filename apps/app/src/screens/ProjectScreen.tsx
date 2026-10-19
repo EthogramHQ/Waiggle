@@ -27,6 +27,7 @@ import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
 import { Dialog } from '../ui/Dialog'
 import { FollowButton } from '../ui/FollowButton'
+import { FollowerCount } from '../ui/FollowerCount'
 import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -202,9 +203,7 @@ function ProjectView({ project }: { project: Project }) {
       </Pressed>
       {/* Suivre : seulement le projet d'un autre ; l'auteur voit seulement le nombre d'abonnés. */}
       {project.isMine ? (
-        <Text variant="callout" tone="secondary">
-          {followers}
-        </Text>
+        <FollowerCount text={followers} />
       ) : (
         <FollowButton
           followed={project.isFollowed}

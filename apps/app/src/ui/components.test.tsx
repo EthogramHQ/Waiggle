@@ -9,6 +9,7 @@ import { Button } from './Button'
 import { Choices } from './Choices'
 import { FeedEnd } from './FeedEnd'
 import { FollowButton } from './FollowButton'
+import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
@@ -176,6 +177,29 @@ describe('NewItemsBanner', () => {
     await fireEvent.press(screen.getByRole('button', { name: '3 nouveautés' }))
 
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('NewItemsBanner, with nothing new', () => {
+  it('says what the feed shows, with nothing to press', async () => {
+    await renderWithProviders(
+      <NewItemsBanner
+        label={null}
+        onPress={jest.fn()}
+        caption="Les nouveaux projets des personnes que tu suis."
+      />,
+    )
+
+    expect(screen.getByText('Les nouveaux projets des personnes que tu suis.')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('FollowerCount', () => {
+  it('shows the number of followers, never their names', async () => {
+    await renderWithProviders(<FollowerCount text="12 abonnés" />)
+
+    expect(screen.getByText('12 abonnés')).toBeTruthy()
   })
 })
 

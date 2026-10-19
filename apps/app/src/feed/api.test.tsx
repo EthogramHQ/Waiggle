@@ -42,6 +42,17 @@ const headIs = (items: FeedItem[], nextCursor: string | null = null) =>
     data: { items, nextCursor, followsAnyone: true },
   })
 
+/**
+ * Le fil affiché, chargé il y a deux minutes : la vérification des nouveautés part de lui, et le
+ * relit puisqu'il a plus d'une minute.
+ */
+const shown = (kind: 'following' | 'discover', testers: boolean, items: FeedItem[]) =>
+  client.setQueryData(
+    ['feed', kind, testers],
+    { pages: [{ items, nextCursor: null, followsAnyone: true }], pageParams: [undefined] },
+    { updatedAt: Date.now() - 120_000 },
+  )
+
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
   jest.mocked(request).mockReset()
@@ -49,6 +60,7 @@ beforeEach(() => {
 
 describe('useFeedNews', () => {
   it('counts the items published above the first one shown', async () => {
+    shown('following', false, [item(1, '09')])
     headIs([item(3, '11'), item(2, '10'), item(1, '09')])
 
     const { result } = await renderHook(() => useFeedNews('following', item(1, '09')), {
@@ -59,6 +71,7 @@ describe('useFeedNews', () => {
   })
 
   it('finds nothing new when the first item shown is still at the top', async () => {
+    shown('following', false, [item(1, '09')])
     headIs([item(1, '09')])
 
     const { result } = await renderHook(() => useFeedNews('following', item(1, '09')), {
@@ -71,6 +84,7 @@ describe('useFeedNews', () => {
 
   it('does not take a vanished first item (gone private) for a pile of news', async () => {
     // Le premier élément affiché a disparu du haut du fil ; rien n'est plus récent que lui.
+    shown('following', false, [item(1, '09')])
     headIs([item(2, '08')])
 
     const { result } = await renderHook(() => useFeedNews('following', item(1, '09')), {
@@ -89,6 +103,7 @@ describe('useFeedNews', () => {
         id: `00000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`,
       },
     }))
+    shown('discover', false, [item(1, '09')])
     headIs(page, 'next')
 
     const { result } = await renderHook(() => useFeedNews('discover', item(1, '09')), {
@@ -98,7 +113,17 @@ describe('useFeedNews', () => {
     await waitFor(() => expect(result.current).toEqual({ count: 20, more: true }))
   })
 
+  it('waits for the feed shown before checking for news: no request twice at first', async () => {
+    headIs([item(1, '09')])
+
+    const { result } = await renderHook(() => useFeedNews('following', undefined), { wrapper })
+
+    expect(request).not.toHaveBeenCalled()
+    expect(result.current).toEqual({ count: null, more: false })
+  })
+
   it('reads the page of the chosen feed, with the testers filter', async () => {
+    shown('discover', true, [])
     headIs([])
 
     await renderHook(() => useFeedNews('discover', undefined, true), { wrapper })

@@ -21,7 +21,7 @@ const keyOf = (kind: FeedKind, testers: boolean) => ['feed', kind, testers] as c
 const NEWS_INTERVAL_MS = 60_000
 
 // L'adresse d'une page. Le curseur est un texte opaque rendu par l'API avec la page précédente ;
-// encodeURIComponent l'insère tel quel, sans qu'il puisse changer le reste de l'adresse.
+// URLSearchParams l'encode : il reste un paramètre, sans pouvoir changer le reste de l'adresse.
 const pathOf = (kind: FeedKind, testers: boolean, cursor?: string) => {
   const params = new URLSearchParams()
   if (cursor) params.set('cursor', cursor)
@@ -81,6 +81,8 @@ export const useFeedNews = (kind: FeedKind, first: FeedItem | undefined, testers
     // Au départ, la première page du fil affiché fait l'affaire : pas de requête en double.
     initialData: () => queryClient.getQueryData<InfiniteData<FeedPage>>(shown)?.pages[0],
     initialDataUpdatedAt: () => queryClient.getQueryState(shown)?.dataUpdatedAt,
+    // Seulement une fois le fil affiché chargé : la première vérification attend sa minute.
+    enabled: queryClient.getQueryState(shown)?.status === 'success',
     staleTime: NEWS_INTERVAL_MS,
     refetchInterval: NEWS_INTERVAL_MS,
     refetchOnWindowFocus: true,

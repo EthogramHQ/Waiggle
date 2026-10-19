@@ -15,6 +15,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Button } from '../ui/Button'
 import { FollowButton } from '../ui/FollowButton'
+import { FollowerCount } from '../ui/FollowerCount'
 import { MemberHeader } from '../ui/MemberHeader'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
@@ -71,9 +72,7 @@ function MemberView({ member }: { member: Member }) {
         action={
           member.isMe ? (
             <Stack gap="md" align="center">
-              <Text variant="callout" tone="secondary">
-                {followers}
-              </Text>
+              <FollowerCount text={followers} />
               <Button
                 label={t('account.editProfile')}
                 variant="secondary"

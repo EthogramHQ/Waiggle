@@ -27,6 +27,7 @@ import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
 import { FeedEnd } from '../ui/FeedEnd'
 import { FollowButton } from '../ui/FollowButton'
+import { FollowerCount } from '../ui/FollowerCount'
 import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
@@ -453,8 +454,20 @@ export function CatalogueScreen() {
           caption={l.followers}
           prominent={false}
         />
-        {/* Le bandeau des nouveautés, puis le bas du fil dans ses trois états. */}
-        <NewItemsBanner label={l.news} onPress={() => {}} />
+        <FollowButton
+          followed
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.following}
+          caption={l.followers}
+          error={l.followError}
+        />
+        {/* Le nombre d'abonnés seul, sur sa propre page. */}
+        <FollowerCount text={l.followers} />
+        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
+        <NewItemsBanner label={null} caption={l.feedCaption} onPress={() => {}} />
+        <NewItemsBanner label={l.news} caption={l.feedCaption} onPress={() => {}} />
+        {/* Le bas du fil dans ses trois états. */}
         <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />

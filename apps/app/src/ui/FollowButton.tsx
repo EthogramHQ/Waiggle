@@ -6,8 +6,8 @@
 import { space } from '@ruche/brand'
 import { View } from 'react-native'
 import { Button } from './Button'
+import { FollowerCount } from './FollowerCount'
 import { Notice } from './Notice'
-import { Text } from './Text'
 
 type Props = {
   followed: boolean
@@ -48,11 +48,7 @@ export function FollowButton({
           icon={followed ? 'check' : 'plus'}
           size="compact"
         />
-        {caption ? (
-          <Text variant="callout" tone="secondary">
-            {caption}
-          </Text>
-        ) : null}
+        {caption ? <FollowerCount text={caption} /> : null}
       </View>
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
       {error ? <Notice message={error} /> : null}

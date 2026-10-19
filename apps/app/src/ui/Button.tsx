@@ -12,6 +12,7 @@ import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
+import { spaceToggles } from './keyboard'
 import { Text, type Tone } from './Text'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -107,6 +108,8 @@ export function Button({
         aria-busy={loading}
         disabled={inactive}
         onPress={onPress}
+        // Un interrupteur s'active aussi avec la barre d'espace sur le web (voir keyboard.ts).
+        {...(checked === undefined ? null : spaceToggles(onPress, inactive))}
         onPressIn={() => {
           scale.value = spring(pressScale, 'firm')
         }}

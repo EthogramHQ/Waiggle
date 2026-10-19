@@ -110,6 +110,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
   const router = useRouter()
   // Le fil choisi : « Abonnements » d'abord, puis « Découvrir » d'un toucher.
   const [feed, setFeed] = useState<FeedKind>('following')
+  const compact = useLayout().sizeClass === 'compact'
   return (
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
     <Screen
@@ -148,6 +149,8 @@ function MemberHome({ id, name }: { id: string; name: string }) {
         ]}
         value={feed}
         onChange={setFeed}
+        // Sur téléphone, les deux choix se partagent la largeur ; plus large, ils gardent leur taille.
+        fill={compact}
       />
       {feed === 'following' ? (
         <FollowingFeed onDiscover={() => setFeed('discover')} />
@@ -174,11 +177,20 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
         kind="empty"
         title={t('feed.nobodyTitle')}
         message={t('feed.nobodyBody')}
-        actions={[{ label: t('feed.nobodyAction'), onPress: onDiscover }]}
+        // En blanc : « Publier un projet », plus haut, reste la seule action miel de l'écran.
+        actions={[{ label: t('feed.nobodyAction'), onPress: onDiscover, variant: 'secondary' }]}
       />
     )
   }
-  return <FeedList feed={feed} items={items} news={news} empty={t('feed.quiet')} />
+  return (
+    <FeedList
+      feed={feed}
+      items={items}
+      news={news}
+      empty={t('feed.quiet')}
+      caption={t('feed.followingCaption')}
+    />
+  )
 }
 
 /** Le fil « Découvrir » : tous les projets publics, ou seulement ceux qui cherchent des testeurs. */
@@ -211,6 +223,7 @@ function DiscoverFeed() {
           items={items}
           news={news}
           empty={testers ? t('feed.testersEmpty') : t('feed.discoverEmpty')}
+          caption={testers ? t('feed.testersCaption') : t('feed.discoverCaption')}
         />
       )}
     </Stack>
@@ -231,24 +244,28 @@ type FeedListProps = {
   news: { count: number | null; more: boolean }
   /** Le message d'un fil vide. */
   empty: string
+  /** La phrase en haut du fil, qui dit ce qu'il montre (remplacée par le bandeau des nouveautés). */
+  caption: string
 }
 
 /** Les cartes d'un fil, le bandeau des nouveautés au-dessus, et la fin du fil en dessous. */
-function FeedList({ feed, items, news, empty }: FeedListProps) {
+function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
   const { t } = useTranslation()
   return (
     <Stack gap="lg">
-      {news.count === null ? null : (
-        <NewItemsBanner
-          label={
-            news.more
+      {/* Toujours là, à la même hauteur : le bandeau y remplace la phrase, sans rien décaler. */}
+      <NewItemsBanner
+        label={
+          news.count === null
+            ? null
+            : news.more
               ? t('feed.newsMany', { max: FEED_PAGE_SIZE })
               : t('feed.news', { count: news.count })
-          }
-          // Relire le fil depuis le début : les nouveautés arrivent en haut, à la place du bandeau.
-          onPress={() => void feed.refetch()}
-        />
-      )}
+        }
+        // Relire le fil depuis le début : les nouveautés arrivent en haut, à la place du bandeau.
+        onPress={() => feed.refetch()}
+        caption={caption}
+      />
       <ProjectGrid empty={empty}>
         {items.map((item) => (
           <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
