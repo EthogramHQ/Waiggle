@@ -112,7 +112,12 @@ function MemberHome({ id, name }: { id: string; name: string }) {
   const [feed, setFeed] = useState<FeedKind>('following')
   return (
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
-    <Screen width="page" header={<TopNav />} title={t('home.greeting', { name })} pageTitle={null}>
+    <Screen
+      width="page"
+      header={<TopNav hideNewProject />}
+      title={t('home.greeting', { name })}
+      pageTitle={null}
+    >
       <Row gap="sm" wrap>
         <Button
           label={t('home.publish')}

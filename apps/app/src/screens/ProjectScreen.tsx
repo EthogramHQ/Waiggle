@@ -213,6 +213,7 @@ function ProjectView({ project }: { project: Project }) {
           text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
           caption={followers}
           error={follow.error ? t('follow.error') : undefined}
+          prominent={false}
         />
       )}
       {project.visibility === 'private' ? (

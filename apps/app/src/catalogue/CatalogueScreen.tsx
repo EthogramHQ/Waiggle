@@ -444,6 +444,15 @@ export function CatalogueScreen() {
           text={l.follow}
           error={l.followError}
         />
+        {/* Sur la page d'un projet, la démo est l'action principale : « Suivre » reste en blanc. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          prominent={false}
+        />
         {/* Le bandeau des nouveautés, puis le bas du fil dans ses trois états. */}
         <NewItemsBanner label={l.news} onPress={() => {}} />
         <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
