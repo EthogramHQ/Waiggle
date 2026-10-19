@@ -909,7 +909,8 @@ describe('NoteComposer', () => {
       />,
     )
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Note publiée.')
+    // Une confirmation se lit poliment (role « status »), comme « Note supprimée. » : pas une alerte.
+    expect(screen.getByRole('status')).toHaveTextContent('Note publiée.')
     expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
   })
 

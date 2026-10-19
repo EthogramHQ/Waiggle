@@ -99,7 +99,9 @@ export function NoteComposer({
         />
         {success ? (
           <View style={{ alignSelf: 'stretch' }}>
-            <Notice tone="success" message={success} />
+            {/* polite : une confirmation se lit sans interrompre (role « status »), comme « Note
+                supprimée. ». */}
+            <Notice tone="success" message={success} polite />
           </View>
         ) : null}
       </View>
