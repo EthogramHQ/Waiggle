@@ -54,6 +54,8 @@ export const memberCounterKeys = (userId: string) => ({
   visualUpload: `visual-upload:${userId}`,
   // Suivre et ne plus suivre, membres et projets ensemble (tranche 4).
   follow: `follow:${userId}`,
+  // Publier une note, tous ses projets ensemble (tranche 4b).
+  note: `note:${userId}`,
 })
 
 /**

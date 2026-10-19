@@ -10,6 +10,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
+import { notesOfAuthor } from '../notes/load'
 import { loadMe } from '../profile/me'
 import { loadProjectsOf } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -239,6 +240,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // Tous ses projets, privés compris (c'est lui qui regarde).
     const projects = await loadProjectsOf(db, user.id, user.id, publicApiUrl)
+    // Toutes les notes de ses projets, privés compris, et pas seulement les 20 du journal de chaque
+    // projet. Jamais celles des projets qu'il suit : elles appartiennent à leurs auteurs.
+    const notes = await notesOfAuthor(db, user.id)
 
     // Ce qu'il suit : l'identifiant et la date, rien de plus. Ses abonnés, eux, ne font pas partie
     // de ses données. Les deux requêtes partent de la clé primaire (follower_id, …).
@@ -267,6 +271,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         exportedAt: new Date().toISOString(),
         user: me,
         projects,
+        notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({

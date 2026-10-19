@@ -17,6 +17,7 @@ import {
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, or, type SQL } from 'drizzle-orm'
 import { projectFollowStates } from '../follows/load'
+import { recentNotesOf } from '../notes/load'
 import { mediaUrl } from '../profile/me'
 
 type MediaRow = typeof schema.projectMedia.$inferSelect
@@ -61,11 +62,11 @@ export const selectProjects = (db: Database) =>
 type ProjectRow = Awaited<ReturnType<ReturnType<typeof selectProjects>['execute']>>[number]
 
 /**
- * Un projet sans son état d'abonnement : tout ce qu'on sait d'une ligne de la base et de ses
- * médias. Les listes (cartes) s'en contentent ; la page d'un projet y ajoute ses abonnés.
- * Omit<A, B> : le type A, sans les champs nommés dans B.
+ * Un projet sans son état d'abonnement ni son journal : tout ce qu'on sait d'une ligne de la base
+ * et de ses médias. Les listes (cartes) s'en contentent ; la page d'un projet y ajoute ses abonnés
+ * et ses notes. Omit<A, B> : le type A, sans les champs nommés dans B.
  */
-type ProjectBase = Omit<Project, keyof FollowState>
+type ProjectBase = Omit<Project, keyof FollowState | 'notes'>
 
 /** La condition « visible par ce membre » : public, ou écrit par lui. */
 export const visibleTo = (viewerId: string) =>
@@ -113,7 +114,8 @@ const toProjectBase = (
 
 /**
  * Des lignes de la base, transformées en projets tels que l'API les renvoie (contrat `Project`),
- * avec leur état d'abonnement : une seule requête de plus pour tous, quel que soit leur nombre.
+ * avec leur état d'abonnement et leur journal : deux requêtes de plus pour tous (une pour les
+ * abonnés, une pour les notes), quel que soit leur nombre. Promise.all les lance en même temps.
  */
 const toProjects = async (
   db: Database,
@@ -122,14 +124,21 @@ const toProjects = async (
   viewerId: string,
   publicApiUrl: string,
 ): Promise<Project[]> => {
-  const follows = await projectFollowStates(
-    db,
-    rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
-    viewerId,
-  )
+  const [follows, journals] = await Promise.all([
+    projectFollowStates(
+      db,
+      rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
+      viewerId,
+    ),
+    recentNotesOf(
+      db,
+      rows.map(({ project }) => project.id),
+    ),
+  ])
   return rows.map((row) => ({
     ...toProjectBase(row, media, viewerId, publicApiUrl),
     ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
+    notes: journals.get(row.project.id) ?? [],
   }))
 }
 

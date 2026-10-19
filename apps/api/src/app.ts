@@ -22,6 +22,7 @@ import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
+import { noteRoutes } from './routes/notes'
 import { projectRoutes } from './routes/projects'
 import { tagRoutes } from './routes/tags'
 import { visualRoutes } from './routes/visuals'
@@ -150,6 +151,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', memberRoutes({ db, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
   app.route('/', followRoutes({ db, limiter }))
+  app.route('/', noteRoutes({ db, limiter }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 
