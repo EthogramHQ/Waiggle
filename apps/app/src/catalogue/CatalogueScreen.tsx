@@ -13,6 +13,7 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
+import { REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -22,6 +23,9 @@ import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
+import { CommentCard } from '../ui/CommentCard'
+import { CommentList } from '../ui/CommentList'
+import { CommentThread } from '../ui/CommentThread'
 import { Constellation } from '../ui/Constellation'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
@@ -46,6 +50,7 @@ import { Notice } from '../ui/Notice'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ProjectGrid } from '../ui/ProjectGrid'
+import { ReactionBar } from '../ui/ReactionBar'
 import { Screen } from '../ui/Screen'
 import { Segmented } from '../ui/Segmented'
 import { SheetHeader } from '../ui/SheetHeader'
@@ -561,6 +566,192 @@ export function CatalogueScreen() {
         <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
       </Section>
 
+      <Section title={l.commentsSection}>
+        {/* Les réactions sur le projet d'un autre : aucune posée, deux posées, puis un refus de
+            l'API. Pour l'auteur : les nombres seuls, sans bouton. */}
+        <ReactionSample l={l} mine={[]} />
+        <ReactionSample l={l} mine={['useful', 'bravo']} />
+        <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
+        <ReactionSample l={l} mine={[]} readOnly />
+        {/* Les cartes d'un commentaire : vu par un autre membre (Répondre), le sien, modifié
+            (Répondre, Modifier, Supprimer), masqué vu par l'auteur du projet (Démasquer), un texte
+            long avec une adresse et un refus de l'API, en cours de modification, et les deux
+            emplacements sans auteur. */}
+        <Surface variant="grouped" padding="xl" gap="xl">
+          <CommentCard
+            author={{ name: 'Max Durand', avatar: null }}
+            authorLabel={l.maxPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentBody}
+            actions={[{ label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} }]}
+          />
+          <CommentCard
+            author={{ name: 'Inès Haddad', avatar: null }}
+            authorLabel={l.inesPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            edited={l.commentEdited}
+            body={l.commentReply}
+            actions={mineActions(l)}
+          />
+          <CommentCard
+            author={{ name: 'Max Durand', avatar: null }}
+            authorLabel={l.maxPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentBody}
+            hidden={l.hiddenBanner}
+            actions={[
+              { label: l.unhideComment, text: l.unhideShort, icon: 'eye', onPress: () => {} },
+            ]}
+          />
+          <CommentCard
+            author={{ name: 'Max Durand', avatar: null }}
+            authorLabel={l.maxPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentLong}
+            actions={[
+              { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
+              { label: l.hideComment, text: l.hideShort, icon: 'eye-slash', onPress: () => {} },
+            ]}
+            error={l.hideError}
+          />
+          <CommentCard
+            author={{ name: 'Inès Haddad', avatar: null }}
+            authorLabel={l.inesPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.commentReply}
+            editor={
+              <ComposerSample
+                field={l.commentField}
+                hint={l.commentHint}
+                submit={l.saveComment}
+                value={l.commentReply}
+                l={l}
+              />
+            }
+          />
+          <CommentCard author={null} when={l.commentWhen} body="" placeholder={l.deletedComment} />
+          <CommentCard author={null} when={l.commentWhen} body="" placeholder={l.hiddenComment} />
+        </Surface>
+        {/* La liste : un fil avec ses réponses et le champ d'une réponse ouvert, un fil sans
+            réponse, puis « Afficher la suite ». Ensuite : la suite qui arrive, la suite en échec,
+            « C'est tout », et la liste vide. */}
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <CommentList
+            state="more"
+            onMore={() => {}}
+            moreLabel={l.showMore}
+            endLabel={l.commentsEnd}
+            empty={l.commentsEmpty}
+          >
+            <CommentThread
+              root={
+                <CommentCard
+                  author={{ name: 'Max Durand', avatar: null }}
+                  authorLabel={l.maxPage}
+                  onAuthorPress={() => {}}
+                  when={l.commentWhen}
+                  body={l.commentBody}
+                  actions={[
+                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
+                  ]}
+                />
+              }
+              replies={[
+                <CommentCard
+                  key="ines"
+                  reply
+                  author={{ name: 'Inès Haddad', avatar: null }}
+                  authorLabel={l.inesPage}
+                  onAuthorPress={() => {}}
+                  when={l.commentWhen}
+                  body={l.commentReply}
+                  actions={[
+                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
+                  ]}
+                />,
+                <CommentCard
+                  key="lea"
+                  reply
+                  author={{ name: 'Léa Moreau', avatar: null }}
+                  authorLabel={l.leaPage}
+                  onAuthorPress={() => {}}
+                  when={l.commentWhen}
+                  body={l.commentReplyLea}
+                  actions={mineActions(l)}
+                />,
+              ]}
+              footer={
+                <ComposerSample
+                  field={l.replyField}
+                  hint={l.replyHint}
+                  submit={l.submitReply}
+                  value=""
+                  l={l}
+                />
+              }
+            />
+            <CommentThread
+              root={
+                <CommentCard
+                  author={null}
+                  when={l.commentWhen}
+                  body=""
+                  placeholder={l.deletedComment}
+                />
+              }
+              replies={
+                <CommentCard
+                  reply
+                  author={{ name: 'Léa Moreau', avatar: null }}
+                  authorLabel={l.leaPage}
+                  onAuthorPress={() => {}}
+                  when={l.commentWhen}
+                  body={l.commentReplyLea}
+                  actions={[
+                    { label: l.replyAction, icon: 'arrow-bend-up-left', onPress: () => {} },
+                  ]}
+                />
+              }
+            />
+          </CommentList>
+        </Surface>
+        {(['loading', 'error', 'end'] as const).map((state) => (
+          <Surface key={state} variant="grouped" padding="xl" gap="lg">
+            <CommentList
+              state={state}
+              onMore={() => {}}
+              moreLabel={l.showMore}
+              endLabel={l.commentsEnd}
+              empty={l.commentsEmpty}
+              errorLabel={l.commentsMoreError}
+              retryLabel={l.retry}
+            >
+              <CommentCard
+                author={{ name: 'Max Durand', avatar: null }}
+                authorLabel={l.maxPage}
+                onAuthorPress={() => {}}
+                when={l.commentWhen}
+                body={l.commentBody}
+              />
+            </CommentList>
+          </Surface>
+        ))}
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <CommentList
+            state="end"
+            onMore={() => {}}
+            moreLabel={l.showMore}
+            endLabel={l.commentsEnd}
+            empty={l.commentsEmpty}
+          />
+        </Surface>
+      </Section>
+
       <Section title={l.illustrations}>
         <Stack direction="row" gap="lg" wrap align="center">
           <Emblem icon="envelope-simple" />
@@ -788,6 +979,85 @@ function NoteComposerSample({
         autoFocus={false}
       />
     </Surface>
+  )
+}
+
+/** La barre des réactions, avec des nombres d'exemple et les réactions posées données. */
+function ReactionSample({
+  l,
+  mine,
+  readOnly = false,
+  error,
+}: {
+  l: Labels
+  mine: ReactionKind[]
+  readOnly?: boolean
+  error?: string
+}) {
+  const counts: Record<ReactionKind, number> = {
+    amazing: 2,
+    inspiring: 0,
+    useful: 5,
+    funny: 1,
+    bravo: 12,
+  }
+  const items = REACTION_KINDS.map((kind) => {
+    const text = l.reactionNames[kind]
+    const isMine = mine.includes(kind)
+    return {
+      kind,
+      text,
+      count: counts[kind],
+      mine: isMine,
+      label: isMine ? `${text}, ${l.reacted}, ${counts[kind]}` : `${text}, ${counts[kind]}`,
+    }
+  })
+  return readOnly ? (
+    <ReactionBar items={items} readOnly caption={l.ownReactions} />
+  ) : (
+    <ReactionBar items={items} onToggle={() => {}} {...(error ? { error } : null)} />
+  )
+}
+
+/** Les actions de son propre commentaire : Répondre, Modifier, Supprimer. */
+const mineActions = (l: Labels) => [
+  { label: l.replyAction, icon: 'arrow-bend-up-left' as const, onPress: () => {} },
+  { label: l.editComment, text: l.editShort, icon: 'pencil-simple' as const, onPress: () => {} },
+  {
+    label: l.deleteComment,
+    text: l.deleteShort,
+    icon: 'trash' as const,
+    tone: 'danger' as const,
+    onPress: () => {},
+  },
+]
+
+/** Le champ d'une réponse ou d'une modification, ouvert, comme sous un commentaire. */
+function ComposerSample({
+  l,
+  field,
+  hint,
+  submit,
+  value,
+}: {
+  l: Labels
+  field: string
+  hint: string
+  submit: string
+  value: string
+}) {
+  return (
+    <NoteComposer
+      open
+      onOpen={() => {}}
+      onCancel={() => {}}
+      value={value}
+      onChangeText={() => {}}
+      onSubmit={() => {}}
+      max={1000}
+      labels={{ open: submit, field, hint, submit, cancel: l.cancel }}
+      autoFocus={false}
+    />
   )
 }
 

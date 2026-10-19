@@ -76,6 +76,13 @@ export function DeleteAccountScreen() {
           detail={t('account.delete.projectsDetail')}
         />
         <ListRow icon="users" label={t('account.delete.followsItem')} />
+        {/* Tranche 5 : ses réactions et ses commentaires partent aussi ; un commentaire qui a des
+            réponses devient « Commentaire supprimé », pour que les réponses des autres restent. */}
+        <ListRow
+          icon="chat-circle"
+          label={t('account.delete.reactionsItem')}
+          detail={t('account.delete.reactionsDetail')}
+        />
       </ListGroup>
 
       {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}

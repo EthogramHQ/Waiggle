@@ -9,6 +9,7 @@ import { Button } from './Button'
 import { Choices } from './Choices'
 import { CommentCard } from './CommentCard'
 import { CommentList } from './CommentList'
+import { CommentThread } from './CommentThread'
 import { FeedEnd } from './FeedEnd'
 import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
@@ -1161,5 +1162,44 @@ describe('CommentList', () => {
     )
     await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
     expect(onMore).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('CommentThread', () => {
+  it('shows the comment first, then its replies in the order given, then what comes after', async () => {
+    await renderWithProviders(
+      <CommentThread
+        root={<Text>Le commentaire</Text>}
+        replies={[<Text key="a">Première réponse</Text>, <Text key="b">Seconde réponse</Text>]}
+        footer={<Text>Le champ de réponse</Text>}
+      />,
+    )
+
+    const shown = screen.getAllByText(
+      /^(Le commentaire|Première réponse|Seconde réponse|Le champ de réponse)$/,
+    )
+    expect(shown.map((node) => node.props.children)).toEqual([
+      'Le commentaire',
+      'Première réponse',
+      'Seconde réponse',
+      'Le champ de réponse',
+    ])
+  })
+})
+
+describe('ReactionBar, the member’s own reactions', () => {
+  it('marks her own reaction as selected, and only that one', async () => {
+    await renderWithProviders(
+      <ReactionBar
+        items={[
+          { kind: 'useful', text: 'Utile', count: 0, mine: false, label: 'Utile, 0' },
+          { kind: 'bravo', text: 'Bravo', count: 4, mine: true, label: 'Bravo, réagi, 4' },
+        ]}
+        onToggle={jest.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Bravo, réagi, 4' })).toBeSelected()
+    expect(screen.getByRole('button', { name: 'Utile, 0' })).not.toBeSelected()
   })
 })

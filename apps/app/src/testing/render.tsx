@@ -2,7 +2,7 @@
 // (traductions, cache des données de l'API), comme dans la vraie appli.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react-native'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import { Dimensions } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -33,15 +33,18 @@ export const renderWithProviders = async (
     // gcTime: Infinity : pas de minuterie de nettoyage du cache, qui empêcherait Jest de s'arrêter.
     defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } },
   })
-  const result = await render(
+  // wrapper : tout ce qui entoure l'écran. Passé ainsi (et non écrit autour de `ui`), il reste en
+  // place quand un test redessine l'écran avec d'autres données (rerender).
+  const wrapper = ({ children }: { children: ReactNode }) => (
     <SafeAreaProvider initialMetrics={phone}>
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
-          <ThemeProvider {...(appearance ? { appearance } : null)}>{ui}</ThemeProvider>
+          <ThemeProvider {...(appearance ? { appearance } : null)}>{children}</ThemeProvider>
         </I18nextProvider>
       </QueryClientProvider>
-    </SafeAreaProvider>,
+    </SafeAreaProvider>
   )
+  const result = await render(ui, { wrapper })
   return { ...result, i18n, queryClient }
 }
 
