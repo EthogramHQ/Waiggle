@@ -158,7 +158,9 @@ describe('ProfileScreen', () => {
 
     // Le « @ » et les majuscules sont retirés avant l'envoi, comme le fera l'API.
     expect(jest.mocked(updateProfile).mock.calls[1]?.[0]).toMatchObject({ handle: 'lea_m' })
-    expect(await screen.findByText('Profil enregistré. @lea te reste réservé 30 jours.')).toBeTruthy()
+    expect(
+      await screen.findByText('Profil enregistré. @lea te reste réservé 30 jours.'),
+    ).toBeTruthy()
     expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea_m')
   })
 
