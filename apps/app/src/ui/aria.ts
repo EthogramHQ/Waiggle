@@ -11,3 +11,11 @@ import { Platform } from 'react-native'
  */
 export const describedBy = (id: string | undefined): object =>
   Platform.OS === 'web' && id ? { 'aria-describedby': id } : {}
+
+/**
+ * À étaler sur un bouton qui reste enfoncé une fois touché (une réaction posée) : `aria-pressed`
+ * sur le web, que react-native-web transmet au navigateur (le lecteur d'écran dit « activé ») ;
+ * sur téléphone, l'état « sélectionné », que React Native sait annoncer.
+ */
+export const pressed = (value: boolean): object =>
+  Platform.OS === 'web' ? { 'aria-pressed': value } : { accessibilityState: { selected: value } }

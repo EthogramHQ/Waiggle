@@ -1,11 +1,14 @@
 // Projets d'exemple pour les tests de l'appli.
-import {
-  type Member,
-  NO_REACTIONS,
-  type Project,
-  type ProjectSummary,
-  type ProjectVisual,
-} from '@ruche/contracts'
+// Seulement des types : scripts/shots.mjs lit ce fichier avec Node, qui ne sait pas charger les
+// sources de @ruche/contracts (leurs imports n'ont pas d'extension). Une valeur importée d'ici
+// (NO_REACTIONS) casserait les captures ; on écrit donc « aucune réaction » en toutes lettres.
+import type { Member, Project, ProjectSummary, ProjectVisual } from '@ruche/contracts'
+
+/** Aucune réaction (comme NO_REACTIONS du contrat). */
+const noReactions: Project['reactions'] = {
+  counts: { amazing: 0, inspiring: 0, useful: 0, funny: 0, bravo: 0 },
+  mine: [],
+}
 
 export const recipesProject: Project = {
   id: '6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
@@ -28,7 +31,7 @@ export const recipesProject: Project = {
   isFollowed: false,
   followerCount: 0,
   notes: [],
-  reactions: NO_REACTIONS,
+  reactions: noReactions,
   commentCount: 0,
   createdAt: '2026-10-12T08:00:00.000Z',
   updatedAt: '2026-10-12T08:00:00.000Z',
