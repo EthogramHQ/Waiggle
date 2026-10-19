@@ -1,5 +1,6 @@
 // Le parcours réel d'un membre, joué dans un vrai navigateur à la place de Louis : deux personnes
-// s'inscrivent, l'une publie un projet avec des photos, l'autre le regarde ; puis le projet devient
+// s'inscrivent, l'une suit l'autre et publie un projet avec des photos, l'autre le voit arriver dans
+// son fil et le regarde ; puis le projet devient
 // privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
@@ -198,6 +199,17 @@ try {
   const avatarUrl = me.avatarUrl ?? fail('pas d’adresse d’avatar')
   await expectMedia('après l’avatar', { avatars: 1, visuals: 0 })
 
+  step('Sam ne suit personne : son fil le dit ; il suit Léa depuis sa page')
+  await open(sam.page, `${appUrl}/`)
+  await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()
+  await open(sam.page, `${appUrl}/members/${me.id}`)
+  const follow = sam.page.getByRole('switch', { name: 'Suivre Lea' })
+  await follow.click()
+  await waitFor('Léa suivie', async () => (await follow.getAttribute('aria-checked')) === 'true')
+  const leaForSam = await (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
+  expectEqual('Léa suivie par Sam', leaForSam.isFollowed, true)
+  expectEqual('abonnés de Léa', leaForSam.followerCount, 1)
+
   step('Léa publie un projet avec trois photos et une couverture verticale')
   await open(lea.page, `${appUrl}/projects/new`)
   await lea.page.getByLabel('Titre').fill('Mon agent de recettes')
@@ -254,6 +266,12 @@ try {
   await expectMedia('après le retrait', { avatars: 1, visuals: 3 })
   const photoUrl = project.visuals[0].url
 
+  step('Le projet de Léa arrive dans le fil de Sam')
+  await open(sam.page, `${appUrl}/`)
+  await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  await sam.page.getByText('Tu es à jour').waitFor()
+  console.log('  ok : le projet est dans le fil « Abonnements » de Sam')
+
   step('Sam voit le projet et ses photos ; une personne sans compte ne voit rien')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Mon agent de recettes').first().waitFor()
@@ -279,6 +297,9 @@ try {
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Ce projet est introuvable').waitFor()
   console.log('  ok : la page du projet est introuvable pour Sam')
+  await open(sam.page, `${appUrl}/`)
+  await sam.page.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.').waitFor()
+  console.log('  ok : le projet a quitté le fil de Sam')
 
   step('La page de Léa : Sam n’y voit plus le projet, Léa le voit, marqué « Privé »')
   await open(sam.page, `${appUrl}/members/${me.id}`)
