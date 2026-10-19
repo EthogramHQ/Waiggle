@@ -59,6 +59,17 @@ const features = [
     routes: /^(\w+ \/v1\/projects\/\{id\}\/visuals|GET \/media)/,
     tables: /^project_media$/,
   },
+  // Avant « membres » : la première fonctionnalité qui correspond l'emporte, et les routes de suivi
+  // (/v1/members/{id}/follow) appartiennent à celle-ci.
+  {
+    id: 'suivre',
+    name: 'Suivre et le fil',
+    tranche: 'Tranche 4a',
+    lessons: ['11 Suivre et le fil'],
+    pages: null,
+    routes: /^\w+ \/v1\/(feed\/|(members|projects)\/\{id\}\/follow$)/,
+    tables: /^(member|project)_follow$/,
+  },
   {
     id: 'membres',
     name: 'Membres et étiquettes',
@@ -81,7 +92,7 @@ const features = [
     id: 'design',
     name: 'Design Miel',
     tranche: 'Design Miel',
-    lessons: ['04 Le design Miel'],
+    lessons: ['04 Le design Miel', '10 Le soin des détails'],
     pages: /^\/catalogue$/,
     routes: null,
     tables: null,

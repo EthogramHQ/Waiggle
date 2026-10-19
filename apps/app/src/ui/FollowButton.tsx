@@ -1,8 +1,9 @@
 // Le bouton « Suivre » d'une page de membre ou de projet, avec le nombre d'abonnés à côté.
 // C'est un interrupteur : le lecteur d'écran annonce « Suivre Léa, interrupteur, désactivé », puis
-// « activé » une fois qu'on la suit. Le nom lu reste le même ; seul le texte affiché change
-// (« Suivre » en miel, puis « Suivi » en blanc avec une coche : l'action est faite, plus discrète ;
-// toujours en blanc quand la page a déjà son action principale, voir `prominent`).
+// « activé » une fois qu'on la suit. Le texte affiché change (« Suivre » en miel, puis « Suivi » en
+// blanc avec une coche : l'action est faite, plus discrète ; toujours en blanc quand la page a déjà
+// son action principale, voir `prominent`), et le nom lu le reprend toujours (« Suivi : Léa ») :
+// c'est l'écran qui le donne, selon l'état.
 import { space } from '@ruche/brand'
 import { View } from 'react-native'
 import { Button } from './Button'

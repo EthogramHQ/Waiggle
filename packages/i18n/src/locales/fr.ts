@@ -27,9 +27,6 @@ export const fr = {
   home: {
     title: 'Bienvenue sur {{appName}}',
     tagline: 'Montre à tes proches ce que tu construis avec l’IA.',
-    comingSoon: 'Le fil arrive bientôt.',
-    comingSoonBody:
-      'Tu y verras les projets de tes proches. En attendant, publie le tien : il sera prêt pour eux.',
     greeting: 'Bonjour {{name}} !',
     signUp: 'Créer un compte',
     signIn: 'Me connecter',

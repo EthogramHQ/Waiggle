@@ -21,9 +21,6 @@ export const en: Translation = {
   home: {
     title: 'Welcome to {{appName}}',
     tagline: 'Show the people close to you what you build with AI.',
-    comingSoon: 'The feed is coming soon.',
-    comingSoonBody:
-      'It will show the projects of the people close to you. Meanwhile, publish yours: it will be ready for them.',
     greeting: 'Hi {{name}}!',
     signUp: 'Create an account',
     signIn: 'Sign in',
