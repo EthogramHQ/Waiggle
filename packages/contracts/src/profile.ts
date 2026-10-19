@@ -1,6 +1,7 @@
 // Formes des données du profil : ce qu'un membre peut modifier, et les règles des avatars.
 import { z } from 'zod'
 import { LanguageSchema } from './accounts'
+import { Handle } from './handles'
 import { DisplayName, FreeText, ShortLabel, uniqueIgnoringCase } from './text'
 
 export const BIO_MAX_LENGTH = 280
@@ -20,6 +21,9 @@ export const ProfileUpdate = z
   .strictObject({
     // Les règles de texte (longueur, caractères interdits) sont dans text.ts.
     name: DisplayName.optional(),
+    // Le pseudo, nettoyé (« @Ines » → « ines ») puis vérifié (voir handles.ts). Pris par un autre
+    // ou réservé : l'API répond 409 handle_taken, et rien du profil n'est enregistré.
+    handle: Handle.optional(),
     bio: FreeText(BIO_MAX_LENGTH).optional(),
     favoriteTools: z
       .array(ShortLabel(TOOL_MAX_LENGTH))

@@ -1,13 +1,16 @@
-// Page « Mon profil » : photo, nom, bio et outils favoris du membre connecté.
+// Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX_LENGTH,
   FAVORITE_TOOLS_MAX,
+  HANDLE_MAX_LENGTH,
+  HANDLE_MIN_LENGTH,
+  HANDLE_RESERVATION_DAYS,
   type Me,
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import type { ApiErrorKey } from '../api/errors'
@@ -15,7 +18,12 @@ import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
-import { type ProfileFormErrors, parseTools, toProfileUpdate } from '../profile/form'
+import {
+  type ProfileForm as FormValues,
+  type ProfileFormErrors,
+  parseTools,
+  toProfileUpdate,
+} from '../profile/form'
 import { useMe, useSetMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -57,32 +65,97 @@ function ProfileForm({ me }: { me: Me }) {
 
   // Un useState par champ : la valeur affichée, et la fonction pour la changer.
   const [name, setName] = useState(me.name)
+  const [handle, setHandle] = useState(me.handle)
   const [bio, setBio] = useState(me.bio)
   const [tools, setTools] = useState(me.favoriteTools.join(', '))
   const [errors, setErrors] = useState<ProfileFormErrors>({})
   const [message, setMessage] = useState<Message>(null)
   const [busy, setBusy] = useState<'save' | 'avatar' | null>(null)
 
+  // Ce que le membre a tapé en dernier, lu au retour de l'API. useRef garde une valeur sans
+  // redessiner l'écran : après l'attente, onSave lit ici le texte d'à présent, alors que name,
+  // handle… lui donneraient celui du moment de l'envoi.
+  const typed = useRef<FormValues>({ name, handle, bio, tools })
+  // Un envoi à la fois : Entrée tapée deux fois, ou Entrée puis « Enregistrer », n'envoie qu'une
+  // fois (l'état busy, lui, n'est à jour qu'au dessin suivant).
+  const saving = useRef(false)
+
+  /**
+   * Ce qui se passe à chaque lettre tapée dans un champ : la valeur change, et l'erreur de ce champ
+   * s'efface (le membre est en train de corriger ; on revérifie au prochain envoi).
+   */
+  const edit =
+    <K extends keyof ProfileFormErrors & keyof FormValues>(
+      field: K,
+      setValue: (value: string) => void,
+    ) =>
+    (value: string) => {
+      typed.current = { ...typed.current, [field]: value }
+      setValue(value)
+      setErrors((previous) => {
+        if (!previous[field]) return previous
+        const { [field]: _cleared, ...others } = previous
+        return others
+      })
+    }
+
   const onSave = async () => {
+    if (saving.current) return
     setMessage(null)
+    // Le formulaire tel qu'envoyé, pour savoir au retour ce qui a changé entre-temps.
+    const sent = typed.current
     // On vérifie avant d'envoyer : le membre voit tout de suite ce qui ne va pas.
-    const checked = toProfileUpdate({ name, bio, tools })
+    // me.handle : le pseudo enregistré. Retapé tel quel, il n'est pas envoyé (ce n'est pas un
+    // changement, et il ne compte pas dans la limite de changements par jour).
+    const former = me.handle
+    const checked = toProfileUpdate(sent, former)
     if (!checked.ok) {
       setErrors(checked.errors)
       return
     }
     setErrors({})
+    saving.current = true
     setBusy('save')
-    const result = await updateProfile(checked.changes)
-    setBusy(null)
+    const result = await updateProfile(checked.changes).finally(() => {
+      saving.current = false
+      setBusy(null)
+    })
+    // Pendant l'attente, le membre a pu continuer à taper (une réponse lente, sur un train) : on
+    // ne touche pas à un champ qui a changé depuis l'envoi.
+    const handleKept = typed.current.handle === sent.handle
     if (!result.ok) {
+      // Un pseudo déjà pris, ou changé trop souvent aujourd'hui, se corrige dans son champ : le
+      // message va dessous (le champ l'annonce), et ce qui a été tapé reste, pour n'avoir qu'à
+      // le retoucher (« ines » → « ines_m »). Si le pseudo a déjà été retouché, le message parle
+      // d'un texte qui n'est plus là : il va dans le message général.
+      if ((result.error === 'handleTaken' || result.error === 'handleChangeLimit') && handleKept) {
+        setErrors({ handle: result.error })
+        return
+      }
       setMessage({ text: t(`errors.${result.error}`), ok: false })
       return
     }
     setMe(result.data) // le cache partagé reçoit le profil à jour
-    setTools(result.data.favoriteTools.join(', ')) // affiche la liste nettoyée (sans doublons)
+    // Les champs non retouchés prennent leur forme enregistrée : le pseudo nettoyé (« @Lea_M »
+    // devient « lea_m »), la liste des outils sans doublons.
+    if (handleKept) {
+      typed.current = { ...typed.current, handle: result.data.handle }
+      setHandle(result.data.handle)
+    }
+    if (typed.current.tools === sent.tools) {
+      const cleaned = result.data.favoriteTools.join(', ')
+      typed.current = { ...typed.current, tools: cleaned }
+      setTools(cleaned)
+    }
     void refetchSession() // la session porte aussi le nom (affiché sur l'accueil) : on la relit
-    setMessage({ text: t('profile.saved'), ok: true })
+    // Un nouveau pseudo : l'ancien reste réservé au membre quelque temps, on le lui dit.
+    setMessage({
+      text:
+        result.data.handle === former
+          ? t('profile.saved')
+          : t('profile.savedHandle', { former, days: HANDLE_RESERVATION_DAYS }),
+      ok: true,
+    })
   }
 
   const onChangeAvatar = async () => {
@@ -124,6 +197,15 @@ function ProfileForm({ me }: { me: Me }) {
     invalidCharacters: invalid,
   }
   const nameError = errors.name && nameMessages[errors.name]
+  const handleMessages = {
+    handleTooShort: t('profile.errors.handleTooShort', { min: HANDLE_MIN_LENGTH }),
+    handleTooLong: t('profile.errors.handleTooLong', { max: HANDLE_MAX_LENGTH }),
+    handleInvalid: t('profile.errors.handleInvalid'),
+    handleReserved: t('profile.errors.handleReserved'),
+    handleTaken: t('errors.handleTaken'),
+    handleChangeLimit: t('errors.handleChangeLimit'),
+  }
+  const handleError = errors.handle && handleMessages[errors.handle]
   const bioError =
     errors.bio === 'invalidCharacters'
       ? invalid
@@ -138,6 +220,8 @@ function ProfileForm({ me }: { me: Me }) {
 
   const back = useGoBack('/account')
   const save = { label: t('profile.save'), onPress: () => void onSave(), loading: busy === 'save' }
+  // Entrée dans un champ d'une ligne enregistre, comme dans un formulaire web.
+  const submitOnEnter = { onSubmitEditing: save.onPress, returnKeyType: 'done' } as const
 
   const notice = message ? (
     <Notice tone={message.ok ? 'success' : 'error'} message={message.text} />
@@ -190,18 +274,37 @@ function ProfileForm({ me }: { me: Me }) {
 
       <FieldGroup>
         <TextField
-          label={t('auth.fields.name')}
+          label={t('profile.fields.name')}
           value={name}
-          onChangeText={setName}
+          onChangeText={edit('name', setName)}
           autoCapitalize="words"
           maxLength={NAME_MAX_LENGTH}
           showCount
           error={nameError}
+          {...submitOnEnter}
+        />
+        {/* Le « @ » est affiché devant, pas dans la valeur : on tape « ines », on lit « @ines ».
+            Taper le « @ » quand même ne gêne pas : il est retiré avant l'envoi. Le compteur
+            montre la limite sans couper (pas de maxLength) : un « @ » collé ne prend pas la
+            place d'une lettre. autoComplete « off » : le navigateur ne propose pas d'adresse. */}
+        <TextField
+          label={t('profile.fields.handle')}
+          value={handle}
+          onChangeText={edit('handle', setHandle)}
+          prefix="@"
+          autoCorrect={false}
+          spellCheck={false}
+          autoComplete="off"
+          limit={HANDLE_MAX_LENGTH}
+          showCount
+          hint={t('profile.fields.handleHint', { min: HANDLE_MIN_LENGTH, max: HANDLE_MAX_LENGTH })}
+          error={handleError}
+          {...submitOnEnter}
         />
         <TextField
           label={t('profile.fields.bio')}
           value={bio}
-          onChangeText={setBio}
+          onChangeText={edit('bio', setBio)}
           autoCapitalize="sentences"
           multiline
           // Pas de maxLength ici : le compteur montre la limite sans couper le texte en plein milieu.
@@ -213,7 +316,7 @@ function ProfileForm({ me }: { me: Me }) {
       <TagInput
         label={t('profile.fields.tools')}
         values={parseTools(tools)}
-        onChange={(list) => setTools(list.join(', '))}
+        onChange={(list) => edit('tools', setTools)(list.join(', '))}
         placeholder={t('profile.fields.toolsPlaceholder')}
         removeLabel={(item) => t('common.remove', { item })}
         limit={t('profile.fields.toolsLimit', { max: FAVORITE_TOOLS_MAX })}

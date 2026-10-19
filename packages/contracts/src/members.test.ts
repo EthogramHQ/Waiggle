@@ -20,6 +20,7 @@ const summary = {
 const lea = {
   id: 'lea-id',
   name: 'Léa',
+  handle: 'lea',
   avatarUrl: null,
   bio: 'Je bricole des agents.',
   favoriteTools: [{ label: 'Claude Code', slug: 'claude-code' }],

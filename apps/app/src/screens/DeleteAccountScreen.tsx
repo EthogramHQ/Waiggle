@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { deleteAccount, downloadMyData, useSession } from '../accounts/api'
 import { useGoBack } from '../navigation/useGoBack'
+import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -26,6 +27,8 @@ export function DeleteAccountScreen() {
   const { t } = useTranslation()
   const router = useRouter()
   const { data, isPending } = useSession()
+  // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà).
+  const me = useMe(Boolean(data))
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -70,6 +73,16 @@ export function DeleteAccountScreen() {
     >
       <ListGroup>
         <ListRow icon="user" label={t('account.delete.profileItem')} detail={data.user.name} />
+        {/* Tranche 6a : son pseudo n'est pas mis en réserve, un autre membre peut le prendre. Le
+            pseudo vient du profil (la session ne le porte pas) : tant qu'il n'est pas arrivé,
+            la ligne reste sans détail plutôt que d'attendre. */}
+        <ListRow
+          icon="at"
+          label={t('account.delete.handleItem')}
+          {...(me.data
+            ? { detail: t('account.delete.handleDetail', { handle: me.data.handle }) }
+            : null)}
+        />
         <ListRow
           icon="images"
           label={t('account.delete.projectsItem')}

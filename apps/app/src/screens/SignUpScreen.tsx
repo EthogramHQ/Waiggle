@@ -123,6 +123,7 @@ export function SignUpScreen() {
       <FieldGroup>
         <TextField
           label={t('auth.fields.name')}
+          hint={t('auth.fields.nameHint')}
           value={name}
           onChangeText={setName}
           autoComplete="name"

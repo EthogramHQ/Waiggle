@@ -62,6 +62,7 @@ function MemberView({ member }: { member: Member }) {
     <Screen width="page" header={<TopNav />} onBack={back} pageTitle={member.name}>
       <MemberHeader
         name={member.name}
+        handle={t('member.handle', { handle: member.handle })}
         avatar={toSource(member.avatarUrl)}
         bio={member.bio}
         toolsTitle={t('member.favoriteTools')}

@@ -63,6 +63,13 @@ describe('MemberScreen', () => {
     expect(screen.queryByRole('button', { name: 'Modifier mon profil' })).toBeNull()
   })
 
+  it('shows her handle under her name (slice 6a)', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('header', { name: 'Léa' })).toBeTruthy()
+    expect(screen.getByText('@lea')).toBeTruthy()
+  })
+
   it('opens a project, and the page of a favourite tool', async () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 

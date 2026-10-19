@@ -2,6 +2,7 @@
 export * from './auth'
 export * from './comments'
 export * from './follows'
+export * from './handles'
 export * from './notes'
 export * from './profile'
 export * from './projects'

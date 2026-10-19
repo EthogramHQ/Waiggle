@@ -21,7 +21,7 @@ const signUpMock = jest.mocked(signUp)
 
 const fillForm = async (password = 'correct-horse-battery', inviteCode = 'miel-2026-noel') => {
   await fireEvent.changeText(screen.getByLabelText('Code d’invitation'), inviteCode)
-  await fireEvent.changeText(screen.getByLabelText('Prénom ou pseudo'), 'Léa')
+  await fireEvent.changeText(screen.getByLabelText('Nom affiché'), 'Léa')
   await fireEvent.changeText(screen.getByLabelText('Adresse e-mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), password)
   await fireEvent.press(screen.getByRole('button', { name: 'Créer un compte' }))

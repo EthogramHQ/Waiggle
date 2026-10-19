@@ -529,7 +529,77 @@ Règles détaillées :
   dates, commentaire parent). Le projet n'est donné que par son identifiant : il appartient à un
   autre, et a pu devenir privé.
 
-## Tranche 6 — Notifications
+## Tranche 6a — Le pseudo
+
+- Chaque membre a un pseudo unique (« @ines_morel »), qui servira à le mentionner (tranche 6b)
+- Il le voit et le change dans « Mon profil » ; les autres le lisent sur sa page
+
+### Précisions (tranche 6a) — validées le 19/10/2026
+
+Décisions de Louis :
+- **L'ordre de la tranche 6** : 6a le pseudo, 6b les notifications dans l'appli avec les mentions,
+  6c les e-mails, le choix par type et le récap. Le push attend une appli native publiée.
+- **Le pseudo est proposé, puis modifiable** : l'appli en fabrique un à partir du nom, pour les
+  nouveaux comptes comme pour ceux qui existent déjà ; le formulaire d'inscription ne change pas.
+- **Changer de pseudo est libre** (avec un quota), et l'ancien reste réservé 30 jours à son
+  propriétaire, pour que personne ne le reprenne aussitôt.
+- **Sa forme** : 3 à 20 caractères, lettres sans accent, chiffres et « _ », en commençant par une
+  lettre. Facile à taper après « @ », et aucun sosie possible.
+- **Où il se voit** : sur la page du membre et dans « Mon profil ». Les adresses ne changent pas
+  (`/members/<id>`) : changer de pseudo ne casse aucun lien.
+
+**Recevoir son pseudo**
+- Étant donné une personne nommée « Inès Morel », qui vient de vérifier son adresse
+- Alors elle a le pseudo « ines_morel » ; s'il est pris ou réservé, « ines_morel2 », puis 3…
+- Et les membres déjà inscrits en reçoivent un de la même façon
+
+**Voir un pseudo**
+- Étant donné un membre connecté, sur la page d'Inès
+- Alors il lit « @ines_morel » sous son nom ; Inès le lit aussi dans « Mon profil »
+
+**Changer de pseudo**
+- Étant donné Inès, dans « Mon profil »
+- Quand elle remplace son pseudo par « ines » et enregistre
+- Alors sa page affiche « @ines », et « ines_morel » lui reste réservé 30 jours
+- Quand un autre membre essaie « ines_morel » pendant ces 30 jours
+- Alors il lit « Ce pseudo est déjà pris », comme pour un pseudo en usage
+- Et Inès peut reprendre « ines_morel » pendant ces 30 jours
+
+Règles détaillées :
+- **Forme** : les majuscules deviennent des minuscules et un « @ » tapé au début est retiré
+  (« @Ines » devient « ines »). Ni « __ », ni « _ » à la fin (« ines__morel » imiterait
+  « ines_morel »). Les mots réservés (admin, support, abuse…) sont refusés, avec le message
+  « réservé », de même que tout pseudo qui contient le nom de l'appli (« support_… ») ; la
+  fabrication l'enlève du nom (décision de Louis du 20/10/2026, après la relecture de sécurité).
+- **Fabrication** : le nom sans accents, en minuscules ; tout le reste devient « _ » (un seul à la
+  suite, aucun au début ni à la fin) ; 16 caractères au plus. Trop court, on ajoute un chiffre
+  (« al1 »). S'il commence par un chiffre, ou s'il ne reste rien (nom écrit dans un autre
+  alphabet) : « membre_… » ou « member_… », selon la langue du compte. Changer son nom ne change
+  pas son pseudo.
+- **Un compte jamais vérifié n'a pas de pseudo** : il n'en bloque donc aucun.
+- **Réservation** : seul le dernier ancien pseudo est réservé ; changer deux fois libère le
+  premier. Personne ne peut ainsi accaparer des pseudos. Au bout de 30 jours, il est libre.
+- **Unicité** : pour un pseudo pris ou réservé par un autre, la réponse est la même (« déjà
+  pris ») : elle ne dit pas lequel des deux. Garder son pseudo actuel n'est pas un changement.
+- **Anti-abus**, par membre : 5 changements de pseudo par jour, en plus du quota du profil.
+- **Suppression du compte** : le pseudo et l'ancien réservé sont libérés aussitôt (rien ne reste
+  attaché à la personne partie). L'écran de suppression le dit.
+- **Export des données** : le pseudo, et l'ancien pseudo réservé avec la date où il redevient libre.
+- **Conservation** : le pseudo, jusqu'au changement ou à la suppression du compte ; l'ancien,
+  30 jours.
+
+## Tranche 6b et 6c — Notifications
+
+Décisions de Louis (19/10/2026), pour la tranche 6b :
+- **6b dans l'appli seulement** : l'écran des notifications, le nombre de nouveautés, les
+  regroupements, et les mentions par pseudo. Les e-mails, le choix par type et le récap viennent
+  en 6c.
+- **Réactions et abonnés sans nom** : groupés par projet et par jour, avec les nombres par type
+  (« 3 réactions sur « Météo » : Bravo ×2, Utile ×1 », « 2 personnes de plus te suivent »). Une
+  réaction retirée disparaît aussi de la notification.
+- **Un commentaire masqué** : son auteur est prévenu sobrement (« Ton commentaire sur « Météo » a
+  été masqué par l'auteur du projet. Toi et l'auteur du projet le voyez encore. ») ; la
+  notification disparaît si le commentaire est démasqué.
 
 - Un membre est notifié quand on réagit à son projet, le commente, le suit ou le mentionne
 - Les notifications similaires sont regroupées (« 3 personnes ont réagi à ton projet »)

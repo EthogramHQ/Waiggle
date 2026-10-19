@@ -28,6 +28,8 @@ import { eq } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import type { Mailer } from '../email/mailer'
 import { existingAccountEmail, verificationEmail } from '../email/templates'
+import { ensureHandle } from '../handles/claim'
+import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
 import { mediaKeysOf } from '../projects/load'
 import { deleteMemberCounters } from '../rate-limit'
@@ -133,6 +135,20 @@ export const createAuth = ({
           to: user.email,
           ...verificationEmail(languageOf(user), { name: user.name, url }),
         })
+      },
+      // Juste après la vérification de l'adresse (le lien ouvert), le membre reçoit son pseudo
+      // (tranche 6a) : pas avant, pour qu'un compte jamais vérifié n'en bloque aucun. Une panne ici
+      // ne doit pas faire échouer la vérification, déjà enregistrée : on la note dans les logs, et
+      // le pseudo sera donné en filet à la première lecture de « Mon profil ».
+      afterEmailVerification: async (user) => {
+        try {
+          await ensureHandle(db, user.id)
+        } catch (error) {
+          console.error(
+            'Handle not given after verification',
+            describeError(error, { method: 'GET', path: '/api/auth/verify-email' }),
+          )
+        }
       },
     },
 

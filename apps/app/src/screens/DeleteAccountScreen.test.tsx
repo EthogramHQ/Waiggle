@@ -2,6 +2,8 @@
 // peut d'abord télécharger ses données.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { deleteAccount, downloadMyData } from '../accounts/api'
+import { getMe } from '../profile/api'
+import { leaMe } from '../testing/fixtures'
 import { mockSession, renderWithI18n } from '../testing/render'
 import { DeleteAccountScreen } from './DeleteAccountScreen'
 
@@ -39,6 +41,12 @@ describe('DeleteAccountScreen', () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
     expect(screen.getByText('Tes réactions et tes commentaires')).toBeTruthy()
+  })
+
+  it('says that the handle becomes free at once (slice 6a)', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(screen.getByText('Ton pseudo')).toBeTruthy()
   })
 
   it('lets the member download their data first', async () => {
@@ -80,5 +88,16 @@ describe('DeleteAccountScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
 
     expect(mockReplace).toHaveBeenCalledWith('/')
+  })
+
+  it('names the handle that becomes free (slice 6a)', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(
+      await screen.findByText(
+        '@lea, et l’ancien s’il t’est réservé : ils redeviennent libres aussitôt',
+      ),
+    ).toBeTruthy()
   })
 })

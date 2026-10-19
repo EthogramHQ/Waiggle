@@ -38,7 +38,7 @@ const features = [
     tranche: 'Tranche 2',
     pages: /^\/(profile|account)$/,
     routes: /^\w+ \/v1\/me(\/|$)/,
-    tables: /^(profile|api_rate_limit)$/,
+    tables: /^(profile|member_handle|api_rate_limit)$/,
   },
   // Avant « projets » : ses routes sont sous /v1/projects/{id}/.
   {

@@ -16,6 +16,8 @@ export const Member = z
   .object({
     id: z.string(),
     name: z.string(),
+    /** Son pseudo, sans le « @ » : unique, contrairement au nom. */
+    handle: z.string(),
     avatarUrl: z.url().nullable(), // null : pas d'avatar
     bio: z.string(),
     /** Les outils favoris du profil, chacun avec son étiquette pour mener à sa page. */

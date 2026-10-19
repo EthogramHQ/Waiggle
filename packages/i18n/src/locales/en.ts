@@ -35,7 +35,8 @@ export const en: Translation = {
   },
   auth: {
     fields: {
-      name: 'First name or nickname',
+      name: 'Display name',
+      nameHint: 'Your @handle will be made from it; you can change it in My profile.',
       email: 'Email address',
       password: 'Password',
       passwordHint: 'At least {{min}} characters.',
@@ -119,6 +120,9 @@ export const en: Translation = {
       projectsItem: 'Your projects',
       projectsDetail: 'With their description, recipe, prompts, photos, notes and comments',
       followsItem: 'Who you follow and who follows you',
+      handleItem: 'Your handle',
+      handleDetail:
+        '@{{handle}}, and your previous one if it is reserved for you: they become free at once',
       reactionsItem: 'Your reactions and your comments',
       reactionsDetail:
         'A comment that received replies becomes “Deleted comment”: your text and your name are erased from it, the replies of others stay.',
@@ -139,6 +143,10 @@ export const en: Translation = {
       privacy: 'The picture is cropped square and cleaned of hidden information, such as location.',
     },
     fields: {
+      name: 'Display name',
+      handle: 'Handle',
+      handleHint:
+        'Members see you as @handle on your page. It was made from your name and does not change with it. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
       bio: 'Bio',
       tools: 'Favorite tools',
       toolsLimit: '{{max}} at most',
@@ -146,8 +154,14 @@ export const en: Translation = {
     },
     save: 'Save',
     saved: 'Profile saved.',
+    savedHandle: 'Profile saved. @{{former}} stays reserved for you for {{days}} days.',
     errors: {
       nameTooLong: 'Your name must be at most {{max}} characters long.',
+      handleTooShort: 'Your handle must be at least {{min}} characters long.',
+      handleTooLong: 'Your handle must be at most {{max}} characters long.',
+      handleInvalid:
+        'Your handle starts with a letter, then only has letters without accents, digits and single “_”, and does not end with “_”.',
+      handleReserved: 'This handle is reserved. Choose another one.',
       bioTooLong: 'Your bio must be at most {{max}} characters long.',
       tooManyTools: '{{max}} tools at most.',
       toolTooLong: 'Each tool must be at most {{max}} characters long.',
@@ -376,6 +390,7 @@ export const en: Translation = {
   },
   member: {
     open: 'See the page of {{name}}',
+    handle: '@{{handle}}',
     favoriteTools: 'Favourite tools',
     projects: 'Projects',
     empty: 'No public project yet.',
@@ -471,6 +486,8 @@ export const en: Translation = {
     tooManyVisuals: 'Six photos at most per project. Remove one to add another.',
     cannotFollowOwn: 'You can’t follow yourself or your own projects.',
     cannotReactOwn: 'You can’t react to your own project.',
+    handleTaken: 'This handle is already taken. Choose another one.',
+    handleChangeLimit: 'You have changed your handle several times today. Try again tomorrow.',
     internal: 'Something went wrong. Try again in a moment.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },

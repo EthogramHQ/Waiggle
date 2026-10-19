@@ -41,7 +41,8 @@ export const fr = {
   },
   auth: {
     fields: {
-      name: 'Prénom ou pseudo',
+      name: 'Nom affiché',
+      nameHint: 'Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
       email: 'Adresse e-mail',
       password: 'Mot de passe',
       passwordHint: 'Au moins {{min}} caractères.',
@@ -128,6 +129,9 @@ export const fr = {
       projectsDetail:
         'Avec leur description, leur recette, leurs prompts, leurs photos, leurs notes et leurs commentaires',
       followsItem: 'Tes abonnements et tes abonnés',
+      handleItem: 'Ton pseudo',
+      handleDetail:
+        '@{{handle}}, et l’ancien s’il t’est réservé : ils redeviennent libres aussitôt',
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
@@ -149,6 +153,10 @@ export const fr = {
         'La photo est recadrée en carré et nettoyée de ses informations cachées, comme le lieu.',
     },
     fields: {
+      name: 'Nom affiché',
+      handle: 'Pseudo',
+      handleHint:
+        'Les membres te voient sous @pseudo sur ta page. Il a été tiré de ton nom et ne change pas avec lui. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
       toolsLimit: '{{max}} au plus',
@@ -156,8 +164,14 @@ export const fr = {
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
+    savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
       nameTooLong: 'Le nom doit faire au plus {{max}} caractères.',
+      handleTooShort: 'Le pseudo doit faire au moins {{min}} caractères.',
+      handleTooLong: 'Le pseudo doit faire au plus {{max}} caractères.',
+      handleInvalid:
+        'Le pseudo commence par une lettre, puis n’a que des lettres sans accent, des chiffres et des « _ » seuls, sans finir par « _ ».',
+      handleReserved: 'Ce pseudo est réservé. Choisis-en un autre.',
       bioTooLong: 'La bio doit faire au plus {{max}} caractères.',
       tooManyTools: '{{max}} outils au plus.',
       toolTooLong: 'Chaque outil doit faire au plus {{max}} caractères.',
@@ -389,6 +403,7 @@ export const fr = {
   },
   member: {
     open: 'Voir la page de {{name}}',
+    handle: '@{{handle}}',
     favoriteTools: 'Outils favoris',
     projects: 'Projets',
     empty: 'Pas encore de projet public.',
@@ -487,6 +502,8 @@ export const fr = {
     tooManyVisuals: 'Six photos au plus par projet. Retires-en une pour en ajouter une autre.',
     cannotFollowOwn: 'Tu ne peux pas te suivre toi-même, ni suivre tes propres projets.',
     cannotReactOwn: 'Tu ne peux pas réagir à ton propre projet.',
+    handleTaken: 'Ce pseudo est déjà pris. Choisis-en un autre.',
+    handleChangeLimit: 'Tu as changé de pseudo plusieurs fois aujourd’hui. Réessaie demain.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },

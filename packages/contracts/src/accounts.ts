@@ -49,6 +49,8 @@ export const Me = z
   .object({
     id: z.string(),
     name: z.string(),
+    /** Son pseudo, sans le « @ » (tranche 6a) : unique, modifiable dans « Mon profil ». */
+    handle: z.string(),
     email: z.email(),
     emailVerified: z.boolean(),
     language: LanguageSchema,

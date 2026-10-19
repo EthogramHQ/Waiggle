@@ -158,6 +158,7 @@ describe('the page of a member', () => {
         'bio',
         'favoriteTools',
         'followerCount',
+        'handle',
         'id',
         'isFollowed',
         'isMe',
