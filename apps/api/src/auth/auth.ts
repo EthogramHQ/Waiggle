@@ -25,6 +25,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { eq } from 'drizzle-orm'
+import { eraseCommentsOf } from '../comments/erase'
 import type { Mailer } from '../email/mailer'
 import { existingAccountEmail, verificationEmail } from '../email/templates'
 import type { FileStorage } from '../media/storage'
@@ -158,6 +159,10 @@ export const createAuth = ({
             projects.map((p) => p.id),
           )
           filesToDelete.set(user.id, row?.avatarKey ? [row.avatarKey, ...keys] : keys)
+          // Ses commentaires (tranche 5) : effacés, sauf ses racines auxquelles d'autres ont
+          // répondu, qui deviennent « Commentaire supprimé » (voir comments/erase.ts). Ici et pas
+          // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
+          await eraseCommentsOf(db, user.id)
         },
         // Juste après : on efface les fichiers eux-mêmes du stockage, et les compteurs anti-abus
         // qui portent son identifiant.

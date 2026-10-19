@@ -9,6 +9,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
+import { commentsOfAuthor } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
@@ -16,6 +17,7 @@ import { notesOfAuthor } from '../notes/load'
 import { loadMe } from '../profile/me'
 import { loadProjectsOf } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { reactionsOfMember } from '../reactions/load'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -266,6 +268,13 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const withDate = (follows: { id: string; followedAt: Date }[]) =>
       follows.map(({ id, followedAt }) => ({ id, followedAt: followedAt.toISOString() }))
 
+    // Ses réactions et ses commentaires (tranche 5), sur les projets des autres comme sur les
+    // siens. Contrairement aux abonnements, ceux d'un projet devenu privé restent : ce sont ses
+    // gestes et son texte (droit d'accès). Le projet n'y est donné que par son identifiant, qui ne
+    // dit rien de lui (ni titre, ni texte d'un autre).
+    const reactions = await reactionsOfMember(db, user.id)
+    const comments = await commentsOfAuthor(db, user.id)
+
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
     c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
@@ -276,6 +285,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         projects,
         notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
+        reactions,
+        comments,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
           ...s,
