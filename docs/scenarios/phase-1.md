@@ -365,6 +365,74 @@ Ajouts après la relecture de sécurité :
 **Ouvrir une démo**
 - Quand un membre ouvre un lien de démo, une page lui indique qu'il quitte Ruche et vers quel domaine
 
+### Précisions (tranche 4) — validées le 19/10/2026
+
+Décisions de Louis :
+- **Une « mise à jour » est une note publiée par l'auteur** (« v2 : mode hors ligne »). Modifier
+  le projet (corriger une faute, changer une photo) ne fait rien remonter dans le fil.
+- **« Cherche des testeurs »** : un projet au statut « testable » qui a un lien de démo. Pas de
+  champ à part.
+- **Les nouveautés** : l'appli vérifie toutes les minutes, et quand on revient sur elle. S'il y a
+  du nouveau, un bandeau « 3 nouveautés » apparaît en haut du fil ; le toucher les affiche. Le fil
+  ne bouge jamais tout seul sous le doigt.
+- **Abonnements** : on voit combien de membres suivent une personne ou un projet, jamais leurs
+  noms. La personne suivie n'est pas prévenue (les notifications viendront en tranche 6).
+- **Réalisation en deux étapes** : 4a pour suivre et les deux fils (nouveaux projets), 4b pour les
+  notes.
+
+**Suivre une personne**
+- Étant donné un membre connecté, sur la page d'un autre membre
+- Quand il touche « Suivre »
+- Alors le bouton devient « Suivi », et le nombre d'abonnés augmente de un
+- Et les nouveaux projets publics de cette personne arrivent dans son fil « Abonnements »
+- Quand il touche de nouveau le bouton, il ne la suit plus
+
+**Suivre un projet**
+- Étant donné un membre connecté, sur le projet d'un autre membre
+- Quand il touche « Suivre ce projet »
+- Alors les notes de ce projet arriveront dans son fil « Abonnements » (4b)
+
+**Le fil « Abonnements »**
+- Étant donné un membre connecté qui suit des personnes
+- Quand il ouvre l'accueil
+- Alors il voit leurs nouveaux projets publics, du plus récent au plus ancien, 20 à la fois
+- Et « Afficher la suite » charge les 20 suivants ; tout au bout, il lit « Tu es à jour »
+- Étant donné un membre qui ne suit personne
+- Alors il lit « Tu ne suis personne pour l'instant », avec un bouton vers « Découvrir »
+
+**Le fil « Découvrir »**
+- Étant donné un membre connecté, sur l'accueil
+- Quand il choisit « Découvrir »
+- Alors il voit tous les projets publics, du plus récent au plus ancien, les siens compris
+- Et le filtre « Cherche des testeurs » ne garde que les projets testables qui ont une démo
+
+**Les notes (4b)**
+- Étant donné l'auteur d'un projet
+- Quand il publie une note (« v2 : mode hors ligne »)
+- Alors elle apparaît dans le journal du projet, et dans le fil des membres qui suivent ce projet
+- Et quand il change le statut de son projet, l'appli lui propose une note déjà écrite (« Le
+  projet passe en « testable ». »)
+
+Règles détaillées :
+- **Date d'un nouveau projet** : le moment où il devient public pour la première fois. Un
+  brouillon privé rendu public une semaine plus tard arrive donc en haut du fil. Le repasser en
+  privé puis en public ne le fait pas remonter.
+- **Un projet privé n'apparaît dans aucun fil**, ses notes non plus, même pour ses abonnés et même
+  pour son auteur. Un abonnement à un projet devenu privé est gardé, mais ne montre plus rien ;
+  si le projet redevient public, ses notes reviennent.
+- **On ne se suit pas soi-même**, ni ses propres projets : refusé.
+- **Suivre un membre** inconnu, supprimé ou jamais vérifié, **ou le projet privé d'un autre** :
+  « introuvable ». Suivre deux fois revient à suivre une fois.
+- **Notes** (4b) : texte brut de 1 à 1 000 caractères, sans caractères invisibles, affiché tel
+  quel. Seul l'auteur publie ou supprime une note de son projet : un autre membre reçoit « refusé »
+  si le projet est public, « introuvable » s'il est privé. La suppression demande une
+  confirmation. Le journal du projet montre les 20 notes les plus récentes.
+- **Anti-abus**, par membre : 120 changements d'abonnement par heure ; 30 notes par jour (4b).
+- **Suppression du compte** : ses abonnements, ses abonnés et ses notes disparaissent, et les
+  nombres d'abonnés baissent d'autant.
+- **Export des données** : il comprend les membres et les projets suivis (identifiant et date), et
+  les notes (4b).
+
 ## Tranche 5 — Réagir et commenter
 
 **Réagir**
