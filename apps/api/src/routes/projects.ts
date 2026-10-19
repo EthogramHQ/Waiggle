@@ -3,7 +3,7 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { Project, ProjectInput, ProjectUpdate } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
@@ -122,6 +122,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // L'identifiant est tiré par le serveur ; l'auteur est le membre connecté, jamais une donnée
     // envoyée par l'appli. Les valeurs absentes prennent leur valeur par défaut.
     const id = crypto.randomUUID()
+    const visibility = input.visibility ?? 'public'
     await db.insert(schema.project).values({
       id,
       authorId: user.id,
@@ -129,11 +130,14 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       pitch: input.pitch,
       description: input.description ?? '',
       status: input.status ?? 'idea',
-      visibility: input.visibility ?? 'public',
+      visibility,
       demoUrl: input.demoUrl ?? null,
       ...withSlugs(input.tools ?? []),
       timeSpent: input.timeSpent ?? null,
       prompts: input.prompts ?? [],
+      // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
+      // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
+      publishedAt: visibility === 'public' ? new Date() : null,
     })
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
@@ -168,6 +172,13 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       ...(changes.description !== undefined && { description: changes.description }),
       ...(changes.status !== undefined && { status: changes.status }),
       ...(changes.visibility !== undefined && { visibility: changes.visibility }),
+      // Rendu public : sa date de publication, si c'est la première fois. coalesce(a, b) vaut a
+      // s'il n'est pas null, sinon b : une date déjà là est gardée (repasser en privé puis en
+      // public ne fait pas remonter le projet dans les fils). « Maintenant » vient de l'horloge de
+      // JavaScript, passé comme paramètre lié par la colonne elle-même (sql.param).
+      ...(changes.visibility === 'public' && {
+        publishedAt: sql`coalesce(${schema.project.publishedAt}, ${sql.param(new Date(), schema.project.publishedAt)}::timestamp)`,
+      }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
       ...(changes.tools !== undefined && withSlugs(changes.tools)),
       ...(changes.timeSpent !== undefined && { timeSpent: changes.timeSpent }),

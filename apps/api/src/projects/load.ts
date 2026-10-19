@@ -2,6 +2,7 @@
 // seulement ici, que se décide ce qu'il a le droit de voir. Un projet privé n'est visible que de
 // son auteur ; pour tous les autres, il n'existe pas.
 import {
+  type FollowState,
   PROJECT_LIST_MAX,
   type Project,
   ProjectId,
@@ -15,6 +16,7 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, or, type SQL } from 'drizzle-orm'
+import { projectFollowStates } from '../follows/load'
 import { mediaUrl } from '../profile/me'
 
 type MediaRow = typeof schema.projectMedia.$inferSelect
@@ -23,7 +25,7 @@ type MediaRow = typeof schema.projectMedia.$inferSelect
 type Reader = Pick<Database, 'select'>
 
 /** Les médias (photos de la galerie et couverture verticale) d'une liste de projets. */
-const selectMedia = async (db: Reader, projectIds: string[]): Promise<MediaRow[]> =>
+export const selectMedia = async (db: Reader, projectIds: string[]): Promise<MediaRow[]> =>
   projectIds.length === 0
     ? []
     : db
@@ -45,7 +47,7 @@ const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
 
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
 // innerJoin : « avec son auteur » (il existe toujours) ; leftJoin : « avec son profil s'il en a un ».
-const selectProjects = (db: Database) =>
+export const selectProjects = (db: Database) =>
   db
     .select({
       project: schema.project,
@@ -58,17 +60,24 @@ const selectProjects = (db: Database) =>
 
 type ProjectRow = Awaited<ReturnType<ReturnType<typeof selectProjects>['execute']>>[number]
 
+/**
+ * Un projet sans son état d'abonnement : tout ce qu'on sait d'une ligne de la base et de ses
+ * médias. Les listes (cartes) s'en contentent ; la page d'un projet y ajoute ses abonnés.
+ * Omit<A, B> : le type A, sans les champs nommés dans B.
+ */
+type ProjectBase = Omit<Project, keyof FollowState>
+
 /** La condition « visible par ce membre » : public, ou écrit par lui. */
 export const visibleTo = (viewerId: string) =>
   or(eq(schema.project.visibility, 'public'), eq(schema.project.authorId, viewerId))
 
-/** Transforme une ligne de la base en projet tel que l'API le renvoie (contrat `Project`). */
-const toProject = (
+/** Transforme une ligne de la base en projet, sans son état d'abonnement. */
+const toProjectBase = (
   { project, authorName, authorAvatarKey }: ProjectRow,
   media: MediaRow[],
   viewerId: string,
   publicApiUrl: string,
-): Project => ({
+): ProjectBase => ({
   id: project.id,
   author: {
     id: project.authorId,
@@ -103,6 +112,28 @@ const toProject = (
 })
 
 /**
+ * Des lignes de la base, transformées en projets tels que l'API les renvoie (contrat `Project`),
+ * avec leur état d'abonnement : une seule requête de plus pour tous, quel que soit leur nombre.
+ */
+const toProjects = async (
+  db: Database,
+  rows: ProjectRow[],
+  media: MediaRow[],
+  viewerId: string,
+  publicApiUrl: string,
+): Promise<Project[]> => {
+  const follows = await projectFollowStates(
+    db,
+    rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
+    viewerId,
+  )
+  return rows.map((row) => ({
+    ...toProjectBase(row, media, viewerId, publicApiUrl),
+    ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
+  }))
+}
+
+/**
  * Le projet `id` s'il est visible par `viewerId`, sinon null : qu'il n'existe pas ou qu'il soit
  * privé, la réponse est la même, pour ne rien révéler.
  */
@@ -116,7 +147,8 @@ export const loadVisibleProject = async (
   if (!ProjectId.safeParse(id).success) return null
   const [row] = await selectProjects(db).where(and(eq(schema.project.id, id), visibleTo(viewerId)))
   if (!row) return null
-  return toProject(row, await selectMedia(db, [id]), viewerId, publicApiUrl)
+  const [project] = await toProjects(db, [row], await selectMedia(db, [id]), viewerId, publicApiUrl)
+  return project ?? null
 }
 
 /** Tous les projets d'un auteur que `viewerId` a le droit de voir, du plus récent au plus ancien. */
@@ -134,11 +166,11 @@ export const loadProjectsOf = async (
     db,
     rows.map((row) => row.project.id),
   )
-  return rows.map((row) => toProject(row, media, viewerId, publicApiUrl))
+  return toProjects(db, rows, media, viewerId, publicApiUrl)
 }
 
 /** Un projet en version courte, pour les listes : sa première photo en couverture, sans la galerie. */
-const toSummary = ({ visuals, ...project }: Project): ProjectSummary => ({
+const toSummary = ({ visuals, ...project }: ProjectBase): ProjectSummary => ({
   id: project.id,
   author: project.author,
   title: project.title,
@@ -151,6 +183,17 @@ const toSummary = ({ visuals, ...project }: Project): ProjectSummary => ({
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
 })
+
+/**
+ * Une ligne de la base en carte de liste (contrat `ProjectSummary`), avec la couverture prise dans
+ * `media` : les médias de toute la liste, lus en une fois par selectMedia.
+ */
+export const rowToSummary = (
+  row: ProjectRow,
+  media: MediaRow[],
+  viewerId: string,
+  publicApiUrl: string,
+): ProjectSummary => toSummary(toProjectBase(row, media, viewerId, publicApiUrl))
 
 /**
  * Une liste de projets (page d'un membre, d'une étiquette) : ceux qui remplissent `where`, du plus
@@ -170,7 +213,7 @@ export const loadSummaries = async (
     db,
     rows.map((row) => row.project.id),
   )
-  return rows.map((row) => toSummary(toProject(row, media, viewerId, publicApiUrl)))
+  return rows.map((row) => rowToSummary(row, media, viewerId, publicApiUrl))
 }
 
 /**

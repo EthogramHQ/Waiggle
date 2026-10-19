@@ -6,6 +6,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
+import { memberFollowState } from '../follows/load'
 import { mediaUrl } from '../profile/me'
 import { loadSummaries, visibleTo, withSlugs } from '../projects/load'
 import { createRouter, errorResponse } from './router'
@@ -56,12 +57,14 @@ export const memberRoutes = ({ db, publicApiUrl }: Deps) => {
     if (!row) return notFound()
 
     // Ses projets que le visiteur peut voir : publics, et aussi privés si c'est sa propre page.
+    // Puis son nombre d'abonnés, et si le visiteur en fait partie (une requête, voir follows/load.ts).
     const projects = await loadSummaries(
       db,
       and(eq(schema.project.authorId, id), visibleTo(viewer.id)),
       viewer.id,
       publicApiUrl,
     )
+    const follow = await memberFollowState(db, id, viewer.id)
     const { tools, toolSlugs } = withSlugs(row.favoriteTools ?? [])
     // Member.parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
     return c.json(
@@ -72,6 +75,7 @@ export const memberRoutes = ({ db, publicApiUrl }: Deps) => {
         bio: row.bio ?? '',
         favoriteTools: tools.map((label, i) => ({ label, slug: toolSlugs[i] ?? label })),
         isMe: row.id === viewer.id,
+        ...follow,
         projects,
       }),
       200,

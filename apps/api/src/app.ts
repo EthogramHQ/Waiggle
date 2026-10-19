@@ -17,6 +17,8 @@ import { errorBody, languageOf } from './errors'
 import { describeError } from './log'
 import type { FileStorage } from './media/storage'
 import { createRateLimiter } from './rate-limit'
+import { feedRoutes } from './routes/feed'
+import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
@@ -147,6 +149,8 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', memberRoutes({ db, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
+  app.route('/', followRoutes({ db, limiter }))
+  app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.
