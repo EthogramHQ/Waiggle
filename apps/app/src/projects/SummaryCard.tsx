@@ -1,4 +1,4 @@
-// La carte d'un projet dans une liste (page d'un membre, d'une étiquette) : elle prépare les textes
+// La carte d'un projet dans une liste (page d'un membre, d'une étiquette, le fil) : elle prépare les textes
 // et l'image d'un résumé de projet pour le composant ProjectCard, et mène à la page du projet.
 // Sur téléphone, la carte est haute : la couverture verticale y va mieux, si l'auteur en a donné une.
 import type { ProjectSummary } from '@ruche/contracts'
@@ -9,7 +9,13 @@ import { ProjectCard } from '../ui/ProjectCard'
 import { useLayout } from '../ui/theme/layout'
 import { shortDate } from './format'
 
-export function SummaryCard({ project }: { project: ProjectSummary }) {
+type Props = {
+  project: ProjectSummary
+  /** La date à afficher, si ce n'est pas la création : dans le fil, le jour de la publication. */
+  at?: string
+}
+
+export function SummaryCard({ project, at = project.createdAt }: Props) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
@@ -25,7 +31,7 @@ export function SummaryCard({ project }: { project: ProjectSummary }) {
           ? { source: toSource(visual.url), thumbhash: visual.thumbhash, label: project.title }
           : null
       }
-      when={shortDate(project.createdAt, i18n.language)}
+      when={shortDate(at, i18n.language)}
       status={{
         label: t(`project.status.${project.status}`),
         strong: project.status === 'testable',

@@ -25,6 +25,8 @@ import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
+import { FeedEnd } from '../ui/FeedEnd'
+import { FollowButton } from '../ui/FollowButton'
 import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
@@ -35,6 +37,7 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
+import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -416,6 +419,36 @@ export function CatalogueScreen() {
         </ProjectGrid>
         {/* La même grille, vide. */}
         <ProjectGrid empty={l.emptyList}>{[]}</ProjectGrid>
+      </Section>
+
+      <Section title={l.feedSection}>
+        {/* Le bouton « Suivre » : pas suivi (miel), suivi (blanc, coché), puis avec une erreur. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+        />
+        <FollowButton
+          followed
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.following}
+          caption={l.followers}
+        />
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          error={l.followError}
+        />
+        {/* Le bandeau des nouveautés, puis le bas du fil dans ses trois états. */}
+        <NewItemsBanner label={l.news} onPress={() => {}} />
+        <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
       </Section>
 
       <Section title={l.illustrations}>

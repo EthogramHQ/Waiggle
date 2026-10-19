@@ -1,20 +1,24 @@
 // Page d'un membre : son avatar, son nom, sa bio, ses outils favoris (chacun mène à sa page
 // d'étiquette), puis ses projets, du plus récent au plus ancien. Sur sa propre page, un membre voit
-// aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil.
+// aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil. Sur la page
+// d'un autre membre, le bouton « Suivre » ; sur les deux, le nombre d'abonnés (jamais leurs noms).
 import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useFollow } from '../follows/api'
 import { useMember } from '../members/api'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Button } from '../ui/Button'
+import { FollowButton } from '../ui/FollowButton'
 import { MemberHeader } from '../ui/MemberHeader'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
+import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
@@ -50,6 +54,8 @@ function MemberView({ member }: { member: Member }) {
   const toSource = useMediaSources()
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
   const back = useGoBack('/')
+  const follow = useFollow({ kind: 'member', id: member.id })
+  const followers = t('follow.followers', { count: member.followerCount })
 
   return (
     <Screen width="page" header={<TopNav />} onBack={back} pageTitle={member.name}>
@@ -64,13 +70,27 @@ function MemberView({ member }: { member: Member }) {
         }))}
         action={
           member.isMe ? (
-            <Button
-              label={t('account.editProfile')}
-              variant="secondary"
-              icon="pencil-simple"
-              onPress={() => router.push('/profile')}
+            <Stack gap="md" align="center">
+              <Text variant="callout" tone="secondary">
+                {followers}
+              </Text>
+              <Button
+                label={t('account.editProfile')}
+                variant="secondary"
+                icon="pencil-simple"
+                onPress={() => router.push('/profile')}
+              />
+            </Stack>
+          ) : (
+            <FollowButton
+              followed={member.isFollowed}
+              onPress={follow.toggle}
+              label={t('follow.member', { name: member.name })}
+              text={member.isFollowed ? t('follow.following') : t('follow.follow')}
+              caption={followers}
+              error={follow.error ? t('follow.error') : undefined}
             />
-          ) : undefined
+          )
         }
       />
       <Text variant="heading" accessibilityRole="header">

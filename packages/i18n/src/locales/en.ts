@@ -324,6 +324,7 @@ export const en: Translation = {
   },
   feed: {
     label: 'The feed',
+    errorTitle: 'The feed could not load',
     tabs: { following: 'Following', discover: 'Discover' },
     filter: { label: 'Which projects', all: 'All', testers: 'Looking for testers' },
     nobodyTitle: 'You don’t follow anyone yet',

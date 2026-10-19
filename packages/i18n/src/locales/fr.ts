@@ -336,6 +336,7 @@ export const fr = {
   },
   feed: {
     label: 'Le fil',
+    errorTitle: 'Le fil n’a pas pu se charger',
     tabs: { following: 'Abonnements', discover: 'Découvrir' },
     filter: { label: 'Quels projets', all: 'Tous', testers: 'Cherchent des testeurs' },
     nobodyTitle: 'Tu ne suis personne pour l’instant',
