@@ -394,6 +394,15 @@ export function CatalogueScreen() {
             />
           }
         />
+        {/* Sans pseudo (un membre d'avant la tranche 6a, pas encore rattrapé), sans bio ni
+            outils : le nom reste seul sous la photo, sans trou. */}
+        <MemberHeader
+          name="Inès Martin"
+          avatar={null}
+          bio=""
+          toolsTitle={l.favoriteTools}
+          tools={[]}
+        />
         {/* Une grille de cartes-liens : une colonne sur téléphone, trois sur ordinateur. */}
         <ProjectGrid empty={l.emptyList}>
           <ProjectCard
@@ -940,13 +949,26 @@ function Fields({ l }: { l: Labels }) {
             limit={l.sampleTitle.length - 2}
             showCount
           />
-          {/* Un préfixe (« @ » d'un pseudo), au repos puis refusé par l'API. */}
-          <TextField label={l.handleField} value={handle} onChangeText={setHandle} prefix="@" />
+          {/* Un préfixe (« @ » d'un pseudo), avec son aide et son compteur, au repos puis refusé
+              par l'API : l'erreur remplace l'aide (et le lecteur d'écran l'annonce). Toucher le
+              libellé ou le « @ » met le curseur dans le champ. */}
+          <TextField
+            label={l.handleField}
+            value={handle}
+            onChangeText={setHandle}
+            prefix="@"
+            limit={20}
+            showCount
+            hint={l.handleHint}
+          />
           <TextField
             label={l.handleField}
             value="ines"
             onChangeText={() => {}}
             prefix="@"
+            limit={20}
+            showCount
+            hint={l.handleHint}
             error={l.handleTaken}
           />
         </Stack>

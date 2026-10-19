@@ -13,6 +13,15 @@ export const describedBy = (id: string | undefined): object =>
   Platform.OS === 'web' && id ? { 'aria-describedby': id } : {}
 
 /**
+ * À étaler sur un champ refusé (`{...invalid(Boolean(error))}`) : `aria-invalid` sur le web, que
+ * react-native-web transmet au navigateur (le lecteur d'écran dit « saisie invalide » en arrivant
+ * sur le champ). Absente des types de React Native, et sans équivalent sur téléphone, où l'erreur
+ * est lue dans l'indice du champ.
+ */
+export const invalid = (value: boolean): object =>
+  Platform.OS === 'web' && value ? { 'aria-invalid': true } : {}
+
+/**
  * À étaler sur un bouton qui reste enfoncé une fois touché (une réaction posée) : `aria-pressed`
  * sur le web, que react-native-web transmet au navigateur (le lecteur d'écran dit « activé ») ;
  * sur téléphone, l'état « sélectionné », que React Native sait annoncer.

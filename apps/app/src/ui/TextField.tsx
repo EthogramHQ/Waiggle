@@ -3,11 +3,23 @@
 // Plusieurs champs placés dans un <FieldGroup> partagent le même groupe, séparés par un trait.
 //
 // L'étiquette est aussi donnée aux lecteurs d'écran (accessibilityLabel) : c'est ce qui permet à une
-// personne aveugle de savoir quoi taper, et aux tests de retrouver le champ par son nom.
+// personne aveugle de savoir quoi taper, et aux tests de retrouver le champ par son nom. L'aide et
+// l'erreur lui sont liées aussi : lues après le nom quand on arrive sur le champ, et l'erreur
+// annoncée dès qu'elle apparaît (voir Message, plus bas).
 import { borders, layout, radii, space, textStyles } from '@ruche/brand'
-import { Children, createContext, Fragment, type ReactNode, useContext, useState } from 'react'
+import {
+  Children,
+  createContext,
+  Fragment,
+  type ReactNode,
+  useContext,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
+import { describedBy, invalid } from './aria'
 import { Icon } from './Icon'
 import { Text, type Tone } from './Text'
 import { fontName } from './theme/fonts'
@@ -47,6 +59,9 @@ type Props = {
   | 'autoFocus'
   | 'editable'
   | 'onKeyPress'
+  // Entrée dans un champ d'une ligne : l'écran décide (enregistrer le formulaire, par exemple).
+  | 'onSubmitEditing'
+  | 'returnKeyType'
 >
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.
@@ -125,6 +140,13 @@ export function TextField({
   const [focused, setFocused] = useState(false)
   // Un mot de passe est masqué, mais on peut l'afficher le temps de vérifier ce qu'on a tapé.
   const [revealed, setRevealed] = useState(false)
+  // useRef : une « poignée » vers le champ dessiné, pour lui donner le focus depuis son libellé.
+  const input = useRef<TextInput>(null)
+  // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie le
+  // champ au texte affiché dessous (aria-describedby).
+  const messageId = useId()
+  // Ce qu'on lit sous le champ : l'erreur d'abord, sinon la confirmation, sinon l'aide.
+  const message = error || success || hint
   const body = textStyles.body
   const max = limit ?? inputProps.maxLength
   // Le compteur compte comme la limite : en « unités » de texte (value.length), comme maxLength et
@@ -141,12 +163,20 @@ export function TextField({
         : 'muted'
 
   const row = (
-    <View
+    // Toute la rangée mène au champ : toucher le libellé ou le « @ » y met le curseur, comme une
+    // étiquette <label> sur une page web. accessible et focusable à faux : la rangée n'est ni un
+    // bouton ni un arrêt de Tab ; le lecteur d'écran et le clavier vont droit au champ. (Une touche
+    // dans le champ lui-même reste au champ : React Native le laisse gérer son toucher.)
+    <Pressable
+      accessible={false}
+      focusable={false}
+      onPress={() => {
+        if (inputProps.editable !== false) input.current?.focus()
+      }}
       style={{
         paddingHorizontal: space.lg,
         paddingTop: space.md,
         paddingBottom: space.sm,
-        gap: space.xxs,
         // Dans un groupe, le champ n'a pas de cadre à lui : quand il est choisi, sa ligne prend un
         // fond doux (en plus de son libellé en couleur), pour qu'on voie où l'on tape.
         ...(inGroup && focused ? { backgroundColor: colors.honeySoft } : null),
@@ -167,7 +197,9 @@ export function TextField({
           </Text>
         ) : null}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+      <View
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xxs }}
+      >
         {/* Le préfixe touche la saisie (« @lea », pas « @ lea ») : d'où ce rang à part, sans
             écart. aria-hidden : un lecteur d'écran lirait « arobase » à chaque passage. */}
         {/* minWidth 0 (ici et sur la saisie) : sans lui, un champ du navigateur garde sa largeur
@@ -179,7 +211,19 @@ export function TextField({
             </View>
           ) : null}
           <TextInput
+            ref={input}
             accessibilityLabel={label}
+            // Ce qui est écrit sous le champ, lu après son nom : sur le web par aria-describedby
+            // (le navigateur relie le champ au texte), sur téléphone par l'indice.
+            accessibilityHint={Platform.OS === 'web' ? undefined : message}
+            {...describedBy(message ? messageId : undefined)}
+            // « Saisie invalide » : le lecteur d'écran le dit en arrivant sur le champ (web).
+            {...invalid(Boolean(error))}
+            // Entrée enregistre sans quitter le champ (web) : le focus ne part pas sur la page, et
+            // on peut corriger tout de suite si le serveur refuse.
+            {...(Platform.OS === 'web' && inputProps.onSubmitEditing
+              ? { blurOnSubmit: false }
+              : null)}
             value={value}
             onChangeText={onChangeText}
             onFocus={() => setFocused(true)}
@@ -236,62 +280,77 @@ export function TextField({
         ) : null}
       </View>
       {/* Dans un groupe, le message reste dans la ligne du champ concerné. */}
-      {inGroup ? <Message error={error} hint={hint} success={success} /> : null}
-    </View>
+      {inGroup ? <Message id={messageId} error={error} hint={hint} success={success} /> : null}
+    </Pressable>
   )
 
   if (inGroup) return row
   return (
-    <View style={{ gap: space.sm }}>
+    <View>
       <GroupFrame state={error ? 'error' : focused ? 'focus' : 'idle'}>{row}</GroupFrame>
-      <Message error={error} hint={hint} success={success} outside />
+      <Message id={messageId} error={error} hint={hint} success={success} outside />
     </View>
   )
 }
 
-/** L'erreur si elle existe, sinon la confirmation, sinon l'aide, sinon rien. */
+/**
+ * L'erreur si elle existe, sinon la confirmation, sinon l'aide, sinon rien.
+ *
+ * L'erreur et la confirmation sont dans une « région vivante » polie (aria-live, que React Native
+ * traduit pour Android et le web) : un texte qui y apparaît est lu par le lecteur d'écran, après ce
+ * qu'il dit déjà. Le membre qui vient de toucher « Enregistrer » entend ainsi « Ce pseudo est déjà
+ * pris » sans avoir à chercher le champ. La région existe toujours, même vide : un lecteur d'écran
+ * ne suit que les régions déjà présentes. L'aide, elle, reste hors de la région : elle ne change
+ * pas, et la relire à chaque lettre tapée après une erreur serait du bruit.
+ */
 function Message({
+  id,
   error,
   hint,
   success,
   outside = false,
 }: {
+  /** L'identifiant que le champ cite dans aria-describedby. */
+  id: string
   error?: string | undefined
   hint?: string | undefined
   success?: string | undefined
   outside?: boolean
 }) {
-  const padding = outside ? { paddingHorizontal: space.sm } : { paddingBottom: space.xs }
-  if (error) {
-    return (
-      <View style={{ flexDirection: 'row', gap: space.xs, alignItems: 'center', ...padding }}>
-        <Icon name="warning-circle" size={16} tone="danger" />
-        <View style={{ flex: 1 }}>
-          <Text variant="caption" tone="danger">
-            {error}
-          </Text>
-        </View>
+  // L'écart avec le champ n'existe que s'il y a un texte : un champ sans aide garde sa hauteur.
+  const padding = outside
+    ? { paddingHorizontal: space.sm, paddingTop: space.sm }
+    : { paddingTop: space.xxs, paddingBottom: space.xs }
+  const status = error ? (
+    <View style={{ flexDirection: 'row', gap: space.xs, alignItems: 'center', ...padding }}>
+      <Icon name="warning-circle" size={16} tone="danger" />
+      <View style={{ flex: 1 }}>
+        <Text variant="caption" tone="danger">
+          {error}
+        </Text>
       </View>
-    )
-  }
-  if (success) {
-    return (
-      <View style={{ flexDirection: 'row', gap: space.xs, alignItems: 'center', ...padding }}>
-        <Icon name="check-circle" size={16} tone="success" />
-        <View style={{ flex: 1 }}>
-          <Text variant="caption" weight={600} tone="success">
-            {success}
-          </Text>
-        </View>
+    </View>
+  ) : success ? (
+    <View style={{ flexDirection: 'row', gap: space.xs, alignItems: 'center', ...padding }}>
+      <Icon name="check-circle" size={16} tone="success" />
+      <View style={{ flex: 1 }}>
+        <Text variant="caption" weight={600} tone="success">
+          {success}
+        </Text>
       </View>
-    )
-  }
-  if (!hint) return null
+    </View>
+  ) : null
   return (
-    <View style={padding}>
-      <Text variant="caption" tone="muted">
-        {hint}
-      </Text>
+    // nativeID devient l'attribut id sur le web : c'est lui que cite aria-describedby.
+    <View nativeID={id}>
+      {!status && hint ? (
+        <View style={padding}>
+          <Text variant="caption" tone="muted">
+            {hint}
+          </Text>
+        </View>
+      ) : null}
+      <View aria-live="polite">{status}</View>
     </View>
   )
 }

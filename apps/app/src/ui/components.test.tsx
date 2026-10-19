@@ -4,6 +4,7 @@
 import { appName, fontWeights, maxTextScale } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
+import { Platform, TextInput } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
@@ -290,6 +291,104 @@ describe('TextField', () => {
 
     expect(onChangeText).toHaveBeenCalledWith('Léa')
     expect(screen.getByText('280 caractères au plus')).toBeTruthy()
+  })
+})
+
+// Tranche 6a : un champ refusé se dit aux lecteurs d'écran, et son libellé mène à la saisie.
+describe('TextField, read by a screen reader', () => {
+  it('reads its hint after its name, then its error instead (phone)', async () => {
+    const { rerender } = await renderWithProviders(
+      <TextField label="Pseudo" value="max" onChangeText={() => {}} hint="3 à 20 caractères" />,
+    )
+    expect(screen.getByLabelText('Pseudo')).toHaveProp('accessibilityHint', '3 à 20 caractères')
+
+    await rerender(
+      <TextField
+        label="Pseudo"
+        value="max"
+        onChangeText={() => {}}
+        hint="3 à 20 caractères"
+        error="Ce pseudo est déjà pris."
+      />,
+    )
+    expect(screen.getByLabelText('Pseudo')).toHaveProp(
+      'accessibilityHint',
+      'Ce pseudo est déjà pris.',
+    )
+  })
+
+  it('announces an error as soon as it appears, politely', async () => {
+    await renderWithProviders(
+      <TextField label="Pseudo" value="max" onChangeText={() => {}} error="Déjà pris." />,
+    )
+
+    // La région vivante entoure le message : il est lu sans que le membre cherche le champ. On
+    // remonte du texte jusqu'au premier bloc qui en est une.
+    let region = screen.getByText('Déjà pris.').parent
+    while (region && region.props['aria-live'] === undefined) region = region.parent
+    expect(region).toHaveProp('aria-live', 'polite')
+  })
+
+  it('is described by its message and marked invalid on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <TextField label="Pseudo" value="max" onChangeText={() => {}} error="Déjà pris." />,
+      )
+
+      const field = screen.getByLabelText('Pseudo')
+      expect(field).toHaveProp('aria-invalid', true)
+      // aria-describedby cite l'identifiant du bloc qui porte le message.
+      const id = field.props['aria-describedby']
+      expect(id).toEqual(expect.any(String))
+      let described = screen.getByText('Déjà pris.').parent
+      while (described && described.props.nativeID !== id) described = described.parent
+      expect(described).toHaveTextContent('Déjà pris.')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is not marked invalid without an error', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<TextField label="Pseudo" value="max" onChangeText={() => {}} />)
+
+      expect(screen.getByLabelText('Pseudo')).not.toHaveProp('aria-invalid')
+      expect(screen.getByLabelText('Pseudo')).not.toHaveProp('aria-describedby')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('gives the focus to the field when its label or prefix is touched', async () => {
+    const focus = jest.spyOn(TextInput.prototype, 'focus')
+    await renderWithProviders(
+      <TextField label="Pseudo" value="lea" onChangeText={() => {}} prefix="@" />,
+    )
+
+    await fireEvent.press(screen.getByText('Pseudo'))
+    // Le « @ » est caché aux lecteurs d'écran (l'étiquette suffit) : on le cherche quand même.
+    await fireEvent.press(screen.getByText('@', { includeHiddenElements: true }))
+
+    expect(focus).toHaveBeenCalledTimes(2)
+    focus.mockRestore()
+  })
+
+  it('lets the screen act on Enter', async () => {
+    const onSubmitEditing = jest.fn()
+    await renderWithProviders(
+      <TextField
+        label="Nom"
+        value="Léa"
+        onChangeText={() => {}}
+        onSubmitEditing={onSubmitEditing}
+      />,
+    )
+
+    await fireEvent(screen.getByLabelText('Nom'), 'submitEditing')
+
+    expect(onSubmitEditing).toHaveBeenCalled()
   })
 })
 
