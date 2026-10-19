@@ -112,8 +112,10 @@ export function Segmented<T extends string>({
             onPress={() => onChange(option.value)}
             {...keys(index)}
             style={{
-              // Côte à côte, chacun sa part de largeur ; très agrandis, chacun sa ligne entière.
-              ...(fill || large ? { flexGrow: 1, flexBasis: large ? '100%' : 0 } : null),
+              // Côte à côte, ils se partagent la largeur ; flexBasis 'auto' : chacun part de la taille
+              // de son texte, si bien qu'un texte agrandi qui ne tient plus passe à la ligne au lieu
+              // de chevaucher son voisin. Très agrandis (sur téléphone), chacun sa ligne entière.
+              ...(fill || large ? { flexGrow: 1, flexBasis: large ? '100%' : 'auto' } : null),
               flexDirection: 'row',
               gap: space.xs,
               alignItems: 'center',

@@ -36,6 +36,7 @@ export const fr = {
     haveAccount: 'J’ai déjà un compte',
     account: 'Mon compte',
     publish: 'Publier un projet',
+    publishShort: 'Publier',
     myProjects: 'Mes projets',
     membersOnly: 'Les projets et les profils ne sont visibles que par les membres connectés.',
     openSource: '{{appName}} est un logiciel libre.',

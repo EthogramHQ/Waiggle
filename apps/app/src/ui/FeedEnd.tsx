@@ -37,7 +37,15 @@ export function FeedEnd({ state, moreLabel, endLabel, onMore, errorLabel, retryL
   const button = useRef<View>(null)
   const end = useRef<View>(null)
   const hadFocus = useRef(false)
+  // Deux clics dans le même instant arrivent avant que l'écran ne se redessine en « chargement » :
+  // ce drapeau, posé au premier clic, fait ignorer le second. Il retombe dès que l'état change.
+  const asked = useRef(false)
+  useEffect(() => {
+    if (state !== 'loading') asked.current = false
+  }, [state])
   const more = () => {
+    if (asked.current) return
+    asked.current = true
     const node = button.current as unknown as WebNode | null
     hadFocus.current = Platform.OS === 'web' && Boolean(node?.contains?.(activeElement()))
     onMore()

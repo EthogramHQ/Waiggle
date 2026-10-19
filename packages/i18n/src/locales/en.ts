@@ -30,6 +30,7 @@ export const en: Translation = {
     haveAccount: 'I already have an account',
     account: 'My account',
     publish: 'Publish a project',
+    publishShort: 'Publish',
     myProjects: 'My projects',
     membersOnly: 'Projects and profiles are only visible to signed-in members.',
     openSource: '{{appName}} is free software.',

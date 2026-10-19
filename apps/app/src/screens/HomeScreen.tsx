@@ -132,8 +132,11 @@ function MemberHome({ id, name }: { id: string; name: string }) {
       {/* Sur téléphone, une seule rangée : « Publier » en clair, ses projets et son compte en
           icônes (avec leur nom pour les lecteurs d'écran). Le fil arrive ainsi plus haut. */}
       <Row gap="sm" wrap>
+        {/* Sur téléphone, « Publier » tout court (le nom lu reste « Publier un projet ») : la rangée
+            tient sur une ligne, même sur un écran de 320 points. */}
         <Button
-          label={t('home.publish')}
+          label={compact ? t('home.publishShort') : t('home.publish')}
+          spokenLabel={t('home.publish')}
           icon="plus"
           size="compact"
           onPress={() => router.push('/projects/new')}
