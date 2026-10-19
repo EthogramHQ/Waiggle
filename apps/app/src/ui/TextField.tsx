@@ -170,7 +170,9 @@ export function TextField({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         {/* Le préfixe touche la saisie (« @lea », pas « @ lea ») : d'où ce rang à part, sans
             écart. aria-hidden : un lecteur d'écran lirait « arobase » à chaque passage. */}
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+        {/* minWidth 0 (ici et sur la saisie) : sans lui, un champ du navigateur garde sa largeur
+            de départ et dépasse du cadre à texte agrandi, au lieu de rétrécir. */}
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }}>
           {prefix ? (
             <View aria-hidden>
               <Text tone="muted">{prefix}</Text>
@@ -188,6 +190,7 @@ export function TextField({
             secureTextEntry={secureTextEntry && !revealed}
             style={{
               flex: 1,
+              minWidth: 0,
               fontFamily: fontName(body.family, body.weight),
               fontSize: body.size,
               lineHeight: body.lineHeight,
