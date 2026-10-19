@@ -14,6 +14,9 @@ import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { NewItemsBanner } from './NewItemsBanner'
+import { NoteCard } from './NoteCard'
+import { NoteComposer } from './NoteComposer'
+import { NoteList } from './NoteList'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -728,5 +731,224 @@ describe('fonts', () => {
     // Funnel Display n'est livrée qu'en 700 : un titre demandé en 500 prend le 700.
     expect(fontName('display', 500)).toBe('FunnelDisplay-700')
     expect(fontName('text', 600)).toBe('FunnelSans-600')
+  })
+})
+
+// --- Tranche 4b : les notes d'un projet ---
+
+describe('NoteCard', () => {
+  const card = {
+    label: 'Note de Léa sur Mon agent de recettes',
+    project: 'Mon agent de recettes',
+    author: { name: 'Léa', avatar: null },
+    body: 'v2 : mode hors ligne',
+    when: '14 oct.',
+  }
+
+  it('is a link named after the note and its project, and opens it when touched', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<NoteCard {...card} onPress={onPress} />)
+
+    await fireEvent.press(
+      screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' }),
+    )
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the note, its project, its author and its date', async () => {
+    await renderWithProviders(<NoteCard {...card} onPress={jest.fn()} />)
+
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.getByText('Mon agent de recettes')).toBeTruthy()
+    expect(screen.getByText('Léa')).toBeTruthy()
+    expect(screen.getByText('14 oct.')).toBeTruthy()
+  })
+
+  it('shows the text exactly as written, without formatting it', async () => {
+    // Une note est du texte brut : les astérisques et les balises restent des caractères.
+    const body = '**v2** : <b>hors ligne</b>\nEt plus rapide.'
+    await renderWithProviders(<NoteCard {...card} body={body} onPress={jest.fn()} />)
+
+    expect(screen.getByText(body)).toBeTruthy()
+  })
+})
+
+describe('NoteList', () => {
+  const notes = [
+    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
+    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+  ]
+
+  it('shows each note with its date, in the order given', async () => {
+    await renderWithProviders(<NoteList notes={notes} />)
+
+    const shown = screen.getAllByText(/^(v2 : mode hors ligne|Première version en ligne)$/)
+    expect(shown).toHaveLength(2)
+    expect(shown[0]).toHaveTextContent('v2 : mode hors ligne')
+    expect(shown[1]).toHaveTextContent('Première version en ligne')
+    expect(screen.getByText('14 oct.')).toBeTruthy()
+    expect(screen.getByText('12 oct.')).toBeTruthy()
+  })
+
+  it('offers to delete each note when asked, and says which one', async () => {
+    const onDelete = jest.fn()
+    await renderWithProviders(
+      <NoteList notes={notes} onDelete={onDelete} deleteLabel="Supprimer la note" />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Supprimer la note' })
+    expect(buttons).toHaveLength(2)
+    const second = buttons[1]
+    if (!second) throw new Error('a delete button per note is expected')
+    await fireEvent.press(second)
+
+    expect(onDelete).toHaveBeenCalledWith('n1')
+  })
+
+  it('offers no delete button without an action', async () => {
+    await renderWithProviders(<NoteList notes={notes} deleteLabel="Supprimer la note" />)
+
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('shows the text exactly as written, without formatting it', async () => {
+    const body = '**v2** : <b>hors ligne</b>'
+    await renderWithProviders(<NoteList notes={[{ id: 'n3', body, when: '15 oct.' }]} />)
+
+    expect(screen.getByText(body)).toBeTruthy()
+  })
+
+  it('says so when there is no note, if given a message', async () => {
+    await renderWithProviders(<NoteList notes={[]} empty="Pas encore de note." />)
+
+    expect(screen.getByText('Pas encore de note.')).toBeTruthy()
+  })
+
+  it('shows nothing at all when there is no note and no message', async () => {
+    await renderWithProviders(<NoteList notes={[]} />)
+
+    expect(screen.queryAllByText(/./)).toHaveLength(0)
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('NoteComposer', () => {
+  const labels = {
+    open: 'Publier une note',
+    field: 'Ta note',
+    hint: 'Ce qui a changé.',
+    submit: 'Publier la note',
+    cancel: 'Annuler',
+  }
+  const handlers = () => ({
+    onOpen: jest.fn(),
+    onCancel: jest.fn(),
+    onChangeText: jest.fn(),
+    onSubmit: jest.fn(),
+  })
+
+  it('is a single button while closed, which asks to open the field', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open={false} value="" max={1000} labels={labels} {...on} />,
+    )
+
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+
+    expect(on.onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the field with its counter once open, then publishes or cancels', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} autoFocus={false} />,
+    )
+
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
+    expect(screen.getByText('2 / 1000')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(on.onSubmit).toHaveBeenCalledTimes(1)
+    expect(on.onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays busy while the note is on its way, without publishing it twice', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
+    )
+
+    const submit = screen.getByRole('button', { name: 'Publier la note' })
+    expect(submit).toBeBusy()
+    await fireEvent.press(submit)
+
+    expect(on.onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('announces a failed publication, above the text kept in the field', async () => {
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...handlers()} error="Raté." />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Raté.')
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2')
+  })
+
+  it('announces the published note once closed', async () => {
+    await renderWithProviders(
+      <NoteComposer
+        open={false}
+        value=""
+        max={1000}
+        labels={labels}
+        {...handlers()}
+        success="Note publiée."
+      />,
+    )
+
+    // Une confirmation se lit poliment (role « status »), comme « Note supprimée. » : pas une alerte.
+    expect(screen.getByRole('status')).toHaveTextContent('Note publiée.')
+    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
+  })
+
+  it('freezes the text and waits to be cancelled while the note is on its way', async () => {
+    const on = handlers()
+    await renderWithProviders(
+      <NoteComposer open value="v2" max={1000} labels={labels} {...on} pending />,
+    )
+
+    expect(screen.getByLabelText('Ta note')).toHaveProp('editable', false)
+    const cancel = screen.getByRole('button', { name: 'Annuler' })
+    expect(cancel).toBeDisabled()
+    await fireEvent.press(cancel)
+    expect(on.onCancel).not.toHaveBeenCalled()
+  })
+})
+
+// --- Relectures de la 4b ---
+
+describe('TextField counter', () => {
+  it('counts like the limit does, an emoji taking two units', async () => {
+    // maxLength et les schémas de l'API comptent en unités de texte : « 🐝 » en vaut deux.
+    await renderWithProviders(
+      <TextField label="Ta note" value="🐝" onChangeText={() => {}} maxLength={1000} showCount />,
+    )
+
+    expect(screen.getByText('2 / 1000')).toBeTruthy()
+  })
+})
+
+describe('TextLink', () => {
+  it('can be disabled, and says so', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<TextLink label="Annuler" role="button" onPress={onPress} disabled />)
+
+    const link = screen.getByRole('button', { name: 'Annuler' })
+    expect(link).toBeDisabled()
+    await fireEvent.press(link)
+    expect(onPress).not.toHaveBeenCalled()
   })
 })

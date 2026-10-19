@@ -400,3 +400,51 @@ describe('the home screen of a member on a computer', () => {
     }
   })
 })
+
+// --- Tranche 4b : les notes des projets suivis dans « Abonnements » ---
+
+/** Une note de Léa sur son agent de recettes, telle que le fil la donne. */
+const noteOfLea: FeedItem = {
+  kind: 'note',
+  at: '2026-10-14T09:00:00.000Z',
+  note: {
+    id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
+    body: 'v2 : mode hors ligne',
+    createdAt: '2026-10-14T09:00:00.000Z',
+  },
+  project: summaryOf(recipesProject),
+}
+
+describe('notes in the « following » feed on the home screen', () => {
+  it('shows the note of a followed project, named after its author and its project', async () => {
+    mockFollowing({ items: [noteOfLea, fromMax] })
+    await renderMemberHome()
+
+    expect(screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    // Le projet qui suit dans le fil est toujours une carte de projet.
+    expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
+  })
+
+  it('opens the page of the project when the note is touched', async () => {
+    mockFollowing({ items: [noteOfLea] })
+    await renderMemberHome()
+
+    await fireEvent.press(
+      screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' }),
+    )
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/projects/[id]',
+      params: { id: recipesProject.id },
+    })
+  })
+
+  it('shows a note and the new project it belongs to as two separate items', async () => {
+    mockFollowing({ items: [noteOfLea, fromLea] })
+    await renderMemberHome()
+
+    expect(screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+  })
+})

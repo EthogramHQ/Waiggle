@@ -69,6 +69,8 @@ const icons = [
   'tag',
   'chat-circle',
   'chat-circle-dots',
+  'megaphone-simple', // une note dans le fil : l'auteur annonce du nouveau
+  'note-pencil', // écrire une note dans le journal
   // Messages et sécurité
   'check-circle',
   'warning',

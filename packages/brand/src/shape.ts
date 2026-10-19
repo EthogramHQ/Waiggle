@@ -36,6 +36,7 @@ export const borders = {
   hairline: 1,
   strong: 1.5, // bordure des boutons secondaires
   focus: 2, // contour de l'élément choisi au clavier
+  quote: 3, // trait de miel devant une citation (le texte d'une note)
 } as const
 
 /**

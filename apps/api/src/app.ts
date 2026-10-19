@@ -22,6 +22,7 @@ import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
+import { noteRoutes } from './routes/notes'
 import { projectRoutes } from './routes/projects'
 import { tagRoutes } from './routes/tags'
 import { visualRoutes } from './routes/visuals'
@@ -115,6 +116,8 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.use('/v1/*', (c, next) => {
     if (c.req.path === '/v1/me/avatar') return next()
     if (/^\/v1\/projects\/[^/]+\/visuals$/.test(c.req.path)) return next()
+    // Une note pèse au plus 1 000 caractères : la petite limite suffit largement.
+    if (/^\/v1\/projects\/[^/]+\/notes(\/|$)/.test(c.req.path)) return small(c, next)
     if (c.req.path === '/v1/projects' || c.req.path.startsWith('/v1/projects/')) {
       return projects(c, next)
     }
@@ -150,6 +153,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', memberRoutes({ db, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
   app.route('/', followRoutes({ db, limiter }))
+  app.route('/', noteRoutes({ db, limiter }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 

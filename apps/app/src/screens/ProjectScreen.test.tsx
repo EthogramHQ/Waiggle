@@ -1,7 +1,8 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useFollow } from '../follows/api'
+import { useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject, getProject } from '../projects/api'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -17,11 +18,16 @@ jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest.fn() }))
 // Suivre : un faux hook, dont le test lit les appels (toggle) et choisit l'erreur.
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
+// Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
+jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
+// Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
+let mockParams: Record<string, string | undefined> = {}
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+  useLocalSearchParams: () => mockParams,
 }))
 
 const { id } = recipesProject
@@ -243,5 +249,355 @@ describe('following a project from its page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'L’abonnement n’a pas pu être enregistré. Réessaie.',
     )
+  })
+})
+
+// --- Tranche 4b : le journal du projet ---
+
+const mockPublish = jest.fn()
+const mockRemove = jest.fn()
+
+beforeEach(() => {
+  mockParams = {}
+  mockPublish.mockReset().mockResolvedValue(true)
+  mockRemove.mockReset().mockResolvedValue(true)
+  jest
+    .mocked(usePublishNote)
+    .mockReset()
+    .mockReturnValue({ publish: mockPublish, pending: false, error: false })
+  jest.mocked(useDeleteNote).mockReset().mockReturnValue({ remove: mockRemove, error: false })
+})
+
+/** Deux notes de Léa, telles que l'API les donne : de la plus récente à la plus ancienne. */
+const v2 = {
+  id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
+  body: 'v2 : mode hors ligne',
+  createdAt: '2026-10-14T09:00:00.000Z',
+}
+const firstVersion = {
+  id: '1c2d3e4f-5061-4b72-9c83-d4e5f6071829',
+  body: 'Première version en ligne',
+  createdAt: '2026-10-12T09:00:00.000Z',
+}
+const withNotes = { ...recipesProject, notes: [v2, firstVersion] }
+
+/** Le projet de Léa, vu par Max. */
+const seenByOther = (project = withNotes) => {
+  mockSession({ user: { id: 'u2', name: 'Max' } })
+  jest.mocked(getProject).mockResolvedValue({ ...project, isMine: false })
+}
+
+/** Les notes affichées, dans l'ordre de la page. */
+const shownNotes = () => screen.getAllByText(/^(v2 : mode hors ligne|Première version en ligne)$/)
+
+/**
+ * Le contenu de la fenêtre de confirmation qui porte ce titre : on remonte depuis le titre jusqu'au
+ * premier ensemble qui contient aussi des boutons. Utile quand un bouton de la page porte le même
+ * nom qu'un bouton de la fenêtre (« Supprimer », pour le projet comme pour la note).
+ */
+const dialogTitled = (title: string) => {
+  let node = screen.getByRole('header', { name: title }).parent
+  while (node && within(node).queryAllByRole('button').length === 0) node = node.parent
+  if (!node) throw new Error(`no dialog titled ${title}`)
+  return within(node)
+}
+
+/** Le bouton « Supprimer la note » de la note numéro `index` (0 : la plus récente). */
+const deleteButton = async (index: number) => {
+  const buttons = await screen.findAllByRole('button', { name: 'Supprimer la note' })
+  const button = buttons[index]
+  if (!button) throw new Error(`no delete button for note ${index}`)
+  return button
+}
+
+describe('the journal of a project', () => {
+  it('shows the notes under a « Journal » header, newest first', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'Journal' })).toBeTruthy()
+    const shown = shownNotes()
+    expect(shown).toHaveLength(2)
+    expect(shown[0]).toHaveTextContent('v2 : mode hors ligne')
+    expect(shown[1]).toHaveTextContent('Première version en ligne')
+  })
+
+  it('shows no journal to another member when there is no note', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.queryByRole('header', { name: 'Journal' })).toBeNull()
+  })
+
+  it('offers another member neither to publish nor to delete a note', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Journal' })
+    expect(screen.queryByRole('button', { name: 'Publier une note' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Supprimer la note' })).toBeNull()
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+  })
+
+  it('invites the author to write a first note', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'Journal' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
+      ),
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
+  })
+})
+
+describe('publishing a note from the project page', () => {
+  it('opens a field to write the note, then publishes it', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Le champ n'est pas ouvert d'office.
+    await screen.findByRole('header', { name: 'Journal' })
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+
+    expect(usePublishNote).toHaveBeenCalledWith(id)
+    expect(mockPublish).toHaveBeenCalledWith('v2 : mode hors ligne')
+  })
+
+  it('empties and closes the field once the note is published', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+
+    await waitFor(() => expect(screen.queryByLabelText('Ta note')).toBeNull())
+    // Rouvert, le champ repart de zéro.
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('')
+  })
+
+  it('says so when the note could not be published, and keeps the text', async () => {
+    mockPublish.mockResolvedValue(false)
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La note n’a pas pu être publiée. Réessaie.',
+    )
+    // Rien n'est perdu : le texte attend dans le champ, pour réessayer.
+    expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2 : mode hors ligne')
+  })
+
+  it('forgets the error once the field is closed and opened again', async () => {
+    mockPublish.mockResolvedValue(false)
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+    await screen.findByRole('alert')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+
+    // L'ancienne erreur n'est pas relue : rien n'a encore été réessayé.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('tells the author of a private project that nobody else sees its notes', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(
+      await screen.findByText(
+        'Pas encore de note. Ce projet est privé : toi seul verras ses notes, jusqu’à ce que tu le rendes public.',
+      ),
+    ).toBeTruthy()
+  })
+})
+
+describe('deleting a note from the project page', () => {
+  beforeEach(() => {
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+  })
+
+  it('offers the author to delete each note, once confirmed', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
+    await fireEvent.press(await deleteButton(0))
+    expect(mockRemove).not.toHaveBeenCalled() // il faut d'abord confirmer
+    const dialog = dialogTitled('Supprimer cette note ?')
+    await fireEvent.press(dialog.getByRole('button', { name: 'Supprimer' }))
+
+    expect(useDeleteNote).toHaveBeenCalledWith(id)
+    expect(mockRemove).toHaveBeenCalledWith(v2.id)
+  })
+
+  it('deletes nothing when the author changes her mind', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await deleteButton(1))
+    await fireEvent.press(
+      dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Annuler' }),
+    )
+
+    expect(mockRemove).not.toHaveBeenCalled()
+    expect(screen.queryByRole('header', { name: 'Supprimer cette note ?' })).toBeNull()
+  })
+})
+
+describe('the note suggested after a change of status', () => {
+  const suggested = 'Le projet passe en « Testable ».'
+
+  it('opens the field, filled in with the new status, when the author comes from the form', async () => {
+    mockParams = { id, announce: 'testable' }
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByLabelText('Ta note')).toHaveDisplayValue(suggested)
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+
+    expect(mockPublish).toHaveBeenCalledWith(suggested)
+  })
+
+  it('suggests nothing to another member', async () => {
+    mockParams = { id, announce: 'testable' }
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Journal' })
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+    expect(screen.queryByText(suggested)).toBeNull()
+  })
+
+  it('suggests nothing for a status that does not exist', async () => {
+    // Une adresse fabriquée à la main ne doit rien glisser dans le champ de l'auteur.
+    mockParams = { id, announce: 'piratage' }
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Journal' })
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+  })
+
+  it('says under the field why it opened by itself', async () => {
+    mockParams = { id, announce: 'testable' }
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByLabelText('Ta note')
+    // \s : les espaces insécables de la typographie française.
+    expect(
+      screen.getByText(/Ton projet est passé en «\sTestable\s»\s: annonce-le à tes abonnés/),
+    ).toBeTruthy()
+  })
+})
+
+// --- Relectures de la 4b : quand « Réessaie » ne sert à rien, et les suites d'une suppression ---
+
+/** Ouvre le champ, écrit une note et la publie. */
+const publishSomething = async () => {
+  await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+  await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+  await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+}
+
+describe('a note refused for a reason that trying again cannot fix', () => {
+  beforeEach(() => mockPublish.mockResolvedValue(false))
+
+  it('says that the 30 notes of the day are used up', async () => {
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true, reason: 'limited' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await publishSomething()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Tu as publié 30 notes aujourd’hui. La suivante pourra partir demain.',
+    )
+  })
+
+  it('says that the session expired', async () => {
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true, reason: 'expired' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await publishSomething()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+  })
+})
+
+describe('writing a note', () => {
+  it('forgets the complaint about an empty note as soon as the text changes', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+    expect(screen.getByText('Écris ta note avant de la publier.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v')
+
+    expect(screen.queryByText('Écris ta note avant de la publier.')).toBeNull()
+    expect(mockPublish).not.toHaveBeenCalled()
+  })
+
+  it('freezes the text and the cancel button while the note is on its way', async () => {
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: true, error: false })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+
+    expect(screen.getByLabelText('Ta note')).toHaveProp('editable', false)
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  })
+})
+
+describe('after deleting a note', () => {
+  beforeEach(() => {
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+  })
+
+  it('keeps the window open with the reason when the deletion fails, to try again', async () => {
+    mockRemove.mockResolvedValue(false)
+    jest.mocked(useDeleteNote).mockReturnValue({ remove: mockRemove, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await deleteButton(0))
+    await fireEvent.press(
+      dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    const dialog = dialogTitled('Supprimer cette note ?')
+    expect(dialog.getByRole('alert')).toHaveTextContent(
+      'La note n’a pas pu être supprimée. Réessaie.',
+    )
+    await fireEvent.press(dialog.getByRole('button', { name: 'Supprimer' }))
+    expect(mockRemove).toHaveBeenCalledTimes(2)
+  })
+
+  it('confirms the deletion without interrupting the screen reader', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await deleteButton(0))
+    await fireEvent.press(
+      dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Note supprimée.')
+    expect(screen.queryByRole('header', { name: 'Supprimer cette note ?' })).toBeNull()
   })
 })

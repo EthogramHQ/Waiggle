@@ -2,22 +2,33 @@
 // (outils, temps passé, prompts clés) et sa description. L'auteur peut le modifier ou le supprimer.
 // L'auteur mène à sa page de membre, et chaque outil à la page de son étiquette. Un autre membre
 // peut suivre le projet ; tous voient combien de membres le suivent.
-// Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture et la description à
-// gauche, le reste à droite.
+// Le journal (tranche 4b) : les notes de l'auteur, de la plus récente à la plus ancienne. L'auteur y
+// publie et y supprime ses notes ; après un changement de statut, le formulaire le ramène ici avec
+// « ?announce=<statut> », et une note toute prête l'attend dans le champ.
+// Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture, la description et le
+// journal à gauche, les informations et les actions à droite.
 // La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
 // première photo ; sur ordinateur, la première photo. Des vignettes permettent de voir les autres,
 // et la lumière d'ambiance prend la couleur de la photo affichée.
-import type { Project, ProjectVisual } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import {
+  NoteText,
+  PROJECT_NOTE_MAX,
+  type Project,
+  ProjectStatus,
+  type ProjectVisual,
+} from '@ruche/contracts'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
 import { useOpenOutside } from '../navigation/links'
+import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject } from '../projects/api'
 import { hostOf, shortDate } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
@@ -32,6 +43,8 @@ import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
+import { NoteComposer } from '../ui/NoteComposer'
+import { NoteList, type NoteListHandle } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
 import { Pressed } from '../ui/Pressed'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -42,6 +55,7 @@ import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
@@ -339,6 +353,9 @@ function ProjectView({ project }: { project: Project }) {
     </Stack>
   ) : null
 
+  // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
+  const journal = project.isMine || project.notes.length > 0 ? <Journal project={project} /> : null
+
   // La lumière d'ambiance prend la couleur de la photo affichée (sans photo : la lumière miel).
   const thumbhash = shown?.visual.thumbhash ?? null
 
@@ -362,6 +379,9 @@ function ProjectView({ project }: { project: Project }) {
               {cover}
               {thumbnails}
               {description}
+              {/* Ce qui se lit longtemps va dans la colonne principale ; la latérale garde les
+                  informations et les actions. */}
+              {journal}
             </>
           }
           side={
@@ -387,7 +407,240 @@ function ProjectView({ project }: { project: Project }) {
       {info}
       {recipe}
       {description}
+      {journal}
       {ownerActions}
     </Screen>
+  )
+}
+
+/**
+ * Le journal du projet : ses notes et, pour l'auteur, de quoi en publier ou en supprimer une. Un
+ * composant à part : ses états (le texte en cours, la note à supprimer) ne redessinent pas toute la
+ * page à chaque lettre tapée.
+ */
+function Journal({ project }: { project: Project }) {
+  const { t, i18n } = useTranslation()
+  const publishNote = usePublishNote(project.id)
+  const deleteNote = useDeleteNote(project.id)
+  // Le champ « Ta note » : ouvert ou non, son texte, et le problème du texte s'il y en a un.
+  const [composing, setComposing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [draftError, setDraftError] = useState<string | undefined>()
+  // Le texte à jour, lu à la fin d'un envoi (la fonction en cours ne voit que l'ancien).
+  const latestDraft = useRef(draft)
+  const changeDraft = (text: string) => {
+    latestDraft.current = text
+    setDraft(text)
+    // Le texte a changé : l'ancien reproche (« Écris ta note… ») ne vaut plus.
+    setDraftError(undefined)
+  }
+  // La confirmation affichée : « Note publiée. » ou « Note supprimée. », jusqu'au geste suivant.
+  const [done, setDone] = useState<'published' | 'deleted' | null>(null)
+  // Le statut annoncé par le formulaire (?announce=) : l'aide du champ dit pourquoi il est ouvert.
+  const [announcing, setAnnouncing] = useState<ProjectStatus | null>(null)
+  // Deux appuis dans le même instant arrivent avant que le bouton ne passe en « en cours » : ce
+  // drapeau, posé au premier, fait ignorer le second (une seule note publiée).
+  const sending = useRef(false)
+  // La note dont on demande confirmation de la suppression, et sa place dans le journal.
+  const [deleting, setDeleting] = useState<{ id: string; index: number } | null>(null)
+  const [removing, setRemoving] = useState(false)
+  // Les erreurs de React Query restent jusqu'au prochain envoi : on ne les montre qu'après un envoi,
+  // et on les cache dès qu'on rouvre le champ ou une nouvelle confirmation.
+  const [showPublishError, setShowPublishError] = useState(false)
+  const [showDeleteError, setShowDeleteError] = useState(false)
+  // Une fois la note supprimée et la fenêtre refermée, le focus va sur la note qui a pris sa place.
+  const router = useRouter()
+  const notesHandle = useRef<NoteListHandle>(null)
+  const focusAfterClose = useRef<number | null>(null)
+
+  // Arrivé du formulaire après un changement de statut (?announce=testable) : le champ s'ouvre avec
+  // une note toute prête (« Le projet passe en « Testable ». »). Seulement pour l'auteur, et
+  // seulement pour un vrai statut : une adresse fabriquée ne glisse rien dans son champ. L'adresse
+  // n'est connue que dans le navigateur : on attend d'y être (voir ui/theme/hydration.ts).
+  const announced = firstParam(useLocalSearchParams<{ announce?: string | string[] }>().announce)
+  const hydrated = useHydrated()
+  // Le statut déjà proposé : changer de langue ensuite ne réécrit pas le champ.
+  const proposed = useRef<string | null>(null)
+  useEffect(() => {
+    if (!hydrated || !project.isMine || proposed.current === announced) return
+    const status = ProjectStatus.safeParse(announced)
+    if (!status.success) return
+    proposed.current = status.data
+    const text = t('project.notes.statusPrefill', { status: t(`project.status.${status.data}`) })
+    latestDraft.current = text
+    setDraft(text)
+    setAnnouncing(status.data)
+    setComposing(true)
+    setDone(null)
+    // On retire le paramètre de l'adresse : recharger la page ne rouvre pas le champ.
+    router.setParams?.({ announce: undefined })
+  }, [hydrated, project.isMine, announced, t, router])
+
+  const submit = async () => {
+    if (sending.current) return
+    // La même règle que l'API (packages/contracts) : un texte non vide, sans caractères invisibles.
+    const checked = NoteText.safeParse(draft)
+    if (!checked.success) {
+      setDraftError(
+        draft.trim() === '' ? t('project.notes.required') : t('project.errors.invalidCharacters'),
+      )
+      return
+    }
+    setDraftError(undefined)
+    sending.current = true
+    setShowPublishError(true)
+    const sent = draft
+    const ok = await publishNote.publish(checked.data)
+    sending.current = false
+    // Refusée : le texte reste dans le champ, et l'erreur s'affiche (publishNote.error).
+    if (!ok) return
+    // Publiée. Si le texte a changé entre-temps, c'est une autre note qui commence : on la garde.
+    if (latestDraft.current !== sent) return
+    changeDraft('')
+    setComposing(false)
+    setAnnouncing(null)
+    setDone('published')
+  }
+
+  const confirmDelete = async () => {
+    if (!deleting || removing) return
+    setRemoving(true)
+    setShowDeleteError(true)
+    const ok = await deleteNote.remove(deleting.id)
+    setRemoving(false)
+    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
+    if (!ok) return
+    // Supprimée : son bouton n'existe plus ; le focus ira sur sa voisine, une fois la fenêtre
+    // refermée. « Note supprimée. » le confirme.
+    focusAfterClose.current = deleting.index
+    setDone('deleted')
+    setDeleting(null)
+  }
+
+  // Le message d'un envoi refusé. 429 et 401 : « Réessaie » ne servirait à rien, on dit pourquoi.
+  const failure = (reason: NoteFailure | undefined, otherwise: string) =>
+    reason === 'limited'
+      ? t('project.notes.limited')
+      : reason === 'expired'
+        ? t('states.expired')
+        : otherwise
+
+  const list = (
+    <NoteList
+      handle={notesHandle}
+      notes={project.notes.map((note) => ({
+        id: note.id,
+        body: note.body,
+        when: shortDate(note.createdAt, i18n.language),
+      }))}
+      {...(project.isMine
+        ? {
+            onDelete: (id: string) => {
+              setShowDeleteError(false)
+              setDone(null)
+              setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
+            },
+            deleteLabel: t('project.notes.delete'),
+            // Sur un projet privé, personne d'autre ne verra ses notes : on le dit.
+            empty:
+              project.visibility === 'private'
+                ? t('project.notes.emptyPrivate')
+                : t('project.notes.empty'),
+          }
+        : null)}
+    />
+  )
+  const empty = project.notes.length === 0
+
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <Text variant="heading" accessibilityRole="header">
+        {t('project.notes.title')}
+      </Text>
+      {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}
+      {empty ? list : null}
+      {project.isMine ? (
+        <NoteComposer
+          open={composing}
+          onOpen={() => {
+            setDone(null)
+            setShowPublishError(false)
+            setComposing(true)
+          }}
+          onCancel={() => {
+            setComposing(false)
+            setDraftError(undefined)
+            setShowPublishError(false)
+            setAnnouncing(null)
+          }}
+          value={draft}
+          onChangeText={changeDraft}
+          onSubmit={() => void submit()}
+          pending={publishNote.pending}
+          max={PROJECT_NOTE_MAX}
+          labels={{
+            open: t('project.notes.add'),
+            field: t('project.notes.field'),
+            // L'aide dit à qui ira la note : à personne d'autre (projet privé), aux abonnés après
+            // un changement de statut (et pourquoi le champ s'est ouvert tout seul), sinon l'usage.
+            hint:
+              project.visibility === 'private'
+                ? t('project.notes.hintPrivate')
+                : announcing
+                  ? t('project.notes.hintAnnounce', {
+                      status: t(`project.status.${announcing}`),
+                    })
+                  : t('project.notes.hint'),
+            submit: t('project.notes.submit'),
+            cancel: t('common.cancel'),
+          }}
+          fieldError={draftError}
+          error={
+            showPublishError && publishNote.error
+              ? failure(publishNote.reason, t('project.notes.error'))
+              : undefined
+          }
+          success={done === 'published' ? t('project.notes.published') : undefined}
+        />
+      ) : null}
+      {/* Après une suppression : la confirmation, lue sans interrompre (role « status »). */}
+      {done === 'deleted' ? (
+        <Notice tone="success" message={t('project.notes.deleted')} polite />
+      ) : null}
+      {empty ? null : list}
+      {/* Supprimer une note est définitif : une fenêtre demande confirmation. */}
+      <Dialog
+        visible={deleting !== null}
+        title={t('project.notes.deleteTitle')}
+        message={t('project.notes.deleteBody')}
+        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
+        onDismiss={() => {
+          if (!removing) setDeleting(null)
+        }}
+        onClosed={() => {
+          const index = focusAfterClose.current
+          focusAfterClose.current = null
+          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
+          if (index !== null) requestAnimationFrame(() => notesHandle.current?.focusAt(index))
+        }}
+      >
+        {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer. */}
+        {showDeleteError && deleteNote.error ? (
+          <Notice message={failure(deleteNote.reason, t('project.notes.deleteError'))} />
+        ) : null}
+        <Button
+          label={t('project.notes.confirmDelete')}
+          variant="confirm"
+          onPress={() => void confirmDelete()}
+          loading={removing}
+        />
+        <Button
+          label={t('common.cancel')}
+          variant="secondary"
+          onPress={() => setDeleting(null)}
+          disabled={removing}
+        />
+      </Dialog>
+    </Surface>
   )
 }

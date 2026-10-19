@@ -57,11 +57,17 @@ const LINE_BREAKS = new Set([0x09, 0x0a, 0x0d]) // tabulation, \n et \r (texte l
 const isForbidden = (code: number) =>
   FORBIDDEN_RANGES.some(([start, end]) => code >= start && code <= end)
 
-// Caractères qui ne dessinent rien à eux seuls : espaces, liants, variantes d'emoji.
+// Caractères qui ne dessinent rien à eux seuls : espaces, liants, variantes d'emoji, sélecteurs
+// mongols, et les « marques » (\p{M} : accents et signes qui se posent sur la lettre d'avant, comme
+// U+0301 ; seuls, ils ne montrent rien de lisible). U+FFFC est l'emplacement d'un objet absent.
 const isInvisible = (char: string, code: number) =>
   /\s/.test(char) ||
+  /\p{M}/u.test(char) ||
   code === 0x200c ||
   code === 0x200d ||
+  code === 0xfffc ||
+  code === 0x1d159 || // « tête de note vide » (musique) : elle ne dessine rien
+  (code >= 0x180b && code <= 0x180f) ||
   (code >= 0xfe00 && code <= 0xfe0f) ||
   (code >= 0xe0100 && code <= 0xe01ef)
 
@@ -121,6 +127,18 @@ export const FreeText = (max: number) =>
     .trim()
     .max(max)
     .refine((text) => isClean(text, { lineBreaks: true, needsVisible: false }), { message })
+
+/**
+ * Un texte libre qui doit montrer quelque chose (une note) : 1 à `max` caractères, retours à la
+ * ligne permis, et au moins un caractère qui se voit (sinon la note paraîtrait vide dans le fil).
+ */
+export const VisibleFreeText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .refine((text) => isClean(text, { lineBreaks: true, needsVisible: true }), { message })
 
 /** Une courte étiquette (un nom d'outil…) : non vide, sur une ligne. */
 export const ShortLabel = (max: number) =>

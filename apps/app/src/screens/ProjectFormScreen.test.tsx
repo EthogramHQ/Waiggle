@@ -362,3 +362,90 @@ describe('ProjectFormScreen, editing', () => {
     }
   })
 })
+
+// --- Tranche 4b : après un changement de statut, la page du projet propose une note ---
+// Le formulaire le lui dit par l'adresse : /projects/<id>?announce=<nouveau statut>.
+describe('ProjectFormScreen, announcing a new status', () => {
+  /** L'adresse ouverte après l'enregistrement : le premier argument du premier replace. */
+  const openedAfterSaving = () => mockReplace.mock.calls[0]?.[0]
+
+  it('opens the project page with the new status when the status changed', async () => {
+    jest
+      .mocked(updateProject)
+      .mockResolvedValue({ ok: true, data: { ...recipesProject, status: 'done' } })
+    await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
+
+    await screen.findByDisplayValue('Mon agent de recettes')
+    await fireEvent.press(screen.getByRole('radio', { name: 'Terminé' })) // il était « Testable »
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(updateProject).toHaveBeenCalledWith(
+      recipesProject.id,
+      expect.objectContaining({ status: 'done' }),
+    )
+    await waitFor(() =>
+      expect(openedAfterSaving()).toStrictEqual({
+        pathname: '/projects/[id]',
+        params: { id: recipesProject.id, announce: 'done' },
+      }),
+    )
+  })
+
+  it('opens the plain project page when the status did not change', async () => {
+    jest
+      .mocked(updateProject)
+      .mockResolvedValue({ ok: true, data: { ...recipesProject, title: 'Nouveau titre' } })
+    await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
+
+    await fireEvent.changeText(
+      await screen.findByDisplayValue('Mon agent de recettes'),
+      'Nouveau titre',
+    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    // toStrictEqual : pas même un « announce » vide dans l'adresse.
+    await waitFor(() =>
+      expect(openedAfterSaving()).toStrictEqual({
+        pathname: '/projects/[id]',
+        params: { id: recipesProject.id },
+      }),
+    )
+  })
+
+  it('announces nothing for a private project, whose notes nobody else would see', async () => {
+    jest.mocked(updateProject).mockResolvedValue({
+      ok: true,
+      data: { ...recipesProject, status: 'done', visibility: 'private' },
+    })
+    await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
+
+    await screen.findByDisplayValue('Mon agent de recettes')
+    await fireEvent.press(screen.getByRole('radio', { name: 'Terminé' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() =>
+      expect(openedAfterSaving()).toStrictEqual({
+        pathname: '/projects/[id]',
+        params: { id: recipesProject.id },
+      }),
+    )
+  })
+
+  it('never announces a status when a project is first published', async () => {
+    jest.mocked(createProject).mockResolvedValue({ ok: true, data: recipesProject })
+    await renderWithProviders(<ProjectFormScreen />)
+
+    await fireEvent.changeText(screen.getByLabelText('Titre'), 'Mon agent de recettes')
+    await fireEvent.changeText(screen.getByLabelText('Le pitch, en une phrase'), 'Un menu malin.')
+    // Un autre statut que celui par défaut (« Idée ») : ce n'est pas pour autant un changement.
+    await fireEvent.press(screen.getByRole('radio', { name: 'Testable' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
+
+    await waitFor(() =>
+      expect(openedAfterSaving()).toStrictEqual({
+        pathname: '/projects/[id]',
+        params: { id: recipesProject.id },
+      }),
+    )
+  })
+})

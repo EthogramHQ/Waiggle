@@ -1,8 +1,8 @@
 // Tests d'intégration de la tranche 3a : publier, lire, modifier et supprimer un projet.
 // Scénarios : docs/scenarios/phase-1.md, tranche 3. Deux membres : Léa (l'autrice) et Max.
-import { AccountExport, ErrorResponse, Me, Project } from '@ruche/contracts'
+import { AccountExport, ErrorResponse, Me, Project, ProjectNote } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -363,5 +363,78 @@ describe('my data and my account', () => {
     await send('POST', '/api/auth/delete-user', lea, { password: leaAccount.password })
 
     expect(await ctx.db.select().from(schema.project)).toHaveLength(0)
+  })
+})
+
+// --- Tranche 4b : les notes dans l'export ---
+// L'export donne toutes les notes publiées sur ses projets (privés compris, et au-delà des 20 du
+// journal), des plus anciennes aux plus récentes, et aucune note des autres membres.
+describe('my notes in my data', () => {
+  // Une fausse horloge, qu'on avance d'une minute entre deux notes : leurs dates sont distinctes,
+  // donc leur ordre est connu. Seule Date est remplacée (voir feed.test.ts).
+  beforeEach(() => {
+    const now = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** Publie une note, une minute après ce qui précède, et renvoie la note. */
+  const postNote = async (projectId: string, body: string, cookie = lea) => {
+    vi.setSystemTime(Date.now() + 60 * 1000)
+    const res = await send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
+    expect(res.status).toBe(201)
+    return ProjectNote.parse(await res.json())
+  }
+
+  it('exports the notes of all my projects, private ones included, oldest first, and nobody else’s', async () => {
+    const mine = await publish()
+    const draft = await publish({ ...recipes, title: 'Mon brouillon', visibility: 'private' })
+    const maxProject = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    const first = await postNote(mine.id, 'Première version en ligne')
+    const secret = await postNote(draft.id, 'Une idée encore secrète')
+    await postNote(maxProject.id, 'Note de Max', max)
+    const last = await postNote(mine.id, 'v2 : mode hors ligne')
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+    const data = AccountExport.parse(JSON.parse(raw))
+
+    expect(data.notes).toEqual([
+      { projectId: mine.id, id: first.id, body: first.body, createdAt: first.createdAt },
+      { projectId: draft.id, id: secret.id, body: secret.body, createdAt: secret.createdAt },
+      { projectId: mine.id, id: last.id, body: last.body, createdAt: last.createdAt },
+    ])
+    expect(raw).not.toContain('Note de Max')
+  })
+
+  it('exports every note, beyond the 20 shown on the page of the project', async () => {
+    const { id } = await publish()
+    const bodies: string[] = []
+    for (let i = 1; i <= 22; i++) bodies.push((await postNote(id, `Note ${i}`)).body)
+
+    const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
+
+    expect(data.notes.map((note) => note.body)).toEqual(bodies)
+  })
+
+  it('does not export the notes of the projects I follow', async () => {
+    const followed = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    expect((await send('POST', `/v1/projects/${followed.id}/follow`, lea)).status).toBe(204)
+    await postNote(followed.id, 'Note de Max', max)
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+
+    expect(AccountExport.parse(JSON.parse(raw)).notes).toEqual([])
+    expect(raw).not.toContain('Note de Max')
+  })
+
+  it('exports no note for a member who never wrote one', async () => {
+    await publish()
+
+    const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
+
+    expect(data.notes).toEqual([])
   })
 })

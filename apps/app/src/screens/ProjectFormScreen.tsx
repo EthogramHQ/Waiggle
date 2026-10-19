@@ -347,7 +347,18 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       })
       return
     }
-    router.replace({ pathname: '/projects/[id]', params: { id: project.id } })
+    // En modification, un nouveau statut mérite d'être annoncé aux abonnés : la page du projet
+    // propose alors une note toute prête (?announce=<statut>, voir ProjectScreen). Jamais à la
+    // création : un premier statut n'est pas un changement. Ni sur un projet privé : personne
+    // d'autre ne verrait la note.
+    const announce =
+      projectId !== undefined &&
+      project.status !== initial.status &&
+      project.visibility === 'public'
+    router.replace({
+      pathname: '/projects/[id]',
+      params: announce ? { id: project.id, announce: project.status } : { id: project.id },
+    })
   }
 
   // L'adresse de démo est vérifiée pendant la frappe : le membre sait tout de suite si elle ira.

@@ -27,9 +27,6 @@ export const fr = {
   home: {
     title: 'Bienvenue sur {{appName}}',
     tagline: 'Montre à tes proches ce que tu construis avec l’IA.',
-    comingSoon: 'Le fil arrive bientôt.',
-    comingSoonBody:
-      'Tu y verras les projets de tes proches. En attendant, publie le tien : il sera prêt pour eux.',
     greeting: 'Bonjour {{name}} !',
     signUp: 'Créer un compte',
     signIn: 'Me connecter',
@@ -128,8 +125,11 @@ export const fr = {
       intro: 'Voici ce qui disparaît avec lui.',
       profileItem: 'Ton profil et ta photo',
       projectsItem: 'Tes projets',
-      projectsDetail: 'Avec leur description, leur recette et leurs prompts',
-      exportHint: 'Un fichier avec tout ton contenu, à garder avant de partir.',
+      projectsDetail:
+        'Avec leur description, leur recette, leurs prompts, leurs photos et leurs notes',
+      followsItem: 'Tes abonnements et tes abonnés',
+      exportHint:
+        'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',
       warning: 'C’est immédiat et sans retour.',
       submit: 'Supprimer définitivement',
@@ -243,6 +243,32 @@ export const fr = {
       uploadFailed:
         'Le projet est publié, mais certaines photos n’ont pas pu être envoyées. Ajoute-les à nouveau ici.',
     },
+    notes: {
+      title: 'Journal',
+      empty:
+        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
+      add: 'Publier une note',
+      field: 'Ta note',
+      hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
+      hintPrivate:
+        'Ce projet est privé : toi seul vois ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
+      emptyPrivate:
+        'Pas encore de note. Ce projet est privé : toi seul verras ses notes, jusqu’à ce que tu le rendes public.',
+      submit: 'Publier la note',
+      required: 'Écris ta note avant de la publier.',
+      hintAnnounce:
+        'Ton projet est passé en « {{status}} » : annonce-le à tes abonnés, ou touche Annuler.',
+      limited: 'Tu as publié 30 notes aujourd’hui. La suivante pourra partir demain.',
+      published: 'Note publiée.',
+      deleted: 'Note supprimée.',
+      error: 'La note n’a pas pu être publiée. Réessaie.',
+      delete: 'Supprimer la note',
+      deleteTitle: 'Supprimer cette note ?',
+      deleteBody: 'Elle disparaîtra du journal et des fils de tes abonnés.',
+      confirmDelete: 'Supprimer',
+      deleteError: 'La note n’a pas pu être supprimée. Réessaie.',
+      statusPrefill: 'Le projet passe en « {{status}} ».',
+    },
     page: {
       published: 'publié le {{date}}',
       external: '{{host}}, un site hors de {{appName}}',
@@ -346,12 +372,15 @@ export const fr = {
     quiet: 'Rien de neuf pour l’instant chez les personnes que tu suis.',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
-    followingCaption: 'Les nouveaux projets des personnes que tu suis.',
+    followingCaption:
+      'Les nouveaux projets des personnes que tu suis, et les notes des projets suivis.',
     discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption: 'Les projets à essayer : leurs auteurs attendent tes retours.',
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
     end: 'Tu es à jour',
+    noteLabel: 'Note de {{name}} sur {{title}}',
+    noteKicker: 'Note',
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',
     newsMany: '{{max}} nouveautés ou plus',

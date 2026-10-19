@@ -1,8 +1,9 @@
 // Les deux fils de l'accueil (tranche 4) : « Abonnements » (GET /v1/feed/following) et
 // « Découvrir » (GET /v1/feed/discover). Ils se lisent par pages de 20, du plus récent au plus
 // ancien, grâce à un curseur : un marque-page rendu avec chaque page, qu'on renvoie pour obtenir
-// la suivante.
+// la suivante. Le curseur note la date et l'identifiant du dernier élément (un projet ou une note).
 import { z } from 'zod'
+import { ProjectNote } from './notes'
 import { ProjectSummary } from './projects'
 
 /** Le nombre d'éléments par page de fil. */
@@ -38,10 +39,23 @@ export const FeedProjectItem = z.object({
 })
 
 /**
- * Un élément du fil. Une « union discriminée » : un objet de l'une des formes listées, que le champ
- * `kind` permet de distinguer. La tranche 4b y ajoutera les notes (`kind: 'update'`).
+ * Une note d'un projet suivi (seulement dans « Abonnements »). `at` est sa date de publication ;
+ * `project` dit de quel projet il s'agit (son titre, son auteur, sa couverture).
  */
-export const FeedItem = z.discriminatedUnion('kind', [FeedProjectItem]).meta({ id: 'FeedItem' })
+export const FeedNoteItem = z.object({
+  kind: z.literal('note'),
+  at: z.iso.datetime(),
+  note: ProjectNote,
+  project: ProjectSummary,
+})
+
+/**
+ * Un élément du fil. Une « union discriminée » : un objet de l'une des formes listées, que le champ
+ * `kind` permet de distinguer : un nouveau projet, ou la note d'un projet suivi.
+ */
+export const FeedItem = z
+  .discriminatedUnion('kind', [FeedProjectItem, FeedNoteItem])
+  .meta({ id: 'FeedItem' })
 export type FeedItem = z.infer<typeof FeedItem>
 
 /** Une page de fil. `nextCursor` vaut null quand il n'y a plus rien après : « Tu es à jour ». */

@@ -13,6 +13,15 @@ export const AccountExport = z
     exportedAt: z.iso.datetime(),
     user: Me,
     projects: z.array(Project),
+    /** Toutes les notes publiées sur ses projets, des plus anciennes aux plus récentes. */
+    notes: z.array(
+      z.object({
+        projectId: ProjectId,
+        id: z.uuid(),
+        body: z.string(),
+        createdAt: z.iso.datetime(),
+      }),
+    ),
     /**
      * Ce que le membre suit : seulement l'identifiant et la date. Un projet suivi a pu devenir privé
      * depuis : son titre n'appartient pas au membre qui le suit, l'export ne le donne donc pas.

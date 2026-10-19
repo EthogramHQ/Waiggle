@@ -148,6 +148,9 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'text', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'background', min: 4.5 },
+  // La carte d'une note et le journal d'un projet : texte posé sur une surface pleine.
+  { text: 'amberText', on: 'surface', min: 4.5 },
+  { text: 'textSecondary', on: 'surface', min: 4.5 },
   { text: 'amber', on: 'background', min: 3 },
   { text: 'dangerText', on: 'background', min: 4.5 },
   { text: 'dangerText', on: 'dangerSoft', min: 4.5 },

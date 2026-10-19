@@ -15,6 +15,7 @@ import { publicHttpsUrl, removeForbiddenCharacters } from '@ruche/contracts'
 import { lexer, type Token } from 'marked'
 import { Fragment, type ReactNode, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { enterActivates } from './keyboard'
 import { fontName, monoFont } from './theme/fonts'
 import { type Theme, useTheme } from './theme/ThemeProvider'
 
@@ -110,6 +111,9 @@ export function Markdown({ text, onLinkPress }: Props) {
             <Text
               key={key}
               accessibilityRole="link"
+              // Entrée ouvre le lien sur le web : sans adresse, ce n'est pas un vrai lien du
+              // navigateur, et react-native-web ne s'en charge pas (voir keyboard.ts).
+              {...enterActivates(() => onLinkPress(target.href))}
               onPress={() => onLinkPress(target.href)}
               style={styles.link}
             >

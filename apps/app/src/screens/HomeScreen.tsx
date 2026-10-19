@@ -4,7 +4,8 @@
 //
 // Deux visages : pour un visiteur, la constellation, le logo et l'invitation à créer un compte ;
 // pour un membre connecté, ses raccourcis (publier, ses projets, son compte) puis le fil, en deux
-// choix : « Abonnements » (les nouveaux projets des personnes suivies) et « Découvrir » (tous les
+// choix : « Abonnements » (les nouveaux projets des personnes suivies, et les notes des projets
+// suivis) et « Découvrir » (tous les
 // projets publics, ou ceux qui cherchent des testeurs). Le fil se lit 20 par 20, jusqu'à « Tu es à
 // jour », et un bandeau annonce les nouveautés sans jamais faire bouger ce qu'on lit.
 import { sourceUrl } from '@ruche/brand'
@@ -18,6 +19,7 @@ import { type FeedKind, useDiscoverFeed, useFeedNews, useFollowingFeed } from '.
 import { feedItemId } from '../feed/items'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
+import { FeedNoteCard } from '../notes/FeedNoteCard'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
@@ -186,7 +188,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
   )
 }
 
-/** Le fil « Abonnements » : les nouveaux projets des personnes suivies. */
+/** Le fil « Abonnements » : les nouveaux projets des personnes suivies, les notes des projets suivis. */
 function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
   const { t } = useTranslation()
   const feed = useFollowingFeed()
@@ -309,9 +311,15 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
       {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
       {feed.isRefetchError ? <Notice message={t(`errors.${errorKey(feed.error)}`)} /> : null}
       <ProjectGrid empty={empty}>
-        {items.map((item) => (
-          <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
-        ))}
+        {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
+            discrète, qui mène elle aussi au projet. */}
+        {items.map((item) =>
+          item.kind === 'note' ? (
+            <FeedNoteCard key={feedItemId(item)} note={item.note} project={item.project} />
+          ) : (
+            <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
+          ),
+        )}
       </ProjectGrid>
       {items.length > 0 ? (
         <FeedEnd

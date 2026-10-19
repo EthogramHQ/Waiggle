@@ -19,7 +19,9 @@ const followingRoute = createRoute({
   request: { query: FeedQuery },
   responses: {
     200: {
-      description: 'The new public projects of the members followed, newest first.',
+      description:
+        'The new public projects of the members followed, and the notes of the public projects ' +
+        'followed, newest first.',
       content: { 'application/json': { schema: FollowingFeedPage } },
     },
     400: errorResponse('Invalid cursor.'),

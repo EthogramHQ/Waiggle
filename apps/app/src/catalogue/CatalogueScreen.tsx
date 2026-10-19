@@ -39,6 +39,9 @@ import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
+import { NoteCard } from '../ui/NoteCard'
+import { NoteComposer } from '../ui/NoteComposer'
+import { NoteList } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -490,6 +493,74 @@ export function CatalogueScreen() {
         />
       </Section>
 
+      <Section title={l.notesSection}>
+        {/* La note dans le fil, à côté d'une carte de projet : avec la couverture du projet, sans
+            couverture (la lumière miel), puis un texte long, coupé après quelques lignes. */}
+        <ProjectGrid empty={l.emptyList}>
+          <NoteCard
+            label={l.noteLabel}
+            project={l.sampleTitle}
+            author={{ name: 'Léa Moreau', avatar: null }}
+            body={l.noteBody}
+            when={l.noteWhen}
+            image={{ source: null, thumbhash: samples.cafe, label: l.samplePhoto }}
+            onPress={() => {}}
+          />
+          <ProjectCard
+            title={l.secondTitle}
+            pitch={l.secondPitch}
+            author={{ name: 'Max Durand', avatar: null }}
+            when={l.now}
+            status={{ label: l.statuses.testable, strong: true }}
+            image={{ source: null, thumbhash: samples.papillon, label: l.samplePhoto }}
+            onPress={() => {}}
+          />
+          <NoteCard
+            label={l.noteLabel}
+            project={l.sampleTitle}
+            author={{ name: 'Léa Moreau', avatar: null }}
+            body={l.noteLong}
+            when={l.noteWhen}
+            onPress={() => {}}
+          />
+        </ProjectGrid>
+        {/* Le journal, vu par l'auteur (un bouton « Supprimer » par note, une adresse longue qui se
+            coupe), puis par un autre membre, puis vide pour l'auteur. Sans note ni message : rien. */}
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <NoteList
+            notes={[
+              { id: 'n3', body: l.noteBody, when: l.noteWhen },
+              { id: 'n2', body: l.noteUrl, when: l.noteWhen },
+              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
+            ]}
+            onDelete={() => {}}
+            deleteLabel={l.deleteNote}
+          />
+        </Surface>
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <NoteList
+            notes={[
+              { id: 'n2', body: l.noteLong, when: l.noteWhen },
+              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
+            ]}
+          />
+        </Surface>
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <NoteList notes={[]} empty={l.journalEmpty} onDelete={() => {}} />
+        </Surface>
+        {/* Après une suppression : une confirmation discrète (role « status »). */}
+        <Notice tone="success" message={l.noteDeleted} polite />
+        {/* Écrire une note : fermé, fermé juste après une publication, ouvert (vide, avec un texte,
+            en cours d'envoi, texte manquant, envoi refusé). */}
+        <NoteComposerSample l={l} open={false} />
+        <NoteComposerSample l={l} open={false} success={l.notePublished} />
+        <NoteComposerSample l={l} open value="" />
+        <NoteComposerSample l={l} open value={l.noteBody} />
+        <NoteComposerSample l={l} open value={l.noteBody} pending />
+        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
+        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
+      </Section>
+
       <Section title={l.illustrations}>
         <Stack direction="row" gap="lg" wrap align="center">
           <Emblem icon="envelope-simple" />
@@ -594,29 +665,46 @@ function Fields({ l }: { l: Labels }) {
   return (
     <Columns
       main={
-        <FieldGroup>
+        <Stack gap="lg">
+          <FieldGroup>
+            <TextField
+              label={l.titleField}
+              value={title}
+              onChangeText={setTitle}
+              maxLength={80}
+              showCount
+            />
+            <TextField
+              label={l.pitchField}
+              value={pitch}
+              onChangeText={setPitch}
+              maxLength={140}
+              showCount
+            />
+            <TextField
+              label={l.descriptionField}
+              value=""
+              onChangeText={() => {}}
+              placeholder={l.placeholder}
+              multiline
+            />
+          </FieldGroup>
+          {/* Un compteur à la limite (ambre), puis au-delà d'une limite seulement affichée (rouge). */}
           <TextField
             label={l.titleField}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={80}
-            showCount
-          />
-          <TextField
-            label={l.pitchField}
-            value={pitch}
-            onChangeText={setPitch}
-            maxLength={140}
-            showCount
-          />
-          <TextField
-            label={l.descriptionField}
-            value=""
+            value={l.sampleTitle}
             onChangeText={() => {}}
-            placeholder={l.placeholder}
-            multiline
+            maxLength={l.sampleTitle.length}
+            showCount
           />
-        </FieldGroup>
+          <TextField
+            label={l.titleField}
+            value={l.sampleTitle}
+            onChangeText={() => {}}
+            limit={l.sampleTitle.length - 2}
+            showCount
+          />
+        </Stack>
       }
       side={<TextField label={l.demoField} value={url} onChangeText={setUrl} error={l.demoError} />}
     />
@@ -658,6 +746,51 @@ function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }
 }
 
 /** Les vignettes sous une couverture : toucher l'une la sélectionne. */
+/** Le champ d'une note dans un état donné, posé dans un journal comme sur la page d'un projet. */
+function NoteComposerSample({
+  l,
+  open,
+  value = '',
+  pending = false,
+  fieldError,
+  error,
+  success,
+}: {
+  l: Labels
+  open: boolean
+  value?: string
+  pending?: boolean
+  fieldError?: string
+  error?: string
+  success?: string
+}) {
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <NoteComposer
+        open={open}
+        onOpen={() => {}}
+        onCancel={() => {}}
+        value={value}
+        onChangeText={() => {}}
+        onSubmit={() => {}}
+        pending={pending}
+        max={1000}
+        labels={{
+          open: l.addNote,
+          field: l.noteField,
+          hint: l.noteHint,
+          submit: l.submitNote,
+          cancel: l.cancel,
+        }}
+        fieldError={fieldError}
+        error={error}
+        success={success}
+        autoFocus={false}
+      />
+    </Surface>
+  )
+}
+
 function ThumbnailsSample({ l }: { l: Labels }) {
   const [selected, setSelected] = useState(0)
   return (
