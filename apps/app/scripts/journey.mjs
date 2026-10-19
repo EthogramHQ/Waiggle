@@ -199,10 +199,21 @@ try {
   const avatarUrl = me.avatarUrl ?? fail('pas d’adresse d’avatar')
   await expectMedia('après l’avatar', { avatars: 1, visuals: 0 })
 
-  step('Sam ne suit personne : son fil le dit ; il suit Léa depuis sa page')
+  // Tranche 6a : un pseudo lui a été donné à la vérification ; elle en choisit un autre, tapé
+  // avec le « @ » comme on l'écrit souvent : l'appli le retire avant d'envoyer.
+  step('Léa change de pseudo')
+  const handle = `lea_${randomBytes(3).toString('hex')}`
+  await lea.page.getByLabel('Pseudo', { exact: true }).fill(`@${handle}`)
+  await lea.page.getByRole('button', { name: 'Enregistrer' }).last().click()
+  await lea.page.getByText('Profil enregistré.').waitFor()
+  const renamed = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
+  expectEqual('pseudo de Léa', renamed.handle, handle)
+
+  step('Sam ne suit personne : son fil le dit ; il lit le pseudo de Léa et la suit depuis sa page')
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
+  await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
   await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
   // Une fois suivie, le nom lu reprend le texte affiché : « Suivi : Lea », activé.
   await sam.page.getByRole('switch', { name: /^Suivi.*Lea$/, checked: true }).waitFor()

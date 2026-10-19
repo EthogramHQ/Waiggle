@@ -140,6 +140,7 @@ export const en: Translation = {
       privacy: 'The picture is cropped square and cleaned of hidden information, such as location.',
     },
     fields: {
+      name: 'Display name',
       handle: 'Handle',
       handleHint:
         'Members will see you as @handle on your page, and can mention you. 3 to 20 characters: letters without accents, digits and “_”. Your previous handle stays reserved for you for 30 days.',

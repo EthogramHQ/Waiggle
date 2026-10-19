@@ -1,8 +1,10 @@
-// Page « Mon profil » : photo, nom, bio et outils favoris du membre connecté.
+// Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX_LENGTH,
   FAVORITE_TOOLS_MAX,
+  HANDLE_MAX_LENGTH,
+  HANDLE_MIN_LENGTH,
   type Me,
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
@@ -57,6 +59,7 @@ function ProfileForm({ me }: { me: Me }) {
 
   // Un useState par champ : la valeur affichée, et la fonction pour la changer.
   const [name, setName] = useState(me.name)
+  const [handle, setHandle] = useState(me.handle)
   const [bio, setBio] = useState(me.bio)
   const [tools, setTools] = useState(me.favoriteTools.join(', '))
   const [errors, setErrors] = useState<ProfileFormErrors>({})
@@ -66,7 +69,9 @@ function ProfileForm({ me }: { me: Me }) {
   const onSave = async () => {
     setMessage(null)
     // On vérifie avant d'envoyer : le membre voit tout de suite ce qui ne va pas.
-    const checked = toProfileUpdate({ name, bio, tools })
+    // me.handle : le pseudo enregistré. Retapé tel quel, il n'est pas envoyé (ce n'est pas un
+    // changement, et il ne compte pas dans la limite de changements par jour).
+    const checked = toProfileUpdate({ name, handle, bio, tools }, me.handle)
     if (!checked.ok) {
       setErrors(checked.errors)
       return
@@ -76,10 +81,17 @@ function ProfileForm({ me }: { me: Me }) {
     const result = await updateProfile(checked.changes)
     setBusy(null)
     if (!result.ok) {
+      // Un pseudo déjà pris se corrige dans son champ : le message va dessous, et ce qui a été
+      // tapé reste, pour n'avoir qu'à le retoucher (« ines » → « ines_m »).
+      if (result.error === 'handleTaken') {
+        setErrors({ handle: 'handleTaken' })
+        return
+      }
       setMessage({ text: t(`errors.${result.error}`), ok: false })
       return
     }
     setMe(result.data) // le cache partagé reçoit le profil à jour
+    setHandle(result.data.handle) // le pseudo tel qu'enregistré (« @Lea_M » devient « lea_m »)
     setTools(result.data.favoriteTools.join(', ')) // affiche la liste nettoyée (sans doublons)
     void refetchSession() // la session porte aussi le nom (affiché sur l'accueil) : on la relit
     setMessage({ text: t('profile.saved'), ok: true })
@@ -124,6 +136,14 @@ function ProfileForm({ me }: { me: Me }) {
     invalidCharacters: invalid,
   }
   const nameError = errors.name && nameMessages[errors.name]
+  const handleMessages = {
+    handleTooShort: t('profile.errors.handleTooShort', { min: HANDLE_MIN_LENGTH }),
+    handleTooLong: t('profile.errors.handleTooLong', { max: HANDLE_MAX_LENGTH }),
+    handleInvalid: t('profile.errors.handleInvalid'),
+    handleReserved: t('profile.errors.handleReserved'),
+    handleTaken: t('errors.handleTaken'),
+  }
+  const handleError = errors.handle && handleMessages[errors.handle]
   const bioError =
     errors.bio === 'invalidCharacters'
       ? invalid
@@ -190,13 +210,25 @@ function ProfileForm({ me }: { me: Me }) {
 
       <FieldGroup>
         <TextField
-          label={t('auth.fields.name')}
+          label={t('profile.fields.name')}
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
           maxLength={NAME_MAX_LENGTH}
           showCount
           error={nameError}
+        />
+        {/* Le « @ » est affiché devant, pas dans la valeur : on tape « ines », on lit « @ines ».
+            Taper le « @ » quand même ne gêne pas : il est retiré avant l'envoi. */}
+        <TextField
+          label={t('profile.fields.handle')}
+          value={handle}
+          onChangeText={setHandle}
+          prefix="@"
+          autoCorrect={false}
+          spellCheck={false}
+          hint={t('profile.fields.handleHint')}
+          error={handleError}
         />
         <TextField
           label={t('profile.fields.bio')}

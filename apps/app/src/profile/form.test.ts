@@ -64,3 +64,32 @@ describe('toProfileUpdate', () => {
     })
   })
 })
+
+describe('toProfileUpdate, the handle (slice 6a)', () => {
+  const valid = { name: 'Léa', bio: '', tools: '', handle: 'lea' }
+
+  it('leaves out a handle that did not change, even typed again with « @ » and capitals', () => {
+    const unchanged = { ok: true, changes: { name: 'Léa', bio: '', favoriteTools: [] } }
+    expect(toProfileUpdate(valid, 'lea')).toEqual(unchanged)
+    expect(toProfileUpdate({ ...valid, handle: ' @Lea ' }, 'lea')).toEqual(unchanged)
+  })
+
+  it('sends a new handle, cleaned up', () => {
+    expect(toProfileUpdate({ ...valid, handle: '@Lea_M' }, 'lea')).toMatchObject({
+      ok: true,
+      changes: { handle: 'lea_m' },
+    })
+  })
+
+  it('names the problem of a handle by its kind', () => {
+    const errorOf = (handle: string) => toProfileUpdate({ ...valid, handle }, 'lea')
+    expect(errorOf('le')).toEqual({ ok: false, errors: { handle: 'handleTooShort' } })
+    expect(errorOf('l'.repeat(21))).toEqual({ ok: false, errors: { handle: 'handleTooLong' } })
+    expect(errorOf('1lea')).toEqual({ ok: false, errors: { handle: 'handleInvalid' } })
+    expect(errorOf('admin')).toEqual({ ok: false, errors: { handle: 'handleReserved' } })
+  })
+
+  it('does not check a handle left as it was, so an old one never blocks the rest', () => {
+    expect(toProfileUpdate({ ...valid, handle: 'admin' }, 'admin')).toMatchObject({ ok: true })
+  })
+})

@@ -171,6 +171,9 @@ export function TagInput({
             submitBehavior="submit"
             style={{
               flex: 1,
+              // Sans lui, le champ du navigateur garde sa largeur de départ et dépasse du cadre à
+              // texte agrandi (même correction que TextField).
+              minWidth: 0,
               minHeight: layout.controlHeight.regular,
               fontFamily: fontName(body.family, body.weight),
               fontSize: body.size,

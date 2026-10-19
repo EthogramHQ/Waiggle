@@ -1441,3 +1441,40 @@ describe('NoteComposer, on a phone', () => {
     )
   })
 })
+
+// --- Tranche 6a : le pseudo ---
+
+describe('TextField with a prefix', () => {
+  it('shows the sign before the value, without reading it out or adding it to the value', async () => {
+    const onChangeText = jest.fn()
+    await renderWithProviders(
+      <TextField label="Pseudo" value="lea" onChangeText={onChangeText} prefix="@" />,
+    )
+
+    // Le « @ » est dessiné, mais caché aux lecteurs d'écran : ils lisent « Pseudo, lea ».
+    expect(screen.getByText('@', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.queryByText('@')).toBeNull()
+    expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea')
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'lea_m')
+    expect(onChangeText).toHaveBeenCalledWith('lea_m')
+  })
+})
+
+describe('MemberHeader with a handle', () => {
+  it('shows the handle under the name, outside the header', async () => {
+    await renderWithProviders(
+      <MemberHeader
+        name="Léa"
+        handle="@lea"
+        avatar={null}
+        bio=""
+        toolsTitle="Outils favoris"
+        tools={[]}
+      />,
+    )
+
+    // Le titre reste le seul nom : un lecteur d'écran annonce « Léa, titre », puis « @lea ».
+    expect(screen.getByRole('header', { name: 'Léa' })).toBeTruthy()
+    expect(screen.getByText('@lea')).toBeTruthy()
+  })
+})

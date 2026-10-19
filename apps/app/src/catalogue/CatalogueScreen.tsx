@@ -377,6 +377,7 @@ export function CatalogueScreen() {
       <Section title={l.memberLists}>
         <MemberHeader
           name="Léa Moreau"
+          handle="@lea_moreau"
           avatar={null}
           bio={l.memberBio}
           toolsTitle={l.favoriteTools}
@@ -896,6 +897,7 @@ function Fields({ l }: { l: Labels }) {
   const [title, setTitle] = useState(l.sampleTitle)
   const [pitch, setPitch] = useState(l.samplePitch)
   const [url, setUrl] = useState('http://192.168.1.12')
+  const [handle, setHandle] = useState('lea_moreau')
   return (
     <Columns
       main={
@@ -937,6 +939,15 @@ function Fields({ l }: { l: Labels }) {
             onChangeText={() => {}}
             limit={l.sampleTitle.length - 2}
             showCount
+          />
+          {/* Un préfixe (« @ » d'un pseudo), au repos puis refusé par l'API. */}
+          <TextField label={l.handleField} value={handle} onChangeText={setHandle} prefix="@" />
+          <TextField
+            label={l.handleField}
+            value="ines"
+            onChangeText={() => {}}
+            prefix="@"
+            error={l.handleTaken}
           />
         </Stack>
       }
