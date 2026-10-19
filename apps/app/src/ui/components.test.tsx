@@ -14,6 +14,8 @@ import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
 import { NewItemsBanner } from './NewItemsBanner'
+import { NoteCard } from './NoteCard'
+import { NoteList } from './NoteList'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -728,5 +730,104 @@ describe('fonts', () => {
     // Funnel Display n'est livrée qu'en 700 : un titre demandé en 500 prend le 700.
     expect(fontName('display', 500)).toBe('FunnelDisplay-700')
     expect(fontName('text', 600)).toBe('FunnelSans-600')
+  })
+})
+
+// --- Tranche 4b : les notes d'un projet ---
+
+describe('NoteCard', () => {
+  const card = {
+    label: 'Note de Léa sur Mon agent de recettes',
+    project: 'Mon agent de recettes',
+    author: { name: 'Léa', avatar: null },
+    body: 'v2 : mode hors ligne',
+    when: '14 oct.',
+  }
+
+  it('is a link named after the note and its project, and opens it when touched', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<NoteCard {...card} onPress={onPress} />)
+
+    await fireEvent.press(
+      screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' }),
+    )
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the note, its project, its author and its date', async () => {
+    await renderWithProviders(<NoteCard {...card} onPress={jest.fn()} />)
+
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.getByText('Mon agent de recettes')).toBeTruthy()
+    expect(screen.getByText('Léa')).toBeTruthy()
+    expect(screen.getByText('14 oct.')).toBeTruthy()
+  })
+
+  it('shows the text exactly as written, without formatting it', async () => {
+    // Une note est du texte brut : les astérisques et les balises restent des caractères.
+    const body = '**v2** : <b>hors ligne</b>\nEt plus rapide.'
+    await renderWithProviders(<NoteCard {...card} body={body} onPress={jest.fn()} />)
+
+    expect(screen.getByText(body)).toBeTruthy()
+  })
+})
+
+describe('NoteList', () => {
+  const notes = [
+    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
+    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+  ]
+
+  it('shows each note with its date, in the order given', async () => {
+    await renderWithProviders(<NoteList notes={notes} />)
+
+    const shown = screen.getAllByText(/^(v2 : mode hors ligne|Première version en ligne)$/)
+    expect(shown).toHaveLength(2)
+    expect(shown[0]).toHaveTextContent('v2 : mode hors ligne')
+    expect(shown[1]).toHaveTextContent('Première version en ligne')
+    expect(screen.getByText('14 oct.')).toBeTruthy()
+    expect(screen.getByText('12 oct.')).toBeTruthy()
+  })
+
+  it('offers to delete each note when asked, and says which one', async () => {
+    const onDelete = jest.fn()
+    await renderWithProviders(
+      <NoteList notes={notes} onDelete={onDelete} deleteLabel="Supprimer la note" />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Supprimer la note' })
+    expect(buttons).toHaveLength(2)
+    const second = buttons[1]
+    if (!second) throw new Error('a delete button per note is expected')
+    await fireEvent.press(second)
+
+    expect(onDelete).toHaveBeenCalledWith('n1')
+  })
+
+  it('offers no delete button without an action', async () => {
+    await renderWithProviders(<NoteList notes={notes} deleteLabel="Supprimer la note" />)
+
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('shows the text exactly as written, without formatting it', async () => {
+    const body = '**v2** : <b>hors ligne</b>'
+    await renderWithProviders(<NoteList notes={[{ id: 'n3', body, when: '15 oct.' }]} />)
+
+    expect(screen.getByText(body)).toBeTruthy()
+  })
+
+  it('says so when there is no note, if given a message', async () => {
+    await renderWithProviders(<NoteList notes={[]} empty="Pas encore de note." />)
+
+    expect(screen.getByText('Pas encore de note.')).toBeTruthy()
+  })
+
+  it('shows nothing at all when there is no note and no message', async () => {
+    await renderWithProviders(<NoteList notes={[]} />)
+
+    expect(screen.queryAllByText(/./)).toHaveLength(0)
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

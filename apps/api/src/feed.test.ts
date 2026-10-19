@@ -18,6 +18,7 @@ import {
   FollowingFeedPage,
   Me,
   Project,
+  ProjectNote,
 } from '@ruche/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -418,5 +419,218 @@ describe('the API contract', () => {
         '/v1/feed/discover',
       ]),
     )
+  })
+})
+
+// --- Tranche 4b : les notes des projets suivis dans le fil « Abonnements » ---
+// Seuls les projets suivis apportent leurs notes : suivre un membre fait venir ses nouveaux
+// projets, pas ses notes. « Découvrir » ne montre que des projets, jamais de note.
+
+/** Suit un projet. */
+const followProject = async (id: string, cookie: string) =>
+  expect((await send('POST', `/v1/projects/${id}/follow`, cookie)).status).toBe(204)
+
+/** Publie une note sur un projet, deux heures après ce qui précède, et renvoie la note. */
+const postNote = async (
+  cookie: string,
+  projectId: string,
+  body = 'v2 : mode hors ligne',
+  { wait = true } = {},
+) => {
+  if (wait) later()
+  const res = await send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
+  expect(res.status).toBe(201)
+  return ProjectNote.parse(await res.json())
+}
+
+/**
+ * Ce qu'est chaque élément d'une page : « project:<id> » ou « note:<id> ». Un projet et ses notes
+ * ont des identifiants distincts : on voit ainsi sans ambiguïté ce que contient le fil.
+ */
+const keys = (page: FeedPage) =>
+  page.items.map((item) =>
+    item.kind === 'note' ? `note:${item.note.id}` : `project:${item.project.id}`,
+  )
+const noteKey = (note: ProjectNote) => `note:${note.id}`
+const projectKey = (project: Project) => `project:${project.id}`
+
+describe('the notes of followed projects in the « following » feed', () => {
+  it('brings the notes of a followed project among the new projects, newest first, dated from their publication', async () => {
+    const recipes = await publish(lea, { title: 'Mon agent de recettes' })
+    await followProject(recipes.id, max)
+    await followMember((await me(zoe)).id, max)
+    const older = await publish(zoe, { title: 'Le carnet de jardin' })
+    const v2 = await postNote(lea, recipes.id, 'v2 : mode hors ligne')
+    const newer = await publish(zoe, { title: 'Le tri des photos' })
+
+    const page = await readFollowing(max)
+
+    expect(keys(page)).toEqual([projectKey(newer), noteKey(v2), projectKey(older)])
+    // La note dit à quel projet elle appartient ; sa date est celle de sa publication.
+    expect(page.items[1]).toEqual({
+      kind: 'note',
+      at: v2.createdAt,
+      note: v2,
+      project: expect.objectContaining({
+        id: recipes.id,
+        title: 'Mon agent de recettes',
+        author: expect.objectContaining({ id: leaId, name: 'Léa' }),
+      }),
+    })
+    expect(page.nextCursor).toBeNull()
+  })
+
+  it('leaves out the notes of a project not followed, even when its author is followed', async () => {
+    const recipes = await publish(lea)
+    await followMember(leaId, max)
+    await postNote(lea, recipes.id)
+
+    // Max suit Léa : il voit son nouveau projet, pas les notes de ce projet qu'il ne suit pas.
+    expect(keys(await readFollowing(max))).toEqual([projectKey(recipes)])
+  })
+
+  it('shows the notes of a followed project to its followers only', async () => {
+    const recipes = await publish(lea)
+    await followProject(recipes.id, max)
+    const v2 = await postNote(lea, recipes.id)
+
+    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)])
+    // Zoé ne suit rien ; Léa ne peut pas suivre son propre projet : leurs fils restent vides.
+    expect((await readFollowing(zoe)).items).toEqual([])
+    expect((await readFollowing(lea)).items).toEqual([])
+  })
+
+  it('stops showing the notes of a project no longer followed', async () => {
+    const recipes = await publish(lea)
+    await followProject(recipes.id, max)
+    const v2 = await postNote(lea, recipes.id)
+    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)]) // témoin
+
+    expect((await send('DELETE', `/v1/projects/${recipes.id}/follow`, max)).status).toBe(204)
+
+    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+  })
+
+  it('removes a deleted note from the feed', async () => {
+    const recipes = await publish(lea)
+    await followProject(recipes.id, max)
+    const kept = await postNote(lea, recipes.id, 'Première version en ligne')
+    const removed = await postNote(lea, recipes.id, 'Une note publiée par erreur')
+    expect(keys(await readFollowing(max))).toEqual([noteKey(removed), noteKey(kept)])
+
+    const res = await send('DELETE', `/v1/projects/${recipes.id}/notes/${removed.id}`, lea)
+    expect(res.status).toBe(204)
+
+    expect(keys(await readFollowing(max))).toEqual([noteKey(kept)])
+  })
+
+  it('drops the notes of a followed project gone private, and brings them back at their date', async () => {
+    const recipes = await publish(lea)
+    await followProject(recipes.id, max)
+    const v2 = await postNote(lea, recipes.id)
+    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)]) // témoin
+
+    await setVisibility(lea, recipes.id, 'private')
+    // Comme s'il avait été supprimé : rien ne trahit qu'il existe encore (voir les tests 4a).
+    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+
+    await setVisibility(lea, recipes.id, 'public')
+    const after = await readFollowing(max)
+    expect(keys(after)).toEqual([noteKey(v2)])
+    // Elle reprend sa place, à sa date de publication : repasser public ne la fait pas remonter.
+    expect(after.items[0]?.at).toBe(v2.createdAt)
+  })
+
+  it('shows, once the project is public again, the notes written while it was private, at their own date', async () => {
+    const recipes = await publish(lea)
+    await followProject(recipes.id, max)
+    await setVisibility(lea, recipes.id, 'private')
+    const meanwhile = await postNote(lea, recipes.id, 'Écrite pendant que le projet était privé')
+    expect((await readFollowing(max)).items).toEqual([])
+
+    await setVisibility(lea, recipes.id, 'public')
+
+    const page = await readFollowing(max)
+    expect(keys(page)).toEqual([noteKey(meanwhile)])
+    expect(page.items[0]?.at).toBe(meanwhile.createdAt)
+  })
+
+  it('takes the notes of a deleted account out of the feeds of her followers', async () => {
+    const recipes = await publish(lea)
+    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
+    await followProject(recipes.id, max)
+    await followProject(garden.id, max)
+    const fromLea = await postNote(lea, recipes.id, 'Note de Léa')
+    const fromZoe = await postNote(zoe, garden.id, 'Note de Zoé')
+    expect(keys(await readFollowing(max))).toEqual([noteKey(fromZoe), noteKey(fromLea)]) // témoin
+
+    const res = await send('POST', '/api/auth/delete-user', lea, {
+      password: leaAccount.password,
+    })
+    expect(res.status).toBe(200)
+
+    // Seule la note de Zoé reste : celles de Léa ont disparu avec son compte.
+    expect(keys(await readFollowing(max))).toEqual([noteKey(fromZoe)])
+  })
+})
+
+describe('notes in the « discover » feed', () => {
+  it('never shows a note, only projects', async () => {
+    const recipes = await publish(lea, { status: 'testable', demoUrl: 'https://demo.example.com' })
+    await followProject(recipes.id, max)
+    await postNote(lea, recipes.id)
+    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
+    await postNote(zoe, garden.id)
+
+    for (const cookie of [max, lea, zoe]) {
+      expect(keys(await readDiscover(cookie))).toEqual([projectKey(garden), projectKey(recipes)])
+      expect(keys(await readDiscover(cookie, { testers: 'true' }))).toEqual([projectKey(recipes)])
+    }
+  })
+})
+
+describe('reading a feed of notes and projects page by page', () => {
+  it('gives 25 notes and 20 projects in pages of 20, in order, without gaps or repeats', async () => {
+    // Max suit Léa (ses 20 nouveaux projets) et un projet de Zoé (ses 25 notes). Les deux
+    // alternent, deux heures d'écart chacun : sous les limites de 20 projets et 30 notes par jour.
+    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
+    await followProject(garden.id, max)
+    await followMember(leaId, max)
+    const published: string[] = []
+    for (let i = 0; i < 25; i++) {
+      published.push(noteKey(await postNote(zoe, garden.id, `Note ${i}`)))
+      if (i < 20) published.push(projectKey(await publish(lea, { title: `Projet ${i}` })))
+    }
+
+    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
+
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, FEED_PAGE_SIZE, 5])
+    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, false, true])
+    expect(pages.flatMap(keys)).toEqual([...published].reverse())
+  })
+
+  it('loses nothing and repeats nothing when notes and projects share the same instant', async () => {
+    // 21 éléments au même instant (la fausse horloge n'avance plus) : 11 projets de Léa et 10 notes
+    // d'un projet de Zoé. La limite de la page tombe au milieu de ces ex aequo de deux sortes.
+    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
+    await followProject(garden.id, max)
+    await followMember(leaId, max)
+    later()
+    const published: string[] = []
+    for (let i = 0; i < 11; i++) {
+      published.push(projectKey(await publish(lea, { title: `Léa ${i}` }, { wait: false })))
+    }
+    for (let i = 0; i < 10; i++) {
+      published.push(noteKey(await postNote(zoe, garden.id, `Note ${i}`, { wait: false })))
+    }
+
+    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
+
+    // Condition du test : tous portent bien la même date (celle de la fausse horloge).
+    expect(new Set(pages.flatMap((page) => page.items.map((item) => item.at))).size).toBe(1)
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, 1])
+    const seen = pages.flatMap(keys)
+    expect(new Set(seen).size).toBe(seen.length) // aucun doublon
+    expect([...seen].sort()).toEqual([...published].sort()) // aucun oubli
   })
 })
