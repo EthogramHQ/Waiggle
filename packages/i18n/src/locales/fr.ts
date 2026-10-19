@@ -125,8 +125,11 @@ export const fr = {
       intro: 'Voici ce qui disparaît avec lui.',
       profileItem: 'Ton profil et ta photo',
       projectsItem: 'Tes projets',
-      projectsDetail: 'Avec leur description, leur recette et leurs prompts',
-      exportHint: 'Un fichier avec tout ton contenu, à garder avant de partir.',
+      projectsDetail:
+        'Avec leur description, leur recette, leurs prompts, leurs photos et leurs notes',
+      followsItem: 'Tes abonnements et tes abonnés',
+      exportHint:
+        'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',
       warning: 'C’est immédiat et sans retour.',
       submit: 'Supprimer définitivement',
@@ -247,6 +250,10 @@ export const fr = {
       add: 'Publier une note',
       field: 'Ta note',
       hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
+      hintPrivate:
+        'Ce projet est privé : toi seul vois ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
+      emptyPrivate:
+        'Pas encore de note. Ce projet est privé : toi seul verras ses notes, jusqu’à ce que tu le rendes public.',
       submit: 'Publier la note',
       required: 'Écris ta note avant de la publier.',
       published: 'Note publiée.',

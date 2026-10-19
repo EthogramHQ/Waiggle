@@ -364,7 +364,7 @@ describe('ProjectFormScreen, editing', () => {
 })
 
 // --- Tranche 4b : après un changement de statut, la page du projet propose une note ---
-// Le formulaire le lui dit par l'adresse : /projects/<id>?annonce=<nouveau statut>.
+// Le formulaire le lui dit par l'adresse : /projects/<id>?announce=<nouveau statut>.
 describe('ProjectFormScreen, announcing a new status', () => {
   /** L'adresse ouverte après l'enregistrement : le premier argument du premier replace. */
   const openedAfterSaving = () => mockReplace.mock.calls[0]?.[0]
@@ -386,7 +386,7 @@ describe('ProjectFormScreen, announcing a new status', () => {
     await waitFor(() =>
       expect(openedAfterSaving()).toStrictEqual({
         pathname: '/projects/[id]',
-        params: { id: recipesProject.id, annonce: 'done' },
+        params: { id: recipesProject.id, announce: 'done' },
       }),
     )
   })
@@ -403,7 +403,26 @@ describe('ProjectFormScreen, announcing a new status', () => {
     )
     await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
 
-    // toStrictEqual : pas même un « annonce » vide dans l'adresse.
+    // toStrictEqual : pas même un « announce » vide dans l'adresse.
+    await waitFor(() =>
+      expect(openedAfterSaving()).toStrictEqual({
+        pathname: '/projects/[id]',
+        params: { id: recipesProject.id },
+      }),
+    )
+  })
+
+  it('announces nothing for a private project, whose notes nobody else would see', async () => {
+    jest.mocked(updateProject).mockResolvedValue({
+      ok: true,
+      data: { ...recipesProject, status: 'done', visibility: 'private' },
+    })
+    await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
+
+    await screen.findByDisplayValue('Mon agent de recettes')
+    await fireEvent.press(screen.getByRole('radio', { name: 'Terminé' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
     await waitFor(() =>
       expect(openedAfterSaving()).toStrictEqual({
         pathname: '/projects/[id]',

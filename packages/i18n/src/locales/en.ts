@@ -117,8 +117,10 @@ export const en: Translation = {
       intro: 'Here is what goes with it.',
       profileItem: 'Your profile and your picture',
       projectsItem: 'Your projects',
-      projectsDetail: 'With their description, recipe and prompts',
-      exportHint: 'A file with all your content, to keep before you leave.',
+      projectsDetail: 'With their description, recipe, prompts, photos and notes',
+      followsItem: 'Who you follow and who follows you',
+      exportHint:
+        'Your texts and settings, to keep before you leave. Your photos are not in it: save the ones you want to keep.',
       password: 'Confirm with your password',
       warning: 'It is immediate and cannot be undone.',
       submit: 'Delete permanently',
@@ -238,6 +240,10 @@ export const en: Translation = {
       add: 'Post a note',
       field: 'Your note',
       hint: 'What changed, what you are preparing, what you are looking for. Your followers will see it in their feed.',
+      hintPrivate:
+        'This project is private: only you see its notes. If you make it public, every member will see them.',
+      emptyPrivate:
+        'No note yet. This project is private: only you will see its notes until you make it public.',
       submit: 'Post the note',
       required: 'Write your note before posting it.',
       published: 'Note posted.',

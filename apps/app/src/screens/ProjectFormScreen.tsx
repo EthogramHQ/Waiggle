@@ -348,12 +348,16 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       return
     }
     // En modification, un nouveau statut mérite d'être annoncé aux abonnés : la page du projet
-    // propose alors une note toute prête (?annonce=<statut>, voir ProjectScreen). Jamais à la
-    // création : un premier statut n'est pas un changement.
-    const announce = projectId !== undefined && project.status !== initial.status
+    // propose alors une note toute prête (?announce=<statut>, voir ProjectScreen). Jamais à la
+    // création : un premier statut n'est pas un changement. Ni sur un projet privé : personne
+    // d'autre ne verrait la note.
+    const announce =
+      projectId !== undefined &&
+      project.status !== initial.status &&
+      project.visibility === 'public'
     router.replace({
       pathname: '/projects/[id]',
-      params: announce ? { id: project.id, annonce: project.status } : { id: project.id },
+      params: announce ? { id: project.id, announce: project.status } : { id: project.id },
     })
   }
 

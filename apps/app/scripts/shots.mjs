@@ -327,7 +327,7 @@ const pages = [
   { name: 'projet', path: project, signedIn: true, fullPage: true },
   // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note
   // toute prête dans le champ du journal.
-  { name: 'projet-annonce', path: `${project}?annonce=testable`, signedIn: true, fullPage: true },
+  { name: 'projet-annonce', path: `${project}?announce=testable`, signedIn: true, fullPage: true },
   { name: 'modifier', path: `${project}/edit`, signedIn: true, fullPage: true },
   // Le projet avec ses photos : couverture verticale sur téléphone, vignettes, éditeur des photos.
   { name: 'projet-photos', path: `/projects/${photosProject.id}`, signedIn: true, fullPage: true },

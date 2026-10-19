@@ -1,6 +1,8 @@
 // Routes du membre connecté : lire et modifier son profil, changer d'avatar, exporter ses données.
 // Toutes exigent d'être connecté.
+
 import { createRoute } from '@hono/zod-openapi'
+import { appName } from '@ruche/brand'
 import { AccountExport, AVATAR_MAX_BYTES, Me, ProfileUpdate } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq } from 'drizzle-orm'
@@ -265,7 +267,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       follows.map(({ id, followedAt }) => ({ id, followedAt: followedAt.toISOString() }))
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
-    c.header('Content-Disposition', 'attachment; filename="ruche-export.json"')
+    // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
+    c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
     return c.json(
       {
         exportedAt: new Date().toISOString(),

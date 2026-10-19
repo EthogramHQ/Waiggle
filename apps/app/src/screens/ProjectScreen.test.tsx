@@ -22,7 +22,7 @@ jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
 jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
-// Les paramètres de l'adresse de la page (?annonce=testable), choisis par chaque test.
+// Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
 let mockParams: Record<string, string | undefined> = {}
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
@@ -398,6 +398,35 @@ describe('publishing a note from the project page', () => {
     // Rien n'est perdu : le texte attend dans le champ, pour réessayer.
     expect(screen.getByLabelText('Ta note')).toHaveDisplayValue('v2 : mode hors ligne')
   })
+
+  it('forgets the error once the field is closed and opened again', async () => {
+    mockPublish.mockResolvedValue(false)
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
+    await screen.findByRole('alert')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
+
+    // L'ancienne erreur n'est pas relue : rien n'a encore été réessayé.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('tells the author of a private project that nobody else sees its notes', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(
+      await screen.findByText(
+        'Pas encore de note. Ce projet est privé : toi seul verras ses notes, jusqu’à ce que tu le rendes public.',
+      ),
+    ).toBeTruthy()
+  })
 })
 
 describe('deleting a note from the project page', () => {
@@ -435,7 +464,7 @@ describe('the note suggested after a change of status', () => {
   const suggested = 'Le projet passe en « Testable ».'
 
   it('opens the field, filled in with the new status, when the author comes from the form', async () => {
-    mockParams = { id, annonce: 'testable' }
+    mockParams = { id, announce: 'testable' }
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByLabelText('Ta note')).toHaveDisplayValue(suggested)
@@ -445,7 +474,7 @@ describe('the note suggested after a change of status', () => {
   })
 
   it('suggests nothing to another member', async () => {
-    mockParams = { id, annonce: 'testable' }
+    mockParams = { id, announce: 'testable' }
     seenByOther()
     await renderWithProviders(<ProjectScreen id={id} />)
 
@@ -456,7 +485,7 @@ describe('the note suggested after a change of status', () => {
 
   it('suggests nothing for a status that does not exist', async () => {
     // Une adresse fabriquée à la main ne doit rien glisser dans le champ de l'auteur.
-    mockParams = { id, annonce: 'piratage' }
+    mockParams = { id, announce: 'piratage' }
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Journal' })

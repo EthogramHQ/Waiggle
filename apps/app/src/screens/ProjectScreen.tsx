@@ -4,7 +4,7 @@
 // peut suivre le projet ; tous voient combien de membres le suivent.
 // Le journal (tranche 4b) : les notes de l'auteur, de la plus récente à la plus ancienne. L'auteur y
 // publie et y supprime ses notes ; après un changement de statut, le formulaire le ramène ici avec
-// « ?annonce=<statut> », et une note toute prête l'attend dans le champ.
+// « ?announce=<statut> », et une note toute prête l'attend dans le champ.
 // Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture et la description à
 // gauche, le reste à droite.
 // La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
@@ -432,16 +432,20 @@ function Journal({ project }: { project: Project }) {
   // La note dont on demande confirmation de la suppression, et sa place dans le journal.
   const [deleting, setDeleting] = useState<{ id: string; index: number } | null>(null)
   const [removing, setRemoving] = useState(false)
+  // Les erreurs de React Query restent jusqu'au prochain envoi : on ne les montre qu'après un envoi,
+  // et on les cache dès qu'on rouvre le champ ou une nouvelle confirmation.
+  const [showPublishError, setShowPublishError] = useState(false)
+  const [showDeleteError, setShowDeleteError] = useState(false)
   // Une fois la note supprimée et la fenêtre refermée, le focus va sur la note qui a pris sa place.
   const router = useRouter()
   const notesHandle = useRef<NoteListHandle>(null)
   const focusAfterClose = useRef<number | null>(null)
 
-  // Arrivé du formulaire après un changement de statut (?annonce=testable) : le champ s'ouvre avec
+  // Arrivé du formulaire après un changement de statut (?announce=testable) : le champ s'ouvre avec
   // une note toute prête (« Le projet passe en « Testable ». »). Seulement pour l'auteur, et
   // seulement pour un vrai statut : une adresse fabriquée ne glisse rien dans son champ. L'adresse
   // n'est connue que dans le navigateur : on attend d'y être (voir ui/theme/hydration.ts).
-  const announced = firstParam(useLocalSearchParams<{ annonce?: string | string[] }>().annonce)
+  const announced = firstParam(useLocalSearchParams<{ announce?: string | string[] }>().announce)
   const hydrated = useHydrated()
   // Le statut déjà proposé : changer de langue ensuite ne réécrit pas le champ.
   const proposed = useRef<string | null>(null)
@@ -454,7 +458,7 @@ function Journal({ project }: { project: Project }) {
     setComposing(true)
     setPublished(false)
     // On retire le paramètre de l'adresse : recharger la page ne rouvre pas le champ.
-    router.setParams?.({ annonce: undefined })
+    router.setParams?.({ announce: undefined })
   }, [hydrated, project.isMine, announced, t, router])
 
   const submit = async () => {
@@ -469,6 +473,7 @@ function Journal({ project }: { project: Project }) {
     }
     setDraftError(undefined)
     sending.current = true
+    setShowPublishError(true)
     const ok = await publishNote.publish(checked.data)
     sending.current = false
     // Refusée : le texte reste dans le champ, et l'erreur s'affiche (publishNote.error).
@@ -481,6 +486,7 @@ function Journal({ project }: { project: Project }) {
   const confirmDelete = async () => {
     if (!deleting || removing) return
     setRemoving(true)
+    setShowDeleteError(true)
     const ok = await deleteNote.remove(deleting.id)
     setRemoving(false)
     // Supprimée : son bouton n'existe plus ; le focus ira sur sa voisine, une fois la fenêtre
@@ -499,10 +505,16 @@ function Journal({ project }: { project: Project }) {
       }))}
       {...(project.isMine
         ? {
-            onDelete: (id: string) =>
-              setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) }),
+            onDelete: (id: string) => {
+              setShowDeleteError(false)
+              setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
+            },
             deleteLabel: t('project.notes.delete'),
-            empty: t('project.notes.empty'),
+            // Sur un projet privé, personne d'autre ne verra ses notes : on le dit.
+            empty:
+              project.visibility === 'private'
+                ? t('project.notes.emptyPrivate')
+                : t('project.notes.empty'),
           }
         : null)}
     />
@@ -521,11 +533,13 @@ function Journal({ project }: { project: Project }) {
           open={composing}
           onOpen={() => {
             setPublished(false)
+            setShowPublishError(false)
             setComposing(true)
           }}
           onCancel={() => {
             setComposing(false)
             setDraftError(undefined)
+            setShowPublishError(false)
           }}
           value={draft}
           onChangeText={setDraft}
@@ -535,23 +549,31 @@ function Journal({ project }: { project: Project }) {
           labels={{
             open: t('project.notes.add'),
             field: t('project.notes.field'),
-            hint: t('project.notes.hint'),
+            hint:
+              project.visibility === 'private'
+                ? t('project.notes.hintPrivate')
+                : t('project.notes.hint'),
             submit: t('project.notes.submit'),
             cancel: t('common.cancel'),
           }}
           fieldError={draftError}
-          error={publishNote.error ? t('project.notes.error') : undefined}
+          error={showPublishError && publishNote.error ? t('project.notes.error') : undefined}
           success={published ? t('project.notes.published') : undefined}
         />
       ) : null}
-      {deleteNote.error ? <Notice message={t('project.notes.deleteError')} /> : null}
+      {showDeleteError && deleteNote.error ? (
+        <Notice message={t('project.notes.deleteError')} />
+      ) : null}
       {empty ? null : list}
       {/* Supprimer une note est définitif : une fenêtre demande confirmation. */}
       <Dialog
         visible={deleting !== null}
         title={t('project.notes.deleteTitle')}
         message={t('project.notes.deleteBody')}
-        onDismiss={() => setDeleting(null)}
+        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
+        onDismiss={() => {
+          if (!removing) setDeleting(null)
+        }}
         onClosed={() => {
           const index = focusAfterClose.current
           focusAfterClose.current = null
@@ -565,7 +587,12 @@ function Journal({ project }: { project: Project }) {
           onPress={() => void confirmDelete()}
           loading={removing}
         />
-        <Button label={t('common.cancel')} variant="secondary" onPress={() => setDeleting(null)} />
+        <Button
+          label={t('common.cancel')}
+          variant="secondary"
+          onPress={() => setDeleting(null)}
+          disabled={removing}
+        />
       </Dialog>
     </Surface>
   )

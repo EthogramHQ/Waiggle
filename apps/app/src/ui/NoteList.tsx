@@ -129,7 +129,8 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
                     variant="plain"
                     label={deleteLabel ?? t('project.notes.delete')}
                     describedBy={bodyId}
-                    hint={note.body.length > 80 ? `${note.body.slice(0, 80)}…` : note.body}
+                    // Array.from compte en caractères (un emoji entier), là où slice compterait en « unités ».
+                    hint={shorten(note.body, 80)}
                     onPress={() => onDelete(note.id)}
                   />
                 ) : null}
@@ -146,4 +147,10 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
       })}
     </View>
   )
+}
+
+/** Le début d'un texte, `max` caractères au plus (un emoji compte pour un), puis « … ». */
+const shorten = (text: string, max: number) => {
+  const chars = Array.from(text)
+  return chars.length > max ? `${chars.slice(0, max).join('')}…` : text
 }

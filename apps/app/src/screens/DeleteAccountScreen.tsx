@@ -75,6 +75,7 @@ export function DeleteAccountScreen() {
           label={t('account.delete.projectsItem')}
           detail={t('account.delete.projectsDetail')}
         />
+        <ListRow icon="users" label={t('account.delete.followsItem')} />
       </ListGroup>
 
       {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}
