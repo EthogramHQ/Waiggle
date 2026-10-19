@@ -420,7 +420,7 @@ describe('the daily limit of handle changes', () => {
     const res = await patchMe(ines, { handle: 'ines_f', bio: 'Une de trop' })
 
     expect(res.status).toBe(429)
-    expect(ErrorResponse.parse(await res.json()).error.code).toBe('rate_limited')
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe('handle_change_limit')
     expect(res.headers.get('retry-after')).toBeTruthy()
     expect(await me(ines)).toMatchObject({ handle: 'ines_e', bio: '' })
   })

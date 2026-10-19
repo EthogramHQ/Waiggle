@@ -128,7 +128,9 @@ export const fr = {
       projectsDetail:
         'Avec leur description, leur recette, leurs prompts, leurs photos, leurs notes et leurs commentaires',
       followsItem: 'Tes abonnements et tes abonnés',
-      handleItem: 'Ton pseudo, qui redevient libre aussitôt',
+      handleItem: 'Ton pseudo',
+      handleDetail:
+        '@{{handle}}, et l’ancien s’il t’est réservé : ils redeviennent libres aussitôt',
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
@@ -155,7 +157,7 @@ export const fr = {
       name: 'Nom affiché',
       handle: 'Pseudo',
       handleHint:
-        'Les membres te verront sous @pseudo sur ta page, et pourront te mentionner. 3 à 20 caractères : lettres sans accent, chiffres et « _ ». Ton ancien pseudo te reste réservé 30 jours.',
+        'Les membres te voient sous @pseudo sur ta page. Il a été tiré de ton nom et ne change pas avec lui. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
       toolsLimit: '{{max}} au plus',
@@ -163,6 +165,7 @@ export const fr = {
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
+    savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
       nameTooLong: 'Le nom doit faire au plus {{max}} caractères.',
       handleTooShort: 'Le pseudo doit faire au moins {{min}} caractères.',
@@ -501,6 +504,7 @@ export const fr = {
     cannotFollowOwn: 'Tu ne peux pas te suivre toi-même, ni suivre tes propres projets.',
     cannotReactOwn: 'Tu ne peux pas réagir à ton propre projet.',
     handleTaken: 'Ce pseudo est déjà pris. Choisis-en un autre.',
+    handleChangeLimit: 'Tu as changé de pseudo plusieurs fois aujourd’hui. Réessaie demain.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
