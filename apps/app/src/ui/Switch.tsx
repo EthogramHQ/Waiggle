@@ -4,6 +4,7 @@ import { radii, space } from '@ruche/brand'
 import { useEffect } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { spaceToggles } from './keyboard'
 import { Text } from './Text'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -38,6 +39,8 @@ export function Switch({ label, value, onValueChange, hint, disabled = false }: 
       aria-disabled={disabled}
       disabled={disabled}
       onPress={() => onValueChange(!value)}
+      // La barre d'espace l'active aussi sur le web (voir keyboard.ts).
+      {...spaceToggles(() => onValueChange(!value), disabled)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}
     >
       <View style={{ flex: 1, gap: space.xxs }}>

@@ -19,6 +19,8 @@ export const recipesProject: Project = {
   visuals: [],
   portraitCover: null,
   isMine: true,
+  isFollowed: false,
+  followerCount: 0,
   createdAt: '2026-10-12T08:00:00.000Z',
   updatedAt: '2026-10-12T08:00:00.000Z',
 }
@@ -83,5 +85,7 @@ export const leaPage: Member = {
     { label: 'Python', slug: 'python' },
   ],
   isMe: false,
+  isFollowed: false,
+  followerCount: 3,
   projects: [summaryOf(projectWithPhotos)],
 }

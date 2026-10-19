@@ -25,6 +25,9 @@ import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
+import { FeedEnd } from '../ui/FeedEnd'
+import { FollowButton } from '../ui/FollowButton'
+import { FollowerCount } from '../ui/FollowerCount'
 import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
@@ -35,6 +38,7 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
+import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -416,6 +420,74 @@ export function CatalogueScreen() {
         </ProjectGrid>
         {/* La même grille, vide. */}
         <ProjectGrid empty={l.emptyList}>{[]}</ProjectGrid>
+      </Section>
+
+      <Section title={l.feedSection}>
+        {/* Le bouton « Suivre » : pas suivi (miel), suivi (blanc, coché), puis avec une erreur. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+        />
+        <FollowButton
+          followed
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.following}
+          caption={l.followers}
+        />
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          error={l.followError}
+        />
+        {/* Sur la page d'un projet, la démo est l'action principale : « Suivre » reste en blanc. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          prominent={false}
+        />
+        <FollowButton
+          followed
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.following}
+          caption={l.followers}
+          error={l.followError}
+        />
+        {/* Dans l'en-tête d'une page de membre : le nombre au-dessus, le tout centré. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          layout="stacked"
+        />
+        {/* Le nombre d'abonnés seul, sur sa propre page. */}
+        <FollowerCount text={l.followers} />
+        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
+        <NewItemsBanner label={null} caption={l.feedCaption} onPress={() => {}} />
+        <NewItemsBanner label={l.news} caption={l.feedCaption} onPress={() => {}} />
+        {/* Le bas du fil dans ses trois états. */}
+        <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        <FeedEnd
+          state="error"
+          moreLabel={l.showMore}
+          endLabel={l.upToDate}
+          errorLabel={l.moreError}
+          retryLabel={l.retry}
+          onMore={() => {}}
+        />
       </Section>
 
       <Section title={l.illustrations}>

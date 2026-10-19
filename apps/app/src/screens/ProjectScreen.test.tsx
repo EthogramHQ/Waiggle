@@ -1,6 +1,7 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
+import { useFollow } from '../follows/api'
 import { deleteProject, getProject } from '../projects/api'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -14,6 +15,8 @@ jest.mock('../api/media', () => ({
 // La barre de navigation (ordinateur) lit le profil pour l'avatar : on remplace l'appel.
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest.fn() }))
+// Suivre : un faux hook, dont le test lit les appels (toggle) et choisit l'erreur.
+jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
@@ -22,8 +25,14 @@ jest.mock('expo-router', () => ({
 }))
 
 const { id } = recipesProject
+const mockToggle = jest.fn()
 
 beforeEach(() => {
+  mockToggle.mockReset()
+  jest
+    .mocked(useFollow)
+    .mockReset()
+    .mockReturnValue({ toggle: mockToggle, error: false, expired: false })
   mockSession({ user: { id: 'u1', name: 'Léa' } })
   jest.mocked(getProject).mockReset().mockResolvedValue(recipesProject)
   jest.mocked(deleteProject).mockReset()
@@ -184,5 +193,55 @@ describe('ProjectScreen', () => {
     } finally {
       restore()
     }
+  })
+})
+
+describe('following a project from its page', () => {
+  /** Le projet de Léa, vu par Max. */
+  const seenByMax = (follow: { isFollowed: boolean; followerCount: number }) => {
+    mockSession({ user: { id: 'u2', name: 'Max' } })
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, isMine: false, ...follow })
+  }
+
+  it('offers to follow the project of another member, and says how many follow it', async () => {
+    seenByMax({ isFollowed: false, followerCount: 2 })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const button = await screen.findByRole('switch', { name: 'Suivre ce projet' })
+    expect(button).not.toBeChecked()
+    expect(screen.getByText('Suivre ce projet')).toBeTruthy()
+    expect(screen.getByText('2 abonnés')).toBeTruthy()
+    expect(useFollow).toHaveBeenCalledWith({ kind: 'project', id })
+
+    await fireEvent.press(button)
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows that the project is followed', async () => {
+    seenByMax({ isFollowed: true, followerCount: 3 })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Une fois suivi, le nom lu reprend le texte affiché, pour la commande vocale.
+    expect(await screen.findByRole('switch', { name: 'Projet suivi' })).toBeChecked()
+    expect(screen.getByText('Projet suivi')).toBeTruthy()
+    expect(screen.getByText('3 abonnés')).toBeTruthy()
+  })
+
+  it('offers no follow button on one’s own project', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.queryByRole('switch', { name: 'Suivre ce projet' })).toBeNull()
+  })
+
+  it('says so when the follow could not be saved', async () => {
+    seenByMax({ isFollowed: false, followerCount: 2 })
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: false })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'L’abonnement n’a pas pu être enregistré. Réessaie.',
+    )
   })
 })

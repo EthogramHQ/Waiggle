@@ -3,6 +3,7 @@
 // les dates de connexion. z.object ne garde que les champs listés ici, et l'API passe sa réponse
 // par Member.parse : un champ de plus, lu par erreur dans la base, ne pourrait pas en sortir.
 import { z } from 'zod'
+import { FollowState } from './follows'
 import { PROJECT_LIST_MAX, ProjectSummary, ProjectTool } from './projects'
 
 /**
@@ -21,6 +22,8 @@ export const Member = z
     favoriteTools: z.array(ProjectTool),
     /** Vrai si c'est la page du membre qui regarde : ses projets privés y figurent aussi. */
     isMe: z.boolean(),
+    /** Si le visiteur la suit, et combien de membres la suivent (jamais leurs noms). */
+    ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */
     projects: z.array(ProjectSummary).max(PROJECT_LIST_MAX),
   })

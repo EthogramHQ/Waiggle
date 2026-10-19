@@ -1,6 +1,6 @@
 // Tests d'intégration de la tranche 3a : publier, lire, modifier et supprimer un projet.
 // Scénarios : docs/scenarios/phase-1.md, tranche 3. Deux membres : Léa (l'autrice) et Max.
-import { AccountExport, ErrorResponse, Project } from '@ruche/contracts'
+import { AccountExport, ErrorResponse, Me, Project } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -307,6 +307,54 @@ describe('my data and my account', () => {
     const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
 
     expect(data.projects.map((p) => p.title)).toEqual([recipes.title])
+  })
+
+  it('exports the members and projects I follow, with their date only, and not my followers', async () => {
+    const maxId = Me.parse(await (await send('GET', '/v1/me', max)).json()).id
+    const followed = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    const mine = await publish()
+    // Léa suit Max et son projet ; Max suit le projet de Léa (cela ne regarde pas l'export de Léa).
+    expect((await send('POST', `/v1/members/${maxId}/follow`, lea)).status).toBe(204)
+    expect((await send('POST', `/v1/projects/${followed.id}/follow`, lea)).status).toBe(204)
+    expect((await send('POST', `/v1/projects/${mine.id}/follow`, max)).status).toBe(204)
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+    const data = AccountExport.parse(JSON.parse(raw))
+
+    expect(data.follows.members).toEqual([{ id: maxId, followedAt: expect.any(String) }])
+    expect(data.follows.projects).toEqual([{ id: followed.id, followedAt: expect.any(String) }])
+    // Seulement l'identifiant et la date : ni le titre du projet suivi, ni le nom ou l'adresse de Max.
+    for (const entry of [...data.follows.members, ...data.follows.projects]) {
+      expect(Object.keys(entry).sort()).toEqual(['followedAt', 'id'])
+    }
+    expect(raw).not.toContain('Projet de Max')
+    expect(raw).not.toContain('max@example.com')
+  })
+
+  it('leaves out a followed project gone private, as if it were deleted', async () => {
+    const followed = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    expect((await send('POST', `/v1/projects/${followed.id}/follow`, lea)).status).toBe(204)
+    expect(
+      (await send('PATCH', `/v1/projects/${followed.id}`, max, { visibility: 'private' })).status,
+    ).toBe(200)
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+
+    // L'abonnement existe encore en base, mais l'export n'en dit rien : il ne trahit pas le projet.
+    expect(AccountExport.parse(JSON.parse(raw)).follows.projects).toEqual([])
+    expect(raw).not.toContain(followed.id)
+  })
+
+  it('exports no follow at all for a member who follows nobody', async () => {
+    const mine = await publish()
+    expect((await send('POST', `/v1/projects/${mine.id}/follow`, max)).status).toBe(204)
+    const maxId = Me.parse(await (await send('GET', '/v1/me', max)).json()).id
+
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+
+    // Ses abonnés ne font pas partie de ses données : Max n'apparaît nulle part.
+    expect(AccountExport.parse(JSON.parse(raw)).follows).toEqual({ members: [], projects: [] })
+    expect(raw).not.toContain(maxId)
   })
 
   it('deletes my projects together with my account', async () => {

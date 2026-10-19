@@ -1,6 +1,7 @@
 // Page d'un projet : sa couverture, son statut, son titre, son auteur, sa démo, sa « recette »
 // (outils, temps passé, prompts clés) et sa description. L'auteur peut le modifier ou le supprimer.
-// L'auteur mène à sa page de membre, et chaque outil à la page de son étiquette.
+// L'auteur mène à sa page de membre, et chaque outil à la page de son étiquette. Un autre membre
+// peut suivre le projet ; tous voient combien de membres le suivent.
 // Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture et la description à
 // gauche, le reste à droite.
 // La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useFollow } from '../follows/api'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -24,6 +26,8 @@ import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
 import { Dialog } from '../ui/Dialog'
+import { FollowButton } from '../ui/FollowButton'
+import { FollowerCount } from '../ui/FollowerCount'
 import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -89,6 +93,8 @@ function ProjectView({ project }: { project: Project }) {
 
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
   const back = useGoBack('/')
+  const follow = useFollow({ kind: 'project', id: project.id })
+  const followers = t('follow.followers', { count: project.followerCount })
 
   const onDelete = async () => {
     setBusy(true)
@@ -216,6 +222,24 @@ function ProjectView({ project }: { project: Project }) {
         </Stack>
       ) : (
         <Text tone="muted">{t('project.page.noDemo')}</Text>
+      )}
+      {/* Suivre, après la démo : on lit d'abord le projet, puis on décide de le suivre. Seulement le
+          projet d'un autre ; l'auteur voit seulement le nombre d'abonnés. */}
+      {project.isMine ? (
+        <FollowerCount text={followers} />
+      ) : (
+        <FollowButton
+          followed={project.isFollowed}
+          onPress={follow.toggle}
+          // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (voir MemberScreen).
+          label={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+          text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+          caption={followers}
+          error={
+            follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
+          }
+          prominent={false}
+        />
       )}
     </Stack>
   )

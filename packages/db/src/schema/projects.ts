@@ -32,13 +32,28 @@ export const project = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    // Le moment où le projet est devenu public pour la première fois : sa date dans les fils
+    // (tranche 4). null tant qu'il n'a jamais été public. Repasser en privé puis en public ne la
+    // change pas. Pas de valeur par défaut : c'est l'API qui l'écrit, avec l'horloge de JavaScript.
+    publishedAt: timestamp('published_at'),
   },
   // Les index sont des sommaires qui accélèrent les recherches fréquentes :
   // - les projets d'un membre, du plus récent au plus ancien ;
-  // - les projets qui portent une étiquette (« GIN » : un sommaire du contenu des listes).
+  // - les projets qui portent une étiquette (« GIN » : un sommaire du contenu des listes) ;
+  // - le fil « Découvrir » : un index « partiel », qui ne range que les lignes où
+  //   visibility = 'public'. Il est plus petit (les brouillons n'y sont pas) et déjà trié dans
+  //   l'ordre du fil (du plus récent au plus ancien, puis par identifiant) : PostgreSQL n'a qu'à
+  //   le lire depuis le début, ou depuis le curseur, et s'arrêter au 21e projet. nullsFirst :
+  //   c'est l'ordre que PostgreSQL donne à « order by … desc » ; sans lui, drizzle écrirait
+  //   « nulls last », et l'index ne serait plus rangé dans l'ordre exact que demande le fil ;
+  // - le fil « Abonnements » : pour chaque membre suivi, ses projets rangés par date.
   (t) => [
     index('project_author_created_idx').on(t.authorId, t.createdAt),
     index('project_tool_slugs_idx').using('gin', t.toolSlugs),
+    index('project_public_published_idx')
+      .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
+      .where(sql`${t.visibility} = 'public'`),
+    index('project_author_published_idx').on(t.authorId, t.publishedAt),
   ],
 )
 

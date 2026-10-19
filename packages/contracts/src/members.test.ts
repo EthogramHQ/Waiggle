@@ -24,6 +24,8 @@ const lea = {
   bio: 'Je bricole des agents.',
   favoriteTools: [{ label: 'Claude Code', slug: 'claude-code' }],
   isMe: false,
+  isFollowed: false,
+  followerCount: 3,
   projects: [summary],
 }
 

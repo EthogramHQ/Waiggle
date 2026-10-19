@@ -137,11 +137,14 @@ const longProject = {
     { label: 'Claude Code', slug: 'claude-code' },
   ],
 }
-// Le projet d'un autre membre, ouvert en modification : l'état « Ce projet n'est pas à toi ».
+// Le projet d'un autre membre (Max) : le bouton « Suivre ce projet », et, ouvert en
+// modification, l'état « Ce projet n'est pas à toi ».
 const notMineProject = {
   ...recipesProject,
   id: '00000000-0000-4000-8000-0000000000aa',
+  author: { id: 'max-id', name: 'Max Durand', avatarUrl: null },
   isMine: false,
+  followerCount: 2,
 }
 // Le même projet, avec ses photos, sous un autre identifiant : on photographie les deux pages.
 const photosProject = { ...projectWithPhotos, id: '7c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f' }
@@ -172,6 +175,60 @@ const sampleImage = (id) => {
   <circle cx="${width * 0.7}" cy="${height * 0.35}" r="${Math.min(width, height) * 0.18}" fill="hsl(${hue + 180} 80% 85%)" opacity="0.8"/>
 </svg>`
 }
+// Le fil de l'accueil : celui de Léa, qui suit des membres (avec une suite à charger), ou vide
+// quand elle ne suit personne. La page en cours choisit (feed: 'nobody' dans la liste plus bas) ;
+// l'API simulée lit ce choix ici, avant chaque page.
+let feedScenario = 'following'
+// Les projets des personnes que Léa suit (Max, Inès) : on ne se suit pas soi-même.
+const max = { id: 'max-id', name: 'Max Durand', avatarUrl: null }
+const ines = { id: 'ines-id', name: 'Inès Haddad', avatarUrl: null }
+const fromOthers = [
+  {
+    ...photosProject,
+    id: '1a2b3c4d-0000-4000-8000-000000000001',
+    author: max,
+    title: 'Le tri des photos de vacances',
+  },
+  {
+    ...recipesProject,
+    id: '1a2b3c4d-0000-4000-8000-000000000002',
+    author: ines,
+    title: 'Mon agent de recettes',
+    status: 'building',
+  },
+  {
+    ...recipesProject,
+    id: '1a2b3c4d-0000-4000-8000-000000000003',
+    author: max,
+    title: 'Un résumé des réunions',
+    pitch: 'Il écoute la réunion et envoie les décisions à chacun.',
+    status: 'idea',
+  },
+  { ...longProject, id: '1a2b3c4d-0000-4000-8000-000000000004', author: ines },
+]
+const feedItems = fromOthers.map((p, i) => ({
+  kind: 'project',
+  at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
+  project: summaryOf(p),
+}))
+// La page de Max, vue par Léa qui ne le suit pas encore.
+const maxMember = {
+  ...leaPage,
+  id: max.id,
+  name: max.name,
+  bio: 'Je fais des outils pour ma famille.',
+  isMe: false,
+  isFollowed: false,
+  followerCount: 12,
+  projects: feedItems
+    .filter((item) => item.project.author.id === max.id)
+    .map((item) => item.project),
+}
+const followingFeed = () =>
+  feedScenario === 'nobody'
+    ? { items: [], nextCursor: null, followsAnyone: false }
+    : { items: feedItems, nextCursor: 'suite', followsAnyone: true }
+
 const fakeApi = (signedIn) => async (route) => {
   const { pathname } = new URL(route.request().url())
   const json = (status, body) =>
@@ -184,7 +241,10 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === `/v1/projects/${notMineProject.id}`) return json(200, notMineProject)
   if (pathname === `/v1/projects/${longProject.id}`) return json(200, longProject)
   if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
+  if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
   if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
+  if (pathname === '/v1/feed/following') return json(200, followingFeed())
+  if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
   // Une page dont le chargement échoue, pour photographier l'état « erreur ».
   if (pathname === '/v1/members/erreur')
     return json(500, { error: { code: 'internal', message: '' } })
@@ -206,7 +266,12 @@ const pages = [
   { name: 'inscription', path: '/sign-up', signedIn: false },
   { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
-  { name: 'accueil-connecte', path: '/', signedIn: true },
+  // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
+  { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
+  { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // La page d'un autre membre et son projet : les boutons « Suivre ».
+  { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
+  { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
@@ -317,6 +382,7 @@ async function layoutReport() {
       lines.push(`## ${shot.name} (${shot.path})`, '')
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
@@ -395,19 +461,42 @@ for (const device of devices) {
       page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
       for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
         await page.setViewportSize(device.viewport)
+        feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
-        if (shot.fullPage) {
-          // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
-          // agrandit la fenêtre à la hauteur de son contenu.
-          const height = await page.evaluate(() =>
-            Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
-          )
-          // Plafond large (le catalogue fait plus de 14 000 points à 320) : au-delà, Chromium refuse.
-          await page.setViewportSize({ ...device.viewport, height: Math.min(height, 16000) })
-          await page.waitForTimeout(300)
+        const file = (part) =>
+          join(out, `${shot.name}${part > 1 ? `-${part}` : ''}-${device.name}-${scheme.name}.png`)
+        if (!shot.fullPage) {
+          await page.screenshot({ path: file(1) })
+          continue
         }
-        await page.screenshot({ path: join(out, `${shot.name}-${device.name}-${scheme.name}.png`) })
+        // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
+        // agrandit la fenêtre à la hauteur de son contenu.
+        const height = await page.evaluate(() =>
+          Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
+        )
+        // Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute (le catalogue en fait
+        // davantage sur téléphone) : on photographie alors la page en plusieurs morceaux
+        // (catalogue, catalogue-2…), en faisant défiler la zone qui défile entre deux captures.
+        const PART = 16000
+        await page.setViewportSize({ ...device.viewport, height: Math.min(height, PART) })
+        await page.waitForTimeout(300)
+        for (let part = 1; (part - 1) * PART < height; part++) {
+          if (part > 1) {
+            await page.evaluate(
+              (top) => {
+                const scrollers = [...document.querySelectorAll('div')].filter(
+                  (el) => el.scrollHeight > el.clientHeight,
+                )
+                const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
+                if (main) main.scrollTop = top
+              },
+              (part - 1) * PART,
+            )
+            await page.waitForTimeout(300)
+          }
+          await page.screenshot({ path: file(part) })
+        }
       }
       await context.close()
     }

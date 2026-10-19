@@ -3,22 +3,35 @@
 // éléments iOS, Android ou web.
 //
 // Deux visages : pour un visiteur, la constellation, le logo et l'invitation à créer un compte ;
-// pour un membre connecté, en attendant le fil (tranche 4), un accueil qui invite à publier et
-// mène à ses projets (sa propre page).
+// pour un membre connecté, ses raccourcis (publier, ses projets, son compte) puis le fil, en deux
+// choix : « Abonnements » (les nouveaux projets des personnes suivies) et « Découvrir » (tous les
+// projets publics, ou ceux qui cherchent des testeurs). Le fil se lit 20 par 20, jusqu'à « Tu es à
+// jour », et un bandeau annonce les nouveautés sans jamais faire bouger ce qu'on lit.
 import { sourceUrl } from '@ruche/brand'
+import { FEED_PAGE_SIZE, type FeedItem } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
+import { errorKey } from '../api/errors'
+import { type FeedKind, useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
+import { feedItemId } from '../feed/items'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
+import { SummaryCard } from '../projects/SummaryCard'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
+import { FeedEnd } from '../ui/FeedEnd'
 import { Hint } from '../ui/Hint'
-import { Emblem } from '../ui/Illustrations'
+import { IconButton } from '../ui/IconButton'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
+import { NewItemsBanner } from '../ui/NewItemsBanner'
+import { Notice } from '../ui/Notice'
+import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
+import { Segmented, type SegmentedHandle } from '../ui/Segmented'
 import { Row, Stack } from '../ui/Stack'
-import { Surface } from '../ui/Surface'
+import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
@@ -97,38 +110,243 @@ function VisitorHome() {
 function MemberHome({ id, name }: { id: string; name: string }) {
   const { t } = useTranslation()
   const router = useRouter()
+  // Le fil choisi : « Abonnements » d'abord, puis « Découvrir » d'un toucher.
+  const [feed, setFeed] = useState<FeedKind>('following')
+  const compact = useLayout().sizeClass === 'compact'
+  // Le choix du fil, pour y ramener le focus du clavier quand un bouton change de fil.
+  const tabs = useRef<SegmentedHandle>(null)
+  const discover = () => {
+    setFeed('discover')
+    // Le bouton touché disparaît avec le fil vide : le focus va sur le choix « Découvrir ».
+    requestAnimationFrame(() => tabs.current?.focusChecked())
+  }
+  const myProjects = () => router.push({ pathname: '/members/[id]', params: { id } })
   return (
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
-    <Screen header={<TopNav />} title={t('home.greeting', { name })} pageTitle={null}>
-      {/* Un état vide qui invite à agir, plutôt qu'une page blanche (voir docs/design/miel.md). */}
-      <Surface variant="grouped" padding="xxl" gap="lg">
-        <Stack align="center">
-          <Emblem icon="sparkle" />
-        </Stack>
-        <Text variant="heading" align="center">
-          {t('home.comingSoon')}
-        </Text>
-        <Text tone="secondary" align="center">
-          {t('home.comingSoonBody')}
-        </Text>
+    <Screen
+      width="page"
+      header={<TopNav hideNewProject />}
+      title={t('home.greeting', { name })}
+      pageTitle={null}
+    >
+      {/* Sur téléphone, une seule rangée : « Publier » en clair, ses projets et son compte en
+          icônes (avec leur nom pour les lecteurs d'écran). Le fil arrive ainsi plus haut. */}
+      <Row gap="sm" wrap>
+        {/* Sur téléphone, « Publier » tout court (le nom lu reste « Publier un projet ») : la rangée
+            tient sur une ligne, même sur un écran de 320 points. */}
         <Button
-          label={t('home.publish')}
+          label={compact ? t('home.publishShort') : t('home.publish')}
+          spokenLabel={t('home.publish')}
           icon="plus"
+          size="compact"
           onPress={() => router.push('/projects/new')}
         />
-        <Button
-          label={t('home.myProjects')}
-          variant="secondary"
-          icon="squares-four"
-          onPress={() => router.push({ pathname: '/members/[id]', params: { id } })}
-        />
-        <Button
-          label={t('home.account')}
-          variant="secondary"
-          icon="user"
-          onPress={() => router.push('/account')}
-        />
-      </Surface>
+        {compact ? (
+          <>
+            <IconButton icon="squares-four" label={t('home.myProjects')} onPress={myProjects} />
+            <IconButton
+              icon="user"
+              label={t('home.account')}
+              onPress={() => router.push('/account')}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              label={t('home.myProjects')}
+              variant="secondary"
+              icon="squares-four"
+              size="compact"
+              onPress={myProjects}
+            />
+            <Button
+              label={t('home.account')}
+              variant="secondary"
+              icon="user"
+              size="compact"
+              onPress={() => router.push('/account')}
+            />
+          </>
+        )}
+      </Row>
+      <Segmented
+        handle={tabs}
+        label={t('feed.label')}
+        options={[
+          { value: 'following', label: t('feed.tabs.following'), icon: 'users' },
+          { value: 'discover', label: t('feed.tabs.discover'), icon: 'compass' },
+        ]}
+        value={feed}
+        onChange={setFeed}
+        // Sur téléphone, les deux choix se partagent la largeur ; plus large, ils gardent leur taille.
+        fill={compact}
+      />
+      {feed === 'following' ? <FollowingFeed onDiscover={discover} /> : <DiscoverFeed />}
     </Screen>
+  )
+}
+
+/** Le fil « Abonnements » : les nouveaux projets des personnes suivies. */
+function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
+  const { t } = useTranslation()
+  const feed = useFollowingFeed()
+  const items = feed.data?.pages.flatMap((page) => page.items) ?? []
+  const news = useFeedNews('following', items[0])
+
+  // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
+  // les cartes déjà lues (voir FeedList).
+  if (!feed.data) {
+    return feed.isError ? (
+      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+    ) : (
+      <StateMessage kind="loading" message={t('common.loading')} />
+    )
+  }
+  if (items.length === 0) {
+    // Ne suivre personne n'est pas une erreur, ni un fil calme : dans les deux cas, on montre où
+    // trouver des projets. En blanc : « Publier un projet », plus haut, reste la seule action miel.
+    const followsAnyone = feed.data.pages[0]?.followsAnyone
+    return (
+      <StateMessage
+        kind="empty"
+        title={followsAnyone ? undefined : t('feed.nobodyTitle')}
+        message={followsAnyone ? t('feed.quiet') : t('feed.nobodyBody')}
+        actions={[{ label: t('feed.nobodyAction'), onPress: onDiscover, variant: 'secondary' }]}
+      />
+    )
+  }
+  return (
+    <FeedList
+      feed={feed}
+      items={items}
+      news={news}
+      empty={t('feed.quiet')}
+      caption={t('feed.followingCaption')}
+    />
+  )
+}
+
+/** Le fil « Découvrir » : tous les projets publics, ou seulement ceux qui cherchent des testeurs. */
+function DiscoverFeed() {
+  const { t } = useTranslation()
+  const [testers, setTesters] = useState(false)
+  const feed = useDiscoverFeed({ testers })
+  const items = feed.data?.pages.flatMap((page) => page.items) ?? []
+  const news = useFeedNews('discover', items[0], testers)
+
+  return (
+    <Stack gap="lg">
+      <Segmented
+        label={t('feed.filter.label')}
+        options={[
+          { value: 'all', label: t('feed.filter.all') },
+          { value: 'testers', label: t('feed.filter.testers') },
+        ]}
+        value={testers ? 'testers' : 'all'}
+        onChange={(value) => setTesters(value === 'testers')}
+        fill={false}
+      />
+      {!feed.data ? (
+        feed.isError ? (
+          <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+        ) : (
+          <StateMessage kind="loading" message={t('common.loading')} />
+        )
+      ) : (
+        <FeedList
+          feed={feed}
+          items={items}
+          news={news}
+          empty={testers ? t('feed.testersEmpty') : t('feed.discoverEmpty')}
+          caption={testers ? t('feed.testersCaption') : t('feed.discoverCaption')}
+        />
+      )}
+    </Stack>
+  )
+}
+
+// Ce dont la liste a besoin d'un fil chargé (une partie du résultat de useInfiniteQuery).
+type LoadedFeed = {
+  hasNextPage: boolean
+  isFetchingNextPage: boolean
+  /** La dernière demande de suite a échoué (les pages déjà lues restent). */
+  isFetchNextPageError?: boolean
+  /** La dernière relecture du fil a échoué (après le bandeau des nouveautés). */
+  isRefetchError?: boolean
+  error?: unknown
+  fetchNextPage: () => Promise<unknown>
+  refetch: () => Promise<unknown>
+}
+
+type FeedListProps = {
+  feed: LoadedFeed
+  items: FeedItem[]
+  news: { count: number | null; more: boolean }
+  /** Le message d'un fil vide. */
+  empty: string
+  /** La phrase en haut du fil, qui dit ce qu'il montre (remplacée par le bandeau des nouveautés). */
+  caption: string
+}
+
+/** Les cartes d'un fil, le bandeau des nouveautés au-dessus, et la fin du fil en dessous. */
+function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
+  const { t } = useTranslation()
+  return (
+    <Stack gap="lg">
+      {/* Toujours là, à la même hauteur : le bandeau y remplace la phrase, sans rien décaler. */}
+      <NewItemsBanner
+        label={
+          news.count === null
+            ? null
+            : news.more
+              ? t('feed.newsMany', { max: FEED_PAGE_SIZE })
+              : t('feed.news', { count: news.count })
+        }
+        // Relire le fil depuis le début : les nouveautés arrivent en haut, à la place du bandeau.
+        onPress={() => feed.refetch()}
+        caption={caption}
+      />
+      {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
+      {feed.isRefetchError ? <Notice message={t(`errors.${errorKey(feed.error)}`)} /> : null}
+      <ProjectGrid empty={empty}>
+        {items.map((item) => (
+          <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
+        ))}
+      </ProjectGrid>
+      {items.length > 0 ? (
+        <FeedEnd
+          state={
+            feed.isFetchingNextPage
+              ? 'loading'
+              : feed.isFetchNextPageError
+                ? 'error'
+                : feed.hasNextPage
+                  ? 'more'
+                  : 'end'
+          }
+          moreLabel={t('feed.more')}
+          endLabel={t('feed.end')}
+          errorLabel={t('feed.moreError')}
+          retryLabel={t('common.retry')}
+          // Une seule demande à la fois, même après un double clic.
+          onMore={() => {
+            if (!feed.isFetchingNextPage) void feed.fetchNextPage()
+          }}
+        />
+      ) : null}
+    </Stack>
+  )
+}
+
+/** Un fil qui n'a pas pu se charger : on dit pourquoi, et on propose de réessayer. */
+function FeedError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <StateMessage
+      kind="error"
+      title={t('feed.errorTitle')}
+      message={t(`errors.${errorKey(error)}`)}
+      actions={[{ label: t('common.retry'), onPress: onRetry }]}
+    />
   )
 }

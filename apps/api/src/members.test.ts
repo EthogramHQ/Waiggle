@@ -151,8 +151,19 @@ describe('the page of a member', () => {
     const text = await res.text()
 
     expect(text).not.toContain('lea@example.com')
+    // Tranche 4 : l'abonnement (suivie ou non, combien d'abonnés), jamais la liste des abonnés.
     expect(Object.keys(JSON.parse(text)).sort()).toEqual(
-      ['avatarUrl', 'bio', 'favoriteTools', 'id', 'isMe', 'name', 'projects'].sort(),
+      [
+        'avatarUrl',
+        'bio',
+        'favoriteTools',
+        'followerCount',
+        'id',
+        'isFollowed',
+        'isMe',
+        'name',
+        'projects',
+      ].sort(),
     )
   })
 
