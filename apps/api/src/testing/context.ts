@@ -1,7 +1,8 @@
-// Outils partagés par les tests de l'API : une API complète, branchée sur une base PGlite neuve,
+// Outils partagés par les tests de l'API : une API complète, branchée sur une base PGlite neuve
+// (copiée d'un modèle déjà migré, voir createTestPgliteDb),
 // une fausse boîte d'envoi d'e-mails et un stockage de fichiers en mémoire.
 // Rien ici n'est utilisé en production.
-import { createPgliteDb } from '@ruche/db/pglite'
+import { createTestPgliteDb } from '@ruche/db/pglite'
 import { createApp } from '../app'
 import { createAuth } from '../auth/auth'
 import { createMemoryMailer } from '../email/mailer'
@@ -24,7 +25,7 @@ export const createTestContext = async ({
   version?: string
   inviteCode?: string | null
 } = {}) => {
-  const { db, close } = await createPgliteDb()
+  const { db, close } = await createTestPgliteDb()
   const mailer = createMemoryMailer()
   const storage = createMemoryStorage()
   const auth = createAuth({
