@@ -2,11 +2,26 @@
 // téléphone et sur ordinateur, de jour et de nuit. Elles servent à relire un changement d'interface
 // sans lancer l'appli : la CI les joint à chaque pull request (onglet « Artifacts »).
 //
-// Usage : pnpm --filter @ruche/app shots            (construit l'appli puis photographie)
-//         pnpm --filter @ruche/app shots --no-build (réutilise la dernière construction)
-//         pnpm --filter @ruche/app shots --no-build --layout (mesure la mise en page à 9 largeurs)
-//         pnpm --filter @ruche/app shots --no-build --explore parcours.mjs (essais au clic, voir plus bas)
-// Les images arrivent dans apps/app/shots/ (non enregistré dans Git).
+// Usage : pnpm --filter @ruche/app shots [options]
+// Sans option, l'appli est construite (dans apps/app/dist-shots/), puis chaque page est
+// photographiée dans apps/app/shots/ (ni l'un ni l'autre n'est enregistré dans Git).
+//
+//   --no-build        réutilise la dernière construction, au lieu de reconstruire (une minute de
+//                     gagnée). Un avertissement s'affiche si elle ne correspond plus au code actuel.
+//   --list            affiche le nom et l'adresse de chaque page, puis s'arrête.
+//   --only a,b        seulement ces pages, par leur nom (voir --list) : pour les captures comme
+//                     pour --layout. Les captures des autres pages, déjà dans le dossier, restent.
+//   --out <dossier>   le dossier des captures (shots/ par défaut). Deux agents lancés en même
+//                     temps, chacun avec son dossier, ne s'écrasent pas.
+//   --read            des captures faites pour être lues par un agent : à l'échelle 1 (au lieu de
+//                     2), et les pages longues coupées en tranches d'environ 1 600 pixels de haut
+//                     (nom-1, nom-2…), plus faciles à regarder qu'une image de 10 000 pixels.
+//   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/).
+//   --explore x.mjs   confie le navigateur à un script d'essais au clic (voir plus bas).
+//
+// Exemples : pnpm --filter @ruche/app shots -- --list
+//            pnpm --filter @ruche/app shots -- --no-build --only projet,compte --read --out C:/tmp/a
+//            pnpm --filter @ruche/app shots -- --no-build --layout --only accueil
 //
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
 // d'exemple que les tests (src/testing/). Node lit ces fichiers TypeScript directement.
@@ -21,7 +36,8 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { createServer } from 'node:http'
-import { dirname, extname, join, resolve, sep } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { leaMe } from '../src/testing/fixtures.ts'
@@ -35,18 +51,123 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const build = join(root, 'dist-shots')
-const out = join(root, 'shots')
+const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
 
-// 1. Construire l'appli web, catalogue compris.
-if (!process.argv.includes('--no-build')) {
+// Arrête le script avec un message, sans la longue trace d'une exception.
+const fail = (message) => {
+  console.error(message)
+  process.exit(1)
+}
+
+// 1. Les options de la ligne de commande (voir le mode d'emploi en tête du fichier).
+const args = process.argv.slice(2)
+const has = (flag) => args.includes(flag)
+// La valeur qui suit une option (« --out shots-a »), ou undefined si l'option est absente.
+const optionValue = (flag) => {
+  const at = args.indexOf(flag)
+  if (at === -1) return undefined
+  const value = args[at + 1]
+  if (!value || value.startsWith('--')) fail(`${flag} attend une valeur.`)
+  return value
+}
+const known = ['--no-build', '--list', '--only', '--out', '--read', '--layout', '--explore']
+for (const [i, arg] of args.entries()) {
+  // « -- » vient de « pnpm … shots -- --list » ; une valeur suit son option.
+  const isValue = ['--only', '--out', '--explore'].includes(args[i - 1])
+  if (arg !== '--' && !isValue && !known.includes(arg)) {
+    fail(`Option inconnue : ${arg}. Options possibles : ${known.join(', ')}.`)
+  }
+}
+const read = has('--read')
+const only = optionValue('--only')
+  ?.split(',')
+  .map((name) => name.trim())
+  .filter(Boolean)
+// Un dossier relatif se lit depuis l'endroit où la commande a été tapée : pnpm lance le script
+// depuis apps/app, mais garde ce point de départ dans INIT_CWD.
+const outArg = optionValue('--out')
+const out = outArg ? resolve(process.env.INIT_CWD ?? process.cwd(), outArg) : defaultOut
+
+// Le dossier des captures est vidé avant chaque série. Garde-fou contre une faute de frappe : il ne
+// doit contenir ni l'appli ni la construction, et un dossier choisi par --out qui contient déjà
+// d'autres fichiers doit venir de ce script (il y laisse un fichier vide, .shots, pour le signer).
+const inside = (dir, parent) => {
+  const path = relative(parent, dir)
+  return !path.startsWith('..') && !isAbsolute(path)
+}
+const claimOut = () => {
+  if (inside(root, out) || inside(out, build)) {
+    fail(`--out ${out} : ce dossier contient l'appli, ou se trouve dans sa construction.`)
+  }
+  const foreign =
+    out !== defaultOut &&
+    existsSync(out) &&
+    readdirSync(out).length > 0 &&
+    !existsSync(join(out, '.shots'))
+  if (foreign) {
+    fail(`--out ${out} : ce dossier contient déjà d'autres fichiers. Choisis un dossier neuf.`)
+  }
+  mkdirSync(out, { recursive: true })
+  writeFileSync(join(out, '.shots'), '')
+}
+
+// Le tampon de la construction : le commit dont elle vient, suivi de « modifié » si la copie de
+// travail avait des changements pas encore enregistrés. Avec --no-build, on le compare à l'état
+// actuel, pour ne pas photographier sans le savoir un code ancien.
+const git = (...gitArgs) => {
+  const result = spawnSync('git', gitArgs, { cwd: root, encoding: 'utf8' })
+  return result.status === 0 ? result.stdout.trim() : null
+}
+const currentStamp = () => {
+  const head = git('rev-parse', 'HEAD')
+  if (!head) return 'inconnu' // pas de Git (archive du code, par exemple)
+  return git('status', '--porcelain') ? `${head} modifié` : head
+}
+const stampFile = join(build, '.commit')
+
+// Construit l'appli web, catalogue compris, puis écrit le tampon.
+// On lance la commande d'Expo avec Node directement (process.execPath), au lieu de « pnpm exec
+// expo » : sous Windows, pnpm est un script (pnpm.cmd) que spawnSync ne sait pas lancer sans
+// passer par l'interpréteur de commandes, et il échouait sans un mot. createRequire permet de
+// trouver un fichier d'un paquet installé (expo/bin/cli) comme le ferait un require().
+const buildSite = () => {
   rmSync(build, { recursive: true, force: true })
+  const expo = createRequire(join(root, 'package.json')).resolve('expo/bin/cli')
   const result = spawnSync(
-    'pnpm',
-    ['exec', 'expo', 'export', '--platform', 'web', '--output-dir', build],
+    process.execPath,
+    [expo, 'export', '--platform', 'web', '--output-dir', build],
     { cwd: root, stdio: 'inherit', env: { ...process.env, EXPO_PUBLIC_CATALOGUE: '1' } },
   )
-  if (result.status !== 0) process.exit(result.status ?? 1)
+  if (result.error) fail(`Impossible de lancer la construction (expo) : ${result.error.message}`)
+  if (result.status !== 0) {
+    fail(
+      `La construction de l'appli web a échoué (code ${result.status ?? result.signal}) : voir les messages d'Expo ci-dessus.`,
+    )
+  }
+  writeFileSync(stampFile, `${currentStamp()}\n`)
+}
+
+// Avec --no-build : la construction existe-t-elle, et vient-elle du code actuel ?
+const checkStamp = () => {
+  if (!existsSync(join(build, 'index.html'))) {
+    fail(`Aucune construction dans ${build} : lance la commande une fois sans --no-build.`)
+  }
+  const built = existsSync(stampFile) ? readFileSync(stampFile, 'utf8').trim() : null
+  const now = currentStamp()
+  if (!built) {
+    console.warn(
+      'Attention : la construction n’a pas de tampon (dist-shots/.commit), on ne sait pas de quel code elle vient. Relance sans --no-build en cas de doute.',
+    )
+  } else if (built !== now) {
+    console.warn(
+      `Attention : la construction vient de ${built}, mais la copie de travail est à ${now}. Les captures risquent de montrer l'ancien code : relance sans --no-build.`,
+    )
+  } else if (now.endsWith('modifié')) {
+    console.warn(
+      'Note : la copie avait déjà des changements lors de la construction. Ceux faits depuis ne se voient pas dans le tampon : relance sans --no-build si tu as modifié l’appli.',
+    )
+  }
 }
 
 // 2. La servir comme le ferait un hébergeur : /sign-in renvoie sign-in.html.
@@ -107,8 +228,6 @@ const server = createServer((req, res) => {
   res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' })
   res.end(readFileSync(file))
 })
-await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-const base = `http://127.0.0.1:${server.address().port}`
 
 // 3. Les réponses simulées de l'API, pour un visiteur ou pour Léa connectée.
 const session = {
@@ -368,8 +487,31 @@ const schemes = [
   { name: 'nuit', colorScheme: 'dark' },
 ]
 
+// 5. Les pages choisies (--only), la liste (--list), puis la construction et le serveur.
+if (only) {
+  const unknown = only.filter((name) => !pages.some((p) => p.name === name))
+  if (unknown.length > 0) {
+    fail(`--only : page inconnue (${unknown.join(', ')}). Les noms : voir --list.`)
+  }
+}
+const selected = only ? pages.filter((p) => only.includes(p.name)) : pages
+
+if (has('--list')) {
+  const width = Math.max(...selected.map((p) => p.name.length))
+  for (const p of selected) {
+    console.log(`${p.name.padEnd(width)}  ${p.path}${p.signedIn ? '  (Léa connectée)' : ''}`)
+  }
+  process.exit(0)
+}
+
+if (has('--no-build')) checkStamp()
+else buildSite()
+
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+const base = `http://127.0.0.1:${server.address().port}`
+
 // --layout : au lieu des captures habituelles, chaque page est mesurée à neuf largeurs d'écran, du
-// petit téléphone au grand écran. Le rapport (shots/layout/rapport.md) signale ce qui dépasse de la
+// petit téléphone au grand écran. Le rapport (<dossier>/layout/rapport.md) signale ce qui dépasse de la
 // largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
 // par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification.
 // --explore <script.mjs> : l'appli tourne sur les mêmes données simulées, et le navigateur est confié
@@ -380,10 +522,8 @@ const schemes = [
 // - open(signedIn, options) : un contexte de navigateur Playwright (visiteur ou Léa connectée),
 //   avec l'API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse (erreur, lenteur).
 // - apiUrl : l'adresse de l'API simulée.
-const exploreAt = process.argv.indexOf('--explore')
-if (exploreAt !== -1) {
-  const script = process.argv[exploreAt + 1]
-  if (!script) throw new Error('--explore attend le chemin du script à lancer')
+const script = optionValue('--explore')
+if (script) {
   const browser = await chromium.launch()
   const open = async (signedIn, options = {}) => {
     const context = await browser.newContext({
@@ -409,7 +549,7 @@ if (exploreAt !== -1) {
   process.exit(0)
 }
 
-if (process.argv.includes('--layout')) {
+if (has('--layout')) {
   await layoutReport()
   server.close()
   process.exit(0)
@@ -417,6 +557,7 @@ if (process.argv.includes('--layout')) {
 
 async function layoutReport() {
   const widths = [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920]
+  claimOut()
   const dir = join(out, 'layout')
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
@@ -429,7 +570,7 @@ async function layoutReport() {
     })
     await context.route(`${apiUrl}/**`, fakeApi(signedIn))
     const page = await context.newPage()
-    for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
+    for (const shot of selected.filter((p) => p.signedIn === signedIn)) {
       lines.push(`## ${shot.name} (${shot.path})`, '')
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
@@ -493,32 +634,60 @@ async function layoutReport() {
   console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
 }
 
-rmSync(out, { recursive: true, force: true })
-mkdirSync(out, { recursive: true })
+// Le dossier des captures : sans --only, on repart d'un dossier vide ; avec --only, on n'efface
+// que les captures des pages choisies, et celles des autres pages restent. Le nom d'une capture
+// donne sa page : « projet-autre-2-telephone-nuit.png » → « projet-autre ».
+claimOut()
+const shotName = new RegExp(
+  `^(.+?)(?:-\\d+)?-(?:${devices.map((d) => d.name).join('|')})-(?:${schemes.map((s) => s.name).join('|')})\\.png$`,
+)
+for (const name of readdirSync(out)) {
+  if (name === '.shots') continue
+  if (only && !only.includes(name.match(shotName)?.[1])) continue
+  rmSync(join(out, name), { recursive: true, force: true })
+}
+
+// Une page longue est photographiée en plusieurs tranches, en faisant défiler sa zone de
+// défilement. Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; près de cette
+// limite, il laisse même des zones non peintes, sans erreur. On coupe donc au-delà de 12 000
+// points (le catalogue : catalogue, catalogue-2…). Avec --read, les tranches font environ 1 600
+// pixels, la hauteur qu'un agent lit confortablement, et sont numérotées dès la première (nom-1).
+const PART = read ? 1600 : 12000
+const scale = read ? 1 : 2
+
 const browser = await chromium.launch()
 const problems = []
 for (const device of devices) {
   for (const scheme of schemes) {
     for (const signedIn of [false, true]) {
+      const shots = selected.filter((p) => p.signedIn === signedIn)
+      if (shots.length === 0) continue
       const context = await browser.newContext({
         viewport: device.viewport,
         colorScheme: scheme.colorScheme,
         locale: 'fr-FR',
-        deviceScaleFactor: 2,
+        deviceScaleFactor: scale,
       })
       await context.route(`${apiUrl}/**`, fakeApi(signedIn))
       const page = await context.newPage()
       // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
       page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
-      for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
+      for (const shot of shots) {
         await page.setViewportSize(device.viewport)
         feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
-        const file = (part) =>
-          join(out, `${shot.name}${part > 1 ? `-${part}` : ''}-${device.name}-${scheme.name}.png`)
+        // Le nom du fichier : sans numéro pour une seule image ; ensuite catalogue, catalogue-2…
+        // ou, avec --read, nom-1, nom-2…
+        const file = (part, parts) => {
+          const numbered = read ? parts > 1 : part > 1
+          return join(
+            out,
+            `${shot.name}${numbered ? `-${part}` : ''}-${device.name}-${scheme.name}.png`,
+          )
+        }
         if (!shot.fullPage) {
-          await page.screenshot({ path: file(1) })
+          await page.screenshot({ path: file(1, 1) })
           continue
         }
         // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
@@ -526,14 +695,13 @@ for (const device of devices) {
         const height = await page.evaluate(() =>
           Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
         )
-        // Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; près de cette limite,
-        // il laisse même des zones non peintes, sans erreur. Au-delà de 12 000 points (le
-        // catalogue, sur téléphone comme sur ordinateur), on photographie donc la page en
-        // plusieurs morceaux (catalogue, catalogue-2…), en faisant défiler la zone qui défile.
-        const PART = 12000
-        await page.setViewportSize({ ...device.viewport, height: Math.min(height, PART) })
+        // Des tranches de hauteur égale (au plus PART) : la dernière tombe pile en bas de la page,
+        // au lieu de reprendre une partie de la précédente.
+        const parts = Math.max(1, Math.ceil(height / PART))
+        const slice = Math.ceil(height / parts)
+        await page.setViewportSize({ ...device.viewport, height: slice })
         await page.waitForTimeout(300)
-        for (let part = 1; (part - 1) * PART < height; part++) {
+        for (let part = 1; part <= parts; part++) {
           if (part > 1) {
             await page.evaluate(
               (top) => {
@@ -546,13 +714,15 @@ for (const device of devices) {
                     ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
                 )
                 const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
+                // Sans zone de défilement à elle, c'est la page entière qui défile.
                 if (main) main.scrollTop = top
+                else window.scrollTo(0, top)
               },
-              (part - 1) * PART,
+              (part - 1) * slice,
             )
             await page.waitForTimeout(300)
           }
-          await page.screenshot({ path: file(part) })
+          await page.screenshot({ path: file(part, parts) })
         }
       }
       await context.close()
