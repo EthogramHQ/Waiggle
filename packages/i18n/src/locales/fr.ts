@@ -150,6 +150,9 @@ export const fr = {
         'La photo est recadrée en carré et nettoyée de ses informations cachées, comme le lieu.',
     },
     fields: {
+      // Dans « Mon profil », le nom ne s'appelle plus « Prénom ou pseudo » (inscription) : le
+      // pseudo a désormais son propre champ, juste en dessous.
+      name: 'Nom affiché',
       handle: 'Pseudo',
       handleHint:
         'Les membres te verront sous @pseudo sur ta page, et pourront te mentionner. 3 à 20 caractères : lettres sans accent, chiffres et « _ ». Ton ancien pseudo te reste réservé 30 jours.',

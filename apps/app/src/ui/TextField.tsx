@@ -27,9 +27,16 @@ type Props = {
   aside?: string
   /** Une confirmation sous le champ, en vert (« Lien vérifié »). Une erreur passe avant. */
   success?: string | undefined
+  /**
+   * Un signe collé devant la saisie, qui n'en fait pas partie (« @ » devant un pseudo) : il dit la
+   * forme attendue sans que le membre ait à le taper. Décoratif : l'étiquette dit déjà ce qu'on tape.
+   */
+  prefix?: string
 } & Pick<
   TextInputProps,
   | 'secureTextEntry'
+  | 'autoCorrect'
+  | 'spellCheck'
   | 'autoComplete'
   | 'keyboardType'
   | 'textContentType'
@@ -108,6 +115,7 @@ export function TextField({
   limit,
   aside,
   success,
+  prefix,
   secureTextEntry = false,
   ...inputProps
 }: Props) {
@@ -160,43 +168,52 @@ export function TextField({
         ) : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-        <TextInput
-          accessibilityLabel={label}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoCapitalize="none"
-          placeholderTextColor={colors.textPlaceholder}
-          // Le champ utilise la police et la taille du texte courant.
-          secureTextEntry={secureTextEntry && !revealed}
-          style={{
-            flex: 1,
-            fontFamily: fontName(body.family, body.weight),
-            fontSize: body.size,
-            lineHeight: body.lineHeight,
-            color: colors.text,
-            minHeight: layout.touchTarget,
-            paddingVertical: space.xs,
-            // Sur le web, le navigateur dessine son propre contour : le groupe s'en charge déjà.
-            outlineWidth: 0,
-            ...(inputProps.multiline ? { minHeight: 96, textAlignVertical: 'top' } : null),
-          }}
-          {...inputProps} // les autres réglages (type de clavier, saisie automatique…) sont transmis tels quels
-          // Un mot de passe, même affiché, ne passe jamais par le correcteur orthographique ni par le
-          // dictionnaire du clavier : certains correcteurs envoient le texte à un service en ligne,
-          // et un clavier pourrait le proposer plus tard en suggestion. Placé après inputProps pour
-          // qu'aucun écran ne puisse le réactiver.
-          {...(secureTextEntry
-            ? {
-                autoCorrect: false,
-                spellCheck: false,
-                ...(revealed && Platform.OS === 'android'
-                  ? { keyboardType: 'visible-password' as const }
-                  : null),
-              }
-            : null)}
-        />
+        {/* Le préfixe touche la saisie (« @lea », pas « @ lea ») : d'où ce rang à part, sans
+            écart. aria-hidden : un lecteur d'écran lirait « arobase » à chaque passage. */}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+          {prefix ? (
+            <View aria-hidden>
+              <Text tone="muted">{prefix}</Text>
+            </View>
+          ) : null}
+          <TextInput
+            accessibilityLabel={label}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            autoCapitalize="none"
+            placeholderTextColor={colors.textPlaceholder}
+            // Le champ utilise la police et la taille du texte courant.
+            secureTextEntry={secureTextEntry && !revealed}
+            style={{
+              flex: 1,
+              fontFamily: fontName(body.family, body.weight),
+              fontSize: body.size,
+              lineHeight: body.lineHeight,
+              color: colors.text,
+              minHeight: layout.touchTarget,
+              paddingVertical: space.xs,
+              // Sur le web, le navigateur dessine son propre contour : le groupe s'en charge déjà.
+              outlineWidth: 0,
+              ...(inputProps.multiline ? { minHeight: 96, textAlignVertical: 'top' } : null),
+            }}
+            {...inputProps} // les autres réglages (type de clavier, saisie automatique…) sont transmis tels quels
+            // Un mot de passe, même affiché, ne passe jamais par le correcteur orthographique ni par le
+            // dictionnaire du clavier : certains correcteurs envoient le texte à un service en ligne,
+            // et un clavier pourrait le proposer plus tard en suggestion. Placé après inputProps pour
+            // qu'aucun écran ne puisse le réactiver.
+            {...(secureTextEntry
+              ? {
+                  autoCorrect: false,
+                  spellCheck: false,
+                  ...(revealed && Platform.OS === 'android'
+                    ? { keyboardType: 'visible-password' as const }
+                    : null),
+                }
+              : null)}
+          />
+        </View>
         {secureTextEntry ? (
           <Pressable
             accessibilityRole="button"

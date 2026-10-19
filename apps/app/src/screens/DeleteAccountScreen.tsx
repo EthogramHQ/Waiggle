@@ -70,6 +70,8 @@ export function DeleteAccountScreen() {
     >
       <ListGroup>
         <ListRow icon="user" label={t('account.delete.profileItem')} detail={data.user.name} />
+        {/* Tranche 6a : son pseudo n'est pas mis en réserve, un autre membre peut le prendre. */}
+        <ListRow icon="at" label={t('account.delete.handleItem')} />
         <ListRow
           icon="images"
           label={t('account.delete.projectsItem')}

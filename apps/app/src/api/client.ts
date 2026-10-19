@@ -4,7 +4,7 @@
 import { Platform } from 'react-native'
 import { authClient } from '../accounts/auth-client'
 import { apiUrl } from '../config'
-import { type ApiResult, errorKeyForStatus } from './errors'
+import { AMBIGUOUS_STATUSES, type ApiResult, errorKeyFor } from './errors'
 
 /**
  * Envoie une requête à l'API avec la session du membre.
@@ -62,5 +62,19 @@ const send = async (path: string, init: RequestInit): Promise<ApiResult<Response
     // fetch ne lève une erreur que si le serveur est injoignable (pas de réseau, API arrêtée).
     return { ok: false, error: 'network' }
   }
-  return res.ok ? { ok: true, data: res } : { ok: false, error: errorKeyForStatus(res.status) }
+  if (res.ok) return { ok: true, data: res }
+  // Un statut partagé par plusieurs refus (409) : le code du corps dit lequel. Pour les autres, on
+  // ne lit pas le corps : un « 413 » peut venir de Caddy, en HTML.
+  const code = AMBIGUOUS_STATUSES.has(res.status) ? await readErrorCode(res) : undefined
+  return { ok: false, error: errorKeyFor(res.status, code) }
+}
+
+/** Le code d'erreur du corps d'une réponse (`{ error: { code: 'handle_taken' } }`), s'il y en a un. */
+const readErrorCode = async (res: Response): Promise<string | undefined> => {
+  const body: unknown = await res.json().catch(() => null)
+  // `in` vérifie qu'une propriété existe : TypeScript en déduit qu'on peut la lire.
+  if (typeof body !== 'object' || body === null || !('error' in body)) return undefined
+  const { error } = body
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined
+  return typeof error.code === 'string' ? error.code : undefined
 }

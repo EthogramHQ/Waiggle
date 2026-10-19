@@ -174,6 +174,7 @@ const leaMember = {
   ...leaPage,
   id: leaMe.id,
   name: leaMe.name,
+  handle: leaMe.handle,
   isMe: true,
   projects: [summaryOf(photosProject), summaryOf(draftProject), summaryOf(recipesProject)],
 }
@@ -237,6 +238,8 @@ const maxMember = {
   ...leaPage,
   id: max.id,
   name: max.name,
+  // Son propre pseudo : sans lui, il hériterait de celui de Léa (leaPage).
+  handle: 'max_durand',
   bio: 'Je fais des outils pour ma famille.',
   isMe: false,
   isFollowed: false,
@@ -370,10 +373,19 @@ const fakeApi = (signedIn) => {
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    const method = route.request().method()
+    // Enregistrer son profil (tranche 6a) : le pseudo de Max est déjà pris (409, comme l'API) ;
+    // le reste est accepté et renvoyé tel quel.
+    if (pathname === '/v1/me' && method === 'PATCH') {
+      const changes = JSON.parse(route.request().postData() ?? '{}')
+      if (changes.handle === maxMember.handle) {
+        return json(409, { error: { code: 'handle_taken', message: '' } })
+      }
+      return json(200, { ...leaMe, ...changes })
+    }
     if (pathname === '/v1/me') return json(200, leaMe)
     // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
     // remplacer ces réponses par un refus).
-    const method = route.request().method()
     if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
       const { body } = JSON.parse(route.request().postData() ?? '{}')
       return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
@@ -514,6 +526,18 @@ const pages = [
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
+  // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
+  {
+    name: 'profil-pseudo-pris',
+    path: '/profile',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByLabel('Pseudo', { exact: true }).fill('max_durand')
+      await page.getByRole('button', { name: 'Enregistrer' }).click()
+      await page.getByText('Ce pseudo est déjà pris. Choisis-en un autre.').waitFor()
+    },
+  },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
   { name: 'projet', path: project, signedIn: true, fullPage: true },
   // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note
