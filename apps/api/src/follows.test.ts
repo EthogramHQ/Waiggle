@@ -269,7 +269,10 @@ describe('following a project', () => {
     await expectDone(await unfollow('members', leaId, lea)) // elle-même : rien à faire
 
     await send('PATCH', `/v1/projects/${project.id}`, lea, { visibility: 'public' })
-    expect(await readProject(project.id, max)).toMatchObject({ isFollowed: false, followerCount: 0 })
+    expect(await readProject(project.id, max)).toMatchObject({
+      isFollowed: false,
+      followerCount: 0,
+    })
   })
 
   it('counts the followers of a project without ever naming them', async () => {

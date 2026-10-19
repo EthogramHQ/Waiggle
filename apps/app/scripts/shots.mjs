@@ -172,6 +172,20 @@ const sampleImage = (id) => {
   <circle cx="${width * 0.7}" cy="${height * 0.35}" r="${Math.min(width, height) * 0.18}" fill="hsl(${hue + 180} 80% 85%)" opacity="0.8"/>
 </svg>`
 }
+// Le fil de l'accueil : celui de Léa, qui suit des membres (avec une suite à charger), ou vide
+// quand elle ne suit personne. La page en cours choisit (feed: 'nobody' dans la liste plus bas) ;
+// l'API simulée lit ce choix ici, avant chaque page.
+let feedScenario = 'following'
+const feedItems = [photosProject, recipesProject, notMineProject, longProject].map((p, i) => ({
+  kind: 'project',
+  at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
+  project: summaryOf(p),
+}))
+const followingFeed = () =>
+  feedScenario === 'nobody'
+    ? { items: [], nextCursor: null, followsAnyone: false }
+    : { items: feedItems, nextCursor: 'suite', followsAnyone: true }
+
 const fakeApi = (signedIn) => async (route) => {
   const { pathname } = new URL(route.request().url())
   const json = (status, body) =>
@@ -185,6 +199,8 @@ const fakeApi = (signedIn) => async (route) => {
   if (pathname === `/v1/projects/${longProject.id}`) return json(200, longProject)
   if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
   if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
+  if (pathname === '/v1/feed/following') return json(200, followingFeed())
+  if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
   // Une page dont le chargement échoue, pour photographier l'état « erreur ».
   if (pathname === '/v1/members/erreur')
     return json(500, { error: { code: 'internal', message: '' } })
@@ -206,7 +222,11 @@ const pages = [
   { name: 'inscription', path: '/sign-up', signedIn: false },
   { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
-  { name: 'accueil-connecte', path: '/', signedIn: true },
+  // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
+  { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
+  { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // Le projet d'un autre membre : le bouton « Suivre ce projet ».
+  { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
@@ -317,6 +337,7 @@ async function layoutReport() {
       lines.push(`## ${shot.name} (${shot.path})`, '')
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
@@ -395,6 +416,7 @@ for (const device of devices) {
       page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
       for (const shot of pages.filter((p) => p.signedIn === signedIn)) {
         await page.setViewportSize(device.viewport)
+        feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
         if (shot.fullPage) {

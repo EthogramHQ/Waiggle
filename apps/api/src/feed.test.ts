@@ -281,6 +281,12 @@ describe('the date of a project in the feeds', () => {
     await followMember(leaId, max)
 
     later(24 * 7) // une semaine plus tard
+    // Une session dure 7 jours : celles ouvertes au début du test ont expiré. Léa et Max se
+    // reconnectent, comme ils le feraient en revenant une semaine plus tard.
+    lea = ctx.cookiesFrom(await ctx.signIn(leaAccount))
+    max = ctx.cookiesFrom(
+      await ctx.signIn({ email: 'max@example.com', password: 'another-long-password' }),
+    )
     await setVisibility(lea, draft.id, 'public')
 
     const following = await readFollowing(max)
