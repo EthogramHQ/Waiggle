@@ -247,8 +247,13 @@ try {
     project = await readProject(lea, projectId)
     return project.visuals[0].id === blue
   })
-  // L'ordre est maintenant bleu, rouge, vert : la deuxième est la rouge.
-  await lea.page.getByRole('button', { name: 'Retirer la photo 2' }).click()
+  // L'ordre est maintenant bleu, rouge, vert : la deuxième est la rouge. Le serveur a fini, mais
+  // l'écran peut encore montrer l'ancien ordre, boutons désactivés, le temps que la réponse arrive.
+  // Cliquer tout de suite viserait la vignette qui portait « photo 2 » avant (la verte, que React
+  // déplace ensuite) : on attend que l'écran soit redessiné, ses boutons de nouveau actifs.
+  const removeSecond = lea.page.getByRole('button', { name: 'Retirer la photo 2' })
+  await waitFor('galerie redessinée', async () => removeSecond.isEnabled())
+  await removeSecond.click()
   await waitFor('photo retirée', async () => {
     project = await readProject(lea, projectId)
     return project.visuals.length === 2
