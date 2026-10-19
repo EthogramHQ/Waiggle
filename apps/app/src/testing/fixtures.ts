@@ -4,6 +4,7 @@ import type { Me } from '@ruche/contracts'
 export const leaMe: Me = {
   id: 'u1',
   name: 'Léa',
+  handle: 'lea',
   email: 'lea@example.com',
   emailVerified: true,
   language: 'fr',

@@ -90,6 +90,7 @@ export const draftProject: Project = {
 export const leaPage: Member = {
   id: 'u1',
   name: 'Léa',
+  handle: 'lea',
   avatarUrl: null,
   bio: 'Je bricole des agents pour la maison.',
   favoriteTools: [

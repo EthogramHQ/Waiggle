@@ -128,6 +128,7 @@ export const fr = {
       projectsDetail:
         'Avec leur description, leur recette, leurs prompts, leurs photos, leurs notes et leurs commentaires',
       followsItem: 'Tes abonnements et tes abonnés',
+      handleItem: 'Ton pseudo, qui redevient libre aussitôt',
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
@@ -149,6 +150,9 @@ export const fr = {
         'La photo est recadrée en carré et nettoyée de ses informations cachées, comme le lieu.',
     },
     fields: {
+      handle: 'Pseudo',
+      handleHint:
+        'Les membres te verront sous @pseudo sur ta page, et pourront te mentionner. 3 à 20 caractères : lettres sans accent, chiffres et « _ ». Ton ancien pseudo te reste réservé 30 jours.',
       bio: 'Bio',
       tools: 'Outils favoris',
       toolsLimit: '{{max}} au plus',
@@ -158,6 +162,11 @@ export const fr = {
     saved: 'Profil enregistré.',
     errors: {
       nameTooLong: 'Le nom doit faire au plus {{max}} caractères.',
+      handleTooShort: 'Le pseudo doit faire au moins {{min}} caractères.',
+      handleTooLong: 'Le pseudo doit faire au plus {{max}} caractères.',
+      handleInvalid:
+        'Le pseudo commence par une lettre, puis n’a que des lettres sans accent, des chiffres et « _ ».',
+      handleReserved: 'Ce pseudo est réservé. Choisis-en un autre.',
       bioTooLong: 'La bio doit faire au plus {{max}} caractères.',
       tooManyTools: '{{max}} outils au plus.',
       toolTooLong: 'Chaque outil doit faire au plus {{max}} caractères.',
@@ -389,6 +398,7 @@ export const fr = {
   },
   member: {
     open: 'Voir la page de {{name}}',
+    handle: '@{{handle}}',
     favoriteTools: 'Outils favoris',
     projects: 'Projets',
     empty: 'Pas encore de projet public.',
@@ -487,6 +497,7 @@ export const fr = {
     tooManyVisuals: 'Six photos au plus par projet. Retires-en une pour en ajouter une autre.',
     cannotFollowOwn: 'Tu ne peux pas te suivre toi-même, ni suivre tes propres projets.',
     cannotReactOwn: 'Tu ne peux pas réagir à ton propre projet.',
+    handleTaken: 'Ce pseudo est déjà pris. Choisis-en un autre.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },

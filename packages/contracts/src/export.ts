@@ -15,6 +15,11 @@ export const AccountExport = z
     exportedAt: z.iso.datetime(),
     user: Me,
     projects: z.array(Project),
+    /**
+     * L'ancien pseudo qui lui reste réservé après un changement (tranche 6a), avec la date où il
+     * redevient libre ; null s'il n'en a pas. Le pseudo actuel est dans `user.handle`.
+     */
+    formerHandle: z.object({ handle: z.string(), reservedUntil: z.iso.datetime() }).nullable(),
     /** Toutes les notes publiées sur ses projets, des plus anciennes aux plus récentes. */
     notes: z.array(
       z.object({

@@ -119,6 +119,7 @@ export const en: Translation = {
       projectsItem: 'Your projects',
       projectsDetail: 'With their description, recipe, prompts, photos, notes and comments',
       followsItem: 'Who you follow and who follows you',
+      handleItem: 'Your handle, which becomes free at once',
       reactionsItem: 'Your reactions and your comments',
       reactionsDetail:
         'A comment that received replies becomes “Deleted comment”: your text and your name are erased from it, the replies of others stay.',
@@ -139,6 +140,9 @@ export const en: Translation = {
       privacy: 'The picture is cropped square and cleaned of hidden information, such as location.',
     },
     fields: {
+      handle: 'Handle',
+      handleHint:
+        'Members will see you as @handle on your page, and can mention you. 3 to 20 characters: letters without accents, digits and “_”. Your previous handle stays reserved for you for 30 days.',
       bio: 'Bio',
       tools: 'Favorite tools',
       toolsLimit: '{{max}} at most',
@@ -148,6 +152,11 @@ export const en: Translation = {
     saved: 'Profile saved.',
     errors: {
       nameTooLong: 'Your name must be at most {{max}} characters long.',
+      handleTooShort: 'Your handle must be at least {{min}} characters long.',
+      handleTooLong: 'Your handle must be at most {{max}} characters long.',
+      handleInvalid:
+        'Your handle starts with a letter, then only has letters without accents, digits and “_”.',
+      handleReserved: 'This handle is reserved. Choose another one.',
       bioTooLong: 'Your bio must be at most {{max}} characters long.',
       tooManyTools: '{{max}} tools at most.',
       toolTooLong: 'Each tool must be at most {{max}} characters long.',
@@ -376,6 +385,7 @@ export const en: Translation = {
   },
   member: {
     open: 'See the page of {{name}}',
+    handle: '@{{handle}}',
     favoriteTools: 'Favourite tools',
     projects: 'Projects',
     empty: 'No public project yet.',
@@ -471,6 +481,7 @@ export const en: Translation = {
     tooManyVisuals: 'Six photos at most per project. Remove one to add another.',
     cannotFollowOwn: 'You can’t follow yourself or your own projects.',
     cannotReactOwn: 'You can’t react to your own project.',
+    handleTaken: 'This handle is already taken. Choose another one.',
     internal: 'Something went wrong. Try again in a moment.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
