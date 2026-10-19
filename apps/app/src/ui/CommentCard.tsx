@@ -25,6 +25,7 @@ import type { ImageSource } from './image'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import { Text } from './Text'
+import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Une action sur le commentaire. */
@@ -87,6 +88,7 @@ export function CommentCard({
   handle,
 }: Props) {
   const { colors } = useTheme()
+  const { sizeClass } = useLayout()
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie les
   // actions au texte qu'elles concernent.
   const bodyId = useId()
@@ -127,6 +129,10 @@ export function CommentCard({
   }
 
   const size = reply ? AVATAR.reply : AVATAR.root
+  // Sur un écran large, le texte s'aligne sous le nom, pas sous la photo ; sur téléphone, il
+  // repart du bord : la place gagnée garde des lignes lisibles, même en retrait sous un fil et
+  // avec un texte agrandi.
+  const indent = sizeClass === 'compact' ? 0 : size + space.sm
   const name = (
     <View
       style={{
@@ -183,8 +189,7 @@ export function CommentCard({
           </>
         ) : null}
       </View>
-      {/* Le texte et les actions s'alignent sous le nom, pas sous la photo. */}
-      <View style={{ paddingLeft: size + space.sm, gap: space.xs }}>
+      <View style={{ paddingLeft: indent, gap: space.xs }}>
         {hidden ? (
           <View
             style={{

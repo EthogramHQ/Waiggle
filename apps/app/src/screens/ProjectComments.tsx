@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import {
   type CommentFailure,
@@ -465,7 +466,14 @@ export function Comments({ project }: { project: Project }) {
     // La première page n'a pas pu se charger : on le dit, et on propose de réessayer. Le reste
     // de la page (le projet, son journal) reste là.
     <>
-      <Notice message={t('project.comments.loadError')} />
+      <Notice
+        message={
+          // 401 : réessayer ne servirait à rien, il faut se reconnecter.
+          errorKey(comments.error) === 'unauthorized'
+            ? t('states.expired')
+            : t('project.comments.loadError')
+        }
+      />
       <Button
         label={t('common.retry')}
         variant="secondary"
