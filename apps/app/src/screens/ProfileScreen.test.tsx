@@ -133,6 +133,66 @@ describe('ProfileScreen', () => {
     expect(getMe).not.toHaveBeenCalled()
   })
 
+  // Tranche 6a : le pseudo, unique, modifiable ici. Scénario : docs/scenarios/phase-1.md,
+  // « Tranche 6a — Le pseudo ».
+  it('shows the current handle, and says who will see it', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea')
+    expect(screen.getByText(/^Les membres te verront sous @pseudo sur ta page/)).toBeTruthy()
+  })
+
+  it('sends the handle only when it changed, cleaned up, and shows the saved one', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: true, data: leaMe })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    // Sans toucher au pseudo : il n'est pas envoyé (garder son pseudo n'est pas un changement).
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(jest.mocked(updateProfile).mock.calls[0]?.[0]).not.toHaveProperty('handle')
+
+    jest.mocked(updateProfile).mockResolvedValue({ ok: true, data: { ...leaMe, handle: 'lea_m' } })
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), ' @Lea_M ')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    // Le « @ » et les majuscules sont retirés avant l'envoi, comme le fera l'API.
+    expect(jest.mocked(updateProfile).mock.calls[1]?.[0]).toMatchObject({ handle: 'lea_m' })
+    expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
+    expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea_m')
+  })
+
+  it.each([
+    ['too short', 'le', 'Le pseudo doit faire au moins 3 caractères.'],
+    ['too long', 'l'.repeat(21), 'Le pseudo doit faire au plus 20 caractères.'],
+    ['not starting with a letter', '1lea', /^Le pseudo commence par une lettre/],
+    ['with an accent', 'léa', /^Le pseudo commence par une lettre/],
+    ['reserved', 'admin', 'Ce pseudo est réservé. Choisis-en un autre.'],
+  ])('explains a handle %s and sends nothing', async (_case, typed, message) => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), typed)
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(screen.getByText(message)).toBeTruthy()
+    expect(updateProfile).not.toHaveBeenCalled()
+  })
+
+  it('says under the field that the handle is already taken, and keeps what was typed', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: false, error: 'handleTaken' })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'max')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByText('Ce pseudo est déjà pris. Choisis-en un autre.')).toBeTruthy()
+    // Sous le champ, pas dans le message général du formulaire (une alerte).
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('max')
+  })
+
   it('does nothing when the member cancels the picture choice', async () => {
     jest.mocked(pickAvatar).mockResolvedValue(null)
     await renderWithProviders(<ProfileScreen />)

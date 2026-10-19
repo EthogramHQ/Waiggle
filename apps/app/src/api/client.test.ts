@@ -45,6 +45,17 @@ describe('request', () => {
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
   })
 
+  it('tells a taken handle from a 7th photo, which share the same status (slice 6a)', async () => {
+    // Deux refus « 409 conflit » : seul le code du corps de la réponse dit lequel.
+    const conflict = (code: string) => json({ error: { code, message: '…' } }, 409)
+    fetchMock
+      .mockResolvedValueOnce(conflict('handle_taken'))
+      .mockResolvedValueOnce(conflict('too_many_visuals'))
+
+    expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'handleTaken' })
+    expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'tooManyVisuals' })
+  })
+
   it('says so when the server cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('Network request failed'))
 

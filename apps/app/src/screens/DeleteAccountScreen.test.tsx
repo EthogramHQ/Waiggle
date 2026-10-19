@@ -41,6 +41,12 @@ describe('DeleteAccountScreen', () => {
     expect(screen.getByText('Tes réactions et tes commentaires')).toBeTruthy()
   })
 
+  it('says that the handle becomes free at once (slice 6a)', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(screen.getByText('Ton pseudo, qui redevient libre aussitôt')).toBeTruthy()
+  })
+
   it('lets the member download their data first', async () => {
     jest.mocked(downloadMyData).mockResolvedValue({ ok: true })
     await renderWithI18n(<DeleteAccountScreen />)
