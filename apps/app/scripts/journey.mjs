@@ -165,7 +165,7 @@ const signUp = async (someone, name) => {
   const email = `${name.toLowerCase()}-${randomBytes(4).toString('hex')}@example.com`
   const { page } = someone
   await open(page, `${appUrl}/sign-up`)
-  await page.getByLabel('Prénom ou pseudo').fill(name)
+  await page.getByLabel('Nom affiché', { exact: true }).fill(name)
   await page.getByLabel('Adresse e-mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)

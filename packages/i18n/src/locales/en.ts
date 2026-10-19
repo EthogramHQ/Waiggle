@@ -35,7 +35,8 @@ export const en: Translation = {
   },
   auth: {
     fields: {
-      name: 'First name or nickname',
+      name: 'Display name',
+      nameHint: 'Your @handle will be made from it; you can change it in My profile.',
       email: 'Email address',
       password: 'Password',
       passwordHint: 'At least {{min}} characters.',

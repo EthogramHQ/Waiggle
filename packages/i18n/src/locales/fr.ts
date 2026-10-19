@@ -41,7 +41,8 @@ export const fr = {
   },
   auth: {
     fields: {
-      name: 'Prénom ou pseudo',
+      name: 'Nom affiché',
+      nameHint: 'Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
       email: 'Adresse e-mail',
       password: 'Mot de passe',
       passwordHint: 'Au moins {{min}} caractères.',
@@ -152,8 +153,6 @@ export const fr = {
         'La photo est recadrée en carré et nettoyée de ses informations cachées, comme le lieu.',
     },
     fields: {
-      // Dans « Mon profil », le nom ne s'appelle plus « Prénom ou pseudo » (inscription) : le
-      // pseudo a désormais son propre champ, juste en dessous.
       name: 'Nom affiché',
       handle: 'Pseudo',
       handleHint:
