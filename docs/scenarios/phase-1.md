@@ -567,8 +567,10 @@ Décisions de Louis :
 
 Règles détaillées :
 - **Forme** : les majuscules deviennent des minuscules et un « @ » tapé au début est retiré
-  (« @Ines » devient « ines »). Les mots réservés (admin, support, le nom de l'appli…) sont
-  refusés, avec le message « réservé ».
+  (« @Ines » devient « ines »). Ni « __ », ni « _ » à la fin (« ines__morel » imiterait
+  « ines_morel »). Les mots réservés (admin, support, abuse…) sont refusés, avec le message
+  « réservé », de même que tout pseudo qui contient le nom de l'appli (« support_… ») ; la
+  fabrication l'enlève du nom (décision de Louis du 20/10/2026, après la relecture de sécurité).
 - **Fabrication** : le nom sans accents, en minuscules ; tout le reste devient « _ » (un seul à la
   suite, aucun au début ni à la fin) ; 16 caractères au plus. Trop court, on ajoute un chiffre
   (« al1 »). S'il commence par un chiffre, ou s'il ne reste rien (nom écrit dans un autre

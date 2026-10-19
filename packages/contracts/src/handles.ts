@@ -13,6 +13,15 @@ export const HANDLE_RESERVATION_DAYS = 30
 export const HANDLE_CHANGES_PER_DAY = 5
 
 /**
+ * Les mots qu'aucun pseudo ne peut contenir, même au milieu (« waiggle_team », « admin_ruche ») :
+ * le nom de l'appli et son nom de code feraient croire à un compte officiel.
+ */
+export const HANDLE_FORBIDDEN_PARTS: readonly string[] = [
+  textVariables.appName.toLowerCase(),
+  'ruche',
+]
+
+/**
  * Les pseudos que personne ne peut prendre : ils feraient croire à un message officiel, ou
  * désigneraient tout le monde dans une mention. Le nom de l'appli vient de `textVariables` : il
  * n'est écrit qu'à un seul endroit du projet.
@@ -55,11 +64,20 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   'undefined',
   'anonyme',
   'anonymous',
+  'abuse',
+  'postmaster',
+  'webmaster',
+  'privacy',
+  'legal',
+  'moderation',
+  'bot',
 ])
 
-// Une lettre sans accent, puis des lettres, des chiffres ou « _ ». Seuls des caractères ASCII :
-// aucun sosie possible (un « і » cyrillique ressemble à un « i » mais n'est pas le même).
-const HANDLE_PATTERN = /^[a-z][a-z0-9_]*$/
+// Une lettre sans accent, puis des lettres ou des chiffres, chacun précédé ou non d'un seul « _ ».
+// Donc ni « __ », ni « _ » à la fin : « ines__morel » ou « ines_morel_ » imiteraient « ines_morel ».
+// Seuls des caractères ASCII : aucun sosie venu d'un autre alphabet (un « і » cyrillique ressemble
+// à un « i » mais n'est pas le même).
+const HANDLE_PATTERN = /^[a-z](?:_?[a-z0-9])*$/
 
 /**
  * Un pseudo tel qu'un membre le tape, puis tel qu'on le garde. Avant de vérifier, on retire les
@@ -67,7 +85,8 @@ const HANDLE_PATTERN = /^[a-z][a-z0-9_]*$/
  *
  * `.pipe` enchaîne deux schémas : le premier nettoie, le second vérifie le résultat. L'appli lit
  * `issue.code` pour choisir son message : `too_small` (trop court), `too_big` (trop long),
- * `invalid_format` (caractère refusé, ou ne commence pas par une lettre), `custom` (mot réservé).
+ * `invalid_format` (caractère refusé, « __ », « _ » final, ou ne commence pas par une lettre), `custom` (mot
+ * réservé, ou qui contient le nom de l'appli).
  */
 export const Handle = z
   .string()
@@ -78,6 +97,11 @@ export const Handle = z
       .min(HANDLE_MIN_LENGTH)
       .max(HANDLE_MAX_LENGTH)
       .regex(HANDLE_PATTERN)
-      .refine((handle) => !RESERVED_HANDLES.has(handle), { message: 'reserved handle' }),
+      .refine(
+        (handle) =>
+          !RESERVED_HANDLES.has(handle) &&
+          !HANDLE_FORBIDDEN_PARTS.some((part) => handle.includes(part)),
+        { message: 'reserved handle' },
+      ),
   )
 export type Handle = z.infer<typeof Handle>

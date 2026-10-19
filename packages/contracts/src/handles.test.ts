@@ -3,7 +3,13 @@
 // docs/scenarios/phase-1.md, « Précisions (tranche 6a) ».
 import { textVariables } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
-import { HANDLE_MAX_LENGTH, HANDLE_MIN_LENGTH, Handle, RESERVED_HANDLES } from './handles'
+import {
+  HANDLE_FORBIDDEN_PARTS,
+  HANDLE_MAX_LENGTH,
+  HANDLE_MIN_LENGTH,
+  Handle,
+  RESERVED_HANDLES,
+} from './handles'
 import { ProfileUpdate } from './profile'
 
 /** Les codes des problèmes trouvés par le schéma (vide : le pseudo est accepté). */
@@ -65,6 +71,20 @@ describe('Handle', () => {
     expect(RESERVED_HANDLES.has(name.toLowerCase())).toBe(true)
     expect(issueCodes(name)).toEqual(['custom'])
     expect(issueCodes(`@${name.toUpperCase()}`)).toEqual(['custom'])
+  })
+
+  it('refuses a double « _ » and a final « _ », which would imitate another handle', () => {
+    expect(issueCodes('ines__morel')).toEqual(['invalid_format'])
+    expect(issueCodes('ines_morel_')).toEqual(['invalid_format'])
+    expect(Handle.parse('ines_m_2')).toBe('ines_m_2')
+  })
+
+  it('refuses any handle that contains the name of the app or its code name', () => {
+    const name = textVariables.appName.toLowerCase()
+    expect(HANDLE_FORBIDDEN_PARTS).toContain(name)
+    for (const handle of [`${name}_team`, `support_${name}`, `my${name}2`, 'admin_ruche']) {
+      expect(issueCodes(handle), handle).toEqual(['custom'])
+    }
   })
 
   it('only reserves words that would otherwise be valid handles', () => {

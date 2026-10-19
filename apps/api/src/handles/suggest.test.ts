@@ -2,6 +2,8 @@
 // pas de réseau. Le numéro ajouté quand le pseudo est pris (« ines_morel2 ») ne se décide pas ici,
 // mais dans ensureHandle (handles.test.ts). Scénario : docs/scenarios/phase-1.md,
 // « Précisions (tranche 6a) », règle « Fabrication ».
+import { Handle } from '@ruche/contracts'
+import { textVariables } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
 import { suggestHandle } from './suggest'
 
@@ -49,6 +51,14 @@ describe('suggestHandle', () => {
       expect(suggestHandle(name, 'fr'), name).toMatch(/^membre_/)
       expect(suggestHandle(name, 'en'), name).toMatch(/^member_/)
     }
+  })
+
+  it('leaves out the name of the app, which no handle may contain', () => {
+    const app = textVariables.appName
+    expect(suggestHandle(`Fan de ${app}`, 'fr')).toBe('fan_de')
+    expect(suggestHandle(`${app}Lover`, 'en')).toBe('lover')
+    expect(suggestHandle(app, 'fr')).toMatch(/^membre_/)
+    expect(Handle.safeParse(suggestHandle(`Ruche ${app} Ruche`, 'en')).success).toBe(true)
   })
 
   it('always gives a valid handle of 16 characters at most', () => {

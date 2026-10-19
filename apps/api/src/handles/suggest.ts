@@ -1,7 +1,12 @@
 // La fabrication d'un pseudo à partir du nom (tranche 6a) : « Inès Morel » donne « ines_morel ».
 // Des fonctions pures, sans base ni réseau : elles proposent des pseudos, et c'est claim.ts qui
 // choisit le premier libre dans la base. Scénario : docs/scenarios/phase-1.md, règle « Fabrication ».
-import { HANDLE_MAX_LENGTH, HANDLE_MIN_LENGTH, Handle } from '@ruche/contracts'
+import {
+  HANDLE_FORBIDDEN_PARTS,
+  HANDLE_MAX_LENGTH,
+  HANDLE_MIN_LENGTH,
+  Handle,
+} from '@ruche/contracts'
 import type { Language } from '@ruche/i18n'
 
 /** La base tirée du nom : 16 caractères au plus, pour qu'un numéro tienne encore dans les 20. */
@@ -54,7 +59,14 @@ const cut = (text: string) => text.slice(0, HANDLE_BASE_MAX_LENGTH).replace(/_+$
  * « membre_ » (numéroté ensuite : « membre_1 »).
  */
 export const handleBase = (name: string, language: Language) => {
-  const plain = plainName(name)
+  // Le nom de l'appli est interdit dans un pseudo, même au milieu : on le retire de la base
+  // (« Fan de Waiggle » → « fan_de »), puis on recolle les « _ » restés seuls.
+  const plain = HANDLE_FORBIDDEN_PARTS.reduce(
+    (text, part) => text.replaceAll(part, '_'),
+    plainName(name),
+  )
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
   if (plain === '') return `${memberWord[language]}_`
   if (/^[0-9]/.test(plain)) return cut(`${memberWord[language]}_${plain}`)
   return cut(plain)

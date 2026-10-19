@@ -171,7 +171,7 @@ export const fr = {
       handleTooShort: 'Le pseudo doit faire au moins {{min}} caractères.',
       handleTooLong: 'Le pseudo doit faire au plus {{max}} caractères.',
       handleInvalid:
-        'Le pseudo commence par une lettre, puis n’a que des lettres sans accent, des chiffres et « _ ».',
+        'Le pseudo commence par une lettre, puis n’a que des lettres sans accent, des chiffres et des « _ » seuls, sans finir par « _ ».',
       handleReserved: 'Ce pseudo est réservé. Choisis-en un autre.',
       bioTooLong: 'La bio doit faire au plus {{max}} caractères.',
       tooManyTools: '{{max}} outils au plus.',

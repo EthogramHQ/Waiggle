@@ -159,7 +159,7 @@ export const en: Translation = {
       handleTooShort: 'Your handle must be at least {{min}} characters long.',
       handleTooLong: 'Your handle must be at most {{max}} characters long.',
       handleInvalid:
-        'Your handle starts with a letter, then only has letters without accents, digits and “_”.',
+        'Your handle starts with a letter, then only has letters without accents, digits and single “_”, and does not end with “_”.',
       handleReserved: 'This handle is reserved. Choose another one.',
       bioTooLong: 'Your bio must be at most {{max}} characters long.',
       tooManyTools: '{{max}} tools at most.',
