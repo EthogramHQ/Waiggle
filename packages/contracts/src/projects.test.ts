@@ -12,6 +12,7 @@ import {
   Thumbhash,
   VisualSlot,
 } from './projects'
+import { NO_REACTIONS } from './reactions'
 
 const valid = {
   title: 'Mon agent de recettes',
@@ -145,6 +146,8 @@ describe('Project with its visuals', () => {
     isFollowed: false,
     followerCount: 0,
     notes: [],
+    reactions: NO_REACTIONS,
+    commentCount: 0,
     createdAt: '2026-10-16T10:00:00.000Z',
     updatedAt: '2026-10-16T10:00:00.000Z',
   }

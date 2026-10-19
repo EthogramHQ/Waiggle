@@ -444,6 +444,80 @@ Règles détaillées :
 - Un membre peut commenter un projet et répondre à un commentaire, avec des mentions `@nom`
 - L'auteur d'un commentaire peut le modifier ou le supprimer ; l'auteur du projet peut le masquer
 
+### Précisions (tranche 5) — validées le 19/10/2026
+
+Décisions de Louis :
+- **Les mentions « @nom » sont reportées à la tranche 6** : un membre n'a pas de pseudo unique, et
+  une mention ne sert qu'à prévenir quelqu'un, ce que font les notifications.
+- **Les réponses tiennent sur un seul niveau** : un commentaire « racine » et ses réponses,
+  affichées dessous de la plus ancienne à la plus récente. Répondre à une réponse ajoute au même fil.
+- **Masquer** : l'auteur du projet masque un commentaire d'un autre. Le commentaire reste visible de
+  son auteur et de l'auteur du projet, marqué « masqué » ; les autres ne le voient plus. L'auteur du
+  projet peut le démasquer. Rien n'est effacé en silence.
+- **Réactions** : chacun voit les nombres par type et ses propres réactions, jamais qui a réagi
+  (comme pour les abonnés). On ne réagit pas à son propre projet.
+- **Ni les réactions ni les commentaires n'apparaissent dans les fils ou sur les cartes** : seulement
+  sur la page du projet. L'auteur sera prévenu par les notifications (tranche 6).
+
+**Réagir**
+- Étant donné un membre connecté, sur le projet public d'un autre
+- Quand il touche « Bravo »
+- Alors le bouton passe en « réagi » et le nombre de « Bravo » augmente de un
+- Et il peut poser jusqu'à cinq réactions différentes sur le même projet, une par type
+- Quand il touche de nouveau « Bravo », sa réaction est retirée et le nombre baisse de un
+- Étant donné l'auteur du projet
+- Alors il voit les nombres de son projet, sans pouvoir réagir
+
+**Commenter**
+- Étant donné un membre connecté, sur un projet qu'il voit (le sien, privé compris, ou le projet
+  public d'un autre)
+- Quand il publie un commentaire (texte brut, 1 à 1 000 caractères)
+- Alors le commentaire apparaît en haut de la liste, avec son nom, sa photo et la date
+- Et un autre membre peut y répondre : la réponse s'affiche sous le commentaire, les réponses de la
+  plus ancienne à la plus récente
+
+**Modifier et supprimer son commentaire**
+- Étant donné l'auteur d'un commentaire
+- Quand il le modifie
+- Alors le texte change et le commentaire porte la mention « modifié »
+- Quand il le supprime, après confirmation
+- Alors il disparaît ; s'il avait des réponses, il devient « Commentaire supprimé » et les réponses
+  restent
+
+**Masquer un commentaire**
+- Étant donné l'auteur du projet, devant le commentaire d'un autre membre
+- Quand il le masque
+- Alors les autres membres ne le voient plus ; son auteur et l'auteur du projet le voient encore,
+  marqué « masqué » ; une racine masquée qui a des réponses visibles devient « Commentaire
+  masqué » pour les autres
+- Quand il le démasque, le commentaire redevient visible de tous
+- L'auteur du projet ne modifie ni ne supprime le commentaire d'un autre
+
+Règles détaillées :
+- **Liste** : les 20 commentaires racines les plus récents d'abord, chacun avec toutes ses réponses
+  (50 au plus) ; « Afficher la suite » charge les 20 suivants ; tout au bout, « C'est tout ».
+- **Droits** : sans session, « connecte-toi » ; projet inconnu, mal formé ou privé d'un autre :
+  « introuvable », toujours la même réponse ; réagir à son propre projet : refusé ; modifier ou
+  supprimer le commentaire d'un autre, ou masquer sans être l'auteur du projet (y compris son propre
+  commentaire : il le supprime plutôt) : « refusé » ; répondre à un commentaire d'un autre projet, à
+  une réponse, à un commentaire supprimé ou à un commentaire masqué qu'on ne voit pas :
+  « introuvable ».
+- **Un projet privé** : seul son auteur voit ses commentaires et ses nombres de réactions. Les
+  réactions et les commentaires écrits quand il était public sont gardés, et reviennent s'il
+  redevient public.
+- **Le nombre de commentaires** affiché compte les racines et les réponses que tout le monde voit :
+  ni les masqués ni les supprimés.
+- **Anti-abus**, par membre : 120 réactions (posées ou retirées) par heure ; 60 commentaires
+  (publiés ou modifiés) par heure ; masquer et supprimer comptent comme des modifications du projet
+  (60 par heure).
+- **Suppression du compte** : ses réactions et ses réponses disparaissent ; ses commentaires racines
+  qui ont des réponses deviennent « Commentaire supprimé » (texte effacé, sans auteur). Ses projets
+  emportent tous leurs commentaires et réactions. L'écran de suppression le dit (« Tes réactions et
+  tes commentaires »).
+- **Export des données** : ses réactions (projet, type, date) et ses commentaires (projet, texte,
+  dates, commentaire parent). Le projet n'est donné que par son identifiant : il appartient à un
+  autre, et a pu devenir privé.
+
 ## Tranche 6 — Notifications
 
 - Un membre est notifié quand on réagit à son projet, le commente, le suit ou le mentionne

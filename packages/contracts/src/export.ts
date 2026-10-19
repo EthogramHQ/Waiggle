@@ -2,7 +2,9 @@
 // formes venues de plusieurs fichiers (compte, projets…), sans créer de dépendance circulaire.
 import { z } from 'zod'
 import { Me } from './accounts'
+import { CommentId } from './comments'
 import { Project, ProjectId } from './projects'
+import { ReactionKind } from './reactions'
 
 /**
  * L'export des données d'un membre (droit d'accès du RGPD), renvoyé par GET /v1/me/export.
@@ -30,6 +32,25 @@ export const AccountExport = z
       members: z.array(z.object({ id: z.string(), followedAt: z.iso.datetime() })),
       projects: z.array(z.object({ id: ProjectId, followedAt: z.iso.datetime() })),
     }),
+    /**
+     * Ses réactions et ses commentaires (tranche 5), des plus anciens aux plus récents. Comme pour
+     * les abonnements, le projet n'est donné que par son identifiant : il appartient à un autre, et
+     * a pu devenir privé. Un commentaire « supprimé » (texte effacé) n'y est plus.
+     */
+    reactions: z.array(
+      z.object({ projectId: ProjectId, kind: ReactionKind, createdAt: z.iso.datetime() }),
+    ),
+    comments: z.array(
+      z.object({
+        projectId: ProjectId,
+        id: CommentId,
+        /** La racine à laquelle il répond ; null pour une racine. */
+        replyTo: CommentId.nullable(),
+        body: z.string(),
+        createdAt: z.iso.datetime(),
+        editedAt: z.iso.datetime().nullable(),
+      }),
+    ),
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),
     sessions: z.array(
       z.object({
