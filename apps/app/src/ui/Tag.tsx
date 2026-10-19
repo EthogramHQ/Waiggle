@@ -2,6 +2,7 @@
 // l'étiquette ; sans `onPress`, c'est une simple pastille.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { Pressable, View, type ViewStyle } from 'react-native'
+import { enterActivates } from './keyboard'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -38,6 +39,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={label}
+      // Entrée ouvre l'étiquette sur le web, comme un vrai lien (voir keyboard.ts).
+      {...enterActivates(onPress)}
       onPress={onPress}
       // La pastille dessinée fait 36 points de haut ; la zone à toucher autour d'elle, 44.
       style={{

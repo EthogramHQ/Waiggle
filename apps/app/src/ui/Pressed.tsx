@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { Pressable } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
+import { enterActivates } from './keyboard'
 import { spring } from './theme/motion'
 
 type Props = {
@@ -37,6 +38,8 @@ export function Pressed({
         accessibilityRole={role}
         accessibilityLabel={label}
         {...describedByProps(describedBy)}
+        // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
+        {...(role === 'link' ? enterActivates(onPress) : null)}
         onPress={onPress}
         onPressIn={() => {
           scale.value = spring(pressScale, 'firm')
