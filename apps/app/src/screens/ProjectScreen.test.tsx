@@ -1,9 +1,26 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
+import { type Comment, NO_REACTIONS, type Project } from '@ruche/contracts'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
+import {
+  useComments,
+  useDeleteComment,
+  useEditComment,
+  useHideComment,
+  usePostComment,
+} from '../comments/api'
 import { useFollow } from '../follows/api'
 import { useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject, getProject } from '../projects/api'
+import { useReaction } from '../reactions/api'
+import {
+  commentOf,
+  leaReply,
+  maxAuthor,
+  maxComment,
+  zoeComment,
+  zoeReply,
+} from '../testing/comments'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { ProjectScreen } from './ProjectScreen'
@@ -20,6 +37,15 @@ jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
 // Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
 jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+// Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.
+jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
+jest.mock('../comments/api', () => ({
+  useComments: jest.fn(),
+  usePostComment: jest.fn(),
+  useEditComment: jest.fn(),
+  useDeleteComment: jest.fn(),
+  useHideComment: jest.fn(),
+}))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
@@ -599,5 +625,563 @@ describe('after deleting a note', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Note supprimée.')
     expect(screen.queryByRole('header', { name: 'Supprimer cette note ?' })).toBeNull()
+  })
+})
+
+// --- Tranche 5 : réagir et commenter ---
+
+const mockReact = jest.fn()
+const mockPost = jest.fn()
+const mockEdit = jest.fn()
+const mockRemoveComment = jest.fn()
+const mockSetHidden = jest.fn()
+const mockFetchNextPage = jest.fn()
+
+/**
+ * La liste des commentaires telle que useComments la rend : une page déjà lue (comme
+ * useInfiniteQuery), et peut-être une suite à charger.
+ */
+const mockComments = (
+  items: Comment[],
+  { hasNextPage = false, isFetchingNextPage = false } = {},
+) => {
+  jest.mocked(useComments).mockReturnValue({
+    data: { pages: [{ items, nextCursor: hasNextPage ? 'abc' : null }], pageParams: [undefined] },
+    status: 'success',
+    isPending: false,
+    isLoading: false,
+    isSuccess: true,
+    isError: false,
+    isFetchNextPageError: false,
+    error: null,
+    hasNextPage,
+    isFetchingNextPage,
+    isRefetching: false,
+    fetchNextPage: mockFetchNextPage,
+    refetch: jest.fn().mockResolvedValue(undefined),
+  } as unknown as ReturnType<typeof useComments>)
+}
+
+beforeEach(() => {
+  mockReact.mockReset()
+  jest
+    .mocked(useReaction)
+    .mockReset()
+    .mockReturnValue({ toggle: mockReact, error: false, expired: false })
+  mockPost.mockReset().mockResolvedValue(true)
+  mockEdit.mockReset().mockResolvedValue(true)
+  mockRemoveComment.mockReset().mockResolvedValue(true)
+  mockSetHidden.mockReset().mockResolvedValue(true)
+  mockFetchNextPage.mockReset().mockResolvedValue(undefined)
+  jest
+    .mocked(usePostComment)
+    .mockReset()
+    .mockReturnValue({ post: mockPost, pending: false, error: false })
+  jest
+    .mocked(useEditComment)
+    .mockReset()
+    .mockReturnValue({ edit: mockEdit, pending: false, error: false })
+  jest
+    .mocked(useDeleteComment)
+    .mockReset()
+    .mockReturnValue({ remove: mockRemoveComment, error: false })
+  jest
+    .mocked(useHideComment)
+    .mockReset()
+    .mockReturnValue({ setHidden: mockSetHidden, error: false })
+  jest.mocked(useComments).mockReset()
+  mockComments([])
+})
+
+/** Le projet de Léa avec ces réactions (vu par elle-même, sauf si le test appelle seenByOther). */
+const withReactions = (reactions: Project['reactions']): Project => ({
+  ...recipesProject,
+  reactions,
+})
+
+/**
+ * Les actions d'un commentaire : on remonte depuis son texte jusqu'au premier ensemble qui contient
+ * des boutons, c'est-à-dire sa carte. Les réponses ont chacune la leur, hors de celle de la racine.
+ */
+const cardOf = (text: string) => {
+  let node = screen.getByText(text).parent
+  while (node && within(node).queryAllByRole('button').length === 0) node = node.parent
+  if (!node) throw new Error(`no actions around the comment ${text}`)
+  return within(node)
+}
+
+/** Les textes des commentaires affichés, dans l'ordre de la page. */
+const shownComments = () =>
+  screen.getAllByText(
+    /^(Super idée, je teste ce soir\.|Moi aussi, dis-nous !|Merci à vous deux\.|Ça marche aussi en anglais \?)$/,
+  )
+
+describe('reacting to a project from its page', () => {
+  it('offers another member the five reactions with their numbers, and reacts to the one touched', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    for (const name of ['Bluffant, 0', 'Inspirant, 0', 'Utile, 0', 'Drôle, 0']) {
+      expect(await screen.findByRole('button', { name })).toBeTruthy()
+    }
+    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, 3' }))
+
+    expect(useReaction).toHaveBeenCalledWith(id)
+    expect(mockReact).toHaveBeenCalledWith('bravo')
+  })
+
+  it('says in their name which reactions are the member’s own', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 4 }, mine: ['bravo'] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('button', { name: 'Bravo, réagi, 4' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Utile, 0' })).toBeTruthy()
+  })
+
+  it('shows the author the numbers of her project, without letting her react', async () => {
+    jest
+      .mocked(getProject)
+      .mockResolvedValue(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 2 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('Les réactions à ton projet')).toBeTruthy()
+    expect(screen.getByLabelText('Bravo, 2')).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Bravo),/ }),
+    ).toBeNull()
+  })
+
+  it('says so when the reaction could not be saved', async () => {
+    seenByOther(recipesProject)
+    jest.mocked(useReaction).mockReturnValue({ toggle: mockReact, error: true, expired: false })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta réaction n’a pas pu être enregistrée. Réessaie.',
+    )
+  })
+
+  it('says that the session expired', async () => {
+    seenByOther(recipesProject)
+    jest.mocked(useReaction).mockReturnValue({ toggle: mockReact, error: true, expired: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+  })
+})
+
+describe('the comments of a project', () => {
+  it('shows the comments under their header, newest thread first, replies oldest first', async () => {
+    seenByOther({ ...recipesProject, commentCount: 4 })
+    mockComments([maxComment, zoeComment])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'Commentaires (4)' })).toBeTruthy()
+    expect(useComments).toHaveBeenCalledWith(id)
+    const shown = shownComments()
+    expect(shown).toHaveLength(4)
+    expect(shown[0]).toHaveTextContent('Super idée, je teste ce soir.')
+    expect(shown[1]).toHaveTextContent('Moi aussi, dis-nous !')
+    expect(shown[2]).toHaveTextContent('Merci à vous deux.')
+    expect(shown[3]).toHaveTextContent('Ça marche aussi en anglais ?')
+  })
+
+  it('leads from a comment to the page of its author', async () => {
+    seenByOther()
+    mockComments([zoeComment, commentOf({ id: maxComment.id, author: maxAuthor, body: 'Bravo' })])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Voir la page de Max' }))
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u2' } })
+  })
+
+  it('says when a comment was edited', async () => {
+    seenByOther()
+    mockComments([{ ...zoeComment, editedAt: '2026-10-14T10:00:00.000Z' }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('modifié')).toBeTruthy()
+  })
+
+  it('invites to comment when there is no comment yet', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'Commentaires (0)' })).toBeTruthy()
+    expect(screen.getByText('Pas encore de commentaire.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toBeTruthy()
+    expect(screen.queryByText('C’est tout')).toBeNull()
+  })
+
+  it('offers the next comments, then says when there are no more', async () => {
+    seenByOther()
+    mockComments([zoeComment], { hasNextPage: true })
+    const view = await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Afficher la suite' }))
+    expect(mockFetchNextPage).toHaveBeenCalledTimes(1)
+
+    mockComments([zoeComment])
+    await view.rerender(<ProjectScreen id={id} />)
+    expect(await screen.findByText('C’est tout')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
+  })
+
+  it('shows « Commentaire supprimé » in place of a deleted comment, above its replies', async () => {
+    seenByOther()
+    mockComments([{ ...maxComment, author: null, body: '', state: 'deleted', replies: [zoeReply] }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('Commentaire supprimé')).toBeTruthy()
+    expect(screen.getByText('Moi aussi, dis-nous !')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Voir la page de Max' })).toBeNull()
+  })
+
+  it('shows « Commentaire masqué » in place of a hidden comment the member cannot read', async () => {
+    seenByOther()
+    mockComments([{ ...maxComment, author: null, body: '', state: 'hidden', replies: [zoeReply] }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('Commentaire masqué')).toBeTruthy()
+    expect(screen.getByText('Moi aussi, dis-nous !')).toBeTruthy()
+    // Le bandeau des deux auteurs n'est pas pour les autres : ils ne lisent rien du commentaire.
+    expect(screen.queryByText('Masqué par l’auteur du projet')).toBeNull()
+  })
+})
+
+/** Ouvre le champ, écrit un commentaire et le publie. */
+const commentSomething = async (text = 'Bravo, ça marche !') => {
+  await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+  await fireEvent.changeText(screen.getByLabelText('Ton commentaire'), text)
+  await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
+}
+
+describe('writing a comment', () => {
+  it('opens a field to write the comment, then publishes it', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Le champ n'est pas ouvert d'office.
+    await screen.findByRole('button', { name: 'Écrire un commentaire' })
+    expect(screen.queryByLabelText('Ton commentaire')).toBeNull()
+    await commentSomething('Bravo, ça marche !')
+
+    expect(usePostComment).toHaveBeenCalledWith(id)
+    expect(mockPost).toHaveBeenCalledWith({ body: 'Bravo, ça marche !' })
+  })
+
+  it('lets the author comment her own project too', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething('Merci pour vos retours.')
+
+    expect(mockPost).toHaveBeenCalledWith({ body: 'Merci pour vos retours.' })
+  })
+
+  it('empties and closes the field once the comment is published, and says so', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething()
+
+    await waitFor(() => expect(screen.queryByLabelText('Ton commentaire')).toBeNull())
+    expect(screen.getByRole('status')).toHaveTextContent('Commentaire publié.')
+    // Rouvert, le champ repart de zéro.
+    await fireEvent.press(screen.getByRole('button', { name: 'Écrire un commentaire' }))
+    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('')
+  })
+
+  it('says so when the comment could not be published, and keeps the text', async () => {
+    seenByOther()
+    mockPost.mockResolvedValue(false)
+    jest.mocked(usePostComment).mockReturnValue({ post: mockPost, pending: false, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething('Bravo, ça marche !')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Le commentaire n’a pas pu être publié. Réessaie.',
+    )
+    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Bravo, ça marche !')
+  })
+
+  it('says that the 60 comments of the hour are used up', async () => {
+    seenByOther()
+    mockPost.mockResolvedValue(false)
+    jest
+      .mocked(usePostComment)
+      .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'limited' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
+    )
+  })
+
+  it('says that the session expired', async () => {
+    seenByOther()
+    mockPost.mockResolvedValue(false)
+    jest
+      .mocked(usePostComment)
+      .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'expired' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+  })
+
+  it('asks for a text before publishing', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
+
+    expect(screen.getByText('Écris ton commentaire avant de le publier.')).toBeTruthy()
+    expect(mockPost).not.toHaveBeenCalled()
+  })
+})
+
+describe('replying to a comment', () => {
+  beforeEach(() => {
+    seenByOther()
+    mockComments([maxComment, zoeComment])
+  })
+
+  it('opens a field under the comment, then publishes the reply in its thread', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Ça marche aussi en anglais ?')
+    await fireEvent.press(
+      cardOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
+    )
+    await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Oui, en anglais aussi.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
+
+    expect(mockPost).toHaveBeenCalledWith({
+      body: 'Oui, en anglais aussi.',
+      replyTo: zoeComment.id,
+    })
+    // Une fois publiée, le champ de réponse se referme.
+    await waitFor(() => expect(screen.queryByLabelText('Ta réponse')).toBeNull())
+  })
+
+  it('answers a reply in the same thread, under its first comment', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Moi aussi, dis-nous !')
+    await fireEvent.press(cardOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }))
+    await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Je vous raconte demain.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
+
+    // Les réponses tiennent sur un seul niveau : on répond au commentaire racine.
+    expect(mockPost).toHaveBeenCalledWith({
+      body: 'Je vous raconte demain.',
+      replyTo: maxComment.id,
+    })
+  })
+
+  it('offers no reply on a deleted comment', async () => {
+    mockComments([{ ...zoeComment, author: null, body: '', state: 'deleted', replies: [leaReply] }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Commentaire supprimé')
+    // Seule la réponse de Léa, encore visible, peut recevoir une réponse.
+    expect(screen.getAllByRole('button', { name: 'Répondre' })).toHaveLength(1)
+  })
+})
+
+describe('editing and deleting one’s comment', () => {
+  // Max regarde le projet de Léa : son propre commentaire, et celui de Zoé.
+  beforeEach(() => {
+    seenByOther()
+    mockComments([{ ...maxComment, isMine: true }, zoeComment])
+  })
+
+  /** Touche ce bouton dans la carte du commentaire de Max. */
+  const pressOnMaxComment = async (name: string) => {
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(cardOf('Super idée, je teste ce soir.').getByRole('button', { name }))
+  }
+
+  it('lets the author of a comment edit it, starting from its text', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await pressOnMaxComment('Modifier le commentaire')
+    const field = screen.getByLabelText('Ton commentaire')
+    expect(field).toHaveDisplayValue('Super idée, je teste ce soir.')
+    await fireEvent.changeText(field, 'Testé : ça marche.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(useEditComment).toHaveBeenCalledWith(id)
+    expect(mockEdit).toHaveBeenCalledWith({ id: maxComment.id, body: 'Testé : ça marche.' })
+    await waitFor(() => expect(screen.queryByLabelText('Ton commentaire')).toBeNull())
+  })
+
+  it('says so when the edit could not be saved, and keeps the text', async () => {
+    mockEdit.mockResolvedValue(false)
+    jest.mocked(useEditComment).mockReturnValue({ edit: mockEdit, pending: false, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await pressOnMaxComment('Modifier le commentaire')
+    await fireEvent.changeText(screen.getByLabelText('Ton commentaire'), 'Testé.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Le commentaire n’a pas pu être modifié. Réessaie.',
+    )
+    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Testé.')
+  })
+
+  it('offers neither edit nor delete on the comments of others', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Ça marche aussi en anglais ?')
+    const others = cardOf('Ça marche aussi en anglais ?')
+    expect(others.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
+    expect(others.queryByRole('button', { name: 'Supprimer le commentaire' })).toBeNull()
+    // Une seule paire en tout : celle du commentaire de Max.
+    expect(screen.getAllByRole('button', { name: 'Modifier le commentaire' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Supprimer le commentaire' })).toHaveLength(1)
+  })
+
+  it('deletes a comment once its author confirms, and says so', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await pressOnMaxComment('Supprimer le commentaire')
+    expect(mockRemoveComment).not.toHaveBeenCalled() // il faut d'abord confirmer
+    await fireEvent.press(
+      dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    expect(useDeleteComment).toHaveBeenCalledWith(id)
+    expect(mockRemoveComment).toHaveBeenCalledWith(maxComment.id)
+    expect(await screen.findByRole('status')).toHaveTextContent('Commentaire supprimé.')
+  })
+
+  it('deletes nothing when the author changes her mind', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await pressOnMaxComment('Supprimer le commentaire')
+    await fireEvent.press(
+      dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Annuler' }),
+    )
+
+    expect(mockRemoveComment).not.toHaveBeenCalled()
+    expect(screen.queryByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeNull()
+  })
+
+  it('keeps the window open with the reason when the deletion fails, to try again', async () => {
+    mockRemoveComment.mockResolvedValue(false)
+    jest.mocked(useDeleteComment).mockReturnValue({ remove: mockRemoveComment, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await pressOnMaxComment('Supprimer le commentaire')
+    await fireEvent.press(
+      dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    expect(dialogTitled('Supprimer ce commentaire ?').getByRole('alert')).toHaveTextContent(
+      'Le commentaire n’a pas pu être supprimé. Réessaie.',
+    )
+  })
+})
+
+describe('hiding a comment from the project page', () => {
+  // Léa regarde son projet : le commentaire de Max (et ses réponses, dont la sienne), et celui de
+  // Zoé.
+  beforeEach(() => {
+    mockComments([
+      { ...maxComment, replies: [zoeReply, { ...leaReply, isMine: true }] },
+      zoeComment,
+    ])
+  })
+
+  it('lets the author of the project hide the comment of another member', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Masquer le commentaire',
+      }),
+    )
+
+    expect(useHideComment).toHaveBeenCalledWith(id)
+    expect(mockSetHidden).toHaveBeenCalledWith({ id: maxComment.id, hidden: true })
+  })
+
+  it('offers her to hide the comments of others only, and to delete her own instead', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Merci à vous deux.')
+    const own = cardOf('Merci à vous deux.')
+    // Son propre commentaire, elle le supprime plutôt que de le masquer.
+    expect(own.queryByRole('button', { name: 'Masquer le commentaire' })).toBeNull()
+    expect(own.getByRole('button', { name: 'Supprimer le commentaire' })).toBeTruthy()
+    // Celui d'un autre, elle ne le modifie ni ne le supprime : elle peut le masquer.
+    const others = cardOf('Ça marche aussi en anglais ?')
+    expect(others.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
+    expect(others.queryByRole('button', { name: 'Supprimer le commentaire' })).toBeNull()
+    expect(others.getByRole('button', { name: 'Masquer le commentaire' })).toBeTruthy()
+  })
+
+  it('shows her a hidden comment with its banner, and lets her show it back', async () => {
+    mockComments([{ ...zoeComment, state: 'hidden' }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('Masqué par l’auteur du projet')).toBeTruthy()
+    expect(screen.getByText('Ça marche aussi en anglais ?')).toBeTruthy()
+    await fireEvent.press(
+      cardOf('Ça marche aussi en anglais ?').getByRole('button', {
+        name: 'Démasquer le commentaire',
+      }),
+    )
+
+    expect(mockSetHidden).toHaveBeenCalledWith({ id: zoeComment.id, hidden: false })
+  })
+
+  it('shows its author that a comment is hidden, without letting him show it back', async () => {
+    seenByOther()
+    mockComments([{ ...maxComment, state: 'hidden', isMine: true, replies: [] }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('Masqué par l’auteur du projet')).toBeTruthy()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Démasquer le commentaire' })).toBeNull()
+  })
+
+  it('never offers other members to hide a comment', async () => {
+    seenByOther()
+    mockComments([maxComment, zoeComment])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    expect(screen.queryByRole('button', { name: 'Masquer le commentaire' })).toBeNull()
+  })
+
+  it('says so when the comment could not be hidden', async () => {
+    mockSetHidden.mockResolvedValue(false)
+    jest.mocked(useHideComment).mockReturnValue({ setHidden: mockSetHidden, error: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Masquer le commentaire',
+      }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Le changement n’a pas pu être enregistré. Réessaie.',
+    )
   })
 })

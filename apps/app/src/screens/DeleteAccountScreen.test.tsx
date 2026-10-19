@@ -35,6 +35,12 @@ describe('DeleteAccountScreen', () => {
     expect(screen.getByText('C’est immédiat et sans retour.')).toBeTruthy()
   })
 
+  it('says that the reactions and comments of the member go with the account', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(screen.getByText('Tes réactions et tes commentaires')).toBeTruthy()
+  })
+
   it('lets the member download their data first', async () => {
     jest.mocked(downloadMyData).mockResolvedValue({ ok: true })
     await renderWithI18n(<DeleteAccountScreen />)

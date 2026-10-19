@@ -7,6 +7,8 @@ import { useState } from 'react'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
+import { CommentCard } from './CommentCard'
+import { CommentList } from './CommentList'
 import { FeedEnd } from './FeedEnd'
 import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
@@ -22,6 +24,7 @@ import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
 import { ProjectGrid } from './ProjectGrid'
+import { ReactionBar, type ReactionBarItem } from './ReactionBar'
 import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
@@ -950,5 +953,213 @@ describe('TextLink', () => {
     expect(link).toBeDisabled()
     await fireEvent.press(link)
     expect(onPress).not.toHaveBeenCalled()
+  })
+})
+
+// --- Tranche 5 : réagir et commenter ---
+
+describe('ReactionBar', () => {
+  // Les cinq réactions, telles que l'écran les prépare : le texte affiché, le nombre, et le nom lu
+  // par le lecteur d'écran, qui dit aussi si la réaction est la sienne (« réagi »).
+  const items: ReactionBarItem[] = [
+    { kind: 'amazing', text: 'Bluffant', count: 0, mine: false, label: 'Bluffant, 0' },
+    { kind: 'inspiring', text: 'Inspirant', count: 1, mine: false, label: 'Inspirant, 1' },
+    { kind: 'useful', text: 'Utile', count: 0, mine: false, label: 'Utile, 0' },
+    { kind: 'funny', text: 'Drôle', count: 0, mine: false, label: 'Drôle, 0' },
+    { kind: 'bravo', text: 'Bravo', count: 4, mine: true, label: 'Bravo, réagi, 4' },
+  ]
+
+  it('is one button per reaction, named after it and its count, and reacts with the one touched', async () => {
+    const onToggle = jest.fn()
+    await renderWithProviders(<ReactionBar items={items} onToggle={onToggle} />)
+
+    expect(screen.getAllByRole('button')).toHaveLength(5)
+    expect(screen.getByText('Bluffant')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Utile, 0' }))
+
+    expect(onToggle).toHaveBeenCalledWith('useful')
+  })
+
+  it('says in its name which reaction is the member’s own, and lets her remove it', async () => {
+    const onToggle = jest.fn()
+    await renderWithProviders(<ReactionBar items={items} onToggle={onToggle} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 4' }))
+
+    expect(onToggle).toHaveBeenCalledWith('bravo')
+  })
+
+  it('shows the numbers without any button when read-only, with its caption', async () => {
+    const own = items.map((item) => ({
+      ...item,
+      mine: false,
+      label: `${item.text}, ${item.count}`,
+    }))
+    await renderWithProviders(
+      <ReactionBar items={own} readOnly caption="Les réactions à ton projet" />,
+    )
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.getByText('Les réactions à ton projet')).toBeTruthy()
+    expect(screen.getByLabelText('Bravo, 4')).toBeTruthy()
+    expect(screen.getByLabelText('Inspirant, 1')).toBeTruthy()
+  })
+
+  it('reads out its error as soon as it appears', async () => {
+    await renderWithProviders(
+      <ReactionBar
+        items={items}
+        onToggle={jest.fn()}
+        error="Ta réaction n’a pas pu être enregistrée. Réessaie."
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Ta réaction n’a pas pu être enregistrée. Réessaie.',
+    )
+  })
+})
+
+describe('CommentCard', () => {
+  const card = {
+    author: { name: 'Max', avatar: null },
+    authorLabel: 'Voir la page de Max',
+    when: '15 oct.',
+    body: 'Super idée, je teste ce soir.',
+  }
+
+  it('shows its author, its date and its text exactly as written', async () => {
+    // Un commentaire est du texte brut : les astérisques et les balises restent des caractères.
+    const body = '**Bravo** : <b>ça marche</b>\nEt vite.'
+    await renderWithProviders(<CommentCard {...card} body={body} onAuthorPress={jest.fn()} />)
+
+    expect(screen.getByText(body)).toBeTruthy()
+    expect(screen.getByText('Max')).toBeTruthy()
+    expect(screen.getByText('15 oct.')).toBeTruthy()
+  })
+
+  it('leads to the page of its author', async () => {
+    const onAuthorPress = jest.fn()
+    await renderWithProviders(<CommentCard {...card} onAuthorPress={onAuthorPress} />)
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Voir la page de Max' }))
+
+    expect(onAuthorPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('says when it was edited', async () => {
+    await renderWithProviders(<CommentCard {...card} onAuthorPress={jest.fn()} edited="modifié" />)
+
+    expect(screen.getByText('modifié')).toBeTruthy()
+  })
+
+  it('offers the actions it is given, as buttons named after them', async () => {
+    const reply = jest.fn()
+    const remove = jest.fn()
+    await renderWithProviders(
+      <CommentCard
+        {...card}
+        onAuthorPress={jest.fn()}
+        actions={[
+          { label: 'Répondre', onPress: reply },
+          { label: 'Supprimer le commentaire', onPress: remove },
+        ]}
+      />,
+    )
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Répondre' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le commentaire' }))
+
+    expect(reply).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers no action when it is given none', async () => {
+    await renderWithProviders(<CommentCard {...card} onAuthorPress={jest.fn()} />)
+
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy() // témoin : la carte est là
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('shows the banner of a hidden comment, with its text, for the two authors', async () => {
+    await renderWithProviders(
+      <CommentCard {...card} onAuthorPress={jest.fn()} hidden="Masqué par l’auteur du projet" />,
+    )
+
+    expect(screen.getByText('Masqué par l’auteur du projet')).toBeTruthy()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+  })
+
+  it('shows only its placeholder when it has no author', async () => {
+    await renderWithProviders(
+      <CommentCard author={null} when="15 oct." body="" placeholder="Commentaire supprimé" />,
+    )
+
+    expect(screen.getByText('Commentaire supprimé')).toBeTruthy()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByText('Max')).toBeNull()
+  })
+})
+
+describe('CommentList', () => {
+  const labels = { moreLabel: 'Afficher la suite', endLabel: 'C’est tout' }
+
+  it('shows the threads in the order given, then offers the next ones', async () => {
+    const onMore = jest.fn()
+    await renderWithProviders(
+      <CommentList {...labels} state="more" onMore={onMore} empty="Pas encore de commentaire.">
+        <Text>Premier fil</Text>
+        <Text>Second fil</Text>
+      </CommentList>,
+    )
+
+    const shown = screen.getAllByText(/^(Premier|Second) fil$/)
+    expect(shown[0]).toHaveTextContent('Premier fil')
+    expect(shown[1]).toHaveTextContent('Second fil')
+    expect(screen.queryByText('Pas encore de commentaire.')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Afficher la suite' }))
+    expect(onMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('says « C’est tout » once every comment is shown', async () => {
+    await renderWithProviders(
+      <CommentList {...labels} state="end" onMore={jest.fn()} empty="Pas encore de commentaire.">
+        <Text>Premier fil</Text>
+      </CommentList>,
+    )
+
+    expect(screen.getByText('C’est tout')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('says so when there is no comment yet, without « C’est tout »', async () => {
+    await renderWithProviders(
+      <CommentList {...labels} state="end" onMore={jest.fn()} empty="Pas encore de commentaire." />,
+    )
+
+    expect(screen.getByText('Pas encore de commentaire.')).toBeTruthy()
+    expect(screen.queryByText('C’est tout')).toBeNull()
+  })
+
+  it('says when the next comments failed to load, and offers to retry', async () => {
+    const onMore = jest.fn()
+    await renderWithProviders(
+      <CommentList
+        {...labels}
+        state="error"
+        onMore={onMore}
+        empty="Pas encore de commentaire."
+        errorLabel="La suite des commentaires n’a pas pu se charger."
+        retryLabel="Réessayer"
+      >
+        <Text>Premier fil</Text>
+      </CommentList>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'La suite des commentaires n’a pas pu se charger.',
+    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(onMore).toHaveBeenCalledTimes(1)
   })
 })
