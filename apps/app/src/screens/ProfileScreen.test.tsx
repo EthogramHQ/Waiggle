@@ -140,7 +140,7 @@ describe('ProfileScreen', () => {
     await screen.findByDisplayValue('Léa')
 
     expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea')
-    expect(screen.getByText(/^Les membres te verront sous @pseudo sur ta page/)).toBeTruthy()
+    expect(screen.getByText(/^Les membres te voient sous @pseudo sur ta page/)).toBeTruthy()
   })
 
   it('sends the handle only when it changed, cleaned up, and shows the saved one', async () => {
