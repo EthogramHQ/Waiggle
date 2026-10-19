@@ -13,6 +13,7 @@ export const ErrorCode = z.enum([
   'unavailable',
   'too_many_visuals',
   'cannot_follow_own',
+  'cannot_react_own',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

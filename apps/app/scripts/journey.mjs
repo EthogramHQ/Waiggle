@@ -1,7 +1,7 @@
 // Le parcours réel d'un membre, joué dans un vrai navigateur à la place de Louis : deux personnes
 // s'inscrivent, l'une suit l'autre et publie un projet avec des photos, l'autre le voit arriver dans
-// son fil et le regarde ; puis le projet devient
-// privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
+// son fil et le regarde, réagit et commente (l'auteur répond, puis masque le commentaire) ; puis le
+// projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
 // Usage : node apps/app/scripts/journey.mjs <adresse de l'appli> <adresse de l'API>
@@ -297,6 +297,45 @@ try {
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByRole('link', { name: 'Note de Lea sur Mon agent de recettes' }).waitFor()
   console.log('  ok : la note de Léa est dans le fil de Sam')
+
+  step('Sam réagit « Bravo » et commente ; Léa répond, puis masque le commentaire de Sam')
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  // Le nom lu de chaque réaction dit son nombre, et « réagi » une fois posée.
+  await sam.page.getByRole('button', { name: 'Bravo, 0' }).click()
+  await sam.page.getByRole('button', { name: 'Bravo, réagi, 1' }).waitFor()
+  await waitFor(
+    'réaction enregistrée',
+    async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
+  )
+  console.log('  ok : Léa voit « Bravo » compté une fois')
+  // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
+  // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
+  const samSays = 'Testé ce soir : une soupe parfaite.'
+  await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+  await sam.page.getByLabel('Ton commentaire').fill(samSays)
+  await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
+  await sam.page.getByText('Commentaire publié.').waitFor()
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  await lea.page.getByText(samSays, { exact: true }).waitFor()
+  await lea.page.getByRole('button', { name: 'Répondre', exact: true }).click()
+  await lea.page.getByLabel('Ta réponse').fill('Merci Sam, la version dessert arrive.')
+  await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()
+  await lea.page.getByText('Réponse publiée.').waitFor()
+  // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer.
+  await lea.page.getByRole('button', { name: 'Masquer le commentaire' }).click()
+  // C'est elle qui l'a masqué : son bandeau le dit ainsi ; Sam lit « Masqué par l'auteur du projet ».
+  await lea.page.getByText('Masqué par toi').waitFor()
+  // Un commentaire masqué ne compte plus : reste la réponse de Léa.
+  expectEqual('commentaires comptés', (await readProject(lea, projectId)).commentCount, 1)
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await sam.page.getByText('Masqué par l’auteur du projet').waitFor()
+  await sam.page.getByText(samSays, { exact: true }).waitFor()
+  console.log('  ok : Sam voit son commentaire, marqué « masqué »')
+  expectEqual(
+    'commentaires, sans compte',
+    await statusFor(visitor, `${apiUrl}/v1/projects/${projectId}/comments`),
+    401,
+  )
 
   step('Léa passe le projet en privé : la photo devient introuvable, même pour qui a l’adresse')
   await open(lea.page, `${appUrl}/projects/${projectId}/edit`)

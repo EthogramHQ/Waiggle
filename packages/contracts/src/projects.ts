@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { FollowState } from './follows'
 import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
+import { ReactionState } from './reactions'
 import { FreeText, isCleanText, ShortLabel, uniqueIgnoringCase } from './text'
 
 export const PROJECT_TITLE_MAX = 80
@@ -219,6 +220,13 @@ export const Project = z
     ...FollowState.shape,
     /** Le journal : les notes de l'auteur, de la plus récente à la plus ancienne (20 au plus). */
     notes: z.array(ProjectNote).max(PROJECT_NOTES_SHOWN),
+    /** Les réactions (tranche 5) : les nombres par type, et celles du membre qui regarde. */
+    reactions: ReactionState,
+    /**
+     * Le nombre de commentaires que tout le monde voit (racines et réponses, sans les masqués ni
+     * les supprimés). La liste elle-même se lit à part : GET /v1/projects/{id}/comments.
+     */
+    commentCount: z.int().nonnegative(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

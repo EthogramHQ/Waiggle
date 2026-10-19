@@ -41,6 +41,16 @@ const features = [
     routes: /^\w+ \/v1\/me(\/|$)/,
     tables: /^(profile|api_rate_limit)$/,
   },
+  // Avant « projets » : ses routes sont sous /v1/projects/{id}/.
+  {
+    id: 'reagir',
+    name: 'Réagir et commenter',
+    tranche: 'Tranche 5',
+    lessons: [],
+    pages: null,
+    routes: /^\w+ \/v1\/projects\/\{id\}\/(reactions|comments)(\/|$)/,
+    tables: /^project_(reaction|comment)$/,
+  },
   {
     id: 'projets',
     name: 'Projets',

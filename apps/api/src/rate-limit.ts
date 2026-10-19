@@ -56,6 +56,10 @@ export const memberCounterKeys = (userId: string) => ({
   follow: `follow:${userId}`,
   // Publier une note, tous ses projets ensemble (tranche 4b).
   note: `note:${userId}`,
+  // Poser et retirer une réaction, tous les projets ensemble (tranche 5).
+  reaction: `reaction:${userId}`,
+  // Publier et modifier un commentaire, tous les projets ensemble (tranche 5).
+  comment: `comment:${userId}`,
 })
 
 /**

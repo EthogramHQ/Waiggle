@@ -18,3 +18,9 @@ require('react-native-reanimated').setUpTests()
 const { Dimensions } = require('react-native')
 const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
 Dimensions.set({ window: phone, screen: phone })
+
+// React Query prévient React d'un changement (une page de plus arrivée) au tour suivant de la boucle
+// d'événements (setTimeout). Dans un test, ce tour vient après act() : le hook lu juste après
+// montrerait encore l'état d'avant. On prévient React dès la fin de la tâche en cours (une
+// « microtâche »), ce que act() attend.
+require('@tanstack/react-query').notifyManager.setScheduler(queueMicrotask)

@@ -16,6 +16,7 @@ const errorMessages = {
   unavailable: 'unavailable',
   too_many_visuals: 'tooManyVisuals',
   cannot_follow_own: 'cannotFollowOwn',
+  cannot_react_own: 'cannotReactOwn',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

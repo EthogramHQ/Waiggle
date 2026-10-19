@@ -7,6 +7,9 @@
 // « ?announce=<statut> », et une note toute prête l'attend dans le champ.
 // Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture, la description et le
 // journal à gauche, les informations et les actions à droite.
+// Les réactions et les commentaires (tranche 5) : un autre membre pose ses réactions sous « Suivre »
+// (l'auteur voit seulement les nombres) ; les commentaires viennent après le journal, dans la
+// colonne principale sur ordinateur.
 // La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
 // première photo ; sur ordinateur, la première photo. Des vignettes permettent de voir les autres,
 // et la lumière d'ambiance prend la couleur de la photo affichée.
@@ -16,6 +19,7 @@ import {
   type Project,
   ProjectStatus,
   type ProjectVisual,
+  REACTION_KINDS,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -32,6 +36,7 @@ import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject } from '../projects/api'
 import { hostOf, shortDate } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
+import { useReaction } from '../reactions/api'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
@@ -48,6 +53,7 @@ import { NoteList, type NoteListHandle } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
 import { Pressed } from '../ui/Pressed'
 import { ProjectCover } from '../ui/ProjectCover'
+import { ReactionBar } from '../ui/ReactionBar'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
@@ -57,6 +63,7 @@ import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
+import { Comments } from './ProjectComments'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function ProjectScreen({ id }: { id: string }) {
@@ -109,6 +116,24 @@ function ProjectView({ project }: { project: Project }) {
   const back = useGoBack('/')
   const follow = useFollow({ kind: 'project', id: project.id })
   const followers = t('follow.followers', { count: project.followerCount })
+  const reaction = useReaction(project.id)
+  // Les cinq réactions, telles que la barre les affiche. Le nom lu reprend le texte affiché et dit
+  // si la réaction est la sienne (« Bravo, réagi, 4 »).
+  const reactions = REACTION_KINDS.map((kind) => {
+    const text = t(`project.reactions.${kind}`)
+    const count = project.reactions.counts[kind]
+    const mine = !project.isMine && project.reactions.mine.includes(kind)
+    return {
+      kind,
+      text,
+      count,
+      mine,
+      label: t(mine ? 'project.reactions.labelMine' : 'project.reactions.label', {
+        name: text,
+        count,
+      }),
+    }
+  })
 
   const onDelete = async () => {
     setBusy(true)
@@ -255,6 +280,23 @@ function ProjectView({ project }: { project: Project }) {
           prominent={false}
         />
       )}
+      {/* Réagir, après Suivre. L'auteur ne réagit pas à son propre projet : il voit les nombres. */}
+      {project.isMine ? (
+        <ReactionBar items={reactions} readOnly caption={t('project.reactions.own')} />
+      ) : (
+        <ReactionBar
+          items={reactions}
+          onToggle={reaction.toggle}
+          label={t('project.reactions.group')}
+          error={
+            reaction.expired
+              ? t('states.expired')
+              : reaction.error
+                ? t('project.reactions.error')
+                : undefined
+          }
+        />
+      )}
     </Stack>
   )
 
@@ -355,6 +397,8 @@ function ProjectView({ project }: { project: Project }) {
 
   // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
   const journal = project.isMine || project.notes.length > 0 ? <Journal project={project} /> : null
+  // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
+  const comments = <Comments project={project} />
 
   // La lumière d'ambiance prend la couleur de la photo affichée (sans photo : la lumière miel).
   const thumbhash = shown?.visual.thumbhash ?? null
@@ -382,6 +426,7 @@ function ProjectView({ project }: { project: Project }) {
               {/* Ce qui se lit longtemps va dans la colonne principale ; la latérale garde les
                   informations et les actions. */}
               {journal}
+              {comments}
             </>
           }
           side={
@@ -408,6 +453,9 @@ function ProjectView({ project }: { project: Project }) {
       {recipe}
       {description}
       {journal}
+      {/* La conversation vient après le projet ; « Modifier » et « Supprimer », que l'auteur
+          cherche moins souvent, ferment la page. */}
+      {comments}
       {ownerActions}
     </Screen>
   )

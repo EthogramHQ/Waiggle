@@ -1,6 +1,6 @@
 // Tests d'intégration de la tranche 3a : publier, lire, modifier et supprimer un projet.
 // Scénarios : docs/scenarios/phase-1.md, tranche 3. Deux membres : Léa (l'autrice) et Max.
-import { AccountExport, ErrorResponse, Me, Project, ProjectNote } from '@ruche/contracts'
+import { AccountExport, Comment, ErrorResponse, Me, Project, ProjectNote } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -436,5 +436,145 @@ describe('my notes in my data', () => {
     const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
 
     expect(data.notes).toEqual([])
+  })
+})
+
+// --- Tranche 5 : les réactions et les commentaires dans l'export ---
+// L'export donne les réactions du membre (projet, type, date) et ses commentaires (projet, texte,
+// dates, commentaire auquel il répond), des plus anciens aux plus récents. Le projet n'est donné
+// que par son identifiant : il appartient à un autre, et a pu devenir privé.
+describe('my reactions and comments in my data', () => {
+  // Une fausse horloge, qu'on avance d'une minute entre deux gestes : leurs dates sont distinctes,
+  // donc leur ordre est connu. Seule Date est remplacée (voir feed.test.ts).
+  beforeEach(() => {
+    const now = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const later = () => vi.setSystemTime(Date.now() + 60 * 1000)
+
+  /** Pose une réaction, une minute après ce qui précède, et renvoie sa date. */
+  const react = async (projectId: string, kind: string, cookie = lea) => {
+    later()
+    const res = await send('PUT', `/v1/projects/${projectId}/reactions/${kind}`, cookie)
+    expect(res.status).toBe(204)
+    return new Date(Date.now()).toISOString()
+  }
+
+  /** Publie un commentaire (une réponse si `replyTo` est donné), une minute après ce qui précède. */
+  const postComment = async (projectId: string, body: string, cookie = lea, replyTo?: string) => {
+    later()
+    const res = await send('POST', `/v1/projects/${projectId}/comments`, cookie, {
+      body,
+      ...(replyTo && { replyTo }),
+    })
+    expect(res.status).toBe(201)
+    return Comment.parse(await res.json())
+  }
+
+  const exported = async () => {
+    const raw = await (await send('GET', '/v1/me/export', lea)).text()
+    return { raw, data: AccountExport.parse(JSON.parse(raw)) }
+  }
+
+  it('exports my reactions with the project, the kind and the date only, oldest first', async () => {
+    const maxProject = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    const mine = await publish()
+    const bravoAt = await react(maxProject.id, 'bravo')
+    const usefulAt = await react(maxProject.id, 'useful')
+    // Max réagit au projet de Léa : cela ne regarde pas l'export de Léa.
+    await react(mine.id, 'funny', max)
+
+    const { raw, data } = await exported()
+
+    expect(data.reactions).toEqual([
+      { projectId: maxProject.id, kind: 'bravo', createdAt: bravoAt },
+      { projectId: maxProject.id, kind: 'useful', createdAt: usefulAt },
+    ])
+    expect(raw).not.toContain('Projet de Max')
+  })
+
+  it('exports my comments and replies, with their dates and the comment they answer, and nobody else’s', async () => {
+    const maxProject = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    const fromMax = await postComment(maxProject.id, 'Commentaire de Max', max)
+    const root = await postComment(maxProject.id, 'Mon avis sur le projet de Max')
+    const reply = await postComment(maxProject.id, 'Ma réponse à Max', lea, fromMax.id)
+    later()
+    const edit = await send('PATCH', `/v1/projects/${maxProject.id}/comments/${root.id}`, lea, {
+      body: 'Mon avis corrigé',
+    })
+    expect(edit.status).toBe(200)
+
+    const { raw, data } = await exported()
+
+    expect(data.comments).toEqual([
+      {
+        projectId: maxProject.id,
+        id: root.id,
+        replyTo: null,
+        body: 'Mon avis corrigé',
+        createdAt: root.createdAt,
+        editedAt: new Date(Date.now()).toISOString(),
+        hiddenAt: null,
+      },
+      {
+        projectId: maxProject.id,
+        id: reply.id,
+        replyTo: fromMax.id,
+        body: 'Ma réponse à Max',
+        createdAt: reply.createdAt,
+        editedAt: null,
+        hiddenAt: null,
+      },
+    ])
+    expect(raw).not.toContain('Commentaire de Max')
+    expect(raw).not.toContain('Projet de Max')
+  })
+
+  it('never gives the title of a project I reacted to or commented, even gone private', async () => {
+    const maxProject = await publish({ ...recipes, title: 'Projet secret de Max' }, max)
+    await react(maxProject.id, 'bravo')
+    await postComment(maxProject.id, 'Mon avis')
+    const hidden = await send('PATCH', `/v1/projects/${maxProject.id}`, max, {
+      visibility: 'private',
+    })
+    expect(hidden.status).toBe(200)
+
+    const { raw } = await exported()
+
+    expect(raw).not.toContain('Projet secret de Max')
+    expect(raw).not.toContain('Un menu avec ce qu’il y a au frigo.')
+  })
+
+  it('leaves out a comment I deleted, even when its replies keep it as « deleted comment »', async () => {
+    const maxProject = await publish({ ...recipes, title: 'Projet de Max' }, max)
+    const answered = await postComment(maxProject.id, 'Un avis que je regrette')
+    await postComment(maxProject.id, 'Réponse de Max', max, answered.id)
+    const lone = await postComment(maxProject.id, 'Un autre avis supprimé')
+    for (const id of [answered.id, lone.id]) {
+      const res = await send('DELETE', `/v1/projects/${maxProject.id}/comments/${id}`, lea)
+      expect(res.status).toBe(204)
+    }
+
+    const { raw, data } = await exported()
+
+    expect(data.comments).toEqual([])
+    expect(raw).not.toContain('Un avis que je regrette')
+    expect(raw).not.toContain(answered.id)
+  })
+
+  it('exports no reaction and no comment for a member who never reacted nor commented', async () => {
+    const mine = await publish()
+    await postComment(mine.id, 'Avis de Max', max)
+    await react(mine.id, 'bravo', max)
+
+    const { data } = await exported()
+
+    expect(data.reactions).toEqual([])
+    expect(data.comments).toEqual([])
   })
 })

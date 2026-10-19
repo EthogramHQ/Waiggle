@@ -288,6 +288,14 @@ const notMineProject = {
   followerCount: 2,
   notes: recipesNotes.slice(1),
 }
+// Un autre projet de Max, très commenté (tranche 5) : les fils, leurs réponses, les emplacements.
+const commentedProject = {
+  ...notMineProject,
+  id: '00000000-0000-4000-8000-0000000000cc',
+  title: 'Le chef des restes',
+  pitch: 'Il transforme les restes de la semaine en trois menus.',
+  followerCount: 5,
+}
 // Le même projet, avec ses photos, sous un autre identifiant : on photographie les deux pages.
 const photosProject = { ...projectWithPhotos, id: '7c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f' }
 // La page de Léa, vue par elle-même (avec son brouillon privé), et la page d'une étiquette.
@@ -386,42 +394,213 @@ const followingFeed = () =>
     ? { items: [], nextCursor: null, followsAnyone: false }
     : { items: followingItems, nextCursor: 'suite', followsAnyone: true }
 
-const fakeApi = (signedIn) => async (route) => {
-  const { pathname } = new URL(route.request().url())
-  const json = (status, body) =>
-    route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-  if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
-  if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
-  if (pathname === '/v1/me') return json(200, leaMe)
-  // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
-  // remplacer ces réponses par un refus).
-  const method = route.request().method()
-  if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
-    const { body } = JSON.parse(route.request().postData() ?? '{}')
-    return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+// Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son
+// identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
+// (d'octobre 2026) de sa publication, et le reste au choix (state, isMine, editedAt, replies).
+const lea = { id: leaMe.id, name: leaMe.name, avatarUrl: null }
+const comment = (n, author, body, day, hour, fields = {}) => ({
+  id: `5e6f7081-92a3-4b4c-8d5e-${String(n).padStart(12, '0')}`,
+  author,
+  body: author ? body : '',
+  createdAt: new Date(Date.UTC(2026, 9, day, hour)).toISOString(),
+  editedAt: null,
+  state: 'visible',
+  isMine: author?.id === leaMe.id,
+  replies: [],
+  ...fields,
+})
+// Sur le projet de Léa, vue par elle-même : elle masque le commentaire d'un autre (et peut le
+// démasquer), et supprime ou modifie les siens.
+const recipesComments = [
+  comment(1, max, 'Super idée, je teste ce soir avec ce qu’il reste dans le frigo.', 18, 9, {
+    replies: [
+      comment(2, ines, 'Moi aussi, dis-nous comment ça se passe !', 18, 10),
+      comment(3, lea, 'Merci à vous deux, j’ajoute les desserts la semaine prochaine.', 18, 12),
+    ],
+  }),
+  comment(4, ines, 'Viens plutôt voir mon projet, il fait la même chose en mieux !', 17, 9, {
+    state: 'hidden',
+  }),
+  comment(5, max, 'Il sait tenir compte des allergies ?', 16, 9),
+]
+// Sur le projet de Max, vue par Léa : un fil avec ses réponses (dont la sienne, modifiée), son
+// commentaire masqué par Max (elle le lit encore, avec le bandeau), un commentaire supprimé et un
+// masqué (des emplacements, gardés pour leurs réponses), puis « Afficher la suite ».
+const notMineComments = [
+  comment(
+    11,
+    ines,
+    'Testé avec les restes de raclette : trois idées, dont une soupe. Bluffant.',
+    18,
+    9,
+    {
+      replies: [
+        comment(12, max, 'Merci ! La soupe, c’est aussi ma préférée.', 18, 11),
+        comment(13, lea, 'Je confirme, testée hier soir.', 18, 20, {
+          editedAt: new Date(Date.UTC(2026, 9, 18, 21)).toISOString(),
+        }),
+      ],
+    },
+  ),
+  comment(14, lea, 'Petite pub : mon tri des photos fait pareil pour les albums !', 17, 9, {
+    state: 'hidden',
+  }),
+  comment(15, null, '', 16, 9, {
+    state: 'deleted',
+    replies: [comment(16, ines, 'Oui, il gère aussi les allergies.', 16, 10)],
+  }),
+  comment(17, null, '', 15, 9, {
+    state: 'hidden',
+    replies: [comment(18, max, 'Merci pour le retour, je regarde ça.', 15, 12)],
+  }),
+  comment(19, ines, 'Ça marche avec un frigo presque vide ?', 14, 9),
+]
+const notMineMore = [comment(20, ines, 'Première version testée : bravo pour l’interface.', 12, 9)]
+// Sur le projet aux contenus très longs : un commentaire de 1 000 caractères, une adresse sans
+// espace en réponse.
+const longComments = [
+  comment(21, max, longNote, 17, 9, {
+    replies: [comment(22, ines, urlNote, 17, 10)],
+  }),
+]
+// Les commentaires de chaque projet : la première page, puis la suite (curseur « suite »).
+const commentsOf = {
+  [recipesProject.id]: [recipesComments],
+  [commentedProject.id]: [notMineComments, notMineMore],
+  [longProject.id]: [longComments],
+}
+// Les nombres affichés : réactions par type, réactions de Léa, commentaires visibles de tous.
+const reactionsOf = {
+  [recipesProject.id]: {
+    counts: { amazing: 3, inspiring: 1, useful: 6, funny: 0, bravo: 9 },
+    mine: [],
+  },
+  [commentedProject.id]: {
+    counts: { amazing: 2, inspiring: 4, useful: 7, funny: 1, bravo: 12 },
+    mine: ['useful', 'bravo'],
+  },
+}
+const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
+
+const fakeApi = (signedIn) => {
+  // Ce que Léa change dans ce navigateur : ses réactions, et le nombre de commentaires ajoutés.
+  const reactions = structuredClone(reactionsOf)
+  const added = {}
+  // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
+  const withExtras = (project) => ({
+    ...project,
+    reactions: reactions[project.id] ?? project.reactions,
+    commentCount: (commentCountOf[project.id] ?? 0) + (added[project.id] ?? 0),
+  })
+  return async (route) => {
+    const url = new URL(route.request().url())
+    const { pathname } = url
+    const json = (status, body) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
+    if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    if (pathname === '/v1/me') return json(200, leaMe)
+    // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
+    // remplacer ces réponses par un refus).
+    const method = route.request().method()
+    if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
+      const { body } = JSON.parse(route.request().postData() ?? '{}')
+      return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+    }
+    if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // Réagir (PUT) ou retirer sa réaction (DELETE) : les nombres changent pour la relecture qui suit.
+    const reaction = pathname.match(/^\/v1\/projects\/([^/]+)\/reactions\/([a-z]+)$/)
+    if (reaction) {
+      const [, id, kind] = reaction
+      reactions[id] = reactions[id] ?? {
+        counts: { amazing: 0, inspiring: 0, useful: 0, funny: 0, bravo: 0 },
+        mine: [],
+      }
+      const state = reactions[id]
+      const react = method === 'PUT'
+      if (react !== state.mine.includes(kind)) {
+        state.counts[kind] += react ? 1 : -1
+        state.mine = react ? [...state.mine, kind] : state.mine.filter((k) => k !== kind)
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // Les commentaires : la première page, puis la suite (« suite ») ; publier, modifier, supprimer,
+    // masquer : l'API simulée accepte.
+    const comments = pathname.match(/^\/v1\/projects\/([^/]+)\/comments$/)
+    if (comments && method === 'GET') {
+      const pages = commentsOf[comments[1]] ?? [[]]
+      const index = url.searchParams.get('cursor') === 'suite' ? 1 : 0
+      return json(200, {
+        items: pages[index] ?? [],
+        nextCursor: index + 1 < pages.length ? 'suite' : null,
+      })
+    }
+    if (comments && method === 'POST') {
+      const { body, replyTo } = JSON.parse(route.request().postData() ?? '{}')
+      // Comme la vraie API : on répond à une racine de ce projet, qu'on voit (pas un emplacement
+      // « Commentaire supprimé » ou « masqué »), sinon 404. Une réponse à une réponse aussi.
+      if (replyTo) {
+        const roots = (commentsOf[comments[1]] ?? []).flat()
+        const root = roots.find((c) => c.id === replyTo)
+        if (!root || root.state === 'deleted' || !root.author) {
+          return json(404, { error: { code: 'not_found', message: '' } })
+        }
+      }
+      added[comments[1]] = (added[comments[1]] ?? 0) + 1
+      return json(201, {
+        ...comment(0, lea, body, 19, 9),
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+      })
+    }
+    const one = pathname.match(/^\/v1\/projects\/([^/]+)\/comments\/([^/]+)$/)
+    if (one && method === 'PATCH') {
+      const { body } = JSON.parse(route.request().postData() ?? '{}')
+      const all = Object.values(commentsOf)
+        .flat(2)
+        .flatMap((c) => [c, ...c.replies])
+      const { replies: _replies, ...original } =
+        all.find((c) => c.id === one[2]) ?? comment(0, lea, '', 19, 9)
+      return json(200, { ...original, id: one[2], body, editedAt: new Date().toISOString() })
+    }
+    if (one && method === 'DELETE') {
+      added[one[1]] = (added[one[1]] ?? 0) - 1
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (/^\/v1\/projects\/[^/]+\/comments\/[^/]+\/hide$/.test(pathname)) {
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, withExtras(recipesShown))
+    if (pathname === `/v1/projects/${photosProject.id}`) return json(200, withExtras(photosProject))
+    if (pathname === `/v1/projects/${notMineProject.id}`) {
+      return json(200, withExtras(notMineProject))
+    }
+    if (pathname === `/v1/projects/${commentedProject.id}`) {
+      return json(200, withExtras(commentedProject))
+    }
+    if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
+    if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
+    if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
+    if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
+    if (pathname === '/v1/feed/following') return json(200, followingFeed())
+    if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
+    // Une page dont le chargement échoue, pour photographier l'état « erreur ».
+    if (pathname === '/v1/members/erreur')
+      return json(500, { error: { code: 'internal', message: '' } })
+    const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
+    if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
+    const media = pathname.match(/^\/media\/visuals\/([0-9a-f-]+)\.webp$/)
+    if (media) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: sampleImage(media[1]),
+      })
+    }
+    return json(404, { error: { code: 'not_found', message: '' } })
   }
-  if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
-    return route.fulfill({ status: 204, body: '' })
-  }
-  if (pathname === `/v1/projects/${recipesProject.id}`) return json(200, recipesShown)
-  if (pathname === `/v1/projects/${photosProject.id}`) return json(200, photosProject)
-  if (pathname === `/v1/projects/${notMineProject.id}`) return json(200, notMineProject)
-  if (pathname === `/v1/projects/${longProject.id}`) return json(200, longProject)
-  if (pathname === `/v1/members/${leaMe.id}`) return json(200, leaMember)
-  if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
-  if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
-  if (pathname === '/v1/feed/following') return json(200, followingFeed())
-  if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
-  // Une page dont le chargement échoue, pour photographier l'état « erreur ».
-  if (pathname === '/v1/members/erreur')
-    return json(500, { error: { code: 'internal', message: '' } })
-  const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
-  if (tag) return json(200, { slug: tag[1], label: null, projects: [] })
-  const media = pathname.match(/^\/media\/visuals\/([0-9a-f-]+)\.webp$/)
-  if (media) {
-    return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: sampleImage(media[1]) })
-  }
-  return json(404, { error: { code: 'not_found', message: '' } })
 }
 
 // 4. Ce qu'on photographie.
@@ -439,6 +618,28 @@ const pages = [
   // La page d'un autre membre et son projet : les boutons « Suivre ».
   { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
   { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
+  // Les commentaires d'un projet (tranche 5) : les fils, leurs réponses, un commentaire masqué,
+  // un supprimé, « Afficher la suite » ; puis les champs ouverts (un commentaire en cours, une
+  // réponse), ouverts par un clic une fois la page prête (prepare).
+  {
+    name: 'projet-commentaires',
+    path: `/projects/${commentedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'projet-commenter',
+    path: `/projects/${commentedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+      await page
+        .getByLabel('Ton commentaire')
+        .fill('Testé ce soir : il m’a proposé une soupe de fanes de radis, une vraie réussite.')
+      await page.getByRole('button', { name: 'Répondre', exact: true }).first().click()
+    },
+  },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
@@ -577,6 +778,10 @@ async function layoutReport() {
         feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
+        if (shot.prepare) {
+          await shot.prepare(page)
+          await page.waitForTimeout(300)
+        }
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
         const found = await page.evaluate(() => {
           const width = window.innerWidth
@@ -677,6 +882,11 @@ for (const device of devices) {
         feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
+        // Un geste avant la capture (ouvrir un champ), puis le temps de son fondu.
+        if (shot.prepare) {
+          await shot.prepare(page)
+          await page.waitForTimeout(300)
+        }
         // Le nom du fichier : sans numéro pour une seule image ; ensuite catalogue, catalogue-2…
         // ou, avec --read, nom-1, nom-2…
         const file = (part, parts) => {
