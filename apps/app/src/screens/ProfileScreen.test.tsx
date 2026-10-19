@@ -203,3 +203,99 @@ describe('ProfileScreen', () => {
     expect(uploadAvatar).not.toHaveBeenCalled()
   })
 })
+
+// Tranche 6a, après les relectures : le champ du pseudo et l'enregistrement.
+describe('ProfileScreen, the handle field', () => {
+  it('shows the limits of a handle and counts its characters', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    expect(screen.getByText(/3 à 20 caractères : lettres sans accent/)).toBeTruthy()
+    expect(screen.getByText('3 / 20')).toBeTruthy()
+  })
+
+  it('recalls that the former handle stays reserved after a change', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: true, data: { ...leaMe, handle: 'lea_m' } })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'lea_m')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(
+      await screen.findByText('Profil enregistré. @lea te reste réservé 30 jours.'),
+    ).toBeTruthy()
+  })
+
+  it('keeps what is typed while the profile is being saved', async () => {
+    // Une réponse lente : le test décide quand elle arrive.
+    let answer: (value: Awaited<ReturnType<typeof updateProfile>>) => void = () => {}
+    jest.mocked(updateProfile).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'lea_m')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    // Pendant l'envoi, le membre se ravise et retouche son pseudo.
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'lea_mo')
+    answer({ ok: true, data: { ...leaMe, handle: 'lea_m' } })
+
+    expect(await screen.findByText(/^Profil enregistré\./)).toBeTruthy()
+    expect(screen.getByLabelText('Pseudo')).toHaveDisplayValue('lea_mo')
+  })
+
+  it('clears the error of the handle as soon as it is retouched', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: false, error: 'handleTaken' })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'max')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('Ce pseudo est déjà pris. Choisis-en un autre.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'max_')
+
+    expect(screen.queryByText('Ce pseudo est déjà pris. Choisis-en un autre.')).toBeNull()
+  })
+
+  it('says under the field that the handle changed too often today', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: false, error: 'handleChangeLimit' })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(screen.getByLabelText('Pseudo'), 'lea_six')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(
+      await screen.findByText(
+        'Tu as changé de pseudo plusieurs fois aujourd’hui. Réessaie demain.',
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('saves once on Enter in a one-line field, even pressed again while saving', async () => {
+    let answer: (value: Awaited<ReturnType<typeof updateProfile>>) => void = () => {}
+    jest.mocked(updateProfile).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    const handle = screen.getByLabelText('Pseudo')
+    await fireEvent(handle, 'submitEditing')
+    // La réponse n'est pas encore là : Entrée, puis « Enregistrer », n'envoient rien de plus.
+    await fireEvent(handle, 'submitEditing')
+    await fireEvent(screen.getByLabelText('Nom affiché'), 'submitEditing')
+    answer({ ok: true, data: leaMe })
+
+    expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
+    expect(updateProfile).toHaveBeenCalledTimes(1)
+  })
+})

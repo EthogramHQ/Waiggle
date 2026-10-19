@@ -11,9 +11,15 @@ export type ProfileForm = { name: string; bio: string; tools: string; handle?: s
 
 export type ProfileFormErrors = {
   name?: 'nameRequired' | 'nameTooLong' | 'invalidCharacters'
-  // handleTaken ne vient pas d'ici mais de l'API (409) : l'écran le range avec les autres, sous
-  // le champ, pour que le membre le lise là où il doit corriger.
-  handle?: 'handleTooShort' | 'handleTooLong' | 'handleInvalid' | 'handleReserved' | 'handleTaken'
+  // handleTaken (409) et handleChangeLimit (429) ne viennent pas d'ici mais de l'API : l'écran les
+  // range avec les autres, sous le champ, pour que le membre les lise là où il doit corriger.
+  handle?:
+    | 'handleTooShort'
+    | 'handleTooLong'
+    | 'handleInvalid'
+    | 'handleReserved'
+    | 'handleTaken'
+    | 'handleChangeLimit'
   bio?: 'bioTooLong' | 'invalidCharacters'
   tools?: 'tooManyTools' | 'toolTooLong' | 'invalidCharacters'
 }

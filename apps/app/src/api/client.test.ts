@@ -56,6 +56,19 @@ describe('request', () => {
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'tooManyVisuals' })
   })
 
+  it('tells the daily handle limit from too many requests, which share the same status', async () => {
+    // Deux refus « 429 » : le 6e changement de pseudo du jour (réessayer demain), et le débit
+    // (réessayer dans quelques minutes) ; sans corps lisible, c'est le débit.
+    fetchMock
+      .mockResolvedValueOnce(json({ error: { code: 'handle_change_limit', message: '…' } }, 429))
+      .mockResolvedValueOnce(json({ error: { code: 'rate_limited', message: '…' } }, 429))
+      .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429 }))
+
+    expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'handleChangeLimit' })
+    expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
+    expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
+  })
+
   it('says so when the server cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('Network request failed'))
 
