@@ -18,6 +18,13 @@ describe('safeNext', () => {
     }
   })
 
+  // Tranche 6c : le récap mène à « Mes notifications » ; sans session, la connexion y ramène.
+  it('keeps the notifications page, where the e-mails lead', () => {
+    expect(safeNext('/notifications')).toBe('/notifications')
+    expect(safeNext('/notifications?from=recap')).toBe('/notifications?from=recap')
+    expect(safeNext('/notificationsx')).toBeNull()
+  })
+
   it('refuses another site, however it is written', () => {
     for (const value of [
       'https://faux.example',

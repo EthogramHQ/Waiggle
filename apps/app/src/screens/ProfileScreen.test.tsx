@@ -1,11 +1,19 @@
 // Tests de l'écran « Mon profil ». L'API (profile/api) est remplacée par de faux appels.
-import { fireEvent, screen } from '@testing-library/react-native'
+import type { EmailPreferences } from '@ruche/contracts'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { request } from '../api/client'
+import type { ApiResult } from '../api/errors'
 import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
+import { leaEmailPreferences } from '../testing/email'
 import { leaMe } from '../testing/fixtures'
+import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { ProfileScreen } from './ProfileScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// Les réglages d'e-mail (tranche 6c) passent par le client réseau (email/api.ts) : on le remplace
+// par un faux serveur, qui rend les réglages de Léa et accepte leurs changements.
+jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
 // Les images de l'API voyagent avec la session (api/media.ts) : ici, l'adresse suffit.
 jest.mock('../api/media', () => ({
   useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),
@@ -16,15 +24,44 @@ jest.mock('../profile/api', () => ({
   uploadAvatar: jest.fn(),
   pickAvatar: jest.fn(),
 }))
+const mockPush = jest.fn()
 const mockReplace = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
-  useRouter: () => ({ push: jest.fn(), replace: mockReplace, canGoBack: () => false }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, canGoBack: () => false }),
 }))
+
+const emailPath = '/v1/me/email-preferences'
+// Les réglages d'e-mail tels que le faux serveur les garde, et la réponse choisie pour le prochain
+// PATCH (sans elle, il accepte et rend l'état complet, comme l'API).
+let storedEmails: EmailPreferences
+let nextEmailPatch: (() => Promise<ApiResult<EmailPreferences>>) | null
+const fakeRequest = async (to: string, init: RequestInit = {}) => {
+  if (to !== emailPath) return { ok: false, error: 'notFound' } as const
+  if (init.method === 'PATCH') {
+    if (nextEmailPatch) return nextEmailPatch()
+    storedEmails = { ...storedEmails, ...JSON.parse(String(init.body)) }
+    return { ok: true, data: storedEmails } as const
+  }
+  return { ok: true, data: storedEmails } as const
+}
+/** Les corps des PATCH des réglages d'e-mail, dans l'ordre. */
+const emailPatches = () =>
+  jest
+    .mocked(request)
+    .mock.calls.filter(([to, init]) => to === emailPath && init.method === 'PATCH')
+    .map(([, init]) => JSON.parse(String(init.body)) as unknown)
 
 let session: ReturnType<typeof mockSession>
 
 beforeEach(() => {
+  storedEmails = { ...leaEmailPreferences }
+  nextEmailPatch = null
+  jest
+    .mocked(request)
+    .mockReset()
+    .mockImplementation(fakeRequest as typeof request)
+  mockPush.mockReset()
   session = mockSession({ user: { name: 'Léa' } })
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   jest.mocked(updateProfile).mockReset()
@@ -299,5 +336,88 @@ describe('ProfileScreen, the handle field', () => {
 
     expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
     expect(updateProfile).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Tranche 6c : la section « E-mails ». Deux réglages, chacun enregistré dès qu'on le touche, sans
+// passer par « Enregistrer ». Scénario : docs/scenarios/phase-1.md, « Précisions (tranche 6c) ».
+describe('ProfileScreen, the e-mail settings', () => {
+  const recap = () => screen.findByRole('switch', { name: 'Le récap de la semaine' })
+  const mentions = () =>
+    screen.findByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+
+  it('shows the two settings, the weekly recap on and the mention e-mails off', async () => {
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(await screen.findByRole('header', { name: 'E-mails' })).toBeTruthy()
+    expect(await recap()).toBeChecked()
+    expect(await mentions()).not.toBeChecked()
+    expect(screen.getByText('Le lundi matin, seulement s’il y a du nouveau.')).toBeTruthy()
+    // Les e-mails du compte ne dépendent pas de ces réglages : la section le dit.
+    expect(
+      screen.getByText(
+        'Les e-mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('shows the settings saved by the member', async () => {
+    storedEmails = { weeklyRecap: false, mentionEmails: true }
+    await renderWithProviders(<ProfileScreen />)
+
+    // Le temps que les réglages arrivent de l'API (s'ils s'affichent d'abord avec d'autres valeurs).
+    await waitFor(() =>
+      expect(
+        screen.getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' }),
+      ).toBeChecked(),
+    )
+    expect(await recap()).not.toBeChecked()
+  })
+
+  it('saves a setting as soon as it is touched, without « Enregistrer »', async () => {
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await recap())
+
+    expect(await recap()).not.toBeChecked()
+    await waitFor(() => expect(emailPatches()).toEqual([{ weeklyRecap: false }]))
+    expect(await screen.findByText('Réglage enregistré.')).toBeTruthy()
+    // Le formulaire du profil n'est pas envoyé pour autant.
+    expect(updateProfile).not.toHaveBeenCalled()
+  })
+
+  it('turns the mention e-mails on', async () => {
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await mentions())
+
+    expect(await mentions()).toBeChecked()
+    await waitFor(() => expect(emailPatches()).toEqual([{ mentionEmails: true }]))
+  })
+
+  it('puts the setting back, and says so, when it could not be saved', async () => {
+    nextEmailPatch = async () => ({ ok: false, error: 'network' })
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await recap())
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Le récap de la semaine' })).toBeChecked(),
+    )
+    expect(screen.queryByText('Réglage enregistré.')).toBeNull()
+  })
+
+  it('says to sign in again, with a link back to this page, when the session expired', async () => {
+    nextEmailPatch = async () => ({ ok: false, error: 'unauthorized' })
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await recap())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
+    expect(visited(mockPush)).toEqual(['/sign-in?next=/page/actuelle'])
   })
 })
