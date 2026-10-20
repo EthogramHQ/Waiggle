@@ -72,6 +72,7 @@ export const fr = {
       body: 'Nous avons envoyé un lien à {{email}}. Clique dessus pour activer ton compte.',
       bodyNoEmail: 'Nous t’avons envoyé un lien par e-mail. Clique dessus pour activer ton compte.',
       locked: 'Tant que tu n’as pas ouvert ce lien, tu ne peux pas te connecter.',
+      expires: 'Sans vérification sous {{days}} jours, l’inscription est effacée.',
       back: 'Retour à la connexion',
     },
     verified: {
@@ -168,6 +169,17 @@ export const fr = {
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
+    // Les réglages d'e-mail (tranche 6c) : chacun s'enregistre dès qu'on le touche.
+    emails: {
+      title: 'E-mails',
+      weeklyRecap: 'Le récap de la semaine',
+      weeklyRecapHint: 'Le lundi matin, seulement s’il y a du nouveau.',
+      mentionEmails: 'Un e-mail quand on me mentionne ou me répond',
+      mentionEmailsHint: 'Un quart d’heure après, si tu ne l’as pas déjà vu. Un par heure au plus.',
+      saved: 'Réglage enregistré.',
+      accountEmails:
+        'Les e-mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
+    },
     savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
       nameTooLong: 'Le nom doit faire au plus {{max}} caractères.',
@@ -408,7 +420,8 @@ export const fr = {
     },
   },
   member: {
-    open: 'Voir la page de {{name}}',
+    // {{nameOf}} : « d’Inès », « de Léa » (nameOf de @ruche/i18n, tranche 6c).
+    open: 'Voir la page {{nameOf}}',
     handle: '@{{handle}}',
     favoriteTools: 'Outils favoris',
     projects: 'Projets',
@@ -440,6 +453,27 @@ export const fr = {
     home: 'Retour à l’accueil',
     seeProject: 'Voir le projet',
     expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
+    /** Le lien posé à côté de « Ta session a expiré » (tranche 6c). */
+    signIn: 'Me reconnecter',
+  },
+  // La page ouverte depuis le lien « Ne plus recevoir… » d'un e-mail (tranche 6c), sans connexion.
+  // Ouvrir la page ne change rien : seul « Confirmer » coupe les e-mails. Aucune donnée du membre.
+  unsubscribe: {
+    title: 'Tes e-mails',
+    askRecap: 'Ne plus recevoir le récap de la semaine ?',
+    askMentions: 'Ne plus recevoir les e-mails de mentions et de réponses ?',
+    confirm: 'Confirmer',
+    keep: 'Garder mes e-mails',
+    doneRecap: 'C’est fait : tu ne recevras plus le récap de la semaine.',
+    doneMentions: 'C’est fait : tu ne recevras plus d’e-mail quand on te mentionne ou te répond.',
+    allOff: 'Tout couper',
+    allDone: 'C’est fait : tu ne recevras plus aucun e-mail de notification.',
+    accountEmails:
+      'Les e-mails liés à ton compte, comme la vérification de ton adresse, continuent.',
+    manage: 'Gérer mes e-mails',
+    invalidTitle: 'Lien invalide',
+    invalid:
+      'Ce lien ne permet pas de te désinscrire. Connecte-toi pour gérer tes e-mails dans Mon profil.',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
@@ -452,6 +486,38 @@ export const fr = {
       'Ce lien ne peut pas être ouvert : seules les adresses https vers un site public sont acceptées.',
   },
   email: {
+    // Les e-mails de notification (tranche 6c). Un membre y est nommé avec son pseudo ; aucun
+    // texte d'un autre membre dans l'objet (visible sur un écran verrouillé). Chaque e-mail dit
+    // pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
+    manage: 'Gérer mes e-mails',
+    recap: {
+      subject: 'Du nouveau sur {{appName}}',
+      intro: 'Voici ce que tu n’as pas encore vu sur {{appName}} cette semaine.',
+      first:
+        'C’est ton premier récap : chaque lundi, s’il y a du nouveau, {{appName}} te résume tes notifications. Tu peux le couper à tout moment.',
+      comment: '{{name}} (@{{handle}}) a commenté « {{title}} »',
+      reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} »',
+      mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} »',
+      more_one: 'Et {{count}} autre',
+      more_other: 'Et {{count}} autres',
+      alsoLabel: 'Et aussi :',
+      reactions_one: '{{count}} réaction à tes projets',
+      reactions_other: '{{count}} réactions à tes projets',
+      follows_one: '{{count}} nouvel abonnement',
+      follows_other: '{{count}} nouveaux abonnements',
+      button: 'Voir mes notifications',
+      last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
+      reason: 'Tu reçois ce récap parce qu’il est activé dans tes réglages {{appName}}.',
+      unsubscribe: 'Ne plus recevoir le récap de la semaine',
+    },
+    mentions: {
+      subject: 'On parle de toi sur {{appName}}',
+      mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} » :',
+      reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} » :',
+      button: 'Voir sur {{appName}}',
+      reason: 'Tu reçois cet e-mail parce que tu as activé les e-mails de mentions et de réponses.',
+      unsubscribe: 'Ne plus recevoir les e-mails de mentions et de réponses',
+    },
     footer: '{{appName}}, le réseau des projets IA entre proches.',
     greeting: 'Bonjour {{name}},',
     verify: {
@@ -487,7 +553,7 @@ export const fr = {
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
     end: 'Tu es à jour',
-    noteLabel: 'Note de {{name}} sur {{title}}',
+    noteLabel: 'Note {{nameOf}} sur {{title}}',
     noteKicker: 'Note',
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',
@@ -547,6 +613,7 @@ export const fr = {
     cannotReactOwn: 'Tu ne peux pas réagir à ton propre projet.',
     handleTaken: 'Ce pseudo est déjà pris. Choisis-en un autre.',
     handleChangeLimit: 'Tu as changé de pseudo plusieurs fois aujourd’hui. Réessaie demain.',
+    unsubscribeInvalid: 'Ce lien ne permet pas de te désinscrire.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },

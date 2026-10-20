@@ -687,6 +687,64 @@ Règles détaillées :
 - **Export des données** : la date « vu jusqu'à », et pour chacun de ses commentaires les
   identifiants des membres qu'il y mentionne.
 
+### Précisions (tranche 6c) — validées le 20/10/2026
+
+Décisions de Louis (20/10/2026) :
+- **Ne pas encombrer les boîtes e-mail des membres** : une seule sorte d'e-mail par défaut, le récap
+  de la semaine ; tout le reste est à demander.
+- **E-mail seulement** : le push attend l'appli native (une tranche à part).
+- **Désinscription sans connexion, confirmée par un bouton**, depuis chaque e-mail : ouvrir le lien
+  ne change rien (un antivirus qui ouvre les liens ne désinscrit personne).
+- **Ordonnanceur : pg-boss** (une file de tâches rangée dans PostgreSQL).
+- Ajoutés à la tranche : les purges de nuit (conformité n°4), un lien « Se connecter » à côté de
+  « session expirée », l'élision « d'Inès ».
+
+**Les réglages** (dans « Mon profil », section « E-mails »)
+- Deux choix seulement :
+  - « Le récap de la semaine » : activé par défaut ;
+  - « Un e-mail quand on me mentionne ou me répond » : désactivé par défaut.
+- Chaque choix s'enregistre aussitôt.
+
+**Le récap**
+- Étant donné Inès, qui n'a pas ouvert ses notifications depuis lundi dernier
+- Quand arrive le lundi à 9 h (heure de Paris)
+- Alors elle reçoit un seul e-mail, « Du nouveau sur Waiggle » : ses commentaires, réponses et
+  mentions non vus, puis une ligne de nombres (« et 5 réactions, 2 nouveaux abonnés »), au plus
+  5 lignes, et un lien vers ses notifications
+- Mais si elle a tout vu dans l'appli, ou s'il n'y a rien, aucun e-mail
+- Et après 3 récaps sans aucune visite, on n'en envoie plus jusqu'à son retour (le 3e le dit)
+
+**L'e-mail de mention ou de réponse** (seulement si Inès l'a activé)
+- Quand Malik la mentionne ou lui répond
+- Alors, 15 minutes plus tard, un e-mail court la prévient (avec l'extrait), regroupant tout ce qui
+  est arrivé entre-temps
+- Mais rien ne part si elle a ouvert ses notifications entre-temps, ou si le commentaire a disparu
+  pour elle ; au plus un e-mail par heure
+
+**Se désinscrire**
+- Étant donné Inès, qui touche « Ne plus recevoir le récap de la semaine » au bas d'un récap
+- Alors une page, sans connexion, demande « Ne plus recevoir le récap de la semaine ? », avec
+  « Confirmer » et « Garder mes e-mails » ; rien ne change avant « Confirmer »
+- Quand elle confirme, la page le dit, propose « Tout couper » (les e-mails de compte, eux,
+  continuent) et mène aux réglages ; elle ne montre ni son nom ni son adresse
+- Et sa messagerie propose aussi « Se désabonner » (en-tête List-Unsubscribe), avec sa propre
+  confirmation
+
+Règles détaillées :
+- Seulement un compte vérifié, dans sa langue ; les e-mails de compte ne changent pas.
+- Ce qui part se calcule au moment de l'envoi, comme l'écran des notifications (droits, masquage,
+  projet privé) ; un même événement ne part jamais deux fois par e-mail.
+- Ni pixel, ni lien réécrit ; le lien de désinscription est signé et ne donne accès à rien d'autre.
+- Purges de nuit : sessions expirées, jetons de vérification, compteurs anti-abus périmés,
+  historique de pg-boss au-delà de 7 jours, et les inscriptions jamais vérifiées au bout de
+  30 jours (la page « vérifie ton e-mail » le dit).
+- Le récap ne montre pas le texte des commentaires des autres ; seul l'e-mail de mentions, que le
+  membre active lui-même, en donne un extrait. Aucun lien écrit par un membre n'est cliquable dans
+  un e-mail. Chaque e-mail dit pourquoi on le reçoit, et le premier récap l'explique.
+- Après une restauration de sauvegarde, les envois restent coupés tant que les refus faits
+  depuis (suppressions, désinscriptions) ne sont pas réappliqués.
+- Export et suppression du compte : les deux réglages et les dates « envoyé jusqu'à ».
+
 ## Tranche 7 — Sécurité et modération
 
 **Signaler**
