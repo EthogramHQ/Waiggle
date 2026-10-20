@@ -135,6 +135,9 @@ export const fr = {
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
+      notificationsItem: 'Tes notifications et tes mentions',
+      notificationsDetail:
+        'Tes réactions, tes abonnements et tes commentaires disparaissent aussi des notifications des autres.',
       exportHint:
         'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',

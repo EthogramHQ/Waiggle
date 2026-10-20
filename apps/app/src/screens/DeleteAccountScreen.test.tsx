@@ -49,6 +49,12 @@ describe('DeleteAccountScreen', () => {
     expect(screen.getByText('Ton pseudo')).toBeTruthy()
   })
 
+  it('says that the notifications and mentions of the member go too (slice 6b)', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(screen.getByText('Tes notifications et tes mentions')).toBeTruthy()
+  })
+
   it('lets the member download their data first', async () => {
     jest.mocked(downloadMyData).mockResolvedValue({ ok: true })
     await renderWithI18n(<DeleteAccountScreen />)

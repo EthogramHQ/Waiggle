@@ -126,6 +126,9 @@ export const en: Translation = {
       reactionsItem: 'Your reactions and your comments',
       reactionsDetail:
         'A comment that received replies becomes “Deleted comment”: your text and your name are erased from it, the replies of others stay.',
+      notificationsItem: 'Your notifications and your mentions',
+      notificationsDetail:
+        'Your reactions, follows and comments also disappear from the notifications of others.',
       exportHint:
         'Your texts and settings, to keep before you leave. Your photos are not in it: save the ones you want to keep.',
       password: 'Confirm with your password',

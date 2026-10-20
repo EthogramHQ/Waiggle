@@ -206,6 +206,12 @@ export function MentionField({
           // ce n'est pas un arrêt de Tab (les flèches, dans le champ, parcourent les choix).
           accessible
           focusable={false}
+          // Sur le web, le champ perd le focus dès que le bouton de la souris s'enfonce, avant que
+          // le choix ne reçoive son « pressIn » : la liste se fermait et le clic tombait dans le
+          // vide. « pointerdown » arrive avant la perte du focus : on note qu'un choix commence.
+          onPointerDown={() => {
+            choosing.current = true
+          }}
           style={{
             backgroundColor: colors.surface,
             borderRadius: radii.group,

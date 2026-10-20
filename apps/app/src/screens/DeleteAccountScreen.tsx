@@ -96,6 +96,13 @@ export function DeleteAccountScreen() {
           label={t('account.delete.reactionsItem')}
           detail={t('account.delete.reactionsDetail')}
         />
+        {/* Tranche 6b : ses notifications et ses mentions partent aussi ; ses gestes sortent des
+            notifications des autres, qui sont calculées et non recopiées. */}
+        <ListRow
+          icon="bell"
+          label={t('account.delete.notificationsItem')}
+          detail={t('account.delete.notificationsDetail')}
+        />
       </ListGroup>
 
       {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}
