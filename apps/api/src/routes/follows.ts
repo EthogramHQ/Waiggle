@@ -1,6 +1,7 @@
 // Suivre et ne plus suivre (tranche 4a) : POST et DELETE sur /v1/members/{id}/follow et
-// /v1/projects/{id}/follow. Réservé aux membres connectés. La personne ou l'auteur suivi n'est pas
-// prévenu (les notifications viendront en tranche 6), et la liste des abonnés n'est lue nulle part.
+// /v1/projects/{id}/follow. Réservé aux membres connectés. La personne ou l'auteur suivi en est
+// prévenu par ses notifications (tranche 6b), par un nombre, jamais par un nom : la liste des
+// abonnés n'est lue nulle part.
 import { createRoute, z } from '@hono/zod-openapi'
 import { MemberId, ProjectId } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -127,9 +128,12 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     // « insert … on conflict do nothing » : si la ligne existe déjà (même clé primaire, donc déjà
     // suivi), PostgreSQL n'écrit rien et ne lève pas d'erreur. Suivre deux fois revient ainsi à
     // suivre une fois, même si deux demandes arrivent en même temps.
+    // La date vient de l'horloge de JavaScript, pas de la valeur par défaut de la base (now() en
+    // SQL) : elle date la notification « de nouveaux abonnés » (tranche 6b), et les tests la
+    // maîtrisent ainsi.
     await db
       .insert(schema.memberFollow)
-      .values({ followerId: viewer.id, memberId: id })
+      .values({ followerId: viewer.id, memberId: id, createdAt: new Date() })
       .onConflictDoNothing()
     return ok(c)
   })
@@ -172,7 +176,7 @@ export const followRoutes = ({ db, limiter }: Deps) => {
 
     await db
       .insert(schema.projectFollow)
-      .values({ followerId: viewer.id, projectId: id })
+      .values({ followerId: viewer.id, projectId: id, createdAt: new Date() })
       .onConflictDoNothing()
     return ok(c)
   })

@@ -126,6 +126,9 @@ export const en: Translation = {
       reactionsItem: 'Your reactions and your comments',
       reactionsDetail:
         'A comment that received replies becomes “Deleted comment”: your text and your name are erased from it, the replies of others stay.',
+      notificationsItem: 'Your notifications, and the links to you in the comments of others',
+      notificationsDetail:
+        'Your handle stays written there, as plain text, with no link to you. Your reactions, follows and comments also disappear from the notifications of others.',
       exportHint:
         'Your texts and settings, to keep before you leave. Your photos are not in it: save the ones you want to keep.',
       password: 'Confirm with your password',
@@ -399,6 +402,10 @@ export const en: Translation = {
     notFoundTitle: 'This member cannot be found',
     notFound: 'The account may have been deleted, or the link is wrong.',
   },
+  mentions: {
+    suggestions: 'Members to mention',
+    option: '{{name}}, @{{handle}}',
+  },
   tag: {
     subtitle: 'The public projects made with this tool, newest first.',
     emptyTitle: 'No project here yet',
@@ -473,6 +480,34 @@ export const en: Translation = {
     followers_one: '{{count}} follower',
     followers_other: '{{count}} followers',
     error: 'Your follow could not be saved. Try again.',
+  },
+  notifications: {
+    title: 'Notifications',
+    bell: 'Notifications',
+    bellNew_one: 'Notifications, {{count}} new',
+    bellNew_other: 'Notifications, {{count}} new',
+    bellNewMany: 'Notifications, more than {{max}} new',
+    new: 'New',
+    empty:
+      'Nothing yet. When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
+    emptyAction: 'Publish a project',
+    more: 'Show more',
+    end: 'That’s all',
+    moreError: 'The next notifications could not be loaded.',
+    errorTitle: 'The notifications could not be loaded',
+    reactions_one: '{{count}} reaction on “{{title}}”',
+    reactions_other: '{{count}} reactions on “{{title}}”',
+    reactionCount: '{{reaction}} ×{{count}}',
+    comment: '{{name}} commented on “{{title}}”',
+    mention: '{{name}} mentioned you in a comment on “{{title}}”',
+    reply: '{{name}} replied to your comment on “{{title}}”',
+    memberFollows_one: '{{count}} more person follows you',
+    memberFollows_other: '{{count}} more people follow you',
+    projectFollows_one: '{{count}} more person follows “{{title}}”',
+    projectFollows_other: '{{count}} more people follow “{{title}}”',
+    hidden:
+      'Your comment on “{{title}}” was hidden by the project’s author. You and the project’s author can still see it.',
+    handle: 'Your handle is @{{handle}}, taken from your name. You can change it in My profile.',
   },
   errors: {
     notFound: 'This page does not exist.',

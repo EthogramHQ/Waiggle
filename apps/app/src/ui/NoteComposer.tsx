@@ -17,6 +17,7 @@ import { Platform, View } from 'react-native'
 import { Button } from './Button'
 import { focusWithoutScroll, revealWithoutJump } from './focus'
 import { escapeCloses } from './keyboard'
+import { MentionField, type MentionSuggestion } from './MentionField'
 import { Notice } from './Notice'
 import { TextField } from './TextField'
 import { TextLink } from './TextLink'
@@ -64,6 +65,15 @@ type Props = {
    * s'ouvre loin de là où l'on regardait. Seulement après un geste du membre.
    */
   reveal?: boolean
+  /**
+   * Le champ propose des membres à mentionner après « @ » (un commentaire, tranche 6b) : les
+   * suggestions trouvées par l'écran, le nom de leur liste, et ce que le champ cherche.
+   */
+  mentions?: {
+    suggestions: readonly MentionSuggestion[]
+    label: string
+    onQueryChange: (query: string | null) => void
+  }
 }
 
 // Le peu du navigateur dont on a besoin ici : l'élément qui a le focus, et le corps de la page.
@@ -87,6 +97,7 @@ export function NoteComposer({
   success,
   autoFocus = true,
   reveal = false,
+  mentions,
 }: Props) {
   const { sizeClass } = useLayout()
   const calm = useCalmMotion()
@@ -134,25 +145,37 @@ export function NoteComposer({
       </View>
     )
   }
+  // Les réglages du champ, les mêmes avec ou sans les suggestions de membres.
+  const fieldProps = {
+    // Échap referme le champ, comme « Annuler » (web), sauf pendant l'envoi. (Avec une liste de
+    // membres ouverte, Échap la referme d'abord : voir MentionField.)
+    ...escapeCloses(onCancel, pending),
+    label: labels.field,
+    value,
+    onChangeText,
+    hint: labels.hint,
+    error: fieldError,
+    multiline: true,
+    maxLength: max,
+    showCount: true,
+    autoCapitalize: 'sentences' as const,
+    // Le champ vient d'apparaître, à la demande du membre : on peut y écrire tout de suite.
+    autoFocus,
+    // Pendant l'envoi, le texte ne bouge plus : ce qui part est ce qu'on voit.
+    editable: !pending,
+  }
   return (
     <View ref={field} style={{ gap: space.md }}>
-      <TextField
-        // Échap referme le champ, comme « Annuler » (web), sauf pendant l'envoi.
-        {...escapeCloses(onCancel, pending)}
-        label={labels.field}
-        value={value}
-        onChangeText={onChangeText}
-        hint={labels.hint}
-        error={fieldError}
-        multiline
-        maxLength={max}
-        showCount
-        autoCapitalize="sentences"
-        // Le champ vient d'apparaître, à la demande du membre : on peut y écrire tout de suite.
-        autoFocus={autoFocus}
-        // Pendant l'envoi, le texte ne bouge plus : ce qui part est ce qu'on voit.
-        editable={!pending}
-      />
+      {mentions ? (
+        <MentionField
+          {...fieldProps}
+          suggestions={mentions.suggestions}
+          suggestionsLabel={mentions.label}
+          onQueryChange={mentions.onQueryChange}
+        />
+      ) : (
+        <TextField {...fieldProps} />
+      )}
       {error ? <Notice message={error} /> : null}
       {/* « Annuler » en simple lien, comme dans l'en-tête des formulaires : on voit d'emblée lequel
           des deux publie. Ils passent l'un sous l'autre quand la place manque. */}

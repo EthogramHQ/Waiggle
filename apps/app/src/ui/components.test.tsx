@@ -11,17 +11,20 @@ import { Choices } from './Choices'
 import { CommentCard, type CommentCardHandle } from './CommentCard'
 import { CommentList } from './CommentList'
 import { CommentThread } from './CommentThread'
+import { CountBadge } from './CountBadge'
 import { FeedEnd } from './FeedEnd'
 import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
+import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
 import { Notice } from './Notice'
+import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
@@ -30,6 +33,7 @@ import { ReactionBar, type ReactionBarItem } from './ReactionBar'
 import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
+import { Stack } from './Stack'
 import { StateMessage } from './StateMessage'
 import { Step } from './StepNumber'
 import { Switch } from './Switch'
@@ -1575,5 +1579,266 @@ describe('MemberHeader with a handle', () => {
     // Le titre reste le seul nom : un lecteur d'écran annonce « Léa, titre », puis « @lea ».
     expect(screen.getByRole('header', { name: 'Léa' })).toBeTruthy()
     expect(screen.getByText('@lea')).toBeTruthy()
+  })
+})
+
+describe('MentionField, beyond the end of the text', () => {
+  const suggestions = [{ id: 'u5', name: 'Inès Morel', handle: 'ines_morel', avatar: null }]
+
+  /** Le champ et son texte, comme dans un écran. */
+  function Field({ initial }: { initial: string }) {
+    const [value, setValue] = useState(initial)
+    return (
+      <MentionField
+        label="Ton commentaire"
+        value={value}
+        onChangeText={setValue}
+        suggestions={suggestions}
+        suggestionsLabel="Membres à mentionner"
+        onQueryChange={() => {}}
+        multiline
+      />
+    )
+  }
+
+  it('completes the mention typed in the middle of the text, where the cursor is', async () => {
+    await renderWithProviders(<Field initial="Bravo @in, à demain." />)
+    const field = screen.getByLabelText('Ton commentaire')
+
+    // Le curseur juste après « @in » (le champ le dit par onSelectionChange).
+    await fireEvent(field, 'selectionChange', { nativeEvent: { selection: { start: 9, end: 9 } } })
+    await fireEvent.press(screen.getByRole('option', { name: /Inès Morel/ }))
+
+    // Seul « @in » est remplacé ; la suite (qui commence par une virgule) reste.
+    expect(field).toHaveDisplayValue('Bravo @ines_morel , à demain.')
+  })
+
+  it('closes the list when the field loses the focus', async () => {
+    await renderWithProviders(<Field initial="Bravo @in" />)
+    expect(screen.getByLabelText('Membres à mentionner')).toBeTruthy()
+
+    await fireEvent(screen.getByLabelText('Ton commentaire'), 'blur')
+
+    expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
+  })
+
+  it('lets a second Escape close the comment, once the list is closed (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const onCancel = jest.fn()
+      await renderWithProviders(
+        <NoteComposer
+          open
+          onOpen={() => {}}
+          onCancel={onCancel}
+          value="Bravo @in"
+          onChangeText={() => {}}
+          onSubmit={() => {}}
+          max={1000}
+          labels={{
+            open: 'Écrire un commentaire',
+            field: 'Ton commentaire',
+            hint: 'Tous les membres le liront.',
+            submit: 'Publier le commentaire',
+            cancel: 'Annuler',
+          }}
+          mentions={{ suggestions, label: 'Membres à mentionner', onQueryChange: () => {} }}
+          autoFocus={false}
+        />,
+      )
+      const pressEscape = () =>
+        fireEvent(screen.getByLabelText('Ton commentaire'), 'keyPress', {
+          nativeEvent: { key: 'Escape', preventDefault: jest.fn() },
+        })
+
+      await pressEscape()
+      expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
+      expect(onCancel).not.toHaveBeenCalled()
+
+      await pressEscape()
+      expect(onCancel).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+// --- Tranche 6b : la pastille des nouveautés et la carte d'une notification ---
+
+describe('CountBadge', () => {
+  it('writes the number, up to the maximum, then « max+ »', async () => {
+    await renderWithProviders(
+      <>
+        <CountBadge count={3} />
+        <CountBadge count={10} />
+      </>,
+    )
+
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.queryByText('10', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('shows nothing at zero', async () => {
+    await renderWithProviders(<CountBadge count={0} />)
+
+    expect(screen.queryByText('0', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('is hidden from screen readers: the button that carries it says the number', async () => {
+    await renderWithProviders(
+      <IconButton
+        icon="bell"
+        label="Notifications, 3 nouvelles"
+        onPress={() => {}}
+        badge={<CountBadge count={3} />}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Notifications, 3 nouvelles' })).toBeTruthy()
+    // Témoin : la pastille est bien dessinée, mais cachée.
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.queryByText('3')).toBeNull()
+  })
+})
+
+/** Le premier élément qui porte un rôle, en remontant depuis celui-ci (lui compris). */
+type Node = ReturnType<typeof screen.getByText>
+const roleAround = (start: Node | null): Node | null => {
+  let node = start
+  while (node && !node.props.role && !node.props.accessibilityRole) node = node.parent
+  return node
+}
+
+describe('Stack announced as a list', () => {
+  it('makes each child an item of the list', async () => {
+    await renderWithProviders(
+      <Stack accessibilityRole="list">
+        <Text>Un</Text>
+        <Text>Deux</Text>
+      </Stack>,
+    )
+
+    // Chaque texte est dans son élément de liste, et les deux dans la même liste.
+    const [one, two] = ['Un', 'Deux'].map((text) => roleAround(screen.getByText(text)))
+    expect(one?.props.role).toBe('listitem')
+    expect(two?.props.role).toBe('listitem')
+    expect(one).not.toBe(two)
+    expect(roleAround(one?.parent ?? null)?.props.accessibilityRole).toBe('list')
+  })
+
+  it('adds no list item to a plain stack', async () => {
+    await renderWithProviders(
+      <Stack>
+        <Text>Un</Text>
+      </Stack>,
+    )
+
+    expect(roleAround(screen.getByText('Un'))).toBeNull()
+  })
+})
+
+describe('NotificationCard', () => {
+  it('is a link named by everything it says, « new » first', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <NotificationCard
+        icon="heart"
+        text="2 réactions sur « Météo »"
+        detail="Bravo ×2"
+        when="20 oct."
+        isNew
+        newLabel="Nouveau"
+        onPress={onPress}
+      />,
+    )
+
+    await fireEvent.press(
+      screen.getByRole('link', { name: 'Nouveau. 2 réactions sur « Météo ». Bravo ×2. 20 oct.' }),
+    )
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('says « new » only when it is new', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="at"
+        text="Malik parle de toi"
+        quote="Demande à @ines"
+        when="20 oct."
+        isNew={false}
+        newLabel="Nouveau"
+        onPress={() => {}}
+      />,
+    )
+
+    expect(
+      screen.getByRole('link', { name: 'Malik parle de toi. Demande à @ines. 20 oct.' }),
+    ).toBeTruthy()
+    expect(screen.queryByText('Nouveau', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('adds no full stop after a part that already ends with a sign', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="chat-circle"
+        text="Malik a commenté « Météo »"
+        quote="Super idée, je teste ce soir…"
+        when="20 oct."
+        isNew={false}
+        newLabel="Nouveau"
+        onPress={() => {}}
+      />,
+    )
+
+    // « ce soir… » et non « ce soir…. » : un lecteur d'écran ne lit pas deux ponctuations.
+    expect(
+      screen.getByRole('link', {
+        name: 'Malik a commenté « Météo ». Super idée, je teste ce soir… 20 oct.',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('is neither a link nor a button without a destination', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="user-plus"
+        text="3 personnes de plus te suivent"
+        when="19 oct."
+        isNew
+        newLabel="Nouveau"
+      />,
+    )
+
+    expect(screen.getByText('3 personnes de plus te suivent')).toBeTruthy()
+    expect(screen.getByText('Nouveau')).toBeTruthy()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('opens with Enter on the web, like the other cards', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const onPress = jest.fn()
+      await renderWithProviders(
+        <NotificationCard
+          icon="heart"
+          text="2 réactions"
+          when="20 oct."
+          isNew={false}
+          newLabel="Nouveau"
+          onPress={onPress}
+        />,
+      )
+
+      await fireEvent(screen.getByRole('link'), 'keyDown', {
+        key: 'Enter',
+        repeat: false,
+        preventDefault: () => {},
+      })
+      expect(onPress).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
   })
 })

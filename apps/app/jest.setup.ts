@@ -12,6 +12,14 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'))
 require('react-native-reanimated').setUpTests()
 
+// Aucun test ne parle au vrai réseau, ni à la vraie session. Le client Better Auth (une bibliothèque
+// en modules ESM, que Jest ne charge pas) est remplacé par un client inerte, et fetch échoue : un
+// écran qui demande quelque chose que son test n'a pas prévu (la cloche de la barre du haut, sur
+// ordinateur) reçoit une erreur réseau, comme hors ligne, au lieu d'appeler un serveur. Les tests
+// qui en ont besoin posent leurs propres faux (api/client.test.ts, accounts/api.test.ts).
+jest.mock('./src/accounts/auth-client', () => ({ authClient: { getCookie: () => null } }))
+globalThis.fetch = jest.fn(() => Promise.reject(new Error('No network in tests')))
+
 // La fenêtre des tests est celle d'un téléphone (390 × 844 points), comme les captures « téléphone ».
 // Par défaut, React Native prend 750 points de large, ce qui est déjà une tablette pour l'appli
 // (barre de navigation, colonnes) : les tests d'écran décrivent le téléphone, sauf mention contraire.

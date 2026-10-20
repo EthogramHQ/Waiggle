@@ -32,6 +32,7 @@ import {
 } from '../comments/load'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
@@ -302,15 +303,19 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         // Introuvable : un commentaire inconnu, d'un autre projet, supprimé, une réponse (l'appli
         // répond dans le même fil, à sa racine), ou un commentaire que ce membre ne voit pas
         // (masqué, ou laissé par un autre sur un projet devenu privé).
-        if (!root || root.rootId !== null || !sees(root, viewer)) return false
+        if (!root || root.rootId !== null || !sees(root, viewer)) return null
       }
       await tx.insert(c).values(row)
-      return true
+      // Les membres que mentionne le texte (« @ines_morel »), rangés dans la même transaction :
+      // un commentaire n'existe jamais sans ses mentions, ni l'inverse. Datées comme lui.
+      const mentions = await resolveMentions(tx, body, user.id)
+      if (mentions.length > 0) await saveMentions(tx, row.id, mentions, row.createdAt)
+      return mentions
     })
     if (!written) return notFound(ctx)
 
     const authors = await authorsOf(db, [user.id], publicApiUrl)
-    const shown = presentComment(row, viewer, authors, false)
+    const shown = presentComment(row, viewer, authors, false, written)
     if (!shown) return notFound(ctx)
     return ctx.json(Comment.parse({ ...shown, replies: [] }), 201)
   })
@@ -323,22 +328,41 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Le garde a vérifié que c'est son commentaire ; la condition est redite ici (auteur, projet,
     // non supprimé), au cas où il aurait été supprimé entre-temps. « returning » renvoie la ligne
     // modifiée : aucune, et il n'y a plus rien à modifier. Un commentaire masqué reste masqué.
-    const [row] = await db
-      .update(c)
-      .set({ body, editedAt: new Date() })
-      .where(
-        and(eq(c.id, commentId), eq(c.projectId, id), eq(c.authorId, user.id), isNull(c.deletedAt)),
-      )
-      .returning({
-        id: c.id,
-        authorId: c.authorId,
-        body: c.body,
-        createdAt: c.createdAt,
-        editedAt: c.editedAt,
-        hiddenAt: c.hiddenAt,
-        deletedAt: c.deletedAt,
-      })
-    if (!row) return notFound(ctx)
+    // Le texte et ses mentions changent dans la même transaction : les mentions ajoutées sont
+    // datées de la modification, celles qui ont disparu sont effacées, les autres gardent leur date
+    // (saveMentions, mentions/write.ts).
+    const editedAt = new Date()
+    const edited = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(c)
+        .set({ body, editedAt })
+        .where(
+          and(
+            eq(c.id, commentId),
+            eq(c.projectId, id),
+            eq(c.authorId, user.id),
+            isNull(c.deletedAt),
+          ),
+        )
+        .returning({
+          id: c.id,
+          authorId: c.authorId,
+          body: c.body,
+          createdAt: c.createdAt,
+          editedAt: c.editedAt,
+          hiddenAt: c.hiddenAt,
+          deletedAt: c.deletedAt,
+        })
+      if (!row) return null
+      // Les mentions déjà gardées d'abord : un pseudo encore écrit garde le membre qu'il désignait
+      // à l'écriture, même si ce pseudo a changé de main depuis (mentions/write.ts).
+      const kept = await mentionsOf(tx, row.id)
+      const mentions = await resolveMentions(tx, body, user.id, kept)
+      await saveMentions(tx, row.id, mentions, editedAt)
+      return { row, mentions }
+    })
+    if (!edited) return notFound(ctx)
+    const { row, mentions } = edited
     const authors = await authorsOf(db, [user.id], publicApiUrl)
     // Son auteur voit toujours son commentaire, masqué ou non, sur un projet public ou privé :
     // savoir s'il est aussi l'auteur du projet, ou si le projet est privé, ne change rien ici.
@@ -347,6 +371,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       { id: user.id, isProjectAuthor: false, projectIsPrivate: false },
       authors,
       false,
+      mentions,
     )
     if (!shown) return notFound(ctx)
     return ctx.json(CommentReply.parse(shown), 200)
@@ -384,6 +409,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           .where(and(eq(c.id, commentId), hasReplies(commentId)))
           .returning({ id: c.id })
         if (!kept) await tx.delete(c).where(eq(c.id, commentId))
+        // Gardée comme emplacement, elle perd aussi ses mentions : elles partent avec le texte.
+        else
+          await tx
+            .delete(schema.commentMention)
+            .where(eq(schema.commentMention.commentId, commentId))
         return
       }
       // Une réponse est effacée. Si c'était la dernière d'un « Commentaire supprimé », celui-ci ne

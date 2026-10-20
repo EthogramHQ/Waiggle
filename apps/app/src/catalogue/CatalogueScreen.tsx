@@ -27,6 +27,7 @@ import { CommentCard } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
 import { Constellation } from '../ui/Constellation'
+import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
 import { FeedEnd } from '../ui/FeedEnd'
@@ -42,11 +43,14 @@ import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
+import { MentionField, type MentionSuggestion } from '../ui/MentionField'
+import { MentionText } from '../ui/MentionText'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { NoteCard } from '../ui/NoteCard'
 import { NoteComposer } from '../ui/NoteComposer'
 import { NoteList } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
+import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -579,6 +583,81 @@ export function CatalogueScreen() {
         <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
       </Section>
 
+      <Section title={l.notificationsSection}>
+        {/* La cloche : sans nouveauté (pas de pastille), avec 3, puis au-delà de 9 (« 9+ »). Une
+            pastille seule, hors de la cloche, pour voir ses formes. */}
+        <Stack direction="row" gap="lg" wrap>
+          <IconButton
+            icon="bell"
+            label={l.bell}
+            onPress={() => {}}
+            badge={<CountBadge count={0} />}
+          />
+          <IconButton
+            icon="bell"
+            label={l.bellThree}
+            onPress={() => {}}
+            badge={<CountBadge count={3} />}
+          />
+          <IconButton
+            icon="bell"
+            label={l.bellMany}
+            onPress={() => {}}
+            badge={<CountBadge count={10} />}
+          />
+          <CountBadge count={1} />
+          <CountBadge count={42} max={99} />
+        </Stack>
+        {/* Les cartes : nouvelle avec un détail, nouvelle avec l'extrait en citation (qui finit par
+            « … » : le nom lu n'y ajoute pas de point), déjà vue avec une citation, sans destination
+            (les abonnés au compte), et un titre très long. Une liste annoncée, comme à l'écran. */}
+        <Stack gap="sm" accessibilityRole="list">
+          <NotificationCard
+            icon="heart"
+            text={l.notifReactions}
+            detail={l.notifReactionsDetail}
+            when={l.notifToday}
+            isNew
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="chat-circle"
+            text={l.notifComment}
+            quote={l.notifCommentQuote}
+            when={l.notifToday}
+            isNew
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="at"
+            text={l.notifMention}
+            quote={l.notifMentionQuote}
+            when={l.notifToday}
+            isNew={false}
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="user-plus"
+            text={l.notifFollows}
+            when={l.notifYesterday}
+            isNew={false}
+            newLabel={l.notifNew}
+          />
+          <NotificationCard
+            icon="heart"
+            text={l.notifLongTitle}
+            detail={l.notifReactionsDetail}
+            when={l.notifYesterday}
+            isNew={false}
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+        </Stack>
+      </Section>
+
       <Section title={l.commentsSection}>
         {/* Les réactions sur le projet d'un autre : aucune posée, deux posées, puis un refus de
             l'API. Pour l'auteur : les nombres seuls, sans bouton. */}
@@ -806,6 +885,39 @@ export function CatalogueScreen() {
             empty={l.commentsEmpty}
           />
         </Surface>
+        {/* Les mentions (tranche 6b). Le champ : sans « @ », « @in » avec deux membres proposés,
+            « @zz » sans personne (pas de liste), et une longue liste (5 membres, noms longs). On
+            peut y taper : flèches, Entrée, Échap. */}
+        <MentionFieldSample l={l} initial={l.mentionPlain} suggestions={[]} />
+        <MentionFieldSample l={l} initial={l.mentionTyping} suggestions={TWO_MEMBERS} />
+        <MentionFieldSample l={l} initial={l.mentionNobody} suggestions={[]} />
+        <MentionFieldSample l={l} initial={l.mentionTyping} suggestions={FIVE_MEMBERS} />
+        {/* Le texte publié : deux mentions rendues par l'API (des liens), un pseudo inconnu (du
+            texte) ; puis majuscules, pseudo long et adresse e-mail (qui reste du texte). */}
+        <Surface variant="grouped" padding="xl" gap="lg">
+          <MentionText
+            text={l.mentionBody}
+            mentions={[{ handle: 'ines_haddad', memberId: 'u5' }]}
+            onMemberPress={() => {}}
+          />
+          <MentionText
+            text={l.mentionLongBody}
+            mentions={[
+              { handle: 'ines_haddad', memberId: 'u5' },
+              { handle: 'max_durand_cuisine_b', memberId: 'u2' },
+            ]}
+            onMemberPress={() => {}}
+          />
+          <CommentCard
+            author={{ name: 'Max Durand', avatar: null }}
+            authorLabel={l.maxPage}
+            onAuthorPress={() => {}}
+            when={l.commentWhen}
+            body={l.mentionBody}
+            mentions={[{ handle: 'ines_haddad', memberId: 'u5' }]}
+            onMemberPress={() => {}}
+          />
+        </Surface>
       </Section>
 
       <Section title={l.illustrations}>
@@ -1012,6 +1124,52 @@ function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }
       onPickPortrait={() => setPortrait(samples.cafe)}
       onRemovePortrait={() => setPortrait(null)}
     />
+  )
+}
+
+/** Deux membres proposés après « @in ». */
+const TWO_MEMBERS: MentionSuggestion[] = [
+  { id: 'u5', name: 'Inès Haddad', handle: 'ines_haddad', avatar: null },
+  { id: 'u6', name: 'Iniko Diallo', handle: 'iniko', avatar: null },
+]
+
+/** La liste la plus longue (5 membres), avec des noms et des pseudos longs. */
+const FIVE_MEMBERS: MentionSuggestion[] = [
+  ...TWO_MEMBERS,
+  {
+    id: 'u7',
+    name: 'Ingrid-Marie de la Fontaine-Beauregard',
+    handle: 'ingrid_marie_fontain',
+    avatar: null,
+  },
+  { id: 'u8', name: 'Inaya Benali', handle: 'inaya_b', avatar: null },
+  { id: 'u9', name: 'Indira Lopes', handle: 'indira_lopes_2', avatar: null },
+]
+
+/** Le champ d'un commentaire avec ses suggestions ; on peut y taper (le texte est gardé ici). */
+function MentionFieldSample({
+  l,
+  initial,
+  suggestions,
+}: {
+  l: Labels
+  initial: string
+  suggestions: MentionSuggestion[]
+}) {
+  const [value, setValue] = useState(initial)
+  return (
+    <Surface variant="grouped" padding="xl" gap="lg">
+      <MentionField
+        label={l.mentionField}
+        value={value}
+        onChangeText={setValue}
+        hint={l.mentionHint}
+        suggestions={suggestions}
+        suggestionsLabel={l.mentionList}
+        onQueryChange={() => {}}
+        multiline
+      />
+    </Surface>
   )
 }
 

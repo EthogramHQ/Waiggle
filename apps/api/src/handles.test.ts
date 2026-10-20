@@ -7,7 +7,14 @@
 // l'horloge de JavaScript (Date) par une fausse, qu'on avance à la main. Les 30 jours de réservation
 // et le quota de 5 changements par jour se vérifient ainsi sans attendre.
 import { appName } from '@ruche/brand'
-import { AccountExport, ErrorResponse, Handle, Me, Member } from '@ruche/contracts'
+import {
+  AccountExport,
+  ErrorResponse,
+  Handle,
+  Me,
+  Member,
+  NotificationPage,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -549,5 +556,118 @@ describe('exporting my data', () => {
     // Témoin : l'export d'Inès, lui, les donne tous les deux.
     const own = await exportOf(ines)
     expect([own.user.handle, own.formerHandle?.handle]).toEqual(['ines_secret', 'ines_morel'])
+  })
+})
+
+describe('the notification of the handle', () => {
+  // La première notification d'un membre dit le pseudo qu'il a reçu (tranche 6b). Elle est datée
+  // par sa ligne notification_state, qui naît avec le pseudo (packages/db/src/schema/notifications.ts).
+  // Ses notifications elles-mêmes sont testées dans notifications.test.ts.
+  const t = schema.notificationState
+  /** La ligne d'un membre (aucune ou une) : sa date de naissance et jusqu'où il a vu. */
+  const stateOf = async (userId: string) =>
+    (
+      await ctx.db
+        .select({ createdAt: t.createdAt, seenAt: t.seenAt })
+        .from(t)
+        .where(sql`${t.userId} = ${userId}`)
+    ).map((row) => ({ createdAt: row.createdAt.toISOString(), seenAt: row.seenAt }))
+  const now = () => new Date(Date.now()).toISOString()
+
+  it('is born with the handle, when the member verifies her address', async () => {
+    // Inès a vérifié son adresse au début du test, et l'horloge n'a pas bougé depuis.
+    expect(await stateOf(inesId)).toEqual([{ createdAt: now(), seenAt: null }])
+  })
+
+  it('is not born before the address is verified', async () => {
+    await ctx.signUp({ ...inesAccount, email: 'first@example.com' })
+    const [pending] = await rows<{ id: string }>(
+      sql`select id from "user" where email = 'first@example.com'`,
+    )
+    expect(await stateOf(pending?.id ?? '')).toEqual([])
+
+    later(MINUTE)
+    const first = await openVerificationLink('first@example.com')
+
+    expect(await stateOf((await me(first)).id)).toEqual([{ createdAt: now(), seenAt: null }])
+  })
+
+  it('is born with a handle given on the way, on « My profile »', async () => {
+    await ctx.db.execute(sql`delete from member_handle where user_id = ${inesId}`)
+    await ctx.db.execute(sql`delete from notification_state where user_id = ${inesId}`)
+    later(MINUTE)
+
+    expect((await me(ines)).handle).toBe('ines_morel')
+
+    expect(await stateOf(inesId)).toEqual([{ createdAt: now(), seenAt: null }])
+  })
+
+  it('is given at startup to the members who already had a handle, and to the others with theirs', async () => {
+    // Les membres d'avant la tranche 6b ont un pseudo, mais pas encore de ligne : comme Max ici.
+    await ctx.db.execute(sql`delete from notification_state where user_id = ${maxId}`)
+    // Un compte d'avant la tranche 6a, sans pseudo ni ligne, et un compte jamais vérifié.
+    await ctx.db.insert(schema.user).values([
+      { id: 'old-1', name: 'Zoé Martin', email: 'zoe@example.com', emailVerified: true },
+      { id: 'never', name: 'Jamais Vérifié', email: 'never@example.com', emailVerified: false },
+    ])
+    const inesBefore = await stateOf(inesId)
+    expect(inesBefore).toHaveLength(1)
+    later(DAY)
+
+    await backfillHandles(ctx.db)
+
+    expect(await stateOf(maxId)).toEqual([{ createdAt: now(), seenAt: null }])
+    expect(await stateOf('old-1')).toEqual([{ createdAt: now(), seenAt: null }])
+    expect(await stateOf('never')).toEqual([])
+    // Inès avait déjà la sienne : elle ne change pas.
+    expect(await stateOf(inesId)).toEqual(inesBefore)
+  })
+
+  /** Le moment où ce membre a choisi lui-même son pseudo, selon sa ligne (null : jamais). */
+  const chosenOf = async (userId: string) => {
+    const [row] = await ctx.db
+      .select({ chosenAt: t.handleChosenAt })
+      .from(t)
+      .where(sql`${t.userId} = ${userId}`)
+    return row?.chosenAt?.toISOString() ?? null
+  }
+
+  it('is marked « chosen » when the member picks a handle herself', async () => {
+    expect(await chosenOf(inesId)).toBeNull() // témoin : le pseudo reçu
+    later(MINUTE)
+
+    await changeHandle(ines, 'ines')
+
+    expect(await chosenOf(inesId)).toBe(now())
+    // Sa date de naissance, elle, ne change pas.
+    expect(await stateOf(inesId)).toHaveLength(1)
+  })
+
+  it('is given at startup marked « chosen » to a member who had already changed her handle', async () => {
+    // Max a changé de pseudo pendant la tranche 6a, avant d'avoir sa ligne ; Inès a gardé le sien.
+    await changeHandle(max, 'maxime')
+    await ctx.db.execute(sql`delete from notification_state where user_id in (${maxId}, ${inesId})`)
+    later(DAY)
+
+    await backfillHandles(ctx.db)
+
+    expect(await chosenOf(maxId)).toBe(now())
+    expect(await chosenOf(inesId)).toBeNull()
+    // Pour Max, aucune notification « Ton pseudo est @… » : elle ne serait pas vraie.
+    const res = await send('GET', '/v1/notifications', max)
+    expect(res.status).toBe(200)
+    expect(NotificationPage.parse(await res.json()).items).toEqual([])
+  })
+
+  it('changes nothing at the next startup', async () => {
+    await ctx.db.execute(sql`delete from notification_state where user_id = ${maxId}`)
+    await backfillHandles(ctx.db)
+    const first = await stateOf(maxId)
+    expect(first).toHaveLength(1)
+    later(DAY)
+
+    await backfillHandles(ctx.db)
+
+    expect(await stateOf(maxId)).toEqual(first)
   })
 })

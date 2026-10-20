@@ -3,6 +3,7 @@
 // lignes. Dessous, les actions permises au membre qui regarde, données par l'écran (« Modifier »,
 // « Supprimer », « Masquer ») : de simples boutons texte (CommentActionButton), sans menu à ouvrir.
 // « Répondre » n'est pas ici : il vient une seule fois, au bout du fil (CommentThread).
+// Les « @pseudo » rendus par l'API (tranche 6b) sont des liens vers la page du membre (MentionText).
 //
 // Trois autres allures :
 // - masqué par l'auteur du projet : un bandeau le dit, au-dessus du texte, que seuls lui et l'auteur
@@ -16,6 +17,7 @@
 // lequel. Quand une action disparaît (le champ de modification se referme), l'écran peut ramener
 // le focus du clavier sur elle (handle).
 import { layout, radii, space } from '@ruche/brand'
+import type { Mention } from '@ruche/contracts'
 import { type ReactNode, type Ref, useId, useImperativeHandle, useRef } from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
@@ -28,6 +30,7 @@ import {
 import { focusWithoutScroll } from './focus'
 import { Icon } from './Icon'
 import type { ImageSource } from './image'
+import { MentionText } from './MentionText'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
 import { Text } from './Text'
@@ -49,6 +52,10 @@ type Props = {
   when: string
   /** Le texte, tel qu'écrit (vide pour un emplacement). */
   body: string
+  /** Les membres mentionnés dans le texte, rendus par l'API (tranche 6b) : des liens. */
+  mentions?: readonly Mention[]
+  /** Une mention touchée : l'identifiant du membre, pour ouvrir sa page. */
+  onMemberPress?: (memberId: string) => void
   /** « modifié », s'il l'a été. */
   edited?: string | undefined
   /** Le bandeau d'un commentaire masqué (« Masqué par toi »), s'il l'est. */
@@ -70,6 +77,10 @@ type Props = {
   handle?: Ref<CommentCardHandle>
 }
 
+// Sans mention, ni rien à ouvrir : des valeurs fixes, les mêmes à chaque dessin.
+const NO_MENTIONS: readonly Mention[] = []
+const ignore = () => {}
+
 /**
  * La photo de l'auteur : un peu plus petite pour une réponse, posée en retrait sous son fil.
  * Exportée : le trait des réponses (CommentThread) part sous le milieu de la photo de la racine.
@@ -82,6 +93,8 @@ export function CommentCard({
   onAuthorPress,
   when,
   body,
+  mentions = NO_MENTIONS,
+  onMemberPress = ignore,
   edited,
   hidden,
   placeholder,
@@ -214,12 +227,8 @@ export function CommentCard({
         ) : null}
         {editor ?? (
           <>
-            {/* Texte brut, affiché tel quel ; selectable : on peut le copier. Un mot très long
-                (une adresse) se coupe au lieu de sortir de l'écran ; readable : sur un grand
-                écran, la ligne garde une longueur confortable. */}
-            <Text selectable breakAnywhere readable>
-              {body}
-            </Text>
+            {/* Texte brut, affiché tel quel, ses mentions en liens (MentionText). */}
+            <MentionText text={body} mentions={mentions} onMemberPress={onMemberPress} />
             {actions.length > 0 ? (
               // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
               // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt.

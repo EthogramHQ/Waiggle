@@ -20,6 +20,7 @@ import { feedItemId } from '../feed/items'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
+import { NotificationBell } from '../notifications/NotificationBell'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
@@ -146,6 +147,8 @@ function MemberHome({ id, name }: { id: string; name: string }) {
         {compact ? (
           <>
             <IconButton icon="squares-four" label={t('home.myProjects')} onPress={myProjects} />
+            {/* Sur téléphone, pas de barre du haut : la cloche se range avec les raccourcis. */}
+            <NotificationBell />
             <IconButton
               icon="user"
               label={t('home.account')}

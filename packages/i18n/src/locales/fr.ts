@@ -135,6 +135,10 @@ export const fr = {
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
+      notificationsItem:
+        'Tes notifications, et les liens vers toi dans les commentaires des autres',
+      notificationsDetail:
+        'Ton pseudo y reste écrit, en texte simple, sans lien vers toi. Tes réactions, tes abonnements et tes commentaires disparaissent aussi des notifications des autres.',
       exportHint:
         'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',
@@ -412,6 +416,13 @@ export const fr = {
     notFoundTitle: 'Ce membre est introuvable',
     notFound: 'Son compte a peut-être été supprimé, ou le lien est incorrect.',
   },
+  // Les mentions « @pseudo » dans les commentaires (tranche 6b).
+  mentions: {
+    /** Le nom de la liste des membres proposés après « @ », lu par les lecteurs d'écran. */
+    suggestions: 'Membres à mentionner',
+    /** Un membre proposé : son nom, puis son pseudo. */
+    option: '{{name}}, @{{handle}}',
+  },
   tag: {
     subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
     emptyTitle: 'Encore aucun projet ici',
@@ -489,6 +500,35 @@ export const fr = {
     followers_one: '{{count}} abonné',
     followers_other: '{{count}} abonnés',
     error: 'L’abonnement n’a pas pu être enregistré. Réessaie.',
+  },
+  // Tranche 6b : les notifications dans l'appli. Jamais le nom de qui a réagi ou suit.
+  notifications: {
+    title: 'Notifications',
+    bell: 'Notifications',
+    bellNew_one: 'Notifications, {{count}} nouvelle',
+    bellNew_other: 'Notifications, {{count}} nouvelles',
+    bellNewMany: 'Notifications, plus de {{max}} nouvelles',
+    new: 'Nouveau',
+    empty:
+      'Rien pour l’instant. Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
+    emptyAction: 'Publier un projet',
+    more: 'Afficher la suite',
+    end: 'C’est tout',
+    moreError: 'La suite des notifications n’a pas pu se charger.',
+    errorTitle: 'Les notifications n’ont pas pu se charger',
+    reactions_one: '{{count}} réaction sur « {{title}} »',
+    reactions_other: '{{count}} réactions sur « {{title}} »',
+    reactionCount: '{{reaction}} ×{{count}}',
+    comment: '{{name}} a commenté « {{title}} »',
+    mention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
+    reply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
+    memberFollows_one: '{{count}} personne de plus te suit',
+    memberFollows_other: '{{count}} personnes de plus te suivent',
+    projectFollows_one: '{{count}} personne de plus suit « {{title}} »',
+    projectFollows_other: '{{count}} personnes de plus suivent « {{title}} »',
+    hidden:
+      'Ton commentaire sur « {{title}} » a été masqué par l’auteur du projet. Toi et l’auteur du projet le voyez encore.',
+    handle: 'Ton pseudo est @{{handle}}, tiré de ton nom. Tu peux le changer dans Mon profil.',
   },
   errors: {
     notFound: 'Cette page n’existe pas.',

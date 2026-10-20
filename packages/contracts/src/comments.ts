@@ -1,9 +1,11 @@
 // Les commentaires d'un projet (tranche 5) : un membre commente un projet qu'il voit, un autre lui
 // répond. Un commentaire « racine » et ses réponses forment un fil, sur un seul niveau : répondre à
 // une réponse ajoute au même fil. L'auteur d'un commentaire le modifie ou le supprime ; l'auteur du
-// projet peut le masquer. Les mentions « @nom » viendront avec les notifications (tranche 6).
+// projet peut le masquer. Un commentaire peut mentionner des membres par leur pseudo (tranche 6b,
+// voir mentions.ts).
 import { z } from 'zod'
 import { FeedCursor } from './feed'
+import { MENTIONS_MAX, Mention } from './mentions'
 import { ProjectAuthor } from './projects'
 import { VisibleFreeText } from './text'
 
@@ -63,6 +65,11 @@ export const CommentReply = z
     state: CommentState,
     /** Vrai si le membre qui regarde l'a écrit : l'appli affiche alors « Modifier » et « Supprimer ». */
     isMine: z.boolean(),
+    /**
+     * Les membres mentionnés (tranche 6b), dans l'ordre du texte ; vide quand l'auteur est null.
+     * L'appli ne fait un lien que de ces pseudos-là.
+     */
+    mentions: z.array(Mention).max(MENTIONS_MAX),
   })
   .meta({ id: 'CommentReply' })
 export type CommentReply = z.infer<typeof CommentReply>

@@ -605,6 +605,88 @@ Décisions de Louis (19/10/2026), pour la tranche 6b :
 - Les notifications similaires sont regroupées (« 3 personnes ont réagi à ton projet »)
 - Il choisit, par type, push, e-mail ou rien ; un récap par e-mail est possible
 
+### Précisions (tranche 6b) — validées le 20/10/2026
+
+Décisions de Louis :
+- **Un commentaire prévient l'auteur du projet et l'auteur du fil** : l'auteur du projet pour tout
+  commentaire d'un autre, l'auteur d'un commentaire racine pour une réponse d'un autre dans son fil.
+  Les autres participants ne sont prévenus que s'ils sont mentionnés.
+- **Après « @ », les proches d'abord, puis tous** : l'auteur du projet, ceux qui l'ont commenté et
+  ceux qu'on suit, puis les autres membres dont le pseudo commence ainsi.
+- **Ouvrir l'écran remet le nombre à zéro.**
+- **Une notification se garde 90 jours.**
+- **Des notifications calculées, pas recopiées** : la liste se calcule à partir des réactions,
+  abonnements, commentaires et mentions qui existent. Ce qui disparaît (réaction retirée,
+  commentaire supprimé ou masqué, projet devenu privé, compte supprimé) emporte sa notification ; ce
+  qui revient (démasqué, redevenu public) la ramène.
+
+**Le nombre de nouveautés**
+- Étant donné Inès, connectée, dont le projet public « Météo » vient de recevoir deux « Bravo »
+- Alors une cloche montre « 1 » (un groupe), dans la barre du haut sur ordinateur, à côté de
+  « Mes projets » sur téléphone ; au-delà de 9 : « 9+ » ; à zéro, pas de pastille
+- Et le nombre se met à jour seul, environ chaque minute, et quand l'appli revient au premier plan
+
+**L'écran des notifications**
+- Quand Inès touche la cloche
+- Alors elle lit, de la plus récente à la plus ancienne : « 2 réactions sur « Météo » : Bravo ×2 » ;
+  « Malik a commenté « Météo » : « Super idée… » » ; « Malik parle de toi dans un commentaire sur
+  « Météo » » ; « Malik a répondu à ton commentaire sur « Météo » » ; « 3 personnes de plus te
+  suivent » ; « 2 personnes de plus suivent « Météo » »
+- Et les nouvelles sont signalées ; le nombre de la cloche revient à zéro
+- Quand elle touche une notification, elle arrive sur le projet (ou sur « Mon profil » pour celle du
+  pseudo) ; celles des abonnés à son compte ne mènent nulle part
+- Au bout : « Afficher la suite » (20 par 20), puis « C'est tout » ; sans rien : un état vide
+
+**Mentionner**
+- Étant donné Malik, qui écrit un commentaire sur le projet public « Météo »
+- Quand il tape « @in »
+- Alors l'appli propose au plus 5 membres, les proches d'abord (nom, pseudo, photo)
+- Quand il choisit Inès, « @ines_morel » s'écrit dans le texte
+- Et, publié, « @ines_morel » est un lien vers la page d'Inès, et Inès est notifiée
+- Quand Inès change ensuite de pseudo, le texte de Malik garde « @ines_morel », et le lien mène
+  toujours à Inès, jamais à qui reprendrait ce pseudo
+
+**Masquer**
+- Étant donné l'auteur de « Météo », qui masque le commentaire de Malik
+- Alors Malik lit « Ton commentaire sur « Météo » a été masqué par l'auteur du projet. Toi et
+  l'auteur du projet le voyez encore. » ; s'il est démasqué, la notification disparaît
+- Et les membres mentionnés dans ce commentaire ne le voient plus, ni sa notification
+
+**Le pseudo**
+- Étant donné un membre qui reçoit son pseudo (nouveau compte vérifié, ou membre déjà inscrit)
+- Alors sa première notification dit « Ton pseudo est @ines_morel, tiré de ton nom. Tu peux le
+  changer dans Mon profil. »
+
+Règles détaillées :
+- **Regroupements** : les réactions, par projet et par jour (heure de Paris), avec les nombres par
+  type, sans aucun nom ; les abonnés à un projet, par projet et par jour ; les abonnés au compte,
+  par jour ; sans nom. Une réaction ou un abonnement retiré sort du nombre ; à zéro, le groupe
+  disparaît. Un groupe qui grandit après avoir été vu redevient nouveau et remonte en tête.
+- **Commentaires** : un par notification, avec le nom de l'auteur (déjà visible sous le
+  commentaire) et un extrait de son texte actuel (80 caractères). Une seule notification par
+  commentaire et par personne : mention, sinon réponse, sinon commentaire. Supprimé, ou masqué pour
+  elle : la notification disparaît.
+- **Mentions** : dans les commentaires seulement (ni notes ni descriptions). Un pseudo en usage
+  seulement (pas un ancien réservé), majuscules acceptées ; 5 membres au plus par commentaire
+  (au-delà, du texte simple) ; se mentionner soi-même ne notifie pas. Une modification qui ajoute
+  une mention prévient la personne ajoutée ; qui en retire une retire la notification. La mention
+  est gardée par l'identifiant du membre, trouvé au moment de l'écriture ; compte supprimé : du
+  texte simple. **Une mention ne notifie que qui peut lire le commentaire** : sur un projet privé,
+  personne ; commentaire masqué, seulement l'auteur du projet.
+- **Suggestions** : à partir de 2 caractères après « @ », sur le pseudo seulement ; 5 au plus ;
+  seulement des comptes vérifiés, sur un projet qu'on voit. Anti-abus : 600 recherches par heure
+  et par membre.
+- **Nouveau** : ouvrir l'écran marque comme vu tout ce qui existait à l'ouverture.
+- **Droits** : sans session, « connecte-toi » ; chacun ne lit que ses notifications. Rien ne vient
+  de ses propres gestes ; un projet privé ne produit aucune notification venant des autres (ils n'y
+  voient rien, et leurs gestes passés y sont cachés).
+- **Conservation** : 90 jours, puis plus rien n'est montré. Rien n'est recopié : on ne garde que la
+  date « vu jusqu'à » et les mentions (avec leur commentaire).
+- **Suppression du compte** : ses mentions et son état de lecture disparaissent ; ses gestes
+  disparaissent des notifications des autres. L'écran de suppression le dit (« Tes notifications »).
+- **Export des données** : la date « vu jusqu'à », et pour chacun de ses commentaires les
+  identifiants des membres qu'il y mentionne.
+
 ## Tranche 7 — Sécurité et modération
 
 **Signaler**

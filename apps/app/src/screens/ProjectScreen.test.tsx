@@ -46,6 +46,9 @@ jest.mock('../comments/api', () => ({
   useDeleteComment: jest.fn(),
   useHideComment: jest.fn(),
 }))
+// Les suggestions après « @ » (tranche 6b) : personne à proposer ; elles sont testées dans
+// ProjectComments.test.tsx.
+jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.

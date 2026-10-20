@@ -520,6 +520,7 @@ describe('my reactions and comments in my data', () => {
         createdAt: root.createdAt,
         editedAt: new Date(Date.now()).toISOString(),
         hiddenAt: null,
+        mentions: [],
       },
       {
         projectId: maxProject.id,
@@ -529,6 +530,7 @@ describe('my reactions and comments in my data', () => {
         createdAt: reply.createdAt,
         editedAt: null,
         hiddenAt: null,
+        mentions: [],
       },
     ])
     expect(raw).not.toContain('Commentaire de Max')

@@ -21,7 +21,9 @@ import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
+import { mentionsOfComments } from '../mentions/load'
 import { notesOfAuthor } from '../notes/load'
+import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
 import { loadProjectsOf } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -323,6 +325,17 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // (tranche 6a). Le pseudo actuel est déjà dans `me`.
     const formerHandle = await formerHandleOf(db, user.id, new Date())
 
+    // Les membres qu'il mentionne dans ses commentaires (tranche 6b), par leur identifiant : c'est
+    // ce que la base garde de ses mentions. Une requête pour tous ses commentaires
+    // (mentions/load.ts). Jamais les mentions de lui par les autres : elles sont dans leur texte.
+    const mentionsByComment = await mentionsOfComments(
+      db,
+      comments.map((comment) => comment.id),
+    )
+    // Jusqu'où il a vu ses notifications. Les notifications elles-mêmes n'y sont pas : elles sont
+    // calculées à partir des gestes des autres, qui ne sont pas ses données.
+    const seenAt = await readSeenAt(db, user.id)
+
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
     c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
@@ -335,7 +348,11 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
-        comments,
+        comments: comments.map((comment) => ({
+          ...comment,
+          mentions: mentionsByComment.get(comment.id) ?? [],
+        })),
+        notifications: { seenAt: seenAt?.toISOString() ?? null },
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
           ...s,

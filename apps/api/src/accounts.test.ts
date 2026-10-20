@@ -220,6 +220,66 @@ describe('exporting my data', () => {
 
     expect(res.status).toBe(401)
   })
+
+  it('gives how far I have seen my notifications, and nothing of what others did', async () => {
+    const cookies = await signUpAndVerify()
+    const exportOf = async () =>
+      AccountExport.parse(
+        await (await ctx.request('/v1/me/export', { headers: { cookie: cookies } })).json(),
+      )
+    // Jamais ouvert l'écran : null.
+    expect((await exportOf()).notifications).toEqual({ seenAt: null })
+
+    // L'appli ouvre l'écran : elle lit la liste, puis renvoie l'heure du serveur.
+    const page = await ctx.request('/v1/notifications', { headers: { cookie: cookies } })
+    expect(page.status).toBe(200)
+    const { asOf } = (await page.json()) as { asOf: string }
+    const seen = await ctx.request('/v1/notifications/seen', {
+      method: 'PUT',
+      headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify({ upTo: asOf }),
+    })
+    expect(seen.status).toBe(204)
+
+    expect((await exportOf()).notifications).toEqual({ seenAt: asOf })
+  })
+
+  it('gives, for each of my comments, the ids of the members I mention in it', async () => {
+    const cookies = await signUpAndVerify()
+    const ines = await ctx.verifiedMember({
+      name: 'Inès Morel',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    const inesId = Me.parse(
+      await (await ctx.request('/v1/me', { headers: { cookie: ines } })).json(),
+    ).id
+    const json = (cookie: string) => ({ cookie, 'content-type': 'application/json' })
+    const project = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: json(ines),
+      body: JSON.stringify({ title: 'Météo', pitch: 'La pluie de demain.' }),
+    })
+    expect(project.status).toBe(201)
+    const { id: projectId } = (await project.json()) as { id: string }
+    for (const body of ['Merci @ines_morel !', 'Sans mention.']) {
+      const res = await ctx.request(`/v1/projects/${projectId}/comments`, {
+        method: 'POST',
+        headers: json(cookies),
+        body: JSON.stringify({ body }),
+      })
+      expect(res.status).toBe(201)
+    }
+
+    const data = AccountExport.parse(
+      await (await ctx.request('/v1/me/export', { headers: { cookie: cookies } })).json(),
+    )
+
+    expect(data.comments.map((c) => [c.body, c.mentions])).toEqual([
+      ['Merci @ines_morel !', [inesId]],
+      ['Sans mention.', []],
+    ])
+  })
 })
 
 describe('deleting my account', () => {
@@ -236,6 +296,58 @@ describe('deleting my account', () => {
     expect(await ctx.db.select().from(schema.user)).toHaveLength(0)
     expect(await ctx.db.select().from(schema.session)).toHaveLength(0)
     expect((await ctx.signIn(lea)).status).toBe(401)
+  })
+
+  it('erases how far I have seen my notifications, the mentions of me and those I wrote', async () => {
+    const cookies = await signUpAndVerify()
+    const ines = await ctx.verifiedMember({
+      name: 'Inès Morel',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    const json = (cookie: string) => ({ cookie, 'content-type': 'application/json' })
+    const project = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: json(ines),
+      body: JSON.stringify({ title: 'Météo', pitch: 'La pluie de demain.' }),
+    })
+    const { id: projectId } = (await project.json()) as { id: string }
+    // Léa mentionne Inès, Inès mentionne Léa (son pseudo : « lea »).
+    for (const [cookie, body] of [
+      [cookies, 'Merci @ines_morel !'],
+      [ines, 'Avec plaisir @lea'],
+    ] as const) {
+      const res = await ctx.request(`/v1/projects/${projectId}/comments`, {
+        method: 'POST',
+        headers: json(cookie),
+        body: JSON.stringify({ body }),
+      })
+      expect(res.status).toBe(201)
+    }
+    const seen = await ctx.request('/v1/notifications/seen', {
+      method: 'PUT',
+      headers: json(cookies),
+      body: JSON.stringify({ upTo: new Date().toISOString() }),
+    })
+    expect(seen.status).toBe(204)
+    // Témoin : avant la suppression, deux mentions et deux états de lecture (Léa et Inès).
+    expect(await ctx.db.select().from(schema.commentMention)).toHaveLength(2)
+    expect(await ctx.db.select().from(schema.notificationState)).toHaveLength(2)
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: json(cookies),
+      body: JSON.stringify({ password: lea.password }),
+    })
+
+    expect(res.status).toBe(200)
+    // Il ne reste que l'état de lecture d'Inès, et aucune mention : ni de Léa, ni écrite par elle.
+    expect(await ctx.db.select().from(schema.commentMention)).toEqual([])
+    const inesId = Me.parse(
+      await (await ctx.request('/v1/me', { headers: { cookie: ines } })).json(),
+    ).id
+    const states = await ctx.db.select().from(schema.notificationState)
+    expect(states.map((s) => s.userId)).toEqual([inesId])
   })
 
   it('refuses a deletion request sent from another website (CSRF)', async () => {

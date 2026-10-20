@@ -1,6 +1,7 @@
 // Le parcours réel d'un membre, joué dans un vrai navigateur à la place de Louis : deux personnes
 // s'inscrivent, l'une suit l'autre et publie un projet avec des photos, l'autre le voit arriver dans
-// son fil et le regarde, réagit et commente (l'auteur répond, puis masque le commentaire) ; puis le
+// son fil et le regarde, réagit et commente en mentionnant l'auteur (qui le voit dans ses notifications,
+// répond, puis masque le commentaire) ; puis le
 // projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
@@ -326,13 +327,30 @@ try {
   console.log('  ok : Léa voit « Bravo » compté une fois')
   // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
   // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
-  const samSays = 'Testé ce soir : une soupe parfaite.'
+  // Tranche 6b : Sam mentionne Léa. Il tape « @ » et le début de son pseudo, choisit Léa dans la
+  // liste proposée (l'appli écrit « @pseudo » et une espace), puis finit sa phrase.
+  const samSays = `Testé ce soir, @${handle} une soupe parfaite.`
   await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
-  await sam.page.getByLabel('Ton commentaire').fill(samSays)
+  const samField = sam.page.getByLabel('Ton commentaire')
+  await samField.fill(`Testé ce soir, @${handle.slice(0, 4)}`)
+  await sam.page.getByRole('option', { name: `Lea, @${handle}` }).click()
+  await samField.pressSequentially('une soupe parfaite.')
   await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
   await sam.page.getByText('Commentaire publié.').waitFor()
-  await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await lea.page.getByText(samSays, { exact: true }).waitFor()
+
+  step('Léa voit la cloche, puis la notification de la mention, qui mène au projet')
+  // Le nombre n'est relu que chaque minute : on recharge l'accueil pour le lire tout de suite.
+  await open(lea.page, `${appUrl}/`)
+  await lea.page
+    .getByRole('button', { name: /^Notifications, \d+ nouvelles?$/ })
+    .first()
+    .click()
+  await lea.page.getByRole('link', { name: /Sam parle de toi dans un commentaire/ }).click()
+  await lea.page.waitForURL(`**/projects/${projectId}`)
+  // Dans le texte publié, la mention est un lien vers la page de Léa.
+  await lea.page.getByRole('link', { name: `@${handle}`, exact: true }).waitFor()
+  const unread = await (await lea.request.get(`${apiUrl}/v1/notifications/unread`)).json()
+  expectEqual('nouveautés après la visite', unread.count, 0)
   await lea.page.getByRole('button', { name: 'Répondre', exact: true }).click()
   await lea.page.getByLabel('Ta réponse').fill('Merci Sam, la version dessert arrive.')
   await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()

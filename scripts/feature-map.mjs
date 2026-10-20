@@ -40,6 +40,15 @@ const features = [
     routes: /^\w+ \/v1\/me(\/|$)/,
     tables: /^(profile|member_handle|api_rate_limit)$/,
   },
+  // Avant « membres » : la recherche après « @ » est sous /v1/members/.
+  {
+    id: 'notifications',
+    name: 'Notifications et mentions',
+    tranche: 'Tranche 6b',
+    pages: /^\/notifications$/,
+    routes: /^\w+ \/v1\/(notifications(\/|$)|members\/mentionable$)/,
+    tables: /^(notification_state|comment_mention)$/,
+  },
   // Avant « projets » : ses routes sont sous /v1/projects/{id}/.
   {
     id: 'reagir',
