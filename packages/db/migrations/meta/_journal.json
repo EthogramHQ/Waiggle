@@ -57,6 +57,13 @@
       "when": 1792446077198,
       "tag": "0007_handles",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792496252539,
+      "tag": "0008_notifications",
+      "breakpoints": true
     }
   ]
 }

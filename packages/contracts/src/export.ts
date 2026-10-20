@@ -59,8 +59,16 @@ export const AccountExport = z
          * sur le texte du membre est une donnée qui le concerne.
          */
         hiddenAt: z.iso.datetime().nullable(),
+        /** Les identifiants des membres qu'il y mentionne (tranche 6b). */
+        mentions: z.array(z.string()),
       }),
     ),
+    /**
+     * Les notifications (tranche 6b) : elles sont calculées à partir des gestes des autres, qui ne
+     * lui appartiennent pas ; l'export ne garde donc que ce qui est à lui : jusqu'où il les a vues
+     * (null s'il n'a jamais ouvert l'écran).
+     */
+    notifications: z.object({ seenAt: z.iso.datetime().nullable() }),
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),
     sessions: z.array(
       z.object({
