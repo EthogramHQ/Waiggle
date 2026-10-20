@@ -20,8 +20,8 @@ flowchart LR
     n9["comptes"]
     n10["projets"]
     n8["routes"]
-    n11["médias"]
     n12["e-mails"]
+    n11["médias"]
   end
   subgraph paquets["packages (partagés)"]
     n17["traductions"]
@@ -36,12 +36,16 @@ flowchart LR
   n9 --> n15
   n9 --> n18
   n9 --> n17
+  n12 --> n14
+  n12 --> n16
+  n12 --> n15
   n12 --> n18
   n12 --> n17
   n10 --> n14
   n10 --> n16
   n10 --> n15
   n8 --> n9
+  n8 --> n12
   n8 --> n11
   n8 --> n10
   n8 --> n14

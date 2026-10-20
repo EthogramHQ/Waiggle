@@ -5,6 +5,14 @@ import { type Database, schema } from '@ruche/db'
 import { inArray, sql } from 'drizzle-orm'
 
 export type RateRule = { windowMs: number; max: number }
+
+/**
+ * La plus longue fenêtre permise : un jour. La purge de nuit (jobs/nightly-purge.ts) efface les
+ * compteurs dont la fenêtre a commencé il y a plus de 25 heures (ce jour, plus une marge) : une
+ * règle plus longue verrait son compteur effacé en cours de route, et le quota ne tiendrait plus.
+ * hit() refuse donc toute règle plus longue (relecture de sécurité S-A5 de la tranche 6c).
+ */
+export const RATE_WINDOW_MAX_MS = 24 * 60 * 60 * 1000
 export type RateDecision = { allowed: true } | { allowed: false; retryAfterSeconds: number }
 
 export type RateLimiter = {
@@ -18,6 +26,8 @@ export type RateLimiter = {
  */
 export const createRateLimiter = (db: Database, clock: () => number = Date.now): RateLimiter => ({
   async hit(key, { windowMs, max }) {
+    // Une erreur de programmation, pas une demande d'un membre : on le dit fort.
+    if (windowMs > RATE_WINDOW_MAX_MS) throw new Error('Rate window longer than one day')
     const now = clock()
     const t = schema.apiRateLimit
     // Une seule requête SQL, « atomique » : même si deux requêtes arrivent en même temps,
@@ -71,6 +81,10 @@ export const memberCounterKeys = (userId: string) => ({
   notificationsRead: `notifications-read:${userId}`,
   // Marquer ses notifications comme vues (tranche 6b).
   notificationsSeen: `notifications-seen:${userId}`,
+  // Changer ses réglages d'e-mail (tranche 6c).
+  emailPreferences: `email-preferences:${userId}`,
+  // Les liens de désinscription valides de ce membre, toutes adresses IP confondues (tranche 6c).
+  unsubscribe: `unsubscribe:${userId}`,
 })
 
 /**

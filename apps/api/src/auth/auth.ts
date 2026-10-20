@@ -13,19 +13,13 @@ import {
   PASSWORD_MIN_LENGTH,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import {
-  defaultLanguage,
-  type Language,
-  parseAcceptLanguage,
-  resolveLanguage,
-  resources,
-  supportedLanguages,
-} from '@ruche/i18n'
+import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { eq } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
+import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
 import { existingAccountEmail, verificationEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
@@ -81,14 +75,9 @@ const inviteDigest = (code: string) =>
 const isRightInviteCode = (sent: unknown, expected: string) =>
   typeof sent === 'string' && timingSafeEqual(inviteDigest(sent), inviteDigest(expected))
 
-const isLanguage = (value: unknown): value is Language =>
-  typeof value === 'string' && (supportedLanguages as readonly string[]).includes(value)
-
-// Langue d'un membre déjà inscrit : celle de son profil, le français si elle est absente ou invalide.
-const languageOf = (user: object): Language => {
-  const language = 'language' in user ? user.language : undefined
-  return isLanguage(language) ? language : defaultLanguage
-}
+// La langue d'un membre déjà inscrit (celle de son profil, le français sinon) : email/language.ts,
+// partagé avec les e-mails de notification (tranche 6c).
+const languageOf = languageOfMember
 
 export const createAuth = ({
   db,

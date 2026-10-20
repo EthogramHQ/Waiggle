@@ -654,3 +654,43 @@ describe('who receives the recap', () => {
     expect(written).not.toContain(malikAccount.email)
   })
 })
+
+// Ajouté avec le backend (précision de la session du 21/10/2026) : les « nouveaux abonnements » du
+// récap comptent les abonnés au compte du membre ET à ses projets.
+describe('the new follows of the recap', () => {
+  it('counts the follows of the account and of the projects of the member', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    later()
+    // Malik et Sam suivent le projet Météo ; Zoé suit le compte d'Inès.
+    for (const cookie of [malik, sam]) {
+      const res = await act.send('POST', `/v1/projects/${meteo.id}/follow`, cookie)
+      expect(res.status).toBe(204)
+      later()
+    }
+    await act.followMember(inesId, zoe)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(fill(fr.recap.follows_other, { count: '3' }))
+  })
+
+  it('leaves out the follows of a project that became private', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const jardin = await act.publish(ines, 'Jardin')
+    later()
+    for (const project of [meteo, jardin]) {
+      const res = await act.send('POST', `/v1/projects/${project.id}/follow`, malik)
+      expect(res.status).toBe(204)
+      later()
+    }
+    await act.setVisibility(jardin.id, ines, 'private')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(fill(fr.recap.follows_one, { count: '1' }))
+  })
+})

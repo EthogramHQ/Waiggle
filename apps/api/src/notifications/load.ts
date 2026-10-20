@@ -29,7 +29,7 @@ export const notificationCutoff = (now: Date) => new Date(now.getTime() - NOTIFI
 // paramètre lié : « ::timestamptz » la lit comme un instant, et « at time zone 'UTC' » la
 // ramène à l'heure UTC sans fuseau, comme les colonnes. Ainsi rien ne dépend du fuseau de la
 // base ni du pilote (un objet Date passé tel quel pourrait être écrit en heure locale).
-const utc = (date: Date | string) =>
+export const utc = (date: Date | string) =>
   sql`(${typeof date === 'string' ? date : date.toISOString()}::timestamptz at time zone 'UTC')`
 
 /**
@@ -257,7 +257,7 @@ const ListRow = z.object({
   author_handle: z.string().nullable(),
   my_handle: z.string().nullable(),
 })
-type ListRow = z.infer<typeof ListRow>
+export type ListRow = z.infer<typeof ListRow>
 
 /**
  * L'extrait d'un commentaire : son texte actuel sur une ligne, 80 caractères au plus, suivi de
@@ -275,7 +275,11 @@ export const excerptOf = (body: string) => {
  * Une ligne en notification du contrat ; null si ce qu'elle montre a disparu entre-temps (le
  * projet, l'auteur, un pseudo). `seenAt` : la dernière ouverture de l'écran (null : jamais).
  */
-const present = (row: ListRow, seenAt: Date | null, publicApiUrl: string): Notification | null => {
+export const present = (
+  row: ListRow,
+  seenAt: Date | null,
+  publicApiUrl: string,
+): Notification | null => {
   const common = {
     id: row.key,
     at: row.at,
@@ -340,6 +344,61 @@ const present = (row: ListRow, seenAt: Date | null, publicApiUrl: string): Notif
 }
 
 /**
+ * Complète les lignes choisies par `chosen` (une requête sur les sources, déjà triée et bornée) :
+ * le titre du projet, le texte du commentaire, l'auteur et les pseudos. Partagé par la liste de
+ * l'appli et par les e-mails (tranche 6c), pour que les deux montrent exactement la même chose.
+ */
+const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
+  const query = sql`
+    select n.kind, n.key, to_char(n.at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, n.day, n.reason,
+      n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
+      project.id as project_id, project.title as project_title,
+      c.id as comment_id, c.body,
+      a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
+      ah.handle as author_handle, mh.handle as my_handle
+    from (${chosen}) n
+    left join project on project.id = n.project_id
+    left join project_comment c on c.id = n.comment_id
+    left join "user" a on a.id = n.author_id
+    left join profile ap on ap.user_id = n.author_id
+    left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
+    left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
+    order by n.at desc, n.key desc
+  `
+  return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
+}
+
+/**
+ * Toutes les notifications de `me` dont le geste est postérieur à `since`, de la plus récente à la
+ * plus ancienne, pour les e-mails (tranche 6c) : le récap de la semaine (depuis 7 jours au plus)
+ * et l'e-mail de mentions (depuis 24 heures au plus). Le même calcul que l'écran des
+ * notifications (les six sources, puis present() pour écarter ce qui a disparu), mais sans page :
+ * la borne `since` limite déjà la lecture à l'activité récente autour du membre, par les index de
+ * chaque source. Chaque élément garde sa ligne brute (`row.body` : le texte entier du commentaire,
+ * que l'e-mail de mentions nettoie avant d'en tirer l'extrait).
+ */
+export const loadNotificationsSince = async (
+  db: Database,
+  me: string,
+  since: Date,
+  publicApiUrl: string,
+) => {
+  const rows = await loadDetailedRows(
+    db,
+    me,
+    sql`
+      select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
+        author_id, day, amazing, inspiring, useful, funny, bravo, total
+      from (${sources(me, since)}) u
+    `,
+  )
+  return rows.flatMap((row) => {
+    const notification = present(row, null, publicApiUrl)
+    return notification ? [{ row, notification }] : []
+  })
+}
+
+/**
  * Une page de notifications de `me`, de la plus récente à la plus ancienne (puis par clé, pour
  * départager deux groupes du même instant), après le curseur s'il y en a un. Une seule requête,
  * quelle que soit la longueur de la page :
@@ -371,30 +430,18 @@ export const loadNotificationPage = async (
   now: Date,
   publicApiUrl: string,
 ) => {
-  const query = sql`
-    select n.kind, n.key, to_char(n.at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, n.day, n.reason,
-      n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
-      project.id as project_id, project.title as project_title,
-      c.id as comment_id, c.body,
-      a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
-      ah.handle as author_handle, mh.handle as my_handle
-    from (
+  const rows = await loadDetailedRows(
+    db,
+    me,
+    sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total
       from (${sources(me, notificationCutoff(now))}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc
       limit ${NOTIFICATION_PAGE_SIZE + 1}
-    ) n
-    left join project on project.id = n.project_id
-    left join project_comment c on c.id = n.comment_id
-    left join "user" a on a.id = n.author_id
-    left join profile ap on ap.user_id = n.author_id
-    left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
-    left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
-    order by n.at desc, n.key desc
-  `
-  const { rows } = z.object({ rows: z.array(ListRow) }).parse(await db.execute(query))
+    `,
+  )
   const page = rows.slice(0, NOTIFICATION_PAGE_SIZE)
   // Le marque-page vient de la dernière ligne lue de la page, même si elle a été laissée de côté
   // (son projet venait de disparaître) : la page suivante repart exactement d'où celle-ci s'arrête.

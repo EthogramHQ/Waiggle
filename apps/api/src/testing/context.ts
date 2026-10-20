@@ -80,6 +80,7 @@ export const createTestContext = async ({
     storage,
     appUrl: TEST_APP_URL,
     publicApiUrl: TEST_API_URL,
+    secret: TEST_AUTH_SECRET,
   })
 
   /**

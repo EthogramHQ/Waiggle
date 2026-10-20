@@ -13,6 +13,7 @@ import {
 } from './email/mailer'
 import { loadEnv } from './env'
 import { backfillHandles, purgeExpiredHandles } from './handles/claim'
+import { type Scheduler, startScheduler } from './jobs/scheduler'
 import { describeError } from './log'
 import { createDiskStorage } from './media/storage'
 
@@ -92,16 +93,53 @@ const app = createApp({
   storage,
   appUrl: env.appUrl,
   publicApiUrl: env.publicApiUrl,
+  secret: env.authSecret,
 })
 
 const server = serve({ fetch: app.fetch, port: env.port }, ({ port }) => {
   console.log(`Ruche API listening on http://localhost:${port} (${env.nodeEnv})`)
 })
 
+// 5. Les tâches planifiées (tranche 6c : récap de la semaine, e-mails de mentions, purge de nuit),
+// seulement avec un vrai PostgreSQL : pg-boss ne tourne pas sur PGlite. Démarrées après
+// l'ouverture du port et sans l'attendre : une panne ici est notée, et l'API sert quand même.
+let scheduler: Scheduler | null = null
+if (env.databaseUrl) {
+  startScheduler({
+    databaseUrl: env.databaseUrl,
+    deps: {
+      db: database.db,
+      mailer,
+      appUrl: env.appUrl,
+      apiUrl: env.publicApiUrl,
+      secret: env.authSecret,
+    },
+    emailJobs: env.emailJobs,
+  })
+    .then((started) => {
+      scheduler = started
+    })
+    .catch((error: unknown) => {
+      console.error(
+        'Job scheduler not started',
+        describeError(error, { method: 'STARTUP', path: 'pg-boss' }),
+      )
+    })
+}
+
 // Arrêt propre : quand Docker ou Ctrl+C demandent l'arrêt (SIGTERM / SIGINT),
-// on laisse les requêtes en cours se terminer, on ferme la base, puis on quitte.
+// on laisse les requêtes en cours se terminer, puis les tâches planifiées, on ferme la base, et on
+// quitte.
 const shutdown = () => {
   server.close(async () => {
+    try {
+      await scheduler?.stop()
+    } catch (error) {
+      console.error(
+        'Job scheduler stop failed',
+        describeError(error, { method: 'STOP', path: 'pg-boss' }),
+      )
+    }
     await database.close()
     process.exit(0)
   })

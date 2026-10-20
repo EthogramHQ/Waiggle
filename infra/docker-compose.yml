@@ -81,6 +81,9 @@ services:
       ALLOW_CONSOLE_MAIL: ${ALLOW_CONSOLE_MAIL:-}
       # Le code d'invitation demandé à l'inscription : sans lui, l'API refuse de démarrer.
       SIGNUP_INVITE_CODE: ${SIGNUP_INVITE_CODE:?Définir SIGNUP_INVITE_CODE dans le fichier des secrets}
+      # Les e-mails de notification (récap, mentions) : « on » par défaut, « off » avant de
+      # restaurer une sauvegarde (voir infra/.env.example et docs/ops/serveur.md).
+      EMAIL_JOBS: ${EMAIL_JOBS:-}
       MEDIA_DIR: /app/media
     volumes:
       # Les avatars des membres. Sauvegardés avec la base de données (infra/backup.sh).

@@ -11,6 +11,28 @@ export interface Mailer {
   send(email: Email): Promise<void>
 }
 
+/**
+ * Les seuls en-têtes qu'un e-mail peut ajouter (tranche 6c, relecture de sécurité S-A7) : ceux de
+ * la désinscription en un clic (RFC 8058), que la messagerie lit pour afficher son bouton « Se
+ * désabonner ». Toute autre clé est refusée, et chaque valeur doit être de l'ASCII imprimable (du
+ * code 32, l'espace, au code 126, « ~ ») : un retour à la ligne glissé dans une valeur ajouterait
+ * un en-tête de plus (« Bcc: … », une copie cachée vers n'importe qui).
+ */
+const ALLOWED_HEADERS = new Set(['List-Unsubscribe', 'List-Unsubscribe-Post'])
+const PRINTABLE_ASCII = /^[\x20-\x7E]*$/
+
+/** Vérifie les en-têtes d'un e-mail, et lève une erreur (rien ne part) s'ils sortent des règles. */
+const checkedHeaders = (headers: Email['headers']): [string, string][] => {
+  const entries = Object.entries(headers ?? {})
+  for (const [key, value] of entries) {
+    if (!ALLOWED_HEADERS.has(key) || !PRINTABLE_ASCII.test(value)) {
+      // Le message ne recopie ni la clé ni la valeur : elles pourraient contenir n'importe quoi.
+      throw new Error('Email header refused')
+    }
+  }
+  return entries
+}
+
 /** Pour les tests : garde les e-mails dans un tableau au lieu de les envoyer. */
 export const createMemoryMailer = () => {
   const sent: Email[] = []
@@ -24,8 +46,12 @@ export const createMemoryMailer = () => {
 
 /** Pour le développement : affiche l'e-mail (et donc le lien à cliquer) dans le terminal. */
 export const createConsoleMailer = (): Mailer => ({
-  async send({ to, subject, text }) {
-    console.log(`\n--- E-mail pour ${to} ---\n${subject}\n\n${text}\n--- fin ---\n`)
+  async send({ to, subject, text, headers }) {
+    // Les en-têtes ajoutés (désinscription en un clic) s'affichent avant l'objet.
+    const lines = checkedHeaders(headers).map(([key, value]) => `${key}: ${value}\n`)
+    console.log(
+      `\n--- E-mail pour ${to} ---\n${lines.join('')}${subject}\n\n${text}\n--- fin ---\n`,
+    )
   },
 })
 
@@ -42,7 +68,9 @@ export const createBrevoMailer = ({
   from,
   fetch: doFetch = fetch,
 }: BrevoOptions): Mailer => ({
-  async send({ to, subject, text, html }) {
+  async send({ to, subject, text, html, headers }) {
+    // Les en-têtes sont vérifiés avant tout envoi : un en-tête refusé, et rien ne part.
+    const extra = checkedHeaders(headers)
     const res = await doFetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -62,6 +90,8 @@ export const createBrevoMailer = ({
         subject,
         textContent: text,
         htmlContent: html,
+        // Brevo prend les en-têtes ajoutés sous forme d'objet { clé: valeur }.
+        ...(extra.length > 0 && { headers: Object.fromEntries(extra) }),
       }),
       signal: AbortSignal.timeout(10_000), // on n'attend jamais plus de 10 secondes
     })
@@ -96,7 +126,8 @@ export const createScalewayMailer = ({
   from,
   fetch: doFetch = fetch,
 }: ScalewayOptions): Mailer => ({
-  async send({ to, subject, text, html }) {
+  async send({ to, subject, text, html, headers }) {
+    const extra = checkedHeaders(headers)
     const res = await doFetch(
       `https://api.scaleway.com/transactional-email/v1alpha1/regions/${region}/emails`,
       {
@@ -114,6 +145,12 @@ export const createScalewayMailer = ({
           subject,
           text,
           html,
+          // Scaleway prend les en-têtes ajoutés sous forme de liste de paires { key, value } :
+          // champ additional_headers de l'API v1alpha1 (CreateEmailRequest, vérifié dans son SDK
+          // officiel, scaleway-sdk-go, le 21/10/2026).
+          ...(extra.length > 0 && {
+            additional_headers: extra.map(([key, value]) => ({ key, value })),
+          }),
         }),
         signal: AbortSignal.timeout(10_000), // on n'attend jamais plus de 10 secondes
       },
