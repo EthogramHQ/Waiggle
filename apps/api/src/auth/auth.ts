@@ -35,6 +35,15 @@ import { mediaKeysOf } from '../projects/load'
 import { deleteMemberCounters } from '../rate-limit'
 import { authSchemaOptions } from './schema-options'
 
+/**
+ * Une façon de hacher et de vérifier les mots de passe. Hacher, c'est transformer le mot de passe
+ * en une empreinte dont on ne peut pas le retrouver : la base ne garde que l'empreinte.
+ */
+export type PasswordHashing = {
+  hash: (password: string) => Promise<string>
+  verify: (data: { hash: string; password: string }) => Promise<boolean>
+}
+
 export type AuthOptions = {
   db: Database
   mailer: Mailer
@@ -50,6 +59,12 @@ export type AuthOptions = {
   rateLimit: boolean
   /** Le code d'invitation exigé à l'inscription ; null : inscription libre (développement). */
   inviteCode: string | null
+  /**
+   * Réservé aux tests (testing/context.ts) : un hachage rapide à la place de scrypt. La production
+   * (index.ts) ne passe rien, et Better Auth garde scrypt, volontairement lent (~120 ms) pour
+   * qu'un voleur de la base ne puisse pas essayer des milliards de mots de passe.
+   */
+  password?: PasswordHashing
 }
 
 // L'empreinte (SHA-256) d'un code d'invitation, sous sa forme comparable (voir
@@ -84,6 +99,7 @@ export const createAuth = ({
   appUrl,
   rateLimit,
   inviteCode,
+  password,
 }: AuthOptions) => {
   // Fichiers à effacer après la suppression d'un compte (identifiant du membre → ses fichiers :
   // son avatar et les photos de tous ses projets).
@@ -108,6 +124,8 @@ export const createAuth = ({
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,
+      // Sans option, Better Auth hache avec scrypt (auth/password.test.ts le vérifie).
+      ...(password && { password }),
       // Pas de connexion tant que l'adresse n'est pas vérifiée. Effet secondaire voulu :
       // une inscription avec une adresse existante répond comme une inscription normale.
       requireEmailVerification: true,

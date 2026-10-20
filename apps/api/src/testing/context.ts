@@ -2,14 +2,39 @@
 // (copiée d'un modèle déjà migré, voir createTestPgliteDb),
 // une fausse boîte d'envoi d'e-mails et un stockage de fichiers en mémoire.
 // Rien ici n'est utilisé en production.
+import { createHash, randomBytes } from 'node:crypto'
 import { createTestPgliteDb } from '@ruche/db/pglite'
 import { createApp } from '../app'
-import { createAuth } from '../auth/auth'
+import { createAuth, type PasswordHashing } from '../auth/auth'
 import { createMemoryMailer } from '../email/mailer'
 import { createMemoryStorage } from '../media/storage'
 
 export const TEST_APP_URL = 'http://localhost:8081'
 export const TEST_API_URL = 'http://localhost:3000'
+
+/**
+ * Un hachage de mot de passe rapide, pour les tests seulement. scrypt, celui de la production,
+ * prend ~120 ms par inscription ou connexion, exprès (voir auth.ts) : multiplié par des centaines
+ * de tests, cela coûtait des dizaines de secondes. Ici, un SHA-256 salé : un « sel » est une valeur
+ * aléatoire mêlée au mot de passe, pour que deux comptes au même mot de passe n'aient pas la même
+ * empreinte. Il distingue deux mots de passe, ce qui suffit aux tests (mauvais mot de passe refusé,
+ * changement de mot de passe), mais se calcule trop vite pour protéger une vraie base.
+ */
+const sha256 = (salt: string, password: string) =>
+  createHash('sha256').update(`${salt}:${password}`).digest('hex')
+
+export const fastPasswordHashing: PasswordHashing = {
+  // L'empreinte garde son sel, et une étiquette qui dit d'où elle vient : « test-sha256:sel:empreinte ».
+  hash: async (password) => {
+    const salt = randomBytes(16).toString('hex')
+    return `test-sha256:${salt}:${sha256(salt, password)}`
+  },
+  verify: async ({ hash, password }) => {
+    const [kind, salt, digest] = hash.split(':')
+    if (kind !== 'test-sha256' || !salt || !digest) return false
+    return sha256(salt, password) === digest
+  },
+}
 
 type Credentials = { email: string; password: string }
 type SignUpBody = Credentials & { name: string; language?: string; inviteCode?: string }
@@ -37,6 +62,7 @@ export const createTestContext = async ({
     appUrl: TEST_APP_URL,
     rateLimit: true,
     inviteCode,
+    password: fastPasswordHashing,
   })
   const app = createApp({
     version,
