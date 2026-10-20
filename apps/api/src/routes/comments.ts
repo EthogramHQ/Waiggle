@@ -406,6 +406,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           .where(and(eq(c.id, commentId), hasReplies(commentId)))
           .returning({ id: c.id })
         if (!kept) await tx.delete(c).where(eq(c.id, commentId))
+        // Gardée comme emplacement, elle perd aussi ses mentions : elles partent avec le texte.
+        else
+          await tx
+            .delete(schema.commentMention)
+            .where(eq(schema.commentMention.commentId, commentId))
         return
       }
       // Une réponse est effacée. Si c'était la dernière d'un « Commentaire supprimé », celui-ci ne

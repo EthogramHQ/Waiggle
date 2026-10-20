@@ -364,6 +364,20 @@ describe('a deleted account', () => {
       mentions: [],
     })
   })
+
+  it('keeps no mention of a comment deleted by its author but kept for its replies', async () => {
+    const meteo = await publish(ines)
+    const published = await comment(meteo.id, malik, 'Tu as vu, @zoe ?')
+    await comment(meteo.id, ines, 'Oui !', published.id) // sa place reste dans la liste
+    const before = await ctx.db.select().from(schema.commentMention)
+    expect(before).toHaveLength(1) // témoin
+
+    const res = await send('DELETE', `/v1/projects/${meteo.id}/comments/${published.id}`, malik)
+    expect(res.status).toBe(204)
+
+    // Le texte est effacé : la mention, gardée par identifiant, part avec lui.
+    expect(await ctx.db.select().from(schema.commentMention)).toEqual([])
+  })
 })
 
 describe('the members proposed after « @ »', () => {
