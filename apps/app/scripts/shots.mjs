@@ -32,6 +32,13 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
+import {
+  leaEmailPreferences,
+  malformedToken,
+  mentionsToken,
+  recapToken,
+  refusedToken,
+} from '../src/testing/email.ts'
 import { leaMe } from '../src/testing/fixtures.ts'
 import {
   draftProject,
@@ -509,6 +516,8 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
   // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
   let me = structuredClone(leaMe)
+  // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
+  let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
   const withExtras = (project) => ({
     ...project,
@@ -521,8 +530,23 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
     const json = (status, body) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
-    if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
     const method = route.request().method()
+    // Se désinscrire depuis un e-mail (tranche 6c) : sans session, comme la vraie API. Le jeton
+    // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
+    if (pathname === '/v1/email/unsubscribe' && method === 'POST') {
+      const token = url.searchParams.get('token')
+      if (token === refusedToken || ![recapToken, mentionsToken].includes(token)) {
+        return json(400, { error: { code: 'unsubscribe_invalid', message: '' } })
+      }
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    // Les réglages d'e-mail (tranche 6c) : lus, puis modifiés un par un ; l'API rend l'état complet.
+    if (pathname === '/v1/me/email-preferences' && method === 'PATCH') {
+      emailPreferences = { ...emailPreferences, ...JSON.parse(route.request().postData() ?? '{}') }
+      return json(200, emailPreferences)
+    }
+    if (pathname === '/v1/me/email-preferences') return json(200, emailPreferences)
     // Enregistrer son profil (tranche 6a) : le pseudo de Max est déjà pris (409, comme l'API) ;
     // le reste est accepté, gardé et renvoyé.
     if (pathname === '/v1/me' && method === 'PATCH') {
@@ -772,6 +796,34 @@ const pages = [
   { name: 'erreur', path: '/members/erreur', signedIn: true, wait: 4500 },
   { name: 'adresse-inconnue', path: '/nulle-part', signedIn: false },
   { name: 'adresse-verifiee', path: '/verified', signedIn: true },
+  // Se désinscrire depuis un e-mail (tranche 6c), sans connexion : la question, la confirmation,
+  // « Tout couper », puis un lien abîmé (« Lien invalide » dès l'ouverture). « profil » montre la
+  // section « E-mails ».
+  { name: 'desinscription', path: `/unsubscribe?token=${recapToken}`, signedIn: false },
+  {
+    name: 'desinscription-faite',
+    path: `/unsubscribe?token=${recapToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Confirmer' }).click()
+      await page.getByText(/tu ne recevras plus le récap de la semaine/).waitFor()
+    },
+  },
+  {
+    name: 'desinscription-tout',
+    path: `/unsubscribe?token=${mentionsToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Confirmer' }).click()
+      await page.getByRole('button', { name: 'Tout couper' }).click()
+      await page.getByText(/plus aucun e-mail de notification/).waitFor()
+    },
+  },
+  {
+    name: 'desinscription-invalide',
+    path: `/unsubscribe?token=${malformedToken}`,
+    signedIn: false,
+  },
   // Des contenus très longs : titre, description, outils, adresse de démo.
   { name: 'projet-long', path: `/projects/${longProject.id}`, signedIn: true, fullPage: true },
   { name: 'pas-a-moi', path: `/projects/${notMineProject.id}/edit`, signedIn: true },

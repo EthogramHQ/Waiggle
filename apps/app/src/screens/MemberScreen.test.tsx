@@ -3,6 +3,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
+import { visited } from '../testing/navigation'
 import { draftProject, leaPage, projectWithPhotos, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { MemberScreen } from './MemberScreen'
@@ -250,5 +251,24 @@ describe('following a member from her page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
+  })
+
+  // Tranche 6c : à côté du message, un lien mène à la connexion, qui ramène ensuite sur cette page.
+  it('offers a link to sign in again, back to this page, when the session expired', async () => {
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: true })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Me reconnecter' }))
+
+    expect(visited(mockPush)).toEqual(['/sign-in?next=/page/actuelle'])
+  })
+
+  it('offers no sign-in link when the follow failed for another reason', async () => {
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: false })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    // Témoin : le message d'erreur est bien là.
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Me reconnecter' })).toBeNull()
   })
 })
