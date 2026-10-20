@@ -1,6 +1,7 @@
 // Toutes les tables de Ruche. Chaque domaine a son fichier, ré-exporté ici.
 export * from './auth'
 export * from './comments'
+export * from './email'
 export * from './follows'
 export * from './handles'
 export * from './notes'
