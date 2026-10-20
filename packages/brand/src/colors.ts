@@ -50,7 +50,10 @@ const day = {
   dangerSoft: '#FEE4E2', // fond d'un message d'erreur, bouton « Supprimer »
   dangerBorder: '#F2B8B5', // bordure d'un champ en erreur
   success: '#12805C', // confirmation ponctuelle (« Copié »)
-  badge: '#E5484D', // pastille rouge des nouveautés
+  // La pastille rouge des nouveautés (la cloche des notifications) et son chiffre, en blanc. Un
+  // rouge assez sombre pour qu'un chiffre blanc s'y lise (contraste 4,5 : voir contrastPairs).
+  badge: '#D1343A',
+  onBadge: '#FFFFFF',
 
   // Matières (couleurs transparentes : rgba = rouge, vert, bleu, opacité de 0 à 1)
   glass: 'rgba(255,255,255,0.56)', // verre : barres flottantes, boutons ronds sur image
@@ -100,7 +103,8 @@ const night = {
   dangerSoft: '#3A1A17',
   dangerBorder: '#7A2A24',
   success: '#3CCB8E',
-  badge: '#E5484D',
+  badge: '#D1343A',
+  onBadge: '#FFFFFF',
 
   glass: 'rgba(30,26,20,0.70)',
   glassBorder: 'rgba(255,255,255,0.12)',
@@ -155,6 +159,8 @@ export const contrastPairs: readonly { text: ColorName; on: ColorName; min: 3 | 
   { text: 'dangerText', on: 'background', min: 4.5 },
   { text: 'dangerText', on: 'dangerSoft', min: 4.5 },
   { text: 'onDanger', on: 'danger', min: 4.5 },
+  // Le chiffre de la pastille des nouveautés (CountBadge).
+  { text: 'onBadge', on: 'badge', min: 4.5 },
   { text: 'success', on: 'background', min: 4.5 },
   { text: 'focusRing', on: 'background', min: 3 },
 ]

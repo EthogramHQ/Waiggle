@@ -2,8 +2,22 @@
 // Analogie : un tableau d'affichage. Un écran qui a besoin du profil regarde d'abord le tableau ;
 // si l'information y est, il l'affiche tout de suite, sinon il va la chercher et l'épingle.
 // Les autres écrans en profitent sans refaire la requête.
-import { QueryClient } from '@tanstack/react-query'
+import { focusManager, QueryClient } from '@tanstack/react-query'
+import { AppState, Platform } from 'react-native'
 import { ApiError, type ApiErrorKey } from './errors'
+
+// « Au premier plan » : sur le web, React Query le sait seul (l'onglet visible ou non). Sur
+// téléphone, il faut le lui dire : AppState annonce quand l'appli revient au premier plan
+// (« active ») ou passe en arrière-plan. Les lectures qui guettent du nouveau (la cloche des
+// notifications, le bandeau du fil) se relancent alors au retour, et se taisent en arrière-plan.
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setFocused(state === 'active')
+    })
+    return () => subscription.remove()
+  })
+}
 
 // Les refus définitifs : réessayer donnerait la même réponse, et ferait attendre le membre
 // plusieurs secondes avant de voir « introuvable ». Seules les pannes passagères sont réessayées.

@@ -38,6 +38,7 @@ export const borders = {
   focus: 2, // contour de l'élément choisi au clavier
   quote: 3, // trait de miel devant une citation (le texte d'une note)
   thread: 2, // trait qui rattache les réponses à leur commentaire
+  badge: 2, // liseré qui détache une pastille de nouveautés de l'icône qu'elle chevauche
 } as const
 
 /**

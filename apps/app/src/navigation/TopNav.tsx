@@ -1,5 +1,5 @@
 // La barre de navigation des tablettes et ordinateurs : une capsule de verre en haut, avec le logo
-// (retour à l'accueil), « Nouveau projet » et l'avatar (mon compte). Sur téléphone, elle n'apparaît
+// (retour à l'accueil), « Nouveau projet », la cloche des notifications et l'avatar (mon compte). Sur téléphone, elle n'apparaît
 // pas : la barre d'onglets du bas arrivera avec le fil (tranche 4).
 // « Publier un projet » est un bouton secondaire : l'action principale (en miel) reste celle de la
 // page (« Publier », « Tester la démo »). Le formulaire de projet le masque (`hideNewProject`).
@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
+import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -48,6 +49,8 @@ export function TopNav({ hideNewProject = false }: Props) {
               onPress={() => router.push('/projects/new')}
             />
           )}
+          {/* La cloche des notifications, avec le nombre de nouveautés (tranche 6b). */}
+          <NotificationBell />
           <Pressed label={t('home.account')} onPress={() => router.push('/account')}>
             <Avatar name={name} source={toSource(me.data?.avatarUrl)} label={name} size={44} />
           </Pressed>
