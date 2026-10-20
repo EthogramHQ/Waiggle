@@ -22,6 +22,26 @@ export const invalid = (value: boolean): object =>
   Platform.OS === 'web' && value ? { 'aria-invalid': true } : {}
 
 /**
+ * À étaler sur le champ d'une liste de suggestions (`{...comboboxLinks(listId, open, activeId)}`),
+ * sur le web : `aria-autocomplete` dit qu'une liste propose de compléter ce qu'on tape,
+ * `aria-controls` désigne cette liste (son `nativeID`), et `aria-activedescendant` le choix en
+ * surbrillance, que le lecteur d'écran lit pendant que le focus reste dans le champ. Absents des
+ * types de React Native ; sur téléphone, on touche directement les choix.
+ */
+export const comboboxLinks = (
+  listId: string,
+  open: boolean,
+  activeId: string | undefined,
+): object =>
+  Platform.OS === 'web'
+    ? {
+        'aria-autocomplete': 'list',
+        ...(open ? { 'aria-controls': listId } : null),
+        ...(open && activeId ? { 'aria-activedescendant': activeId } : null),
+      }
+    : {}
+
+/**
  * À étaler sur un bouton qui reste enfoncé une fois touché (une réaction posée) : `aria-pressed`
  * sur le web, que react-native-web transmet au navigateur (le lecteur d'écran dit « activé ») ;
  * sur téléphone, l'état « sélectionné », que React Native sait annoncer.

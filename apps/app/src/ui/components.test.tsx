@@ -17,6 +17,7 @@ import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { MemberHeader } from './MemberHeader'
+import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
@@ -1575,5 +1576,86 @@ describe('MemberHeader with a handle', () => {
     // Le titre reste le seul nom : un lecteur d'écran annonce « Léa, titre », puis « @lea ».
     expect(screen.getByRole('header', { name: 'Léa' })).toBeTruthy()
     expect(screen.getByText('@lea')).toBeTruthy()
+  })
+})
+
+describe('MentionField, beyond the end of the text', () => {
+  const suggestions = [{ id: 'u5', name: 'Inès Morel', handle: 'ines_morel', avatar: null }]
+
+  /** Le champ et son texte, comme dans un écran. */
+  function Field({ initial }: { initial: string }) {
+    const [value, setValue] = useState(initial)
+    return (
+      <MentionField
+        label="Ton commentaire"
+        value={value}
+        onChangeText={setValue}
+        suggestions={suggestions}
+        suggestionsLabel="Membres à mentionner"
+        onQueryChange={() => {}}
+        multiline
+      />
+    )
+  }
+
+  it('completes the mention typed in the middle of the text, where the cursor is', async () => {
+    await renderWithProviders(<Field initial="Bravo @in, à demain." />)
+    const field = screen.getByLabelText('Ton commentaire')
+
+    // Le curseur juste après « @in » (le champ le dit par onSelectionChange).
+    await fireEvent(field, 'selectionChange', { nativeEvent: { selection: { start: 9, end: 9 } } })
+    await fireEvent.press(screen.getByRole('option', { name: /Inès Morel/ }))
+
+    // Seul « @in » est remplacé ; la suite (qui commence par une virgule) reste.
+    expect(field).toHaveDisplayValue('Bravo @ines_morel , à demain.')
+  })
+
+  it('closes the list when the field loses the focus', async () => {
+    await renderWithProviders(<Field initial="Bravo @in" />)
+    expect(screen.getByRole('listbox', { name: 'Membres à mentionner' })).toBeTruthy()
+
+    await fireEvent(screen.getByLabelText('Ton commentaire'), 'blur')
+
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('lets a second Escape close the comment, once the list is closed (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const onCancel = jest.fn()
+      await renderWithProviders(
+        <NoteComposer
+          open
+          onOpen={() => {}}
+          onCancel={onCancel}
+          value="Bravo @in"
+          onChangeText={() => {}}
+          onSubmit={() => {}}
+          max={1000}
+          labels={{
+            open: 'Écrire un commentaire',
+            field: 'Ton commentaire',
+            hint: 'Tous les membres le liront.',
+            submit: 'Publier le commentaire',
+            cancel: 'Annuler',
+          }}
+          mentions={{ suggestions, label: 'Membres à mentionner', onQueryChange: () => {} }}
+          autoFocus={false}
+        />,
+      )
+      const pressEscape = () =>
+        fireEvent(screen.getByLabelText('Ton commentaire'), 'keyPress', {
+          nativeEvent: { key: 'Escape', preventDefault: jest.fn() },
+        })
+
+      await pressEscape()
+      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(onCancel).not.toHaveBeenCalled()
+
+      await pressEscape()
+      expect(onCancel).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
   })
 })
