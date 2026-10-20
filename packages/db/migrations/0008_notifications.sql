@@ -1,6 +1,7 @@
 CREATE TABLE "comment_mention" (
 	"comment_id" uuid NOT NULL,
 	"member_id" text NOT NULL,
+	"handle" text NOT NULL,
 	"created_at" timestamp NOT NULL,
 	CONSTRAINT "comment_mention_comment_id_member_id_pk" PRIMARY KEY("comment_id","member_id")
 );

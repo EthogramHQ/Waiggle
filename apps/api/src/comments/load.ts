@@ -9,6 +9,7 @@ import {
   type Comment,
   type CommentPage,
   type CommentReply,
+  type Mention,
   type Project,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -27,6 +28,7 @@ import {
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
+import { mentionsOf } from '../mentions/load'
 import { mediaUrl } from '../profile/me'
 
 type Reader = Pick<Database, 'select'>
@@ -89,7 +91,7 @@ export const sees = (row: Pick<CommentRow, 'authorId' | 'hiddenAt'>, viewer: Vie
  * La même règle, écrite en SQL pour les colonnes de project_comment ou d'un de ses « alias » (la
  * même table sous un autre nom, voir loadCommentPage). Elle doit dire exactement ce que dit `sees`.
  */
-const seesSql = (
+export const seesSql = (
   table: { hiddenAt: Column; authorId: Column },
   viewer: Viewer,
 ): SQL | undefined => {
@@ -104,12 +106,15 @@ const seesSql = (
  * tout. `hasShownReplies` : pour une racine, au moins une de ses réponses est montrée à ce membre ;
  * elle reste alors à sa place sous forme d'emplacement (« Commentaire supprimé », « Commentaire
  * masqué »), sans auteur ni texte, pour que les réponses gardent leur fil.
+ * `mentions` : les membres que mentionne son texte (mentions/load.ts) ; un emplacement n'en a
+ * jamais, puisqu'il ne montre pas le texte.
  */
 export const presentComment = (
   row: CommentRow,
   viewer: Viewer,
   authors: Map<string, ProjectAuthor>,
   hasShownReplies: boolean,
+  mentions: Mention[] = [],
 ): CommentReply | null => {
   const base = {
     id: row.id,
@@ -118,7 +123,7 @@ export const presentComment = (
   }
   const placeholder = (state: 'hidden' | 'deleted'): CommentReply | null =>
     hasShownReplies
-      ? { ...base, author: null, body: '', editedAt: null, state, isMine: false }
+      ? { ...base, author: null, body: '', editedAt: null, state, isMine: false, mentions: [] }
       : null
   if (row.deletedAt !== null) return placeholder('deleted')
   const author = row.authorId === null ? undefined : authors.get(row.authorId)
@@ -132,6 +137,7 @@ export const presentComment = (
     body: row.body,
     state: row.hiddenAt === null ? 'visible' : 'hidden',
     isMine: row.authorId === viewer.id,
+    mentions,
   }
 }
 
@@ -170,8 +176,9 @@ export const authorsOf = async (
 /**
  * Une page de commentaires d'un projet, telle que la voit `viewer` : 20 racines au plus, de la plus
  * récente à la plus ancienne, après le curseur s'il y en a un ; sous chacune, ses réponses montrées
- * à ce membre, de la plus ancienne à la plus récente (50 au plus). Toujours trois requêtes, quel
- * que soit le nombre de commentaires : les racines, leurs réponses, leurs auteurs.
+ * à ce membre, de la plus ancienne à la plus récente (50 au plus). Toujours quatre requêtes au
+ * plus, quel que soit le nombre de commentaires : les racines, leurs réponses, leurs auteurs, et
+ * les membres qu'ils mentionnent.
  */
 export const loadCommentPage = async (
   db: Reader,
@@ -288,12 +295,24 @@ export const loadCommentPage = async (
     publicApiUrl,
   )
 
+  // 4. Les mentions des commentaires dont ce membre lit le texte (ni supprimés, ni sans auteur, ni
+  // masqués pour lui), en une requête : une place vide ne montre pas de mention.
+  const read = [...page, ...[...repliesByRoot.values()].flat()].filter(
+    (row) =>
+      row.deletedAt === null &&
+      row.authorId !== null &&
+      authors.has(row.authorId) &&
+      sees(row, viewer),
+  )
+  const mentions = await mentionsOf(db, read)
+  const mentionsFor = (row: CommentRow) => mentions.get(row.id) ?? []
+
   const items = page.flatMap((root): Comment[] => {
     const replies = (repliesByRoot.get(root.id) ?? [])
       // Redit en JavaScript : la requête a déjà écarté les réponses qu'il ne voit pas.
       .filter((row) => sees(row, viewer))
-      .flatMap((row) => presentComment(row, viewer, authors, false) ?? [])
-    const shownRoot = presentComment(root, viewer, authors, replies.length > 0)
+      .flatMap((row) => presentComment(row, viewer, authors, false, mentionsFor(row)) ?? [])
+    const shownRoot = presentComment(root, viewer, authors, replies.length > 0, mentionsFor(root))
     return shownRoot ? [{ ...shownRoot, replies }] : []
   })
 

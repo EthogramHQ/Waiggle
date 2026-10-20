@@ -158,7 +158,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', meRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', projectRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
-  app.route('/', memberRoutes({ db, publicApiUrl }))
+  app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
   app.route('/', followRoutes({ db, limiter }))
   app.route('/', noteRoutes({ db, limiter }))
