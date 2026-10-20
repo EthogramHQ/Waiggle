@@ -346,7 +346,9 @@ describe('ProjectFormScreen, editing', () => {
     jest.mocked(getProject).mockResolvedValue({ ...recipesProject, isMine: false })
     await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
 
-    expect(await screen.findByText('Seul l’auteur peut modifier ce projet.')).toBeTruthy()
+    expect(
+      await screen.findByText('Seule la personne qui a publié ce projet peut le modifier.'),
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
   })
 

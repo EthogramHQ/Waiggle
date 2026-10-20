@@ -310,7 +310,7 @@ export const fr = {
       add: 'Écrire un commentaire',
       addShort: 'Commenter',
       field: 'Ton commentaire',
-      hint: 'Tous les membres connectés liront ton commentaire. L’auteur du projet peut le masquer.',
+      hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
       hintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
       about: '{{name}} : {{text}}',
@@ -322,7 +322,7 @@ export const fr = {
       reply: 'Répondre',
       replyField: 'Ta réponse',
       replyHint:
-        'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; l’auteur du projet peut la masquer.',
+        'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient public, tous les membres la liront.',
       replySubmit: 'Publier la réponse',
@@ -333,9 +333,9 @@ export const fr = {
       edit: 'Modifier le commentaire',
       editShort: 'Modifier',
       editHint:
-        'Tous les membres connectés liront la nouvelle version, marquée « modifié ». L’auteur du projet peut la masquer.',
+        'Tous les membres connectés liront la nouvelle version, marquée « modifié ». La personne qui a publié le projet peut la masquer.',
       editHintHidden:
-        'Ce commentaire est masqué : il ne reste visible que de toi et de l’auteur du projet.',
+        'Ce commentaire est masqué : il ne reste visible que de toi et de la personne qui a publié le projet.',
       editSubmit: 'Enregistrer',
       editError: 'Le commentaire n’a pas pu être modifié. Réessaie.',
       saved: 'Commentaire modifié.',
@@ -353,9 +353,11 @@ export const fr = {
       unhide: 'Démasquer le commentaire',
       hideShort: 'Masquer',
       unhideShort: 'Démasquer',
-      hiddenBanner: 'Masqué par l’auteur du projet : les autres membres ne le voient plus.',
+      hiddenBanner:
+        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
       hiddenByMe: 'Masqué par toi',
-      hiddenDone: 'Commentaire masqué : il ne reste visible que de son auteur et de toi.',
+      hiddenDone:
+        'Commentaire masqué : il ne reste visible que de toi et de la personne qui l’a écrit.',
       shownDone: 'Commentaire de nouveau visible par tous.',
       hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
       deletedPlaceholder: 'Commentaire supprimé',
@@ -386,7 +388,7 @@ export const fr = {
       notFoundTitle: 'Ce projet est introuvable',
       notFound: 'Il a peut-être été supprimé, ou le lien est incorrect.',
       home: 'Retour à l’accueil',
-      notMine: 'Seul l’auteur peut modifier ce projet.',
+      notMine: 'Seule la personne qui a publié ce projet peut le modifier.',
     },
     errors: {
       checkFields: 'Vérifie les champs en rouge.',
@@ -480,7 +482,8 @@ export const fr = {
     followingCaption:
       'Les nouveaux projets des personnes que tu suis, et les notes des projets suivis.',
     discoverCaption: 'Les derniers projets publiés par les membres.',
-    testersCaption: 'Les projets à essayer : leurs auteurs attendent tes retours.',
+    testersCaption:
+      'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
     end: 'Tu es à jour',
@@ -527,7 +530,7 @@ export const fr = {
     projectFollows_one: '{{count}} personne de plus suit « {{title}} »',
     projectFollows_other: '{{count}} personnes de plus suivent « {{title}} »',
     hidden:
-      'Ton commentaire sur « {{title}} » a été masqué par l’auteur du projet. Toi et l’auteur du projet le voyez encore.',
+      'Ton commentaire sur « {{title}} » a été masqué par la personne qui a publié le projet. Il reste visible pour toi et pour cette personne.',
     handle: 'Ton pseudo est @{{handle}}, tiré de ton nom. Tu peux le changer dans Mon profil.',
   },
   errors: {
