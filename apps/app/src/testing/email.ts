@@ -25,4 +25,4 @@ export const mentionsToken = `v1.dTE.mentions.${signature}`
 export const refusedToken = `v1.dTE.recap.${'A'.repeat(43)}`
 
 /** Un jeton abîmé (une sorte inconnue, une signature coupée) : « Lien invalide » dès l'ouverture. */
-export const malformedToken = 'v1.dTE.weekly.Zm9yLXRlc3Rz'
+export const malformedToken = 'v1.dTE.weekly.Zm9yLXRlc3Rz' // gitleaks:allow
