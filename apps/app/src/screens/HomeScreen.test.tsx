@@ -5,6 +5,8 @@ import { appName } from '@ruche/brand'
 import type { FeedItem, FeedPage, FollowingFeedPage, Project } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
+import { createI18n } from '../i18n'
+import { useUnreadCount } from '../notifications/api'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithI18n, setDesktopWindow } from '../testing/render'
 import { HomeScreen } from './HomeScreen'
@@ -22,6 +24,8 @@ jest.mock('../feed/api', () => ({
   useDiscoverFeed: jest.fn(),
   useFeedNews: jest.fn(),
 }))
+// Le nombre de la cloche (tranche 6b) : un faux hook, choisi par chaque test.
+jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
 const mockPush = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/',
@@ -110,6 +114,7 @@ beforeEach(() => {
   jest.mocked(useFollowingFeed).mockReset()
   jest.mocked(useDiscoverFeed).mockReset()
   jest.mocked(useFeedNews).mockReset()
+  jest.mocked(useUnreadCount).mockReset().mockReturnValue(0)
   mockFollowing()
   mockDiscover()
   mockNews({ count: null, more: false })
@@ -446,5 +451,53 @@ describe('notes in the « following » feed on the home screen', () => {
 
     expect(screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+  })
+})
+
+// --- Tranche 6b : la cloche des notifications, à côté de « Mes projets » sur téléphone ---
+
+describe('the notification bell on the home screen of a phone', () => {
+  const { t } = createI18n('fr')
+
+  it('says how many groups are new, next to « my projects »', async () => {
+    jest.mocked(useUnreadCount).mockReturnValue(1)
+    await renderMemberHome()
+
+    expect(screen.getByRole('button', { name: 'Mes projets' })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: t('notifications.bellNew', { count: 1 }) }),
+    ).toBeTruthy()
+    expect(screen.getByText('1', { includeHiddenElements: true })).toBeTruthy()
+  })
+
+  it('stops at « 9+ » beyond nine', async () => {
+    jest.mocked(useUnreadCount).mockReturnValue(10)
+    await renderMemberHome()
+
+    expect(screen.getByRole('button', { name: t('notifications.bellNewMany') })).toBeTruthy()
+    expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
+  })
+
+  it('shows no badge when nothing is new', async () => {
+    await renderMemberHome()
+
+    expect(screen.getByRole('button', { name: t('notifications.bell') })).toBeTruthy()
+    expect(screen.queryByText('0', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('opens the notifications', async () => {
+    await renderMemberHome()
+
+    await fireEvent.press(screen.getByRole('button', { name: t('notifications.bell') }))
+
+    expect(mockPush).toHaveBeenCalledWith('/notifications')
+  })
+
+  it('is not offered to a visitor', async () => {
+    await renderWithI18n(<HomeScreen />)
+
+    // Témoin : l'accueil du visiteur est bien affiché.
+    expect(screen.getByRole('button', { name: 'Créer un compte' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: t('notifications.bell') })).toBeNull()
   })
 })

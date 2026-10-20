@@ -1,6 +1,7 @@
 // Commentaires d'exemple pour les tests de l'appli (tranche 5) : des fils sur le projet de Léa,
-// tels que l'API les donne (GET /v1/projects/{id}/comments).
-import type { Comment, CommentReply } from '@ruche/contracts'
+// tels que l'API les donne (GET /v1/projects/{id}/comments). Depuis la tranche 6b, chaque
+// commentaire a aussi ses mentions (vides par défaut), et Inès peut être mentionnée.
+import type { Comment, CommentReply, Mention, Mentionable } from '@ruche/contracts'
 
 export const leaAuthor = { id: 'u1', name: 'Léa', avatarUrl: null }
 export const maxAuthor = { id: 'u2', name: 'Max', avatarUrl: null }
@@ -15,8 +16,30 @@ export const replyOf = (
   editedAt: null,
   state: 'visible',
   isMine: false,
+  mentions: [],
   ...fields,
 })
+
+// --- Tranche 6b : les mentions ---
+
+/** Inès, telle que les suggestions la proposent après « @in ». */
+export const inesMember: Mentionable = {
+  id: 'u5',
+  name: 'Inès Morel',
+  handle: 'ines_morel',
+  avatarUrl: null,
+}
+
+/** Iniko, un second membre dont le pseudo commence par « in ». */
+export const inikoMember: Mentionable = {
+  id: 'u6',
+  name: 'Iniko Diallo',
+  handle: 'iniko',
+  avatarUrl: null,
+}
+
+/** La mention d'Inès, telle que l'API la rend avec un commentaire : le pseudo écrit, et son membre. */
+export const inesMention: Mention = { handle: 'ines_morel', memberId: inesMember.id }
 
 /** Un commentaire racine, avec ses réponses (aucune par défaut). */
 export const commentOf = ({
