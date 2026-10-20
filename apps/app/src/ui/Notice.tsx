@@ -71,9 +71,10 @@ export function Notice({ message, tone = 'error', polite = false, action }: Prop
   if (!action) return alert
   // Avec une action : le cadre entoure le message et le lien. Le cadre lui-même n'est pas
   // « accessible » : sur iOS, il regrouperait ses enfants et VoiceOver n'atteindrait plus le lien.
-  // Le lien s'aligne sur le texte du message (après l'icône de 20 points et l'écart).
+  // Le lien s'aligne sur le texte du message (après l'icône de 20 points et l'écart). Sa zone à
+  // toucher (44 points) donne déjà de l'air sous le mot : pas de marge du cadre en dessous.
   return (
-    <View style={frame}>
+    <View style={[frame, { paddingBottom: 0 }]}>
       {alert}
       <View style={{ paddingLeft: ICON_SIZE + space.sm, alignItems: 'flex-start' }}>
         <TextLink label={action.label} onPress={action.onPress} tone={look.text} />
