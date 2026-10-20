@@ -11,6 +11,12 @@ import { createMemoryStorage } from '../media/storage'
 
 export const TEST_APP_URL = 'http://localhost:8081'
 export const TEST_API_URL = 'http://localhost:3000'
+/**
+ * La clé secrète de l'API des tests (BETTER_AUTH_SECRET en production). Les liens de
+ * désinscription des e-mails sont signés avec une clé qui en est dérivée (tranche 6c) : les tests
+ * s'en servent pour fabriquer un lien valide, comme le ferait un e-mail.
+ */
+export const TEST_AUTH_SECRET = 'test-secret-that-is-long-enough-for-tests'
 
 /**
  * Un hachage de mot de passe rapide, pour les tests seulement. scrypt, celui de la production,
@@ -60,7 +66,7 @@ export const createTestContext = async ({
     db,
     mailer,
     storage,
-    secret: 'test-secret-that-is-long-enough-for-tests',
+    secret: TEST_AUTH_SECRET,
     publicApiUrl: TEST_API_URL,
     appUrl: TEST_APP_URL,
     rateLimit: true,
