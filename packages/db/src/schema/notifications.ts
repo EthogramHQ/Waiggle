@@ -21,6 +21,9 @@ export const commentMention = pgTable(
     memberId: text('member_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    // Le pseudo tel qu'il était écrit dans le texte (minuscules, sans « @ ») : l'appli en fait un
+    // lien vers ce membre, même s'il a changé de pseudo depuis ou si un autre a repris l'ancien.
+    handle: text('handle').notNull(),
     // La date de la mention : celle du commentaire, ou celle de la modification qui l'a ajoutée.
     // C'est la date de la notification. Écrite par l'API (horloge que les tests remplacent).
     createdAt: timestamp('created_at').notNull(),
