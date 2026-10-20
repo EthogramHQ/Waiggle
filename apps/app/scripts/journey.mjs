@@ -210,6 +210,15 @@ try {
   const renamed = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
   expectEqual('pseudo de Léa', renamed.handle, handle)
 
+  // Tranche 6c : un réglage d'e-mail s'enregistre dès qu'on le touche, sans « Enregistrer ».
+  step('Léa coupe le récap de la semaine ; la page rechargée le montre coupé')
+  await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: true }).click()
+  await lea.page.getByText('Réglage enregistré.').waitFor()
+  await open(lea.page, `${appUrl}/profile`)
+  await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: false }).waitFor()
+  const emails = await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()
+  expectEqual('récap de Léa', emails.weeklyRecap, false)
+
   step('Sam ne suit personne : son fil le dit ; il lit le pseudo de Léa et la suit depuis sa page')
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()

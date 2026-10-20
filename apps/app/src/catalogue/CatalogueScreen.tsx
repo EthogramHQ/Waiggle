@@ -187,6 +187,8 @@ export function CatalogueScreen() {
         <Notice message={l.errorMessage} />
         <Notice tone="info" message={l.infoMessage} />
         <Notice tone="success" message={l.successMessage} />
+        {/* Avec une action : un lien sous le message (« Me reconnecter », tranche 6c). */}
+        <Notice message={l.expired} action={{ label: l.signInAgain, onPress: () => {} }} />
       </Section>
 
       <Section title={l.surfaces}>
@@ -251,6 +253,7 @@ export function CatalogueScreen() {
           <ListRow label={l.signOut} trailing="sign-out" onPress={() => {}} />
           <ListRow label={l.deleteAccount} tone="danger" trailing="trash" onPress={() => {}} />
         </ListGroup>
+        <EmailSwitches l={l} />
       </Section>
 
       {/* Les états d'une page qui n'a pas (encore) son contenu : toujours une issue. */}
@@ -486,6 +489,17 @@ export function CatalogueScreen() {
           text={l.following}
           caption={l.followers}
           error={l.followError}
+        />
+        {/* La session a expiré : réessayer ne sert à rien, le lien mène à la connexion. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          prominent={false}
+          error={l.expired}
+          errorAction={{ label: l.signInAgain, onPress: () => {} }}
         />
         {/* Dans l'en-tête d'une page de membre : le nombre au-dessus, le tout centré. */}
         <FollowButton
@@ -1366,6 +1380,30 @@ function Choicesample({ l }: { l: Labels }) {
       />
       <Switch label={l.switchLabel} hint={l.switchHint} value={notify} onValueChange={setNotify} />
     </Stack>
+  )
+}
+
+/** Des interrupteurs rangés dans un groupe de réglages, comme « E-mails » dans « Mon profil ». */
+function EmailSwitches({ l }: { l: Labels }) {
+  const [recap, setRecap] = useState(true)
+  const [mentions, setMentions] = useState(false)
+  return (
+    <ListGroup title={l.emailsTitle} footer={l.emailsAccount}>
+      <Switch
+        inGroup
+        label={l.emailsRecap}
+        hint={l.emailsRecapHint}
+        value={recap}
+        onValueChange={setRecap}
+      />
+      <Switch
+        inGroup
+        label={l.emailsMentions}
+        hint={l.emailsMentionsHint}
+        value={mentions}
+        onValueChange={setMentions}
+      />
+    </ListGroup>
   )
 }
 

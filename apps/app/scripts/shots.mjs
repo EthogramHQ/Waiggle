@@ -770,6 +770,38 @@ const pages = [
       await page.getByText(/te reste réservé/).waitFor()
     },
   },
+  // Tranche 6c : un réglage d'e-mail touché, enregistré tout de suite (« Réglage enregistré. »).
+  {
+    name: 'profil-email',
+    path: '/profile',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page
+        .getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+        .click()
+      await page.getByText('Réglage enregistré.').waitFor()
+    },
+  },
+  // Tranche 6c : la session expire pendant la visite. Suivre le projet est refusé (401) : le
+  // message, et à côté le lien « Me reconnecter ». La route de cette page passe avant l'API
+  // simulée du contexte.
+  {
+    name: 'session-expiree',
+    path: `/projects/${notMineProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route('**/v1/projects/*/follow', (route) =>
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'unauthorized', message: '' } }),
+        }),
+      )
+      await page.getByRole('switch', { name: /Suivre ce projet|Projet suivi/ }).click()
+      await page.getByRole('link', { name: 'Me reconnecter' }).waitFor()
+    },
+  },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
   { name: 'projet', path: project, signedIn: true, fullPage: true },
   // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note

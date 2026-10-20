@@ -1,6 +1,6 @@
 // Écran affiché juste après l'inscription : « va cliquer sur le lien reçu par e-mail ».
 // L'adresse arrive dans l'URL de la page (/check-email?email=…), lue avec useLocalSearchParams.
-import { SignInRequest } from '@ruche/contracts'
+import { SignInRequest, UNVERIFIED_ACCOUNT_DAYS } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { firstParam } from '../navigation/params'
@@ -38,6 +38,10 @@ export function CheckEmailScreen() {
             {email ? t('auth.checkEmail.body', { email }) : t('auth.checkEmail.bodyNoEmail')}
           </Text>
           <Notice tone="info" message={t('auth.checkEmail.locked')} />
+          {/* La purge de nuit efface une inscription jamais vérifiée (tranche 6c) : on le dit. */}
+          <Text variant="callout" tone="muted" align="center">
+            {t('auth.checkEmail.expires', { days: UNVERIFIED_ACCOUNT_DAYS })}
+          </Text>
           <Button
             label={t('auth.checkEmail.back')}
             variant="secondary"

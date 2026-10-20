@@ -31,7 +31,7 @@ import { focusWithoutScroll } from './focus'
 import { Icon } from './Icon'
 import type { ImageSource } from './image'
 import { MentionText } from './MentionText'
-import { Notice } from './Notice'
+import { Notice, type NoticeAction } from './Notice'
 import { Pressed } from './Pressed'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
@@ -70,6 +70,10 @@ type Props = {
   description?: string | undefined
   /** Une action a échoué : le message, sous les actions. */
   error?: string | undefined
+  /**
+   * Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré, tranche 6c).
+   */
+  errorAction?: NoticeAction | undefined
   /** Le champ de modification, à la place du texte et des actions. */
   editor?: ReactNode
   /** Une réponse : une photo plus petite. */
@@ -101,6 +105,7 @@ export function CommentCard({
   actions = [],
   description,
   error,
+  errorAction,
   editor,
   reply = false,
   handle,
@@ -259,7 +264,7 @@ export function CommentCard({
             ) : null}
           </>
         )}
-        {error ? <Notice message={error} /> : null}
+        {error ? <Notice message={error} action={errorAction} /> : null}
       </View>
     </View>
   )
