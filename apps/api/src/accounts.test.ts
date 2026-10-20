@@ -381,4 +381,23 @@ describe('deleting my account', () => {
     expect(res.ok).toBe(false)
     expect(await ctx.db.select().from(schema.user)).toHaveLength(1)
   })
+
+  // Better Auth accepte, sans mot de passe, une session de moins d'un jour (« fraîche ») : quelqu'un
+  // qui trouve un téléphone ouvert pourrait effacer le compte. On exige le mot de passe, toujours.
+  it.each([
+    ['without a password', {}],
+    ['with an empty password', { password: '' }],
+    ['with a deletion token instead of the password', { token: 'any-token' }],
+  ])('keeps the account when the request comes %s, even from a fresh session', async (_, body) => {
+    const cookies = await signUpAndVerify()
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    expect(res.status).toBe(400)
+    expect(await ctx.db.select().from(schema.user)).toHaveLength(1)
+  })
 })
