@@ -1,5 +1,5 @@
 {
-  "id": "875f2524-95e0-4b2d-adbf-606ac732f1c6",
+  "id": "fa08f06d-b39d-4fc4-b579-3e1130b7dc5a",
   "prevId": "c4430933-8a95-4ce7-a036-cf5a828bfb95",
   "version": "7",
   "dialect": "postgresql",
@@ -110,12 +110,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -162,9 +158,7 @@
         "rate_limit_key_unique": {
           "name": "rate_limit_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -247,12 +241,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -262,9 +252,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -335,9 +323,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -562,12 +548,8 @@
           "name": "project_comment_project_id_project_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -575,12 +557,8 @@
           "name": "project_comment_author_id_user_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "user",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -588,12 +566,8 @@
           "name": "project_comment_root_id_project_comment_id_fk",
           "tableFrom": "project_comment",
           "tableTo": "project_comment",
-          "columnsFrom": [
-            "root_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["root_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -650,12 +624,8 @@
           "name": "member_follow_follower_id_user_id_fk",
           "tableFrom": "member_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "follower_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["follower_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -663,12 +633,8 @@
           "name": "member_follow_member_id_user_id_fk",
           "tableFrom": "member_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -676,10 +642,7 @@
       "compositePrimaryKeys": {
         "member_follow_follower_id_member_id_pk": {
           "name": "member_follow_follower_id_member_id_pk",
-          "columns": [
-            "follower_id",
-            "member_id"
-          ]
+          "columns": ["follower_id", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -738,12 +701,8 @@
           "name": "project_follow_follower_id_user_id_fk",
           "tableFrom": "project_follow",
           "tableTo": "user",
-          "columnsFrom": [
-            "follower_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["follower_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -751,12 +710,8 @@
           "name": "project_follow_project_id_project_id_fk",
           "tableFrom": "project_follow",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -764,10 +719,7 @@
       "compositePrimaryKeys": {
         "project_follow_follower_id_project_id_pk": {
           "name": "project_follow_follower_id_project_id_pk",
-          "columns": [
-            "follower_id",
-            "project_id"
-          ]
+          "columns": ["follower_id", "project_id"]
         }
       },
       "uniqueConstraints": {},
@@ -842,12 +794,8 @@
           "name": "member_handle_user_id_user_id_fk",
           "tableFrom": "member_handle",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -921,12 +869,8 @@
           "name": "project_note_project_id_project_id_fk",
           "tableFrom": "project_note",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -949,6 +893,12 @@
         },
         "member_id": {
           "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handle": {
+          "name": "handle",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -982,12 +932,8 @@
           "name": "comment_mention_comment_id_project_comment_id_fk",
           "tableFrom": "comment_mention",
           "tableTo": "project_comment",
-          "columnsFrom": [
-            "comment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["comment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -995,12 +941,8 @@
           "name": "comment_mention_member_id_user_id_fk",
           "tableFrom": "comment_mention",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1008,10 +950,7 @@
       "compositePrimaryKeys": {
         "comment_mention_comment_id_member_id_pk": {
           "name": "comment_mention_comment_id_member_id_pk",
-          "columns": [
-            "comment_id",
-            "member_id"
-          ]
+          "columns": ["comment_id", "member_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1048,12 +987,8 @@
           "name": "notification_state_user_id_user_id_fk",
           "tableFrom": "notification_state",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1108,12 +1043,8 @@
           "name": "profile_user_id_user_id_fk",
           "tableFrom": "profile",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1313,12 +1244,8 @@
           "name": "project_author_id_user_id_fk",
           "tableFrom": "project",
           "tableTo": "user",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1446,12 +1373,8 @@
           "name": "project_media_project_id_project_id_fk",
           "tableFrom": "project_media",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1461,9 +1384,7 @@
         "project_media_storage_key_unique": {
           "name": "project_media_storage_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
+          "columns": ["storage_key"]
         }
       },
       "policies": {},
@@ -1552,12 +1473,8 @@
           "name": "project_reaction_project_id_project_id_fk",
           "tableFrom": "project_reaction",
           "tableTo": "project",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1565,12 +1482,8 @@
           "name": "project_reaction_member_id_user_id_fk",
           "tableFrom": "project_reaction",
           "tableTo": "user",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1578,11 +1491,7 @@
       "compositePrimaryKeys": {
         "project_reaction_project_id_member_id_kind_pk": {
           "name": "project_reaction_project_id_member_id_kind_pk",
-          "columns": [
-            "project_id",
-            "member_id",
-            "kind"
-          ]
+          "columns": ["project_id", "member_id", "kind"]
         }
       },
       "uniqueConstraints": {},
