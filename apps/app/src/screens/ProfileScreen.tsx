@@ -1,4 +1,6 @@
 // Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
+// Puis la section « E-mails » (tranche 6c) : deux interrupteurs, enregistrés chacun dès qu'on le
+// touche, sans passer par « Enregistrer » (qui ne concerne que le formulaire au-dessus).
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX_LENGTH,
@@ -13,8 +15,10 @@ import {
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import type { ApiErrorKey } from '../api/errors'
+import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useEmailPreferences, useUpdateEmailPreferences } from '../email/api'
+import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
@@ -28,10 +32,12 @@ import { useMe, useSetMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { SheetHeader } from '../ui/SheetHeader'
 import { Row, Stack } from '../ui/Stack'
+import { Switch } from '../ui/Switch'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
@@ -331,6 +337,74 @@ function ProfileForm({ me }: { me: Me }) {
           <Button {...save} />
         </Row>
       ) : null}
+      <EmailSettings />
     </Screen>
+  )
+}
+
+/**
+ * La section « E-mails » : le récap de la semaine (activé par défaut) et l'e-mail de mentions et de
+ * réponses (désactivé par défaut). Chaque interrupteur s'enregistre au toucher ; dessous, la
+ * confirmation (« Réglage enregistré. ») ou ce qui n'a pas marché.
+ */
+function EmailSettings() {
+  const { t } = useTranslation()
+  const preferences = useEmailPreferences()
+  const save = useUpdateEmailPreferences()
+  const signInAgain = useSignInAgain()
+  const data = preferences.data
+
+  // Les réglages ne sont pas encore là : une ligne d'attente, plutôt que des interrupteurs dont la
+  // position serait fausse. Ils n'ont pas pu se charger : le message, et de quoi réessayer.
+  const rows = data
+    ? [
+        <Switch
+          key="weeklyRecap"
+          inGroup
+          label={t('profile.emails.weeklyRecap')}
+          hint={t('profile.emails.weeklyRecapHint')}
+          value={data.weeklyRecap}
+          onValueChange={(weeklyRecap) => save.update({ weeklyRecap })}
+        />,
+        <Switch
+          key="mentionEmails"
+          inGroup
+          label={t('profile.emails.mentionEmails')}
+          hint={t('profile.emails.mentionEmailsHint')}
+          value={data.mentionEmails}
+          onValueChange={(mentionEmails) => save.update({ mentionEmails })}
+        />,
+      ]
+    : preferences.isError
+      ? [
+          <ListRow
+            key="retry"
+            label={t('common.retry')}
+            trailing="arrows-clockwise"
+            onPress={() => void preferences.refetch()}
+          />,
+        ]
+      : [<ListRow key="loading" label={t('common.loading')} />]
+
+  // Le message sous le groupe : l'échec de la lecture, sinon celui du dernier changement, sinon sa
+  // confirmation. Une session expirée : réessayer ne sert à rien, le lien mène à la connexion.
+  const failure = preferences.isError ? errorKey(preferences.error) : save.failure
+  const notice =
+    failure === 'unauthorized' ? (
+      <Notice message={t('states.expired')} action={signInAgain()} />
+    ) : failure ? (
+      <Notice message={t(`errors.${failure}`)} />
+    ) : save.saved ? (
+      // Une confirmation, lue sans couper ce que disait le lecteur d'écran (role « status »).
+      <Notice tone="success" message={t('profile.emails.saved')} polite />
+    ) : null
+
+  return (
+    <Stack gap="md">
+      <ListGroup title={t('profile.emails.title')} footer={t('profile.emails.accountEmails')}>
+        {rows}
+      </ListGroup>
+      {notice}
+    </Stack>
   )
 }

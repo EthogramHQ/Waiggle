@@ -378,7 +378,7 @@ const en: typeof fr = {
   notifLongTitle:
     '2 reactions on “A tasting notebook for specialty coffees with an assistant that suggests the grind”',
   notesSection: 'Project notes',
-  noteLabel: 'Note by Léa on Coffee notebook',
+  noteLabel: 'Léa’s note on Coffee notebook',
   noteBody: 'v2: offline mode. The notes open even without a network, at the end of the garden.',
   noteLong:
     'Big update this weekend. The notebook now recognises ceramic cups as well as glass ones, suggests a grinder setting for each coffee, and keeps a year of tasting history. I also redid the home screen so it fits small phones, fixed the bug with backlit photos, and added a PDF export to share your notes with the family. Next step: a shared mode, to compare our tastes around the same coffee pot. If you want to try it, write to me.',
@@ -409,9 +409,9 @@ const en: typeof fr = {
   ownReactions: 'Reactions to your project',
   reactionGroup: 'React to this project',
   reactionError: 'Your reaction could not be saved. Try again.',
-  maxPage: 'See the page of Max Durand',
-  inesPage: 'See the page of Inès Haddad',
-  leaPage: 'See the page of Léa Moreau',
+  maxPage: 'See Max Durand’s page',
+  inesPage: 'See Inès Haddad’s page',
+  leaPage: 'See Léa Moreau’s page',
   commentBody: 'Great idea, I am trying it tonight with what is left in the fridge.',
   commentLong:
     'I tried it with three different fridges: mine, my parents’ and the one at work. It does very well, except with yesterday’s leftovers, which it takes for fresh ingredients. The code of my test: https://github.com/max-durand/a-very-long-repository-name-to-see-the-line-break',

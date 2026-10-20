@@ -3,7 +3,13 @@
 // va sur un voisin logique au lieu de retomber tout en haut de la page, et la page reste où elle est
 // (preventScroll), là où la personne lisait. Sur téléphone, il n'y a pas de clavier à suivre : rien.
 // À l'inverse, revealWithoutJump fait venir dans l'écran un élément qui vient de s'ouvrir hors de vue.
-import { Platform } from 'react-native'
+import { Platform, type View } from 'react-native'
+
+/**
+ * Ce qu'un écran garde dans une ref pour y poser le focus plus tard (un Button, un TextLink) : les
+ * écrans n'importent rien de react-native, ils passent par ce nom.
+ */
+export type Focusable = View
 
 // Le peu du navigateur dont on a besoin : un élément qu'on peut focaliser, ou faire venir dans
 // l'écran. (Les types de React Native ne décrivent pas la page web.)

@@ -18,7 +18,7 @@ import { Button } from './Button'
 import { focusWithoutScroll, revealWithoutJump } from './focus'
 import { escapeCloses } from './keyboard'
 import { MentionField, type MentionSuggestion } from './MentionField'
-import { Notice } from './Notice'
+import { Notice, type NoticeAction } from './Notice'
 import { TextField } from './TextField'
 import { TextLink } from './TextLink'
 import { useLayout } from './theme/layout'
@@ -53,6 +53,10 @@ type Props = {
   fieldError?: string | undefined
   /** La publication a échoué : le message, au-dessus des boutons (le texte reste dans le champ). */
   error?: string | undefined
+  /**
+   * Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré, tranche 6c).
+   */
+  errorAction?: NoticeAction | undefined
   /** La confirmation, une fois la note publiée (« Note publiée. »), sous le bouton refermé. */
   success?: string | undefined
   /**
@@ -94,6 +98,7 @@ export function NoteComposer({
   labels,
   fieldError,
   error,
+  errorAction,
   success,
   autoFocus = true,
   reveal = false,
@@ -176,7 +181,7 @@ export function NoteComposer({
       ) : (
         <TextField {...fieldProps} />
       )}
-      {error ? <Notice message={error} /> : null}
+      {error ? <Notice message={error} action={errorAction} /> : null}
       {/* « Annuler » en simple lien, comme dans l'en-tête des formulaires : on voit d'emblée lequel
           des deux publie. Ils passent l'un sous l'autre quand la place manque. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.lg }}>

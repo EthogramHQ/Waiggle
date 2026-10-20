@@ -37,6 +37,22 @@ export const fill = (template: string, params: Readonly<Record<string, string>> 
   )
 }
 
+/**
+ * Le nom d'un membre précédé de ce qui le relie au texte, pour {{nameOf}} (tranche 6c) :
+ * - en français, « de » s'élide devant une voyelle (accents compris, y, œ et æ aussi) ou un h :
+ *   « d’Inès », « d’Hugo », « d’Yves », mais « de Léa » ; un nom vide donne « de » suivi de rien ;
+ * - en anglais, le possessif : « Inès’s ».
+ * L'apostrophe est typographique (’, U+2019), comme dans tous les textes. Le texte qui l'utilise
+ * s'écrit sans « de » : « Voir la page {{nameOf}} ».
+ */
+export const nameOf = (language: Language, name: string): string => {
+  if (language === 'en') return `${name}’s`
+  // normalize('NFD') sépare la lettre de son accent (« É » → « E » + accent) : il suffit alors de
+  // regarder la lettre de base. Le drapeau i accepte les minuscules comme les majuscules.
+  const first = name.normalize('NFD').charAt(0)
+  return /^[aeiouyhœæ]$/i.test(first) ? `d’${name}` : `de ${name}`
+}
+
 /** Les textes, dans la forme attendue par la bibliothèque i18next. */
 export const resources = {
   fr: { translation: fr },
