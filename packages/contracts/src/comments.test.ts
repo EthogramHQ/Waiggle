@@ -10,6 +10,7 @@ import {
   EditedComment,
   NewComment,
 } from './comments'
+import { MENTIONS_MAX } from './mentions'
 
 const rootId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const replyId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
@@ -69,6 +70,7 @@ describe('Comment', () => {
     editedAt: null,
     state: 'visible',
     isMine: true,
+    mentions: [],
   }
   const root = {
     id: rootId,
@@ -78,6 +80,8 @@ describe('Comment', () => {
     editedAt: '2026-10-19T09:05:00.000Z',
     state: 'visible',
     isMine: false,
+    // Les mentions (tranche 6b) : Sam y désigne Léa par son pseudo.
+    mentions: [{ handle: 'lea', memberId: 'lea-id' }],
     replies: [reply],
   }
 
@@ -87,7 +91,7 @@ describe('Comment', () => {
 
   it('describes a deleted or hidden placeholder, without author nor text', () => {
     for (const state of ['deleted', 'hidden']) {
-      const placeholder = { ...root, author: null, body: '', state }
+      const placeholder = { ...root, author: null, body: '', state, mentions: [] }
       expect(Comment.parse(placeholder)).toEqual(placeholder)
     }
   })
@@ -109,6 +113,20 @@ describe('Comment', () => {
     }))
     expect(Comment.safeParse({ ...root, replies: replies.slice(0, -1) }).success).toBe(true)
     expect(Comment.safeParse({ ...root, replies }).success).toBe(false)
+  })
+
+  it('carries at most 5 mentions, each with the handle as written and the member it named', () => {
+    const mentions = Array.from({ length: MENTIONS_MAX + 1 }, (_, i) => ({
+      handle: `membre${i}`,
+      memberId: `member-${i}`,
+    }))
+    expect(Comment.safeParse({ ...root, mentions: mentions.slice(0, -1) }).success).toBe(true)
+    expect(Comment.safeParse({ ...root, mentions }).success).toBe(false)
+    // Une mention sans membre n'en est pas une : l'appli ne ferait pas de lien.
+    expect(Comment.safeParse({ ...root, mentions: [{ handle: 'lea' }] }).success).toBe(false)
+    // Le champ est obligatoire : vide quand le commentaire ne mentionne personne.
+    const { mentions: _omitted, ...withoutMentions } = root
+    expect(Comment.safeParse(withoutMentions).success).toBe(false)
   })
 
   it('paginates roots 20 by 20, with an opaque cursor', () => {
