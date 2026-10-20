@@ -401,7 +401,10 @@ const notificationPages = (choice) => {
         at: hoursAgo(2),
         isNew: true,
         project: notified(recipesProject),
-        comment: { id: commentIdOf(1), excerpt: 'Super idée, je teste ce soir avec ce qu’il reste dans le…' },
+        comment: {
+          id: commentIdOf(1),
+          excerpt: 'Super idée, je teste ce soir avec ce qu’il reste dans le…',
+        },
         author: { ...max, handle: 'max' },
       },
       {
