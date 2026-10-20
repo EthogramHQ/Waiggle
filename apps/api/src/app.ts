@@ -24,6 +24,7 @@ import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { noteRoutes } from './routes/notes'
+import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { tagRoutes } from './routes/tags'
@@ -164,6 +165,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
+  app.route('/', notificationRoutes({ db, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

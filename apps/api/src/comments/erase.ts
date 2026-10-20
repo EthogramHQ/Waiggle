@@ -70,10 +70,22 @@ const eraseComments = (db: Database, owned: Owned) =>
       .where(and(owned(c), isNull(c.rootId)))
       .for('update')
 
-    await tx
+    const emptied = await tx
       .update(c)
       .set({ body: '', authorId: null, editedAt: null, hiddenAt: null, deletedAt: new Date() })
       .where(and(owned(c), isNull(c.rootId), exists(repliesOf(c.id, true))))
+      .returning({ id: c.id })
+    // Les mentions partent avec le texte (tranche 6b) : un « Commentaire supprimé » ne mentionne
+    // plus personne. Les commentaires effacés à l'étape 2 emportent les leurs seuls (cascade).
+    // La clé primaire de comment_mention (comment_id, …) les trouve.
+    if (emptied.length > 0) {
+      await tx.delete(schema.commentMention).where(
+        inArray(
+          schema.commentMention.commentId,
+          emptied.map(({ id }) => id),
+        ),
+      )
+    }
 
     const erased = await tx.delete(c).where(owned(c)).returning({ rootId: c.rootId })
 

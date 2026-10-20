@@ -4,11 +4,13 @@
 // - backfillHandles : la même chose pour tous les membres d'avant la tranche, au démarrage
 //   (avec purgeExpiredHandles, qui efface les réservations finies) ;
 // - claimHandle : un membre choisit lui-même son pseudo (PATCH /v1/me).
-// La table member_handle est décrite dans packages/db/src/schema/handles.ts.
+// La table member_handle est décrite dans packages/db/src/schema/handles.ts. Un pseudo donné fait
+// aussi naître la ligne notification_state du membre (tranche 6b, notifications/state.ts).
 import { type Database, schema } from '@ruche/db'
 import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
-import { and, asc, eq, inArray, isNotNull, isNull, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm'
 import { describeError } from '../log'
+import { createNotificationState } from '../notifications/state'
 import { currentHandle, currentHandleOf, reservationCutoff } from './load'
 import { handleBase, handleCandidates } from './suggest'
 
@@ -121,6 +123,9 @@ const lockMember = async (tx: Database, userId: string) => {
  * ce filet pouvait écrire un second pseudo actuel : la base le refusait (index unique partiel
  * member_handle_current_idx) et le membre recevait une erreur 500. Avec lui, le second arrivé
  * attend le premier, puis relit le pseudo actuel : il le trouve, et ne fait rien.
+ *
+ * Dans la même transaction naît sa ligne notification_state (tranche 6b), datée du même instant :
+ * c'est la date de sa première notification, « Ton pseudo est @… ».
  */
 const giveHandle = (db: Database, userId: string, now: Date): Promise<string | null> =>
   db.transaction(async (tx) => {
@@ -128,7 +133,9 @@ const giveHandle = (db: Database, userId: string, now: Date): Promise<string | n
     if (!member?.emailVerified) return null
     const existing = await currentHandle(tx, userId)
     if (existing) return existing
-    return assignHandle(tx, member, now)
+    const handle = await assignHandle(tx, member, now)
+    await createNotificationState(tx, userId, now)
+    return handle
   })
 
 /**
@@ -167,7 +174,42 @@ export const backfillHandles = async (db: Database): Promise<number> => {
       })
     }
   }
+  await backfillNotificationStates(db, now)
   return given
+}
+
+/**
+ * Le rattrapage de la tranche 6b : chaque membre qui a un pseudo actuel mais pas encore de ligne
+ * notification_state (ceux d'avant la tranche) en reçoit une, datée du démarrage : sa première
+ * notification lui dit alors le pseudo qu'il a. Une ligne déjà là ne change pas (« on conflict do
+ * nothing ») : au démarrage suivant, rien ne bouge.
+ *
+ * Une seule requête, « insert … select » : les lignes à insérer sont lues par un select, sans
+ * passer par JavaScript.
+ *   insert into notification_state (user_id, created_at)
+ *   select user_id, $maintenant from member_handle where released_at is null
+ *   on conflict do nothing
+ * L'index partiel member_handle_current_idx donne les pseudos actuels ; la clé primaire de
+ * notification_state repère les lignes déjà là. La date passe par la colonne (sql.param), comme
+ * dans cursor.ts : jamais écrite dans le texte SQL.
+ */
+const backfillNotificationStates = async (db: Database, now: Date) => {
+  const t = schema.notificationState
+  await db
+    .insert(t)
+    .select(
+      db
+        // Drizzle demande toutes les colonnes de la table, dans son ordre : seen_at vide (jamais
+        // ouvert), created_at le démarrage.
+        .select({
+          userId: h.userId,
+          seenAt: sql<Date | null>`null`.as('seen_at'),
+          createdAt: sql<Date>`${sql.param(now, t.createdAt)}::timestamp`.as('created_at'),
+        })
+        .from(h)
+        .where(isNull(h.releasedAt)),
+    )
+    .onConflictDoNothing()
 }
 
 /**
