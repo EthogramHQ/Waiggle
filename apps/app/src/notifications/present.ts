@@ -67,22 +67,15 @@ export const presentNotification = (notification: Notification, t: T): Presented
       const { reason, author, project, comment } = notification
       const name = author.name
       const title = project.title
-      // Un commentaire sur son projet : l'extrait est dans la phrase ; une mention ou une réponse :
-      // il vient dessous, en citation.
-      if (reason === 'comment')
-        return {
-          icon: 'chat-circle',
-          text: t('notifications.comment', { name, title, excerpt: comment.excerpt }),
-          detail: null,
-          quote: null,
-          target: projectRoute(project.id),
-        }
+      // Les trois sortes (sur son projet, une mention, une réponse) écrivent la phrase, puis
+      // l'extrait dessous, en citation : la même forme partout, et l'extrait se lit à part.
+      const sorts = {
+        comment: { icon: 'chat-circle', text: t('notifications.comment', { name, title }) },
+        mention: { icon: 'at', text: t('notifications.mention', { name, title }) },
+        reply: { icon: 'arrow-bend-up-left', text: t('notifications.reply', { name, title }) },
+      } as const
       return {
-        icon: reason === 'mention' ? 'at' : 'arrow-bend-up-left',
-        text:
-          reason === 'mention'
-            ? t('notifications.mention', { name, title })
-            : t('notifications.reply', { name, title }),
+        ...sorts[reason],
         detail: null,
         quote: comment.excerpt,
         target: projectRoute(project.id),

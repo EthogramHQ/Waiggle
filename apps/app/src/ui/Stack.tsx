@@ -2,7 +2,7 @@
 // écart régulier pris dans l'échelle des espaces. C'est la brique de mise en page des écrans : ils
 // n'écrivent ainsi jamais de marge ou d'écart en chiffres.
 import { type Space, space } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { View, type ViewStyle } from 'react-native'
 
 type Props = {
@@ -59,13 +59,26 @@ export function Stack({
     // minWidth: 0 laisse le texte se replier au lieu de pousser la mise en page hors de l'écran.
     ...(grow ? { flex: 1, minWidth: 0 } : null),
   }
+  // Une liste annoncée (« liste, 8 éléments ») : chaque enfant y devient un élément de liste. Les
+  // lecteurs d'écran disent ainsi combien il y en a, et permettent de sauter d'un élément au suivant.
+  const items =
+    accessibilityRole === 'list'
+      ? Children.toArray(children).map((child, index) => (
+          <View
+            key={isValidElement(child) && child.key !== null ? child.key : index}
+            role="listitem"
+          >
+            {child}
+          </View>
+        ))
+      : children
   return (
     <View
       style={style}
       {...(accessibilityRole ? { accessibilityRole } : null)}
       {...(accessibilityLabel ? { accessibilityLabel } : null)}
     >
-      {children}
+      {items}
     </View>
   )
 }

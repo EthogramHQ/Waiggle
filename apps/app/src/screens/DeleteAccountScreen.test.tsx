@@ -52,7 +52,13 @@ describe('DeleteAccountScreen', () => {
   it('says that the notifications and mentions of the member go too (slice 6b)', async () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
-    expect(screen.getByText('Tes notifications et tes mentions')).toBeTruthy()
+    expect(
+      screen.getByText('Tes notifications, et les liens vers toi dans les commentaires des autres'),
+    ).toBeTruthy()
+    // Le pseudo reste écrit dans le texte des autres : l'écran le dit, sans rien promettre de plus.
+    expect(
+      screen.getByText(/Ton pseudo y reste écrit, en texte simple, sans lien vers toi\./),
+    ).toBeTruthy()
   })
 
   it('lets the member download their data first', async () => {

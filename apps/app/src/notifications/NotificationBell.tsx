@@ -22,7 +22,7 @@ export function NotificationBell() {
     count === 0
       ? t('notifications.bell')
       : count > SHOWN_MAX
-        ? t('notifications.bellNewMany')
+        ? t('notifications.bellNewMany', { max: SHOWN_MAX })
         : t('notifications.bellNew', { count })
   return (
     <IconButton

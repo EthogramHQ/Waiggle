@@ -18,8 +18,9 @@ type Props = {
 export const badgeText = (count: number, max = 9): string =>
   count > max ? `${max}+` : String(count)
 
-// La taille d'une pastille d'un chiffre : un rond. Plus de chiffres l'allongent en gélule.
-const SIZE = 20
+/** La taille d'une pastille d'un chiffre : un rond. Plus de chiffres l'allongent en gélule. */
+export const BADGE_SIZE = 20
+const SIZE = BADGE_SIZE
 
 export function CountBadge({ count, max = 9 }: Props) {
   const { colors } = useTheme()
@@ -46,9 +47,9 @@ export function CountBadge({ count, max = 9 }: Props) {
         borderColor: colors.background,
       }}
     >
-      {/* Le chiffre grandit avec le réglage de taille, mais moins qu'un texte courant : la
-          pastille reste une pastille. */}
-      <Text variant="micro" weight={700} tone="onBadge" tabular maxScale={1.4}>
+      {/* Le chiffre grandit avec le réglage de taille, mais peu (×1,2 au plus) : la pastille reste
+          une pastille, de la même taille partout, et ne cache pas l'icône qu'elle accompagne. */}
+      <Text variant="micro" weight={700} tone="onBadge" tabular maxScale={1.2}>
         {badgeText(count, max)}
       </Text>
     </View>

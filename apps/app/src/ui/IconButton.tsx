@@ -6,6 +6,7 @@ import type { ReactNode, Ref } from 'react'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
+import { BADGE_SIZE } from './CountBadge'
 import { Icon, type IconName, type IconTone } from './Icon'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -37,6 +38,10 @@ type Props = {
    */
   badge?: ReactNode
 }
+
+// Où s'accroche le coin bas gauche de la pastille, compté depuis le bord droit (et le haut) du
+// bouton : une pastille d'un chiffre dépasse alors de 4 points en haut et à droite (space.xs).
+const BADGE_ANCHOR = BADGE_SIZE - space.xs
 
 export function IconButton({
   icon,
@@ -107,10 +112,18 @@ export function IconButton({
         <Icon name={icon} size={size === 'large' ? 28 : 22} tone={look.tone} />
       </Pressable>
       {badge ? (
-        // Hors du bouton, par-dessus son coin : elle déborde un peu du rond, sans agrandir la zone
-        // à toucher ni décaler l'icône. pointerEvents : un toucher sur la pastille va au bouton.
+        // Par-dessus le coin haut droit : elle déborde un peu du rond, sans agrandir la zone à
+        // toucher ni décaler l'icône. Elle est accrochée par son coin bas gauche (left, bottom) et
+        // non par le haut droit : quand le texte agrandi la fait grossir, elle grandit vers le haut
+        // et vers la droite, hors du bouton, au lieu de recouvrir l'icône. pointerEvents : un
+        // toucher sur la pastille va au bouton.
         <View
-          style={{ position: 'absolute', top: -space.xs, right: -space.xs, pointerEvents: 'none' }}
+          style={{
+            position: 'absolute',
+            left: diameter - BADGE_ANCHOR,
+            bottom: diameter - BADGE_ANCHOR,
+            pointerEvents: 'none',
+          }}
         >
           {badge}
         </View>

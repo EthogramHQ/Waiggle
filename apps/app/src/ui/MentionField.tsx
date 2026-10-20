@@ -6,11 +6,15 @@
 // C'est le motif « combobox » des lecteurs d'écran : le champ garde le focus, la liste (rôle
 // « listbox ») lui est liée, et le choix en surbrillance est lu sans quitter le champ.
 // - au toucher (ou à la souris) : on touche un membre ;
-// - au clavier (web) : flèches haut et bas pour parcourir, Entrée pour choisir, Échap pour refermer
-//   la liste sans rien changer au texte (un second Échap fait ce que fait le champ d'habitude, par
-//   exemple refermer le commentaire en cours) ;
+// - au clavier (web) : le premier membre est déjà en surbrillance, Entrée le choisit ; les flèches
+//   haut et bas parcourent les autres ; Échap referme la liste sans rien changer au texte (un second
+//   Échap fait ce que fait le champ d'habitude, par exemple refermer le commentaire en cours) ;
 // - la liste se referme d'elle-même quand le mot est fini (une espace), et quand le focus quitte
-//   le champ (Tab).
+//   le champ (Tab, qui va au bouton suivant : la liste n'est pas un arrêt de Tab).
+//
+// La liste ne montre que les membres dont le pseudo commence par ce qui est tapé : l'écran peut
+// encore tenir la réponse d'une recherche précédente (« @in » pendant qu'on tape « @ma », avant que
+// la nouvelle réponse n'arrive). Sans ce tri, Entrée choisirait Inès pour « @ma ».
 //
 // La liste prend sa place sous le champ, dans la page : elle apparaît parce qu'on tape, et pousse
 // les boutons dessous plutôt que de les recouvrir.
@@ -101,9 +105,19 @@ export function MentionField({
   const end = Math.min(cursor ?? value.length, value.length)
   const typing = end < 0 ? null : mentionAt(value, end)
   const query = typing && !dismissed ? typing.query : null
-  const open = query !== null && suggestions.length > 0
-  const activeIndex =
-    open && active?.query === query && active.index < suggestions.length ? active.index : -1
+  // Seulement les membres qui répondent à la recherche en cours (voir en tête du fichier).
+  const shown =
+    query === null
+      ? []
+      : suggestions.filter((suggestion) => suggestion.handle.toLowerCase().startsWith(query))
+  const open = shown.length > 0
+  // Le choix en surbrillance : celui des flèches pour cette recherche, sinon le premier (Entrée le
+  // prend tout de suite, sans passer par les flèches).
+  const activeIndex = !open
+    ? -1
+    : active?.query === query && active.index < shown.length
+      ? active.index
+      : 0
   const optionId = (index: number) => `${listId}-${index}`
 
   // L'écran apprend ce qu'on cherche à chaque changement (et null quand on ne cherche plus rien).
@@ -137,12 +151,34 @@ export function MentionField({
     focusWithoutScroll(input.current)
   }
 
+  // Le bouton de la souris s'enfonce sur la liste (web). Le champ va perdre le focus : on note
+  // qu'un choix commence, pour que la liste reste ouverte (voir onBlur). Quand le bouton remonte,
+  // où que ce soit dans la page (on a pu glisser hors de la liste avant de lâcher), on fait le
+  // point juste après le clic : un membre choisi a rendu le focus au champ ; sinon, rien n'est
+  // choisi et le champ n'a plus le focus, la liste se referme au lieu de rester orpheline.
+  const startChoosing = () => {
+    choosing.current = true
+    if (typeof document === 'undefined') return
+    const release = () => {
+      document.removeEventListener('pointerup', release, true)
+      document.removeEventListener('pointercancel', release, true)
+      // setTimeout 0 : après le clic qui suit le relâchement (c'est lui qui choisit).
+      setTimeout(() => {
+        choosing.current = false
+        if (!input.current?.isFocused()) setDismissed(true)
+      }, 0)
+    }
+    // true : à la phase de capture, avant qu'un élément de la page ne puisse arrêter l'évènement.
+    document.addEventListener('pointerup', release, true)
+    document.addEventListener('pointercancel', release, true)
+  }
+
   const keyPress = (event: KeyPress) => {
     const { key } = event.nativeEvent
     // Appelée sur l'évènement lui-même : détachée de lui, le navigateur la refuse (« Illegal invocation »).
     const preventDefault = () => event.nativeEvent.preventDefault?.()
     if (open && query !== null) {
-      const count = suggestions.length
+      const count = shown.length
       if (key === 'ArrowDown' || key === 'ArrowUp') {
         // preventDefault : le curseur ne saute pas au début ou à la fin du texte.
         preventDefault()
@@ -155,12 +191,17 @@ export function MentionField({
         setActive({ query, index: next })
         return
       }
-      const chosen = suggestions[activeIndex]
+      const chosen = shown[activeIndex]
       if (key === 'Enter' && chosen) {
         // preventDefault : Entrée choisit, sans ajouter de retour à la ligne.
         preventDefault()
         choose(chosen)
         return
+      }
+      if (key === 'Tab') {
+        // Tab quitte le champ vers le bouton suivant, comme d'habitude (pas de preventDefault) ;
+        // la liste se referme au passage, sans rien choisir.
+        setDismissed(true)
       }
       if (key === 'Escape') {
         // Échap referme d'abord la liste, et rien d'autre (le champ reste ouvert, son texte aussi).
@@ -202,16 +243,14 @@ export function MentionField({
           nativeID={listId}
           {...LISTBOX}
           accessibilityLabel={suggestionsLabel}
-          // accessible : la liste est un élément nommé pour les lecteurs d'écran ; focusable faux :
-          // ce n'est pas un arrêt de Tab (les flèches, dans le champ, parcourent les choix).
-          accessible
+          // Pas d'« accessible » : sur iOS, il ferait de la liste un seul bloc, et VoiceOver ne
+          // pourrait plus atteindre les membres un par un. focusable faux : ce n'est pas un arrêt
+          // de Tab (les flèches, dans le champ, parcourent les choix).
           focusable={false}
           // Sur le web, le champ perd le focus dès que le bouton de la souris s'enfonce, avant que
           // le choix ne reçoive son « pressIn » : la liste se fermait et le clic tombait dans le
-          // vide. « pointerdown » arrive avant la perte du focus : on note qu'un choix commence.
-          onPointerDown={() => {
-            choosing.current = true
-          }}
+          // vide. « pointerdown » arrive avant la perte du focus : voir startChoosing.
+          onPointerDown={startChoosing}
           style={{
             backgroundColor: colors.surface,
             borderRadius: radii.group,
@@ -221,7 +260,7 @@ export function MentionField({
             overflow: 'hidden',
           }}
         >
-          {suggestions.map((suggestion, index) => {
+          {shown.map((suggestion, index) => {
             const selected = index === activeIndex
             return (
               <Pressable
@@ -233,8 +272,10 @@ export function MentionField({
                   handle: suggestion.handle,
                 })}
                 aria-selected={selected}
-                // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ.
+                // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ. Sur le
+                // web, Pressable pose de lui-même tabIndex 0 : -1 l'en retire.
                 focusable={false}
+                tabIndex={-1}
                 onPressIn={() => {
                   choosing.current = true
                 }}

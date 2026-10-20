@@ -32,6 +32,16 @@ type Props = {
   onPress?: (() => void) | null
 }
 
+/**
+ * Un morceau du nom lu, fini par un point, sauf s'il finit déjà par un signe (« ce soir… »,
+ * « Bravo ! ») : un lecteur d'écran lirait sinon « ce soir… . ». Les espaces de fin comptent pour
+ * rien (l'espace fine avant « ! » non plus : on regarde le dernier caractère visible).
+ */
+export const sentence = (part: string): string => {
+  const trimmed = part.trimEnd()
+  return /[.!?…]$/u.test(trimmed) ? trimmed : `${trimmed}.`
+}
+
 // Le rond de l'icône : assez grand pour se repérer d'un coup d'œil en parcourant la liste.
 const BUBBLE = 40
 
@@ -131,8 +141,11 @@ export function NotificationCard({
     </View>
   )
   if (!onPress) return content
-  // Le nom du lien : tout ce que la carte écrit, « Nouveau » d'abord.
-  const label = [isNew ? newLabel : null, text, detail, quote, when].filter(Boolean).join('. ')
+  // Le nom du lien : tout ce que la carte écrit, « Nouveau » d'abord, en phrases.
+  const label = [isNew ? newLabel : null, text, detail, quote, when]
+    .filter((part): part is string => Boolean(part))
+    .map(sentence)
+    .join(' ')
   return (
     <Pressed label={label} onPress={onPress} role="link" fill>
       {content}

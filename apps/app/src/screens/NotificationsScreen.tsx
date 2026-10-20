@@ -68,20 +68,18 @@ function MemberNotifications() {
           <StateMessage kind="loading" message={t('common.loading')} />
         )
       ) : items.length === 0 ? (
+        // Rien encore : ce qui en fera venir, c'est un projet publié (les autres y réagiront).
         <StateMessage
           kind="empty"
           message={t('notifications.empty')}
           actions={[
-            {
-              label: t('notifications.emptyAction'),
-              onPress: () => router.replace('/'),
-              variant: 'secondary',
-            },
+            { label: t('notifications.emptyAction'), onPress: () => router.push('/projects/new') },
           ]}
         />
       ) : (
         <Stack gap="lg">
-          <Stack gap="sm">
+          {/* Une liste annoncée : « liste, 20 éléments », et on saute d'une notification à l'autre. */}
+          <Stack gap="sm" accessibilityRole="list">
             {items.map((notification) => {
               const shown = presentNotification(notification, t)
               const target = shown.target
