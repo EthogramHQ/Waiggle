@@ -11,7 +11,7 @@ import {
   ProfileUpdate,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
@@ -21,6 +21,7 @@ import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
+import { mentionsOfComments } from '../mentions/load'
 import { notesOfAuthor } from '../notes/load'
 import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
@@ -325,27 +326,12 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const formerHandle = await formerHandleOf(db, user.id, new Date())
 
     // Les membres qu'il mentionne dans ses commentaires (tranche 6b), par leur identifiant : c'est
-    // ce que la base garde de ses mentions. Une requête pour tous ses commentaires :
-    //   select comment_mention.comment_id, comment_mention.member_id from comment_mention
-    //   join project_comment on project_comment.id = comment_mention.comment_id
-    //   where project_comment.author_id = $membre and project_comment.deleted_at is null
-    //   order by comment_mention.created_at, comment_mention.member_id
-    // project_comment_author_idx trouve ses commentaires, puis la clé primaire de comment_mention
-    // (comment_id, member_id) leurs mentions. Jamais les mentions de lui par les autres : elles
-    // sont dans leur texte, pas dans ses données.
-    const m = schema.commentMention
-    const written = await db
-      .select({ commentId: m.commentId, memberId: m.memberId })
-      .from(m)
-      .innerJoin(schema.projectComment, eq(schema.projectComment.id, m.commentId))
-      .where(
-        and(eq(schema.projectComment.authorId, user.id), isNull(schema.projectComment.deletedAt)),
-      )
-      .orderBy(asc(m.createdAt), asc(m.memberId))
-    const mentionsByComment = new Map<string, string[]>()
-    for (const { commentId, memberId } of written) {
-      mentionsByComment.set(commentId, [...(mentionsByComment.get(commentId) ?? []), memberId])
-    }
+    // ce que la base garde de ses mentions. Une requête pour tous ses commentaires
+    // (mentions/load.ts). Jamais les mentions de lui par les autres : elles sont dans leur texte.
+    const mentionsByComment = await mentionsOfComments(
+      db,
+      comments.map((comment) => comment.id),
+    )
     // Jusqu'où il a vu ses notifications. Les notifications elles-mêmes n'y sont pas : elles sont
     // calculées à partir des gestes des autres, qui ne sont pas ses données.
     const seenAt = await readSeenAt(db, user.id)
