@@ -52,8 +52,13 @@ type Element = ReturnType<typeof screen.getByText>
 const textOf = (node: Element): string =>
   node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 
-/** Une expression qui trouve ce texte n'importe où dans un texte plus long (la carte entière). */
-const containing = (text: string) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+/**
+ * Une expression qui trouve ce texte n'importe où dans un texte plus long (la carte entière).
+ * getByText remplace tous les blancs du texte affiché (espaces insécables de « » et « : »
+ * comprises) par des espaces simples : on fait de même avec le texte cherché.
+ */
+const containing = (text: string) =>
+  new RegExp(text.replace(/\s+/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 
 const mockMarkSeen = jest.fn()
 

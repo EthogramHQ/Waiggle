@@ -11,6 +11,7 @@ import { Choices } from './Choices'
 import { CommentCard, type CommentCardHandle } from './CommentCard'
 import { CommentList } from './CommentList'
 import { CommentThread } from './CommentThread'
+import { CountBadge } from './CountBadge'
 import { FeedEnd } from './FeedEnd'
 import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
@@ -23,6 +24,7 @@ import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
 import { Notice } from './Notice'
+import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
@@ -1654,6 +1656,129 @@ describe('MentionField, beyond the end of the text', () => {
 
       await pressEscape()
       expect(onCancel).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+// --- Tranche 6b : la pastille des nouveautés et la carte d'une notification ---
+
+describe('CountBadge', () => {
+  it('writes the number, up to the maximum, then « max+ »', async () => {
+    await renderWithProviders(
+      <>
+        <CountBadge count={3} />
+        <CountBadge count={10} />
+      </>,
+    )
+
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.queryByText('10', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('shows nothing at zero', async () => {
+    await renderWithProviders(<CountBadge count={0} />)
+
+    expect(screen.queryByText('0', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('is hidden from screen readers: the button that carries it says the number', async () => {
+    await renderWithProviders(
+      <IconButton
+        icon="bell"
+        label="Notifications, 3 nouvelles"
+        onPress={() => {}}
+        badge={<CountBadge count={3} />}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Notifications, 3 nouvelles' })).toBeTruthy()
+    // Témoin : la pastille est bien dessinée, mais cachée.
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.queryByText('3')).toBeNull()
+  })
+})
+
+describe('NotificationCard', () => {
+  it('is a link named by everything it says, « new » first', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <NotificationCard
+        icon="heart"
+        text="2 réactions sur « Météo »"
+        detail="Bravo ×2"
+        when="20 oct."
+        isNew
+        newLabel="Nouveau"
+        onPress={onPress}
+      />,
+    )
+
+    await fireEvent.press(
+      screen.getByRole('link', { name: 'Nouveau. 2 réactions sur « Météo ». Bravo ×2. 20 oct.' }),
+    )
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('says « new » only when it is new', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="at"
+        text="Malik parle de toi"
+        quote="Demande à @ines"
+        when="20 oct."
+        isNew={false}
+        newLabel="Nouveau"
+        onPress={() => {}}
+      />,
+    )
+
+    expect(
+      screen.getByRole('link', { name: 'Malik parle de toi. Demande à @ines. 20 oct.' }),
+    ).toBeTruthy()
+    expect(screen.queryByText('Nouveau', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('is neither a link nor a button without a destination', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="user-plus"
+        text="3 personnes de plus te suivent"
+        when="19 oct."
+        isNew
+        newLabel="Nouveau"
+      />,
+    )
+
+    expect(screen.getByText('3 personnes de plus te suivent')).toBeTruthy()
+    expect(screen.getByText('Nouveau')).toBeTruthy()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('opens with Enter on the web, like the other cards', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const onPress = jest.fn()
+      await renderWithProviders(
+        <NotificationCard
+          icon="heart"
+          text="2 réactions"
+          when="20 oct."
+          isNew={false}
+          newLabel="Nouveau"
+          onPress={onPress}
+        />,
+      )
+
+      await fireEvent(screen.getByRole('link'), 'keyDown', {
+        key: 'Enter',
+        repeat: false,
+        preventDefault: () => {},
+      })
+      expect(onPress).toHaveBeenCalledTimes(1)
     } finally {
       jest.restoreAllMocks()
     }

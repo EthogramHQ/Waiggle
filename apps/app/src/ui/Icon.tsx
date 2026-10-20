@@ -23,6 +23,7 @@ const toneColor = {
   onDanger: 'onDanger',
   disabled: 'onHoneyDisabled',
   status: 'statusText',
+  onBadge: 'onBadge',
   honey: 'honey',
   amber: 'amber',
 } as const

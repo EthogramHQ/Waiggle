@@ -386,10 +386,123 @@ const reactionsOf = {
 }
 const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
 
+// Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
+// nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
+// réactions et les abonnés. Chaque page choisit (notifications: 'none' : aucune ; 'many' : la
+// cloche à « 9+ »), et ce choix est donné à sa propre API simulée, comme le fil.
+const hoursAgo = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString()
+const dayOf = (iso) => iso.slice(0, 10)
+const notified = (project) => ({ id: project.id, title: project.title })
+// L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
+const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
+const notificationPages = (choice) => {
+  if (choice === 'none') return [[]]
+  const reactionsAt = hoursAgo(1)
+  const followsAt = hoursAgo(26)
+  const oldAt = hoursAgo(24 * 12)
+  return [
+    [
+      {
+        kind: 'reactions',
+        id: `reactions:${recipesProject.id}:${dayOf(reactionsAt)}`,
+        at: reactionsAt,
+        isNew: true,
+        project: notified(recipesProject),
+        day: dayOf(reactionsAt),
+        counts: { amazing: 0, inspiring: 1, useful: 2, funny: 0, bravo: 3 },
+        total: 6,
+      },
+      {
+        kind: 'comment',
+        reason: 'comment',
+        id: `comment:${commentIdOf(1)}`,
+        at: hoursAgo(2),
+        isNew: true,
+        project: notified(recipesProject),
+        comment: {
+          id: commentIdOf(1),
+          excerpt: 'Super idée, je teste ce soir avec ce qu’il reste dans le…',
+        },
+        author: { ...max, handle: 'max' },
+      },
+      {
+        kind: 'comment',
+        reason: 'mention',
+        id: `comment:${commentIdOf(2)}`,
+        at: hoursAgo(5),
+        isNew: false,
+        project: notified(commentedProject),
+        comment: {
+          id: commentIdOf(2),
+          excerpt: '@lea_moreau avait fait pareil avec ses recettes, demande-lui !',
+        },
+        author: { ...ines, handle: 'ines_haddad' },
+      },
+      {
+        kind: 'comment',
+        reason: 'reply',
+        id: `comment:${commentIdOf(3)}`,
+        at: hoursAgo(8),
+        isNew: false,
+        project: notified(commentedProject),
+        comment: { id: commentIdOf(3), excerpt: 'Oui, la version 2 garde les listes de courses.' },
+        author: { ...max, handle: 'max' },
+      },
+      {
+        kind: 'member_follows',
+        id: `member_follows:${dayOf(followsAt)}`,
+        at: followsAt,
+        isNew: false,
+        day: dayOf(followsAt),
+        count: 3,
+      },
+      {
+        kind: 'project_follows',
+        id: `project_follows:${longProject.id}:${dayOf(followsAt)}`,
+        at: hoursAgo(27),
+        isNew: false,
+        project: notified(longProject),
+        day: dayOf(followsAt),
+        count: 2,
+      },
+      {
+        kind: 'hidden',
+        id: `hidden:${commentIdOf(4)}`,
+        at: hoursAgo(50),
+        isNew: false,
+        project: notified(commentedProject),
+        comment: { id: commentIdOf(4), excerpt: 'Le bouton « Partager » ne marche pas chez moi.' },
+      },
+    ],
+    [
+      {
+        kind: 'reactions',
+        id: `reactions:${photosProject.id}:${dayOf(oldAt)}`,
+        at: oldAt,
+        isNew: false,
+        project: notified(photosProject),
+        day: dayOf(oldAt),
+        counts: { amazing: 1, inspiring: 0, useful: 0, funny: 1, bravo: 0 },
+        total: 2,
+      },
+      {
+        kind: 'handle',
+        id: 'handle',
+        at: hoursAgo(24 * 20),
+        isNew: false,
+        handle: leaMe.handle,
+      },
+    ],
+  ]
+}
+
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
-const fakeApi = (signedIn, feed = 'following') => {
+const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
+  // Les notifications : vues (PUT …/seen) ou non. Vues, la cloche revient à zéro.
+  const notificationList = notificationPages(notifications)
+  let seen = false
   // Ce que Léa change dans ce navigateur : ses réactions, et le nombre de commentaires ajoutés.
   const reactions = structuredClone(reactionsOf)
   const added = {}
@@ -508,6 +621,23 @@ const fakeApi = (signedIn, feed = 'following') => {
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
+    // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
+    if (pathname === '/v1/notifications/unread') {
+      const fresh = notificationList.flat().filter((n) => n.isNew).length
+      return json(200, { count: seen ? 0 : notifications === 'many' ? 10 : fresh })
+    }
+    if (pathname === '/v1/notifications/seen' && method === 'PUT') {
+      seen = true
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/notifications') {
+      const index = url.searchParams.get('cursor') === 'suite' ? 1 : 0
+      return json(200, {
+        items: notificationList[index] ?? [],
+        nextCursor: index + 1 < notificationList.length ? 'suite' : null,
+        asOf: new Date().toISOString(),
+      })
+    }
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
     // recherche, 5 au plus, comme l'API.
@@ -543,6 +673,10 @@ const pages = [
   // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
   { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // Les notifications (tranche 6b) : la liste (avec sa suite), l'écran vide, et la cloche à « 9+ ».
+  { name: 'notifications', path: '/notifications', signedIn: true, fullPage: true },
+  { name: 'notifications-vide', path: '/notifications', signedIn: true, notifications: 'none' },
+  { name: 'cloche-pleine', path: '/', signedIn: true, notifications: 'many' },
   // La page d'un autre membre et son projet : les boutons « Suivre ».
   { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
   { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
@@ -759,18 +893,19 @@ const settle = async (page) => {
 // - base : l'adresse de l'appli ; paths : l'adresse de chaque page photographiée, par son nom ;
 // - open(signedIn, options) : un contexte de navigateur Playwright (visiteur ou Léa connectée),
 //   avec sa propre API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse
-//   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; le reste va à newContext.
+//   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; options.notifications: 'none'
+//   aucune notification, 'many' la cloche à « 9+ » ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, { feed, ...options } = {}) => {
+  const open = async (signedIn, { feed, notifications, ...options } = {}) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed))
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications))
     return context
   }
   try {
@@ -813,7 +948,7 @@ async function layoutReport() {
       viewport: { width: 390, height: 844 },
     })
     try {
-      await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed))
+      await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed, shot.notifications))
       const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
@@ -935,7 +1070,7 @@ const capture = async ({ shot, device, scheme }) => {
     deviceScaleFactor: scale,
   })
   try {
-    await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed))
+    await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed, shot.notifications))
     const page = await context.newPage()
     // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
     page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))

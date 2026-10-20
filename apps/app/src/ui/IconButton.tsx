@@ -1,9 +1,9 @@
 // Un bouton rond qui n'affiche qu'une icône (retour, partager, plus…). Comme on ne voit pas de texte,
 // le nom (`label`) est obligatoire : c'est lui que lisent les lecteurs d'écran (« Retour »), et
 // lui qui permet aux tests de retrouver le bouton.
-import { borders, layout, pressScale, radii } from '@ruche/brand'
-import type { Ref } from 'react'
-import { Platform, Pressable, type View, type ViewStyle } from 'react-native'
+import { borders, layout, pressScale, radii, space } from '@ruche/brand'
+import type { ReactNode, Ref } from 'react'
+import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { Icon, type IconName, type IconTone } from './Icon'
@@ -31,6 +31,11 @@ type Props = {
   hint?: string
   /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteList). */
   ref?: Ref<View>
+  /**
+   * Une pastille posée sur le coin haut droit (le nombre de nouveautés d'une cloche : CountBadge).
+   * Elle ne dit rien aux lecteurs d'écran : le `label` doit contenir le nombre.
+   */
+  badge?: ReactNode
 }
 
 export function IconButton({
@@ -43,6 +48,7 @@ export function IconButton({
   describedBy,
   hint,
   ref,
+  badge,
 }: Props) {
   const { colors, shadows } = useTheme()
   const scale = useSharedValue(1)
@@ -100,6 +106,15 @@ export function IconButton({
       >
         <Icon name={icon} size={size === 'large' ? 28 : 22} tone={look.tone} />
       </Pressable>
+      {badge ? (
+        // Hors du bouton, par-dessus son coin : elle déborde un peu du rond, sans agrandir la zone
+        // à toucher ni décaler l'icône. pointerEvents : un toucher sur la pastille va au bouton.
+        <View
+          style={{ position: 'absolute', top: -space.xs, right: -space.xs, pointerEvents: 'none' }}
+        >
+          {badge}
+        </View>
+      ) : null}
     </Animated.View>
   )
 }

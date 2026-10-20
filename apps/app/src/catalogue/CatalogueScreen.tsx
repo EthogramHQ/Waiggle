@@ -27,6 +27,7 @@ import { CommentCard } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
 import { Constellation } from '../ui/Constellation'
+import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
 import { FeedEnd } from '../ui/FeedEnd'
@@ -49,6 +50,7 @@ import { NoteCard } from '../ui/NoteCard'
 import { NoteComposer } from '../ui/NoteComposer'
 import { NoteList } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
+import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -579,6 +581,79 @@ export function CatalogueScreen() {
         <NoteComposerSample l={l} open value={l.noteBody} pending />
         <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
         <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
+      </Section>
+
+      <Section title={l.notificationsSection}>
+        {/* La cloche : sans nouveauté (pas de pastille), avec 3, puis au-delà de 9 (« 9+ »). Une
+            pastille seule, hors de la cloche, pour voir ses formes. */}
+        <Stack direction="row" gap="lg" wrap>
+          <IconButton
+            icon="bell"
+            label={l.bell}
+            onPress={() => {}}
+            badge={<CountBadge count={0} />}
+          />
+          <IconButton
+            icon="bell"
+            label={l.bellThree}
+            onPress={() => {}}
+            badge={<CountBadge count={3} />}
+          />
+          <IconButton
+            icon="bell"
+            label={l.bellMany}
+            onPress={() => {}}
+            badge={<CountBadge count={10} />}
+          />
+          <CountBadge count={1} />
+          <CountBadge count={42} max={99} />
+        </Stack>
+        {/* Les cartes : nouvelle avec un détail, nouvelle avec l'extrait dans la phrase, déjà vue avec
+            une citation, sans destination (les abonnés au compte), et un titre très long. */}
+        <Stack gap="sm">
+          <NotificationCard
+            icon="heart"
+            text={l.notifReactions}
+            detail={l.notifReactionsDetail}
+            when={l.notifToday}
+            isNew
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="chat-circle"
+            text={l.notifComment}
+            when={l.notifToday}
+            isNew
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="at"
+            text={l.notifMention}
+            quote={l.notifMentionQuote}
+            when={l.notifToday}
+            isNew={false}
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+          <NotificationCard
+            icon="user-plus"
+            text={l.notifFollows}
+            when={l.notifYesterday}
+            isNew={false}
+            newLabel={l.notifNew}
+          />
+          <NotificationCard
+            icon="heart"
+            text={l.notifLongTitle}
+            detail={l.notifReactionsDetail}
+            when={l.notifYesterday}
+            isNew={false}
+            newLabel={l.notifNew}
+            onPress={() => {}}
+          />
+        </Stack>
       </Section>
 
       <Section title={l.commentsSection}>

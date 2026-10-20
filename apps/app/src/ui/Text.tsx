@@ -30,6 +30,7 @@ export type Tone =
   | 'onDanger'
   | 'disabled'
   | 'status'
+  | 'onBadge'
 
 // Sur le web, un mot sans espace plus large que l'écran déborde ; « overflow-wrap: anywhere » le
 // coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
@@ -47,6 +48,7 @@ const toneColor = {
   onDanger: 'onDanger',
   disabled: 'onHoneyDisabled',
   status: 'statusText',
+  onBadge: 'onBadge',
 } as const
 
 export type TextProps = {
