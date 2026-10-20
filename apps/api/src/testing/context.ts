@@ -2,14 +2,42 @@
 // (copiée d'un modèle déjà migré, voir createTestPgliteDb),
 // une fausse boîte d'envoi d'e-mails et un stockage de fichiers en mémoire.
 // Rien ici n'est utilisé en production.
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { createTestPgliteDb } from '@ruche/db/pglite'
 import { createApp } from '../app'
-import { createAuth } from '../auth/auth'
+import { createAuth, type PasswordHashing } from '../auth/auth'
 import { createMemoryMailer } from '../email/mailer'
 import { createMemoryStorage } from '../media/storage'
 
 export const TEST_APP_URL = 'http://localhost:8081'
 export const TEST_API_URL = 'http://localhost:3000'
+
+/**
+ * Un hachage de mot de passe rapide, pour les tests seulement. scrypt, celui de la production,
+ * prend ~120 ms par inscription ou connexion, exprès (voir auth.ts) : multiplié par des centaines
+ * de tests, cela coûtait des dizaines de secondes. Ici, le même scrypt, mais avec un coût
+ * minuscule (N = 16 au lieu de 16 384) : une fraction de milliseconde. Un « sel » (valeur
+ * aléatoire mêlée au mot de passe) fait que deux comptes au même mot de passe n'ont pas la même
+ * empreinte. Cela suffit aux tests (mauvais mot de passe refusé, changement de mot de passe),
+ * mais se calcule trop vite pour protéger une vraie base. (Un SHA-256 marchait aussi, mais
+ * l'analyse de sécurité du dépôt, CodeQL, refuse à juste titre un hachage rapide généraliste
+ * pour un mot de passe, même dans les tests.)
+ */
+const scryptCheap = (salt: string, password: string) =>
+  scryptSync(password, salt, 32, { N: 16, r: 1, p: 1 }).toString('hex')
+
+export const fastPasswordHashing: PasswordHashing = {
+  // L'empreinte garde son sel, et une étiquette qui dit d'où elle vient : « test-scrypt:sel:empreinte ».
+  hash: async (password) => {
+    const salt = randomBytes(16).toString('hex')
+    return `test-scrypt:${salt}:${scryptCheap(salt, password)}`
+  },
+  verify: async ({ hash, password }) => {
+    const [kind, salt, digest] = hash.split(':')
+    if (kind !== 'test-scrypt' || !salt || !digest) return false
+    return timingSafeEqual(Buffer.from(scryptCheap(salt, password)), Buffer.from(digest))
+  },
+}
 
 type Credentials = { email: string; password: string }
 type SignUpBody = Credentials & { name: string; language?: string; inviteCode?: string }
@@ -37,6 +65,7 @@ export const createTestContext = async ({
     appUrl: TEST_APP_URL,
     rateLimit: true,
     inviteCode,
+    password: fastPasswordHashing,
   })
   const app = createApp({
     version,

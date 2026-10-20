@@ -18,6 +18,9 @@
 //                     (nom-1, nom-2…), plus faciles à regarder qu'une image de 10 000 pixels.
 //   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/).
 //   --explore x.mjs   confie le navigateur à un script d'essais au clic (voir plus bas).
+//   --serial          une capture à la fois, au lieu de trois (voir « La file » plus bas) : plus
+//                     lent, mais utile pour savoir si un défaut vient du parallélisme (une page
+//                     qui n'a pas fini son animation parce que la machine est trop chargée).
 //
 // Exemples : pnpm --filter @ruche/app shots -- --list
 //            pnpm --filter @ruche/app shots -- --no-build --only projet,compte --read --out C:/tmp/a
@@ -59,7 +62,16 @@ const optionValue = (flag) => {
   if (!value || value.startsWith('--')) fail(`${flag} attend une valeur.`)
   return value
 }
-const known = ['--no-build', '--list', '--only', '--out', '--read', '--layout', '--explore']
+const known = [
+  '--no-build',
+  '--list',
+  '--only',
+  '--out',
+  '--read',
+  '--layout',
+  '--explore',
+  '--serial',
+]
 for (const [i, arg] of args.entries()) {
   // « -- » vient de « pnpm … shots -- --list » ; une valeur suit son option.
   const isValue = ['--only', '--out', '--explore'].includes(args[i - 1])
@@ -198,9 +210,9 @@ const sampleImage = (id) => {
 </svg>`
 }
 // Le fil de l'accueil : celui de Léa, qui suit des membres (avec une suite à charger), ou vide
-// quand elle ne suit personne. La page en cours choisit (feed: 'nobody' dans la liste plus bas) ;
-// l'API simulée lit ce choix ici, avant chaque page.
-let feedScenario = 'following'
+// quand elle ne suit personne. Chaque page choisit (feed: 'nobody' dans la liste plus bas), et
+// ce choix est donné à sa propre API simulée (fakeApi), jamais rangé dans une variable commune :
+// trois pages photographiées en même temps ne doivent pas se le voler.
 // Les projets des personnes que Léa suit (Max, Inès) : on ne se suit pas soi-même.
 const max = { id: 'max-id', name: 'Max Durand', avatarUrl: null }
 const ines = { id: 'ines-id', name: 'Inès Haddad', avatarUrl: null }
@@ -263,8 +275,8 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
-const followingFeed = () =>
-  feedScenario === 'nobody'
+const followingFeed = (feed) =>
+  feed === 'nobody'
     ? { items: [], nextCursor: null, followsAnyone: false }
     : { items: followingItems, nextCursor: 'suite', followsAnyone: true }
 
@@ -356,7 +368,10 @@ const reactionsOf = {
 }
 const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
 
-const fakeApi = (signedIn) => {
+// L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
+// Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
+// chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
+const fakeApi = (signedIn, feed = 'following') => {
   // Ce que Léa change dans ce navigateur : ses réactions, et le nombre de commentaires ajoutés.
   const reactions = structuredClone(reactionsOf)
   const added = {}
@@ -473,7 +488,7 @@ const fakeApi = (signedIn) => {
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
-    if (pathname === '/v1/feed/following') return json(200, followingFeed())
+    if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     if (pathname === '/v1/members/erreur')
@@ -628,6 +643,71 @@ const server = createSiteServer()
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}`
 
+// La file : les captures se prennent trois à la fois (une par une avec --serial). Une capture
+// passe l'essentiel de son temps à attendre (le réseau, les ressorts, les fondus) : pendant
+// qu'une page attend, une autre peut se charger. Au-delà de trois, la machine de la CI (quatre
+// processeurs) serait trop chargée, et les animations risqueraient de ne pas finir à temps.
+// Chaque travail ouvre son propre contexte Playwright (un navigateur « neuf » : ses cookies, sa
+// fenêtre, son API simulée) : rien ne passe d'un travail à l'autre.
+const lanes = has('--serial') ? 1 : 3
+// Fait `work(job)` pour chaque travail, `lanes` à la fois. Une « voie » est une boucle asynchrone
+// qui prend le prochain travail de la liste dès qu'elle a fini le sien ; les voies tournent en
+// même temps, mais JavaScript n'exécute qu'un bout de code à la fois : `next++` ne peut pas être
+// lu par deux voies au même instant. Au premier échec, les voies finissent leur travail en cours,
+// n'en prennent plus, et l'erreur est relancée.
+const runQueue = async (jobs, work) => {
+  let next = 0
+  let failure = null
+  const lane = async () => {
+    while (next < jobs.length && !failure) {
+      const job = jobs[next++]
+      try {
+        await work(job)
+      } catch (error) {
+        failure ??= { error }
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(lanes, jobs.length) }, lane))
+  if (failure) throw failure.error
+}
+
+// La hauteur du contenu : celle de la plus haute zone de la page (l'écran défile à l'intérieur
+// d'un ScrollView, pas la page elle-même).
+const contentHeight = (page) =>
+  page.evaluate(() =>
+    Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
+  )
+// La hauteur de ce qui défile : la zone de défilement de l'écran, ou la page entière. Contrairement
+// à contentHeight, elle ignore la lumière d'ambiance, qui dérive sans cesse de quelques pixels
+// dans son cadre et ne serait jamais « stable ».
+const scrollHeight = (page) =>
+  page.evaluate(() => {
+    const scrollers = [...document.querySelectorAll('div')].filter((el) =>
+      ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
+    )
+    return Math.max(
+      document.documentElement.scrollHeight,
+      ...scrollers.map((el) => el.scrollHeight),
+    )
+  })
+// Attend que la page ait fini de grandir (la description, le journal, les commentaires se
+// dessinent après le haut de la page), puis rend sa hauteur. Une attente fixe ne suffit pas :
+// quand trois pages se dessinent en même temps, chacune va moins vite, et la première version
+// de ce script photographiait parfois une page coupée à mi-hauteur. On mesure toutes les 250 ms,
+// jusqu'à deux mesures de suite identiques (au plus 10 secondes).
+const settle = async (page) => {
+  let last = await scrollHeight(page)
+  let steady = 0
+  for (let i = 0; i < 40 && steady < 2; i++) {
+    await page.waitForTimeout(250)
+    const now = await scrollHeight(page)
+    steady = now === last ? steady + 1 : 0
+    last = now
+  }
+  return contentHeight(page)
+}
+
 // --layout : au lieu des captures habituelles, chaque page est mesurée à neuf largeurs d'écran, du
 // petit téléphone au grand écran. Le rapport (<dossier>/layout/rapport.md) signale ce qui dépasse de la
 // largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
@@ -638,18 +718,19 @@ const base = `http://127.0.0.1:${server.address().port}`
 // inhabituels, pas seulement l'allure. Le script exporte une fonction par défaut qui reçoit :
 // - base : l'adresse de l'appli ; paths : l'adresse de chaque page photographiée, par son nom ;
 // - open(signedIn, options) : un contexte de navigateur Playwright (visiteur ou Léa connectée),
-//   avec l'API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse (erreur, lenteur).
+//   avec sa propre API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse
+//   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, options = {}) => {
+  const open = async (signedIn, { feed, ...options } = {}) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn))
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed))
     return context
   }
   try {
@@ -680,28 +761,29 @@ async function layoutReport() {
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
   const browser = await chromium.launch()
-  const lines = ['# Mise en page à plusieurs largeurs', '']
-  for (const signedIn of [false, true]) {
+  // Le rapport de chaque page, rangé à sa place dans la liste : les pages finissent dans le
+  // désordre (trois à la fois), mais le rapport garde l'ordre de la liste.
+  const sections = new Map()
+  // Un travail par page, dans son propre contexte : sa fenêtre et son API simulée neuve, gardée
+  // d'une largeur à l'autre (le pseudo enregistré à 320 px se retrouve à 360 px).
+  const measure = async (shot) => {
+    const lines = [`## ${shot.name} (${shot.path})`, '']
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn))
-    const page = await context.newPage()
-    for (const shot of selected.filter((p) => p.signedIn === signedIn)) {
-      lines.push(`## ${shot.name} (${shot.path})`, '')
-      // Une API simulée neuve par page, comme pour les captures.
-      await context.unroute(`${apiUrl}/**`)
-      await context.route(`${apiUrl}/**`, fakeApi(signedIn))
+    try {
+      await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed))
+      const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
-        feedScenario = shot.feed ?? 'following'
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         if (shot.prepare) {
           await shot.prepare(page)
           await page.waitForTimeout(300)
         }
+        await settle(page) // la page entière, pas seulement son haut (voir settle)
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
         const found = await page.evaluate(() => {
           const width = window.innerWidth
@@ -751,10 +833,21 @@ async function layoutReport() {
         )
       }
       lines.push('')
+      sections.set(shot, lines)
+    } finally {
+      await context.close()
     }
-    await context.close()
   }
-  await browser.close()
+  try {
+    await runQueue(selected, measure)
+  } finally {
+    await browser.close()
+  }
+  const lines = [
+    '# Mise en page à plusieurs largeurs',
+    '',
+    ...selected.flatMap((shot) => sections.get(shot)),
+  ]
   writeFileSync(join(dir, 'rapport.md'), `${lines.join('\n')}\n`)
   console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
 }
@@ -780,91 +873,94 @@ for (const name of readdirSync(out)) {
 const PART = read ? 1600 : 12000
 const scale = read ? 1 : 2
 
+// Les travaux de la file : une capture par page, appareil et thème. Le catalogue, le plus long,
+// est en tête de la liste : il commence tôt au lieu de finir seul, après tous les autres.
+const jobs = selected.flatMap((shot) =>
+  devices.flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
+)
+
 const browser = await chromium.launch()
+// Les erreurs de toutes les pages, réunies ici et signalées à la fin (le script échoue alors).
+// Plusieurs pages y ajoutent les leurs en même temps : sans risque, JavaScript n'exécute qu'un
+// bout de code à la fois.
 const problems = []
-for (const device of devices) {
-  for (const scheme of schemes) {
-    for (const signedIn of [false, true]) {
-      const shots = selected.filter((p) => p.signedIn === signedIn)
-      if (shots.length === 0) continue
-      const context = await browser.newContext({
-        viewport: device.viewport,
-        colorScheme: scheme.colorScheme,
-        locale: 'fr-FR',
-        deviceScaleFactor: scale,
-      })
-      await context.route(`${apiUrl}/**`, fakeApi(signedIn))
-      const page = await context.newPage()
-      // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
-      page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
-      for (const shot of shots) {
-        // Une API simulée neuve par page : ce qu'une page enregistre (un nouveau pseudo) ne se
-        // voit pas sur la suivante, et une capture ne dépend pas des pages prises avant elle.
-        await context.unroute(`${apiUrl}/**`)
-        await context.route(`${apiUrl}/**`, fakeApi(signedIn))
-        await page.setViewportSize(device.viewport)
-        feedScenario = shot.feed ?? 'following'
-        await page.goto(base + shot.path, { waitUntil: 'networkidle' })
-        await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
-        // Un geste avant la capture (ouvrir un champ), puis le temps de son fondu.
-        if (shot.prepare) {
-          await shot.prepare(page)
-          await page.waitForTimeout(300)
-        }
-        // Le nom du fichier : sans numéro pour une seule image ; ensuite catalogue, catalogue-2…
-        // ou, avec --read, nom-1, nom-2…
-        const file = (part, parts) => {
-          const numbered = read ? parts > 1 : part > 1
-          return join(
-            out,
-            `${shot.name}${numbered ? `-${part}` : ''}-${device.name}-${scheme.name}.png`,
-          )
-        }
-        if (!shot.fullPage) {
-          await page.screenshot({ path: file(1, 1) })
-          continue
-        }
-        // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
-        // agrandit la fenêtre à la hauteur de son contenu.
-        const height = await page.evaluate(() =>
-          Math.max(...[...document.querySelectorAll('div')].map((el) => el.scrollHeight)),
-        )
-        // Des tranches de hauteur égale (au plus PART) : la dernière tombe pile en bas de la page,
-        // au lieu de reprendre une partie de la précédente.
-        const parts = Math.max(1, Math.ceil(height / PART))
-        const slice = Math.ceil(height / parts)
-        await page.setViewportSize({ ...device.viewport, height: slice })
-        await page.waitForTimeout(300)
-        for (let part = 1; part <= parts; part++) {
-          if (part > 1) {
-            await page.evaluate(
-              (top) => {
-                // Seulement une vraie zone de défilement (overflow auto ou scroll) : un bloc qui
-                // dépasse d'un pixel sans défiler était choisi à sa place, et la deuxième capture
-                // reprenait le haut de la page, à moitié peint.
-                const scrollers = [...document.querySelectorAll('div')].filter(
-                  (el) =>
-                    el.scrollHeight > el.clientHeight &&
-                    ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
-                )
-                const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
-                // Sans zone de défilement à elle, c'est la page entière qui défile.
-                if (main) main.scrollTop = top
-                else window.scrollTo(0, top)
-              },
-              (part - 1) * slice,
-            )
-            await page.waitForTimeout(300)
-          }
-          await page.screenshot({ path: file(part, parts) })
-        }
-      }
-      await context.close()
+const capture = async ({ shot, device, scheme }) => {
+  // Un contexte neuf par capture, avec son API simulée neuve : ce qu'une page enregistre (un
+  // nouveau pseudo) ne se voit sur aucune autre, et une capture ne dépend pas de celles prises
+  // avant elle, ni de celles prises en même temps.
+  const context = await browser.newContext({
+    viewport: device.viewport,
+    colorScheme: scheme.colorScheme,
+    locale: 'fr-FR',
+    deviceScaleFactor: scale,
+  })
+  try {
+    await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed))
+    const page = await context.newPage()
+    // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
+    page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))
+    await page.goto(base + shot.path, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(shot.wait ?? 600) // le temps des ressorts et des fondus
+    // Un geste avant la capture (ouvrir un champ), puis le temps de son fondu.
+    if (shot.prepare) {
+      await shot.prepare(page)
+      await page.waitForTimeout(300)
     }
+    const height = await settle(page)
+    // Le nom du fichier : sans numéro pour une seule image ; ensuite catalogue, catalogue-2…
+    // ou, avec --read, nom-1, nom-2…
+    const file = (part, parts) => {
+      const numbered = read ? parts > 1 : part > 1
+      return join(
+        out,
+        `${shot.name}${numbered ? `-${part}` : ''}-${device.name}-${scheme.name}.png`,
+      )
+    }
+    if (!shot.fullPage) {
+      await page.screenshot({ path: file(1, 1) })
+      return
+    }
+    // L'écran défile à l'intérieur de la page (ScrollView) : pour tout photographier, on
+    // agrandit la fenêtre à la hauteur de son contenu (mesurée par settle).
+    // Des tranches de hauteur égale (au plus PART) : la dernière tombe pile en bas de la page,
+    // au lieu de reprendre une partie de la précédente.
+    const parts = Math.max(1, Math.ceil(height / PART))
+    const slice = Math.ceil(height / parts)
+    await page.setViewportSize({ ...device.viewport, height: slice })
+    await page.waitForTimeout(300)
+    for (let part = 1; part <= parts; part++) {
+      if (part > 1) {
+        await page.evaluate(
+          (top) => {
+            // Seulement une vraie zone de défilement (overflow auto ou scroll) : un bloc qui
+            // dépasse d'un pixel sans défiler était choisi à sa place, et la deuxième capture
+            // reprenait le haut de la page, à moitié peint.
+            const scrollers = [...document.querySelectorAll('div')].filter(
+              (el) =>
+                el.scrollHeight > el.clientHeight &&
+                ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
+            )
+            const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
+            // Sans zone de défilement à elle, c'est la page entière qui défile.
+            if (main) main.scrollTop = top
+            else window.scrollTo(0, top)
+          },
+          (part - 1) * slice,
+        )
+        await page.waitForTimeout(300)
+      }
+      await page.screenshot({ path: file(part, parts) })
+    }
+  } finally {
+    await context.close()
   }
 }
-await browser.close()
-server.close()
+try {
+  await runQueue(jobs, capture)
+} finally {
+  await browser.close()
+  server.close()
+}
 
 console.log(`Captures dans ${out}`)
 if (problems.length > 0) {
