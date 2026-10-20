@@ -59,7 +59,7 @@ export const resolveMentions = async (
  * Range les mentions d'un commentaire qui vient d'être écrit ou modifié, à la date `at` :
  * - celles qui n'y sont plus sont effacées (leur notification disparaît avec elles) ;
  * - les nouvelles sont ajoutées, datées de `at` (la notification arrive maintenant) ;
- * - celles qui y étaient déjà gardent leur date : « on conflict do nothing » laisse la ligne
+ * - celles qui y étaient déjà gardent leur date et leur pseudo : « on conflict do nothing » laisse la ligne
  *   existante telle quelle quand la clé (comment_id, member_id) est déjà prise. Ainsi, corriger
  *   une faute de frappe ne fait pas revenir une notification déjà vue.
  * La clé primaire (comment_id, member_id) sert aux deux requêtes : elle range les lignes par
@@ -80,9 +80,13 @@ export const saveMentions = async (
         memberIds.length > 0 ? notInArray(cm.memberId, memberIds) : undefined,
       ),
     )
-  if (memberIds.length === 0) return
+  if (mentions.length === 0) return
+  // Le pseudo est gardé tel qu'il a été résolu (minuscules, sans « @ ») : c'est lui que l'appli
+  // transforme en lien, même si le membre en change ensuite.
   await db
     .insert(cm)
-    .values(memberIds.map((memberId) => ({ commentId, memberId, createdAt: at })))
+    .values(
+      mentions.map(({ memberId, handle }) => ({ commentId, memberId, handle, createdAt: at })),
+    )
     .onConflictDoNothing()
 }
