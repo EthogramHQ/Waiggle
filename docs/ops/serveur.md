@@ -421,6 +421,27 @@ pas** : on prévient Louis.
   côté de la base actuelle. Si la sauvegarde est abîmée, il s'arrête sans rien changer. Si
   l'échange final était interrompu, la base restaurée reste disponible sous le nom
   `ruche_restauration` : on la renomme alors à la main, avec l'accord de Louis.
+- **Les e-mails de notification pendant une restauration** (depuis la tranche 6c). Une sauvegarde
+  ramène les comptes supprimés et les désinscriptions faites depuis : sans précaution, le récap
+  de la semaine ou un e-mail de mentions partirait vers des personnes qui ont dit non. Dans
+  l'ordre :
+  1. avant de restaurer, couper les envois : `EMAIL_JOBS=off` dans `secrets.env` (Louis), puis
+     redémarrer l'API. Elle retire alors les planifications du récap et des mentions ; la purge
+     de nuit continue ;
+
+     ```bash
+     ssh -t waiggle nano /srv/ruche/secrets.env     # Louis : EMAIL_JOBS=off
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose up -d api'
+     ```
+
+  2. restaurer (`restore.sh`, avec l'accord de Louis) ;
+  3. réappliquer les refus faits depuis la sauvegarde : supprimer de nouveau les comptes supprimés
+     depuis, couper de nouveau les e-mails des membres qui s'étaient désinscrits (la liste vient
+     de Louis : demandes reçues, journaux) ;
+  4. remettre `EMAIL_JOBS=on` (ou vide) dans `secrets.env`, puis redémarrer l'API comme en 1.
+
+  Deux filets restent, même sans cette précaution : jamais une mention de plus de 24 heures dans
+  un e-mail, et jamais deux récaps à moins de 6 jours d'intervalle.
 - **Vérifier une sauvegarde** sans toucher au site : la restaurer dans une base jetable.
 
   ```bash

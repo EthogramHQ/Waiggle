@@ -54,6 +54,14 @@ const EnvSchema = z
     SIGNUP_INVITE_CODE: optional(
       z.string().trim().min(INVITE_CODE_MIN_LENGTH).max(INVITE_CODE_MAX_LENGTH),
     ),
+    // L'interrupteur des e-mails de notification (tranche 6c) : « on » par défaut, « off » pour que
+    // l'ordonnanceur ne planifie ni le récap ni les e-mails de mentions (la purge de nuit continue).
+    // On le coupe avant de restaurer une sauvegarde (docs/ops/serveur.md). Toute autre valeur
+    // (« false », « OFF ») arrête le serveur : une faute de frappe ne doit pas laisser partir des e-mails.
+    EMAIL_JOBS: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.enum(['on', 'off']).default('on'),
+    ),
   })
   // superRefine : des règles qui dépendent de plusieurs variables à la fois.
   .superRefine((env, ctx) => {
@@ -142,6 +150,8 @@ export type Env = {
   mail: MailConfig
   /** Le code d'invitation exigé à l'inscription ; null : inscription libre (développement). */
   inviteCode: string | null
+  /** Les e-mails de notification (récap, mentions) sont-ils planifiés ? (EMAIL_JOBS) */
+  emailJobs: boolean
 }
 
 /**
@@ -183,5 +193,6 @@ export const loadEnv = (source: Record<string, string | undefined>): Env => {
     appUrl: env.APP_URL,
     mail,
     inviteCode: env.SIGNUP_INVITE_CODE ?? null,
+    emailJobs: env.EMAIL_JOBS === 'on',
   }
 }
