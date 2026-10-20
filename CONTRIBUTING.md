@@ -32,6 +32,8 @@ est empaquetée en un seul fichier par esbuild pour la production.
 ```bash
 pnpm install
 pnpm check                       # lint + architecture + types + tests, avant chaque commit
+# Sur un PC modeste, les tests d'un paquet à la fois, avec 2 processus chacun :
+TURBO_CONCURRENCY=1 pnpm test -- --maxWorkers=2
 pnpm arch                        # vérifie les frontières entre parties, redessine le schéma
 pnpm lint:fix                    # formatage et corrections Biome
 pnpm --filter @ruche/api dev     # API sur http://localhost:3000 (/health, /openapi.json)
@@ -53,10 +55,15 @@ Chaque fonctionnalité est une tranche verticale, dans cet ordre :
    (`app.request(...)`), test de composant pour l'écran. Lance-les et constate l'échec.
 4. **Le backend**, jusqu'au vert.
 5. **L'interface**, puis son test.
-6. **`pnpm check`** vert, puis une relecture de sécurité de la branche (liste de contrôle :
-   la section « Sécurité » ci-dessous).
+6. **`pnpm check`** vert, puis les relectures de la branche :
+   - l'interface : les règles du code (étages, textes, accessibilité) ;
+   - le design : largeurs, espacements, hiérarchie, états, parcours ;
+   - la sécurité : la section « Sécurité » ci-dessous ;
+   - le juridique et l'éthique, si la tranche touche aux données, aux e-mails, à l'IA ou à la
+     modération.
 7. **Le bilan pour Louis**, selon ses consignes personnelles, gardées hors du dépôt.
-8. Une branche et une pull request par fonctionnalité. **Rien n'est fusionné sans relecture de Louis.**
+8. Une branche et une pull request par fonctionnalité. **Rien n'est fusionné ni déployé sans
+   l'accord écrit de Louis, donné pour cette pull request ou ce commit.**
 
 Toute fonctionnalité non triviale commence par un plan, validé avant le code. Si un scénario est ambigu, pose la question
 plutôt que d'inventer une règle métier.
@@ -169,5 +176,5 @@ code pilote le serveur depuis le PC de Louis, par `ssh waiggle`.
 - Le scénario est couvert par des tests qui passent.
 - `pnpm check` est vert, la CI aussi.
 - Les textes existent en français et en anglais.
-- La relecture de sécurité n'a relevé aucun problème bloquant.
-- Louis a relu et approuvé la pull request.
+- Les relectures n'ont relevé aucun problème bloquant.
+- Louis a approuvé la pull request, par écrit et en la nommant.
