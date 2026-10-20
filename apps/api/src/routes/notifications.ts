@@ -10,6 +10,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { countUnread, loadNotificationPage, readNotificationCursor } from '../notifications/load'
 import { markSeen, readSeenAt } from '../notifications/state'
+import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -27,6 +28,7 @@ const listRoute = createRoute({
     },
     400: errorResponse('Invalid cursor.'),
     401: errorResponse('Not signed in.'),
+    429: errorResponse('Too many requests.'),
   },
 })
 
@@ -40,6 +42,7 @@ const unreadRoute = createRoute({
       content: { 'application/json': { schema: UnreadCount } },
     },
     401: errorResponse('Not signed in.'),
+    429: errorResponse('Too many requests.'),
   },
 })
 
@@ -55,12 +58,22 @@ const seenRoute = createRoute({
     204: { description: 'Done (no content).' },
     400: errorResponse('Not a date.'),
     401: errorResponse('Not signed in.'),
+    429: errorResponse('Too many requests.'),
   },
 })
 
-type Deps = { db: Database; publicApiUrl: string }
+// Les quotas (relecture de sécurité de la tranche 6b) : chaque lecture recalcule 90 jours
+// d'activité autour du membre (notifications/load.ts), ce qui coûte plus qu'une lecture ordinaire.
+// - lire (la liste et le nombre de la cloche, un seul compteur) : 300 par minute. L'appli relit la
+//   cloche de temps en temps et une page à chaque défilement : 300, c'est très large pour elle,
+//   mais cela arrête une boucle qui chargerait la base ;
+// - marquer vu : 60 par minute, une fois par ouverture de l'écran dans l'appli.
+const readRule: RateRule = { windowMs: 60 * 1000, max: 300 }
+const seenRule: RateRule = { windowMs: 60 * 1000, max: 60 }
 
-export const notificationRoutes = ({ db, publicApiUrl }: Deps) => {
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+
+export const notificationRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
   // Connecté obligatoire, avant tout le reste (même avant la lecture du corps de PUT).
   app.use('/v1/notifications', requireUser)
@@ -68,6 +81,29 @@ export const notificationRoutes = ({ db, publicApiUrl }: Deps) => {
 
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
   const invalid = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'validation'), 400)
+
+  // Un « middleware » (une fonction qui passe avant la route, et peut répondre à sa place) qui
+  // compte la demande dans le compteur `counter` du membre, et répond 429 au-delà de la règle.
+  // Il est posé AVANT la vérification de la demande (que Hono place juste avant la route) : chaque
+  // demande compte, même mal écrite (un curseur faux, un corps qui n'est pas une date).
+  const quota =
+    (counter: 'notificationsRead' | 'notificationsSeen', rule: RateRule) =>
+    async (c: Context<AppEnv>, next: () => Promise<void>) => {
+      const user = c.get('user')
+      if (!user) return unauthorized(c)
+      const decision = await limiter.hit(memberCounterKeys(user.id)[counter], rule)
+      if (!decision.allowed) {
+        c.header('Retry-After', String(decision.retryAfterSeconds))
+        return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+      }
+      await next()
+    }
+  app.on(
+    'GET',
+    ['/v1/notifications', '/v1/notifications/unread'],
+    quota('notificationsRead', readRule),
+  )
+  app.on('PUT', '/v1/notifications/seen', quota('notificationsSeen', seenRule))
 
   app.openapi(listRoute, async (c) => {
     const viewer = c.get('user')

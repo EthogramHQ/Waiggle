@@ -47,4 +47,9 @@ export const notificationState = pgTable('notification_state', {
   // Le moment où la ligne est née, en même temps que son pseudo : c'est la date de sa première
   // notification (« Ton pseudo est @… »), qui disparaît, comme les autres, après 90 jours.
   createdAt: timestamp('created_at').notNull(),
+  // Le moment où le membre a choisi lui-même un pseudo (PATCH /v1/me), ou celui où le rattrapage a
+  // vu qu'il en avait déjà changé. null : il garde le pseudo reçu. Dès qu'elle est remplie, la
+  // notification « Ton pseudo est @… » n'est plus montrée : elle parlait du pseudo reçu, elle ne
+  // serait plus vraie.
+  handleChosenAt: timestamp('handle_chosen_at'),
 })

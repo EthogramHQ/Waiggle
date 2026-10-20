@@ -19,9 +19,12 @@ import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limi
 import { createRouter, errorResponse } from './router'
 
 // Anti-abus des suggestions (scénario 6b, « Suggestions ») : 600 recherches par heure et par
-// membre. L'appli attend qu'on s'arrête de taper avant de chercher : 600, c'est beaucoup
-// d'écriture, et c'est assez peu pour qu'on ne puisse pas relever tous les pseudos du réseau.
+// membre, et 2 000 par jour. L'appli attend qu'on s'arrête de taper avant de chercher : 600 dans
+// l'heure, c'est beaucoup d'écriture. Mais 600 par heure, jour et nuit, suffiraient à relever peu
+// à peu tous les pseudos du réseau : le plafond du jour l'empêche, avec la règle des 3 caractères
+// (mentions/search.ts : à 2 caractères, seulement les proches).
 const mentionSearchRule: RateRule = { windowMs: 60 * 60 * 1000, max: 600 }
+const mentionSearchDayRule: RateRule = { windowMs: 24 * 60 * 60 * 1000, max: 2000 }
 
 const mentionableRoute = createRoute({
   method: 'get',
@@ -30,7 +33,7 @@ const mentionableRoute = createRoute({
   description:
     'Members whose current handle starts with `q`, verified, never the viewer: first those ' +
     'close to the project (its author, the authors of its comments, the members followed), then ' +
-    'the others, by handle. Five at most.',
+    'the others, by handle (only from 3 characters on: with 2, the close ones only). Five at most.',
   request: { query: MentionableQuery },
   responses: {
     200: {
@@ -71,10 +74,18 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   app.on('GET', '/v1/members/mentionable', async (c, next) => {
     const user = c.get('user')
     if (!user) return c.json(errorBody(languageOf(c), 'unauthorized'), 401)
-    const decision = await limiter.hit(memberCounterKeys(user.id).mentionSearch, mentionSearchRule)
-    if (!decision.allowed) {
-      c.header('Retry-After', String(decision.retryAfterSeconds))
-      return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    const keys = memberCounterKeys(user.id)
+    // Les deux compteurs avancent à chaque demande : celui de l'heure, puis celui du jour. Le
+    // premier refus l'emporte (avec son délai d'attente).
+    for (const [key, rule] of [
+      [keys.mentionSearch, mentionSearchRule],
+      [keys.mentionSearchDay, mentionSearchDayRule],
+    ] as const) {
+      const decision = await limiter.hit(key, rule)
+      if (!decision.allowed) {
+        c.header('Retry-After', String(decision.retryAfterSeconds))
+        return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+      }
     }
     await next()
   })

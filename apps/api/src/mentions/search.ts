@@ -15,6 +15,13 @@ const c = schema.projectComment
 const f = schema.memberFollow
 
 /**
+ * À partir de combien de caractères on propose aussi les membres qui ne sont pas des proches
+ * (décision du 20/10/2026). Avec 2 caractères, 26 × 26 demandes suffiraient à parcourir presque
+ * tout le réseau : on ne propose alors que les proches, qu'on connaît déjà.
+ */
+const OTHERS_FROM = 3
+
+/**
  * Cherche les membres dont le pseudo ACTUEL commence par `prefix` (déjà en minuscules, sans « @ »,
  * vérifié par MentionableQuery : lettres, chiffres et « _ » seulement), pour `viewer` qui commente
  * le projet `project`. Seulement des comptes vérifiés, jamais lui-même (se mentionner ne prévient
@@ -33,6 +40,8 @@ const f = schema.memberFollow
  *   where member_handle.released_at is null and starts_with(member_handle.handle, $debut)
  *     and "user".email_verified and "user".id <> $moi
  *   order by close desc, member_handle.handle collate "C" limit 5
+ * Avec un début de moins de 3 caractères (OTHERS_FROM), la condition « close » s'ajoute au
+ * « where » : seulement les proches.
  *
  * « Proches » : l'auteur du projet, ceux dont il lit un commentaire sur ce projet (la règle
  * `seesSql` de comments/load.ts : un commentaire masqué pour lui ne lui apprend rien), et ceux
@@ -91,6 +100,8 @@ export const searchMentionable = async (
         sql`starts_with(${h.handle}, ${prefix})`,
         eq(u.emailVerified, true),
         ne(u.id, viewer.id),
+        // Trop court pour chercher dans tout le réseau : les proches seulement.
+        prefix.length < OTHERS_FROM ? close : undefined,
       ),
     )
     .orderBy(desc(sql`coalesce(${close}, false)`), asc(sql`${h.handle} collate "C"`))

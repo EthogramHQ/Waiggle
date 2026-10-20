@@ -64,6 +64,13 @@ export const memberCounterKeys = (userId: string) => ({
   handle: `handle:${userId}`,
   // Chercher un membre à mentionner après « @ » (tranche 6b).
   mentionSearch: `mention-search:${userId}`,
+  // Le même, sur une journée : un second plafond, pour qu'on ne puisse pas relever tous les pseudos
+  // du réseau en cherchant 600 fois par heure, jour et nuit.
+  mentionSearchDay: `mention-search-day:${userId}`,
+  // Lire ses notifications : la liste et le nombre de la cloche ensemble (tranche 6b).
+  notificationsRead: `notifications-read:${userId}`,
+  // Marquer ses notifications comme vues (tranche 6b).
+  notificationsSeen: `notifications-seen:${userId}`,
 })
 
 /**

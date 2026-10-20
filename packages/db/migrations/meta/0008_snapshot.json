@@ -1,5 +1,5 @@
 {
-  "id": "fa08f06d-b39d-4fc4-b579-3e1130b7dc5a",
+  "id": "7f0e854e-9908-4a41-83f3-282df10cbc7c",
   "prevId": "c4430933-8a95-4ce7-a036-cf5a828bfb95",
   "version": "7",
   "dialect": "postgresql",
@@ -979,6 +979,12 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true
+        },
+        "handle_chosen_at": {
+          "name": "handle_chosen_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

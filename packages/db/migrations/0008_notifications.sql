@@ -9,7 +9,8 @@ CREATE TABLE "comment_mention" (
 CREATE TABLE "notification_state" (
 	"user_id" text PRIMARY KEY NOT NULL,
 	"seen_at" timestamp,
-	"created_at" timestamp NOT NULL
+	"created_at" timestamp NOT NULL,
+	"handle_chosen_at" timestamp
 );
 --> statement-breakpoint
 ALTER TABLE "comment_mention" ADD CONSTRAINT "comment_mention_comment_id_project_comment_id_fk" FOREIGN KEY ("comment_id") REFERENCES "public"."project_comment"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

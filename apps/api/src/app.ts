@@ -165,7 +165,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
-  app.route('/', notificationRoutes({ db, publicApiUrl }))
+  app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

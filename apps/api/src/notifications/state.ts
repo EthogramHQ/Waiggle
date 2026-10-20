@@ -22,6 +22,19 @@ export const createNotificationState = async (db: Database, userId: string, now:
 }
 
 /**
+ * Note que le membre vient de choisir lui-même son pseudo (PATCH /v1/me, dans la transaction du
+ * changement) : la notification « Ton pseudo est @… », qui parlait du pseudo reçu, disparaît
+ * (source 6 de notifications/load.ts). Un « upsert » : la ligne existe presque toujours ; sinon
+ * (un membre qui n'avait pas encore de pseudo), elle naît ici, déjà marquée « choisi ».
+ */
+export const markHandleChosen = async (db: Database, userId: string, now: Date) => {
+  await db
+    .insert(t)
+    .values({ userId, createdAt: now, handleChosenAt: now })
+    .onConflictDoUpdate({ target: t.userId, set: { handleChosenAt: now } })
+}
+
+/**
  * Marque vu tout ce qui est arrivé jusqu'à `upTo`, borné à `now` (l'heure du serveur : l'appli ne
  * peut pas marquer vu l'avenir). La date ne recule jamais : « greatest(ancienne, nouvelle) » garde
  * la plus récente des deux (et greatest ignore un null : jamais ouvert, la nouvelle date l'emporte).

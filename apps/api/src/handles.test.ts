@@ -7,7 +7,14 @@
 // l'horloge de JavaScript (Date) par une fausse, qu'on avance à la main. Les 30 jours de réservation
 // et le quota de 5 changements par jour se vérifient ainsi sans attendre.
 import { appName } from '@ruche/brand'
-import { AccountExport, ErrorResponse, Handle, Me, Member } from '@ruche/contracts'
+import {
+  AccountExport,
+  ErrorResponse,
+  Handle,
+  Me,
+  Member,
+  NotificationPage,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -614,6 +621,42 @@ describe('the notification of the handle', () => {
     expect(await stateOf('never')).toEqual([])
     // Inès avait déjà la sienne : elle ne change pas.
     expect(await stateOf(inesId)).toEqual(inesBefore)
+  })
+
+  /** Le moment où ce membre a choisi lui-même son pseudo, selon sa ligne (null : jamais). */
+  const chosenOf = async (userId: string) => {
+    const [row] = await ctx.db
+      .select({ chosenAt: t.handleChosenAt })
+      .from(t)
+      .where(sql`${t.userId} = ${userId}`)
+    return row?.chosenAt?.toISOString() ?? null
+  }
+
+  it('is marked « chosen » when the member picks a handle herself', async () => {
+    expect(await chosenOf(inesId)).toBeNull() // témoin : le pseudo reçu
+    later(MINUTE)
+
+    await changeHandle(ines, 'ines')
+
+    expect(await chosenOf(inesId)).toBe(now())
+    // Sa date de naissance, elle, ne change pas.
+    expect(await stateOf(inesId)).toHaveLength(1)
+  })
+
+  it('is given at startup marked « chosen » to a member who had already changed her handle', async () => {
+    // Max a changé de pseudo pendant la tranche 6a, avant d'avoir sa ligne ; Inès a gardé le sien.
+    await changeHandle(max, 'maxime')
+    await ctx.db.execute(sql`delete from notification_state where user_id in (${maxId}, ${inesId})`)
+    later(DAY)
+
+    await backfillHandles(ctx.db)
+
+    expect(await chosenOf(maxId)).toBe(now())
+    expect(await chosenOf(inesId)).toBeNull()
+    // Pour Max, aucune notification « Ton pseudo est @… » : elle ne serait pas vraie.
+    const res = await send('GET', '/v1/notifications', max)
+    expect(res.status).toBe(200)
+    expect(NotificationPage.parse(await res.json()).items).toEqual([])
   })
 
   it('changes nothing at the next startup', async () => {

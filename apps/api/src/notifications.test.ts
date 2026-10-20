@@ -22,7 +22,10 @@ import {
   Project,
   UnreadCount,
 } from '@ruche/contracts'
+import { schema } from '@ruche/db'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { memberCounterKeys } from './rate-limit'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -551,6 +554,19 @@ describe('comments', () => {
     expect(commentReasons(await notifications(malik))).toEqual([`mention:${replyMention.id}`])
   })
 
+  it('counts in the bell only what the list shows: not a comment whose author has no handle', async () => {
+    const meteo = await publish(ines)
+    await openScreen(ines) // celle du pseudo est vue
+    await comment(meteo.id, malik, 'Super idée.')
+    expect(await unread(ines)).toBe(1) // témoin
+    // Malik n'a plus de pseudo actuel (comme un compte d'avant la tranche 6a, pas encore servi par
+    // le rattrapage) : la liste ne peut pas montrer son commentaire.
+    await ctx.db.delete(schema.memberHandle).where(eq(schema.memberHandle.userId, malikId))
+
+    expect(await notifications(ines)).toEqual([])
+    expect(await unread(ines)).toBe(0)
+  })
+
   it('never comes from my own gestures', async () => {
     const meteo = await publish(ines)
     const root = await comment(meteo.id, ines, 'Vos idées ?')
@@ -734,12 +750,17 @@ describe('the handle', () => {
     expect(await unread(ines)).toBe(1)
   })
 
-  it('gives the current handle after a change', async () => {
+  // Ce test disait « donne le pseudo actuel après un changement » : la notification aurait alors dit
+  // « Ton pseudo est @ines », comme si on le lui avait donné. Relecture juridique de la tranche 6b :
+  // elle parle du pseudo reçu, et disparaît dès que le membre en choisit un lui-même.
+  it('disappears once the member chooses a handle herself: it would no longer be true', async () => {
+    expect(await unread(ines)).toBe(1) // témoin : celle du pseudo reçu
     later()
     const res = await send('PATCH', '/v1/me', ines, { handle: 'ines' })
     expect(res.status).toBe(200)
 
-    expect((await readPage(ines)).items).toMatchObject([{ kind: 'handle', handle: 'ines' }])
+    expect((await readPage(ines)).items).toEqual([])
+    expect(await unread(ines)).toBe(0)
   })
 })
 
@@ -853,6 +874,39 @@ describe('the rights', () => {
     expect((await send('GET', '/v1/notifications', ines)).status).toBe(200)
     expect((await send('GET', '/v1/notifications/unread', ines)).status).toBe(200)
     expect((await markSeen(ines, new Date().toISOString())).status).toBe(204)
+  })
+
+  /**
+   * Range directement le compteur de ce membre à `count` demandes déjà faites dans la minute :
+   * 300 lectures réelles recalculeraient 300 fois la liste, pour rien de plus.
+   */
+  const alreadyUsed = (key: string, count: number) =>
+    ctx.db.insert(schema.apiRateLimit).values({ key, count, windowStart: Date.now() })
+
+  it('answers 300 reads a minute, list and bell together, counting malformed ones, then asks to wait', async () => {
+    await alreadyUsed(memberCounterKeys(inesId).notificationsRead, 298)
+    // La 299e, mal formée, compte aussi ; la 300e, celle de la cloche, passe encore.
+    const bad = await send('GET', `/v1/notifications?${new URLSearchParams({ cursor: 'x' })}`, ines)
+    expect(bad.status).toBe(400)
+    expect((await send('GET', '/v1/notifications/unread', ines)).status).toBe(200)
+
+    await expectError(await send('GET', '/v1/notifications', ines), 429, 'rate_limited')
+    await expectError(await send('GET', '/v1/notifications/unread', ines), 429, 'rate_limited')
+    // Chaque membre a son compteur ; une minute plus tard, Inès lit de nouveau.
+    expect((await send('GET', '/v1/notifications', malik)).status).toBe(200)
+    later(MINUTE)
+    expect((await send('GET', '/v1/notifications', ines)).status).toBe(200)
+  })
+
+  it('answers 60 « seen » a minute, counting malformed ones, then asks to wait', async () => {
+    await alreadyUsed(memberCounterKeys(inesId).notificationsSeen, 59)
+    await expectError(await markSeen(ines, 'maintenant'), 400, 'validation')
+
+    await expectError(await markSeen(ines, new Date().toISOString()), 429, 'rate_limited')
+    // Le compteur des lectures est un autre : la liste se lit toujours.
+    expect((await send('GET', '/v1/notifications', ines)).status).toBe(200)
+    later(MINUTE)
+    await expectDone(await markSeen(ines, new Date().toISOString()))
   })
 
   it('shows each member her own notifications only', async () => {

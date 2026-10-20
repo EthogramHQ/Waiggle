@@ -19,6 +19,7 @@ import {
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { memberCounterKeys } from './rate-limit'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -328,6 +329,60 @@ describe('a handle that changes after the mention', () => {
     const fresh = await comment(meteo.id, malikAgain, 'Salut @ines_morel')
     expect(fresh.mentions).toEqual([{ handle: 'ines_morel', memberId: zoeId }])
   })
+
+  // À la modification, une mention gardée ne se relit pas : le pseudo encore écrit désigne le
+  // membre d'origine (relecture de sécurité de la tranche 6b).
+  it('keeps the mention when the comment is edited after the change of handle', async () => {
+    const meteo = await publish(ines)
+    const published = await comment(meteo.id, malik, 'Merci @ines_morel !')
+    await changeHandle(ines, 'ines')
+
+    await editComment(meteo.id, published.id, malik, 'Merci beaucoup @ines_morel !')
+
+    expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
+      { handle: 'ines_morel', memberId: inesId },
+    ])
+    expect(await mentionNotifications(ines)).toHaveLength(1)
+  })
+
+  it('keeps the mention to the same member when the comment is edited after another took the handle', async () => {
+    const meteo = await publish(ines)
+    const published = await comment(meteo.id, malik, 'Merci @ines_morel !')
+    await changeHandle(ines, 'ines')
+    later(30 * DAY + MINUTE)
+    const zoeAgain = await signInAgain(zoeAccount)
+    const malikAgain = await signInAgain(malikAccount)
+    await changeHandle(zoeAgain, 'ines_morel')
+
+    await editComment(meteo.id, published.id, malikAgain, 'Merci encore @ines_morel !')
+
+    expect((await readComments(meteo.id, zoeAgain))[0]?.mentions).toEqual([
+      { handle: 'ines_morel', memberId: inesId },
+    ])
+    // Zoé n'est pas prévenue : le commentaire ne la désigne pas.
+    expect(await mentionNotifications(zoeAgain)).toEqual([])
+  })
+
+  it('gives the new handle once it replaces the former in the text, one mention per member, same date', async () => {
+    const meteo = await publish(ines)
+    const published = await comment(meteo.id, malik, 'Merci @ines_morel !')
+    const [notified] = await mentionNotifications(ines)
+    await changeHandle(ines, 'ines')
+
+    // Les deux pseudos écrits : l'ancien, déjà gardé, l'emporte ; une seule mention d'Inès.
+    await editComment(meteo.id, published.id, malik, 'Merci @ines_morel, alias @ines !')
+    expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
+      { handle: 'ines_morel', memberId: inesId },
+    ])
+
+    // L'ancien effacé : la mention prend le pseudo écrit, et garde sa date (pas de nouvelle alerte).
+    await editComment(meteo.id, published.id, malik, 'Merci @ines !')
+    expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
+      { handle: 'ines', memberId: inesId },
+    ])
+    expect(await ctx.db.select().from(schema.commentMention)).toHaveLength(1)
+    expect((await mentionNotifications(ines)).map((n) => n.at)).toEqual([notified?.at])
+  })
 })
 
 describe('a deleted account', () => {
@@ -399,26 +454,38 @@ describe('the members proposed after « @ »', () => {
       password: 'a-long-enough-password',
     })
 
+  // Ce test cherchait « in » : depuis la décision du 20/10/2026, 2 caractères ne proposent que les
+  // proches. Il cherche donc « ine », avec des pseudos qui commencent tous ainsi.
   it('proposes the close members first, then the others, 5 at most', async () => {
     const meteo = await publish(ines)
-    // Des pseudos qui commencent tous par « in » : ina, inaya, inda, inge, inu (et ines_morel).
-    await member('Ina')
-    await member('Inaya')
-    await member('Inda')
-    const inge = await member('Inge')
-    const inu = await member('Inu')
-    // Les proches de Malik sur « Météo » : l'autrice (Inès), qui l'a commenté (Inge), et qui il
-    // suit (Inu). Par ordre alphabétique seul, ils ne seraient pas en tête.
-    await comment(meteo.id, inge, 'Joli.')
+    // Des pseudos qui commencent tous par « ine » : inea, ineb, inec, ined, inez (et ines_morel).
+    await member('Inea')
+    await member('Ineb')
+    await member('Inec')
+    const ined = await member('Ined')
+    const inez = await member('Inez')
+    // Les proches de Malik sur « Météo » : l'autrice (Inès), qui l'a commenté (Ined), et qui il
+    // suit (Inez). Par ordre alphabétique seul, ils ne seraient pas en tête.
+    await comment(meteo.id, ined, 'Joli.')
     later()
-    const inuId = (await me(inu)).id
-    expect((await send('POST', `/v1/members/${inuId}/follow`, malik)).status).toBe(204)
+    const inezId = (await me(inez)).id
+    expect((await send('POST', `/v1/members/${inezId}/follow`, malik)).status).toBe(204)
 
-    const handles = await proposed(malik, { q: 'in', projectId: meteo.id })
+    const handles = await proposed(malik, { q: 'ine', projectId: meteo.id })
 
     expect(handles).toHaveLength(5)
-    expect(handles.slice(0, 3).sort()).toEqual(['ines_morel', 'inge', 'inu'])
-    expect(handles.slice(3)).toEqual(['ina', 'inaya'])
+    expect(handles.slice(0, 3).sort()).toEqual(['ined', 'ines_morel', 'inez'])
+    expect(handles.slice(3)).toEqual(['inea', 'ineb'])
+  })
+
+  it('proposes the close members only with 2 characters, everyone from 3', async () => {
+    const meteo = await publish(ines)
+    await member('Ina')
+
+    // « in » : l'autrice du projet, une proche ; pas Ina, que Malik ne connaît pas ici.
+    expect(await proposed(malik, { q: 'in', projectId: meteo.id })).toEqual(['ines_morel'])
+    // Témoin : avec un caractère de plus, Ina est proposée.
+    expect(await proposed(malik, { q: 'ina', projectId: meteo.id })).toEqual(['ina'])
   })
 
   it('searches the start of the handle only, with capitals and an « @ » accepted', async () => {
@@ -474,8 +541,9 @@ describe('the members proposed after « @ »', () => {
     expect(hidden.status).toBe(404)
     expect(unknown.status).toBe(404)
     expect(await hidden.json()).toEqual(await unknown.json())
-    // Témoin : son autrice, elle, y cherche qui elle veut.
-    expect(await proposed(ines, { q: 'ma', projectId: draft.id })).toEqual(['malik'])
+    // Témoin : son autrice, elle, y cherche qui elle veut (3 caractères : Malik n'est pas un
+    // proche d'Inès sur ce brouillon).
+    expect(await proposed(ines, { q: 'mal', projectId: draft.id })).toEqual(['malik'])
   })
 
   it('waits for 2 characters, and refuses a malformed request', async () => {
@@ -518,4 +586,39 @@ describe('the members proposed after « @ »', () => {
     later(HOUR)
     expect(await proposed(malik, params)).toEqual(['ines_morel'])
   }, 60_000)
+
+  /** Range directement un compteur de Malik, comme s'il avait déjà fait `count` demandes. */
+  const alreadyUsed = (key: string, count: number) =>
+    ctx.db.insert(schema.apiRateLimit).values({ key, count, windowStart: Date.now() })
+
+  it('counts a malformed request too', async () => {
+    const meteo = await publish(ines)
+    await alreadyUsed(memberCounterKeys(malikId).mentionSearch, 599)
+
+    // La 600e, mal formée : refusée (400), mais comptée.
+    await expectError(await mentionable(malik, { q: 'i', projectId: meteo.id }), 400, 'validation')
+
+    await expectError(
+      await mentionable(malik, { q: 'ine', projectId: meteo.id }),
+      429,
+      'rate_limited',
+    )
+  })
+
+  it('answers 2 000 searches a day per member, then asks to wait until the next day', async () => {
+    const meteo = await publish(ines)
+    const params = { q: 'ine', projectId: meteo.id }
+    // 1 999 recherches déjà faites aujourd'hui, réparties sur les heures (le compteur du jour,
+    // rangé directement : 2 000 demandes réelles prendraient plus d'une minute).
+    await alreadyUsed(memberCounterKeys(malikId).mentionSearchDay, 1999)
+
+    expect(await proposed(malik, params)).toEqual(['ines_morel'])
+    await expectError(await mentionable(malik, params), 429, 'rate_limited')
+    // L'heure suivante n'y change rien ; le lendemain, si.
+    later(HOUR)
+    await expectError(await mentionable(malik, params), 429, 'rate_limited')
+    expect(await proposed(zoe, params)).toEqual(['ines_morel'])
+    later(DAY)
+    expect(await proposed(malik, params)).toEqual(['ines_morel'])
+  })
 })

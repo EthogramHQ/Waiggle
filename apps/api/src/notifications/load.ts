@@ -163,6 +163,12 @@ const sources = (me: string, since: Date): SQL => {
       ) candidate
       order by candidate.id, candidate.rank
     ) best
+    -- Un auteur sans pseudo actuel (un compte d'avant la tranche 6a, pas encore servi par le
+    -- rattrapage) : present() écarte la notification, faute de pseudo à montrer. La jointure
+    -- l'écarte dès ici, pour que la cloche (countUnread) compte exactement ce que la liste montre.
+    -- Un seul pseudo actuel par membre : l'index unique partiel member_handle_current_idx le trouve.
+    join member_handle author_handle
+      on author_handle.user_id = best.author_id and author_handle.released_at is null
 
     union all
 
@@ -177,11 +183,15 @@ const sources = (me: string, since: Date): SQL => {
 
     union all
 
-    -- 6. Son pseudo, daté de la naissance de sa ligne notification_state.
+    -- 6. Le pseudo qu'il a reçu, daté de la naissance de sa ligne notification_state ; seulement
+    --    tant qu'il le garde : dès qu'il en choisit un lui-même (handle_chosen_at), elle ne serait
+    --    plus vraie. Et seulement s'il a un pseudo actuel (member_handle_current_idx), comme le
+    --    demande present() : la cloche ne compte pas une ligne que la liste ne montrerait pas.
     select 'handle', 'handle', s.created_at, null, null, null, null,
       null, null, null, null, null, null, null
     from notification_state s
-    where s.user_id = ${me} and s.created_at > ${after}
+    join member_handle mine on mine.user_id = s.user_id and mine.released_at is null
+    where s.user_id = ${me} and s.created_at > ${after} and s.handle_chosen_at is null
   `
 }
 

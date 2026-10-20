@@ -32,7 +32,7 @@ import {
 } from '../comments/load'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
-import { resolveMentions, saveMentions } from '../mentions/write'
+import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
@@ -354,7 +354,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           deletedAt: c.deletedAt,
         })
       if (!row) return null
-      const mentions = await resolveMentions(tx, body, user.id)
+      // Les mentions déjà gardées d'abord : un pseudo encore écrit garde le membre qu'il désignait
+      // à l'écriture, même si ce pseudo a changé de main depuis (mentions/write.ts).
+      const kept = await mentionsOf(tx, row.id)
+      const mentions = await resolveMentions(tx, body, user.id, kept)
       await saveMentions(tx, row.id, mentions, editedAt)
       return { row, mentions }
     })

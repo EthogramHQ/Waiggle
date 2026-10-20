@@ -10,7 +10,7 @@ import { type Database, schema } from '@ruche/db'
 import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
 import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm'
 import { describeError } from '../log'
-import { createNotificationState } from '../notifications/state'
+import { createNotificationState, markHandleChosen } from '../notifications/state'
 import { currentHandle, currentHandleOf, reservationCutoff } from './load'
 import { handleBase, handleCandidates } from './suggest'
 
@@ -184,27 +184,45 @@ export const backfillHandles = async (db: Database): Promise<number> => {
  * notification lui dit alors le pseudo qu'il a. Une ligne déjà là ne change pas (« on conflict do
  * nothing ») : au démarrage suivant, rien ne bouge.
  *
+ * Sauf pour qui a déjà changé de pseudo (tranche 6a) : celui-là garde un ancien pseudo réservé,
+ * « libéré par lui » (released_at rempli). Sa ligne naît alors marquée « choisi »
+ * (handle_chosen_at), et la notification « Ton pseudo est @… », qui parle d'un pseudo reçu, ne lui
+ * est pas montrée : elle ne serait pas vraie. (Une réservation finie et effacée ne se voit plus ;
+ * la tranche 6a, déployée le jour même, n'en a encore aucune.)
+ *
  * Une seule requête, « insert … select » : les lignes à insérer sont lues par un select, sans
  * passer par JavaScript.
- *   insert into notification_state (user_id, created_at)
- *   select user_id, $maintenant from member_handle where released_at is null
+ *   insert into notification_state (user_id, seen_at, created_at, handle_chosen_at)
+ *   select user_id, null, $maintenant,
+ *     case when exists (select 1 from member_handle old
+ *       where old.user_id = member_handle.user_id and old.released_at is not null)
+ *     then $maintenant end
+ *   from member_handle where released_at is null
  *   on conflict do nothing
- * L'index partiel member_handle_current_idx donne les pseudos actuels ; la clé primaire de
- * notification_state repère les lignes déjà là. La date passe par la colonne (sql.param), comme
- * dans cursor.ts : jamais écrite dans le texte SQL.
+ * L'index partiel member_handle_current_idx donne les pseudos actuels ; member_handle_user_idx
+ * trouve les anciens pseudos de chacun ; la clé primaire de notification_state repère les lignes
+ * déjà là. La date passe par la colonne (sql.param), comme dans cursor.ts : jamais écrite dans le
+ * texte SQL.
  */
 const backfillNotificationStates = async (db: Database, now: Date) => {
   const t = schema.notificationState
+  const at = sql`${sql.param(now, t.createdAt)}::timestamp`
   await db
     .insert(t)
     .select(
       db
         // Drizzle demande toutes les colonnes de la table, dans son ordre : seen_at vide (jamais
-        // ouvert), created_at le démarrage.
+        // ouvert), created_at le démarrage, handle_chosen_at le démarrage s'il a déjà changé.
         .select({
           userId: h.userId,
           seenAt: sql<Date | null>`null`.as('seen_at'),
-          createdAt: sql<Date>`${sql.param(now, t.createdAt)}::timestamp`.as('created_at'),
+          createdAt: sql<Date>`${at}`.as('created_at'),
+          // « member_handle.user_id » écrit en toutes lettres : dans un insert … select, Drizzle
+          // écrit ${h.userId} sans le nom de la table, et « user_id » désignerait alors la colonne
+          // de « old » (la table la plus proche), ce qui rendrait la condition toujours vraie.
+          handleChosenAt: sql<Date | null>`case when exists (select 1 from member_handle old
+            where old.user_id = member_handle.user_id and old.released_at is not null)
+            then ${at} end`.as('handle_chosen_at'),
         })
         .from(h)
         .where(isNull(h.releasedAt)),
@@ -293,5 +311,7 @@ export const claimHandle = async (
     })
     .returning({ handle: h.handle })
   if (!taken) throw new HandleTakenError()
+  // Un pseudo choisi par le membre : la notification du pseudo reçu n'est plus vraie, elle part.
+  await markHandleChosen(tx, userId, now)
   return true
 }
