@@ -399,6 +399,10 @@ export const en: Translation = {
     notFoundTitle: 'This member cannot be found',
     notFound: 'The account may have been deleted, or the link is wrong.',
   },
+  mentions: {
+    suggestions: 'Members to mention',
+    option: '{{name}}, @{{handle}}',
+  },
   tag: {
     subtitle: 'The public projects made with this tool, newest first.',
     emptyTitle: 'No project here yet',

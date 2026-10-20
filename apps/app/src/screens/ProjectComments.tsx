@@ -8,6 +8,8 @@
 // commentaire à supprimer) ne redessinent pas toute la page à chaque lettre tapée.
 // Le focus du clavier ne se perd jamais : un champ qui se referme le rend au bouton qui l'avait
 // ouvert (« Répondre », « Modifier ») ; après une suppression, il va sur l'action voisine.
+// Dans chaque champ (commentaire, réponse, modification), « @in » propose des membres à mentionner
+// (tranche 6b) ; une fois publié, « @ines_morel » est un lien vers la page d'Inès.
 import {
   COMMENT_MAX,
   type Comment,
@@ -28,6 +30,7 @@ import {
   useHideComment,
   usePostComment,
 } from '../comments/api'
+import { useMentionable } from '../mentions/api'
 import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
@@ -61,6 +64,9 @@ type Done =
 
 // Ce que le focus peut viser après une suppression : une action d'une carte, ou « Répondre ».
 type FocusTarget = { card: string } | { thread: string }
+
+// Le champ où se tape une mention : le nouveau commentaire, la réponse, ou la modification.
+type MentionFrom = 'root' | 'reply' | 'edit'
 
 export function Comments({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
@@ -107,6 +113,10 @@ export function Comments({ project }: { project: Project }) {
   const [hiding, setHiding] = useState<ReadonlySet<string>>(new Set())
   const hidingNow = useRef(new Set<string>())
   const [done, setDone] = useState<Done | null>(null)
+  // La mention en cours de frappe (« @in ») et le champ où elle se tape : un seul à la fois, même
+  // si plusieurs champs sont ouverts. Les suggestions ne vont qu'à ce champ.
+  const [mentioning, setMentioning] = useState<{ from: MentionFrom; query: string } | null>(null)
+  const mentionable = useMentionable(project.id, mentioning?.query ?? null)
 
   // Le focus du clavier. Chaque carte donne une poignée pour poser le focus sur une de ses actions,
   // chaque fil une poignée pour le poser sur « Répondre ».
@@ -163,6 +173,35 @@ export function Comments({ project }: { project: Project }) {
       error: text.trim() === '' ? required : t('project.errors.invalidCharacters'),
     }
   }
+
+  // --- Les mentions ------------------------------------------------------------------------------
+
+  /** Ce qu'il faut au champ `from` pour proposer des membres après « @ ». */
+  const mentionsFor = (from: MentionFrom) => ({
+    suggestions:
+      mentioning?.from === from
+        ? mentionable.map((member) => ({
+            id: member.id,
+            name: member.name,
+            handle: member.handle,
+            avatar: toSource(member.avatarUrl),
+          }))
+        : [],
+    label: t('mentions.suggestions'),
+    onQueryChange: (query: string | null) =>
+      setMentioning((current) =>
+        query !== null
+          ? { from, query }
+          : // Ce champ ne cherche plus : on n'efface que sa propre recherche.
+            current?.from === from
+            ? null
+            : current,
+      ),
+  })
+
+  /** Une mention touchée : la page du membre gardé avec elle (son identifiant). */
+  const openMember = (memberId: string) =>
+    router.push({ pathname: '/members/[id]', params: { id: memberId } })
 
   // --- Un nouveau commentaire -------------------------------------------------------------------
 
@@ -423,6 +462,8 @@ export function Comments({ project }: { project: Project }) {
           : null)}
         when={shortDate(comment.createdAt, i18n.language)}
         body={comment.body}
+        mentions={comment.mentions}
+        onMemberPress={openMember}
         edited={comment.editedAt ? t('project.comments.edited') : undefined}
         // Le bandeau, pour les deux auteurs qui lisent encore un commentaire masqué : l'auteur du
         // projet l'a masqué lui-même ; l'auteur du commentaire apprend que les autres ne le voient
@@ -461,6 +502,7 @@ export function Comments({ project }: { project: Project }) {
               pending={edit.pending}
               max={COMMENT_MAX}
               reveal
+              mentions={mentionsFor('edit')}
               labels={{
                 open: t('project.comments.edit'),
                 field: t('project.comments.field'),
@@ -495,6 +537,7 @@ export function Comments({ project }: { project: Project }) {
         pending={post.pending && postFrom === 'reply'}
         max={COMMENT_MAX}
         reveal
+        mentions={mentionsFor('reply')}
         labels={{
           open: t('project.comments.reply'),
           field: t('project.comments.replyField'),
@@ -655,6 +698,7 @@ export function Comments({ project }: { project: Project }) {
         onSubmit={() => void submit()}
         pending={post.pending && postFrom === 'root'}
         max={COMMENT_MAX}
+        mentions={mentionsFor('root')}
         labels={{
           open: t('project.comments.add'),
           // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».

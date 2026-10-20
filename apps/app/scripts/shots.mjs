@@ -292,6 +292,8 @@ const comment = (n, author, body, day, hour, fields = {}) => ({
   editedAt: null,
   state: 'visible',
   isMine: author?.id === leaMe.id,
+  // Les membres mentionnés (tranche 6b) : aucun par défaut.
+  mentions: [],
   replies: [],
   ...fields,
 })
@@ -339,7 +341,17 @@ const notMineComments = [
     state: 'hidden',
     replies: [comment(18, max, 'Merci pour le retour, je regarde ça.', 15, 12)],
   }),
-  comment(19, ines, 'Ça marche avec un frigo presque vide ?', 14, 9),
+  // Deux mentions : celle de Max, rendue par l'API (un lien), et un pseudo inconnu (du texte).
+  comment(
+    19,
+    ines,
+    'Ça marche avec un frigo presque vide ? @max_durand, @paul_inconnu, vous avez essayé ?',
+    14,
+    9,
+    {
+      mentions: [{ handle: 'max_durand', memberId: max.id }],
+    },
+  ),
 ]
 const notMineMore = [comment(20, ines, 'Première version testée : bravo pour l’interface.', 12, 9)]
 // Sur le projet aux contenus très longs : un commentaire de 1 000 caractères, une adresse sans
@@ -348,6 +360,12 @@ const longComments = [
   comment(21, max, longNote, 17, 9, {
     replies: [comment(22, ines, urlNote, 17, 10)],
   }),
+]
+// Les membres qu'on peut mentionner (tranche 6b), tels que GET /v1/members/mentionable les rend.
+const mentionable = [
+  { id: ines.id, name: ines.name, handle: 'ines_haddad', avatarUrl: null },
+  { id: 'iniko-id', name: 'Iniko Diallo', handle: 'iniko', avatarUrl: null },
+  { id: max.id, name: max.name, handle: 'max_durand', avatarUrl: null },
 ]
 // Les commentaires de chaque projet : la première page, puis la suite (curseur « suite »).
 const commentsOf = {
@@ -491,6 +509,12 @@ const fakeApi = (signedIn, feed = 'following') => {
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
+    // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
+    // recherche, 5 au plus, comme l'API.
+    if (pathname === '/v1/members/mentionable') {
+      const q = (url.searchParams.get('q') ?? '').toLowerCase()
+      return json(200, { members: mentionable.filter((m) => m.handle.startsWith(q)).slice(0, 5) })
+    }
     if (pathname === '/v1/members/erreur')
       return json(500, { error: { code: 'internal', message: '' } })
     const tag = pathname.match(/^\/v1\/tags\/([^/]+)$/)
@@ -542,6 +566,22 @@ const pages = [
         .getByLabel('Ton commentaire')
         .fill('Testé ce soir : il m’a proposé une soupe de fanes de radis, une vraie réussite.')
       await page.getByRole('button', { name: 'Répondre', exact: true }).first().click()
+    },
+  },
+  // Mentionner (tranche 6b) : « @in » tapé dans un commentaire, la liste des membres ouverte, le
+  // premier en surbrillance (flèche du bas).
+  {
+    name: 'projet-mentionner',
+    path: `/projects/${commentedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+      const field = page.getByLabel('Ton commentaire')
+      await field.fill('Bravo, demande à @i')
+      await field.press('n')
+      await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()
+      await field.press('ArrowDown')
     },
   },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },

@@ -412,6 +412,13 @@ export const fr = {
     notFoundTitle: 'Ce membre est introuvable',
     notFound: 'Son compte a peut-être été supprimé, ou le lien est incorrect.',
   },
+  // Les mentions « @pseudo » dans les commentaires (tranche 6b).
+  mentions: {
+    /** Le nom de la liste des membres proposés après « @ », lu par les lecteurs d'écran. */
+    suggestions: 'Membres à mentionner',
+    /** Un membre proposé : son nom, puis son pseudo. */
+    option: '{{name}}, @{{handle}}',
+  },
   tag: {
     subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
     emptyTitle: 'Encore aucun projet ici',

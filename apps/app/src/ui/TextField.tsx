@@ -12,14 +12,16 @@ import {
   createContext,
   Fragment,
   type ReactNode,
+  type Ref,
   useContext,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
-import { describedBy, invalid } from './aria'
+import { comboboxLinks, describedBy, invalid } from './aria'
 import { Icon } from './Icon'
 import { Text, type Tone } from './Text'
 import { fontName } from './theme/fonts'
@@ -44,6 +46,15 @@ type Props = {
    * forme attendue sans que le membre ait à le taper. Décoratif : l'étiquette dit déjà ce qu'on tape.
    */
   prefix?: string
+  /** Une poignée vers la saisie elle-même : pour y remettre le focus (MentionField). */
+  inputRef?: Ref<TextInput>
+  /** Le champ a perdu le focus (en plus de ce que le champ en fait lui-même). */
+  onBlur?: () => void
+  /**
+   * Le champ propose une liste de choix pendant qu'on tape (rôle « combobox », MentionField) :
+   * la liste est-elle ouverte, son identifiant, et le choix en surbrillance s'il y en a un.
+   */
+  combobox?: { expanded: boolean; listId: string; activeId?: string | undefined }
 } & Pick<
   TextInputProps,
   | 'secureTextEntry'
@@ -62,6 +73,8 @@ type Props = {
   // Entrée dans un champ d'une ligne : l'écran décide (enregistrer le formulaire, par exemple).
   | 'onSubmitEditing'
   | 'returnKeyType'
+  // Où est le curseur : MentionField cherche le « @pseudo » qui se tape juste avant lui.
+  | 'onSelectionChange'
 >
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.
@@ -131,6 +144,9 @@ export function TextField({
   aside,
   success,
   prefix,
+  inputRef,
+  onBlur,
+  combobox,
   secureTextEntry = false,
   ...inputProps
 }: Props) {
@@ -142,6 +158,8 @@ export function TextField({
   const [revealed, setRevealed] = useState(false)
   // useRef : une « poignée » vers le champ dessiné, pour lui donner le focus depuis son libellé.
   const input = useRef<TextInput>(null)
+  // La même saisie, partagée avec l'écran ou le composant qui l'a demandée (inputRef).
+  useImperativeHandle(inputRef, () => input.current as TextInput)
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie le
   // champ au texte affiché dessous (aria-describedby).
   const messageId = useId()
@@ -219,6 +237,15 @@ export function TextField({
             {...describedBy(message ? messageId : undefined)}
             // « Saisie invalide » : le lecteur d'écran le dit en arrivant sur le champ (web).
             {...invalid(Boolean(error))}
+            // Un champ à suggestions : le lecteur d'écran annonce « liste déroulante, réduite ou
+            // développée », et lit le choix en surbrillance sans quitter le champ (aria-activedescendant).
+            {...(combobox
+              ? {
+                  role: 'combobox' as const,
+                  'aria-expanded': combobox.expanded,
+                  ...comboboxLinks(combobox.listId, combobox.expanded, combobox.activeId),
+                }
+              : null)}
             // Entrée enregistre sans quitter le champ (web) : le focus ne part pas sur la page, et
             // on peut corriger tout de suite si le serveur refuse.
             {...(Platform.OS === 'web' && inputProps.onSubmitEditing
@@ -227,7 +254,10 @@ export function TextField({
             value={value}
             onChangeText={onChangeText}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onBlur={() => {
+              setFocused(false)
+              onBlur?.()
+            }}
             autoCapitalize="none"
             placeholderTextColor={colors.textPlaceholder}
             // Le champ utilise la police et la taille du texte courant.
