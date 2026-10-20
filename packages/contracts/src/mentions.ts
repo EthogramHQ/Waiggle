@@ -13,11 +13,12 @@ export const MENTIONABLE_MAX = 5
 export const MENTION_QUERY_MIN = 2
 
 // Un « @ » suivi d'une lettre puis de lettres, chiffres ou « _ » (insensible à la casse). Le « @ »
-// ne doit pas suivre une lettre, un chiffre, « _ », « . » ou un autre « @ » : « ines@exemple.fr »
-// est une adresse, pas une mention. La parenthèse du début capture ce qui précède (début du texte
-// ou autre caractère) : on évite ainsi les « lookbehind » (?<!…), mal connus de certains moteurs
-// JavaScript. Le drapeau g (« global ») trouve toutes les occurrences.
-const MENTION_REGEX = /(^|[^A-Za-z0-9_@.])@([A-Za-z][A-Za-z0-9_]*)/g
+// ne doit pas suivre une lettre (accentuée ou non, de tout alphabet : \p{L}), un chiffre (\p{N}),
+// « _ », « . » ou un autre « @ » : « andré@exemple.fr » est une adresse, pas une mention. Le
+// drapeau u (« unicode ») permet ces classes \p{…}. La parenthèse du début capture ce qui précède
+// (début du texte ou autre caractère) : on évite ainsi les « lookbehind » (?<!…), mal connus de
+// certains moteurs JavaScript. Le drapeau g (« global ») trouve toutes les occurrences.
+const MENTION_REGEX = /(^|[^\p{L}\p{N}_@.])@([A-Za-z][A-Za-z0-9_]*)/gu
 // La forme d'un pseudo (la même que `Handle`, dans handles.ts) : un candidat qui ne la respecte pas
 // (« @ines_ », « @a ») reste du texte.
 const HANDLE_SHAPE = /^[a-z](?:_?[a-z0-9])*$/
