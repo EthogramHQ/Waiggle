@@ -2,7 +2,7 @@
 // (copiée d'un modèle déjà migré, voir createTestPgliteDb),
 // une fausse boîte d'envoi d'e-mails et un stockage de fichiers en mémoire.
 // Rien ici n'est utilisé en production.
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { createTestPgliteDb } from '@ruche/db/pglite'
 import { createApp } from '../app'
 import { createAuth, type PasswordHashing } from '../auth/auth'
@@ -15,24 +15,27 @@ export const TEST_API_URL = 'http://localhost:3000'
 /**
  * Un hachage de mot de passe rapide, pour les tests seulement. scrypt, celui de la production,
  * prend ~120 ms par inscription ou connexion, exprès (voir auth.ts) : multiplié par des centaines
- * de tests, cela coûtait des dizaines de secondes. Ici, un SHA-256 salé : un « sel » est une valeur
- * aléatoire mêlée au mot de passe, pour que deux comptes au même mot de passe n'aient pas la même
- * empreinte. Il distingue deux mots de passe, ce qui suffit aux tests (mauvais mot de passe refusé,
- * changement de mot de passe), mais se calcule trop vite pour protéger une vraie base.
+ * de tests, cela coûtait des dizaines de secondes. Ici, le même scrypt, mais avec un coût
+ * minuscule (N = 16 au lieu de 16 384) : une fraction de milliseconde. Un « sel » (valeur
+ * aléatoire mêlée au mot de passe) fait que deux comptes au même mot de passe n'ont pas la même
+ * empreinte. Cela suffit aux tests (mauvais mot de passe refusé, changement de mot de passe),
+ * mais se calcule trop vite pour protéger une vraie base. (Un SHA-256 marchait aussi, mais
+ * l'analyse de sécurité du dépôt, CodeQL, refuse à juste titre un hachage rapide généraliste
+ * pour un mot de passe, même dans les tests.)
  */
-const sha256 = (salt: string, password: string) =>
-  createHash('sha256').update(`${salt}:${password}`).digest('hex')
+const scryptCheap = (salt: string, password: string) =>
+  scryptSync(password, salt, 32, { N: 16, r: 1, p: 1 }).toString('hex')
 
 export const fastPasswordHashing: PasswordHashing = {
-  // L'empreinte garde son sel, et une étiquette qui dit d'où elle vient : « test-sha256:sel:empreinte ».
+  // L'empreinte garde son sel, et une étiquette qui dit d'où elle vient : « test-scrypt:sel:empreinte ».
   hash: async (password) => {
     const salt = randomBytes(16).toString('hex')
-    return `test-sha256:${salt}:${sha256(salt, password)}`
+    return `test-scrypt:${salt}:${scryptCheap(salt, password)}`
   },
   verify: async ({ hash, password }) => {
     const [kind, salt, digest] = hash.split(':')
-    if (kind !== 'test-sha256' || !salt || !digest) return false
-    return sha256(salt, password) === digest
+    if (kind !== 'test-scrypt' || !salt || !digest) return false
+    return timingSafeEqual(Buffer.from(scryptCheap(salt, password)), Buffer.from(digest))
   },
 }
 

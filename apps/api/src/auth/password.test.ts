@@ -48,7 +48,7 @@ describe('password hashing', () => {
     const { password } = await ctx.auth.$context
     const hash = await password.hash('correct-horse-battery')
 
-    expect(hash).toMatch(/^test-sha256:/)
+    expect(hash).toMatch(/^test-scrypt:/)
     expect(await password.verify({ hash, password: 'correct-horse-battery' })).toBe(true)
     expect(await password.verify({ hash, password: 'correct-horse-batterY' })).toBe(false)
     // Deux empreintes du même mot de passe diffèrent : chacune a son sel.
