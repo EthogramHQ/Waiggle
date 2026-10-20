@@ -62,6 +62,8 @@ export const memberCounterKeys = (userId: string) => ({
   comment: `comment:${userId}`,
   // Changer de pseudo, essais sur un pseudo pris compris (tranche 6a).
   handle: `handle:${userId}`,
+  // Chercher un membre à mentionner après « @ » (tranche 6b).
+  mentionSearch: `mention-search:${userId}`,
 })
 
 /**

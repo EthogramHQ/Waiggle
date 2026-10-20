@@ -1,17 +1,48 @@
-// La page d'un membre (GET /v1/members/{id}) : son profil public et ses projets.
-// Réservée aux membres connectés. Un membre inconnu, supprimé ou jamais vérifié : « introuvable ».
+// Les routes des membres, réservées aux membres connectés :
+// - GET /v1/members/{id} : la page d'un membre, son profil public et ses projets. Un membre
+//   inconnu, supprimé ou jamais vérifié : « introuvable » ;
+// - GET /v1/members/mentionable : les membres proposés après « @ » dans un commentaire (tranche 6b).
 import { createRoute, z } from '@hono/zod-openapi'
-import { Member, MemberId } from '@ruche/contracts'
+import { Member, MemberId, MentionableList, MentionableQuery } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
+import { viewerOf } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
 import { memberFollowState } from '../follows/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { searchMentionable } from '../mentions/search'
 import { mediaUrl } from '../profile/me'
 import { loadSummaries, visibleTo, withSlugs } from '../projects/load'
+import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { createRouter, errorResponse } from './router'
+
+// Anti-abus des suggestions (scénario 6b, « Suggestions ») : 600 recherches par heure et par
+// membre. L'appli attend qu'on s'arrête de taper avant de chercher : 600, c'est beaucoup
+// d'écriture, et c'est assez peu pour qu'on ne puisse pas relever tous les pseudos du réseau.
+const mentionSearchRule: RateRule = { windowMs: 60 * 60 * 1000, max: 600 }
+
+const mentionableRoute = createRoute({
+  method: 'get',
+  path: '/v1/members/mentionable',
+  summary: 'Members to mention in a comment',
+  description:
+    'Members whose current handle starts with `q`, verified, never the viewer: first those ' +
+    'close to the project (its author, the authors of its comments, the members followed), then ' +
+    'the others, by handle. Five at most.',
+  request: { query: MentionableQuery },
+  responses: {
+    200: {
+      description: 'The members proposed.',
+      content: { 'application/json': { schema: MentionableList } },
+    },
+    400: errorResponse('Invalid query (less than 2 characters, or not a handle).'),
+    401: errorResponse('Not signed in.'),
+    404: errorResponse('No such project, or a private project of another member.'),
+    429: errorResponse('Too many searches.'),
+  },
+})
 
 const readMemberRoute = createRoute({
   method: 'get',
@@ -28,11 +59,53 @@ const readMemberRoute = createRoute({
   },
 })
 
-type Deps = { db: Database; publicApiUrl: string }
+type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
 
-export const memberRoutes = ({ db, publicApiUrl }: Deps) => {
+export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
   app.use('/v1/members/*', requireUser)
+
+  // Le quota AVANT la vérification de la demande (déclarée dans la route, vérifiée par un
+  // middleware que Hono place juste avant elle, comme dans routes/comments.ts) : chaque demande
+  // compte, même mal écrite.
+  app.on('GET', '/v1/members/mentionable', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return c.json(errorBody(languageOf(c), 'unauthorized'), 401)
+    const decision = await limiter.hit(memberCounterKeys(user.id).mentionSearch, mentionSearchRule)
+    if (!decision.allowed) {
+      c.header('Retry-After', String(decision.retryAfterSeconds))
+      return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    }
+    await next()
+  })
+
+  // Enregistrée avant /v1/members/{id} : sinon « mentionable » serait pris pour un identifiant.
+  app.openapi(mentionableRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json(errorBody(languageOf(c), 'unauthorized'), 401)
+    const { q, projectId } = c.req.valid('query')
+    // Le projet, s'il est visible par ce membre (public, ou le sien). Inconnu ou privé d'un
+    // autre : la même réponse « introuvable », pour ne pas révéler qu'un projet privé existe.
+    // L'identifiant est déjà un UUID bien formé (MentionableQuery) ; la clé primaire le trouve.
+    const [project] = await db
+      .select({
+        id: schema.project.id,
+        authorId: schema.project.authorId,
+        visibility: schema.project.visibility,
+      })
+      .from(schema.project)
+      .where(and(eq(schema.project.id, projectId), visibleTo(user.id)))
+    if (!project) return c.json(errorBody(languageOf(c), 'not_found'), 404)
+    const members = await searchMentionable(
+      db,
+      q,
+      viewerOf(user.id, project),
+      project,
+      publicApiUrl,
+    )
+    // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
+    return c.json(MentionableList.parse({ members }), 200)
+  })
 
   app.openapi(readMemberRoute, async (c) => {
     const viewer = c.get('user')
