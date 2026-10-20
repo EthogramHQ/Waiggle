@@ -126,9 +126,9 @@ export const en: Translation = {
       reactionsItem: 'Your reactions and your comments',
       reactionsDetail:
         'A comment that received replies becomes “Deleted comment”: your text and your name are erased from it, the replies of others stay.',
-      notificationsItem: 'Your notifications and your mentions',
+      notificationsItem: 'Your notifications, and the links to you in the comments of others',
       notificationsDetail:
-        'Your reactions, follows and comments also disappear from the notifications of others.',
+        'Your handle stays written there, as plain text, with no link to you. Your reactions, follows and comments also disappear from the notifications of others.',
       exportHint:
         'Your texts and settings, to keep before you leave. Your photos are not in it: save the ones you want to keep.',
       password: 'Confirm with your password',
@@ -486,11 +486,11 @@ export const en: Translation = {
     bell: 'Notifications',
     bellNew_one: 'Notifications, {{count}} new',
     bellNew_other: 'Notifications, {{count}} new',
-    bellNewMany: 'Notifications, more than 9 new',
+    bellNewMany: 'Notifications, more than {{max}} new',
     new: 'New',
     empty:
       'Nothing yet. When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
-    emptyAction: 'Back to home',
+    emptyAction: 'Publish a project',
     more: 'Show more',
     end: 'That’s all',
     moreError: 'The next notifications could not be loaded.',
@@ -498,7 +498,7 @@ export const en: Translation = {
     reactions_one: '{{count}} reaction on “{{title}}”',
     reactions_other: '{{count}} reactions on “{{title}}”',
     reactionCount: '{{reaction}} ×{{count}}',
-    comment: '{{name}} commented on “{{title}}”: “{{excerpt}}”',
+    comment: '{{name}} commented on “{{title}}”',
     mention: '{{name}} mentioned you in a comment on “{{title}}”',
     reply: '{{name}} replied to your comment on “{{title}}”',
     memberFollows_one: '{{count}} more person follows you',

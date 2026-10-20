@@ -208,6 +208,27 @@ describe('NotificationsScreen', () => {
     expect(screen.getAllByText(containing(texts.comment)).length).toBeGreaterThan(0)
   })
 
+  it('quotes the excerpt under the sentence, for every sort of comment', async () => {
+    for (const notification of [commentNotification, mentionNotification, replyNotification]) {
+      mockPages([notificationPageOf([notification])])
+      const { unmount } = await renderWithProviders(<NotificationsScreen />)
+
+      // L'extrait est un texte à lui, sous la phrase, et non une fin de phrase.
+      expect(screen.getByText(notification.comment.excerpt)).toBeTruthy()
+      await unmount()
+    }
+  })
+
+  it('lists the notifications as a list', async () => {
+    await renderWithProviders(<NotificationsScreen />)
+
+    // Chaque carte est un élément de liste (les lecteurs d'écran annoncent « liste, 8 éléments »).
+    const link = screen.getByRole('link', { name: containing(texts.reactions) })
+    let node: typeof link | null = link
+    while (node && node.props.role !== 'listitem') node = node.parent
+    expect(node).not.toBeNull()
+  })
+
   it('points out the new notifications, and only them', async () => {
     // Dans l'exemple, seules les deux premières sont nouvelles.
     await renderWithProviders(<NotificationsScreen />)
@@ -311,6 +332,15 @@ describe('the end of the list', () => {
 
     expect(screen.getByText(t('notifications.empty'))).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
+  })
+
+  it('offers to publish a project when there is nothing yet', async () => {
+    mockPages([notificationPageOf([])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier un projet' }))
+
+    expect(mockPush).toHaveBeenCalledWith('/projects/new')
   })
 
   it('loads the next 20 on request', async () => {

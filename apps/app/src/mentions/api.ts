@@ -50,7 +50,10 @@ const pathOf = (projectId: string, query: string) => {
  *   permet d'abandonner la demande : quand le texte change, l'ancienne recherche n'a plus de
  *   lecteur, et React Query l'annule au lieu d'attendre une réponse qui ne servira plus.
  * - Pendant qu'une nouvelle recherche part, la liste précédente reste affichée
- *   (`keepPreviousData`) : les suggestions ne clignotent pas à chaque lettre.
+ *   (`keepPreviousData`) : les suggestions ne clignotent pas à chaque lettre. Elle peut donc
+ *   répondre à une autre recherche (« in » pendant qu'on tape « ma ») : MentionField ne garde que
+ *   les membres dont le pseudo commence par ce qui est tapé (l'API cherche par début de pseudo,
+ *   la règle est la même), et rien d'une réponse périmée ne peut être choisi.
  * - Un refus de l'API (quota dépassé, réseau) ne propose personne, sans message : écrire le
  *   commentaire reste possible, on tape alors le pseudo en entier.
  */

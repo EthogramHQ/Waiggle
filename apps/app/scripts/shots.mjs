@@ -703,7 +703,7 @@ const pages = [
     },
   },
   // Mentionner (tranche 6b) : « @in » tapé dans un commentaire, la liste des membres ouverte, le
-  // premier en surbrillance (flèche du bas).
+  // premier en surbrillance d'emblée (Entrée le choisirait).
   {
     name: 'projet-mentionner',
     path: `/projects/${commentedProject.id}`,
@@ -715,7 +715,6 @@ const pages = [
       await field.fill('Bravo, demande à @i')
       await field.press('n')
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()
-      await field.press('ArrowDown')
     },
   },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },

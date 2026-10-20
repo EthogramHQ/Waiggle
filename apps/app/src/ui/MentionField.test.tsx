@@ -76,7 +76,7 @@ describe('MentionField', () => {
     await type('Bravo @in ')
 
     expect(lastQuery(onQueryChange)).toBeNull()
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
   })
 
   it('does not take an e-mail address for a mention', async () => {
@@ -86,7 +86,7 @@ describe('MentionField', () => {
     await type('Écris à contact@ines')
 
     expect(lastQuery(onQueryChange) ?? null).toBeNull()
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
     // Témoin : une vraie mention, plus loin dans le même texte, est bien cherchée.
     await type('Écris à contact@ines ou à @in')
     expect(lastQuery(onQueryChange)).toBe('in')
@@ -97,7 +97,7 @@ describe('MentionField', () => {
 
     await type('Bravo @i')
 
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
     expect(screen.getByRole('combobox', { name: LABEL, expanded: false })).toBeTruthy()
   })
 
@@ -107,7 +107,7 @@ describe('MentionField', () => {
     await type('Bravo @in')
 
     expect(screen.getByRole('combobox', { name: LABEL, expanded: true })).toBeTruthy()
-    expect(screen.getByRole('listbox', { name: LIST })).toBeTruthy()
+    expect(screen.getByLabelText(LIST)).toBeTruthy()
     const options = screen.getAllByRole('option')
     expect(options).toHaveLength(2)
     expect(screen.getByRole('option', { name: /Inès Morel.*@ines_morel/ })).toBeTruthy()
@@ -119,7 +119,7 @@ describe('MentionField', () => {
 
     await type('Bravo @zz')
 
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
     expect(screen.getByRole('combobox', { name: LABEL, expanded: false })).toBeTruthy()
   })
 
@@ -132,7 +132,7 @@ describe('MentionField', () => {
 
     // Le début tapé (« @in ») devient le pseudo entier, suivi d'une espace pour continuer.
     expect(field()).toHaveDisplayValue('Bravo @ines_morel ')
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
     expect(lastQuery(onQueryChange)).toBeNull()
   })
 
@@ -158,7 +158,7 @@ describe('MentionField with a keyboard (web)', () => {
     await renderWithProviders(<Field />)
     await type('Bravo @in')
 
-    await key('ArrowDown')
+    // Le premier membre est en surbrillance d'emblée (Entrée le prendrait).
     expect(screen.getByRole('option', { name: /Inès Morel/, selected: true })).toBeTruthy()
     await key('ArrowDown')
     expect(screen.getByRole('option', { name: /Iniko Diallo/, selected: true })).toBeTruthy()
@@ -168,20 +168,74 @@ describe('MentionField with a keyboard (web)', () => {
     await key('Enter')
 
     expect(field()).toHaveDisplayValue('Bravo @ines_morel ')
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
   })
 
   it('closes the list with Escape, leaving the text as it was', async () => {
     await renderWithProviders(<Field />)
     await type('Bravo @in')
-    expect(screen.getByRole('listbox', { name: LIST })).toBeTruthy()
+    expect(screen.getByLabelText(LIST)).toBeTruthy()
 
     await key('Escape')
 
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText(LIST)).toBeNull()
     expect(field()).toHaveDisplayValue('Bravo @in')
     // Une lettre de plus : la liste revient.
     await type('Bravo @ine')
-    expect(screen.getByRole('listbox', { name: LIST })).toBeTruthy()
+    expect(screen.getByLabelText(LIST)).toBeTruthy()
+  })
+
+  it('chooses the first member with Enter, without the arrows', async () => {
+    await renderWithProviders(<Field />)
+    await type('Bravo @in')
+
+    await key('Enter')
+
+    expect(field()).toHaveDisplayValue('Bravo @ines_morel ')
+  })
+
+  it('chooses nobody from an older answer while the new one is on its way', async () => {
+    // Les suggestions restent celles de « @in » (la réponse pour « @ma » n'est pas arrivée).
+    await renderWithProviders(<Field />)
+    await type('Bravo @in')
+    await key('Enter')
+    expect(field()).toHaveDisplayValue('Bravo @ines_morel ')
+
+    await type('Bravo @ines_morel @ma')
+    expect(screen.queryByLabelText(LIST)).toBeNull()
+    expect(screen.getByRole('combobox', { name: LABEL, expanded: false })).toBeTruthy()
+    await key('ArrowDown')
+    await key('Enter')
+
+    expect(field()).toHaveDisplayValue('Bravo @ines_morel @ma')
+  })
+
+  it('keeps only the members who still match while the next answer is on its way', async () => {
+    await renderWithProviders(<Field />)
+
+    await type('Bravo @ine')
+
+    // Iniko répondait à « @in », plus à « @ine ».
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Inès Morel/ })).toBeTruthy()
+  })
+
+  it('closes the list on Tab, and lets Tab go on to the next button', async () => {
+    await renderWithProviders(<Field />)
+    await type('Bravo @in')
+    const preventDefault = jest.fn()
+
+    await fireEvent(field(), 'keyPress', { nativeEvent: { key: 'Tab', preventDefault } })
+
+    expect(screen.queryByLabelText(LIST)).toBeNull()
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(field()).toHaveDisplayValue('Bravo @in')
+  })
+
+  it('keeps the suggestions out of the Tab order', async () => {
+    await renderWithProviders(<Field />)
+    await type('Bravo @in')
+
+    for (const option of screen.getAllByRole('option')) expect(option).toHaveProp('tabIndex', -1)
   })
 })

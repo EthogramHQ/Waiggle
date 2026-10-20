@@ -51,7 +51,11 @@ describe('the bell of the top bar', () => {
     jest.mocked(useUnreadCount).mockReturnValue(10)
     await renderWithProviders(<TopNav />)
 
-    expect(screen.getByRole('button', { name: t('notifications.bellNewMany') })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: t('notifications.bellNewMany', { max: 9 }) }),
+    ).toBeTruthy()
+    // Le nom lu dit le même nombre que la pastille.
+    expect(screen.getByRole('button', { name: /plus de 9 nouvelles/ })).toBeTruthy()
     expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
     expect(screen.queryByText('10', { includeHiddenElements: true })).toBeNull()
   })

@@ -33,6 +33,7 @@ import { ReactionBar, type ReactionBarItem } from './ReactionBar'
 import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
+import { Stack } from './Stack'
 import { StateMessage } from './StateMessage'
 import { Step } from './StepNumber'
 import { Switch } from './Switch'
@@ -1614,11 +1615,11 @@ describe('MentionField, beyond the end of the text', () => {
 
   it('closes the list when the field loses the focus', async () => {
     await renderWithProviders(<Field initial="Bravo @in" />)
-    expect(screen.getByRole('listbox', { name: 'Membres à mentionner' })).toBeTruthy()
+    expect(screen.getByLabelText('Membres à mentionner')).toBeTruthy()
 
     await fireEvent(screen.getByLabelText('Ton commentaire'), 'blur')
 
-    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
   })
 
   it('lets a second Escape close the comment, once the list is closed (web)', async () => {
@@ -1651,7 +1652,7 @@ describe('MentionField, beyond the end of the text', () => {
         })
 
       await pressEscape()
-      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
       expect(onCancel).not.toHaveBeenCalled()
 
       await pressEscape()
@@ -1701,6 +1702,42 @@ describe('CountBadge', () => {
   })
 })
 
+/** Le premier élément qui porte un rôle, en remontant depuis celui-ci (lui compris). */
+type Node = ReturnType<typeof screen.getByText>
+const roleAround = (start: Node | null): Node | null => {
+  let node = start
+  while (node && !node.props.role && !node.props.accessibilityRole) node = node.parent
+  return node
+}
+
+describe('Stack announced as a list', () => {
+  it('makes each child an item of the list', async () => {
+    await renderWithProviders(
+      <Stack accessibilityRole="list">
+        <Text>Un</Text>
+        <Text>Deux</Text>
+      </Stack>,
+    )
+
+    // Chaque texte est dans son élément de liste, et les deux dans la même liste.
+    const [one, two] = ['Un', 'Deux'].map((text) => roleAround(screen.getByText(text)))
+    expect(one?.props.role).toBe('listitem')
+    expect(two?.props.role).toBe('listitem')
+    expect(one).not.toBe(two)
+    expect(roleAround(one?.parent ?? null)?.props.accessibilityRole).toBe('list')
+  })
+
+  it('adds no list item to a plain stack', async () => {
+    await renderWithProviders(
+      <Stack>
+        <Text>Un</Text>
+      </Stack>,
+    )
+
+    expect(roleAround(screen.getByText('Un'))).toBeNull()
+  })
+})
+
 describe('NotificationCard', () => {
   it('is a link named by everything it says, « new » first', async () => {
     const onPress = jest.fn()
@@ -1739,6 +1776,27 @@ describe('NotificationCard', () => {
       screen.getByRole('link', { name: 'Malik parle de toi. Demande à @ines. 20 oct.' }),
     ).toBeTruthy()
     expect(screen.queryByText('Nouveau', { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('adds no full stop after a part that already ends with a sign', async () => {
+    await renderWithProviders(
+      <NotificationCard
+        icon="chat-circle"
+        text="Malik a commenté « Météo »"
+        quote="Super idée, je teste ce soir…"
+        when="20 oct."
+        isNew={false}
+        newLabel="Nouveau"
+        onPress={() => {}}
+      />,
+    )
+
+    // « ce soir… » et non « ce soir…. » : un lecteur d'écran ne lit pas deux ponctuations.
+    expect(
+      screen.getByRole('link', {
+        name: 'Malik a commenté « Météo ». Super idée, je teste ce soir… 20 oct.',
+      }),
+    ).toBeTruthy()
   })
 
   it('is neither a link nor a button without a destination', async () => {

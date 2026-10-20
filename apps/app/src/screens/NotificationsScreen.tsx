@@ -53,7 +53,12 @@ function MemberNotifications() {
     return <SignedOutScreen expired />
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('notifications.title')}>
+    <Screen
+      // Liste vide : l'écran propose lui-même « Publier un projet » ; la barre ne le répète pas.
+      header={<TopNav hideNewProject={list.data !== undefined && items.length === 0} />}
+      onBack={back}
+      title={t('notifications.title')}
+    >
       {!list.data ? (
         // Une erreur avant toute page : on dit pourquoi et on propose de réessayer. Une suite
         // ratée, elle, garde les cartes déjà lues (voir FeedEnd plus bas).
@@ -68,20 +73,18 @@ function MemberNotifications() {
           <StateMessage kind="loading" message={t('common.loading')} />
         )
       ) : items.length === 0 ? (
+        // Rien encore : ce qui en fera venir, c'est un projet publié (les autres y réagiront).
         <StateMessage
           kind="empty"
           message={t('notifications.empty')}
           actions={[
-            {
-              label: t('notifications.emptyAction'),
-              onPress: () => router.replace('/'),
-              variant: 'secondary',
-            },
+            { label: t('notifications.emptyAction'), onPress: () => router.push('/projects/new') },
           ]}
         />
       ) : (
         <Stack gap="lg">
-          <Stack gap="sm">
+          {/* Une liste annoncée : « liste, 20 éléments », et on saute d'une notification à l'autre. */}
+          <Stack gap="sm" accessibilityRole="list">
             {items.map((notification) => {
               const shown = presentNotification(notification, t)
               const target = shown.target

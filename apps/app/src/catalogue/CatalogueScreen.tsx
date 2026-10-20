@@ -608,9 +608,10 @@ export function CatalogueScreen() {
           <CountBadge count={1} />
           <CountBadge count={42} max={99} />
         </Stack>
-        {/* Les cartes : nouvelle avec un détail, nouvelle avec l'extrait dans la phrase, déjà vue avec
-            une citation, sans destination (les abonnés au compte), et un titre très long. */}
-        <Stack gap="sm">
+        {/* Les cartes : nouvelle avec un détail, nouvelle avec l'extrait en citation (qui finit par
+            « … » : le nom lu n'y ajoute pas de point), déjà vue avec une citation, sans destination
+            (les abonnés au compte), et un titre très long. Une liste annoncée, comme à l'écran. */}
+        <Stack gap="sm" accessibilityRole="list">
           <NotificationCard
             icon="heart"
             text={l.notifReactions}
@@ -623,6 +624,7 @@ export function CatalogueScreen() {
           <NotificationCard
             icon="chat-circle"
             text={l.notifComment}
+            quote={l.notifCommentQuote}
             when={l.notifToday}
             isNew
             newLabel={l.notifNew}

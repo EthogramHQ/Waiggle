@@ -164,14 +164,14 @@ describe('mentioning a member in a comment', () => {
       await fireEvent.press(screen.getByRole('button', { name: 'Écrire un commentaire' }))
       const field = screen.getByLabelText('Ton commentaire')
       await fireEvent.changeText(field, 'Bravo @in')
-      expect(screen.getByRole('listbox')).toBeTruthy()
+      expect(screen.getByLabelText('Membres à mentionner')).toBeTruthy()
 
       await fireEvent(field, 'keyPress', {
         nativeEvent: { key: 'Escape', preventDefault: jest.fn() },
       })
 
       // Échap ferme d'abord la liste ; le commentaire en cours reste ouvert, avec son texte.
-      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(screen.queryByLabelText('Membres à mentionner')).toBeNull()
       expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Bravo @in')
     } finally {
       jest.restoreAllMocks()

@@ -135,9 +135,10 @@ export const fr = {
       reactionsItem: 'Tes réactions et tes commentaires',
       reactionsDetail:
         'Un commentaire qui a reçu des réponses devient « Commentaire supprimé » : ton texte et ton nom en sont effacés, les réponses des autres restent.',
-      notificationsItem: 'Tes notifications et tes mentions',
+      notificationsItem:
+        'Tes notifications, et les liens vers toi dans les commentaires des autres',
       notificationsDetail:
-        'Tes réactions, tes abonnements et tes commentaires disparaissent aussi des notifications des autres.',
+        'Ton pseudo y reste écrit, en texte simple, sans lien vers toi. Tes réactions, tes abonnements et tes commentaires disparaissent aussi des notifications des autres.',
       exportHint:
         'Tes textes et tes réglages, à garder avant de partir. Tes photos n’y sont pas : enregistre celles que tu veux garder.',
       password: 'Confirme avec ton mot de passe',
@@ -506,11 +507,11 @@ export const fr = {
     bell: 'Notifications',
     bellNew_one: 'Notifications, {{count}} nouvelle',
     bellNew_other: 'Notifications, {{count}} nouvelles',
-    bellNewMany: 'Notifications, plus de 9 nouvelles',
+    bellNewMany: 'Notifications, plus de {{max}} nouvelles',
     new: 'Nouveau',
     empty:
       'Rien pour l’instant. Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
-    emptyAction: 'Revenir à l’accueil',
+    emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
     end: 'C’est tout',
     moreError: 'La suite des notifications n’a pas pu se charger.',
@@ -518,7 +519,7 @@ export const fr = {
     reactions_one: '{{count}} réaction sur « {{title}} »',
     reactions_other: '{{count}} réactions sur « {{title}} »',
     reactionCount: '{{reaction}} ×{{count}}',
-    comment: '{{name}} a commenté « {{title}} » : « {{excerpt}} »',
+    comment: '{{name}} a commenté « {{title}} »',
     mention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
     reply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
     memberFollows_one: '{{count}} personne de plus te suit',

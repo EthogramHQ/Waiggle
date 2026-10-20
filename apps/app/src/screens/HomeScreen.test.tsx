@@ -474,7 +474,9 @@ describe('the notification bell on the home screen of a phone', () => {
     jest.mocked(useUnreadCount).mockReturnValue(10)
     await renderMemberHome()
 
-    expect(screen.getByRole('button', { name: t('notifications.bellNewMany') })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: t('notifications.bellNewMany', { max: 9 }) }),
+    ).toBeTruthy()
     expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
   })
 
