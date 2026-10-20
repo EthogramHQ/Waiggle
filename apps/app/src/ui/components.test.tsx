@@ -126,6 +126,26 @@ describe('Switch', () => {
 
     expect(onValueChange).toHaveBeenCalledWith(true)
   })
+
+  // Tranche 6c : une ligne d'un groupe de réglages (« E-mails » dans « Mon profil »).
+  it('stays a switch with its state and its hint when it is a row of a settings group', async () => {
+    const onValueChange = jest.fn()
+    await renderWithProviders(
+      <Switch
+        inGroup
+        label="Le récap de la semaine"
+        hint="Le lundi matin, seulement s’il y a du nouveau."
+        value
+        onValueChange={onValueChange}
+      />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+    expect(toggle).toBeChecked()
+    expect(screen.getByText('Le lundi matin, seulement s’il y a du nouveau.')).toBeTruthy()
+    await fireEvent.press(toggle)
+    expect(onValueChange).toHaveBeenCalledWith(false)
+  })
 })
 
 describe('FollowButton', () => {
@@ -162,6 +182,23 @@ describe('FollowButton', () => {
 
     expect(screen.getByRole('switch', { name: 'Suivre Léa' })).toBeChecked()
     expect(screen.getByText('Suivi')).toBeTruthy()
+  })
+
+  it('offers the link given with its error (slice 6c)', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={jest.fn()}
+        label="Suivre Léa"
+        text="Suivre"
+        error="Ta session a expiré. Reconnecte-toi pour continuer."
+        errorAction={{ label: 'Me reconnecter', onPress }}
+      />,
+    )
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 
   it('reads out its error as soon as it appears', async () => {
@@ -402,6 +439,30 @@ describe('Notice', () => {
 
     expect(screen.getByRole('alert')).toBeTruthy()
     expect(screen.getByText('Mot de passe incorrect.')).toBeTruthy()
+  })
+
+  // Tranche 6c : « Me reconnecter » après « Ta session a expiré ». Le lien est hors de l'alerte :
+  // l'alerte ne lit que le message, et le lien reste atteignable à part.
+  it('offers a link after its message, outside the alert, that leads elsewhere', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Notice
+        message="Ta session a expiré. Reconnecte-toi pour continuer."
+        action={{ label: 'Me reconnecter', onPress }}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no link without an action', async () => {
+    await renderWithProviders(<Notice message="Mot de passe incorrect." />)
+
+    expect(screen.queryByRole('link')).toBeNull()
   })
 })
 
