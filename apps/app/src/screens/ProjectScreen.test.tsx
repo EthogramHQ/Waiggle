@@ -853,7 +853,9 @@ describe('the comments of a project', () => {
     expect(screen.getByText('Moi aussi, dis-nous !')).toBeTruthy()
     // Le bandeau des deux auteurs n'est pas pour les autres : ils ne lisent rien du commentaire.
     expect(
-      screen.queryByText('Masqué par l’auteur du projet : les autres membres ne le voient plus.'),
+      screen.queryByText(
+        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
+      ),
     ).toBeNull()
   })
 })
@@ -1165,7 +1167,7 @@ describe('hiding a comment from the project page', () => {
 
     expect(
       await screen.findByText(
-        'Masqué par l’auteur du projet : les autres membres ne le voient plus.',
+        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
       ),
     ).toBeTruthy()
     expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
@@ -1295,7 +1297,7 @@ describe('the comments, after the reviews', () => {
 
     expect(
       screen.getByText(
-        'Tous les membres connectés liront ton commentaire. L’auteur du projet peut le masquer.',
+        'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
       ),
     ).toBeTruthy()
   })
@@ -1318,7 +1320,9 @@ describe('the comments, after the reviews', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Modifier le commentaire' }))
 
     expect(
-      screen.getByText(/il ne reste visible que de toi et de l’auteur du projet\.$/),
+      screen.getByText(
+        /il ne reste visible que de toi et de la personne qui a publié le projet\.$/,
+      ),
     ).toBeTruthy()
   })
 

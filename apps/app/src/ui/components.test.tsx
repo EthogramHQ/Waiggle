@@ -1187,10 +1187,14 @@ describe('CommentCard', () => {
 
   it('shows the banner of a hidden comment, with its text, for the two authors', async () => {
     await renderWithProviders(
-      <CommentCard {...card} onAuthorPress={jest.fn()} hidden="Masqué par l’auteur du projet" />,
+      <CommentCard
+        {...card}
+        onAuthorPress={jest.fn()}
+        hidden="Masqué par la personne qui a publié le projet"
+      />,
     )
 
-    expect(screen.getByText('Masqué par l’auteur du projet')).toBeTruthy()
+    expect(screen.getByText('Masqué par la personne qui a publié le projet')).toBeTruthy()
     expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
   })
 

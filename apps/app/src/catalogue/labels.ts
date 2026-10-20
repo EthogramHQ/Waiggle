@@ -178,7 +178,8 @@ const fr = {
   commentReplyLea: 'Merci à vous deux, j’ajoute les desserts la semaine prochaine.',
   commentWhen: '15 oct.',
   commentEdited: 'modifié',
-  hiddenBanner: 'Masqué par l’auteur du projet : les autres membres ne le voient plus.',
+  hiddenBanner:
+    'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
   hiddenByMe: 'Masqué par toi',
   commentAbout: 'Max Durand : Super idée, je teste ce soir avec ce qu’il reste dans le frigo.',
   deletedComment: 'Commentaire supprimé',
@@ -195,12 +196,12 @@ const fr = {
   hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
   commentField: 'Ton commentaire',
   commentHint:
-    'Tous les membres connectés liront ton commentaire. L’auteur du projet peut le masquer.',
+    'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
   editHintHidden:
-    'Ce commentaire est masqué : il ne reste visible que de toi et de l’auteur du projet.',
+    'Ce commentaire est masqué : il ne reste visible que de toi et de la personne qui a publié le projet.',
   replyField: 'Ta réponse',
   replyHint:
-    'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; l’auteur du projet peut la masquer.',
+    'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
   submitReply: 'Publier la réponse',
   saveComment: 'Enregistrer',
   commentsEmpty: 'Pas encore de commentaire.',
