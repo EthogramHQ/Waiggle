@@ -53,7 +53,12 @@ function MemberNotifications() {
     return <SignedOutScreen expired />
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('notifications.title')}>
+    <Screen
+      // Liste vide : l'écran propose lui-même « Publier un projet » ; la barre ne le répète pas.
+      header={<TopNav hideNewProject={list.data !== undefined && items.length === 0} />}
+      onBack={back}
+      title={t('notifications.title')}
+    >
       {!list.data ? (
         // Une erreur avant toute page : on dit pourquoi et on propose de réessayer. Une suite
         // ratée, elle, garde les cartes déjà lues (voir FeedEnd plus bas).
