@@ -93,7 +93,9 @@ export function NotificationCard({
               paddingLeft: space.md,
             }}
           >
-            <Text variant="callout" tone="secondary" numberOfLines={2} breakAnywhere>
+            {/* En entier : l'API le raccourcit déjà (80 caractères), et à texte agrandi, une coupe
+                après deux lignes en cacherait la moitié. */}
+            <Text variant="callout" tone="secondary" breakAnywhere>
               {quote}
             </Text>
           </View>

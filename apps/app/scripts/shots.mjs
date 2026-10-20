@@ -375,6 +375,8 @@ const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [long
 const hoursAgo = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString()
 const dayOf = (iso) => iso.slice(0, 10)
 const notified = (project) => ({ id: project.id, title: project.title })
+// L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
+const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
   const reactionsAt = hoursAgo(1)
@@ -395,22 +397,22 @@ const notificationPages = (choice) => {
       {
         kind: 'comment',
         reason: 'comment',
-        id: 'comment:n1',
+        id: `comment:${commentIdOf(1)}`,
         at: hoursAgo(2),
         isNew: true,
         project: notified(recipesProject),
-        comment: { id: 'n1', excerpt: 'Super idée, je teste ce soir avec ce qu’il reste dans le…' },
+        comment: { id: commentIdOf(1), excerpt: 'Super idée, je teste ce soir avec ce qu’il reste dans le…' },
         author: { ...max, handle: 'max' },
       },
       {
         kind: 'comment',
         reason: 'mention',
-        id: 'comment:n2',
+        id: `comment:${commentIdOf(2)}`,
         at: hoursAgo(5),
         isNew: false,
         project: notified(commentedProject),
         comment: {
-          id: 'n2',
+          id: commentIdOf(2),
           excerpt: '@lea_moreau avait fait pareil avec ses recettes, demande-lui !',
         },
         author: { ...ines, handle: 'ines_haddad' },
@@ -418,11 +420,11 @@ const notificationPages = (choice) => {
       {
         kind: 'comment',
         reason: 'reply',
-        id: 'comment:n3',
+        id: `comment:${commentIdOf(3)}`,
         at: hoursAgo(8),
         isNew: false,
-        project: notified(notMineProject),
-        comment: { id: 'n3', excerpt: 'Oui, la version 2 garde les listes de courses.' },
+        project: notified(commentedProject),
+        comment: { id: commentIdOf(3), excerpt: 'Oui, la version 2 garde les listes de courses.' },
         author: { ...max, handle: 'max' },
       },
       {
@@ -435,29 +437,29 @@ const notificationPages = (choice) => {
       },
       {
         kind: 'project_follows',
-        id: `project_follows:${photosProject.id}:${dayOf(followsAt)}`,
+        id: `project_follows:${longProject.id}:${dayOf(followsAt)}`,
         at: hoursAgo(27),
         isNew: false,
-        project: notified(photosProject),
+        project: notified(longProject),
         day: dayOf(followsAt),
         count: 2,
       },
       {
         kind: 'hidden',
-        id: 'hidden:n4',
+        id: `hidden:${commentIdOf(4)}`,
         at: hoursAgo(50),
         isNew: false,
-        project: notified(notMineProject),
-        comment: { id: 'n4', excerpt: 'Le bouton « Partager » ne marche pas chez moi.' },
+        project: notified(commentedProject),
+        comment: { id: commentIdOf(4), excerpt: 'Le bouton « Partager » ne marche pas chez moi.' },
       },
     ],
     [
       {
         kind: 'reactions',
-        id: `reactions:${longProject.id}:${dayOf(oldAt)}`,
+        id: `reactions:${photosProject.id}:${dayOf(oldAt)}`,
         at: oldAt,
         isNew: false,
-        project: notified(longProject),
+        project: notified(photosProject),
         day: dayOf(oldAt),
         counts: { amazing: 1, inspiring: 0, useful: 0, funny: 1, bravo: 0 },
         total: 2,
