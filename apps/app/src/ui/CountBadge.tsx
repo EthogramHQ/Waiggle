@@ -32,6 +32,8 @@ export function CountBadge({ count, max = 9 }: Props) {
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
       style={{
+        // Sa propre hauteur, même dans une rangée qui étire ses enfants.
+        alignSelf: 'flex-start',
         minWidth: SIZE,
         minHeight: SIZE,
         paddingHorizontal: space.xs,
