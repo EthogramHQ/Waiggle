@@ -101,6 +101,40 @@ describe('defangLinks', () => {
     expect(defangLinks('Bravo 👩‍💻')).toBe('Bravo 👩‍💻')
   })
 
+  // Ajoutés avec les suites de la relecture de sécurité de e414e88 (A1, A2).
+  it('replaces a domain hiding a mark that browsers ignore right after the dot', () => {
+    // Ce ne sont pas des caractères de mise en forme (\p{Cf}) mais des marques (\p{Mn}) « à
+    // ignorer » : un navigateur les efface d'un nom de domaine (UTS 46), et « evil.͏com » mène à
+    // evil.com.
+    for (const written of [
+      'evil.͏com', // U+034F, liant de graphèmes
+      'evil.︀com', // U+FE00, sélecteur de variante 1
+      'evil.᠋com', // U+180B, sélecteur de variante mongol
+      'evil.\u{E0100}com', // U+E0100, sélecteur de variante 17
+    ]) {
+      const result = defangLinks(`va sur ${written} maintenant`)
+
+      expect(result, JSON.stringify(written)).toBe('va sur [lien] maintenant')
+    }
+    // Le sélecteur d'émoji (U+FE0F), ignoré lui aussi pour chercher, reste dans le texte rendu.
+    expect(defangLinks('Bravo ❤️')).toBe('Bravo ❤️')
+  })
+
+  it('replaces an address whose scheme is glued to an underscore, a digit or a word', () => {
+    for (const written of [
+      '_http://192.168.0.1/admin',
+      '1http://203.0.113.5/login',
+      'a_http://1.2.3.4/x',
+    ]) {
+      const result = defangLinks(`va sur ${written} maintenant`)
+
+      expect(result, written).not.toContain('192.168')
+      expect(result, written).not.toContain('203.0')
+      expect(result, written).not.toContain('1.2.3.4')
+      expect(result, written).toContain('[lien]')
+    }
+  })
+
   it('writes the placeholder it is given, in the language of the e-mail', () => {
     expect(defangLinks('go to evil.com now', '[link]')).toBe('go to [link] now')
   })
