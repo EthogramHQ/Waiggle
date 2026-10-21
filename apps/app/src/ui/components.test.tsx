@@ -2055,6 +2055,24 @@ describe('ListGroup, its footer and a busy row', () => {
     expect(screen.getByText('Les e-mails du compte.')).toBeTruthy()
   })
 
+  // Relecture de e414e88 : la phrase servait de clé React ; deux phrases identiques en avaient la
+  // même, et React pouvait en perdre une.
+  it('shows two identical sentences of its footer, each once', async () => {
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await renderWithProviders(
+        <ListGroup footer={['La même phrase.', 'La même phrase.']}>
+          <ListRow label="Une ligne" />
+        </ListGroup>,
+      )
+
+      expect(screen.getAllByText('La même phrase.')).toHaveLength(2)
+      expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+    } finally {
+      errors.mockRestore()
+    }
+  })
+
   it('announces a row that waits as busy, with its label', async () => {
     await renderWithProviders(
       <ListGroup>

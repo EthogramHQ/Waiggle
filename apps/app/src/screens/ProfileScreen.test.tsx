@@ -567,6 +567,34 @@ describe('ProfileScreen, the e-mail settings after the reviews', () => {
     }
   })
 
+  // Relecture de e414e88 : après un « Réessayer » qui échoue encore, le focus reste sur le bouton,
+  // et le lecteur d'écran n'entendait que la fin de l'attente. La raison de l'échec est une alerte,
+  // posée au-dessus du groupe dès le premier échec (rien ne bouge sous le doigt au suivant) ; chaque
+  // nouvel échec la pose à neuf, et une alerte posée à neuf est lue.
+  it('says why the settings could not be loaded, and says it again when « Réessayer » fails again', async () => {
+    let reads = 0
+    jest.mocked(request).mockImplementation((async (to: string, init: RequestInit = {}) => {
+      if (to === emailPath && init.method === 'GET') {
+        reads += 1
+        return { ok: false, error: 'network' }
+      }
+      return fakeRequest(to, init)
+    }) as typeof request)
+    await renderWithProviders(<ProfileScreen />)
+
+    const first = await screen.findByRole('alert')
+    expect(first).toHaveTextContent(/Vérifie ta connexion et réessaie\./)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+
+    await waitFor(() => expect(reads).toBe(2))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Réessayer' })).not.toBeBusy())
+    const again = screen.getByRole('alert')
+    expect(again).toHaveTextContent(/Vérifie ta connexion et réessaie\./)
+    // Une alerte neuve, pas la même restée en place (des valeurs simples : voir la charte).
+    expect(again === first).toBe(false)
+  })
+
   it('does not move the focus when the settings arrive without « Réessayer »', async () => {
     const focus = jest.spyOn(focusModule, 'focusWithoutScroll').mockReturnValue(true)
     try {
