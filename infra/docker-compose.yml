@@ -12,11 +12,28 @@
 # valeur par défaut si NOM est absent.
 name: ruche
 
+# Les journaux (logs) de chaque conteneur, et leur rotation : au plus 5 fichiers de 10 Mo, le plus
+# ancien effacé quand un sixième commencerait. Sans limite, ils grandiraient jusqu'à remplir le
+# disque, et garderaient sans fin l'identifiant des membres qui se désinscrivent ou suppriment leur
+# compte (docs/ops/serveur.md, « Sauvegardes »). « local » est le format compact de Docker, celui
+# que le serveur choisit déjà par défaut (infra/server/bootstrap.sh) : l'écrire ici fixe la règle
+# pour chaque service, sur n'importe quelle machine, et `compose logs` sait le lire.
+#
+# « x-logging » est un bloc de réglages partagé : « &logging » lui donne un nom (une ancre YAML),
+# et chaque service le reprend par « logging: *logging », au lieu de le recopier. Docker Compose
+# ignore les clés qui commencent par « x- ».
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   # Base de données PostgreSQL, avec l'extension pgvector pour la future recherche sémantique.
   db:
     image: pgvector/pgvector:0.8.7-pg17
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ruche}
       POSTGRES_USER: ${POSTGRES_USER:-ruche}
@@ -58,6 +75,7 @@ services:
       context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    logging: *logging
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -119,6 +137,7 @@ services:
         APP_DOMAIN: ${APP_DOMAIN:-localhost}
         API_DOMAIN: ${API_DOMAIN:-api.localhost}
     restart: unless-stopped
+    logging: *logging
     # Les seuls ports ouverts sur Internet : 80 (HTTP, qui renvoie vers HTTPS) et 443 (HTTPS,
     # en TCP et en UDP pour HTTP/3).
     ports:
