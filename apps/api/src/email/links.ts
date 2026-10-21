@@ -8,7 +8,11 @@ import { type Language, resources } from '@ruche/i18n'
 
 /**
  * Ce qu'on reconnaît comme une adresse, en une seule expression régulière (un motif de texte) :
- * - avec un protocole (« https://… », « http://192.168.0.1/admin ») : tout jusqu'au prochain blanc ;
+ * - avec un protocole (« https://… », « http://192.168.0.1/admin ») : tout jusqu'au prochain blanc.
+ *   Sans « \b » (frontière de mot) devant : en JavaScript, \b ne connaît que les lettres et chiffres
+ *   ASCII et « _ », si bien que « _http://192.168.0.1 » ou « 1http://… » n'étaient pas reconnus, et
+ *   l'adresse IP restait entière (relecture de sécurité de e414e88, A2). Sans lui, la recherche
+ *   prend la première lettre possible du protocole : « _http://… » donne « _[lien] » ;
  * - sinon un nom de domaine : des mots de lettres, chiffres ou tirets séparés par des points, dont
  *   le dernier (l'extension : « com », « example ») a au moins deux lettres, suivi éventuellement
  *   d'un chemin (« /login »). « xn--… » (les domaines accentués encodés) en fait partie.
@@ -27,7 +31,7 @@ import { type Language, resources } from '@ruche/i18n'
  * u (lettres accentuées : « \p{L} » veut dire « une lettre de n'importe quelle langue »).
  */
 const ADDRESS =
-  /\b[a-z][a-z0-9+.-]*:\/\/\S+|(?<![\p{L}\p{N}])(?:[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}])?\.)+\p{L}[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}](?:\/[^\s]*)?/giu
+  /[a-z][a-z0-9+.-]*:\/\/\S+|(?<![\p{L}\p{N}])(?:[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}])?\.)+\p{L}[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}](?:\/[^\s]*)?/giu
 
 /** Les points que les navigateurs lisent comme « . » dans une adresse : 。 ． ｡ ․ */
 const DOT_LOOKALIKES = /[。．｡․]/gu
@@ -40,6 +44,16 @@ const DOT_LOOKALIKES = /[。．｡․]/gu
 const FORMAT = /\p{Cf}/u
 
 /**
+ * Ce qu'un navigateur efface d'un nom de domaine (la norme UTS 46) : les invisibles ci-dessus, et
+ * aussi les caractères « à ignorer par défaut » (\p{Default_Ignorable_Code_Point}) qui ne sont pas
+ * des \p{Cf} : le liant de graphèmes (U+034F), les sélecteurs de variante (U+FE00…, U+180B…,
+ * U+E0100…). « evil.<U+034F>com » mène à evil.com (relecture de sécurité de e414e88, A1).
+ * Seulement pour chercher : le texte rendu garde ces caractères (keep, plus bas), sinon « ❤️ »
+ * perdrait son sélecteur U+FE0F, qui le dessine en couleur.
+ */
+const IGNORED_IN_ADDRESS = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/u
+
+/**
  * Les deux invisibles gardés dans le texte rendu : le liant (U+200D, qui assemble les émojis
  * « famille ») et l'anti-liant (U+200C, nécessaire au persan). Les autres disparaissent de l'e-mail.
  */
@@ -48,11 +62,11 @@ const KEPT_FORMAT = new Set(['‌', '‍'])
 /**
  * Comment un navigateur lit un caractère dans une adresse. NFKC (une « normalisation » Unicode)
  * ramène les variantes d'une lettre à sa forme simple : « ｅ » (pleine chasse) ou « ⓔ » deviennent
- * « e », comme le fait un navigateur avec un nom de domaine. Les invisibles disparaissent, et les
- * points ressemblants deviennent « . ».
+ * « e », comme le fait un navigateur avec un nom de domaine. Les invisibles et les caractères à
+ * ignorer disparaissent, et les points ressemblants deviennent « . ».
  */
 const readAs = (char: string) =>
-  FORMAT.test(char) ? '' : char.normalize('NFKC').replace(DOT_LOOKALIKES, '.')
+  IGNORED_IN_ADDRESS.test(char) ? '' : char.normalize('NFKC').replace(DOT_LOOKALIKES, '.')
 
 /** Le texte de « [lien] » dans une langue (« [link] » en anglais). */
 export const linkPlaceholder = (language: Language) => resources[language].translation.email.link

@@ -104,7 +104,9 @@ const mentionsOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     member.recap_sent_at,
     new Date(now.getTime() - MENTION_WINDOW_MS),
   )
-  const items = (await loadNotificationsSince(deps.db, member.id, since, deps.apiUrl)).flatMap(
+  // Rien d'après `now`, la date qui sera notée comme celle de l'envoi : ce qui arrive pendant le
+  // passage partira au suivant, une seule fois.
+  const items = (await loadNotificationsSince(deps.db, member.id, since, now, deps.apiUrl)).flatMap(
     ({ row, notification }) =>
       notification.kind === 'comment' && notification.reason !== 'comment'
         ? [{ row, notification, reason: notification.reason }]

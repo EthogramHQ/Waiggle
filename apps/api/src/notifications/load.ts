@@ -77,9 +77,26 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.author_id <> ${
  *      commentaire sur son projet : ses projets puis project_comment_project_idx) ;
  *   5. ses commentaires masqués : project_comment_author_idx ;
  *   6. son pseudo : la clé primaire de notification_state.
+ *
+ * `until` (les e-mails seulement, tranche 6c, suite de la relecture de sécurité A7) : rien de daté
+ * après cet instant. Une tâche lit ses membres l'un après l'autre, parfois pendant des minutes,
+ * mais note `now` comme date d'envoi : un geste arrivé entre `now` et la lecture ne doit pas partir
+ * maintenant, puisqu'il est après la date notée et repartirait au passage suivant. Cette borne
+ * haute ne change pas l'index de chaque source : elle écarte des lignes déjà trouvées par lui (ou
+ * resserre l'intervalle lu dans project_comment_root_created_idx, qui porte la date).
  */
-const sources = (me: string, since: Date): SQL => {
+const sources = (me: string, since: Date, until?: Date): SQL => {
   const after = utc(since)
+  const upTo = until ? utc(until) : null
+  /**
+   * « Le geste daté par `column` est dans la fenêtre » : après `since`, et pas après `until`.
+   * `column` est toujours un nom écrit ici (« r.created_at »), jamais une entrée du client :
+   * sql.raw le recopie tel quel ; les dates, elles, restent des paramètres liés (utc).
+   */
+  const during = (column: string) =>
+    upTo
+      ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
+      : sql`${sql.raw(column)} > ${after}`
   return sql`
     -- 1. Les réactions à ses projets publics, par projet et par jour de Paris, sans aucun nom :
     --    « count(*) filter (where …) » compte seulement les lignes qui remplissent la condition.
@@ -99,7 +116,7 @@ const sources = (me: string, since: Date): SQL => {
     join project_reaction r on r.project_id = p.id
     cross join lateral (select ${parisDay('r.created_at')} as day) d
     where p.author_id = ${me} and p.visibility = 'public'
-      and r.member_id <> ${me} and r.created_at > ${after}
+      and r.member_id <> ${me} and ${during('r.created_at')}
     group by r.project_id, d.day
 
     union all
@@ -112,7 +129,7 @@ const sources = (me: string, since: Date): SQL => {
     join project_follow f on f.project_id = p.id
     cross join lateral (select ${parisDay('f.created_at')} as day) d
     where p.author_id = ${me} and p.visibility = 'public'
-      and f.follower_id <> ${me} and f.created_at > ${after}
+      and f.follower_id <> ${me} and ${during('f.created_at')}
     group by f.project_id, d.day
 
     union all
@@ -123,7 +140,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, count(*)::int
     from member_follow f
     cross join lateral (select ${parisDay('f.created_at')} as day) d
-    where f.member_id = ${me} and f.created_at > ${after}
+    where f.member_id = ${me} and ${during('f.created_at')}
     group by d.day
 
     union all
@@ -147,19 +164,19 @@ const sources = (me: string, since: Date): SQL => {
         from comment_mention m
         join project_comment c on c.id = m.comment_id
         join project p on p.id = c.project_id
-        where m.member_id = ${me} and m.created_at > ${after} and ${readable(me)}
+        where m.member_id = ${me} and ${during('m.created_at')} and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'reply', 2, c.created_at
         from project_comment root
         join project_comment c on c.root_id = root.id
         join project p on p.id = c.project_id
-        where root.author_id = ${me} and root.root_id is null and c.created_at > ${after}
+        where root.author_id = ${me} and root.root_id is null and ${during('c.created_at')}
           and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'comment', 3, c.created_at
         from project p
         join project_comment c on c.project_id = p.id
-        where p.author_id = ${me} and c.created_at > ${after} and ${readable(me)}
+        where p.author_id = ${me} and ${during('c.created_at')} and ${readable(me)}
       ) candidate
       order by candidate.id, candidate.rank
     ) best
@@ -178,7 +195,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, null, null
     from project_comment c
     join project on project.id = c.project_id
-    where c.author_id = ${me} and c.deleted_at is null and c.hidden_at > ${after}
+    where c.author_id = ${me} and c.deleted_at is null and ${during('c.hidden_at')}
       and project.author_id <> ${me} and ${visibleTo(me)}
 
     union all
@@ -191,7 +208,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, null, null
     from notification_state s
     join member_handle mine on mine.user_id = s.user_id and mine.released_at is null
-    where s.user_id = ${me} and s.created_at > ${after} and s.handle_chosen_at is null
+    where s.user_id = ${me} and ${during('s.created_at')} and s.handle_chosen_at is null
   `
 }
 
@@ -369,7 +386,8 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
 }
 
 /**
- * Toutes les notifications de `me` dont le geste est postérieur à `since`, de la plus récente à la
+ * Toutes les notifications de `me` dont le geste est postérieur à `since` et pas postérieur à
+ * `until` (le `now` de la tâche : voir sources), de la plus récente à la
  * plus ancienne, pour les e-mails (tranche 6c) : le récap de la semaine (depuis 7 jours au plus)
  * et l'e-mail de mentions (depuis 24 heures au plus). Le même calcul que l'écran des
  * notifications (les six sources, puis present() pour écarter ce qui a disparu), mais sans page :
@@ -381,6 +399,7 @@ export const loadNotificationsSince = async (
   db: Database,
   me: string,
   since: Date,
+  until: Date,
   publicApiUrl: string,
 ) => {
   const rows = await loadDetailedRows(
@@ -389,7 +408,7 @@ export const loadNotificationsSince = async (
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total
-      from (${sources(me, since)}) u
+      from (${sources(me, since, until)}) u
     `,
   )
   return rows.flatMap((row) => {

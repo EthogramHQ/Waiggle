@@ -121,7 +121,8 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
     member.recap_sent_at,
     new Date(now.getTime() - RECAP_WINDOW_MS),
   )
-  const notifications = await loadNotificationsSince(deps.db, member.id, since, deps.apiUrl)
+  // Rien d'après `now`, la date notée comme celle du récap (voir loadNotificationsSince).
+  const notifications = await loadNotificationsSince(deps.db, member.id, since, now, deps.apiUrl)
   const lines: DatedLine[] = []
   let reactions = 0
   let follows = 0

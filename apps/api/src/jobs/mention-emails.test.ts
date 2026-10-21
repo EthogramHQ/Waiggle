@@ -388,6 +388,35 @@ describe('only once', () => {
       expect(withTheMention, address).toHaveLength(1)
     }
   })
+
+  // Ajouté avec les suites de la relecture de sécurité de e414e88 (A5) : la tâche lit les mentions
+  // de chaque membre après son `now` (tout un lot : parfois des minutes). Une mention écrite
+  // entre-temps est datée après le `now` noté comme date d'envoi : elle partait tout de suite, puis
+  // repartait au passage suivant.
+  it('sends a mention written while the task runs once, at the next run', async () => {
+    await act.comment(velo.id, malik, '@ines_morel premier message.')
+    later(16 * MINUTE)
+    const now = new Date()
+    later() // now + 1 s : la tâche lancée à `now` n'a pas encore lu Inès
+    await act.comment(velo.id, zoe, '@ines_morel écrit pendant la tâche.')
+
+    await mentionEmails(depsWith(), now)
+    const first = onlyMentionsTo(inesAccount.email)
+    expect(first.text).toContain('premier message')
+    expect(first.text).not.toContain('pendant la tâche')
+
+    vi.setSystemTime(now.getTime() + HOUR + MINUTE)
+    await runMentions()
+    const sent = mentionsTo(inesAccount.email)
+    expect(sent).toHaveLength(2)
+    expect(sent[1]?.text).toContain('pendant la tâche')
+    expect(sent[1]?.text).not.toContain('premier message')
+
+    // Et plus jamais ensuite.
+    vi.setSystemTime(now.getTime() + 2 * HOUR + 2 * MINUTE)
+    await runMentions()
+    expect(mentionsTo(inesAccount.email)).toHaveLength(2)
+  })
 })
 
 describe('what the e-mail shows', () => {

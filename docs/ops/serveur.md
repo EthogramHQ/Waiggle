@@ -449,7 +449,22 @@ pas** : on prévient Louis.
 
      `grep -E` ne garde que les lignes exactement de cette forme, avec un identifiant fait de
      lettres et de chiffres. Les journaux sont des données : une ligne d'une autre forme n'est
-     jamais recopiée dans une requête. Le nombre affiché à la fin est celui des refus trouvés ;
+     jamais recopiée dans une requête. Le nombre affiché à la fin est celui des refus trouvés.
+
+     Puis, toujours **avant de restaurer**, vérifier sur la base en service que chaque compte noté
+     `Account deleted` n'existe plus : la suppression de l'étape 3 est définitive, et elle ne doit
+     jamais viser un compte vivant (une ligne mal lue, ou écrite par autre chose que l'API). Les
+     identifiants du fichier, puis la requête, avec chacun d'eux entre apostrophes :
+
+     ```bash
+     ssh waiggle 'sed -nE "s/^Account deleted ([A-Za-z0-9]+)\$/\1/p" /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+     select id from "user" where id in ('<identifiant 1>', '<identifiant 2>');
+     SQL
+     ```
+
+     La requête ne doit rien rendre. Un identifiant qu'elle rend est un compte encore présent : on
+     ne le supprime pas à l'étape 3, et on prévient Louis avant d'aller plus loin ;
   1. avant de restaurer, couper les envois : `EMAIL_JOBS=off` dans `secrets.env` (Louis), puis
      redémarrer l'API. Elle retire alors les planifications du récap et des mentions ; la purge
      de nuit continue ;
@@ -467,12 +482,14 @@ pas** : on prévient Louis.
        par `false` si `<quoi>` vaut `recap` ou `all` (sinon `true`), et `M` par `false` s'il vaut
        `mentions` ou `all` (sinon `true`). C'est celle de l'API (`email/preferences.ts`) : un
        « et » logique avec l'ancienne valeur ne peut que couper, jamais rallumer, et un compte qui
-       n'existe pas ne reçoit rien ;
+       n'existe pas ne reçoit rien. `now() at time zone 'UTC'` : les colonnes de dates sont des
+       `timestamp` sans fuseau qui contiennent l'heure UTC (voir « Les heures du serveur et de la
+       base », plus bas) ; `now()` seul y serait écrit à l'heure du fuseau de la connexion ;
 
        ```bash
        ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
        insert into email_preference (user_id, weekly_recap, mention_emails, updated_at)
-       select id, R, false, now() from "user" where id = '<identifiant>'
+       select id, R, false, now() at time zone 'UTC' from "user" where id = '<identifiant>'
        on conflict (user_id) do update set
          weekly_recap = email_preference.weekly_recap and R,
          mention_emails = email_preference.mention_emails and M,
@@ -480,8 +497,8 @@ pas** : on prévient Louis.
        SQL
        ```
 
-     - pour chaque `Account deleted <identifiant>` : `delete from "user" where id = '<identifiant>';`
-       (même chemin). Tout ce qui est rattaché au compte par une clé « cascade » part avec lui
+     - pour chaque `Account deleted <identifiant>` que la vérification de l'étape 0 a trouvé absent
+       de la base en service : `delete from "user" where id = '<identifiant>';` (même chemin). Tout ce qui est rattaché au compte par une clé « cascade » part avec lui
        (sessions, profil, projets, réactions, abonnements, réglages). Mais ce chemin ne fait pas tout
        le ménage de la suppression par l'appli (`auth/auth.ts`) : ses commentaires restent, sans
        auteur, jusqu'à la prochaine suppression d'un compte par un membre, qui les balaie ; son
@@ -510,14 +527,30 @@ pas** : on prévient Louis.
   Quand les journaux ne suffisent pas, il reste la sauvegarde `avant-restauration`, que `restore.sh`
   fait juste avant de restaurer : elle contient les comptes et les réglages tels qu'ils étaient. La
   restaurer dans une base jetable (« Vérifier une sauvegarde », ci-dessous), puis y lire les
-  réglages changés depuis l'heure de la sauvegarde restaurée
-  (`select user_id, weekly_recap, mention_emails from email_preference where updated_at > '<heure>'`)
+  réglages changés depuis l'heure de la sauvegarde restaurée, convertie en UTC (voir ci-dessous) :
+
+  ```sql
+  select user_id, weekly_recap, mention_emails from email_preference
+  where updated_at > ('<heure>'::timestamp at time zone 'Europe/Paris' at time zone 'UTC');
+  ```
+
   et comparer les identifiants des comptes (`select id from "user"`) avec ceux de la base restaurée :
   un compte absent de `avant-restauration` a été supprimé depuis (ou effacé par la purge des
   inscriptions jamais vérifiées).
 
   Deux filets restent, même sans cette précaution : jamais une mention de plus de 24 heures dans
   un e-mail, et jamais deux récaps à moins de 6 jours d'intervalle.
+- **Les heures du serveur et de la base.** Le serveur est à l'heure de Paris
+  (`infra/server/bootstrap.sh`, « Fuseau horaire ») : les noms des sauvegardes et l'option
+  `--since` des journaux parlent en heure de Paris. Les colonnes de dates de la base, elles, sont
+  des `timestamp` sans fuseau qui contiennent l'heure UTC (écrite par l'API). Toute heure tapée dans
+  une requête d'une procédure se convertit donc :
+  `'2026-10-21 03:00:00'::timestamp at time zone 'Europe/Paris' at time zone 'UTC'`. Le premier
+  `at time zone` dit « cette heure est celle de Paris » (un instant, heure d'été comprise), le
+  second donne l'heure UTC de cet instant, sans fuseau, comme les colonnes (ici `01:00:00` en
+  octobre avant le changement d'heure, `02:00:00` en hiver). Sans cette conversion, la comparaison
+  se décale de une à deux heures, et des lignes sont manquées. De même, une date écrite par une
+  requête prend `now() at time zone 'UTC'`, jamais `now()` seul.
 - **Vérifier une sauvegarde** sans toucher au site : la restaurer dans une base jetable.
 
   ```bash
