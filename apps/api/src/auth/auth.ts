@@ -75,6 +75,28 @@ const inviteDigest = (code: string) =>
 const isRightInviteCode = (sent: unknown, expected: string) =>
   typeof sent === 'string' && timingSafeEqual(inviteDigest(sent), inviteDigest(expected))
 
+// Les quotas de Better Auth (fenêtres en secondes, comme il les attend). Règle générale : 100
+// requêtes par minute et par adresse IP. Règles plus strictes sur les routes sensibles : 5 essais
+// de connexion par quart d'heure rendent impossible de deviner un mot de passe en essayant des
+// milliers de combinaisons.
+const AUTH_RATE_GENERAL = { window: 60, max: 100 }
+export const AUTH_RATE_RULES = {
+  '/sign-in/email': { window: 15 * 60, max: 5 },
+  '/sign-up/email': { window: 60 * 60, max: 10 },
+  '/send-verification-email': { window: 60 * 60, max: 5 },
+  '/delete-user': { window: 15 * 60, max: 5 },
+} satisfies Record<string, { window: number; max: number }>
+
+/**
+ * La plus longue fenêtre de ces quotas, en millisecondes. La purge de nuit (jobs/nightly-purge.ts)
+ * n'efface un compteur de Better Auth qu'après elle : une règle d'un jour ajoutée ici allonge donc
+ * d'elle-même la durée de garde, au lieu d'être remise à zéro chaque nuit (relecture de sécurité
+ * A4).
+ */
+export const AUTH_RATE_WINDOW_MAX_MS =
+  1000 *
+  Math.max(AUTH_RATE_GENERAL.window, ...Object.values(AUTH_RATE_RULES).map((rule) => rule.window))
+
 // La langue d'un membre déjà inscrit (celle de son profil, le français sinon) : email/language.ts,
 // partagé avec les e-mails de notification (tranche 6c).
 const languageOf = languageOfMember
@@ -190,7 +212,13 @@ export const createAuth = ({
         // Juste après : on efface les fichiers eux-mêmes du stockage, les compteurs anti-abus
         // qui portent son identifiant, et les commentaires restés sans auteur (un commentaire
         // publié pendant la suppression, entre beforeDelete et maintenant : voir comments/erase.ts).
+        //
+        // D'abord, une ligne dans les journaux : seulement l'identifiant (ni nom, ni adresse). Une
+        // sauvegarde restaurée ramènerait ce compte ; cette ligne dit qu'il faut le supprimer de
+        // nouveau (docs/ops/serveur.md, « Sauvegardes »). Écrite en premier, elle ne dépend pas du
+        // ménage qui suit : le compte est déjà parti.
         afterDelete: async (user) => {
+          console.log(`Account deleted ${user.id}`)
           const keys = filesToDelete.get(user.id) ?? []
           filesToDelete.delete(user.id)
           for (const key of keys) await storage.delete(key)
@@ -212,17 +240,9 @@ export const createAuth = ({
     rateLimit: {
       ...authSchemaOptions.rateLimit,
       enabled: rateLimit,
-      // Règle générale : 100 requêtes par minute et par adresse IP.
-      window: 60,
-      max: 100,
-      // Règles plus strictes sur les routes sensibles. 5 essais de connexion par quart d'heure
-      // rendent impossible de deviner un mot de passe en essayant des milliers de combinaisons.
-      customRules: {
-        '/sign-in/email': { window: 15 * 60, max: 5 },
-        '/sign-up/email': { window: 60 * 60, max: 10 },
-        '/send-verification-email': { window: 60 * 60, max: 5 },
-        '/delete-user': { window: 15 * 60, max: 5 },
-      },
+      // Les règles, écrites plus haut (AUTH_RATE_RULES) : la purge de nuit lit leur durée.
+      ...AUTH_RATE_GENERAL,
+      customRules: AUTH_RATE_RULES,
     },
 
     advanced: {

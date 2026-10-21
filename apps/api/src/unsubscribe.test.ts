@@ -348,3 +348,52 @@ describe('the limits', () => {
     expect((await unsubscribe({ token: tokenOf(malikId, 'recap') })).status).toBe(204)
   })
 })
+
+// Décision de Louis (restauration, option a) : chaque refus laisse une ligne de journal,
+// « Unsubscribe <identifiant> <recap|mentions|all> », pour pouvoir le réappliquer après la
+// restauration d'une sauvegarde (docs/ops/serveur.md). Ni adresse, ni nom, ni jeton.
+describe('the trace of an unsubscribe, for a restored backup', () => {
+  /** Ce que l'API écrit dans ses journaux pendant `action`, ligne par ligne. */
+  const logsDuring = async (action: () => unknown) => {
+    const logs = (['log', 'info', 'warn', 'error'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
+    )
+    await action()
+    return logs.flatMap((spy) => spy.mock.calls.map((args) => args.map(String).join(' ')))
+  }
+
+  it('writes one line with the member and what was turned off, and nothing else about them', async () => {
+    const lines = await logsDuring(async () => {
+      await unsubscribe({ token: tokenOf(inesId, 'recap') })
+      await unsubscribe({ token: tokenOf(malikId, 'mentions') })
+      await unsubscribe({ token: tokenOf(malikId, 'recap'), scope: 'all' })
+    })
+
+    expect(lines.filter((line) => line.startsWith('Unsubscribe '))).toEqual([
+      `Unsubscribe ${inesId} recap`,
+      `Unsubscribe ${malikId} mentions`,
+      `Unsubscribe ${malikId} all`,
+    ])
+    const written = lines.join('\n')
+    for (const secret of ['ines@example.com', 'malik@example.com', 'Inès', 'Malik']) {
+      expect(written).not.toContain(secret)
+    }
+    // La procédure de restauration ne garde que les lignes dont l'identifiant est fait de lettres
+    // et de chiffres (grep de docs/ops/serveur.md) : si les identifiants changeaient de forme,
+    // elle laisserait passer des refus sans le dire.
+    expect(`${inesId} ${malikId}`).toMatch(/^[A-Za-z0-9]+ [A-Za-z0-9]+$/)
+  })
+
+  it('writes nothing for an invalid link or a deleted account', async () => {
+    const lines = await logsDuring(async () => {
+      await expectInvalid(await unsubscribe({ token: `${tokenOf(inesId, 'recap')}x` }))
+      await act.deleteAccount(malik, 'malik-long-password')
+      await expectInvalid(await unsubscribe({ token: tokenOf(malikId, 'recap') }))
+    })
+
+    expect(lines.filter((line) => line.startsWith('Unsubscribe '))).toEqual([])
+    // Témoin : un lien valide écrit bien sa ligne.
+    const after = await logsDuring(() => unsubscribe({ token: tokenOf(inesId, 'mentions') }))
+    expect(after).toContain(`Unsubscribe ${inesId} mentions`)
+  })
+})

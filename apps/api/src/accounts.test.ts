@@ -5,7 +5,7 @@
 import { appName } from '@ruche/brand'
 import { AccountExport, ErrorResponse, Me } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -399,5 +399,48 @@ describe('deleting my account', () => {
 
     expect(res.status).toBe(400)
     expect(await ctx.db.select().from(schema.user)).toHaveLength(1)
+  })
+})
+
+// Décision de Louis (restauration, option a) : une sauvegarde restaurée ramènerait un compte
+// supprimé depuis. La suppression laisse donc une ligne de journal, « Account deleted
+// <identifiant> », pour la refaire ; ni adresse, ni nom.
+describe('the trace of a deleted account, for a restored backup', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('writes the identifier of the account, and nothing else about it', async () => {
+    const cookies = await signUpAndVerify()
+    const [row] = await ctx.db.select({ id: schema.user.id }).from(schema.user)
+    const logs = (['log', 'info', 'warn', 'error'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
+    )
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: lea.password }),
+    })
+
+    expect(res.status).toBe(200)
+    const lines = logs.flatMap((spy) => spy.mock.calls.map((args) => args.map(String).join(' ')))
+    expect(lines).toContain(`Account deleted ${row?.id}`)
+    expect(lines.join('\n')).not.toContain(lea.email)
+    expect(lines.join('\n')).not.toContain(lea.name)
+  })
+
+  it('writes nothing when the deletion is refused', async () => {
+    const cookies = await signUpAndVerify()
+    const logged = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'wrong-password-here' }),
+    })
+
+    expect(res.status).not.toBe(200)
+    expect(logged.mock.calls.flat().join(' ')).not.toContain('Account deleted')
   })
 })

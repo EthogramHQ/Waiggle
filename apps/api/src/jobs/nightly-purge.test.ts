@@ -14,6 +14,7 @@
 import { schema } from '@ruche/db'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AUTH_RATE_RULES, AUTH_RATE_WINDOW_MAX_MS } from '../auth/auth'
 import { createRateLimiter, RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { activity } from '../testing/activity'
 import { createTestContext, type TestContext } from '../testing/context'
@@ -211,6 +212,45 @@ describe('sign-ups never verified', () => {
     await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))
 
     expect(await userIds()).toEqual([inesId])
+  })
+
+  // Relecture de sécurité A3 : la purge efface en SQL, sans le ménage de la suppression d'un
+  // compte (fichiers, commentaires, compteurs). Un compte qui a reçu un pseudo (donné à la
+  // vérification de l'adresse) a été un vrai membre : même redevenu « non vérifié » (un futur
+  // changement d'adresse, par exemple), la purge ne le touche jamais.
+  it('keeps an unverified account that already has a handle (a former member)', async () => {
+    await ctx.db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.id, inesId))
+
+    const purged = await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))
+
+    expect(purged.unverifiedAccounts).toBe(0)
+    expect(await userIds()).toEqual([inesId])
+  })
+})
+
+// Relecture de sécurité A4 : la purge garde les compteurs de Better Auth pendant sa plus longue
+// fenêtre, lue dans ses règles (auth.ts). Un compteur encore dans la fenêtre de n'importe quelle
+// règle est gardé : sinon la règle repartirait de zéro chaque nuit.
+describe('the counters of Better Auth', () => {
+  it('are kept as long as the longest window of its rules', async () => {
+    const now = at(START, 2 * DAY)
+    const windows = Object.values(AUTH_RATE_RULES).map(({ window }) => window * 1000)
+    expect(AUTH_RATE_WINDOW_MAX_MS).toBe(Math.max(...windows))
+    await ctx.db.insert(schema.rateLimit).values(
+      windows.map((windowMs, i) => ({
+        id: `rule-${i}`,
+        key: `198.51.100.${i}/rule`,
+        count: 1,
+        lastRequest: now.getTime() - windowMs + MINUTE,
+      })),
+    )
+
+    await nightlyPurge(ctx.db, now)
+
+    const left = (await ctx.db.select({ id: schema.rateLimit.id }).from(schema.rateLimit)).map(
+      ({ id }) => id,
+    )
+    expect(left).toEqual(expect.arrayContaining(windows.map((_, i) => `rule-${i}`)))
   })
 })
 
