@@ -64,8 +64,11 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
       </View>
       {notes.length > 0 ? (
         <View style={{ paddingHorizontal: space.lg, gap: space.xs }}>
-          {notes.map((note) => (
-            <Text key={note} variant="caption" tone="muted">
+          {notes.map((note, index) => (
+            // Deux phrases du pied peuvent être identiques : leur rang les distingue, et la liste
+            // ne change pas d'ordre.
+            // biome-ignore lint/suspicious/noArrayIndexKey: une phrase du pied n'a pas d'autre identité que sa place
+            <Text key={index} variant="caption" tone="muted">
               {note}
             </Text>
           ))}

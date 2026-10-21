@@ -31,6 +31,9 @@ type Props = {
    * Pour y poser le focus du clavier quand le bouton touché disparaît (« Confirmer », sur la page
    * de désinscription) : le message prend sa place, jamais l'action suivante. Avec une ref, le
    * message peut recevoir le focus sur le web (tabIndex -1), sans devenir une étape de Tab.
+   * C'est alors le focus qui le fait lire : la zone n'est plus annoncée en plus (aria-live off),
+   * sinon certains lecteurs d'écran le liraient deux fois. Sur téléphone, où aucun focus du
+   * clavier ne vient le lire, l'annonce reste.
    */
   ref?: Ref<View>
 }
@@ -63,7 +66,9 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
       ref={ref}
       accessible
       {...(polite ? { role: 'status' as const } : { accessibilityRole: 'alert' as const })}
-      {...(ref && Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
+      {...(ref && Platform.OS === 'web'
+        ? { tabIndex: -1 as const, 'aria-live': 'off' as const }
+        : null)}
       style={[
         { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
         action ? null : frame,

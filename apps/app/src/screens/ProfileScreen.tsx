@@ -372,14 +372,22 @@ function EmailSettings() {
   // « en attente » et oublie l'erreur : sans cet état, la ligne d'erreur ferait place à
   // « Chargement… », et le bouton qui avait le focus disparaîtrait.
   const [retrying, setRetrying] = useState(false)
+  // Combien de « Réessayer » ont échoué : sert de clé à l'alerte qui dit pourquoi. Une clé neuve
+  // fait poser une alerte neuve, que le lecteur d'écran lit ; la même alerte restée en place ne
+  // serait pas relue, et le membre n'entendrait que la fin de l'attente (relecture de 6c).
+  const [failedRetries, setFailedRetries] = useState(0)
   const retry = () => {
     focusFirst.current = true
     setRetrying(true)
     void preferences
       .refetch()
       .then((result) => {
-        // Encore un échec : le focus reste sur « Réessayer », rien à déplacer.
-        if (result.isError) focusFirst.current = false
+        // Encore un échec : le focus reste sur « Réessayer », rien à déplacer ; l'alerte est
+        // posée à neuf.
+        if (result.isError) {
+          focusFirst.current = false
+          setFailedRetries((count) => count + 1)
+        }
       })
       .finally(() => setRetrying(false))
   }
@@ -446,12 +454,16 @@ function EmailSettings() {
       : [<ListRow key="loading" label={t('common.loading')} busy />]
 
   // Le message entre le titre et le groupe. Une session expirée (à la lecture ou au changement) :
-  // le lien mène à la connexion. Une autre panne de lecture : la ligne du groupe la dit déjà.
+  // le lien mène à la connexion. Une autre panne de lecture : la ligne du groupe dit ce qui
+  // manque, l'alerte dit pourquoi ; elle est là dès le premier échec et reste pendant la nouvelle
+  // lecture, pour que la ligne de « Réessayer » ne bouge pas sous le doigt.
   const failure = loadFailure ?? (last === 'saved' ? null : last)
   const notice =
     failure === 'unauthorized' ? (
       <Notice message={t('states.expired')} action={signInAgain()} />
-    ) : loadFailure ? null : failure ? (
+    ) : loadFailure ? (
+      <Notice key={`loadFailure-${failedRetries}`} message={t(`errors.${loadFailure}`)} />
+    ) : failure ? (
       <Notice message={t(`errors.${failure}`)} />
     ) : last === 'saved' ? (
       // Une confirmation, lue sans couper ce que disait le lecteur d'écran (role « status »).

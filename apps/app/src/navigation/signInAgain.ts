@@ -19,6 +19,18 @@ const currentQuery = (): string => {
 }
 
 /**
+ * Où revenir après la connexion, depuis la page `pathname` : le chemin et les paramètres de
+ * l'adresse, si la page de connexion les accepte (même filtre, safeNext) ; sinon, au moins la page,
+ * sans eux. À appeler au toucher (les paramètres sont lus dans le navigateur à cet instant). Sert
+ * aussi au bouton « Me connecter » de la page « Réservé aux membres » (SignedOutScreen).
+ */
+export const nextAfterSignIn = (pathname: string): string => {
+  const query = currentQuery()
+  const withQuery = `${pathname}${query}`
+  return query && safeNext(withQuery) ? withQuery : pathname
+}
+
+/**
  * Hook : l'action « Me reconnecter », prête à passer à un composant (`errorAction`) ou à une
  * Notice (`action`). `before` sert à refermer ce qui doit l'être avant de partir (une fenêtre de
  * confirmation, qui resterait sinon par-dessus la page de connexion).
@@ -32,13 +44,8 @@ export const useSignInAgain = () => {
     label: t('states.signIn'),
     onPress: () => {
       before?.()
-      // Le retour garde les paramètres de l'adresse, si la page de connexion les accepte (même
-      // filtre, safeNext) ; sinon, on revient au moins sur la page, sans eux.
-      const query = currentQuery()
-      const withQuery = `${pathname}${query}`
-      const next = query && safeNext(withQuery) ? withQuery : pathname
       // push (et non replace) : le retour depuis la connexion ramène aussi sur cette page.
-      router.push({ pathname: '/sign-in', params: { next } })
+      router.push({ pathname: '/sign-in', params: { next: nextAfterSignIn(pathname) } })
     },
   })
 }
