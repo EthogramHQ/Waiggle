@@ -4,3 +4,7 @@
 # Résumé d'image (ThumbHash) d'un exemple du catalogue des composants, pas une clé. Les versions
 # suivantes du fichier portent le commentaire « gitleaks:allow » sur la ligne.
 49556f80da1f90ec618a250fc0eaa5fe55fff7d5:apps/app/src/catalogue/CatalogueScreen.tsx:generic-api-key:48
+
+# Un faux jeton de désinscription des tests de l'appli (tranche 6c), abîmé exprès : ni secret, ni
+# signature valide. Les versions suivantes du fichier portent « gitleaks:allow » sur la ligne.
+f97b266a2935c0dc81c340f967a4d3813d1086ed:apps/app/src/testing/email.ts:generic-api-key:28
