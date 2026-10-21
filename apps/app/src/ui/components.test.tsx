@@ -488,6 +488,39 @@ describe('Notice', () => {
       jest.restoreAllMocks()
     }
   })
+
+  // Relecture de e414e88 : un message qui reçoit le focus et qui est aussi une zone annoncée
+  // (role « status » ou « alert ») est lu deux fois par certains lecteurs d'écran. Une seule
+  // annonce : celle du focus, sur le web ; sans ref, l'annonce de la zone.
+  it('is read once on the web when it takes the focus: the focus reads it, not the live region', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const ref = createRef<View>()
+      await renderWithProviders(<Notice message="C’est fait." polite ref={ref} />)
+      expect(screen.getByRole('status')).toHaveProp('aria-live', 'off')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('stays announced as it appears without a ref', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(screen.getByRole('status')).not.toHaveProp('aria-live')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+describe('Notice, held by a screen on a phone', () => {
+  // Sur téléphone, aucun focus du clavier ne vient le lire : l'annonce de la zone reste.
+  it('stays an announced alert', async () => {
+    const ref = createRef<View>()
+    await renderWithProviders(<Notice message="Lien invalide." ref={ref} />)
+    expect(screen.getByRole('alert')).not.toHaveProp('aria-live')
+  })
 })
 
 describe('Text', () => {

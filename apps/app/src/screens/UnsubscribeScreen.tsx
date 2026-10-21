@@ -42,6 +42,12 @@ const kindOf = (token: string | undefined) => {
   return parsed.data.split('.')[2] === 'mentions' ? ('mentions' as const) : ('recap' as const)
 }
 
+/**
+ * Combien de temps « Tout couper » reste sourd après la confirmation : plus qu'une double tape
+ * (deux tapes à moins de 300 ms), moins qu'il n'en faut pour lire le message et viser le bouton.
+ */
+const ALL_OFF_GUARD_MS = 600
+
 export function UnsubscribeScreen() {
   const { t } = useTranslation()
   const router = useRouter()
@@ -62,6 +68,12 @@ export function UnsubscribeScreen() {
   // n'agit qu'à la question, « Tout couper » qu'après la confirmation. Un appui qui arriverait sur
   // un bouton déjà remplacé ne fait donc rien.
   const stepNow = useRef<Step>('ask')
+  // Le moment de la confirmation (horloge en millisecondes). Une double tape sur « Confirmer » a sa
+  // seconde tape environ 200 ms après la première : si la page a changé entre-temps, elle peut
+  // tomber sur « Tout couper », quelle que soit la place qu'on lui donne (un titre qui raccourcit,
+  // un texte agrandi, une autre largeur déplacent tout). « Tout couper » ignore donc les appuis des
+  // premiers instants qui suivent la confirmation (relecture de 6c).
+  const doneAt = useRef(0)
 
   // Après « Confirmer », « Tout couper » ou un lien refusé, le bouton touché disparaît. Le focus du
   // clavier va au message qui le remplace (non interactif), jamais sur l'action suivante : un
@@ -77,6 +89,7 @@ export function UnsubscribeScreen() {
 
   const send = async (scope?: 'all') => {
     if (busy.current || !token || stepNow.current !== (scope ? 'done' : 'ask')) return
+    if (scope && Date.now() - doneAt.current < ALL_OFF_GUARD_MS) return
     busy.current = true
     setSending(true)
     setFailure(null)
@@ -87,6 +100,7 @@ export function UnsubscribeScreen() {
       // 400 : jeton faux ou compte supprimé (l'API ne dit pas lequel) : le lien est invalide.
       const next: Step = !result.ok ? 'invalid' : scope ? 'allDone' : 'done'
       stepNow.current = next
+      doneAt.current = Date.now()
       focusMessage.current = true
       setStep(next)
     } else {
@@ -118,7 +132,13 @@ export function UnsubscribeScreen() {
   // « Tout couper », en gardant le focus du clavier.
   const content = invalid ? (
     <Fragment key="invalid">
-      <Notice ref={messageRef} message={t('unsubscribe.invalid')} />
+      {/* La ref (et le focus) seulement quand l'API refuse le lien au clic : le message prend
+          alors la place du bouton touché, et c'est le focus qui le fait lire. Un lien abîmé dès
+          l'ouverture n'a rien remplacé : le message reste une alerte annoncée. */}
+      <Notice
+        ref={step === 'invalid' ? messageRef : undefined}
+        message={t('unsubscribe.invalid')}
+      />
       {manage}
     </Fragment>
   ) : step === 'ask' ? (
@@ -138,9 +158,13 @@ export function UnsubscribeScreen() {
         polite
         message={kind === 'mentions' ? t('unsubscribe.doneMentions') : t('unsubscribe.doneRecap')}
       />
-      {/* « Tout couper » ne touche pas aux e-mails du compte : on le dit avant qu'il soit touché.
-          Le bouton vient après cette phrase, loin de la place de « Confirmer » : une double tape
-          ne tombe pas dessus. */}
+      {/* « Gérer mes e-mails » vient avant « Tout couper », pour l'éloigner de la place qu'avait
+          « Confirmer » : la page se centre dans la hauteur, et le titre raccourcit après la
+          réponse ; sans ce lien entre les deux, « Tout couper » remontait sous le doigt (à 3 pt
+          du bas de « Confirmer » sur téléphone, par-dessus sur ordinateur). La garde dans le temps
+          de `send` protège aussi, à toutes les largeurs. */}
+      {manage}
+      {/* « Tout couper » ne touche pas aux e-mails du compte : on le dit juste avant le bouton. */}
       {accountEmails}
       {failureNotice}
       <Button
@@ -149,7 +173,6 @@ export function UnsubscribeScreen() {
         onPress={() => void send('all')}
         loading={sending}
       />
-      {manage}
     </Fragment>
   ) : (
     <Fragment key="allDone">

@@ -3,7 +3,7 @@
 // Ouvrir la page ne change rien (un antivirus qui ouvre les liens ne désinscrit personne) : seul
 // « Confirmer » envoie la demande. La fonction unsubscribe (email/api) est remplacée par un faux.
 import { appName } from '@ruche/brand'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { Platform } from 'react-native'
 import UnsubscribeRoute from '../../app/unsubscribe'
@@ -49,6 +49,16 @@ const open = (params: Record<string, string | string[]>) => {
 const confirm = () => fireEvent.press(screen.getByRole('button', { name: 'Confirmer' }))
 
 /**
+ * « Tout couper » ignore les appuis des instants qui suivent la confirmation (la seconde tape d'une
+ * double tape, voir plus bas). Un membre qui l'a lue appuie plus tard : l'horloge (`Date.now`)
+ * avance ici d'une seconde, et continue d'avancer ensuite.
+ */
+const onceTheConfirmationIsRead = () => {
+  const now = Date.now.bind(Date)
+  jest.spyOn(Date, 'now').mockImplementation(() => now() + 1000)
+}
+
+/**
  * Ce qui a reçu le focus du clavier en dernier (web) : son rôle et son tabIndex. Des valeurs
  * simples : comparer l'élément entier ferait écrire à Jest, en cas d'échec, un écart sans fin.
  */
@@ -70,7 +80,10 @@ beforeEach(() => {
   mockReplace.mockReset()
   jest.mocked(focusWithoutScroll).mockClear()
 })
-afterEach(() => jest.restoreAllMocks())
+afterEach(() => {
+  jest.restoreAllMocks()
+  jest.useRealTimers()
+})
 
 describe('UnsubscribeScreen', () => {
   it('is the page of the /unsubscribe address', () => {
@@ -164,6 +177,7 @@ describe('UnsubscribeScreen', () => {
   it('turns every notification e-mail off with « Tout couper », after the confirmation', async () => {
     await open({ token: recapToken })
     await confirm()
+    onceTheConfirmationIsRead()
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
 
@@ -186,6 +200,7 @@ describe('UnsubscribeScreen', () => {
     await open({ token: recapToken })
     await confirm()
     const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+    onceTheConfirmationIsRead()
     jest.mocked(unsubscribe).mockImplementation(() => new Promise(() => {}))
 
     await fireEvent.press(allOff)
@@ -291,6 +306,7 @@ describe('UnsubscribeScreen', () => {
     expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
 
     await confirm()
+    onceTheConfirmationIsRead()
     await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
 
     await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.')
@@ -316,7 +332,44 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     expect(screen.queryByText(/plus aucun e-mail/)).toBeNull()
   })
 
-  it('puts « Tout couper » after the sentence about the account e-mails, never in the place of « Confirmer »', async () => {
+  // Relecture de e414e88 : l'ordre des éléments ne dit rien de leur place à l'écran. Après la
+  // réponse, le titre raccourcissait et « Tout couper » remontait sous le doigt (à 3 pt du bas de
+  // « Confirmer » sur téléphone, par-dessus à 768 et 1 280 px). Ce qui protège à toutes les
+  // largeurs et tailles de texte : « Tout couper » ne réagit pas dans les instants qui suivent la
+  // confirmation. De faux minuteurs font passer le temps (et avec lui `Date.now`).
+  it('ignores « Tout couper » touched right after the confirmation, as the second tap of a double tap', async () => {
+    jest.useFakeTimers()
+    await open({ token: recapToken })
+    await confirm()
+    const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+
+    // La seconde tape d'une double tape : moins d'une demi-seconde après la réponse.
+    await act(() => jest.advanceTimersByTime(200))
+    await fireEvent.press(allOff)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+    expect(screen.queryByText(/plus aucun e-mail/)).toBeNull()
+  })
+
+  it('sends « Tout couper » touched once the confirmation has had time to be read', async () => {
+    jest.useFakeTimers()
+    await open({ token: recapToken })
+    await confirm()
+    const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+
+    // Témoin : le même appui, 700 ms plus tard, part bien.
+    await act(() => jest.advanceTimersByTime(700))
+    await fireEvent.press(allOff)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(2)
+    expect(jest.mocked(unsubscribe).mock.calls[1]).toEqual([recapToken, 'all'])
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.'),
+    ).toBeTruthy()
+  })
+
+  it('says the account e-mails keep coming just before « Tout couper », after the link to the settings', async () => {
     await open({ token: recapToken })
     await confirm()
 
@@ -324,10 +377,13 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     const page = JSON.stringify(screen.toJSON())
     // Des morceaux sans espace avant « : » (une espace insécable dans le texte affiché).
     const done = page.indexOf('tu ne recevras plus le récap de la semaine.')
+    const manage = page.indexOf('Gérer mes e-mails')
     const accountEmails = page.indexOf('Les e-mails liés à ton compte')
     const allOff = page.indexOf('Tout couper')
     expect(done).toBeGreaterThan(-1)
-    expect(accountEmails).toBeGreaterThan(done)
+    // « Gérer mes e-mails » s'intercale entre la place de « Confirmer » et « Tout couper ».
+    expect(manage).toBeGreaterThan(done)
+    expect(accountEmails).toBeGreaterThan(manage)
     expect(allOff).toBeGreaterThan(accountEmails)
   })
 
@@ -346,6 +402,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     jest.replaceProperty(Platform, 'OS', 'web')
     await open({ token: recapToken })
     await confirm()
+    onceTheConfirmationIsRead()
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
 
@@ -366,6 +423,31 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     const message = await screen.findByRole('alert')
     expect(message).toHaveTextContent(/Ce lien ne permet pas de te désinscrire\./)
     expect(focused()).toEqual({ role: 'alert', tabIndex: -1 })
+  })
+})
+
+// Relecture de e414e88 : un message qui reçoit le focus et qui est aussi une zone annoncée est lu
+// deux fois par certains lecteurs d'écran. Une seule annonce, selon le cas.
+describe('UnsubscribeScreen, read once by a screen reader (web)', () => {
+  it('lets the focus read the confirmation, without announcing it a second time', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('status')
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+    expect(message).toHaveProp('aria-live', 'off')
+  })
+
+  it('announces a link damaged from the start, which takes no focus', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: malformedToken })
+
+    const message = screen.getByRole('alert')
+    expect(message).not.toHaveProp('aria-live')
+    expect(message).not.toHaveProp('tabIndex')
+    expect(focusWithoutScroll).not.toHaveBeenCalledWith(expect.anything())
   })
 })
 
