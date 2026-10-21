@@ -850,6 +850,27 @@ describe('the comments of a project', () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u2' } })
   })
 
+  it('elides « de » before an author whose name starts with a vowel (« d’Inès »)', async () => {
+    // Tranche 6c : {{nameOf}}, rempli par useNameOf, pour l'autrice du projet et d'un commentaire.
+    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    seenByOther({ ...withNotes, author: ines })
+    mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const links = await screen.findAllByRole('link', { name: 'Voir la page d’Inès' })
+    expect(links).toHaveLength(2) // l'autrice du projet, puis celle du commentaire
+    expect(screen.queryByRole('link', { name: /de Inès/ })).toBeNull()
+  })
+
+  it('writes the possessive in English (« See Inès’s page »)', async () => {
+    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    seenByOther({ ...withNotes, author: ines })
+    mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
+    await renderWithProviders(<ProjectScreen id={id} />, 'en')
+
+    expect(await screen.findAllByRole('link', { name: 'See Inès’s page' })).toHaveLength(2)
+  })
+
   it('says when a comment was edited', async () => {
     seenByOther()
     mockComments([{ ...zoeComment, editedAt: '2026-10-14T10:00:00.000Z' }])
