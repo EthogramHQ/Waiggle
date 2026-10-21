@@ -10,13 +10,14 @@
 // 2. rien, ou rien qui attend depuis 15 minutes : pas d'e-mail (il partira à un prochain passage,
 //    15 à 20 minutes après la première mention, avec tout ce qui est arrivé entre-temps) ;
 // 3. sinon, « prendre » l'envoi (une seule requête note la date et rend l'adresse, si les
-//    conditions tiennent encore), puis envoyer, dans la langue du membre.
+//    conditions tiennent encore), retirer ce qu'un récap parti entre-temps contenait déjà, puis
+//    envoyer, dans la langue du membre.
 import { MENTION_EMAIL_DELAY_MINUTES, MENTION_EMAIL_MIN_INTERVAL_MINUTES } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { languageOfMember } from '../email/language'
-import { defangLinks } from '../email/links'
+import { defangLinks, linkPlaceholder } from '../email/links'
 import { mentionEmail } from '../email/templates'
 import { excerptOf, loadNotificationsSince, utc } from '../notifications/load'
 import { BATCH_SIZE, isoDate, type JobDeps, latest, linksFor, logMemberFailure } from './shared'
@@ -68,7 +69,13 @@ const candidates = async (db: Database, now: Date, after: string): Promise<Candi
   return z.object({ rows: z.array(Candidate) }).parse(await db.execute(query)).rows
 }
 
-const Taken = z.object({ email: z.string(), name: z.string(), language: z.string() })
+const Taken = z.object({
+  email: z.string(),
+  name: z.string(),
+  language: z.string(),
+  // La date du dernier récap, relue au moment de la prise (voir mentionsOne).
+  recap_sent_at: isoDate,
+})
 
 /**
  * La prise atomique de l'envoi (relecture de sécurité S-B2) : « update … from "user" … returning »
@@ -83,7 +90,7 @@ const take = async (db: Database, userId: string, now: Date) => {
     from "user" u
     where ep.user_id = ${userId} and u.id = ep.user_id and u.email_verified and ep.mention_emails
       and (ep.mention_sent_at is null or ep.mention_sent_at <= ${intervalCutoff(now)})
-    returning u.email, u.name, u.language
+    returning u.email, u.name, u.language, to_char(ep.recap_sent_at, ${ISO}) as recap_sent_at
   `
   const [row] = z.object({ rows: z.array(Taken) }).parse(await db.execute(query)).rows
   return row ?? null
@@ -110,19 +117,27 @@ const mentionsOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   }
   const taken = await take(deps.db, member.id, now)
   if (!taken) return false
+  // Le lundi à 9 h, le récap tourne en même temps (relecture de sécurité A7). S'il est parti pour ce
+  // membre après la lecture du lot, il contenait déjà ces mentions : la date relue dans la prise le
+  // montre, et on les retire. Le récap fait de même avec la date de cet e-mail (weekly-recap.ts).
+  const recapAt = taken.recap_sent_at?.getTime() ?? Number.NEGATIVE_INFINITY
+  const fresh = items.filter(({ notification }) => Date.parse(notification.at) > recapAt)
+  // Tout est parti dans le récap : rien n'est envoyé (la date reste notée, cas rare d'une course).
+  if (fresh.length === 0) return false
+  const language = languageOfMember(taken)
   await deps.mailer.send({
     to: taken.email,
-    ...mentionEmail(languageOfMember(taken), {
+    ...mentionEmail(language, {
       name: taken.name,
       // Les plus anciennes d'abord : l'e-mail se lit comme la conversation.
-      items: items.reverse().map(({ row, notification, reason }) => ({
+      items: fresh.reverse().map(({ row, notification, reason }) => ({
         kind: reason,
         name: notification.author.name,
         handle: notification.author.handle,
         title: notification.project.title,
         // Les adresses retirées du texte entier AVANT de le couper : une adresse coupée en deux
         // par l'extrait ne serait plus reconnue.
-        excerpt: excerptOf(defangLinks(row.body ?? '')),
+        excerpt: excerptOf(defangLinks(row.body ?? '', linkPlaceholder(language))),
       })),
       links: linksFor(deps, member.id, 'mentions'),
     }),

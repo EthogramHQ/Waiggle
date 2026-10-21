@@ -694,3 +694,43 @@ describe('the new follows of the recap', () => {
     expect(recap.text).toContain(fill(fr.recap.follows_one, { count: '1' }))
   })
 })
+
+// Ajouté avec les corrections de la relecture de sécurité (A7) : le lundi à 9 h, le récap et
+// l'e-mail de mentions tournent en même temps. Chacun lit la date d'envoi de l'autre au début de son
+// lot ; si l'autre envoie entre-temps, la même mention partirait deux fois.
+describe('the recap and the mention e-mail at the same time', () => {
+  it('never sends a mention twice when the mention e-mail goes out during the recap', async () => {
+    await act.setPreferences(ines, { mentionEmails: true })
+    await act.setPreferences(zoe, { mentionEmails: true })
+    const meteo = await act.publish(ines, 'Météo')
+    later()
+    await act.comment(meteo.id, malik, '@ines_morel et @zoe, regardez.')
+    later(16 * MINUTE)
+    const now = new Date()
+    // Au premier récap envoyé, l'e-mail de mentions passe (même heure) : il sert l'autre membre,
+    // que le récap n'a pas encore traité, mais dont il a déjà lu la date d'envoi des mentions.
+    let ran = false
+    const mailer: Mailer = {
+      async send(email) {
+        if (!ran) {
+          ran = true
+          await mentionEmails(depsWith(), now)
+        }
+        await ctx.mailer.send(email)
+      },
+    }
+
+    await weeklyRecap(depsWith(mailer), now)
+
+    const notificationSubjects = [...recapSubjects, fill(fr.mentions.subject)]
+    for (const address of [inesAccount.email, zoeAccount.email]) {
+      const withTheMention = ctx.mailer.sent.filter(
+        (email) =>
+          email.to === address &&
+          notificationSubjects.includes(email.subject) &&
+          email.text.includes('Météo'),
+      )
+      expect(withTheMention, address).toHaveLength(1)
+    }
+  })
+})
