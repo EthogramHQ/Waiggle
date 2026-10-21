@@ -12,7 +12,7 @@ import {
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiErrorKey, errorKey } from '../api/errors'
@@ -31,6 +31,7 @@ import {
 import { useMe, useSetMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
+import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -344,8 +345,11 @@ function ProfileForm({ me }: { me: Me }) {
 
 /**
  * La section « E-mails » : le récap de la semaine (activé par défaut) et l'e-mail de mentions et de
- * réponses (désactivé par défaut). Chaque interrupteur s'enregistre au toucher ; dessous, la
- * confirmation (« Réglage enregistré. ») ou ce qui n'a pas marché.
+ * réponses (désactivé par défaut). Chaque interrupteur s'enregistre au toucher, ce que dit la phrase
+ * sous le groupe : la section n'est pas une partie du formulaire à « Enregistrer », d'où aussi son
+ * propre titre, plus grand que celui d'un groupe. Entre ce titre et le groupe, la confirmation
+ * (« Réglage enregistré. ») ou ce qui n'a pas marché : sur téléphone, la section est au bas de la
+ * page, et un message posé sous le groupe sortait de l'écran (relecture de design, 6c).
  */
 function EmailSettings() {
   const { t } = useTranslation()
@@ -354,12 +358,58 @@ function EmailSettings() {
   const signInAgain = useSignInAgain()
   const data = preferences.data
 
+  // « Réessayer » a marché : la ligne qui portait le bouton disparaît, et le focus du clavier, qui
+  // était dessus, irait tout en haut de la page. On le pose sur le premier interrupteur, dès qu'il
+  // est dessiné (useEffect, après chaque dessin). focusFirst : une ref, pour ne pas redessiner.
+  const firstSwitch = useRef<Focusable>(null)
+  const focusFirst = useRef(false)
+  useEffect(() => {
+    if (!focusFirst.current || !firstSwitch.current) return
+    focusFirst.current = false
+    focusWithoutScroll(firstSwitch.current)
+  })
+  // Une nouvelle lecture en cours, demandée par « Réessayer ». React Query remet alors la requête
+  // « en attente » et oublie l'erreur : sans cet état, la ligne d'erreur ferait place à
+  // « Chargement… », et le bouton qui avait le focus disparaîtrait.
+  const [retrying, setRetrying] = useState(false)
+  const retry = () => {
+    focusFirst.current = true
+    setRetrying(true)
+    void preferences
+      .refetch()
+      .then((result) => {
+        // Encore un échec : le focus reste sur « Réessayer », rien à déplacer.
+        if (result.isError) focusFirst.current = false
+      })
+      .finally(() => setRetrying(false))
+  }
+
+  // La lecture a échoué, et il n'y a rien à montrer : pourquoi (la clé du message d'erreur),
+  // gardé pendant la nouvelle lecture (`failedRead`).
+  const readFailure = !data && preferences.isError ? errorKey(preferences.error) : null
+  const [failedRead, setFailedRead] = useState(readFailure)
+  if (readFailure !== null && readFailure !== failedRead) setFailedRead(readFailure)
+  const loadFailure = data ? null : (readFailure ?? (retrying ? failedRead : null))
+
+  // Ce qu'a donné le dernier changement : enregistré, ou la raison de l'échec. Pendant l'envoi du
+  // suivant, le hook ne dit plus rien (ni « enregistré » ni échec) : on garde le message d'avant
+  // (`shown`), sinon il disparaîtrait le temps de l'envoi et les interrupteurs, posés sous lui,
+  // sauteraient deux fois sous le doigt. (Changer un état pendant le dessin est permis à un
+  // composant pour lui-même : React le redessine aussitôt.)
+  const outcome: ApiErrorKey | 'saved' | null = save.failure ?? (save.saved ? 'saved' : null)
+  const [shown, setShown] = useState(outcome)
+  if (outcome !== null && outcome !== shown) setShown(outcome)
+  const last = outcome ?? shown
+
   // Les réglages ne sont pas encore là : une ligne d'attente, plutôt que des interrupteurs dont la
-  // position serait fausse. Ils n'ont pas pu se charger : le message, et de quoi réessayer.
+  // position serait fausse. Ils n'ont pas pu se charger : la ligne le dit, puis « Réessayer »
+  // (occupé pendant la nouvelle lecture). Une session expirée : réessayer ne servirait à rien, le
+  // lien de l'alerte mène à la connexion ; pas de bouton.
   const rows = data
     ? [
         <Switch
           key="weeklyRecap"
+          ref={firstSwitch}
           inGroup
           label={t('profile.emails.weeklyRecap')}
           hint={t('profile.emails.weeklyRecapHint')}
@@ -375,36 +425,49 @@ function EmailSettings() {
           onValueChange={(mentionEmails) => save.update({ mentionEmails })}
         />,
       ]
-    : preferences.isError
+    : loadFailure
       ? [
           <ListRow
-            key="retry"
-            label={t('common.retry')}
-            trailing="arrows-clockwise"
-            onPress={() => void preferences.refetch()}
+            key="loadError"
+            label={t('profile.emails.loadError')}
+            accessory={
+              loadFailure === 'unauthorized' ? null : (
+                <Button
+                  label={t('common.retry')}
+                  variant="secondary"
+                  size="compact"
+                  loading={retrying}
+                  onPress={retry}
+                />
+              )
+            }
           />,
         ]
-      : [<ListRow key="loading" label={t('common.loading')} />]
+      : [<ListRow key="loading" label={t('common.loading')} busy />]
 
-  // Le message sous le groupe : l'échec de la lecture, sinon celui du dernier changement, sinon sa
-  // confirmation. Une session expirée : réessayer ne sert à rien, le lien mène à la connexion.
-  const failure = preferences.isError ? errorKey(preferences.error) : save.failure
+  // Le message entre le titre et le groupe. Une session expirée (à la lecture ou au changement) :
+  // le lien mène à la connexion. Une autre panne de lecture : la ligne du groupe la dit déjà.
+  const failure = loadFailure ?? (last === 'saved' ? null : last)
   const notice =
     failure === 'unauthorized' ? (
       <Notice message={t('states.expired')} action={signInAgain()} />
-    ) : failure ? (
+    ) : loadFailure ? null : failure ? (
       <Notice message={t(`errors.${failure}`)} />
-    ) : save.saved ? (
+    ) : last === 'saved' ? (
       // Une confirmation, lue sans couper ce que disait le lecteur d'écran (role « status »).
       <Notice tone="success" message={t('profile.emails.saved')} polite />
     ) : null
 
+  // paddingY : un peu plus d'air au-dessus du titre, pour que la section se détache du formulaire.
   return (
-    <Stack gap="md">
-      <ListGroup title={t('profile.emails.title')} footer={t('profile.emails.accountEmails')}>
+    <Stack gap="md" paddingY="lg">
+      <Text variant="heading" accessibilityRole="header">
+        {t('profile.emails.title')}
+      </Text>
+      {notice}
+      <ListGroup footer={[t('profile.emails.instant'), t('profile.emails.accountEmails')]}>
         {rows}
       </ListGroup>
-      {notice}
     </Stack>
   )
 }

@@ -4,7 +4,7 @@
 import { appName, fontWeights, maxTextScale } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
-import { Platform, TextInput } from 'react-native'
+import { Platform, TextInput, type View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
@@ -17,6 +17,7 @@ import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
+import { ListGroup, ListRow } from './ListGroup'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
@@ -1905,5 +1906,136 @@ describe('NotificationCard', () => {
     } finally {
       jest.restoreAllMocks()
     }
+  })
+})
+
+// Tranche 6c, après les relectures : les réglages d'e-mail de « Mon profil ».
+describe('Switch, read by a screen reader', () => {
+  const hint = 'Le lundi matin, seulement s’il y a du nouveau.'
+
+  it('is described by its hint on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Switch
+          inGroup
+          label="Le récap de la semaine"
+          hint={hint}
+          value
+          onValueChange={() => {}}
+        />,
+      )
+
+      // Le nom (accessibilityLabel) cache le texte de l'aide : aria-describedby la fait lire après.
+      const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+      const id = toggle.props['aria-describedby']
+      expect(id).toEqual(expect.any(String))
+      let described = screen.getByText(hint)
+      while (described.parent && described.props.nativeID !== id) described = described.parent
+      expect(described.props.nativeID).toBe(id)
+      expect(toggle).not.toHaveProp('accessibilityHint', hint)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('gives its hint as the accessibility hint on a phone', async () => {
+    await renderWithProviders(
+      <Switch label="Le récap de la semaine" hint={hint} value onValueChange={() => {}} />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+    expect(toggle).toHaveProp('accessibilityHint', hint)
+    expect(toggle).not.toHaveProp('aria-describedby')
+  })
+
+  it('is described by nothing without a hint', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Switch label="Notifications" value onValueChange={() => {}} />)
+
+      expect(screen.getByRole('switch', { name: 'Notifications' })).not.toHaveProp(
+        'aria-describedby',
+      )
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is announced as disabled, and does not flip, when it is disabled in a group', async () => {
+    const onValueChange = jest.fn()
+    await renderWithProviders(
+      <Switch inGroup disabled label="Notifications" value={false} onValueChange={onValueChange} />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Notifications' })
+    expect(toggle).toBeDisabled()
+    await fireEvent.press(toggle)
+    expect(onValueChange).not.toHaveBeenCalled()
+  })
+
+  it('hands its element to a ref, to receive the keyboard focus', async () => {
+    const ref = createRef<View>()
+    await renderWithProviders(
+      <Switch ref={ref} label="Notifications" value onValueChange={() => {}} />,
+    )
+
+    expect(ref.current).not.toBeNull()
+  })
+})
+
+describe('ListGroup, its footer and a busy row', () => {
+  it('shows each sentence of its footer as its own paragraph', async () => {
+    await renderWithProviders(
+      <ListGroup
+        title="E-mails"
+        footer={['Chaque réglage s’enregistre dès que tu le touches.', 'Les e-mails du compte.']}
+      >
+        <ListRow label="Une ligne" />
+      </ListGroup>,
+    )
+
+    expect(screen.getByText('Chaque réglage s’enregistre dès que tu le touches.')).toBeTruthy()
+    expect(screen.getByText('Les e-mails du compte.')).toBeTruthy()
+  })
+
+  it('announces a row that waits as busy, with its label', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Chargement…" busy />
+      </ListGroup>,
+    )
+
+    expect(screen.getByRole('progressbar', { name: 'Chargement…' })).toBeBusy()
+  })
+
+  it('shows a row that does not wait as a plain row', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Léa Moreau" />
+      </ListGroup>,
+    )
+
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.getByText('Léa Moreau')).toBeTruthy()
+  })
+})
+
+describe('Notice, polite with an action', () => {
+  it('stays a status, outside which its link can be reached', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Notice
+        tone="info"
+        polite
+        message="Ce projet est privé."
+        action={{ label: 'Le rendre public', onPress }}
+      />,
+    )
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('Ce projet est privé.')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('link', { name: 'Le rendre public' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 })
