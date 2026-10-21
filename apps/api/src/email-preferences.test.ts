@@ -252,3 +252,45 @@ describe('deleting my account', () => {
     expect(await act.preferences(malik)).toEqual({ weeklyRecap: true, mentionEmails: true })
   })
 })
+
+// Décision de Louis (restauration, option a) : couper un réglage dans l'appli est aussi un refus,
+// qu'une sauvegarde restaurée perdrait. Il laisse la même ligne de journal qu'une désinscription
+// par le lien : « Unsubscribe <identifiant> <recap|mentions|all> », sans adresse ni nom.
+describe('the trace of a setting turned off, for a restored backup', () => {
+  /** Les lignes « Unsubscribe … » écrites dans les journaux pendant `action`. */
+  const unsubscribeLinesDuring = async (action: () => unknown) => {
+    const logs = (['log', 'info', 'warn', 'error'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
+    )
+    await action()
+    const lines = logs.flatMap((spy) => spy.mock.calls.map((args) => args.map(String).join(' ')))
+    for (const secret of ['ines@example.com', 'Inès']) {
+      expect(lines.join('\n')).not.toContain(secret)
+    }
+    return lines.filter((line) => line.startsWith('Unsubscribe '))
+  }
+
+  it('writes one line for each setting turned off, and one "all" for both at once', async () => {
+    const lines = await unsubscribeLinesDuring(async () => {
+      await act.setPreferences(ines, { weeklyRecap: false })
+      await act.setPreferences(ines, { mentionEmails: false })
+      await act.setPreferences(ines, { weeklyRecap: false, mentionEmails: false })
+    })
+
+    expect(lines).toEqual([
+      `Unsubscribe ${inesId} recap`,
+      `Unsubscribe ${inesId} mentions`,
+      `Unsubscribe ${inesId} all`,
+    ])
+  })
+
+  it('writes nothing when a setting is turned on, or when the change is refused', async () => {
+    const lines = await unsubscribeLinesDuring(async () => {
+      await act.setPreferences(ines, { mentionEmails: true, weeklyRecap: true })
+      expect((await patch(ines, { weeklyRecap: 'no' })).status).toBe(400)
+      expect((await patch(null, { weeklyRecap: false })).status).toBe(401)
+    })
+
+    expect(lines).toEqual([])
+  })
+})

@@ -12,6 +12,7 @@ import { createRoute } from '@hono/zod-openapi'
 import {
   EmailPreferences,
   EmailPreferencesUpdate,
+  type UnsubscribeKind,
   UnsubscribeQuery,
   UnsubscribeToken,
 } from '@ruche/contracts'
@@ -94,6 +95,17 @@ const preferencesRule: RateRule = { windowMs: MINUTE, max: 60 }
 const unsubscribeIpRule: RateRule = { windowMs: HOUR, max: 300 }
 const unsubscribeMemberRule: RateRule = { windowMs: HOUR, max: 10 }
 
+/**
+ * Une ligne de journal par refus : « Unsubscribe <identifiant> <recap|mentions|all> ». Une
+ * sauvegarde restaurée ramènerait les réglages d'avant ; ces lignes disent quels refus réappliquer
+ * (docs/ops/serveur.md, « Sauvegardes »). Seulement l'identifiant du membre : ni adresse, ni nom, ni
+ * jeton (les journaux sont gardés et lus par d'autres outils). L'identifiant vient de la session ou
+ * d'un jeton signé par nous : jamais d'un texte tapé, qui pourrait imiter une ligne.
+ */
+const logUnsubscribe = (userId: string, what: UnsubscribeKind | 'all') => {
+  console.log(`Unsubscribe ${userId} ${what}`)
+}
+
 type Deps = {
   db: Database
   limiter: RateLimiter
@@ -149,6 +161,13 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
     if (!user) return unauthorized(c)
     const update = c.req.valid('json')
     const preferences = await updateEmailPreferences(db, user.id, update, new Date())
+    // Couper un réglage dans l'appli est aussi un refus : il laisse la même ligne de journal
+    // qu'une désinscription par le lien (voir logUnsubscribe).
+    const recapOff = update.weeklyRecap === false
+    const mentionsOff = update.mentionEmails === false
+    if (recapOff || mentionsOff) {
+      logUnsubscribe(user.id, recapOff && mentionsOff ? 'all' : recapOff ? 'recap' : 'mentions')
+    }
     return c.json(EmailPreferences.parse(preferences), 200)
   })
 
@@ -175,6 +194,7 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
 
       const done = await unsubscribeMember(db, link.userId, link.kind, scope === 'all', new Date())
       if (!done) return invalidLink(c)
+      logUnsubscribe(link.userId, scope === 'all' ? 'all' : link.kind)
       return c.body(null, 204)
     },
     // Une adresse mal formée (jeton absent, de mauvaise forme, portée inconnue) : la même réponse
