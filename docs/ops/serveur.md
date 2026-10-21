@@ -584,17 +584,26 @@ un nouveau code au hasard : `openssl rand -hex 8`.
 - **Le système** : les correctifs de sécurité s'installent seuls. Une fois par mois, l'assistant de code
   peut lancer `ssh waiggle 'sudo apt-get update && sudo apt-get upgrade -y'`. Cette commande met
   aussi à jour Docker, qui n'est pas dans les mises à jour automatiques.
-- **L'appli et ses images** (dépendances, Node, Caddy, PostgreSQL, actions de la CI) : le dépôt
-  contient les réglages de Renovate (`renovate.json`), mais **l'application Renovate n'est pas
-  encore installée** sur le dépôt (constaté le 21/10/2026 : aucune pull request, aucun ticket
-  « Dependency Dashboard »). À faire par le propriétaire du dépôt : installer l'application GitHub
-  « Renovate » (Mend) pour `EthogramHQ/Waiggle` seulement. Une fois installée, Renovate propose
-  les mises à jour par pull request le lundi matin, puis on déploie comme d'habitude ; on vérifie
-  qu'elle tourne par ses pull requests, pas par son fichier de réglages.
+- **L'appli et ses images** (dépendances, Node, Caddy, PostgreSQL, actions de la CI) : l'application
+  GitHub « Renovate » (Mend) est installée pour `EthogramHQ/Waiggle` seulement (21/10/2026), et
+  lit `renovate.json`. Elle ouvre ses pull requests le lundi avant 6 h :
+  - les mises à jour mineures et correctives, regroupées en une seule pull request ; Better Auth à
+    part, ses paquets ensemble ;
+  - les mises à jour **majeures** n'ouvrent pas de pull request d'elles-mêmes : elles attendent
+    une case cochée dans le ticket « Dependency Dashboard », une par une, parce qu'elles changent
+    le comportement ;
+  - jamais le SDK Expo (Expo, React, React Native et les bibliothèques qui suivent son SDK : on le
+    monte avec `expo install --fix`), ni les versions imposées de `pnpm-workspace.yaml` (des
+    correctifs de sécurité choisis à la main).
+
+  On fusionne quand la CI est verte, puis on déploie comme d'habitude. On vérifie que Renovate
+  tourne par ses pull requests et son ticket, et par son tableau sur `developer.mend.io` (le
+  « mode silencieux » doit y être coupé, sinon rien ne s'ouvre).
   - Les images de départ des Dockerfile et les actions de la CI sont désignées par leur empreinte
-    (`@sha256:…`, SHA de commit) : sans Renovate, elles ne bougent plus d'elles-mêmes, correctifs
-    de sécurité compris. En attendant, les mettre à jour à la main, une fois par mois, dans une pull
-    request (l'empreinte se lit sur le registre de l'image, ou par `gh api` pour une action).
+    (`@sha256:…`, SHA de commit) : seules les pull requests de Renovate les font bouger, correctifs
+    de sécurité compris. Si Renovate s'arrête, les mettre à jour à la main, une fois par mois,
+    dans une pull request (l'empreinte se lit sur le registre de l'image, ou par `gh api` pour
+    une action).
   - L'audit des dépendances (`pnpm audit`, job `audit` de la CI) tourne aussi chaque lundi sur
     `main`, même sans commit : GitHub prévient par e-mail s'il échoue.
 - **PostgreSQL** : une nouvelle version majeure (17 → 18) ne se fait pas par un simple
