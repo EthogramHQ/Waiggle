@@ -41,7 +41,9 @@ describe('CheckEmailScreen', () => {
     await renderWithI18n(<CheckEmailScreen />)
 
     expect(
-      screen.getByText('Sans vérification sous 30 jours, l’inscription est effacée.'),
+      screen.getByText(
+        'Sans vérification dans les 30 jours qui suivent l’inscription, elle est effacée.',
+      ),
     ).toBeTruthy()
   })
 })

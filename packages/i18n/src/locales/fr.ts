@@ -72,7 +72,8 @@ export const fr = {
       body: 'Nous avons envoyé un lien à {{email}}. Clique dessus pour activer ton compte.',
       bodyNoEmail: 'Nous t’avons envoyé un lien par e-mail. Clique dessus pour activer ton compte.',
       locked: 'Tant que tu n’as pas ouvert ce lien, tu ne peux pas te connecter.',
-      expires: 'Sans vérification sous {{days}} jours, l’inscription est effacée.',
+      expires:
+        'Sans vérification dans les {{days}} jours qui suivent l’inscription, elle est effacée.',
       back: 'Retour à la connexion',
     },
     verified: {
@@ -179,6 +180,9 @@ export const fr = {
       saved: 'Réglage enregistré.',
       accountEmails:
         'Les e-mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
+      // Ces réglages ne passent pas par « Enregistrer » : la phrase le dit (relecture de design, 6c).
+      instant: 'Chaque réglage s’enregistre dès que tu le touches.',
+      loadError: 'Tes réglages d’e-mail n’ont pas pu se charger.',
     },
     savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
@@ -490,31 +494,36 @@ export const fr = {
     // texte d'un autre membre dans l'objet (visible sur un écran verrouillé). Chaque e-mail dit
     // pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
     manage: 'Gérer mes e-mails',
+    // Ce qui remplace une adresse écrite par un membre (`defangLinks`), dans la langue de l'e-mail.
+    link: '[lien]',
     recap: {
       subject: 'Du nouveau sur {{appName}}',
+      heading: 'Du nouveau cette semaine',
       intro: 'Voici ce que tu n’as pas encore vu sur {{appName}} cette semaine.',
       first:
-        'C’est ton premier récap : chaque lundi, s’il y a du nouveau, {{appName}} te résume tes notifications. Tu peux le couper à tout moment.',
+        'C’est ton premier récap : chaque lundi, s’il y a du nouveau, {{appName}} te résume tes notifications. Il est activé par défaut ; tu peux le couper à tout moment.',
       comment: '{{name}} (@{{handle}}) a commenté « {{title}} »',
       reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} »',
       mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} »',
-      more_one: 'Et {{count}} autre',
-      more_other: 'Et {{count}} autres',
+      more_one: 'Et {{count}} autre notification',
+      more_other: 'Et {{count}} autres notifications',
       alsoLabel: 'Et aussi :',
       reactions_one: '{{count}} réaction à tes projets',
       reactions_other: '{{count}} réactions à tes projets',
-      follows_one: '{{count}} nouvel abonnement',
-      follows_other: '{{count}} nouveaux abonnements',
+      follows_one: '{{count}} nouvel abonné',
+      follows_other: '{{count}} nouveaux abonnés',
       button: 'Voir mes notifications',
       last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
       reason: 'Tu reçois ce récap parce qu’il est activé dans tes réglages {{appName}}.',
       unsubscribe: 'Ne plus recevoir le récap de la semaine',
     },
     mentions: {
-      subject: 'On parle de toi sur {{appName}}',
+      // Objet et titre vrais même quand l'e-mail ne contient que des réponses (relecture juridique).
+      subject: 'Mentions et réponses sur {{appName}}',
+      heading: 'Mentions et réponses',
       mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} » :',
       reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} » :',
-      button: 'Voir sur {{appName}}',
+      button: 'Voir mes notifications',
       reason: 'Tu reçois cet e-mail parce que tu as activé les e-mails de mentions et de réponses.',
       unsubscribe: 'Ne plus recevoir les e-mails de mentions et de réponses',
     },
