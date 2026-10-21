@@ -32,6 +32,15 @@ const features = [
     routes: /^(ALL \/api\/auth)/,
     tables: /^(user|session|account|verification|rate_limit)$/,
   },
+  // Avant « profil » : les réglages d'e-mail sont sous /v1/me/.
+  {
+    id: 'emails',
+    name: 'E-mails de notification',
+    tranche: 'Tranche 6c',
+    pages: /^\/unsubscribe$/,
+    routes: /^\w+ \/v1\/(email\/|me\/email-preferences$)/,
+    tables: /^email_preference$/,
+  },
   {
     id: 'profil',
     name: 'Profil et langue',
