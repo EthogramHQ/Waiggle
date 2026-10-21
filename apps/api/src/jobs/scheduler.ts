@@ -103,6 +103,34 @@ export const startScheduler = async ({
   })
   await boss.start()
 
+  // Une fois pg-boss démarré, il tient des connexions et lance sa maintenance à intervalles : si la
+  // suite échoue (une file refusée, PostgreSQL coupé entre deux étapes), on l'arrête aussitôt,
+  // sans attendre de tâche (graceful: false), avant de rendre l'erreur à index.ts. Sinon il
+  // tournerait en arrière-plan, sans que personne puisse plus l'arrêter (relecture de sécurité A5).
+  try {
+    await planTasks(boss, deps, emailJobs)
+  } catch (error) {
+    // Si l'arrêt lui-même échoue, on le note, et c'est l'erreur d'origine qui remonte : c'est elle
+    // qui dit pourquoi les tâches ne tournent pas.
+    await boss.stop({ graceful: false }).catch((stopError: unknown) => {
+      console.error(
+        'Job scheduler stop failed',
+        describeError(stopError, { method: 'STARTUP', path: 'pg-boss' }),
+      )
+    })
+    throw error
+  }
+  console.log(`Job scheduler started (${TIME_ZONE})`)
+
+  return {
+    // Arrêt propre : pg-boss laisse finir la tâche en cours (30 secondes au plus), puis ferme ses
+    // connexions.
+    stop: () => boss.stop({ graceful: true, timeout: 30_000 }),
+  }
+}
+
+/** Crée les files, puis planifie chaque tâche (ou la retire, si EMAIL_JOBS=off). */
+const planTasks = async (boss: PgBoss, deps: JobDeps, emailJobs: boolean) => {
   for (const task of tasks) {
     // createQueue ne change rien à une file qui existe déjà (« on conflict do nothing »).
     await boss.createQueue(task.name, {
@@ -135,12 +163,5 @@ export const startScheduler = async ({
         throw new Error(`${task.name} failed`)
       }
     })
-  }
-  console.log(`Job scheduler started (${TIME_ZONE})`)
-
-  return {
-    // Arrêt propre : pg-boss laisse finir la tâche en cours (30 secondes au plus), puis ferme ses
-    // connexions.
-    stop: () => boss.stop({ graceful: true, timeout: 30_000 }),
   }
 }
