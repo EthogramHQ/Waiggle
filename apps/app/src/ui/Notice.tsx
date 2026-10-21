@@ -4,7 +4,8 @@
 // expiré », tranche 6c) : c'est un lien à part, hors de l'alerte, pour que l'alerte ne lise que le
 // message et que le lien reste atteignable au clavier et par VoiceOver.
 import { radii, space } from '@ruche/brand'
-import { View } from 'react-native'
+import type { Ref } from 'react'
+import { Platform, View } from 'react-native'
 import { Icon, type IconName, type IconTone } from './Icon'
 import { Text, type Tone } from './Text'
 import { TextLink } from './TextLink'
@@ -26,9 +27,15 @@ type Props = {
   polite?: boolean
   /** Un lien sous le message, dans le cadre ; il mène ailleurs (rôle link). */
   action?: NoticeAction | undefined
+  /**
+   * Pour y poser le focus du clavier quand le bouton touché disparaît (« Confirmer », sur la page
+   * de désinscription) : le message prend sa place, jamais l'action suivante. Avec une ref, le
+   * message peut recevoir le focus sur le web (tabIndex -1), sans devenir une étape de Tab.
+   */
+  ref?: Ref<View>
 }
 
-export function Notice({ message, tone = 'error', polite = false, action }: Props) {
+export function Notice({ message, tone = 'error', polite = false, action, ref }: Props) {
   const { colors } = useTheme()
   const looks: Record<
     NonNullable<Props['tone']>,
@@ -53,8 +60,10 @@ export function Notice({ message, tone = 'error', polite = false, action }: Prop
   // accessible : le message est lu d'un seul tenant (l'icône est décorative, seul le texte compte).
   const alert = (
     <View
+      ref={ref}
       accessible
       {...(polite ? { role: 'status' as const } : { accessibilityRole: 'alert' as const })}
+      {...(ref && Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
       style={[
         { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
         action ? null : frame,

@@ -23,6 +23,19 @@ describe('nameOf in French', () => {
     expect(nameOf('fr', 'Hélène')).toBe('d’Hélène')
   })
 
+  it('elides « de » before a y followed by a consonant, where it sounds like « i »', () => {
+    expect(nameOf('fr', 'Yves')).toBe('d’Yves')
+    expect(nameOf('fr', 'Ysée')).toBe('d’Ysée')
+    expect(nameOf('fr', 'yves')).toBe('d’yves')
+  })
+
+  it('keeps « de » before a y followed by a vowel, where it is a consonant', () => {
+    // « de Yasmine », comme « de Yann » : devant une voyelle, le y se prononce comme une consonne.
+    for (const name of ['Yasmine', 'Yann', 'Yolande', 'Yuki', 'Yéléna', 'yasmine', 'YANN']) {
+      expect(nameOf('fr', name)).toBe(`de ${name}`)
+    }
+  })
+
   it('elides « de » before a name written in small letters', () => {
     expect(nameOf('fr', 'inès')).toBe('d’inès')
     expect(nameOf('fr', 'élodie')).toBe('d’élodie')

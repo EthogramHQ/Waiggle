@@ -2,19 +2,30 @@
 // d'un e-mail, sans connexion. Scénario : docs/scenarios/phase-1.md, « Précisions (tranche 6c) ».
 // Ouvrir la page ne change rien (un antivirus qui ouvre les liens ne désinscrit personne) : seul
 // « Confirmer » envoie la demande. La fonction unsubscribe (email/api) est remplacée par un faux.
+import { appName } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useLocalSearchParams } from 'expo-router'
+import { Platform } from 'react-native'
 import UnsubscribeRoute from '../../app/unsubscribe'
 import { unsubscribe } from '../email/api'
 import { malformedToken, mentionsToken, recapToken } from '../testing/email'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { focusWithoutScroll } from '../ui/focus'
 import { useHydrated } from '../ui/theme/hydration'
 import { UnsubscribeScreen } from './UnsubscribeScreen'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 jest.mock('../email/api', () => ({ unsubscribe: jest.fn() }))
+// Sur le web, la page adopte la langue du navigateur au premier dessin (useBrowserLanguage, dans
+// i18n.ts) : les tests « web » ci-dessous la veulent française, comme le reste du fichier.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
+// Où la page pose le focus du clavier (web) : le test lit l'élément reçu.
+jest.mock('../ui/focus', () => ({
+  ...jest.requireActual('../ui/focus'),
+  focusWithoutScroll: jest.fn(() => true),
+}))
 // La page lit son jeton dans l'adresse, inconnue du pré-rendu : elle attend l'hydratation (voir
 // ui/theme/hydration.ts). Chaque test choisit si la page est hydratée (oui, par défaut).
 jest.mock('../ui/theme/hydration', () => ({
@@ -37,6 +48,19 @@ const open = (params: Record<string, string | string[]>) => {
 
 const confirm = () => fireEvent.press(screen.getByRole('button', { name: 'Confirmer' }))
 
+/**
+ * Ce qui a reçu le focus du clavier en dernier (web) : son rôle et son tabIndex. Des valeurs
+ * simples : comparer l'élément entier ferait écrire à Jest, en cas d'échec, un écart sans fin.
+ */
+const focused = () => {
+  const node = jest.mocked(focusWithoutScroll).mock.lastCall?.[0] as
+    | { props?: Record<string, unknown> }
+    | null
+    | undefined
+  const props = node?.props ?? {}
+  return { role: props.role ?? props.accessibilityRole, tabIndex: props.tabIndex }
+}
+
 beforeEach(() => {
   // Personne de connecté : la page sert sans session. (Un test vérifie aussi le cas d'une session.)
   mockSession(null)
@@ -44,7 +68,9 @@ beforeEach(() => {
   jest.mocked(unsubscribe).mockReset().mockResolvedValue({ ok: true, data: null })
   mockPush.mockReset()
   mockReplace.mockReset()
+  jest.mocked(focusWithoutScroll).mockClear()
 })
+afterEach(() => jest.restoreAllMocks())
 
 describe('UnsubscribeScreen', () => {
   it('is the page of the /unsubscribe address', () => {
@@ -269,5 +295,99 @@ describe('UnsubscribeScreen', () => {
 
     await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.')
     expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
+  })
+})
+
+// Relectures de 6c : une double tape ou deux fois Entrée sur « Confirmer » coupait tous les
+// e-mails. « Tout couper » prenait la place exacte de « Confirmer » (le second appui tombait
+// dessus), React réutilisait le même bouton, et le focus du clavier allait sur lui.
+describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
+  it('sends a single request, of the confirmed kind only, when the second tap lands after the answer', async () => {
+    await open({ token: recapToken })
+    const button = screen.getByRole('button', { name: 'Confirmer' })
+
+    // Le même élément touché deux fois : la réponse (immédiate) arrive entre les deux appuis.
+    await fireEvent.press(button)
+    await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.')
+    await fireEvent.press(button)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+    expect(screen.queryByText(/plus aucun e-mail/)).toBeNull()
+  })
+
+  it('puts « Tout couper » after the sentence about the account e-mails, never in the place of « Confirmer »', async () => {
+    await open({ token: recapToken })
+    await confirm()
+
+    await screen.findByRole('button', { name: 'Tout couper' })
+    const page = JSON.stringify(screen.toJSON())
+    // Des morceaux sans espace avant « : » (une espace insécable dans le texte affiché).
+    const done = page.indexOf('tu ne recevras plus le récap de la semaine.')
+    const accountEmails = page.indexOf('Les e-mails liés à ton compte')
+    const allOff = page.indexOf('Tout couper')
+    expect(done).toBeGreaterThan(-1)
+    expect(accountEmails).toBeGreaterThan(done)
+    expect(allOff).toBeGreaterThan(accountEmails)
+  })
+
+  it('gives the keyboard focus to the message once confirmed, not to an action (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('status')
+    expect(message).toHaveTextContent('C’est fait : tu ne recevras plus le récap de la semaine.')
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+  })
+
+  it('gives the focus to the message again once everything is off (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+    await confirm()
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
+
+    const message = await screen.findByRole('status')
+    expect(message).toHaveTextContent(
+      'C’est fait : tu ne recevras plus aucun e-mail de notification.',
+    )
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+  })
+
+  it('gives the focus to the message when the API refuses the link (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    jest.mocked(unsubscribe).mockResolvedValue({ ok: false, error: 'validation' })
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent(/Ce lien ne permet pas de te désinscrire\./)
+    expect(focused()).toEqual({ role: 'alert', tabIndex: -1 })
+  })
+})
+
+describe('UnsubscribeScreen, its heading', () => {
+  it('asks its question as the title of the page, under the name of the app', async () => {
+    await open({ token: mentionsToken })
+
+    expect(
+      screen.getByRole('header', {
+        name: 'Ne plus recevoir les e-mails de mentions et de réponses ?',
+      }),
+    ).toBeTruthy()
+    // Qui arrive d'un e-mail voit d'abord où il est, comme sur l'accueil des visiteurs.
+    expect(screen.getByLabelText(appName)).toBeTruthy()
+  })
+
+  it('names the page « Tes e-mails » once the question is answered', async () => {
+    await open({ token: recapToken })
+
+    await confirm()
+
+    expect(await screen.findByRole('header', { name: 'Tes e-mails' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: /Ne plus recevoir/ })).toBeNull()
   })
 })

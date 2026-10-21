@@ -21,7 +21,6 @@ import {
   type ProjectVisual,
   REACTION_KINDS,
 } from '@ruche/contracts'
-import { nameOf, resolveLanguage } from '@ruche/i18n'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -65,6 +64,7 @@ import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
+import { useNameOf } from '../useNameOf'
 import { Comments } from './ProjectComments'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
@@ -98,6 +98,7 @@ export function ProjectScreen({ id }: { id: string }) {
 
 function ProjectView({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
+  const nameOf = useNameOf()
   const router = useRouter()
   const openOutside = useOpenOutside()
   const forgetProject = useForgetProject()
@@ -224,7 +225,7 @@ function ProjectView({ project }: { project: Project }) {
       )}
       <Pressed
         label={t('member.open', {
-          nameOf: nameOf(resolveLanguage([i18n.language]), project.author.name),
+          nameOf: nameOf(project.author.name),
         })}
         role="link"
         onPress={() =>

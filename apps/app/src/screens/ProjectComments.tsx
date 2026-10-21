@@ -17,7 +17,6 @@ import {
   CommentText,
   type Project,
 } from '@ruche/contracts'
-import { nameOf, resolveLanguage } from '@ruche/i18n'
 import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -44,6 +43,7 @@ import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
+import { useNameOf } from '../useNameOf'
 
 // Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
 // au fil, pas au commentaire.)
@@ -72,6 +72,7 @@ type MentionFrom = 'root' | 'reply' | 'edit'
 
 export function Comments({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
+  const nameOf = useNameOf()
   const router = useRouter()
   const toSource = useMediaSources()
   const comments = useComments(project.id)
@@ -464,7 +465,7 @@ export function Comments({ project }: { project: Project }) {
         {...(author
           ? {
               authorLabel: t('member.open', {
-                nameOf: nameOf(resolveLanguage([i18n.language]), author.name),
+                nameOf: nameOf(author.name),
               }),
               onAuthorPress: () =>
                 router.push({ pathname: '/members/[id]', params: { id: author.id } }),
