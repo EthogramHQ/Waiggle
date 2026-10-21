@@ -217,8 +217,25 @@ export const createAuth = ({
     //   par PATCH /v1/me ;
     // - expo-authorization-proxy (plugin Expo) ne sert qu'à la connexion par Google, Apple… sur
     //   téléphone, que l'appli ne propose pas. Elle renvoie vers n'importe quelle adresse donnée
-    //   dans le lien : un lien sur notre domaine pourrait mener vers un faux site (hameçonnage).
-    disabledPaths: ['/update-user', '/expo-authorization-proxy'],
+    //   dans le lien : un lien sur notre domaine pourrait mener vers un faux site (hameçonnage) ;
+    // - change-password : l'appli ne propose pas (encore) de changer son mot de passe. Ouverte, elle
+    //   laisserait quelqu'un qui a volé une session essayer 100 mots de passe par minute ;
+    // - list-sessions et revoke-* : lister ou couper ses sessions, que l'appli ne montre pas ;
+    // - sign-in/social et link-social : la connexion par Google, Apple… que l'appli ne propose pas.
+    //   Ouvertes, elles écrivent dans les logs le nom de fournisseur envoyé par n'importe qui.
+    // Une route fermée répond 404, comme une adresse inconnue (test dans accounts.test.ts). Le jour
+    // où l'appli s'en sert, on la retire de cette liste, avec ses tests.
+    disabledPaths: [
+      '/update-user',
+      '/expo-authorization-proxy',
+      '/change-password',
+      '/list-sessions',
+      '/revoke-session',
+      '/revoke-sessions',
+      '/revoke-other-sessions',
+      '/sign-in/social',
+      '/link-social',
+    ],
 
     rateLimit: {
       ...authSchemaOptions.rateLimit,

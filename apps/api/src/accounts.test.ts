@@ -186,6 +186,42 @@ describe('signing in', () => {
 
     expect(blocked.status).toBe(429)
   })
+
+  // Le cookie de session, tel que la production le pose (API en https) :
+  // - préfixe __Secure- : le navigateur ne l'accepte que d'une page en https ;
+  // - HttpOnly : aucun script de page ne peut le lire, même en cas de faille ;
+  // - Secure : jamais envoyé sur une connexion en clair ;
+  // - SameSite=Lax : pas envoyé avec un formulaire posté depuis un autre site ;
+  // - Max-Age de 7 jours : la durée d'une session.
+  it('keeps the session in a cookie that scripts and other sites cannot use', async () => {
+    const secure = await createTestContext({ publicApiUrl: 'https://api.example.test' })
+    try {
+      await secure.verifiedMember(lea)
+
+      const res = await secure.signIn(lea)
+      const session = res.headers
+        .getSetCookie()
+        .find((cookie) => cookie.startsWith('__Secure-ruche.session_token='))
+      const attributes = (session ?? '')
+        .split(';')
+        .slice(1)
+        .map((attribute) => attribute.trim().toLowerCase())
+
+      expect(res.status).toBe(200)
+      expect(session).toBeDefined()
+      expect(attributes).toEqual(
+        expect.arrayContaining([
+          'httponly',
+          'secure',
+          'samesite=lax',
+          'path=/',
+          `max-age=${7 * 24 * 60 * 60}`,
+        ]),
+      )
+    } finally {
+      await secure.close()
+    }
+  })
 })
 
 describe('the profile route', () => {
@@ -219,6 +255,22 @@ describe('exporting my data', () => {
     const res = await ctx.request('/v1/me/export')
 
     expect(res.status).toBe(401)
+  })
+
+  // L'export lit toutes les données du membre : une lecture lourde, limitée à 30 par heure.
+  it('blocks a 31st export within an hour', async () => {
+    const cookies = await signUpAndVerify()
+    for (let i = 0; i < 30; i++) {
+      expect((await ctx.request('/v1/me/export', { headers: { cookie: cookies } })).status).toBe(
+        200,
+      )
+    }
+
+    const res = await ctx.request('/v1/me/export', { headers: { cookie: cookies } })
+
+    expect(res.status).toBe(429)
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe('rate_limited')
+    expect(res.headers.get('retry-after')).toBeTruthy()
   })
 
   it('gives how far I have seen my notifications, and nothing of what others did', async () => {
@@ -279,6 +331,36 @@ describe('exporting my data', () => {
       ['Merci @ines_morel !', [inesId]],
       ['Sans mention.', []],
     ])
+  })
+})
+
+// Better Auth ouvre d'office des routes que l'appli n'appelle jamais. Chacune est une porte de
+// plus : changer de mot de passe avec une session volée (100 essais par minute), lister ou couper
+// les sessions, se connecter par un fournisseur (Google…) que nous n'avons pas, dont le nom finirait
+// dans les logs. Fermées, elles répondent comme une adresse inconnue, même avec une session.
+describe('authentication routes the app does not use', () => {
+  it.each([
+    ['POST', '/change-password', { currentPassword: lea.password, newPassword: 'new-password-1' }],
+    ['GET', '/list-sessions', undefined],
+    ['POST', '/revoke-session', { token: 'any-token' }],
+    ['POST', '/revoke-sessions', {}],
+    ['POST', '/revoke-other-sessions', {}],
+    ['POST', '/sign-in/social', { provider: 'google' }],
+    ['POST', '/link-social', { provider: 'google' }],
+  ] as const)('are closed: %s %s', async (method, path, body) => {
+    const cookies = await signUpAndVerify()
+
+    const res = await ctx.request(`/api/auth${path}`, {
+      method,
+      headers: { cookie: cookies, ...(body && { 'content-type': 'application/json' }) },
+      ...(body && { body: JSON.stringify(body) }),
+    })
+
+    expect(res.status).toBe(404)
+    // Le refus vient de la fermeture, pas de la route elle-même (« fournisseur inconnu »…).
+    expect(await res.text()).not.toMatch(/PROVIDER|SESSION|PASSWORD/i)
+    // Témoin : la session ouverte par l'inscription marche toujours, mot de passe inchangé.
+    expect((await ctx.request('/v1/me', { headers: { cookie: cookies } })).status).toBe(200)
   })
 })
 

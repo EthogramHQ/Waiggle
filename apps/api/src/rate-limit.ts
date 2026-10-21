@@ -71,6 +71,8 @@ export const memberCounterKeys = (userId: string) => ({
   notificationsRead: `notifications-read:${userId}`,
   // Marquer ses notifications comme vues (tranche 6b).
   notificationsSeen: `notifications-seen:${userId}`,
+  // Télécharger toutes ses données (audit de sécurité d'octobre 2026) : une lecture lourde.
+  export: `export:${userId}`,
 })
 
 /**

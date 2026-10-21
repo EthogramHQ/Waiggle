@@ -77,7 +77,31 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   // secureHeaders ajoute des en-têtes de sécurité standards : interdiction d'afficher le site
   // dans une iframe étrangère, obligation du HTTPS, etc. « same-site » laisse l'appli web
   // (waiggle.io) lire les réponses de l'API (api.waiggle.io), qui est sur le même site.
-  app.use(secureHeaders({ crossOriginResourcePolicy: 'same-site' }))
+  //
+  // La CSP (Content-Security-Policy) dit au navigateur ce qu'une page a le droit de charger et
+  // d'exécuter. L'API ne sert presque que du JSON, mais son domaine porte le cookie de session et
+  // Better Auth y affiche une page HTML (/api/auth/error) : si une faille y glissait du code, cette
+  // politique l'empêcherait de tourner. Elle n'autorise rien (default-src 'none') sauf les styles
+  // écrits dans la page (ceux de la page d'erreur), interdit de l'afficher dans un cadre
+  // (frame-ancestors 'none'), et isole la page comme dans un bac à sable (sandbox : ni script, ni
+  // formulaire, ni accès aux cookies du domaine). Elle ne gêne pas l'appli : une CSP ne s'applique
+  // qu'aux pages ouvertes par le navigateur, pas aux réponses lues par fetch.
+  const apiHeaders = secureHeaders({
+    crossOriginResourcePolicy: 'same-site',
+    contentSecurityPolicy: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      styleSrc: ["'unsafe-inline'"],
+      sandbox: [],
+    },
+  })
+  // Les images de /media ont leur propre CSP, encore plus stricte (voir routes/media.ts) :
+  // secureHeaders écrit ses en-têtes après la route et effacerait la sienne, d'où ce second
+  // réglage, sans CSP.
+  const mediaHeaders = secureHeaders({ crossOriginResourcePolicy: 'same-site' })
+  app.use((c, next) =>
+    c.req.path.startsWith('/media/') ? mediaHeaders(c, next) : apiHeaders(c, next),
+  )
 
   // Middleware maison : détermine la langue de la requête et l'annonce dans la réponse.
   app.use(async (c, next) => {
