@@ -3,7 +3,7 @@
 // (coche) ou simplement afficher une information. Les réglages du compte en sont faits.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { Children, Fragment, type ReactNode } from 'react'
-import { Pressable, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
@@ -12,8 +12,11 @@ import { useTheme } from './theme/ThemeProvider'
 type GroupProps = {
   /** Un petit titre au-dessus du groupe (« Langue », « Mes données »). */
   title?: string
-  /** Une explication sous le groupe. */
-  footer?: string
+  /**
+   * Une explication sous le groupe ; plusieurs phrases, chacune son paragraphe (« Chaque réglage
+   * s'enregistre dès que tu le touches. », puis la phrase sur les e-mails du compte).
+   */
+  footer?: string | readonly string[]
   children: ReactNode
   /** Annoncé comme un groupe de boutons radio (une liste de choix). */
   radio?: boolean
@@ -22,6 +25,7 @@ type GroupProps = {
 export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
+  const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
   return (
     <View style={{ gap: space.sm }}>
       {title ? (
@@ -58,11 +62,13 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
           </Fragment>
         ))}
       </View>
-      {footer ? (
-        <View style={{ paddingHorizontal: space.lg }}>
-          <Text variant="caption" tone="muted">
-            {footer}
-          </Text>
+      {notes.length > 0 ? (
+        <View style={{ paddingHorizontal: space.lg, gap: space.xs }}>
+          {notes.map((note) => (
+            <Text key={note} variant="caption" tone="muted">
+              {note}
+            </Text>
+          ))}
         </View>
       ) : null}
     </View>
@@ -86,6 +92,11 @@ type RowProps = {
   accessory?: ReactNode
   /** Inactive (par exemple pendant que son action est en cours). */
   disabled?: boolean
+  /**
+   * Une ligne qui attend (« Chargement… ») : une roue à droite, et les lecteurs d'écran
+   * l'annoncent comme une attente en cours (rôle progressbar, aria-busy), avec son libellé.
+   */
+  busy?: boolean
 }
 
 export function ListRow({
@@ -99,6 +110,7 @@ export function ListRow({
   selected,
   accessory,
   disabled = false,
+  busy = false,
 }: RowProps) {
   const { colors } = useTheme()
   const isChoice = selected !== undefined
@@ -115,6 +127,17 @@ export function ListRow({
 
   const content = (
     <View
+      // Une attente : la ligne entière est lue d'un tenant, comme une barre de progression sans
+      // fin connue, « occupée ». Un rôle est nécessaire : sur le web, le navigateur ignore le nom
+      // d'un bloc qui n'en a pas.
+      {...(busy && !onPress
+        ? {
+            accessible: true,
+            accessibilityRole: 'progressbar' as const,
+            accessibilityLabel: label,
+            'aria-busy': true,
+          }
+        : null)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -154,6 +177,7 @@ export function ListRow({
         </Text>
       ) : null}
       {accessory}
+      {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
       {right}
     </View>
   )

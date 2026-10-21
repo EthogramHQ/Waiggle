@@ -189,6 +189,13 @@ export function CatalogueScreen() {
         <Notice tone="success" message={l.successMessage} />
         {/* Avec une action : un lien sous le message (« Me reconnecter », tranche 6c). */}
         <Notice message={l.expired} action={{ label: l.signInAgain, onPress: () => {} }} />
+        {/* Une information avec une action, lue sans couper le lecteur d'écran (polite). */}
+        <Notice
+          tone="info"
+          polite
+          message={l.infoMessage}
+          action={{ label: l.infoAction, onPress: () => {} }}
+        />
       </Section>
 
       <Section title={l.surfaces}>
@@ -254,6 +261,10 @@ export function CatalogueScreen() {
           <ListRow label={l.deleteAccount} tone="danger" trailing="trash" onPress={() => {}} />
         </ListGroup>
         <EmailSwitches l={l} />
+        {/* Une ligne qui attend (les réglages pas encore arrivés) : annoncée comme occupée. */}
+        <ListGroup>
+          <ListRow label={l.loadingRow} busy />
+        </ListGroup>
       </Section>
 
       {/* Les états d'une page qui n'a pas (encore) son contenu : toujours une issue. */}
@@ -1388,7 +1399,8 @@ function EmailSwitches({ l }: { l: Labels }) {
   const [recap, setRecap] = useState(true)
   const [mentions, setMentions] = useState(false)
   return (
-    <ListGroup title={l.emailsTitle} footer={l.emailsAccount}>
+    // Le pied du groupe en deux phrases, chacune son paragraphe (« Mon profil »).
+    <ListGroup title={l.emailsTitle} footer={[l.emailsInstant, l.emailsAccount]}>
       <Switch
         inGroup
         label={l.emailsRecap}
@@ -1402,6 +1414,15 @@ function EmailSwitches({ l }: { l: Labels }) {
         hint={l.emailsMentionsHint}
         value={mentions}
         onValueChange={setMentions}
+      />
+      {/* Désactivé : il pâlit et ne bascule plus. */}
+      <Switch
+        inGroup
+        disabled
+        label={l.emailsDisabled}
+        hint={l.emailsDisabledHint}
+        value={false}
+        onValueChange={() => {}}
       />
     </ListGroup>
   )

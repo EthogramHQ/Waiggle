@@ -8,6 +8,7 @@ import { leaEmailPreferences } from '../testing/email'
 import { leaMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
+import * as focusModule from '../ui/focus'
 import { ProfileScreen } from './ProfileScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -419,5 +420,173 @@ describe('ProfileScreen, the e-mail settings', () => {
     )
     await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
     expect(visited(mockPush)).toEqual(['/sign-in?next=/page/actuelle'])
+  })
+})
+
+// Tranche 6c, après les relectures de l'interface et du design (commit 9b4172b).
+describe('ProfileScreen, the e-mail settings after the reviews', () => {
+  const recapName = 'Le récap de la semaine'
+  const loadError = 'Tes réglages d’e-mail n’ont pas pu se charger.'
+
+  /** La première lecture des réglages échoue (`error`), les suivantes passent par le faux serveur. */
+  const failFirstRead = (error: 'network' | 'unauthorized') => {
+    let failed = false
+    jest.mocked(request).mockImplementation((async (to: string, init: RequestInit = {}) => {
+      if (to === emailPath && init.method === 'GET' && !failed) {
+        failed = true
+        return { ok: false, error }
+      }
+      return fakeRequest(to, init)
+    }) as typeof request)
+  }
+
+  /** Le rang de chaque élément dans l'ordre de lecture de la page (de haut en bas). */
+  const readingOrder = (...elements: ReturnType<typeof screen.getByRole>[]) => {
+    const all: unknown[] = []
+    const walk = (node: ReturnType<typeof screen.getByRole>) => {
+      all.push(node)
+      for (const child of node.children) if (typeof child !== 'string') walk(child)
+    }
+    walk(screen.root as ReturnType<typeof screen.getByRole>)
+    return elements.map((element) => all.indexOf(element))
+  }
+
+  it('says that each setting is saved as soon as it is touched, under the group', async () => {
+    await renderWithProviders(<ProfileScreen />)
+
+    await screen.findByRole('switch', { name: recapName })
+    expect(screen.getByText('Chaque réglage s’enregistre dès que tu le touches.')).toBeTruthy()
+  })
+
+  // Sur téléphone, le groupe est en bas de la page : sous lui, le message sortait de l'écran.
+  it('shows a refused change between the title and the switches', async () => {
+    nextEmailPatch = async () => ({ ok: false, error: 'unauthorized' })
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await screen.findByRole('switch', { name: recapName }))
+
+    const alert = await screen.findByRole('alert')
+    const [title, message, toggle] = readingOrder(
+      screen.getByRole('header', { name: 'E-mails' }),
+      alert,
+      screen.getByRole('switch', { name: recapName }),
+    )
+    expect(title).toBeLessThan(message as number)
+    expect(message).toBeLessThan(toggle as number)
+    expect(screen.getByRole('link', { name: 'Me reconnecter' })).toBeTruthy()
+  })
+
+  it('shows the confirmation between the title and the switches too', async () => {
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await screen.findByRole('switch', { name: recapName }))
+
+    const [message, toggle] = readingOrder(
+      await screen.findByRole('status'),
+      screen.getByRole('switch', { name: recapName }),
+    )
+    expect(message).toBeLessThan(toggle as number)
+  })
+
+  // Le message reste en place pendant le changement suivant : sans cela, il disparaissait le
+  // temps de l'envoi puis revenait, et les interrupteurs sautaient deux fois sous le doigt.
+  it('keeps the confirmation in place while the next change is on its way', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await fireEvent.press(await screen.findByRole('switch', { name: recapName }))
+    expect(await screen.findByText('Réglage enregistré.')).toBeTruthy()
+
+    let answer: (result: ApiResult<EmailPreferences>) => void = () => {}
+    nextEmailPatch = () =>
+      new Promise((resolve) => {
+        answer = resolve
+      })
+    await fireEvent.press(
+      screen.getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' }),
+    )
+
+    expect(screen.getByText('Réglage enregistré.')).toBeTruthy()
+    answer({ ok: true, data: { weeklyRecap: false, mentionEmails: true } })
+    await waitFor(() => expect(emailPatches()).toHaveLength(2))
+  })
+
+  it('announces the line that waits for the settings as busy', async () => {
+    jest.mocked(request).mockImplementation((() => new Promise(() => {})) as typeof request)
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(await screen.findByRole('progressbar', { name: 'Chargement…' })).toBeBusy()
+  })
+
+  it('says what could not be loaded, then offers to try again', async () => {
+    failFirstRead('network')
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(await screen.findByText(loadError)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy()
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+
+  it('shows « Réessayer » as busy and inactive while the settings are read again', async () => {
+    let answer: (result: ApiResult<EmailPreferences>) => void = () => {}
+    let reads = 0
+    jest.mocked(request).mockImplementation((async (to: string, init: RequestInit = {}) => {
+      if (init.method !== 'GET') return fakeRequest(to, init)
+      reads += 1
+      if (reads === 1) return { ok: false, error: 'network' }
+      return new Promise<ApiResult<EmailPreferences>>((resolve) => {
+        answer = resolve
+      })
+    }) as typeof request)
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Réessayer' })).toBeBusy())
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDisabled()
+    // Un second appui pendant la lecture ne relance rien.
+    await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(reads).toBe(2)
+    answer({ ok: true, data: leaEmailPreferences })
+    expect(await screen.findByRole('switch', { name: recapName })).toBeChecked()
+  })
+
+  it('gives the keyboard focus to the first switch once « Réessayer » worked', async () => {
+    const focus = jest.spyOn(focusModule, 'focusWithoutScroll').mockReturnValue(true)
+    try {
+      failFirstRead('network')
+      await renderWithProviders(<ProfileScreen />)
+      await screen.findByText(loadError)
+      expect(focus).not.toHaveBeenCalled()
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
+
+      await screen.findByRole('switch', { name: recapName })
+      await waitFor(() => expect(focus).toHaveBeenCalledTimes(1))
+      expect(focus.mock.calls[0]?.[0]).toBeTruthy()
+    } finally {
+      focus.mockRestore()
+    }
+  })
+
+  it('does not move the focus when the settings arrive without « Réessayer »', async () => {
+    const focus = jest.spyOn(focusModule, 'focusWithoutScroll').mockReturnValue(true)
+    try {
+      await renderWithProviders(<ProfileScreen />)
+
+      await screen.findByRole('switch', { name: recapName })
+      expect(focus).not.toHaveBeenCalled()
+    } finally {
+      focus.mockRestore()
+    }
+  })
+
+  it('offers to sign in again, and no « Réessayer », when the session expired', async () => {
+    failFirstRead('unauthorized')
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    expect(screen.getByRole('link', { name: 'Me reconnecter' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
   })
 })
