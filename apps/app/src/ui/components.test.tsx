@@ -4,7 +4,7 @@
 import { appName, fontWeights, maxTextScale } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
-import { Platform, TextInput } from 'react-native'
+import { Platform, TextInput, type View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
@@ -17,6 +17,7 @@ import { FollowButton } from './FollowButton'
 import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
+import { ListGroup, ListRow } from './ListGroup'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
@@ -126,6 +127,26 @@ describe('Switch', () => {
 
     expect(onValueChange).toHaveBeenCalledWith(true)
   })
+
+  // Tranche 6c : une ligne d'un groupe de réglages (« E-mails » dans « Mon profil »).
+  it('stays a switch with its state and its hint when it is a row of a settings group', async () => {
+    const onValueChange = jest.fn()
+    await renderWithProviders(
+      <Switch
+        inGroup
+        label="Le récap de la semaine"
+        hint="Le lundi matin, seulement s’il y a du nouveau."
+        value
+        onValueChange={onValueChange}
+      />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+    expect(toggle).toBeChecked()
+    expect(screen.getByText('Le lundi matin, seulement s’il y a du nouveau.')).toBeTruthy()
+    await fireEvent.press(toggle)
+    expect(onValueChange).toHaveBeenCalledWith(false)
+  })
 })
 
 describe('FollowButton', () => {
@@ -162,6 +183,23 @@ describe('FollowButton', () => {
 
     expect(screen.getByRole('switch', { name: 'Suivre Léa' })).toBeChecked()
     expect(screen.getByText('Suivi')).toBeTruthy()
+  })
+
+  it('offers the link given with its error (slice 6c)', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={jest.fn()}
+        label="Suivre Léa"
+        text="Suivre"
+        error="Ta session a expiré. Reconnecte-toi pour continuer."
+        errorAction={{ label: 'Me reconnecter', onPress }}
+      />,
+    )
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 
   it('reads out its error as soon as it appears', async () => {
@@ -402,6 +440,86 @@ describe('Notice', () => {
 
     expect(screen.getByRole('alert')).toBeTruthy()
     expect(screen.getByText('Mot de passe incorrect.')).toBeTruthy()
+  })
+
+  // Tranche 6c : « Me reconnecter » après « Ta session a expiré ». Le lien est hors de l'alerte :
+  // l'alerte ne lit que le message, et le lien reste atteignable à part.
+  it('offers a link after its message, outside the alert, that leads elsewhere', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Notice
+        message="Ta session a expiré. Reconnecte-toi pour continuer."
+        action={{ label: 'Me reconnecter', onPress }}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no link without an action', async () => {
+    await renderWithProviders(<Notice message="Mot de passe incorrect." />)
+
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  // Tranche 6c : avec une ref, le message peut recevoir le focus sur le web (tabIndex -1), sans
+  // devenir une étape de Tab ; sans ref, il reste hors du parcours du clavier.
+  it('can take the focus on the web when a screen holds it', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const ref = createRef<View>()
+      await renderWithProviders(<Notice message="C’est fait." polite ref={ref} />)
+      expect(screen.getByRole('status')).toHaveProp('tabIndex', -1)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('stays out of the keyboard path without a ref', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(screen.getByRole('status')).not.toHaveProp('tabIndex')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  // Relecture de e414e88 : un message qui reçoit le focus et qui est aussi une zone annoncée
+  // (role « status » ou « alert ») est lu deux fois par certains lecteurs d'écran. Une seule
+  // annonce : celle du focus, sur le web ; sans ref, l'annonce de la zone.
+  it('is read once on the web when it takes the focus: the focus reads it, not the live region', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const ref = createRef<View>()
+      await renderWithProviders(<Notice message="C’est fait." polite ref={ref} />)
+      expect(screen.getByRole('status')).toHaveProp('aria-live', 'off')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('stays announced as it appears without a ref', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(screen.getByRole('status')).not.toHaveProp('aria-live')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+describe('Notice, held by a screen on a phone', () => {
+  // Sur téléphone, aucun focus du clavier ne vient le lire : l'annonce de la zone reste.
+  it('stays an announced alert', async () => {
+    const ref = createRef<View>()
+    await renderWithProviders(<Notice message="Lien invalide." ref={ref} />)
+    expect(screen.getByRole('alert')).not.toHaveProp('aria-live')
   })
 })
 
@@ -1844,5 +1962,154 @@ describe('NotificationCard', () => {
     } finally {
       jest.restoreAllMocks()
     }
+  })
+})
+
+// Tranche 6c, après les relectures : les réglages d'e-mail de « Mon profil ».
+describe('Switch, read by a screen reader', () => {
+  const hint = 'Le lundi matin, seulement s’il y a du nouveau.'
+
+  it('is described by its hint on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Switch
+          inGroup
+          label="Le récap de la semaine"
+          hint={hint}
+          value
+          onValueChange={() => {}}
+        />,
+      )
+
+      // Le nom (accessibilityLabel) cache le texte de l'aide : aria-describedby la fait lire après.
+      const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+      const id = toggle.props['aria-describedby']
+      expect(id).toEqual(expect.any(String))
+      let described = screen.getByText(hint)
+      while (described.parent && described.props.nativeID !== id) described = described.parent
+      expect(described.props.nativeID).toBe(id)
+      expect(toggle).not.toHaveProp('accessibilityHint', hint)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('gives its hint as the accessibility hint on a phone', async () => {
+    await renderWithProviders(
+      <Switch label="Le récap de la semaine" hint={hint} value onValueChange={() => {}} />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Le récap de la semaine' })
+    expect(toggle).toHaveProp('accessibilityHint', hint)
+    expect(toggle).not.toHaveProp('aria-describedby')
+  })
+
+  it('is described by nothing without a hint', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Switch label="Notifications" value onValueChange={() => {}} />)
+
+      expect(screen.getByRole('switch', { name: 'Notifications' })).not.toHaveProp(
+        'aria-describedby',
+      )
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is announced as disabled, and does not flip, when it is disabled in a group', async () => {
+    const onValueChange = jest.fn()
+    await renderWithProviders(
+      <Switch inGroup disabled label="Notifications" value={false} onValueChange={onValueChange} />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Notifications' })
+    expect(toggle).toBeDisabled()
+    await fireEvent.press(toggle)
+    expect(onValueChange).not.toHaveBeenCalled()
+  })
+
+  it('hands its element to a ref, to receive the keyboard focus', async () => {
+    const ref = createRef<View>()
+    await renderWithProviders(
+      <Switch ref={ref} label="Notifications" value onValueChange={() => {}} />,
+    )
+
+    expect(ref.current).not.toBeNull()
+  })
+})
+
+describe('ListGroup, its footer and a busy row', () => {
+  it('shows each sentence of its footer as its own paragraph', async () => {
+    await renderWithProviders(
+      <ListGroup
+        title="E-mails"
+        footer={['Chaque réglage s’enregistre dès que tu le touches.', 'Les e-mails du compte.']}
+      >
+        <ListRow label="Une ligne" />
+      </ListGroup>,
+    )
+
+    expect(screen.getByText('Chaque réglage s’enregistre dès que tu le touches.')).toBeTruthy()
+    expect(screen.getByText('Les e-mails du compte.')).toBeTruthy()
+  })
+
+  // Relecture de e414e88 : la phrase servait de clé React ; deux phrases identiques en avaient la
+  // même, et React pouvait en perdre une.
+  it('shows two identical sentences of its footer, each once', async () => {
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await renderWithProviders(
+        <ListGroup footer={['La même phrase.', 'La même phrase.']}>
+          <ListRow label="Une ligne" />
+        </ListGroup>,
+      )
+
+      expect(screen.getAllByText('La même phrase.')).toHaveLength(2)
+      expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+    } finally {
+      errors.mockRestore()
+    }
+  })
+
+  it('announces a row that waits as busy, with its label', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Chargement…" busy />
+      </ListGroup>,
+    )
+
+    expect(screen.getByRole('progressbar', { name: 'Chargement…' })).toBeBusy()
+  })
+
+  it('shows a row that does not wait as a plain row', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Léa Moreau" />
+      </ListGroup>,
+    )
+
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.getByText('Léa Moreau')).toBeTruthy()
+  })
+})
+
+describe('Notice, polite with an action', () => {
+  it('stays a status, outside which its link can be reached', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Notice
+        tone="info"
+        polite
+        message="Ce projet est privé."
+        action={{ label: 'Le rendre public', onPress }}
+      />,
+    )
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('Ce projet est privé.')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('link', { name: 'Le rendre public' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 })

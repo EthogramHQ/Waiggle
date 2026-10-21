@@ -1,7 +1,8 @@
 // Un lien en texte souligné, pour une action secondaire dans une phrase ou sous un formulaire
 // (« Créer un compte », « Changer d'adresse »). Pour l'action principale : un Button.
 import { layout } from '@ruche/brand'
-import { Pressable } from 'react-native'
+import type { Ref } from 'react'
+import { Pressable, type View } from 'react-native'
 import { enterActivates } from './keyboard'
 import { Text, type Tone } from './Text'
 
@@ -16,6 +17,8 @@ type Props = {
    * lecteurs d'écran l'annoncent comme désactivé (aria-disabled).
    */
   disabled?: boolean
+  /** Pour y poser le focus du clavier quand l'élément qui l'avait disparaît (voir focus.ts). */
+  ref?: Ref<View>
 }
 
 export function TextLink({
@@ -24,9 +27,11 @@ export function TextLink({
   tone = 'default',
   role = 'link',
   disabled = false,
+  ref,
 }: Props) {
   return (
     <Pressable
+      ref={ref}
       accessibilityRole={role}
       accessibilityLabel={label}
       aria-disabled={disabled}

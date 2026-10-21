@@ -30,6 +30,7 @@ import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
+import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
@@ -63,6 +64,7 @@ import { Text } from '../ui/Text'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
+import { useNameOf } from '../useNameOf'
 import { Comments } from './ProjectComments'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
@@ -96,6 +98,7 @@ export function ProjectScreen({ id }: { id: string }) {
 
 function ProjectView({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
+  const nameOf = useNameOf()
   const router = useRouter()
   const openOutside = useOpenOutside()
   const forgetProject = useForgetProject()
@@ -117,6 +120,8 @@ function ProjectView({ project }: { project: Project }) {
   const follow = useFollow({ kind: 'project', id: project.id })
   const followers = t('follow.followers', { count: project.followerCount })
   const reaction = useReaction(project.id)
+  // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
+  const signInAgain = useSignInAgain()
   // Les cinq réactions, telles que la barre les affiche. Le nom lu reprend le texte affiché et dit
   // si la réaction est la sienne (« Bravo, réagi, 4 »).
   const reactions = REACTION_KINDS.map((kind) => {
@@ -219,7 +224,9 @@ function ProjectView({ project }: { project: Project }) {
         </Text>
       )}
       <Pressed
-        label={t('member.open', { name: project.author.name })}
+        label={t('member.open', {
+          nameOf: nameOf(project.author.name),
+        })}
         role="link"
         onPress={() =>
           router.push({ pathname: '/members/[id]', params: { id: project.author.id } })
@@ -277,6 +284,7 @@ function ProjectView({ project }: { project: Project }) {
           error={
             follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
           }
+          errorAction={follow.expired ? signInAgain() : undefined}
           prominent={false}
         />
       )}
@@ -295,6 +303,7 @@ function ProjectView({ project }: { project: Project }) {
                 ? t('project.reactions.error')
                 : undefined
           }
+          errorAction={reaction.expired ? signInAgain() : undefined}
         />
       )}
     </Stack>
@@ -470,6 +479,7 @@ function Journal({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
   const publishNote = usePublishNote(project.id)
   const deleteNote = useDeleteNote(project.id)
+  const signInAgain = useSignInAgain()
   // Le champ « Ta note » : ouvert ou non, son texte, et le problème du texte s'il y en a un.
   const [composing, setComposing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -572,6 +582,10 @@ function Journal({ project }: { project: Project }) {
       : reason === 'expired'
         ? t('states.expired')
         : otherwise
+  // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
+  // doit l'être avant de partir (la fenêtre de confirmation).
+  const failureAction = (reason: NoteFailure | undefined, before?: () => void) =>
+    reason === 'expired' ? signInAgain(before) : undefined
 
   const list = (
     <NoteList
@@ -648,6 +662,9 @@ function Journal({ project }: { project: Project }) {
               ? failure(publishNote.reason, t('project.notes.error'))
               : undefined
           }
+          errorAction={
+            showPublishError && publishNote.error ? failureAction(publishNote.reason) : undefined
+          }
           success={done === 'published' ? t('project.notes.published') : undefined}
         />
       ) : null}
@@ -674,7 +691,10 @@ function Journal({ project }: { project: Project }) {
       >
         {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer. */}
         {showDeleteError && deleteNote.error ? (
-          <Notice message={failure(deleteNote.reason, t('project.notes.deleteError'))} />
+          <Notice
+            message={failure(deleteNote.reason, t('project.notes.deleteError'))}
+            action={failureAction(deleteNote.reason, () => setDeleting(null))}
+          />
         ) : null}
         <Button
           label={t('project.notes.confirmDelete')}

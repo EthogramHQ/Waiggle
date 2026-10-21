@@ -16,6 +16,7 @@ export const ErrorCode = z.enum([
   'cannot_react_own',
   'handle_taken',
   'handle_change_limit',
+  'unsubscribe_invalid',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

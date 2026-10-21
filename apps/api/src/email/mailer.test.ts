@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { createBrevoMailer, createScalewayMailer } from './mailer'
+import { describe, expect, it, vi } from 'vitest'
+import { createBrevoMailer, createConsoleMailer, createScalewayMailer } from './mailer'
 
 const email = { to: 'lea@example.com', subject: 'Sujet', text: 'Texte', html: '<p>Texte</p>' }
 
@@ -98,5 +98,84 @@ describe('createBrevoMailer', () => {
     })
 
     await expect(mailer.send(email)).rejects.toThrow(/401/)
+  })
+})
+
+// Les en-têtes de désinscription en un clic (tranche 6c, RFC 8058) : le récap et l'e-mail de
+// mentions portent « List-Unsubscribe » (l'adresse signée) et « List-Unsubscribe-Post », pour que
+// la messagerie affiche son bouton « Se désabonner ». Seuls ces deux en-têtes sont permis, en ASCII
+// imprimable (relecture de sécurité S-A7) : un retour à la ligne dans une valeur ajouterait un
+// en-tête (« Bcc: … », une copie cachée vers n'importe qui).
+const unsubscribeUrl = 'https://api.waiggle.io/v1/email/unsubscribe?token=v1.abc.recap.sig'
+const withHeaders = {
+  ...email,
+  headers: {
+    'List-Unsubscribe': `<${unsubscribeUrl}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  },
+}
+
+const scalewayWith = (fakeFetch: typeof fetch) =>
+  createScalewayMailer({
+    secretKey: 'test-secret',
+    projectId: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
+    region: 'fr-par',
+    from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+    fetch: fakeFetch,
+  })
+const brevoWith = (fakeFetch: typeof fetch) =>
+  createBrevoMailer({
+    apiKey: 'test-key',
+    from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+    fetch: fakeFetch,
+  })
+
+describe('the one-click unsubscribe headers', () => {
+  it('passes them to Scaleway as additional headers', async () => {
+    const { calls, fakeFetch } = recordingFetch(new Response('{}', { status: 200 }))
+
+    await scalewayWith(fakeFetch).send(withHeaders)
+
+    expect(JSON.parse(String(calls[0]?.init.body)).additional_headers).toEqual([
+      { key: 'List-Unsubscribe', value: `<${unsubscribeUrl}>` },
+      { key: 'List-Unsubscribe-Post', value: 'List-Unsubscribe=One-Click' },
+    ])
+  })
+
+  it('passes them to Brevo as headers', async () => {
+    const { calls, fakeFetch } = recordingFetch(new Response('{}', { status: 201 }))
+
+    await brevoWith(fakeFetch).send(withHeaders)
+
+    expect(JSON.parse(String(calls[0]?.init.body)).headers).toEqual(withHeaders.headers)
+  })
+
+  it('shows them in the terminal in development', async () => {
+    const logged = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await createConsoleMailer().send(withHeaders)
+
+    expect(JSON.stringify(logged.mock.calls)).toContain('List-Unsubscribe')
+    logged.mockRestore()
+  })
+
+  it('refuses any other header, a line break or a non-ASCII value, and sends nothing', async () => {
+    const forbidden = [
+      { Bcc: 'someone@evil.example' },
+      { 'List-Unsubscribe': `<${unsubscribeUrl}>\r\nBcc: someone@evil.example` },
+      { 'List-Unsubscribe': `<${unsubscribeUrl}>\nBcc: someone@evil.example` },
+      { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Clické' },
+      { 'Reply-To': 'someone@evil.example' },
+    ]
+    for (const headers of forbidden) {
+      const scaleway = recordingFetch(new Response('{}', { status: 200 }))
+      const brevo = recordingFetch(new Response('{}', { status: 201 }))
+
+      await expect(scalewayWith(scaleway.fakeFetch).send({ ...email, headers })).rejects.toThrow()
+      await expect(brevoWith(brevo.fakeFetch).send({ ...email, headers })).rejects.toThrow()
+
+      expect(scaleway.calls).toEqual([])
+      expect(brevo.calls).toEqual([])
+    }
   })
 })

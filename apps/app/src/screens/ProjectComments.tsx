@@ -31,6 +31,7 @@ import {
   usePostComment,
 } from '../comments/api'
 import { useMentionable } from '../mentions/api'
+import { useSignInAgain } from '../navigation/signInAgain'
 import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
@@ -42,6 +43,7 @@ import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
+import { useNameOf } from '../useNameOf'
 
 // Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
 // au fil, pas au commentaire.)
@@ -70,6 +72,7 @@ type MentionFrom = 'root' | 'reply' | 'edit'
 
 export function Comments({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
+  const nameOf = useNameOf()
   const router = useRouter()
   const toSource = useMediaSources()
   const comments = useComments(project.id)
@@ -77,6 +80,8 @@ export function Comments({ project }: { project: Project }) {
   const edit = useEditComment(project.id)
   const remove = useDeleteComment(project.id)
   const hide = useHideComment(project.id)
+  // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
+  const signInAgain = useSignInAgain()
   const isPrivate = project.visibility === 'private'
 
   // Un nouveau commentaire : le champ ouvert ou non, son texte, et le problème du texte s'il y en a un.
@@ -163,6 +168,10 @@ export function Comments({ project }: { project: Project }) {
     otherwise: string,
     limited = t('project.comments.limited'),
   ) => (reason === 'limited' ? limited : reason === 'expired' ? t('states.expired') : otherwise)
+  // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
+  // doit l'être avant de partir (la fenêtre de confirmation).
+  const failureAction = (reason: CommentFailure | undefined, before?: () => void) =>
+    reason === 'expired' ? signInAgain(before) : undefined
 
   // La même règle que l'API (packages/contracts) : un texte non vide, sans caractères invisibles.
   const check = (text: string, required: string) => {
@@ -455,7 +464,9 @@ export function Comments({ project }: { project: Project }) {
         author={author ? { name: author.name, avatar: toSource(author.avatarUrl) } : null}
         {...(author
           ? {
-              authorLabel: t('member.open', { name: author.name }),
+              authorLabel: t('member.open', {
+                nameOf: nameOf(author.name),
+              }),
               onAuthorPress: () =>
                 router.push({ pathname: '/members/[id]', params: { id: author.id } }),
             }
@@ -487,6 +498,7 @@ export function Comments({ project }: { project: Project }) {
             ? failure(hide.reason, t('project.comments.hideError'), t('errors.rateLimited'))
             : undefined
         }
+        errorAction={hideFailed === comment.id ? failureAction(hide.reason) : undefined}
         editor={
           editing === comment.id ? (
             <NoteComposer
@@ -516,6 +528,7 @@ export function Comments({ project }: { project: Project }) {
                   ? failure(edit.reason, t('project.comments.editError'))
                   : undefined
               }
+              errorAction={showEditError && edit.error ? failureAction(edit.reason) : undefined}
             />
           ) : undefined
         }
@@ -556,6 +569,7 @@ export function Comments({ project }: { project: Project }) {
               : failure(post.reason, t('project.comments.replyError'))
             : undefined
         }
+        errorAction={postFrom === 'reply' && post.error ? failureAction(post.reason) : undefined}
       />
     ) : null
 
@@ -631,7 +645,10 @@ export function Comments({ project }: { project: Project }) {
     // de la page (le projet, son journal) reste là. 401 : réessayer ne servirait à rien, il faut
     // se reconnecter ; pas de bouton.
     <>
-      <Notice message={expired ? t('states.expired') : t('project.comments.loadError')} />
+      <Notice
+        message={expired ? t('states.expired') : t('project.comments.loadError')}
+        action={expired ? signInAgain() : undefined}
+      />
       {expired ? null : (
         <Button
           label={t('common.retry')}
@@ -715,6 +732,7 @@ export function Comments({ project }: { project: Project }) {
             ? failure(post.reason, t('project.comments.error'))
             : undefined
         }
+        errorAction={postFrom === 'root' && post.error ? failureAction(post.reason) : undefined}
         success={done?.kind === 'published' ? t('project.comments.published') : undefined}
       />
       {empty ? null : list}
@@ -757,6 +775,7 @@ export function Comments({ project }: { project: Project }) {
               t('project.comments.deleteError'),
               t('errors.rateLimited'),
             )}
+            action={failureAction(remove.reason, () => setDeleting(null))}
           />
         ) : null}
         <Button

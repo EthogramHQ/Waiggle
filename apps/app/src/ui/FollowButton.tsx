@@ -8,7 +8,7 @@ import { space } from '@ruche/brand'
 import { View } from 'react-native'
 import { Button } from './Button'
 import { FollowerCount } from './FollowerCount'
-import { Notice } from './Notice'
+import { Notice, type NoticeAction } from './Notice'
 
 type Props = {
   followed: boolean
@@ -21,6 +21,10 @@ type Props = {
   caption?: string
   /** Un message si le dernier changement n'a pas pu être enregistré. */
   error?: string
+  /**
+   * Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré, tranche 6c).
+   */
+  errorAction?: NoticeAction | undefined
   /**
    * En miel quand suivre est l'action principale de la page (celle d'un membre) ; en blanc quand
    * une autre l'est déjà (« Tester la démo » sur un projet) : une seule action miel par écran.
@@ -40,6 +44,7 @@ export function FollowButton({
   text,
   caption,
   error,
+  errorAction,
   prominent = true,
   layout = 'row',
 }: Props) {
@@ -72,7 +77,7 @@ export function FollowButton({
         </View>
       )}
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
-      {error ? <Notice message={error} /> : null}
+      {error ? <Notice message={error} action={errorAction} /> : null}
     </View>
   )
 }

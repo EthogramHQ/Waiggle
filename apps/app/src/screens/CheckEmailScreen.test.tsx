@@ -33,4 +33,17 @@ describe('CheckEmailScreen', () => {
       ),
     ).toBeTruthy()
   })
+
+  // Tranche 6c : la purge de nuit efface les inscriptions jamais vérifiées au bout de 30 jours
+  // (UNVERIFIED_ACCOUNT_DAYS) ; la page le dit.
+  it('says that a sign-up never verified is deleted after 30 days', async () => {
+    jest.mocked(useLocalSearchParams).mockReturnValue({ email: 'lea@example.com' })
+    await renderWithI18n(<CheckEmailScreen />)
+
+    expect(
+      screen.getByText(
+        'Sans vérification dans les 30 jours qui suivent l’inscription, elle est effacée.',
+      ),
+    ).toBeTruthy()
+  })
 })

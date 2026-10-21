@@ -1,0 +1,475 @@
+// Tests de la page de désinscription (tranche 6c), ouverte depuis le lien « Ne plus recevoir… »
+// d'un e-mail, sans connexion. Scénario : docs/scenarios/phase-1.md, « Précisions (tranche 6c) ».
+// Ouvrir la page ne change rien (un antivirus qui ouvre les liens ne désinscrit personne) : seul
+// « Confirmer » envoie la demande. La fonction unsubscribe (email/api) est remplacée par un faux.
+import { appName } from '@ruche/brand'
+import { act, fireEvent, screen } from '@testing-library/react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { Platform } from 'react-native'
+import UnsubscribeRoute from '../../app/unsubscribe'
+import { unsubscribe } from '../email/api'
+import { malformedToken, mentionsToken, recapToken } from '../testing/email'
+import { visited } from '../testing/navigation'
+import { mockSession, renderWithProviders } from '../testing/render'
+import { focusWithoutScroll } from '../ui/focus'
+import { useHydrated } from '../ui/theme/hydration'
+import { UnsubscribeScreen } from './UnsubscribeScreen'
+
+// Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
+jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+jest.mock('../email/api', () => ({ unsubscribe: jest.fn() }))
+// Sur le web, la page adopte la langue du navigateur au premier dessin (useBrowserLanguage, dans
+// i18n.ts) : les tests « web » ci-dessous la veulent française, comme le reste du fichier.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
+// Où la page pose le focus du clavier (web) : le test lit l'élément reçu.
+jest.mock('../ui/focus', () => ({
+  ...jest.requireActual('../ui/focus'),
+  focusWithoutScroll: jest.fn(() => true),
+}))
+// La page lit son jeton dans l'adresse, inconnue du pré-rendu : elle attend l'hydratation (voir
+// ui/theme/hydration.ts). Chaque test choisit si la page est hydratée (oui, par défaut).
+jest.mock('../ui/theme/hydration', () => ({
+  ...jest.requireActual('../ui/theme/hydration'),
+  useHydrated: jest.fn(),
+}))
+const mockPush = jest.fn()
+const mockReplace = jest.fn()
+jest.mock('expo-router', () => ({
+  usePathname: () => '/unsubscribe',
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+  useLocalSearchParams: jest.fn(),
+}))
+
+/** Ouvre la page comme depuis un lien d'e-mail : /unsubscribe?token=…[&scope=…]. */
+const open = (params: Record<string, string | string[]>) => {
+  jest.mocked(useLocalSearchParams).mockReturnValue(params)
+  return renderWithProviders(<UnsubscribeScreen />)
+}
+
+const confirm = () => fireEvent.press(screen.getByRole('button', { name: 'Confirmer' }))
+
+/**
+ * « Tout couper » ignore les appuis des instants qui suivent la confirmation (la seconde tape d'une
+ * double tape, voir plus bas). Un membre qui l'a lue appuie plus tard : l'horloge (`Date.now`)
+ * avance ici d'une seconde, et continue d'avancer ensuite.
+ */
+const onceTheConfirmationIsRead = () => {
+  const now = Date.now.bind(Date)
+  jest.spyOn(Date, 'now').mockImplementation(() => now() + 1000)
+}
+
+/**
+ * Ce qui a reçu le focus du clavier en dernier (web) : son rôle et son tabIndex. Des valeurs
+ * simples : comparer l'élément entier ferait écrire à Jest, en cas d'échec, un écart sans fin.
+ */
+const focused = () => {
+  const node = jest.mocked(focusWithoutScroll).mock.lastCall?.[0] as
+    | { props?: Record<string, unknown> }
+    | null
+    | undefined
+  const props = node?.props ?? {}
+  return { role: props.role ?? props.accessibilityRole, tabIndex: props.tabIndex }
+}
+
+beforeEach(() => {
+  // Personne de connecté : la page sert sans session. (Un test vérifie aussi le cas d'une session.)
+  mockSession(null)
+  jest.mocked(useHydrated).mockReset().mockReturnValue(true)
+  jest.mocked(unsubscribe).mockReset().mockResolvedValue({ ok: true, data: null })
+  mockPush.mockReset()
+  mockReplace.mockReset()
+  jest.mocked(focusWithoutScroll).mockClear()
+})
+afterEach(() => {
+  jest.restoreAllMocks()
+  jest.useRealTimers()
+})
+
+describe('UnsubscribeScreen', () => {
+  it('is the page of the /unsubscribe address', () => {
+    expect(UnsubscribeRoute).toBe(UnsubscribeScreen)
+  })
+
+  it('asks before stopping the weekly recap, and sends nothing when the page opens', async () => {
+    await open({ token: recapToken })
+
+    expect(screen.getByText('Ne plus recevoir le récap de la semaine ?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Garder mes e-mails' })).toBeTruthy()
+    // Le cœur de la règle : ouvrir le lien ne désinscrit personne.
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('names the mention e-mails when the link came from one of them', async () => {
+    await open({ token: mentionsToken })
+
+    expect(
+      screen.getByText('Ne plus recevoir les e-mails de mentions et de réponses ?'),
+    ).toBeTruthy()
+    expect(screen.queryByText('Ne plus recevoir le récap de la semaine ?')).toBeNull()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('keeps the e-mails and goes home with « Garder mes e-mails »', async () => {
+    await open({ token: recapToken })
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Garder mes e-mails' }))
+
+    expect(visited(mockPush, mockReplace)).toEqual(['/'])
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('stops the recap once « Confirmer » is touched, and says so', async () => {
+    await open({ token: recapToken })
+
+    await confirm()
+
+    // Le jeton seul : la sorte d'e-mail à couper est écrite dedans.
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]?.[0]).toBe(recapToken)
+    expect(jest.mocked(unsubscribe).mock.calls[0]?.[1]).toBeUndefined()
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
+    // Ensuite : tout couper, ou aller aux réglages.
+    expect(screen.getByRole('button', { name: 'Tout couper' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Gérer mes e-mails' })).toBeTruthy()
+  })
+
+  it('says which e-mails stopped when the link came from a mention e-mail', async () => {
+    await open({ token: mentionsToken })
+
+    await confirm()
+
+    expect(
+      await screen.findByText(
+        'C’est fait : tu ne recevras plus d’e-mail quand on te mentionne ou te répond.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('sends a single request when « Confirmer » is touched twice, and shows it is on its way', async () => {
+    // La réponse reste en attente : le second toucher arrive pendant l'envoi.
+    let answer: (value: { ok: true; data: null }) => void = () => {}
+    jest.mocked(unsubscribe).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
+    await open({ token: recapToken })
+
+    await confirm()
+    await confirm()
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    // L'état « en cours » : le bouton l'annonce (aria-busy) et ne réagit plus.
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeBusy()
+
+    answer({ ok: true, data: null })
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
+    ).toBeTruthy()
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('turns every notification e-mail off with « Tout couper », after the confirmation', async () => {
+    await open({ token: recapToken })
+    await confirm()
+    onceTheConfirmationIsRead()
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
+
+    expect(unsubscribe).toHaveBeenCalledTimes(2)
+    expect(jest.mocked(unsubscribe).mock.calls[1]).toEqual([recapToken, 'all'])
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.'),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Tout couper' })).toBeNull()
+    // R6 : « Tout couper » ne touche pas aux e-mails du compte, et la page le dit.
+    expect(
+      screen.getByText(
+        'Les e-mails liés à ton compte, comme la vérification de ton adresse, continuent.',
+      ),
+    ).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Gérer mes e-mails' })).toBeTruthy()
+  })
+
+  it('sends « Tout couper » only once, even touched twice', async () => {
+    await open({ token: recapToken })
+    await confirm()
+    const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+    onceTheConfirmationIsRead()
+    jest.mocked(unsubscribe).mockImplementation(() => new Promise(() => {}))
+
+    await fireEvent.press(allOff)
+    await fireEvent.press(screen.getByRole('button', { name: 'Tout couper' }))
+
+    expect(unsubscribe).toHaveBeenCalledTimes(2) // « Confirmer », puis un seul « Tout couper »
+    expect(screen.getByRole('button', { name: 'Tout couper' })).toBeBusy()
+  })
+
+  it('leads to the e-mail settings in « Mon profil »', async () => {
+    await open({ token: recapToken })
+    await confirm()
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Gérer mes e-mails' }))
+
+    expect(visited(mockPush, mockReplace)).toEqual(['/profile'])
+  })
+
+  it('says the link is invalid at once when its token is damaged, without calling the API', async () => {
+    await open({ token: malformedToken })
+
+    expect(screen.getByText('Lien invalide')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Ce lien ne permet pas de te désinscrire. Connecte-toi pour gérer tes e-mails dans Mon profil.',
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('says the link is invalid when it has no token', async () => {
+    await open({})
+
+    expect(screen.getByText('Lien invalide')).toBeTruthy()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('says the link is invalid when its token is far too long', async () => {
+    await open({ token: `${recapToken}${'A'.repeat(300)}` })
+
+    expect(screen.getByText('Lien invalide')).toBeTruthy()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('reads only the first token when the address repeats it', async () => {
+    await open({ token: [recapToken, malformedToken] })
+
+    await confirm()
+
+    expect(jest.mocked(unsubscribe).mock.calls[0]?.[0]).toBe(recapToken)
+  })
+
+  it('says the link is invalid when the API refuses it', async () => {
+    // 400 unsubscribe_invalid : jeton faux, compte supprimé (l'API ne dit pas lequel).
+    jest.mocked(unsubscribe).mockResolvedValue({ ok: false, error: 'validation' })
+    await open({ token: recapToken })
+
+    await confirm()
+
+    expect(await screen.findByText('Lien invalide')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
+    expect(screen.queryByText(/C’est fait/)).toBeNull()
+  })
+
+  it('says what went wrong and lets the member try again when the network fails', async () => {
+    jest.mocked(unsubscribe).mockResolvedValueOnce({ ok: false, error: 'network' })
+    await open({ token: recapToken })
+
+    await confirm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Vérifie ta connexion et réessaie\./)
+    // Le lien n'est pas invalide : « Confirmer » reste là, et un second essai part.
+    expect(screen.queryByText('Lien invalide')).toBeNull()
+    await confirm()
+    expect(unsubscribe).toHaveBeenCalledTimes(2)
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
+    ).toBeTruthy()
+  })
+
+  it('shows nothing that depends on the link before the page is hydrated, and sends nothing', async () => {
+    // Pré-rendu web : la page ne connaît pas encore son adresse.
+    jest.mocked(useHydrated).mockReturnValue(false)
+    const { rerender } = await open({ token: recapToken })
+
+    expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
+    expect(screen.queryByText('Ne plus recevoir le récap de la semaine ?')).toBeNull()
+    expect(screen.queryByText('Lien invalide')).toBeNull()
+    expect(unsubscribe).not.toHaveBeenCalled()
+
+    // Témoin : une fois hydratée, la même page pose sa question.
+    jest.mocked(useHydrated).mockReturnValue(true)
+    await rerender(<UnsubscribeScreen />)
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeTruthy()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('shows neither the name nor the address of the member, even signed in (R6)', async () => {
+    mockSession({ user: { id: 'u1', name: 'Léa', email: 'lea@example.com' } })
+    await open({ token: recapToken })
+    expect(screen.getByRole('button', { name: 'Confirmer' })).toBeTruthy()
+    expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
+
+    await confirm()
+    onceTheConfirmationIsRead()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
+
+    await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.')
+    expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
+  })
+})
+
+// Relectures de 6c : une double tape ou deux fois Entrée sur « Confirmer » coupait tous les
+// e-mails. « Tout couper » prenait la place exacte de « Confirmer » (le second appui tombait
+// dessus), React réutilisait le même bouton, et le focus du clavier allait sur lui.
+describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
+  it('sends a single request, of the confirmed kind only, when the second tap lands after the answer', async () => {
+    await open({ token: recapToken })
+    const button = screen.getByRole('button', { name: 'Confirmer' })
+
+    // Le même élément touché deux fois : la réponse (immédiate) arrive entre les deux appuis.
+    await fireEvent.press(button)
+    await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.')
+    await fireEvent.press(button)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+    expect(screen.queryByText(/plus aucun e-mail/)).toBeNull()
+  })
+
+  // Relecture de e414e88 : l'ordre des éléments ne dit rien de leur place à l'écran. Après la
+  // réponse, le titre raccourcissait et « Tout couper » remontait sous le doigt (à 3 pt du bas de
+  // « Confirmer » sur téléphone, par-dessus à 768 et 1 280 px). Ce qui protège à toutes les
+  // largeurs et tailles de texte : « Tout couper » ne réagit pas dans les instants qui suivent la
+  // confirmation. De faux minuteurs font passer le temps (et avec lui `Date.now`).
+  it('ignores « Tout couper » touched right after the confirmation, as the second tap of a double tap', async () => {
+    jest.useFakeTimers()
+    await open({ token: recapToken })
+    await confirm()
+    const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+
+    // La seconde tape d'une double tape : moins d'une demi-seconde après la réponse.
+    await act(() => jest.advanceTimersByTime(200))
+    await fireEvent.press(allOff)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(unsubscribe).mock.calls[0]).toEqual([recapToken, undefined])
+    expect(screen.queryByText(/plus aucun e-mail/)).toBeNull()
+  })
+
+  it('sends « Tout couper » touched once the confirmation has had time to be read', async () => {
+    jest.useFakeTimers()
+    await open({ token: recapToken })
+    await confirm()
+    const allOff = await screen.findByRole('button', { name: 'Tout couper' })
+
+    // Témoin : le même appui, 700 ms plus tard, part bien.
+    await act(() => jest.advanceTimersByTime(700))
+    await fireEvent.press(allOff)
+
+    expect(unsubscribe).toHaveBeenCalledTimes(2)
+    expect(jest.mocked(unsubscribe).mock.calls[1]).toEqual([recapToken, 'all'])
+    expect(
+      await screen.findByText('C’est fait : tu ne recevras plus aucun e-mail de notification.'),
+    ).toBeTruthy()
+  })
+
+  it('says the account e-mails keep coming just before « Tout couper », after the link to the settings', async () => {
+    await open({ token: recapToken })
+    await confirm()
+
+    await screen.findByRole('button', { name: 'Tout couper' })
+    const page = JSON.stringify(screen.toJSON())
+    // Des morceaux sans espace avant « : » (une espace insécable dans le texte affiché).
+    const done = page.indexOf('tu ne recevras plus le récap de la semaine.')
+    const manage = page.indexOf('Gérer mes e-mails')
+    const accountEmails = page.indexOf('Les e-mails liés à ton compte')
+    const allOff = page.indexOf('Tout couper')
+    expect(done).toBeGreaterThan(-1)
+    // « Gérer mes e-mails » s'intercale entre la place de « Confirmer » et « Tout couper ».
+    expect(manage).toBeGreaterThan(done)
+    expect(accountEmails).toBeGreaterThan(manage)
+    expect(allOff).toBeGreaterThan(accountEmails)
+  })
+
+  it('gives the keyboard focus to the message once confirmed, not to an action (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('status')
+    expect(message).toHaveTextContent('C’est fait : tu ne recevras plus le récap de la semaine.')
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+  })
+
+  it('gives the focus to the message again once everything is off (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+    await confirm()
+    onceTheConfirmationIsRead()
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
+
+    const message = await screen.findByRole('status')
+    expect(message).toHaveTextContent(
+      'C’est fait : tu ne recevras plus aucun e-mail de notification.',
+    )
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+  })
+
+  it('gives the focus to the message when the API refuses the link (web)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    jest.mocked(unsubscribe).mockResolvedValue({ ok: false, error: 'validation' })
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent(/Ce lien ne permet pas de te désinscrire\./)
+    expect(focused()).toEqual({ role: 'alert', tabIndex: -1 })
+  })
+})
+
+// Relecture de e414e88 : un message qui reçoit le focus et qui est aussi une zone annoncée est lu
+// deux fois par certains lecteurs d'écran. Une seule annonce, selon le cas.
+describe('UnsubscribeScreen, read once by a screen reader (web)', () => {
+  it('lets the focus read the confirmation, without announcing it a second time', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: recapToken })
+
+    await confirm()
+
+    const message = await screen.findByRole('status')
+    expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
+    expect(message).toHaveProp('aria-live', 'off')
+  })
+
+  it('announces a link damaged from the start, which takes no focus', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await open({ token: malformedToken })
+
+    const message = screen.getByRole('alert')
+    expect(message).not.toHaveProp('aria-live')
+    expect(message).not.toHaveProp('tabIndex')
+    expect(focusWithoutScroll).not.toHaveBeenCalledWith(expect.anything())
+  })
+})
+
+describe('UnsubscribeScreen, its heading', () => {
+  it('asks its question as the title of the page, under the name of the app', async () => {
+    await open({ token: mentionsToken })
+
+    expect(
+      screen.getByRole('header', {
+        name: 'Ne plus recevoir les e-mails de mentions et de réponses ?',
+      }),
+    ).toBeTruthy()
+    // Qui arrive d'un e-mail voit d'abord où il est, comme sur l'accueil des visiteurs.
+    expect(screen.getByLabelText(appName)).toBeTruthy()
+  })
+
+  it('names the page « Tes e-mails » once the question is answered', async () => {
+    await open({ token: recapToken })
+
+    await confirm()
+
+    expect(await screen.findByRole('header', { name: 'Tes e-mails' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: /Ne plus recevoir/ })).toBeNull()
+  })
+})

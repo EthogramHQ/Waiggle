@@ -21,6 +21,7 @@ import {
   zoeComment,
   zoeReply,
 } from '../testing/comments'
+import { visited } from '../testing/navigation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { ProjectScreen } from './ProjectScreen'
@@ -61,6 +62,15 @@ jest.mock('expo-router', () => ({
 
 const { id } = recipesProject
 const mockToggle = jest.fn()
+
+/**
+ * Tranche 6c : à côté de « Ta session a expiré », un lien « Me reconnecter » mène à la connexion,
+ * qui ramène ensuite sur cette page (?next=, vérifié par navigation/next.ts).
+ */
+const signInAgain = async () => {
+  await fireEvent.press(await screen.findByRole('link', { name: 'Me reconnecter' }))
+  expect(visited(mockPush)).toContain('/sign-in?next=/page/actuelle')
+}
 
 beforeEach(() => {
   mockToggle.mockReset()
@@ -278,6 +288,27 @@ describe('following a project from its page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'L’abonnement n’a pas pu être enregistré. Réessaie.',
     )
+  })
+
+  it('offers no sign-in link when the follow failed for another reason (slice 6c)', async () => {
+    seenByMax({ isFollowed: false, followerCount: 2 })
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: false })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : le message d'erreur est bien là.
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Me reconnecter' })).toBeNull()
+  })
+
+  it('offers to sign in again when the session expired while following (slice 6c)', async () => {
+    seenByMax({ isFollowed: false, followerCount: 2 })
+    jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: true, expired: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    await signInAgain()
   })
 })
 
@@ -568,6 +599,16 @@ describe('a note refused for a reason that trying again cannot fix', () => {
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
   })
+
+  it('offers to sign in again, back to the project, when the session expired (slice 6c)', async () => {
+    jest
+      .mocked(usePublishNote)
+      .mockReturnValue({ publish: mockPublish, pending: false, error: true, reason: 'expired' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+    await publishSomething()
+
+    await signInAgain()
+  })
 })
 
 describe('writing a note', () => {
@@ -773,6 +814,14 @@ describe('reacting to a project from its page', () => {
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
   })
+
+  it('offers to sign in again when the session expired while reacting (slice 6c)', async () => {
+    seenByOther(recipesProject)
+    jest.mocked(useReaction).mockReturnValue({ toggle: mockReact, error: true, expired: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await signInAgain()
+  })
 })
 
 describe('the comments of a project', () => {
@@ -799,6 +848,27 @@ describe('the comments of a project', () => {
     await fireEvent.press(await screen.findByRole('link', { name: 'Voir la page de Max' }))
 
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u2' } })
+  })
+
+  it('elides « de » before an author whose name starts with a vowel (« d’Inès »)', async () => {
+    // Tranche 6c : {{nameOf}}, rempli par useNameOf, pour l'autrice du projet et d'un commentaire.
+    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    seenByOther({ ...withNotes, author: ines })
+    mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const links = await screen.findAllByRole('link', { name: 'Voir la page d’Inès' })
+    expect(links).toHaveLength(2) // l'autrice du projet, puis celle du commentaire
+    expect(screen.queryByRole('link', { name: /de Inès/ })).toBeNull()
+  })
+
+  it('writes the possessive in English (« See Inès’s page »)', async () => {
+    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    seenByOther({ ...withNotes, author: ines })
+    mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
+    await renderWithProviders(<ProjectScreen id={id} />, 'en')
+
+    expect(await screen.findAllByRole('link', { name: 'See Inès’s page' })).toHaveLength(2)
   })
 
   it('says when a comment was edited', async () => {
@@ -944,6 +1014,19 @@ describe('writing a comment', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
+  })
+
+  it('offers to sign in again when the session expired while commenting (slice 6c)', async () => {
+    seenByOther()
+    mockPost.mockResolvedValue(false)
+    jest
+      .mocked(usePostComment)
+      .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'expired' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await commentSomething()
+
+    await signInAgain()
   })
 
   it('asks for a text before publishing', async () => {
@@ -1414,6 +1497,25 @@ describe('the comments, after the reviews', () => {
       await screen.findByText('Ta session a expiré. Reconnecte-toi pour continuer.'),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
+  })
+
+  it('offers to sign in again when the comments could not load because the session expired (slice 6c)', async () => {
+    seenByOther()
+    jest.mocked(useComments).mockReturnValue({
+      data: undefined,
+      status: 'error',
+      isPending: false,
+      isError: true,
+      isFetchNextPageError: false,
+      error: new ApiError('unauthorized'),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: mockFetchNextPage,
+      refetch: jest.fn(),
+    } as unknown as ReturnType<typeof useComments>)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await signInAgain()
   })
 
   it('offers to retry when the comments could not load for another reason', async () => {

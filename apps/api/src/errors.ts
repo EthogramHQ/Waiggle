@@ -19,6 +19,7 @@ const errorMessages = {
   cannot_react_own: 'cannotReactOwn',
   handle_taken: 'handleTaken',
   handle_change_limit: 'handleChangeLimit',
+  unsubscribe_invalid: 'unsubscribeInvalid',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

@@ -16,6 +16,7 @@ import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
 import { commentsOfAuthor } from '../comments/load'
+import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
@@ -289,6 +290,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const sessions = await db
       .select({
         createdAt: schema.session.createdAt,
+        updatedAt: schema.session.updatedAt,
         expiresAt: schema.session.expiresAt,
         ipAddress: schema.session.ipAddress,
         userAgent: schema.session.userAgent,
@@ -342,6 +344,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Jusqu'où il a vu ses notifications. Les notifications elles-mêmes n'y sont pas : elles sont
     // calculées à partir des gestes des autres, qui ne sont pas ses données.
     const seenAt = await readSeenAt(db, user.id)
+    // Ses réglages d'e-mail et les dates des derniers envois (tranche 6c), valeurs par défaut
+    // comprises. Jamais de jeton de désinscription : il se recalcule, il n'est pas gardé.
+    const emailPreferences = await exportEmailPreferences(db, user.id)
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
@@ -360,10 +365,12 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           mentions: mentionsByComment.get(comment.id) ?? [],
         })),
         notifications: { seenAt: seenAt?.toISOString() ?? null },
+        emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
           ...s,
           createdAt: s.createdAt.toISOString(),
+          updatedAt: s.updatedAt.toISOString(),
           expiresAt: s.expiresAt.toISOString(),
         })),
       },

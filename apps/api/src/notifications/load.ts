@@ -29,7 +29,7 @@ export const notificationCutoff = (now: Date) => new Date(now.getTime() - NOTIFI
 // paramètre lié : « ::timestamptz » la lit comme un instant, et « at time zone 'UTC' » la
 // ramène à l'heure UTC sans fuseau, comme les colonnes. Ainsi rien ne dépend du fuseau de la
 // base ni du pilote (un objet Date passé tel quel pourrait être écrit en heure locale).
-const utc = (date: Date | string) =>
+export const utc = (date: Date | string) =>
   sql`(${typeof date === 'string' ? date : date.toISOString()}::timestamptz at time zone 'UTC')`
 
 /**
@@ -77,9 +77,26 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.author_id <> ${
  *      commentaire sur son projet : ses projets puis project_comment_project_idx) ;
  *   5. ses commentaires masqués : project_comment_author_idx ;
  *   6. son pseudo : la clé primaire de notification_state.
+ *
+ * `until` (les e-mails seulement, tranche 6c, suite de la relecture de sécurité A7) : rien de daté
+ * après cet instant. Une tâche lit ses membres l'un après l'autre, parfois pendant des minutes,
+ * mais note `now` comme date d'envoi : un geste arrivé entre `now` et la lecture ne doit pas partir
+ * maintenant, puisqu'il est après la date notée et repartirait au passage suivant. Cette borne
+ * haute ne change pas l'index de chaque source : elle écarte des lignes déjà trouvées par lui (ou
+ * resserre l'intervalle lu dans project_comment_root_created_idx, qui porte la date).
  */
-const sources = (me: string, since: Date): SQL => {
+const sources = (me: string, since: Date, until?: Date): SQL => {
   const after = utc(since)
+  const upTo = until ? utc(until) : null
+  /**
+   * « Le geste daté par `column` est dans la fenêtre » : après `since`, et pas après `until`.
+   * `column` est toujours un nom écrit ici (« r.created_at »), jamais une entrée du client :
+   * sql.raw le recopie tel quel ; les dates, elles, restent des paramètres liés (utc).
+   */
+  const during = (column: string) =>
+    upTo
+      ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
+      : sql`${sql.raw(column)} > ${after}`
   return sql`
     -- 1. Les réactions à ses projets publics, par projet et par jour de Paris, sans aucun nom :
     --    « count(*) filter (where …) » compte seulement les lignes qui remplissent la condition.
@@ -99,7 +116,7 @@ const sources = (me: string, since: Date): SQL => {
     join project_reaction r on r.project_id = p.id
     cross join lateral (select ${parisDay('r.created_at')} as day) d
     where p.author_id = ${me} and p.visibility = 'public'
-      and r.member_id <> ${me} and r.created_at > ${after}
+      and r.member_id <> ${me} and ${during('r.created_at')}
     group by r.project_id, d.day
 
     union all
@@ -112,7 +129,7 @@ const sources = (me: string, since: Date): SQL => {
     join project_follow f on f.project_id = p.id
     cross join lateral (select ${parisDay('f.created_at')} as day) d
     where p.author_id = ${me} and p.visibility = 'public'
-      and f.follower_id <> ${me} and f.created_at > ${after}
+      and f.follower_id <> ${me} and ${during('f.created_at')}
     group by f.project_id, d.day
 
     union all
@@ -123,7 +140,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, count(*)::int
     from member_follow f
     cross join lateral (select ${parisDay('f.created_at')} as day) d
-    where f.member_id = ${me} and f.created_at > ${after}
+    where f.member_id = ${me} and ${during('f.created_at')}
     group by d.day
 
     union all
@@ -147,19 +164,19 @@ const sources = (me: string, since: Date): SQL => {
         from comment_mention m
         join project_comment c on c.id = m.comment_id
         join project p on p.id = c.project_id
-        where m.member_id = ${me} and m.created_at > ${after} and ${readable(me)}
+        where m.member_id = ${me} and ${during('m.created_at')} and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'reply', 2, c.created_at
         from project_comment root
         join project_comment c on c.root_id = root.id
         join project p on p.id = c.project_id
-        where root.author_id = ${me} and root.root_id is null and c.created_at > ${after}
+        where root.author_id = ${me} and root.root_id is null and ${during('c.created_at')}
           and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'comment', 3, c.created_at
         from project p
         join project_comment c on c.project_id = p.id
-        where p.author_id = ${me} and c.created_at > ${after} and ${readable(me)}
+        where p.author_id = ${me} and ${during('c.created_at')} and ${readable(me)}
       ) candidate
       order by candidate.id, candidate.rank
     ) best
@@ -178,7 +195,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, null, null
     from project_comment c
     join project on project.id = c.project_id
-    where c.author_id = ${me} and c.deleted_at is null and c.hidden_at > ${after}
+    where c.author_id = ${me} and c.deleted_at is null and ${during('c.hidden_at')}
       and project.author_id <> ${me} and ${visibleTo(me)}
 
     union all
@@ -191,7 +208,7 @@ const sources = (me: string, since: Date): SQL => {
       null, null, null, null, null, null, null
     from notification_state s
     join member_handle mine on mine.user_id = s.user_id and mine.released_at is null
-    where s.user_id = ${me} and s.created_at > ${after} and s.handle_chosen_at is null
+    where s.user_id = ${me} and ${during('s.created_at')} and s.handle_chosen_at is null
   `
 }
 
@@ -257,7 +274,7 @@ const ListRow = z.object({
   author_handle: z.string().nullable(),
   my_handle: z.string().nullable(),
 })
-type ListRow = z.infer<typeof ListRow>
+export type ListRow = z.infer<typeof ListRow>
 
 /**
  * L'extrait d'un commentaire : son texte actuel sur une ligne, 80 caractères au plus, suivi de
@@ -275,7 +292,11 @@ export const excerptOf = (body: string) => {
  * Une ligne en notification du contrat ; null si ce qu'elle montre a disparu entre-temps (le
  * projet, l'auteur, un pseudo). `seenAt` : la dernière ouverture de l'écran (null : jamais).
  */
-const present = (row: ListRow, seenAt: Date | null, publicApiUrl: string): Notification | null => {
+export const present = (
+  row: ListRow,
+  seenAt: Date | null,
+  publicApiUrl: string,
+): Notification | null => {
   const common = {
     id: row.key,
     at: row.at,
@@ -340,6 +361,63 @@ const present = (row: ListRow, seenAt: Date | null, publicApiUrl: string): Notif
 }
 
 /**
+ * Complète les lignes choisies par `chosen` (une requête sur les sources, déjà triée et bornée) :
+ * le titre du projet, le texte du commentaire, l'auteur et les pseudos. Partagé par la liste de
+ * l'appli et par les e-mails (tranche 6c), pour que les deux montrent exactement la même chose.
+ */
+const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
+  const query = sql`
+    select n.kind, n.key, to_char(n.at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, n.day, n.reason,
+      n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
+      project.id as project_id, project.title as project_title,
+      c.id as comment_id, c.body,
+      a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
+      ah.handle as author_handle, mh.handle as my_handle
+    from (${chosen}) n
+    left join project on project.id = n.project_id
+    left join project_comment c on c.id = n.comment_id
+    left join "user" a on a.id = n.author_id
+    left join profile ap on ap.user_id = n.author_id
+    left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
+    left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
+    order by n.at desc, n.key desc
+  `
+  return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
+}
+
+/**
+ * Toutes les notifications de `me` dont le geste est postérieur à `since` et pas postérieur à
+ * `until` (le `now` de la tâche : voir sources), de la plus récente à la
+ * plus ancienne, pour les e-mails (tranche 6c) : le récap de la semaine (depuis 7 jours au plus)
+ * et l'e-mail de mentions (depuis 24 heures au plus). Le même calcul que l'écran des
+ * notifications (les six sources, puis present() pour écarter ce qui a disparu), mais sans page :
+ * la borne `since` limite déjà la lecture à l'activité récente autour du membre, par les index de
+ * chaque source. Chaque élément garde sa ligne brute (`row.body` : le texte entier du commentaire,
+ * que l'e-mail de mentions nettoie avant d'en tirer l'extrait).
+ */
+export const loadNotificationsSince = async (
+  db: Database,
+  me: string,
+  since: Date,
+  until: Date,
+  publicApiUrl: string,
+) => {
+  const rows = await loadDetailedRows(
+    db,
+    me,
+    sql`
+      select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
+        author_id, day, amazing, inspiring, useful, funny, bravo, total
+      from (${sources(me, since, until)}) u
+    `,
+  )
+  return rows.flatMap((row) => {
+    const notification = present(row, null, publicApiUrl)
+    return notification ? [{ row, notification }] : []
+  })
+}
+
+/**
  * Une page de notifications de `me`, de la plus récente à la plus ancienne (puis par clé, pour
  * départager deux groupes du même instant), après le curseur s'il y en a un. Une seule requête,
  * quelle que soit la longueur de la page :
@@ -371,30 +449,18 @@ export const loadNotificationPage = async (
   now: Date,
   publicApiUrl: string,
 ) => {
-  const query = sql`
-    select n.kind, n.key, to_char(n.at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, n.day, n.reason,
-      n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
-      project.id as project_id, project.title as project_title,
-      c.id as comment_id, c.body,
-      a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
-      ah.handle as author_handle, mh.handle as my_handle
-    from (
+  const rows = await loadDetailedRows(
+    db,
+    me,
+    sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total
       from (${sources(me, notificationCutoff(now))}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc
       limit ${NOTIFICATION_PAGE_SIZE + 1}
-    ) n
-    left join project on project.id = n.project_id
-    left join project_comment c on c.id = n.comment_id
-    left join "user" a on a.id = n.author_id
-    left join profile ap on ap.user_id = n.author_id
-    left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
-    left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
-    order by n.at desc, n.key desc
-  `
-  const { rows } = z.object({ rows: z.array(ListRow) }).parse(await db.execute(query))
+    `,
+  )
   const page = rows.slice(0, NOTIFICATION_PAGE_SIZE)
   // Le marque-page vient de la dernière ligne lue de la page, même si elle a été laissée de côté
   // (son projet venait de disparaître) : la page suivante repart exactement d'où celle-ci s'arrête.

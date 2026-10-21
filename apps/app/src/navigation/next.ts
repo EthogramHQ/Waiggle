@@ -9,9 +9,11 @@
 const MAX_LENGTH = 512
 
 // Les seules pages où revenir : celles qu'un visiteur ouvre par un lien et qui demandent d'être
-// connecté. Pas la page d'avertissement (/out), qui pourrait servir à pousser vers un faux site
-// juste après la connexion, ni les pages de connexion elles-mêmes.
-const RETURN_PAGES = /^\/(?:(?:members|projects|tags)\/|(?:account|profile)(?:[/?#]|$))/
+// connecté (dont « Mes notifications », là où mène le récap de la semaine, tranche 6c). Pas la page
+// d'avertissement (/out), qui pourrait servir à pousser vers un faux site juste après la
+// connexion, ni les pages de connexion elles-mêmes.
+const RETURN_PAGES =
+  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|notifications)(?:[/?#]|$))/
 
 // Les caractères permis dans un chemin d'adresse, en ASCII seulement : rien d'invisible, aucune
 // barre oblique « pleine chasse » (／) ni caractère de contrôle qui pourrait tromper un navigateur.

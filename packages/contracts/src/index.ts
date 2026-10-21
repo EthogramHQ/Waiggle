@@ -3,6 +3,7 @@
 // et l'appli les utilise pour connaître le type exact des réponses.
 export * from './accounts'
 export * from './comments'
+export * from './email'
 export * from './errors'
 export * from './export'
 export * from './feed'

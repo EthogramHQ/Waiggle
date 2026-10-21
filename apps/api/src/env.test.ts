@@ -122,6 +122,21 @@ describe('loadEnv', () => {
     }
   })
 
+  // L'interrupteur des e-mails de notification (tranche 6c, décision de Louis du 20/10/2026) : à
+  // « off », l'ordonnanceur ne planifie ni le récap ni les e-mails de mentions (la purge de nuit
+  // continue). On le coupe avant de restaurer une sauvegarde, qui ramènerait des comptes supprimés
+  // et des désinscriptions annulées (docs/ops/serveur.md).
+  it('turns the notification e-mails on by default, and lets them be turned off', () => {
+    expect(loadEnv({}).emailJobs).toBe(true)
+    expect(loadEnv(production).emailJobs).toBe(true)
+    expect(loadEnv({ ...production, EMAIL_JOBS: 'on' }).emailJobs).toBe(true)
+    expect(loadEnv({ ...production, EMAIL_JOBS: 'off' }).emailJobs).toBe(false)
+    // Une variable vide compte comme absente ; une faute de frappe arrête le serveur.
+    expect(loadEnv({ ...production, EMAIL_JOBS: '' }).emailJobs).toBe(true)
+    expect(() => loadEnv({ ...production, EMAIL_JOBS: 'false' })).toThrow(/EMAIL_JOBS/)
+    expect(() => loadEnv({ ...production, EMAIL_JOBS: 'OFF ' })).toThrow(/EMAIL_JOBS/)
+  })
+
   it('refuses to write emails in the logs in production, unless allowed for a trial', () => {
     const consoleMail = { ...production, MAIL_PROVIDER: 'console', BREVO_API_KEY: undefined }
     expect(() => loadEnv(consoleMail)).toThrow(/MAIL_PROVIDER/)

@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { Me } from './accounts'
 import { CommentId } from './comments'
+import { EmailPreferencesExport } from './email'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 
@@ -69,10 +70,14 @@ export const AccountExport = z
      * (null s'il n'a jamais ouvert l'écran).
      */
     notifications: z.object({ seenAt: z.iso.datetime().nullable() }),
+    /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
+    emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),
     sessions: z.array(
       z.object({
         createdAt: z.iso.datetime(),
+        /** La dernière utilisation (au plus une mise à jour par jour) : le récap s'en sert (6c). */
+        updatedAt: z.iso.datetime(),
         expiresAt: z.iso.datetime(),
         ipAddress: z.string().nullable(),
         userAgent: z.string().nullable(),

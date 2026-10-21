@@ -400,7 +400,11 @@ pas** : on prévient Louis.
 
 - **Si la version ratée a modifié la base** (une nouvelle migration dans `packages/db/migrations`),
   il faut aussi restaurer la sauvegarde faite juste avant elle. **Avec l'accord explicite de
-  Louis**, car tout ce qui a été écrit depuis est perdu :
+  Louis**, car tout ce qui a été écrit depuis est perdu. Suivre aussi « Les e-mails de
+  notification pendant une restauration » (dans « Sauvegardes », plus bas) :
+  0. **avant de redéployer**, mettre de côté les refus faits depuis la sauvegarde (étape 0 de
+     cette procédure) : le redéploiement remplace le conteneur de l'API, et ses journaux partent
+     avec lui ;
   1. redéployer le commit précédent (voir ci-dessus) ;
   2. restaurer la sauvegarde `avant-deploi` du déploiement raté : son nom est affiché dans la
      sortie de ce déploiement.
@@ -421,6 +425,132 @@ pas** : on prévient Louis.
   côté de la base actuelle. Si la sauvegarde est abîmée, il s'arrête sans rien changer. Si
   l'échange final était interrompu, la base restaurée reste disponible sous le nom
   `ruche_restauration` : on la renomme alors à la main, avec l'accord de Louis.
+- **Les e-mails de notification pendant une restauration** (depuis la tranche 6c). Une sauvegarde
+  ramène les comptes supprimés et les désinscriptions faites depuis : sans précaution, le récap
+  de la semaine ou un e-mail de mentions partirait vers des personnes qui ont dit non. Dans
+  l'ordre :
+  0. **avant tout le reste**, mettre de côté les refus faits depuis la sauvegarde. Chacun a laissé
+     une ligne dans les journaux de l'API, avec l'identifiant du membre, jamais son adresse :
+     - `Unsubscribe <identifiant> recap` (ou `mentions`, ou `all` pour les deux) : un e-mail coupé,
+       par le lien d'un e-mail, par le bouton « Se désabonner » de la messagerie, ou dans l'appli
+       (Mon profil) ;
+     - `Account deleted <identifiant>` : un compte supprimé par son membre.
+
+     Ces journaux vivent avec le conteneur de l'API : couper les envois (étape 1) ou redéployer
+     le remplace, et les efface. On les copie donc d'abord dans un fichier, sur le serveur, à côté
+     des sauvegardes (les identifiants des membres ne quittent pas le serveur). L'heure de départ
+     vient du nom de la sauvegarde : `2026-10-21_030000-quotidien` donne `2026-10-21T03:00:00`, à
+     l'heure du serveur, comme celle que lit `--since`. Prendre quelques minutes de marge avant :
+     un refus réappliqué deux fois ne change rien.
+
+     ```bash
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all)|Account deleted [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ```
+
+     `grep -E` ne garde que les lignes exactement de cette forme, avec un identifiant fait de
+     lettres et de chiffres. Les journaux sont des données : une ligne d'une autre forme n'est
+     jamais recopiée dans une requête. Le nombre affiché à la fin est celui des refus trouvés.
+
+     Puis, toujours **avant de restaurer**, vérifier sur la base en service que chaque compte noté
+     `Account deleted` n'existe plus : la suppression de l'étape 3 est définitive, et elle ne doit
+     jamais viser un compte vivant (une ligne mal lue, ou écrite par autre chose que l'API). Les
+     identifiants du fichier, puis la requête, avec chacun d'eux entre apostrophes :
+
+     ```bash
+     ssh waiggle 'sed -nE "s/^Account deleted ([A-Za-z0-9]+)\$/\1/p" /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+     select id from "user" where id in ('<identifiant 1>', '<identifiant 2>');
+     SQL
+     ```
+
+     La requête ne doit rien rendre. Un identifiant qu'elle rend est un compte encore présent : on
+     ne le supprime pas à l'étape 3, et on prévient Louis avant d'aller plus loin ;
+  1. avant de restaurer, couper les envois : `EMAIL_JOBS=off` dans `secrets.env` (Louis), puis
+     redémarrer l'API. Elle retire alors les planifications du récap et des mentions ; la purge
+     de nuit continue ;
+
+     ```bash
+     ssh -t waiggle nano /srv/ruche/secrets.env     # Louis : EMAIL_JOBS=off
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose up -d api'
+     ```
+
+  2. restaurer (`restore.sh`, avec l'accord de Louis) ;
+  3. réappliquer les refus du fichier de l'étape 0, dans l'ordre, avec l'accord de Louis (ce sont
+     des écritures dans la base), ainsi que ceux reçus autrement (une demande écrite à Louis). Les
+     requêtes passent par `db_query` (`infra/lib.sh`), qui lit le SQL sur l'entrée standard :
+     - pour chaque `Unsubscribe <identifiant> <quoi>` : la requête ci-dessous, avec `R` remplacé
+       par `false` si `<quoi>` vaut `recap` ou `all` (sinon `true`), et `M` par `false` s'il vaut
+       `mentions` ou `all` (sinon `true`). C'est celle de l'API (`email/preferences.ts`) : un
+       « et » logique avec l'ancienne valeur ne peut que couper, jamais rallumer, et un compte qui
+       n'existe pas ne reçoit rien. `now() at time zone 'UTC'` : les colonnes de dates sont des
+       `timestamp` sans fuseau qui contiennent l'heure UTC (voir « Les heures du serveur et de la
+       base », plus bas) ; `now()` seul y serait écrit à l'heure du fuseau de la connexion ;
+
+       ```bash
+       ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<'SQL'
+       insert into email_preference (user_id, weekly_recap, mention_emails, updated_at)
+       select id, R, false, now() at time zone 'UTC' from "user" where id = '<identifiant>'
+       on conflict (user_id) do update set
+         weekly_recap = email_preference.weekly_recap and R,
+         mention_emails = email_preference.mention_emails and M,
+         updated_at = excluded.updated_at;
+       SQL
+       ```
+
+     - pour chaque `Account deleted <identifiant>` que la vérification de l'étape 0 a trouvé absent
+       de la base en service : `delete from "user" where id = '<identifiant>';` (même chemin). Tout ce qui est rattaché au compte par une clé « cascade » part avec lui
+       (sessions, profil, projets, réactions, abonnements, réglages). Mais ce chemin ne fait pas tout
+       le ménage de la suppression par l'appli (`auth/auth.ts`) : ses commentaires restent, sans
+       auteur, jusqu'à la prochaine suppression d'un compte par un membre, qui les balaie ; son
+       avatar et ses photos restent dans le volume des fichiers. Un outil qui rejoue la suppression
+       complète reste à écrire ;
+  4. remettre `EMAIL_JOBS=on` (ou vide) dans `secrets.env`, puis redémarrer l'API comme en 1 ;
+  5. effacer le fichier de l'étape 0 (`rm /srv/ruche/backups/refus-<nom>.txt`) : il garde des
+     identifiants de membres, et n'a plus d'usage.
+
+  **Ce que les journaux ne permettent pas de retrouver.** Une ligne n'y reste pas toujours :
+  - les journaux d'un conteneur partent avec lui. Chaque déploiement d'une nouvelle version, et
+    chaque `compose up` après un changement de `secrets.env`, remplacent le conteneur de l'API :
+    les lignes ne remontent jamais avant le dernier de ces remplacements (`compose ps`, colonne
+    « Created »). Un simple redémarrage (celui de `restore.sh`, ou après une panne) les garde. Pour
+    une sauvegarde plus ancienne que le dernier déploiement, les refus faits entre les deux ne sont
+    pas dans les journaux ;
+  - la rotation : 5 fichiers de 10 Mo par service, le plus ancien effacé quand un sixième
+    commencerait (`infra/docker-compose.yml`, « x-logging »). L'API n'écrit pas une ligne par
+    visite, seulement ses tâches, ses erreurs et ces refus : quelques kilo-octets par jour au
+    rythme actuel, soit des années avant que la rotation n'efface quoi que ce soit. Mais une erreur
+    qui se répète en boucle écrit environ 1 Ko à chaque fois : 50 000 erreurs suffisent à tout
+    remplir, en quelques heures ou quelques jours. Au-delà, les lignes sont perdues ;
+  - un réglage rallumé dans l'appli après coup n'est pas noté : réappliquer le refus le coupe de
+    nouveau. C'est le sens prudent ; le membre peut le rallumer dans Mon profil.
+
+  Quand les journaux ne suffisent pas, il reste la sauvegarde `avant-restauration`, que `restore.sh`
+  fait juste avant de restaurer : elle contient les comptes et les réglages tels qu'ils étaient. La
+  restaurer dans une base jetable (« Vérifier une sauvegarde », ci-dessous), puis y lire les
+  réglages changés depuis l'heure de la sauvegarde restaurée, convertie en UTC (voir ci-dessous) :
+
+  ```sql
+  select user_id, weekly_recap, mention_emails from email_preference
+  where updated_at > ('<heure>'::timestamp at time zone 'Europe/Paris' at time zone 'UTC');
+  ```
+
+  et comparer les identifiants des comptes (`select id from "user"`) avec ceux de la base restaurée :
+  un compte absent de `avant-restauration` a été supprimé depuis (ou effacé par la purge des
+  inscriptions jamais vérifiées).
+
+  Deux filets restent, même sans cette précaution : jamais une mention de plus de 24 heures dans
+  un e-mail, et jamais deux récaps à moins de 6 jours d'intervalle.
+- **Les heures du serveur et de la base.** Le serveur est à l'heure de Paris
+  (`infra/server/bootstrap.sh`, « Fuseau horaire ») : les noms des sauvegardes et l'option
+  `--since` des journaux parlent en heure de Paris. Les colonnes de dates de la base, elles, sont
+  des `timestamp` sans fuseau qui contiennent l'heure UTC (écrite par l'API). Toute heure tapée dans
+  une requête d'une procédure se convertit donc :
+  `'2026-10-21 03:00:00'::timestamp at time zone 'Europe/Paris' at time zone 'UTC'`. Le premier
+  `at time zone` dit « cette heure est celle de Paris » (un instant, heure d'été comprise), le
+  second donne l'heure UTC de cet instant, sans fuseau, comme les colonnes (ici `01:00:00` en
+  octobre avant le changement d'heure, `02:00:00` en hiver). Sans cette conversion, la comparaison
+  se décale de une à deux heures, et des lignes sont manquées. De même, une date écrite par une
+  requête prend `now() at time zone 'UTC'`, jamais `now()` seul.
 - **Vérifier une sauvegarde** sans toucher au site : la restaurer dans une base jetable.
 
   ```bash

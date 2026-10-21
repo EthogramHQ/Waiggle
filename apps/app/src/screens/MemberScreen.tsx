@@ -10,6 +10,7 @@ import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
 import { useMember } from '../members/api'
+import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { SummaryCard } from '../projects/SummaryCard'
@@ -56,6 +57,7 @@ function MemberView({ member }: { member: Member }) {
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
   const back = useGoBack('/')
   const follow = useFollow({ kind: 'member', id: member.id })
+  const signInAgain = useSignInAgain()
   const followers = t('follow.followers', { count: member.followerCount })
 
   return (
@@ -98,6 +100,7 @@ function MemberView({ member }: { member: Member }) {
               error={
                 follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
               }
+              errorAction={follow.expired ? signInAgain() : undefined}
             />
           )
         }

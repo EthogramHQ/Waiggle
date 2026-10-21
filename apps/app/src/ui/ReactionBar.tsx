@@ -18,7 +18,7 @@ import { Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { pressed } from './aria'
 import { Icon, type IconName } from './Icon'
-import { Notice } from './Notice'
+import { Notice, type NoticeAction } from './Notice'
 import { Text } from './Text'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -47,6 +47,10 @@ type Props = {
   caption?: string
   /** Le dernier changement n'a pas pu être enregistré : le message, sous les pastilles. */
   error?: string | undefined
+  /**
+   * Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré, tranche 6c).
+   */
+  errorAction?: NoticeAction | undefined
 }
 
 // L'icône de chaque réaction : le contour, puis la version pleine une fois la réaction posée.
@@ -58,7 +62,15 @@ const icons: Record<ReactionKind, { outline: IconName; filled: IconName }> = {
   bravo: { outline: 'hands-clapping', filled: 'hands-clapping-fill' },
 }
 
-export function ReactionBar({ items, onToggle, label, readOnly = false, caption, error }: Props) {
+export function ReactionBar({
+  items,
+  onToggle,
+  label,
+  readOnly = false,
+  caption,
+  error,
+  errorAction,
+}: Props) {
   if (readOnly || !onToggle) {
     return (
       <View style={{ gap: space.sm }}>
@@ -93,7 +105,7 @@ export function ReactionBar({ items, onToggle, label, readOnly = false, caption,
         ))}
       </View>
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
-      {error ? <Notice message={error} /> : null}
+      {error ? <Notice message={error} action={errorAction} /> : null}
     </View>
   )
 }

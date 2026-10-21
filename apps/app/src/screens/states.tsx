@@ -8,6 +8,7 @@ import { type Href, usePathname, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
+import { nextAfterSignIn } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Screen } from '../ui/Screen'
@@ -69,8 +70,10 @@ export function SignedOutScreen({
         actions={[
           {
             label: t('home.signIn'),
-            // push (et non replace) : le retour depuis la connexion ramène sur cette page.
-            onPress: () => router.push({ pathname: '/sign-in', params: { next: pathname } }),
+            // push (et non replace) : le retour depuis la connexion ramène sur cette page, avec
+            // les paramètres de son adresse quand la connexion les accepte (?announce=…).
+            onPress: () =>
+              router.push({ pathname: '/sign-in', params: { next: nextAfterSignIn(pathname) } }),
           },
           { label: t('home.signUp'), onPress: () => router.push('/sign-up') },
         ]}

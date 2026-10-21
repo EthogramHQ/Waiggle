@@ -7,6 +7,7 @@ import { appName } from '@ruche/brand'
 import { type ErrorCode, HealthResponse } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import { parseAcceptLanguage, resolveLanguage } from '@ruche/i18n'
+import type { MiddlewareHandler } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
@@ -18,6 +19,7 @@ import { describeError } from './log'
 import type { FileStorage } from './media/storage'
 import { createRateLimiter } from './rate-limit'
 import { commentRoutes } from './routes/comments'
+import { emailRoutes, UNSUBSCRIBE_PATH } from './routes/email'
 import { feedRoutes } from './routes/feed'
 import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
@@ -42,6 +44,11 @@ export type AppOptions = {
   appUrl: string
   /** Adresse publique de l'API, pour fabriquer les liens des images. */
   publicApiUrl: string
+  /**
+   * La clé secrète de l'API (BETTER_AUTH_SECRET) : la clé des liens de désinscription des e-mails
+   * en est dérivée (tranche 6c, email/unsubscribe-token.ts).
+   */
+  secret: string
 }
 
 // Déclaration de la route GET /health. createRoute décrit la route ET sa réponse attendue :
@@ -70,7 +77,15 @@ const codeByStatus: Partial<Record<number, ErrorCode>> = {
 }
 const codeForStatus = (status: number): ErrorCode => codeByStatus[status] ?? 'validation'
 
-export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: AppOptions) => {
+export const createApp = ({
+  version,
+  auth,
+  db,
+  storage,
+  appUrl,
+  publicApiUrl,
+  secret,
+}: AppOptions) => {
   const app = new OpenAPIHono<AppEnv>()
 
   // Un « middleware » est une fonction exécutée pour chaque requête, avant (et après) la route.
@@ -163,8 +178,16 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   // Sur nos propres routes /v1/… : d'abord refuser les modifications venues d'un autre site
   // (voir security/same-origin.ts ; Better Auth fait la même vérification sur /api/auth/…),
   // puis retrouver le membre connecté.
-  app.use('/v1/*', sameOriginWrites([appUrl, publicApiUrl]))
-  app.use('/v1/*', sessionMiddleware(auth))
+  // Une exception : la désinscription depuis un e-mail (tranche 6c). Elle n'utilise jamais la
+  // session (seul le jeton signé du lien compte, et il ne fait que couper des e-mails), et la
+  // messagerie qui envoie le POST « Se désabonner » vient d'un autre site (le webmail) ou d'aucun :
+  // ni le contrôle d'origine, ni la recherche de la session ne s'y appliquent.
+  const outsideSession =
+    (middleware: MiddlewareHandler<AppEnv>): MiddlewareHandler<AppEnv> =>
+    (c, next) =>
+      c.req.path === UNSUBSCRIBE_PATH ? next() : middleware(c, next)
+  app.use('/v1/*', outsideSession(sameOriginWrites([appUrl, publicApiUrl])))
+  app.use('/v1/*', outsideSession(sessionMiddleware(auth)))
   // Les images aussi demandent de savoir qui regarde : elles sont réservées aux membres.
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
@@ -190,6 +213,7 @@ export const createApp = ({ version, auth, db, storage, appUrl, publicApiUrl }: 
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

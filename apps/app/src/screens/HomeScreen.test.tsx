@@ -431,6 +431,16 @@ describe('notes in the « following » feed on the home screen', () => {
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
   })
 
+  it('elides « de » before an author whose name starts with a vowel (« Note d’Inès »)', async () => {
+    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    mockFollowing({
+      items: [{ ...noteOfLea, project: { ...noteOfLea.project, author: ines } }],
+    })
+    await renderMemberHome()
+
+    expect(screen.getByRole('link', { name: 'Note d’Inès sur Mon agent de recettes' })).toBeTruthy()
+  })
+
   it('opens the page of the project when the note is touched', async () => {
     mockFollowing({ items: [noteOfLea] })
     await renderMemberHome()
