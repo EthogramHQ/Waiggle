@@ -227,7 +227,11 @@ try {
   await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
   // Une fois suivie, le nom lu reprend le texte affiché : « Suivi : Lea », activé.
   await sam.page.getByRole('switch', { name: /^Suivi.*Lea$/, checked: true }).waitFor()
-  const leaForSam = await (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
+  // L'interrupteur passe à « Suivi » avant la réponse de l'API (affichage optimiste) : on attend
+  // que l'API ait enregistré l'abonnement, comme pour les réactions plus bas (course vue en CI, 6c).
+  const readLeaForSam = async () => (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
+  await waitFor('abonnement enregistré', async () => (await readLeaForSam()).isFollowed === true)
+  const leaForSam = await readLeaForSam()
   expectEqual('Léa suivie par Sam', leaForSam.isFollowed, true)
   expectEqual('abonnés de Léa', leaForSam.followerCount, 1)
 
