@@ -243,10 +243,22 @@ export const createAuth = ({
     //    caractère invisible).
     // Ces contrôles ont lieu AVANT que Better Auth ne regarde si l'adresse existe déjà : la réponse
     // est la même dans les deux cas, elle ne révèle pas qui a un compte.
+    //
+    // À la suppression du compte : le mot de passe est obligatoire. Sans lui, Better Auth se
+    // contente d'une session de moins d'un jour (« fraîche ») ; quelqu'un qui trouverait un
+    // téléphone ouvert pourrait alors tout effacer. Le champ `token` (suppression confirmée par
+    // e-mail, que nous n'utilisons pas) est refusé pour la même raison.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== '/sign-up/email') return
         const body: object = typeof ctx.body === 'object' && ctx.body !== null ? ctx.body : {}
+        if (ctx.path === '/delete-user') {
+          const password = 'password' in body ? body.password : undefined
+          if (typeof password !== 'string' || password === '' || 'token' in body) {
+            throw new APIError('BAD_REQUEST', { message: 'Password required' })
+          }
+          return
+        }
+        if (ctx.path !== '/sign-up/email') return
         if (inviteCode !== null) {
           const sent = 'inviteCode' in body ? body.inviteCode : undefined
           if (!isRightInviteCode(sent, inviteCode)) {
