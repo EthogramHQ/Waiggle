@@ -24,6 +24,7 @@ import {
   type TestContext,
 } from '../testing/context'
 import { mentionEmails } from './mention-emails'
+import { weeklyRecap } from './weekly-recap'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -351,6 +352,41 @@ describe('only once', () => {
 
     expect(mentionsTo(inesAccount.email)).toEqual([])
     expect(await ctx.db.select().from(schema.user)).toHaveLength(3)
+  })
+
+  // Ajouté avec les corrections de la relecture de sécurité (A7) : le lundi à 9 h, le récap passe
+  // en même temps. La tâche a lu la date du dernier récap au début de son lot : si le récap envoie
+  // la mention entre-temps, elle partirait une seconde fois.
+  it('never sends a mention twice when the recap goes out while the e-mails go out', async () => {
+    await act.setPreferences(zoe, { mentionEmails: true })
+    await act.comment(meteo.id, malik, '@ines_morel et @zoe, regardez.')
+    later(16 * MINUTE)
+    const now = new Date()
+    // Au premier e-mail de mentions envoyé, le récap passe (même heure) : il sert l'autre membre,
+    // que la tâche n'a pas encore traité, mais dont elle a déjà lu la date du dernier récap.
+    let ran = false
+    const mailer: Mailer = {
+      async send(email) {
+        if (!ran) {
+          ran = true
+          await weeklyRecap(depsWith(), now)
+        }
+        await ctx.mailer.send(email)
+      },
+    }
+
+    await mentionEmails(depsWith(mailer), now)
+
+    const notificationSubjects = [...subjects, fill(fr.recap.subject)]
+    for (const address of [inesAccount.email, zoeAccount.email]) {
+      const withTheMention = ctx.mailer.sent.filter(
+        (email) =>
+          email.to === address &&
+          notificationSubjects.includes(email.subject) &&
+          email.text.includes('Météo'),
+      )
+      expect(withTheMention, address).toHaveLength(1)
+    }
   })
 })
 

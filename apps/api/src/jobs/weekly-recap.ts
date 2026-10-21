@@ -12,7 +12,8 @@
 //    conditions tiennent encore à cet instant, et rend l'adresse. Aucune ligne rendue (désinscrit
 //    ou compte supprimé entre-temps, autre exécution passée avant) : rien ne part. La date est
 //    notée AVANT l'envoi : un envoi qui échoue est perdu plutôt que doublé ;
-// 4. envoyer, dans la langue du membre.
+// 4. retirer ce qu'un e-mail de mentions parti entre-temps contenait déjà (la prise relit sa date),
+//    puis envoyer, dans la langue du membre.
 import { RECAP_MAX_LINES, RECAP_UNVISITED_MAX } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
@@ -102,6 +103,17 @@ const candidates = async (db: Database, now: Date, after: string): Promise<Candi
   return z.object({ rows: z.array(Candidate) }).parse(await db.execute(query)).rows
 }
 
+/** Une ligne du récap, avec ce qu'il faut pour l'écarter si l'e-mail de mentions l'a déjà envoyée. */
+type DatedLine = RecapLine & { at: number }
+
+/**
+ * Une mention ou une réponse déjà partie dans un e-mail de mentions (sa date n'est pas après celle
+ * du dernier e-mail de mentions) : elle ne revient pas dans le récap. Un simple commentaire sur un
+ * projet du membre ne part jamais en e-mail de mentions : il reste.
+ */
+const mailedBefore = (line: DatedLine, mentionSentAt: Date | null) =>
+  line.kind !== 'comment' && mentionSentAt !== null && line.at <= mentionSentAt.getTime()
+
 /** Ce que contient le récap d'un membre ; null s'il n'y a rien de nouveau. */
 const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
   const since = latest(
@@ -110,25 +122,22 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
     new Date(now.getTime() - RECAP_WINDOW_MS),
   )
   const notifications = await loadNotificationsSince(deps.db, member.id, since, deps.apiUrl)
-  const lines: RecapLine[] = []
+  const lines: DatedLine[] = []
   let reactions = 0
   let follows = 0
   for (const { notification } of notifications) {
     switch (notification.kind) {
       case 'comment': {
-        // Une mention ou une réponse déjà partie dans un e-mail de mentions ne revient pas.
-        const mailed =
-          notification.reason !== 'comment' &&
-          member.mention_sent_at !== null &&
-          Date.parse(notification.at) <= member.mention_sent_at.getTime()
-        if (!mailed) {
-          lines.push({
-            kind: notification.reason,
-            name: notification.author.name,
-            handle: notification.author.handle,
-            title: notification.project.title,
-          })
+        const line = {
+          kind: notification.reason,
+          name: notification.author.name,
+          handle: notification.author.handle,
+          title: notification.project.title,
+          at: Date.parse(notification.at),
         }
+        // Un premier tri avec la date lue au début du lot : il évite de prendre l'envoi pour rien.
+        // Le tri qui compte se refait après la prise (recapOne), avec la date relue à cet instant.
+        if (!mailedBefore(line, member.mention_sent_at)) lines.push(line)
         break
       }
       case 'reactions':
@@ -145,12 +154,7 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
     }
   }
   if (lines.length === 0 && reactions === 0 && follows === 0) return null
-  return {
-    lines: lines.slice(0, RECAP_MAX_LINES),
-    more: Math.max(0, lines.length - RECAP_MAX_LINES),
-    reactions,
-    follows,
-  }
+  return { lines, reactions, follows }
 }
 
 const Taken = z.object({
@@ -158,6 +162,8 @@ const Taken = z.object({
   name: z.string(),
   language: z.string(),
   recap_unvisited: z.number().int(),
+  // La date du dernier e-mail de mentions, relue au moment de la prise (voir recapOne).
+  mention_sent_at: isoDate,
 })
 
 /**
@@ -188,9 +194,10 @@ const take = async (db: Database, userId: string, now: Date) => {
           or email_preference.recap_sent_at <= ${utc(new Date(now.getTime() - RECAP_MIN_INTERVAL_MS))})
         and (email_preference.recap_unvisited < ${RECAP_UNVISITED_MAX}
           or ${visitedSince('email_preference')})
-      returning user_id, recap_unvisited
+      returning user_id, recap_unvisited, mention_sent_at
     )
-    select u.email, u.name, u.language, taken.recap_unvisited
+    select u.email, u.name, u.language, taken.recap_unvisited,
+      to_char(taken.mention_sent_at, ${ISO}) as mention_sent_at
     from taken join "user" u on u.id = taken.user_id
   `
   const [row] = z.object({ rows: z.array(Taken) }).parse(await db.execute(query)).rows
@@ -209,12 +216,24 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     throw error
   }
   if (!taken) return false
+  // Le lundi à 9 h, l'e-mail de mentions tourne en même temps (relecture de sécurité A7). S'il a
+  // envoyé une mention à ce membre après la lecture du lot, la date relue dans la prise le montre :
+  // on retire cette mention ici. La prise de l'e-mail de mentions fait de même avec la date du récap
+  // (mention-emails.ts) : celle des deux qui passe en second voit toujours la date de la première,
+  // car les deux écrivent la même ligne, l'une après l'autre (verrou de la ligne).
+  const lines = content.lines.filter((line) => !mailedBefore(line, taken.mention_sent_at))
+  // Tout était déjà parti : rien n'est envoyé. La date du récap reste notée (cas rare, une course
+  // entre les deux tâches) ; le récap suivant repart de là, sans rien perdre de nouveau.
+  if (lines.length === 0 && content.reactions === 0 && content.follows === 0) return false
   const language = languageOfMember(taken)
   await deps.mailer.send({
     to: taken.email,
     ...recapEmail(language, {
       name: taken.name,
-      ...content,
+      lines: lines.slice(0, RECAP_MAX_LINES).map(({ at: _at, ...line }) => line),
+      more: Math.max(0, lines.length - RECAP_MAX_LINES),
+      reactions: content.reactions,
+      follows: content.follows,
       first: member.recap_sent_at === null,
       last: taken.recap_unvisited >= RECAP_UNVISITED_MAX,
       links: linksFor(deps, member.id, 'recap'),
