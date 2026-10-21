@@ -50,14 +50,18 @@ type SignUpBody = Credentials & { name: string; language?: string; inviteCode?: 
 
 /**
  * Une API complète pour un test. `inviteCode` : le code d'invitation exigé à l'inscription, comme
- * en production ; sans lui, l'inscription est libre (comme en développement).
+ * en production ; sans lui, l'inscription est libre (comme en développement). `publicApiUrl` :
+ * l'adresse publique de l'API ; une adresse en https fait poser à Better Auth des cookies
+ * « Secure », comme en production (les autres tests restent en http, comme en développement).
  */
 export const createTestContext = async ({
   version = 'test',
   inviteCode = null,
+  publicApiUrl = TEST_API_URL,
 }: {
   version?: string
   inviteCode?: string | null
+  publicApiUrl?: string
 } = {}) => {
   const { db, close } = await createTestPgliteDb()
   const mailer = createMemoryMailer()
@@ -67,7 +71,7 @@ export const createTestContext = async ({
     mailer,
     storage,
     secret: TEST_AUTH_SECRET,
-    publicApiUrl: TEST_API_URL,
+    publicApiUrl,
     appUrl: TEST_APP_URL,
     rateLimit: true,
     inviteCode,
@@ -79,7 +83,7 @@ export const createTestContext = async ({
     db,
     storage,
     appUrl: TEST_APP_URL,
-    publicApiUrl: TEST_API_URL,
+    publicApiUrl,
     secret: TEST_AUTH_SECRET,
   })
 

@@ -85,6 +85,8 @@ export const memberCounterKeys = (userId: string) => ({
   emailPreferences: `email-preferences:${userId}`,
   // Les liens de désinscription valides de ce membre, toutes adresses IP confondues (tranche 6c).
   unsubscribe: `unsubscribe:${userId}`,
+  // Télécharger toutes ses données (audit de sécurité d'octobre 2026) : une lecture lourde.
+  export: `export:${userId}`,
 })
 
 /**

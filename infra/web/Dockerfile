@@ -1,13 +1,15 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Image Docker « web » : la porte d'entrée du serveur. Elle contient Caddy (voir infra/Caddyfile)
 # et l'appli web déjà construite, prête à être servie. À construire depuis la racine du dépôt :
 #   docker build -f infra/web/Dockerfile --build-arg APP_DOMAIN=waiggle.io \
 #     --build-arg API_DOMAIN=api.waiggle.io .
 # Sans ces deux réglages, l'appli est construite pour localhost (essais sur son ordinateur).
 # Deux étapes, comme pour l'API : une pour construire, une pour servir (le strict minimum).
+# Les images de départ sont désignées par leur empreinte (@sha256:…), comme pour l'API (voir
+# apps/api/Dockerfile) ; l'étiquette n'est là que pour le lecteur.
 
 # --- Étape 1 : construction de l'appli web ---
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /repo
 RUN corepack enable
 
@@ -34,7 +36,7 @@ RUN pnpm --filter @ruche/app build
 RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
-FROM caddy:2.11.7-alpine
+FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
 # Caddy tourne avec son propre utilisateur, jamais en root. Il ne peut écrire que dans /data et

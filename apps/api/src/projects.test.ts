@@ -277,6 +277,17 @@ describe('changing a project', () => {
 
     expect((await send('PATCH', `/v1/projects/${id}`, lea, { pitch: 'De trop' })).status).toBe(429)
   })
+
+  it('is only for signed-in members', async () => {
+    const { id } = await publish()
+
+    const res = await send('PATCH', `/v1/projects/${id}`, null, { title: 'Anonyme' })
+
+    expect(res.status).toBe(401)
+    expect(Project.parse(await (await read(id, lea)).json()).title).toBe(recipes.title)
+    // Témoin : la même demande, avec la session de l'autrice, passe.
+    expect((await send('PATCH', `/v1/projects/${id}`, lea, { title: 'Signé' })).status).toBe(200)
+  })
 })
 
 describe('deleting a project', () => {
@@ -296,6 +307,17 @@ describe('deleting a project', () => {
 
     expect(res.status).toBe(403)
     expect((await read(id, lea)).status).toBe(200)
+  })
+
+  it('is only for signed-in members', async () => {
+    const { id } = await publish()
+
+    const res = await send('DELETE', `/v1/projects/${id}`, null)
+
+    expect(res.status).toBe(401)
+    expect((await read(id, lea)).status).toBe(200)
+    // Témoin : la même demande, avec la session de l'autrice, efface le projet.
+    expect((await send('DELETE', `/v1/projects/${id}`, lea)).status).toBe(204)
   })
 })
 

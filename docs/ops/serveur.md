@@ -584,8 +584,19 @@ un nouveau code au hasard : `openssl rand -hex 8`.
 - **Le système** : les correctifs de sécurité s'installent seuls. Une fois par mois, l'assistant de code
   peut lancer `ssh waiggle 'sudo apt-get update && sudo apt-get upgrade -y'`. Cette commande met
   aussi à jour Docker, qui n'est pas dans les mises à jour automatiques.
-- **L'appli et ses images** (Node, Caddy, PostgreSQL) : Renovate propose les mises à jour par pull
-  request, puis on déploie comme d'habitude.
+- **L'appli et ses images** (dépendances, Node, Caddy, PostgreSQL, actions de la CI) : le dépôt
+  contient les réglages de Renovate (`renovate.json`), mais **l'application Renovate n'est pas
+  encore installée** sur le dépôt (constaté le 21/10/2026 : aucune pull request, aucun ticket
+  « Dependency Dashboard »). À faire par le propriétaire du dépôt : installer l'application GitHub
+  « Renovate » (Mend) pour `EthogramHQ/Waiggle` seulement. Une fois installée, Renovate propose
+  les mises à jour par pull request le lundi matin, puis on déploie comme d'habitude ; on vérifie
+  qu'elle tourne par ses pull requests, pas par son fichier de réglages.
+  - Les images de départ des Dockerfile et les actions de la CI sont désignées par leur empreinte
+    (`@sha256:…`, SHA de commit) : sans Renovate, elles ne bougent plus d'elles-mêmes, correctifs
+    de sécurité compris. En attendant, les mettre à jour à la main, une fois par mois, dans une pull
+    request (l'empreinte se lit sur le registre de l'image, ou par `gh api` pour une action).
+  - L'audit des dépendances (`pnpm audit`, job `audit` de la CI) tourne aussi chaque lundi sur
+    `main`, même sans commit : GitHub prévient par e-mail s'il échoue.
 - **PostgreSQL** : une nouvelle version majeure (17 → 18) ne se fait pas par un simple
   déploiement. Elle demande une sauvegarde, puis une restauration dans la nouvelle version. À
   préparer le moment venu.

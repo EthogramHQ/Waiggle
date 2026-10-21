@@ -1,11 +1,21 @@
 # Intégration continue : GitHub lance ces vérifications à chaque envoi sur main
 # et sur chaque pull request. Une pull request n'est fusionnée que si tout est vert.
+#
+# Toutes les actions sont épinglées par l'empreinte (SHA) du commit de leur code, le commentaire
+# donne la version : une étiquette (v5) peut être déplacée vers un autre code, une empreinte non.
+# Une action modifiée en douce ne peut donc pas lire le code ni les jetons de la CI.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  # Chaque lundi à 5 h (heure UTC), sur main : le seul audit des dépendances. Une faille publiée
+  # pendant une semaine sans commit serait sinon passée inaperçue. GitHub prévient par e-mail
+  # quand une exécution planifiée échoue (la personne qui a écrit cette ligne `cron` en dernier),
+  # et suspend la planification d'un dépôt public resté 60 jours sans activité.
+  schedule:
+    - cron: '0 5 * * 1'
 
 # Droits minimaux : la CI peut lire le code, rien de plus.
 permissions:
@@ -13,20 +23,22 @@ permissions:
 
 # Si on pousse deux fois de suite sur une pull request, la vérification précédente est annulée.
 # Sur main, chaque commit a son propre groupe : aucune fusion n'est annulée, chacune publie ses
-# images.
+# images. L'audit planifié a son groupe à lui : il n'annule jamais la vérification d'un commit.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'schedule' && 'weekly-audit' || github.sha }}
   cancel-in-progress: true
 
 jobs:
   # Lint, types, tests et construction de l'API et de l'appli web.
   check:
     name: Lint, types, tests, build
+    # Pas pendant l'audit planifié du lundi (voir `schedule`, en tête) : le code n'a pas changé.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4 # version de pnpm lue dans package.json
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0 ; version de pnpm lue dans package.json
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -52,19 +64,20 @@ jobs:
   # Échoue aussi si une page affiche une erreur (par exemple un écart entre le serveur et le navigateur).
   shots:
     name: Screenshots
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15 # si le navigateur se bloque, on n'attend pas des heures
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @ruche/app exec playwright install --with-deps chromium
       - run: pnpm --filter @ruche/app shots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() # même en cas d'échec : les images aident à comprendre pourquoi
         with:
           name: captures
@@ -74,23 +87,25 @@ jobs:
   # Cherche des secrets (mots de passe, clés) oubliés dans tout l'historique Git.
   secrets:
     name: Secret scan
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0 # tout l'historique, pas seulement le dernier commit
       # gitleaks lancé directement dans son conteneur officiel, sur tout l'historique.
-      # (L'action GitHub ne savait pas analyser le tout premier commit du dépôt.)
-      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --verbose
+      # (L'action GitHub ne savait pas analyser le tout premier commit du dépôt.) L'image est
+      # désignée par son empreinte (@sha256:…) : l'étiquette v8.24.3 n'est là que pour le lecteur.
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055 git /repo --redact --verbose
 
   # Signale les failles connues dans les dépendances (exceptions justifiées dans pnpm-workspace.yaml).
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           package-manager-cache: false # rien n'est installé ici, donc rien à mettre en cache
@@ -100,9 +115,10 @@ jobs:
   # « de fumée » de bout en bout (voir infra/smoke-test.sh).
   docker:
     name: API image builds and runs
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: docker build -f apps/api/Dockerfile -t ruche-api:ci .
       - run: infra/smoke-test.sh ruche-api:ci
 
@@ -111,14 +127,15 @@ jobs:
   # et restauration, puis une visite dans un vrai navigateur (voir infra/stack-test.sh).
   stack:
     name: Production stack
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0 # l'essai de deploy.sh simule un dépôt Git avec son historique
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -127,7 +144,7 @@ jobs:
       - run: pnpm --filter @ruche/app exec playwright install --with-deps chromium
       - run: infra/stack-test.sh
       # Si le parcours d'un membre s'arrête, ses captures d'écran aident à comprendre pourquoi.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: parcours
@@ -138,8 +155,8 @@ jobs:
   # Publie les images de l'API et de la porte d'entrée web sur ghcr.io. Seulement après une fusion
   # sur main, et seulement si toutes les vérifications ci-dessus sont vertes. Le serveur les
   # télécharge ensuite (infra/deploy.sh) : il ne construit rien lui-même.
-  # Ce job peut écrire des images : ses actions sont épinglées par l'empreinte de leur code (le
-  # commentaire donne la version), pour qu'une action modifiée en douce ne puisse pas en profiter.
+  # Ce job peut écrire des images : comme partout, ses actions sont épinglées par l'empreinte de
+  # leur code. Il ne tourne ni sur une pull request ni pendant l'audit planifié.
   publish:
     name: Publish images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
