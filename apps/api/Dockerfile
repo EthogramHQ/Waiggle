@@ -1,10 +1,16 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Image Docker de l'API. À construire depuis la racine du dépôt :
 #   docker build -f apps/api/Dockerfile .
 # Deux étapes : une pour construire (avec tous les outils), une pour exécuter (le strict minimum).
+#
+# Chaque image de départ est désignée par son empreinte (@sha256:…), l'étiquette (24-alpine) n'est
+# là que pour le lecteur : une étiquette peut être déplacée vers une autre image, une empreinte
+# non. La construction est ainsi la même d'un jour à l'autre, et une image remplacée en douce sur
+# le registre serait refusée. Revers : les correctifs de Node et d'Alpine n'arrivent qu'en
+# changeant l'empreinte (Renovate le propose, voir docs/ops/serveur.md, « Mises à jour »).
 
 # --- Étape 1 : construction ---
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /repo
 RUN corepack enable
 
@@ -32,7 +38,7 @@ RUN pnpm --filter @ruche/api-runtime deploy --prod --offline \
 
 # --- Étape 2 : exécution ---
 # On repart d'une image vide : ni code source, ni outils de build, ni dépendances de dev.
-FROM node:24-alpine
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
 WORKDIR /app
 ENV NODE_ENV=production
 # Les migrations SQL (création et évolution des tables) sont appliquées au démarrage.
