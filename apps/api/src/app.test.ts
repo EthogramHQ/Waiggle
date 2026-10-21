@@ -68,6 +68,29 @@ describe('security headers', () => {
     expect(res.headers.get('x-frame-options')).toBe('SAMEORIGIN')
     expect(res.headers.get('strict-transport-security')).toContain('max-age=')
   })
+
+  // Le domaine de l'API porte le cookie de session et sert parfois du HTML (la page d'erreur de
+  // Better Auth) : si une faille y glissait un script, la CSP l'empêcherait de s'exécuter.
+  it('forbid any script, frame or resource on every response, JSON included', async () => {
+    for (const path of ['/health', '/does-not-exist', '/v1/me']) {
+      const csp = (await ctx.request(path)).headers.get('content-security-policy') ?? ''
+
+      expect(csp).toContain("default-src 'none'")
+      expect(csp).toContain("frame-ancestors 'none'")
+      expect(csp).toContain('sandbox')
+      expect(csp).not.toContain('script-src')
+    }
+  })
+
+  it('still let the authentication error page show, styled and without scripts', async () => {
+    const res = await ctx.request('/api/auth/error?error=state_mismatch')
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('text/html')
+    expect(res.headers.get('content-security-policy')).toBe(
+      "default-src 'none'; frame-ancestors 'none'; style-src 'unsafe-inline'; sandbox",
+    )
+  })
 })
 
 describe('cross-origin requests (CORS)', () => {

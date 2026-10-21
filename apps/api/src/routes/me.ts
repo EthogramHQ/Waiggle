@@ -37,6 +37,10 @@ const profileRule: RateRule = { windowMs: HOUR, max: 30 }
 const avatarRule: RateRule = { windowMs: HOUR, max: 10 }
 // Changer de pseudo (tranche 6a) : 5 fois par 24 heures, en plus du quota du profil.
 const handleRule: RateRule = { windowMs: 24 * HOUR, max: HANDLE_CHANGES_PER_DAY }
+// L'export de ses données lit tout ce que le membre a écrit (projets, notes, commentaires…) : une
+// quinzaine de requêtes. 30 par heure laissent largement de quoi s'en servir, mais empêchent une
+// session volée, ou un script en boucle, d'occuper la base à le redemander sans fin.
+const exportRule: RateRule = { windowMs: HOUR, max: 30 }
 
 const meResponse = { description: 'The profile.', content: { 'application/json': { schema: Me } } }
 
@@ -94,6 +98,7 @@ const exportRoute = createRoute({
       content: { 'application/json': { schema: AccountExport } },
     },
     401: errorResponse('Not signed in.'),
+    429: errorResponse('Too many exports.'),
   },
 })
 
@@ -270,6 +275,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   app.openapi(exportRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).export, exportRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
 
