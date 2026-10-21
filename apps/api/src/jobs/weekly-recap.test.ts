@@ -474,6 +474,31 @@ describe('the rhythm of the recap', () => {
     expect(recaps[1]?.text).not.toContain(line('comment', 'Météo'))
   })
 
+  // Ajouté avec les suites de la relecture de sécurité de e414e88 (A5) : un commentaire écrit
+  // pendant le passage du récap (après son `now`, avant la lecture du membre) partait dans ce récap,
+  // puis revenait dans le suivant, puisqu'il est daté après la date notée.
+  it('sends a comment written while the recap runs once, in the next recap', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    later()
+    await act.comment(meteo.id, malik, 'Premier.')
+    later(HOUR)
+    const now = new Date()
+    later() // now + 1 s
+    await act.comment(meteo.id, zoe, 'Second.')
+
+    await weeklyRecap(depsWith(), now)
+    const first = onlyRecapTo(inesAccount.email)
+    expect(first.text).toContain(line('comment', 'Météo'))
+    expect(first.text).not.toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+
+    vi.setSystemTime(now.getTime() + 6 * DAY + MINUTE)
+    await runRecap()
+    const recaps = recapsTo(inesAccount.email)
+    expect(recaps).toHaveLength(2)
+    expect(recaps[1]?.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    expect(recaps[1]?.text).not.toContain(line('comment', 'Météo'))
+  })
+
   it('explains the first recap, once', async () => {
     const meteo = await act.publish(ines, 'Météo')
     later()
