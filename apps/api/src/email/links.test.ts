@@ -56,4 +56,52 @@ describe('defangLinks', () => {
       expect(defangLinks(ordinary)).toBe(ordinary)
     }
   })
+
+  // Ajoutés avec les corrections de la relecture de sécurité (B1, A1) : un domaine collé à une
+  // ponctuation, ou écrit avec des caractères que la messagerie ou le navigateur lisent comme les
+  // lettres et le point ordinaires, passait intact.
+  it('replaces a domain glued to a hyphen, an underscore or a colon', () => {
+    for (const written of [
+      '-waiggle-login.com',
+      '_waiggle-login.com',
+      'Support -waiggle-login.com',
+      ':-evil.com',
+      'x--evil.com',
+      'voir:evil.com',
+      '(evil.com)',
+    ]) {
+      const result = defangLinks(`va sur ${written} maintenant`)
+
+      expect(result, written).not.toContain('waiggle-login.com')
+      expect(result, written).not.toContain('evil.com')
+      expect(result, written).toContain('[lien]')
+    }
+  })
+
+  it('replaces a domain written with a look-alike dot or an invisible character', () => {
+    for (const written of [
+      'evil。com', // 。 point idéographique
+      'evil．com', // ． point pleine chasse
+      'evil｡com', // ｡ point idéographique demi-chasse
+      'evil․com', // ․ point de conduite
+      'evil​.com', // espace sans largeur
+      'evil­.com', // trait d'union conditionnel
+      'ｅｖｉｌ.com', // ｅｖｉｌ en lettres pleine chasse
+      'evil.c‍om', // liant au milieu de l'extension
+    ]) {
+      const result = defangLinks(`va sur ${written} maintenant`)
+
+      expect(result, JSON.stringify(written)).toBe('va sur [lien] maintenant')
+    }
+  })
+
+  it('keeps the text as it was written around an address', () => {
+    expect(defangLinks('Super… voir evil.com… ﬁn')).toBe('Super… voir [lien]… ﬁn')
+    // Les émojis assemblés (liant U+200D) restent entiers.
+    expect(defangLinks('Bravo 👩‍💻')).toBe('Bravo 👩‍💻')
+  })
+
+  it('writes the placeholder it is given, in the language of the e-mail', () => {
+    expect(defangLinks('go to evil.com now', '[link]')).toBe('go to [link] now')
+  })
 })

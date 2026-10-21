@@ -5,14 +5,16 @@
 //
 // Les e-mails de notification (tranche 6c : le récap de la semaine, l'e-mail de mentions) suivent
 // des règles de plus (relectures de sécurité et juridique du plan) :
-// - aucun lien venu d'un membre : son nom, un titre ou un extrait passent par defangLinks ;
+// - aucun lien venu d'un membre : son nom, un titre ou un extrait passent par defangLinks, qui
+//   écrit « [lien] » dans la langue de l'e-mail (cela vaut aussi pour le nom saisi à l'inscription,
+//   dans les e-mails de compte) ;
 // - chaque lien (href) mène à l'appli ou à l'API, jamais ailleurs ; aucune image (ni avatar, ni
 //   pixel d'ouverture) ;
 // - l'objet est fixe : rien d'écrit par un membre ne s'affiche sur un écran verrouillé ;
 // - chaque e-mail dit pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
-import { palettes, radii } from '@ruche/brand'
+import { appName, palettes, radii } from '@ruche/brand'
 import { fill, type Language, resources } from '@ruche/i18n'
-import { defangLinks } from './links'
+import { defangLinks, linkPlaceholder } from './links'
 
 export type Email = {
   to: string
@@ -51,6 +53,8 @@ type Item = { line: string; excerpt?: string }
 type Layout = {
   /** La langue de l'e-mail, annoncée dans `<html lang>` (lecteurs d'écran, traduction). */
   language: Language
+  /** La phrase titre, en gras sous le nom de l'appli (« Du nouveau cette semaine »). */
+  heading?: string
   greeting: string
   paragraphs: string[]
   /** Une liste (les notifications d'un récap ou d'un e-mail de mentions). */
@@ -58,7 +62,7 @@ type Layout = {
   /** Des paragraphes après la liste (« Et 2 autres », les nombres). */
   after?: string[]
   button: Link
-  /** Les petites lignes sous le bouton (« ce lien est valable une heure », « le dernier récap »). */
+  /** Les petites lignes sous le bouton (« si tu n'as rien demandé, ignore cet e-mail »). */
   notes: string[]
   /** Le pied : pourquoi on reçoit cet e-mail, puis les liens (se désinscrire, gérer). */
   reason?: string
@@ -66,10 +70,19 @@ type Layout = {
   footer: string
 }
 
+/**
+ * La seule feuille de style de l'e-mail : une « requête média » (@media), qui ne s'applique que
+ * sur un écran de moins de 480 px, resserre les marges (relecture de design, 6c : à 320 px, il ne
+ * restait que 214 px de texte). Apple Mail et Gmail la suivent ; une messagerie qui l'ignore garde
+ * les marges larges. « !important » : sinon les styles écrits dans les balises l'emportent.
+ */
+const narrowScreenStyle = `@media (max-width:480px){.page{padding:12px 8px !important}.card{padding:20px 16px !important}}`
+
 // Mise en page commune à tous les e-mails. Styles écrits directement dans les balises :
-// beaucoup de messageries ignorent les feuilles de style.
+// beaucoup de messageries ignorent les feuilles de style (seule la requête média ci-dessus en a une).
 const render = ({
   language,
+  heading,
   greeting,
   paragraphs,
   items = [],
@@ -85,6 +98,8 @@ const render = ({
   const textItems = items.flatMap(({ line, excerpt }) =>
     excerpt === undefined ? [`• ${line}`] : [`• ${line}`, `  > ${excerpt}`],
   )
+  // Le titre (heading) n'y est pas : il sert la hiérarchie visuelle du HTML, et l'objet de l'e-mail
+  // dit déjà la même chose en tête du texte brut.
   const text = [
     greeting,
     '',
@@ -117,9 +132,35 @@ const render = ({
           )
           .join('')}</ul>`
   const muted = `font-size:13px;color:${c.textMuted}`
+  const small = `text-align:center;font-size:13px;line-height:1.5;color:${c.textMuted}`
+  // Le haut de l'e-mail (relecture de design, 6c) : le nom de l'appli, en texte (aucune image), puis
+  // la phrase titre en gras ; « Bonjour Inès » vient ensuite, au corps normal.
+  const top = [
+    p(
+      appName,
+      `margin:0 0 ${heading ? 8 : 20}px;font-size:15px;font-weight:bold;color:${c.amberText}`,
+    ),
+    ...(heading
+      ? [p(heading, 'margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:bold')]
+      : []),
+  ].join('\n    ')
+  // Les liens du pied, l'un sous l'autre (relecture de design, 6c) : en 14 px, avec 10 px de jeu
+  // au-dessus et en dessous, chacun se touche du doigt sans toucher l'autre.
+  const footerLinks = links
+    .map(
+      (link) =>
+        `<p style="margin:0;text-align:center;font-size:14px;line-height:1.4"><a href="${escapeHtml(link.url)}" style="display:inline-block;padding:10px 4px;color:${c.textMuted}">${escapeHtml(link.label)}</a></p>`,
+    )
+    .join('\n    ')
   const html = `<!doctype html>
-<html lang="${language}"><body style="margin:0;padding:24px;background:${c.surfaceGrouped};font-family:Arial,sans-serif;color:${c.text}">
-  <div style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
+<html lang="${language}"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${narrowScreenStyle}</style>
+</head><body style="margin:0;background:${c.surfaceGrouped}">
+<div class="page" style="padding:24px;background:${c.surfaceGrouped};font-family:Arial,sans-serif;color:${c.text}">
+  <div class="card" style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
+    ${top}
     ${p(greeting, 'font-size:16px')}
     ${paragraphs.map((value) => p(value)).join('\n    ')}
     ${htmlItems}
@@ -129,18 +170,12 @@ const render = ({
     </p>
     ${notes.map((note) => p(note, muted)).join('\n    ')}
   </div>
-  ${reason ? p(reason, `text-align:center;font-size:12px;color:${c.textMuted}`) : ''}
-  ${
-    links.length > 0
-      ? `<p style="text-align:center;font-size:12px">${links
-          .map(
-            (link) =>
-              `<a href="${escapeHtml(link.url)}" style="color:${c.textMuted}">${escapeHtml(link.label)}</a>`,
-          )
-          .join(' · ')}</p>`
-      : ''
-  }
-  <p style="text-align:center;font-size:12px;color:${c.textMuted}">${escapeHtml(footer)}</p>
+  <div style="max-width:520px;margin:16px auto 0">
+    ${reason ? p(reason, small) : ''}
+    ${footerLinks}
+    ${p(footer, small)}
+  </div>
+</div>
 </body></html>`
   return { text, html }
 }
@@ -155,7 +190,10 @@ export const verificationEmail = (
     subject: fill(t.verify.subject),
     ...render({
       language,
-      greeting: fill(t.greeting, { name }),
+      // Le nom saisi à l'inscription part vers l'adresse saisie, quelle qu'elle soit : sans ce
+      // filtre, « Ton compte est bloqué, va sur waiggle-login.com » partirait de notre domaine
+      // vers n'importe qui (relecture de sécurité A2).
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
       paragraphs: [t.verify.body, t.verify.expires],
       button: { label: t.verify.button, url },
       notes: [t.verify.ignore],
@@ -178,7 +216,8 @@ export const existingAccountEmail = (
     subject: fill(t.existingAccount.subject),
     ...render({
       language,
-      greeting: fill(t.greeting, { name }),
+      // Le nom du compte existant : filtré comme dans verificationEmail (relecture de sécurité A2).
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
       paragraphs: [t.existingAccount.body],
       button: { label: t.existingAccount.button, url: signInUrl },
       notes: [t.existingAccount.ignore],
@@ -224,11 +263,17 @@ export type RecapLine = {
   title: string
 }
 
-/** Les paramètres d'une ligne, nettoyés : aucune adresse écrite par un membre n'en sort. */
-const lineParams = ({ name, handle, title }: { name: string; handle: string; title: string }) => ({
-  name: defangLinks(name),
+/**
+ * Les paramètres d'une ligne, nettoyés : aucune adresse écrite par un membre n'en sort. Le pseudo
+ * n'a pas besoin du filtre : le schéma n'y admet ni point ni barre (lettres, chiffres et « _ »).
+ */
+const lineParams = (
+  { name, handle, title }: { name: string; handle: string; title: string },
+  link: string,
+) => ({
+  name: defangLinks(name, link),
   handle,
-  title: defangLinks(title),
+  title: defangLinks(title, link),
 })
 
 /** « 1 réaction » ou « 3 réactions » : la clé _one ou _other, sans règle de pluriel de plus. */
@@ -257,6 +302,7 @@ export type RecapData = {
  */
 export const recapEmail = (language: Language, data: RecapData): EmailContent => {
   const t = resources[language].translation.email
+  const link = linkPlaceholder(language)
   const counts = [
     ...(data.reactions > 0
       ? [counted(t.recap.reactions_one, t.recap.reactions_other, data.reactions)]
@@ -270,9 +316,16 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
     headers: unsubscribeHeaders(data.links.oneClick),
     ...render({
       language,
-      greeting: fill(t.greeting, { name: defangLinks(data.name) }),
-      paragraphs: [fill(t.recap.intro), ...(data.first ? [fill(t.recap.first)] : [])],
-      items: data.lines.map((line) => ({ line: fill(t.recap[line.kind], lineParams(line)) })),
+      heading: fill(t.recap.heading),
+      greeting: fill(t.greeting, { name: defangLinks(data.name, link) }),
+      // Ce qui est propre à cet e-mail (le premier, le dernier pour l'instant) vient juste sous
+      // l'introduction, au corps normal, avant la liste et le bouton (relecture de design, 6c).
+      paragraphs: [
+        fill(t.recap.intro),
+        ...(data.first ? [fill(t.recap.first)] : []),
+        ...(data.last ? [fill(t.recap.last)] : []),
+      ],
+      items: data.lines.map((line) => ({ line: fill(t.recap[line.kind], lineParams(line, link)) })),
       after: [
         ...(data.more > 0 ? [counted(t.recap.more_one, t.recap.more_other, data.more)] : []),
         // « Et aussi : 3 réactions à tes projets, 2 nouveaux abonnements » ; sans liste au-dessus,
@@ -286,7 +339,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
           : []),
       ],
       button: { label: fill(t.recap.button), url: data.links.button },
-      notes: data.last ? [fill(t.recap.last)] : [],
+      notes: [],
       reason: fill(t.recap.reason),
       links: [
         { label: t.recap.unsubscribe, url: data.links.unsubscribe },
@@ -310,16 +363,18 @@ export type MentionData = {
  */
 export const mentionEmail = (language: Language, data: MentionData): EmailContent => {
   const t = resources[language].translation.email
+  const link = linkPlaceholder(language)
   return {
     subject: fill(t.mentions.subject),
     headers: unsubscribeHeaders(data.links.oneClick),
     ...render({
       language,
-      greeting: fill(t.greeting, { name: defangLinks(data.name) }),
+      heading: fill(t.mentions.heading),
+      greeting: fill(t.greeting, { name: defangLinks(data.name, link) }),
       paragraphs: [],
       items: data.items.map((item) => ({
-        line: fill(t.mentions[item.kind], lineParams(item)),
-        excerpt: defangLinks(item.excerpt),
+        line: fill(t.mentions[item.kind], lineParams(item, link)),
+        excerpt: defangLinks(item.excerpt, link),
       })),
       button: { label: fill(t.mentions.button), url: data.links.button },
       notes: [],
