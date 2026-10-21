@@ -39,8 +39,10 @@ export const fill = (template: string, params: Readonly<Record<string, string>> 
 
 /**
  * Le nom d'un membre précédé de ce qui le relie au texte, pour {{nameOf}} (tranche 6c) :
- * - en français, « de » s'élide devant une voyelle (accents compris, y, œ et æ aussi) ou un h :
- *   « d’Inès », « d’Hugo », « d’Yves », mais « de Léa » ; un nom vide donne « de » suivi de rien ;
+ * - en français, « de » s'élide devant une voyelle (accents compris, œ et æ aussi) ou un h :
+ *   « d’Inès », « d’Hugo », mais « de Léa » ; un nom vide donne « de » suivi de rien ;
+ * - le y compte comme une voyelle quand il se prononce « i », devant une consonne (« d’Yves »),
+ *   mais comme une consonne devant une voyelle (« de Yasmine », « de Yann ») ;
  * - en anglais, le possessif : « Inès’s ».
  * L'apostrophe est typographique (’, U+2019), comme dans tous les textes. Le texte qui l'utilise
  * s'écrit sans « de » : « Voir la page {{nameOf}} ».
@@ -49,8 +51,11 @@ export const nameOf = (language: Language, name: string): string => {
   if (language === 'en') return `${name}’s`
   // normalize('NFD') sépare la lettre de son accent (« É » → « E » + accent) : il suffit alors de
   // regarder la lettre de base. Le drapeau i accepte les minuscules comme les majuscules.
-  const first = name.normalize('NFD').charAt(0)
-  return /^[aeiouyhœæ]$/i.test(first) ? `d’${name}` : `de ${name}`
+  // Pour le y, on regarde aussi la lettre suivante : NFD place l'accent après sa lettre (« Yé »
+  // devient « Y », « e », accent), la deuxième lettre est donc déjà sans accent.
+  const base = name.normalize('NFD')
+  const elides = /^[aeiouhœæ]/i.test(base) || (/^y/i.test(base) && !/^y[aeiouyœæ]/i.test(base))
+  return elides ? `d’${name}` : `de ${name}`
 }
 
 /** Les textes, dans la forme attendue par la bibliothèque i18next. */
