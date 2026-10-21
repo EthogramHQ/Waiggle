@@ -6,6 +6,11 @@
   "labels": ["dependencies"],
   "packageRules": [
     {
+      "description": "Major updates wait for an approval in the Dependency Dashboard: they change behaviour and are reviewed one by one.",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
       "description": "Expo SDK upgrades are done deliberately with `expo install --fix`, not by Renovate.",
       "matchPackageNames": [
         "expo",
@@ -15,9 +20,15 @@
         "react-dom",
         "react-native",
         "react-native-*",
+        "@react-native-async-storage/async-storage",
         "@types/react"
       ],
       "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    },
+    {
+      "description": "The overrides of pnpm-workspace.yaml are security pins chosen by hand for an indirect dependency (see the comments there): never bumped by Renovate.",
+      "matchFileNames": ["pnpm-workspace.yaml"],
       "enabled": false
     },
     {
