@@ -465,6 +465,29 @@ describe('Notice', () => {
 
     expect(screen.queryByRole('link')).toBeNull()
   })
+
+  // Tranche 6c : avec une ref, le message peut recevoir le focus sur le web (tabIndex -1), sans
+  // devenir une étape de Tab ; sans ref, il reste hors du parcours du clavier.
+  it('can take the focus on the web when a screen holds it', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const ref = createRef<View>()
+      await renderWithProviders(<Notice message="C’est fait." polite ref={ref} />)
+      expect(screen.getByRole('status')).toHaveProp('tabIndex', -1)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('stays out of the keyboard path without a ref', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(screen.getByRole('status')).not.toHaveProp('tabIndex')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('Text', () => {
