@@ -30,7 +30,13 @@ export function TopNav({ hideNewProject = false }: Props) {
   const { data: session } = useSession()
   const shown = sizeClass !== 'compact'
   // Le profil (pour l'avatar) n'est demandé que si la barre est affichée.
-  const me = useMe(Boolean(session) && shown)
+  // retryOnMount: false, pour éviter une boucle. Les écrans de chargement et d'erreur ont chacun
+  // leur propre barre : quand « Mon profil » passe de l'un à l'autre, une nouvelle barre apparaît.
+  // Par défaut, React Query relance alors la lecture du profil qui vient d'échouer, ce qui efface
+  // l'erreur : la page revient à « Chargement… », la lecture échoue, l'erreur remonte une nouvelle
+  // barre, et ainsi de suite (une requête par seconde, sans jamais montrer l'erreur). La barre se
+  // contente donc du nom de la session tant que le profil manque ; « Réessayer » relance la lecture.
+  const me = useMe(Boolean(session) && shown, { retryOnMount: false })
   const toSource = useMediaSources(shown)
 
   if (!shown || !session) return null
