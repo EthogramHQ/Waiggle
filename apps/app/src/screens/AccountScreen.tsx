@@ -1,7 +1,8 @@
 // Page « Réglages » : qui est connecté, profil, langue, apparence, export des données,
-// déconnexion. La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
+// déconnexion, l'adresse pour nous écrire, et la modération pour un administrateur (tranche 6d).
+// La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
 
-import { sourceUrl } from '@ruche/brand'
+import { contactEmail, sourceUrl } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
 import { useRouter } from 'expo-router'
@@ -95,6 +96,19 @@ export function AccountScreen() {
         onPress={() => router.push('/profile')}
       />
 
+      {/* Tranche 6d : la modération, pour un administrateur seulement. La ligne apparaît quand le
+          profil est arrivé ; ce champ ne donne aucun droit, l'API refait la vérification. */}
+      {me.data?.isAdmin ? (
+        <ListGroup>
+          <ListRow
+            label={t('account.moderation')}
+            icon="shield-check"
+            trailing="chevron"
+            onPress={() => router.push('/moderation')}
+          />
+        </ListGroup>
+      ) : null}
+
       <ListGroup title={t('account.language.title')} footer={t('account.language.hint')} radio>
         {supportedLanguages.map((language) => (
           <ListRow
@@ -160,6 +174,19 @@ export function AccountScreen() {
 
       {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
           un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
+      {/* Tranche 6d : nous écrire, à l'adresse de contact (écrite dans @ruche/brand seulement).
+          Elle s'affiche en clair, pour qui veut la recopier, et s'ouvre par la page « Tu
+          quittes… », comme tout lien vers l'extérieur. */}
+      <ListGroup footer={t('account.contact.hint')}>
+        <ListRow
+          label={t('account.contact.label')}
+          detail={contactEmail}
+          spokenLabel={`${t('account.contact.label')}, ${contactEmail}`}
+          trailing="envelope-simple"
+          onPress={() => openOutside(`mailto:${contactEmail}`)}
+        />
+      </ListGroup>
+
       <ListGroup title={t('account.about.title')} footer={t('home.openSource')}>
         <ListRow
           label={t('home.seeCode')}

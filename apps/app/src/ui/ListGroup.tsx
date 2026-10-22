@@ -101,6 +101,11 @@ type RowProps = {
    * l'annoncent comme une attente en cours (rôle progressbar, aria-busy), avec son libellé.
    */
   busy?: boolean
+  /**
+   * Le nom lu d'une ligne qu'on touche, s'il doit dire plus que son libellé (« Nous écrire,
+   * contact@… ») : le nom d'un bouton cache le texte qu'il contient, la précision comprise.
+   */
+  spokenLabel?: string
 }
 
 export function ListRow({
@@ -115,6 +120,7 @@ export function ListRow({
   accessory,
   disabled = false,
   busy = false,
+  spokenLabel,
 }: RowProps) {
   const { colors } = useTheme()
   const isChoice = selected !== undefined
@@ -190,7 +196,7 @@ export function ListRow({
   return (
     <Pressable
       accessibilityRole={isChoice ? 'radio' : 'button'}
-      accessibilityLabel={label}
+      accessibilityLabel={spokenLabel ?? label}
       aria-disabled={disabled}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Un choix (bouton radio) se coche avec la barre d'espace, sur le web : react-native-web ne

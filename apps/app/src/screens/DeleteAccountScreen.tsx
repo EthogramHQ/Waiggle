@@ -105,6 +105,13 @@ export function DeleteAccountScreen() {
         />
       </ListGroup>
 
+      {/* Tranche 6d (règle 24 de la relecture du plan) : ce qui ne part pas tout de suite. Ses
+          signalements restent, sans son nom, et une trace des retraits de ses contenus, un an. */}
+      <ListGroup title={t('account.delete.remains.title')}>
+        <ListRow icon="flag" label={t('account.delete.remains.reports')} />
+        <ListRow icon="clock" label={t('account.delete.remains.removals')} />
+      </ListGroup>
+
       {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}
       <Step
         value={1}

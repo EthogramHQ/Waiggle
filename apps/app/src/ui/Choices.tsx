@@ -14,7 +14,8 @@ type Option<T extends string> = { value: T; label: string; icon?: IconName }
 type Props<T extends string> = {
   label: string
   options: Option<T>[]
-  value: T
+  /** Le choix coché ; null : aucun encore (une question à laquelle il faut répondre soi-même). */
+  value: T | null
   onChange: (value: T) => void
 }
 
