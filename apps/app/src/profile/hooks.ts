@@ -11,9 +11,11 @@ export const meQueryKey = ['me'] as const
 
 /**
  * Le profil du membre connecté. `enabled: false` (personne de connecté) : aucune requête.
- * Renvoie { data, isPending, isError… } : les écrans affichent un état selon le cas.
+ * `retryOnMount: false` : ce lecteur, en apparaissant, ne relance pas une lecture qui a échoué
+ * (voir TopNav). Renvoie { data, isPending, isError… } : les écrans affichent un état selon le cas.
  */
-export const useMe = (enabled = true) => useQuery({ queryKey: meQueryKey, queryFn: getMe, enabled })
+export const useMe = (enabled = true, { retryOnMount = true } = {}) =>
+  useQuery({ queryKey: meQueryKey, queryFn: getMe, enabled, retryOnMount })
 
 /** Remplace le profil gardé en cache par celui renvoyé par l'API après une modification. */
 export const useSetMe = () => {
