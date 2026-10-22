@@ -485,6 +485,9 @@ export const en: Translation = {
     dismissed: 'Report dismissed.',
     removedDone: 'Content removed.',
     restoredDone: 'Content restored.',
+    // The end of the list (added with the interface, slice 6d): all read, or the next page failed.
+    end: 'That’s all',
+    moreError: 'The rest of the list could not load.',
   },
   removal: {
     banner: 'Removed by moderation',

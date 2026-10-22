@@ -2,6 +2,7 @@
 // dans une description) passe par ici avant de s'ouvrir.
 // Pourquoi ? Un lien peut mentir sur sa destination : le texte « le site officiel » peut mener
 // ailleurs. Ici, le membre voit l'adresse réelle, et le nom du site en clair, avant de décider.
+import { contactEmail } from '@ruche/brand'
 import { publicHttpsUrl } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
@@ -22,7 +23,14 @@ import { useHydrated } from '../ui/theme/hydration'
  * machine du réseau local, pas d'identifiant caché avant « @ », pas de nom écrit dans un autre
  * alphabet qui pourrait imiter un site connu.
  */
-const safeTarget = (value: string | undefined): URL | null => (value ? publicHttpsUrl(value) : null)
+const safeTarget = (value: string | undefined): { host: string; href: string } | null => {
+  if (!value) return null
+  // Une seule exception (tranche 6d) : un e-mail à notre adresse de contact (« Nous écrire », dans
+  // Mon compte). L'adresse est comparée en entier : aucun autre « mailto: » ne passe, ni un sujet
+  // ou un destinataire ajouté après elle. Le « site » montré en grand est alors l'adresse.
+  if (value === `mailto:${contactEmail}`) return { host: contactEmail, href: value }
+  return publicHttpsUrl(value)
+}
 
 export function LeavingScreen({ url }: { url: string | undefined }) {
   const { t } = useTranslation()
