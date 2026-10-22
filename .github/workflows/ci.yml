@@ -20,8 +20,8 @@ on:
 # Toutes les tâches tournent sur Ubuntu 24.04, nommé en clair, et non sur « ubuntu-latest » :
 # le 22/10/2026, GitHub a fait passer « ubuntu-latest » à Ubuntu 26.04, où Playwright (le
 # navigateur des captures et du parcours de production) ne s'installe pas encore. Une machine
-# nommée ne change pas sous nos pieds ; passer à une version plus récente sera un choix, dans sa
-# propre pull request.
+# nommée ne change pas sous nos pieds. On reviendra à « ubuntu-latest » quand Playwright prendra
+# en charge Ubuntu 26.04 : Renovate propose ses nouvelles versions, dont les notes le diront.
 
 # Droits minimaux : la CI peut lire le code, rien de plus.
 permissions:
