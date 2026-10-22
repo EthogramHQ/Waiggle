@@ -745,17 +745,17 @@ Règles détaillées :
   depuis (suppressions, désinscriptions) ne sont pas réappliqués.
 - Export et suppression du compte : les deux réglages et les dates « envoyé jusqu'à ».
 
-## Tranche 6d — Signaler
+## Tranche 7a — Signaler
 
 - Tout membre peut signaler un projet, une note, un commentaire (ou une réponse) ou un profil,
   avec un motif
 - Le signalement arrive dans la file de l'administration, qui peut retirer le contenu ou classer
   le signalement ; chaque décision est tracée (qui, quand, pourquoi)
 
-### Précisions (tranche 6d) — validées le 22/10/2026
+### Précisions (tranche 7a) — validées le 22/10/2026
 
 Décisions de Louis (22/10/2026) :
-- **6d est la première moitié de la tranche 7** : signaler, et traiter un signalement. Bloquer un
+- **7a est la première partie de la tranche 7** : signaler, et traiter un signalement. Bloquer un
   membre et suspendre un compte viennent après.
 - **Qui administre** : un rôle « administrateur », posé ou retiré par un script du dépôt
   (`infra/`), jamais depuis l'appli. Louis seul au départ.
@@ -825,7 +825,7 @@ Règles détaillées :
 
 ## Tranche 7 — Sécurité et modération
 
-**Signaler** : fait en tranche 6d (signaler, retirer ou classer, décisions tracées).
+**Signaler** : fait en tranche 7a (signaler, retirer ou classer, décisions tracées).
 
 **Bloquer**
 - Un membre peut en bloquer un autre : ils ne voient plus leurs contenus respectifs et ne peuvent
