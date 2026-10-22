@@ -33,6 +33,7 @@ import {
 import { useMentionable } from '../mentions/api'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { shortDate } from '../projects/format'
+import { removalBanner } from '../reports/removal'
 import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
 import { type CommentAction, CommentCard, type CommentCardHandle } from '../ui/CommentCard'
@@ -46,8 +47,8 @@ import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
 
 // Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
-// au fil, pas au commentaire.)
-type ActionId = 'edit' | 'delete' | 'hide'
+// au fil, pas au commentaire.) « Signaler » (tranche 6d) ouvre la page du même nom.
+type ActionId = 'edit' | 'delete' | 'hide' | 'report'
 
 // Où dire « Ton commentaire a été supprimé. » : à la place du commentaire disparu.
 // - une réponse : à sa place dans son fil ;
@@ -136,10 +137,14 @@ export function Comments({ project }: { project: Project }) {
 
   /** Les actions permises sur ce commentaire, dans l'ordre d'affichage. */
   const actionIds = (comment: CommentReply): ActionId[] => {
-    if (comment.isMine) return ['edit', 'delete']
-    // L'auteur du projet masque le commentaire d'un autre ; le sien, il le supprime plutôt.
-    if (project.isMine && comment.state !== 'deleted') return ['hide']
-    return []
+    // Son propre commentaire retiré par la modération : on ne le modifie plus (l'API refuserait,
+    // 409 `removed`), on peut encore le supprimer.
+    if (comment.isMine) return comment.state === 'removed' ? ['delete'] : ['edit', 'delete']
+    // Un emplacement (supprimé, masqué ou retiré pour qui regarde) n'a aucune action.
+    if (!comment.author || comment.state === 'deleted' || comment.state === 'removed') return []
+    // L'auteur du projet masque le commentaire d'un autre ; tout le monde peut le signaler,
+    // jamais le sien.
+    return project.isMine ? ['hide', 'report'] : ['report']
   }
 
   /**
@@ -418,6 +423,14 @@ export function Comments({ project }: { project: Project }) {
             setDeleting({ id: comment.id, hasReplies: hasReplies(comment) })
           },
         }
+      case 'report':
+        // Une réponse est un commentaire comme un autre : la même sorte de cible.
+        return {
+          label: t('report.action'),
+          icon: 'flag',
+          onPress: () =>
+            router.push({ pathname: '/report', params: { kind: 'comment', id: comment.id } }),
+        }
       default: {
         // 'hide' : masquer, ou démasquer un commentaire déjà masqué.
         const hidden = comment.state === 'hidden'
@@ -486,10 +499,19 @@ export function Comments({ project }: { project: Project }) {
               : t('project.comments.hiddenBanner')
             : undefined
         }
+        // Retiré par la modération (tranche 6d) : son auteur, seul à le lire encore, voit pourquoi
+        // et comment contester ; les autres, l'auteur du projet compris, un simple emplacement.
+        removed={
+          comment.state === 'removed' && author && comment.removal
+            ? removalBanner(comment.removal, t)
+            : undefined
+        }
         placeholder={
           comment.state === 'deleted'
             ? t('project.comments.deletedPlaceholder')
-            : t('project.comments.hiddenPlaceholder')
+            : comment.state === 'removed'
+              ? t('project.comments.removedPlaceholder')
+              : t('project.comments.hiddenPlaceholder')
         }
         actions={actionsOf(comment, rootId)}
         description={describe(comment)}

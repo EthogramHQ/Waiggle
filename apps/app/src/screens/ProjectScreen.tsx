@@ -38,6 +38,7 @@ import { deleteProject } from '../projects/api'
 import { hostOf, shortDate } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
+import { removalBanner } from '../reports/removal'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
@@ -55,12 +56,14 @@ import { Notice } from '../ui/Notice'
 import { Pressed } from '../ui/Pressed'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ReactionBar } from '../ui/ReactionBar'
+import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
+import { TextLink } from '../ui/TextLink'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
@@ -306,8 +309,24 @@ function ProjectView({ project }: { project: Project }) {
           errorAction={reaction.expired ? signInAgain() : undefined}
         />
       )}
+      {/* Signaler (tranche 6d), sous les actions : un lien discret, jamais sur son propre projet. */}
+      {project.isMine ? null : (
+        <Row>
+          <TextLink
+            label={t('report.project')}
+            tone="secondary"
+            onPress={() =>
+              router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
+            }
+          />
+        </Row>
+      )}
     </Stack>
   )
+
+  // Retiré par la modération (tranche 6d) : l'auteur, seul à le voir encore, lit en tête pourquoi,
+  // et comment contester.
+  const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
 
   const recipe = hasRecipe ? (
     <Surface variant="grouped" padding="xl" gap="lg">
@@ -370,12 +389,17 @@ function ProjectView({ project }: { project: Project }) {
   const ownerActions = project.isMine ? (
     <Stack gap="md">
       {error ? <Notice message={error} /> : null}
-      <Button
-        label={t('project.page.edit')}
-        variant="secondary"
-        icon="pencil-simple"
-        onPress={() => router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })}
-      />
+      {/* Un projet retiré ne se modifie plus (l'API refuserait, 409 `removed`) ; il se supprime. */}
+      {project.removal ? null : (
+        <Button
+          label={t('project.page.edit')}
+          variant="secondary"
+          icon="pencil-simple"
+          onPress={() =>
+            router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })
+          }
+        />
+      )}
       <Button
         label={t('project.page.delete')}
         variant="danger"
@@ -426,6 +450,7 @@ function ProjectView({ project }: { project: Project }) {
         <Text variant={wide ? 'display' : 'title1'} accessibilityRole="header" breakAnywhere>
           {project.title}
         </Text>
+        {removal}
         <Columns
           main={
             <>
@@ -458,6 +483,7 @@ function ProjectView({ project }: { project: Project }) {
     >
       {cover}
       {thumbnails}
+      {removal}
       {info}
       {recipe}
       {description}
@@ -594,6 +620,9 @@ function Journal({ project }: { project: Project }) {
         id: note.id,
         body: note.body,
         when: shortDate(note.createdAt, i18n.language),
+        // Une note retirée par la modération (tranche 6d) n'arrive qu'à l'auteur du projet : il
+        // lit pourquoi, au-dessus de son texte.
+        removed: note.removal ? removalBanner(note.removal, t) : undefined,
       }))}
       {...(project.isMine
         ? {
@@ -609,7 +638,12 @@ function Journal({ project }: { project: Project }) {
                 ? t('project.notes.emptyPrivate')
                 : t('project.notes.empty'),
           }
-        : null)}
+        : {
+            // Un autre membre peut signaler chaque note (tranche 6d).
+            onReport: (id: string) =>
+              router.push({ pathname: '/report', params: { kind: 'note', id } }),
+            reportLabel: t('report.note'),
+          })}
     />
   )
   const empty = project.notes.length === 0
@@ -621,7 +655,9 @@ function Journal({ project }: { project: Project }) {
       </Text>
       {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
-      {project.isMine ? (
+      {/* Un projet retiré par la modération ne reçoit plus de note (l'API refuserait, 409
+          `removed`) : le champ disparaît jusqu'à un rétablissement. */}
+      {project.isMine && !project.removal ? (
         <NoteComposer
           open={composing}
           onOpen={() => {
