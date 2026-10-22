@@ -17,6 +17,7 @@ export const replyOf = (
   state: 'visible',
   isMine: false,
   mentions: [],
+  removal: null,
   ...fields,
 })
 

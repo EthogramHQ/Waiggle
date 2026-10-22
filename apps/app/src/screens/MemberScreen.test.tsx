@@ -3,7 +3,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
-import { visited } from '../testing/navigation'
+import { reportsOpened, visited } from '../testing/navigation'
 import { draftProject, leaPage, projectWithPhotos, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { MemberScreen } from './MemberScreen'
@@ -270,5 +270,27 @@ describe('following a member from her page', () => {
     // Témoin : le message d'erreur est bien là.
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Me reconnecter' })).toBeNull()
+  })
+})
+
+// --- Tranche 6d : signaler un profil ---
+
+describe('reporting a member from her page', () => {
+  it('offers to report the profile of another member, and opens « Signaler » for her', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Signaler ce profil' }))
+
+    // La page « Signaler » reçoit la sorte et l'identifiant de la cible (app/report.tsx).
+    expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'member', id: 'u1' })])
+  })
+
+  it('never offers to report one’s own profile', async () => {
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isMe: true })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    // Témoin : la page est affichée.
+    expect(await screen.findByRole('header', { name: 'Léa' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Signaler ce profil' })).toBeNull()
   })
 })

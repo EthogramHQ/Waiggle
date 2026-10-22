@@ -1,8 +1,11 @@
+import { contactEmail } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { signOut } from '../accounts/api'
 import { getMe } from '../profile/api'
-import { leaMe } from '../testing/fixtures'
+import { adminMe, leaMe } from '../testing/fixtures'
+import { pathOf, visited } from '../testing/navigation'
 import { mockSession, renderWithI18n } from '../testing/render'
+import { containing } from '../testing/text'
 import { AccountScreen } from './AccountScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
@@ -81,5 +84,49 @@ describe('AccountScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Supprimer mon compte' }))
 
     expect(mockPush).toHaveBeenCalledWith('/account/delete')
+  })
+})
+
+// --- Tranche 6d : la modération (administrateur seulement) et l'adresse de contact ---
+
+describe('moderation in my account', () => {
+  it('leads an administrator to the moderation page', async () => {
+    jest.mocked(getMe).mockResolvedValue(adminMe)
+    await renderWithI18n(<AccountScreen />)
+
+    // Le profil arrive après l'affichage : la ligne apparaît quand on sait qu'il est administrateur.
+    await fireEvent.press(await screen.findByRole('button', { name: /^Modération/ }))
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toContain('/moderation')
+  })
+
+  it('shows no moderation to a member who is not an administrator', async () => {
+    // Léa (leaMe) : isAdmin est faux.
+    await renderWithI18n(<AccountScreen />)
+
+    // Témoin : le profil est arrivé (la ligne « Nous écrire » ne dépend pas de lui, l'avatar oui).
+    expect(await screen.findByRole('button', { name: /^Nous écrire/ })).toBeTruthy()
+    expect(jest.mocked(getMe)).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^Modération/ })).toBeNull()
+    expect(screen.queryByText('Modération')).toBeNull()
+  })
+})
+
+describe('writing to us from my account', () => {
+  it('shows the contact address, in French or in English', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    expect(screen.getAllByText(containing(contactEmail)).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/En français ou en anglais/).length).toBeGreaterThan(0)
+  })
+
+  it('opens an e-mail to the contact address through the leaving page', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    await fireEvent.press(screen.getByRole('button', { name: /^Nous écrire/ }))
+
+    // useOpenOutside : la page d'avertissement, avec l'adresse mailto: (seul endroit où elle est
+    // écrite : packages/brand).
+    expect(visited(mockPush)).toContain(`/out?url=mailto:${contactEmail}`)
   })
 })

@@ -33,6 +33,7 @@ export const recipesProject: Project = {
   notes: [],
   reactions: noReactions,
   commentCount: 0,
+  removal: null,
   createdAt: '2026-10-12T08:00:00.000Z',
   updatedAt: '2026-10-12T08:00:00.000Z',
 }

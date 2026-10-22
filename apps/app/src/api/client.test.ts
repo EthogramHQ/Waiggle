@@ -69,6 +69,23 @@ describe('request', () => {
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
   })
 
+  it('tells apart the refusals of reporting and moderating, by the code of the answer (slice 6d)', async () => {
+    // Trois refus « 409 » (déjà signalé, déjà décidé, contenu retiré) et un « 422 » (son propre
+    // contenu) : chacun a son message, que seul le code du corps de la réponse désigne.
+    const refusal = (code: string, status: number) =>
+      json({ error: { code, message: '…' } }, status)
+    fetchMock
+      .mockResolvedValueOnce(refusal('already_reported', 409))
+      .mockResolvedValueOnce(refusal('already_decided', 409))
+      .mockResolvedValueOnce(refusal('removed', 409))
+      .mockResolvedValueOnce(refusal('own_content', 422))
+
+    expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'alreadyReported' })
+    expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'alreadyDecided' })
+    expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'removed' })
+    expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'ownContent' })
+  })
+
   it('says so when the server cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('Network request failed'))
 
