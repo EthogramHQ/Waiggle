@@ -73,6 +73,22 @@ export const CreatedReport = z.object({ id: z.uuid() }).meta({ id: 'CreatedRepor
 export type CreatedReport = z.infer<typeof CreatedReport>
 
 /**
+ * Ce que la page « Signaler » montre de la cible (GET /v1/reports/target?kind=…&id=…), lu par l'API
+ * avec la même règle de visibilité que le signalement : un lien fabriqué ne fait donc jamais
+ * signaler autre chose que ce que le membre voit. 404 pour une cible inconnue ou invisible.
+ */
+export const ReportTargetPreview = z
+  .object({
+    target: ReportTarget,
+    /** Le texte actuel : titre et pitch d'un projet, texte d'une note ou d'un commentaire, nom et pseudo d'un membre. */
+    text: z.string(),
+    /** Le projet de la cible, pour revenir à sa page ; null pour un profil. */
+    projectId: ProjectId.nullable(),
+  })
+  .meta({ id: 'ReportTargetPreview' })
+export type ReportTargetPreview = z.infer<typeof ReportTargetPreview>
+
+/**
  * L'état actuel d'une cible dans la file : encore là, déjà retirée, ou disparue (supprimée par son
  * auteur, compte supprimé).
  */
