@@ -163,9 +163,22 @@ export function ReportCard({
         </View>
       ) : null}
 
-      <Text variant="caption" tone="muted">
-        {when}
-      </Text>
+      {/* La date, et « Voir » au bout de la même ligne : le lien reste à l'écart des décisions,
+          qui ont leur propre rangée. À texte agrandi, « Voir » passe à la ligne. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          columnGap: space.md,
+        }}
+      >
+        <Text variant="caption" tone="muted">
+          {when}
+        </Text>
+        <TextLink label={viewLabel} onPress={onView} />
+      </View>
 
       {status ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
@@ -178,29 +191,25 @@ export function ReportCard({
         </View>
       ) : null}
 
-      {/* « Voir », puis les décisions. Elles passent à la ligne quand la place manque (téléphone,
-          texte agrandi) ; l'écart garde chaque bouton à distance de son voisin. */}
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: space.md,
-        }}
-      >
-        <TextLink label={viewLabel} onPress={onView} />
-        {actions.map((action) => (
-          <Button
-            key={action.label}
-            label={action.label}
-            onPress={action.onPress}
-            variant={action.tone === 'danger' ? 'danger' : 'secondary'}
-            size="compact"
-            loading={action.loading ?? false}
-            {...(action.ref ? { ref: action.ref } : null)}
-          />
-        ))}
-      </View>
+      {/* Les décisions. Elles passent à la ligne quand la place manque (texte agrandi) ; l'écart
+          garde chaque bouton à distance de son voisin. */}
+      {actions.length > 0 ? (
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.md }}
+        >
+          {actions.map((action) => (
+            <Button
+              key={action.label}
+              label={action.label}
+              onPress={action.onPress}
+              variant={action.tone === 'danger' ? 'danger' : 'secondary'}
+              size="compact"
+              loading={action.loading ?? false}
+              {...(action.ref ? { ref: action.ref } : null)}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   )
 }
