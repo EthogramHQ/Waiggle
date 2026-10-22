@@ -204,6 +204,24 @@ if compose exec -T api sh -c 'test -f /app/media/apres.txt'; then die "fichier p
 expect "version après restauration" "$(web -f "https://$API_HOST/health" | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).version))')" stack-test
 echo "ok"
 
+step "Le rôle d'administrateur de la modération (infra/grant-admin.sh)"
+# Le membre restauré (avant@example.com, adresse vérifiée) reçoit le rôle, puis le perd ; sa ligne
+# reste, datée de la révocation. Une adresse avec une apostrophe est refusée avant toute requête,
+# une adresse inconnue échoue. GITHUB_ACTIONS vide : ces refus sont attendus.
+admins() {
+  echo "select count(*) from admin_member where revoked_at is null;" | db_query
+}
+if GITHUB_ACTIONS="" infra/grant-admin.sh "a'@b.io" 2>/dev/null; then die "une adresse avec une apostrophe a été acceptée"; fi
+if GITHUB_ACTIONS="" infra/grant-admin.sh personne@example.com 2>/dev/null; then die "une adresse inconnue a été acceptée"; fi
+expect "administrateurs après les refus" "$(admins)" 0
+infra/grant-admin.sh AVANT@example.com
+expect "administrateurs en fonction" "$(admins)" 1
+infra/grant-admin.sh avant@example.com --revoke
+expect "administrateurs après --revoke" "$(admins)" 0
+expect "lignes gardées après --revoke" "$(echo 'select count(*) from admin_member;' | db_query)" 1
+if GITHUB_ACTIONS="" infra/grant-admin.sh avant@example.com --revoke 2>/dev/null; then die "une seconde révocation a été acceptée"; fi
+echo "ok"
+
 step "Le parcours réel d'un membre, dans un vrai navigateur (apps/app/scripts/journey.mjs)"
 # Deux comptes, un projet avec photos, privé puis supprimé, puis un compte supprimé : ce que voit
 # chacun, et ce qui reste sur le disque. Le script lit les e-mails dans les logs de l'API, et liste
