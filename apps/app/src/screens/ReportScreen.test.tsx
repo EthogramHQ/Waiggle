@@ -3,15 +3,15 @@
 // une précision facultative, puis remercie. Chaque refus de l'API a son propre texte.
 //
 // L'interface attendue de `src/reports/api.ts` (écrit par ui-dev) :
-// - `useReportTarget(target: ReportTarget | null, projectId: string | undefined)` : la lecture de
-//   la cible (React Query), qui rend `{ text }` ; null quand l'adresse ne décrit aucune cible
-//   valable, et la page ne demande rien ;
-// - `getReportTarget(target, projectId)` : la lecture elle-même, que ce test remplace ;
+// - `useReportTarget(target: ReportTarget | null)` : la lecture de la cible (React Query), par
+//   GET /v1/reports/target (règle 26 du plan), qui rend un `ReportTargetPreview` (`target`,
+//   `text` actuel, `projectId`) ; null quand l'adresse ne décrit aucune cible valable, et la page
+//   ne demande rien ;
+// - `getReportTarget(target)` : la lecture elle-même, que ce test remplace ;
 // - `sendReport(report: CreateReport)` : l'envoi, qui rend un `ApiResult` (`{ ok: true, data }` ou
 //   `{ ok: false, error }`, la clé du message d'erreur).
-// La page elle-même reçoit les paramètres bruts de l'adresse (app/report.tsx) : `kind`, `id`, et
-// `project` (le projet d'une note ou d'un commentaire).
-import type { ReportTarget } from '@ruche/contracts'
+// La page elle-même reçoit les paramètres bruts de l'adresse (app/report.tsx) : `kind` et `id`.
+import type { ReportTarget, ReportTargetPreview } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { getReportTarget, sendReport } from '../reports/api'
@@ -35,10 +35,10 @@ jest.mock('../reports/api', () => {
   return {
     getReportTarget,
     sendReport: jest.fn(),
-    useReportTarget: (target: { kind: string; id: string } | null, projectId?: string) =>
+    useReportTarget: (target: { kind: string; id: string } | null) =>
       useQuery({
-        queryKey: ['report-target', target?.kind, target?.id, projectId],
-        queryFn: () => getReportTarget(target, projectId),
+        queryKey: ['report-target', target?.kind, target?.id],
+        queryFn: () => getReportTarget(target),
         enabled: target !== null,
       }),
   }
@@ -62,10 +62,12 @@ const commentId = 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d'
 const projectId = '6e7f8091-a2b3-4dc4-9ed5-e6f708192a3b'
 const commentText = 'Envoie-moi le code de ta carte, je te débloque la version pro.'
 const target: ReportTarget = { kind: 'comment', id: commentId }
+/** Ce que rend GET /v1/reports/target pour ce commentaire (ReportTargetPreview). */
+const preview: ReportTargetPreview = { target, text: commentText, projectId }
 
 /** La page « Signaler » de ce commentaire, telle que l'ouvre l'action « Signaler ». */
 const reportComment = () =>
-  renderWithProviders(<ReportScreen kind="comment" id={commentId} project={projectId} />)
+  renderWithProviders(<ReportScreen kind="comment" id={commentId} />)
 
 /** Les sept motifs, dans l'ordre du contrat (ReportReason). */
 const reasonLabels = [
@@ -86,7 +88,7 @@ const sendWith = async (reason: string) => {
 
 beforeEach(() => {
   mockSession({ user: { id: 'u4', name: 'Malik' } })
-  jest.mocked(getReportTarget).mockReset().mockResolvedValue({ text: commentText })
+  jest.mocked(getReportTarget).mockReset().mockResolvedValue(preview)
   jest
     .mocked(sendReport)
     .mockReset()
@@ -104,7 +106,7 @@ describe('what is reported', () => {
     expect(screen.getByText('Le commentaire signalé')).toBeTruthy()
     // La cible vient de l'adresse, mais son texte de l'API : un lien fabriqué ne fait pas
     // signaler autre chose que ce qu'on lit.
-    expect(getReportTarget).toHaveBeenCalledWith(target, projectId)
+    expect(getReportTarget).toHaveBeenCalledWith(target)
   })
 
   it('says « not found » when the API does not give the content (unknown, private, removed)', async () => {
@@ -126,7 +128,7 @@ describe('what is reported', () => {
 
   it('says « not found » for an id that does not fit its kind, without asking the API', async () => {
     // Un commentaire a un identifiant uuid (ReportTarget du contrat).
-    await renderWithProviders(<ReportScreen kind="comment" id="../../v1/me" project={projectId} />)
+    await renderWithProviders(<ReportScreen kind="comment" id="../../v1/me" />)
 
     expect(await screen.findByRole('button', { name: 'Retour à l’accueil' })).toBeTruthy()
     expect(getReportTarget).not.toHaveBeenCalled()
@@ -141,12 +143,16 @@ describe('what is reported', () => {
   })
 
   it('names each kind of target', async () => {
-    jest.mocked(getReportTarget).mockResolvedValue({ text: 'Lucas Martin (@lucas_martin)' })
+    jest.mocked(getReportTarget).mockResolvedValue({
+      target: { kind: 'member', id: 'u7' },
+      text: 'Lucas Martin (@lucas_martin)',
+      projectId: null,
+    })
     await renderWithProviders(<ReportScreen kind="member" id="u7" />)
 
     expect(await screen.findByText('Lucas Martin (@lucas_martin)')).toBeTruthy()
     expect(screen.getByText('Le profil signalé')).toBeTruthy()
-    expect(getReportTarget).toHaveBeenCalledWith({ kind: 'member', id: 'u7' }, undefined)
+    expect(getReportTarget).toHaveBeenCalledWith({ kind: 'member', id: 'u7' })
   })
 })
 

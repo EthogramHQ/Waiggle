@@ -342,6 +342,21 @@ describe('a comment removed by the moderation', () => {
     expect(screen.queryByText('Contenu retiré par la modération')).toBeNull()
   })
 
+  it('lets its author delete it, but no longer edit it', async () => {
+    // Règle 28 du plan : modifier un contenu retiré est refusé (409 `removed`), le supprimer reste
+    // permis.
+    mockComments([
+      { ...maxComment, state: 'removed', isMine: true, removal: removalAfterReport, replies: [] },
+    ])
+    await renderWithProviders(<Comments project={project} />)
+
+    const card = cardOf('Super idée, je teste ce soir.')
+    expect(card.getByRole('button', { name: 'Supprimer le commentaire' })).toBeTruthy()
+    expect(card.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
+    // Témoin : le bandeau du retrait est bien là (la carte est celle d'un commentaire retiré).
+    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBeGreaterThan(0)
+  })
+
   it('names nobody who reported it, even to its author', async () => {
     mockComments([
       { ...maxComment, state: 'removed', isMine: true, removal: removalAfterReport, replies: [] },
