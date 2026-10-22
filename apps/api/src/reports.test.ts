@@ -18,6 +18,7 @@ import {
   NotificationPage,
   ProjectNote,
   REPORTS_PER_DAY,
+  ReportTargetPreview,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
@@ -469,5 +470,114 @@ describe('the limit of reports', () => {
     expect((await postReport(zoe, target('project', meteo.id))).status).toBe(201)
     later(DAY)
     expect((await postReport(max, target('project', meteo.id))).status).toBe(201)
+  })
+})
+
+// Règle 26 : la page « Signaler » lit sa cible par GET /v1/reports/target, avec la même règle de
+// visibilité que le signalement lui-même. Un lien fabriqué ne fait donc ni lire, ni signaler,
+// autre chose que ce que le membre voit.
+describe('the preview of the target', () => {
+  const previewPath = (kind: string, id: string) =>
+    `/v1/reports/target?${new URLSearchParams({ kind, id })}`
+  const preview = (cookie: string | null, kind: string, id: string) =>
+    act.send('GET', previewPath(kind, id), cookie)
+  const readPreview = async (cookie: string, kind: string, id: string) => {
+    const res = await preview(cookie, kind, id)
+    expect(res.status, `${kind} ${id}`).toBe(200)
+    return ReportTargetPreview.parse(await res.json())
+  }
+  const unknownPreview = () => preview(max, 'project', UNKNOWN)
+
+  it('gives the current text and the project of each kind of target', async () => {
+    const note = await postNote(meteo.id, lea, 'Une note à lire')
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire à lire')
+    const { handle } = await act.me(lea)
+
+    expect(await readPreview(max, 'project', meteo.id)).toEqual({
+      target: { kind: 'project', id: meteo.id },
+      text: expect.stringContaining('Météo'),
+      projectId: meteo.id,
+    })
+    expect((await readPreview(max, 'project', meteo.id)).text).toContain(
+      'La pluie de demain, quartier par quartier.',
+    )
+    expect(await readPreview(max, 'note', note.id)).toEqual({
+      target: { kind: 'note', id: note.id },
+      text: 'Une note à lire',
+      projectId: meteo.id,
+    })
+    expect(await readPreview(max, 'comment', comment.id)).toEqual({
+      target: { kind: 'comment', id: comment.id },
+      text: 'Un commentaire à lire',
+      projectId: meteo.id,
+    })
+    const member = await readPreview(max, 'member', leaId)
+    expect(member).toMatchObject({ target: { kind: 'member', id: leaId }, projectId: null })
+    expect(member.text).toContain('Léa')
+    expect(member.text).toContain(handle)
+  })
+
+  it('asks to sign in without a session', async () => {
+    await expectError(await preview(null, 'project', meteo.id), 401, 'unauthorized')
+    // Témoin : avec la session de Max, la cible se lit.
+    expect((await preview(max, 'project', meteo.id)).status).toBe(200)
+  })
+
+  it('answers the same 404 as the report for what the member cannot see', async () => {
+    const draft = await act.publish(lea, 'Brouillon', { visibility: 'private' })
+    const velo = await act.publish(lea, 'Vélo')
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.project.id, velo.id))
+    const secret = await postNote(draft.id, lea, 'Une idée encore secrète')
+    const hidden = await act.comment(meteo.id, zoe, 'Un commentaire masqué par Léa')
+    await act.hide(meteo.id, hidden.id, lea)
+    const deleted = await act.comment(meteo.id, zoe, 'Un commentaire supprimé')
+    await act.deleteComment(meteo.id, deleted.id, zoe)
+
+    for (const [kind, id] of [
+      ['project', draft.id],
+      ['project', velo.id],
+      ['note', UNKNOWN],
+      ['note', secret.id],
+      ['comment', hidden.id],
+      ['comment', deleted.id],
+      ['member', 'no-such-member'],
+    ] as const) {
+      await expectSameNotFound(await preview(max, kind, id), await unknownPreview())
+    }
+    // Le signalement répond la même chose, mot pour mot.
+    await expectSameNotFound(
+      await postReport(max, target('project', draft.id)),
+      await unknownPreview(),
+    )
+    // Témoin : le projet public se lit.
+    expect((await preview(max, 'project', meteo.id)).status).toBe(200)
+  })
+
+  it('answers 400 for an id that does not fit its kind', async () => {
+    for (const [kind, id] of [
+      ['project', 'pas-un-uuid'],
+      ['comment', leaId],
+      ['member', '../admin'],
+      ['reaction', meteo.id],
+    ]) {
+      await expectError(await preview(max, kind as string, id as string), 400, 'validation')
+    }
+    const res = await act.send('GET', '/v1/reports/target', max)
+    await expectError(res, 400, 'validation')
+  })
+
+  it('refuses her own content, as the report does', async () => {
+    const note = await postNote(meteo.id, lea, 'Ma note')
+
+    for (const [kind, id] of [
+      ['project', meteo.id],
+      ['note', note.id],
+      ['member', leaId],
+    ] as const) {
+      await expectError(await preview(lea, kind, id), 422, 'own_content')
+    }
   })
 })

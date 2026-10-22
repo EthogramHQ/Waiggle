@@ -35,6 +35,7 @@ import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { jpegImage, visualForm } from './testing/images'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -775,5 +776,47 @@ describe('who is told', () => {
       await (await act.send('GET', '/v1/notifications', max)).json(),
     )
     expect(maxPage.items.map((n) => n.kind)).toContain('report_handled')
+  })
+})
+
+// ─── Questions des test-writer (23/10/2026), règles 29 et 30 du plan ──────────────────────────────
+
+// Règle 30 : ajouter une note ou une photo à un projet retiré, c'est le modifier.
+describe('adding to a removed project', () => {
+  it('refuses a new note or a new photo while the project is removed', async () => {
+    await report(max, projectTarget())
+    await remove(projectTarget())
+
+    later()
+    await expectError(
+      await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Une note de plus' }),
+      409,
+      'removed',
+    )
+    const photo = await ctx.request(`/v1/projects/${meteo.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: visualForm(await jpegImage(1200, 800)),
+    })
+    await expectError(photo, 409, 'removed')
+    expect((await readProject(meteo.id, lea)).notes).toEqual([])
+  })
+})
+
+// Règle 29 : une cible supprimée par son auteur quitte la file, sans prévenir qui l'a signalée.
+describe('a target deleted by its author', () => {
+  it('leaves the queue, and its reporter is told nothing', async () => {
+    const comment = await act.comment(meteo.id, zoe, 'Un commentaire bientôt supprimé')
+    await report(max, { kind: 'comment', id: comment.id })
+    await report(max, projectTarget()) // témoin : une cible encore là
+    await act.deleteComment(meteo.id, comment.id, zoe)
+
+    const page = await readQueue()
+
+    expect(page.items.map((item) => item.target)).toEqual([projectTarget()])
+    const maxPage = NotificationPage.parse(
+      await (await act.send('GET', '/v1/notifications', max)).json(),
+    )
+    expect(maxPage.items.filter((n) => n.kind === 'report_handled')).toEqual([])
   })
 })
