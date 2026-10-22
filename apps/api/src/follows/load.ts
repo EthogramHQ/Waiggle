@@ -4,6 +4,7 @@
 import type { FollowState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, type Column, eq, inArray, sql } from 'drizzle-orm'
+import { listedProject } from '../projects/visibility'
 
 type Reader = Pick<Database, 'select'>
 
@@ -95,7 +96,8 @@ export const projectFollowStates = async (
  *
  * Un projet suivi qui est devenu privé ne compte pas : sinon, la réponse changerait selon qu'il est
  * privé (encore compté) ou supprimé (plus compté), et trahirait qu'il existe encore. On ne garde
- * que les projets publics (on ne peut pas suivre les siens, donc pas besoin d'autre cas).
+ * que les projets publics et pas retirés (listedProject ; on ne peut pas suivre les siens, donc pas
+ * besoin d'autre cas).
  */
 export const followsAnyone = async (db: Reader, viewerId: string): Promise<boolean> => {
   const [member, project] = await Promise.all([
@@ -108,9 +110,7 @@ export const followsAnyone = async (db: Reader, viewerId: string): Promise<boole
       .select({ id: schema.projectFollow.projectId })
       .from(schema.projectFollow)
       .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
-      .where(
-        and(eq(schema.projectFollow.followerId, viewerId), eq(schema.project.visibility, 'public')),
-      )
+      .where(and(eq(schema.projectFollow.followerId, viewerId), listedProject()))
       .limit(1),
   ])
   return member.length > 0 || project.length > 0

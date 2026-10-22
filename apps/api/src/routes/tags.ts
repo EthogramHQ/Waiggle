@@ -4,10 +4,11 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { TagPage, TagParam, toolSlug } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, arrayContains, eq } from 'drizzle-orm'
+import { and, arrayContains } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { loadSummaries } from '../projects/load'
+import { listedProject } from '../projects/visibility'
 import { createRouter, errorResponse } from './router'
 
 const readTagRoute = createRoute({
@@ -40,11 +41,12 @@ export const tagRoutes = ({ db, publicApiUrl }: Deps) => {
     // Une étiquette faite seulement d'espaces ne donne rien : aucun projet ne peut la porter.
     if (!slug) return c.json(errorBody(languageOf(c), 'validation'), 400)
     // arrayContains : « la liste tool_slugs contient cette étiquette » (opérateur @> de
-    // PostgreSQL, accéléré par l'index GIN de la table). Seulement les projets publics, même pour
-    // leur auteur : ses brouillons n'ont rien à faire sur une page partagée.
+    // PostgreSQL, accéléré par l'index GIN de la table). Seulement les projets publics et pas
+    // retirés (listedProject), même pour leur auteur : ses brouillons n'ont rien à faire sur une
+    // page partagée, ni un projet que la modération a retiré.
     const projects = await loadSummaries(
       db,
-      and(eq(schema.project.visibility, 'public'), arrayContains(schema.project.toolSlugs, [slug])),
+      and(listedProject(), arrayContains(schema.project.toolSlugs, [slug])),
       viewer.id,
       publicApiUrl,
     )

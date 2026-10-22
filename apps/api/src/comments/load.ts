@@ -11,6 +11,7 @@ import {
   type CommentReply,
   type Mention,
   type Project,
+  type Removal,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import {
@@ -30,6 +31,8 @@ import { alias } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { mediaUrl } from '../profile/me'
+import { listedProject } from '../projects/visibility'
+import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
 // L'auteur d'un commentaire, sous la même forme que l'auteur d'un projet (contrat `ProjectAuthor`).
@@ -40,7 +43,15 @@ const c = schema.projectComment
 /** Ce qu'on lit d'un commentaire pour le montrer. */
 export type CommentRow = Pick<
   typeof c.$inferSelect,
-  'id' | 'authorId' | 'body' | 'createdAt' | 'editedAt' | 'hiddenAt' | 'deletedAt'
+  | 'id'
+  | 'authorId'
+  | 'body'
+  | 'createdAt'
+  | 'editedAt'
+  | 'hiddenAt'
+  | 'deletedAt'
+  | 'removedAt'
+  | 'removalId'
 >
 
 // Les colonnes de CommentRow, pour les « select » ci-dessous.
@@ -52,6 +63,8 @@ const rowColumns = {
   editedAt: c.editedAt,
   hiddenAt: c.hiddenAt,
   deletedAt: c.deletedAt,
+  removedAt: c.removedAt,
+  removalId: c.removalId,
 }
 
 /**
@@ -61,30 +74,40 @@ const rowColumns = {
  */
 export type Viewer = { id: string; isProjectAuthor: boolean; projectIsPrivate: boolean }
 
-/** Le Viewer d'un membre devant un projet qu'il a le droit de voir. */
+/**
+ * Le Viewer d'un membre devant un projet qu'il a le droit de voir. Un projet retiré par la
+ * modération (tranche 6d) compte comme privé : seul son auteur le voit encore, et il n'y lit que
+ * ses propres commentaires, puisque les autres ne peuvent plus y lire les leurs.
+ */
 export const viewerOf = (
   memberId: string,
-  project: { authorId: string; visibility: string },
+  project: { authorId: string; visibility: string; removedAt: Date | null },
 ): Viewer => ({
   id: memberId,
   isProjectAuthor: project.authorId === memberId,
-  projectIsPrivate: project.visibility !== 'public',
+  projectIsPrivate: project.visibility !== 'public' || project.removedAt !== null,
 })
 
 /**
  * La règle de visibilité d'un commentaire non supprimé, en un seul endroit (décisions de Louis du
  * 19/10/2026, docs/scenarios/phase-1.md, tranche 5) : ce membre lit-il ce commentaire ?
  * - sans auteur (compte disparu sans passer par l'API) : personne ;
+ * - retiré par la modération (tranche 6d, règle 1 de la relecture du plan) : seulement s'il l'a
+ *   écrit, sans exception, pas même l'auteur du projet (qui lit pourtant ce qu'il a masqué) ;
  * - sur un projet privé : seulement s'il l'a écrit. Ce que les autres ont laissé quand le projet
  *   était public est gardé, mais personne ne le lit, l'auteur du projet compris : rien de ce
  *   qu'ils ont écrit n'est lu sans eux. Tout revient si le projet redevient public ;
  * - sur un projet public : tout le monde, sauf s'il est masqué ; un commentaire masqué reste lu
  *   par son auteur et par l'auteur du projet.
  */
-export const sees = (row: Pick<CommentRow, 'authorId' | 'hiddenAt'>, viewer: Viewer) => {
+export const sees = (
+  row: Pick<CommentRow, 'authorId' | 'hiddenAt' | 'removedAt'>,
+  viewer: Viewer,
+) => {
   if (row.authorId === null) return false
-  if (viewer.projectIsPrivate) return row.authorId === viewer.id
-  return row.hiddenAt === null || viewer.isProjectAuthor || row.authorId === viewer.id
+  if (row.authorId === viewer.id) return true
+  if (row.removedAt !== null || viewer.projectIsPrivate) return false
+  return row.hiddenAt === null || viewer.isProjectAuthor
 }
 
 /**
@@ -92,13 +115,20 @@ export const sees = (row: Pick<CommentRow, 'authorId' | 'hiddenAt'>, viewer: Vie
  * même table sous un autre nom, voir loadCommentPage). Elle doit dire exactement ce que dit `sees`.
  */
 export const seesSql = (
-  table: { hiddenAt: Column; authorId: Column },
+  table: { hiddenAt: Column; authorId: Column; removedAt: Column },
   viewer: Viewer,
 ): SQL | undefined => {
   // « author_id = $membre » écarte aussi les lignes sans auteur (null n'est égal à rien).
   if (viewer.projectIsPrivate) return eq(table.authorId, viewer.id)
-  if (viewer.isProjectAuthor) return isNotNull(table.authorId) // masqués compris
-  return and(isNotNull(table.authorId), or(isNull(table.hiddenAt), eq(table.authorId, viewer.id)))
+  const mine = eq(table.authorId, viewer.id)
+  // L'auteur du projet : les masqués compris, jamais les retirés des autres.
+  if (viewer.isProjectAuthor) {
+    return and(isNotNull(table.authorId), or(isNull(table.removedAt), mine))
+  }
+  return and(
+    isNotNull(table.authorId),
+    or(and(isNull(table.hiddenAt), isNull(table.removedAt)), mine),
+  )
 }
 
 /**
@@ -108,6 +138,8 @@ export const seesSql = (
  * masqué »), sans auteur ni texte, pour que les réponses gardent leur fil.
  * `mentions` : les membres que mentionne son texte (mentions/load.ts) ; un emplacement n'en a
  * jamais, puisqu'il ne montre pas le texte.
+ * `removals` : les retraits lus par removalsOf (removals/load.ts), rangés par décision ; seul
+ * l'auteur d'un commentaire retiré en reçoit un.
  */
 export const presentComment = (
   row: CommentRow,
@@ -115,13 +147,14 @@ export const presentComment = (
   authors: Map<string, ProjectAuthor>,
   hasShownReplies: boolean,
   mentions: Mention[] = [],
+  removals: Map<string, Removal> = new Map(),
 ): CommentReply | null => {
   const base = {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
   }
-  const placeholder = (state: 'hidden' | 'deleted'): CommentReply | null =>
+  const placeholder = (state: 'hidden' | 'deleted' | 'removed'): CommentReply | null =>
     hasShownReplies
       ? {
           ...base,
@@ -131,7 +164,6 @@ export const presentComment = (
           state,
           isMine: false,
           mentions: [],
-          // Tranche 6d : le retrait par la modération reste à brancher (backend-dev).
           removal: null,
         }
       : null
@@ -139,18 +171,28 @@ export const presentComment = (
   const author = row.authorId === null ? undefined : authors.get(row.authorId)
   // Sans auteur (compte disparu sans passer par l'API), il n'y a plus rien à montrer de lui.
   if (!author) return placeholder('deleted')
-  // Masqué pour ce membre, ou laissé par un autre sur un projet devenu privé : sa place seulement.
-  if (!sees(row, viewer)) return placeholder('hidden')
+  // Retiré par la modération, masqué pour ce membre, ou laissé par un autre sur un projet devenu
+  // privé : sa place seulement (« Contenu retiré par la modération », « Commentaire masqué »).
+  if (!sees(row, viewer)) return placeholder(row.removedAt === null ? 'hidden' : 'removed')
+  // Ici, un commentaire retiré est forcément le sien (sees) : il le lit, avec l'explication.
+  const removed = row.removedAt !== null
   return {
     ...base,
     author,
     body: row.body,
-    state: row.hiddenAt === null ? 'visible' : 'hidden',
+    state: removed ? 'removed' : row.hiddenAt === null ? 'visible' : 'hidden',
     isMine: row.authorId === viewer.id,
     mentions,
-    removal: null,
+    removal: removed ? (removals.get(row.removalId ?? '') ?? null) : null,
   }
 }
+
+/**
+ * Les décisions dont ce membre lit le retrait : celles de ses propres commentaires retirés, parmi
+ * `rows`. Les commentaires retirés des autres ne montrent jamais leur explication.
+ */
+const ownRemovalIds = (rows: CommentRow[], viewer: Viewer) =>
+  rows.map((row) => (row.removedAt !== null && row.authorId === viewer.id ? row.removalId : null))
 
 /**
  * Les auteurs de ces commentaires, en une requête quelle que soit leur nombre : leur nom, et
@@ -187,9 +229,9 @@ export const authorsOf = async (
 /**
  * Une page de commentaires d'un projet, telle que la voit `viewer` : 20 racines au plus, de la plus
  * récente à la plus ancienne, après le curseur s'il y en a un ; sous chacune, ses réponses montrées
- * à ce membre, de la plus ancienne à la plus récente (50 au plus). Toujours quatre requêtes au
- * plus, quel que soit le nombre de commentaires : les racines, leurs réponses, leurs auteurs, et
- * les membres qu'ils mentionnent.
+ * à ce membre, de la plus ancienne à la plus récente (50 au plus). Toujours cinq requêtes au
+ * plus, quel que soit le nombre de commentaires : les racines, leurs réponses, leurs auteurs, les
+ * membres qu'ils mentionnent, et l'explication des siens qui ont été retirés.
  */
 export const loadCommentPage = async (
   db: Reader,
@@ -262,6 +304,8 @@ export const loadCommentPage = async (
         editedAt: reply.editedAt,
         hiddenAt: reply.hiddenAt,
         deletedAt: reply.deletedAt,
+        removedAt: reply.removedAt,
+        removalId: reply.removalId,
       })
       .from(reply)
       .where(and(eq(reply.rootId, c.id), seesSql(reply, viewer)))
@@ -278,6 +322,8 @@ export const loadCommentPage = async (
         editedAt: shown.editedAt,
         hiddenAt: shown.hiddenAt,
         deletedAt: shown.deletedAt,
+        removedAt: shown.removedAt,
+        removalId: shown.removalId,
       })
       .from(c)
       .crossJoinLateral(shown)
@@ -315,15 +361,29 @@ export const loadCommentPage = async (
       authors.has(row.authorId) &&
       sees(row, viewer),
   )
-  const mentions = await mentionsOf(db, read)
+  // 5. L'explication de ses propres commentaires retirés (tranche 6d), en une requête, et
+  // seulement s'il y en a sur la page (removalsOf ne demande rien pour une liste vide).
+  const [mentions, removals] = await Promise.all([
+    mentionsOf(db, read),
+    removalsOf(db, ownRemovalIds(read, viewer)),
+  ])
   const mentionsFor = (row: CommentRow) => mentions.get(row.id) ?? []
 
   const items = page.flatMap((root): Comment[] => {
     const replies = (repliesByRoot.get(root.id) ?? [])
       // Redit en JavaScript : la requête a déjà écarté les réponses qu'il ne voit pas.
       .filter((row) => sees(row, viewer))
-      .flatMap((row) => presentComment(row, viewer, authors, false, mentionsFor(row)) ?? [])
-    const shownRoot = presentComment(root, viewer, authors, replies.length > 0, mentionsFor(root))
+      .flatMap(
+        (row) => presentComment(row, viewer, authors, false, mentionsFor(row), removals) ?? [],
+      )
+    const shownRoot = presentComment(
+      root,
+      viewer,
+      authors,
+      replies.length > 0,
+      mentionsFor(root),
+      removals,
+    )
     return shownRoot ? [{ ...shownRoot, replies }] : []
   })
 
@@ -341,17 +401,18 @@ export const loadCommentPage = async (
 
 /**
  * Le nombre de commentaires que tout le monde voit, pour plusieurs projets, en une requête : les
- * racines et les réponses, sans les masqués, les supprimés, ni ceux d'un compte disparu (sans
- * auteur). Le même nombre pour tous, les deux auteurs compris. Sur un projet privé, que seul son
- * auteur voit, il ne compte que ses propres commentaires : ceux des autres sont cachés à tous
- * (voir `sees`).
+ * racines et les réponses, sans les masqués, les supprimés, les retirés par la modération (règle 1
+ * de la relecture du plan de 6d), ni ceux d'un compte disparu (sans auteur). Le même nombre pour
+ * tous, les deux auteurs compris. Sur un projet privé ou retiré, que seul son auteur voit, il ne
+ * compte que ses propres commentaires : ceux des autres sont cachés à tous (voir `sees`).
  *
  * En SQL :
  *   select project_comment.project_id, count(*)::int from project_comment
  *   inner join project on project.id = project_comment.project_id
  *   where project_comment.project_id in (…) and hidden_at is null and deleted_at is null
- *     and project_comment.author_id is not null
- *     and (project.visibility = 'public' or project_comment.author_id = project.author_id)
+ *     and project_comment.removed_at is null and project_comment.author_id is not null
+ *     and ((project.visibility = 'public' and project.removed_at is null)
+ *       or project_comment.author_id = project.author_id)
  *   group by project_comment.project_id
  * La jointure (« inner join ») met à côté de chaque commentaire la ligne de son projet, trouvée
  * par la clé primaire de project, pour lire sa visibilité et son auteur. L'index
@@ -372,8 +433,9 @@ export const commentCountsOf = async (
         inArray(c.projectId, projectIds),
         isNull(c.hiddenAt),
         isNull(c.deletedAt),
+        isNull(c.removedAt),
         isNotNull(c.authorId),
-        or(eq(p.visibility, 'public'), eq(c.authorId, p.authorId)),
+        or(listedProject(), eq(c.authorId, p.authorId)),
       ),
     )
     .groupBy(c.projectId)
@@ -385,9 +447,10 @@ export const commentCountsOf = async (
  * données : racines et réponses, masqués compris (c'est son texte), sur tous les projets, même
  * devenus privés (le projet n'est donné que par son identifiant). Un commentaire qu'il a supprimé
  * n'y est plus : son texte est effacé et il n'a plus d'auteur. La date de masquage y est : il a le
- * droit de savoir que l'auteur du projet a masqué son texte, et quand. L'index
- * project_comment_author_idx trouve ses commentaires ; le tri se fait ensuite en mémoire (l'export
- * est rare).
+ * droit de savoir que l'auteur du projet a masqué son texte, et quand. De même pour un retrait par
+ * la modération (tranche 6d, règle 18) : le fondement, l'explication et la date, lus par
+ * removalsOf en une requête de plus, seulement s'il en a. L'index project_comment_author_idx trouve
+ * ses commentaires ; le tri se fait ensuite en mémoire (l'export est rare).
  */
 export const commentsOfAuthor = async (db: Reader, authorId: string) => {
   const rows = await db
@@ -399,14 +462,21 @@ export const commentsOfAuthor = async (db: Reader, authorId: string) => {
       createdAt: c.createdAt,
       editedAt: c.editedAt,
       hiddenAt: c.hiddenAt,
+      removedAt: c.removedAt,
+      removalId: c.removalId,
     })
     .from(c)
     .where(and(eq(c.authorId, authorId), isNull(c.deletedAt)))
     .orderBy(asc(c.createdAt), asc(c.id))
-  return rows.map((row) => ({
+  const removals = await removalsOf(
+    db,
+    rows.map((row) => (row.removedAt === null ? null : row.removalId)),
+  )
+  return rows.map(({ removedAt, removalId, ...row }) => ({
     ...row,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
     hiddenAt: row.hiddenAt?.toISOString() ?? null,
+    removal: removedAt === null ? null : (removals.get(removalId ?? '') ?? null),
   }))
 }

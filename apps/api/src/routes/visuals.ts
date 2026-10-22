@@ -11,7 +11,7 @@ import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
 import { processVisual } from '../media/visual'
-import { loadVisibleProject } from '../projects/load'
+import { loadVisibleProject, projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -43,7 +43,9 @@ const uploadVisualRoute = createRoute({
     401: errorResponse('Not signed in.'),
     403: errorResponse('Someone else’s project.'),
     404: errorResponse('No such project.'),
-    409: errorResponse('Six photos already.'),
+    409: errorResponse(
+      'Six photos already (`too_many_visuals`), or my project removed by the moderation (`removed`).',
+    ),
     413: errorResponse('File too large.'),
     415: errorResponse('Not a JPEG, PNG or WebP image, or a vertical cover wider than tall.'),
     429: errorResponse('Too many uploads.'),
@@ -95,9 +97,13 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   app.use('/v1/projects/:id/visuals', async (c, next) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
-    const access = await ownProject(c.req.param('id'), user.id)
+    // Une petite requête (l'auteur et la date de retrait) plutôt que tout le projet.
+    const access = await projectAccess(db, c.req.param('id'), user.id)
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
+    // Son projet retiré par la modération : on n'y ajoute pas de photo tant qu'il n'est pas
+    // rétabli (tranche 6d, règle 30 de la relecture du plan). Supprimer une photo reste permis.
+    if (access === 'removed') return c.json(errorBody(languageOf(c), 'removed'), 409)
     await next()
   })
 

@@ -5,6 +5,7 @@
 import { NO_REACTIONS, ReactionKind, type ReactionState } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { listedProject } from '../projects/visibility'
 
 type Reader = Pick<Database, 'select'>
 
@@ -15,12 +16,12 @@ const r = schema.projectReaction
  * soit leur nombre (et pas une par projet). Sur un projet privé, aucune : on ne réagit pas à son
  * propre projet, ce sont donc toutes des réactions d'autres membres, cachées à tous, l'auteur du
  * projet compris (décision du 19/10/2026). Elles sont gardées et reviennent si le projet redevient
- * public.
+ * public. De même sur un projet retiré par la modération (tranche 6d), jusqu'à son rétablissement.
  *
  * En SQL :
  *   select project_id, kind, count(*)::int, bool_or(member_id = $viewer)
  *   from project_reaction inner join project on project.id = project_reaction.project_id
- *   where project_id in (…) and project.visibility = 'public'
+ *   where project_id in (…) and project.visibility = 'public' and project.removed_at is null
  *   group by project_id, kind
  *
  * La jointure (« inner join ») met à côté de chaque réaction la ligne de son projet, trouvée par
@@ -46,7 +47,7 @@ export const reactionStatesOf = async (
     })
     .from(r)
     .innerJoin(schema.project, eq(schema.project.id, r.projectId))
-    .where(and(inArray(r.projectId, projectIds), eq(schema.project.visibility, 'public')))
+    .where(and(inArray(r.projectId, projectIds), listedProject()))
     .groupBy(r.projectId, r.kind)
   for (const row of rows) {
     // Chaque projet part de « aucune réaction » : les cinq types sont présents, même à zéro.
