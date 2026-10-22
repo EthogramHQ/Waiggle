@@ -2,7 +2,8 @@
 // PostgreSQL (son propre schéma, « pgboss »), qui lance chaque tâche à son heure, sur le fuseau de
 // Paris, une seule à la fois, même si l'API tournait un jour sur plusieurs serveurs.
 //
-// Il ne fait qu'appeler les tâches (weekly-recap.ts, mention-emails.ts, nightly-purge.ts), qui
+// Il ne fait qu'appeler les tâches (weekly-recap.ts, mention-emails.ts, moderation-alert.ts,
+// nightly-purge.ts), qui
 // contiennent toutes les règles et se testent sans lui. Il ne démarre qu'avec un vrai PostgreSQL
 // (DATABASE_URL) : en développement, en test et pendant le parcours local (PGlite), aucune tâche
 // automatique ne tourne.
@@ -20,6 +21,7 @@
 import { PgBoss } from 'pg-boss'
 import { describeError } from '../log'
 import { mentionEmails } from './mention-emails'
+import { moderationAlert } from './moderation-alert'
 import { nightlyPurge } from './nightly-purge'
 import type { JobDeps } from './shared'
 import { weeklyRecap } from './weekly-recap'
@@ -28,7 +30,7 @@ const TIME_ZONE = 'Europe/Paris'
 const SEVEN_DAYS = 7 * 24 * 60 * 60
 
 type Task = {
-  name: 'weekly-recap' | 'mention-emails' | 'nightly-purge'
+  name: 'weekly-recap' | 'mention-emails' | 'moderation-alert' | 'nightly-purge'
   /** Quand : une expression « cron » (minute, heure, jour du mois, mois, jour de la semaine). */
   cron: string
   /** Combien de secondes une exécution peut durer avant d'être déclarée perdue. */
@@ -61,6 +63,17 @@ const tasks: Task[] = [
     run: mentionEmails,
   },
   {
+    // Toutes les 10 minutes (tranche 6d) : l'alerte aux administrateurs, au plus une par heure et
+    // par administrateur (moderation-alert.ts). Un passage manqué est fait au suivant. C'est un
+    // e-mail : EMAIL_JOBS=off la coupe ; la file se relève alors à la main (docs/ops/moderation.md).
+    name: 'moderation-alert',
+    cron: '*/10 * * * *',
+    expireInSeconds: 15 * 60,
+    missed: 'skip',
+    sendsEmails: true,
+    run: moderationAlert,
+  },
+  {
     // Chaque nuit à 3 h.
     name: 'nightly-purge',
     cron: '0 3 * * *',
@@ -77,12 +90,12 @@ type SchedulerOptions = {
   /** L'adresse du vrai PostgreSQL (DATABASE_URL). */
   databaseUrl: string
   deps: JobDeps
-  /** EMAIL_JOBS : à false, ni récap ni e-mails de mentions (la purge continue). */
+  /** EMAIL_JOBS : à false, ni récap, ni e-mails de mentions, ni alerte de modération (la purge continue). */
   emailJobs: boolean
 }
 
 /**
- * Démarre pg-boss et ses trois planifications. Lève une erreur si le démarrage échoue : index.ts
+ * Démarre pg-boss et ses quatre planifications. Lève une erreur si le démarrage échoue : index.ts
  * la note dans les journaux et l'API continue sans tâches.
  */
 export const startScheduler = async ({

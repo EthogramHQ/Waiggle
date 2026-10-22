@@ -12,6 +12,9 @@
 //   pixel d'ouverture) ;
 // - l'objet est fixe : rien d'écrit par un membre ne s'affiche sur un écran verrouillé ;
 // - chaque e-mail dit pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
+//
+// Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 6d, règle 23), écrite en
+// texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
 import { appName, palettes, radii } from '@ruche/brand'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
@@ -345,6 +348,44 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
         { label: t.recap.unsubscribe, url: data.links.unsubscribe },
         { label: t.manage, url: data.links.manage },
       ],
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+// ─── L'alerte de modération (tranche 6d) ─────────────────────────────────────────────────────────
+
+export type ModerationAlertData = {
+  /** Le nom de l'administrateur qui la reçoit (la salutation). */
+  name: string
+  /** Le nombre de signalements en attente. */
+  count: number
+  /** Le lien vers l'écran « Modération » de l'appli. */
+  url: string
+}
+
+/**
+ * L'e-mail d'alerte à un administrateur : des signalements attendent une décision. Aucun extrait,
+ * aucun motif, personne de nommé (précision 5 du plan) : le nombre et le lien, rien de plus ne part
+ * chez l'envoyeur d'e-mails. Pas de lien de désinscription : il cesse avec le rôle
+ * (infra/grant-admin.sh --revoke) ou avec EMAIL_JOBS=off. L'adresse de contact est dans le pied,
+ * comme dans tous les e-mails (`footer`, en texte).
+ */
+export const moderationAlertEmail = (
+  language: Language,
+  { name, count, url }: ModerationAlertData,
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.moderationAlert.subject),
+    ...render({
+      language,
+      heading: fill(t.moderationAlert.heading),
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
+      paragraphs: [counted(t.moderationAlert.body_one, t.moderationAlert.body_other, count)],
+      button: { label: fill(t.moderationAlert.button), url },
+      notes: [],
+      reason: fill(t.moderationAlert.reason),
       footer: fill(t.footer),
     }),
   }

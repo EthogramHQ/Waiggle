@@ -27,6 +27,7 @@ import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
 import { mediaKeysOf } from '../projects/load'
 import { deleteMemberCounters } from '../rate-limit'
+import { voidReportsOfDepartedAuthors } from '../reports/queue'
 import { authSchemaOptions } from './schema-options'
 
 /**
@@ -224,6 +225,21 @@ export const createAuth = ({
           for (const key of keys) await storage.delete(key)
           await deleteMemberCounters(db, user.id)
           await sweepOrphanComments(db)
+          // Les signalements qui visaient ses contenus ou son profil (tranche 6d, règle 16) : la
+          // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
+          // « sans objet » (effacés 30 jours plus tard), ceux suivis d'un retrait restent un an. Ici,
+          // après la suppression, et pas dans beforeDelete : une suppression refusée ne touche à
+          // rien. Ceux qu'elle a faits restent, sans son nom (reporter_id remis à null par la base).
+          // Une panne ici ne doit pas faire échouer la suppression, déjà faite : la purge de nuit
+          // rattrape (reports/retention.ts).
+          try {
+            await voidReportsOfDepartedAuthors(db, new Date())
+          } catch (error) {
+            console.error(
+              'Reports not voided after deletion',
+              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
+            )
+          }
         },
       },
     },
