@@ -86,7 +86,7 @@ function MemberView({ member }: { member: Member }) {
               />
             </Stack>
           ) : (
-            <Stack gap="xs" align="center">
+            <Stack gap="sm" align="center">
               <FollowButton
                 followed={member.isFollowed}
                 onPress={follow.toggle}
