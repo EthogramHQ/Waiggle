@@ -11,6 +11,7 @@
 // horloge part d'une date loin d'aujourd'hui, et une purge qui lirait l'heure de la base effacerait
 // tout ce qui est « encore valide » dans le test. Et une date mal comparée selon le fuseau de la
 // connexion déconnecterait des membres : un test fixe le fuseau à Paris.
+import { randomUUID } from 'node:crypto'
 import { schema } from '@ruche/db'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -263,5 +264,159 @@ describe('the longest window of our counters', () => {
     await expect(limiter.hit('one-day', { windowMs: DAY, max: 1 })).resolves.toEqual({
       allowed: true,
     })
+  })
+})
+
+// ─── Tranche 6d : les signalements et les décisions de modération ─────────────────────────────────
+// Règles 16 et 17 de la relecture du plan (22/10/2026), durées à faire valider par un
+// professionnel :
+// - un signalement sans objet (compte de l'auteur supprimé, contenu disparu) est effacé au bout de
+//   30 jours, jamais la nuit même (le temps de prévenir les autorités) ;
+// - un signalement clos (retiré, classé), un an après la décision ;
+// - une décision, un an après la dernière décision sur la même cible ; jamais tant que son contenu
+//   reste retiré (sinon l'auteur perdrait l'explication).
+// Les lignes sont écrites directement en base : ces tests ne vérifient que la purge.
+describe('the reports and decisions of the moderation', () => {
+  type ReportRow = typeof schema.contentReport.$inferInsert
+
+  /** Un signalement d'Inès (elle signale : on ne teste ici que les durées). */
+  const insertReport = async (values: Partial<ReportRow>) => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.contentReport).values({
+      id,
+      reporterId: inesId,
+      targetKind: 'project',
+      targetId: randomUUID(),
+      projectId: null,
+      targetAuthorId: null,
+      reason: 'other',
+      snapshot: 'Le texte signalé',
+      status: 'open',
+      createdAt: START,
+      ...values,
+    })
+    return id
+  }
+  const reportStatuses = async () =>
+    Object.fromEntries(
+      (
+        await ctx.db
+          .select({ id: schema.contentReport.id, status: schema.contentReport.status })
+          .from(schema.contentReport)
+      ).map(({ id, status }) => [id, status]),
+    )
+  const insertDecision = async (targetId: string, action: string, createdAt: Date) => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id,
+      targetKind: 'project',
+      targetId,
+      action,
+      ground: action === 'remove' ? 'rules' : null,
+      explanation: action === 'remove' ? 'Publicité déguisée.' : null,
+      adminId: null,
+      createdAt,
+    })
+    return id
+  }
+  const decisionIds = async () =>
+    (await ctx.db.select({ id: schema.moderationDecision.id }).from(schema.moderationDecision)).map(
+      ({ id }) => id,
+    )
+
+  it('erases a void report after 30 days, never the same night', async () => {
+    const id = await insertReport({ status: 'void', decidedAt: START })
+
+    await nightlyPurge(ctx.db, at(START, HOUR))
+    expect(await reportStatuses()).toEqual({ [id]: 'void' })
+    await nightlyPurge(ctx.db, at(START, 29 * DAY))
+    expect(await reportStatuses()).toEqual({ [id]: 'void' })
+
+    await nightlyPurge(ctx.db, at(START, 30 * DAY + HOUR))
+    expect(await reportStatuses()).toEqual({})
+  })
+
+  it('voids the open or dismissed reports whose author is gone, and erases them 30 days later', async () => {
+    // L'auteur du contenu est parti (target_author_id mis à null par la base), mais la suppression
+    // du compte n'a pas pu les classer : la purge rattrape.
+    const open = await insertReport({ status: 'open', targetKind: 'member', targetId: 'gone-id' })
+    const dismissed = await insertReport({ status: 'dismissed', decidedAt: START })
+    const removed = await insertReport({ status: 'removed', decidedAt: START })
+
+    await nightlyPurge(ctx.db, at(START, HOUR))
+
+    expect(await reportStatuses()).toEqual({
+      [open]: 'void',
+      [dismissed]: 'void',
+      // Suivi d'un retrait : gardé tel quel, avec son texte, jusqu'au terme d'un an.
+      [removed]: 'removed',
+    })
+    await nightlyPurge(ctx.db, at(START, 31 * DAY + 2 * HOUR))
+    expect(await reportStatuses()).toEqual({ [removed]: 'removed' })
+  })
+
+  it('voids the open reports of a content its author deleted', async () => {
+    // Précision 6 du plan : sans code dans chaque route de suppression.
+    const id = await insertReport({
+      targetKind: 'comment',
+      targetId: randomUUID(), // aucun commentaire de ce nom : supprimé depuis
+      targetAuthorId: inesId,
+    })
+
+    await nightlyPurge(ctx.db, at(START, HOUR))
+
+    expect(await reportStatuses()).toEqual({ [id]: 'void' })
+  })
+
+  it('keeps a closed report one year after the decision, whatever the time zone', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const base = { targetId: meteo.id, projectId: meteo.id, targetAuthorId: inesId }
+    const dismissed = await insertReport({ ...base, status: 'dismissed', decidedAt: START })
+    const removed = await insertReport({
+      ...base,
+      reporterId: null,
+      targetAuthorId: null,
+      status: 'removed',
+      decidedAt: at(START, DAY),
+    })
+    await ctx.db.execute(sql`set time zone 'Europe/Paris'`)
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    expect(await reportStatuses()).toEqual({ [dismissed]: 'dismissed', [removed]: 'removed' })
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    expect(await reportStatuses()).toEqual({ [removed]: 'removed' })
+    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR))
+    expect(await reportStatuses()).toEqual({})
+  })
+
+  it('keeps the decisions on a target one year after the last one', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const removal = await insertDecision(meteo.id, 'remove', START)
+    const restore = await insertDecision(meteo.id, 'restore', at(START, 200 * DAY))
+
+    await nightlyPurge(ctx.db, at(START, 366 * DAY))
+    expect((await decisionIds()).sort()).toEqual([removal, restore].sort())
+
+    await nightlyPurge(ctx.db, at(START, 566 * DAY))
+    expect(await decisionIds()).toEqual([])
+  })
+
+  it('never erases the decision of a content still removed', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const removal = await insertDecision(meteo.id, 'remove', START)
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: START, removalId: removal })
+      .where(eq(schema.project.id, meteo.id))
+
+    await nightlyPurge(ctx.db, at(START, 2 * 365 * DAY))
+
+    expect(await decisionIds()).toEqual([removal])
+    const [row] = await ctx.db
+      .select({ removalId: schema.project.removalId })
+      .from(schema.project)
+      .where(eq(schema.project.id, meteo.id))
+    expect(row?.removalId).toBe(removal)
   })
 })
