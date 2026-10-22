@@ -1,6 +1,9 @@
+import { contactEmail } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { signIn } from '../accounts/api'
+import { createI18n } from '../i18n'
 import { renderWithI18n } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import { SignInScreen } from './SignInScreen'
 
 jest.mock('../accounts/api', () => ({ signIn: jest.fn() }))
@@ -90,5 +93,25 @@ describe('SignInScreen', () => {
     expect(
       screen.getByText('Your email is not verified yet: we just sent you the link again.'),
     ).toBeTruthy()
+  })
+})
+
+// --- Tranche 6d : l'adresse de contact, lisible sans compte (règle 23 de la relecture du plan) ---
+
+describe('the contact address on the sign-in page', () => {
+  it('gives the contact address, in French or in English, to someone without an account', async () => {
+    // Une personne photographiée ou une autorité n'a pas de compte : elle doit pouvoir écrire.
+    await renderWithI18n(<SignInScreen />)
+
+    expect(screen.getAllByText(containing(fr.t('auth.contact'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(contactEmail)).length).toBeGreaterThan(0)
+  })
+
+  it('gives it in English too', async () => {
+    await renderWithI18n(<SignInScreen />, 'en')
+
+    expect(
+      screen.getAllByText(containing(createI18n('en').t('auth.contact'))).length,
+    ).toBeGreaterThan(0)
   })
 })

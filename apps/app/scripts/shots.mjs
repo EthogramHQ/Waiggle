@@ -41,6 +41,19 @@ import {
 } from '../src/testing/email.ts'
 import { leaMe } from '../src/testing/fixtures.ts'
 import {
+  moderationQueuePageOf,
+  removalAfterReport,
+  removalByLaw,
+  removedPageOf,
+} from '../src/testing/moderation.ts'
+import {
+  memberReportDismissedNotification,
+  removedCommentNotification,
+  removedProjectNotification,
+  reportDismissedNotification,
+  reportHandledNotification,
+} from '../src/testing/notifications.ts'
+import {
   draftProject,
   leaPage,
   projectWithPhotos,
@@ -130,6 +143,8 @@ const note = (n, body, day) => ({
   id: `0b1c2d3e-4f50-4a61-8b72-00000000000${n}`,
   body,
   createdAt: new Date(Date.UTC(2026, 9, day, 9)).toISOString(),
+  // Le retrait par la modération (tranche 6d) : aucun par défaut.
+  removal: null,
 })
 const recipesNotes = [
   note(3, 'v2 : mode hors ligne. Les recettes se lisent même sans réseau, au fond du jardin.', 18),
@@ -301,6 +316,8 @@ const comment = (n, author, body, day, hour, fields = {}) => ({
   isMine: author?.id === leaMe.id,
   // Les membres mentionnés (tranche 6b) : aucun par défaut.
   mentions: [],
+  // Le retrait par la modération (tranche 6d), rempli pour son auteur seul : aucun par défaut.
+  removal: null,
   replies: [],
   ...fields,
 })
@@ -374,8 +391,36 @@ const mentionable = [
   { id: 'iniko-id', name: 'Iniko Diallo', handle: 'iniko', avatarUrl: null },
   { id: max.id, name: max.name, handle: 'max_durand', avatarUrl: null },
 ]
+// Tranche 6d : le projet « Avis express » de Léa, retiré après un signalement, au nom des règles.
+// Elle seule le voit encore : le bandeau en tête, avec l'explication et l'adresse pour contester.
+const removedProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000dd',
+  title: 'Avis express',
+  pitch: 'Il rédige des avis cinq étoiles pour les boutiques de ses amis.',
+  removal: { ...removalAfterReport, explanation: 'Écrire de faux avis n’est pas permis ici.' },
+  notes: [
+    {
+      ...note(7, 'v2 : il publie les avis tout seul, sur plusieurs sites à la fois.', 19),
+      removal: { ...removalByLaw, explanation: 'Publier de faux avis est une pratique interdite.' },
+    },
+    note(6, 'Première version : il propose trois avis à recopier.', 14),
+  ],
+}
+const removedComments = [
+  comment(31, lea, 'Écris-moi en privé, je te fais tes avis pour 5 €.', 19, 9, {
+    state: 'removed',
+    removal: removalAfterReport,
+  }),
+  comment(32, null, '', 18, 9, {
+    state: 'removed',
+    replies: [comment(33, ines, 'Je ne suis pas sûre que ce soit une bonne idée…', 18, 11)],
+  }),
+  comment(34, max, 'Ça marche aussi pour les restaurants ?', 17, 9),
+]
 // Les commentaires de chaque projet : la première page, puis la suite (curseur « suite »).
 const commentsOf = {
+  [removedProject.id]: [removedComments],
   [recipesProject.id]: [recipesComments],
   [commentedProject.id]: [notMineComments, notMineMore],
   [longProject.id]: [longComments],
@@ -404,6 +449,40 @@ const notified = (project) => ({ id: project.id, title: project.title })
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  // Tranche 6d : un signalement traité (retiré, puis classé), un commentaire et un projet de Léa
+  // retirés. Les signalements traités ne nomment ni titre ni auteur ; le lien n'existe que si le
+  // contenu est encore visible.
+  if (choice === 'moderation') {
+    return [
+      [
+        { ...reportHandledNotification, at: hoursAgo(1) },
+        {
+          ...removedCommentNotification,
+          at: hoursAgo(3),
+          project: notified(commentedProject),
+        },
+        {
+          ...reportDismissedNotification,
+          at: hoursAgo(26),
+          link: { projectId: notMineProject.id, memberId: null },
+        },
+        {
+          ...removedProjectNotification,
+          id: `removed:project:${removedProject.id}`,
+          at: hoursAgo(30),
+          project: notified(removedProject),
+          ground: removedProject.removal.ground,
+          explanation: removedProject.removal.explanation,
+          afterReport: removedProject.removal.afterReport,
+        },
+        {
+          ...memberReportDismissedNotification,
+          at: hoursAgo(50),
+          link: { projectId: null, memberId: max.id },
+        },
+      ],
+    ]
+  }
   const reactionsAt = hoursAgo(1)
   const followsAt = hoursAgo(26)
   const oldAt = hoursAgo(24 * 12)
@@ -506,7 +585,8 @@ const notificationPages = (choice) => {
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
-const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
+// `admin` (tranche 6d) : Léa est administratrice, GET /v1/me le dit et la modération répond.
+const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = false) => {
   // Les notifications : vues (PUT …/seen) ou non. Vues, la cloche revient à zéro.
   const notificationList = notificationPages(notifications)
   let seen = false
@@ -515,7 +595,9 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
   const added = {}
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
   // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
-  let me = structuredClone(leaMe)
+  let me = structuredClone({ ...leaMe, isAdmin: admin })
+  // Les décisions de modération prises dans ce navigateur (tranche 6d) : la cible quitte sa liste.
+  const decided = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
@@ -638,6 +720,9 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
       return json(200, withExtras(commentedProject))
     }
     if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
+    if (pathname === `/v1/projects/${removedProject.id}`) {
+      return json(200, withExtras(removedProject))
+    }
     if (pathname === `/v1/members/${leaMe.id}`) {
       return json(200, { ...leaMember, name: me.name, handle: me.handle, bio: me.bio })
     }
@@ -661,6 +746,29 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some') => {
         nextCursor: index + 1 < notificationList.length ? 'suite' : null,
         asOf: new Date().toISOString(),
       })
+    }
+    // Signaler (tranche 6d) : accepté (la page « signaler-erreur » remplace cette réponse par le
+    // quota atteint).
+    if (pathname === '/v1/reports' && method === 'POST') {
+      return json(201, { id: crypto.randomUUID() })
+    }
+    // La modération (tranche 6d) : pour un membre qui n'est pas administrateur, ces routes
+    // n'existent pas (404, comme la vraie API). Une décision retire la cible de sa liste.
+    if (pathname.startsWith('/v1/moderation/') && !admin) {
+      return json(404, { error: { code: 'not_found', message: '' } })
+    }
+    if (pathname === '/v1/moderation/reports') {
+      const page = moderationQueuePageOf()
+      return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
+    }
+    if (pathname === '/v1/moderation/removed') {
+      const page = removedPageOf()
+      return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
+    }
+    if (pathname === '/v1/moderation/decisions' && method === 'POST') {
+      const { action, target } = JSON.parse(route.request().postData() ?? '{}')
+      decided.add(target?.id)
+      return json(201, { id: crypto.randomUUID(), action, createdAt: new Date().toISOString() })
     }
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
@@ -801,6 +909,69 @@ const pages = [
       await page.getByRole('switch', { name: /Suivre ce projet|Projet suivi/ }).click()
       await page.getByRole('link', { name: 'Me reconnecter' }).waitFor()
     },
+  },
+  // Tranche 6d : signaler le commentaire d'Inès sur le projet de Max, puis le quota atteint.
+  {
+    name: 'signaler',
+    path: `/report?kind=comment&id=${notMineComments[0]?.id}&project=${commentedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'signaler-erreur',
+    path: `/report?kind=comment&id=${notMineComments[0]?.id}&project=${commentedProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route('**/v1/reports', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'rate_limited', message: '' } }),
+        }),
+      )
+      await page.getByRole('radio', { name: /^Arnaque ou spam/ }).click()
+      await page.getByRole('button', { name: 'Envoyer' }).click()
+      await page.getByRole('alert').waitFor()
+    },
+  },
+  // La modération, vue par Léa administratrice : la file, les retirés, le dialogue « Retirer ».
+  { name: 'moderation', path: '/moderation', signedIn: true, admin: true, fullPage: true },
+  {
+    name: 'moderation-retires',
+    path: '/moderation',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: 'Retirés' }).click()
+      await page.getByRole('button', { name: 'Rétablir' }).first().waitFor()
+    },
+  },
+  {
+    name: 'moderation-retirer',
+    path: '/moderation',
+    signedIn: true,
+    admin: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Retirer', exact: true }).first().click()
+      await page.getByRole('heading', { name: 'Retirer ce contenu ?' }).waitFor()
+    },
+  },
+  { name: 'compte-admin', path: '/account', signedIn: true, admin: true, fullPage: true },
+  // Le projet retiré de Léa, vu par elle : bandeau, note retirée, commentaires retirés.
+  {
+    name: 'projet-retire',
+    path: `/projects/${removedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  // Les deux sortes de notifications de la modération.
+  {
+    name: 'notifications-moderation',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'moderation',
+    fullPage: true,
   },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
   { name: 'projet', path: project, signedIn: true, fullPage: true },
@@ -981,18 +1152,19 @@ const settle = async (page) => {
 // - open(signedIn, options) : un contexte de navigateur Playwright (visiteur ou Léa connectée),
 //   avec sa propre API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse
 //   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; options.notifications: 'none'
-//   aucune notification, 'many' la cloche à « 9+ » ; le reste va à newContext.
+//   aucune notification, 'many' la cloche à « 9+ », 'moderation' celles de la modération ;
+//   options.admin: true fait de Léa une administratrice (tranche 6d) ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, { feed, notifications, ...options } = {}) => {
+  const open = async (signedIn, { feed, notifications, admin, ...options } = {}) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications))
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications, admin))
     return context
   }
   try {
@@ -1035,7 +1207,10 @@ async function layoutReport() {
       viewport: { width: 390, height: 844 },
     })
     try {
-      await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed, shot.notifications))
+      await context.route(
+        `${apiUrl}/**`,
+        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin),
+      )
       const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
@@ -1157,7 +1332,10 @@ const capture = async ({ shot, device, scheme }) => {
     deviceScaleFactor: scale,
   })
   try {
-    await context.route(`${apiUrl}/**`, fakeApi(shot.signedIn, shot.feed, shot.notifications))
+    await context.route(
+      `${apiUrl}/**`,
+      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin),
+    )
     const page = await context.newPage()
     // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.
     page.on('pageerror', (error) => problems.push(`${page.url()}: ${error.message}`))

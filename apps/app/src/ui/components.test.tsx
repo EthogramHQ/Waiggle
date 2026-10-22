@@ -2113,3 +2113,104 @@ describe('Notice, polite with an action', () => {
     expect(onPress).toHaveBeenCalledTimes(1)
   })
 })
+
+// --- Tranche 6d : signaler, et ce qui est retiré par la modération ---
+
+/** Le bandeau que l'auteur lit sur son contenu retiré : un titre, puis les phrases données par l'écran. */
+const removedBanner = {
+  title: 'Retiré par la modération',
+  lines: [
+    'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
+    'Fondement : les règles.',
+    'Explication : Demander un code de carte bancaire n’est pas permis ici.',
+    'Pour contester : contact@example.com',
+  ],
+}
+
+describe('CommentCard, removed by the moderation', () => {
+  it('shows its author the banner of the removal, every sentence of it, and the text', async () => {
+    await renderWithProviders(
+      <CommentCard
+        author={{ name: 'Max', avatar: null }}
+        when="15 oct."
+        body="Super idée, je teste ce soir."
+        removed={removedBanner}
+      />,
+    )
+
+    expect(screen.getByText('Retiré par la modération')).toBeTruthy()
+    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+  })
+
+  it('shows the others only « Contenu retiré par la modération », without author or text', async () => {
+    await renderWithProviders(
+      <CommentCard
+        author={null}
+        when="15 oct."
+        body=""
+        placeholder="Contenu retiré par la modération"
+        removed={removedBanner}
+      />,
+    )
+
+    expect(screen.getByText('Contenu retiré par la modération')).toBeTruthy()
+    // Un emplacement n'a ni bandeau, ni lien, ni action, même si on lui en donne.
+    expect(screen.queryByText('Retiré par la modération')).toBeNull()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+describe('NoteList, reporting and removed notes', () => {
+  const notes = [
+    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
+    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+  ]
+
+  it('offers to report each note when asked, and says which one', async () => {
+    const onReport = jest.fn()
+    await renderWithProviders(
+      <NoteList notes={notes} onReport={onReport} reportLabel="Signaler cette note" />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Signaler cette note' })
+    expect(buttons).toHaveLength(2)
+    // Sur téléphone, l'indice dit laquelle : le début de son texte.
+    expect(buttons[1]).toHaveProp('accessibilityHint', expect.stringContaining('Première version'))
+    const second = buttons[1]
+    if (!second) throw new Error('a report button per note is expected')
+    await fireEvent.press(second)
+
+    expect(onReport).toHaveBeenCalledWith('n1')
+  })
+
+  it('names the report button « Signaler cette note » by default', async () => {
+    await renderWithProviders(<NoteList notes={notes} onReport={jest.fn()} />)
+
+    expect(screen.getAllByRole('button', { name: 'Signaler cette note' })).toHaveLength(2)
+  })
+
+  it('offers no report button without an action', async () => {
+    await renderWithProviders(<NoteList notes={notes} reportLabel="Signaler cette note" />)
+
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy() // témoin
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('shows the banner of a removed note, for its author, above its text', async () => {
+    await renderWithProviders(
+      <NoteList
+        notes={[
+          { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.', removed: removedBanner },
+          { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+        ]}
+      />,
+    )
+
+    expect(screen.getAllByText('Retiré par la modération')).toHaveLength(1)
+    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.getByText('Première version en ligne')).toBeTruthy()
+  })
+})

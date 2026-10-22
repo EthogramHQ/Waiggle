@@ -13,6 +13,39 @@ export const hrefOf = (href: unknown): string => {
   return String(href)
 }
 
+/**
+ * L'adresse réelle d'une destination (tranche 6d) : les parties variables du chemin sont remplies
+ * par leurs paramètres. `{ pathname: '/projects/[id]', params: { id: 'abc' } }` et
+ * `'/projects/abc'` donnent tous deux « /projects/abc » ; les autres paramètres restent après « ? ».
+ */
+export const pathOf = (href: unknown): string => {
+  if (typeof href === 'object' && href !== null && 'pathname' in href) {
+    const { pathname, params = {} } = href as {
+      pathname: string
+      params?: Record<string, string>
+    }
+    const rest: Record<string, string> = {}
+    let path = pathname
+    for (const [key, value] of Object.entries(params)) {
+      if (path.includes(`[${key}]`)) path = path.replace(`[${key}]`, value)
+      else rest[key] = value
+    }
+    const query = new URLSearchParams(rest).toString()
+    return decodeURIComponent(query ? `${path}?${query}` : path)
+  }
+  return hrefOf(href)
+}
+
+/**
+ * Les pages « Signaler » demandées par un test (tranche 6d) : pour chaque visite de /report, ses
+ * paramètres (`kind`, `id`, et ce que l'écran ajoute). L'ordre des paramètres n'importe pas.
+ */
+export const reportsOpened = (...mocks: jest.Mock[]): Record<string, string>[] =>
+  mocks
+    .flatMap((mock) => mock.mock.calls.map(([href]) => pathOf(href)))
+    .filter((path) => path === '/report' || path.startsWith('/report?'))
+    .map((path) => Object.fromEntries(new URLSearchParams(path.slice('/report'.length))))
+
 /** Toutes les adresses demandées aux faux router.push / router.replace d'un test, dans l'ordre. */
 export const visited = (...mocks: jest.Mock[]): string[] =>
   mocks.flatMap((mock) => mock.mock.calls.map(([href]) => hrefOf(href)))

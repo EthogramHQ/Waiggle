@@ -12,4 +12,18 @@ export const leaMe: Me = {
   bio: 'Je bricole des agents IA le week-end.',
   favoriteTools: ['Claude', 'Cursor'],
   avatarUrl: null,
+  // Tranche 6d : Léa n'est pas administratrice (voir `adminMe` pour Louis).
+  isAdmin: false,
+}
+
+/** Louis, administrateur (tranche 6d) : il voit « Modération » dans Mon compte. */
+export const adminMe: Me = {
+  ...leaMe,
+  id: 'u9',
+  name: 'Louis',
+  handle: 'louis',
+  email: 'louis@example.com',
+  bio: '',
+  favoriteTools: [],
+  isAdmin: true,
 }

@@ -12,6 +12,7 @@ import {
   handleNotification,
   hiddenNotification,
   memberFollowsNotification,
+  memberReportDismissedNotification,
   mentionNotification,
   meteoProject,
   noReactionCounts,
@@ -19,9 +20,14 @@ import {
   notificationsAsOf,
   projectFollowsNotification,
   reactionsNotification,
+  removedCommentNotification,
+  removedProjectNotification,
   replyNotification,
+  reportDismissedNotification,
+  reportHandledNotification,
 } from '../testing/notifications'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { missingSentences, removalSentences } from '../testing/text'
 import { NotificationsScreen } from './NotificationsScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -419,5 +425,121 @@ describe('when something goes wrong', () => {
     expect(screen.getAllByText('Réservé aux membres').length).toBeGreaterThan(0)
     expect(screen.queryByText(containing(texts.reactions))).toBeNull()
     expect(mockMarkSeen).not.toHaveBeenCalled()
+  })
+})
+
+// --- Tranche 6d : un contenu retiré, un signalement traité ---
+
+/** Le retrait que décrit une notification « removed », pour lire les mêmes phrases qu'ailleurs. */
+const removalOf = (notification: typeof removedCommentNotification) => ({
+  ground: notification.ground,
+  explanation: notification.explanation,
+  afterReport: notification.afterReport,
+  at: notification.at,
+})
+
+describe('a content of mine removed by the moderation', () => {
+  it('says which comment was removed, on which project, and quotes it', async () => {
+    mockPages([notificationPageOf([removedCommentNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t('notifications.removed.comment', { title: 'Météo' })
+    expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
+    expect(screen.getByText(removedCommentNotification.excerpt ?? '')).toBeTruthy()
+  })
+
+  it('says it is visible to me alone, after a report, decided by a person, why, and how to contest', async () => {
+    // Règle 13 de la relecture du plan (article 17 du DSA).
+    mockPages([notificationPageOf([removedCommentNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(
+      missingSentences(removalSentences(removalOf(removedCommentNotification)), screen),
+    ).toEqual([])
+  })
+
+  it('says when a project was removed by law, without any report', async () => {
+    mockPages([notificationPageOf([removedProjectNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(
+      screen.getAllByText(containing(t('notifications.removed.project', { title: 'Météo' })))
+        .length,
+    ).toBeGreaterThan(0)
+    expect(
+      missingSentences(removalSentences(removalOf(removedProjectNotification)), screen),
+    ).toEqual([])
+    expect(screen.queryByText(containing(t('removal.afterReport')))).toBeNull()
+  })
+
+  it('leads to the project, which its author still sees', async () => {
+    mockPages([notificationPageOf([removedCommentNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t('notifications.removed.comment', { title: 'Météo' })
+    await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/projects/[id]',
+      params: { id: meteoProject.id },
+    })
+  })
+})
+
+describe('a report of mine that was handled', () => {
+  const removedText = t('notifications.reportHandled.comment.removed')
+
+  it('says only the kind of content and the outcome, and how to disagree', async () => {
+    mockPages([notificationPageOf([reportHandledNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(screen.getAllByText(containing(removedText)).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(t('notifications.reportHandled.contest'))).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it('names no title, no author and no explanation', async () => {
+    // Règle 2 de la relecture du plan : le contenu a pu devenir privé, ou son auteur partir.
+    mockPages([notificationPageOf([reportHandledNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    // Témoin : la notification est là…
+    expect(screen.getAllByText(containing(removedText)).length).toBeGreaterThan(0)
+    // … sans rien de ce qui appartient au contenu.
+    expect(screen.queryByText(/Météo|Malik/)).toBeNull()
+    expect(screen.queryByText(containing(t('removal.contest')))).toBeNull()
+  })
+
+  it('leads nowhere when the content is no longer visible', async () => {
+    mockPages([notificationPageOf([reportHandledNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(screen.getAllByText(containing(removedText)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('link', { name: containing(removedText) })).toBeNull()
+    expect(screen.queryByRole('button', { name: containing(removedText) })).toBeNull()
+  })
+
+  it('says a dismissed report in its own words, and leads to the project still visible', async () => {
+    mockPages([notificationPageOf([reportDismissedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t('notifications.reportHandled.project.dismissed')
+    await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/projects/[id]',
+      params: { id: reportDismissedNotification.link?.projectId },
+    })
+  })
+
+  it('leads to the page of the member for a dismissed report of a profile', async () => {
+    mockPages([notificationPageOf([memberReportDismissedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t('notifications.reportHandled.member.dismissed')
+    await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u7' } })
   })
 })

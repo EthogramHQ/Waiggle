@@ -416,6 +416,7 @@ const noteOfLea: FeedItem = {
     id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
     body: 'v2 : mode hors ligne',
     createdAt: '2026-10-14T09:00:00.000Z',
+    removal: null,
   },
   project: summaryOf(recipesProject),
 }
