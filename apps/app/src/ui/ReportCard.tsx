@@ -127,6 +127,9 @@ export function ReportCard({
             <View
               key={reason}
               style={{
+                // À texte agrandi, un motif long (« Harcèlement ou haine ×1 ») passe à la ligne dans
+                // sa pastille au lieu de sortir de la carte.
+                maxWidth: '100%',
                 paddingHorizontal: space.sm,
                 paddingVertical: space.xxs,
                 borderRadius: radii.pill,
