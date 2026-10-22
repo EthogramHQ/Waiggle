@@ -1,7 +1,8 @@
 // Page d'un membre : son avatar, son nom, sa bio, ses outils favoris (chacun mène à sa page
 // d'étiquette), puis ses projets, du plus récent au plus ancien. Sur sa propre page, un membre voit
 // aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil. Sur la page
-// d'un autre membre, le bouton « Suivre » ; sur les deux, le nombre d'abonnés (jamais leurs noms).
+// d'un autre membre, le bouton « Suivre », puis « Signaler ce profil » (tranche 6d) ; sur les deux,
+// le nombre d'abonnés (jamais leurs noms).
 import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
@@ -22,6 +23,7 @@ import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
+import { TextLink } from '../ui/TextLink'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 export function MemberScreen({ id }: { id: string }) {
@@ -84,24 +86,39 @@ function MemberView({ member }: { member: Member }) {
               />
             </Stack>
           ) : (
-            <FollowButton
-              followed={member.isFollowed}
-              onPress={follow.toggle}
-              // Le nom lu contient toujours le texte affiché (« Suivi : Léa » quand on la suit) :
-              // dire « touche Suivi » à la commande vocale trouve bien ce bouton.
-              label={
-                member.isFollowed
-                  ? t('follow.memberFollowing', { name: member.name })
-                  : t('follow.member', { name: member.name })
-              }
-              text={member.isFollowed ? t('follow.following') : t('follow.follow')}
-              caption={followers}
-              layout="stacked"
-              error={
-                follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
-              }
-              errorAction={follow.expired ? signInAgain() : undefined}
-            />
+            <Stack gap="xs" align="center">
+              <FollowButton
+                followed={member.isFollowed}
+                onPress={follow.toggle}
+                // Le nom lu contient toujours le texte affiché (« Suivi : Léa » quand on la suit) :
+                // dire « touche Suivi » à la commande vocale trouve bien ce bouton.
+                label={
+                  member.isFollowed
+                    ? t('follow.memberFollowing', { name: member.name })
+                    : t('follow.member', { name: member.name })
+                }
+                text={member.isFollowed ? t('follow.following') : t('follow.follow')}
+                caption={followers}
+                layout="stacked"
+                error={
+                  follow.expired
+                    ? t('states.expired')
+                    : follow.error
+                      ? t('follow.error')
+                      : undefined
+                }
+                errorAction={follow.expired ? signInAgain() : undefined}
+              />
+              {/* Signaler ce profil (tranche 6d) : un lien discret sous « Suivre », jamais sur sa
+                  propre page. */}
+              <TextLink
+                label={t('report.member')}
+                tone="secondary"
+                onPress={() =>
+                  router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
+                }
+              />
+            </Stack>
           )
         }
       />
