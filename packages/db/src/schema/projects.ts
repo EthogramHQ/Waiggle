@@ -3,6 +3,7 @@
 import { sql } from 'drizzle-orm'
 import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { moderationDecision } from './moderation'
 
 export const project = pgTable(
   'project',
@@ -36,6 +37,13 @@ export const project = pgTable(
     // (tranche 4). null tant qu'il n'a jamais été public. Repasser en privé puis en public ne la
     // change pas. Pas de valeur par défaut : c'est l'API qui l'écrit, avec l'horloge de JavaScript.
     publishedAt: timestamp('published_at'),
+    // Retiré par la modération (tranche 6d) : le projet n'est plus visible que de son auteur, avec
+    // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
+    // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
+    removedAt: timestamp('removed_at'),
+    // La décision de retrait, pour retrouver son fondement et son explication. onDelete:
+    // 'set null' : l'API ne purge pas une décision tant que son contenu reste retiré.
+    removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'set null' }),
   },
   // Les index sont des sommaires qui accélèrent les recherches fréquentes :
   // - les projets d'un membre, du plus récent au plus ancien ;

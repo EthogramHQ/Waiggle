@@ -17,6 +17,12 @@ export const ErrorCode = z.enum([
   'handle_taken',
   'handle_change_limit',
   'unsubscribe_invalid',
+  // Tranche 6d : signaler son propre contenu, ou décider de ce qui nous concerne ; signaler deux
+  // fois la même chose ; une décision déjà prise entre-temps ; modifier un contenu retiré.
+  'own_content',
+  'already_reported',
+  'already_decided',
+  'removed',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

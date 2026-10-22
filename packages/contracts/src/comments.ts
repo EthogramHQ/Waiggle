@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { FeedCursor } from './feed'
 import { MENTIONS_MAX, Mention } from './mentions'
 import { ProjectAuthor } from './projects'
+import { Removal } from './removal'
 import { VisibleFreeText } from './text'
 
 /** Un commentaire fait au plus 1 000 caractères, comme une note. */
@@ -46,9 +47,13 @@ export type EditedComment = z.infer<typeof EditedComment>
  *   son texte ; pour les autres, une racine masquée qui a des réponses n'est plus qu'un
  *   « Commentaire masqué » sans auteur ni texte (et sans réponse, elle n'apparaît pas) ;
  * - deleted : une racine supprimée par son auteur, gardée parce qu'elle a des réponses :
- *   « Commentaire supprimé », sans auteur ni texte.
+ *   « Commentaire supprimé », sans auteur ni texte ;
+ * - removed : retiré par la modération (tranche 6d). Seul son auteur le voit encore, avec son
+ *   texte et `removal` ; pour tous les autres, l'auteur du projet compris, ce n'est plus qu'un
+ *   « Contenu retiré par la modération » sans auteur, ni texte, ni mentions (et sans réponse
+ *   visible, il n'apparaît pas). On ne peut plus y répondre ni y réagir.
  */
-export const CommentState = z.enum(['visible', 'hidden', 'deleted'])
+export const CommentState = z.enum(['visible', 'hidden', 'deleted', 'removed'])
 export type CommentState = z.infer<typeof CommentState>
 
 /** Une réponse, ou une racine sans ses réponses. */
@@ -70,6 +75,8 @@ export const CommentReply = z
      * L'appli ne fait un lien que de ces pseudos-là.
      */
     mentions: z.array(Mention).max(MENTIONS_MAX),
+    /** Le retrait par la modération (tranche 6d), rempli pour son auteur seul ; null sinon. */
+    removal: Removal.nullable(),
   })
   .meta({ id: 'CommentReply' })
 export type CommentReply = z.infer<typeof CommentReply>

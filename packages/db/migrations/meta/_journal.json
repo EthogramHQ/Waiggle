@@ -71,6 +71,13 @@
       "when": 1792535827738,
       "tag": "0009_email_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792706512779,
+      "tag": "0010_moderation",
+      "breakpoints": true
     }
   ]
 }

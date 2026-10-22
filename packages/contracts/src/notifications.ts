@@ -8,6 +8,8 @@ import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
+import { RemovalGround } from './removal'
+import { ReportTargetKind } from './reports'
 
 /** L'écran charge les notifications 20 par 20, de la plus récente à la plus ancienne. */
 export const NOTIFICATION_PAGE_SIZE = 20
@@ -93,6 +95,40 @@ export const HiddenNotification = z.object({
   comment: NotifiedComment,
 })
 
+/**
+ * Un de ses contenus a été retiré par la modération (tranche 6d). Le texte dit ce qui est retiré,
+ * qu'il n'est plus visible que de lui jusqu'à un rétablissement, s'il l'a été après un signalement
+ * (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment contester.
+ * Rétabli, la notification disparaît.
+ */
+export const RemovedNotification = z.object({
+  ...Common,
+  kind: z.literal('removed'),
+  targetKind: z.enum(['project', 'note', 'comment']),
+  project: NotifiedProject,
+  /** L'extrait d'une note ou d'un commentaire retiré ; null pour un projet. */
+  excerpt: z
+    .string()
+    .max(EXCERPT_MAX + 1)
+    .nullable(),
+  ground: RemovalGround,
+  explanation: z.string(),
+  afterReport: z.boolean(),
+})
+
+/**
+ * Un de ses signalements a été traité (tranche 6d) : la sorte de cible et l'issue, rien d'autre. Ni
+ * titre, ni extrait, ni auteur, ni explication : le contenu a pu devenir privé, ou son auteur
+ * partir. `link` mène à la cible seulement si elle est encore visible au moment de la lecture.
+ */
+export const ReportHandledNotification = z.object({
+  ...Common,
+  kind: z.literal('report_handled'),
+  targetKind: ReportTargetKind,
+  outcome: z.enum(['removed', 'dismissed']),
+  link: z.object({ projectId: ProjectId.nullable(), memberId: z.string().nullable() }).nullable(),
+})
+
 /** La première notification : le pseudo qu'il a reçu, tiré de son nom, qu'il peut changer. */
 export const HandleNotification = z.object({
   ...Common,
@@ -110,6 +146,8 @@ export const Notification = z
     CommentNotification,
     HiddenNotification,
     HandleNotification,
+    RemovedNotification,
+    ReportHandledNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

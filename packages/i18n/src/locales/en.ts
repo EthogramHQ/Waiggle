@@ -34,6 +34,8 @@ export const en: Translation = {
     seeCode: 'See the code',
   },
   auth: {
+    contact:
+      'A question, something to report? Write to us at {{contactEmail}}, in English or French.',
     fields: {
       name: 'Display name',
       nameHint: 'Your @handle will be made from it; you can change it in My profile.',
@@ -109,6 +111,11 @@ export const en: Translation = {
       done: 'Your data has been downloaded.',
     },
     section: { title: 'Account' },
+    contact: {
+      label: 'Contact us',
+      hint: 'In English or French. For a question, something to report, or your data.',
+    },
+    moderation: 'Moderation',
     email: {
       label: 'Email address',
       soon: 'editable soon',
@@ -136,6 +143,11 @@ export const en: Translation = {
       warning: 'It is immediate and cannot be undone.',
       submit: 'Delete permanently',
       wrongPassword: 'Incorrect password.',
+      remains: {
+        title: 'What stays',
+        reports: 'Your reports stay for a year, without your name',
+        removals: 'A record of removals of your content stays for a year',
+      },
     },
   },
   profile: {
@@ -360,6 +372,7 @@ export const en: Translation = {
       hideError: 'The change could not be saved. Try again.',
       deletedPlaceholder: 'Deleted comment',
       hiddenPlaceholder: 'Hidden comment',
+      removedPlaceholder: 'Removed by moderation',
       more: 'Show more',
       end: 'That’s all',
       moreError: 'The next comments could not load.',
@@ -403,6 +416,87 @@ export const en: Translation = {
       promptTooLong: 'Each prompt must be at most {{max}} characters long.',
       invalidCharacters: 'Some characters are not allowed (invisible or control characters).',
     },
+  },
+  report: {
+    title: 'Report',
+    action: 'Report',
+    project: 'Report this project',
+    note: 'Report this note',
+    member: 'Report this profile',
+    target: {
+      project: 'The project you’re reporting',
+      note: 'The note you’re reporting',
+      comment: 'The comment you’re reporting',
+      member: 'The profile you’re reporting',
+    },
+    reasonLabel: 'Why are you reporting it?',
+    reasons: {
+      illegal: 'Illegal content',
+      harassment: 'Harassment or hate',
+      sexualViolent: 'Sexual or violent content',
+      scamSpam: 'Scam or spam',
+      impersonation: 'Impersonation',
+      privacy: 'A photo or information about me without my consent',
+      other: 'Something else',
+    },
+    details: 'Details (optional)',
+    detailsHint: 'Don’t add personal information that isn’t needed.',
+    illegalDetails: 'Tell us why',
+    illegalHint:
+      'Tell us why this content seems illegal to you. By sending, you confirm your report is sincere and accurate to the best of your knowledge.',
+    anonymity:
+      'The person concerned won’t know it was you. Moderation sees who reports, to prevent abuse.',
+    danger: 'Is someone in danger? Call 112.',
+    submit: 'Send',
+    sent: 'Thank you, your report has been sent. Moderation will look at it.',
+    back: 'Go back',
+  },
+  moderation: {
+    title: 'Moderation',
+    pending: 'Pending',
+    removed: 'Removed',
+    empty: 'No reports pending.',
+    emptyRemoved: 'No removed content.',
+    more: 'Show more',
+    errorTitle: 'Moderation couldn’t load',
+    kinds: { project: 'Project', note: 'Note', comment: 'Comment', member: 'Profile' },
+    snapshot: 'Text at the time of the report; current images',
+    count_one: '{{count}} report',
+    count_other: '{{count}} reports',
+    reasonCount: '{{reason}} ×{{count}}',
+    since: 'First reported on {{date}}',
+    removedOn: 'Removed on {{date}}',
+    concernsMe: 'This concerns you: another administrator has to decide.',
+    state: { removed: 'Already removed', gone: 'Since deleted by its author' },
+    view: 'View',
+    remove: 'Remove',
+    dismiss: 'Dismiss',
+    restore: 'Restore',
+    removeTitle: 'Remove this content?',
+    removeMessage:
+      'Only its author will see it, and they’ll be told with your explanation. You can restore it.',
+    groundLabel: 'Grounds',
+    grounds: { illegal: 'The law', rules: '{{appName}}’s rules' },
+    explanation: 'Explanation',
+    explanationHint:
+      'Shown to the author. Say which rule or which law; never name who reported it.',
+    confirmRemove: 'Remove',
+    cancel: 'Cancel',
+    dismissed: 'Report dismissed.',
+    removedDone: 'Content removed.',
+    restoredDone: 'Content restored.',
+  },
+  removal: {
+    banner: 'Removed by moderation',
+    onlyYou: 'Only you can see it now, until it may be restored.',
+    afterReport: 'After a report, a person from moderation decided to remove it.',
+    direct: 'A person from moderation decided to remove it.',
+    grounds: {
+      illegal: 'Grounds: the law.',
+      rules: 'Grounds: {{appName}}’s rules.',
+    },
+    explanation: 'Explanation: {{explanation}}',
+    contest: 'To contest: {{contactEmail}}',
   },
   member: {
     // {{nameOf}}: “Inès’s” (nameOf from @ruche/i18n, slice 6c).
@@ -494,7 +588,17 @@ export const en: Translation = {
       reason: 'You receive this email because you turned on emails about mentions and replies.',
       unsubscribe: 'Stop receiving emails about mentions and replies',
     },
-    footer: '{{appName}}, the network for AI projects among friends and family.',
+    footer:
+      '{{appName}}, the network for AI projects among friends and family. Contact: {{contactEmail}}',
+    moderationAlert: {
+      subject: 'Reports pending on {{appName}}',
+      heading: 'Reports pending',
+      body_one: '{{count}} report is waiting for a decision.',
+      body_other: '{{count}} reports are waiting for a decision.',
+      button: 'Open moderation',
+      reason:
+        'You’re getting this e-mail because you’re an administrator of {{appName}}. At most one an hour.',
+    },
     greeting: 'Hi {{name}},',
     verify: {
       subject: 'Activate your {{appName}} account',
@@ -571,6 +675,30 @@ export const en: Translation = {
     hidden:
       'Your comment on “{{title}}” was hidden by the project’s author. You and the project’s author can still see it.',
     handle: 'Your handle is @{{handle}}, taken from your name. You can change it in My profile.',
+    removed: {
+      project: 'Your project “{{title}}” was removed by moderation',
+      note: 'Your note on “{{title}}” was removed by moderation',
+      comment: 'Your comment on “{{title}}” was removed by moderation',
+    },
+    reportHandled: {
+      project: {
+        removed: 'Your report of a project was handled: the project was removed.',
+        dismissed: 'Your report of a project was handled: we didn’t remove it.',
+      },
+      note: {
+        removed: 'Your report of a note was handled: the note was removed.',
+        dismissed: 'Your report of a note was handled: we didn’t remove it.',
+      },
+      comment: {
+        removed: 'Your report of a comment was handled: the comment was removed.',
+        dismissed: 'Your report of a comment was handled: we didn’t remove it.',
+      },
+      member: {
+        removed: 'Your report of a profile was handled: moderation took action.',
+        dismissed: 'Your report of a profile was handled: we didn’t change anything.',
+      },
+      contest: 'Disagree? Write to us: {{contactEmail}}',
+    },
   },
   errors: {
     notFound: 'This page does not exist.',
@@ -588,6 +716,10 @@ export const en: Translation = {
     handleChangeLimit: 'You have changed your handle several times today. Try again tomorrow.',
     unsubscribeInvalid: 'This link cannot unsubscribe you.',
     internal: 'Something went wrong. Try again in a moment.',
+    ownContent: 'You can’t report your own content, or decide on what concerns you.',
+    alreadyReported: 'You’ve already reported this. Moderation will look at it.',
+    alreadyDecided: 'A decision was already made on this content in the meantime.',
+    removed: 'This content was removed by moderation: it can no longer be edited.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }

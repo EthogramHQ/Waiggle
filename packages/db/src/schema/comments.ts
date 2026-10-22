@@ -4,6 +4,7 @@
 import { sql } from 'drizzle-orm'
 import { type AnyPgColumn, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { moderationDecision } from './moderation'
 import { project } from './projects'
 
 export const projectComment = pgTable(
@@ -42,6 +43,13 @@ export const projectComment = pgTable(
     // Supprimé par son auteur alors qu'il avait des réponses (null : pas supprimé). Sans réponse,
     // un commentaire supprimé n'est pas gardé : sa ligne est effacée.
     deletedAt: timestamp('deleted_at'),
+    // Retiré par la modération (tranche 6d) : le commentaire n'est plus visible que de son auteur, avec
+    // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
+    // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
+    removedAt: timestamp('removed_at'),
+    // La décision de retrait, pour retrouver son fondement et son explication. onDelete:
+    // 'set null' : l'API ne purge pas une décision tant que son contenu reste retiré.
+    removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'set null' }),
   },
   (t) => [
     // Les pages de commentaires : les racines d'un projet, de la plus récente à la plus ancienne,
