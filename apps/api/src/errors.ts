@@ -20,6 +20,10 @@ const errorMessages = {
   handle_taken: 'handleTaken',
   handle_change_limit: 'handleChangeLimit',
   unsubscribe_invalid: 'unsubscribeInvalid',
+  own_content: 'ownContent',
+  already_reported: 'alreadyReported',
+  already_decided: 'alreadyDecided',
+  removed: 'removed',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

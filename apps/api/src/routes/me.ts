@@ -357,13 +357,20 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         user: me,
         formerHandle,
         projects,
-        notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
+        notes: notes.map((note) => ({
+          ...note,
+          createdAt: note.createdAt.toISOString(),
+          // Tranche 6d : les retraits et les signalements restent à brancher (backend-dev).
+          removal: null,
+        })),
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({
           ...comment,
           mentions: mentionsByComment.get(comment.id) ?? [],
+          removal: null,
         })),
+        reports: [],
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

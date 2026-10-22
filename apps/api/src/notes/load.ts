@@ -15,6 +15,8 @@ export const toNote = ({ id, body, createdAt }: NoteRow): ProjectNote => ({
   id,
   body,
   createdAt: createdAt.toISOString(),
+  // Tranche 6d : le retrait par la modération reste à brancher (backend-dev).
+  removal: null,
 })
 
 /**

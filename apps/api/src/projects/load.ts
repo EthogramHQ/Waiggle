@@ -113,6 +113,8 @@ const toProjectBase = (
   isMine: project.authorId === viewerId,
   createdAt: project.createdAt.toISOString(),
   updatedAt: project.updatedAt.toISOString(),
+  // Tranche 6d : le retrait par la modération reste à brancher (backend-dev).
+  removal: null,
 })
 
 /**

@@ -50,5 +50,7 @@ export const loadMe = async (
     bio: profile?.bio ?? '',
     favoriteTools: profile?.favoriteTools ?? [],
     avatarUrl: profile?.avatarKey ? mediaUrl(publicApiUrl, profile.avatarKey) : null,
+    // Tranche 6d : la lecture de admin_member reste à brancher (backend-dev).
+    isAdmin: false,
   }
 }

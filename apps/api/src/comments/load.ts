@@ -123,7 +123,17 @@ export const presentComment = (
   }
   const placeholder = (state: 'hidden' | 'deleted'): CommentReply | null =>
     hasShownReplies
-      ? { ...base, author: null, body: '', editedAt: null, state, isMine: false, mentions: [] }
+      ? {
+          ...base,
+          author: null,
+          body: '',
+          editedAt: null,
+          state,
+          isMine: false,
+          mentions: [],
+          // Tranche 6d : le retrait par la modération reste à brancher (backend-dev).
+          removal: null,
+        }
       : null
   if (row.deletedAt !== null) return placeholder('deleted')
   const author = row.authorId === null ? undefined : authors.get(row.authorId)
@@ -138,6 +148,7 @@ export const presentComment = (
     state: row.hiddenAt === null ? 'visible' : 'hidden',
     isMine: row.authorId === viewer.id,
     mentions,
+    removal: null,
   }
 }
 
