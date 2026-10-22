@@ -103,6 +103,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         id: schema.project.id,
         authorId: schema.project.authorId,
         visibility: schema.project.visibility,
+        // Un projet retiré compte comme privé pour la recherche (viewerOf, comments/load.ts).
+        removedAt: schema.project.removedAt,
       })
       .from(schema.project)
       .where(and(eq(schema.project.id, projectId), visibleTo(user.id)))

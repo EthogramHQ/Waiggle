@@ -88,8 +88,9 @@ const postRoute = createRoute({
     401: errorResponse('Not signed in.'),
     404: errorResponse(
       'No such project, or a private project of another member; or the comment answered is ' +
-        'unknown, a reply, deleted, or hidden from the member.',
+        'unknown, a reply, deleted, hidden from the member, or removed by the moderation.',
     ),
+    409: errorResponse('My own project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many comments.'),
   },
 })
@@ -111,6 +112,7 @@ const editRoute = createRoute({
     401: errorResponse('Not signed in.'),
     403: errorResponse('The comment of another member.'),
     404: errorResponse(notFoundComment),
+    409: errorResponse('My comment, or my project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many comments.'),
   },
 })
@@ -192,7 +194,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
     if (!ProjectId.safeParse(projectId).success) return null
     const [project] = await db
-      .select({ authorId: schema.project.authorId, visibility: schema.project.visibility })
+      .select({
+        authorId: schema.project.authorId,
+        visibility: schema.project.visibility,
+        removedAt: schema.project.removedAt,
+      })
       .from(schema.project)
       .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
     // Le projet, et qui le regarde (voir Viewer, comments/load.ts).
@@ -209,11 +215,24 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const commentOf = async (projectId: string, commentId: string, viewer: Viewer) => {
     if (!CommentId.safeParse(commentId).success) return null
     const [comment] = await db
-      .select({ authorId: c.authorId, rootId: c.rootId, hiddenAt: c.hiddenAt })
+      .select({
+        authorId: c.authorId,
+        rootId: c.rootId,
+        hiddenAt: c.hiddenAt,
+        removedAt: c.removedAt,
+      })
       .from(c)
       .where(and(eq(c.id, commentId), eq(c.projectId, projectId), isNull(c.deletedAt)))
     return comment && sees(comment, viewer) ? comment : null
   }
+
+  /**
+   * 409 « removed » (tranche 6d, règles 4 et 30 de la relecture du plan) : un contenu retiré par la
+   * modération ne se modifie plus, et on n'ajoute rien à un projet retiré, tant qu'il n'est pas
+   * rétabli. Seul son auteur peut recevoir cette réponse : pour tout autre, le contenu retiré est
+   * déjà introuvable (404), et la réponse ne révèle donc rien.
+   */
+  const removed = (ctx: Context<AppEnv>) => ctx.json(errorBody(languageOf(ctx), 'removed'), 409)
 
   /** Compte la demande dans un quota du membre ; renvoie le délai d'attente s'il est dépassé. */
   const overLimit = async (key: string, rule: RateRule) => {
@@ -245,7 +264,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (!user) return unauthorized(ctx)
     const wait = await overLimit(memberCounterKeys(user.id).comment, commentRule)
     if (wait !== null) return tooMany(ctx, wait)
-    if (!(await projectOf(ctx.req.param('id'), user.id))) return notFound(ctx)
+    const project = await projectOf(ctx.req.param('id'), user.id)
+    if (!project) return notFound(ctx)
+    // Un projet retiré n'est visible que de son auteur : lui seul peut arriver ici, et il n'y
+    // ajoute rien tant que le projet est retiré (règle 30).
+    if (project.removedAt !== null) return removed(ctx)
     await next()
   })
 
@@ -261,6 +284,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (!comment) return notFound(ctx)
     // Seul son auteur modifie un commentaire, pas même l'auteur du projet (qui peut le masquer).
     if (comment.authorId !== user.id) return forbidden(ctx)
+    // Son commentaire retiré, ou son commentaire sur son propre projet retiré : il le lit, il peut
+    // le supprimer, mais pas le modifier (règle 4).
+    if (comment.removedAt !== null || project.removedAt !== null) return removed(ctx)
     await next()
   })
 
@@ -287,6 +313,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       editedAt: null,
       hiddenAt: null,
       deletedAt: null,
+      removedAt: null,
+      removalId: null,
     }
 
     // Une « transaction » : plusieurs opérations qui réussissent toutes, ou aucune. Pour une
@@ -296,14 +324,22 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const written = await db.transaction(async (tx) => {
       if (replyTo !== undefined) {
         const [root] = await tx
-          .select({ authorId: c.authorId, rootId: c.rootId, hiddenAt: c.hiddenAt })
+          .select({
+            authorId: c.authorId,
+            rootId: c.rootId,
+            hiddenAt: c.hiddenAt,
+            removedAt: c.removedAt,
+          })
           .from(c)
           .where(and(eq(c.id, replyTo), eq(c.projectId, id), isNull(c.deletedAt)))
           .for('share')
         // Introuvable : un commentaire inconnu, d'un autre projet, supprimé, une réponse (l'appli
-        // répond dans le même fil, à sa racine), ou un commentaire que ce membre ne voit pas
-        // (masqué, ou laissé par un autre sur un projet devenu privé).
-        if (!root || root.rootId !== null || !sees(root, viewer)) return null
+        // répond dans le même fil, à sa racine), un commentaire que ce membre ne voit pas
+        // (masqué, ou laissé par un autre sur un projet devenu privé), ou retiré par la modération,
+        // même pour son auteur qui le lit encore (règle 4 : on ne répond plus à un contenu retiré).
+        if (!root || root.rootId !== null || root.removedAt !== null || !sees(root, viewer)) {
+          return null
+        }
       }
       await tx.insert(c).values(row)
       // Les membres que mentionne le texte (« @ines_morel »), rangés dans la même transaction :
@@ -342,6 +378,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
             eq(c.projectId, id),
             eq(c.authorId, user.id),
             isNull(c.deletedAt),
+            // Redit ici, comme l'auteur : un commentaire retiré entre le garde et l'écriture
+            // n'est pas modifié (aucune ligne rendue, donc « introuvable »).
+            isNull(c.removedAt),
           ),
         )
         .returning({
@@ -352,6 +391,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           editedAt: c.editedAt,
           hiddenAt: c.hiddenAt,
           deletedAt: c.deletedAt,
+          removedAt: c.removedAt,
+          removalId: c.removalId,
         })
       if (!row) return null
       // Les mentions déjà gardées d'abord : un pseudo encore écrit garde le membre qu'il désignait

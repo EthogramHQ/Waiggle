@@ -4,7 +4,7 @@
 import type { Me } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 
@@ -29,10 +29,21 @@ export const loadMe = async (
   publicApiUrl: string,
 ): Promise<Me | null> => {
   const [row] = await db
-    .select({ user: schema.user, profile: schema.profile, handle: schema.memberHandle.handle })
+    .select({
+      user: schema.user,
+      profile: schema.profile,
+      handle: schema.memberHandle.handle,
+      adminSince: schema.adminMember.grantedAt,
+    })
     .from(schema.user)
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
     .leftJoin(schema.memberHandle, currentHandleOf(schema.user.id))
+    // Administrateur (tranche 6d) : une ligne de admin_member, non révoquée. Lue à chaque fois,
+    // dans la même requête (la clé primaire de admin_member) : un rôle retiré se voit aussitôt.
+    .leftJoin(
+      schema.adminMember,
+      and(eq(schema.adminMember.userId, schema.user.id), isNull(schema.adminMember.revokedAt)),
+    )
     .where(eq(schema.user.id, userId))
   if (!row) return null
 
@@ -50,7 +61,8 @@ export const loadMe = async (
     bio: profile?.bio ?? '',
     favoriteTools: profile?.favoriteTools ?? [],
     avatarUrl: profile?.avatarKey ? mediaUrl(publicApiUrl, profile.avatarKey) : null,
-    // Tranche 6d : la lecture de admin_member reste à brancher (backend-dev).
-    isAdmin: false,
+    // Seulement pour que l'appli montre l'entrée « Modération » : les routes de modération relisent
+    // elles-mêmes admin_member à chaque demande, sans croire l'appli.
+    isAdmin: row.adminSince !== null,
   }
 }
