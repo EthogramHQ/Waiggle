@@ -424,9 +424,27 @@ describe('my notes in my data', () => {
     const data = AccountExport.parse(JSON.parse(raw))
 
     expect(data.notes).toEqual([
-      { projectId: mine.id, id: first.id, body: first.body, createdAt: first.createdAt },
-      { projectId: draft.id, id: secret.id, body: secret.body, createdAt: secret.createdAt },
-      { projectId: mine.id, id: last.id, body: last.body, createdAt: last.createdAt },
+      {
+        projectId: mine.id,
+        id: first.id,
+        body: first.body,
+        createdAt: first.createdAt,
+        removal: null,
+      },
+      {
+        projectId: draft.id,
+        id: secret.id,
+        body: secret.body,
+        createdAt: secret.createdAt,
+        removal: null,
+      },
+      {
+        projectId: mine.id,
+        id: last.id,
+        body: last.body,
+        createdAt: last.createdAt,
+        removal: null,
+      },
     ])
     expect(raw).not.toContain('Note de Max')
   })
@@ -542,6 +560,7 @@ describe('my reactions and comments in my data', () => {
         createdAt: root.createdAt,
         editedAt: new Date(Date.now()).toISOString(),
         hiddenAt: null,
+        removal: null,
         mentions: [],
       },
       {
@@ -552,6 +571,7 @@ describe('my reactions and comments in my data', () => {
         createdAt: reply.createdAt,
         editedAt: null,
         hiddenAt: null,
+        removal: null,
         mentions: [],
       },
     ])

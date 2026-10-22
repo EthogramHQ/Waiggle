@@ -71,6 +71,7 @@ describe('Comment', () => {
     state: 'visible',
     isMine: true,
     mentions: [],
+    removal: null,
   }
   const root = {
     id: rootId,
@@ -82,6 +83,7 @@ describe('Comment', () => {
     isMine: false,
     // Les mentions (tranche 6b) : Sam y désigne Léa par son pseudo.
     mentions: [{ handle: 'lea', memberId: 'lea-id' }],
+    removal: null,
     replies: [reply],
   }
 

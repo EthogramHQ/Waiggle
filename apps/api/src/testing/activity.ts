@@ -7,7 +7,20 @@
 // Un geste qui échoue lève une erreur qui dit lequel (la méthode, le chemin, le statut) : le test
 // s'arrête là, au lieu d'échouer plus loin sur un e-mail manquant sans qu'on sache pourquoi.
 // Les tests espacent eux-mêmes les gestes (fausse horloge, `later()`).
-import { Comment, EmailPreferences, Me, NotificationPage, Project } from '@ruche/contracts'
+import {
+  Comment,
+  CreatedReport,
+  EmailPreferences,
+  Me,
+  ModerationDecision,
+  type ModerationDecisionInput,
+  NotificationPage,
+  Project,
+  type ReportReason,
+  type ReportTarget,
+} from '@ruche/contracts'
+import { schema } from '@ruche/db'
+import { eq } from 'drizzle-orm'
 import type { TestContext } from './context'
 
 export const activity = (ctx: TestContext) => {
@@ -126,5 +139,50 @@ export const activity = (ctx: TestContext) => {
     deleteAccount: async (cookie: string, password: string) => {
       await expectStatus(200, 'POST', '/api/auth/delete-user', cookie, { password })
     },
+
+    // ─── Signaler et modérer (tranche 6d) ───────────────────────────────────────────────────────
+
+    /** Signale une cible (POST /v1/reports), avec un motif et une précision facultative. */
+    report: async (
+      cookie: string,
+      target: ReportTarget,
+      reason: ReportReason = 'other',
+      details?: string,
+    ) =>
+      CreatedReport.parse(
+        await (
+          await expectStatus(201, 'POST', '/v1/reports', cookie, {
+            target,
+            reason,
+            ...(details !== undefined && { details }),
+          })
+        ).json(),
+      ),
+
+    /**
+     * Un administrateur décide (POST /v1/moderation/decisions) : retirer, classer ou rétablir.
+     * 201 : la décision est une ressource créée, comme un signalement.
+     */
+    decide: async (cookie: string, decision: ModerationDecisionInput) =>
+      ModerationDecision.parse(
+        await (
+          await expectStatus(201, 'POST', '/v1/moderation/decisions', cookie, decision)
+        ).json(),
+      ),
+
+    /**
+     * Fait de ce membre un administrateur. En production, seul le script infra/grant-admin.sh le
+     * fait, directement en base : aucune route de l'API ne donne ce rôle. Le test écrit donc lui
+     * aussi directement dans la table admin_member.
+     */
+    makeAdmin: async (userId: string) =>
+      await ctx.db.insert(schema.adminMember).values({ userId, grantedAt: new Date() }),
+
+    /** Retire le rôle (grant-admin.sh --revoke) : la ligne reste, datée de sa révocation. */
+    revokeAdmin: async (userId: string) =>
+      await ctx.db
+        .update(schema.adminMember)
+        .set({ revokedAt: new Date() })
+        .where(eq(schema.adminMember.userId, userId)),
   }
 }

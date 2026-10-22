@@ -46,11 +46,12 @@ afterEach(() => {
 })
 
 describe('starting the job scheduler', () => {
-  it('plans the three tasks and stops pg-boss gracefully when asked', async () => {
+  // Tranche 6d : une quatrième tâche, l'alerte de modération.
+  it('plans the four tasks and stops pg-boss gracefully when asked', async () => {
     const scheduler = await start()
 
     expect(boss.start).toHaveBeenCalledOnce()
-    expect(boss.schedule).toHaveBeenCalledTimes(3)
+    expect(boss.schedule).toHaveBeenCalledTimes(4)
     expect(boss.stop).not.toHaveBeenCalled()
     await scheduler.stop()
     expect(boss.stop).toHaveBeenCalledWith({ graceful: true, timeout: 30_000 })
@@ -72,5 +73,32 @@ describe('starting the job scheduler', () => {
     boss.stop.mockRejectedValueOnce(new Error('stop failed'))
 
     await expect(start()).rejects.toBe(failure)
+  })
+})
+
+// Tranche 6d : l'alerte aux administrateurs, toutes les 10 minutes, est un e-mail : EMAIL_JOBS=off
+// la coupe, comme le récap et les mentions.
+describe('the moderation alert task', () => {
+  it('runs every 10 minutes', async () => {
+    await start()
+
+    expect(boss.schedule).toHaveBeenCalledWith(
+      'moderation-alert',
+      '*/10 * * * *',
+      null,
+      expect.objectContaining({ missed: 'skip' }),
+    )
+  })
+
+  it('is switched off with the other e-mails', async () => {
+    await startScheduler({ databaseUrl: 'postgres://test', deps, emailJobs: false })
+
+    expect(boss.unschedule).toHaveBeenCalledWith('moderation-alert')
+    expect(boss.schedule).not.toHaveBeenCalledWith(
+      'moderation-alert',
+      expect.anything(),
+      null,
+      expect.anything(),
+    )
   })
 })
