@@ -766,7 +766,7 @@ Décisions de Louis (22/10/2026) :
   contenu retiré, par une notification avec l'explication ; la personne qui a signalé, par une
   notification quand c'est traité. L'auteur d'un contenu ne sait jamais qui l'a signalé ; seule la
   modération le voit, pour éviter les abus.
-- **Une adresse de contact** (`contact@waiggle.io`), affichée dans « Mon compte » et dans le pied
+- **Une adresse de contact** (`contact@waiggle.com`), affichée dans « Mon compte » et dans le pied
   des e-mails. La boîte est créée par Louis avant le déploiement.
 
 **Signaler**

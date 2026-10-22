@@ -10,4 +10,4 @@ export const sourceUrl = 'https://github.com/EthogramHQ/Waiggle'
 
 // L’adresse de contact (tranche 6d) : questions, contenus à signaler, demandes sur les données. Seul
 // endroit où elle est écrite ; les textes la citent par {{contactEmail}}, rempli automatiquement.
-export const contactEmail = 'contact@waiggle.io'
+export const contactEmail = 'contact@waiggle.com'
