@@ -105,7 +105,7 @@ export const publicHttpsUrl = (value: string): URL | null => {
     return null // ce n'est pas une adresse
   }
   if (url.protocol !== 'https:') return null
-  // « https://waiggle.io@pirate.example.com » mène à pirate.example.com : ce qui précède @ est un identifiant.
+  // « https://waiggle.com@pirate.example.com » mène à pirate.example.com : ce qui précède @ est un identifiant.
   if (url.username || url.password) return null
 
   // Un seul point final est permis (« example.com. » est une écriture valide) ; plusieurs, non.

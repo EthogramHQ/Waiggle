@@ -34,7 +34,7 @@ développera ; chacune est livrable seule.
 - Étant donné un e-mail envoyé par l'appli à propos du compte (vérification, adresse déjà utilisée)
 - Quand le membre l'ouvre
 - Alors aucun pixel ni image de suivi n'y signale l'ouverture
-- Et chaque lien pointe directement vers waiggle.io ou api.waiggle.io, jamais vers un domaine de
+- Et chaque lien pointe directement vers waiggle.com ou api.waiggle.com, jamais vers un domaine de
   redirection d'un prestataire
 
 ### Notes de réalisation (tranche 1)
@@ -298,7 +298,7 @@ miel). Ces scénarios valent pour tous les écrans, présents et à venir.
 
 Statut : **validé par Louis** le 13/10/2026 (avec le plan de mise en ligne).
 
-L'appli est en ligne sur waiggle.io. Pour rester entre proches, il faut un code d'invitation pour
+L'appli est en ligne sur waiggle.com. Pour rester entre proches, il faut un code d'invitation pour
 créer un compte. Louis le choisit et le donne à qui il veut.
 
 **S'inscrire avec le bon code**
@@ -319,7 +319,7 @@ créer un compte. Louis le choisit et le donne à qui il veut.
   de code : en essayer des milliers est impossible
 
 **Partager un lien d'invitation**
-- Quand un visiteur ouvre `https://waiggle.io/sign-up?code=…`
+- Quand un visiteur ouvre `https://waiggle.com/sign-up?code=…`
 - Alors le champ « Code d'invitation » est déjà rempli
 
 ### Précisions (inscription sur invitation)

@@ -91,7 +91,7 @@ describe('ProjectUpdate', () => {
 const visual = {
   id: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
   kind: 'image',
-  url: 'https://api.waiggle.io/media/visuals/2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f.webp',
+  url: 'https://api.waiggle.com/media/visuals/2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f.webp',
   width: 1600,
   height: 900,
   // Le ThumbHash d'une vraie image : une vingtaine d'octets, écrits en base64.
@@ -227,8 +227,8 @@ describe('DemoUrl', () => {
   })
 
   it('refuses an address that hides a login, often used to disguise the real site', () => {
-    // « https://waiggle.io@pirate.example.com » mène en réalité à pirate.example.com.
-    expect(accepted('https://waiggle.io@pirate.example.com')).toBe(false)
+    // « https://waiggle.com@pirate.example.com » mène en réalité à pirate.example.com.
+    expect(accepted('https://waiggle.com@pirate.example.com')).toBe(false)
   })
 })
 

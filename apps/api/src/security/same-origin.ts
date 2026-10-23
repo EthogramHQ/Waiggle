@@ -17,7 +17,7 @@ const readOnlyMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 /** Refuse (403) les modifications envoyées depuis un autre site que ceux de la liste. */
 export const sameOriginWrites = (allowedUrls: string[]): MiddlewareHandler<AppEnv> => {
-  // new URL(...).origin normalise l'adresse : « https://waiggle.io/ » devient « https://waiggle.io ».
+  // new URL(...).origin normalise l'adresse : « https://waiggle.com/ » devient « https://waiggle.com ».
   const allowed = new Set(allowedUrls.map((url) => new URL(url).origin))
 
   return async (c, next) => {

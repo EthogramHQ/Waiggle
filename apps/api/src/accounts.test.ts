@@ -219,6 +219,10 @@ describe('signing in', () => {
           `max-age=${7 * 24 * 60 * 60}`,
         ]),
       )
+      // Aucun attribut Domain : le cookie reste attaché au seul nom de l'API (api.waiggle.com).
+      // Avec Domain=waiggle.com, il partirait vers tous les sous-domaines, y compris ceux d'un
+      // prestataire (le futur news.waiggle.com des e-mails marketing).
+      expect(attributes.some((attribute) => attribute.startsWith('domain='))).toBe(false)
     } finally {
       await secure.close()
     }

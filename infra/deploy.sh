@@ -98,6 +98,18 @@ main() {
   else
     echo "AVERTISSEMENT : https://$APP_DOMAIN ou https://$API_DOMAIN ne répond pas encore (DNS, certificats ?)"
   fi
+  # Les anciens domaines renvoient vers les nouveaux (infra/Caddyfile) : on lit le code et la
+  # destination de la redirection, sans la suivre.
+  local legacy_app=${LEGACY_APP_DOMAIN:-} legacy_api=${LEGACY_API_DOMAIN:-} answer
+  if [ -n "$legacy_app" ] && [ -n "$legacy_api" ]; then
+    answer="$(curl -s --max-time 15 -o /dev/null -w '%{http_code} %header{location}' "https://$legacy_app/" || true) $(
+      curl -s --max-time 15 -o /dev/null -w '%{http_code} %header{location}' "https://$legacy_api/health" || true)"
+    if [ "$answer" = "301 https://$APP_DOMAIN/ 308 https://$API_DOMAIN/health" ]; then
+      echo "ok : $legacy_app et $legacy_api renvoient vers les nouveaux domaines"
+    else
+      echo "AVERTISSEMENT : redirections des anciens domaines inattendues (« $answer »)"
+    fi
+  fi
   # Les images sont réservées aux membres : une vraie image, demandée sans session, doit répondre
   # « introuvable ». On prend une photo de projet (ou, sinon, un avatar) dans la base ; sa clé est
   # vérifiée avant d'en faire une adresse. Sans aucune image en base, rien à vérifier.

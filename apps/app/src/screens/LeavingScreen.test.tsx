@@ -70,7 +70,7 @@ describe('LeavingScreen', () => {
   })
 
   it('refuses local machines and disguised addresses', async () => {
-    for (const url of ['https://192.168.1.1/admin', 'https://waiggle.io@pirate.example.com']) {
+    for (const url of ['https://192.168.1.1/admin', 'https://waiggle.com@pirate.example.com']) {
       await renderWithProviders(<LeavingScreen url={url} />)
       expect(screen.queryByRole('button', { name: /Continuer/ })).toBeNull()
     }

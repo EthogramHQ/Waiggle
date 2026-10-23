@@ -12,11 +12,11 @@ const production = {
   NODE_ENV: 'production',
   DATABASE_URL: 'postgres://ruche:secret@db:5432/ruche',
   BETTER_AUTH_SECRET: 'a'.repeat(32),
-  PUBLIC_API_URL: 'https://api.waiggle.io',
-  APP_URL: 'https://waiggle.io',
+  PUBLIC_API_URL: 'https://api.waiggle.com',
+  APP_URL: 'https://waiggle.com',
   MAIL_PROVIDER: 'brevo',
   BREVO_API_KEY: 'key',
-  MAIL_FROM_EMAIL: 'no-reply@waiggle.io',
+  MAIL_FROM_EMAIL: 'no-reply@waiggle.com',
   SIGNUP_INVITE_CODE: inviteCode,
 }
 
@@ -42,7 +42,7 @@ describe('loadEnv', () => {
       mail: {
         provider: 'brevo',
         apiKey: 'key',
-        from: { email: 'no-reply@waiggle.io', name: appName },
+        from: { email: 'no-reply@waiggle.com', name: appName },
       },
       inviteCode,
     })
@@ -85,7 +85,7 @@ describe('loadEnv', () => {
       secretKey: 'secret',
       projectId: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
       region: 'fr-par',
-      from: { email: 'no-reply@waiggle.io', name: appName },
+      from: { email: 'no-reply@waiggle.com', name: appName },
     })
     // Le service n'existe qu'à Paris : une autre région est refusée au démarrage, pas au premier e-mail.
     expect(() => loadEnv({ ...scaleway, SCALEWAY_REGION: 'nl-ams' })).toThrow(/SCALEWAY_REGION/)

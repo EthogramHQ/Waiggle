@@ -93,7 +93,7 @@ export const createApp = ({
   // Un « middleware » est une fonction exécutée pour chaque requête, avant (et après) la route.
   // secureHeaders ajoute des en-têtes de sécurité standards : interdiction d'afficher le site
   // dans une iframe étrangère, obligation du HTTPS, etc. « same-site » laisse l'appli web
-  // (waiggle.io) lire les réponses de l'API (api.waiggle.io), qui est sur le même site.
+  // (waiggle.com) lire les réponses de l'API (api.waiggle.com), qui est sur le même site.
   //
   // La CSP (Content-Security-Policy) dit au navigateur ce qu'une page a le droit de charger et
   // d'exécuter. L'API ne sert presque que du JSON, mais son domaine porte le cookie de session et

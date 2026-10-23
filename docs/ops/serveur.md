@@ -8,18 +8,19 @@ choix eux-mêmes sont expliqués dans l'[ADR 0003](../adr/0003-hebergement.md).
 ## 1. Vue d'ensemble
 
 ```text
-Internet ──443──▶ web (Caddy + appli construite) ─┬─ waiggle.io      → les pages de l'appli
-                                                  └─ api.waiggle.io  → api:3000 ─▶ db (réseau interne)
+Internet ──443──▶ web (Caddy + appli construite) ─┬─ waiggle.com      → les pages de l'appli
+                                                  ├─ api.waiggle.com  → api:3000 ─▶ db (réseau interne)
+                                                  └─ waiggle.io, api.waiggle.io → redirigent vers waiggle.com
 ```
 
 | Quoi | Où |
 | --- | --- |
 | Hébergeur | Hostinger, VPS KVM 2 (2 processeurs, 8 Go de mémoire), à Paris |
 | Système | Debian 13, compte d'administration `louis` (root fermé) |
-| Domaines | waiggle.io (appli), api.waiggle.io (API), www.waiggle.io (renvoie vers waiggle.io) |
+| Domaines | waiggle.com (appli), api.waiggle.com (API), www.waiggle.com (renvoie vers waiggle.com) ; anciens : waiggle.io, www.waiggle.io et api.waiggle.io redirigent (ADR 0006) ; waiggle.fr redirigé par Hostinger |
 | Images | `ghcr.io/ethogramhq/waiggle-api` et `waiggle-web`, publiées par la CI après chaque fusion sur main |
 | Dossier de l'appli | `/srv/ruche` : `repo/` (copie du dépôt), `secrets.env`, `deployed.env`, `backups/` |
-| E-mails | Scaleway Transactional Email (compte), expéditeur `no-reply@waiggle.io` ; Brevo réservé au marketing (ADR 0005) |
+| E-mails | Scaleway Transactional Email (compte), expéditeur `no-reply@waiggle.com` ; Brevo réservé au marketing (ADR 0005) |
 
 Ce qui se fait tout seul :
 
@@ -105,10 +106,12 @@ L'assistant ne tape jamais un mot de passe, une clé ou un numéro de carte : ce
    - **Compte et projet** : crée le compte Scaleway (identité et moyen de paiement, même pour rester
      dans les 300 e-mails gratuits par mois). Note l'identifiant du projet (un UUID, dans les
      réglages du projet) : c'est `SCALEWAY_PROJECT_ID`.
-   - **Domaine** : dans Transactional Email, ajoute le domaine waiggle.io. Scaleway donne des
-     enregistrements DNS (SPF, DKIM, MX de rebond, DMARC) : garde-les pour l'étape « DNS ». Le
-     SPF doit citer Scaleway **et** Brevo tant que les deux ont le droit d'envoyer depuis le
-     domaine. La vérification du domaine se fait d'elle-même, quelques minutes après les DNS.
+   - **Domaine** : dans Transactional Email, ajoute le domaine waiggle.com. Scaleway donne des
+     enregistrements DNS (SPF, DKIM, MX de rebond, DMARC) : garde-les pour l'étape « DNS ». Un
+     domaine n'a qu'**un seul** SPF : il cite à la fois la boîte Hostinger et Scaleway (et Brevo,
+     le jour où il enverra). Le MX de rebond de Scaleway ne s'ajoute pas : les MX de Hostinger
+     servent la boîte `contact@`. La vérification du domaine se fait d'elle-même, quelques
+     minutes à une heure après les DNS.
    - **Clé API** : dans IAM, crée une application dédiée (« waiggle-api »), puis une politique
      portée sur **le projet** (pas sur l'organisation) avec le seul jeu de permissions
      `TransactionalEmailEmailApiCreate` : envoyer des e-mails par l'API, et rien d'autre (ni
@@ -175,7 +178,7 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
 - **Pare-feu de hPanel** (ou le connecteur Hostinger, avec l'accord de Louis) : il n'autorise que
   22/tcp, 80/tcp, 443/tcp et 443/udp. Il s'ajoute au pare-feu du serveur lui-même. Deux couches
   valent mieux qu'une.
-- **DNS de waiggle.io** (hPanel, rubrique « DNS ») : supprime les enregistrements « parking » de
+- **DNS de waiggle.com** (hPanel, rubrique « DNS ») : supprime les enregistrements « parking » de
   Hostinger pour `@` et `www`, puis ajoute :
 
   | Type | Nom | Valeur |
@@ -184,9 +187,24 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
   | AAAA | `@` | adresse IPv6 du VPS |
   | A | `api` | adresse IPv4 du VPS |
   | AAAA | `api` | adresse IPv6 du VPS |
-  | CNAME | `www` | `waiggle.io` |
+  | CNAME | `www` | `waiggle.com` |
   | CAA | `@` | `0 issue "letsencrypt.org"` (seul Let's Encrypt peut délivrer des certificats) |
-  | … | … | les enregistrements donnés par Scaleway (SPF, DKIM, MX, DMARC) et, pour le marketing, par Brevo |
+  | TXT | `@` | `v=spf1 include:_spf.mail.hostinger.com include:_spf.tem.scaleway.com ~all` (un seul SPF) |
+  | TXT | `<projet>._domainkey` | le DKIM donné par Scaleway |
+  | … | … | MX, DKIM (`hostingermail-a/b/c`), `autodiscover` et `autoconfig` de la boîte Hostinger ; plus tard, pour le marketing, ceux de Brevo (`news.waiggle.com`) |
+
+  **Les anciens domaines** (`waiggle.io`, `waiggle.fr`) gardent leurs A et AAAA (ou la
+  redirection de Hostinger), et annoncent qu'ils n'envoient aucun e-mail, pour qu'on ne puisse pas
+  écrire en leur nom :
+
+  | Type | Nom | Valeur |
+  | --- | --- | --- |
+  | TXT | `@` | `v=spf1 -all` |
+  | TXT | `_dmarc` | `v=DMARC1; p=reject` |
+  | MX | `@` | `0 .` (« MX nul » : aucune boîte) |
+
+  Attention : activer puis supprimer une boîte Hostinger sur un domaine efface ses
+  enregistrements mail (SPF, DKIM, DMARC, MX) ; c'est arrivé à `waiggle.io` le 23/10/2026.
 
   Pour DMARC, commence par `p=none` : on observe d'abord, on durcit ensuite. Les rapports des
   messageries (adresse `rua` de l'enregistrement `_dmarc`) partent chez Postmark « DMARC Digests »,
@@ -198,7 +216,7 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
 Les changements DNS mettent de quelques minutes à quelques heures à se propager. C'est pour ça
 qu'on les fait tôt : ils se propagent pendant les étapes suivantes.
 
-**À vérifier** : `nslookup waiggle.io` et `nslookup api.waiggle.io` donnent l'adresse du VPS.
+**À vérifier** : `nslookup waiggle.com` et `nslookup api.waiggle.com` donnent l'adresse du VPS.
 
 ### Étape 3 : le compte `louis`, puis fermeture de root
 
@@ -252,7 +270,7 @@ production : sans lui, les liens des e-mails, qui connectent au compte, finiraie
 MAIL_PROVIDER=scaleway
 SCALEWAY_SECRET_KEY=<la clé secrète de l'application IAM>
 SCALEWAY_PROJECT_ID=<l'identifiant du projet>
-MAIL_FROM_EMAIL=no-reply@waiggle.io
+MAIL_FROM_EMAIL=no-reply@waiggle.com
 ```
 
 **À vérifier** (l'assistant de code peut le faire : ces commandes comptent les lignes remplies, sans rien
@@ -310,12 +328,15 @@ Si le DNS n'était pas prêt, Caddy réessaie tout seul. Pour accélérer une fo
 
 L'assistant de code les fait toutes, et en donne le résultat à Louis :
 
-- **Pages** : `curl -sI https://waiggle.io/` donne 200, avec les en-têtes `strict-transport-security`
-  et `content-security-policy`. `curl -sI https://waiggle.io/nexiste-pas` donne 404.
-- **Version** : `curl -s https://api.waiggle.io/health` annonce le bon commit.
+- **Pages** : `curl -sI https://waiggle.com/` donne 200, avec les en-têtes `strict-transport-security`
+  et `content-security-policy`. `curl -sI https://waiggle.com/nexiste-pas` donne 404.
+- **Version** : `curl -s https://api.waiggle.com/health` annonce le bon commit.
 - **Redirections** :
-  - `curl -sI http://waiggle.io/` renvoie vers https (308) ;
-  - `curl -sI https://www.waiggle.io/` renvoie vers waiggle.io (301).
+  - `curl -sI http://waiggle.com/` renvoie vers https (308) ;
+  - `curl -sI https://www.waiggle.com/` renvoie vers waiggle.com (301) ;
+  - `curl -sI 'https://waiggle.io/sign-in?code=x'` renvoie vers `https://waiggle.com/sign-in?code=x` (301) ;
+  - `curl -sI https://api.waiggle.io/health` renvoie vers `https://api.waiggle.com/health` (308) ;
+  - `curl -sI https://waiggle.fr/` renvoie vers `https://waiggle.com/` (301, Hostinger).
 - **Ports** : `ssh waiggle 'sudo ss -tulnp'` ne montre que 22, 80 et 443 ouverts vers
   l'extérieur (443 en TCP et en UDP). Le port 5432 (base), le port 3000 (API) et le port 5355
   (LLMNR, éteint par l'étape `base`) n'apparaissent pas.
@@ -327,7 +348,7 @@ L'assistant de code les fait toutes, et en donne le résultat à Louis :
   ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && db_query' <<< "select count(*) from session where ip_address::inet << '172.16.0.0/12' or ip_address::inet << 'fc00::/7';"
   ```
 - **Navigateur** :
-  - `node apps/app/scripts/site-check.mjs https://waiggle.io` : aucun blocage de la CSP, aucune
+  - `node apps/app/scripts/site-check.mjs https://waiggle.com` : aucun blocage de la CSP, aucune
     erreur dans les pages ;
   - il faut avoir lancé `pnpm install` et
     `pnpm --filter @ruche/app exec playwright install chromium` sur le PC.
@@ -345,7 +366,7 @@ L'assistant de code les fait toutes, et en donne le résultat à Louis :
   un vrai e-mail, le vrai domaine.
   1. inscription avec le code, sur téléphone puis sur ordinateur ;
   2. l'e-mail arrive hors des indésirables. Dans « Afficher l'original », on doit lire
-     `dkim=pass` et `dmarc=pass`, le lien du bouton doit pointer vers `api.waiggle.io` (jamais
+     `dkim=pass` (`header.d=waiggle.com`) et `dmarc=pass`, le lien du bouton doit pointer vers `api.waiggle.com` (jamais
      vers un domaine de prestataire), et il ne doit y avoir aucune image invisible de suivi ;
   3. vérification de l'adresse, puis publication d'un projet ;
   4. un second compte le voit ;
@@ -358,7 +379,7 @@ Le code d'invitation, tu le lis toi-même :
 ssh waiggle "sed -n 's/^SIGNUP_INVITE_CODE=//p' /srv/ruche/secrets.env"
 ```
 
-Le lien à envoyer à tes proches est alors `https://waiggle.io/sign-up?code=<code>`.
+Le lien à envoyer à tes proches est alors `https://waiggle.com/sign-up?code=<code>`.
 
 ## 4. Au quotidien
 
@@ -578,12 +599,31 @@ signalements, un retrait demandé par e-mail, les durées de conservation : tout
 
 ### Changer de domaine
 
-1. Acheter le domaine, puis créer ses enregistrements DNS (partie 3, étape 2).
-2. Modifier `infra/site.env` dans une pull request. Une fois fusionnée, la CI publie des images
-   construites pour le nouveau domaine.
-3. Déployer. Caddy obtient les nouveaux certificats.
-4. Scaleway : ajouter et vérifier le nouveau domaine, puis changer `MAIL_FROM_EMAIL` dans les
-   secrets.
+Fait une fois, de `waiggle.io` vers `waiggle.com` (23/10/2026, ADR 0006). Dans l'ordre :
+
+1. Acheter le domaine, puis créer ses enregistrements DNS (partie 3, étape 2), CAA compris :
+   Caddy demande les certificats dès son démarrage.
+2. E-mails, sans attendre le code : ajouter et vérifier le domaine chez Scaleway (SPF fusionné,
+   DKIM), changer `MAIL_FROM_EMAIL` dans les secrets, redémarrer l'API, lire les en-têtes d'un
+   vrai e-mail. Puis verrouiller l'ancien domaine (SPF `-all`, DMARC `p=reject`, MX nul).
+3. Une pull request : dans `infra/site.env`, le nouveau domaine dans `APP_DOMAIN` /
+   `API_DOMAIN`, l'ancien dans `LEGACY_APP_DOMAIN` / `LEGACY_API_DOMAIN` (Caddy le redirige).
+   Une fois fusionnée, la CI publie des images construites pour le nouveau domaine.
+4. Juste avant de déployer : aucun compte inscrit dans l'heure sans adresse vérifiée (son lien,
+   vers l'ancien domaine, échouerait) :
+   `select count(*) from "user" where email_verified = false and created_at at time zone 'UTC' > now() - interval '1 hour';`
+   Prévenir les membres : chacun devra se reconnecter (le cookie de session est attaché à
+   l'ancien nom de l'API).
+5. Déployer, puis les vérifications de l'étape 7 et un vrai e-mail.
+6. Changer le code d'invitation (l'ancien circule dans des liens vers l'ancien domaine) ; garder
+   l'ancien domaine en renouvellement automatique.
+
+Revenir en arrière : jamais en redéployant le commit précédent, même dans l'heure. Les
+navigateurs gardent les redirections permanentes sans limite, et l'ancien commit ne sert plus le
+nouveau domaine : qui a suivi une redirection tomberait sur une erreur de certificat, sans pouvoir
+passer outre (HSTS). On revient par un commit qui permute les deux domaines dans `site.env`
+(l'ancien redevient principal, le nouveau passe dans `LEGACY_*`), préparé sur une branche avant
+la bascule, fusionné puis déployé.
 
 ### Mises à jour
 

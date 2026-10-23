@@ -13,7 +13,7 @@ import {
 } from './templates'
 
 describe('verificationEmail', () => {
-  const url = 'https://api.waiggle.io/api/auth/verify-email?token=abc'
+  const url = 'https://api.waiggle.com/api/auth/verify-email?token=abc'
 
   it('is written in French, with the link in the text and in the button', () => {
     const email = verificationEmail('fr', { name: 'Léa', url })
@@ -41,7 +41,7 @@ describe('verificationEmail', () => {
 
 describe('existingAccountEmail', () => {
   it('tells the owner someone tried to sign up, and points to sign-in', () => {
-    const signInUrl = 'https://waiggle.io/sign-in'
+    const signInUrl = 'https://waiggle.com/sign-in'
     const email = existingAccountEmail('fr', { name: 'Léa', signInUrl })
 
     expect(email.subject).toBe(`Tentative d’inscription sur ${appName}`)
@@ -51,10 +51,10 @@ describe('existingAccountEmail', () => {
 
 // Ajoutés avec les corrections des relectures de la branche 6c (sécurité B1, A2 ; design 5 à 9).
 const links: NotificationLinks = {
-  button: 'https://waiggle.io/notifications',
-  unsubscribe: 'https://waiggle.io/unsubscribe?token=t',
-  manage: 'https://waiggle.io/profile',
-  oneClick: 'https://api.waiggle.io/v1/email/unsubscribe?token=t',
+  button: 'https://waiggle.com/notifications',
+  unsubscribe: 'https://waiggle.com/unsubscribe?token=t',
+  manage: 'https://waiggle.com/profile',
+  oneClick: 'https://api.waiggle.com/v1/email/unsubscribe?token=t',
 }
 
 const recapData = (overrides: Partial<RecapData> = {}): RecapData => ({
@@ -85,7 +85,7 @@ describe('a name written to trap the account e-mails', () => {
   const trap = 'Ton compte est bloqué, va sur waiggle-login.com'
 
   it('turns the address of a name into « [lien] » in the verification e-mail', () => {
-    const email = verificationEmail('fr', { name: trap, url: 'https://api.waiggle.io/verify' })
+    const email = verificationEmail('fr', { name: trap, url: 'https://api.waiggle.com/verify' })
 
     for (const part of [email.text, email.html]) {
       expect(part).not.toContain('waiggle-login.com')
@@ -94,7 +94,7 @@ describe('a name written to trap the account e-mails', () => {
   })
 
   it('does the same in the e-mail sent to the owner of an existing account, in her language', () => {
-    const email = existingAccountEmail('en', { name: trap, signInUrl: 'https://waiggle.io/x' })
+    const email = existingAccountEmail('en', { name: trap, signInUrl: 'https://waiggle.com/x' })
 
     for (const part of [email.text, email.html]) {
       expect(part).not.toContain('waiggle-login.com')
@@ -213,11 +213,11 @@ describe('the layout of a notification e-mail', () => {
 // jamais en lien « mailto: » (tout lien d'un e-mail mène à l'appli ou à l'API).
 describe('the contact address in the footer', () => {
   const emails = () => [
-    verificationEmail('fr', { name: 'Léa', url: 'https://api.waiggle.io/verify' }),
-    existingAccountEmail('en', { name: 'Sam', signInUrl: 'https://waiggle.io/sign-in' }),
+    verificationEmail('fr', { name: 'Léa', url: 'https://api.waiggle.com/verify' }),
+    existingAccountEmail('en', { name: 'Sam', signInUrl: 'https://waiggle.com/sign-in' }),
     recapEmail('fr', recapData()),
     mentionEmail('en', mentionData()),
-    moderationAlertEmail('fr', { name: 'Louis', count: 2, url: 'https://waiggle.io/moderation' }),
+    moderationAlertEmail('fr', { name: 'Louis', count: 2, url: 'https://waiggle.com/moderation' }),
   ]
 
   it('is written in every e-mail, as text and never as a link', () => {
@@ -233,7 +233,7 @@ describe('the contact address in the footer', () => {
 // L'e-mail d'alerte à l'administrateur (plan 7a, « Tâche et e-mail » ; précision 5) : le nombre
 // de signalements en attente et un lien vers « Modération », sans aucun extrait.
 describe('moderationAlertEmail', () => {
-  const url = 'https://waiggle.io/moderation'
+  const url = 'https://waiggle.com/moderation'
 
   it('gives the number of pending reports and a button to the moderation screen', () => {
     const email = moderationAlertEmail('fr', { name: 'Louis', count: 3, url })
@@ -261,6 +261,6 @@ describe('moderationAlertEmail', () => {
 
     const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
     expect(hrefs).toContain(url)
-    for (const href of hrefs) expect(href.startsWith('https://waiggle.io/'), href).toBe(true)
+    for (const href of hrefs) expect(href.startsWith('https://waiggle.com/'), href).toBe(true)
   })
 })
