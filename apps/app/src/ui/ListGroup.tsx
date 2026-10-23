@@ -5,6 +5,7 @@ import { borders, layout, radii, space } from '@ruche/brand'
 import { Children, Fragment, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
+import { spaceToggles } from './keyboard'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -100,6 +101,11 @@ type RowProps = {
    * l'annoncent comme une attente en cours (rôle progressbar, aria-busy), avec son libellé.
    */
   busy?: boolean
+  /**
+   * Le nom lu d'une ligne qu'on touche, s'il doit dire plus que son libellé (« Nous écrire,
+   * contact@… ») : le nom d'un bouton cache le texte qu'il contient, la précision comprise.
+   */
+  spokenLabel?: string
 }
 
 export function ListRow({
@@ -114,6 +120,7 @@ export function ListRow({
   accessory,
   disabled = false,
   busy = false,
+  spokenLabel,
 }: RowProps) {
   const { colors } = useTheme()
   const isChoice = selected !== undefined
@@ -189,9 +196,13 @@ export function ListRow({
   return (
     <Pressable
       accessibilityRole={isChoice ? 'radio' : 'button'}
-      accessibilityLabel={label}
+      accessibilityLabel={spokenLabel ?? label}
       aria-disabled={disabled}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
+      // Un choix (bouton radio) se coche avec la barre d'espace, sur le web : react-native-web ne
+      // le fait que pour les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a)
+      // ne pouvait pas s'envoyer au clavier : aucun motif ne se cochait.
+      {...(isChoice ? spaceToggles(onPress, disabled) : null)}
       disabled={disabled}
       onPress={onPress}
       // Le groupe rogne ce qui dépasse : l'anneau de focus se dessine à l'intérieur de la ligne.

@@ -16,12 +16,14 @@ import {
   toolSlug,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, desc, eq, inArray, or, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
 import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
 import { recentNotesOf } from '../notes/load'
 import { mediaUrl } from '../profile/me'
 import { reactionStatesOf } from '../reactions/load'
+import { removalsOf } from '../removals/load'
+import { projectVisibleTo } from './visibility'
 
 type MediaRow = typeof schema.projectMedia.$inferSelect
 
@@ -69,11 +71,17 @@ type ProjectRow = Awaited<ReturnType<ReturnType<typeof selectProjects>['execute'
  * qu'on sait d'une ligne de la base et de ses médias. Les listes (cartes) s'en contentent ; la page
  * d'un projet y ajoute le reste. Omit<A, B> : le type A, sans les champs nommés dans B.
  */
-type ProjectBase = Omit<Project, keyof FollowState | 'notes' | 'reactions' | 'commentCount'>
+type ProjectBase = Omit<
+  Project,
+  keyof FollowState | 'notes' | 'reactions' | 'commentCount' | 'removal'
+>
 
-/** La condition « visible par ce membre » : public, ou écrit par lui. */
-export const visibleTo = (viewerId: string) =>
-  or(eq(schema.project.visibility, 'public'), eq(schema.project.authorId, viewerId))
+/**
+ * La condition « visible par ce membre » : public et pas retiré, ou écrit par lui. Le nom que
+ * gardent les routes ; la règle elle-même est écrite une seule fois, dans visibility.ts (tranche
+ * 7a).
+ */
+export const visibleTo = projectVisibleTo
 
 /** Transforme une ligne de la base en projet, sans son état d'abonnement. */
 const toProjectBase = (
@@ -119,7 +127,10 @@ const toProjectBase = (
  * Des lignes de la base, transformées en projets tels que l'API les renvoie (contrat `Project`),
  * avec leur état d'abonnement, leur journal, leurs réactions et leur nombre de commentaires :
  * quatre requêtes de plus pour tous (abonnés, notes, réactions, commentaires), quel que soit leur
- * nombre. Promise.all les lance en même temps.
+ * nombre. Promise.all les lance en même temps. Une cinquième, seulement si l'un d'eux est un projet
+ * retiré du membre qui regarde : l'explication du retrait (removals/load.ts). Un projet retiré
+ * n'arrive ici que pour son auteur (visibleTo) ; la condition est redite, pour que `removal` ne
+ * soit jamais rempli pour un autre.
  */
 const toProjects = async (
   db: Database,
@@ -129,23 +140,52 @@ const toProjects = async (
   publicApiUrl: string,
 ): Promise<Project[]> => {
   const ids = rows.map(({ project }) => project.id)
-  const [follows, journals, reactions, commentCounts] = await Promise.all([
+  // Le retrait d'un projet ne se lit que par son auteur.
+  const removalIdOf = ({ project }: ProjectRow) =>
+    project.removedAt !== null && project.authorId === viewerId ? project.removalId : null
+  const [follows, journals, reactions, commentCounts, removals] = await Promise.all([
     projectFollowStates(
       db,
       rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
       viewerId,
     ),
-    recentNotesOf(db, ids),
+    recentNotesOf(db, ids, viewerId),
     reactionStatesOf(db, ids, viewerId),
     commentCountsOf(db, ids),
+    removalsOf(db, rows.map(removalIdOf)),
   ])
-  return rows.map((row) => ({
-    ...toProjectBase(row, media, viewerId, publicApiUrl),
-    ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
-    notes: journals.get(row.project.id) ?? [],
-    reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
-    commentCount: commentCounts.get(row.project.id) ?? 0,
-  }))
+  return rows.map((row) => {
+    const removalId = removalIdOf(row)
+    return {
+      ...toProjectBase(row, media, viewerId, publicApiUrl),
+      ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
+      notes: journals.get(row.project.id) ?? [],
+      reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
+      commentCount: commentCounts.get(row.project.id) ?? 0,
+      removal: (removalId && removals.get(removalId)) || null,
+    }
+  })
+}
+
+/**
+ * Ce que ce membre peut faire du projet `id`, en une petite requête servie par la clé primaire
+ * (on ne lit que l'auteur et la date de retrait, pas tout le projet) :
+ * - 'not_found' : identifiant mal formé, projet inconnu, privé ou retiré d'un autre (la même
+ *   réponse, pour ne rien révéler) ;
+ * - 'forbidden' : un projet qu'il voit, mais d'un autre ;
+ * - 'removed' : le sien, retiré par la modération : il le lit et peut le supprimer, mais ni le
+ *   modifier ni y ajouter quoi que ce soit (409, règles 4 et 30 de la relecture du plan) ;
+ * - 'mine' : le sien.
+ */
+export const projectAccess = async (db: Reader, id: string, viewerId: string) => {
+  if (!ProjectId.safeParse(id).success) return 'not_found' as const
+  const [project] = await db
+    .select({ authorId: schema.project.authorId, removedAt: schema.project.removedAt })
+    .from(schema.project)
+    .where(and(eq(schema.project.id, id), visibleTo(viewerId)))
+  if (!project) return 'not_found' as const
+  if (project.authorId !== viewerId) return 'forbidden' as const
+  return project.removedAt === null ? ('mine' as const) : ('removed' as const)
 }
 
 /**

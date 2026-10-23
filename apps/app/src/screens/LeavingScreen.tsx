@@ -22,7 +22,12 @@ import { useHydrated } from '../ui/theme/hydration'
  * machine du réseau local, pas d'identifiant caché avant « @ », pas de nom écrit dans un autre
  * alphabet qui pourrait imiter un site connu.
  */
-const safeTarget = (value: string | undefined): URL | null => (value ? publicHttpsUrl(value) : null)
+const safeTarget = (value: string | undefined): { host: string; href: string } | null => {
+  if (!value) return null
+  // Aucun « mailto: », même vers notre adresse : ces textes parlent d'un site tiers. « Nous
+  // écrire » (Mon compte) ouvre la messagerie directement, sans passer par ici.
+  return publicHttpsUrl(value)
+}
 
 export function LeavingScreen({ url }: { url: string | undefined }) {
   const { t } = useTranslation()

@@ -1,8 +1,12 @@
+import { contactEmail } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { Linking } from 'react-native'
 import { signOut } from '../accounts/api'
 import { getMe } from '../profile/api'
-import { leaMe } from '../testing/fixtures'
+import { adminMe, leaMe } from '../testing/fixtures'
+import { pathOf, visited } from '../testing/navigation'
 import { mockSession, renderWithI18n } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import { AccountScreen } from './AccountScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
@@ -81,5 +85,67 @@ describe('AccountScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Supprimer mon compte' }))
 
     expect(mockPush).toHaveBeenCalledWith('/account/delete')
+  })
+})
+
+// --- Tranche 7a : la modération (administrateur seulement) et l'adresse de contact ---
+
+describe('moderation in my account', () => {
+  it('leads an administrator to the moderation page', async () => {
+    jest.mocked(getMe).mockResolvedValue(adminMe)
+    await renderWithI18n(<AccountScreen />)
+
+    // Le profil arrive après l'affichage : la ligne apparaît quand on sait qu'il est administrateur.
+    await fireEvent.press(await screen.findByRole('button', { name: /^Modération/ }))
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toContain('/moderation')
+  })
+
+  it('shows no moderation to a member who is not an administrator', async () => {
+    // Léa (leaMe) : isAdmin est faux.
+    await renderWithI18n(<AccountScreen />)
+
+    // Témoin : le profil est arrivé (la ligne « Nous écrire » ne dépend pas de lui, l'avatar oui).
+    expect(await screen.findByRole('button', { name: /^Nous écrire/ })).toBeTruthy()
+    expect(jest.mocked(getMe)).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^Modération/ })).toBeNull()
+    expect(screen.queryByText('Modération')).toBeNull()
+  })
+})
+
+describe('writing to us from my account', () => {
+  it('shows the contact address, in French or in English', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    expect(screen.getAllByText(containing(contactEmail)).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/En français ou en anglais/).length).toBeGreaterThan(0)
+  })
+
+  // Test changé après la relecture de design de 4966555 : « Nous écrire » passait par la page « Tu
+  // quittes Waiggle », dont les textes parlent d'un site tiers. Notre propre adresse s'ouvre
+  // directement dans la messagerie, sans avertissement.
+  it('opens an e-mail to the contact address directly, without the leaving page', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+    try {
+      await renderWithI18n(<AccountScreen />)
+
+      await fireEvent.press(screen.getByRole('button', { name: /^Nous écrire/ }))
+
+      // L'adresse vient de packages/brand, seul endroit où elle est écrite.
+      expect(openURL).toHaveBeenCalledWith(`mailto:${contactEmail}`)
+      expect(visited(mockPush).filter((href) => href.startsWith('/out'))).toEqual([])
+    } finally {
+      openURL.mockRestore()
+    }
+  })
+
+  it('says the contact address in the spoken name of the row', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    expect(
+      screen.getByRole('button', {
+        name: fr.t('account.contact.spoken', { contactEmail }),
+      }),
+    ).toBeTruthy()
   })
 })

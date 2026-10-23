@@ -6,16 +6,27 @@
 // Les boutons de suppression portent tous le même nom ; sur le web, chacun est en plus « décrit »
 // par le texte de sa note (aria-describedby) : le lecteur d'écran dit laquelle il supprime.
 // Quand une note disparaît, l'écran peut ramener le focus du clavier sur sa voisine (handle).
+//
+// Tranche 7a : pour un autre membre, un drapeau « Signaler cette note » par note (`onReport`),
+// décrit de la même façon par son texte. Pour l'auteur, une note retirée par la modération garde sa
+// place, avec le bandeau du retrait au-dessus de son texte (`removed`).
 import { borders, layout, radii, readableWidth, space, textStyles } from '@ruche/brand'
 import { type Ref, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
+import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
-type Note = { id: string; body: string; when: string }
+type Note = {
+  id: string
+  body: string
+  when: string
+  /** Le bandeau d'une note retirée par la modération, pour l'auteur (tranche 7a). */
+  removed?: RemovedBanner | undefined
+}
 
 /**
  * Ce qu'un écran peut demander au journal : poser le focus sur le bouton « Supprimer » de la note
@@ -30,6 +41,10 @@ type Props = {
   onDelete?: (id: string) => void
   /** Le nom des boutons de suppression (par défaut, « Supprimer la note »). */
   deleteLabel?: string
+  /** Pour un autre membre : signaler une note (l'écran ouvre la page « Signaler »). */
+  onReport?: (id: string) => void
+  /** Le nom des boutons de signalement (par défaut, « Signaler cette note »). */
+  reportLabel?: string
   /** Le message d'un journal vide ; sans lui, un journal vide n'affiche rien. */
   empty?: string
   handle?: Ref<NoteListHandle>
@@ -38,7 +53,15 @@ type Props = {
 // Le point de chaque note sur la ligne de temps.
 const DOT = 10
 
-export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props) {
+export function NoteList({
+  notes,
+  onDelete,
+  deleteLabel,
+  onReport,
+  reportLabel,
+  empty,
+  handle,
+}: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   // Un préfixe unique pour les identifiants des textes (aria-describedby), stable entre le
@@ -53,10 +76,10 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
     },
   }))
 
-  const deletable = Boolean(onDelete)
-  // La première ligne d'une note (sa date) a la hauteur du bouton quand il y en a un : le point de
-  // la ligne de temps se centre sur elle.
-  const firstLine = deletable ? layout.touchTarget : textStyles.caption.lineHeight
+  // La première ligne d'une note (sa date) a la hauteur du bouton quand il y en a un (supprimer ou
+  // signaler) : le point de la ligne de temps se centre sur elle.
+  const withButton = Boolean(onDelete ?? onReport)
+  const firstLine = withButton ? layout.touchTarget : textStyles.caption.lineHeight
 
   if (notes.length === 0) {
     if (!empty) return null
@@ -136,8 +159,22 @@ export function NoteList({ notes, onDelete, deleteLabel, empty, handle }: Props)
                     hint={shorten(note.body, 80)}
                     onPress={() => onDelete(note.id)}
                   />
+                ) : onReport ? (
+                  // Pour un autre membre : signaler la note. Même description que « Supprimer » :
+                  // le lecteur d'écran dit laquelle.
+                  <IconButton
+                    icon="flag"
+                    variant="plain"
+                    label={reportLabel ?? t('report.note')}
+                    describedBy={bodyId}
+                    hint={shorten(note.body, 80)}
+                    onPress={() => onReport(note.id)}
+                  />
                 ) : null}
               </View>
+              {note.removed ? (
+                <RemovalNotice title={note.removed.title} lines={note.removed.lines} compact />
+              ) : null}
               {/* Texte brut, affiché tel quel ; selectable : on peut le copier. Un mot très long
                   (une adresse) se coupe au lieu de sortir de l'écran ; readable : sur un grand
                   écran, la ligne garde une longueur confortable. */}

@@ -9,6 +9,7 @@ import {
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
+  ReportTargetKind,
   UNREAD_COUNT_MAX,
 } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
@@ -16,6 +17,8 @@ import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
+import { listedProject } from '../projects/visibility'
+import { afterReportSql, toRemoval } from '../removals/load'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -44,18 +47,21 @@ const parisDay = (column: string) =>
 // ─── Les six sources ────────────────────────────────────────────────────────────────────────────
 
 /**
- * « `me` lit le commentaire c (du projet p), et n'en est pas l'auteur » : la règle de `sees`
- * (comments/load.ts), écrite pour un lecteur qui n'a pas écrit le commentaire, et pour des
+ * « `me` lit le commentaire c (du projet `project`), et n'en est pas l'auteur » : la règle de
+ * `sees` (comments/load.ts), écrite pour un lecteur qui n'a pas écrit le commentaire, et pour des
  * commentaires de plusieurs projets à la fois (seesSql, elle, sert un projet déjà connu) :
  * - ni supprimé, ni sans auteur : « author_id <> me » écarte aussi les null (null n'est différent
  *   de rien) ;
- * - sur un projet public seulement : sur un projet privé, seul l'auteur d'un commentaire le lit
- *   (et ce n'est pas `me`) ;
+ * - pas retiré par la modération (tranche 7a, règle 1 : sans exception, pas même pour l'auteur du
+ *   projet) ;
+ * - sur un projet public et pas retiré seulement (listedProject) : sur un projet privé, seul
+ *   l'auteur d'un commentaire le lit (et ce n'est pas `me`) ;
  * - pas masqué, sauf pour l'auteur du projet, qui lit encore ce qu'il a masqué.
  * Une mention ne notifie ainsi que qui peut lire (scénario de la tranche 6b).
  */
-const readable = (me: string) => sql`(c.deleted_at is null and c.author_id <> ${me}
-  and p.visibility = 'public' and (c.hidden_at is null or p.author_id = ${me}))`
+const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is null
+  and c.author_id <> ${me} and ${listedProject()}
+  and (c.hidden_at is null or project.author_id = ${me}))`
 
 /**
  * Toutes les notifications de `me` dont le geste est postérieur à `since`, une ligne par
@@ -76,7 +82,12 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.author_id <> ${
  *      réponse dans son fil : project_comment_author_idx puis project_comment_root_created_idx ;
  *      commentaire sur son projet : ses projets puis project_comment_project_idx) ;
  *   5. ses commentaires masqués : project_comment_author_idx ;
- *   6. son pseudo : la clé primaire de notification_state.
+ *   6. son pseudo : la clé primaire de notification_state ;
+ *   7. ses contenus retirés par la modération (tranche 7a) ;
+ *   8. ses signalements traités (tranche 7a).
+ * Les sources 7 et 8 ajoutent cinq colonnes : target_kind (la sorte de contenu), note_id (une note
+ * retirée), decision_id (la décision de retrait), outcome (l'issue d'un signalement) et member_id
+ * (le membre visé par un signalement, pour le lien) ; null pour les six premières.
  *
  * `until` (les e-mails seulement, tranche 6c, suite de la relecture de sécurité A7) : rien de daté
  * après cet instant. Une tâche lit ses membres l'un après l'autre, parfois pendant des minutes,
@@ -97,6 +108,91 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     upTo
       ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
       : sql`${sql.raw(column)} > ${after}`
+  // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; les deux de la modération (tranche 7a)
+  // en ont besoin de cinq de plus. Plutôt que d'ajouter cinq « null » à chacune des six, on les
+  // ajoute une fois autour d'elles (« select u.*, null… from (…) u »), et les sources 7 et 8
+  // donnent les dix-neuf colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
+  // garde son index.
+  return sql`
+    select u.*, null::text as target_kind, null::uuid as note_id, null::uuid as decision_id,
+      null::text as outcome, null::text as member_id
+    from (${socialSources(me, during)}) u
+
+    union all
+
+    -- 7. Ses contenus retirés par la modération (tranche 7a) : ses projets, les notes de ses
+    --    projets, ses commentaires. Datés du retrait, et repérés par la décision (« removed:<id> »)
+    --    : rétabli, le contenu n'a plus de removed_at, et la notification disparaît d'elle-même.
+    --    Un commentaire ne vient que d'un projet qu'il voit encore (règle 3 de la relecture du
+    --    plan, comme la source 5) : sur un projet devenu privé ou retiré, rien, pas même le titre.
+    --    Index : ses projets par project_author_created_idx (puis les notes de chacun par
+    --    project_note_project_created_idx) ; ses commentaires par project_comment_author_idx. Les
+    --    contenus retirés sont rares : ces lectures écartent presque tout aussitôt.
+    select 'removed', 'removed:' || x.removal_id, x.removed_at, x.project_id, x.comment_id,
+      null, null, null, null, null, null, null, null, null,
+      x.target_kind, x.note_id, x.removal_id, null, null
+    from (
+      select 'project' as target_kind, project.id as project_id, null::uuid as comment_id,
+        null::uuid as note_id, project.removal_id, project.removed_at
+      from project
+      where project.author_id = ${me} and project.removed_at is not null
+        and ${during('project.removed_at')}
+      union all
+      select 'note', project.id, null, nt.id, nt.removal_id, nt.removed_at
+      from project
+      join project_note nt on nt.project_id = project.id
+      where project.author_id = ${me} and nt.removed_at is not null
+        and ${during('nt.removed_at')}
+      union all
+      select 'comment', c.project_id, c.id, null, c.removal_id, c.removed_at
+      from project_comment c
+      join project on project.id = c.project_id
+      where c.author_id = ${me} and c.deleted_at is null and c.removed_at is not null
+        and ${during('c.removed_at')} and ${visibleTo(me)}
+    ) x
+    where x.removal_id is not null
+
+    union all
+
+    -- 8. Ses signalements traités (tranche 7a) : la sorte de cible et l'issue, rien d'autre (règle
+    --    2). Un signalement « sans objet » (void : la cible a disparu) ne prévient personne (règle
+    --    29). Le lien se calcule ici, à la lecture : le projet de la cible, seulement si ce membre
+    --    la voit encore (projet visible, note ou commentaire ni retiré, ni supprimé, ni masqué pour
+    --    lui), et le membre visé, seulement si son compte existe encore. « case » ne lance que la
+    --    sous-requête de la sorte de cible : l'identifiant y est converti en uuid (« ::uuid »)
+    --    seulement pour un projet, une note ou un commentaire, dont l'identifiant est un uuid
+    --    (vérifié par POST /v1/reports) ; chacune passe par la clé primaire de sa table.
+    --    Index : content_report_reporter_idx (ses signalements).
+    select 'report_handled', 'report:' || r.id, r.decided_at,
+      case r.target_kind
+        when 'project' then (
+          select project.id from project
+          where project.id = r.target_id::uuid and ${visibleTo(me)})
+        when 'note' then (
+          select project.id from project_note nt
+          join project on project.id = nt.project_id
+          where nt.id = r.target_id::uuid and nt.removed_at is null and ${visibleTo(me)})
+        when 'comment' then (
+          select project.id from project_comment c
+          join project on project.id = c.project_id
+          where c.id = r.target_id::uuid and c.deleted_at is null and c.removed_at is null
+            and c.author_id is not null and (c.hidden_at is null or project.author_id = ${me})
+            and ${visibleTo(me)})
+      end,
+      null, null, null, null, null, null, null, null, null, null,
+      r.target_kind, null, null, r.status,
+      case when r.target_kind = 'member' then (select u.id from "user" u where u.id = r.target_id) end
+    from content_report r
+    where r.reporter_id = ${me} and r.status in ('removed', 'dismissed')
+      and ${during('r.decided_at')}
+  `
+}
+
+/**
+ * Les six sources de la tranche 6b (réactions, abonnés, commentaires, masquages, pseudo), avec
+ * leurs quatorze colonnes. `during` : la fenêtre de dates (voir sources).
+ */
+const socialSources = (me: string, during: (column: string) => SQL): SQL => {
   return sql`
     -- 1. Les réactions à ses projets publics, par projet et par jour de Paris, sans aucun nom :
     --    « count(*) filter (where …) » compte seulement les lignes qui remplissent la condition.
@@ -112,10 +208,10 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
       (count(*) filter (where r.kind = 'funny'))::int as funny,
       (count(*) filter (where r.kind = 'bravo'))::int as bravo,
       count(*)::int as total
-    from project p
-    join project_reaction r on r.project_id = p.id
+    from project
+    join project_reaction r on r.project_id = project.id
     cross join lateral (select ${parisDay('r.created_at')} as day) d
-    where p.author_id = ${me} and p.visibility = 'public'
+    where project.author_id = ${me} and ${listedProject()}
       and r.member_id <> ${me} and ${during('r.created_at')}
     group by r.project_id, d.day
 
@@ -125,10 +221,10 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     select 'project_follows', 'project_follows:' || f.project_id || ':' || d.day,
       max(f.created_at), f.project_id, null, null, null, d.day,
       null, null, null, null, null, count(*)::int
-    from project p
-    join project_follow f on f.project_id = p.id
+    from project
+    join project_follow f on f.project_id = project.id
     cross join lateral (select ${parisDay('f.created_at')} as day) d
-    where p.author_id = ${me} and p.visibility = 'public'
+    where project.author_id = ${me} and ${listedProject()}
       and f.follower_id <> ${me} and ${during('f.created_at')}
     group by f.project_id, d.day
 
@@ -163,20 +259,20 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
         select c.id, c.project_id, c.author_id, 'mention' as reason, 1 as rank, m.created_at as at
         from comment_mention m
         join project_comment c on c.id = m.comment_id
-        join project p on p.id = c.project_id
+        join project on project.id = c.project_id
         where m.member_id = ${me} and ${during('m.created_at')} and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'reply', 2, c.created_at
         from project_comment root
         join project_comment c on c.root_id = root.id
-        join project p on p.id = c.project_id
+        join project on project.id = c.project_id
         where root.author_id = ${me} and root.root_id is null and ${during('c.created_at')}
           and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'comment', 3, c.created_at
-        from project p
-        join project_comment c on c.project_id = p.id
-        where p.author_id = ${me} and ${during('c.created_at')} and ${readable(me)}
+        from project
+        join project_comment c on c.project_id = project.id
+        where project.author_id = ${me} and ${during('c.created_at')} and ${readable(me)}
       ) candidate
       order by candidate.id, candidate.rank
     ) best
@@ -211,6 +307,9 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     where s.user_id = ${me} and ${during('s.created_at')} and s.handle_chosen_at is null
   `
 }
+
+/** Les cinq colonnes des sources de la modération (7 et 8), à reprendre dans chaque lecture. */
+const moderationColumns = sql.raw('target_kind, note_id, decision_id, outcome, member_id')
 
 // ─── Le marque-page ─────────────────────────────────────────────────────────────────────────────
 
@@ -253,7 +352,16 @@ export const readNotificationCursor = (
 // les type) plutôt qu'un « as » qui croirait la base sur parole.
 const count = z.number().int().nullable()
 const ListRow = z.object({
-  kind: z.enum(['reactions', 'project_follows', 'member_follows', 'comment', 'hidden', 'handle']),
+  kind: z.enum([
+    'reactions',
+    'project_follows',
+    'member_follows',
+    'comment',
+    'hidden',
+    'handle',
+    'removed',
+    'report_handled',
+  ]),
   key: z.string(),
   at: z.string(),
   day: z.string().nullable(),
@@ -273,6 +381,14 @@ const ListRow = z.object({
   author_avatar_key: z.string().nullable(),
   author_handle: z.string().nullable(),
   my_handle: z.string().nullable(),
+  // Tranche 7a : les sources de la modération.
+  target_kind: ReportTargetKind.nullable(),
+  outcome: z.string().nullable(),
+  member_id: z.string().nullable(),
+  note_body: z.string().nullable(),
+  ground: z.string().nullable(),
+  explanation: z.string().nullable(),
+  after_report: z.boolean().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -357,6 +473,54 @@ export const present = (
     case 'handle':
       if (row.my_handle === null) return null
       return { ...common, kind: 'handle', handle: row.my_handle }
+    case 'removed': {
+      // Le fondement, l'explication et « après un signalement », lus avec la décision ; jamais qui
+      // a décidé ni qui a signalé (règle 14).
+      const removal =
+        row.ground === null
+          ? null
+          : toRemoval({
+              ground: row.ground,
+              explanation: row.explanation,
+              createdAt: new Date(row.at),
+              afterReport: row.after_report ?? false,
+            })
+      if (!project || !removal || row.target_kind === null || row.target_kind === 'member') {
+        return null
+      }
+      // L'extrait d'une note ou d'un commentaire retiré : son texte actuel, que son auteur lit
+      // encore. Disparu entre-temps : plus de notification.
+      const text =
+        row.target_kind === 'note' ? row.note_body : row.target_kind === 'comment' ? row.body : null
+      if (row.target_kind !== 'project' && text === null) return null
+      return {
+        ...common,
+        kind: 'removed',
+        targetKind: row.target_kind,
+        project,
+        excerpt: text === null ? null : excerptOf(text),
+        ground: removal.ground,
+        explanation: removal.explanation,
+        afterReport: removal.afterReport,
+      }
+    }
+    case 'report_handled': {
+      // La sorte de cible et l'issue, rien d'autre (règle 2) : la ligne porte aussi le titre du
+      // projet (jointure commune à toutes les sources), qui n'est volontairement pas repris ici.
+      const outcome = z.enum(['removed', 'dismissed']).safeParse(row.outcome)
+      if (row.target_kind === null || !outcome.success) return null
+      const link =
+        row.project_id !== null || row.member_id !== null
+          ? { projectId: row.project_id, memberId: row.member_id }
+          : null
+      return {
+        ...common,
+        kind: 'report_handled',
+        targetKind: row.target_kind,
+        outcome: outcome.data,
+        link,
+      }
+    }
   }
 }
 
@@ -372,7 +536,15 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       project.id as project_id, project.title as project_title,
       c.id as comment_id, c.body,
       a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
-      ah.handle as author_handle, mh.handle as my_handle
+      ah.handle as author_handle, mh.handle as my_handle,
+      n.target_kind, n.outcome, n.member_id, nt.body as note_body,
+      md.ground, md.explanation,
+      (md.id is not null and ${afterReportSql({
+        id: sql.raw('md.id'),
+        targetKind: sql.raw('md.target_kind'),
+        targetId: sql.raw('md.target_id'),
+        adminId: sql.raw('md.admin_id'),
+      })}) as after_report
     from (${chosen}) n
     left join project on project.id = n.project_id
     left join project_comment c on c.id = n.comment_id
@@ -380,6 +552,9 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join profile ap on ap.user_id = n.author_id
     left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
     left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
+    -- Tranche 7a : le texte d'une note retirée, et la décision d'un retrait (clés primaires).
+    left join project_note nt on nt.id = n.note_id
+    left join moderation_decision md on md.id = n.decision_id
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
@@ -407,7 +582,7 @@ export const loadNotificationsSince = async (
     me,
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
-        author_id, day, amazing, inspiring, useful, funny, bravo, total
+        author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
       from (${sources(me, since, until)}) u
     `,
   )
@@ -454,7 +629,7 @@ export const loadNotificationPage = async (
     me,
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
-        author_id, day, amazing, inspiring, useful, funny, bravo, total
+        author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
       from (${sources(me, notificationCutoff(now))}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc

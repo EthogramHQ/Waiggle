@@ -75,7 +75,7 @@ const isInvisible = (char: string, code: number) =>
  * Vrai si le texte ne contient que des caractères autorisés (et, si `needsVisible`, au moins un
  * caractère qui se voit : un nom fait uniquement d'espaces exotiques paraîtrait vide).
  */
-const isClean = (
+export const isClean = (
   text: string,
   { lineBreaks, needsVisible }: { lineBreaks: boolean; needsVisible: boolean },
 ) => {

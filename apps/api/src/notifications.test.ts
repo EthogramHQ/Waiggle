@@ -20,13 +20,16 @@ import {
   type Notification,
   NotificationPage,
   Project,
+  type ReportTarget,
   UnreadCount,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadNotificationsSince } from './notifications/load'
 import { memberCounterKeys } from './rate-limit'
-import { createTestContext, type TestContext } from './testing/context'
+import { activity } from './testing/activity'
+import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
 
 let ctx: TestContext
 let ines: string // cookies de session
@@ -923,5 +926,286 @@ describe('the rights', () => {
     expect(text).not.toContain(meteo.id)
     expect(text).not.toContain('Secret')
     expect(text).not.toContain('ines_morel')
+  })
+})
+
+// ─── Tranche 7a : les deux notifications de la modération ─────────────────────────────────────────
+// « removed » prévient l'auteur d'un contenu retiré (clé removed:<id de la décision>) ;
+// « report_handled » prévient la personne qui a signalé (clé report:<id du signalement>). Règles 2
+// et 3 de la relecture du plan (22/10/2026). Sam est l'administrateur : son rôle est posé en base,
+// comme le fait infra/grant-admin.sh.
+describe('the notifications of the moderation', () => {
+  let act: ReturnType<typeof activity>
+  let samId: string
+
+  beforeEach(async () => {
+    act = activity(ctx)
+    samId = (await me(sam)).id
+    await act.makeAdmin(samId)
+  })
+
+  const report = async (cookie: string, target: ReportTarget) => {
+    later()
+    return act.report(cookie, target)
+  }
+  const remove = async (target: ReportTarget, explanation = 'Publicité déguisée.') => {
+    later()
+    return act.decide(sam, { action: 'remove', target, ground: 'rules', explanation })
+  }
+  const dismiss = async (target: ReportTarget) => {
+    later()
+    return act.decide(sam, { action: 'dismiss', target })
+  }
+  const ofKind = async (cookie: string, kind: Notification['kind']) =>
+    (await notifications(cookie)).filter((n) => n.kind === kind)
+
+  describe('« removed », to the author', () => {
+    it('tells the author of a removed project, with the ground and the explanation', async () => {
+      const meteo = await publish(ines)
+      await report(malik, { kind: 'project', id: meteo.id })
+      const before = await unread(ines)
+
+      const decision = await remove({ kind: 'project', id: meteo.id })
+
+      expect(await ofKind(ines, 'removed')).toEqual([
+        {
+          id: `removed:${decision.id}`,
+          kind: 'removed',
+          at: new Date(Date.now()).toISOString(),
+          isNew: true,
+          targetKind: 'project',
+          project: { id: meteo.id, title: 'Météo' },
+          excerpt: null,
+          ground: 'rules',
+          explanation: 'Publicité déguisée.',
+          afterReport: true,
+        },
+      ])
+      expect(await unread(ines)).toBe(before + 1)
+      // Personne d'autre ne la reçoit.
+      expect(await ofKind(malik, 'removed')).toEqual([])
+      expect(await ofKind(zoe, 'removed')).toEqual([])
+    })
+
+    it('gives an excerpt of a removed note or comment', async () => {
+      const meteo = await publish(ines)
+      later()
+      const noteRes = await send('POST', `/v1/projects/${meteo.id}/notes`, ines, {
+        body: 'Une note publicitaire',
+      })
+      expect(noteRes.status).toBe(201)
+      const note = (await noteRes.json()) as { id: string }
+      const published = await comment(meteo.id, malik, 'Un commentaire insultant')
+      await report(zoe, { kind: 'note', id: note.id })
+      await report(zoe, { kind: 'comment', id: published.id })
+
+      await remove({ kind: 'note', id: note.id })
+      await remove({ kind: 'comment', id: published.id }, 'Insulte.')
+
+      expect(await ofKind(ines, 'removed')).toMatchObject([
+        { targetKind: 'note', project: { id: meteo.id }, excerpt: 'Une note publicitaire' },
+      ])
+      expect(await ofKind(malik, 'removed')).toMatchObject([
+        {
+          targetKind: 'comment',
+          project: { id: meteo.id, title: 'Météo' },
+          excerpt: 'Un commentaire insultant',
+          explanation: 'Insulte.',
+        },
+      ])
+    })
+
+    it('disappears when the content is restored', async () => {
+      const meteo = await publish(ines)
+      await report(malik, { kind: 'project', id: meteo.id })
+      await remove({ kind: 'project', id: meteo.id })
+      expect(await ofKind(ines, 'removed')).toHaveLength(1)
+
+      later()
+      await act.decide(sam, { action: 'restore', target: { kind: 'project', id: meteo.id } })
+
+      expect(await ofKind(ines, 'removed')).toEqual([])
+    })
+
+    // Règle 3 : la notification d'un commentaire retiré passe par la visibilité du projet.
+    it('never shows the title of a project that became private, for a removed comment', async () => {
+      const meteo = await publish(ines)
+      const published = await comment(meteo.id, malik, 'Un commentaire insultant')
+      await report(zoe, { kind: 'comment', id: published.id })
+      await remove({ kind: 'comment', id: published.id })
+      expect(await ofKind(malik, 'removed')).toHaveLength(1) // témoin
+
+      await setVisibility(meteo.id, ines, 'private')
+
+      const page = await send('GET', '/v1/notifications', malik)
+      const text = await page.text()
+      expect(page.status).toBe(200)
+      expect(text).not.toContain('Météo')
+      expect(text).not.toContain(meteo.id)
+    })
+  })
+
+  // Relecture de sécurité de 4966555 (B1), règle 1 du plan : un commentaire retiré ne se lit plus,
+  // pas même par l'auteur du projet. Les notifications de commentaires (raisons « comment »,
+  // « mention », « reply ») ne passent pas par `sees` mais par sa copie en SQL brut, `readable`
+  // (notifications/load.ts) : c'est cette copie que ce test couvre, dans la liste de l'écran et
+  // dans loadNotificationsSince, d'où partent le récap et les e-mails de mentions.
+  describe('a comment removed by the moderation', () => {
+    it('tells nobody about it any more: not the author of the project, not the members it names', async () => {
+      const zoeId = (await me(zoe)).id
+      const since = new Date(Date.now())
+      const meteo = await publish(ines)
+      const fromZoe = await comment(meteo.id, zoe, 'Un commentaire de Zoé')
+      const mention = await comment(meteo.id, malik, 'Regarde ça, @zoe !')
+      const reply = await comment(meteo.id, malik, 'Une réponse insultante', fromZoe.id)
+      const removed = [mention.id, reply.id]
+      // Témoins, avant le retrait : Inès apprend les trois commentaires, Zoé la mention et la réponse.
+      expect(commentReasons(await notifications(ines))).toEqual(
+        expect.arrayContaining([`comment:${mention.id}`, `comment:${reply.id}`]),
+      )
+      expect(commentReasons(await notifications(zoe))).toEqual(
+        expect.arrayContaining([`mention:${mention.id}`, `reply:${reply.id}`]),
+      )
+      const zoeBefore = await loadNotificationsSince(
+        ctx.db,
+        zoeId,
+        since,
+        new Date(Date.now()),
+        TEST_API_URL,
+      )
+      expect(zoeBefore.map(({ row }) => row.comment_id)).toEqual(
+        expect.arrayContaining([mention.id, reply.id]),
+      )
+
+      for (const id of removed) {
+        await report(sam, { kind: 'comment', id })
+        await remove({ kind: 'comment', id }, 'Insulte.')
+      }
+      later()
+      const until = new Date(Date.now())
+
+      for (const [name, cookie, memberId] of [
+        ['Inès', ines, inesId],
+        ['Zoé', zoe, zoeId],
+      ] as const) {
+        // La liste de l'écran : plus rien de ces deux commentaires, ni leur id, ni leur texte.
+        const res = await send('GET', '/v1/notifications', cookie)
+        expect(res.status, name).toBe(200)
+        const text = await res.text()
+        for (const leak of [...removed, 'Regarde ça', 'insultante']) {
+          expect(text, `${name}: ${leak}`).not.toContain(leak)
+        }
+        // La source des e-mails (récap, mentions) : pas davantage.
+        const items = await loadNotificationsSince(ctx.db, memberId, since, until, TEST_API_URL)
+        for (const { row, notification } of items) {
+          expect(removed, name).not.toContain(row.comment_id)
+          expect(JSON.stringify(notification), name).not.toContain('insultante')
+        }
+        // Témoin : seul le commentaire de Zoé reste, pour Inès ; Zoé n'apprend pas le sien.
+        expect(
+          items.flatMap(({ row }) => (row.kind === 'comment' ? [row.comment_id] : [])),
+          name,
+        ).toEqual(name === 'Inès' ? [fromZoe.id] : [])
+      }
+      // Témoin : le commentaire de Zoé, lui, n'est pas retiré, et Inès l'apprend toujours.
+      expect(commentReasons(await notifications(ines))).toEqual([`comment:${fromZoe.id}`])
+    })
+  })
+
+  describe('« report_handled », to the reporter', () => {
+    it('tells each reporter that the content was removed, without a link to it', async () => {
+      const meteo = await publish(ines)
+      const fromMalik = await report(malik, { kind: 'project', id: meteo.id })
+      const fromZoe = await report(zoe, { kind: 'project', id: meteo.id })
+
+      await remove({ kind: 'project', id: meteo.id })
+
+      for (const [cookie, created] of [
+        [malik, fromMalik],
+        [zoe, fromZoe],
+      ] as const) {
+        expect(await ofKind(cookie, 'report_handled')).toEqual([
+          {
+            id: `report:${created.id}`,
+            kind: 'report_handled',
+            at: new Date(Date.now()).toISOString(),
+            isNew: true,
+            targetKind: 'project',
+            outcome: 'removed',
+            // Le projet retiré ne se voit plus : aucun lien.
+            link: null,
+          },
+        ])
+      }
+      expect(await ofKind(ines, 'report_handled')).toEqual([])
+    })
+
+    it('tells the reporter that the content stays, with a link while it is visible', async () => {
+      const meteo = await publish(ines)
+      await report(malik, { kind: 'project', id: meteo.id })
+      await report(zoe, { kind: 'member', id: inesId })
+
+      await dismiss({ kind: 'project', id: meteo.id })
+      await dismiss({ kind: 'member', id: inesId })
+
+      expect(await ofKind(malik, 'report_handled')).toMatchObject([
+        {
+          targetKind: 'project',
+          outcome: 'dismissed',
+          link: { projectId: meteo.id, memberId: null },
+        },
+      ])
+      expect(await ofKind(zoe, 'report_handled')).toMatchObject([
+        { targetKind: 'member', outcome: 'dismissed', link: { projectId: null, memberId: inesId } },
+      ])
+    })
+
+    // Règle 2 : ni titre, ni extrait, ni auteur, ni explication ; un lien seulement si la cible se
+    // voit encore au moment de la lecture.
+    it('says nothing of a project made private or removed after the report', async () => {
+      const meteo = await publish(ines, { title: 'Météo secrète' })
+      const velo = await publish(ines, { title: 'Vélo du dimanche' })
+      const onVelo = await comment(velo.id, zoe, 'Un commentaire sur Vélo')
+      await report(malik, { kind: 'project', id: meteo.id })
+      await report(malik, { kind: 'comment', id: onVelo.id })
+      await dismiss({ kind: 'project', id: meteo.id })
+      await dismiss({ kind: 'comment', id: onVelo.id })
+
+      await setVisibility(meteo.id, ines, 'private')
+      await report(zoe, { kind: 'project', id: velo.id })
+      await remove({ kind: 'project', id: velo.id }, 'Explication du retrait.')
+
+      const res = await send('GET', '/v1/notifications', malik)
+      const text = await res.text()
+      const handled = NotificationPage.parse(JSON.parse(text)).items.filter(
+        (n) => n.kind === 'report_handled',
+      )
+      expect(handled.map((n) => n.kind === 'report_handled' && n.link)).toEqual([null, null])
+      for (const leak of [
+        meteo.id,
+        velo.id,
+        'Météo secrète',
+        'Vélo du dimanche',
+        'Un commentaire sur Vélo',
+        'Explication du retrait',
+        inesId,
+        'Inès',
+        'ines_morel',
+      ]) {
+        expect(text, leak).not.toContain(leak)
+      }
+    })
+
+    it('gives no link to a comment that was removed', async () => {
+      const meteo = await publish(ines)
+      const published = await comment(meteo.id, zoe, 'Un commentaire insultant')
+      await report(malik, { kind: 'comment', id: published.id })
+
+      await remove({ kind: 'comment', id: published.id })
+
+      expect(await ofKind(malik, 'report_handled')).toMatchObject([
+        { targetKind: 'comment', outcome: 'removed', link: null },
+      ])
+    })
   })
 })

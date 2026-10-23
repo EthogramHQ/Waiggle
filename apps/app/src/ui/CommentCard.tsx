@@ -8,8 +8,11 @@
 // Trois autres allures :
 // - masqué par l'auteur du projet : un bandeau le dit, au-dessus du texte, que seuls lui et l'auteur
 //   du commentaire lisent encore (`hidden`) ;
-// - un emplacement, sans auteur ni texte : « Commentaire supprimé », « Commentaire masqué »
-//   (`placeholder`), une ligne discrète gardée parce que des réponses le suivent ;
+// - retiré par la modération (tranche 7a) : pour son auteur, seul à le lire encore, le bandeau du
+//   retrait (`removed` : pourquoi, et comment contester), au-dessus du texte ;
+// - un emplacement, sans auteur ni texte : « Commentaire supprimé », « Commentaire masqué »,
+//   « Contenu retiré par la modération » (`placeholder`), une ligne discrète gardée parce que des
+//   réponses le suivent. Un emplacement n'a ni bandeau, ni lien, ni action, même si on lui en donne ;
 // - en cours de modification : le champ (`editor`) prend la place du texte et des actions.
 //
 // Plusieurs commentaires ont chacun leur « Supprimer » : chaque action est en plus « décrite » par
@@ -33,6 +36,7 @@ import type { ImageSource } from './image'
 import { MentionText } from './MentionText'
 import { Notice, type NoticeAction } from './Notice'
 import { Pressed } from './Pressed'
+import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -60,6 +64,8 @@ type Props = {
   edited?: string | undefined
   /** Le bandeau d'un commentaire masqué (« Masqué par toi »), s'il l'est. */
   hidden?: string | undefined
+  /** Le bandeau d'un commentaire retiré par la modération, pour son auteur (tranche 7a). */
+  removed?: RemovedBanner | undefined
   /** Ce qu'on lit à la place d'un commentaire sans auteur (« Commentaire supprimé »). */
   placeholder?: string | undefined
   actions?: CommentAction[]
@@ -101,6 +107,7 @@ export function CommentCard({
   onMemberPress = ignore,
   edited,
   hidden,
+  removed,
   placeholder,
   actions = [],
   description,
@@ -230,6 +237,7 @@ export function CommentCard({
             </View>
           </View>
         ) : null}
+        {removed ? <RemovalNotice title={removed.title} lines={removed.lines} compact /> : null}
         {editor ?? (
           <>
             {/* Texte brut, affiché tel quel, ses mentions en liens (MentionText). */}

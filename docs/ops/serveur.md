@@ -570,6 +570,12 @@ ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose up -d api'
 L'ancien code ne marche plus aussitôt. Les membres déjà inscrits ne sont pas touchés. Pour tirer
 un nouveau code au hasard : `openssl rand -hex 8`.
 
+### Modération
+
+Donner ou retirer le rôle d'administrateur (`infra/grant-admin.sh`), traiter la file des
+signalements, un retrait demandé par e-mail, les durées de conservation : tout est dans
+[`moderation.md`](moderation.md).
+
 ### Changer de domaine
 
 1. Acheter le domaine, puis créer ses enregistrements DNS (partie 3, étape 2).

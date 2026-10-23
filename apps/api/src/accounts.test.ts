@@ -6,6 +6,7 @@ import { appName } from '@ruche/brand'
 import { AccountExport, ErrorResponse, Me } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { activity } from './testing/activity'
 import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -524,5 +525,242 @@ describe('the trace of a deleted account, for a restored backup', () => {
 
     expect(res.status).not.toBe(200)
     expect(logged.mock.calls.flat().join(' ')).not.toContain('Account deleted')
+  })
+})
+
+// ─── Tranche 7a : les signalements et les retraits, dans l'export et à la suppression du compte ──
+// Règles 16 et 18 de la relecture du plan (22/10/2026). Léa publie, Max signale, Zoé est une
+// autre membre, Louis l'administrateur (rôle posé en base, comme infra/grant-admin.sh).
+describe('reports and removals of an account', () => {
+  let act: ReturnType<typeof activity>
+  let leaCookie: string
+  let max: string
+  let zoe: string
+  let louis: string
+  let leaId: string
+  let maxId: string
+  let louisId: string
+
+  const maxAccount = { name: 'Max', email: 'max@example.com', password: 'another-long-password' }
+
+  beforeEach(async () => {
+    // Une fausse horloge, posée après la création de l'API (voir plus haut) : on l'avance d'une
+    // seconde entre deux signalements, pour que leur ordre soit connu. Seule Date est remplacée.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now())
+    act = activity(ctx)
+    leaCookie = await signUpAndVerify()
+    max = await ctx.verifiedMember(maxAccount)
+    zoe = await ctx.verifiedMember({
+      name: 'Zoé',
+      email: 'zoe@example.com',
+      password: 'zoe-long-password',
+    })
+    louis = await ctx.verifiedMember({
+      name: 'Louis',
+      email: 'louis@example.com',
+      password: 'louis-long-password',
+    })
+    leaId = (await act.me(leaCookie)).id
+    maxId = (await act.me(max)).id
+    louisId = (await act.me(louis)).id
+    await act.makeAdmin(louisId)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const later = () => vi.setSystemTime(Date.now() + 1000)
+
+  const exportOf = async (cookie: string) => {
+    const res = await act.send('GET', '/v1/me/export', cookie)
+    expect(res.status).toBe(200)
+    const raw = await res.text()
+    return { raw, data: AccountExport.parse(JSON.parse(raw)) }
+  }
+  const reports = () =>
+    ctx.db.select().from(schema.contentReport).orderBy(schema.contentReport.createdAt)
+
+  describe('in the export', () => {
+    it('lists the reports I made, oldest first, without the reported text', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', {
+        pitch: 'Un pitch très reconnaissable.',
+      })
+      const published = await act.comment(meteo.id, leaCookie, 'Un commentaire reconnaissable')
+      const first = await act.report(max, { kind: 'project', id: meteo.id }, 'privacy', 'Ma photo.')
+      later()
+      await act.report(max, { kind: 'comment', id: published.id }, 'harassment')
+      const decision = await act.decide(louis, {
+        action: 'dismiss',
+        target: { kind: 'project', id: meteo.id },
+      })
+      const stored = await reports()
+
+      const { raw, data } = await exportOf(max)
+
+      expect(first.id).toBe(stored[0]?.id)
+      expect(data.reports).toEqual([
+        {
+          targetKind: 'project',
+          targetId: meteo.id,
+          reason: 'privacy',
+          details: 'Ma photo.',
+          createdAt: stored[0]?.createdAt.toISOString(),
+          outcome: 'dismissed',
+          decidedAt: decision.createdAt,
+        },
+        {
+          targetKind: 'comment',
+          targetId: published.id,
+          reason: 'harassment',
+          details: null,
+          createdAt: stored[1]?.createdAt.toISOString(),
+          outcome: 'open',
+          decidedAt: null,
+        },
+      ])
+      for (const leak of [
+        'Météo',
+        'Un pitch très reconnaissable',
+        'Un commentaire reconnaissable',
+      ]) {
+        expect(raw, leak).not.toContain(leak)
+      }
+    })
+
+    it('never lists the reports that target me', async () => {
+      await act.report(leaCookie, { kind: 'member', id: maxId }, 'impersonation', 'Faux Max.')
+      await act.report(zoe, { kind: 'member', id: maxId }, 'other')
+
+      const { raw, data } = await exportOf(max)
+
+      expect(data.reports).toEqual([])
+      expect(raw).not.toContain('impersonation')
+      expect(raw).not.toContain('Faux Max')
+      // Témoin : Léa, elle, retrouve le signalement qu'elle a fait.
+      expect((await exportOf(leaCookie)).data.reports).toMatchObject([
+        { targetKind: 'member', targetId: maxId, reason: 'impersonation', details: 'Faux Max.' },
+      ])
+    })
+
+    it('gives the removals of my projects, notes and comments, with ground and explanation', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      const velo = await act.publish(zoe, 'Vélo')
+      const noteRes = await act.send('POST', `/v1/projects/${meteo.id}/notes`, leaCookie, {
+        body: 'Une note retirée',
+      })
+      const note = (await noteRes.json()) as { id: string }
+      const published = await act.comment(velo.id, leaCookie, 'Un commentaire retiré')
+      // Le projet en dernier : retiré, il cache ses notes aux autres membres, qui ne peuvent plus
+      // les signaler (404, règle 5).
+      for (const target of [
+        { kind: 'note', id: note.id },
+        { kind: 'comment', id: published.id },
+        { kind: 'project', id: meteo.id },
+      ] as const) {
+        await act.report(max, target, 'other')
+        await act.decide(louis, {
+          action: 'remove',
+          target,
+          ground: target.kind === 'comment' ? 'illegal' : 'rules',
+          explanation: `Retrait : ${target.kind}`,
+        })
+      }
+
+      const { raw, data } = await exportOf(leaCookie)
+
+      const removal = (ground: string, kind: string) => ({
+        ground,
+        explanation: `Retrait : ${kind}`,
+        at: expect.any(String),
+        afterReport: true,
+      })
+      expect(data.projects.find((p) => p.id === meteo.id)?.removal).toEqual(
+        removal('rules', 'project'),
+      )
+      expect(data.notes.find((n) => n.id === note.id)?.removal).toEqual(removal('rules', 'note'))
+      expect(data.comments.find((c) => c.id === published.id)?.removal).toEqual(
+        removal('illegal', 'comment'),
+      )
+      // Ni l'administrateur, ni la personne qui a signalé.
+      for (const leak of [louisId, maxId, 'Louis']) expect(raw, leak).not.toContain(leak)
+      // Les signalements qui la visent n'y sont pas.
+      expect(data.reports).toEqual([])
+    })
+  })
+
+  describe('when the account is deleted', () => {
+    it('voids the open or dismissed reports on her contents, and keeps those followed by a removal', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      const velo = await act.publish(leaCookie, 'Vélo', { pitch: 'Un pitch gardé un an.' })
+      const published = await act.comment(meteo.id, leaCookie, 'Un commentaire de Léa')
+      await act.report(max, { kind: 'project', id: meteo.id }) // reste ouvert
+      await act.report(max, { kind: 'comment', id: published.id }) // classé
+      await act.decide(louis, { action: 'dismiss', target: { kind: 'comment', id: published.id } })
+      await act.report(max, { kind: 'project', id: velo.id }) // suivi d'un retrait
+      await act.decide(louis, {
+        action: 'remove',
+        target: { kind: 'project', id: velo.id },
+        ground: 'rules',
+        explanation: 'Arnaque.',
+      })
+
+      await act.deleteAccount(leaCookie, lea.password)
+
+      const rows = await reports()
+      const byTarget = Object.fromEntries(
+        rows.map((r) => [r.targetId, [r.status, r.targetAuthorId, r.reporterId === maxId]]),
+      )
+      expect(byTarget).toEqual({
+        [meteo.id]: ['void', null, true],
+        [published.id]: ['void', null, true],
+        [velo.id]: ['removed', null, true],
+      })
+      // Le signalement suivi d'un retrait garde son texte jusqu'au terme d'un an.
+      expect(rows.find((r) => r.targetId === velo.id)?.snapshot).toContain('Un pitch gardé un an.')
+    })
+
+    it('keeps the reports she made, without her name', async () => {
+      const velo = await act.publish(zoe, 'Vélo')
+      await act.report(max, { kind: 'project', id: velo.id }, 'scam_spam', 'Une arnaque.')
+
+      await act.deleteAccount(max, maxAccount.password)
+
+      expect(await reports()).toEqual([
+        expect.objectContaining({
+          reporterId: null,
+          targetId: velo.id,
+          reason: 'scam_spam',
+          details: 'Une arnaque.',
+          status: 'open',
+        }),
+      ])
+    })
+
+    it('touches no report when the deletion is refused', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      await act.report(max, { kind: 'project', id: meteo.id })
+
+      const refused = await act.send('POST', '/api/auth/delete-user', leaCookie, {
+        password: 'not-the-right-password',
+      })
+
+      expect(refused.status).not.toBe(200)
+      expect((await reports()).map((r) => [r.status, r.targetAuthorId])).toEqual([['open', leaId]])
+    })
+
+    it('takes the administrator role with the account, and keeps his decisions without his name', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      await act.report(max, { kind: 'project', id: meteo.id })
+      await act.decide(louis, { action: 'dismiss', target: { kind: 'project', id: meteo.id } })
+
+      await act.deleteAccount(louis, 'louis-long-password')
+
+      expect(await ctx.db.select().from(schema.adminMember)).toEqual([])
+      expect(await ctx.db.select().from(schema.moderationDecision)).toEqual([
+        expect.objectContaining({ action: 'dismiss', targetId: meteo.id, adminId: null }),
+      ])
+    })
   })
 })

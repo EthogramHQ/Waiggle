@@ -8,7 +8,7 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
-import { loadVisibleProject, mediaKeysOf, withSlugs } from '../projects/load'
+import { loadVisibleProject, mediaKeysOf, projectAccess, withSlugs } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -44,9 +44,13 @@ const readProjectRoute = createRoute({
   summary: 'Read a project',
   request: { params },
   responses: {
-    200: projectResponse('The project.'),
+    200: projectResponse(
+      'The project. `removal` is filled for its author only, when the moderation removed it.',
+    ),
     401: errorResponse('Not signed in.'),
-    404: errorResponse('No such project, or a private project of another member.'),
+    404: errorResponse(
+      'No such project, or a private project of another member, or one removed by the moderation.',
+    ),
   },
 })
 
@@ -64,6 +68,7 @@ const updateProjectRoute = createRoute({
     401: errorResponse('Not signed in.'),
     403: errorResponse('Someone else’s project.'),
     404: errorResponse('No such project.'),
+    409: errorResponse('My project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many changes.'),
   },
 })
@@ -101,16 +106,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
   }
 
-  /**
-   * Le projet, s'il appartient au membre. Sinon : « introuvable » s'il ne le voit pas (projet
-   * privé d'un autre, ou inexistant), « refusé » s'il le voit mais n'en est pas l'auteur.
-   */
-  const ownProject = async (id: string, userId: string) => {
-    const project = await loadVisibleProject(db, id, userId, publicApiUrl)
-    if (!project) return 'not_found' as const
-    if (!project.isMine) return 'forbidden' as const
-    return project
-  }
+  // 409 « removed » (tranche 7a, règle 4 de la relecture du plan) : son projet retiré par la
+  // modération ne se modifie plus tant qu'il n'est pas rétabli ; il peut encore le supprimer. Seul
+  // son auteur reçoit cette réponse : pour les autres, un projet retiré est introuvable (404).
+  const removed = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'removed'), 409)
 
   app.openapi(createProjectRoute, async (c) => {
     const user = c.get('user')
@@ -160,9 +159,12 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
     const { id } = c.req.valid('param')
-    const access = await ownProject(id, user.id)
+    // Sinon : « introuvable » s'il ne le voit pas (projet privé ou retiré d'un autre, ou
+    // inexistant), « refusé » s'il le voit mais n'en est pas l'auteur (projectAccess).
+    const access = await projectAccess(db, id, user.id)
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
+    if (access === 'removed') return removed(c)
 
     // On n'écrit que les champs envoyés (même astuce que pour le profil).
     const changes = c.req.valid('json')
@@ -239,7 +241,8 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
     const { id } = c.req.valid('param')
-    const access = await ownProject(id, user.id)
+    // Un projet retiré se supprime quand même : son auteur peut toujours effacer ce qu'il a écrit.
+    const access = await projectAccess(db, id, user.id)
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
 

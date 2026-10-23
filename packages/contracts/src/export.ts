@@ -6,6 +6,8 @@ import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
 import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
+import { Removal } from './removal'
+import { ReportExport } from './reports'
 
 /**
  * L'export des données d'un membre (droit d'accès du RGPD), renvoyé par GET /v1/me/export.
@@ -28,6 +30,8 @@ export const AccountExport = z
         id: z.uuid(),
         body: z.string(),
         createdAt: z.iso.datetime(),
+        /** Le retrait par la modération (tranche 7a) ; null pour une note visible. */
+        removal: Removal.nullable(),
       }),
     ),
     /**
@@ -60,6 +64,8 @@ export const AccountExport = z
          * sur le texte du membre est une donnée qui le concerne.
          */
         hiddenAt: z.iso.datetime().nullable(),
+        /** Le retrait par la modération (tranche 7a) ; null pour un commentaire visible. */
+        removal: Removal.nullable(),
         /** Les identifiants des membres qu'il y mentionne (tranche 6b). */
         mentions: z.array(z.string()),
       }),
@@ -70,6 +76,11 @@ export const AccountExport = z
      * (null s'il n'a jamais ouvert l'écran).
      */
     notifications: z.object({ seenAt: z.iso.datetime().nullable() }),
+    /**
+     * Les signalements qu'il a faits (tranche 7a), des plus anciens aux plus récents, sans le texte
+     * visé. Jamais ceux qui visent ses contenus.
+     */
+    reports: z.array(ReportExport),
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

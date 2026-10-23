@@ -15,7 +15,7 @@
 // Les adresses sont imposées par la construction : l'appli construite appelle l'API sur
 // http://localhost:3000 (src/config.ts), et l'API n'accepte que l'origine de l'appli (APP_URL),
 // http://localhost:8081. Ces deux ports doivent donc être libres (pas de « pnpm dev » en même temps).
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import {
   createWriteStream,
@@ -102,10 +102,56 @@ writeFileSync(
 )
 const command = (script) => `"${process.execPath}" "${script}"`
 
-// 4. L'API, lancée par Node avec tsx (qui lit le TypeScript sans étape de construction). On passe
-// par « node --import tsx » plutôt que par la commande tsx : un seul processus, qu'on sait arrêter.
+// tsx lit le TypeScript sans étape de construction ; on le trouve, comme @ruche/db, depuis l'API.
+const fromApi = createRequire(join(apiDir, 'package.json'))
+const tsx = pathToFileURL(fromApi.resolve('tsx/esm')).href
+
+// 4. La base, préparée avant l'API (tranche 7a). Le parcours a besoin d'un administrateur de la
+// modération ; aucune route de l'API ne donne ce rôle, et en production seul infra/grant-admin.sh
+// l'écrit, directement dans la table admin_member. Ici, impossible d'écrire dans la base pendant
+// que l'API tourne : PGlite n'accepte qu'un seul processus à la fois. On la crée donc avant (les
+// migrations, comme l'API le ferait), et on y pose un « déclencheur » : une fonction que
+// PostgreSQL lance lui-même après chaque écriture dans la table des comptes. Dès qu'un compte
+// dont l'adresse commence par « admin- » (celui que journey.mjs inscrit sous le nom « Admin »)
+// a vérifié son adresse, il est inscrit comme administrateur : la même écriture et la même
+// condition (adresse vérifiée) que grant-admin.sh. Cette base est jetée à la fin du parcours.
+step('La base du parcours : migrée, et prête à désigner son administrateur')
+const pgliteDir = join(work, 'pglite')
+const prepareScript = join(work, 'prepare-db.mts')
+const grantAdminSql = `
+create function journey_grant_admin() returns trigger language plpgsql as $fn$
+begin
+  insert into admin_member (user_id, granted_at) values (new.id, now() at time zone 'UTC')
+  on conflict (user_id) do nothing;
+  return new;
+end
+$fn$;
+create trigger journey_grant_admin after insert or update of email_verified on "user"
+  for each row when (new.email_verified and new.email like 'admin-%@example.com')
+  execute function journey_grant_admin();
+`
+writeFileSync(
+  prepareScript,
+  [
+    `import { createPgliteDb } from ${JSON.stringify(pathToFileURL(fromApi.resolve('@ruche/db/pglite')).href)}`,
+    `const { db, close } = await createPgliteDb(${JSON.stringify(pgliteDir)})`,
+    // $client : le client PGlite sous Drizzle ; exec() accepte plusieurs requêtes à la suite.
+    `await db.$client.exec(${JSON.stringify(grantAdminSql)})`,
+    'await close()',
+  ].join('\n'),
+)
+const prepared = spawnSync(process.execPath, ['--import', tsx, prepareScript], {
+  cwd: apiDir,
+  encoding: 'utf8',
+})
+if (prepared.status !== 0) {
+  console.error(`La préparation de la base a échoué :\n${prepared.stderr || prepared.stdout}`)
+  process.exit(1)
+}
+
+// 5. L'API, lancée par Node avec tsx. On passe par « node --import tsx » plutôt que par la
+// commande tsx : un seul processus, qu'on sait arrêter.
 step(`L'API sur ${apiUrl} (base et médias dans ${work})`)
-const tsx = pathToFileURL(createRequire(join(apiDir, 'package.json')).resolve('tsx/esm')).href
 const log = createWriteStream(logFile)
 const api = spawn(process.execPath, ['--import', tsx, 'src/index.ts'], {
   cwd: apiDir,
@@ -114,7 +160,7 @@ const api = spawn(process.execPath, ['--import', tsx, 'src/index.ts'], {
     PORT: String(API_PORT),
     NODE_ENV: 'development',
     DATABASE_URL: '', // vide = absente : PGlite, même si la variable traîne dans l'environnement
-    PGLITE_DIR: join(work, 'pglite'),
+    PGLITE_DIR: pgliteDir,
     MEDIA_DIR: mediaDir,
     MAIL_PROVIDER: 'console',
     SIGNUP_INVITE_CODE: inviteCode,
@@ -165,11 +211,11 @@ for (;;) {
   await new Promise((resolve) => setTimeout(resolve, 300))
 }
 
-// 5. L'appli, servie sur toutes les adresses de la machine (localhost peut être 127.0.0.1 ou ::1).
+// 6. L'appli, servie sur toutes les adresses de la machine (localhost peut être 127.0.0.1 ou ::1).
 await new Promise((resolve) => site.listen(APP_PORT, resolve))
 console.log(`L'appli sur ${appUrl}`)
 
-// 6. Le parcours lui-même, lancé depuis le dossier temporaire (ses captures d'échec y vont).
+// 7. Le parcours lui-même, lancé depuis le dossier temporaire (ses captures d'échec y vont).
 step('Le parcours (scripts/journey.mjs)')
 const journey = spawn(process.execPath, [join(root, 'scripts', 'journey.mjs'), appUrl, apiUrl], {
   cwd: work,

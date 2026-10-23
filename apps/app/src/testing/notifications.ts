@@ -121,6 +121,81 @@ export const allNotifications: Notification[] = [
   handleNotification,
 ]
 
+// --- Tranche 7a : les deux sortes de la modération ---
+// À part de `allNotifications` : les tests des tranches précédentes comptent ses éléments.
+
+/** Le commentaire d'Inès sur « Météo » a été retiré, après un signalement, au nom des règles. */
+export const removedCommentNotification: Of<'removed'> = {
+  kind: 'removed',
+  id: 'removed:comment:b3c4d5e6-f708-4129-8a3b-4c5d6e7f8091',
+  at: '2026-10-21T09:00:00.000Z',
+  isNew: true,
+  targetKind: 'comment',
+  project: meteoProject,
+  excerpt: 'Écris-moi en privé pour le code',
+  ground: 'rules',
+  explanation: 'Demander un code de carte bancaire n’est pas permis ici.',
+  afterReport: true,
+}
+
+/** Le projet « Météo » lui-même a été retiré, sans signalement, au nom de la loi. */
+export const removedProjectNotification: Of<'removed'> = {
+  kind: 'removed',
+  id: `removed:project:${meteoProject.id}`,
+  at: '2026-10-21T08:00:00.000Z',
+  isNew: false,
+  targetKind: 'project',
+  project: meteoProject,
+  excerpt: null,
+  ground: 'illegal',
+  explanation: 'Ces photos montrent des personnes sans leur accord.',
+  afterReport: false,
+}
+
+/**
+ * Le signalement d'un commentaire, fait par Inès, a été traité : retiré. Ni titre, ni extrait, ni
+ * auteur ; le commentaire n'est plus visible, donc aucun lien.
+ */
+export const reportHandledNotification: Of<'report_handled'> = {
+  kind: 'report_handled',
+  id: 'report_handled:c4d5e6f7-0819-4a3b-9c4d-5e6f708192a3',
+  at: '2026-10-21T10:00:00.000Z',
+  isNew: true,
+  targetKind: 'comment',
+  outcome: 'removed',
+  link: null,
+}
+
+/** Le signalement d'un projet, classé sans suite : le projet est toujours visible, d'où le lien. */
+export const reportDismissedNotification: Of<'report_handled'> = {
+  kind: 'report_handled',
+  id: 'report_handled:d5e6f708-192a-4b4c-8d5e-6f708192a3b4',
+  at: '2026-10-21T07:00:00.000Z',
+  isNew: false,
+  targetKind: 'project',
+  outcome: 'dismissed',
+  link: { projectId: 'e6f70819-2a3b-4c5d-9e6f-708192a3b4c5', memberId: null },
+}
+
+/** Le signalement d'un profil, classé sans suite : le lien mène à la page du membre. */
+export const memberReportDismissedNotification: Of<'report_handled'> = {
+  kind: 'report_handled',
+  id: 'report_handled:e6f70819-2a3b-4c5d-8e6f-708192a3b4c5',
+  at: '2026-10-21T06:00:00.000Z',
+  isNew: false,
+  targetKind: 'member',
+  outcome: 'dismissed',
+  link: { projectId: null, memberId: 'u7' },
+}
+
+export const moderationNotifications: Notification[] = [
+  reportHandledNotification,
+  removedCommentNotification,
+  removedProjectNotification,
+  reportDismissedNotification,
+  memberReportDismissedNotification,
+]
+
 /** L'heure du serveur au moment de la lecture : l'appli la renvoie pour marquer vu. */
 export const notificationsAsOf = '2026-10-20T12:30:00.000Z'
 

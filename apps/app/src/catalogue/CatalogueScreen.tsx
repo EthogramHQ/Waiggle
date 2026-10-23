@@ -75,6 +75,8 @@ import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { labels } from './labels'
+import { ModerationCatalogue } from './moderation'
+import { ReportSamples } from './reports'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -690,8 +692,8 @@ export function CatalogueScreen() {
         <ReactionSample l={l} mine={['useful', 'bravo']} />
         <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
         <ReactionSample l={l} mine={[]} readOnly />
-        {/* Les cartes d'un commentaire : vu par un autre membre (sans action : « Répondre » est au
-            bout du fil), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
+        {/* Les cartes d'un commentaire : sans action (« Répondre » est au bout du fil ; « Signaler »,
+            tranche 7a, est dans la section suivante), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
             son auteur), masqué vu par l'auteur du projet (Démasquer), Masquer en cours d'envoi, un
             texte long avec une adresse et un refus de l'API, en cours de modification, et les
             deux emplacements sans auteur. */}
@@ -944,6 +946,10 @@ export function CatalogueScreen() {
           />
         </Surface>
       </Section>
+
+      {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
+      <ReportSamples />
+      <ModerationCatalogue />
 
       <Section title={l.illustrations}>
         <Stack direction="row" gap="lg" wrap align="center">
@@ -1365,7 +1371,11 @@ function TagSample({ l }: { l: Labels }) {
 }
 
 function Choicesample({ l }: { l: Labels }) {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<'idea' | 'building' | 'testable'>('testable')
+  // Sans choix coché au départ : une question à laquelle il faut répondre soi-même, comme le motif
+  // d'un retrait dans la modération (tranche 7a), avec ses vrais textes.
+  const [ground, setGround] = useState<'illegal' | 'rules' | null>(null)
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [notify, setNotify] = useState(true)
   return (
@@ -1379,6 +1389,15 @@ function Choicesample({ l }: { l: Labels }) {
         ]}
         value={status}
         onChange={setStatus}
+      />
+      <Choices
+        label={t('moderation.groundLabel')}
+        options={[
+          { value: 'illegal', label: t('moderation.grounds.illegal') },
+          { value: 'rules', label: t('moderation.grounds.rules') },
+        ]}
+        value={ground}
+        onChange={setGround}
       />
       <Segmented
         label={l.visibilityField}

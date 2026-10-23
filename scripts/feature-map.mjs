@@ -58,6 +58,14 @@ const features = [
     routes: /^\w+ \/v1\/(notifications(\/|$)|members\/mentionable$)/,
     tables: /^(notification_state|comment_mention)$/,
   },
+  {
+    id: 'moderation',
+    name: 'Signaler et modérer',
+    tranche: 'Tranche 7a',
+    pages: /^\/(report|moderation)$/,
+    routes: /^\w+ \/v1\/(reports|moderation)(\/|$)/,
+    tables: /^(content_report|moderation_decision|admin_member)$/,
+  },
   // Avant « projets » : ses routes sont sous /v1/projects/{id}/.
   {
     id: 'reagir',

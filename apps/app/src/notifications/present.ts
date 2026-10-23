@@ -20,7 +20,8 @@ const projectRoute = (id: string): Href => ({ pathname: '/projects/[id]', params
 
 /**
  * Les textes et la destination d'une notification. Les réactions et les abonnés ne nomment
- * personne ; un commentaire nomme son auteur, déjà visible sous le commentaire.
+ * personne ; un commentaire nomme son auteur, déjà visible sous le commentaire. Celles de la
+ * modération (tranche 7a) ne nomment jamais qui a signalé, ni qui a décidé.
  */
 export const presentNotification = (notification: Notification, t: T): Presented => {
   switch (notification.kind) {
@@ -97,5 +98,42 @@ export const presentNotification = (notification: Notification, t: T): Presented
         quote: null,
         target: '/profile',
       }
+    case 'removed': {
+      // Tranche 7a, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
+      // phrase), puis, une phrase par ligne, que lui seul le voit encore, après un signalement ou
+      // non (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment
+      // contester. L'extrait d'une note ou d'un commentaire suit en citation. Elle mène au projet,
+      // que son auteur voit toujours (un commentaire retiré s'y lit pour lui seul).
+      const { targetKind, project, excerpt, ground, explanation, afterReport } = notification
+      return {
+        icon: 'prohibit',
+        text: t(`notifications.removed.${targetKind}`, { title: project.title }),
+        detail: [
+          t('removal.onlyYou'),
+          afterReport ? t('removal.afterReport') : t('removal.direct'),
+          t(`removal.grounds.${ground}`),
+          t('removal.explanation', { explanation }),
+          t('removal.contest'),
+        ].join('\n'),
+        quote: excerpt,
+        target: projectRoute(project.id),
+      }
+    }
+    case 'report_handled': {
+      // Tranche 7a, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
+      // extrait, ni auteur. Un lien seulement si la cible est encore visible (l'API le décide).
+      const { targetKind, outcome, link } = notification
+      return {
+        icon: 'flag',
+        text: t(`notifications.reportHandled.${targetKind}.${outcome}`),
+        detail: t('notifications.reportHandled.contest'),
+        quote: null,
+        target: link?.memberId
+          ? { pathname: '/members/[id]', params: { id: link.memberId } }
+          : link?.projectId
+            ? projectRoute(link.projectId)
+            : null,
+      }
+    }
   }
 }

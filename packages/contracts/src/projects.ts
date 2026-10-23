@@ -5,6 +5,7 @@ import { FollowState } from './follows'
 import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
+import { Removal } from './removal'
 import { FreeText, isCleanText, ShortLabel, uniqueIgnoringCase } from './text'
 
 export const PROJECT_TITLE_MAX = 80
@@ -227,6 +228,11 @@ export const Project = z
      * les supprimés). La liste elle-même se lit à part : GET /v1/projects/{id}/comments.
      */
     commentCount: z.int().nonnegative(),
+    /**
+     * Le retrait par la modération (tranche 7a). Un projet retiré n'est plus visible que de son
+     * auteur : c'est donc à lui seul que ce champ est rempli ; null pour un projet visible.
+     */
+    removal: Removal.nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

@@ -1,6 +1,6 @@
 // Point d'entrée du paquet @ruche/i18n, partagé par l'API et l'appli.
 // Il contient les textes dans chaque langue et la logique pour choisir la bonne langue.
-import { appName } from '@ruche/brand'
+import { appName, contactEmail } from '@ruche/brand'
 import { en } from './locales/en'
 import { fr } from './locales/fr'
 
@@ -19,9 +19,10 @@ export const defaultLanguage: Language = 'fr'
 
 /**
  * Les paramètres présents dans tous les textes et remplis automatiquement, sans qu'on ait à les
- * passer : {{appName}} devient le nom de l'appli. L'appli les donne à i18next, l'API à `fill`.
+ * passer : {{appName}} devient le nom de l'appli, {{contactEmail}} l'adresse de contact
+ * (tranche 7a). L'appli les donne à i18next, l'API à `fill`.
  */
-export const textVariables = { appName } as const
+export const textVariables = { appName, contactEmail } as const
 
 /**
  * Remplace les {{paramètres}} d'un texte par leur valeur, pour l'API (l'appli utilise i18next) :

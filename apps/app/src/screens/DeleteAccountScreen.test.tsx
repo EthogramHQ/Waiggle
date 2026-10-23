@@ -5,6 +5,7 @@ import { deleteAccount, downloadMyData } from '../accounts/api'
 import { getMe } from '../profile/api'
 import { leaMe } from '../testing/fixtures'
 import { mockSession, renderWithI18n } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import { DeleteAccountScreen } from './DeleteAccountScreen'
 
 jest.mock('../accounts/api', () => ({
@@ -111,5 +112,23 @@ describe('DeleteAccountScreen', () => {
         '@lea, et l’ancien s’il t’est réservé : ils redeviennent libres aussitôt',
       ),
     ).toBeTruthy()
+  })
+})
+
+// --- Tranche 7a : ce qui reste après la suppression (règle 24 de la relecture du plan) ---
+
+describe('what remains after deleting the account', () => {
+  it('says that the reports of the member and a trace of the removals stay one year', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(screen.getAllByText(containing(fr.t('account.delete.remains.title'))).length).toBe(1)
+    // « Tes signalements restent, sans ton nom, un an »
+    expect(
+      screen.getAllByText(containing(fr.t('account.delete.remains.reports'))).length,
+    ).toBeGreaterThan(0)
+    // « Une trace des retraits de tes contenus reste un an »
+    expect(
+      screen.getAllByText(containing(fr.t('account.delete.remains.removals'))).length,
+    ).toBeGreaterThan(0)
   })
 })

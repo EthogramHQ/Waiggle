@@ -1,6 +1,7 @@
 // Les notes d'un projet (tranche 4b) : de courtes nouvelles publiées par son auteur (« v2 : mode
 // hors ligne »). Elles forment le journal du projet et arrivent dans le fil de ses abonnés.
 import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { moderationDecision } from './moderation'
 import { project } from './projects'
 
 export const projectNote = pgTable(
@@ -20,6 +21,13 @@ export const projectNote = pgTable(
     // l'horloge de JavaScript. Une seule horloge pour tout ce qui date les fils (voir published_at
     // du projet) : les dates se comparent entre elles, et les tests peuvent la remplacer.
     createdAt: timestamp('created_at').notNull(),
+    // Retiré par la modération (tranche 7a) : la note n'est plus visible que de son auteur, avec
+    // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
+    // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
+    removedAt: timestamp('removed_at'),
+    // La décision de retrait, pour retrouver son fondement et son explication. onDelete:
+    // 'set null' : l'API ne purge pas une décision tant que son contenu reste retiré.
+    removalId: uuid('removal_id').references(() => moderationDecision.id, { onDelete: 'set null' }),
   },
   (t) => [
     // L'index du journal et du fil : pour un projet, ses notes de la plus récente à la plus

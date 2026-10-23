@@ -36,6 +36,7 @@ describe('FeedItem, a note', () => {
         id: '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7',
         body: 'v2 : mode hors ligne.',
         createdAt: '2026-10-19T09:00:00.000Z',
+        removal: null,
       },
       project: {
         id: '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6',

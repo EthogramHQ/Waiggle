@@ -10,12 +10,13 @@ import {
   PROJECT_NOTES_SHOWN,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { followsAnyone } from '../follows/load'
 import { toNote } from '../notes/load'
 import { rowToSummary, selectMedia, selectProjects } from '../projects/load'
+import { listedProject } from '../projects/visibility'
 
 const t = schema.project
 const n = schema.projectNote
@@ -35,8 +36,10 @@ const loadPage = async (
   const rows = await selectProjects(db)
     .where(
       and(
-        // Un projet privé n'apparaît dans aucun fil, même pour son auteur.
-        eq(t.visibility, 'public'),
+        // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur. L'index
+        // partiel project_public_published_idx (visibility = 'public') sert toujours : « removed_at
+        // is null » écarte au passage les quelques projets retirés qu'il contient.
+        listedProject(),
         isNotNull(t.publishedAt),
         where,
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
@@ -139,8 +142,8 @@ const selectFollowingEntries = (
     .from(t)
     .where(
       and(
-        // Un projet privé n'apparaît dans aucun fil, même pour son auteur.
-        eq(t.visibility, 'public'),
+        // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur.
+        listedProject(),
         isNotNull(t.publishedAt),
         inArray(t.authorId, followedMembers),
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
@@ -159,10 +162,15 @@ const selectFollowingEntries = (
       and(
         eq(n.projectId, f.projectId),
         cursor ? after(cursor, n.createdAt, n.id) : undefined,
+        // Une note retirée par la modération n'arrive jamais dans le fil (tranche 7a) : un abonné
+        // ne peut pas être l'auteur du projet, qui seul la lit encore (on ne suit pas ses projets).
+        isNull(n.removedAt),
         // Seulement parmi les 20 notes les plus récentes du projet, celles de son journal : une note
         // lisible par les abonnés doit toujours être visible, et supprimable, par son auteur. On
         // compte les notes plus récentes que celle-ci (« newer ») : moins de 20, elle est au journal.
-        sql`(select count(*) from ${n} as newer where newer.project_id = ${n.projectId} and (newer.created_at, newer.id) > (${n.createdAt}, ${n.id})) < ${PROJECT_NOTES_SHOWN}`,
+        // Les notes retirées ne comptent pas, comme dans le journal que lisent les autres
+        // (notes/load.ts) : elles n'y prennent pas de place.
+        sql`(select count(*) from ${n} as newer where newer.project_id = ${n.projectId} and newer.removed_at is null and (newer.created_at, newer.id) > (${n.createdAt}, ${n.id})) < ${PROJECT_NOTES_SHOWN}`,
       ),
     )
     .orderBy(desc(n.createdAt), desc(n.id))
@@ -177,9 +185,9 @@ const selectFollowingEntries = (
       body: recentNotes.body,
     })
     .from(f)
-    // Seulement les projets encore publics : un projet suivi devenu privé ne montre plus rien,
-    // pas même à son auteur (qui ne peut d'ailleurs pas suivre ses propres projets).
-    .innerJoin(t, and(eq(t.id, f.projectId), eq(t.visibility, 'public')))
+    // Seulement les projets encore publics et pas retirés : un projet suivi devenu privé ne montre
+    // plus rien, pas même à son auteur (qui ne peut d'ailleurs pas suivre ses propres projets).
+    .innerJoin(t, and(eq(t.id, f.projectId), listedProject()))
     .crossJoinLateral(recentNotes)
     .where(eq(f.followerId, viewerId))
     .orderBy(desc(recentNotes.createdAt), desc(recentNotes.id))
@@ -219,7 +227,7 @@ export const loadFollowingFeed = async (
   const rows =
     projectIds.length === 0
       ? []
-      : await selectProjects(db).where(and(inArray(t.id, projectIds), eq(t.visibility, 'public')))
+      : await selectProjects(db).where(and(inArray(t.id, projectIds), listedProject()))
   const media = await selectMedia(
     db,
     rows.map((row) => row.project.id),

@@ -87,6 +87,8 @@ export const memberCounterKeys = (userId: string) => ({
   unsubscribe: `unsubscribe:${userId}`,
   // Télécharger toutes ses données (audit de sécurité d'octobre 2026) : une lecture lourde.
   export: `export:${userId}`,
+  // Signaler un contenu (tranche 7a) : 20 par jour, contre les signalements en rafale.
+  report: `report:${userId}`,
 })
 
 /**

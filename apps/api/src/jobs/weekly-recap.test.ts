@@ -10,6 +10,7 @@
 // Quatre membres : Inès (qui reçoit le récap), Malik, Zoé et Sam (qui commentent, répondent,
 // mentionnent, réagissent et suivent). La fausse horloge part d'un lundi fixe, loin d'aujourd'hui.
 import { appName } from '@ruche/brand'
+import { NotificationPage } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
@@ -756,6 +757,48 @@ describe('the recap and the mention e-mail at the same time', () => {
           email.text.includes('Météo'),
       )
       expect(withTheMention, address).toHaveLength(1)
+    }
+  })
+})
+
+// Tranche 7a, règle 31 du plan : le récap du lundi ignore les deux notifications de la modération
+// (« removed » pour l'auteur, « report_handled » pour qui a signalé) ; elles restent dans l'appli.
+describe('the notifications of the moderation', () => {
+  it('are left out of the recap', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const recettes = await act.publish(malik, 'Recettes')
+    await act.makeAdmin((await act.me(sam)).id)
+    later()
+    await act.report(malik, { kind: 'project', id: meteo.id }, 'scam_spam')
+    later()
+    await act.decide(sam, {
+      action: 'remove',
+      target: { kind: 'project', id: meteo.id },
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+    })
+    later()
+    // Témoin : Malik a aussi du nouveau, un commentaire de Zoé.
+    await act.comment(recettes.id, zoe, 'Miam.')
+    later(HOUR)
+    // Témoin : les deux notifications sont bien dans l'appli.
+    const kinds = async (cookie: string) =>
+      NotificationPage.parse(
+        await (await act.send('GET', '/v1/notifications', cookie)).json(),
+      ).items.map((n) => n.kind)
+    expect(await kinds(ines)).toContain('removed')
+    expect(await kinds(malik)).toContain('report_handled')
+
+    await runRecap()
+
+    // Inès n'a rien d'autre de neuf : aucun récap.
+    expect(recapsTo(inesAccount.email)).toEqual([])
+    const recap = onlyRecapTo(malikAccount.email)
+    expect(recap.text).toContain(line('comment', 'Recettes', 'Zoé', 'zoe'))
+    for (const part of [recap.text, recap.html]) {
+      expect(part).not.toContain('Météo')
+      expect(part).not.toContain('signalement')
+      expect(part).not.toContain('modération')
     }
   })
 })

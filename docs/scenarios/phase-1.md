@@ -745,11 +745,88 @@ Règles détaillées :
   depuis (suppressions, désinscriptions) ne sont pas réappliqués.
 - Export et suppression du compte : les deux réglages et les dates « envoyé jusqu'à ».
 
-## Tranche 7 — Sécurité et modération
+## Tranche 7a — Signaler
+
+- Tout membre peut signaler un projet, une note, un commentaire (ou une réponse) ou un profil,
+  avec un motif
+- Le signalement arrive dans la file de l'administration, qui peut retirer le contenu ou classer
+  le signalement ; chaque décision est tracée (qui, quand, pourquoi)
+
+### Précisions (tranche 7a) — validées le 22/10/2026
+
+Décisions de Louis (22/10/2026) :
+- **7a est la première partie de la tranche 7** : signaler, et traiter un signalement. Bloquer un
+  membre et suspendre un compte viennent après.
+- **Qui administre** : un rôle « administrateur », posé ou retiré par un script du dépôt
+  (`infra/`), jamais depuis l'appli. Louis seul au départ.
+- **Deux actions sur un signalement** : retirer le contenu, ou classer sans suite. Un profil
+  signalé va dans la file, mais les actions sur un compte (suspendre, retirer la photo ou le
+  pseudo) viennent avec la suspension.
+- **Qui est prévenu** : l'administrateur par un e-mail, au plus un par heure ; l'auteur d'un
+  contenu retiré, par une notification avec l'explication ; la personne qui a signalé, par une
+  notification quand c'est traité. L'auteur d'un contenu ne sait jamais qui l'a signalé ; seule la
+  modération le voit, pour éviter les abus.
+- **Une adresse de contact** (`contact@waiggle.com`), affichée dans « Mon compte » et dans le pied
+  des e-mails. La boîte est créée par Louis avant le déploiement.
 
 **Signaler**
-- Tout membre peut signaler un projet, un commentaire ou un profil, avec un motif
-- Le signalement arrive dans la file de l'administration
+- Étant donné Malik, connecté, sur le projet « Météo » d'Inès
+- Quand il choisit « Signaler » dans le menu du projet, un motif, et envoie
+- Alors il lit « Merci, ton signalement a été envoyé. La modération va le regarder. »
+- Et le projet reste affiché pour tout le monde tant que rien n'est décidé
+- Et Inès n'est pas prévenue du signalement
+- Même chose pour une note du journal, un commentaire, une réponse, ou la page d'un membre
+
+**Traiter un signalement** (l'administrateur)
+- Étant donné Louis, administrateur, qui ouvre « Modération » depuis « Mon compte »
+- Alors il voit les signalements en attente, du plus ancien au plus récent : le contenu tel qu'il
+  était au moment du signalement, un lien vers lui, le motif, le nombre de signalements reçus
+  pour ce contenu, la date
+- Quand il choisit « Retirer », avec le fondement (la loi ou les règles de l'appli) et une phrase
+  d'explication
+- Alors le contenu disparaît pour les autres membres, et son auteur est prévenu, avec
+  l'explication
+- Et la personne qui a signalé est prévenue que son signalement a été traité
+- Quand il choisit « Classer sans suite »
+- Alors le contenu reste, le signalement quitte la file, et la personne qui a signalé est prévenue
+- Et chaque décision est gardée : qui, quand, quelle action, quelle explication
+
+**Un contenu retiré**
+- Un projet retiré n'apparaît plus nulle part pour les autres (comme un projet privé) ; son
+  auteur le voit encore, avec « Retiré par la modération » et l'explication
+- Une note retirée disparaît pour les autres ; son auteur la voit encore, avec « Retiré par la
+  modération » et l’explication
+- Un commentaire ou une réponse retirés deviennent « Contenu retiré par la modération » pour les
+  autres, comme un commentaire supprimé ; les réponses restent ; son auteur le voit encore, avec
+  l’explication
+- L'administrateur peut le rétablir ; la décision est tracée de la même façon
+
+Règles détaillées :
+- **Motifs** : contenu illégal ; harcèlement ou haine ; contenu sexuel ou violent ; arnaque ou
+  spam ; usurpation d'identité ; une photo ou une information sur moi sans mon accord ; autre. Une précision libre facultative, 500 caractères au plus.
+- **Qui peut signaler quoi** : un membre connecté, un contenu qu'il voit, jamais le sien. Un seul
+  signalement par membre et par contenu ; le refaire répond « déjà signalé ».
+- **Anti-abus** : 20 signalements par membre et par jour.
+- **Seul un administrateur** voit la file, les signalements et les décisions ; pour tout autre
+  membre, ces routes répondent comme si elles n'existaient pas.
+- **Un contenu supprimé par son auteur** pendant l'attente : le signalement est classé tout seul.
+- **Le texte signalé** est copié dans le signalement au moment de l'envoi, pour que l'auteur ne
+  puisse pas le changer avant la décision.
+- **Suppression du compte** : les signalements faits par la personne partie restent, sans son
+  nom, jusqu'à un an après leur traitement ; ceux qui visent ses contenus encore ouverts deviennent
+  « sans objet » (gardés 30 jours), et ceux qui ont mené à un retrait restent un an.
+- **Export des données** : les signalements que le membre a faits (contenu visé, motif, date,
+  décision) ; jamais ceux qui le visent.
+- **Un administrateur ne décide pas de ce qui le concerne** : un signalement de son propre contenu
+  ou de son profil attend un autre administrateur.
+- **Conservation** : les signalements clos et les décisions, un an ; les signalements d'un compte
+  supprimé encore ouverts, 30 jours (à faire valider par un professionnel).
+- **Procédure de retrait** dans `docs/ops/` : comment l'éditeur retire un contenu signalé hors de
+  l'appli (par exemple par e-mail à l'adresse de contact), et le rôle d'administrateur.
+
+## Tranche 7 — Sécurité et modération
+
+**Signaler** : fait en tranche 7a (signaler, retirer ou classer, décisions tracées).
 
 **Bloquer**
 - Un membre peut en bloquer un autre : ils ne voient plus leurs contenus respectifs et ne peuvent

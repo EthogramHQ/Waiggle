@@ -25,10 +25,12 @@ import { followRoutes } from './routes/follows'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
+import { moderationRoutes } from './routes/moderation'
 import { noteRoutes } from './routes/notes'
 import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
+import { reportRoutes } from './routes/reports'
 import { tagRoutes } from './routes/tags'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
@@ -214,6 +216,9 @@ export const createApp = ({
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
+  // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
+  app.route('/', reportRoutes({ db, limiter }))
+  app.route('/', moderationRoutes({ db }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

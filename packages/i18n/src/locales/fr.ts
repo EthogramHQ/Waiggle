@@ -40,6 +40,9 @@ export const fr = {
     seeCode: 'Voir le code',
   },
   auth: {
+    // L'adresse de contact, lisible sans compte (une personne photographiée, une autorité).
+    contact:
+      'Une question, un contenu à signaler ? Écris-nous à {{contactEmail}}, en français ou en anglais.',
     fields: {
       name: 'Nom affiché',
       nameHint: 'Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
@@ -118,6 +121,12 @@ export const fr = {
       done: 'Tes données ont été téléchargées.',
     },
     section: { title: 'Compte' },
+    contact: {
+      label: 'Nous écrire',
+      spoken: 'Nous écrire : {{contactEmail}}',
+      hint: 'En français ou en anglais. Pour une question, un contenu à signaler ou tes données.',
+    },
+    moderation: 'Modération',
     email: {
       label: 'Adresse e-mail',
       soon: 'modifiable bientôt',
@@ -147,6 +156,11 @@ export const fr = {
       warning: 'C’est immédiat et sans retour.',
       submit: 'Supprimer définitivement',
       wrongPassword: 'Mot de passe incorrect.',
+      remains: {
+        title: 'Ce qui reste',
+        reports: 'Tes signalements restent, sans ton nom, jusqu’à un an après leur traitement',
+        removals: 'Une trace des retraits de tes contenus reste un an',
+      },
     },
   },
   profile: {
@@ -378,6 +392,7 @@ export const fr = {
       hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
       deletedPlaceholder: 'Commentaire supprimé',
       hiddenPlaceholder: 'Commentaire masqué',
+      removedPlaceholder: 'Contenu retiré par la modération',
       more: 'Afficher la suite',
       end: 'C’est tout',
       moreError: 'La suite des commentaires n’a pas pu se charger.',
@@ -422,6 +437,107 @@ export const fr = {
       invalidCharacters:
         'Certains caractères ne sont pas autorisés (caractères invisibles ou de contrôle).',
     },
+  },
+  report: {
+    // Signaler un contenu (tranche 7a). « La modération » : il n'y a qu'une personne derrière.
+    title: 'Signaler',
+    action: 'Signaler',
+    project: 'Signaler ce projet',
+    note: 'Signaler cette note',
+    member: 'Signaler ce profil',
+    target: {
+      project: 'Le projet signalé',
+      note: 'La note signalée',
+      comment: 'Le commentaire signalé',
+      member: 'Le profil signalé',
+    },
+    reasonLabel: 'Pourquoi le signales-tu ?',
+    reasons: {
+      illegal: 'Contenu illégal',
+      harassment: 'Harcèlement ou haine',
+      sexualViolent: 'Contenu sexuel ou violent',
+      scamSpam: 'Arnaque ou spam',
+      impersonation: 'Usurpation d’identité',
+      privacy: 'Une photo ou une information sur moi sans mon accord',
+      other: 'Autre chose',
+    },
+    details: 'Précision (facultatif)',
+    detailsHint: 'N’ajoute pas d’informations personnelles inutiles.',
+    illegalDetails: 'Dis-nous pourquoi',
+    illegalHint:
+      'Dis-nous pourquoi ce contenu te semble illégal. En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
+    anonymity:
+      'La personne concernée ne saura pas que c’est toi. La modération voit qui signale, pour éviter les abus.',
+    danger: 'Quelqu’un est en danger ? Appelle le 112.',
+    submit: 'Envoyer',
+    sent: 'Merci, ton signalement a été envoyé. La modération va le regarder.',
+    back: 'Revenir',
+    // Tranche 7a, décisions du 23/10 : la précision obligatoire pour un contenu dit illégal, le
+    // quota de 20 par jour, et un contenu disparu entre l’ouverture de la page et l’envoi.
+    illegalRequired: 'Dis-nous pourquoi ce contenu te semble illégal.',
+    limited:
+      'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous : {{contactEmail}}',
+    gone: 'Ce contenu n’existe plus, ou tu ne peux plus le voir.',
+  },
+  moderation: {
+    title: 'Modération',
+    pending: 'En attente',
+    removed: 'Retirés',
+    empty: 'Aucun signalement en attente.',
+    emptyRemoved: 'Aucun contenu retiré.',
+    more: 'Afficher la suite',
+    errorTitle: 'La modération n’a pas pu se charger',
+    kinds: { project: 'Projet', note: 'Note', comment: 'Commentaire', member: 'Profil' },
+    snapshot: 'Texte au moment du signalement ; images actuelles',
+    count_one: '{{count}} signalement',
+    count_other: '{{count}} signalements',
+    reasonCount: '{{reason}} : {{count}}',
+    since: 'Premier signalement le {{date}}',
+    removedOn: 'Retiré le {{date}}',
+    concernsMe: 'Te concerne : un autre administrateur doit décider.',
+    state: { removed: 'Déjà retiré', gone: 'Supprimé depuis par son auteur' },
+    view: 'Voir',
+    // Un contenu retiré : le projet qui le porte reste lisible (une note, un commentaire).
+    viewProject: 'Voir le projet',
+    // Ce qui relie chaque bouton d’une carte à son contenu, lu par le lecteur d’écran.
+    describe: '{{kind}} : {{excerpt}}',
+    // Le nom du groupe d’onglets (« En attente », « Retirés »).
+    list: 'Liste affichée',
+    remove: 'Retirer',
+    dismiss: 'Classer sans suite',
+    restore: 'Rétablir',
+    removeTitle: 'Retirer ce contenu ?',
+    removeMessage:
+      'Les autres membres ne le verront plus. Son auteur sera prévenu, avec ton explication. Tu pourras le rétablir.',
+    groundLabel: 'Fondement',
+    grounds: { illegal: 'La loi', rules: 'Les règles de {{appName}}' },
+    explanation: 'Explication',
+    explanationHint:
+      'Montrée à l’auteur. Dis quelle règle ou quelle loi ; ne nomme jamais qui a signalé.',
+    confirmRemove: 'Retirer',
+    cancel: 'Annuler',
+    dismissed: 'Signalement classé sans suite.',
+    removedDone: 'Contenu retiré.',
+    restoredDone: 'Contenu rétabli.',
+    // Le bas de la liste (ajoutés par l'interface, tranche 7a) : tout est lu, ou la suite a raté.
+    end: 'C’est tout',
+    moreError: 'La suite de la liste n’a pas pu se charger.',
+  },
+  removal: {
+    // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de
+    // lui seul, après un signalement ou non, qu'une personne a décidé, le fondement, l'explication,
+    // et comment contester.
+    banner: 'Retiré par la modération',
+    onlyYou: 'Les autres membres ne voient plus ce contenu, jusqu’à un éventuel rétablissement.',
+    afterReport:
+      'Après un signalement, une personne de la modération a décidé de retirer ce contenu.',
+    direct: 'Une personne de la modération a décidé de retirer ce contenu.',
+    grounds: {
+      illegal: 'Fondement : la loi.',
+      rules: 'Fondement : les règles de {{appName}}.',
+    },
+    explanation: 'Explication : {{explanation}}',
+    contest: 'Pour contester : {{contactEmail}}',
   },
   member: {
     // {{nameOf}} : « d’Inès », « de Léa » (nameOf de @ruche/i18n, tranche 6c).
@@ -527,7 +643,17 @@ export const fr = {
       reason: 'Tu reçois cet e-mail parce que tu as activé les e-mails de mentions et de réponses.',
       unsubscribe: 'Ne plus recevoir les e-mails de mentions et de réponses',
     },
-    footer: '{{appName}}, le réseau des projets IA entre proches.',
+    footer: '{{appName}}, le réseau des projets IA entre proches. Contact : {{contactEmail}}',
+    moderationAlert: {
+      // Sans aucun extrait : le nombre en attente et le lien, rien de plus ne part chez l'envoyeur.
+      subject: 'Signalements en attente sur {{appName}}',
+      heading: 'Signalements en attente',
+      body_one: '{{count}} signalement attend une décision.',
+      body_other: '{{count}} signalements attendent une décision.',
+      button: 'Ouvrir la modération',
+      reason:
+        'Tu reçois cet e-mail parce que tu es administrateur de {{appName}}. Au plus un par heure.',
+    },
     greeting: 'Bonjour {{name}},',
     verify: {
       subject: 'Active ton compte {{appName}}',
@@ -607,6 +733,31 @@ export const fr = {
     hidden:
       'Ton commentaire sur « {{title}} » a été masqué par la personne qui a publié le projet. Il reste visible pour toi et pour cette personne.',
     handle: 'Ton pseudo est @{{handle}}, tiré de ton nom. Tu peux le changer dans Mon profil.',
+    removed: {
+      project: 'Ton projet « {{title}} » a été retiré par la modération',
+      note: 'Ta note sur « {{title}} » a été retirée par la modération',
+      comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
+    },
+    reportHandled: {
+      // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
+      project: {
+        removed: 'Ton signalement d’un projet a été traité : le projet a été retiré.',
+        dismissed: 'Ton signalement d’un projet a été traité : nous ne l’avons pas retiré.',
+      },
+      note: {
+        removed: 'Ton signalement d’une note a été traité : la note a été retirée.',
+        dismissed: 'Ton signalement d’une note a été traité : nous ne l’avons pas retirée.',
+      },
+      comment: {
+        removed: 'Ton signalement d’un commentaire a été traité : le commentaire a été retiré.',
+        dismissed: 'Ton signalement d’un commentaire a été traité : nous ne l’avons pas retiré.',
+      },
+      member: {
+        removed: 'Ton signalement d’un profil a été traité : la modération est intervenue.',
+        dismissed: 'Ton signalement d’un profil a été traité : nous n’avons rien changé.',
+      },
+      contest: 'Pas d’accord ? Écris-nous : {{contactEmail}}',
+    },
   },
   errors: {
     notFound: 'Cette page n’existe pas.',
@@ -624,6 +775,10 @@ export const fr = {
     handleChangeLimit: 'Tu as changé de pseudo plusieurs fois aujourd’hui. Réessaie demain.',
     unsubscribeInvalid: 'Ce lien ne permet pas de te désinscrire.',
     internal: 'Une erreur inattendue est survenue. Réessaie dans un instant.',
+    ownContent: 'Tu ne peux pas signaler ton propre contenu, ni décider de ce qui te concerne.',
+    alreadyReported: 'Tu as déjà signalé ce contenu. La modération va le regarder.',
+    alreadyDecided: 'Une décision a déjà été prise sur ce contenu entre-temps.',
+    removed: 'Ce contenu a été retiré par la modération : il ne peut plus être modifié.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

@@ -2,6 +2,7 @@
 // ligne »). Elles forment le journal du projet, et arrivent dans le fil des membres qui le suivent.
 // Modifier le projet lui-même (corriger une faute) ne fait rien remonter : seule une note le fait.
 import { z } from 'zod'
+import { Removal } from './removal'
 import { VisibleFreeText } from './text'
 
 /** Une note fait au plus 1 000 caractères : quelques phrases, pas un article. */
@@ -23,12 +24,16 @@ export const NoteText = VisibleFreeText(PROJECT_NOTE_MAX)
 export const NewProjectNote = z.object({ body: NoteText }).meta({ id: 'NewProjectNote' })
 export type NewProjectNote = z.infer<typeof NewProjectNote>
 
-/** Une note publiée. */
+/**
+ * Une note publiée. Une note retirée par la modération (tranche 7a) n'apparaît plus que pour
+ * l'auteur du projet, avec `removal` ; null pour les notes visibles.
+ */
 export const ProjectNote = z
   .object({
     id: ProjectNoteId,
     body: z.string(),
     createdAt: z.iso.datetime(),
+    removal: Removal.nullable(),
   })
   .meta({ id: 'ProjectNote' })
 export type ProjectNote = z.infer<typeof ProjectNote>

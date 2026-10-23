@@ -9,6 +9,9 @@ import {
   HANDLE_CHANGES_PER_DAY,
   Me,
   ProfileUpdate,
+  ReportOutcome,
+  ReportReason,
+  ReportTargetKind,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq } from 'drizzle-orm'
@@ -27,6 +30,7 @@ import { notesOfAuthor } from '../notes/load'
 import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
 import { loadProjectsOf } from '../projects/load'
+import { listedProject } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
 import type { AppEnv } from '../types'
@@ -317,9 +321,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       .select({ id: schema.projectFollow.projectId, followedAt: schema.projectFollow.createdAt })
       .from(schema.projectFollow)
       .innerJoin(schema.project, eq(schema.project.id, schema.projectFollow.projectId))
-      .where(
-        and(eq(schema.projectFollow.followerId, user.id), eq(schema.project.visibility, 'public')),
-      )
+      // Un projet suivi retiré par la modération n'y figure pas non plus (listedProject).
+      .where(and(eq(schema.projectFollow.followerId, user.id), listedProject()))
       .orderBy(asc(schema.projectFollow.createdAt))
     const withDate = (follows: { id: string; followedAt: Date }[]) =>
       follows.map(({ id, followedAt }) => ({ id, followedAt: followedAt.toISOString() }))
@@ -347,6 +350,34 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Ses réglages d'e-mail et les dates des derniers envois (tranche 6c), valeurs par défaut
     // comprises. Jamais de jeton de désinscription : il se recalcule, il n'est pas gardé.
     const emailPreferences = await exportEmailPreferences(db, user.id)
+    // Les signalements qu'il a faits (tranche 7a, règle 18 de la relecture du plan), des plus
+    // anciens aux plus récents : la cible, le motif, sa précision, la date et l'issue. Ni le texte
+    // visé (snapshot : il appartient à un autre, et a pu devenir privé), ni l'explication de la
+    // décision. Jamais les signalements qui le visent : la condition porte sur reporter_id seul.
+    // L'index content_report_reporter_idx trouve ses signalements ; le tri se fait en mémoire.
+    const reportRows = await db
+      .select({
+        targetKind: schema.contentReport.targetKind,
+        targetId: schema.contentReport.targetId,
+        reason: schema.contentReport.reason,
+        details: schema.contentReport.details,
+        createdAt: schema.contentReport.createdAt,
+        status: schema.contentReport.status,
+        decidedAt: schema.contentReport.decidedAt,
+      })
+      .from(schema.contentReport)
+      .where(eq(schema.contentReport.reporterId, user.id))
+      .orderBy(asc(schema.contentReport.createdAt), asc(schema.contentReport.id))
+    // .parse vérifie que chaque valeur lue est l'une de celles permises par le contrat.
+    const reports = reportRows.map((row) => ({
+      targetKind: ReportTargetKind.parse(row.targetKind),
+      targetId: row.targetId,
+      reason: ReportReason.parse(row.reason),
+      details: row.details,
+      createdAt: row.createdAt.toISOString(),
+      outcome: ReportOutcome.parse(row.status),
+      decidedAt: row.decidedAt?.toISOString() ?? null,
+    }))
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
@@ -357,13 +388,14 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         user: me,
         formerHandle,
         projects,
-        notes: notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })),
+        notes,
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({
           ...comment,
           mentions: mentionsByComment.get(comment.id) ?? [],
         })),
+        reports,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

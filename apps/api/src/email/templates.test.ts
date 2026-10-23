@@ -1,10 +1,11 @@
-import { appName } from '@ruche/brand'
+import { appName, contactEmail } from '@ruche/brand'
 import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
 import {
   existingAccountEmail,
   type MentionData,
   mentionEmail,
+  moderationAlertEmail,
   type NotificationLinks,
   type RecapData,
   recapEmail,
@@ -203,5 +204,63 @@ describe('the layout of a notification e-mail', () => {
 
     expect(email.html).toMatch(/@media \(max-width:480px\)/)
     expect(email.html).toContain('class="card"')
+  })
+})
+
+// ─── Tranche 7a ──────────────────────────────────────────────────────────────────────────────────
+
+// Règle 23 de la relecture du plan : l'adresse de contact dans le pied de chaque e-mail, en texte,
+// jamais en lien « mailto: » (tout lien d'un e-mail mène à l'appli ou à l'API).
+describe('the contact address in the footer', () => {
+  const emails = () => [
+    verificationEmail('fr', { name: 'Léa', url: 'https://api.waiggle.io/verify' }),
+    existingAccountEmail('en', { name: 'Sam', signInUrl: 'https://waiggle.io/sign-in' }),
+    recapEmail('fr', recapData()),
+    mentionEmail('en', mentionData()),
+    moderationAlertEmail('fr', { name: 'Louis', count: 2, url: 'https://waiggle.io/moderation' }),
+  ]
+
+  it('is written in every e-mail, as text and never as a link', () => {
+    for (const email of emails()) {
+      expect(email.text, email.subject).toContain(contactEmail)
+      expect(email.html, email.subject).toContain(contactEmail)
+      expect(email.html, email.subject).not.toContain('mailto:')
+      expect(email.html, email.subject).not.toMatch(new RegExp(`href="[^"]*${contactEmail}`))
+    }
+  })
+})
+
+// L'e-mail d'alerte à l'administrateur (plan 7a, « Tâche et e-mail » ; précision 5) : le nombre
+// de signalements en attente et un lien vers « Modération », sans aucun extrait.
+describe('moderationAlertEmail', () => {
+  const url = 'https://waiggle.io/moderation'
+
+  it('gives the number of pending reports and a button to the moderation screen', () => {
+    const email = moderationAlertEmail('fr', { name: 'Louis', count: 3, url })
+
+    expect(email.subject).toBe(fill(fr.moderationAlert.subject))
+    expect(email.text).toContain('Bonjour Louis')
+    expect(email.text).toContain(fill(fr.moderationAlert.body_other, { count: '3' }))
+    expect(email.text).toContain(url)
+    expect(email.text).toContain(fill(fr.moderationAlert.reason))
+    expect(email.html).toContain(`href="${url}"`)
+    expect(email.html).toContain(`>${fill(fr.moderationAlert.button)}</a>`)
+  })
+
+  it('speaks of one report in the singular, and in English for an English-speaking administrator', () => {
+    expect(moderationAlertEmail('fr', { name: 'Louis', count: 1, url }).text).toContain(
+      fill(fr.moderationAlert.body_one, { count: '1' }),
+    )
+    const english = moderationAlertEmail('en', { name: 'Louis', count: 2, url })
+    expect(english.subject).toBe(fill(en.moderationAlert.subject))
+    expect(english.text).toContain(fill(en.moderationAlert.body_other, { count: '2' }))
+  })
+
+  it('links to the app only', () => {
+    const email = moderationAlertEmail('fr', { name: 'Louis', count: 2, url })
+
+    const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+    expect(hrefs).toContain(url)
+    for (const href of hrefs) expect(href.startsWith('https://waiggle.io/'), href).toBe(true)
   })
 })

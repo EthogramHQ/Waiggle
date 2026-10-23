@@ -1,5 +1,5 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
-import { type Comment, NO_REACTIONS, type Project } from '@ruche/contracts'
+import { type Comment, NO_REACTIONS, type Project, type ProjectNote } from '@ruche/contracts'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import {
@@ -21,9 +21,11 @@ import {
   zoeComment,
   zoeReply,
 } from '../testing/comments'
-import { visited } from '../testing/navigation'
+import { removalAfterReport, removalByLaw } from '../testing/moderation'
+import { reportsOpened, visited } from '../testing/navigation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
+import { containing, fr, missingSentences, removalSentences } from '../testing/text'
 import { ProjectScreen } from './ProjectScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -329,15 +331,17 @@ beforeEach(() => {
 })
 
 /** Deux notes de Léa, telles que l'API les donne : de la plus récente à la plus ancienne. */
-const v2 = {
+const v2: ProjectNote = {
   id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
   body: 'v2 : mode hors ligne',
   createdAt: '2026-10-14T09:00:00.000Z',
+  removal: null,
 }
-const firstVersion = {
+const firstVersion: ProjectNote = {
   id: '1c2d3e4f-5061-4b72-9c83-d4e5f6071829',
   body: 'Première version en ligne',
   createdAt: '2026-10-12T09:00:00.000Z',
+  removal: null,
 }
 const withNotes = { ...recipesProject, notes: [v2, firstVersion] }
 
@@ -754,6 +758,19 @@ const cardOf = (text: string) => {
   return within(node)
 }
 
+/**
+ * Le fil d'un commentaire : « Répondre » est porté par le fil, pas par la carte, qui a ses propres
+ * actions depuis la tranche 7a (« Signaler »). On remonte donc jusqu'à l'ensemble qui le contient.
+ */
+const threadOf = (text: string) => {
+  let node = screen.getByText(text).parent
+  while (node && within(node).queryAllByRole('button', { name: 'Répondre' }).length === 0) {
+    node = node.parent
+  }
+  if (!node) throw new Error(`no thread around the comment ${text}`)
+  return within(node)
+}
+
 /** Les textes des commentaires affichés, dans l'ordre de la page. */
 const shownComments = () =>
   screen.getAllByText(
@@ -1052,7 +1069,7 @@ describe('replying to a comment', () => {
 
     await screen.findByText('Ça marche aussi en anglais ?')
     await fireEvent.press(
-      cardOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
+      threadOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
     )
     await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Oui, en anglais aussi.')
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
@@ -1069,7 +1086,9 @@ describe('replying to a comment', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByText('Moi aussi, dis-nous !')
-    await fireEvent.press(cardOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }))
+    await fireEvent.press(
+      threadOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }),
+    )
     await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Je vous raconte demain.')
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
 
@@ -1546,5 +1565,110 @@ describe('the comments, after the reviews', () => {
       .getAllByRole('button', { name: /^(Écrire un commentaire|Modifier|Supprimer)$/ })
       .map((button) => button.props.accessibilityLabel)
     expect(order).toEqual(['Écrire un commentaire', 'Modifier', 'Supprimer'])
+  })
+})
+
+// --- Tranche 7a : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
+
+describe('reporting a project from its page', () => {
+  it('offers another member to report the project, and opens « Signaler » for it', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Signaler ce projet' }))
+
+    expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
+  })
+
+  it('never offers the author to report the project', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page de l'auteur est affichée, avec ses actions.
+    expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
+  })
+})
+
+describe('reporting a note from the journal', () => {
+  it('offers another member a « Signaler cette note » button per note', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const buttons = await screen.findAllByRole('button', { name: 'Signaler cette note' })
+    expect(buttons).toHaveLength(2)
+    const second = buttons[1]
+    if (!second) throw new Error('a report button per note is expected')
+    await fireEvent.press(second)
+
+    expect(reportsOpened(mockPush)).toEqual([
+      expect.objectContaining({ kind: 'note', id: firstVersion.id }),
+    ])
+  })
+
+  it('says which note the button reports, by its text', async () => {
+    seenByOther()
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const buttons = await screen.findAllByRole('button', { name: 'Signaler cette note' })
+    // Comme « Supprimer la note » : l'indice lu sur téléphone est le début de la note.
+    expect(buttons[0]).toHaveProp('accessibilityHint', expect.stringContaining('v2'))
+  })
+
+  it('never offers the author to report a note of the project', async () => {
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : l'auteur supprime ses notes ; il ne les signale pas.
+    expect(await screen.findAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Signaler cette note' })).toBeNull()
+  })
+})
+
+describe('a project removed by the moderation, seen by its author', () => {
+  it('says at the top that it was removed, why, by whom, and how to contest', async () => {
+    // Retiré sans signalement, au nom de la loi : « une personne de la modération a décidé ».
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, removal: removalByLaw })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBeGreaterThan(0)
+    expect(missingSentences(removalSentences(removalByLaw), screen)).toEqual([])
+    // Le fondement de la loi, pas celui des règles ; aucun signalement mentionné.
+    expect(screen.queryByText(containing(fr.t('removal.grounds.rules')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t('removal.afterReport')))).toBeNull()
+  })
+
+  it('says when the removal followed a report, without saying who reported', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, removal: removalAfterReport })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
+  })
+
+  it('shows no such banner on a project that was not removed', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page est là, sans bandeau de retrait.
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.queryByText(containing(fr.t('removal.banner')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t('removal.contest')))).toBeNull()
+  })
+})
+
+describe('a note removed by the moderation, seen by the author of the project', () => {
+  it('keeps the note in the journal, with « Retiré par la modération » and why', async () => {
+    jest.mocked(getProject).mockResolvedValue({
+      ...recipesProject,
+      notes: [{ ...v2, removal: removalAfterReport }, firstVersion],
+    })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBe(1)
+    expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
+    // L'autre note, visible, n'a pas de bandeau : un seul « Pour contester ».
+    expect(screen.getAllByText(containing(fr.t('removal.contest')))).toHaveLength(1)
   })
 })

@@ -21,6 +21,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
 import { Text, type Tone } from './Text'
@@ -42,6 +43,13 @@ type Props = {
   spokenLabel?: string
   /** Fait du bouton un interrupteur, activé ou non (role « switch »). */
   checked?: boolean
+  /**
+   * Le texte (caché) qui précise sur quoi porte le bouton, quand plusieurs boutons portent le même
+   * nom (« Retirer » sur chaque carte de la modération) : relié par aria-describedby sur le web.
+   */
+  describedById?: string | undefined
+  /** La même précision sur téléphone, où aria-describedby n'existe pas : un indice lu après le nom. */
+  hint?: string | undefined
   /** Pour y poser le focus du clavier depuis le composant qui l'utilise (voir NoteComposer). */
   ref?: Ref<View>
 }
@@ -56,6 +64,8 @@ export function Button({
   disabled = false,
   spokenLabel,
   checked,
+  describedById,
+  hint,
   ref,
 }: Props) {
   const { colors, shadows } = useTheme()
@@ -114,6 +124,9 @@ export function Button({
         ref={ref}
         accessibilityRole={checked === undefined ? 'button' : 'switch'}
         accessibilityLabel={spokenLabel ?? label}
+        {...describedBy(describedById)}
+        // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle (comme IconButton).
+        accessibilityHint={Platform.OS === 'web' ? undefined : hint}
         aria-checked={checked}
         // Les lecteurs d'écran annoncent « désactivé » ou « occupé ». Les propriétés aria-… sont les
         // seules que react-native-web transmet au navigateur (accessibilityState y est ignoré) ;

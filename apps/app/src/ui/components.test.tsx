@@ -744,6 +744,99 @@ describe('Choices', () => {
     expect(screen.getByRole('radio', { name: 'Terminé', checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Idée', checked: false })).toBeTruthy()
   })
+
+  // Une question à laquelle il faut répondre soi-même (le motif d'un retrait) : rien n'est coché.
+  it('may start with no choice checked', async () => {
+    await renderWithProviders(
+      <Choices
+        label="Pourquoi ?"
+        options={[
+          { value: 'rules', label: 'Les règles' },
+          { value: 'law', label: 'La loi' },
+        ]}
+        value={null}
+        onChange={() => {}}
+      />,
+    )
+
+    expect(screen.getAllByRole('radio')).toHaveLength(2) // témoin
+    expect(screen.queryByRole('radio', { checked: true })).toBeNull()
+  })
+
+  // Tranche 7a, relecture de design de 4966555 : sur le web, la barre d'espace ne cochait rien (seuls
+  // les boutons y réagissent dans react-native-web) et les flèches ne bougeaient pas.
+  describe('on the web, with the keyboard', () => {
+    /** Une touche du clavier, telle que react-native-web la passe à onKeyDown. */
+    const key = (name: string) => ({ key: name, repeat: false, preventDefault: () => {} })
+    const options = [
+      { value: 'rules', label: 'Les règles' },
+      { value: 'law', label: 'La loi' },
+      { value: 'other', label: 'Autre' },
+    ] as const
+    type Reason = (typeof options)[number]['value']
+    const Sample = ({ start = null }: { start?: Reason | null }) => {
+      const [value, setValue] = useState<Reason | null>(start)
+      return <Choices label="Pourquoi ?" options={[...options]} value={value} onChange={setValue} />
+    }
+
+    it('checks a choice with the space bar', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample />)
+
+        await fireEvent(screen.getByRole('radio', { name: 'La loi' }), 'keyDown', key(' '))
+
+        expect(screen.getByRole('radio', { name: 'La loi', checked: true })).toBeTruthy()
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('moves to the next or previous choice with the arrows, going round', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample start="rules" />)
+
+        await fireEvent(
+          screen.getByRole('radio', { name: 'Les règles' }),
+          'keyDown',
+          key('ArrowRight'),
+        )
+        expect(screen.getByRole('radio', { name: 'La loi', checked: true })).toBeTruthy()
+
+        await fireEvent(screen.getByRole('radio', { name: 'La loi' }), 'keyDown', key('ArrowDown'))
+        expect(screen.getByRole('radio', { name: 'Autre', checked: true })).toBeTruthy()
+
+        await fireEvent(screen.getByRole('radio', { name: 'Autre' }), 'keyDown', key('ArrowRight'))
+        expect(screen.getByRole('radio', { name: 'Les règles', checked: true })).toBeTruthy()
+
+        await fireEvent(
+          screen.getByRole('radio', { name: 'Les règles' }),
+          'keyDown',
+          key('ArrowLeft'),
+        )
+        expect(screen.getByRole('radio', { name: 'Autre', checked: true })).toBeTruthy()
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('is a single stop for Tab: the checked choice, or the first one when none is', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample />)
+        const tabIndexes = () =>
+          screen.getAllByRole('radio').map((radio) => radio.props.tabIndex as number | undefined)
+
+        expect(tabIndexes()).toEqual([0, -1, -1])
+
+        await fireEvent.press(screen.getByRole('radio', { name: 'Autre' }))
+        expect(tabIndexes()).toEqual([-1, -1, 0])
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+  })
 })
 
 describe('TagInput', () => {
@@ -2111,5 +2204,106 @@ describe('Notice, polite with an action', () => {
     expect(screen.getByText('Ce projet est privé.')).toBeTruthy()
     await fireEvent.press(screen.getByRole('link', { name: 'Le rendre public' }))
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+// --- Tranche 7a : signaler, et ce qui est retiré par la modération ---
+
+/** Le bandeau que l'auteur lit sur son contenu retiré : un titre, puis les phrases données par l'écran. */
+const removedBanner = {
+  title: 'Retiré par la modération',
+  lines: [
+    'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
+    'Fondement : les règles.',
+    'Explication : Demander un code de carte bancaire n’est pas permis ici.',
+    'Pour contester : contact@example.com',
+  ],
+}
+
+describe('CommentCard, removed by the moderation', () => {
+  it('shows its author the banner of the removal, every sentence of it, and the text', async () => {
+    await renderWithProviders(
+      <CommentCard
+        author={{ name: 'Max', avatar: null }}
+        when="15 oct."
+        body="Super idée, je teste ce soir."
+        removed={removedBanner}
+      />,
+    )
+
+    expect(screen.getByText('Retiré par la modération')).toBeTruthy()
+    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+  })
+
+  it('shows the others only « Contenu retiré par la modération », without author or text', async () => {
+    await renderWithProviders(
+      <CommentCard
+        author={null}
+        when="15 oct."
+        body=""
+        placeholder="Contenu retiré par la modération"
+        removed={removedBanner}
+      />,
+    )
+
+    expect(screen.getByText('Contenu retiré par la modération')).toBeTruthy()
+    // Un emplacement n'a ni bandeau, ni lien, ni action, même si on lui en donne.
+    expect(screen.queryByText('Retiré par la modération')).toBeNull()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+describe('NoteList, reporting and removed notes', () => {
+  const notes = [
+    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
+    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+  ]
+
+  it('offers to report each note when asked, and says which one', async () => {
+    const onReport = jest.fn()
+    await renderWithProviders(
+      <NoteList notes={notes} onReport={onReport} reportLabel="Signaler cette note" />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Signaler cette note' })
+    expect(buttons).toHaveLength(2)
+    // Sur téléphone, l'indice dit laquelle : le début de son texte.
+    expect(buttons[1]).toHaveProp('accessibilityHint', expect.stringContaining('Première version'))
+    const second = buttons[1]
+    if (!second) throw new Error('a report button per note is expected')
+    await fireEvent.press(second)
+
+    expect(onReport).toHaveBeenCalledWith('n1')
+  })
+
+  it('names the report button « Signaler cette note » by default', async () => {
+    await renderWithProviders(<NoteList notes={notes} onReport={jest.fn()} />)
+
+    expect(screen.getAllByRole('button', { name: 'Signaler cette note' })).toHaveLength(2)
+  })
+
+  it('offers no report button without an action', async () => {
+    await renderWithProviders(<NoteList notes={notes} reportLabel="Signaler cette note" />)
+
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy() // témoin
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('shows the banner of a removed note, for its author, above its text', async () => {
+    await renderWithProviders(
+      <NoteList
+        notes={[
+          { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.', removed: removedBanner },
+          { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
+        ]}
+      />,
+    )
+
+    expect(screen.getAllByText('Retiré par la modération')).toHaveLength(1)
+    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.getByText('Première version en ligne')).toBeTruthy()
   })
 })

@@ -3,14 +3,14 @@
 // même sur son projet privé. Le journal se lit avec le projet (champ `notes` de GET
 // /v1/projects/{id}) ; les notes des projets suivis arrivent dans le fil (feed/load.ts).
 import { createRoute, z } from '@hono/zod-openapi'
-import { NewProjectNote, ProjectId, ProjectNote, ProjectNoteId } from '@ruche/contracts'
+import { NewProjectNote, ProjectNote, ProjectNoteId } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { toNote } from '../notes/load'
-import { visibleTo } from '../projects/load'
+import { projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -41,6 +41,7 @@ const postNoteRoute = createRoute({
     401: errorResponse('Not signed in.'),
     403: errorResponse('The public project of another member.'),
     404: errorResponse('No such project, or a private project of another member.'),
+    409: errorResponse('My project, removed by the moderation (`removed`).'),
     429: errorResponse('Too many notes today.'),
   },
 })
@@ -78,23 +79,17 @@ export const noteRoutes = ({ db, limiter }: Deps) => {
 
   /**
    * Le membre peut-il écrire dans le journal de ce projet ? Seulement s'il en est l'auteur.
-   * Sinon : « introuvable » s'il ne le voit pas (identifiant mal formé, projet inconnu, ou privé
-   * d'un autre : la même réponse, pour ne rien révéler), « refusé » s'il le voit sans en être
-   * l'auteur (un projet public d'un autre membre).
-   *
-   * Une petite requête, servie par la clé primaire de project : on ne lit que l'auteur, pas tout
-   * le projet (photos, abonnés, journal) comme le ferait loadVisibleProject.
+   * Sinon : « introuvable » s'il ne le voit pas (identifiant mal formé, projet inconnu, privé ou
+   * retiré d'un autre : la même réponse, pour ne rien révéler), « refusé » s'il le voit sans en
+   * être l'auteur (un projet public d'un autre membre). 'removed' : son projet, retiré par la
+   * modération (tranche 7a). Une petite requête, servie par la clé primaire de project
+   * (projectAccess, projects/load.ts) : on ne lit pas tout le projet.
    */
-  const access = async (projectId: string, userId: string) => {
-    // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
-    if (!ProjectId.safeParse(projectId).success) return 'not_found' as const
-    const [project] = await db
-      .select({ authorId: schema.project.authorId })
-      .from(schema.project)
-      .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
-    if (!project) return 'not_found' as const
-    return project.authorId === userId ? ('mine' as const) : ('forbidden' as const)
-  }
+  const access = (projectId: string, userId: string) => projectAccess(db, projectId, userId)
+
+  // 409 « removed » (règle 30 de la relecture du plan de 7a) : on n'ajoute pas de note à son
+  // projet retiré tant qu'il n'est pas rétabli. Seul son auteur peut recevoir cette réponse.
+  const removed = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'removed'), 409)
 
   // Publier : le quota et les droits sont vérifiés AVANT de lire le texte de la note. Le corps
   // déclaré dans postNoteRoute est en effet vérifié par un middleware que Hono place juste avant la
@@ -109,6 +104,7 @@ export const noteRoutes = ({ db, limiter }: Deps) => {
     const allowed = await access(c.req.param('id'), user.id)
     if (allowed === 'not_found') return notFound(c)
     if (allowed === 'forbidden') return forbidden(c)
+    if (allowed === 'removed') return removed(c)
     await next()
   })
 
@@ -134,6 +130,8 @@ export const noteRoutes = ({ db, limiter }: Deps) => {
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
     const { id, noteId } = c.req.valid('param')
+    // Supprimer une note reste permis sur son projet retiré, et pour une note retirée : son auteur
+    // peut toujours effacer ce qu'il a écrit ('removed' passe donc ici).
     const allowed = await access(id, user.id)
     if (allowed === 'not_found') return notFound(c)
     if (allowed === 'forbidden') return forbidden(c)
