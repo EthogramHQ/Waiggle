@@ -10,8 +10,10 @@
 // Chaque refus de l'envoi a son texte : déjà signalé, quota atteint, contenu disparu, son propre
 // contenu, session expirée (avec « Me reconnecter », qui ramène ici). Le motif et la précision
 // restent en place pour réessayer.
+import { contactEmail } from '@ruche/brand'
 import {
   REPORT_DETAILS_MAX,
+  REPORTS_PER_DAY,
   type ReportReason,
   ReportTarget,
   type ReportTargetKind,
@@ -169,15 +171,16 @@ function ReportForm({
   }
 
   // Le message d'un refus. Une session expirée a son lien « Me reconnecter », qui revient ici. Le
-  // quota (20 par jour) et un contenu disparu entre-temps ont leurs propres phrases : les messages
-  // généraux (« quelques minutes », « Cette page n'existe pas ») seraient faux sur ce formulaire.
+  // quota (REPORTS_PER_DAY par jour, avec l'adresse de contact pour un cas urgent) et un contenu
+  // disparu entre-temps ont leurs propres phrases : les messages généraux (« quelques minutes »,
+  // « Cette page n'existe pas ») seraient faux sur ce formulaire.
   const failureMessage =
     failure === null
       ? null
       : failure === 'unauthorized'
         ? t('states.expired')
         : failure === 'rateLimited'
-          ? t('report.limited')
+          ? t('report.limited', { max: REPORTS_PER_DAY, contactEmail })
           : failure === 'notFound'
             ? t('report.gone')
             : t(`errors.${failure}`)

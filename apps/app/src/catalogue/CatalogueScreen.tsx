@@ -1371,7 +1371,11 @@ function TagSample({ l }: { l: Labels }) {
 }
 
 function Choicesample({ l }: { l: Labels }) {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<'idea' | 'building' | 'testable'>('testable')
+  // Sans choix coché au départ : une question à laquelle il faut répondre soi-même, comme le motif
+  // d'un retrait dans la modération (tranche 7a), avec ses vrais textes.
+  const [ground, setGround] = useState<'illegal' | 'rules' | null>(null)
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [notify, setNotify] = useState(true)
   return (
@@ -1385,6 +1389,15 @@ function Choicesample({ l }: { l: Labels }) {
         ]}
         value={status}
         onChange={setStatus}
+      />
+      <Choices
+        label={t('moderation.groundLabel')}
+        options={[
+          { value: 'illegal', label: t('moderation.grounds.illegal') },
+          { value: 'rules', label: t('moderation.grounds.rules') },
+        ]}
+        value={ground}
+        onChange={setGround}
       />
       <Segmented
         label={l.visibilityField}
