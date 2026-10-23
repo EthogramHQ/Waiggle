@@ -7,7 +7,7 @@ import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { leaEmailPreferences } from '../testing/email'
 import { leaMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
-import { mockSession, renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import * as focusModule from '../ui/focus'
 import { ProfileScreen } from './ProfileScreen'
 
@@ -161,6 +161,28 @@ describe('ProfileScreen', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Revenir' }))
 
     expect(mockReplace).toHaveBeenCalledWith('/account')
+  })
+
+  // Relecture de design du 22/10/2026 : sur grand écran, la barre du haut lit aussi le profil
+  // (pour l'avatar). Une panne de GET /v1/me faisait boucler la page entre « Chargement… » et
+  // l'erreur, avec une requête de plus à chaque tour, sans jamais montrer l'erreur.
+  it('shows the error on a large screen too, without asking for the profile again', async () => {
+    const restoreWindow = setDesktopWindow()
+    try {
+      // La première demande échoue ; une deuxième, s'il y en avait une, resterait sans réponse
+      // (sinon la boucle tournerait sans fin et bloquerait le test) : la page resterait alors
+      // sur « Chargement… ».
+      jest
+        .mocked(getMe)
+        .mockRejectedValueOnce(new Error('panne'))
+        .mockReturnValue(new Promise(() => {}))
+      await renderWithProviders(<ProfileScreen />)
+
+      expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeTruthy()
+      expect(getMe).toHaveBeenCalledTimes(1)
+    } finally {
+      restoreWindow()
+    }
   })
 
   it('asks a visitor to sign in', async () => {
