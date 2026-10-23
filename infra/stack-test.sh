@@ -219,8 +219,8 @@ expect "connexion depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code
   -d '{"email":"a@example.com","password":"stack-test-password"}')" 403
 # Le contrôle général de Better Auth sur ses POST ne joue qu'avec un cookie : un faux suffit.
 expect "déconnexion depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X POST \
-  "https://$API_HOST/api/auth/sign-out" -H "Origin: https://$OLD_HOST" \
-  -H 'Cookie: __Secure-ruche.session_token=faux')" 403
+  "https://$API_HOST/api/auth/sign-out" -H "Origin: https://$OLD_HOST" -H 'Content-Type: application/json' \
+  -H 'Cookie: __Secure-ruche.session_token=faux' -d '{}')" 403
 preflight=$(headers_of -X OPTIONS "https://$API_HOST/v1/me" -H "Origin: https://$OLD_HOST" \
   -H 'Access-Control-Request-Method: PATCH')
 if grep -q '^access-control-allow-origin:' <<<"$preflight"; then
