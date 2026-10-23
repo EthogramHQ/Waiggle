@@ -2,6 +2,7 @@
 // components.test.tsx : ReportCard est écrit par un autre agent que CommentCard et NoteList ; tant
 // qu'il manque, seul ce fichier échoue, et les autres tests des composants restent lisibles.
 import { fireEvent, screen } from '@testing-library/react-native'
+import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { ReportCard } from './ReportCard'
 
@@ -96,6 +97,103 @@ describe('ReportCard', () => {
 
     expect(screen.getByText('Te concerne : un autre administrateur doit décider.')).toBeTruthy()
     expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('has no « Voir » link when it is given nowhere to lead (a removed project)', async () => {
+    await renderWithProviders(
+      <ReportCard
+        {...card}
+        viewLabel={undefined}
+        actions={[{ label: 'Rétablir', onPress: jest.fn() }]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Rétablir' })).toBeTruthy() // témoin
+    expect(screen.queryAllByRole('link')).toHaveLength(0)
+  })
+
+  it('replaces its buttons with the outcome once decided, and keeps the content in place', async () => {
+    await renderWithProviders(
+      <ReportCard
+        {...card}
+        onView={jest.fn()}
+        decided={{ message: 'Signalement classé sans suite.', ok: true }}
+        actions={[{ label: 'Classer sans suite', onPress: jest.fn() }]}
+      />,
+    )
+
+    expect(screen.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Classer sans suite' })).toBeNull()
+    expect(screen.getByText(card.snapshot)).toBeTruthy()
+  })
+
+  it('says a failure above its buttons, which stay to try again', async () => {
+    await renderWithProviders(
+      <ReportCard
+        {...card}
+        onView={jest.fn()}
+        error="Une erreur inattendue est survenue."
+        actions={[{ label: 'Classer sans suite', onPress: jest.fn() }]}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Classer sans suite' })).toBeTruthy()
+  })
+
+  describe('says which card each button acts on', () => {
+    const description = 'Commentaire : Envoie-moi le code de ta carte…'
+    const actions = [
+      { label: 'Retirer', onPress: jest.fn(), tone: 'danger' as const },
+      { label: 'Classer sans suite', onPress: jest.fn() },
+    ]
+
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    it('as a hint read after the name, on a phone', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} onView={jest.fn()} description={description} actions={actions} />,
+      )
+
+      const named = [
+        screen.getByRole('link', { name: 'Voir' }),
+        screen.getByRole('button', { name: 'Retirer' }),
+        screen.getByRole('button', { name: 'Classer sans suite' }),
+      ]
+      expect(named.map((element) => element.props.accessibilityHint)).toEqual([
+        description,
+        description,
+        description,
+      ])
+    })
+
+    it('through aria-describedby and a hidden text, on the web', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      await renderWithProviders(
+        <ReportCard {...card} onView={jest.fn()} description={description} actions={actions} />,
+      )
+
+      const named = [
+        screen.getByRole('link', { name: 'Voir' }),
+        screen.getByRole('button', { name: 'Retirer' }),
+        screen.getByRole('button', { name: 'Classer sans suite' }),
+      ]
+      const ids = named.map((element) => element.props['aria-describedby'])
+      expect(ids[0]).toEqual(expect.any(String))
+      expect(new Set(ids).size).toBe(1)
+      // Le texte désigné porte la description : le lecteur d'écran la lit après le nom.
+      // Caché à la vue (display: none), le navigateur le lit quand même quand on le désigne.
+      const described = screen.getByText(description, { includeHiddenElements: true })
+      expect(described.props.nativeID).toBe(ids[0])
+      // Sur le web, pas d'indice en plus : il serait lu deux fois.
+      expect(named.map((element) => element.props.accessibilityHint)).toEqual([
+        undefined,
+        undefined,
+        undefined,
+      ])
+    })
   })
 
   it('shows no precision at all when there is none', async () => {

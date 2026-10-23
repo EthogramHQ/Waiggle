@@ -2,7 +2,8 @@
 // (« Créer un compte », « Changer d'adresse »). Pour l'action principale : un Button.
 import { layout } from '@ruche/brand'
 import type { Ref } from 'react'
-import { Pressable, type View } from 'react-native'
+import { Platform, Pressable, type View } from 'react-native'
+import { describedBy } from './aria'
 import { enterActivates } from './keyboard'
 import { Text, type Tone } from './Text'
 
@@ -17,6 +18,13 @@ type Props = {
    * lecteurs d'écran l'annoncent comme désactivé (aria-disabled).
    */
   disabled?: boolean
+  /**
+   * Le texte (caché) qui précise où mène le lien, quand plusieurs liens portent le même nom
+   * (« Voir » sur chaque carte de la modération) : relié par aria-describedby sur le web.
+   */
+  describedById?: string | undefined
+  /** La même précision sur téléphone, où aria-describedby n'existe pas : un indice lu après le nom. */
+  hint?: string | undefined
   /** Pour y poser le focus du clavier quand l'élément qui l'avait disparaît (voir focus.ts). */
   ref?: Ref<View>
 }
@@ -27,6 +35,8 @@ export function TextLink({
   tone = 'default',
   role = 'link',
   disabled = false,
+  describedById,
+  hint,
   ref,
 }: Props) {
   return (
@@ -34,6 +44,9 @@ export function TextLink({
       ref={ref}
       accessibilityRole={role}
       accessibilityLabel={label}
+      {...describedBy(describedById)}
+      // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle (comme IconButton).
+      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
       aria-disabled={disabled}
       disabled={disabled}
       // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
