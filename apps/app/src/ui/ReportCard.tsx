@@ -8,11 +8,22 @@
 // lien de la carte est « Voir », construit par l'écran à partir de la sorte et de l'identifiant.
 // Jamais qui a signalé : la carte n'a aucune place pour un nom.
 // Sans action (un contenu qui concerne l'administrateur lui-même), `status` dit pourquoi.
-import { borders, radii, space } from '@ruche/brand'
-import type { Ref } from 'react'
+//
+// Chaque carte a ses « Voir », « Retirer », « Classer sans suite » : le lecteur d'écran dit de
+// quelle carte il s'agit grâce à une courte description (la sorte et le début du texte), reliée à
+// chaque bouton par aria-describedby sur le web et lue comme indice sur téléphone (`description`).
+//
+// Une fois décidée (`decided`), la carte reste à sa place : ses boutons laissent la place au
+// résultat (« Signalement classé sans suite. »), sur une ligne au moins aussi haute. Rien ne
+// remonte ainsi sous le doigt : retirer la carte faisait arriver le « Classer » de la suivante à
+// l'endroit exact qu'on venait de toucher (relecture de la tranche 7a).
+import { borders, layout, radii, space } from '@ruche/brand'
+import { type Ref, useId } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
+import { ActionDescription } from './CommentAction'
 import { Icon } from './Icon'
+import { Notice } from './Notice'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -47,11 +58,28 @@ type Props = {
   when: string
   /** Une phrase sur l'état de la cible (« Te concerne… », « Déjà retiré »). */
   status?: string
-  /** Le nom du lien vers le contenu (« Voir »), et où il mène. */
-  viewLabel: string
-  onView: () => void
+  /**
+   * Le nom du lien vers le contenu (« Voir », « Voir le projet »), et où il mène. Sans eux, pas de
+   * lien : un projet retiré n'a plus de page à montrer.
+   */
+  viewLabel?: string | undefined
+  onView?: (() => void) | undefined
   /** Les décisions possibles ; aucune si la liste est vide ou absente. */
   actions?: readonly ReportCardAction[]
+  /**
+   * Ce que lit le lecteur d'écran après le nom de chaque bouton et du lien (« Commentaire : Envoie-
+   * moi le code… ») : de quelle carte il s'agit, quand toutes ont les mêmes boutons.
+   */
+  description?: string | undefined
+  /**
+   * Le résultat de la décision prise sur cette carte : il remplace les boutons. `ok` faux : rien
+   * n'a été fait ici (une décision prise entre-temps par quelqu'un d'autre), en simple information.
+   */
+  decided?: { message: string; ok: boolean } | undefined
+  /** Pour poser le focus du clavier sur ce résultat (le bouton touché a disparu). */
+  decidedRef?: Ref<View> | undefined
+  /** Le refus d'une décision (une panne) : au-dessus des boutons, qui restent pour réessayer. */
+  error?: string | undefined
 }
 
 export function ReportCard({
@@ -66,8 +94,18 @@ export function ReportCard({
   viewLabel,
   onView,
   actions = [],
+  description,
+  decided,
+  decidedRef,
+  error,
 }: Props) {
   const { colors, shadows } = useTheme()
+  // L'identifiant du texte caché qui décrit la carte (aria-describedby), stable entre le pré-rendu
+  // web et le navigateur (useId).
+  const descriptionId = useId()
+  const describes = description
+    ? { describedById: descriptionId, hint: description }
+    : { describedById: undefined, hint: undefined }
   return (
     <View
       style={{
@@ -180,7 +218,9 @@ export function ReportCard({
         <Text variant="caption" tone="muted">
           {when}
         </Text>
-        <TextLink label={viewLabel} onPress={onView} />
+        {viewLabel && onView ? (
+          <TextLink label={viewLabel} onPress={onView} {...describes} />
+        ) : null}
       </View>
 
       {status ? (
@@ -194,9 +234,23 @@ export function ReportCard({
         </View>
       ) : null}
 
-      {/* Les décisions. Elles passent à la ligne quand la place manque (texte agrandi) ; l'écart
-          garde chaque bouton à distance de son voisin. */}
-      {actions.length > 0 ? (
+      {/* Une panne : le message reste au-dessus des boutons jusqu'à la réponse suivante. */}
+      {error && !decided ? <Notice message={error} /> : null}
+
+      {/* Le résultat, à la place des boutons : sa ligne fait au moins leur hauteur (44 points),
+          et rien de ce qui suit ne remonte. */}
+      {decided ? (
+        <View style={{ minHeight: layout.touchTarget, justifyContent: 'center' }}>
+          <Notice
+            message={decided.message}
+            tone={decided.ok ? 'success' : 'info'}
+            polite
+            {...(decidedRef ? { ref: decidedRef } : null)}
+          />
+        </View>
+      ) : actions.length > 0 ? (
+        // Les décisions. Elles passent à la ligne quand la place manque (texte agrandi) ; l'écart
+        // garde chaque bouton à distance de son voisin.
         <View
           style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.md }}
         >
@@ -208,11 +262,13 @@ export function ReportCard({
               variant={action.tone === 'danger' ? 'danger' : 'secondary'}
               size="compact"
               loading={action.loading ?? false}
+              {...describes}
               {...(action.ref ? { ref: action.ref } : null)}
             />
           ))}
         </View>
       ) : null}
+      {description ? <ActionDescription id={descriptionId} text={description} /> : null}
     </View>
   )
 }

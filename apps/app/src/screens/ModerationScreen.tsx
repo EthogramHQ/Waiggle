@@ -5,9 +5,11 @@
 // Sur un signalement, deux décisions :
 // - « Retirer » ouvre une fenêtre qui demande le fondement (la loi, ou les règles de l'appli) puis
 //   une explication, montrée à l'auteur (règle 21 de la relecture du plan) ;
-// - « Classer sans suite » se fait en un geste. La carte suivante remonte alors à la place de celle
-//   qu'on vient de classer, sous le doigt : un second appui arrivé moins de 600 ms après (la
-//   seconde tape d'une double tape) est ignoré (charte du design, décision de la tranche 6c).
+// - « Classer sans suite » se fait en un geste.
+// Une carte décidée reste à sa place jusqu'au changement d'onglet, avec le résultat à la place de
+// ses boutons (« Signalement classé sans suite. ») : la carte suivante ne remonte pas sous le doigt
+// (relecture de la tranche 7a : une seconde tape, 700 ms après, classait un signalement non lu).
+// En plus, un appui arrivé moins de 600 ms après une décision est ignoré (charte du design, 6c).
 // Un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil) : la carte le
 // dit, sans bouton (règle 11). Un profil ne se « retire » pas : seulement « Classer sans suite ».
 //
@@ -22,7 +24,7 @@ import {
   type RemovedItem,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
@@ -34,6 +36,7 @@ import { useMe } from '../profile/hooks'
 import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
+import { excerpt } from '../ui/CommentAction'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
@@ -54,10 +57,43 @@ const SETTLE_MS = 600
 
 type Tab = 'pending' | 'removed'
 
-/** Le message posé au-dessus de la liste après une décision : une confirmation ou un refus. */
-type Message = { text: string; ok: boolean }
+/** Le résultat d'une décision, posé sur sa carte : une confirmation, ou « déjà décidé ». */
+type Outcome = { message: string; ok: boolean }
 
-/** Les refus qui rendent la fenêtre « Retirer » sans objet : la file est relue, on la referme. */
+/**
+ * Une carte décidée : la liste de React Query l'a déjà ôtée, l'écran la garde à la place qu'elle
+ * avait (`index`, son rang parmi les cartes affichées), avec son résultat.
+ */
+type Decided<Item> = { key: string; index: number; item: Item; outcome: Outcome }
+
+/** Une carte affichée : un élément de la liste, et son résultat s'il a été décidé. */
+type Shown<Item> = { key: string; index: number; item: Item; outcome?: Outcome }
+
+/**
+ * Les cartes affichées : celles de la liste reçue, et les cartes décidées remises à leur rang.
+ * Une carte décidée encore présente dans la liste (la réponse n'a pas encore été appliquée) n'y
+ * figure qu'une fois, avec son résultat.
+ */
+const keepDecided = <Item extends { target: ModerationQueueItem['target'] }>(
+  items: readonly Item[],
+  decided: readonly Decided<Item>[],
+): Shown<Item>[] => {
+  const done = new Set(decided.map((entry) => entry.key))
+  const shown: Omit<Shown<Item>, 'index'>[] = items
+    .map((item) => ({ key: targetKey(item.target), item }))
+    .filter((entry) => !done.has(entry.key))
+  // Du plus petit rang au plus grand : chaque carte retrouve sa place parmi celles déjà posées.
+  for (const entry of [...decided].sort((a, b) => a.index - b.index)) {
+    shown.splice(Math.min(entry.index, shown.length), 0, {
+      key: entry.key,
+      item: entry.item,
+      outcome: entry.outcome,
+    })
+  }
+  return shown.map((entry, index) => ({ ...entry, index }))
+}
+
+/** Les refus qui rendent une décision sans objet : la file est relue, la carte le dit. */
 const settledElsewhere: ReadonlySet<string> = new Set(['alreadyDecided', 'notFound'])
 
 export function ModerationScreen() {
@@ -86,17 +122,44 @@ function AdminModeration() {
   const removed = useRemovedItems(tab === 'removed')
   const { decide } = useDecide()
 
-  const [message, setMessage] = useState<Message | null>(null)
-  const messageRef = useRef<Focusable>(null)
-  // Après une décision, le focus du clavier va au message : la carte touchée a disparu, et le
-  // bouton qui remonte à sa place n'est pas la suite logique (piège de la désinscription, 6c).
-  const focusMessage = useRef(false)
+  // Les cartes décidées de chaque onglet, gardées à leur place jusqu'au changement d'onglet.
+  const [decidedQueue, setDecidedQueue] = useState<Decided<ModerationQueueItem>[]>([])
+  const [decidedRemoved, setDecidedRemoved] = useState<Decided<RemovedItem>[]>([])
+  // Les pannes, carte par carte : le message reste jusqu'à la réponse suivante (charte du design :
+  // il ne disparaît pas pendant l'envoi, sinon les boutons sautent sous le doigt).
+  const [failures, setFailures] = useState<Readonly<Record<string, string>>>({})
+  // La dernière carte décidée. Le focus du clavier va à son résultat : le bouton touché a laissé
+  // la place à ce résultat, et le bouton suivant n'est pas la suite logique (désinscription, 6c).
+  const [lastDecided, setLastDecided] = useState<string | null>(null)
+  const outcomeRef = useRef<Focusable>(null)
+  const focusOutcome = useRef(false)
   useEffect(() => {
-    if (message && focusMessage.current) {
-      focusMessage.current = false
-      focusWithoutScroll(messageRef.current)
+    if (lastDecided && focusOutcome.current) {
+      focusOutcome.current = false
+      focusWithoutScroll(outcomeRef.current)
     }
-  }, [message])
+  }, [lastDecided])
+
+  /** Changer d'onglet est le geste qui range les cartes décidées : la liste repart de zéro. */
+  const changeTab = (next: Tab) => {
+    setTab(next)
+    setDecidedQueue([])
+    setDecidedRemoved([])
+    setFailures({})
+    setLastDecided(null)
+  }
+
+  /** Garde la carte décidée à sa place, avec son résultat, et oublie sa dernière panne. */
+  const settle = <Item,>(
+    record: Dispatch<SetStateAction<Decided<Item>[]>>,
+    entry: Decided<Item>,
+  ) => {
+    record((previous) => [...previous.filter(({ key }) => key !== entry.key), entry])
+    setFailures((previous) =>
+      Object.fromEntries(Object.entries(previous).filter(([key]) => key !== entry.key)),
+    )
+    setLastDecided(entry.key)
+  }
 
   // L'heure où la liste a bougé pour la dernière fois (une décision arrivée), et la décision en
   // cours. Des refs (useRef) : lues au moment de l'appui, sans attendre que l'écran se redessine.
@@ -105,8 +168,13 @@ function AdminModeration() {
   // La cible en cours d'envoi, pour montrer la roue sur son bouton.
   const [pending, setPending] = useState<string | null>(null)
 
-  // La fenêtre « Retirer » : la cible, le fondement choisi, l'explication, et les erreurs.
-  const [removing, setRemoving] = useState<ModerationQueueItem | null>(null)
+  // La fenêtre « Retirer » : ouverte ou non, la carte visée (gardée pendant le fondu de fermeture,
+  // pour que le texte rappelé ne disparaisse pas avant la fenêtre), le fondement choisi,
+  // l'explication, et les erreurs.
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [removing, setRemoving] = useState<{ item: ModerationQueueItem; index: number } | null>(
+    null,
+  )
   const [ground, setGround] = useState<RemovalGround | null>(null)
   const [explanation, setExplanation] = useState('')
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -124,38 +192,54 @@ function AdminModeration() {
     action()
   }
 
-  /** Envoie une décision en un geste (classer, rétablir), puis l'annonce. */
-  const run = async (input: ModerationDecisionInput, done: string) => {
+  /**
+   * Envoie une décision en un geste (classer, rétablir). Réussie, ou rendue sans objet par une
+   * décision prise ailleurs, elle se pose sur sa carte (`onSettled`) ; une panne s'affiche au-dessus
+   * des boutons, qui restent pour réessayer.
+   */
+  const run = async (
+    input: ModerationDecisionInput,
+    done: string,
+    onSettled: (outcome: Outcome) => void,
+  ) => {
+    const key = targetKey(input.target)
     deciding.current = true
-    setPending(targetKey(input.target))
+    setPending(key)
     const result = await decide(input)
     deciding.current = false
     setPending(null)
     settledAt.current = Date.now()
-    focusMessage.current = true
-    setMessage(
-      result.ok ? { text: done, ok: true } : { text: t(`errors.${result.error}`), ok: false },
-    )
+    if (result.ok || settledElsewhere.has(result.error)) {
+      focusOutcome.current = true
+      onSettled(
+        result.ok
+          ? { message: done, ok: true }
+          : { message: t(`errors.${result.error}`), ok: false },
+      )
+    } else {
+      setFailures((previous) => ({ ...previous, [key]: t(`errors.${result.error}`) }))
+    }
   }
 
-  const openRemove = (item: ModerationQueueItem) => {
+  const openRemove = (item: ModerationQueueItem, index: number) => {
     setGround(null)
     setExplanation('')
     setFieldError(null)
     setDialogError(null)
-    setRemoving(item)
+    setRemoving({ item, index })
+    setRemoveOpen(true)
   }
 
   const closeRemove = () => {
     // Pendant l'envoi, la fenêtre reste ouverte (charte : le focus prévu après se perdrait).
-    if (!submitting) setRemoving(null)
+    if (!submitting) setRemoveOpen(false)
   }
 
   const confirmRemove = async () => {
-    const target = removing?.target
+    const target = removing?.item.target
     const text = explanation.trim()
     // Le bouton est inactif tant qu'il manque le fondement ou l'explication ; on vérifie quand même.
-    if (!target || !ground || text === '' || deciding.current) return
+    if (!removing || !target || !ground || text === '' || deciding.current) return
     if (!RemovalExplanation.safeParse(text).success) {
       setFieldError(t('profile.errors.invalidCharacters'))
       return
@@ -169,12 +253,15 @@ function AdminModeration() {
     if (result.ok || settledElsewhere.has(result.error)) {
       settledAt.current = Date.now()
       focusAfterClose.current = true
-      setMessage(
-        result.ok
-          ? { text: t('moderation.removedDone'), ok: true }
-          : { text: t(`errors.${result.error}`), ok: false },
-      )
-      setRemoving(null)
+      settle(setDecidedQueue, {
+        key: targetKey(target),
+        index: removing.index,
+        item: removing.item,
+        outcome: result.ok
+          ? { message: t('moderation.removedDone'), ok: true }
+          : { message: t(`errors.${result.error}`), ok: false },
+      })
+      setRemoveOpen(false)
     } else {
       // Une panne (réseau, serveur) : la fenêtre reste, avec ce qui a été tapé, pour réessayer.
       setDialogError(t(`errors.${result.error}`))
@@ -194,8 +281,18 @@ function AdminModeration() {
     setRetrying(false)
   }
 
-  const queueCard = (item: ModerationQueueItem) => {
-    const key = targetKey(item.target)
+  /** Ce qui est commun à toutes les cartes : la description lue, le résultat, la panne. */
+  const cardState = (key: string, kind: string, text: string, outcome: Outcome | undefined) => ({
+    // « Commentaire : Envoie-moi le code… », lu après « Retirer », « Voir »… : de quelle carte il
+    // s'agit, quand toutes ont les mêmes boutons.
+    description: t('moderation.describe', { kind, excerpt: excerpt(text) }),
+    decided: outcome,
+    decidedRef: key === lastDecided ? outcomeRef : undefined,
+    error: failures[key],
+  })
+
+  const queueCard = ({ key, index, item, outcome }: Shown<ModerationQueueItem>) => {
+    const kind = t(`moderation.kinds.${item.target.kind}`)
     const actions: ReportCardAction[] = []
     if (!item.concernsMe) {
       // Un profil ne se retire pas (l'API le refuse) ; un contenu déjà retiré ou disparu non plus.
@@ -203,14 +300,19 @@ function AdminModeration() {
         actions.push({
           label: t('moderation.remove'),
           tone: 'danger',
-          onPress: guarded(() => openRemove(item)),
+          onPress: guarded(() => openRemove(item, index)),
         })
       }
       actions.push({
         label: t('moderation.dismiss'),
         loading: pending === key,
         onPress: guarded(
-          () => void run({ action: 'dismiss', target: item.target }, t('moderation.dismissed')),
+          () =>
+            void run(
+              { action: 'dismiss', target: item.target },
+              t('moderation.dismissed'),
+              (done) => settle(setDecidedQueue, { key, index, item, outcome: done }),
+            ),
         ),
       })
     }
@@ -222,7 +324,8 @@ function AdminModeration() {
     return (
       <ReportCard
         key={key}
-        kind={t(`moderation.kinds.${item.target.kind}`)}
+        {...cardState(key, kind, item.snapshot, outcome)}
+        kind={kind}
         count={t('moderation.count', { count: item.count })}
         snapshot={item.snapshot}
         snapshotLabel={t('moderation.snapshot')}
@@ -242,19 +345,26 @@ function AdminModeration() {
     )
   }
 
-  const removedCard = (item: RemovedItem) => {
-    const key = targetKey(item.target)
+  const removedCard = ({ key, index, item, outcome }: Shown<RemovedItem>) => {
+    const kind = t(`moderation.kinds.${item.target.kind}`)
     return (
       <ReportCard
         key={key}
-        kind={t(`moderation.kinds.${item.target.kind}`)}
+        {...cardState(key, kind, item.text, outcome)}
+        kind={kind}
         snapshot={item.text}
         reasons={[t(`moderation.grounds.${item.ground}`)]}
         details={[item.explanation]}
         when={t('moderation.removedOn', { date: shortDate(item.removedAt, i18n.language) })}
         {...(item.concernsMe ? { status: t('moderation.concernsMe') } : null)}
-        viewLabel={t('moderation.view')}
-        onView={() => router.push(viewHref(item.target, item.projectId))}
+        // Un projet retiré n'a plus de page, même pour l'administrateur : pas de lien. Une note ou
+        // un commentaire retiré : on va voir le projet qui le portait (le contenu n'y est plus).
+        {...(item.target.kind === 'project'
+          ? null
+          : {
+              viewLabel: t('moderation.viewProject'),
+              onView: () => router.push(viewHref(item.target, item.projectId)),
+            })}
         actions={
           item.concernsMe
             ? []
@@ -267,6 +377,7 @@ function AdminModeration() {
                       void run(
                         { action: 'restore', target: item.target },
                         t('moderation.restoredDone'),
+                        (done) => settle(setDecidedRemoved, { key, index, item, outcome: done }),
                       ),
                   ),
                 },
@@ -278,30 +389,22 @@ function AdminModeration() {
 
   const queueItems = queue.data?.pages.flatMap((page) => page.items) ?? []
   const removedItems = removed.data?.pages.flatMap((page) => page.items) ?? []
-  const count = tab === 'pending' ? queueItems.length : removedItems.length
+  const shownQueue = keepDecided(queueItems, decidedQueue)
+  const shownRemoved = keepDecided(removedItems, decidedRemoved)
+  const count = tab === 'pending' ? shownQueue.length : shownRemoved.length
   const showsError = (!list.data && list.isError) || (retrying && !list.data)
 
   return (
     <Screen header={<TopNav />} onBack={back} title={t('moderation.title')}>
       <Segmented<Tab>
-        label={t('moderation.title')}
+        label={t('moderation.list')}
         options={[
           { value: 'pending', label: t('moderation.pending') },
           { value: 'removed', label: t('moderation.removed') },
         ]}
         value={tab}
-        onChange={setTab}
+        onChange={changeTab}
       />
-      {/* Le dernier message reste jusqu'à la décision suivante : il ne disparaît pas pendant
-          l'envoi, pour que les cartes en dessous ne remontent pas sous le doigt. */}
-      {message ? (
-        <Notice
-          ref={messageRef}
-          message={message.text}
-          tone={message.ok ? 'success' : 'error'}
-          polite={message.ok}
-        />
-      ) : null}
 
       {showsError ? (
         <StateMessage
@@ -321,7 +424,7 @@ function AdminModeration() {
         <Stack gap="lg">
           {/* Une liste annoncée : « liste, 4 éléments », et on saute d'une carte à l'autre. */}
           <Stack gap="md" accessibilityRole="list">
-            {tab === 'pending' ? queueItems.map(queueCard) : removedItems.map(removedCard)}
+            {tab === 'pending' ? shownQueue.map(queueCard) : shownRemoved.map(removedCard)}
           </Stack>
           <FeedEnd
             state={
@@ -346,15 +449,25 @@ function AdminModeration() {
       )}
 
       <Dialog
-        visible={removing !== null}
+        visible={removeOpen}
         title={t('moderation.removeTitle')}
+        // Le contenu visé, rappelé sous le titre : la fenêtre couvre la carte qu'on a touchée.
+        quote={
+          removing
+            ? {
+                label: t(`moderation.kinds.${removing.item.target.kind}`),
+                text: removing.item.snapshot,
+              }
+            : undefined
+        }
         message={t('moderation.removeMessage')}
         onDismiss={closeRemove}
         onClosed={() => {
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
-          requestAnimationFrame(() => focusWithoutScroll(messageRef.current))
+          // Le focus va au résultat posé sur la carte, à la place de ses boutons.
+          requestAnimationFrame(() => focusWithoutScroll(outcomeRef.current))
         }}
       >
         <Choices<RemovalGround>

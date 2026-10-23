@@ -143,6 +143,20 @@ describe('who sees the moderation', () => {
     expect(screen.getByRole('radio', { name: 'En attente', checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Retirés', checked: false })).toBeTruthy()
     expect(screen.getByText(scamCommentItem.snapshot)).toBeTruthy()
+    // Le groupe d'onglets porte un nom à lui, pas celui de la page (relecture de 7a).
+    // (Le groupe n'est pas « accessible » : il se cherche par son nom, comme dans components.test.)
+    expect(screen.getByLabelText(fr.t('moderation.list')).props.accessibilityRole).toBe(
+      'radiogroup',
+    )
+  })
+
+  it('recalls the content to remove in the « Retirer » window', async () => {
+    await openModeration()
+
+    await fireEvent.press(cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Retirer' }))
+
+    // Le texte paraît deux fois : sur la carte, et rappelé dans la fenêtre.
+    expect(screen.getAllByText(scamCommentItem.snapshot)).toHaveLength(2)
   })
 
   it('says « not found » to a member who is not an administrator, and shows nothing of the queue', async () => {
@@ -196,8 +210,11 @@ describe('the pending reports', () => {
     const card = cardOf(scamCommentItem.snapshot)
     expect(card.getByText('Commentaire')).toBeTruthy()
     expect(card.getByText(containing(fr.t('moderation.count', { count: 3 })))).toBeTruthy()
-    expect(card.getByText(containing('Arnaque ou spam ×2'))).toBeTruthy()
-    expect(card.getByText(containing('Harcèlement ou haine ×1'))).toBeTruthy()
+    // Le format du motif et de son nombre vient des textes (« Arnaque ou spam : 2 » depuis 8e26421).
+    const reasonCount = (reason: string, count: number) =>
+      containing(fr.t('moderation.reasonCount', { reason, count }))
+    expect(card.getByText(reasonCount('Arnaque ou spam', 2))).toBeTruthy()
+    expect(card.getByText(reasonCount('Harcèlement ou haine', 1))).toBeTruthy()
     expect(card.getByText('Il a écrit la même chose sous trois projets.')).toBeTruthy()
     expect(card.getByText(/Premier signalement le /)).toBeTruthy()
     expect(card.getByText(containing(fr.t('moderation.snapshot')))).toBeTruthy()
@@ -388,6 +405,24 @@ describe('dismissing a report', () => {
     expect(mockDecide).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the decided card in its place, the outcome instead of its buttons', async () => {
+    // Relecture de 7a : la carte retirée de la liste faisait remonter le « Classer » suivant sous
+    // le doigt. La file mise à jour n'a plus le commentaire de Sam ; l'écran le garde, premier.
+    await dismissFirst()
+
+    const shown = screen
+      .getAllByText(
+        new RegExp(
+          `^(${containing(scamCommentItem.snapshot).source}|${containing(fakeReviewsItem.snapshot).source})$`,
+        ),
+      )
+      .map((node) => [node.props.children].flat().join(''))
+    expect(shown).toEqual([scamCommentItem.snapshot, fakeReviewsItem.snapshot])
+    const decidedCard = cardOf(scamCommentItem.snapshot)
+    expect(decidedCard.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
+    expect(decidedCard.queryByRole('button')).toBeNull()
+  })
+
   it('dismisses the next one touched once the first has had time to be read', async () => {
     jest.useFakeTimers()
     const next = await dismissFirst()
@@ -432,6 +467,20 @@ describe('the removed contents', () => {
       target: removedCommentItem.target,
     })
     expect(await screen.findByText('Contenu rétabli.')).toBeTruthy()
+  })
+
+  it('leads to the project of a removed comment, and nowhere for a removed project', async () => {
+    // Relecture de 7a : un projet retiré n'a plus de page, même pour l'administrateur.
+    await openRemoved()
+
+    await fireEvent.press(
+      cardOf(removedCommentItem.text).getByRole('link', { name: 'Voir le projet' }),
+    )
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual([
+      `/projects/${meteoProjectId}`,
+    ])
+    expect(screen.getAllByRole('link', { name: /^Voir/ })).toHaveLength(1)
   })
 
   it('says when nothing has been removed', async () => {
