@@ -813,7 +813,8 @@ Règles détaillées :
 - **Le texte signalé** est copié dans le signalement au moment de l'envoi, pour que l'auteur ne
   puisse pas le changer avant la décision.
 - **Suppression du compte** : les signalements faits par la personne partie restent, sans son
-  nom ; ceux qui visent ses contenus sont classés.
+  nom, jusqu'à un an après leur traitement ; ceux qui visent ses contenus encore ouverts deviennent
+  « sans objet » (gardés 30 jours), et ceux qui ont mené à un retrait restent un an.
 - **Export des données** : les signalements que le membre a faits (contenu visé, motif, date,
   décision) ; jamais ceux qui le visent.
 - **Un administrateur ne décide pas de ce qui le concerne** : un signalement de son propre contenu

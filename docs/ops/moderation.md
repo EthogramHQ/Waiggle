@@ -80,8 +80,10 @@ et au pied de chaque e-mail) reçoit aussi des signalements, de personnes qui n'
 2. Si le contenu est sur Waiggle : l'administrateur le **signale lui-même** depuis l'appli (motif le
    plus proche, la demande résumée en précision, sans données personnelles inutiles), puis le
    **retire ou classe** depuis la file. La trace est ainsi la même que pour un signalement d'un
-   membre. L'auteur lira « pas à la suite d'un signalement » : c'est exact, la demande est venue
-   d'ailleurs.
+   membre, et l'auteur lit « Après un signalement, une personne de la modération a décidé de
+   retirer ce contenu. » : une demande reçue par e-mail est un signalement. L'explication commence
+   par « À la suite d'un signalement reçu par e-mail, … » (l'auteur doit savoir d'où vient la
+   décision, article 17 du DSA).
 3. **Répondre** avec la décision et le recours : « Vous pouvez contester cette décision en
    répondant à cet e-mail. »
 
@@ -108,10 +110,21 @@ Un profil ne se « retire » pas dans l'appli (seul « classer » est possible).
 profil, une bio ou un nom illicite :
 
 1. une sauvegarde (`infra/backup.sh avant-moderation`) ;
-2. une ligne de trace dans `moderation_decision` (sorte `member`, action `remove`, fondement,
-   explication, `admin_id`), puis la correction en base (`profile.avatar_key` à null, ou la bio
-   vidée), dans la même transaction ;
-3. un e-mail au membre pour l'en informer, avec le recours.
+2. dans **une seule transaction** :
+   - une ligne de trace dans `moderation_decision` (sorte `member`, `target_id` = l'id du membre,
+     action `remove`, fondement, explication, `admin_id`, `created_at` en UTC) ;
+   - la correction : `profile.avatar_key` à null, ou `profile.bio` vidée ; pour un nom, le
+     remplacer dans `user.name` par un nom neutre (« Membre ») ; pour un pseudo, ne rien écrire à
+     la main : demander au membre d'en changer, et classer en attendant ;
+   - **clore les signalements ouverts du profil**, comme le fait l'appli (sinon ils restent dans la
+     file et la personne qui a signalé n'est jamais prévenue, article 16 du DSA) :
+     `update content_report set status = 'removed', decided_at = <date UTC>, decision_id = <id de
+     la décision> where target_kind = 'member' and target_id = <id du membre> and status = 'open'`.
+     La notification « ton signalement a été traité » se calcule à partir de ces lignes ;
+3. un e-mail au membre pour l'en informer, avec le fondement, l'explication et le recours.
+
+Cette décision n'apparaît ni dans l'onglet « Retirés » ni dans l'export du membre : à reprendre
+avec le script dédié (liste de conformité).
 
 Un script dédié reste à écrire (à reprendre) : d'ici là, tester la requête sur une copie de la
 sauvegarde (`serveur.md`, « Sauvegardes »), jamais directement.
@@ -151,8 +164,10 @@ La purge de nuit (`apps/api/src/reports/retention.ts`) applique ces durées :
 
 | Donnée | Gardée |
 | --- | --- |
+| Signalement ouvert | jusqu'à la décision |
 | Signalement classé ou suivi d'un retrait | un an après la décision |
 | Signalement « sans objet » (cible disparue, compte de l'auteur supprimé) | 30 jours |
 | Décision | un an après la dernière décision sur la même cible, et tant que le contenu reste retiré |
 | Signalements faits par un compte supprimé | gardés, sans son nom, jusqu'à leur terme |
 | Rôle d'administrateur révoqué | gardé (historique), effacé avec le compte |
+| Date de la dernière alerte d'un administrateur (`admin_member.alerted_at`) | tant que le rôle existe |
