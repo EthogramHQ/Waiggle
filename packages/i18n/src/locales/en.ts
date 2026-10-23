@@ -105,6 +105,7 @@ export const en: Translation = {
       night: 'Night',
       hint: 'On this device only. “Automatic” follows your device setting.',
     },
+    emails: { title: 'Emails', row: 'Choose which emails you get' },
     data: { title: 'My data' },
     export: {
       button: 'Download my data',
@@ -666,6 +667,7 @@ export const en: Translation = {
     bellNew_other: 'Notifications, {{count}} new',
     bellNewMany: 'Notifications, more than {{max}} new',
     new: 'New',
+    emptyTitle: 'No notifications yet',
     empty:
       'Nothing yet. When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
     emptyAction: 'Publish a project',
