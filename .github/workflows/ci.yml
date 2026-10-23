@@ -192,6 +192,11 @@ jobs:
           app=$(read_value APP_DOMAIN); api=$(read_value API_DOMAIN); prefix=$(read_value IMAGE_PREFIX)
           [[ $app =~ ^[a-z0-9.-]+$ ]] || { echo "APP_DOMAIN invalide"; exit 1; }
           [[ $api =~ ^[a-z0-9.-]+$ ]] || { echo "API_DOMAIN invalide"; exit 1; }
+          # Les anciens domaines ne servent pas à construire, mais le serveur lit ce fichier
+          # (shell et Caddy) : même contrôle.
+          for name in LEGACY_APP_DOMAIN LEGACY_API_DOMAIN; do
+            [[ $(read_value "$name") =~ ^[a-z0-9.-]+$ ]] || { echo "$name invalide"; exit 1; }
+          done
           [[ $prefix =~ ^ghcr\.io/[a-z0-9._/-]+$ ]] || { echo "IMAGE_PREFIX invalide"; exit 1; }
           { echo "app=$app"; echo "api=$api"; echo "prefix=$prefix"; } >>"$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

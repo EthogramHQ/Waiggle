@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Image Docker « web » : la porte d'entrée du serveur. Elle contient Caddy (voir infra/Caddyfile)
 # et l'appli web déjà construite, prête à être servie. À construire depuis la racine du dépôt :
-#   docker build -f infra/web/Dockerfile --build-arg APP_DOMAIN=waiggle.io \
-#     --build-arg API_DOMAIN=api.waiggle.io .
+#   docker build -f infra/web/Dockerfile --build-arg APP_DOMAIN=waiggle.com \
+#     --build-arg API_DOMAIN=api.waiggle.com .
 # Sans ces deux réglages, l'appli est construite pour localhost (essais sur son ordinateur).
 # Deux étapes, comme pour l'API : une pour construire, une pour servir (le strict minimum).
 # Les images de départ sont désignées par leur empreinte (@sha256:…), comme pour l'API (voir

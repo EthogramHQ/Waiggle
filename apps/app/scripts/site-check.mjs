@@ -1,11 +1,11 @@
-// Visite un site déjà en ligne (la pile d'essai de la CI, ou waiggle.io) dans un vrai navigateur,
+// Visite un site déjà en ligne (la pile d'essai de la CI, ou waiggle.com) dans un vrai navigateur,
 // comme un visiteur sans compte, sur téléphone et ordinateur, de jour et de nuit. Signale :
 // - tout ce que la CSP du serveur a bloqué (un script, un style, une image ou un appel refusé :
 //   en production, l'appli serait cassée sans qu'aucun test de l'appli ne le voie) ;
 // - toute erreur dans la page, dont un écart entre la page pré-rendue et le navigateur.
 //
 // Usage : node apps/app/scripts/site-check.mjs <adresse du site>
-//   node apps/app/scripts/site-check.mjs https://waiggle.io
+//   node apps/app/scripts/site-check.mjs https://waiggle.com
 // La pile d'essai (infra/stack-test.sh) le lance sur https://localhost.
 import { chromium } from 'playwright'
 

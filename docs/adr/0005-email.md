@@ -2,6 +2,8 @@
 
 - Statut : accepté
 - Date : 2026-10-14
+- Mis à jour : le 23/10/2026, les e-mails partent de `no-reply@waiggle.com` et le marketing
+  partira de `news.waiggle.com` (ADR 0006)
 
 (Le numéro 0004 a été utilisé par une décision retirée, voir l'ADR 0003.)
 
@@ -38,7 +40,7 @@ Hostinger comme relais SMTP (ni listes, ni désabonnement, ni volume) ; tout fai
    `no-reply@waiggle.io`. Scaleway ne sait pas insérer de pixel ni réécrire les liens : la
    fonction n'existe pas. Les e-mails arrivent tels que l'API les a écrits.
 3. **Les e-mails marketing passeront par Brevo**, le jour où ils existeront, depuis un
-   sous-domaine dédié (`news.waiggle.io`), avec le consentement par contact de Brevo (formulaires,
+   sous-domaine dédié (`news.waiggle.com`, ADR 0006), avec le consentement par contact de Brevo (formulaires,
    attribut de consentement, lien de retrait). Le compte Brevo, le domaine authentifié et le réglage
    « consentement au suivi des pixels par contact » sont conservés dans ce but.
 4. **L'auto-hébergement (Postfix, puis éventuellement Listmonk) est une étape future**, pas une

@@ -147,6 +147,9 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       API_DOMAIN: ${API_DOMAIN:-api.localhost}
+      # Les anciens domaines, qui redirigent vers les nouveaux (infra/site.env).
+      LEGACY_APP_DOMAIN: ${LEGACY_APP_DOMAIN:-legacy.localhost}
+      LEGACY_API_DOMAIN: ${LEGACY_API_DOMAIN:-api.legacy.localhost}
     volumes:
       # Les certificats HTTPS : gardés d'une version à l'autre, sinon il faudrait les redemander.
       - caddy-data:/data

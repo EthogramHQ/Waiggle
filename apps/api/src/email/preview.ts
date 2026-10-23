@@ -14,8 +14,8 @@ import {
 } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
 
-const APP_URL = 'https://waiggle.io'
-const API_URL = 'https://api.waiggle.io'
+const APP_URL = 'https://waiggle.com'
+const API_URL = 'https://api.waiggle.com'
 // Une clé d'exemple : les jetons de l'aperçu ne valent rien sur le vrai serveur.
 const PREVIEW_SECRET = 'preview-only-secret-not-used-anywhere'
 const MEMBER_ID = 'Xk3vQ9pLm2RtY7wZ4aBcD8eFgH1jKlMn'

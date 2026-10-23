@@ -95,7 +95,7 @@ describe('Markdown', () => {
 
   it('never makes a link clickable unless it leads to a public website', async () => {
     await show(
-      '[ref][x] [box](https://192.168.1.1) [faux](https://waiggle.io@pirate.example.com)\n\n[x]: javascript:alert(1)',
+      '[ref][x] [box](https://192.168.1.1) [faux](https://waiggle.com@pirate.example.com)\n\n[x]: javascript:alert(1)',
     )
 
     expect(screen.queryByRole('link')).toBeNull()

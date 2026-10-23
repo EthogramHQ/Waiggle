@@ -5,7 +5,7 @@
 # temporaire. Puis on vérifie, comme le ferait un visiteur :
 #   - chaque adresse de l'appli mène à la bonne page, une adresse inconnue à « introuvable » (404) ;
 #   - les en-têtes de sécurité et de cache ;
-#   - les redirections (HTTP vers HTTPS, www) ;
+#   - les redirections (HTTP vers HTTPS, www, anciens domaines), qui ne mènent que chez nous ;
 #   - l'API derrière Caddy ;
 #   - une visite dans un vrai navigateur (apps/app/scripts/site-check.mjs) ;
 #   - une sauvegarde suivie d'une restauration rend exactement les données sauvegardées ;
@@ -48,19 +48,24 @@ expect() {
   [ "$2" = "$3" ] || die "$1 : attendu « $3 », obtenu « $2 »"
 }
 
-# Les adresses de la pile d'essai. Comme waiggle.io et api.waiggle.io, l'appli et l'API sont sur le
+# Les adresses de la pile d'essai. Comme waiggle.com et api.waiggle.com, l'appli et l'API sont sur le
 # même « site » pour un navigateur : ruche.localhost et api.ruche.localhost. Avec localhost et
 # api.localhost, ce ne serait pas le cas (localhost compte comme une fin de domaine, comme .io), et
 # le navigateur garderait le cookie de session pour l'API : l'appli connectée ne marcherait pas.
 APP_HOST=ruche.localhost
 API_HOST=api.$APP_HOST
+# Les anciens domaines, qui ne font que rediriger (comme waiggle.io et api.waiggle.io).
+OLD_HOST=old.localhost
+OLD_API_HOST=api.$OLD_HOST
 
 # curl vers notre serveur local : ces noms (et www.) mènent à cette machine, et -k accepte le
 # certificat de Caddy, signé par sa propre autorité locale.
 web() {
   curl -sS -k --max-time 20 \
     --resolve "$APP_HOST:443:127.0.0.1" --resolve "$APP_HOST:80:127.0.0.1" \
-    --resolve "$API_HOST:443:127.0.0.1" --resolve "www.$APP_HOST:443:127.0.0.1" "$@"
+    --resolve "$API_HOST:443:127.0.0.1" --resolve "www.$APP_HOST:443:127.0.0.1" \
+    --resolve "$OLD_HOST:443:127.0.0.1" --resolve "www.$OLD_HOST:443:127.0.0.1" \
+    --resolve "$OLD_API_HOST:443:127.0.0.1" "$@"
 }
 
 # Le nombre de membres dans la base.
@@ -82,7 +87,8 @@ sign_up() {
 }
 
 step "Préparation : adresses locales, secrets tirés au hasard"
-printf 'APP_DOMAIN=%s\nAPI_DOMAIN=%s\nIMAGE_PREFIX=ruche-stack-test\n' "$APP_HOST" "$API_HOST" >"$RUCHE_SITE_ENV"
+printf 'APP_DOMAIN=%s\nAPI_DOMAIN=%s\nLEGACY_APP_DOMAIN=%s\nLEGACY_API_DOMAIN=%s\nIMAGE_PREFIX=ruche-stack-test\n' \
+  "$APP_HOST" "$API_HOST" "$OLD_HOST" "$OLD_API_HOST" >"$RUCHE_SITE_ENV"
 # Le même modèle et les mêmes commandes que infra/server/bootstrap.sh sur le serveur.
 INVITE_CODE=$(openssl rand -hex 8)
 # ALLOW_CONSOLE_MAIL : les e-mails sont écrits dans les logs, pour y lire les liens de vérification.
@@ -167,6 +173,46 @@ expect "HTTP → HTTPS" "$(web -o /dev/null -w '%{http_code} %{redirect_url}' "h
   "308 https://$APP_HOST/sign-in"
 expect "www → domaine" "$(web -o /dev/null -w '%{http_code} %{redirect_url}' "https://www.$APP_HOST/sign-in?a=1")" \
   "301 https://$APP_HOST/sign-in?a=1"
+echo "ok"
+
+step "Les anciens domaines renvoient vers les nouveaux, et seulement chez nous"
+# Le code et la destination tels que Caddy les écrit : --path-as-is envoie le chemin sans le
+# simplifier, et %header{location} lit l'en-tête brut (%{redirect_url} le normaliserait).
+redirect_of() {
+  web --path-as-is -o /dev/null -w '%{http_code} %header{location}' "$@"
+}
+expect "ancien domaine" "$(redirect_of "https://$OLD_HOST/sign-in?code=a1")" "301 https://$APP_HOST/sign-in?code=a1"
+expect "ancien www" "$(redirect_of "https://www.$OLD_HOST/projects/x")" "301 https://$APP_HOST/projects/x"
+# L'ancien nom de l'API ne transmet rien à l'API : il redirige, même /health.
+expect "ancienne API" "$(redirect_of "https://$OLD_API_HOST/health")" "308 https://$API_HOST/health"
+expect "ancienne API, POST" "$(redirect_of -X POST "https://$OLD_API_HOST/v1/email/unsubscribe?token=x")" \
+  "308 https://$API_HOST/v1/email/unsubscribe?token=x"
+# En suivant la redirection, la méthode arrive intacte : un POST avec un faux jeton reçoit le refus
+# de l'API (400), là où un GET aurait été renvoyé vers la page de l'appli.
+expect "désinscription en un clic, redirigée" \
+  "$(web -L -X POST -o /dev/null -w '%{http_code}' "https://$OLD_API_HOST/v1/email/unsubscribe?token=x")" 400
+# Redirections piégées : la destination reste toujours sur notre domaine.
+for path in '//evil.example/' '/%5Cevil.example' '/\evil.example' '/..//evil.example'; do
+  location=$(web --path-as-is -o /dev/null -w '%header{location}' "https://$OLD_HOST$path")
+  [[ $location == "https://$APP_HOST/"* ]] || die "$path renvoie vers « $location »"
+done
+location=$(web -o /dev/null -w '%header{location}' -H 'Host: evil.example' "https://$OLD_HOST/x")
+[[ $location != *evil.example* ]] || die "un en-tête Host piégé change la destination : « $location »"
+# HSTS reste sur les redirections (le navigateur l'a retenu pour ces noms).
+for url in "https://$OLD_HOST/" "https://$OLD_API_HOST/health" "https://www.$APP_HOST/"; do
+  grep -qx "strict-transport-security: max-age=31536000; includesubdomains" <<<"$(headers_of "$url")" ||
+    die "$url : HSTS manquant"
+done
+# L'API refuse l'ancienne origine : écriture, connexion, et pré-vol CORS.
+expect "écriture depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X PATCH "https://$API_HOST/v1/me" \
+  -H "Origin: https://$OLD_HOST" -H 'Content-Type: application/json' -d '{}')" 403
+expect "connexion depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X POST \
+  "https://$API_HOST/api/auth/sign-in/email" -H "Origin: https://$OLD_HOST" -H 'Content-Type: application/json' \
+  -d '{"email":"a@example.com","password":"stack-test-password"}')" 403
+if headers_of -X OPTIONS "https://$API_HOST/v1/me" -H "Origin: https://$OLD_HOST" \
+  -H 'Access-Control-Request-Method: PATCH' | grep -q '^access-control-allow-origin:'; then
+  die "le pré-vol CORS accepte l'ancienne origine"
+fi
 echo "ok"
 
 step "Les fichiers de la porte d'entrée ne peuvent pas être modifiés, Caddy ne tourne pas en root"
@@ -258,7 +304,8 @@ first=$(git -C "$WORK/repo" rev-parse HEAD)
 git -C "$WORK/repo" -c user.name=Essai -c user.email=essai@example.com commit --quiet --allow-empty -m essai
 git -C "$WORK/repo" push --quiet origin HEAD:main
 second=$(git -C "$WORK/repo" rev-parse HEAD)
-printf 'APP_DOMAIN=%s\nAPI_DOMAIN=%s\nIMAGE_PREFIX=localhost:5000/ruche-stack-test\n' "$APP_HOST" "$API_HOST" >"$RUCHE_SITE_ENV"
+printf 'APP_DOMAIN=%s\nAPI_DOMAIN=%s\nLEGACY_APP_DOMAIN=%s\nLEGACY_API_DOMAIN=%s\nIMAGE_PREFIX=localhost:5000/ruche-stack-test\n' \
+  "$APP_HOST" "$API_HOST" "$OLD_HOST" "$OLD_API_HOST" >"$RUCHE_SITE_ENV"
 health_version() {
   web -f "https://$API_HOST/health" | node -e 'process.stdin.on("data", (d) => console.log(JSON.parse(d).version))'
 }

@@ -22,7 +22,7 @@ describe('createScalewayMailer', () => {
       secretKey: 'test-secret',
       projectId: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
       region: 'fr-par',
-      from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       fetch: fakeFetch,
     })
 
@@ -38,7 +38,7 @@ describe('createScalewayMailer', () => {
     expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal)
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
       project_id: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
-      from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       to: [{ email: 'lea@example.com' }],
       subject: 'Sujet',
       text: 'Texte',
@@ -51,7 +51,7 @@ describe('createScalewayMailer', () => {
       secretKey: 'bad-secret',
       projectId: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
       region: 'fr-par',
-      from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       fetch: async () => new Response('{"message":"internal details"}', { status: 403 }),
     })
 
@@ -70,7 +70,7 @@ describe('createBrevoMailer', () => {
     }
     const mailer = createBrevoMailer({
       apiKey: 'test-key',
-      from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       fetch: fakeFetch,
     })
 
@@ -81,7 +81,7 @@ describe('createBrevoMailer', () => {
     const headers = new Headers(calls[0]?.init.headers)
     expect(headers.get('api-key')).toBe('test-key')
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
-      sender: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      sender: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       // Pas de pixel d'ouverture ni de lien de suivi : la promesse « pas de traqueurs ».
       to: [{ email: 'lea@example.com', contactPixelTrackingConsent: false }],
       subject: 'Sujet',
@@ -93,7 +93,7 @@ describe('createBrevoMailer', () => {
   it('fails loudly when Brevo refuses the email', async () => {
     const mailer = createBrevoMailer({
       apiKey: 'bad-key',
-      from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+      from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
       fetch: async () => new Response('unauthorized', { status: 401 }),
     })
 
@@ -106,7 +106,7 @@ describe('createBrevoMailer', () => {
 // la messagerie affiche son bouton « Se désabonner ». Seuls ces deux en-têtes sont permis, en ASCII
 // imprimable (relecture de sécurité S-A7) : un retour à la ligne dans une valeur ajouterait un
 // en-tête (« Bcc: … », une copie cachée vers n'importe qui).
-const unsubscribeUrl = 'https://api.waiggle.io/v1/email/unsubscribe?token=v1.abc.recap.sig'
+const unsubscribeUrl = 'https://api.waiggle.com/v1/email/unsubscribe?token=v1.abc.recap.sig'
 const withHeaders = {
   ...email,
   headers: {
@@ -120,13 +120,13 @@ const scalewayWith = (fakeFetch: typeof fetch) =>
     secretKey: 'test-secret',
     projectId: '2f8c1d4e-5b6a-4c7d-8e9f-0a1b2c3d4e5f',
     region: 'fr-par',
-    from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+    from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
     fetch: fakeFetch,
   })
 const brevoWith = (fakeFetch: typeof fetch) =>
   createBrevoMailer({
     apiKey: 'test-key',
-    from: { email: 'no-reply@waiggle.io', name: 'Ruche' },
+    from: { email: 'no-reply@waiggle.com', name: 'Ruche' },
     fetch: fakeFetch,
   })
 

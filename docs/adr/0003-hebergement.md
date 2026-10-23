@@ -2,6 +2,7 @@
 
 - Statut : accepté
 - Date : 2026-10-13
+- Mis à jour : le 23/10/2026, le domaine principal devient waiggle.com (ADR 0006)
 
 ## Contexte
 

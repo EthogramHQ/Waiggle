@@ -2,7 +2,7 @@
 // le serveur vérifie la session à chaque image. Ce fichier fabrique la « source » à donner aux
 // composants d'image pour que la session voyage avec la demande.
 // - Sur le web, le navigateur joint lui-même le cookie de session : l'API est sur le même site
-//   (api.waiggle.io pour waiggle.io).
+//   (api.waiggle.com pour waiggle.com).
 // - Sur téléphone, il n'y a pas de cookies de navigateur : on ajoute l'en-tête Cookie, avec la
 //   session gardée par le plugin Expo, comme pour les requêtes (voir api/client.ts).
 import { useQuery } from '@tanstack/react-query'

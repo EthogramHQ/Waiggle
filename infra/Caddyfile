@@ -1,7 +1,8 @@
 # Caddy : la porte d'entrée du serveur. C'est le seul programme joignable depuis Internet.
 # - Il obtient et renouvelle tout seul les certificats HTTPS (le cadenas du navigateur).
-# - Sur le domaine de l'appli (waiggle.io), il sert les fichiers de l'appli web, déjà construite.
-# - Sur le domaine de l'API (api.waiggle.io), il transmet les requêtes à l'API.
+# - Sur le domaine de l'appli (waiggle.com), il sert les fichiers de l'appli web, déjà construite.
+# - Sur le domaine de l'API (api.waiggle.com), il transmet les requêtes à l'API.
+# - Sur les anciens domaines (waiggle.io, api.waiggle.io), il renvoie vers les nouveaux.
 # Les domaines viennent de infra/site.env. {$NOM:défaut} lit une variable d'environnement ;
 # sans elle, Caddy prend la valeur par défaut : localhost, pour essayer sur son ordinateur.
 #
@@ -102,9 +103,37 @@
 	}
 }
 
-# www.waiggle.io renvoie vers waiggle.io.
+# Les en-têtes des adresses qui ne font que rediriger. HSTS : le navigateur continue de n'utiliser
+# que HTTPS pour ces noms (il l'a retenu pour un an) ; sans lui, l'ancien nom de l'API, qui le
+# recevait de l'API elle-même, le perdrait.
+(redirect_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+# www.waiggle.com renvoie vers waiggle.com.
 www.{$APP_DOMAIN:localhost} {
+	import redirect_headers
 	redir https://{$APP_DOMAIN:localhost}{uri} permanent
+}
+
+# Les anciens domaines (infra/site.env) renvoient vers les nouveaux, à la même adresse.
+# La destination est écrite en entier (https://<nouveau domaine>) et {uri} commence toujours
+# par « / » : aucune requête, même piégée (« //autre.site », en-tête Host), ne peut renvoyer
+# ailleurs que chez nous.
+# - L'appli : 301, redirection permanente.
+{$LEGACY_APP_DOMAIN:legacy.localhost}, www.{$LEGACY_APP_DOMAIN:legacy.localhost} {
+	import redirect_headers
+	redir https://{$APP_DOMAIN:localhost}{uri} permanent
+}
+# - L'API : 308, la même redirection permanente, mais qui garde la méthode et le corps. Les
+#   e-mails déjà envoyés proposent un désabonnement « en un clic », un POST : avec un 301,
+#   certaines messageries le changeraient en GET.
+{$LEGACY_API_DOMAIN:api.legacy.localhost} {
+	import redirect_headers
+	redir https://{$API_DOMAIN:api.localhost}{uri} 308
 }
 
 # L'API. Ses en-têtes de sécurité sont posés par l'API elle-même (apps/api/src/app.ts).

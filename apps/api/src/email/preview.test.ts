@@ -19,7 +19,7 @@ describe('emailPreviews', () => {
       expect(email.html, file).not.toMatch(/<img/i)
       for (const [, href] of email.html.matchAll(/href="([^"]*)"/g)) {
         expect(
-          href?.startsWith('https://waiggle.io/') || href?.startsWith('https://api.waiggle.io/'),
+          href?.startsWith('https://waiggle.com/') || href?.startsWith('https://api.waiggle.com/'),
           href,
         ).toBe(true)
       }
