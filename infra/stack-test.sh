@@ -225,9 +225,11 @@ echo "ok"
 step "Le parcours réel d'un membre, dans un vrai navigateur (apps/app/scripts/journey.mjs)"
 # Deux comptes, un projet avec photos, privé puis supprimé, puis un compte supprimé : ce que voit
 # chacun, et ce qui reste sur le disque. Le script lit les e-mails dans les logs de l'API, et liste
-# les fichiers du dossier des médias, dans le conteneur lui-même.
+# les fichiers du dossier des médias, dans le conteneur lui-même. Son administrateur de la
+# modération (tranche 7a) reçoit le rôle par le script de production, grant-admin.sh.
 api_container=$(compose ps -q api)
-JOURNEY_INVITE_CODE=$INVITE_CODE \
+JOURNEY_ADMIN_CMD=infra/grant-admin.sh \
+  JOURNEY_INVITE_CODE=$INVITE_CODE \
   JOURNEY_MAIL_CMD="docker logs $api_container" \
   JOURNEY_MEDIA_CMD="docker exec $api_container find /app/media -name '*.webp'" \
   node apps/app/scripts/journey.mjs "https://$APP_HOST" "https://$API_HOST"
