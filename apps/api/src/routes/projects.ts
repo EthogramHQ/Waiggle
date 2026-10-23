@@ -106,7 +106,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
   }
 
-  // 409 « removed » (tranche 6d, règle 4 de la relecture du plan) : son projet retiré par la
+  // 409 « removed » (tranche 7a, règle 4 de la relecture du plan) : son projet retiré par la
   // modération ne se modifie plus tant qu'il n'est pas rétabli ; il peut encore le supprimer. Seul
   // son auteur reçoit cette réponse : pour les autres, un projet retiré est introuvable (404).
   const removed = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'removed'), 409)

@@ -162,7 +162,7 @@ const selectFollowingEntries = (
       and(
         eq(n.projectId, f.projectId),
         cursor ? after(cursor, n.createdAt, n.id) : undefined,
-        // Une note retirée par la modération n'arrive jamais dans le fil (tranche 6d) : un abonné
+        // Une note retirée par la modération n'arrive jamais dans le fil (tranche 7a) : un abonné
         // ne peut pas être l'auteur du projet, qui seul la lit encore (on ne suit pas ses projets).
         isNull(n.removedAt),
         // Seulement parmi les 20 notes les plus récentes du projet, celles de son journal : une note

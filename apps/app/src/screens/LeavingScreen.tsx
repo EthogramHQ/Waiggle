@@ -25,7 +25,7 @@ import { useHydrated } from '../ui/theme/hydration'
  */
 const safeTarget = (value: string | undefined): { host: string; href: string } | null => {
   if (!value) return null
-  // Une seule exception (tranche 6d) : un e-mail à notre adresse de contact (« Nous écrire », dans
+  // Une seule exception (tranche 7a) : un e-mail à notre adresse de contact (« Nous écrire », dans
   // Mon compte). L'adresse est comparée en entier : aucun autre « mailto: » ne passe, ni un sujet
   // ou un destinataire ajouté après elle. Le « site » montré en grand est alors l'adresse.
   if (value === `mailto:${contactEmail}`) return { host: contactEmail, href: value }

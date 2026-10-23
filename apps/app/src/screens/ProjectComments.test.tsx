@@ -105,6 +105,19 @@ const cardOf = (text: string) => {
   return within(node)
 }
 
+/**
+ * Le fil d'un commentaire : « Répondre » est porté par le fil, pas par la carte, qui a ses propres
+ * actions depuis la tranche 7a (« Signaler »). On remonte donc jusqu'à l'ensemble qui le contient.
+ */
+const threadOf = (text: string) => {
+  let node = screen.getByText(text).parent
+  while (node && within(node).queryAllByRole('button', { name: 'Répondre' }).length === 0) {
+    node = node.parent
+  }
+  if (!node) throw new Error(`no thread around the comment ${text}`)
+  return within(node)
+}
+
 /** Tape ce texte dans le champ, puis choisit Inès dans les suggestions. */
 const mentionInes = async (label: string, typed: string) => {
   await fireEvent.changeText(screen.getByLabelText(label), typed)
@@ -139,7 +152,7 @@ describe('mentioning a member in a comment', () => {
     await renderWithProviders(<Comments project={project} />)
 
     await fireEvent.press(
-      cardOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
+      threadOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
     )
     await mentionInes('Ta réponse', 'Oui, demande à @in')
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
@@ -219,7 +232,7 @@ describe('a published mention', () => {
   })
 })
 
-// --- Tranche 6d : signaler un commentaire, et ce qu'on voit d'un commentaire retiré ---
+// --- Tranche 7a : signaler un commentaire, et ce qu'on voit d'un commentaire retiré ---
 
 describe('reporting a comment', () => {
   it('offers « Signaler » on the comment of another member, and opens the page for it', async () => {

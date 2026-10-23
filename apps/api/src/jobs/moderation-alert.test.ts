@@ -1,4 +1,4 @@
-// Tests de l'e-mail d'alerte aux administrateurs (tranche 6d). Plan 6d, « Tâche et e-mail », et
+// Tests de l'e-mail d'alerte aux administrateurs (tranche 7a). Plan 7a, « Tâche et e-mail », et
 // règle 15 de la relecture du plan (22/10/2026).
 //
 // La tâche, moderationAlert({ db, mailer, appUrl, apiUrl, secret }, now), passe toutes les

@@ -21,7 +21,7 @@ const projectRoute = (id: string): Href => ({ pathname: '/projects/[id]', params
 /**
  * Les textes et la destination d'une notification. Les réactions et les abonnés ne nomment
  * personne ; un commentaire nomme son auteur, déjà visible sous le commentaire. Celles de la
- * modération (tranche 6d) ne nomment jamais qui a signalé, ni qui a décidé.
+ * modération (tranche 7a) ne nomment jamais qui a signalé, ni qui a décidé.
  */
 export const presentNotification = (notification: Notification, t: T): Presented => {
   switch (notification.kind) {
@@ -99,7 +99,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
         target: '/profile',
       }
     case 'removed': {
-      // Tranche 6d, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
+      // Tranche 7a, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
       // phrase), puis, une phrase par ligne, que lui seul le voit encore, après un signalement ou
       // non (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment
       // contester. L'extrait d'une note ou d'un commentaire suit en citation. Elle mène au projet,
@@ -120,7 +120,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
       }
     }
     case 'report_handled': {
-      // Tranche 6d, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
+      // Tranche 7a, règle 2 : la sorte de contenu et l'issue, et comment contester ; ni titre, ni
       // extrait, ni auteur. Un lien seulement si la cible est encore visible (l'API le décide).
       const { targetKind, outcome, link } = notification
       return {

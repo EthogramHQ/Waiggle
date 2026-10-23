@@ -79,7 +79,7 @@ type ProjectBase = Omit<
 /**
  * La condition « visible par ce membre » : public et pas retiré, ou écrit par lui. Le nom que
  * gardent les routes ; la règle elle-même est écrite une seule fois, dans visibility.ts (tranche
- * 6d).
+ * 7a).
  */
 export const visibleTo = projectVisibleTo
 

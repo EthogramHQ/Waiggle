@@ -1,7 +1,7 @@
-// Tests d'intégration de la tranche 6d : la modération. L'administrateur lit la file des
+// Tests d'intégration de la tranche 7a : la modération. L'administrateur lit la file des
 // signalements (GET /v1/moderation/reports), les contenus retirés (GET /v1/moderation/removed), et
 // décide (POST /v1/moderation/decisions) : retirer, classer sans suite, rétablir. Scénario :
-// docs/scenarios/phase-1.md, « Tranche 6d — Signaler » ; règles 1, 4 et 9 à 14 de la relecture du
+// docs/scenarios/phase-1.md, « Tranche 7a — Signaler » ; règles 1, 4 et 9 à 14 de la relecture du
 // plan (22/10/2026).
 //
 // Quatre membres : Léa (l'autrice du projet « Météo »), Max (qui signale et commente), Zoé (une
@@ -403,7 +403,7 @@ describe('removing a project', () => {
 
   it('says it did not follow a report when the administrator reported it himself', async () => {
     // Précision 2 du plan : un retrait demandé par e-mail ; Louis signale lui-même, puis retire.
-    await report(louis, projectTarget(), 'illegal')
+    await report(louis, projectTarget(), 'illegal', 'Demande reçue par e-mail.')
     await remove(projectTarget())
 
     expect((await readProject(meteo.id, lea)).removal?.afterReport).toBe(false)
@@ -417,7 +417,9 @@ describe('removing a project', () => {
 
 describe('removing a note', () => {
   it('hides it from the others, and shows it to its author with the removal', async () => {
-    await act.followMember(leaId, zoe)
+    // Suivre le projet, pas son autrice : seules les notes des projets suivis arrivent dans le fil
+    // « Abonnements » (tranche 4) ; suivre un membre n'y fait venir que ses nouveaux projets.
+    expect((await act.send('POST', `/v1/projects/${meteo.id}/follow`, zoe)).status).toBe(204)
     const kept = await postNote(meteo.id, lea, 'Une note qui reste')
     const note = await postNote(meteo.id, lea, 'Une note publicitaire')
     await report(max, { kind: 'note', id: note.id })
@@ -508,9 +510,18 @@ describe('a removed content', () => {
     const comment = await act.comment(meteo.id, max, 'Le commentaire de Max')
     await report(zoe, projectTarget())
     await report(zoe, { kind: 'comment', id: comment.id })
-    await remove(projectTarget())
+    // Le commentaire d'abord : une fois le projet retiré, Max ne le voit plus du tout (404,
+    // règle 5), et la règle 4 ne peut plus se lire sur son commentaire.
     await remove({ kind: 'comment', id: comment.id })
+    await expectError(
+      await act.send('PATCH', `/v1/projects/${meteo.id}/comments/${comment.id}`, max, {
+        body: 'Un texte corrigé',
+      }),
+      409,
+      'removed',
+    )
 
+    await remove(projectTarget())
     await expectError(
       await act.send('PATCH', `/v1/projects/${meteo.id}`, lea, {
         title: 'Météo, nouvelle version',
@@ -520,13 +531,6 @@ describe('a removed content', () => {
     )
     await expectError(
       await act.send('PATCH', `/v1/projects/${meteo.id}`, lea, { visibility: 'private' }),
-      409,
-      'removed',
-    )
-    await expectError(
-      await act.send('PATCH', `/v1/projects/${meteo.id}/comments/${comment.id}`, max, {
-        body: 'Un texte corrigé',
-      }),
       409,
       'removed',
     )

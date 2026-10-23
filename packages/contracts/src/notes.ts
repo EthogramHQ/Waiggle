@@ -25,7 +25,7 @@ export const NewProjectNote = z.object({ body: NoteText }).meta({ id: 'NewProjec
 export type NewProjectNote = z.infer<typeof NewProjectNote>
 
 /**
- * Une note publiée. Une note retirée par la modération (tranche 6d) n'apparaît plus que pour
+ * Une note publiée. Une note retirée par la modération (tranche 7a) n'apparaît plus que pour
  * l'auteur du projet, avec `removal` ; null pour les notes visibles.
  */
 export const ProjectNote = z

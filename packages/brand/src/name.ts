@@ -8,6 +8,6 @@ export const appName = 'Waiggle'
 // Le code source de l'appli, public (licence AGPL) : l'appli le signale à ses membres.
 export const sourceUrl = 'https://github.com/EthogramHQ/Waiggle'
 
-// L’adresse de contact (tranche 6d) : questions, contenus à signaler, demandes sur les données. Seul
+// L’adresse de contact (tranche 7a) : questions, contenus à signaler, demandes sur les données. Seul
 // endroit où elle est écrite ; les textes la citent par {{contactEmail}}, rempli automatiquement.
 export const contactEmail = 'contact@waiggle.com'

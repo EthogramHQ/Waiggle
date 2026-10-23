@@ -1,4 +1,4 @@
-// Ce que lit l'administrateur (tranche 6d) : la file des signalements en attente, regroupés par
+// Ce que lit l'administrateur (tranche 7a) : la file des signalements en attente, regroupés par
 // cible, et la liste des contenus retirés, pour pouvoir les rétablir. Et le classement « sans
 // objet » des signalements dont la cible a disparu (précision 6 du plan), fait à la lecture de la
 // file et par la purge de nuit plutôt que dans chaque route de suppression.

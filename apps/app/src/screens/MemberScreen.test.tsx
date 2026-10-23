@@ -273,7 +273,7 @@ describe('following a member from her page', () => {
   })
 })
 
-// --- Tranche 6d : signaler un profil ---
+// --- Tranche 7a : signaler un profil ---
 
 describe('reporting a member from her page', () => {
   it('offers to report the profile of another member, and opens « Signaler » for her', async () => {

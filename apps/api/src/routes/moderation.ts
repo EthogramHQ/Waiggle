@@ -1,4 +1,4 @@
-// Routes de la modération (tranche 6d), réservées aux administrateurs :
+// Routes de la modération (tranche 7a), réservées aux administrateurs :
 // - GET /v1/moderation/reports : la file des signalements en attente, regroupés par cible ;
 // - GET /v1/moderation/removed : les contenus retirés, pour pouvoir les rétablir ;
 // - POST /v1/moderation/decisions : retirer, classer sans suite, ou rétablir.

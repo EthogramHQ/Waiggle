@@ -143,7 +143,7 @@ const note = (n, body, day) => ({
   id: `0b1c2d3e-4f50-4a61-8b72-00000000000${n}`,
   body,
   createdAt: new Date(Date.UTC(2026, 9, day, 9)).toISOString(),
-  // Le retrait par la modération (tranche 6d) : aucun par défaut.
+  // Le retrait par la modération (tranche 7a) : aucun par défaut.
   removal: null,
 })
 const recipesNotes = [
@@ -316,7 +316,7 @@ const comment = (n, author, body, day, hour, fields = {}) => ({
   isMine: author?.id === leaMe.id,
   // Les membres mentionnés (tranche 6b) : aucun par défaut.
   mentions: [],
-  // Le retrait par la modération (tranche 6d), rempli pour son auteur seul : aucun par défaut.
+  // Le retrait par la modération (tranche 7a), rempli pour son auteur seul : aucun par défaut.
   removal: null,
   replies: [],
   ...fields,
@@ -391,7 +391,7 @@ const mentionable = [
   { id: 'iniko-id', name: 'Iniko Diallo', handle: 'iniko', avatarUrl: null },
   { id: max.id, name: max.name, handle: 'max_durand', avatarUrl: null },
 ]
-// Tranche 6d : le projet « Avis express » de Léa, retiré après un signalement, au nom des règles.
+// Tranche 7a : le projet « Avis express » de Léa, retiré après un signalement, au nom des règles.
 // Elle seule le voit encore : le bandeau en tête, avec l'explication et l'adresse pour contester.
 const removedProject = {
   ...recipesProject,
@@ -449,7 +449,7 @@ const notified = (project) => ({ id: project.id, title: project.title })
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
-  // Tranche 6d : un signalement traité (retiré, puis classé), un commentaire et un projet de Léa
+  // Tranche 7a : un signalement traité (retiré, puis classé), un commentaire et un projet de Léa
   // retirés. Les signalements traités ne nomment ni titre ni auteur ; le lien n'existe que si le
   // contenu est encore visible.
   if (choice === 'moderation') {
@@ -585,7 +585,7 @@ const notificationPages = (choice) => {
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
-// `admin` (tranche 6d) : Léa est administratrice, GET /v1/me le dit et la modération répond.
+// `admin` (tranche 7a) : Léa est administratrice, GET /v1/me le dit et la modération répond.
 const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = false) => {
   // Les notifications : vues (PUT …/seen) ou non. Vues, la cloche revient à zéro.
   const notificationList = notificationPages(notifications)
@@ -596,7 +596,7 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = f
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
   // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
   let me = structuredClone({ ...leaMe, isAdmin: admin })
-  // Les décisions de modération prises dans ce navigateur (tranche 6d) : la cible quitte sa liste.
+  // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
@@ -747,12 +747,26 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = f
         asOf: new Date().toISOString(),
       })
     }
-    // Signaler (tranche 6d) : accepté (la page « signaler-erreur » remplace cette réponse par le
+    // Signaler (tranche 7a) : accepté (la page « signaler-erreur » remplace cette réponse par le
     // quota atteint).
     if (pathname === '/v1/reports' && method === 'POST') {
       return json(201, { id: crypto.randomUUID() })
     }
-    // La modération (tranche 6d) : pour un membre qui n'est pas administrateur, ces routes
+    // La cible que montre la page « Signaler » (GET /v1/reports/target) : le commentaire des
+    // captures, avec son texte et son projet.
+    if (pathname === '/v1/reports/target') {
+      const id = url.searchParams.get('id')
+      const comment = notMineComments.find((c) => c.id === id)
+      if (url.searchParams.get('kind') !== 'comment' || !comment) {
+        return json(404, { error: { code: 'not_found', message: '' } })
+      }
+      return json(200, {
+        target: { kind: 'comment', id: comment.id },
+        text: comment.body,
+        projectId: commentedProject.id,
+      })
+    }
+    // La modération (tranche 7a) : pour un membre qui n'est pas administrateur, ces routes
     // n'existent pas (404, comme la vraie API). Une décision retire la cible de sa liste.
     if (pathname.startsWith('/v1/moderation/') && !admin) {
       return json(404, { error: { code: 'not_found', message: '' } })
@@ -910,7 +924,7 @@ const pages = [
       await page.getByRole('link', { name: 'Me reconnecter' }).waitFor()
     },
   },
-  // Tranche 6d : signaler le commentaire d'Inès sur le projet de Max, puis le quota atteint.
+  // Tranche 7a : signaler le commentaire d'Inès sur le projet de Max, puis le quota atteint.
   {
     name: 'signaler',
     path: `/report?kind=comment&id=${notMineComments[0]?.id}&project=${commentedProject.id}`,
@@ -1153,7 +1167,7 @@ const settle = async (page) => {
 //   avec sa propre API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse
 //   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; options.notifications: 'none'
 //   aucune notification, 'many' la cloche à « 9+ », 'moderation' celles de la modération ;
-//   options.admin: true fait de Léa une administratrice (tranche 6d) ; le reste va à newContext.
+//   options.admin: true fait de Léa une administratrice (tranche 7a) ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {

@@ -216,7 +216,7 @@ export const createApp = ({
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
-  // Signaler (tout membre) et modérer (administrateurs seulement, tranche 6d).
+  // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
   app.route('/', moderationRoutes({ db }))
   app.route('/', mediaRoutes({ db, storage }))

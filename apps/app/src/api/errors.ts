@@ -17,7 +17,7 @@ export type ApiErrorKey =
   | 'tooManyVisuals'
   | 'handleTaken'
   | 'handleChangeLimit'
-  // Tranche 6d : signaler et modérer.
+  // Tranche 7a : signaler et modérer.
   | 'ownContent'
   | 'alreadyReported'
   | 'alreadyDecided'
@@ -41,7 +41,7 @@ const byStatus: Record<number, ApiErrorKey> = {
   413: 'payloadTooLarge',
   415: 'unsupportedMediaType',
   // 422 : « demande impossible à traiter ». L'API ne s'en sert que pour son propre contenu
-  // (own_content, tranche 6d) : signaler ce qu'on a publié, ou décider de ce qui nous concerne.
+  // (own_content, tranche 7a) : signaler ce qu'on a publié, ou décider de ce qui nous concerne.
   422: 'ownContent',
   // 429 : « trop de demandes ». Aussi le 6e changement de pseudo du jour (handle_change_limit),
   // qui a son propre message (réessayer demain, pas dans quelques minutes) : voir byCode.
@@ -63,7 +63,7 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   handle_taken: 'handleTaken',
   handle_change_limit: 'handleChangeLimit',
   too_many_visuals: 'tooManyVisuals',
-  // Tranche 6d : trois 409 de plus (déjà signalé, déjà décidé, contenu retiré) et un 422.
+  // Tranche 7a : trois 409 de plus (déjà signalé, déjà décidé, contenu retiré) et un 422.
   already_reported: 'alreadyReported',
   already_decided: 'alreadyDecided',
   removed: 'removed',

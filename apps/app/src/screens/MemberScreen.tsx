@@ -1,7 +1,7 @@
 // Page d'un membre : son avatar, son nom, sa bio, ses outils favoris (chacun mène à sa page
 // d'étiquette), puis ses projets, du plus récent au plus ancien. Sur sa propre page, un membre voit
 // aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil. Sur la page
-// d'un autre membre, le bouton « Suivre », puis « Signaler ce profil » (tranche 6d) ; sur les deux,
+// d'un autre membre, le bouton « Suivre », puis « Signaler ce profil » (tranche 7a) ; sur les deux,
 // le nombre d'abonnés (jamais leurs noms).
 import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
@@ -109,7 +109,7 @@ function MemberView({ member }: { member: Member }) {
                 }
                 errorAction={follow.expired ? signInAgain() : undefined}
               />
-              {/* Signaler ce profil (tranche 6d) : un lien discret sous « Suivre », jamais sur sa
+              {/* Signaler ce profil (tranche 7a) : un lien discret sous « Suivre », jamais sur sa
                   propre page. */}
               <TextLink
                 label={t('report.member')}

@@ -1,4 +1,4 @@
-// La section « Signaler, et ce qui est retiré » du catalogue (tranche 6d) : le bandeau d'un contenu
+// La section « Signaler, et ce qui est retiré » du catalogue (tranche 7a) : le bandeau d'un contenu
 // retiré, les commentaires et le journal avec leur « Signaler », et ce que lit l'auteur d'un
 // contenu retiré. Un fichier à part, avec ses propres textes : la section de la modération
 // (`moderation.tsx`) vit à côté, sans que deux personnes écrivent dans le même fichier.

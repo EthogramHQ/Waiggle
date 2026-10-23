@@ -96,7 +96,7 @@ describe('SignInScreen', () => {
   })
 })
 
-// --- Tranche 6d : l'adresse de contact, lisible sans compte (règle 23 de la relecture du plan) ---
+// --- Tranche 7a : l'adresse de contact, lisible sans compte (règle 23 de la relecture du plan) ---
 
 describe('the contact address on the sign-in page', () => {
   it('gives the contact address, in French or in English, to someone without an account', async () => {

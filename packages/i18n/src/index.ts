@@ -20,7 +20,7 @@ export const defaultLanguage: Language = 'fr'
 /**
  * Les paramètres présents dans tous les textes et remplis automatiquement, sans qu'on ait à les
  * passer : {{appName}} devient le nom de l'appli, {{contactEmail}} l'adresse de contact
- * (tranche 6d). L'appli les donne à i18next, l'API à `fill`.
+ * (tranche 7a). L'appli les donne à i18next, l'API à `fill`.
  */
 export const textVariables = { appName, contactEmail } as const
 

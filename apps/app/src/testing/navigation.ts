@@ -14,7 +14,7 @@ export const hrefOf = (href: unknown): string => {
 }
 
 /**
- * L'adresse réelle d'une destination (tranche 6d) : les parties variables du chemin sont remplies
+ * L'adresse réelle d'une destination (tranche 7a) : les parties variables du chemin sont remplies
  * par leurs paramètres. `{ pathname: '/projects/[id]', params: { id: 'abc' } }` et
  * `'/projects/abc'` donnent tous deux « /projects/abc » ; les autres paramètres restent après « ? ».
  */
@@ -37,7 +37,7 @@ export const pathOf = (href: unknown): string => {
 }
 
 /**
- * Les pages « Signaler » demandées par un test (tranche 6d) : pour chaque visite de /report, ses
+ * Les pages « Signaler » demandées par un test (tranche 7a) : pour chaque visite de /report, ses
  * paramètres (`kind`, `id`, et ce que l'écran ajoute). L'ordre des paramètres n'importe pas.
  */
 export const reportsOpened = (...mocks: jest.Mock[]): Record<string, string>[] =>

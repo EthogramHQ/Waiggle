@@ -98,7 +98,7 @@ export function SignInScreen() {
         <TextLink label={t('auth.signIn.createOne')} onPress={() => router.replace('/sign-up')} />
       </Row>
       <Hint icon="lock-simple" text={t('home.membersOnly')} />
-      {/* Tranche 6d (règle 23 de la relecture du plan) : l'adresse de contact, lisible sans compte.
+      {/* Tranche 7a (règle 23 de la relecture du plan) : l'adresse de contact, lisible sans compte.
           Une personne photographiée, ou une autorité, doit pouvoir nous écrire sans s'inscrire. */}
       <Hint icon="envelope-simple" text={t('auth.contact')} />
     </Screen>

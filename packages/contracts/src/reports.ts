@@ -1,4 +1,4 @@
-// Signaler un contenu, et le traiter (tranche 6d). Un membre signale un projet, une note, un
+// Signaler un contenu, et le traiter (tranche 7a). Un membre signale un projet, une note, un
 // commentaire (ou une réponse) ou un profil, avec un motif ; un administrateur voit la file, puis
 // retire le contenu ou classe le signalement. Chaque décision est gardée : qui, quand, quoi,
 // pourquoi. La personne qui signale n'apparaît dans aucune réponse destinée à l'auteur du contenu.
@@ -57,13 +57,20 @@ export type ReportReason = z.infer<typeof ReportReason>
 
 /**
  * Ce que l'appli envoie pour signaler (POST /v1/reports). Le texte visé n'en fait pas partie :
- * l'API le lit en base. Une précision vide compte comme aucune.
+ * l'API le lit en base. Une précision vide compte comme aucune, sauf pour un contenu dit illégal :
+ * elle y est obligatoire (article 16 du règlement européen sur les services numériques, une
+ * explication suffisamment étayée ; décision du 23/10/2026). `refine` ajoute cette règle qui lie
+ * deux champs ; `path` range l'erreur sous `details`.
  */
 export const CreateReport = z
   .object({
     target: ReportTarget,
     reason: ReportReason,
     details: FreeText(REPORT_DETAILS_MAX).optional(),
+  })
+  .refine((report) => report.reason !== 'illegal' || (report.details ?? '').trim() !== '', {
+    path: ['details'],
+    message: 'an illegal content needs an explanation',
   })
   .meta({ id: 'CreateReport' })
 export type CreateReport = z.infer<typeof CreateReport>

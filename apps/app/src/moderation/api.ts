@@ -1,4 +1,4 @@
-// Lire et traiter la file de modération (tranche 6d), réservée aux administrateurs : les
+// Lire et traiter la file de modération (tranche 7a), réservée aux administrateurs : les
 // signalements en attente, les contenus retirés, et les décisions (retirer, classer sans suite,
 // rétablir). Les écrans n'appellent que ces hooks ; leurs tests les remplacent par de faux résultats.
 // L'API refait la vérification « administrateur » à chaque requête : pour tout autre membre, ces

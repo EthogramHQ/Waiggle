@@ -9,7 +9,7 @@
 // - les inscriptions jamais vérifiées au bout de 30 jours (décision de Louis du 20/10/2026), sauf
 //   un compte qui a déjà reçu un pseudo (un ancien membre : voir plus bas) ;
 // - les signalements et les décisions de modération arrivés au terme de leur durée de garde
-//   (tranche 6d, reports/retention.ts).
+//   (tranche 7a, reports/retention.ts).
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
 // L'heure vient du paramètre `now` et entre dans le SQL par utc() (un texte ISO lu comme un instant,
@@ -81,7 +81,7 @@ export const nightlyPurge = async (db: Database, now: Date) => {
       ),
     )
     .returning({ id: schema.user.id })
-  // Les signalements et les décisions de modération (tranche 6d) : reports/retention.ts.
+  // Les signalements et les décisions de modération (tranche 7a) : reports/retention.ts.
   const moderation = await purgeModeration(db, now)
 
   const purged = {

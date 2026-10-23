@@ -69,7 +69,7 @@ describe('request', () => {
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'rateLimited' })
   })
 
-  it('tells apart the refusals of reporting and moderating, by the code of the answer (slice 6d)', async () => {
+  it('tells apart the refusals of reporting and moderating, by the code of the answer (slice 7a)', async () => {
     // Trois refus « 409 » (déjà signalé, déjà décidé, contenu retiré) et un « 422 » (son propre
     // contenu) : chacun a son message, que seul le code du corps de la réponse désigne.
     const refusal = (code: string, status: number) =>

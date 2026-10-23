@@ -1,7 +1,7 @@
 // Lecture des notes d'un projet (tranche 4b) : le journal affiché sur la page d'un projet, et
 // toutes les notes d'un membre pour l'export de ses données. Qui a le droit de voir quel projet
 // est décidé ailleurs (projects/load.ts) : ici, on ne lit que les notes de projets déjà autorisés.
-// Une note retirée par la modération (tranche 6d) ne se lit plus que par l'auteur du projet, avec
+// Une note retirée par la modération (tranche 7a) ne se lit plus que par l'auteur du projet, avec
 // l'explication du retrait.
 import { PROJECT_NOTES_SHOWN, type ProjectNote, type Removal } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'

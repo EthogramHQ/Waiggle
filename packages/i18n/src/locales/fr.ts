@@ -438,7 +438,7 @@ export const fr = {
     },
   },
   report: {
-    // Signaler un contenu (tranche 6d). « La modération » : il n'y a qu'une personne derrière.
+    // Signaler un contenu (tranche 7a). « La modération » : il n'y a qu'une personne derrière.
     title: 'Signaler',
     action: 'Signaler',
     project: 'Signaler ce projet',
@@ -471,6 +471,12 @@ export const fr = {
     submit: 'Envoyer',
     sent: 'Merci, ton signalement a été envoyé. La modération va le regarder.',
     back: 'Revenir',
+    // Tranche 7a, décisions du 23/10 : la précision obligatoire pour un contenu dit illégal, le
+    // quota de 20 par jour, et un contenu disparu entre l’ouverture de la page et l’envoi.
+    illegalRequired: 'Dis-nous pourquoi ce contenu te semble illégal.',
+    limited:
+      'Tu as déjà envoyé 20 signalements aujourd’hui. Tu pourras en envoyer d’autres demain. Pour un cas urgent, écris-nous : {{contactEmail}}',
+    gone: 'Ce contenu n’existe plus, ou tu ne peux plus le voir.',
   },
   moderation: {
     title: 'Modération',
@@ -506,7 +512,7 @@ export const fr = {
     dismissed: 'Signalement classé sans suite.',
     removedDone: 'Contenu retiré.',
     restoredDone: 'Contenu rétabli.',
-    // Le bas de la liste (ajoutés par l'interface, tranche 6d) : tout est lu, ou la suite a raté.
+    // Le bas de la liste (ajoutés par l'interface, tranche 7a) : tout est lu, ou la suite a raté.
     end: 'C’est tout',
     moreError: 'La suite de la liste n’a pas pu se charger.',
   },
@@ -725,7 +731,7 @@ export const fr = {
       comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
     },
     reportHandled: {
-      // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 6d).
+      // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
       project: {
         removed: 'Ton signalement d’un projet a été traité : le projet a été retiré.',
         dismissed: 'Ton signalement d’un projet a été traité : nous ne l’avons pas retiré.',

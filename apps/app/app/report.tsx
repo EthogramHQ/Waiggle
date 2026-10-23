@@ -1,4 +1,4 @@
-// Page : Signaler un contenu (« /report?kind=comment&id=… », tranche 6d). L'écran lui-même est dans
+// Page : Signaler un contenu (« /report?kind=comment&id=… », tranche 7a). L'écran lui-même est dans
 // src/screens ; ici, on lit seulement la sorte et l'identifiant de la cible dans l'adresse.
 import { useLocalSearchParams } from 'expo-router'
 import { firstParam } from '../src/navigation/params'

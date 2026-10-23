@@ -61,7 +61,7 @@ const features = [
   {
     id: 'moderation',
     name: 'Signaler et modérer',
-    tranche: 'Tranche 6d',
+    tranche: 'Tranche 7a',
     pages: /^\/(report|moderation)$/,
     routes: /^\w+ \/v1\/(reports|moderation)(\/|$)/,
     tables: /^(content_report|moderation_decision|admin_member)$/,

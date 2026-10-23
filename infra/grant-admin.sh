@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Donne, ou retire, le rôle d'administrateur de la modération à un membre (tranche 6d). C'est le
+# Donne, ou retire, le rôle d'administrateur de la modération à un membre (tranche 7a). C'est le
 # seul moyen de le donner : aucune route de l'API ne l'écrit. Procédure : docs/ops/moderation.md.
 #
 # Usage : infra/grant-admin.sh <adresse e-mail> [--revoke]

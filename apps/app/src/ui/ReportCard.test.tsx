@@ -1,4 +1,4 @@
-// Tests de la carte d'un signalement dans la file de modération (tranche 6d). À part de
+// Tests de la carte d'un signalement dans la file de modération (tranche 7a). À part de
 // components.test.tsx : ReportCard est écrit par un autre agent que CommentCard et NoteList ; tant
 // qu'il manque, seul ce fichier échoue, et les autres tests des composants restent lisibles.
 import { fireEvent, screen } from '@testing-library/react-native'

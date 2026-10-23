@@ -140,7 +140,7 @@ export const activity = (ctx: TestContext) => {
       await expectStatus(200, 'POST', '/api/auth/delete-user', cookie, { password })
     },
 
-    // ─── Signaler et modérer (tranche 6d) ───────────────────────────────────────────────────────
+    // ─── Signaler et modérer (tranche 7a) ───────────────────────────────────────────────────────
 
     /** Signale une cible (POST /v1/reports), avec un motif et une précision facultative. */
     report: async (

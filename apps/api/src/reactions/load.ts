@@ -16,7 +16,7 @@ const r = schema.projectReaction
  * soit leur nombre (et pas une par projet). Sur un projet privé, aucune : on ne réagit pas à son
  * propre projet, ce sont donc toutes des réactions d'autres membres, cachées à tous, l'auteur du
  * projet compris (décision du 19/10/2026). Elles sont gardées et reviennent si le projet redevient
- * public. De même sur un projet retiré par la modération (tranche 6d), jusqu'à son rétablissement.
+ * public. De même sur un projet retiré par la modération (tranche 7a), jusqu'à son rétablissement.
  *
  * En SQL :
  *   select project_id, kind, count(*)::int, bool_or(member_id = $viewer)

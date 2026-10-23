@@ -1,4 +1,4 @@
-// La page « Modération » (tranche 6d, « /moderation »), réservée aux administrateurs. Deux onglets :
+// La page « Modération » (tranche 7a, « /moderation »), réservée aux administrateurs. Deux onglets :
 // « En attente », les signalements regroupés par contenu, du plus ancien au plus récent ; et
 // « Retirés », les contenus retirés, qu'on peut rétablir.
 //

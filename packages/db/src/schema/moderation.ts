@@ -1,4 +1,4 @@
-// La modération (tranche 6d) : les administrateurs, les signalements des membres et les décisions
+// La modération (tranche 7a) : les administrateurs, les signalements des membres et les décisions
 // prises. Qui peut lire quoi est décidé par l'API (apps/api/src/routes/moderation.ts) : la base
 // garde les faits. Le retrait lui-même est noté sur le contenu (removed_at sur project,
 // project_note et project_comment), pour que chaque lecture puisse l'exclure sans jointure.

@@ -2114,7 +2114,7 @@ describe('Notice, polite with an action', () => {
   })
 })
 
-// --- Tranche 6d : signaler, et ce qui est retiré par la modération ---
+// --- Tranche 7a : signaler, et ce qui est retiré par la modération ---
 
 /** Le bandeau que l'auteur lit sur son contenu retiré : un titre, puis les phrases données par l'écran. */
 const removedBanner = {

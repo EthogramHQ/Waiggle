@@ -267,7 +267,7 @@ describe('the longest window of our counters', () => {
   })
 })
 
-// ─── Tranche 6d : les signalements et les décisions de modération ─────────────────────────────────
+// ─── Tranche 7a : les signalements et les décisions de modération ─────────────────────────────────
 // Règles 16 et 17 de la relecture du plan (22/10/2026), durées à faire valider par un
 // professionnel :
 // - un signalement sans objet (compte de l'auteur supprimé, contenu disparu) est effacé au bout de

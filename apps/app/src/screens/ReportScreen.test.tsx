@@ -1,4 +1,4 @@
-// Tests de la page « Signaler » (tranche 6d) : Malik signale le commentaire de Sam sur « Météo ». La
+// Tests de la page « Signaler » (tranche 7a) : Malik signale le commentaire de Sam sur « Météo ». La
 // page montre ce qu'il signale (lu par l'API, jamais pris de l'adresse), propose les sept motifs et
 // une précision facultative, puis remercie. Chaque refus de l'API a son propre texte.
 //
@@ -66,8 +66,7 @@ const target: ReportTarget = { kind: 'comment', id: commentId }
 const preview: ReportTargetPreview = { target, text: commentText, projectId }
 
 /** La page « Signaler » de ce commentaire, telle que l'ouvre l'action « Signaler ». */
-const reportComment = () =>
-  renderWithProviders(<ReportScreen kind="comment" id={commentId} />)
+const reportComment = () => renderWithProviders(<ReportScreen kind="comment" id={commentId} />)
 
 /** Les sept motifs, dans l'ordre du contrat (ReportReason). */
 const reasonLabels = [
@@ -211,6 +210,22 @@ describe('the form', () => {
     expect(screen.getAllByText(containing(fr.t('report.illegalHint'))).length).toBeGreaterThan(0)
   })
 
+  it('sends nothing for an illegal content without an explanation', async () => {
+    // Décision du 23/10 (plan, règle 36) : la précision est obligatoire pour un contenu illégal.
+    await reportComment()
+
+    await sendWith('Contenu illégal')
+
+    expect(await screen.findByText(containing(fr.t('report.illegalRequired')))).toBeTruthy()
+    expect(sendReport).not.toHaveBeenCalled()
+
+    await fireEvent.changeText(screen.getByLabelText('Dis-nous pourquoi'), 'Il donne une adresse.')
+    await fireEvent.press(screen.getByRole('button', { name: 'Envoyer' }))
+    expect(sendReport).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'illegal', details: 'Il donne une adresse.' }),
+    )
+  })
+
   it('asks for no good faith for another reason', async () => {
     await reportComment()
 
@@ -316,7 +331,8 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('errors.rateLimited')))).toBeTruthy()
+    // Décision du 23/10 (plan, règle 35) : une phrase propre au quota de 20 par jour.
+    expect(await screen.findByText(containing(fr.t('report.limited')))).toBeTruthy()
     expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
   })
 
@@ -326,7 +342,8 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('errors.notFound')))).toBeTruthy()
+    // Décision du 23/10 (plan, règle 37, qui remplace la règle 27) : une phrase sur le contenu.
+    expect(await screen.findByText(containing(fr.t('report.gone')))).toBeTruthy()
     expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
   })
 

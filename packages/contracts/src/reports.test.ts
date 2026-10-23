@@ -1,6 +1,6 @@
-// Tests du contrat des signalements et de la modération (tranche 6d) : ce qu'un membre peut
+// Tests du contrat des signalements et de la modération (tranche 7a) : ce qu'un membre peut
 // envoyer pour signaler, ce que la file montre à l'administrateur, et surtout ce qu'elle ne montre
-// jamais (qui a signalé). Scénario : docs/scenarios/phase-1.md, « Tranche 6d — Signaler » ; règles
+// jamais (qui a signalé). Scénario : docs/scenarios/phase-1.md, « Tranche 7a — Signaler » ; règles
 // de la relecture du plan (22/10/2026), numérotées comme dans le plan.
 import { describe, expect, it } from 'vitest'
 import { AccountExport } from './export'
@@ -63,6 +63,18 @@ describe('CreateReport', () => {
     ])
     expect(CreateReport.safeParse({ ...report, reason: 'privacy' }).success).toBe(true)
     expect(CreateReport.safeParse({ ...report, reason: 'boring' }).success).toBe(false)
+  })
+
+  // Plan, règle 36 (article 16 du DSA) : un contenu dit illégal demande une explication.
+  it('asks for an explanation when the content is said to be illegal', () => {
+    for (const details of [undefined, '', '   ']) {
+      expect(CreateReport.safeParse({ ...report, reason: 'illegal', details }).success).toBe(false)
+    }
+    expect(
+      CreateReport.safeParse({ ...report, reason: 'illegal', details: 'Une adresse privée.' })
+        .success,
+    ).toBe(true)
+    expect(CreateReport.safeParse({ ...report, reason: 'other' }).success).toBe(true)
   })
 
   it('takes optional details of 500 characters at most, trimmed', () => {

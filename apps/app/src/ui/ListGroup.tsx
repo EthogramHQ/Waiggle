@@ -200,7 +200,7 @@ export function ListRow({
       aria-disabled={disabled}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Un choix (bouton radio) se coche avec la barre d'espace, sur le web : react-native-web ne
-      // le fait que pour les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 6d)
+      // le fait que pour les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a)
       // ne pouvait pas s'envoyer au clavier : aucun motif ne se cochait.
       {...(isChoice ? spaceToggles(onPress, disabled) : null)}
       disabled={disabled}

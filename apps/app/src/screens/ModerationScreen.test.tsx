@@ -1,4 +1,4 @@
-// Tests de la page « Modération » (tranche 6d) : Louis, administrateur, voit les signalements en
+// Tests de la page « Modération » (tranche 7a) : Louis, administrateur, voit les signalements en
 // attente, du plus ancien au plus récent, retire un contenu (avec un fondement et une explication)
 // ou classe le signalement sans suite, et rétablit un contenu retiré. Pour tout autre membre, la
 // page n'existe pas.

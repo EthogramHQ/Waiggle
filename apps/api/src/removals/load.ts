@@ -1,4 +1,4 @@
-// Ce que l'auteur d'un contenu retiré lit du retrait (tranche 6d, contrat `Removal`) : le
+// Ce que l'auteur d'un contenu retiré lit du retrait (tranche 7a, contrat `Removal`) : le
 // fondement, l'explication, la date, et si le retrait a suivi un signalement. Partagé par les
 // projets, les notes, les commentaires et l'export, qui ne font chacun qu'appeler removalsOf avec
 // les décisions de leurs contenus retirés. Jamais d'identifiant d'administrateur ni de signaleur :

@@ -13,7 +13,7 @@
 // - l'objet est fixe : rien d'écrit par un membre ne s'affiche sur un écran verrouillé ;
 // - chaque e-mail dit pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
 //
-// Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 6d, règle 23), écrite en
+// Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 7a, règle 23), écrite en
 // texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
 import { appName, palettes, radii } from '@ruche/brand'
 import { fill, type Language, resources } from '@ruche/i18n'
@@ -353,7 +353,7 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
   }
 }
 
-// ─── L'alerte de modération (tranche 6d) ─────────────────────────────────────────────────────────
+// ─── L'alerte de modération (tranche 7a) ─────────────────────────────────────────────────────────
 
 export type ModerationAlertData = {
   /** Le nom de l'administrateur qui la reçoit (la salutation). */

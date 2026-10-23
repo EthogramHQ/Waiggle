@@ -928,7 +928,7 @@ describe('the rights', () => {
   })
 })
 
-// ─── Tranche 6d : les deux notifications de la modération ─────────────────────────────────────────
+// ─── Tranche 7a : les deux notifications de la modération ─────────────────────────────────────────
 // « removed » prévient l'auteur d'un contenu retiré (clé removed:<id de la décision>) ;
 // « report_handled » prévient la personne qui a signalé (clé report:<id du signalement>). Règles 2
 // et 3 de la relecture du plan (22/10/2026). Sam est l'administrateur : son rôle est posé en base,

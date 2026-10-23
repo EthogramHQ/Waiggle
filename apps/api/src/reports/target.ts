@@ -1,4 +1,4 @@
-// Retrouver la cible d'un signalement (tranche 6d) : un projet, une note, un commentaire ou un
+// Retrouver la cible d'un signalement (tranche 7a) : un projet, une note, un commentaire ou un
 // profil. Deux lectures :
 // - pour un membre qui signale (POST /v1/reports, GET /v1/reports/target) : seulement ce qu'il voit,
 //   avec les règles de visibilité des autres lectures (projects/visibility.ts, comments/load.ts) ;
@@ -88,14 +88,17 @@ export const loadReportable = async (
           projectId: c.projectId,
           projectAuthorId: p.authorId,
           visibility: p.visibility,
+          projectRemovedAt: p.removedAt,
         })
         .from(c)
         .innerJoin(p, eq(p.id, c.projectId))
         .where(and(eq(c.id, target.id), isNull(c.deletedAt), projectVisibleTo(viewerId)))
       if (!row || row.authorId === null) return null
+      // `viewerOf` traite un projet retiré comme privé : il lui faut donc sa date de retrait.
       const viewer = viewerOf(viewerId, {
         authorId: row.projectAuthorId,
         visibility: row.visibility,
+        removedAt: row.projectRemovedAt,
       })
       if (!sees(row, viewer)) return null
       if (row.removedAt !== null && row.authorId !== viewerId) return null

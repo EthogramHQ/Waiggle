@@ -225,7 +225,7 @@ export const createAuth = ({
           for (const key of keys) await storage.delete(key)
           await deleteMemberCounters(db, user.id)
           await sweepOrphanComments(db)
-          // Les signalements qui visaient ses contenus ou son profil (tranche 6d, règle 16) : la
+          // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
           // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
           // « sans objet » (effacés 30 jours plus tard), ceux suivis d'un retrait restent un an. Ici,
           // après la suppression, et pas dans beforeDelete : une suppression refusée ne touche à

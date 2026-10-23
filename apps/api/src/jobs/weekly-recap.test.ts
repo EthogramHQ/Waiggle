@@ -761,7 +761,7 @@ describe('the recap and the mention e-mail at the same time', () => {
   })
 })
 
-// Tranche 6d, règle 31 du plan : le récap du lundi ignore les deux notifications de la modération
+// Tranche 7a, règle 31 du plan : le récap du lundi ignore les deux notifications de la modération
 // (« removed » pour l'auteur, « report_handled » pour qui a signalé) ; elles restent dans l'appli.
 describe('the notifications of the moderation', () => {
   it('are left out of the recap', async () => {

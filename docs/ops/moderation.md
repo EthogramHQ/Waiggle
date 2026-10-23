@@ -1,6 +1,6 @@
 # La modération : signalements, retraits, procédure
 
-Depuis la tranche 6d, un membre peut signaler un projet, une note, un commentaire (ou une réponse)
+Depuis la tranche 7a, un membre peut signaler un projet, une note, un commentaire (ou une réponse)
 ou un profil. Un administrateur lit la file dans l'appli (écran « Modération », visible des seuls
 administrateurs), puis retire le contenu ou classe le signalement. Chaque décision est gardée :
 qui, quand, quoi, pourquoi. Ce document dit comment faire, et ce qu'il faut faire dans les cas

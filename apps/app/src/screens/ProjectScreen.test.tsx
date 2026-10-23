@@ -758,6 +758,19 @@ const cardOf = (text: string) => {
   return within(node)
 }
 
+/**
+ * Le fil d'un commentaire : « Répondre » est porté par le fil, pas par la carte, qui a ses propres
+ * actions depuis la tranche 7a (« Signaler »). On remonte donc jusqu'à l'ensemble qui le contient.
+ */
+const threadOf = (text: string) => {
+  let node = screen.getByText(text).parent
+  while (node && within(node).queryAllByRole('button', { name: 'Répondre' }).length === 0) {
+    node = node.parent
+  }
+  if (!node) throw new Error(`no thread around the comment ${text}`)
+  return within(node)
+}
+
 /** Les textes des commentaires affichés, dans l'ordre de la page. */
 const shownComments = () =>
   screen.getAllByText(
@@ -1056,7 +1069,7 @@ describe('replying to a comment', () => {
 
     await screen.findByText('Ça marche aussi en anglais ?')
     await fireEvent.press(
-      cardOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
+      threadOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
     )
     await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Oui, en anglais aussi.')
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
@@ -1073,7 +1086,9 @@ describe('replying to a comment', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByText('Moi aussi, dis-nous !')
-    await fireEvent.press(cardOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }))
+    await fireEvent.press(
+      threadOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }),
+    )
     await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Je vous raconte demain.')
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
 
@@ -1553,7 +1568,7 @@ describe('the comments, after the reviews', () => {
   })
 })
 
-// --- Tranche 6d : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
+// --- Tranche 7a : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
 
 describe('reporting a project from its page', () => {
   it('offers another member to report the project, and opens « Signaler » for it', async () => {

@@ -428,7 +428,7 @@ describe('when something goes wrong', () => {
   })
 })
 
-// --- Tranche 6d : un contenu retiré, un signalement traité ---
+// --- Tranche 7a : un contenu retiré, un signalement traité ---
 
 /** Le retrait que décrit une notification « removed », pour lire les mêmes phrases qu'ailleurs. */
 const removalOf = (notification: typeof removedCommentNotification) => ({

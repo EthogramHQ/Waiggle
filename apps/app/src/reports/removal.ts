@@ -1,4 +1,4 @@
-// Ce que lit l'auteur d'un contenu retiré par la modération (tranche 6d) : le bandeau de son projet,
+// Ce que lit l'auteur d'un contenu retiré par la modération (tranche 7a) : le bandeau de son projet,
 // de sa note ou de son commentaire. Une fonction pure, à part des hooks de api.ts : les tests d'écran
 // remplacent api.ts sans perdre celle-ci.
 //

@@ -115,7 +115,7 @@ describe('DeleteAccountScreen', () => {
   })
 })
 
-// --- Tranche 6d : ce qui reste après la suppression (règle 24 de la relecture du plan) ---
+// --- Tranche 7a : ce qui reste après la suppression (règle 24 de la relecture du plan) ---
 
 describe('what remains after deleting the account', () => {
   it('says that the reports of the member and a trace of the removals stay one year', async () => {

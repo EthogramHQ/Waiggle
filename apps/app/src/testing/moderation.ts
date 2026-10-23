@@ -1,4 +1,4 @@
-// Signalements et retraits d'exemple pour les tests de l'appli (tranche 6d) : la file de modération
+// Signalements et retraits d'exemple pour les tests de l'appli (tranche 7a) : la file de modération
 // telle que l'API la donne à Louis, administrateur (GET /v1/moderation/reports), les contenus
 // retirés (GET /v1/moderation/removed), et le retrait que lit l'auteur d'un contenu retiré.
 // Seuls des types viennent de @ruche/contracts : les captures (scripts/shots.mjs) lisent ce fichier.

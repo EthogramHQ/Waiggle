@@ -1,4 +1,4 @@
-// Le retrait d'un contenu par la modération (tranche 6d), tel que son auteur le lit. Fichier à
+// Le retrait d'un contenu par la modération (tranche 7a), tel que son auteur le lit. Fichier à
 // part, sans autre import que zod : les projets, les notes et les commentaires s'en servent, et
 // reports.ts lit les projets ; le mettre dans reports.ts ferait une boucle d'imports.
 import { z } from 'zod'

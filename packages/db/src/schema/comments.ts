@@ -43,7 +43,7 @@ export const projectComment = pgTable(
     // Supprimé par son auteur alors qu'il avait des réponses (null : pas supprimé). Sans réponse,
     // un commentaire supprimé n'est pas gardé : sa ligne est effacée.
     deletedAt: timestamp('deleted_at'),
-    // Retiré par la modération (tranche 6d) : le commentaire n'est plus visible que de son auteur, avec
+    // Retiré par la modération (tranche 7a) : le commentaire n'est plus visible que de son auteur, avec
     // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
     // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
     removedAt: timestamp('removed_at'),

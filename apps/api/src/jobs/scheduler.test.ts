@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 describe('starting the job scheduler', () => {
-  // Tranche 6d : une quatrième tâche, l'alerte de modération.
+  // Tranche 7a : une quatrième tâche, l'alerte de modération.
   it('plans the four tasks and stops pg-boss gracefully when asked', async () => {
     const scheduler = await start()
 
@@ -76,7 +76,7 @@ describe('starting the job scheduler', () => {
   })
 })
 
-// Tranche 6d : l'alerte aux administrateurs, toutes les 10 minutes, est un e-mail : EMAIL_JOBS=off
+// Tranche 7a : l'alerte aux administrateurs, toutes les 10 minutes, est un e-mail : EMAIL_JOBS=off
 // la coupe, comme le récap et les mentions.
 describe('the moderation alert task', () => {
   it('runs every 10 minutes', async () => {

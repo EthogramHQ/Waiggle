@@ -82,12 +82,12 @@ export const noteRoutes = ({ db, limiter }: Deps) => {
    * Sinon : « introuvable » s'il ne le voit pas (identifiant mal formé, projet inconnu, privé ou
    * retiré d'un autre : la même réponse, pour ne rien révéler), « refusé » s'il le voit sans en
    * être l'auteur (un projet public d'un autre membre). 'removed' : son projet, retiré par la
-   * modération (tranche 6d). Une petite requête, servie par la clé primaire de project
+   * modération (tranche 7a). Une petite requête, servie par la clé primaire de project
    * (projectAccess, projects/load.ts) : on ne lit pas tout le projet.
    */
   const access = (projectId: string, userId: string) => projectAccess(db, projectId, userId)
 
-  // 409 « removed » (règle 30 de la relecture du plan de 6d) : on n'ajoute pas de note à son
+  // 409 « removed » (règle 30 de la relecture du plan de 7a) : on n'ajoute pas de note à son
   // projet retiré tant qu'il n'est pas rétabli. Seul son auteur peut recevoir cette réponse.
   const removed = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'removed'), 409)
 

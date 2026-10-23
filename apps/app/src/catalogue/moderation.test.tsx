@@ -1,4 +1,4 @@
-// La section « Modération » du catalogue (tranche 6d) se dessine, avec ses cartes dans tous leurs
+// La section « Modération » du catalogue (tranche 7a) se dessine, avec ses cartes dans tous leurs
 // états : décisions proposées, envoi en cours, aucune décision (« Te concerne »), contenu retiré.
 import { screen } from '@testing-library/react-native'
 import { renderWithProviders } from '../testing/render'

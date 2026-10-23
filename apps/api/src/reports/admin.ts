@@ -1,4 +1,4 @@
-// Qui est administrateur (tranche 6d). Le rôle se donne et se retire par un script du dépôt
+// Qui est administrateur (tranche 7a). Le rôle se donne et se retire par un script du dépôt
 // (infra/grant-admin.sh), directement en base : aucune route ne l'écrit. Il est relu à chaque
 // requête (règle 9 de la relecture du plan) : un rôle retiré cesse aussitôt, même pour une session
 // déjà ouverte.

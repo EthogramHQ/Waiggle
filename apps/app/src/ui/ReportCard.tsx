@@ -1,4 +1,4 @@
-// La carte d'un signalement dans la file de modération (tranche 6d), ou d'un contenu retiré : la
+// La carte d'un signalement dans la file de modération (tranche 7a), ou d'un contenu retiré : la
 // sorte de contenu (« Commentaire ») et le nombre de signalements, le texte signalé en citation,
 // les motifs avec leur nombre, les précisions laissées par les membres, la date, un lien « Voir »,
 // puis les décisions possibles (« Retirer », « Classer sans suite », « Rétablir »).

@@ -1,4 +1,4 @@
-// Page « Signaler » (tranche 6d) : un membre signale un projet, une note, un commentaire (ou une
+// Page « Signaler » (tranche 7a) : un membre signale un projet, une note, un commentaire (ou une
 // réponse) ou un profil. La page montre ce qu'il signale, tel que l'API le lit (jamais le texte de
 // l'adresse), propose les sept motifs et une précision facultative, puis remercie.
 //
@@ -133,9 +133,21 @@ function ReportForm({
   }, [sent])
 
   const illegal = reason === 'illegal'
+  // Pour un contenu dit illégal, la précision est obligatoire (article 16 du DSA : une explication
+  // suffisamment étayée). Le bouton reste actif : un appui sans précision dit ce qui manque, sous le
+  // champ, plutôt qu'un bouton grisé qui ne dit pas pourquoi.
+  const [missingWhy, setMissingWhy] = useState(false)
+  const changeDetails = (value: string) => {
+    setDetails(value)
+    if (value.trim() !== '') setMissingWhy(false)
+  }
 
   const submit = async () => {
     if (busy.current || reason === null || sent) return
+    if (illegal && details.trim() === '') {
+      setMissingWhy(true)
+      return
+    }
     busy.current = true
     setSending(true)
     // Une précision vide ne part pas : elle compte comme aucune.
@@ -156,13 +168,19 @@ function ReportForm({
     setFailure(result.error)
   }
 
-  // Le message d'un refus. Une session expirée a son lien « Me reconnecter », qui revient ici.
+  // Le message d'un refus. Une session expirée a son lien « Me reconnecter », qui revient ici. Le
+  // quota (20 par jour) et un contenu disparu entre-temps ont leurs propres phrases : les messages
+  // généraux (« quelques minutes », « Cette page n'existe pas ») seraient faux sur ce formulaire.
   const failureMessage =
     failure === null
       ? null
       : failure === 'unauthorized'
         ? t('states.expired')
-        : t(`errors.${failure}`)
+        : failure === 'rateLimited'
+          ? t('report.limited')
+          : failure === 'notFound'
+            ? t('report.gone')
+            : t(`errors.${failure}`)
 
   return (
     <Screen header={<TopNav />} onBack={back} title={t('report.title')}>
@@ -199,7 +217,8 @@ function ReportForm({
           <TextField
             label={illegal ? t('report.illegalDetails') : t('report.details')}
             value={details}
-            onChangeText={setDetails}
+            onChangeText={changeDetails}
+            error={illegal && missingWhy ? t('report.illegalRequired') : undefined}
             hint={
               illegal
                 ? `${t('report.illegalHint')} ${t('report.detailsHint')}`

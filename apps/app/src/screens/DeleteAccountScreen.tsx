@@ -105,7 +105,7 @@ export function DeleteAccountScreen() {
         />
       </ListGroup>
 
-      {/* Tranche 6d (règle 24 de la relecture du plan) : ce qui ne part pas tout de suite. Ses
+      {/* Tranche 7a (règle 24 de la relecture du plan) : ce qui ne part pas tout de suite. Ses
           signalements restent, sans son nom, et une trace des retraits de ses contenus, un an. */}
       <ListGroup title={t('account.delete.remains.title')}>
         <ListRow icon="flag" label={t('account.delete.remains.reports')} />

@@ -47,7 +47,7 @@ import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
 
 // Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
-// au fil, pas au commentaire.) « Signaler » (tranche 6d) ouvre la page du même nom.
+// au fil, pas au commentaire.) « Signaler » (tranche 7a) ouvre la page du même nom.
 type ActionId = 'edit' | 'delete' | 'hide' | 'report'
 
 // Où dire « Ton commentaire a été supprimé. » : à la place du commentaire disparu.
@@ -499,7 +499,7 @@ export function Comments({ project }: { project: Project }) {
               : t('project.comments.hiddenBanner')
             : undefined
         }
-        // Retiré par la modération (tranche 6d) : son auteur, seul à le lire encore, voit pourquoi
+        // Retiré par la modération (tranche 7a) : son auteur, seul à le lire encore, voit pourquoi
         // et comment contester ; les autres, l'auteur du projet compris, un simple emplacement.
         removed={
           comment.state === 'removed' && author && comment.removal

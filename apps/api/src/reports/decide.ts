@@ -1,4 +1,4 @@
-// Une décision de modération (tranche 6d) : retirer un contenu, classer ses signalements sans
+// Une décision de modération (tranche 7a) : retirer un contenu, classer ses signalements sans
 // suite, ou rétablir un contenu retiré. Règles 11 et 12 de la relecture du plan :
 // - un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil) ;
 // - deux décisions en même temps sur la même cible : la seconde trouve la première déjà prise.

@@ -450,6 +450,10 @@ export const en: Translation = {
     submit: 'Send',
     sent: 'Thank you, your report has been sent. Moderation will look at it.',
     back: 'Go back',
+    illegalRequired: 'Tell us why this content seems illegal to you.',
+    limited:
+      'You’ve already sent 20 reports today. You can send more tomorrow. For something urgent, write to us: {{contactEmail}}',
+    gone: 'This content no longer exists, or you can no longer see it.',
   },
   moderation: {
     title: 'Moderation',
@@ -485,7 +489,7 @@ export const en: Translation = {
     dismissed: 'Report dismissed.',
     removedDone: 'Content removed.',
     restoredDone: 'Content restored.',
-    // The end of the list (added with the interface, slice 6d): all read, or the next page failed.
+    // The end of the list (added with the interface, slice 7a): all read, or the next page failed.
     end: 'That’s all',
     moreError: 'The rest of the list could not load.',
   },

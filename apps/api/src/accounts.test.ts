@@ -528,7 +528,7 @@ describe('the trace of a deleted account, for a restored backup', () => {
   })
 })
 
-// ─── Tranche 6d : les signalements et les retraits, dans l'export et à la suppression du compte ──
+// ─── Tranche 7a : les signalements et les retraits, dans l'export et à la suppression du compte ──
 // Règles 16 et 18 de la relecture du plan (22/10/2026). Léa publie, Max signale, Zoé est une
 // autre membre, Louis l'administrateur (rôle posé en base, comme infra/grant-admin.sh).
 describe('reports and removals of an account', () => {
@@ -652,10 +652,12 @@ describe('reports and removals of an account', () => {
       })
       const note = (await noteRes.json()) as { id: string }
       const published = await act.comment(velo.id, leaCookie, 'Un commentaire retiré')
+      // Le projet en dernier : retiré, il cache ses notes aux autres membres, qui ne peuvent plus
+      // les signaler (404, règle 5).
       for (const target of [
-        { kind: 'project', id: meteo.id },
         { kind: 'note', id: note.id },
         { kind: 'comment', id: published.id },
+        { kind: 'project', id: meteo.id },
       ] as const) {
         await act.report(max, target, 'other')
         await act.decide(louis, {

@@ -1,7 +1,7 @@
-// Routes des signalements (tranche 6d) : POST /v1/reports pour signaler un projet, une note, un
+// Routes des signalements (tranche 7a) : POST /v1/reports pour signaler un projet, une note, un
 // commentaire (ou une réponse) ou un profil ; GET /v1/reports/target pour que la page « Signaler »
 // montre la cible, lue avec la même règle de visibilité. Ce que l'administrateur en fait est dans
-// routes/moderation.ts. Scénario : docs/scenarios/phase-1.md, « Tranche 6d — Signaler » ; règles
+// routes/moderation.ts. Scénario : docs/scenarios/phase-1.md, « Tranche 7a — Signaler » ; règles
 // 5 à 7 et 26 de la relecture du plan.
 import { createRoute, z } from '@hono/zod-openapi'
 import {

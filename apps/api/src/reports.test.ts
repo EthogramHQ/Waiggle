@@ -1,5 +1,5 @@
-// Tests d'intégration de la tranche 6d : signaler un contenu (POST /v1/reports). Scénario :
-// docs/scenarios/phase-1.md, « Tranche 6d — Signaler » ; règles 5 à 8 de la relecture du plan
+// Tests d'intégration de la tranche 7a : signaler un contenu (POST /v1/reports). Scénario :
+// docs/scenarios/phase-1.md, « Tranche 7a — Signaler » ; règles 5 à 8 de la relecture du plan
 // (22/10/2026). Trois membres : Léa (l'autrice du projet « Météo », de ses notes et d'un
 // commentaire), Max (qui signale) et Zoé (une autre, qui signale aussi). Ce que l'administrateur
 // fait des signalements est testé dans moderation.test.ts.
@@ -172,6 +172,22 @@ describe('reporting a content', () => {
     ])
   })
 
+  it('refuses an illegal content without an explanation', async () => {
+    // Plan, règle 36 (article 16 du DSA) : une explication pour un contenu dit illégal.
+    for (const details of [undefined, '', '   ']) {
+      await expectError(
+        await postReport(max, {
+          target: { kind: 'project', id: meteo.id },
+          reason: 'illegal',
+          ...(details !== undefined && { details }),
+        }),
+        400,
+        'validation',
+      )
+    }
+    expect(await storedReports()).toHaveLength(0)
+  })
+
   it('accepts each of the seven reasons', async () => {
     const reasons = [
       'illegal',
@@ -184,7 +200,12 @@ describe('reporting a content', () => {
     ]
     for (const reason of reasons) {
       const project = await act.publish(lea, `Projet ${reason}`)
-      const res = await postReport(max, { target: { kind: 'project', id: project.id }, reason })
+      // Un contenu illégal demande une précision (plan, règle 36).
+      const res = await postReport(max, {
+        target: { kind: 'project', id: project.id },
+        reason,
+        ...(reason === 'illegal' && { details: 'Il publie une adresse privée.' }),
+      })
       expect(res.status, reason).toBe(201)
     }
     await expectError(
@@ -439,7 +460,7 @@ describe('reporting what one cannot report', () => {
     expect((await postReport(max, target('project', meteo.id))).status).toBe(201)
 
     await expectError(
-      await postReport(max, { target: { kind: 'project', id: meteo.id }, reason: 'illegal' }),
+      await postReport(max, { target: { kind: 'project', id: meteo.id }, reason: 'other' }),
       409,
       'already_reported',
     )

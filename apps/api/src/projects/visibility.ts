@@ -1,4 +1,4 @@
-// Qui voit un projet, en un seul endroit (tranche 6d). Avant, chaque lecture écrivait elle-même
+// Qui voit un projet, en un seul endroit (tranche 7a). Avant, chaque lecture écrivait elle-même
 // « visibility = 'public' » ; un projet retiré par la modération doit maintenant disparaître de
 // toutes ces lectures à la fois. Chaque lecture appelle donc l'une de ces deux conditions, et
 // aucune ne réécrit la règle.

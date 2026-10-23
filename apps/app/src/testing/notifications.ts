@@ -121,7 +121,7 @@ export const allNotifications: Notification[] = [
   handleNotification,
 ]
 
-// --- Tranche 6d : les deux sortes de la modération ---
+// --- Tranche 7a : les deux sortes de la modération ---
 // À part de `allNotifications` : les tests des tranches précédentes comptent ses éléments.
 
 /** Le commentaire d'Inès sur « Météo » a été retiré, après un signalement, au nom des règles. */

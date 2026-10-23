@@ -48,7 +48,7 @@ export type EditedComment = z.infer<typeof EditedComment>
  *   « Commentaire masqué » sans auteur ni texte (et sans réponse, elle n'apparaît pas) ;
  * - deleted : une racine supprimée par son auteur, gardée parce qu'elle a des réponses :
  *   « Commentaire supprimé », sans auteur ni texte ;
- * - removed : retiré par la modération (tranche 6d). Seul son auteur le voit encore, avec son
+ * - removed : retiré par la modération (tranche 7a). Seul son auteur le voit encore, avec son
  *   texte et `removal` ; pour tous les autres, l'auteur du projet compris, ce n'est plus qu'un
  *   « Contenu retiré par la modération » sans auteur, ni texte, ni mentions (et sans réponse
  *   visible, il n'apparaît pas). On ne peut plus y répondre ni y réagir.
@@ -75,7 +75,7 @@ export const CommentReply = z
      * L'appli ne fait un lien que de ces pseudos-là.
      */
     mentions: z.array(Mention).max(MENTIONS_MAX),
-    /** Le retrait par la modération (tranche 6d), rempli pour son auteur seul ; null sinon. */
+    /** Le retrait par la modération (tranche 7a), rempli pour son auteur seul ; null sinon. */
     removal: Removal.nullable(),
   })
   .meta({ id: 'CommentReply' })

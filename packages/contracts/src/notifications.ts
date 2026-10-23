@@ -96,7 +96,7 @@ export const HiddenNotification = z.object({
 })
 
 /**
- * Un de ses contenus a été retiré par la modération (tranche 6d). Le texte dit ce qui est retiré,
+ * Un de ses contenus a été retiré par la modération (tranche 7a). Le texte dit ce qui est retiré,
  * qu'il n'est plus visible que de lui jusqu'à un rétablissement, s'il l'a été après un signalement
  * (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment contester.
  * Rétabli, la notification disparaît.
@@ -117,7 +117,7 @@ export const RemovedNotification = z.object({
 })
 
 /**
- * Un de ses signalements a été traité (tranche 6d) : la sorte de cible et l'issue, rien d'autre. Ni
+ * Un de ses signalements a été traité (tranche 7a) : la sorte de cible et l'issue, rien d'autre. Ni
  * titre, ni extrait, ni auteur, ni explication : le contenu a pu devenir privé, ou son auteur
  * partir. `link` mène à la cible seulement si elle est encore visible au moment de la lecture.
  */

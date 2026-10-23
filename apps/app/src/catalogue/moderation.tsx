@@ -1,4 +1,4 @@
-// La section « Modération » du catalogue (tranche 6d) : la carte d'un signalement (ReportCard) dans
+// La section « Modération » du catalogue (tranche 7a) : la carte d'un signalement (ReportCard) dans
 // tous ses états, et les deux notifications de la modération. Fichier à part de CatalogueScreen.tsx,
 // qui l'importe en une ligne : deux personnes y travaillaient en même temps. Ses exemples (un outil
 // de développement, absent de l'appli publiée) sont écrits ici, en français et en anglais.

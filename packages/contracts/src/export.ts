@@ -30,7 +30,7 @@ export const AccountExport = z
         id: z.uuid(),
         body: z.string(),
         createdAt: z.iso.datetime(),
-        /** Le retrait par la modération (tranche 6d) ; null pour une note visible. */
+        /** Le retrait par la modération (tranche 7a) ; null pour une note visible. */
         removal: Removal.nullable(),
       }),
     ),
@@ -64,7 +64,7 @@ export const AccountExport = z
          * sur le texte du membre est une donnée qui le concerne.
          */
         hiddenAt: z.iso.datetime().nullable(),
-        /** Le retrait par la modération (tranche 6d) ; null pour un commentaire visible. */
+        /** Le retrait par la modération (tranche 7a) ; null pour un commentaire visible. */
         removal: Removal.nullable(),
         /** Les identifiants des membres qu'il y mentionne (tranche 6b). */
         mentions: z.array(z.string()),
@@ -77,7 +77,7 @@ export const AccountExport = z
      */
     notifications: z.object({ seenAt: z.iso.datetime().nullable() }),
     /**
-     * Les signalements qu'il a faits (tranche 6d), des plus anciens aux plus récents, sans le texte
+     * Les signalements qu'il a faits (tranche 7a), des plus anciens aux plus récents, sans le texte
      * visé. Jamais ceux qui visent ses contenus.
      */
     reports: z.array(ReportExport),

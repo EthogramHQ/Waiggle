@@ -207,7 +207,7 @@ describe('the layout of a notification e-mail', () => {
   })
 })
 
-// ─── Tranche 6d ──────────────────────────────────────────────────────────────────────────────────
+// ─── Tranche 7a ──────────────────────────────────────────────────────────────────────────────────
 
 // Règle 23 de la relecture du plan : l'adresse de contact dans le pied de chaque e-mail, en texte,
 // jamais en lien « mailto: » (tout lien d'un e-mail mène à l'appli ou à l'API).
@@ -230,7 +230,7 @@ describe('the contact address in the footer', () => {
   })
 })
 
-// L'e-mail d'alerte à l'administrateur (plan 6d, « Tâche et e-mail » ; précision 5) : le nombre
+// L'e-mail d'alerte à l'administrateur (plan 7a, « Tâche et e-mail » ; précision 5) : le nombre
 // de signalements en attente et un lien vers « Modération », sans aucun extrait.
 describe('moderationAlertEmail', () => {
   const url = 'https://waiggle.io/moderation'

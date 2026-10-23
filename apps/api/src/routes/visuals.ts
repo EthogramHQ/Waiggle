@@ -102,7 +102,7 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
     // Son projet retiré par la modération : on n'y ajoute pas de photo tant qu'il n'est pas
-    // rétabli (tranche 6d, règle 30 de la relecture du plan). Supprimer une photo reste permis.
+    // rétabli (tranche 7a, règle 30 de la relecture du plan). Supprimer une photo reste permis.
     if (access === 'removed') return c.json(errorBody(languageOf(c), 'removed'), 409)
     await next()
   })

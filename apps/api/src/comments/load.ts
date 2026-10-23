@@ -76,7 +76,7 @@ export type Viewer = { id: string; isProjectAuthor: boolean; projectIsPrivate: b
 
 /**
  * Le Viewer d'un membre devant un projet qu'il a le droit de voir. Un projet retiré par la
- * modération (tranche 6d) compte comme privé : seul son auteur le voit encore, et il n'y lit que
+ * modération (tranche 7a) compte comme privé : seul son auteur le voit encore, et il n'y lit que
  * ses propres commentaires, puisque les autres ne peuvent plus y lire les leurs.
  */
 export const viewerOf = (
@@ -92,7 +92,7 @@ export const viewerOf = (
  * La règle de visibilité d'un commentaire non supprimé, en un seul endroit (décisions de Louis du
  * 19/10/2026, docs/scenarios/phase-1.md, tranche 5) : ce membre lit-il ce commentaire ?
  * - sans auteur (compte disparu sans passer par l'API) : personne ;
- * - retiré par la modération (tranche 6d, règle 1 de la relecture du plan) : seulement s'il l'a
+ * - retiré par la modération (tranche 7a, règle 1 de la relecture du plan) : seulement s'il l'a
  *   écrit, sans exception, pas même l'auteur du projet (qui lit pourtant ce qu'il a masqué) ;
  * - sur un projet privé : seulement s'il l'a écrit. Ce que les autres ont laissé quand le projet
  *   était public est gardé, mais personne ne le lit, l'auteur du projet compris : rien de ce
@@ -361,7 +361,7 @@ export const loadCommentPage = async (
       authors.has(row.authorId) &&
       sees(row, viewer),
   )
-  // 5. L'explication de ses propres commentaires retirés (tranche 6d), en une requête, et
+  // 5. L'explication de ses propres commentaires retirés (tranche 7a), en une requête, et
   // seulement s'il y en a sur la page (removalsOf ne demande rien pour une liste vide).
   const [mentions, removals] = await Promise.all([
     mentionsOf(db, read),
@@ -402,7 +402,7 @@ export const loadCommentPage = async (
 /**
  * Le nombre de commentaires que tout le monde voit, pour plusieurs projets, en une requête : les
  * racines et les réponses, sans les masqués, les supprimés, les retirés par la modération (règle 1
- * de la relecture du plan de 6d), ni ceux d'un compte disparu (sans auteur). Le même nombre pour
+ * de la relecture du plan de 7a), ni ceux d'un compte disparu (sans auteur). Le même nombre pour
  * tous, les deux auteurs compris. Sur un projet privé ou retiré, que seul son auteur voit, il ne
  * compte que ses propres commentaires : ceux des autres sont cachés à tous (voir `sees`).
  *
@@ -448,7 +448,7 @@ export const commentCountsOf = async (
  * devenus privés (le projet n'est donné que par son identifiant). Un commentaire qu'il a supprimé
  * n'y est plus : son texte est effacé et il n'a plus d'auteur. La date de masquage y est : il a le
  * droit de savoir que l'auteur du projet a masqué son texte, et quand. De même pour un retrait par
- * la modération (tranche 6d, règle 18) : le fondement, l'explication et la date, lus par
+ * la modération (tranche 7a, règle 18) : le fondement, l'explication et la date, lus par
  * removalsOf en une requête de plus, seulement s'il en a. L'index project_comment_author_idx trouve
  * ses commentaires ; le tri se fait ensuite en mémoire (l'export est rare).
  */

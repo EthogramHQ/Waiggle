@@ -21,7 +21,7 @@ export const projectNote = pgTable(
     // l'horloge de JavaScript. Une seule horloge pour tout ce qui date les fils (voir published_at
     // du projet) : les dates se comparent entre elles, et les tests peuvent la remplacer.
     createdAt: timestamp('created_at').notNull(),
-    // Retiré par la modération (tranche 6d) : la note n'est plus visible que de son auteur, avec
+    // Retiré par la modération (tranche 7a) : la note n'est plus visible que de son auteur, avec
     // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
     // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
     removedAt: timestamp('removed_at'),

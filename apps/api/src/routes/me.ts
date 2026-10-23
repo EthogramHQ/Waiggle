@@ -350,7 +350,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Ses réglages d'e-mail et les dates des derniers envois (tranche 6c), valeurs par défaut
     // comprises. Jamais de jeton de désinscription : il se recalcule, il n'est pas gardé.
     const emailPreferences = await exportEmailPreferences(db, user.id)
-    // Les signalements qu'il a faits (tranche 6d, règle 18 de la relecture du plan), des plus
+    // Les signalements qu'il a faits (tranche 7a, règle 18 de la relecture du plan), des plus
     // anciens aux plus récents : la cible, le motif, sa précision, la date et l'issue. Ni le texte
     // visé (snapshot : il appartient à un autre, et a pu devenir privé), ni l'explication de la
     // décision. Jamais les signalements qui le visent : la condition porte sur reporter_id seul.

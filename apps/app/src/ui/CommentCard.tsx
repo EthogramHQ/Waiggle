@@ -8,7 +8,7 @@
 // Trois autres allures :
 // - masqué par l'auteur du projet : un bandeau le dit, au-dessus du texte, que seuls lui et l'auteur
 //   du commentaire lisent encore (`hidden`) ;
-// - retiré par la modération (tranche 6d) : pour son auteur, seul à le lire encore, le bandeau du
+// - retiré par la modération (tranche 7a) : pour son auteur, seul à le lire encore, le bandeau du
 //   retrait (`removed` : pourquoi, et comment contester), au-dessus du texte ;
 // - un emplacement, sans auteur ni texte : « Commentaire supprimé », « Commentaire masqué »,
 //   « Contenu retiré par la modération » (`placeholder`), une ligne discrète gardée parce que des
@@ -64,7 +64,7 @@ type Props = {
   edited?: string | undefined
   /** Le bandeau d'un commentaire masqué (« Masqué par toi »), s'il l'est. */
   hidden?: string | undefined
-  /** Le bandeau d'un commentaire retiré par la modération, pour son auteur (tranche 6d). */
+  /** Le bandeau d'un commentaire retiré par la modération, pour son auteur (tranche 7a). */
   removed?: RemovedBanner | undefined
   /** Ce qu'on lit à la place d'un commentaire sans auteur (« Commentaire supprimé »). */
   placeholder?: string | undefined

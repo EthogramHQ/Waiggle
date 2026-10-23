@@ -1,4 +1,4 @@
-// La page « Tu quittes… » et l'adresse de contact (tranche 6d) : « Nous écrire », dans Mon compte,
+// La page « Tu quittes… » et l'adresse de contact (tranche 7a) : « Nous écrire », dans Mon compte,
 // passe par cette page avec un lien « mailto: ». Seule notre adresse passe ; tout autre « mailto: »
 // reste refusé, comme tout lien qui n'est pas https. À part de LeavingScreen.test.tsx, écrit avant.
 import { contactEmail } from '@ruche/brand'

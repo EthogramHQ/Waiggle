@@ -227,7 +227,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   }
 
   /**
-   * 409 « removed » (tranche 6d, règles 4 et 30 de la relecture du plan) : un contenu retiré par la
+   * 409 « removed » (tranche 7a, règles 4 et 30 de la relecture du plan) : un contenu retiré par la
    * modération ne se modifie plus, et on n'ajoute rien à un projet retiré, tant qu'il n'est pas
    * rétabli. Seul son auteur peut recevoir cette réponse : pour tout autre, le contenu retiré est
    * déjà introuvable (404), et la réponse ne révèle donc rien.

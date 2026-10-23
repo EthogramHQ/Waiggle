@@ -1,4 +1,4 @@
-// Le bandeau d'un contenu retiré par la modération (tranche 6d), tel que son auteur le lit : un
+// Le bandeau d'un contenu retiré par la modération (tranche 7a), tel que son auteur le lit : un
 // titre (« Retiré par la modération »), puis une phrase par ligne (qu'il est seul à le voir, après
 // un signalement ou non, le fondement, l'explication, comment contester). Les phrases viennent de
 // l'écran (reports/removal.ts) : le composant ne fait que les poser.

@@ -229,7 +229,7 @@ export const Project = z
      */
     commentCount: z.int().nonnegative(),
     /**
-     * Le retrait par la modération (tranche 6d). Un projet retiré n'est plus visible que de son
+     * Le retrait par la modération (tranche 7a). Un projet retiré n'est plus visible que de son
      * auteur : c'est donc à lui seul que ce champ est rempli ; null pour un projet visible.
      */
     removal: Removal.nullable(),

@@ -87,7 +87,7 @@ describe('AccountScreen', () => {
   })
 })
 
-// --- Tranche 6d : la modération (administrateur seulement) et l'adresse de contact ---
+// --- Tranche 7a : la modération (administrateur seulement) et l'adresse de contact ---
 
 describe('moderation in my account', () => {
   it('leads an administrator to the moderation page', async () => {

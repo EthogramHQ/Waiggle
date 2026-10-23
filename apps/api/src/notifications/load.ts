@@ -52,7 +52,7 @@ const parisDay = (column: string) =>
  * commentaires de plusieurs projets à la fois (seesSql, elle, sert un projet déjà connu) :
  * - ni supprimé, ni sans auteur : « author_id <> me » écarte aussi les null (null n'est différent
  *   de rien) ;
- * - pas retiré par la modération (tranche 6d, règle 1 : sans exception, pas même pour l'auteur du
+ * - pas retiré par la modération (tranche 7a, règle 1 : sans exception, pas même pour l'auteur du
  *   projet) ;
  * - sur un projet public et pas retiré seulement (listedProject) : sur un projet privé, seul
  *   l'auteur d'un commentaire le lit (et ce n'est pas `me`) ;
@@ -83,8 +83,8 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  *      commentaire sur son projet : ses projets puis project_comment_project_idx) ;
  *   5. ses commentaires masqués : project_comment_author_idx ;
  *   6. son pseudo : la clé primaire de notification_state ;
- *   7. ses contenus retirés par la modération (tranche 6d) ;
- *   8. ses signalements traités (tranche 6d).
+ *   7. ses contenus retirés par la modération (tranche 7a) ;
+ *   8. ses signalements traités (tranche 7a).
  * Les sources 7 et 8 ajoutent cinq colonnes : target_kind (la sorte de contenu), note_id (une note
  * retirée), decision_id (la décision de retrait), outcome (l'issue d'un signalement) et member_id
  * (le membre visé par un signalement, pour le lien) ; null pour les six premières.
@@ -108,7 +108,7 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     upTo
       ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
       : sql`${sql.raw(column)} > ${after}`
-  // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; les deux de la modération (tranche 6d)
+  // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; les deux de la modération (tranche 7a)
   // en ont besoin de cinq de plus. Plutôt que d'ajouter cinq « null » à chacune des six, on les
   // ajoute une fois autour d'elles (« select u.*, null… from (…) u »), et les sources 7 et 8
   // donnent les dix-neuf colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
@@ -120,7 +120,7 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
 
     union all
 
-    -- 7. Ses contenus retirés par la modération (tranche 6d) : ses projets, les notes de ses
+    -- 7. Ses contenus retirés par la modération (tranche 7a) : ses projets, les notes de ses
     --    projets, ses commentaires. Datés du retrait, et repérés par la décision (« removed:<id> »)
     --    : rétabli, le contenu n'a plus de removed_at, et la notification disparaît d'elle-même.
     --    Un commentaire ne vient que d'un projet qu'il voit encore (règle 3 de la relecture du
@@ -154,7 +154,7 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
 
     union all
 
-    -- 8. Ses signalements traités (tranche 6d) : la sorte de cible et l'issue, rien d'autre (règle
+    -- 8. Ses signalements traités (tranche 7a) : la sorte de cible et l'issue, rien d'autre (règle
     --    2). Un signalement « sans objet » (void : la cible a disparu) ne prévient personne (règle
     --    29). Le lien se calcule ici, à la lecture : le projet de la cible, seulement si ce membre
     --    la voit encore (projet visible, note ou commentaire ni retiré, ni supprimé, ni masqué pour
@@ -381,7 +381,7 @@ const ListRow = z.object({
   author_avatar_key: z.string().nullable(),
   author_handle: z.string().nullable(),
   my_handle: z.string().nullable(),
-  // Tranche 6d : les sources de la modération.
+  // Tranche 7a : les sources de la modération.
   target_kind: ReportTargetKind.nullable(),
   outcome: z.string().nullable(),
   member_id: z.string().nullable(),
@@ -552,7 +552,7 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join profile ap on ap.user_id = n.author_id
     left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
     left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
-    -- Tranche 6d : le texte d'une note retirée, et la décision d'un retrait (clés primaires).
+    -- Tranche 7a : le texte d'une note retirée, et la décision d'un retrait (clés primaires).
     left join project_note nt on nt.id = n.note_id
     left join moderation_decision md on md.id = n.decision_id
     order by n.at desc, n.key desc

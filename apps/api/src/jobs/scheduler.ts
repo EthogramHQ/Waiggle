@@ -63,7 +63,7 @@ const tasks: Task[] = [
     run: mentionEmails,
   },
   {
-    // Toutes les 10 minutes (tranche 6d) : l'alerte aux administrateurs, au plus une par heure et
+    // Toutes les 10 minutes (tranche 7a) : l'alerte aux administrateurs, au plus une par heure et
     // par administrateur (moderation-alert.ts). Un passage manqué est fait au suivant. C'est un
     // e-mail : EMAIL_JOBS=off la coupe ; la file se relève alors à la main (docs/ops/moderation.md).
     name: 'moderation-alert',

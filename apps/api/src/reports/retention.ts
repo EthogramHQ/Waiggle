@@ -1,4 +1,4 @@
-// Combien de temps on garde les signalements et les décisions de modération (tranche 6d, règles
+// Combien de temps on garde les signalements et les décisions de modération (tranche 7a, règles
 // 16, 17 et 32 de la relecture du plan ; durées à faire valider par un professionnel). Appelé par
 // la purge de nuit (jobs/nightly-purge.ts) :
 // - d'abord le rattrapage du « sans objet » : les signalements ouverts d'une cible disparue, et

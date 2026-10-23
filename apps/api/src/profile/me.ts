@@ -38,7 +38,7 @@ export const loadMe = async (
     .from(schema.user)
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
     .leftJoin(schema.memberHandle, currentHandleOf(schema.user.id))
-    // Administrateur (tranche 6d) : une ligne de admin_member, non révoquée. Lue à chaque fois,
+    // Administrateur (tranche 7a) : une ligne de admin_member, non révoquée. Lue à chaque fois,
     // dans la même requête (la clé primaire de admin_member) : un rôle retiré se voit aussitôt.
     .leftJoin(
       schema.adminMember,

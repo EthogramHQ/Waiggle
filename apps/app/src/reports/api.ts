@@ -1,4 +1,4 @@
-// Signaler un contenu (tranche 6d) : lire ce qu'on signale, puis envoyer le signalement. La page
+// Signaler un contenu (tranche 7a) : lire ce qu'on signale, puis envoyer le signalement. La page
 // « Signaler » n'appelle que ces fonctions ; les tests les remplacent.
 //
 // La cible vient de l'adresse de la page (`?kind=comment&id=…`), mais son texte vient de l'API

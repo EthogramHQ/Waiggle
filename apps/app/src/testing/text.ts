@@ -1,4 +1,4 @@
-// Outils de test pour retrouver un texte de l'appli à l'écran (tranche 6d), quelle que soit la façon
+// Outils de test pour retrouver un texte de l'appli à l'écran (tranche 7a), quelle que soit la façon
 // dont l'écran l'a découpé (un seul paragraphe, ou une ligne par phrase).
 import type { Removal } from '@ruche/contracts'
 import { createI18n } from '../i18n'
@@ -15,7 +15,7 @@ export const containing = (text: string) =>
   new RegExp(text.replace(/\s+/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 
 /**
- * Ce que l'auteur d'un contenu retiré doit lire (règle 13 de la relecture du plan 6d, article 17
+ * Ce que l'auteur d'un contenu retiré doit lire (règle 13 de la relecture du plan 7a, article 17
  * du DSA), phrase par phrase : ce qui est retiré, que lui seul le voit encore, après un
  * signalement ou non (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et
  * comment contester. Le titre « Retiré par la modération » n'en fait pas partie : chaque test le

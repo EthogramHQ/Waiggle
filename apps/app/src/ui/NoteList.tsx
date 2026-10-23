@@ -7,7 +7,7 @@
 // par le texte de sa note (aria-describedby) : le lecteur d'écran dit laquelle il supprime.
 // Quand une note disparaît, l'écran peut ramener le focus du clavier sur sa voisine (handle).
 //
-// Tranche 6d : pour un autre membre, un drapeau « Signaler cette note » par note (`onReport`),
+// Tranche 7a : pour un autre membre, un drapeau « Signaler cette note » par note (`onReport`),
 // décrit de la même façon par son texte. Pour l'auteur, une note retirée par la modération garde sa
 // place, avec le bandeau du retrait au-dessus de son texte (`removed`).
 import { borders, layout, radii, readableWidth, space, textStyles } from '@ruche/brand'
@@ -24,7 +24,7 @@ type Note = {
   id: string
   body: string
   when: string
-  /** Le bandeau d'une note retirée par la modération, pour l'auteur (tranche 6d). */
+  /** Le bandeau d'une note retirée par la modération, pour l'auteur (tranche 7a). */
   removed?: RemovedBanner | undefined
 }
 

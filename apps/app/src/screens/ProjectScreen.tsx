@@ -309,7 +309,7 @@ function ProjectView({ project }: { project: Project }) {
           errorAction={reaction.expired ? signInAgain() : undefined}
         />
       )}
-      {/* Signaler (tranche 6d), sous les actions : un lien discret, jamais sur son propre projet. */}
+      {/* Signaler (tranche 7a), sous les actions : un lien discret, jamais sur son propre projet. */}
       {project.isMine ? null : (
         <Row>
           <TextLink
@@ -324,7 +324,7 @@ function ProjectView({ project }: { project: Project }) {
     </Stack>
   )
 
-  // Retiré par la modération (tranche 6d) : l'auteur, seul à le voir encore, lit en tête pourquoi,
+  // Retiré par la modération (tranche 7a) : l'auteur, seul à le voir encore, lit en tête pourquoi,
   // et comment contester.
   const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
 
@@ -620,7 +620,7 @@ function Journal({ project }: { project: Project }) {
         id: note.id,
         body: note.body,
         when: shortDate(note.createdAt, i18n.language),
-        // Une note retirée par la modération (tranche 6d) n'arrive qu'à l'auteur du projet : il
+        // Une note retirée par la modération (tranche 7a) n'arrive qu'à l'auteur du projet : il
         // lit pourquoi, au-dessus de son texte.
         removed: note.removal ? removalBanner(note.removal, t) : undefined,
       }))}
@@ -639,7 +639,7 @@ function Journal({ project }: { project: Project }) {
                 : t('project.notes.empty'),
           }
         : {
-            // Un autre membre peut signaler chaque note (tranche 6d).
+            // Un autre membre peut signaler chaque note (tranche 7a).
             onReport: (id: string) =>
               router.push({ pathname: '/report', params: { kind: 'note', id } }),
             reportLabel: t('report.note'),

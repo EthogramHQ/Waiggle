@@ -1,5 +1,5 @@
-// L'alerte aux administrateurs (tranche 6d), que l'ordonnanceur lance toutes les 10 minutes.
-// Plan 6d, « Tâche et e-mail », et règle 15 de la relecture du plan.
+// L'alerte aux administrateurs (tranche 7a), que l'ordonnanceur lance toutes les 10 minutes.
+// Plan 7a, « Tâche et e-mail », et règle 15 de la relecture du plan.
 //
 // S'il y a des signalements ouverts créés après le dernier e-mail d'un administrateur, et que
 // celui-ci date d'au moins une heure (ou n'a jamais eu lieu), il reçoit un e-mail : le nombre de

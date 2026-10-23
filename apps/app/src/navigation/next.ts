@@ -11,11 +11,11 @@ const MAX_LENGTH = 512
 // Les seules pages où revenir : celles qu'un visiteur ouvre par un lien et qui demandent d'être
 // connecté (dont « Mes notifications », là où mène le récap de la semaine, tranche 6c, et
 // « Signaler », avec la sorte et l'identifiant de sa cible, quand la session expire à l'envoi,
-// tranche 6d : la page relit sa cible auprès de l'API, rien n'est pris de l'adresse). Pas la page
+// tranche 7a : la page relit sa cible auprès de l'API, rien n'est pris de l'adresse). Pas la page
 // d'avertissement (/out), qui pourrait servir à pousser vers un faux site juste après la
 // connexion, ni les pages de connexion elles-mêmes.
 const RETURN_PAGES =
-  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|notifications|report)(?:[/?#]|$))/
+  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|notifications|report|moderation)(?:[/?#]|$))/
 
 // Les caractères permis dans un chemin d'adresse, en ASCII seulement : rien d'invisible, aucune
 // barre oblique « pleine chasse » (／) ni caractère de contrôle qui pourrait tromper un navigateur.

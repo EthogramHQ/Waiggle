@@ -1,4 +1,4 @@
-// Tests d'une liste de choix au clavier (tranche 6d) : sur le web, un choix (bouton radio) se coche
+// Tests d'une liste de choix au clavier (tranche 7a) : sur le web, un choix (bouton radio) se coche
 // avec la barre d'espace. Sans cela, la page « Signaler » ne pouvait pas s'envoyer au clavier.
 // À part de components.test.tsx, partagé avec l'autre agent de la tranche.
 import { fireEvent, screen } from '@testing-library/react-native'

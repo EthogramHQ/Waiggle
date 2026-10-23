@@ -60,7 +60,7 @@ export const Me = z
     favoriteTools: z.array(z.string()),
     avatarUrl: z.url().nullable(), // null : pas encore d'avatar
     /**
-     * Vrai si le membre est administrateur (tranche 6d) : l'appli montre alors « Modération ».
+     * Vrai si le membre est administrateur (tranche 7a) : l'appli montre alors « Modération ».
      * L'API refait la vérification à chaque route d'administration : ce champ ne donne aucun droit.
      */
     isAdmin: z.boolean(),

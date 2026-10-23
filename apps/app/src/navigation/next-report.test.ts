@@ -1,4 +1,4 @@
-// Tests de safeNext pour la page « Signaler » (tranche 6d) : quand la session expire à l'envoi,
+// Tests de safeNext pour la page « Signaler » (tranche 7a) : quand la session expire à l'envoi,
 // « Me reconnecter » ramène sur la même page, avec la sorte et l'identifiant de la cible. À part de
 // next.test.ts, écrit avant la tranche.
 import { safeNext } from './next'

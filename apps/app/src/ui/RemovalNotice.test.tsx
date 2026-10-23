@@ -1,4 +1,4 @@
-// Tests du bandeau d'un contenu retiré par la modération (tranche 6d), et des phrases que l'appli y
+// Tests du bandeau d'un contenu retiré par la modération (tranche 7a), et des phrases que l'appli y
 // pose. À part de components.test.tsx, partagé avec l'autre agent de la tranche.
 import type { Removal } from '@ruche/contracts'
 import { screen } from '@testing-library/react-native'

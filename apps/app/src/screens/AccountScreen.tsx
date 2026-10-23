@@ -1,5 +1,5 @@
 // Page « Réglages » : qui est connecté, profil, langue, apparence, export des données,
-// déconnexion, l'adresse pour nous écrire, et la modération pour un administrateur (tranche 6d).
+// déconnexion, l'adresse pour nous écrire, et la modération pour un administrateur (tranche 7a).
 // La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
 
 import { contactEmail, sourceUrl } from '@ruche/brand'
@@ -96,7 +96,7 @@ export function AccountScreen() {
         onPress={() => router.push('/profile')}
       />
 
-      {/* Tranche 6d : la modération, pour un administrateur seulement. La ligne apparaît quand le
+      {/* Tranche 7a : la modération, pour un administrateur seulement. La ligne apparaît quand le
           profil est arrivé ; ce champ ne donne aucun droit, l'API refait la vérification. */}
       {me.data?.isAdmin ? (
         <ListGroup>
@@ -174,7 +174,7 @@ export function AccountScreen() {
 
       {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
           un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
-      {/* Tranche 6d : nous écrire, à l'adresse de contact (écrite dans @ruche/brand seulement).
+      {/* Tranche 7a : nous écrire, à l'adresse de contact (écrite dans @ruche/brand seulement).
           Elle s'affiche en clair, pour qui veut la recopier, et s'ouvre par la page « Tu
           quittes… », comme tout lien vers l'extérieur. */}
       <ListGroup footer={t('account.contact.hint')}>

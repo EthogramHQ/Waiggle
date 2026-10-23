@@ -37,7 +37,7 @@ export const project = pgTable(
     // (tranche 4). null tant qu'il n'a jamais été public. Repasser en privé puis en public ne la
     // change pas. Pas de valeur par défaut : c'est l'API qui l'écrit, avec l'horloge de JavaScript.
     publishedAt: timestamp('published_at'),
-    // Retiré par la modération (tranche 6d) : le projet n'est plus visible que de son auteur, avec
+    // Retiré par la modération (tranche 7a) : le projet n'est plus visible que de son auteur, avec
     // l'explication de la décision. Null : pas retiré. Rétablir remet null. Indépendant de la
     // visibilité choisie par l'auteur : il ne peut pas « dé-retirer » en changeant un réglage.
     removedAt: timestamp('removed_at'),
