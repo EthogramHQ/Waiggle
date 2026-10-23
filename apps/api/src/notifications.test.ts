@@ -26,9 +26,10 @@ import {
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadNotificationsSince } from './notifications/load'
 import { memberCounterKeys } from './rate-limit'
 import { activity } from './testing/activity'
-import { createTestContext, type TestContext } from './testing/context'
+import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
 
 let ctx: TestContext
 let ines: string // cookies de session
@@ -1041,6 +1042,73 @@ describe('the notifications of the moderation', () => {
       expect(page.status).toBe(200)
       expect(text).not.toContain('Météo')
       expect(text).not.toContain(meteo.id)
+    })
+  })
+
+  // Relecture de sécurité de 4966555 (B1), règle 1 du plan : un commentaire retiré ne se lit plus,
+  // pas même par l'auteur du projet. Les notifications de commentaires (raisons « comment »,
+  // « mention », « reply ») ne passent pas par `sees` mais par sa copie en SQL brut, `readable`
+  // (notifications/load.ts) : c'est cette copie que ce test couvre, dans la liste de l'écran et
+  // dans loadNotificationsSince, d'où partent le récap et les e-mails de mentions.
+  describe('a comment removed by the moderation', () => {
+    it('tells nobody about it any more: not the author of the project, not the members it names', async () => {
+      const zoeId = (await me(zoe)).id
+      const since = new Date(Date.now())
+      const meteo = await publish(ines)
+      const fromZoe = await comment(meteo.id, zoe, 'Un commentaire de Zoé')
+      const mention = await comment(meteo.id, malik, 'Regarde ça, @zoe !')
+      const reply = await comment(meteo.id, malik, 'Une réponse insultante', fromZoe.id)
+      const removed = [mention.id, reply.id]
+      // Témoins, avant le retrait : Inès apprend les trois commentaires, Zoé la mention et la réponse.
+      expect(commentReasons(await notifications(ines))).toEqual(
+        expect.arrayContaining([`comment:${mention.id}`, `comment:${reply.id}`]),
+      )
+      expect(commentReasons(await notifications(zoe))).toEqual(
+        expect.arrayContaining([`mention:${mention.id}`, `reply:${reply.id}`]),
+      )
+      const zoeBefore = await loadNotificationsSince(
+        ctx.db,
+        zoeId,
+        since,
+        new Date(Date.now()),
+        TEST_API_URL,
+      )
+      expect(zoeBefore.map(({ row }) => row.comment_id)).toEqual(
+        expect.arrayContaining([mention.id, reply.id]),
+      )
+
+      for (const id of removed) {
+        await report(sam, { kind: 'comment', id })
+        await remove({ kind: 'comment', id }, 'Insulte.')
+      }
+      later()
+      const until = new Date(Date.now())
+
+      for (const [name, cookie, memberId] of [
+        ['Inès', ines, inesId],
+        ['Zoé', zoe, zoeId],
+      ] as const) {
+        // La liste de l'écran : plus rien de ces deux commentaires, ni leur id, ni leur texte.
+        const res = await send('GET', '/v1/notifications', cookie)
+        expect(res.status, name).toBe(200)
+        const text = await res.text()
+        for (const leak of [...removed, 'Regarde ça', 'insultante']) {
+          expect(text, `${name}: ${leak}`).not.toContain(leak)
+        }
+        // La source des e-mails (récap, mentions) : pas davantage.
+        const items = await loadNotificationsSince(ctx.db, memberId, since, until, TEST_API_URL)
+        for (const { row, notification } of items) {
+          expect(removed, name).not.toContain(row.comment_id)
+          expect(JSON.stringify(notification), name).not.toContain('insultante')
+        }
+        // Témoin : seul le commentaire de Zoé reste, pour Inès ; Zoé n'apprend pas le sien.
+        expect(
+          items.flatMap(({ row }) => (row.kind === 'comment' ? [row.comment_id] : [])),
+          name,
+        ).toEqual(name === 'Inès' ? [fromZoe.id] : [])
+      }
+      // Témoin : le commentaire de Zoé, lui, n'est pas retiré, et Inès l'apprend toujours.
+      expect(commentReasons(await notifications(ines))).toEqual([`comment:${fromZoe.id}`])
     })
   })
 

@@ -428,6 +428,30 @@ describe('a content the member cannot see', () => {
     expect((await postReport(max, target('member', leaId))).status).toBe(201)
   })
 
+  // Relecture de sécurité de 4966555 (C3) : un compte dont l'adresse n'a jamais été vérifiée n'est
+  // pas un membre (il n'a ni pseudo ni profil visible). Le signaler, ou lire son aperçu, doit
+  // répondre la même 404 qu'un membre inconnu : sinon la route dirait qu'une inscription existe.
+  it('answers the same 404 for a member whose email was never verified', async () => {
+    await ctx.signUp({ name: 'Tom', email: 'tom@example.com', password: 'tom-long-password' })
+    const [tom] = await ctx.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'tom@example.com'))
+    if (!tom) throw new Error('Tom should exist, unverified')
+
+    await expectSameNotFound(
+      await postReport(max, target('member', tom.id)),
+      await postReport(max, target('member', 'no-such-member')),
+    )
+    const previewOf = (id: string) =>
+      act.send('GET', `/v1/reports/target?${new URLSearchParams({ kind: 'member', id })}`, max)
+    await expectSameNotFound(await previewOf(tom.id), await previewOf('no-such-member'))
+    expect(await storedReports()).toEqual([])
+    // Témoin : le profil de Léa, vérifié, se lit et se signale.
+    expect((await previewOf(leaId)).status).toBe(200)
+    expect((await postReport(max, target('member', leaId))).status).toBe(201)
+  })
+
   // Règle 5 : la visibilité passe avant « déjà signalé ».
   it('answers 404, not 409, for a content reported and then made private', async () => {
     expect((await postReport(max, target('project', meteo.id))).status).toBe(201)
