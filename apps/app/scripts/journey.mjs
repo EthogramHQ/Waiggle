@@ -1,8 +1,9 @@
 // Le parcours réel d'un membre, joué dans un vrai navigateur à la place de Louis : deux personnes
 // s'inscrivent, l'une suit l'autre et publie un projet avec des photos, l'autre le voit arriver dans
 // son fil et le regarde, réagit et commente en mentionnant l'auteur (qui le voit dans ses notifications,
-// répond, puis masque le commentaire) ; puis le
-// projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
+// répond, puis masque le commentaire). Un troisième membre signale un second commentaire, qu'un
+// administrateur retire (tranche 7a) : celui qui a signalé est prévenu, l'auteur voit pourquoi, les
+// autres ne le voient plus. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
 // Usage : node apps/app/scripts/journey.mjs <adresse de l'appli> <adresse de l'API>
@@ -12,6 +13,10 @@
 //                        ses e-mails (ALLOW_CONSOLE_MAIL) : on y lit les liens de vérification ;
 //   JOURNEY_MEDIA_CMD    (facultatif) une commande qui liste les fichiers du dossier des médias,
 //                        pour vérifier que les fichiers disparaissent avec ce qu'ils illustrent ;
+//   JOURNEY_ADMIN_CMD    (facultatif) une commande qui fait d'un membre un administrateur de la
+//                        modération, son adresse ajoutée à la fin (infra/grant-admin.sh sur la
+//                        pile d'essai). Sans elle, la base doit le faire seule : le parcours local
+//                        (journey-local.mjs) prépare la sienne pour le compte « admin-… » ;
 //   JOURNEY_SHELL        (facultatif) le shell de ces commandes (par défaut celui du système).
 // La pile d'essai (infra/stack-test.sh) le lance sur https://ruche.localhost. Jamais sur le vrai site :
 // il crée des comptes, et le vrai site n'écrit pas ses e-mails dans les logs.
@@ -25,6 +30,7 @@ const inviteCode = process.env.JOURNEY_INVITE_CODE ?? ''
 const mailCommand = process.env.JOURNEY_MAIL_CMD
 const mediaCommand = process.env.JOURNEY_MEDIA_CMD
 const shell = process.env.JOURNEY_SHELL
+const adminCommand = process.env.JOURNEY_ADMIN_CMD
 if (!appUrl?.startsWith('http') || !apiUrl?.startsWith('http') || !mailCommand) {
   console.error(
     'Usage : JOURNEY_MAIL_CMD=… node apps/app/scripts/journey.mjs <adresse de l’appli> <adresse de l’API>',
@@ -182,6 +188,9 @@ const signUp = async (someone, name) => {
 const lea = await person('Léa')
 const sam = await person('Sam')
 const visitor = await person('Visiteur')
+// Tranche 7a : Malik signale un commentaire, l'administrateur de la modération le traite.
+const malik = await person('Malik')
+const admin = await person('Admin')
 
 try {
   step('Deux personnes s’inscrivent avec le code d’invitation, et vérifient leur adresse')
@@ -384,6 +393,134 @@ try {
     401,
   )
 
+  // Tranche 7a : signaler, puis traiter le signalement. Sam publie un second commentaire, qu'un
+  // nouveau membre, Malik, signale ; l'administrateur le retire.
+  step('Sam publie un second commentaire ; Malik, nouveau membre, le signale')
+  const spam = 'Gagne 500 € par jour depuis chez toi, écris-moi en privé.'
+  await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+  await sam.page.getByLabel('Ton commentaire').fill(spam)
+  await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
+  await sam.page.getByText('Commentaire publié.').waitFor()
+  await signUp(malik, 'Malik')
+  await open(malik.page, `${appUrl}/projects/${projectId}`)
+  // La réponse de Léa a aussi son « Signaler » : on prend le bouton de la carte du commentaire de
+  // Sam, c'est-à-dire le plus petit bloc qui contient à la fois son texte et un « Signaler » (les
+  // blocs sont rangés du plus grand au plus petit dans la page : le dernier est la carte).
+  await malik.page
+    .locator('div')
+    .filter({ has: malik.page.getByText(spam, { exact: true }) })
+    .filter({ has: malik.page.getByRole('button', { name: 'Signaler', exact: true }) })
+    .last()
+    .getByRole('button', { name: 'Signaler', exact: true })
+    .click()
+  await malik.page.waitForURL(/\/report\?/)
+  // La page vise bien le commentaire de Sam : son identifiant, lu par l'API, est celui de l'adresse.
+  // Et elle le montre (le dernier exemplaire du texte : la page du projet, sous celle-ci dans la
+  // pile de navigation, garde le sien).
+  const spamId = await (async () => {
+    const json = await (
+      await malik.request.get(`${apiUrl}/v1/projects/${projectId}/comments`)
+    ).json()
+    const find = (value) =>
+      value && typeof value === 'object'
+        ? value.body === spam
+          ? value.id
+          : Object.values(value).map(find).find(Boolean)
+        : undefined
+    return find(json) ?? fail('commentaire de Sam introuvable dans l’API')
+  })()
+  expectEqual('commentaire visé', new URL(malik.page.url()).searchParams.get('id'), spamId)
+  await malik.page.getByText('Le commentaire signalé').waitFor()
+  await malik.page.getByText(spam, { exact: true }).last().waitFor()
+  await malik.page.getByRole('radio', { name: 'Arnaque ou spam' }).click()
+  await malik.page
+    .getByLabel('Précision (facultatif)')
+    .fill('Une offre d’argent facile, sans rapport avec le projet.')
+  await malik.page.getByRole('button', { name: 'Envoyer' }).click()
+  await malik.page
+    .getByText('Merci, ton signalement a été envoyé. La modération va le regarder.')
+    .waitFor()
+  console.log('  ok : Malik lit le remerciement')
+
+  // Léa n'est pas prévenue du signalement. Elle répond au commentaire de Sam : une fois celui-ci
+  // retiré, sa réponse doit rester, sous un emplacement (comme sous un commentaire supprimé).
+  step('Léa répond au second commentaire de Sam')
+  const leaAnswer = 'Ce n’est pas le lieu pour ça, Sam.'
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  await lea.page
+    .locator('div')
+    .filter({ has: lea.page.getByText(spam, { exact: true }) })
+    .filter({ has: lea.page.getByRole('button', { name: 'Répondre', exact: true }) })
+    .last()
+    .getByRole('button', { name: 'Répondre', exact: true })
+    .click()
+  await lea.page.getByLabel('Ta réponse').fill(leaAnswer)
+  await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()
+  await lea.page.getByText('Réponse publiée.').waitFor()
+  console.log('  ok : Léa a répondu au commentaire signalé')
+
+  step('Un administrateur ouvre « Modération » depuis « Mon compte », et retire le commentaire')
+  const adminEmail = await signUp(admin, 'Admin')
+  // Le rôle ne se donne par aucune route de l'API. Sur la pile d'essai, le script de production
+  // (infra/grant-admin.sh, JOURNEY_ADMIN_CMD) l'écrit dans la base ; le parcours local, lui, a
+  // préparé sa base pour qu'un compte « admin-… » vérifié le reçoive (journey-local.mjs).
+  if (adminCommand) execSync(`${adminCommand} ${adminEmail}`, { shell, stdio: 'inherit' })
+  await waitFor(
+    'rôle d’administrateur',
+    async () => (await (await admin.request.get(`${apiUrl}/v1/me`)).json()).isAdmin === true,
+  )
+  console.log('  ok : Admin est administrateur')
+  await open(admin.page, `${appUrl}/account`)
+  await admin.page.getByRole('button', { name: 'Modération' }).click()
+  await admin.page.waitForURL(/\/moderation$/)
+  // La carte du signalement : le texte copié au moment de l'envoi, le motif et son nombre, et la
+  // précision de Malik.
+  const reportCard = admin.page
+    .locator('div')
+    .filter({ has: admin.page.getByText(spam, { exact: true }) })
+    .filter({ has: admin.page.getByRole('button', { name: 'Retirer', exact: true }) })
+    .last()
+  await reportCard.getByText(/Arnaque ou spam\s*:\s*1/).waitFor()
+  await reportCard.getByText('Une offre d’argent facile, sans rapport avec le projet.').waitFor()
+  await reportCard.getByRole('button', { name: 'Retirer', exact: true }).click()
+  // La fenêtre « Retirer ce contenu ? » : le plus petit bloc qui contient son titre et le choix du
+  // fondement. Son bouton « Retirer » est le sien, pas celui de la carte, restée dessous.
+  const removeDialog = admin.page
+    .locator('div')
+    .filter({ has: admin.page.getByRole('heading', { name: /^Retirer ce contenu\s*\?$/ }) })
+    .filter({ has: admin.page.getByRole('radiogroup', { name: 'Fondement' }) })
+    .last()
+  await removeDialog.getByRole('radio', { name: /^Les règles de / }).click()
+  const explanation = 'Les messages publicitaires ne sont pas admis dans les commentaires.'
+  await removeDialog.getByLabel('Explication', { exact: true }).fill(explanation)
+  await removeDialog.getByRole('button', { name: 'Retirer', exact: true }).click()
+  await admin.page.getByText('Contenu retiré.', { exact: true }).waitFor()
+  console.log('  ok : l’administrateur a retiré le commentaire')
+
+  step('Malik est prévenu que son signalement a été traité')
+  await open(malik.page, `${appUrl}/notifications`)
+  await malik.page
+    .getByText(/^Ton signalement d’un commentaire a été traité\s*: le commentaire a été retiré\.$/)
+    .waitFor()
+  console.log('  ok : Malik lit « traité » dans ses notifications')
+
+  step('Sam voit son commentaire « Retiré par la modération » ; Léa ne le voit plus')
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await sam.page.getByText('Retiré par la modération', { exact: true }).waitFor()
+  await sam.page.getByText(new RegExp(`^Explication\\s*: ${explanation}$`)).waitFor()
+  await sam.page.getByText(spam, { exact: true }).waitFor()
+  console.log('  ok : Sam lit le bandeau, l’explication et son texte')
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
+  // Pour Léa, le commentaire retiré n'est plus qu'un emplacement, sans auteur ; sa réponse reste.
+  await lea.page.getByText('Contenu retiré par la modération', { exact: true }).waitFor()
+  await lea.page.getByText(leaAnswer, { exact: true }).waitFor()
+  console.log('  ok : Léa voit « Contenu retiré par la modération », et sa réponse dessous')
+  expectEqual('commentaire retiré, à l’écran de Léa', await lea.page.getByText(spam).count(), 0)
+  const leaComments = await (
+    await lea.request.get(`${apiUrl}/v1/projects/${projectId}/comments`)
+  ).text()
+  expectEqual('commentaire retiré, dans l’API pour Léa', leaComments.includes(spam), false)
+
   step('Léa passe le projet en privé : la photo devient introuvable, même pour qui a l’adresse')
   await open(lea.page, `${appUrl}/projects/${projectId}/edit`)
   await lea.page.getByRole('switch', { name: 'Public' }).click()
@@ -427,7 +564,7 @@ try {
 } catch (error) {
   // Une capture de chaque navigateur, et le texte qu'il affiche : de quoi comprendre où le
   // parcours s'est arrêté, même sans ouvrir les captures (gardées par la CI).
-  for (const [who, someone] of Object.entries({ lea, sam })) {
+  for (const [who, someone] of Object.entries({ lea, sam, malik, admin })) {
     await someone.page.screenshot({ path: `journey-${who}.png`, fullPage: true }).catch(() => {})
     const text = await someone.page
       .locator('body')
