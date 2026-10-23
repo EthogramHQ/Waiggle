@@ -77,6 +77,19 @@ describe('CreateReport', () => {
     expect(CreateReport.safeParse({ ...report, reason: 'other' }).success).toBe(true)
   })
 
+  // Relecture de sécurité de 4966555 (C1) : une précision « remplie » de caractères invisibles
+  // n'explique rien. Un liant sans chasse (U+200D), un accent seul (U+0301, qui se pose sur la
+  // lettre précédente) ou la lettre de remplissage coréenne (U+3164, qui ne dessine rien) passent
+  // un simple `trim()` : le contrat doit les refuser comme une précision vide.
+  it('refuses an explanation of an illegal content made of invisible characters only', () => {
+    for (const details of ['‍', '́', 'ㅤ', ' ‍́ㅤ ']) {
+      expect(
+        CreateReport.safeParse({ ...report, reason: 'illegal', details }).success,
+        JSON.stringify(details),
+      ).toBe(false)
+    }
+  })
+
   it('takes optional details of 500 characters at most, trimmed', () => {
     expect(CreateReport.parse(report)).toEqual(report)
     expect(CreateReport.parse({ ...report, details: '  Le lien mène à une arnaque.  ' })).toEqual({

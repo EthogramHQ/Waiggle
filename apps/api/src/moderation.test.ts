@@ -409,6 +409,36 @@ describe('removing a project', () => {
     expect((await readProject(meteo.id, lea)).removal?.afterReport).toBe(false)
   })
 
+  // Relecture de sécurité de 4966555 (C2) : les photos d'un projet retiré ne se servent plus à
+  // qui a gardé leur adresse. /media/<clé> doit répondre à Zoé exactement comme pour une clé qui
+  // n'existe pas (statut, type et corps), sinon l'adresse dirait que la photo existe encore.
+  it('stops serving its photos to the others, like an unknown file, and keeps them for its author', async () => {
+    later()
+    const added = await ctx.request(`/v1/projects/${meteo.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: visualForm(await jpegImage(1200, 800)),
+    })
+    expect(added.status).toBe(201)
+    const url = Project.parse(await added.json()).visuals[0]?.url ?? ''
+    const open = (path: string, cookie: string) => ctx.request(path, { headers: { cookie } })
+    const photo = new URL(url).pathname
+    const unknown = `/media/visuals/${UNKNOWN}.webp`
+    expect((await open(photo, zoe)).status).toBe(200) // témoin, avant le retrait
+
+    await report(max, projectTarget())
+    await remove(projectTarget())
+
+    const res = await open(photo, zoe)
+    const reference = await open(unknown, zoe)
+    expect(res.status).toBe(404)
+    expect(res.status).toBe(reference.status)
+    expect(res.headers.get('content-type')).toBe(reference.headers.get('content-type'))
+    expect(await res.text()).toBe(await reference.text())
+    // Léa, son autrice, voit encore son projet retiré : ses photos aussi.
+    expect((await open(photo, lea)).status).toBe(200)
+  })
+
   it('gives no removal to a project that is not removed', async () => {
     expect((await readProject(meteo.id, lea)).removal).toBeNull()
     expect((await readProject(meteo.id, zoe)).removal).toBeNull()
