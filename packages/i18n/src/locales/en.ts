@@ -113,6 +113,7 @@ export const en: Translation = {
     section: { title: 'Account' },
     contact: {
       label: 'Contact us',
+      spoken: 'Contact us: {{contactEmail}}',
       hint: 'In English or French. For a question, something to report, or your data.',
     },
     moderation: 'Moderation',
@@ -145,7 +146,7 @@ export const en: Translation = {
       wrongPassword: 'Incorrect password.',
       remains: {
         title: 'What stays',
-        reports: 'Your reports stay for a year, without your name',
+        reports: 'Your reports stay, without your name, until a year after they are handled',
         removals: 'A record of removals of your content stays for a year',
       },
     },
@@ -452,7 +453,7 @@ export const en: Translation = {
     back: 'Go back',
     illegalRequired: 'Tell us why this content seems illegal to you.',
     limited:
-      'You’ve already sent 20 reports today. You can send more tomorrow. For something urgent, write to us: {{contactEmail}}',
+      'You’ve reached the limit of {{max}} reports in 24 hours. For something urgent, write to us: {{contactEmail}}',
     gone: 'This content no longer exists, or you can no longer see it.',
   },
   moderation: {
@@ -467,18 +468,21 @@ export const en: Translation = {
     snapshot: 'Text at the time of the report; current images',
     count_one: '{{count}} report',
     count_other: '{{count}} reports',
-    reasonCount: '{{reason}} ×{{count}}',
+    reasonCount: '{{reason}}: {{count}}',
     since: 'First reported on {{date}}',
     removedOn: 'Removed on {{date}}',
     concernsMe: 'This concerns you: another administrator has to decide.',
     state: { removed: 'Already removed', gone: 'Since deleted by its author' },
     view: 'View',
+    viewProject: 'View the project',
+    describe: '{{kind}}: {{excerpt}}',
+    list: 'List shown',
     remove: 'Remove',
     dismiss: 'Dismiss',
     restore: 'Restore',
     removeTitle: 'Remove this content?',
     removeMessage:
-      'Only its author will see it, and they’ll be told with your explanation. You can restore it.',
+      'Other members won’t see it any more. Its author will be told, with your explanation. You can restore it.',
     groundLabel: 'Grounds',
     grounds: { illegal: 'The law', rules: '{{appName}}’s rules' },
     explanation: 'Explanation',
@@ -495,7 +499,7 @@ export const en: Translation = {
   },
   removal: {
     banner: 'Removed by moderation',
-    onlyYou: 'Only you can see it now, until it may be restored.',
+    onlyYou: 'Other members can no longer see it, until it may be restored.',
     afterReport: 'After a report, a person from moderation decided to remove it.',
     direct: 'A person from moderation decided to remove it.',
     grounds: {
@@ -604,7 +608,7 @@ export const en: Translation = {
       body_other: '{{count}} reports are waiting for a decision.',
       button: 'Open moderation',
       reason:
-        'You’re getting this e-mail because you’re an administrator of {{appName}}. At most one an hour.',
+        'You’re getting this email because you’re an administrator of {{appName}}. At most one an hour.',
     },
     greeting: 'Hi {{name}},',
     verify: {

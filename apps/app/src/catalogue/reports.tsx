@@ -14,7 +14,7 @@ import { Text } from '../ui/Text'
 const fr = {
   section: 'Signaler, et ce qui est retiré',
   removedTitle: 'Retiré par la modération',
-  onlyYou: 'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
+  onlyYou: 'Les autres membres ne voient plus ce contenu, jusqu’à un éventuel rétablissement.',
   afterReport: 'Après un signalement, une personne de la modération a décidé de le retirer.',
   direct: 'Une personne de la modération a décidé de le retirer.',
   groundRules: 'Fondement : les règles de Waiggle.',
@@ -44,7 +44,7 @@ const fr = {
 const en: typeof fr = {
   section: 'Reporting, and what is removed',
   removedTitle: 'Removed by the moderation',
-  onlyYou: 'Only you can see it now, until it is restored.',
+  onlyYou: 'Other members can no longer see it, until it may be restored.',
   afterReport: 'After a report, a person from the moderation decided to remove it.',
   direct: 'A person from the moderation decided to remove it.',
   groundRules: 'Ground: the rules of Waiggle.',

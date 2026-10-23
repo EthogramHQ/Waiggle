@@ -9,7 +9,7 @@ import { MemberId } from './members'
 import { ProjectNoteId } from './notes'
 import { ProjectId } from './projects'
 import { REMOVAL_EXPLANATION_MAX, RemovalGround } from './removal'
-import { FreeText, VisibleFreeText } from './text'
+import { FreeText, isClean, VisibleFreeText } from './text'
 
 /** La précision libre d'un signalement : 500 caractères au plus. */
 export const REPORT_DETAILS_MAX = 500
@@ -60,7 +60,9 @@ export type ReportReason = z.infer<typeof ReportReason>
  * l'API le lit en base. Une précision vide compte comme aucune, sauf pour un contenu dit illégal :
  * elle y est obligatoire (article 16 du règlement européen sur les services numériques, une
  * explication suffisamment étayée ; décision du 23/10/2026). `refine` ajoute cette règle qui lie
- * deux champs ; `path` range l'erreur sous `details`.
+ * deux champs ; `path` range l'erreur sous `details`. La précision doit montrer au moins un
+ * caractère visible : des espaces exotiques ou un accent seul ne disent rien (relecture de
+ * sécurité, 23/10/2026).
  */
 export const CreateReport = z
   .object({
@@ -68,10 +70,16 @@ export const CreateReport = z
     reason: ReportReason,
     details: FreeText(REPORT_DETAILS_MAX).optional(),
   })
-  .refine((report) => report.reason !== 'illegal' || (report.details ?? '').trim() !== '', {
-    path: ['details'],
-    message: 'an illegal content needs an explanation',
-  })
+  .refine(
+    (report) =>
+      report.reason !== 'illegal' ||
+      // isClean laisse passer un texte vide (c'est l'affaire de min(1)) : on l'écarte d'abord.
+      (!!report.details && isClean(report.details, { lineBreaks: true, needsVisible: true })),
+    {
+      path: ['details'],
+      message: 'an illegal content needs an explanation',
+    },
+  )
   .meta({ id: 'CreateReport' })
 export type CreateReport = z.infer<typeof CreateReport>
 

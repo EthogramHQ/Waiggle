@@ -123,6 +123,7 @@ export const fr = {
     section: { title: 'Compte' },
     contact: {
       label: 'Nous écrire',
+      spoken: 'Nous écrire : {{contactEmail}}',
       hint: 'En français ou en anglais. Pour une question, un contenu à signaler ou tes données.',
     },
     moderation: 'Modération',
@@ -157,7 +158,7 @@ export const fr = {
       wrongPassword: 'Mot de passe incorrect.',
       remains: {
         title: 'Ce qui reste',
-        reports: 'Tes signalements restent, sans ton nom, un an',
+        reports: 'Tes signalements restent, sans ton nom, jusqu’à un an après leur traitement',
         removals: 'Une trace des retraits de tes contenus reste un an',
       },
     },
@@ -475,7 +476,7 @@ export const fr = {
     // quota de 20 par jour, et un contenu disparu entre l’ouverture de la page et l’envoi.
     illegalRequired: 'Dis-nous pourquoi ce contenu te semble illégal.',
     limited:
-      'Tu as déjà envoyé 20 signalements aujourd’hui. Tu pourras en envoyer d’autres demain. Pour un cas urgent, écris-nous : {{contactEmail}}',
+      'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous : {{contactEmail}}',
     gone: 'Ce contenu n’existe plus, ou tu ne peux plus le voir.',
   },
   moderation: {
@@ -490,18 +491,24 @@ export const fr = {
     snapshot: 'Texte au moment du signalement ; images actuelles',
     count_one: '{{count}} signalement',
     count_other: '{{count}} signalements',
-    reasonCount: '{{reason}} ×{{count}}',
+    reasonCount: '{{reason}} : {{count}}',
     since: 'Premier signalement le {{date}}',
     removedOn: 'Retiré le {{date}}',
     concernsMe: 'Te concerne : un autre administrateur doit décider.',
     state: { removed: 'Déjà retiré', gone: 'Supprimé depuis par son auteur' },
     view: 'Voir',
+    // Un contenu retiré : le projet qui le porte reste lisible (une note, un commentaire).
+    viewProject: 'Voir le projet',
+    // Ce qui relie chaque bouton d’une carte à son contenu, lu par le lecteur d’écran.
+    describe: '{{kind}} : {{excerpt}}',
+    // Le nom du groupe d’onglets (« En attente », « Retirés »).
+    list: 'Liste affichée',
     remove: 'Retirer',
     dismiss: 'Classer sans suite',
     restore: 'Rétablir',
     removeTitle: 'Retirer ce contenu ?',
     removeMessage:
-      'Il ne sera plus visible que de son auteur, qui sera prévenu avec ton explication. Tu pourras le rétablir.',
+      'Les autres membres ne le verront plus. Son auteur sera prévenu, avec ton explication. Tu pourras le rétablir.',
     groundLabel: 'Fondement',
     grounds: { illegal: 'La loi', rules: 'Les règles de {{appName}}' },
     explanation: 'Explication',
@@ -521,9 +528,10 @@ export const fr = {
     // lui seul, après un signalement ou non, qu'une personne a décidé, le fondement, l'explication,
     // et comment contester.
     banner: 'Retiré par la modération',
-    onlyYou: 'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
-    afterReport: 'Après un signalement, une personne de la modération a décidé de le retirer.',
-    direct: 'Une personne de la modération a décidé de le retirer.',
+    onlyYou: 'Les autres membres ne voient plus ce contenu, jusqu’à un éventuel rétablissement.',
+    afterReport:
+      'Après un signalement, une personne de la modération a décidé de retirer ce contenu.',
+    direct: 'Une personne de la modération a décidé de retirer ce contenu.',
     grounds: {
       illegal: 'Fondement : la loi.',
       rules: 'Fondement : les règles de {{appName}}.',
