@@ -119,7 +119,25 @@ export const noteRoutes = ({ db, limiter }: Deps) => {
     // date de publication d'un projet. Publier une note ne touche pas au projet : sa date de
     // modification (updatedAt) ne bouge pas.
     const note = { id: crypto.randomUUID(), projectId: id, body, createdAt: new Date() }
-    await db.insert(schema.projectNote).values(note)
+    // La garde a lu le projet AVANT cette écriture : la modération a pu le retirer, ou son auteur
+    // le supprimer, entre-temps. On relit donc son état dans une transaction, en verrouillant sa
+    // ligne « FOR SHARE » : une écriture sur cette ligne (le retrait, la suppression) attend la fin
+    // de la transaction, et deux lectures partagées ne se gênent pas. PostgreSQL travaille en READ
+    // COMMITTED : si la ligne était en cours de modification, la lecture verrouillée attend, puis
+    // rend sa version la plus récente, déjà validée. Ce qu'on lit ne change plus jusqu'à l'insertion.
+    const outcome = await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select({ removedAt: schema.project.removedAt })
+        .from(schema.project)
+        .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
+        .for('share')
+      if (!locked) return 'gone' as const
+      if (locked.removedAt !== null) return 'removed' as const
+      await tx.insert(schema.projectNote).values(note)
+      return 'ok' as const
+    })
+    if (outcome === 'gone') return notFound(c)
+    if (outcome === 'removed') return removed(c)
     return c.json(toNote(note), 201)
   })
 

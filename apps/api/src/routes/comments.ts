@@ -234,6 +234,32 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    */
   const removed = (ctx: Context<AppEnv>) => ctx.json(errorBody(languageOf(ctx), 'removed'), 409)
 
+  /**
+   * L'état du projet relu DANS la transaction qui écrit, sous verrou. Les gardes ont lu le projet
+   * avant elle : la modération a pu le retirer entre-temps (ou son auteur le rendre privé, ou le
+   * supprimer). « FOR SHARE » verrouille la ligne contre toute écriture (le retrait attend la fin de
+   * la transaction) sans gêner les autres lecteurs : deux membres qui commentent en même temps ne
+   * s'attendent pas. PostgreSQL travaille en READ COMMITTED : une lecture verrouillée qui a dû
+   * attendre une écriture en cours rend la version la plus récente de la ligne, déjà validée.
+   * 'gone' : le projet n'est plus visible de ce membre (404, comme la garde le dirait maintenant) ;
+   * 'removed' : son propre projet, retiré (409) ; 'open' : on peut écrire.
+   */
+  const lockedProjectState = async (
+    tx: Pick<Database, 'select'>,
+    projectId: string,
+    userId: string,
+  ) => {
+    const [project] = await tx
+      .select({ removedAt: schema.project.removedAt })
+      .from(schema.project)
+      .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
+      .for('share')
+    // visibleTo cache un projet retiré à tout autre que son auteur : s'il est encore trouvé et
+    // retiré, c'est donc le sien.
+    if (!project) return 'gone' as const
+    return project.removedAt === null ? ('open' as const) : ('removed' as const)
+  }
+
   /** Compte la demande dans un quota du membre ; renvoie le délai d'attente s'il est dépassé. */
   const overLimit = async (key: string, rule: RateRule) => {
     const decision = await limiter.hit(key, rule)
@@ -322,6 +348,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // « for share » la verrouille contre une suppression jusqu'à la fin de la transaction (la
     // suppression, elle, la verrouille « for update » : l'une attend l'autre).
     const written = await db.transaction(async (tx) => {
+      // D'abord le projet, relu sous verrou (règle 30 : rien ne s'ajoute à un projet retiré).
+      const state = await lockedProjectState(tx, id, user.id)
+      if (state !== 'open') return state
       if (replyTo !== undefined) {
         const [root] = await tx
           .select({
@@ -338,7 +367,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         // (masqué, ou laissé par un autre sur un projet devenu privé), ou retiré par la modération,
         // même pour son auteur qui le lit encore (règle 4 : on ne répond plus à un contenu retiré).
         if (!root || root.rootId !== null || root.removedAt !== null || !sees(root, viewer)) {
-          return null
+          return 'gone' as const
         }
       }
       await tx.insert(c).values(row)
@@ -348,7 +377,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       if (mentions.length > 0) await saveMentions(tx, row.id, mentions, row.createdAt)
       return mentions
     })
-    if (!written) return notFound(ctx)
+    if (written === 'gone') return notFound(ctx)
+    if (written === 'removed') return removed(ctx)
 
     const authors = await authorsOf(db, [user.id], publicApiUrl)
     const shown = presentComment(row, viewer, authors, false, written)
@@ -369,6 +399,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // (saveMentions, mentions/write.ts).
     const editedAt = new Date()
     const edited = await db.transaction(async (tx) => {
+      // Le projet relu sous verrou : retiré depuis la garde, son commentaire dessus ne se modifie
+      // plus (règle 4) ; devenu invisible pour ce membre, il est introuvable.
+      const state = await lockedProjectState(tx, id, user.id)
+      if (state !== 'open') return state
       const [row] = await tx
         .update(c)
         .set({ body, editedAt })
@@ -394,7 +428,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           removedAt: c.removedAt,
           removalId: c.removalId,
         })
-      if (!row) return null
+      if (!row) return 'gone' as const
       // Les mentions déjà gardées d'abord : un pseudo encore écrit garde le membre qu'il désignait
       // à l'écriture, même si ce pseudo a changé de main depuis (mentions/write.ts).
       const kept = await mentionsOf(tx, row.id)
@@ -402,7 +436,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       await saveMentions(tx, row.id, mentions, editedAt)
       return { row, mentions }
     })
-    if (!edited) return notFound(ctx)
+    if (edited === 'gone') return notFound(ctx)
+    if (edited === 'removed') return removed(ctx)
     const { row, mentions } = edited
     const authors = await authorsOf(db, [user.id], publicApiUrl)
     // Son auteur voit toujours son commentaire, masqué ou non, sur un projet public ou privé :

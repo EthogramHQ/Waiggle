@@ -32,6 +32,7 @@ import {
   toolSlug,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -834,6 +835,99 @@ describe('adding to a removed project', () => {
     })
     await expectError(photo, 409, 'removed')
     expect((await readProject(meteo.id, lea)).notes).toEqual([])
+  })
+})
+
+// Règles 4 et 30, sous le verrou (relecture de sécurité de 7a) : les gardes lisent l'état du projet
+// AVANT la transaction qui écrit. Si la modération le retire entre les deux, l'écriture doit le voir
+// et répondre comme la garde. Pour placer le retrait exactement là, on intercepte la première
+// transaction ouverte par la route : juste avant elle, le projet est retiré en base (comme le ferait
+// une décision de l'administrateur arrivée au même instant). La garde, elle, a déjà dit « le tien ».
+describe('a removal that lands between the guard and the write', () => {
+  /** Retire `projectId` en base juste avant la prochaine transaction, puis la laisse se faire. */
+  const removeBeforeNextTransaction = (projectId: string) => {
+    const original = ctx.db.transaction.bind(ctx.db)
+    const spy = vi.spyOn(ctx.db, 'transaction')
+    spy.mockImplementationOnce(async (run, config) => {
+      await ctx.db
+        .update(schema.project)
+        .set({ removedAt: new Date() })
+        .where(eq(schema.project.id, projectId))
+      return original(run, config)
+    })
+    return spy
+  }
+
+  it('does not save a change to the project', async () => {
+    const spy = removeBeforeNextTransaction(meteo.id)
+    later()
+    const res = await act.send('PATCH', `/v1/projects/${meteo.id}`, lea, { title: 'Autre titre' })
+    expect(spy).toHaveBeenCalled()
+    await expectError(res, 409, 'removed')
+    const [row] = await ctx.db
+      .select({ title: schema.project.title })
+      .from(schema.project)
+      .where(eq(schema.project.id, meteo.id))
+    expect(row?.title).toBe('Météo')
+  })
+
+  it('does not add a photo, and drops its file', async () => {
+    const spy = removeBeforeNextTransaction(meteo.id)
+    later()
+    const res = await ctx.request(`/v1/projects/${meteo.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: visualForm(await jpegImage(1200, 800)),
+    })
+    expect(spy).toHaveBeenCalled()
+    await expectError(res, 409, 'removed')
+    expect(await ctx.db.select().from(schema.projectMedia)).toEqual([])
+    expect([...ctx.storage.files.keys()].filter((key) => key.startsWith('visuals/'))).toEqual([])
+  })
+
+  it('does not add a note', async () => {
+    const spy = removeBeforeNextTransaction(meteo.id)
+    later()
+    const res = await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Une note' })
+    expect(spy).toHaveBeenCalled()
+    await expectError(res, 409, 'removed')
+    expect(await ctx.db.select().from(schema.projectNote)).toEqual([])
+  })
+
+  it('does not add a comment: removed for the author of the project, unknown for another', async () => {
+    removeBeforeNextTransaction(meteo.id)
+    later()
+    const own = await act.send('POST', `/v1/projects/${meteo.id}/comments`, lea, { body: 'Merci' })
+    await expectError(own, 409, 'removed')
+
+    // Rétabli en base, puis retiré de nouveau pendant le commentaire de Max : pour lui, un projet
+    // retiré est introuvable, comme partout ailleurs (404, rien ne révèle le retrait).
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: null })
+      .where(eq(schema.project.id, meteo.id))
+    removeBeforeNextTransaction(meteo.id)
+    later()
+    const other = await act.send('POST', `/v1/projects/${meteo.id}/comments`, max, {
+      body: 'Bravo',
+    })
+    await expectError(other, 404, 'not_found')
+    expect(await ctx.db.select().from(schema.projectComment)).toEqual([])
+  })
+
+  it('does not save an edit to a comment on the removed project of its author', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Merci à tous')
+    removeBeforeNextTransaction(meteo.id)
+    later()
+    const res = await act.send('PATCH', `/v1/projects/${meteo.id}/comments/${comment.id}`, lea, {
+      body: 'Un texte corrigé',
+    })
+    await expectError(res, 409, 'removed')
+    const [row] = await ctx.db
+      .select({ body: schema.projectComment.body })
+      .from(schema.projectComment)
+      .where(eq(schema.projectComment.id, comment.id))
+    expect(row?.body).toBe('Merci à tous')
   })
 })
 
