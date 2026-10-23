@@ -744,6 +744,99 @@ describe('Choices', () => {
     expect(screen.getByRole('radio', { name: 'Terminé', checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Idée', checked: false })).toBeTruthy()
   })
+
+  // Une question à laquelle il faut répondre soi-même (le motif d'un retrait) : rien n'est coché.
+  it('may start with no choice checked', async () => {
+    await renderWithProviders(
+      <Choices
+        label="Pourquoi ?"
+        options={[
+          { value: 'rules', label: 'Les règles' },
+          { value: 'law', label: 'La loi' },
+        ]}
+        value={null}
+        onChange={() => {}}
+      />,
+    )
+
+    expect(screen.getAllByRole('radio')).toHaveLength(2) // témoin
+    expect(screen.queryByRole('radio', { checked: true })).toBeNull()
+  })
+
+  // Tranche 7a, relecture de design de 4966555 : sur le web, la barre d'espace ne cochait rien (seuls
+  // les boutons y réagissent dans react-native-web) et les flèches ne bougeaient pas.
+  describe('on the web, with the keyboard', () => {
+    /** Une touche du clavier, telle que react-native-web la passe à onKeyDown. */
+    const key = (name: string) => ({ key: name, repeat: false, preventDefault: () => {} })
+    const options = [
+      { value: 'rules', label: 'Les règles' },
+      { value: 'law', label: 'La loi' },
+      { value: 'other', label: 'Autre' },
+    ] as const
+    type Reason = (typeof options)[number]['value']
+    const Sample = ({ start = null }: { start?: Reason | null }) => {
+      const [value, setValue] = useState<Reason | null>(start)
+      return <Choices label="Pourquoi ?" options={[...options]} value={value} onChange={setValue} />
+    }
+
+    it('checks a choice with the space bar', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample />)
+
+        await fireEvent(screen.getByRole('radio', { name: 'La loi' }), 'keyDown', key(' '))
+
+        expect(screen.getByRole('radio', { name: 'La loi', checked: true })).toBeTruthy()
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('moves to the next or previous choice with the arrows, going round', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample start="rules" />)
+
+        await fireEvent(
+          screen.getByRole('radio', { name: 'Les règles' }),
+          'keyDown',
+          key('ArrowRight'),
+        )
+        expect(screen.getByRole('radio', { name: 'La loi', checked: true })).toBeTruthy()
+
+        await fireEvent(screen.getByRole('radio', { name: 'La loi' }), 'keyDown', key('ArrowDown'))
+        expect(screen.getByRole('radio', { name: 'Autre', checked: true })).toBeTruthy()
+
+        await fireEvent(screen.getByRole('radio', { name: 'Autre' }), 'keyDown', key('ArrowRight'))
+        expect(screen.getByRole('radio', { name: 'Les règles', checked: true })).toBeTruthy()
+
+        await fireEvent(
+          screen.getByRole('radio', { name: 'Les règles' }),
+          'keyDown',
+          key('ArrowLeft'),
+        )
+        expect(screen.getByRole('radio', { name: 'Autre', checked: true })).toBeTruthy()
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('is a single stop for Tab: the checked choice, or the first one when none is', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(<Sample />)
+        const tabIndexes = () =>
+          screen.getAllByRole('radio').map((radio) => radio.props.tabIndex as number | undefined)
+
+        expect(tabIndexes()).toEqual([0, -1, -1])
+
+        await fireEvent.press(screen.getByRole('radio', { name: 'Autre' }))
+        expect(tabIndexes()).toEqual([-1, -1, 0])
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+  })
 })
 
 describe('TagInput', () => {

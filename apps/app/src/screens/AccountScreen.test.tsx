@@ -1,11 +1,12 @@
 import { contactEmail } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { Linking } from 'react-native'
 import { signOut } from '../accounts/api'
 import { getMe } from '../profile/api'
 import { adminMe, leaMe } from '../testing/fixtures'
 import { pathOf, visited } from '../testing/navigation'
 import { mockSession, renderWithI18n } from '../testing/render'
-import { containing } from '../testing/text'
+import { containing, fr } from '../testing/text'
 import { AccountScreen } from './AccountScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
@@ -120,13 +121,31 @@ describe('writing to us from my account', () => {
     expect(screen.getAllByText(/En français ou en anglais/).length).toBeGreaterThan(0)
   })
 
-  it('opens an e-mail to the contact address through the leaving page', async () => {
+  // Test changé après la relecture de design de 4966555 : « Nous écrire » passait par la page « Tu
+  // quittes Waiggle », dont les textes parlent d'un site tiers. Notre propre adresse s'ouvre
+  // directement dans la messagerie, sans avertissement.
+  it('opens an e-mail to the contact address directly, without the leaving page', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+    try {
+      await renderWithI18n(<AccountScreen />)
+
+      await fireEvent.press(screen.getByRole('button', { name: /^Nous écrire/ }))
+
+      // L'adresse vient de packages/brand, seul endroit où elle est écrite.
+      expect(openURL).toHaveBeenCalledWith(`mailto:${contactEmail}`)
+      expect(visited(mockPush).filter((href) => href.startsWith('/out'))).toEqual([])
+    } finally {
+      openURL.mockRestore()
+    }
+  })
+
+  it('says the contact address in the spoken name of the row', async () => {
     await renderWithI18n(<AccountScreen />)
 
-    await fireEvent.press(screen.getByRole('button', { name: /^Nous écrire/ }))
-
-    // useOpenOutside : la page d'avertissement, avec l'adresse mailto: (seul endroit où elle est
-    // écrite : packages/brand).
-    expect(visited(mockPush)).toContain(`/out?url=mailto:${contactEmail}`)
+    expect(
+      screen.getByRole('button', {
+        name: fr.t('account.contact.spoken', { contactEmail }),
+      }),
+    ).toBeTruthy()
   })
 })

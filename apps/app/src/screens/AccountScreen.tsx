@@ -8,6 +8,7 @@ import { supportedLanguages } from '@ruche/i18n'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Linking } from 'react-native'
 import { downloadMyData, signOut, useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
 import { useOpenOutside } from '../navigation/links'
@@ -172,21 +173,21 @@ export function AccountScreen() {
         />
       </ListGroup>
 
-      {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
-          un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
       {/* Tranche 7a : nous écrire, à l'adresse de contact (écrite dans @ruche/brand seulement).
-          Elle s'affiche en clair, pour qui veut la recopier, et s'ouvre par la page « Tu
-          quittes… », comme tout lien vers l'extérieur. */}
+          Elle s'affiche en clair, pour qui veut la recopier, et s'ouvre directement dans la
+          messagerie : c'est notre adresse, pas un site tiers, donc sans la page « Tu quittes… ». */}
       <ListGroup footer={t('account.contact.hint')}>
         <ListRow
           label={t('account.contact.label')}
           detail={contactEmail}
-          spokenLabel={`${t('account.contact.label')}, ${contactEmail}`}
+          spokenLabel={t('account.contact.spoken', { contactEmail })}
           trailing="envelope-simple"
-          onPress={() => openOutside(`mailto:${contactEmail}`)}
+          onPress={() => void Linking.openURL(`mailto:${contactEmail}`)}
         />
       </ListGroup>
 
+      {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
+          un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
       <ListGroup title={t('account.about.title')} footer={t('home.openSource')}>
         <ListRow
           label={t('home.seeCode')}

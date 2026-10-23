@@ -11,7 +11,8 @@
 // - `sendReport(report: CreateReport)` : l'envoi, qui rend un `ApiResult` (`{ ok: true, data }` ou
 //   `{ ok: false, error }`, la clé du message d'erreur).
 // La page elle-même reçoit les paramètres bruts de l'adresse (app/report.tsx) : `kind` et `id`.
-import type { ReportTarget, ReportTargetPreview } from '@ruche/contracts'
+import { contactEmail } from '@ruche/brand'
+import { REPORTS_PER_DAY, type ReportTarget, type ReportTargetPreview } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { getReportTarget, sendReport } from '../reports/api'
@@ -331,8 +332,12 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    // Décision du 23/10 (plan, règle 35) : une phrase propre au quota de 20 par jour.
-    expect(await screen.findByText(containing(fr.t('report.limited')))).toBeTruthy()
+    // Décision du 23/10 (plan, règle 35) : une phrase propre au quota de 20 par jour. La limite et
+    // l'adresse de contact y arrivent en paramètres (`{{max}}`, `{{contactEmail}}`), jamais vides.
+    const limited = fr.t('report.limited', { max: REPORTS_PER_DAY, contactEmail })
+    expect(limited).toContain(String(REPORTS_PER_DAY))
+    expect(limited).toContain(contactEmail)
+    expect(await screen.findByText(containing(limited))).toBeTruthy()
     expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
   })
 

@@ -1,8 +1,10 @@
-// La page « Tu quittes… » et l'adresse de contact (tranche 7a) : « Nous écrire », dans Mon compte,
-// passe par cette page avec un lien « mailto: ». Seule notre adresse passe ; tout autre « mailto: »
-// reste refusé, comme tout lien qui n'est pas https. À part de LeavingScreen.test.tsx, écrit avant.
+// La page « Tu quittes… » et l'adresse de contact (tranche 7a). Test changé après la relecture de
+// design de 4966555 : « Nous écrire », dans Mon compte, ouvre la messagerie directement (voir
+// AccountScreen.test.tsx), car les textes de cette page parlent d'un site tiers. Elle redevient
+// réservée aux liens https : un « mailto: », même vers notre adresse, y est refusé.
+// À part de LeavingScreen.test.tsx, écrit avant.
 import { contactEmail } from '@ruche/brand'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { screen } from '@testing-library/react-native'
 import { Linking } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { LeavingScreen } from './LeavingScreen'
@@ -24,16 +26,16 @@ beforeEach(() => {
 })
 afterEach(() => openURL.mockRestore())
 
-describe('LeavingScreen and the contact address', () => {
-  it('opens an e-mail to our contact address', async () => {
+describe('LeavingScreen and e-mail addresses', () => {
+  it('refuses an e-mail link, even to our contact address', async () => {
     await renderWithProviders(<LeavingScreen url={`mailto:${contactEmail}`} />)
 
-    await fireEvent.press(screen.getByRole('button', { name: `Continuer vers ${contactEmail}` }))
-
-    expect(openURL).toHaveBeenCalledWith(`mailto:${contactEmail}`)
+    expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy() // témoin
+    expect(screen.queryByRole('button', { name: /^Continuer vers/ })).toBeNull()
+    expect(openURL).not.toHaveBeenCalled()
   })
 
-  it('never opens an e-mail to another address, nor one with something added', async () => {
+  it('refuses an e-mail link with something added', async () => {
     await renderWithProviders(<LeavingScreen url={`mailto:${contactEmail}?bcc=x@example.com`} />)
 
     expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy() // témoin
