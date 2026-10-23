@@ -194,9 +194,13 @@ jobs:
           [[ $api =~ ^[a-z0-9.-]+$ ]] || { echo "API_DOMAIN invalide"; exit 1; }
           # Les anciens domaines ne servent pas à construire, mais le serveur lit ce fichier
           # (shell et Caddy) : même contrôle.
-          for name in LEGACY_APP_DOMAIN LEGACY_API_DOMAIN; do
-            [[ $(read_value "$name") =~ ^[a-z0-9.-]+$ ]] || { echo "$name invalide"; exit 1; }
-          done
+          legacy_app=$(read_value LEGACY_APP_DOMAIN); legacy_api=$(read_value LEGACY_API_DOMAIN)
+          [[ $legacy_app =~ ^[a-z0-9.-]+$ ]] || { echo "LEGACY_APP_DOMAIN invalide"; exit 1; }
+          [[ $legacy_api =~ ^[a-z0-9.-]+$ ]] || { echo "LEGACY_API_DOMAIN invalide"; exit 1; }
+          # Caddy refuse de démarrer si deux blocs portent le même nom (un échange mal fait entre
+          # ancien et nouveau domaine) : les six noms servis doivent tous être différents.
+          [ "$(printf '%s\n' "$app" "$api" "www.$app" "$legacy_app" "www.$legacy_app" "$legacy_api" | sort -u | wc -l)" = 6 ] ||
+            { echo "site.env : deux domaines identiques"; exit 1; }
           [[ $prefix =~ ^ghcr\.io/[a-z0-9._/-]+$ ]] || { echo "IMAGE_PREFIX invalide"; exit 1; }
           { echo "app=$app"; echo "api=$api"; echo "prefix=$prefix"; } >>"$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

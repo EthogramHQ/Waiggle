@@ -618,9 +618,12 @@ Fait une fois, de `waiggle.io` vers `waiggle.com` (23/10/2026, ADR 0006). Dans l
 6. Changer le code d'invitation (l'ancien circule dans des liens vers l'ancien domaine) ; garder
    l'ancien domaine en renouvellement automatique.
 
-Revenir en arrière : dans l'heure, redéployer le commit précédent ; ensuite, un commit qui
-permute les deux domaines dans `site.env` (les navigateurs ont retenu les redirections
-permanentes).
+Revenir en arrière : jamais en redéployant le commit précédent, même dans l'heure. Les
+navigateurs gardent les redirections permanentes sans limite, et l'ancien commit ne sert plus le
+nouveau domaine : qui a suivi une redirection tomberait sur une erreur de certificat, sans pouvoir
+passer outre (HSTS). On revient par un commit qui permute les deux domaines dans `site.env`
+(l'ancien redevient principal, le nouveau passe dans `LEGACY_*`), préparé sur une branche avant
+la bascule, fusionné puis déployé.
 
 ### Mises à jour
 

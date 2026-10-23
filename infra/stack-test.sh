@@ -64,7 +64,8 @@ web() {
   curl -sS -k --max-time 20 \
     --resolve "$APP_HOST:443:127.0.0.1" --resolve "$APP_HOST:80:127.0.0.1" \
     --resolve "$API_HOST:443:127.0.0.1" --resolve "www.$APP_HOST:443:127.0.0.1" \
-    --resolve "$OLD_HOST:443:127.0.0.1" --resolve "www.$OLD_HOST:443:127.0.0.1" \
+    --resolve "$OLD_HOST:443:127.0.0.1" --resolve "$OLD_HOST:80:127.0.0.1" \
+    --resolve "www.$OLD_HOST:443:127.0.0.1" \
     --resolve "$OLD_API_HOST:443:127.0.0.1" "$@"
 }
 
@@ -188,20 +189,27 @@ expect "ancienne API" "$(redirect_of "https://$OLD_API_HOST/health")" "308 https
 expect "ancienne API, POST" "$(redirect_of -X POST "https://$OLD_API_HOST/v1/email/unsubscribe?token=x")" \
   "308 https://$API_HOST/v1/email/unsubscribe?token=x"
 # En suivant la redirection, la méthode arrive intacte : un POST avec un faux jeton reçoit le refus
-# de l'API (400), là où un GET aurait été renvoyé vers la page de l'appli.
-expect "désinscription en un clic, redirigée" \
-  "$(web -L -X POST -o /dev/null -w '%{http_code}' "https://$OLD_API_HOST/v1/email/unsubscribe?token=x")" 400
+# de l'API (400), là où un GET aurait été renvoyé vers la page de l'appli. Avec -d (et non
+# -X POST, que curl garde après n'importe quelle redirection), curl fait comme une messagerie :
+# il ne garde le POST qu'après un 308.
+expect "désinscription en un clic, redirigée" "$(web -L -o /dev/null -w '%{http_code}' \
+  -d 'List-Unsubscribe=One-Click' "https://$OLD_API_HOST/v1/email/unsubscribe?token=x")" 400
 # Redirections piégées : la destination reste toujours sur notre domaine.
 for path in '//evil.example/' '/%5Cevil.example' '/\evil.example' '/..//evil.example'; do
   location=$(web --path-as-is -o /dev/null -w '%header{location}' "https://$OLD_HOST$path")
   [[ $location == "https://$APP_HOST/"* ]] || die "$path renvoie vers « $location »"
 done
+# Un en-tête Host inconnu : Caddy n'a aucun bloc pour ce nom, il ne redirige nulle part.
 location=$(web -o /dev/null -w '%header{location}' -H 'Host: evil.example' "https://$OLD_HOST/x")
-[[ $location != *evil.example* ]] || die "un en-tête Host piégé change la destination : « $location »"
-# HSTS reste sur les redirections (le navigateur l'a retenu pour ces noms).
+[ -z "$location" ] || die "un en-tête Host piégé obtient une redirection : « $location »"
+# Les anciens noms passent aussi de HTTP à HTTPS, avant de rediriger.
+expect "ancien domaine, HTTP → HTTPS" "$(redirect_of "http://$OLD_HOST/x")" "308 https://$OLD_HOST/x"
+# HSTS reste sur les redirections (le navigateur l'a retenu pour ces noms), et Caddy n'y annonce
+# pas son nom.
 for url in "https://$OLD_HOST/" "https://$OLD_API_HOST/health" "https://www.$APP_HOST/"; do
-  grep -qx "strict-transport-security: max-age=31536000; includesubdomains" <<<"$(headers_of "$url")" ||
-    die "$url : HSTS manquant"
+  h=$(headers_of "$url")
+  grep -qx "strict-transport-security: max-age=31536000; includesubdomains" <<<"$h" || die "$url : HSTS manquant"
+  if grep -q '^server:' <<<"$h"; then die "$url : Caddy annonce son nom"; fi
 done
 # L'API refuse l'ancienne origine : écriture, connexion, et pré-vol CORS.
 expect "écriture depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X PATCH "https://$API_HOST/v1/me" \
@@ -209,8 +217,13 @@ expect "écriture depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code
 expect "connexion depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X POST \
   "https://$API_HOST/api/auth/sign-in/email" -H "Origin: https://$OLD_HOST" -H 'Content-Type: application/json' \
   -d '{"email":"a@example.com","password":"stack-test-password"}')" 403
-if headers_of -X OPTIONS "https://$API_HOST/v1/me" -H "Origin: https://$OLD_HOST" \
-  -H 'Access-Control-Request-Method: PATCH' | grep -q '^access-control-allow-origin:'; then
+# Le contrôle général de Better Auth sur ses POST ne joue qu'avec un cookie : un faux suffit.
+expect "déconnexion depuis l'ancienne origine" "$(web -o /dev/null -w '%{http_code}' -X POST \
+  "https://$API_HOST/api/auth/sign-out" -H "Origin: https://$OLD_HOST" \
+  -H 'Cookie: __Secure-ruche.session_token=faux')" 403
+preflight=$(headers_of -X OPTIONS "https://$API_HOST/v1/me" -H "Origin: https://$OLD_HOST" \
+  -H 'Access-Control-Request-Method: PATCH')
+if grep -q '^access-control-allow-origin:' <<<"$preflight"; then
   die "le pré-vol CORS accepte l'ancienne origine"
 fi
 echo "ok"
