@@ -152,17 +152,22 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // deux 5 photos et en ajouteraient chacun une : 7 au total.
     let outcome:
       | { gone: true }
-      | { gone: false; full: true }
-      | { gone: false; full: false; replacedKey: string | null }
+      | { gone: false; removed: true }
+      | { gone: false; removed: false; full: true }
+      | { gone: false; removed: false; full: false; replacedKey: string | null }
     try {
       outcome = await db.transaction(async (tx) => {
         const [locked] = await tx
-          .select({ id: schema.project.id })
+          .select({ removedAt: schema.project.removedAt })
           .from(schema.project)
           .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
           .for('update')
         // Le projet a été supprimé pendant le traitement de l'image : il n'y a plus où la ranger.
         if (!locked) return { gone: true }
+        // Ou retiré par la modération depuis la garde (lue avant le traitement de l'image) : on le
+        // relit ici, sous le verrou. En READ COMMITTED, « FOR UPDATE » rend la version la plus
+        // récente de la ligne, celle qu'a laissée une décision validée pendant qu'on attendait.
+        if (locked.removedAt !== null) return { gone: false, removed: true }
         const existing = await tx
           .select({
             id: schema.projectMedia.id,
@@ -176,7 +181,7 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
         let replacedKey: string | null = null
         if (slot.data === 'gallery' && existing.length >= VISUALS_MAX) {
-          return { gone: false, full: true }
+          return { gone: false, removed: false, full: true }
         }
         if (slot.data === 'portrait') {
           // Une seule couverture verticale : la nouvelle remplace l'ancienne.
@@ -197,7 +202,7 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           height: result.height,
           thumbhash: result.thumbhash,
         })
-        return { gone: false, full: false, replacedKey }
+        return { gone: false, removed: false, full: false, replacedKey }
       })
     } catch (error) {
       await storage.delete(key) // la base n'a rien enregistré : le nouveau fichier ne sert à rien
@@ -206,6 +211,10 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (outcome.gone) {
       await storage.delete(key)
       return notFound(c)
+    }
+    if (outcome.removed) {
+      await storage.delete(key) // rien n'a été enregistré : le fichier déjà écrit ne sert à rien
+      return c.json(errorBody(languageOf(c), 'removed'), 409)
     }
     if (outcome.full) {
       await storage.delete(key)

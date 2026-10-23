@@ -191,11 +191,18 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     const outcome = await db.transaction(async (tx) => {
       // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
       // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
-      await tx
-        .select({ id: schema.project.id })
+      const [locked] = await tx
+        .select({ removedAt: schema.project.removedAt })
         .from(schema.project)
         .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
         .for('update')
+      // La garde (projectAccess) a lu le projet AVANT cette transaction : la modération a pu le
+      // retirer, ou son auteur le supprimer, entre-temps. On relit donc son état ici, sous le
+      // verrou. PostgreSQL travaille en READ COMMITTED : un « SELECT … FOR UPDATE » qui a dû attendre
+      // la fin d'une autre écriture sur la ligne rend sa version la plus récente, déjà validée.
+      // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
+      if (!locked) return 'gone' as const
+      if (locked.removedAt !== null) return 'removed' as const
       if (changes.visualOrder !== undefined) {
         const gallery = await tx
           .select({ id: schema.projectMedia.id })
@@ -227,6 +234,8 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }
       return 'ok' as const
     })
+    if (outcome === 'gone') return notFound(c)
+    if (outcome === 'removed') return removed(c)
     if (outcome === 'invalid_order') return c.json(errorBody(languageOf(c), 'validation'), 400)
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
