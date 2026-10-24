@@ -80,20 +80,34 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
   )
 }
 
-type RowProps = {
+// Les propriétés d'une ligne : une base commune, et `detailAlert` réservé aux lignes qui s'y
+// prêtent (le type « ou bien… ou bien… » ci-dessous refuse les autres dès la compilation).
+type RowProps = RowBase &
+  (
+    | { detailAlert?: undefined }
+    | {
+        /**
+         * La précision dit pourquoi quelque chose a échoué : c'est une alerte, lue dès qu'elle
+         * paraît. La valeur (un compteur d'échecs) pose l'alerte à neuf quand elle change : un
+         * nouvel échec est relu, alors qu'une alerte restée en place ne le serait pas. Le reste de
+         * la ligne (un bouton « Réessayer » qui a le focus) ne bouge pas.
+         * Seulement sur une ligne sans `onPress` : le nom d'une ligne qu'on touche cache son
+         * contenu, l'alerte comprise (elle ne serait pas lue). Et pas avec `detailRight` : seule
+         * la précision placée sous le libellé devient une alerte.
+         */
+        detailAlert: number
+        onPress?: undefined
+        detailRight?: false
+      }
+  )
+
+type RowBase = {
   label: string
   /** Une icône dans une pastille, à gauche du libellé. */
   icon?: IconName
   /** Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. */
   detail?: string
   detailRight?: boolean
-  /**
-   * La précision dit pourquoi quelque chose a échoué : c'est une alerte, lue dès qu'elle paraît.
-   * La valeur (un compteur d'échecs) pose l'alerte à neuf quand elle change : un nouvel échec est
-   * relu, alors qu'une alerte restée en place ne le serait pas. Le reste de la ligne (un bouton
-   * « Réessayer » qui a le focus) ne bouge pas.
-   */
-  detailAlert?: number
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
   tone?: 'default' | 'danger'

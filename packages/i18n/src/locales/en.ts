@@ -17,6 +17,7 @@ export const en: Translation = {
     remove: 'Remove {{item}}',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
+    crashedTitle: 'Something went wrong',
   },
   home: {
     title: 'Welcome to {{appName}}',

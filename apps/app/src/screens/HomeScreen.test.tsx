@@ -279,8 +279,13 @@ describe('the « following » feed on the home screen', () => {
     } as unknown as ReturnType<typeof useFollowingFeed>)
     await renderMemberHome()
 
+    // La règle (une seule action miel par écran), pas la couleur choisie pour « Réessayer » : un
+    // seul bouton au fond miel, et ce n'est pas lui.
+    const honey = (element: ReturnType<typeof screen.getByRole>) =>
+      StyleSheet.flatten(element.props.style)?.backgroundColor === palettes.day.honey
     const retry = screen.getByRole('button', { name: 'Réessayer' })
-    expect(StyleSheet.flatten(retry.props.style).backgroundColor).toBe(palettes.day.surface)
+    expect(honey(retry)).toBe(false)
+    expect(screen.getAllByRole('button').filter(honey)).toHaveLength(1)
     await fireEvent.press(retry)
     expect(following.refetch).toHaveBeenCalledTimes(1)
   })

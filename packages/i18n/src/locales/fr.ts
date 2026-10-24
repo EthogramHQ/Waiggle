@@ -23,6 +23,8 @@ export const fr = {
     remove: 'Retirer {{item}}',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
+    /** Le titre de l'écran de secours, au-dessus de « Cette page n’a pas pu s’afficher. ». */
+    crashedTitle: 'Un problème est survenu',
   },
   home: {
     title: 'Bienvenue sur {{appName}}',
