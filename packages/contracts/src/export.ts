@@ -2,6 +2,7 @@
 // formes venues de plusieurs fichiers (compte, projets…), sans créer de dépendance circulaire.
 import { z } from 'zod'
 import { Me } from './accounts'
+import { BlockExport } from './blocks'
 import { CommentId } from './comments'
 import { EmailPreferencesExport } from './email'
 import { Project, ProjectId } from './projects'
@@ -81,6 +82,8 @@ export const AccountExport = z
      * visé. Jamais ceux qui visent ses contenus.
      */
     reports: z.array(ReportExport),
+    /** Les membres qu'il a bloqués (tranche 7b), des plus anciens aux plus récents ; jamais qui l'a bloqué. */
+    blocks: z.array(BlockExport),
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

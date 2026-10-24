@@ -828,9 +828,71 @@ Règles détaillées :
 
 **Signaler** : fait en tranche 7a (signaler, retirer ou classer, décisions tracées).
 
-**Bloquer**
+**Bloquer** : tranche 7b, ci-dessous.
+
+## Tranche 7b — Bloquer
+
 - Un membre peut en bloquer un autre : ils ne voient plus leurs contenus respectifs et ne peuvent
   plus interagir
+
+### Précisions (tranche 7b) — validées le 24/10/2026
+
+Décisions de Louis (24/10/2026) :
+- **Toutes les entrées d'un membre sont modérées**, après coup : chacune peut être signalée, et
+  sera retirable par l'administrateur (le retrait d'une partie d'un profil ou d'un projet vient en
+  7c, avec la suspension). Jamais de retrait automatique. Plus tard, dans une tranche à part : des
+  filtres qui remontent un doute à l'administrateur, qui valide ou non ; peut-être une aide par IA.
+- **Pas un bouton par champ** : une seule entrée « Signaler » par objet, dans son menu ; le détail
+  (une photo, la bio…) se choisira sur la page « Signaler » (7c). « Bloquer » vit dans le menu de
+  la page d'un membre, et la confirmation d'un signalement propose aussi de bloquer.
+- **Le blocage cache dans les deux sens**, et la personne bloquée n'est pas prévenue.
+
+**Bloquer**
+- Étant donné Malik, connecté, sur la page d'Inès
+- Quand il choisit « Bloquer » dans le menu, lit ce qui va changer, et confirme
+- Alors Malik et Inès ne voient plus les contenus l'un de l'autre : projets, notes, commentaires,
+  mentions ; Malik voit encore l'en-tête de la page d'Inès (nom, pseudo, photo), avec « Tu as
+  bloqué @ines », pour la débloquer ou signaler son profil
+- Et leurs abonnements réciproques sont retirés ; ils ne reviennent pas au déblocage
+- Et Inès n'est pas prévenue : pour elle, la page de Malik répond comme si elle n'existait pas
+
+**Après un signalement**
+- Étant donné Malik qui vient de signaler un commentaire d'Inès
+- Alors la confirmation lui propose aussi de bloquer Inès
+
+**Débloquer**
+- Étant donné Malik qui ouvre « Membres bloqués » depuis « Mon compte »
+- Quand il choisit « Débloquer » pour Inès
+- Alors tout réapparaît de part et d'autre, sauf les abonnements
+
+Règles détaillées :
+- **Commentaires déjà écrits** : dans un fil, le commentaire de l'autre est remplacé pour les deux
+  personnes seulement (« Commentaire d'un membre que tu as bloqué » pour qui a bloqué,
+  « Commentaire indisponible » pour l'autre ; « Commentaire masqué » reste réservé au geste de
+  l'auteur du projet) ; les autres membres le voient toujours, et les réponses restent. Chacun
+  peut toujours supprimer ses propres commentaires et retirer ses réactions.
+- **Plus d'interaction** : ni commenter, ni répondre, ni réagir, ni suivre, chez l'autre.
+- **Les réactions déjà données** restent dans les compteurs, qui ne montrent jamais de nom.
+- **Mentions** : chacun disparaît des suggestions de l'autre après « @ » ; une mention tapée à la
+  main ne prévient pas.
+- **Notifications et e-mails** : ceux qui viennent de l'autre (mention, commentaire, réponse,
+  abonnement, récap du lundi) disparaissent ; les anciennes peuvent réapparaître au déblocage. Une
+  notification de modération (retrait, signalement traité) n'est jamais coupée par un blocage.
+- **La modération voit tout**, blocage ou non ; bloquer ne prévient pas la modération : le dialogue
+  conseille de signaler d'abord. Un blocage ne sert qu'à cacher : ni compteur, ni signal de
+  modération ; débloquer efface la ligne.
+- **Anti-abus** : 100 blocages par membre et par jour.
+- **Export des données** : les membres que j'ai bloqués (pseudo, date) ; jamais qui m'a bloqué.
+- **Conservation** : un blocage est gardé jusqu'au déblocage ou à la suppression d'un des deux
+  comptes.
+- **Registre des entrées** : chaque champ qu'un membre saisit (nom, pseudo, bio, outils, photo ;
+  titre, pitch, description, prompts, outils, lien de démo, photos, couverture d'un projet ;
+  notes ; commentaires) est inscrit à un registre ; un test échoue si un champ n'y est pas couvert
+  par le signalement, le blocage et l'export (le retrait s'y ajoute en 7c).
+- **Copie complète au signalement** : le texte gardé au moment du signalement comprend tous les
+  textes de la cible (pour un projet : aussi description, prompts, outils, lien de démo ; pour un
+  profil : aussi les outils), pas seulement le titre et le pitch. La copie des images est à peser
+  avec la relecture juridique (garder la preuve, ou ne pas garder une image peut-être illégale).
 
 **Administrer**
 - Un administrateur voit la file des signalements, peut masquer un contenu, suspendre un compte et

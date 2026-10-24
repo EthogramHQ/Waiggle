@@ -51,9 +51,23 @@ export type EditedComment = z.infer<typeof EditedComment>
  * - removed : retiré par la modération (tranche 7a). Seul son auteur le voit encore, avec son
  *   texte et `removal` ; pour tous les autres, l'auteur du projet compris, ce n'est plus qu'un
  *   « Contenu retiré par la modération » sans auteur, ni texte, ni mentions (et sans réponse
- *   visible, il n'apparaît pas). On ne peut plus y répondre ni y réagir.
+ *   visible, il n'apparaît pas). On ne peut plus y répondre ni y réagir ;
+ * - blocked : écrit par un membre que le visiteur a bloqué (tranche 7b) : « Commentaire d'un membre
+ *   que tu as bloqué », sans auteur ni texte ;
+ * - unavailable : écrit par un membre qui a bloqué le visiteur : « Commentaire indisponible », sans
+ *   auteur ni texte. Ces deux emplacements suivent la règle des autres : sans réponse visible, le
+ *   commentaire n'apparaît pas. Sauf deux exceptions où le texte reste lu : l'auteur du projet chez
+ *   lui (il y garde la modération), et un commentaire qui mentionne le visiteur et dont l'auteur
+ *   l'a bloqué (il doit pouvoir le signaler).
  */
-export const CommentState = z.enum(['visible', 'hidden', 'deleted', 'removed'])
+export const CommentState = z.enum([
+  'visible',
+  'hidden',
+  'deleted',
+  'removed',
+  'blocked',
+  'unavailable',
+])
 export type CommentState = z.infer<typeof CommentState>
 
 /** Une réponse, ou une racine sans ses réponses. */

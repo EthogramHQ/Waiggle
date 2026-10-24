@@ -24,6 +24,12 @@ export const Member = z
     favoriteTools: z.array(ProjectTool),
     /** Vrai si c'est la page du membre qui regarde : ses projets privés y figurent aussi. */
     isMe: z.boolean(),
+    /**
+     * Vrai si le visiteur a bloqué ce membre (tranche 7b) : la page n'en montre plus que l'en-tête
+     * (nom, pseudo, photo), pour le débloquer ou signaler son profil. Bio vide, ni outils, ni
+     * projets, ni abonnés. Un membre qui a bloqué le visiteur n'a pas de page pour lui (404).
+     */
+    isBlocked: z.boolean(),
     /** Si le visiteur la suit, et combien de membres la suivent (jamais leurs noms). */
     ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */

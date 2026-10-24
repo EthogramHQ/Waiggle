@@ -23,6 +23,11 @@ export const ErrorCode = z.enum([
   'already_reported',
   'already_decided',
   'removed',
+  // Tranche 7b : se bloquer soi-même ; mentionner un membre qu'on a bloqué ; re-signaler un contenu
+  // inchangé depuis que la modération l'a examiné.
+  'cannot_block_own',
+  'blocked_mention',
+  'already_examined',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

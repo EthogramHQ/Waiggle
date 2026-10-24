@@ -78,6 +78,13 @@
       "when": 1792706512779,
       "tag": "0010_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792855304935,
+      "tag": "0011_member_blocks",
+      "breakpoints": true
     }
   ]
 }
