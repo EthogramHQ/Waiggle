@@ -39,6 +39,7 @@ import { hostOf, shortDate } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
+import { ActionMenu } from '../ui/ActionMenu'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
@@ -63,7 +64,6 @@ import { StatusPill } from '../ui/StatusPill'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
-import { TextLink } from '../ui/TextLink'
 import { Thumbnails } from '../ui/Thumbnails'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
@@ -309,15 +309,19 @@ function ProjectView({ project }: { project: Project }) {
           errorAction={reaction.expired ? signInAgain() : undefined}
         />
       )}
-      {/* Signaler (tranche 7a), sous les actions : un lien discret, jamais sur son propre projet. */}
+      {/* Le menu « … » (tranche 7b), sous les actions : « Signaler ce projet ». Jamais sur son
+          propre projet, où il n'aurait rien à offrir (pas de menu vide). */}
       {project.isMine ? null : (
         <Row>
-          <TextLink
-            label={t('report.project')}
-            tone="secondary"
-            onPress={() =>
-              router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
-            }
+          <ActionMenu
+            items={[
+              {
+                label: t('report.project'),
+                icon: 'flag',
+                onPress: () =>
+                  router.push({ pathname: '/report', params: { kind: 'project', id: project.id } }),
+              },
+            ]}
           />
         </Row>
       )}

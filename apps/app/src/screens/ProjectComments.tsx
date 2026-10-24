@@ -14,6 +14,7 @@ import {
   COMMENT_MAX,
   type Comment,
   type CommentReply,
+  type CommentState,
   CommentText,
   type Project,
 } from '@ruche/contracts'
@@ -70,6 +71,17 @@ type FocusTarget = { card: string } | { thread: string }
 
 // Le champ où se tape une mention : le nouveau commentaire, la réponse, ou la modification.
 type MentionFrom = 'root' | 'reply' | 'edit'
+
+// Le texte de l'emplacement d'un commentaire sans auteur, selon son état. Un commentaire « visible »
+// a toujours son auteur : sa ligne ne sert pas, elle garde l'ancien texte par défaut.
+const placeholderKey = {
+  visible: 'project.comments.hiddenPlaceholder',
+  hidden: 'project.comments.hiddenPlaceholder',
+  deleted: 'project.comments.deletedPlaceholder',
+  removed: 'project.comments.removedPlaceholder',
+  blocked: 'project.comments.blockedPlaceholder',
+  unavailable: 'project.comments.unavailablePlaceholder',
+} as const satisfies Record<CommentState, string>
 
 export function Comments({ project }: { project: Project }) {
   const { t, i18n } = useTranslation()
@@ -140,8 +152,18 @@ export function Comments({ project }: { project: Project }) {
     // Son propre commentaire retiré par la modération : on ne le modifie plus (l'API refuserait,
     // 409 `removed`), on peut encore le supprimer.
     if (comment.isMine) return comment.state === 'removed' ? ['delete'] : ['edit', 'delete']
-    // Un emplacement (supprimé, masqué ou retiré pour qui regarde) n'a aucune action.
-    if (!comment.author || comment.state === 'deleted' || comment.state === 'removed') return []
+    // Un emplacement (supprimé, masqué, retiré, ou caché par un blocage, pour qui regarde) n'a
+    // aucune action : rien à y lire, donc rien à signaler, et on n'interagit plus avec un membre
+    // bloqué.
+    if (
+      !comment.author ||
+      comment.state === 'deleted' ||
+      comment.state === 'removed' ||
+      comment.state === 'blocked' ||
+      comment.state === 'unavailable'
+    ) {
+      return []
+    }
     // L'auteur du projet masque le commentaire d'un autre ; tout le monde peut le signaler,
     // jamais le sien.
     return project.isMine ? ['hide', 'report'] : ['report']
@@ -168,11 +190,20 @@ export function Comments({ project }: { project: Project }) {
   })
 
   // Le message d'un envoi refusé. 429 et 401 : « Réessaie » ne servirait à rien, on dit pourquoi.
+  // Une mention d'un membre qu'on a bloqué (422, tranche 7b) : on le dit, sans nommer qui (l'API ne
+  // le dit pas) ; le texte reste dans le champ, à corriger.
   const failure = (
     reason: CommentFailure | undefined,
     otherwise: string,
     limited = t('project.comments.limited'),
-  ) => (reason === 'limited' ? limited : reason === 'expired' ? t('states.expired') : otherwise)
+  ) =>
+    reason === 'limited'
+      ? limited
+      : reason === 'expired'
+        ? t('states.expired')
+        : reason === 'blockedMention'
+          ? t('errors.blockedMention')
+          : otherwise
   // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
   // doit l'être avant de partir (la fenêtre de confirmation).
   const failureAction = (reason: CommentFailure | undefined, before?: () => void) =>
@@ -506,13 +537,11 @@ export function Comments({ project }: { project: Project }) {
             ? removalBanner(comment.removal, t)
             : undefined
         }
-        placeholder={
-          comment.state === 'deleted'
-            ? t('project.comments.deletedPlaceholder')
-            : comment.state === 'removed'
-              ? t('project.comments.removedPlaceholder')
-              : t('project.comments.hiddenPlaceholder')
-        }
+        // L'emplacement d'un commentaire qu'on ne lit pas. Un blocage (tranche 7b) a ses deux
+        // textes : « Commentaire d'un membre que tu as bloqué » pour qui a bloqué, « Commentaire
+        // indisponible » pour qui l'est (rien ne lui dit qu'il est bloqué). « Commentaire masqué »
+        // reste au geste de l'auteur du projet.
+        placeholder={t(placeholderKey[comment.state])}
         actions={actionsOf(comment, rootId)}
         description={describe(comment)}
         error={

@@ -24,14 +24,19 @@ import { projectQueryKey } from '../projects/hooks'
  * - expired : la session a expiré (401), il faut se reconnecter ;
  * - gone : ce que l'on vise n'existe plus pour soi (404) : le commentaire auquel on répond a été
  *   supprimé ou masqué entre-temps, par exemple.
+ * - blockedMention : le texte mentionne un membre qu'on a bloqué (422 `blocked_mention`, tranche
+ *   7b) : on ne peut pas l'interpeller ; l'API ne dit pas lequel, le message non plus.
  * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
  */
-export type CommentFailure = 'limited' | 'expired' | 'gone'
+export type CommentFailure = 'limited' | 'expired' | 'gone' | 'blockedMention'
 
-const reasons: Partial<Record<ApiErrorKey, CommentFailure>> = {
+// `| 'blockedMention'` : la clé du refus, que `api/errors.ts` reçoit dans la même tranche ; l'union
+// garde ce fichier juste avant comme après (une fois la clé dans ApiErrorKey, elle ne change rien).
+const reasons: Partial<Record<ApiErrorKey | 'blockedMention', CommentFailure>> = {
   rateLimited: 'limited',
   unauthorized: 'expired',
   notFound: 'gone',
+  blockedMention: 'blockedMention',
 }
 
 const reasonOf = (error: unknown): CommentFailure | undefined =>
