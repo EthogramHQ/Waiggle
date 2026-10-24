@@ -40,3 +40,8 @@ auditConfig:
     # require() : l'imposer casserait la navigation. Disparaît avec le SDK Expo 58, dont expo-router ne
     # dépend plus de query-string.
     - GHSA-vcc3-ghjq-m6fr
+    # zod < 4.6.6 (mémoire épuisée sur une très grande collection), seulement le zod 3 qu'apporte
+    # l'outil en ligne de commande d'Expo (@expo/cli), qui ne valide que nos propres fichiers. Absent
+    # de l'appli et de l'API, dont le zod est déjà corrigé (4.6.6). À retirer quand @expo/cli passe à
+    # un zod corrigé.
+    - GHSA-mrhx-c7xc-m3w5
