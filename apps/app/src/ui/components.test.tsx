@@ -25,7 +25,7 @@ import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
-import { Notice } from './Notice'
+import { Notice, NoticeScope } from './Notice'
 import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -2421,7 +2421,9 @@ describe('Notice, one per group', () => {
     ...(single ? { single } : null),
   })
 
-  it('shows only the most recent notice of a group', async () => {
+  // Relecture de la PR #29 : remplacer la notice affichée par la plus récente faisait remonter la
+  // page sous le doigt. La première reste à sa place ; la suivante la fait seulement relire.
+  it('keeps the notice already shown, and hides the one that comes after it', async () => {
     await renderWithProviders(
       <>
         <Notice message={first} action={signIn('session')} />
@@ -2430,28 +2432,67 @@ describe('Notice, one per group', () => {
     )
 
     expect(screen.getAllByRole('alert')).toHaveLength(1)
-    expect(screen.getByRole('alert')).toHaveTextContent(second)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
     expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(1)
   })
 
-  it('shows the previous notice again when the most recent one goes away', async () => {
+  it('poses the shown alert anew when another notice of its group arrives, so it is read again', async () => {
+    function SecondFailure() {
+      const [again, setAgain] = useState(false)
+      return (
+        <>
+          <Notice message={first} action={signIn('session')} />
+          {again ? <Notice message={second} action={signIn('session')} /> : null}
+          <Button label="Réagir" onPress={() => setAgain(true)} />
+        </>
+      )
+    }
+    await renderWithProviders(<SecondFailure />)
+    const before = screen.getByRole('alert')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Réagir' }))
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
+    // Une alerte neuve (des valeurs simples, pas l'élément : voir la charte du pôle code).
+    expect(screen.getByRole('alert') === before).toBe(false)
+  })
+
+  it('shows the next notice when the one shown goes away', async () => {
     function TwoFailures() {
       const [both, setBoth] = useState(true)
       return (
         <>
-          <Notice message={first} action={signIn('session')} />
-          {both ? <Notice message={second} action={signIn('session')} /> : null}
+          {both ? <Notice message={first} action={signIn('session')} /> : null}
+          <Notice message={second} action={signIn('session')} />
           <Button label="Effacer" onPress={() => setBoth(false)} />
         </>
       )
     }
     await renderWithProviders(<TwoFailures />)
-    expect(screen.getByRole('alert')).toHaveTextContent(second)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
 
     await fireEvent.press(screen.getByRole('button', { name: 'Effacer' }))
 
     expect(screen.getAllByRole('alert')).toHaveLength(1)
-    expect(screen.getByRole('alert')).toHaveTextContent(first)
+    expect(screen.getByRole('alert')).toHaveTextContent(second)
+  })
+
+  // Sur téléphone, la page du dessous reste montée : sa notice ne cache pas celle de la page vue.
+  it('counts a group per screen: each scope shows its own notice', async () => {
+    await renderWithProviders(
+      <>
+        <NoticeScope>
+          <Notice message={first} action={signIn('session')} />
+        </NoticeScope>
+        <NoticeScope>
+          <Notice message={second} action={signIn('session')} />
+        </NoticeScope>
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(2)
   })
 
   it('keeps every notice that has no group, or another group', async () => {
@@ -2499,6 +2540,19 @@ describe('ListRow, with the reason of a failure', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(reason)
     // Une alerte neuve (des valeurs simples, pas l'élément : voir la charte du pôle code).
     expect(screen.getByRole('alert') === before).toBe(false)
+  })
+
+  // Vérifié par le typage (tsc) : si la règle saute, la directive @ts-expect-error devient une erreur.
+  it('takes a failure reason only on a row that is not touched, under its label', () => {
+    const touched = (
+      // @ts-expect-error : le nom d'une ligne qu'on touche cache son contenu, l'alerte comprise.
+      <ListRow label="Réglages" detail={reason} detailAlert={0} onPress={() => {}} />
+    )
+    const onTheRight = (
+      // @ts-expect-error : seule la précision sous le libellé devient une alerte.
+      <ListRow label="Réglages" detail={reason} detailAlert={0} detailRight />
+    )
+    expect([touched, onTheRight]).toHaveLength(2)
   })
 
   it('keeps a plain detail when it is not a failure', async () => {

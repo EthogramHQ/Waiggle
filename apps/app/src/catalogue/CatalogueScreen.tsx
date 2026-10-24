@@ -210,7 +210,7 @@ export function CatalogueScreen() {
           action={{ label: l.infoAction, onPress: () => {} }}
         />
         {/* Deux messages du même groupe (`single`, comme deux actions refusées par une session
-            expirée) : seul le plus récent, le second, s'affiche. */}
+            expirée) : seul le premier arrivé s'affiche, et le second ne le remplace pas. */}
         <Notice
           message={l.expired}
           action={{ label: l.signInAgain, onPress: () => {}, single: 'catalogue' }}
