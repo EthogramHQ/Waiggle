@@ -16,6 +16,7 @@ import { lexer, type Token } from 'marked'
 import { Fragment, type ReactNode, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { enterActivates } from './keyboard'
+import { headingLevel } from './Text'
 import { fontName, monoFont } from './theme/fonts'
 import { type Theme, useTheme } from './theme/ThemeProvider'
 
@@ -145,8 +146,15 @@ export function Markdown({ text, onLinkPress }: Props) {
       tokens?.map((child, i) => block(child, i, depth + 1))
     switch (token.type) {
       case 'heading':
+        // Les titres d'un membre vivent dans une section de la page (« Description », niveau 2) :
+        // « # » devient un titre de niveau 3, « ## » et plus un niveau 4. Ils ne peuvent ainsi ni
+        // se faire passer pour le titre de la page, ni pour une de ses sections.
         return (
-          <Text key={key} accessibilityRole="header" style={[styles.text, styles.heading]}>
+          <Text
+            key={key}
+            {...headingLevel(token.depth <= 1 ? 3 : 4)}
+            style={[styles.text, styles.heading]}
+          >
             {inline(token.tokens, depth)}
           </Text>
         )

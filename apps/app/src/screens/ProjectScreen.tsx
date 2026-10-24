@@ -222,7 +222,7 @@ function ProjectView({ project }: { project: Project }) {
       />
       {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
       {columns ? null : (
-        <Text variant="title2" accessibilityRole="header" breakAnywhere>
+        <Text variant="title2" heading={1} breakAnywhere>
           {project.title}
         </Text>
       )}
@@ -330,7 +330,7 @@ function ProjectView({ project }: { project: Project }) {
 
   const recipe = hasRecipe ? (
     <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {t('project.page.recipe')}
       </Text>
       {project.tools.length > 0 ? (
@@ -379,7 +379,7 @@ function ProjectView({ project }: { project: Project }) {
 
   const description = project.description ? (
     <Stack gap="md">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {t('project.page.description')}
       </Text>
       <Markdown text={project.description} onLinkPress={openOutside} />
@@ -447,7 +447,7 @@ function ProjectView({ project }: { project: Project }) {
       >
         {/* Le titre au-dessus des colonnes, sur toute la largeur : dans la colonne latérale, un
             titre long passait sur sept lignes. */}
-        <Text variant={wide ? 'display' : 'title1'} accessibilityRole="header" breakAnywhere>
+        <Text variant={wide ? 'display' : 'title1'} heading={1} breakAnywhere>
           {project.title}
         </Text>
         {removal}
@@ -650,7 +650,7 @@ function Journal({ project }: { project: Project }) {
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {t('project.notes.title')}
       </Text>
       {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}

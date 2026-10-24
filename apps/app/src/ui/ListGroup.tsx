@@ -31,7 +31,8 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
     <View style={{ gap: space.sm }}>
       {title ? (
         <View style={{ paddingHorizontal: space.lg }}>
-          <Text variant="caption" weight={600} tone="muted" accessibilityRole="header">
+          {/* Un groupe est une section de la page : titre de niveau 2. */}
+          <Text variant="caption" weight={600} tone="muted" heading={2}>
             {title}
           </Text>
         </View>

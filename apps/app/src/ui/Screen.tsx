@@ -94,7 +94,8 @@ export function Screen({
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (
-            <Text variant="title2" accessibilityRole="header">
+            // Le titre de la page : niveau 1 (ses sections sont de niveau 2).
+            <Text variant="title2" heading={1}>
               {title}
             </Text>
           ) : null}

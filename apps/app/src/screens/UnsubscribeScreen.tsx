@@ -192,7 +192,7 @@ export function UnsubscribeScreen() {
         {/* Une coche une fois l'e-mail coupé ; l'enveloppe sinon. */}
         <Emblem icon={hydrated && !invalid && step !== 'ask' ? 'check' : 'envelope-simple'} />
       </Stack>
-      <Text variant="title2" align="center" accessibilityRole="header">
+      <Text variant="title2" align="center" heading={1}>
         {heading}
       </Text>
       {hydrated ? content : null}

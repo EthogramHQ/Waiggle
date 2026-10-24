@@ -29,7 +29,7 @@ export function CheckEmailScreen() {
       <Stack align="center">
         <Emblem icon="envelope-simple" />
       </Stack>
-      <Text variant="title2" align="center" accessibilityRole="header">
+      <Text variant="title2" align="center" heading={1}>
         {t('auth.checkEmail.title')}
       </Text>
       {hydrated ? (

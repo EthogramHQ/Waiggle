@@ -55,13 +55,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
       {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se
           coupe au lieu de sortir de l'écran. */}
       <Stack gap="xs" align="stretch">
-        <Text
-          variant="callout"
-          weight={600}
-          tone="secondary"
-          align="center"
-          accessibilityRole="header"
-        >
+        <Text variant="callout" weight={600} tone="secondary" align="center" heading={1}>
           {t('leaving.title')}
         </Text>
         {/* Le nom du site, en grand : c'est lui qu'on doit reconnaître (ou pas). */}

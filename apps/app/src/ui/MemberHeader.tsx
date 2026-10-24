@@ -31,7 +31,8 @@ export function MemberHeader({ name, handle, avatar, bio, toolsTitle, tools, act
       <Stack gap="sm" align="stretch">
         {/* Le pseudo colle au nom (écart minimal) : il le précise, comme un second nom. */}
         <Stack gap="xxs" align="stretch">
-          <Text variant="title1" align="center" accessibilityRole="header" breakAnywhere>
+          {/* Le nom du membre est le titre de sa page (niveau 1). */}
+          <Text variant="title1" align="center" heading={1} breakAnywhere>
             {name}
           </Text>
           {/* En discret (gris, plus petit) : le nom reste ce qu'on lit d'abord. Un pseudo n'a
