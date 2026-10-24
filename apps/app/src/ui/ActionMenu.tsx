@@ -193,19 +193,14 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
         {...(Platform.OS === 'web' ? { onDismiss: closed } : null)}
       >
         <View style={{ flex: 1 }}>
-          {/* Le fond invisible qui couvre l'écran : le toucher ferme le menu. Hors de la touche
-              Tab (tabIndex -1) : au clavier, Échap ferme. */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('actionMenu.close')}
-            onPress={dismiss}
-            {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
-            style={{ position: 'absolute', inset: 0 }}
-          />
+          {/* Le menu d'abord, le fond ensuite : en s'ouvrant, la couche (web) pose le focus sur
+              son premier élément atteignable, qui doit être la première action. zIndex garde le
+              menu au-dessus du fond, dessiné après lui. */}
           <View
             onLayout={(event: LayoutChangeEvent) => setMenuHeight(event.nativeEvent.layout.height)}
             style={{
               position: 'absolute',
+              zIndex: 1,
               width,
               maxHeight,
               left: position?.left ?? EDGE,
@@ -223,6 +218,15 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
               maxHeight={maxHeight}
             />
           </View>
+          {/* Le fond invisible qui couvre l'écran : le toucher ferme le menu. Hors de la touche
+              Tab (tabIndex -1) : au clavier, Échap ferme. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('actionMenu.close')}
+            onPress={dismiss}
+            {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
+            style={{ position: 'absolute', inset: 0 }}
+          />
         </View>
       </Modal>
     </>
