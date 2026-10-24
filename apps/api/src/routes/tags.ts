@@ -8,7 +8,7 @@ import { and, arrayContains } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { loadSummaries } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { listedProjectFor } from '../projects/visibility'
 import { createRouter, errorResponse } from './router'
 
 const readTagRoute = createRoute({
@@ -42,11 +42,12 @@ export const tagRoutes = ({ db, publicApiUrl }: Deps) => {
     if (!slug) return c.json(errorBody(languageOf(c), 'validation'), 400)
     // arrayContains : « la liste tool_slugs contient cette étiquette » (opérateur @> de
     // PostgreSQL, accéléré par l'index GIN de la table). Seulement les projets publics et pas
-    // retirés (listedProject), même pour leur auteur : ses brouillons n'ont rien à faire sur une
-    // page partagée, ni un projet que la modération a retiré.
+    // retirés, même pour leur auteur : ses brouillons n'ont rien à faire sur une page partagée, ni
+    // un projet que la modération a retiré. Tranche 7b : ni ceux d'un membre bloqué avec le
+    // visiteur, dans un sens ou dans l'autre (listedProjectFor).
     const projects = await loadSummaries(
       db,
-      and(listedProject(), arrayContains(schema.project.toolSlugs, [slug])),
+      and(listedProjectFor(viewer.id), arrayContains(schema.project.toolSlugs, [slug])),
       viewer.id,
       publicApiUrl,
     )
