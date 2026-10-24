@@ -106,10 +106,10 @@ describe.each(DIRECTIONS)('the contents, when %s', (_, blockNow) => {
       const tag = await (await get(`/v1/tags/${toolSlug('Mistral')}`, cookie)).text()
       expect(tag).not.toContain(hidden)
     }
-    expect(await (await get('/v1/feed/discover', malik)).text()).not.toContain('Une note de Météo')
-    // Zoé voit les deux projets, et la note.
+    // Zoé voit les deux projets. (Découvrir ne montre jamais de note : la note d'Inès se lit sur la
+    // page du projet, qui répond 404 à Malik, test suivant.)
     const zoeFeed = await (await get('/v1/feed/discover', zoe)).text()
-    for (const witness of [meteo.id, velo.id, 'Une note de Météo']) {
+    for (const witness of [meteo.id, velo.id]) {
       expect(zoeFeed).toContain(witness)
     }
   })
