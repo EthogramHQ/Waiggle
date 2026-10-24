@@ -3,8 +3,10 @@
 // Une action peut suivre le message, dans le même cadre (« Me reconnecter » après « Ta session a
 // expiré », tranche 6c) : c'est un lien à part, hors de l'alerte, pour que l'alerte ne lise que le
 // message et que le lien reste atteignable au clavier et par VoiceOver.
+// Une action peut appartenir à un groupe (`single`) : une seule notice du groupe à la fois sur la
+// page, la plus récente (« Ta session a expiré » une fois, même après deux actions refusées).
 import { radii, space } from '@ruche/brand'
-import type { Ref } from 'react'
+import { type Ref, useId, useLayoutEffect, useSyncExternalStore } from 'react'
 import { Platform, View } from 'react-native'
 import { Icon, type IconName, type IconTone } from './Icon'
 import { Text, type Tone } from './Text'
@@ -15,7 +17,65 @@ import { useTheme } from './theme/ThemeProvider'
 const ICON_SIZE = 20
 
 /** Ce qu'on peut faire après le message : un lien vers une autre page (« Me reconnecter »). */
-export type NoticeAction = { label: string; onPress: () => void }
+export type NoticeAction = {
+  label: string
+  onPress: () => void
+  /**
+   * Le nom d'un groupe (« session ») : parmi les messages du même groupe affichés en même temps,
+   * seul le plus récent se montre. Deux actions refusées parce que la session a expiré (Suivre,
+   * puis une réaction) disent la même chose : un seul « Me reconnecter » suffit, près de la
+   * dernière action. Quand le plus récent disparaît, le précédent revient.
+   */
+  single?: string
+}
+
+// Les messages de chaque groupe, du plus ancien au plus récent : un petit magasin partagé par
+// tout le module, hors de React. Chaque Notice d'un groupe s'y inscrit en paraissant et s'en retire
+// en disparaissant ; useSyncExternalStore (un hook de React) redessine celles qu'un changement
+// concerne. Une pile, et non un simple « dernier » : au retrait du plus récent, on sait qui revient.
+const groups = new Map<string, string[]>()
+const listeners = new Set<() => void>()
+const changed = () => {
+  for (const listener of listeners) listener()
+}
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+const join = (group: string, id: string) => {
+  groups.set(group, [...(groups.get(group) ?? []), id])
+  changed()
+}
+const leave = (group: string, id: string) => {
+  const rest = (groups.get(group) ?? []).filter((other) => other !== id)
+  if (rest.length > 0) groups.set(group, rest)
+  else groups.delete(group)
+  changed()
+}
+
+/**
+ * Hook : faut-il cacher ce message, parce qu'un plus récent du même groupe est affiché ? Un message
+ * qui vient de paraître et ne s'est pas encore inscrit est le plus récent : il se montre.
+ * useLayoutEffect inscrit le message avant que l'écran soit peint : l'ancien disparaît dans le
+ * même dessin, sans clignoter. (La page pré-rendue du web n'a pas de groupe : getServerSnapshot.)
+ */
+const useHiddenBySingle = (group: string | undefined): boolean => {
+  const id = useId()
+  useLayoutEffect(() => {
+    if (!group) return
+    join(group, id)
+    return () => leave(group, id)
+  }, [group, id])
+  const stack = useSyncExternalStore(
+    subscribe,
+    () => (group ? groups.get(group) : undefined),
+    () => undefined,
+  )
+  if (!stack?.includes(id)) return false
+  return stack[stack.length - 1] !== id
+}
 
 type Props = {
   message: string
@@ -40,6 +100,8 @@ type Props = {
 
 export function Notice({ message, tone = 'error', polite = false, action, ref }: Props) {
   const { colors } = useTheme()
+  const hidden = useHiddenBySingle(action?.single)
+  if (hidden) return null
   const looks: Record<
     NonNullable<Props['tone']>,
     { icon: IconName; iconTone: IconTone; text: Tone; background: string }

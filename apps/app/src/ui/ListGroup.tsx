@@ -86,6 +86,13 @@ type RowProps = {
   /** Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. */
   detail?: string
   detailRight?: boolean
+  /**
+   * La précision dit pourquoi quelque chose a échoué : c'est une alerte, lue dès qu'elle paraît.
+   * La valeur (un compteur d'échecs) pose l'alerte à neuf quand elle change : un nouvel échec est
+   * relu, alors qu'une alerte restée en place ne le serait pas. Le reste de la ligne (un bouton
+   * « Réessayer » qui a le focus) ne bouge pas.
+   */
+  detailAlert?: number
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
   tone?: 'default' | 'danger'
@@ -113,6 +120,7 @@ export function ListRow({
   icon,
   detail,
   detailRight = false,
+  detailAlert,
   trailing,
   tone = 'default',
   onPress,
@@ -175,7 +183,14 @@ export function ListRow({
         <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
           {label}
         </Text>
-        {detail && !detailRight ? (
+        {detail && !detailRight && detailAlert !== undefined ? (
+          // Une clé neuve à chaque échec : React remplace l'alerte au lieu de changer son texte.
+          <View key={`alert-${detailAlert}`} accessible accessibilityRole="alert">
+            <Text variant="callout" tone="muted">
+              {detail}
+            </Text>
+          </View>
+        ) : detail && !detailRight ? (
           <Text variant="callout" tone="muted">
             {detail}
           </Text>

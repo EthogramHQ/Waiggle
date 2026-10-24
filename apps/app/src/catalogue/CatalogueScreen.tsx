@@ -198,6 +198,16 @@ export function CatalogueScreen() {
           message={l.infoMessage}
           action={{ label: l.infoAction, onPress: () => {} }}
         />
+        {/* Deux messages du même groupe (`single`, comme deux actions refusées par une session
+            expirée) : seul le plus récent, le second, s'affiche. */}
+        <Notice
+          message={l.expired}
+          action={{ label: l.signInAgain, onPress: () => {}, single: 'catalogue' }}
+        />
+        <Notice
+          message={l.expiredAgain}
+          action={{ label: l.signInAgain, onPress: () => {}, single: 'catalogue' }}
+        />
       </Section>
 
       <Section title={l.surfaces}>
@@ -266,6 +276,17 @@ export function CatalogueScreen() {
         {/* Une ligne qui attend (les réglages pas encore arrivés) : annoncée comme occupée. */}
         <ListGroup>
           <ListRow label={l.loadingRow} busy />
+        </ListGroup>
+        {/* Elle n'a pas pu se charger : la raison dessous, en alerte (detailAlert), et l'action. */}
+        <ListGroup>
+          <ListRow
+            label={l.loadFailedRow}
+            detail={l.loadFailedReason}
+            detailAlert={0}
+            accessory={
+              <Button label={l.retry} variant="secondary" size="compact" onPress={() => {}} />
+            }
+          />
         </ListGroup>
       </Section>
 

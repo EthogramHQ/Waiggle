@@ -27,9 +27,12 @@ jest.mock('../profile/api', () => ({
 }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
+// Les paramètres de l'adresse de la page (?section=emails, depuis « Mon compte »), choisis par test.
+let mockParams: Record<string, string | undefined> = {}
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
   useRouter: () => ({ push: mockPush, replace: mockReplace, canGoBack: () => false }),
+  useLocalSearchParams: () => mockParams,
 }))
 
 const emailPath = '/v1/me/email-preferences'
@@ -638,5 +641,65 @@ describe('ProfileScreen, the e-mail settings after the reviews', () => {
     )
     expect(screen.getByRole('link', { name: 'Me reconnecter' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
+  })
+})
+
+// Relecture de design globale du 22/10/2026.
+describe('ProfileScreen, the e-mail settings after the global design review', () => {
+  const loadError = 'Tes réglages d’e-mail n’ont pas pu se charger.'
+
+  beforeEach(() => {
+    mockParams = {}
+  })
+
+  // Une alerte rouge au-dessus du groupe redisait ce que dit la ligne « n'ont pas pu se charger » :
+  // la ligne seule dit ce qui manque et pourquoi, une seule fois.
+  it('announces a failed read once, in the line that says what is missing', async () => {
+    jest.mocked(request).mockImplementation((async (to: string, init: RequestInit = {}) => {
+      if (to === emailPath && init.method === 'GET') return { ok: false, error: 'network' }
+      return fakeRequest(to, init)
+    }) as typeof request)
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(await screen.findByText(loadError)).toBeTruthy()
+    const alerts = screen.getAllByRole('alert')
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toHaveTextContent(/Vérifie ta connexion et réessaie\./)
+    // L'alerte est dans la ligne, sous « n'ont pas pu se charger », et non plus au-dessus du groupe.
+    const order: unknown[] = []
+    const walk = (node: ReturnType<typeof screen.getByRole>) => {
+      order.push(node)
+      for (const child of node.children) if (typeof child !== 'string') walk(child)
+    }
+    walk(screen.root as ReturnType<typeof screen.getByRole>)
+    expect(order.indexOf(screen.getByText(loadError))).toBeLessThan(order.indexOf(alerts[0]))
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy()
+  })
+
+  it('brings the e-mail section into view when « Mon compte » leads there', async () => {
+    const reveal = jest.spyOn(focusModule, 'revealWithoutJump').mockImplementation(() => {})
+    try {
+      mockParams = { section: 'emails' }
+      await renderWithProviders(<ProfileScreen />)
+
+      await screen.findByRole('switch', { name: 'Le récap de la semaine' })
+      await waitFor(() => expect(reveal).toHaveBeenCalledTimes(1))
+      expect(reveal.mock.calls[0]?.[0]).toBeTruthy()
+    } finally {
+      reveal.mockRestore()
+    }
+  })
+
+  it('leaves the page at its top without the parameter', async () => {
+    const reveal = jest.spyOn(focusModule, 'revealWithoutJump').mockImplementation(() => {})
+    try {
+      await renderWithProviders(<ProfileScreen />)
+
+      await screen.findByRole('switch', { name: 'Le récap de la semaine' })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(reveal).not.toHaveBeenCalled()
+    } finally {
+      reveal.mockRestore()
+    }
   })
 })

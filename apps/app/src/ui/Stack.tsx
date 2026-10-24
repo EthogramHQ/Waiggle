@@ -2,7 +2,7 @@
 // écart régulier pris dans l'échelle des espaces. C'est la brique de mise en page des écrans : ils
 // n'écrivent ainsi jamais de marge ou d'écart en chiffres.
 import { type Space, space } from '@ruche/brand'
-import { Children, isValidElement, type ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode, type Ref } from 'react'
 import { View, type ViewStyle } from 'react-native'
 
 type Props = {
@@ -22,6 +22,11 @@ type Props = {
   grow?: boolean
   accessibilityRole?: 'list' | 'radiogroup' | 'none'
   accessibilityLabel?: string
+  /**
+   * Pour faire venir la pile dans l'écran (`revealWithoutJump`, ui/focus.ts) : la section
+   * « E-mails » du profil, quand on y arrive depuis « Mon compte ».
+   */
+  ref?: Ref<View>
 }
 
 const alignments = {
@@ -46,6 +51,7 @@ export function Stack({
   grow = false,
   accessibilityRole,
   accessibilityLabel,
+  ref,
 }: Props) {
   const style: ViewStyle = {
     flexDirection: direction,
@@ -74,6 +80,7 @@ export function Stack({
       : children
   return (
     <View
+      ref={ref}
       style={style}
       {...(accessibilityRole ? { accessibilityRole } : null)}
       {...(accessibilityLabel ? { accessibilityLabel } : null)}

@@ -2307,3 +2307,106 @@ describe('NoteList, reporting and removed notes', () => {
     expect(screen.getByText('Première version en ligne')).toBeTruthy()
   })
 })
+
+// Relecture de design globale du 22/10/2026 : une seule notice « session expirée » par page, et la
+// raison d'une lecture manquée dite dans sa ligne.
+describe('Notice, one per group', () => {
+  const first = 'Ta session a expiré (Suivre).'
+  const second = 'Ta session a expiré (réaction).'
+  const signIn = (single?: string) => ({
+    label: 'Me reconnecter',
+    onPress: () => {},
+    ...(single ? { single } : null),
+  })
+
+  it('shows only the most recent notice of a group', async () => {
+    await renderWithProviders(
+      <>
+        <Notice message={first} action={signIn('session')} />
+        <Notice message={second} action={signIn('session')} />
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(second)
+    expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(1)
+  })
+
+  it('shows the previous notice again when the most recent one goes away', async () => {
+    function TwoFailures() {
+      const [both, setBoth] = useState(true)
+      return (
+        <>
+          <Notice message={first} action={signIn('session')} />
+          {both ? <Notice message={second} action={signIn('session')} /> : null}
+          <Button label="Effacer" onPress={() => setBoth(false)} />
+        </>
+      )
+    }
+    await renderWithProviders(<TwoFailures />)
+    expect(screen.getByRole('alert')).toHaveTextContent(second)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Effacer' }))
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
+  })
+
+  it('keeps every notice that has no group, or another group', async () => {
+    await renderWithProviders(
+      <>
+        <Notice message={first} action={signIn()} />
+        <Notice message={second} action={signIn('session')} />
+        <Notice message="Autre chose." action={signIn('other')} />
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(3)
+  })
+})
+
+describe('ListRow, with the reason of a failure', () => {
+  const reason = 'Vérifie ta connexion et réessaie.'
+
+  it('announces the reason as an alert, under the label', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Tes réglages n’ont pas pu se charger." detail={reason} detailAlert={0} />
+      </ListGroup>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    expect(screen.getByText('Tes réglages n’ont pas pu se charger.')).toBeTruthy()
+  })
+
+  it('poses a new alert when the failure happens again', async () => {
+    const row = (failures: number) => (
+      <ListGroup>
+        <ListRow
+          label="Tes réglages n’ont pas pu se charger."
+          detail={reason}
+          detailAlert={failures}
+        />
+      </ListGroup>
+    )
+    const { rerender } = await renderWithProviders(row(0))
+    const before = screen.getByRole('alert')
+
+    await rerender(row(1))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    // Une alerte neuve (des valeurs simples, pas l'élément : voir la charte du pôle code).
+    expect(screen.getByRole('alert') === before).toBe(false)
+  })
+
+  it('keeps a plain detail when it is not a failure', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Profil" detail="Léa Moreau" />
+      </ListGroup>,
+    )
+
+    expect(screen.getByText('Léa Moreau')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})

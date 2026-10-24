@@ -47,10 +47,12 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
   // relie le lien au texte qui le décrit.
   const bodyId = useId()
   return (
-    <Pressed label={label} onPress={onPress} role="link" fill describedBy={bodyId}>
+    // Pas de `fill` : dans une rangée de la grille, la carte garde sa propre hauteur, en haut de sa
+    // case, au lieu de s'étirer à celle des cartes de projet voisines (à côté d'une grande photo,
+    // ~200 points de vide s'ouvraient entre le texte et l'auteur, relecture du 22/10/2026).
+    <Pressed label={label} onPress={onPress} role="link" describedBy={bodyId}>
       <View
         style={{
-          flexGrow: 1,
           padding: space.sm,
           gap: space.sm,
           backgroundColor: colors.surface,
@@ -62,11 +64,9 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
       >
         {/* Rayon intérieur plus petit que celui de la carte, de l'épaisseur du bord blanc. */}
         <ProjectCover height={COVER_HEIGHT} radius="group" image={image ?? null} />
-        {/* Dans une grille, la place gagnée va au texte (flexGrow) ; l'auteur reste en bas. */}
+        {/* Le texte, puis l'auteur juste dessous. */}
         <View
           style={{
-            flexGrow: 1,
-            justifyContent: 'space-between',
             paddingHorizontal: space.md,
             paddingBottom: space.md,
             gap: space.md,
