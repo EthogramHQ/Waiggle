@@ -149,3 +149,26 @@ describe('writing to us from my account', () => {
     ).toBeTruthy()
   })
 })
+
+// Relecture de design globale du 22/10/2026 : « Mon compte » parlait de la langue des e-mails sans
+// mener aux réglages d'e-mail, qui sont au bas de « Mon profil ».
+describe('the e-mail settings from my account', () => {
+  it('leads to the e-mail section of the profile', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    expect(screen.getByRole('header', { name: 'E-mails' })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Choisir les e-mails reçus' }))
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/profile?section=emails'])
+  })
+
+  it('puts the e-mails right after the appearance', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    // Les titres dans l'ordre de la page : celui des e-mails suit celui de l'apparence.
+    const titles = screen.getAllByRole('header')
+    const appearance = titles.indexOf(screen.getByRole('header', { name: 'Apparence' }))
+    expect(appearance).toBeGreaterThanOrEqual(0)
+    expect(titles.indexOf(screen.getByRole('header', { name: 'E-mails' }))).toBe(appearance + 1)
+  })
+})

@@ -12,12 +12,14 @@ import {
   NAME_MAX_LENGTH,
   TOOL_MAX_LENGTH,
 } from '@ruche/contracts'
+import { useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useEmailPreferences, useUpdateEmailPreferences } from '../email/api'
+import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -31,7 +33,7 @@ import {
 import { useMe, useSetMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
-import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { type Focusable, focusWithoutScroll, revealWithoutJump } from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -42,7 +44,9 @@ import { Switch } from '../ui/Switch'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
+import { useCalmMotion } from '../ui/theme/motion'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function ProfileScreen() {
@@ -357,6 +361,13 @@ function EmailSettings() {
   const save = useUpdateEmailPreferences()
   const signInAgain = useSignInAgain()
   const data = preferences.data
+  // Arrivé depuis « Mon compte » (/profile?section=emails) : la section vient dans l'écran.
+  // L'adresse n'est connue que dans le navigateur : on attend d'y être (ui/theme/hydration.ts).
+  const section = firstParam(useLocalSearchParams<{ section?: string | string[] }>().section)
+  const hydrated = useHydrated()
+  const calm = useCalmMotion()
+  const sectionRef = useRef<Focusable>(null)
+  const revealed = useRef(false)
 
   // « Réessayer » a marché : la ligne qui portait le bouton disparaît, et le focus du clavier, qui
   // était dessus, irait tout en haut de la page. On le pose sur le premier interrupteur, dès qu'il
@@ -372,9 +383,9 @@ function EmailSettings() {
   // « en attente » et oublie l'erreur : sans cet état, la ligne d'erreur ferait place à
   // « Chargement… », et le bouton qui avait le focus disparaîtrait.
   const [retrying, setRetrying] = useState(false)
-  // Combien de « Réessayer » ont échoué : sert de clé à l'alerte qui dit pourquoi. Une clé neuve
-  // fait poser une alerte neuve, que le lecteur d'écran lit ; la même alerte restée en place ne
-  // serait pas relue, et le membre n'entendrait que la fin de l'attente (relecture de 6c).
+  // Combien de « Réessayer » ont échoué : pose à neuf l'alerte qui dit pourquoi (`detailAlert`).
+  // Une alerte neuve est lue par le lecteur d'écran ; la même alerte restée en place ne serait pas
+  // relue, et le membre n'entendrait que la fin de l'attente (relecture de 6c).
   const [failedRetries, setFailedRetries] = useState(0)
   const retry = () => {
     focusFirst.current = true
@@ -398,6 +409,19 @@ function EmailSettings() {
   const [failedRead, setFailedRead] = useState(readFailure)
   if (readFailure !== null && readFailure !== failedRead) setFailedRead(readFailure)
   const loadFailure = data ? null : (readFailure ?? (retrying ? failedRead : null))
+
+  // La section a sa hauteur finale (les réglages, ou la ligne qui dit qu'ils manquent) : on la fait
+  // venir dans l'écran, une seule fois, au dessin suivant (requestAnimationFrame), quand sa place
+  // est connue. Sur téléphone, revealWithoutJump ne fait rien : la page s'ouvre en haut.
+  const settled = data !== undefined || loadFailure !== null
+  useEffect(() => {
+    if (!hydrated || section !== 'emails' || !settled || revealed.current) return
+    const frame = requestAnimationFrame(() => {
+      revealed.current = true
+      revealWithoutJump(sectionRef.current, calm)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hydrated, section, settled, calm])
 
   // Ce qu'a donné le dernier changement : enregistré, ou la raison de l'échec. Pendant l'envoi du
   // suivant, le hook ne dit plus rien (ni « enregistré » ni échec) : on garde le message d'avant
@@ -435,9 +459,15 @@ function EmailSettings() {
       ]
     : loadFailure
       ? [
+          // La ligne dit ce qui manque, et dessous pourquoi : une alerte, posée à neuf à chaque
+          // échec (`detailAlert`), pour être relue même si le focus reste sur « Réessayer ». Une
+          // session expirée a sa propre notice, au-dessus du groupe, avec son lien.
           <ListRow
             key="loadError"
             label={t('profile.emails.loadError')}
+            {...(loadFailure === 'unauthorized'
+              ? null
+              : { detail: t(`errors.${loadFailure}`), detailAlert: failedRetries })}
             accessory={
               loadFailure === 'unauthorized' ? null : (
                 <Button
@@ -454,16 +484,14 @@ function EmailSettings() {
       : [<ListRow key="loading" label={t('common.loading')} busy />]
 
   // Le message entre le titre et le groupe. Une session expirée (à la lecture ou au changement) :
-  // le lien mène à la connexion. Une autre panne de lecture : la ligne du groupe dit ce qui
-  // manque, l'alerte dit pourquoi ; elle est là dès le premier échec et reste pendant la nouvelle
-  // lecture, pour que la ligne de « Réessayer » ne bouge pas sous le doigt.
+  // le lien mène à la connexion. Une autre panne de lecture : rien ici, la ligne du groupe dit
+  // tout (ce qui manque, pourquoi, « Réessayer ») ; une alerte au-dessus redisait la même chose
+  // (relecture de design globale du 22/10/2026).
   const failure = loadFailure ?? (last === 'saved' ? null : last)
   const notice =
     failure === 'unauthorized' ? (
       <Notice message={t('states.expired')} action={signInAgain()} />
-    ) : loadFailure ? (
-      <Notice key={`loadFailure-${failedRetries}`} message={t(`errors.${loadFailure}`)} />
-    ) : failure ? (
+    ) : loadFailure ? null : failure ? (
       <Notice message={t(`errors.${failure}`)} />
     ) : last === 'saved' ? (
       // Une confirmation, lue sans couper ce que disait le lecteur d'écran (role « status »).
@@ -472,8 +500,8 @@ function EmailSettings() {
 
   // paddingY : un peu plus d'air au-dessus du titre, pour que la section se détache du formulaire.
   return (
-    <Stack gap="md" paddingY="lg">
-      <Text variant="heading" accessibilityRole="header">
+    <Stack gap="md" paddingY="lg" ref={sectionRef}>
+      <Text variant="heading" heading={2}>
         {t('profile.emails.title')}
       </Text>
       {notice}

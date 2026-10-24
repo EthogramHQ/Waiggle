@@ -16,4 +16,20 @@ describe('RouteErrorBoundary', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
     expect(retry).toHaveBeenCalled()
   })
+
+  // Relecture de la PR #29 : c'était la seule page sans titre. L'état remplace toute la page, son
+  // titre est donc celui de la page (niveau 1, comme les pages de screens/states.tsx).
+  it('gives the page a title, and still announces what happened', async () => {
+    await renderWithProviders(
+      <RouteErrorBoundary
+        error={new Error('boom')}
+        retry={jest.fn().mockResolvedValue(undefined)}
+      />,
+    )
+
+    expect(screen.getAllByRole('header').map((heading) => heading.props.children)).toEqual([
+      'Un problème est survenu',
+    ])
+    expect(screen.getByRole('alert')).toHaveTextContent('Cette page n’a pas pu s’afficher.')
+  })
 })

@@ -4,7 +4,7 @@
 import { appName, fontWeights, maxTextScale } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
-import { Platform, TextInput, type View } from 'react-native'
+import { Platform, StyleSheet, TextInput, type View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
@@ -18,13 +18,14 @@ import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { ListGroup, ListRow } from './ListGroup'
+import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
-import { Notice } from './Notice'
+import { Notice, NoticeScope } from './Notice'
 import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
@@ -51,6 +52,12 @@ import { Wordmark } from './Wordmark'
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
+// La règle de react-native-web qui choisit la balise d'un élément (<h1>, <h2>…) d'après son rôle et
+// son niveau (aria-level) : appliquée aux propriétés d'un titre, elle dit ce que lira le navigateur.
+const webTagOf = jest.requireActual<(props: object) => string | undefined>(
+  'react-native-web/dist/cjs/modules/AccessibilityUtil/propsToAccessibilityComponent',
+)
+
 describe('Button', () => {
   it('is announced as a button with its label, and runs its action', async () => {
     const onPress = jest.fn()
@@ -59,6 +66,25 @@ describe('Button', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
 
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  // Jest ne mesure aucune largeur : ce test vérifie les règles de mise en page qui permettent au
+  // libellé de se replier ; la mesure réelle (320 points, texte à 200 %) se fait dans le navigateur.
+  it('folds its label on two lines rather than overflowing (large text, narrow screen)', async () => {
+    await renderWithProviders(
+      <Stack direction="row">
+        <Button label="Suivre ce projet" icon="plus" onPress={() => {}} />
+      </Stack>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Suivre ce projet' })
+    // La couche qui porte le bouton ne dépasse pas sa place, et rétrécit dans une rangée.
+    expect(StyleSheet.flatten(button.parent?.props.style)).toMatchObject({
+      maxWidth: '100%',
+      flexShrink: 1,
+    })
+    // Le libellé n'est jamais coupé à une ligne : il passe à la ligne suivante.
+    expect(screen.getByText('Suivre ce projet').props.numberOfLines).toBeUndefined()
   })
 
   it('cannot be pressed twice while its action is running', async () => {
@@ -530,6 +556,64 @@ describe('Text', () => {
     expect(screen.getByText('Bonjour').props.maxFontSizeMultiplier).toBe(maxTextScale)
     expect(maxTextScale).toBe(2)
   })
+
+  it('is a heading of its level: h1, h2, h3 on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Stack>
+          <Text heading={1}>Mon agent de recettes</Text>
+          <Text heading={2}>Description</Text>
+          <Text heading={3}>La recette</Text>
+        </Stack>,
+      )
+
+      expect(screen.getAllByRole('header').map((heading) => webTagOf(heading.props))).toEqual([
+        'h1',
+        'h2',
+        'h3',
+      ])
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is announced as a heading on a phone too, where there is no level', async () => {
+    await renderWithProviders(<Text heading={2}>Description</Text>)
+
+    expect(screen.getByRole('header', { name: 'Description' }).props['aria-level']).toBeUndefined()
+  })
+})
+
+describe('Markdown', () => {
+  it('puts the headings of a member below the sections of the page (h3, h4)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Markdown text={'# La recette\n\n## Les étapes\n\n### Détail'} onLinkPress={() => {}} />,
+      )
+
+      expect(webTagOf(screen.getByRole('header', { name: 'La recette' }).props)).toBe('h3')
+      expect(webTagOf(screen.getByRole('header', { name: 'Les étapes' }).props)).toBe('h4')
+      expect(webTagOf(screen.getByRole('header', { name: 'Détail' }).props)).toBe('h4')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('skips no level when the text starts at « ## » (h3, not h4)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Markdown text={'## Comment ça marche\n\n### Les étapes'} onLinkPress={() => {}} />,
+      )
+
+      expect(webTagOf(screen.getByRole('header', { name: 'Comment ça marche' }).props)).toBe('h3')
+      expect(webTagOf(screen.getByRole('header', { name: 'Les étapes' }).props)).toBe('h4')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('Wordmark', () => {
@@ -956,6 +1040,24 @@ describe('StateMessage', () => {
     expect(screen.getByText('Chargement…')).toBeTruthy()
     expect(screen.queryByRole('header')).toBeNull()
   })
+
+  it('titles a section of the page (h2), or the whole page when asked (h1)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Stack>
+          <StateMessage kind="empty" title="Pas encore de notification" />
+          <StateMessage kind="notFound" title="Page introuvable" level={1} />
+        </Stack>,
+      )
+
+      const tag = (name: string) => webTagOf(screen.getByRole('header', { name }).props)
+      expect(tag('Pas encore de notification')).toBe('h2')
+      expect(tag('Page introuvable')).toBe('h1')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('SheetHeader', () => {
@@ -981,7 +1083,7 @@ describe('SheetHeader', () => {
 describe('Screen', () => {
   it('shows a sticky header once, above the content', async () => {
     await renderWithProviders(
-      <Screen ambient={false} stickyHeader header={<Text accessibilityRole="header">Barre</Text>}>
+      <Screen ambient={false} stickyHeader header={<Text heading={1}>Barre</Text>}>
         <Text>Contenu</Text>
       </Screen>,
     )
@@ -2305,5 +2407,162 @@ describe('NoteList, reporting and removed notes', () => {
     for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
     expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
     expect(screen.getByText('Première version en ligne')).toBeTruthy()
+  })
+})
+
+// Relecture de design globale du 22/10/2026 : une seule notice « session expirée » par page, et la
+// raison d'une lecture manquée dite dans sa ligne.
+describe('Notice, one per group', () => {
+  const first = 'Ta session a expiré (Suivre).'
+  const second = 'Ta session a expiré (réaction).'
+  const signIn = (single?: string) => ({
+    label: 'Me reconnecter',
+    onPress: () => {},
+    ...(single ? { single } : null),
+  })
+
+  // Relecture de la PR #29 : remplacer la notice affichée par la plus récente faisait remonter la
+  // page sous le doigt. La première reste à sa place ; la suivante la fait seulement relire.
+  it('keeps the notice already shown, and hides the one that comes after it', async () => {
+    await renderWithProviders(
+      <>
+        <Notice message={first} action={signIn('session')} />
+        <Notice message={second} action={signIn('session')} />
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
+    expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(1)
+  })
+
+  it('poses the shown alert anew when another notice of its group arrives, so it is read again', async () => {
+    function SecondFailure() {
+      const [again, setAgain] = useState(false)
+      return (
+        <>
+          <Notice message={first} action={signIn('session')} />
+          {again ? <Notice message={second} action={signIn('session')} /> : null}
+          <Button label="Réagir" onPress={() => setAgain(true)} />
+        </>
+      )
+    }
+    await renderWithProviders(<SecondFailure />)
+    const before = screen.getByRole('alert')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Réagir' }))
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
+    // Une alerte neuve (des valeurs simples, pas l'élément : voir la charte du pôle code).
+    expect(screen.getByRole('alert') === before).toBe(false)
+  })
+
+  it('shows the next notice when the one shown goes away', async () => {
+    function TwoFailures() {
+      const [both, setBoth] = useState(true)
+      return (
+        <>
+          {both ? <Notice message={first} action={signIn('session')} /> : null}
+          <Notice message={second} action={signIn('session')} />
+          <Button label="Effacer" onPress={() => setBoth(false)} />
+        </>
+      )
+    }
+    await renderWithProviders(<TwoFailures />)
+    expect(screen.getByRole('alert')).toHaveTextContent(first)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Effacer' }))
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(second)
+  })
+
+  // Sur téléphone, la page du dessous reste montée : sa notice ne cache pas celle de la page vue.
+  it('counts a group per screen: each scope shows its own notice', async () => {
+    await renderWithProviders(
+      <>
+        <NoticeScope>
+          <Notice message={first} action={signIn('session')} />
+        </NoticeScope>
+        <NoticeScope>
+          <Notice message={second} action={signIn('session')} />
+        </NoticeScope>
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(2)
+  })
+
+  it('keeps every notice that has no group, or another group', async () => {
+    await renderWithProviders(
+      <>
+        <Notice message={first} action={signIn()} />
+        <Notice message={second} action={signIn('session')} />
+        <Notice message="Autre chose." action={signIn('other')} />
+      </>,
+    )
+
+    expect(screen.getAllByRole('alert')).toHaveLength(3)
+  })
+})
+
+describe('ListRow, with the reason of a failure', () => {
+  const reason = 'Vérifie ta connexion et réessaie.'
+
+  it('announces the reason as an alert, under the label', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Tes réglages n’ont pas pu se charger." detail={reason} detailAlert={0} />
+      </ListGroup>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    expect(screen.getByText('Tes réglages n’ont pas pu se charger.')).toBeTruthy()
+  })
+
+  it('poses a new alert when the failure happens again', async () => {
+    const row = (failures: number) => (
+      <ListGroup>
+        <ListRow
+          label="Tes réglages n’ont pas pu se charger."
+          detail={reason}
+          detailAlert={failures}
+        />
+      </ListGroup>
+    )
+    const { rerender } = await renderWithProviders(row(0))
+    const before = screen.getByRole('alert')
+
+    await rerender(row(1))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    // Une alerte neuve (des valeurs simples, pas l'élément : voir la charte du pôle code).
+    expect(screen.getByRole('alert') === before).toBe(false)
+  })
+
+  // Vérifié par le typage (tsc) : si la règle saute, la directive @ts-expect-error devient une erreur.
+  it('takes a failure reason only on a row that is not touched, under its label', () => {
+    const touched = (
+      // @ts-expect-error : le nom d'une ligne qu'on touche cache son contenu, l'alerte comprise.
+      <ListRow label="Réglages" detail={reason} detailAlert={0} onPress={() => {}} />
+    )
+    const onTheRight = (
+      // @ts-expect-error : seule la précision sous le libellé devient une alerte.
+      <ListRow label="Réglages" detail={reason} detailAlert={0} detailRight />
+    )
+    expect([touched, onTheRight]).toHaveLength(2)
+  })
+
+  it('keeps a plain detail when it is not a failure', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Profil" detail="Léa Moreau" />
+      </ListGroup>,
+    )
+
+    expect(screen.getByText('Léa Moreau')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

@@ -1,4 +1,4 @@
-// Page « Réglages » : qui est connecté, profil, langue, apparence, export des données,
+// Page « Réglages » : qui est connecté, profil, langue, apparence, e-mails, export des données,
 // déconnexion, l'adresse pour nous écrire, et la modération pour un administrateur (tranche 7a).
 // La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
 
@@ -133,6 +133,17 @@ export function AccountScreen() {
             onPress={() => setAppearance(value)}
           />
         ))}
+      </ListGroup>
+
+      {/* Les réglages d'e-mail vivent dans « Mon profil », tout en bas : la ligne y mène et la
+          page amène la section à l'écran (?section=emails). La langue, plus haut, dit déjà que les
+          e-mails suivent la langue choisie : on trouve ici le reste. */}
+      <ListGroup title={t('account.emails.title')}>
+        <ListRow
+          label={t('account.emails.row')}
+          trailing="chevron"
+          onPress={() => router.push({ pathname: '/profile', params: { section: 'emails' } })}
+        />
       </ListGroup>
 
       <ListGroup title={t('account.data.title')}>

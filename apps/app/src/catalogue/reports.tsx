@@ -87,7 +87,7 @@ export function ReportSamples() {
   }
   return (
     <Stack gap="md">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {l.section}
       </Text>
       {/* En tête d'un projet retiré, pour son auteur : les deux sortes de retrait. */}

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
 import { IconButton } from './IconButton'
+import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
 import { markHydrated } from './theme/hydration'
@@ -94,7 +95,8 @@ export function Screen({
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (
-            <Text variant="title2" accessibilityRole="header">
+            // Le titre de la page : niveau 1 (ses sections sont de niveau 2).
+            <Text variant="title2" heading={1}>
               {title}
             </Text>
           ) : null}
@@ -113,93 +115,98 @@ export function Screen({
   const tabTitle = tabPage ? `${shorten(tabPage)} | ${appName}` : appName
 
   return (
-    // overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement horizontal).
-    <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
-      {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
+    // NoticeScope : les messages d'un même groupe (une seule « session expirée ») se comptent par
+    // écran ; la page restée montée sous celle-ci a les siens (ui/Notice.tsx).
+    <NoticeScope>
+      {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
+          horizontal). */}
+      <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
+        {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
           téléphone, il n'y a pas d'onglet : rien à faire. */}
-      {Platform.OS === 'web' ? (
-        <Head>
-          <title>{tabTitle}</title>
-        </Head>
-      ) : null}
-      {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
-      {pinned ? (
-        // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
-        // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
-        // s'arrête plus net sous la barre.
-        <View
-          style={{
-            paddingTop: insets.top + space.sm,
-            paddingBottom: space.sm,
-            paddingHorizontal: padding,
-            alignItems: 'center',
-            backgroundColor: colors.sheet,
-            borderBottomWidth: borders.hairline,
-            borderBottomColor: colors.line,
-          }}
-        >
-          <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}>
-            {header}
-            {notice}
-          </View>
-        </View>
-      ) : null}
-      {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          alignItems: 'center',
-          // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
-          paddingTop: (pinned ? 0 : insets.top) + space.lg,
-          paddingBottom: insets.bottom + space.huge,
-          paddingHorizontal: padding,
-          gap: space.xl,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
-            change pas de taille d'une page à l'autre. */}
-        {header && !pinned ? (
-          <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+        {Platform.OS === 'web' ? (
+          <Head>
+            <title>{tabTitle}</title>
+          </Head>
         ) : null}
-        {withHero ? (
-          // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+        {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
+        {pinned ? (
+          // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
+          // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
+          // s'arrête plus net sous la barre.
           <View
             style={{
-              width: '100%',
-              maxWidth: layout.maxContentWidth,
-              flexGrow: 1,
-              // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-              // mais s'affiche à droite de la scène.
-              flexDirection: 'row-reverse',
+              paddingTop: insets.top + space.sm,
+              paddingBottom: space.sm,
+              paddingHorizontal: padding,
               alignItems: 'center',
-              gap: space.huge,
+              backgroundColor: colors.sheet,
+              borderBottomWidth: borders.hairline,
+              borderBottomColor: colors.line,
             }}
           >
-            <View style={{ width: layout.formWidth - 80 }}>
-              <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                {body}
-              </Surface>
+            <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}>
+              {header}
+              {notice}
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
           </View>
-        ) : (
-          <View
-            style={{
-              width: '100%',
-              maxWidth: maxWidthFor(width, false),
-              gap: space.xl,
-              // Un formulaire seul se place au milieu de la hauteur de l'écran.
-              ...(width === 'form' && !onBack && !header
-                ? { flexGrow: 1, justifyContent: 'center' }
-                : null),
-            }}
-          >
-            {body}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+        ) : null}
+        {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: 'center',
+            // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
+            paddingTop: (pinned ? 0 : insets.top) + space.lg,
+            paddingBottom: insets.bottom + space.huge,
+            paddingHorizontal: padding,
+            gap: space.xl,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
+            change pas de taille d'une page à l'autre. */}
+          {header && !pinned ? (
+            <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+          ) : null}
+          {withHero ? (
+            // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+            <View
+              style={{
+                width: '100%',
+                maxWidth: layout.maxContentWidth,
+                flexGrow: 1,
+                // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                // mais s'affiche à droite de la scène.
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                gap: space.huge,
+              }}
+            >
+              <View style={{ width: layout.formWidth - 80 }}>
+                <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                  {body}
+                </Surface>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
+            </View>
+          ) : (
+            <View
+              style={{
+                width: '100%',
+                maxWidth: maxWidthFor(width, false),
+                gap: space.xl,
+                // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                ...(width === 'form' && !onBack && !header
+                  ? { flexGrow: 1, justifyContent: 'center' }
+                  : null),
+              }}
+            >
+              {body}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </NoticeScope>
   )
 }
 

@@ -1,6 +1,7 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
 import { type Comment, NO_REACTIONS, type Project, type ProjectNote } from '@ruche/contracts'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { useState } from 'react'
 import { ApiError } from '../api/errors'
 import {
   useComments,
@@ -1670,5 +1671,36 @@ describe('a note removed by the moderation, seen by the author of the project', 
     expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
     // L'autre note, visible, n'a pas de bandeau : un seul « Pour contester ».
     expect(screen.getAllByText(containing(fr.t('removal.contest')))).toHaveLength(1)
+  })
+})
+
+// Relecture de design de 6c : deux actions refusées parce que la session a expiré (Suivre, puis une
+// réaction) empilaient deux « Ta session a expiré » et deux liens « Me reconnecter ».
+describe('a session that expired during two actions on the page', () => {
+  it('says it once, with a single « Me reconnecter », after following then reacting', async () => {
+    seenByOther(recipesProject)
+    // Les deux actions échouent en 401 au toucher : un état React dans chaque faux hook, pour que
+    // l'écran se redessine comme avec le vrai.
+    jest.mocked(useFollow).mockImplementation(() => {
+      const [expired, setExpired] = useState(false)
+      return { toggle: () => setExpired(true), error: expired, expired }
+    })
+    jest.mocked(useReaction).mockImplementation(() => {
+      const [expired, setExpired] = useState(false)
+      return { toggle: () => setExpired(true), error: expired, expired }
+    })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('switch', { name: 'Suivre ce projet' }))
+    // Témoin : le premier refus a bien son lien.
+    expect(await screen.findAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(1)
+    await fireEvent.press(screen.getByRole('button', { name: 'Bluffant, 0' }))
+
+    expect(screen.getAllByRole('link', { name: 'Me reconnecter' })).toHaveLength(1)
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Ta session a expiré. Reconnecte-toi pour continuer.',
+    )
+    await signInAgain()
   })
 })

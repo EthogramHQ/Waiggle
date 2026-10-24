@@ -212,11 +212,6 @@ const leaMember = {
   isMe: true,
   projects: [summaryOf(photosProject), summaryOf(draftProject), summaryOf(recipesProject)],
 }
-const claudeCode = {
-  slug: 'claude-code',
-  label: 'Claude Code',
-  projects: [summaryOf(photosProject), summaryOf(recipesProject)],
-}
 // Une image d'exemple par photo (le dépôt n'en contient aucune) : un dégradé SVG, d'une couleur
 // différente selon la photo, aux proportions annoncées par l'API.
 const sampleImage = (id) => {
@@ -244,6 +239,8 @@ const fromOthers = [
     id: '1a2b3c4d-0000-4000-8000-000000000001',
     author: max,
     title: 'Le tri des photos de vacances',
+    // Son propre pitch : sans lui, il hériterait de celui de l'agent de recettes (le frigo).
+    pitch: 'Il garde les meilleures photos de chaque journée et range le reste.',
   },
   {
     ...recipesProject,
@@ -262,6 +259,13 @@ const fromOthers = [
   },
   { ...longProject, id: '1a2b3c4d-0000-4000-8000-000000000004', author: ines },
 ]
+// La page d'une étiquette : deux projets différents qui la portent, de deux membres (photosProject
+// et recipesProject sont le même projet, l'un avec photos : la page montrait deux fois le même).
+const claudeCode = {
+  slug: 'claude-code',
+  label: 'Claude Code',
+  projects: [summaryOf(fromOthers[0]), summaryOf(recipesProject)],
+}
 const feedItems = fromOthers.map((p, i) => ({
   kind: 'project',
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),

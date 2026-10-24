@@ -23,6 +23,8 @@ export const fr = {
     remove: 'Retirer {{item}}',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
+    /** Le titre de l'écran de secours, au-dessus de « Cette page n’a pas pu s’afficher. ». */
+    crashedTitle: 'Un problème est survenu',
   },
   home: {
     title: 'Bienvenue sur {{appName}}',
@@ -115,6 +117,8 @@ export const fr = {
       night: 'Nuit',
       hint: 'Sur cet appareil seulement. « Automatique » suit le réglage de ton appareil.',
     },
+    // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
+    emails: { title: 'E-mails', row: 'Choisir les e-mails reçus' },
     data: { title: 'Mes données' },
     export: {
       button: 'Télécharger mes données',
@@ -713,8 +717,9 @@ export const fr = {
     bellNew_other: 'Notifications, {{count}} nouvelles',
     bellNewMany: 'Notifications, plus de {{max}} nouvelles',
     new: 'Nouveau',
+    emptyTitle: 'Pas encore de notification',
     empty:
-      'Rien pour l’instant. Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
+      'Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
     emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
     end: 'C’est tout',

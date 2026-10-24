@@ -340,6 +340,13 @@ describe('the end of the list', () => {
     expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
   })
 
+  it('titles the empty list, like every other state', async () => {
+    mockPages([notificationPageOf([])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(screen.getByRole('header', { name: t('notifications.emptyTitle') })).toBeTruthy()
+  })
+
   it('offers to publish a project when there is nothing yet', async () => {
     mockPages([notificationPageOf([])])
     await renderWithProviders(<NotificationsScreen />)

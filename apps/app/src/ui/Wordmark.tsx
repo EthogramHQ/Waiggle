@@ -20,7 +20,8 @@ export function Wordmark({ size = 'small', onPress, header }: Props) {
     <Text
       variant={variants[size]}
       accessibilityLabel={header ?? appName}
-      {...(header ? { accessibilityRole: 'header' as const } : null)}
+      // Le logo qui sert de titre (l'accueil d'un visiteur) est le titre de la page : niveau 1.
+      {...(header ? { heading: 1 as const } : null)}
       maxScale={1.2}
     >
       {appName.toLowerCase()}

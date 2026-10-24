@@ -119,7 +119,11 @@ export function Button({
 
   return (
     // Deux couches : Animated.View porte l'enfoncement animé, Pressable reçoit le doigt.
-    <Animated.View style={animated}>
+    // Jamais plus large que la place donnée (maxWidth), et prêt à rétrécir dans une rangée
+    // (flexShrink) : à texte agrandi (200 %, 320 points), le libellé passe alors à la ligne au lieu
+    // de sortir de l'écran. Sur le web, une vue ne rétrécit pas d'elle-même (flexShrink: 0 par
+    // défaut dans react-native-web) : « Suivre ce projet » mesurait 329 points dans un écran de 320.
+    <Animated.View style={[{ maxWidth: '100%', flexShrink: 1 }, animated]}>
       <Pressable
         ref={ref}
         accessibilityRole={checked === undefined ? 'button' : 'switch'}
@@ -181,7 +185,10 @@ export function Button({
             gap: space.sm,
             alignItems: 'center',
             justifyContent: 'center',
+            // minWidth: 0 : sans lui, une rangée ne descend pas sous la largeur de son contenu, et
+            // le libellé ne se replierait pas.
             flexShrink: 1,
+            minWidth: 0,
             opacity: loading ? 0 : 1,
           }}
         >

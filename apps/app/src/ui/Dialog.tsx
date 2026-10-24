@@ -96,7 +96,8 @@ export function Dialog({
           >
             <Surface variant="sheet" radius="sheet" padding="xxl" gap="lg" centered>
               {illustration ? <View style={{ alignItems: 'center' }}>{illustration}</View> : null}
-              <Text variant="heading" align="center" accessibilityRole="header">
+              {/* Niveau 2 : la fenêtre s'ouvre par-dessus une page qui a déjà son titre. */}
+              <Text variant="heading" align="center" heading={2}>
                 {title}
               </Text>
               {quote ? (

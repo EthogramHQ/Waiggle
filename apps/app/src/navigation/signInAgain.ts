@@ -42,6 +42,9 @@ export const useSignInAgain = () => {
   const pathname = usePathname()
   return (before?: () => void): NoticeAction => ({
     label: t('states.signIn'),
+    // Deux actions refusées sur la même page (Suivre, puis une réaction) : un seul « Ta session a
+    // expiré » et un seul lien, celui du premier refus, qui reste à sa place (ui/Notice.tsx).
+    single: 'session',
     onPress: () => {
       before?.()
       // push (et non replace) : le retour depuis la connexion ramène aussi sur cette page.

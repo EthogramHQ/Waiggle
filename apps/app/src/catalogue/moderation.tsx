@@ -158,7 +158,7 @@ export function ModerationCatalogue() {
   const [dialog, setDialog] = useState(false)
   return (
     <Stack gap="md">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {l.title}
       </Text>
       {/* Les cartes de la file : un commentaire qu'on peut retirer ou classer ; un profil, qu'on

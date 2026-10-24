@@ -4,6 +4,9 @@
 //
 // Tous ont la même barre en haut et la même largeur que la page qu'ils remplacent (`width`) : la
 // mise en page ne saute pas quand le chargement devient le contenu, ou une erreur.
+//
+// Ces pages n'ont pas d'autre titre que celui de leur état : il est donc de niveau 1 (`level`),
+// comme le titre de la page qu'elles remplacent.
 import { type Href, usePathname, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -65,6 +68,7 @@ export function SignedOutScreen({
     <Screen header={<TopNav />} width={width} pageTitle={t('states.signedOutTitle')}>
       <StateMessage
         kind="signedOut"
+        level={1}
         title={t('states.signedOutTitle')}
         message={expired ? t('states.expired') : t('home.membersOnly')}
         actions={[
@@ -108,6 +112,7 @@ export function LoadErrorScreen({
     <Screen header={<TopNav />} width={width} pageTitle={t('states.errorTitle')}>
       <StateMessage
         kind="error"
+        level={1}
         title={t('states.errorTitle')}
         message={t(`errors.${key}`)}
         actions={[
@@ -135,6 +140,7 @@ export function NotFoundState({
     <Screen header={<TopNav />} width={width} pageTitle={title}>
       <StateMessage
         kind="notFound"
+        level={1}
         title={title}
         {...(message ? { message } : null)}
         actions={[{ label: t('states.home'), onPress: () => router.replace('/') }]}
@@ -151,6 +157,7 @@ export function NotMineState({ projectId, width = 'form' }: { projectId: string;
     <Screen header={<TopNav />} width={width} pageTitle={t('states.notMineTitle')}>
       <StateMessage
         kind="signedOut"
+        level={1}
         title={t('states.notMineTitle')}
         message={t('project.page.notMine')}
         actions={[
