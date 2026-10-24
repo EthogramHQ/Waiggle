@@ -5,6 +5,7 @@
 import { findMentions, MENTIONS_MAX, type Mention } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm'
+import { blocksOf, noBlocks } from '../blocks/visibility'
 
 const h = schema.memberHandle
 const cm = schema.commentMention
@@ -29,13 +30,22 @@ const cm = schema.commentMention
  * La clé primaire de member_handle (le pseudo lui-même) trouve chaque pseudo ; celle de user, son
  * compte. Les pseudos viennent du texte du client, mais n'entrent dans la requête que comme
  * paramètres liés ($1, $2…), jamais recopiés dans le SQL.
+ *
+ * Les blocages (tranche 7b, règle 2b de la relecture du plan), lus par une requête de plus
+ * (`blocksOf`, seulement si le texte contient un « @ ») :
+ * - un pseudo qui désigne un membre que l'auteur a bloqué refuse tout le texte : la fonction rend
+ *   'blocked_mention' (422), que ce pseudo soit nouveau ou déjà gardé, et rien n'est écrit ;
+ * - un pseudo nouveau qui désigne un membre qui a bloqué l'auteur se traite comme un pseudo
+ *   inconnu : pas de mention, pas d'erreur, rien ne trahit le blocage. Une mention déjà gardée
+ *   (écrite avant le blocage) reste, elle : la règle 2 laisse le membre mentionné lire et signaler
+ *   ce commentaire, et une modification ne doit pas pouvoir le lui cacher.
  */
 export const resolveMentions = async (
   db: Database,
   body: string,
   authorId: string,
   kept: Mention[] = [],
-): Promise<Mention[]> => {
+): Promise<Mention[] | 'blocked_mention'> => {
   const handles = findMentions(body)
   if (handles.length === 0) return []
   // Les mentions déjà gardées (à la modification) dont le pseudo est encore dans le texte : elles
@@ -62,7 +72,15 @@ export const resolveMentions = async (
               ne(h.userId, authorId),
             ),
           )
-  const resolvedOf = new Map(rows.map((row) => [row.handle, row.memberId]))
+  // Les blocages de l'auteur (règle 2b, voir plus haut) : un membre qu'il a bloqué, désigné par un
+  // pseudo du texte (gardé ou nouveau), refuse le texte entier ; un membre qui l'a bloqué ne
+  // devient pas une mention nouvelle.
+  const designated = [...keptMembers, ...rows.map((row) => row.memberId)]
+  const blocks = designated.length === 0 ? noBlocks : await blocksOf(db, authorId)
+  if (designated.some((memberId) => blocks.byMe.has(memberId))) return 'blocked_mention'
+  const resolvedOf = new Map(
+    rows.filter((row) => !blocks.ofMe.has(row.memberId)).map((row) => [row.handle, row.memberId]),
+  )
   // L'ordre du texte (findMentions le donne déjà, sans doublon), un membre une seule fois, puis
   // les 5 premiers trouvés. Un membre déjà mentionné par un pseudo encore écrit garde ce pseudo-là,
   // même si son pseudo actuel est écrit aussi : une seule ligne par membre et par commentaire.

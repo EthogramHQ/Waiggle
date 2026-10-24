@@ -5,6 +5,7 @@
 import { findMentions, type Mention } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { inArray } from 'drizzle-orm'
+import type { Blocks } from '../blocks/visibility'
 
 type Reader = Pick<Database, 'select'>
 
@@ -34,10 +35,15 @@ const mentionRows = (db: Reader, commentIds: string[]) =>
  *
  * À n'appeler qu'avec les commentaires que le lecteur lit vraiment (pas une place vide de
  * commentaire masqué ou supprimé) : ce qu'on ne lit pas n'a pas de mentions.
+ *
+ * `blocks` (tranche 7b) : les blocages du lecteur (`blocksOf`). Un membre bloqué avec lui, dans un
+ * sens ou dans l'autre, n'a pas de lien : son pseudo reste du texte, et son identifiant ne sort
+ * pas. Le filtre se fait ici, en mémoire, sur les blocages déjà lus : aucune requête de plus.
  */
 export const mentionsOf = async (
   db: Reader,
   comments: MentionSource[],
+  blocks: Blocks,
 ): Promise<Map<string, Mention[]>> => {
   const result = new Map<string, Mention[]>()
   if (comments.length === 0) return result
@@ -46,6 +52,7 @@ export const mentionsOf = async (
     comments.map((comment) => comment.id),
   )
   for (const row of rows) {
+    if (blocks.byMe.has(row.memberId) || blocks.ofMe.has(row.memberId)) continue
     const list = result.get(row.commentId) ?? []
     list.push({ handle: row.handle, memberId: row.memberId })
     result.set(row.commentId, list)
