@@ -18,6 +18,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
+import { blocksOfMember } from '../blocks/list'
 import { commentsOfAuthor } from '../comments/load'
 import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
@@ -379,6 +380,11 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       decidedAt: row.decidedAt?.toISOString() ?? null,
     }))
 
+    // Les membres qu'il a bloqués (tranche 7b), des plus anciens aux plus récents, avec leur pseudo
+    // actuel et la date. Jamais ceux qui l'ont bloqué : ce n'est pas son geste, et le lui dire
+    // trahirait leur blocage (blocks/list.ts).
+    const blocks = await blocksOfMember(db, user.id)
+
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
     c.header('Content-Disposition', `attachment; filename="${appName.toLowerCase()}-export.json"`)
@@ -396,6 +402,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           mentions: mentionsByComment.get(comment.id) ?? [],
         })),
         reports,
+        blocks,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

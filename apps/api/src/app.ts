@@ -18,6 +18,7 @@ import { errorBody, languageOf } from './errors'
 import { describeError } from './log'
 import type { FileStorage } from './media/storage'
 import { createRateLimiter } from './rate-limit'
+import { blockRoutes } from './routes/blocks'
 import { commentRoutes } from './routes/comments'
 import { emailRoutes, UNSUBSCRIBE_PATH } from './routes/email'
 import { feedRoutes } from './routes/feed'
@@ -210,6 +211,8 @@ export const createApp = ({
   app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
   app.route('/', followRoutes({ db, limiter }))
+  // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
+  app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
   app.route('/', noteRoutes({ db, limiter }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
