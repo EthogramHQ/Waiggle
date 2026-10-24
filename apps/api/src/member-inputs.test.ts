@@ -33,7 +33,8 @@ import { avatarForm, jpegImage, visualForm } from './testing/images'
 // ─── L'inventaire du schéma ──────────────────────────────────────────────────────────────────────
 
 /** Toutes les tables du schéma, avec leurs colonnes (nom SQL et type SQL). */
-const tables = Object.values(schema)
+// `unknown[]` : le schéma exporte aussi les relations de Drizzle, que le filtre écarte.
+const tables = (Object.values(schema) as unknown[])
   .filter((value): value is PgTable => is(value, PgTable))
   .map((table) => {
     const config = getTableConfig(table)

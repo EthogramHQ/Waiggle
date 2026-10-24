@@ -802,3 +802,40 @@ describe('the notifications of the moderation', () => {
     }
   })
 })
+
+// ─── Bloquer (tranche 7b) ────────────────────────────────────────────────────────────────────────
+
+// Scénario « Tranche 7b — Bloquer » : ce qui vient de l'autre (commentaire, réponse, mention,
+// réaction, abonnement) disparaît aussi du récap du lundi, dans les deux sens du blocage. Le récap
+// lit le même filtre que la liste des notifications (plan 7b, « Ce qu'un blocage cache »).
+describe('the recap and blocks', () => {
+  it.each([
+    ['Inès blocked Malik', 'ines'],
+    ['Malik blocked Inès', 'malik'],
+  ])('leaves out everything coming from Malik when %s', async (_, who) => {
+    const malikId = (await act.me(malik)).id
+    const meteo = await act.publish(ines, 'Météo')
+    const jardin = await act.publish(sam, 'Jardin')
+    later()
+    await act.comment(meteo.id, malik, 'Un commentaire de Malik')
+    later()
+    await act.comment(jardin.id, malik, '@ines_morel regarde ça.')
+    later()
+    await act.react(meteo.id, 'bravo', malik)
+    later()
+    await act.comment(meteo.id, zoe, 'Un commentaire de Zoé')
+    later()
+    if (who === 'ines') await act.block(malikId, ines)
+    else await act.block(inesId, malik)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(inesAccount.email)
+    expect(recap.text).toContain(line('comment', 'Météo', 'Zoé', 'zoe'))
+    expect(recap.text).not.toContain(line('comment', 'Météo'))
+    expect(recap.text).not.toContain(line('mention', 'Jardin'))
+    expect(recap.text).not.toContain('Malik')
+    expect(recap.html).not.toContain('Malik')
+  })
+})

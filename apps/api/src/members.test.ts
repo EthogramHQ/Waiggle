@@ -160,6 +160,7 @@ describe('the page of a member', () => {
         'followerCount',
         'handle',
         'id',
+        'isBlocked', // tranche 7b : si le visiteur l'a bloquée
         'isFollowed',
         'isMe',
         'name',
