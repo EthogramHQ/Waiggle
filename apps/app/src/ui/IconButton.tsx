@@ -37,6 +37,14 @@ type Props = {
    * Elle ne dit rien aux lecteurs d'écran : le `label` doit contenir le nombre.
    */
   badge?: ReactNode
+  /**
+   * Pour un bouton qui ouvre quelque chose (le menu « … », tranche 7b) : vrai quand c'est ouvert.
+   * `aria-expanded`, que React Native et react-native-web transmettent tous deux (le lecteur
+   * d'écran dit « réduit » ou « développé ») ; absent, le bouton n'en dit rien.
+   */
+  expanded?: boolean
+  /** Ce qu'il ouvre est un menu (`aria-haspopup`, web) : le lecteur d'écran l'annonce. */
+  hasMenu?: boolean
 }
 
 // Où s'accroche le coin bas gauche de la pastille, compté depuis le bord droit (et le haut) du
@@ -54,6 +62,8 @@ export function IconButton({
   hint,
   ref,
   badge,
+  expanded,
+  hasMenu = false,
 }: Props) {
   const { colors, shadows } = useTheme()
   const scale = useSharedValue(1)
@@ -88,6 +98,8 @@ export function IconButton({
         // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle.
         accessibilityHint={Platform.OS === 'web' ? undefined : hint}
         aria-disabled={disabled}
+        {...(expanded === undefined ? null : { 'aria-expanded': expanded })}
+        {...(hasMenu && Platform.OS === 'web' ? { 'aria-haspopup': 'menu' } : null)}
         disabled={disabled}
         onPress={onPress}
         onPressIn={() => {

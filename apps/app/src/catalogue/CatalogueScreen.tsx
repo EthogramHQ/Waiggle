@@ -74,6 +74,7 @@ import type { Appearance } from '../ui/theme/appearance'
 import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
+import { ActionMenuSamples } from './actionMenu'
 import { labels } from './labels'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
@@ -988,6 +989,8 @@ export function CatalogueScreen() {
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
+      {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
+      <ActionMenuSamples />
 
       <Section title={l.illustrations}>
         <Stack direction="row" gap="lg" wrap align="center">
