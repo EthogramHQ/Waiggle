@@ -600,6 +600,20 @@ describe('Markdown', () => {
       jest.restoreAllMocks()
     }
   })
+
+  it('skips no level when the text starts at « ## » (h3, not h4)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Markdown text={'## Comment ça marche\n\n### Les étapes'} onLinkPress={() => {}} />,
+      )
+
+      expect(webTagOf(screen.getByRole('header', { name: 'Comment ça marche' }).props)).toBe('h3')
+      expect(webTagOf(screen.getByRole('header', { name: 'Les étapes' }).props)).toBe('h4')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('Wordmark', () => {

@@ -56,10 +56,26 @@ const parse = (text: string): Token[] | null => {
   }
 }
 
+/**
+ * Le plus grand titre du texte (« # » vaut 1, « ## » vaut 2…), cherché aussi dans les listes et les
+ * citations ; 6 s'il n'y en a aucun. L'imbrication est bornée comme à l'affichage.
+ */
+const topHeadingDepth = (list: Token[] | undefined, nesting = 0): number => {
+  let top = 6
+  if (!list || nesting > MAX_DEPTH) return top
+  for (const token of list) {
+    if (token.type === 'heading') top = Math.min(top, token.depth)
+    if ('tokens' in token) top = Math.min(top, topHeadingDepth(token.tokens, nesting + 1))
+    if (token.type === 'list') top = Math.min(top, topHeadingDepth(token.items, nesting + 1))
+  }
+  return top
+}
+
 export function Markdown({ text, onLinkPress }: Props) {
   const styles = makeStyles(useTheme())
   // useMemo : on ne redécoupe le texte que s'il change, pas à chaque affichage de l'écran.
   const tokens = useMemo(() => parse(text), [text])
+  const topDepth = useMemo(() => topHeadingDepth(tokens ?? undefined), [tokens])
 
   // Les éléments « en ligne » : texte, gras, liens… placés à l'intérieur d'un paragraphe.
   const inline = (list: Token[] | undefined, depth = 0): ReactNode =>
@@ -147,12 +163,14 @@ export function Markdown({ text, onLinkPress }: Props) {
     switch (token.type) {
       case 'heading':
         // Les titres d'un membre vivent dans une section de la page (« Description », niveau 2) :
-        // « # » devient un titre de niveau 3, « ## » et plus un niveau 4. Ils ne peuvent ainsi ni
-        // se faire passer pour le titre de la page, ni pour une de ses sections.
+        // les plus grands du texte deviennent des titres de niveau 3, tous les autres de niveau
+        // 4. Ils ne peuvent ainsi ni se faire passer pour le titre de la page, ni pour une de ses
+        // sections ; et un texte qui commence par « ## » ne saute pas le niveau 3 (un lecteur
+        // d'écran croirait qu'il manque un titre).
         return (
           <Text
             key={key}
-            {...headingLevel(token.depth <= 1 ? 3 : 4)}
+            {...headingLevel(token.depth <= topDepth ? 3 : 4)}
             style={[styles.text, styles.heading]}
           >
             {inline(token.tokens, depth)}

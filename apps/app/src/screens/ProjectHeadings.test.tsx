@@ -85,8 +85,9 @@ describe('ProjectScreen headings', () => {
       expect(tagNamed('Mon agent de recettes')).toBe('h1')
       expect(tagNamed('Description')).toBe('h2')
       expect(tagNamed('Commentaires')).toBe('h2')
+      expect(tagNamed('La recette')).toBe('h2')
       // « ## Comment ça marche », écrit par le membre : sous la section « Description ».
-      expect(tagNamed('Comment ça marche')).toBe('h4')
+      expect(tagNamed('Comment ça marche')).toBe('h3')
     } finally {
       jest.restoreAllMocks()
     }
