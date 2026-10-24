@@ -383,7 +383,6 @@ export const en: Translation = {
       removedPlaceholder: 'Removed by moderation',
       blockedPlaceholder: 'Comment from a member you blocked',
       unavailablePlaceholder: 'Comment unavailable',
-      blockedMention: 'You can’t mention @{{handle}}: you blocked them.',
       more: 'Show more',
       end: 'That’s all',
       moreError: 'The next comments could not load.',

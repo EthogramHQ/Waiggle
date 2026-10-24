@@ -406,7 +406,6 @@ export const fr = {
       // Tranche 7b : « Commentaire masqué » reste au geste de l'auteur du projet (J6).
       blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',
       unavailablePlaceholder: 'Commentaire indisponible',
-      blockedMention: 'Tu ne peux pas mentionner @{{handle}} : tu l’as bloqué.',
       more: 'Afficher la suite',
       end: 'C’est tout',
       moreError: 'La suite des commentaires n’a pas pu se charger.',
