@@ -96,7 +96,7 @@ export function CatalogueScreen() {
     <Screen width="page">
       <Stack gap="md">
         <Wordmark size="large" />
-        <Text variant="title2" accessibilityRole="header">
+        <Text variant="title2" heading={1}>
           {l.title}
         </Text>
         <Text tone="secondary">{l.intro}</Text>
@@ -157,6 +157,17 @@ export function CatalogueScreen() {
                 size="compact"
                 onPress={() => {}}
               />
+              {/* Un libellé trop long pour sa rangée passe à la ligne, sans sortir du bouton
+                  (texte agrandi, écran étroit). */}
+              <Stack direction="row" gap="sm">
+                <Button
+                  label={l.longButton}
+                  variant="secondary"
+                  icon="plus"
+                  size="compact"
+                  onPress={() => {}}
+                />
+              </Stack>
             </OnLight>
           }
         />
@@ -271,9 +282,12 @@ export function CatalogueScreen() {
 
       {/* Les états d'une page qui n'a pas (encore) son contenu : toujours une issue. */}
       <Section title={l.states}>
+        {/* level={3} : ici, chaque état est un exemple rangé sous la section « États » (niveau 2).
+            Dans l'appli, un état a le niveau 2, ou 1 quand il remplace toute la page. */}
         <StateMessage kind="loading" message={l.stateLoading} />
         <StateMessage
           kind="error"
+          level={3}
           title={l.stateErrorTitle}
           message={l.stateError}
           actions={[
@@ -283,18 +297,21 @@ export function CatalogueScreen() {
         />
         <StateMessage
           kind="notFound"
+          level={3}
           title={l.stateNotFoundTitle}
           message={l.stateNotFound}
           actions={[{ label: l.home, onPress: () => {} }]}
         />
         <StateMessage
           kind="empty"
+          level={3}
           title={l.stateEmptyTitle}
           message={l.stateEmpty}
           actions={[{ label: l.publish, onPress: () => {} }]}
         />
         <StateMessage
           kind="signedOut"
+          level={3}
           title={l.stateSignedOutTitle}
           message={l.stateSignedOut}
           actions={[
@@ -974,7 +991,7 @@ type Labels = (typeof labels)['fr']
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Stack gap="md">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {title}
       </Text>
       {children}

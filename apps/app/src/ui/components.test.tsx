@@ -4,7 +4,7 @@
 import { appName, fontWeights, maxTextScale } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
-import { Platform, TextInput, type View } from 'react-native'
+import { Platform, StyleSheet, TextInput, type View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Choices } from './Choices'
@@ -18,6 +18,7 @@ import { FollowerCount } from './FollowerCount'
 import { Hint } from './Hint'
 import { IconButton } from './IconButton'
 import { ListGroup, ListRow } from './ListGroup'
+import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
 import { NewItemsBanner } from './NewItemsBanner'
@@ -51,6 +52,12 @@ import { Wordmark } from './Wordmark'
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
+// La règle de react-native-web qui choisit la balise d'un élément (<h1>, <h2>…) d'après son rôle et
+// son niveau (aria-level) : appliquée aux propriétés d'un titre, elle dit ce que lira le navigateur.
+const webTagOf = jest.requireActual<(props: object) => string | undefined>(
+  'react-native-web/dist/cjs/modules/AccessibilityUtil/propsToAccessibilityComponent',
+)
+
 describe('Button', () => {
   it('is announced as a button with its label, and runs its action', async () => {
     const onPress = jest.fn()
@@ -59,6 +66,25 @@ describe('Button', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
 
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  // Jest ne mesure aucune largeur : ce test vérifie les règles de mise en page qui permettent au
+  // libellé de se replier ; la mesure réelle (320 points, texte à 200 %) se fait dans le navigateur.
+  it('folds its label on two lines rather than overflowing (large text, narrow screen)', async () => {
+    await renderWithProviders(
+      <Stack direction="row">
+        <Button label="Suivre ce projet" icon="plus" onPress={() => {}} />
+      </Stack>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Suivre ce projet' })
+    // La couche qui porte le bouton ne dépasse pas sa place, et rétrécit dans une rangée.
+    expect(StyleSheet.flatten(button.parent?.props.style)).toMatchObject({
+      maxWidth: '100%',
+      flexShrink: 1,
+    })
+    // Le libellé n'est jamais coupé à une ligne : il passe à la ligne suivante.
+    expect(screen.getByText('Suivre ce projet').props.numberOfLines).toBeUndefined()
   })
 
   it('cannot be pressed twice while its action is running', async () => {
@@ -530,6 +556,50 @@ describe('Text', () => {
     expect(screen.getByText('Bonjour').props.maxFontSizeMultiplier).toBe(maxTextScale)
     expect(maxTextScale).toBe(2)
   })
+
+  it('is a heading of its level: h1, h2, h3 on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Stack>
+          <Text heading={1}>Mon agent de recettes</Text>
+          <Text heading={2}>Description</Text>
+          <Text heading={3}>La recette</Text>
+        </Stack>,
+      )
+
+      expect(screen.getAllByRole('header').map((heading) => webTagOf(heading.props))).toEqual([
+        'h1',
+        'h2',
+        'h3',
+      ])
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('is announced as a heading on a phone too, where there is no level', async () => {
+    await renderWithProviders(<Text heading={2}>Description</Text>)
+
+    expect(screen.getByRole('header', { name: 'Description' }).props['aria-level']).toBeUndefined()
+  })
+})
+
+describe('Markdown', () => {
+  it('puts the headings of a member below the sections of the page (h3, h4)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Markdown text={'# La recette\n\n## Les étapes\n\n### Détail'} onLinkPress={() => {}} />,
+      )
+
+      expect(webTagOf(screen.getByRole('header', { name: 'La recette' }).props)).toBe('h3')
+      expect(webTagOf(screen.getByRole('header', { name: 'Les étapes' }).props)).toBe('h4')
+      expect(webTagOf(screen.getByRole('header', { name: 'Détail' }).props)).toBe('h4')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('Wordmark', () => {
@@ -956,6 +1026,24 @@ describe('StateMessage', () => {
     expect(screen.getByText('Chargement…')).toBeTruthy()
     expect(screen.queryByRole('header')).toBeNull()
   })
+
+  it('titles a section of the page (h2), or the whole page when asked (h1)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Stack>
+          <StateMessage kind="empty" title="Pas encore de notification" />
+          <StateMessage kind="notFound" title="Page introuvable" level={1} />
+        </Stack>,
+      )
+
+      const tag = (name: string) => webTagOf(screen.getByRole('header', { name }).props)
+      expect(tag('Pas encore de notification')).toBe('h2')
+      expect(tag('Page introuvable')).toBe('h1')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 describe('SheetHeader', () => {
@@ -981,7 +1069,7 @@ describe('SheetHeader', () => {
 describe('Screen', () => {
   it('shows a sticky header once, above the content', async () => {
     await renderWithProviders(
-      <Screen ambient={false} stickyHeader header={<Text accessibilityRole="header">Barre</Text>}>
+      <Screen ambient={false} stickyHeader header={<Text heading={1}>Barre</Text>}>
         <Text>Contenu</Text>
       </Screen>,
     )

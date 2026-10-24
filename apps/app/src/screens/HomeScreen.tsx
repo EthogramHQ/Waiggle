@@ -74,7 +74,7 @@ function VisitorHome() {
       </Row>
       {/* Sur ordinateur, la scène de gauche montre déjà la constellation et le logo. */}
       {wide ? (
-        <Text variant="title3" accessibilityRole="header">
+        <Text variant="title3" heading={1}>
           {t('home.title')}
         </Text>
       ) : (
@@ -357,7 +357,9 @@ function FeedError({ error, onRetry }: { error: unknown; onRetry: () => void }) 
       kind="error"
       title={t('feed.errorTitle')}
       message={t(`errors.${errorKey(error)}`)}
-      actions={[{ label: t('common.retry'), onPress: onRetry }]}
+      // « Réessayer » en blanc : sur l'accueil, la seule action miel reste « Publier un projet »,
+      // dans la barre du haut (une seule action miel par écran).
+      actions={[{ label: t('common.retry'), onPress: onRetry, variant: 'secondary' }]}
     />
   )
 }

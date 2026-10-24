@@ -1,9 +1,10 @@
 // Test de l'écran d'accueil avec Testing Library : on affiche l'écran en mémoire,
 // puis on le manipule comme le ferait un utilisateur (lire un texte, appuyer sur un bouton).
 // On cherche les éléments par ce que l'utilisateur voit (texte, rôle), pas par leur code interne.
-import { appName } from '@ruche/brand'
+import { appName, palettes } from '@ruche/brand'
 import type { FeedItem, FeedPage, FollowingFeedPage, Project } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
@@ -262,6 +263,26 @@ describe('the « following » feed on the home screen', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('La suite du fil n’a pas pu se charger.')
     await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
     expect(following.fetchNextPage).toHaveBeenCalledTimes(1)
+  })
+
+  // Une seule action miel par écran : sur l'accueil, c'est « Publier un projet ». Le bouton est
+  // trouvé par son rôle et son nom ; seule sa couleur de fond est lue, parce que c'est la règle.
+  it('offers to retry a feed that could not load, without a second honey button', async () => {
+    const following = mockFollowing()
+    jest.mocked(useFollowingFeed).mockReturnValue({
+      ...following,
+      data: undefined,
+      status: 'error',
+      isSuccess: false,
+      isError: true,
+      error: new Error('internal'),
+    } as unknown as ReturnType<typeof useFollowingFeed>)
+    await renderMemberHome()
+
+    const retry = screen.getByRole('button', { name: 'Réessayer' })
+    expect(StyleSheet.flatten(retry.props.style).backgroundColor).toBe(palettes.day.surface)
+    await fireEvent.press(retry)
+    expect(following.refetch).toHaveBeenCalledTimes(1)
   })
 
   it('loads the next 20 on request', async () => {
