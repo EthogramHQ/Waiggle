@@ -712,7 +712,7 @@ export function Comments({ project }: { project: Project }) {
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {/* Sans commentaire, le titre seul : « (0) » n'apprend rien que la liste vide ne dise. */}
         {project.commentCount > 0
           ? t('project.comments.title', { count: project.commentCount })

@@ -501,7 +501,7 @@ function EmailSettings() {
   // paddingY : un peu plus d'air au-dessus du titre, pour que la section se détache du formulaire.
   return (
     <Stack gap="md" paddingY="lg" ref={sectionRef}>
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {t('profile.emails.title')}
       </Text>
       {notice}

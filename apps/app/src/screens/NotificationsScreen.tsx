@@ -74,8 +74,11 @@ function MemberNotifications() {
         )
       ) : items.length === 0 ? (
         // Rien encore : ce qui en fera venir, c'est un projet publié (les autres y réagiront).
+        // Un titre, comme tous les états de l'appli : c'est lui que lit d'abord un lecteur d'écran
+        // qui parcourt la page par ses titres.
         <StateMessage
           kind="empty"
+          title={t('notifications.emptyTitle')}
           message={t('notifications.empty')}
           actions={[
             { label: t('notifications.emptyAction'), onPress: () => router.push('/projects/new') },

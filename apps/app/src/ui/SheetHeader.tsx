@@ -57,7 +57,8 @@ export function SheetHeader({ title, cancel, action }: Props) {
     </View>
   )
   const heading = (
-    <Text variant="headline" align="center" accessibilityRole="header" numberOfLines={2}>
+    // Cet en-tête remplace celui de la page sur téléphone : son titre est celui de la page (niveau 1).
+    <Text variant="headline" align="center" heading={1} numberOfLines={2}>
       {title}
     </Text>
   )

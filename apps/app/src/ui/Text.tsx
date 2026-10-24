@@ -71,11 +71,20 @@ export type TextProps = {
   breakAnywhere?: boolean
   /** Une ligne de longueur confortable (readableWidth), même sur un grand écran. */
   readable?: boolean
+  /**
+   * Fait du texte un titre, de ce niveau (voir `headingLevel` plus bas) : 1 pour le titre de la
+   * page, 2 pour ses sections, 3 et 4 en dessous (les titres écrits par les membres).
+   */
+  heading?: HeadingLevel
+  /**
+   * Le rôle lu par les lecteurs d'écran. « header » en est exclu : un titre passe par `heading`,
+   * qui porte aussi son niveau ; un titre sans niveau ne compile plus.
+   */
+  accessibilityRole?: Exclude<NativeTextProps['accessibilityRole'], 'header'>
 } & Pick<
   NativeTextProps,
   | 'numberOfLines'
   | 'selectable'
-  | 'accessibilityRole'
   | 'accessibilityLabel'
   // « polite » : un texte qui apparaît en cours de route est lu par les lecteurs d'écran, sans
   // couper ce qu'ils disent (par exemple « Préparation de la photo… »).
@@ -85,6 +94,24 @@ export type TextProps = {
   | 'testID'
   | 'nativeID'
 >
+
+/** Les niveaux de titre de l'appli : la page (1), ses sections (2), puis dessous (3, 4). */
+export type HeadingLevel = 1 | 2 | 3 | 4
+
+/**
+ * Les propriétés d'un titre, à étaler sur un texte (`{...headingLevel(2)}`). Un lecteur d'écran
+ * parcourt une page par ses titres, et leur niveau dit ce qui est dans quoi : « Description »
+ * (niveau 2) appartient au projet (niveau 1), « La recette » (niveau 3) à la description. Si tous
+ * les titres ont le même niveau, la page paraît une suite de pages sans lien.
+ * - Partout, le rôle « header » : sur téléphone, VoiceOver et TalkBack l'annoncent « titre » (ils
+ *   ne connaissent pas de niveau).
+ * - Sur le web, `aria-level` en plus : react-native-web en fait une vraie balise `<h1>` à `<h4>`
+ *   (sans lui, tout titre devient un `<h1>`). Cette propriété manque aux types de React Native.
+ */
+export const headingLevel = (level: HeadingLevel): object => ({
+  accessibilityRole: 'header',
+  ...(Platform.OS === 'web' ? { 'aria-level': level } : null),
+})
 
 export function Text({
   children,
@@ -97,6 +124,7 @@ export function Text({
   maxScale = maxTextScale,
   breakAnywhere = false,
   readable = false,
+  heading,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
@@ -123,6 +151,7 @@ export function Text({
         ...(readable ? { maxWidth: readableWidth } : null),
       }}
       {...rest}
+      {...(heading ? headingLevel(heading) : null)}
     >
       {children}
     </NativeText>

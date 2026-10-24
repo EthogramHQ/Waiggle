@@ -6,7 +6,7 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
 import { Emblem, Honeycomb } from './Illustrations'
 import { Stack } from './Stack'
-import { Text } from './Text'
+import { type HeadingLevel, Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -23,9 +23,15 @@ type Props = {
   message?: string
   /** Les issues proposées, de la principale à la secondaire. */
   actions?: Action[]
+  /**
+   * Le niveau du titre : 2 par défaut, car l'état est le plus souvent une section d'une page qui a
+   * son propre titre (« Pas encore de notification » sous « Notifications ») ; 1 quand l'état
+   * remplace toute la page (page introuvable, erreur de chargement : voir screens/states.tsx).
+   */
+  level?: HeadingLevel
 }
 
-export function StateMessage({ kind, title, message, actions = [] }: Props) {
+export function StateMessage({ kind, title, message, actions = [], level = 2 }: Props) {
   const { colors } = useTheme()
   const { height } = useLayout()
   // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand). Sur le web,
@@ -58,7 +64,7 @@ export function StateMessage({ kind, title, message, actions = [] }: Props) {
         ) : null}
         <Stack gap="sm" align="stretch">
           {title ? (
-            <Text variant="title2" align="center" accessibilityRole="header">
+            <Text variant="title2" align="center" heading={level}>
               {title}
             </Text>
           ) : null}

@@ -17,7 +17,7 @@ export function VerifiedScreen() {
       <Stack align="center">
         <Emblem icon="check" />
       </Stack>
-      <Text variant="title2" align="center" accessibilityRole="header">
+      <Text variant="title2" align="center" heading={1}>
         {t('auth.verified.title')}
       </Text>
       <Text tone="secondary" align="center">

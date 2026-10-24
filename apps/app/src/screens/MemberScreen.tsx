@@ -122,7 +122,7 @@ function MemberView({ member }: { member: Member }) {
           )
         }
       />
-      <Text variant="heading" accessibilityRole="header">
+      <Text variant="heading" heading={2}>
         {t('member.projects')}
       </Text>
       <ProjectGrid empty={member.isMe ? t('member.emptyMine') : t('member.empty')}>
