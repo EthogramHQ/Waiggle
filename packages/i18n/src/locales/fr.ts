@@ -832,6 +832,8 @@ export const fr = {
       project: 'Ton projet « {{title}} » a été retiré par la modération',
       note: 'Ta note sur « {{title}} » a été retirée par la modération',
       comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
+      // Tranche 7b, règle 9 : sur le projet d'un membre qui t'a bloqué, ni titre ni lien.
+      commentElsewhere: 'Ton commentaire a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).

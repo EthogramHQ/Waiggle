@@ -766,6 +766,7 @@ export const en: Translation = {
       project: 'Your project “{{title}}” was removed by moderation',
       note: 'Your note on “{{title}}” was removed by moderation',
       comment: 'Your comment on “{{title}}” was removed by moderation',
+      commentElsewhere: 'Your comment was removed by moderation',
     },
     reportHandled: {
       project: {
