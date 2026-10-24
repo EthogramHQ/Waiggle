@@ -261,7 +261,10 @@ describe('the queue', () => {
     expect(page.items[0]).toEqual({
       target: projectTarget(),
       projectId: meteo.id,
-      snapshot: expect.stringContaining('Météo'),
+      // Tranche 7b : la copie la plus récente, champ par champ, ses images, et si les copies diffèrent.
+      snapshot: expect.arrayContaining([{ field: 'title', value: 'Météo' }]),
+      images: [],
+      snapshotsDiffer: false,
       state: 'present',
       concernsMe: false,
       reasons: [
@@ -276,7 +279,7 @@ describe('the queue', () => {
     expect(page.items[1]).toMatchObject({
       projectId: meteo.id,
       count: 1,
-      snapshot: 'Une note signalée',
+      snapshot: [{ field: 'body', value: 'Une note signalée' }],
     })
     expect(page.nextCursor).toBeNull()
   })
@@ -304,10 +307,12 @@ describe('the queue', () => {
 
     const first = await readQueue()
     expect(first.items).toHaveLength(20)
-    expect(first.items[0]?.snapshot).toBe('Commentaire 1')
+    expect(first.items[0]?.snapshot).toEqual([{ field: 'body', value: 'Commentaire 1' }])
     expect(first.nextCursor).not.toBeNull()
     const second = await readQueue(louis, first.nextCursor ?? undefined)
-    expect(second.items.map((item) => item.snapshot)).toEqual(['Commentaire 21'])
+    expect(second.items.map((item) => item.snapshot)).toEqual([
+      [{ field: 'body', value: 'Commentaire 21' }],
+    ])
     expect(second.nextCursor).toBeNull()
   })
 
@@ -946,5 +951,96 @@ describe('a target deleted by its author', () => {
       await (await act.send('GET', '/v1/notifications', max)).json(),
     )
     expect(maxPage.items.filter((n) => n.kind === 'report_handled')).toEqual([])
+  })
+})
+
+// ─── Tranche 7b : copies, images, blocages ───────────────────────────────────────────────────────
+
+// Règle 13 (B3, S11) : la file montre la copie la plus récente parmi les signalements ouverts, et
+// dit quand les copies diffèrent (le contenu a changé entre deux signalements).
+describe('the copy shown in the queue', () => {
+  it('shows the most recent copy, and says that the copies differ', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Première version')
+    await report(max, { kind: 'comment', id: comment.id })
+    later()
+    const edit = await act.send('PATCH', `/v1/projects/${meteo.id}/comments/${comment.id}`, lea, {
+      body: 'Seconde version',
+    })
+    expect(edit.status).toBe(200)
+    await report(zoe, { kind: 'comment', id: comment.id })
+
+    const [item] = (await readQueue()).items
+    expect(item).toMatchObject({
+      snapshot: [{ field: 'body', value: 'Seconde version' }],
+      snapshotsDiffer: true,
+      count: 2,
+    })
+  })
+
+  it('says the copies are the same when nothing changed', async () => {
+    await report(max, projectTarget())
+    await report(zoe, projectTarget())
+
+    expect((await readQueue()).items[0]?.snapshotsDiffer).toBe(false)
+  })
+
+  // Règle 15 (J1) : la copie garde la clé des images ; la file dit si elles sont encore là, jamais
+  // leur clé.
+  it('says whether each image of the copy is still there, without its key', async () => {
+    const upload = await ctx.request(`/v1/projects/${meteo.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: visualForm(await jpegImage(800, 600), 'gallery'),
+    })
+    expect(upload.status).toBe(201)
+    const [media] = await ctx.db
+      .select({ key: schema.projectMedia.storageKey })
+      .from(schema.projectMedia)
+      .where(eq(schema.projectMedia.projectId, meteo.id))
+    await report(max, projectTarget())
+
+    const before = await act.send('GET', '/v1/moderation/reports', louis)
+    const raw = await before.text()
+    expect(ModerationQueuePage.parse(JSON.parse(raw)).items[0]?.images.map((i) => i.state)).toEqual(
+      ['present'],
+    )
+    expect(raw).not.toContain(media?.key ?? 'no key')
+
+    await ctx.db.delete(schema.projectMedia).where(eq(schema.projectMedia.projectId, meteo.id))
+    expect((await readQueue()).items[0]?.images.map((i) => i.state)).toEqual(['gone'])
+  })
+})
+
+// Précision 7 et règle 17 (S9, J13) : la modération ignore les blocages, sauf pour dire « Te
+// concerne » à un administrateur qui a lui-même bloqué l'auteur visé.
+describe('the moderation and blocks', () => {
+  it('shows the queue and lets the administrator decide, even when the author blocked him', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire de Léa')
+    await report(max, { kind: 'comment', id: comment.id })
+    await report(max, projectTarget())
+    later()
+    await act.block(louisId, lea) // Léa bloque l'administrateur
+
+    const page = await readQueue()
+    expect(page.items.map((item) => item.target.kind).sort()).toEqual(['comment', 'project'])
+    expect(page.items.map((item) => item.concernsMe)).toEqual([false, false])
+    expect(page.items.find((i) => i.target.kind === 'comment')?.snapshot).toEqual([
+      { field: 'body', value: 'Un commentaire de Léa' },
+    ])
+    await remove({ kind: 'comment', id: comment.id })
+    await remove(projectTarget())
+    expect((await readQueue()).items).toEqual([])
+  })
+
+  it('flags a target whose author the administrator blocked', async () => {
+    await report(max, projectTarget())
+    await report(max, { kind: 'member', id: leaId })
+    later()
+    await act.block(leaId, louis) // l'administrateur a bloqué Léa
+
+    expect((await readQueue()).items.map((item) => item.concernsMe)).toEqual([true, true])
+    // Un autre administrateur n'est pas concerné.
+    await act.makeAdmin(zoeId)
+    expect((await readQueue(zoe)).items.map((item) => item.concernsMe)).toEqual([false, false])
   })
 })

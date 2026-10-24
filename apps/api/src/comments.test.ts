@@ -1320,3 +1320,195 @@ describe('the API contract', () => {
     expect(Object.keys(doc.paths[hidden] ?? {})).toEqual(expect.arrayContaining(['put', 'delete']))
   })
 })
+
+// ─── Bloquer (tranche 7b) ────────────────────────────────────────────────────────────────────────
+
+// Scénario « Tranche 7b — Bloquer », règles détaillées « Commentaires déjà écrits » ; règles 1, 2,
+// 2b et 8 de la relecture du plan (24/10/2026). Le commentaire de l'autre devient, pour les deux
+// personnes seulement, un emplacement sans auteur ni texte : « blocked » pour qui a bloqué,
+// « unavailable » pour l'autre ; comme les autres emplacements, il n'apparaît que s'il garde des
+// réponses visibles. Le projet est celui de Léa ; Max et Zoé sont bloqués l'un avec l'autre.
+describe('the comments of blocked members', () => {
+  let zoeId: string
+
+  beforeEach(async () => {
+    zoeId = Me.parse(await (await send('GET', '/v1/me', zoe)).json()).id
+  })
+
+  /** `cookie` bloque le membre `memberId` (PUT /v1/members/{id}/block). */
+  const block = async (memberId: string, cookie: string) => {
+    later()
+    await expectDone(await send('PUT', `/v1/members/${encodeURIComponent(memberId)}/block`, cookie))
+  }
+
+  // Règle 8 : les deux emplacements, chacun pour une seule personne.
+  it('shows the comment of a member I blocked as "blocked", and mine as "unavailable" to her', async () => {
+    const project = await publish(lea)
+    const maxRoot = await comment(project.id, max, 'Le commentaire de Max')
+    await comment(project.id, lea, 'Réponse de Léa à Max', maxRoot.id)
+    const zoeRoot = await comment(project.id, zoe, 'Le commentaire de Zoé')
+    await comment(project.id, lea, 'Réponse de Léa à Zoé', zoeRoot.id)
+
+    await block(maxId, zoe) // Zoé bloque Max
+
+    expect(await threads(project.id, zoe)).toEqual([
+      ['Le commentaire de Zoé', 'Réponse de Léa à Zoé'],
+      ['(blocked)', 'Réponse de Léa à Max'],
+    ])
+    expect(await threads(project.id, max)).toEqual([
+      ['(unavailable)', 'Réponse de Léa à Zoé'],
+      ['Le commentaire de Max', 'Réponse de Léa à Max'],
+    ])
+    // Les autres membres, l'autrice du projet comprise, ne voient aucune différence.
+    expect(await threads(project.id, lea)).toEqual([
+      ['Le commentaire de Zoé', 'Réponse de Léa à Zoé'],
+      ['Le commentaire de Max', 'Réponse de Léa à Max'],
+    ])
+  })
+
+  it('gives neither author, text nor mentions in a placeholder', async () => {
+    const project = await publish(lea)
+    const { handle } = Me.parse(await (await send('GET', '/v1/me', lea)).json())
+    const root = await comment(project.id, max, `Un texte de Max pour @${handle}`)
+    await comment(project.id, lea, 'Réponse de Léa', root.id)
+    await block(zoeId, max) // c'est Max qui bloque : Zoé lit « indisponible »
+
+    const res = await send('GET', commentsPath(project.id), zoe)
+    const raw = await res.text()
+    const [placeholder] = CommentPage.parse(JSON.parse(raw)).items
+    expect(placeholder).toMatchObject({
+      state: 'unavailable',
+      author: null,
+      body: '',
+      mentions: [],
+      isMine: false,
+    })
+    expect(raw).not.toContain(maxId)
+    expect(raw).not.toContain('Un texte de Max')
+  })
+
+  it('leaves out a placeholder without visible replies, and a reply of the other one', async () => {
+    const project = await publish(lea)
+    await comment(project.id, max, 'Racine seule de Max')
+    const leaRoot = await comment(project.id, lea, 'Racine de Léa')
+    await comment(project.id, max, 'Réponse de Max', leaRoot.id)
+    await comment(project.id, zoe, 'Réponse de Zoé', leaRoot.id)
+    await block(maxId, zoe)
+
+    expect(await threads(project.id, zoe)).toEqual([['Racine de Léa', 'Réponse de Zoé']])
+    expect(await threads(project.id, max)).toEqual([
+      ['Racine de Léa', 'Réponse de Max'],
+      ['Racine seule de Max'],
+    ])
+  })
+
+  it('shows everything again after unblocking', async () => {
+    const project = await publish(lea)
+    await comment(project.id, max, 'Le commentaire de Max')
+    await block(maxId, zoe)
+    later()
+    await expectDone(await send('DELETE', `/v1/members/${maxId}/block`, zoe))
+
+    expect(await threads(project.id, zoe)).toEqual([['Le commentaire de Max']])
+  })
+
+  it('refuses to reply to a comment of the other one, in both directions', async () => {
+    const project = await publish(lea)
+    const maxRoot = await comment(project.id, max, 'Racine de Max')
+    const zoeRoot = await comment(project.id, zoe, 'Racine de Zoé')
+    await block(maxId, zoe)
+
+    await expectError(await postComment(project.id, zoe, 'Réponse', maxRoot.id), 404, 'not_found')
+    await expectError(await postComment(project.id, max, 'Réponse', zoeRoot.id), 404, 'not_found')
+    // Témoin : chacun répond encore à Léa, et commente le projet.
+    expect((await postComment(project.id, zoe, 'Un mot pour Léa')).status).toBe(201)
+    expect((await postComment(project.id, max, 'Un mot pour Léa')).status).toBe(201)
+  })
+
+  // Précision 4 : le nombre de commentaires reste le même pour tous.
+  it('keeps the same count of comments for everyone', async () => {
+    const project = await publish(lea)
+    await comment(project.id, max, 'Le commentaire de Max')
+    await comment(project.id, zoe, 'Le commentaire de Zoé')
+    await block(maxId, zoe)
+
+    expect((await readProject(project.id, zoe)).commentCount).toBe(2)
+    expect((await readProject(project.id, max)).commentCount).toBe(2)
+  })
+
+  // Règle 1 (B1) : l'auteur d'un projet garde la modération de son espace, quel que soit le sens du
+  // blocage : il lit le commentaire, le masque, le signale.
+  it.each([
+    ['the author of the project blocked the commenter', 'author'],
+    ['the commenter blocked the author of the project', 'commenter'],
+  ])('lets the author of the project read, hide and report a comment when %s', async (_, who) => {
+    const project = await publish(lea)
+    const root = await comment(project.id, max, 'Un commentaire chez Léa')
+    if (who === 'author') await block(maxId, lea)
+    else await block(leaId, max)
+
+    expect(await threads(project.id, lea)).toEqual([['Un commentaire chez Léa']])
+    later()
+    const report = await send('POST', '/v1/reports', lea, {
+      target: { kind: 'comment', id: root.id },
+      reason: 'other',
+    })
+    expect(report.status).toBe(201)
+    await expectDone(await hide(project.id, root.id, lea))
+    expect(await threads(project.id, lea)).toEqual([['(hidden) Un commentaire chez Léa']])
+  })
+
+  // Règle 2 (B2) : un commentaire qui me mentionne reste lisible pour moi si son auteur m'a bloqué
+  // (mention écrite avant le blocage) ; pas si c'est moi qui l'ai bloqué.
+  it('keeps readable a comment that mentions me when its author blocked me', async () => {
+    const project = await publish(lea)
+    const { handle: zoeHandle } = Me.parse(await (await send('GET', '/v1/me', zoe)).json())
+    await comment(project.id, max, `Je parle de @${zoeHandle} dans son dos`)
+    await block(zoeId, max) // Max bloque Zoé après l'avoir mentionnée
+
+    const [root] = (await readComments(project.id, zoe)).items
+    expect(root).toMatchObject({ state: 'visible', body: `Je parle de @${zoeHandle} dans son dos` })
+  })
+
+  it('hides a comment that mentions me when I blocked its author', async () => {
+    const project = await publish(lea)
+    const { handle: zoeHandle } = Me.parse(await (await send('GET', '/v1/me', zoe)).json())
+    await comment(project.id, max, `Je parle de @${zoeHandle}`)
+    await block(maxId, zoe) // c'est Zoé qui bloque
+
+    expect(await threads(project.id, zoe)).toEqual([])
+  })
+
+  // Règle 2b : mentionner un membre qu'on a bloqué est refusé (création comme modification) ;
+  // mentionner un membre qui m'a bloqué passe, sans lien ni mention : rien ne trahit le blocage.
+  it('refuses to write or edit a comment that mentions a member I blocked', async () => {
+    const project = await publish(lea)
+    const { handle: zoeHandle } = Me.parse(await (await send('GET', '/v1/me', zoe)).json())
+    const mine = await comment(project.id, max, 'Un commentaire sans mention')
+    await block(zoeId, max)
+
+    await expectError(
+      await postComment(project.id, max, `Bonjour @${zoeHandle}`),
+      422,
+      'blocked_mention',
+    )
+    await expectError(
+      await editComment(project.id, mine.id, max, `Bonjour @${zoeHandle}`),
+      422,
+      'blocked_mention',
+    )
+    // Témoin : sans la mention, le commentaire passe.
+    expect((await postComment(project.id, max, 'Bonjour à tous')).status).toBe(201)
+  })
+
+  it('writes a mention of a member who blocked me as plain text', async () => {
+    const project = await publish(lea)
+    const { handle: zoeHandle } = Me.parse(await (await send('GET', '/v1/me', zoe)).json())
+    await block(maxId, zoe) // Zoé bloque Max
+
+    const written = await comment(project.id, max, `Bonjour @${zoeHandle}`)
+
+    expect(written).toMatchObject({ body: `Bonjour @${zoeHandle}`, mentions: [] })
+    expect((await readComments(project.id, lea)).items[0]?.mentions).toEqual([])
+  })
+})

@@ -4,7 +4,7 @@
 import { ErrorResponse, FollowingFeedPage, Me, Member, Project } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -348,5 +348,55 @@ describe('deleting an account', () => {
     const feed = await send('GET', '/v1/feed/following', zoe)
     expect(feed.status).toBe(200)
     expect(FollowingFeedPage.parse(await feed.json()).followsAnyone).toBe(false)
+  })
+})
+
+// ─── Suivre et bloquer (tranche 7b) ──────────────────────────────────────────────────────────────
+
+// Règle 5 de la relecture du plan 7b : suivre et bloquer prennent le même verrou sur la paire, et le
+// suivi ne s'écrit que s'il n'existe aucun blocage entre les deux (`insert … where not exists`). Un
+// blocage posé entre la vérification et l'écriture ne laisse donc pas d'abonnement derrière lui.
+//
+// PGlite n'a qu'une connexion : on ne peut pas y faire courir deux requêtes. L'espion sur
+// `transaction` pose le blocage juste avant la transaction du suivi, puis la laisse faire : cela
+// prouve que le suivi relit les blocages dans sa transaction, pas l'attente du verrou elle-même.
+describe('following someone who blocks at the same moment', () => {
+  const blockInside = (blockerId: string, blockedId: string) => {
+    const original = ctx.db.transaction.bind(ctx.db)
+    return vi.spyOn(ctx.db, 'transaction').mockImplementationOnce(async (...args) => {
+      await ctx.db
+        .insert(schema.memberBlock)
+        .values({ blockerId, blockedId, createdAt: new Date() })
+      return original(...args)
+    })
+  }
+
+  it('leaves no follow of a member when the block lands first', async () => {
+    const spy = blockInside(leaId, maxId)
+
+    await expectError(await follow('members', leaId, max), 404, 'not_found')
+
+    expect(spy).toHaveBeenCalled()
+    expect(await ctx.db.select().from(schema.memberFollow)).toEqual([])
+  })
+
+  it('leaves no follow of a project when the block lands first', async () => {
+    const recettes = await publish(lea)
+    const spy = blockInside(maxId, leaId) // dans l'autre sens : c'est Max qui bloque
+
+    await expectError(await follow('projects', recettes.id, max), 404, 'not_found')
+
+    expect(spy).toHaveBeenCalled()
+    expect(await ctx.db.select().from(schema.projectFollow)).toEqual([])
+  })
+
+  it('still lets a third member follow', async () => {
+    await ctx.db
+      .insert(schema.memberBlock)
+      .values({ blockerId: leaId, blockedId: maxId, createdAt: new Date() })
+
+    await expectDone(await follow('members', leaId, zoe))
+    await expectError(await follow('members', leaId, max), 404, 'not_found')
+    await expectError(await follow('members', maxId, lea), 404, 'not_found')
   })
 })

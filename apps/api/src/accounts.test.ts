@@ -722,7 +722,10 @@ describe('reports and removals of an account', () => {
         [velo.id]: ['removed', null, true],
       })
       // Le signalement suivi d'un retrait garde son texte jusqu'au terme d'un an.
-      expect(rows.find((r) => r.targetId === velo.id)?.snapshot).toContain('Un pitch gardé un an.')
+      // Tranche 7b : la copie est un tableau de champs.
+      expect(JSON.stringify(rows.find((r) => r.targetId === velo.id)?.snapshot)).toContain(
+        'Un pitch gardé un an.',
+      )
     })
 
     it('keeps the reports she made, without her name', async () => {
