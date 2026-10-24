@@ -12,7 +12,7 @@
 // action à l'autre (Début et Fin : la première et la dernière), Entrée ou Espace choisit, Échap ou
 // Tab referme. Une fois le menu fermé, le focus revient au bouton « … », sans faire défiler la page.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { useEffect, useRef, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   type LayoutChangeEvent,
@@ -67,7 +67,6 @@ type PressEvent = { nativeEvent?: { pageX?: number; pageY?: number } }
 
 export function ActionMenu({ items, label, variant = 'plain' }: Props) {
   const { t } = useTranslation()
-  const { colors } = useTheme()
   const window = useWindowDimensions()
   const [open, setOpen] = useState(false)
   // Où est le bouton dans la fenêtre, et quelle taille a le menu : de quoi le poser. Tant que
@@ -151,42 +150,6 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
     return () => cancelAnimationFrame(frame)
   }, [open])
 
-  // Les touches d'une action, sur le web. react-native-web ne choisit à l'Espace que les boutons ;
-  // les flèches et Tab sont propres à un menu.
-  const keys = (index: number, item: ActionMenuItem) =>
-    Platform.OS === 'web'
-      ? {
-          onKeyDown: (event: KeyEvent) => {
-            const last = items.length - 1
-            const target =
-              event.key === 'ArrowDown'
-                ? index === last
-                  ? 0
-                  : index + 1
-                : event.key === 'ArrowUp'
-                  ? index === 0
-                    ? last
-                    : index - 1
-                  : event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                      ? last
-                      : null
-            if (target !== null) {
-              event.preventDefault()
-              focusWithoutScroll(actions.current[target])
-            } else if (event.key === ' ') {
-              event.preventDefault()
-              choose(item)
-            } else if (event.key === 'Tab') {
-              // Tab quitte le menu : il se ferme, et le focus revient au bouton « … ».
-              event.preventDefault()
-              hide()
-            }
-          },
-        }
-      : {}
-
   // Où poser le menu : sous le bouton, aligné sur son bord droit s'il est dans la moitié droite de
   // l'écran (sur son bord gauche sinon), sans jamais sortir de l'écran. S'il manque de place en
   // bas, au-dessus du bouton ; s'il en manque des deux côtés (texte très agrandi), contre le haut,
@@ -240,8 +203,6 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
             style={{ position: 'absolute', inset: 0 }}
           />
           <View
-            accessibilityRole="menu"
-            aria-label={label ?? t('actionMenu.label')}
             onLayout={(event: LayoutChangeEvent) => setMenuHeight(event.nativeEvent.layout.height)}
             style={{
               position: 'absolute',
@@ -253,68 +214,145 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
               opacity: position ? 1 : 0,
             }}
           >
-            <Surface variant="panel" radius="group" padding="xs">
-              {/* Plus haut que l'écran (texte très agrandi) : la liste défile dans le menu. */}
-              <ScrollView bounces={false} style={{ maxHeight: maxHeight - 2 * space.xs }}>
-                {items.map((item, index) => (
-                  <View key={item.label}>
-                    {/* Un trait fin entre deux actions, en retrait des coins arrondis. */}
-                    {index > 0 ? (
-                      <View
-                        style={{
-                          height: borders.hairline,
-                          backgroundColor: colors.line,
-                          marginHorizontal: space.md,
-                        }}
-                      />
-                    ) : null}
-                    <Pressable
-                      ref={(node) => {
-                        actions.current[index] = node
-                      }}
-                      accessibilityRole="menuitem"
-                      accessibilityLabel={item.label}
-                      onPress={() => choose(item)}
-                      {...keys(index, item)}
-                      // L'anneau de focus se dessine à l'intérieur de l'action : le menu rogne
-                      // ce qui dépasse de ses coins.
-                      {...insetFocus}
-                      style={({ pressed }) => ({
-                        minHeight: layout.touchTarget,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: space.md,
-                        paddingHorizontal: space.md,
-                        paddingVertical: space.sm,
-                        borderRadius: radii.small,
-                        ...(pressed ? { backgroundColor: colors.surfaceGrouped } : null),
-                      })}
-                    >
-                      {item.icon ? (
-                        <Icon
-                          name={item.icon}
-                          size={20}
-                          tone={item.tone === 'danger' ? 'danger' : 'secondary'}
-                        />
-                      ) : null}
-                      {/* flexShrink : un libellé long, ou très agrandi, passe à la ligne. */}
-                      <View style={{ flexShrink: 1 }}>
-                        <Text
-                          weight={500}
-                          tone={item.tone === 'danger' ? 'danger' : 'default'}
-                          selectable={false}
-                        >
-                          {item.label}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            </Surface>
+            <ActionMenuList
+              label={label ?? t('actionMenu.label')}
+              items={items}
+              onChoose={choose}
+              onLeave={hide}
+              actions={actions}
+              maxHeight={maxHeight}
+            />
           </View>
         </View>
       </Modal>
     </>
+  )
+}
+
+type ListProps = {
+  /** Le nom du menu, lu par les lecteurs d'écran (le même que celui du bouton). */
+  label: string
+  items: ActionMenuItem[]
+  onChoose: (item: ActionMenuItem) => void
+  /** Tab, sur le web : on quitte le menu (il se ferme). */
+  onLeave?: () => void
+  /** Où ranger les actions, pour y poser le focus (la première à l'ouverture, les flèches). */
+  actions?: RefObject<(View | null)[]>
+  /** La hauteur au-delà de laquelle la liste défile. */
+  maxHeight?: number
+}
+
+/**
+ * La liste des actions, telle qu'elle flotte sous le bouton « … ». Exportée pour le catalogue, qui
+ * la montre ouverte sans couche par-dessus la page ; les écrans passent par ActionMenu.
+ */
+export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHeight }: ListProps) {
+  const { colors } = useTheme()
+  const own = useRef<(View | null)[]>([])
+  const refs = actions ?? own
+
+  // Les touches d'une action, sur le web. react-native-web ne choisit à l'Espace que les boutons ;
+  // les flèches et Tab sont propres à un menu.
+  const keys = (index: number, item: ActionMenuItem) =>
+    Platform.OS === 'web'
+      ? {
+          onKeyDown: (event: KeyEvent) => {
+            const last = items.length - 1
+            const target =
+              event.key === 'ArrowDown'
+                ? index === last
+                  ? 0
+                  : index + 1
+                : event.key === 'ArrowUp'
+                  ? index === 0
+                    ? last
+                    : index - 1
+                  : event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                      ? last
+                      : null
+            if (target !== null) {
+              event.preventDefault()
+              focusWithoutScroll(refs.current[target])
+            } else if (event.key === ' ') {
+              event.preventDefault()
+              onChoose(item)
+            } else if (event.key === 'Tab' && onLeave) {
+              // Tab quitte le menu : il se ferme, et le focus revient au bouton « … ».
+              event.preventDefault()
+              onLeave()
+            }
+          },
+        }
+      : {}
+
+  return (
+    // role « menu » : le lecteur d'écran annonce une liste d'actions, nommée comme son bouton. Pas
+    // d'`accessible` : sur iOS, VoiceOver doit atteindre chaque action.
+    <View accessibilityRole="menu" aria-label={label}>
+      <Surface variant="panel" radius="group" padding="xs">
+        {/* Plus haut que l'écran (texte très agrandi) : la liste défile dans le menu. */}
+        <ScrollView
+          bounces={false}
+          style={maxHeight === undefined ? undefined : { maxHeight: maxHeight - 2 * space.xs }}
+        >
+          {items.map((item, index) => (
+            <View key={item.label}>
+              {/* Un trait fin entre deux actions, en retrait des coins arrondis. */}
+              {index > 0 ? (
+                <View
+                  style={{
+                    height: borders.hairline,
+                    backgroundColor: colors.line,
+                    marginHorizontal: space.md,
+                  }}
+                />
+              ) : null}
+              <Pressable
+                ref={(node) => {
+                  refs.current[index] = node
+                }}
+                accessibilityRole="menuitem"
+                accessibilityLabel={item.label}
+                onPress={() => onChoose(item)}
+                {...keys(index, item)}
+                // L'anneau de focus se dessine à l'intérieur de l'action : le menu rogne ce qui
+                // dépasse de ses coins.
+                {...insetFocus}
+                style={({ pressed }) => ({
+                  minHeight: layout.touchTarget,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space.md,
+                  paddingHorizontal: space.md,
+                  paddingVertical: space.sm,
+                  borderRadius: radii.small,
+                  ...(pressed ? { backgroundColor: colors.surfaceGrouped } : null),
+                })}
+              >
+                {item.icon ? (
+                  <Icon
+                    name={item.icon}
+                    size={20}
+                    tone={item.tone === 'danger' ? 'danger' : 'secondary'}
+                  />
+                ) : null}
+                {/* flexShrink : un libellé long, ou très agrandi, passe à la ligne. */}
+                <View style={{ flexShrink: 1 }}>
+                  <Text
+                    weight={500}
+                    tone={item.tone === 'danger' ? 'danger' : 'default'}
+                    selectable={false}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      </Surface>
+    </View>
   )
 }
