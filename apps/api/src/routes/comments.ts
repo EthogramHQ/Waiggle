@@ -17,7 +17,7 @@ import {
   ProjectId,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, exists, isNotNull, isNull, not, sql } from 'drizzle-orm'
+import { and, eq, exists, isNotNull, isNull, not, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
@@ -35,6 +35,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
+import { listedProject } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -193,10 +194,19 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * Le projet, s'il est visible par ce membre (public, ou le sien) : seulement son auteur, lu par
    * la clé primaire. null : identifiant mal formé, projet inconnu ou privé d'un autre, la même
    * réponse pour les trois, pour ne rien révéler.
+   *
+   * `undo` (tranche 7b, règle 7 de la relecture du plan) : supprimer son commentaire défait son
+   * propre geste, qu'un blocage ne refuse jamais. Le projet d'un membre bloqué avec lui, caché
+   * partout ailleurs (visibleTo), reste alors trouvé : la condition est celle de visibleTo moins
+   * le blocage (`listedProject`, public et non retiré, ou le sien). Un projet privé ou retiré d'un
+   * autre reste introuvable, comme avant.
    */
-  const projectOf = async (projectId: string, userId: string) => {
+  const projectOf = async (projectId: string, userId: string, undo = false) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
     if (!ProjectId.safeParse(projectId).success) return null
+    const reachable = undo
+      ? or(listedProject(), eq(schema.project.authorId, userId))
+      : visibleTo(userId)
     const [project] = await db
       .select({
         authorId: schema.project.authorId,
@@ -204,7 +214,7 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         removedAt: schema.project.removedAt,
       })
       .from(schema.project)
-      .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
+      .where(and(eq(schema.project.id, projectId), reachable))
     if (!project) return null
     // Le projet, et qui le regarde (voir Viewer, comments/load.ts), avec ses blocages (tranche
     // 7b) : une requête de plus, par les deux index de member_block (blocksOf).
@@ -501,7 +511,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const wait = await overLimit(memberCounterKeys(user.id).projectChange, changeRule)
     if (wait !== null) return tooMany(ctx, wait)
     const { id, commentId } = ctx.req.valid('param')
-    const project = await projectOf(id, user.id)
+    // `true` : même chez un membre bloqué avec lui (règle 7). commentOf ne trouve alors que ses
+    // propres commentaires sur ce projet (sees : ceux du membre bloqué lui restent cachés), et le
+    // contrôle de l'auteur ci-dessous ne laisse supprimer que les siens.
+    const project = await projectOf(id, user.id, true)
     if (!project) return notFound(ctx)
     const comment = await commentOf(id, commentId, project.viewer)
     if (!comment) return notFound(ctx)
