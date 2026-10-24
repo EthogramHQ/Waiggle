@@ -15,7 +15,7 @@ const MAX_LENGTH = 512
 // d'avertissement (/out), qui pourrait servir à pousser vers un faux site juste après la
 // connexion, ni les pages de connexion elles-mêmes.
 const RETURN_PAGES =
-  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|notifications|report|moderation)(?:[/?#]|$))/
+  /^\/(?:(?:members|projects|tags)\/|(?:account|profile|notifications|report|moderation|blocks)(?:[/?#]|$))/
 
 // Les caractères permis dans un chemin d'adresse, en ASCII seulement : rien d'invisible, aucune
 // barre oblique « pleine chasse » (／) ni caractère de contrôle qui pourrait tromper un navigateur.

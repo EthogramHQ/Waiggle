@@ -30,9 +30,7 @@ import { projectQueryKey } from '../projects/hooks'
  */
 export type CommentFailure = 'limited' | 'expired' | 'gone' | 'blockedMention'
 
-// `| 'blockedMention'` : la clé du refus, que `api/errors.ts` reçoit dans la même tranche ; l'union
-// garde ce fichier juste avant comme après (une fois la clé dans ApiErrorKey, elle ne change rien).
-const reasons: Partial<Record<ApiErrorKey | 'blockedMention', CommentFailure>> = {
+const reasons: Partial<Record<ApiErrorKey, CommentFailure>> = {
   rateLimited: 'limited',
   unauthorized: 'expired',
   notFound: 'gone',
