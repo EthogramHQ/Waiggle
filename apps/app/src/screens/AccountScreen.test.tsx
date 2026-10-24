@@ -113,6 +113,20 @@ describe('moderation in my account', () => {
   })
 })
 
+// --- Tranche 7b : les membres bloqués, une page de « Mon compte » ---
+
+describe('the members I blocked, from my account', () => {
+  it('leads every member to « Membres bloqués »', async () => {
+    // Léa n'est pas administratrice : la ligne est pour tous, pas seulement pour la modération.
+    await renderWithI18n(<AccountScreen />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: /^Membres bloqués/ }))
+
+    // La page de la liste (app/blocks.tsx, plan de la tranche 7b).
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toContain('/blocks')
+  })
+})
+
 describe('writing to us from my account', () => {
   it('shows the contact address, in French or in English', async () => {
     await renderWithI18n(<AccountScreen />)

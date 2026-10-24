@@ -13,7 +13,8 @@ describe('ReportCard', () => {
   const card = {
     kind: 'Commentaire',
     snapshot: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
-    snapshotLabel: 'Texte au moment du signalement ; images actuelles',
+    // Le libellé de la citation a changé avec la tranche 7b (moderation.snapshot, commit du contrat).
+    snapshotLabel: 'Copie au moment du signalement',
     count: '3 signalements',
     reasons: ['Arnaque ou spam ×2', 'Harcèlement ou haine ×1'],
     details: ['Il a écrit la même chose sous trois projets.'],
@@ -33,10 +34,10 @@ describe('ReportCard', () => {
     expect(screen.getByText('Premier signalement le 20 oct.')).toBeTruthy()
   })
 
-  it('says the text is the one reported, and the images today’s (rule 22)', async () => {
+  it('says what its quote shows: the copy made when reported (rule 22)', async () => {
     await renderWithProviders(<ReportCard {...card} onView={jest.fn()} />)
 
-    expect(screen.getByText('Texte au moment du signalement ; images actuelles')).toBeTruthy()
+    expect(screen.getByText('Copie au moment du signalement')).toBeTruthy()
   })
 
   it('shows the text and the details as plain text, without Markdown or a link to touch', async () => {
@@ -193,6 +194,76 @@ describe('ReportCard', () => {
         undefined,
         undefined,
       ])
+    })
+  })
+
+  // --- Tranche 7b : la copie champ par champ, et l'état des images ---
+  //
+  // Interface attendue : `snapshot` accepte, en plus d'un texte (un contenu retiré), une liste de
+  // champs `{ label, value }` déjà traduits (« Titre », « Faux avis en masse ») ; `images`, les
+  // phrases sur l'état des images (« Couverture : toujours affichée ») ; `snapshotNote`, la phrase
+  // qui dit que le contenu a changé entre deux signalements.
+  describe('a copy made of several fields', () => {
+    const fields = [
+      { label: 'Titre', value: 'Faux avis en masse' },
+      { label: 'Pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+      { label: 'Lien de démo', value: 'https://faux-avis.example/essai' },
+    ]
+
+    it('shows each field with its label, in the order given', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={fields} onView={jest.fn()} />,
+      )
+
+      for (const { label, value } of fields) {
+        expect(screen.getByText(label)).toBeTruthy()
+        expect(screen.getByText(value)).toBeTruthy()
+      }
+      const shown = screen
+        .getAllByText(/^(Faux avis en masse|Cinquante avis.*|https:\/\/faux-avis\.example\/essai)$/)
+        .map((element) => element.props.children)
+      expect(shown).toEqual(fields.map((field) => field.value))
+    })
+
+    it('shows each field as plain text, a link written by a member included', async () => {
+      const tricky = [
+        { label: 'Description', value: '**Gratuit** : [clique ici](https://piege.example)' },
+        { label: 'Lien de démo', value: 'https://piege.example/demo' },
+      ]
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={tricky} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(tricky[0]?.value ?? '')).toBeTruthy()
+      expect(screen.getByText(tricky[1]?.value ?? '')).toBeTruthy()
+      expect(screen.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([
+        'Voir',
+      ])
+    })
+
+    it('says the state of each image it is given', async () => {
+      const images = ['Couverture : toujours affichée', 'Photo : supprimée ou remplacée depuis']
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={fields} images={images} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(images[0] ?? '')).toBeTruthy()
+      expect(screen.getByText(images[1] ?? '')).toBeTruthy()
+    })
+
+    it('says that the content changed between two reports, when told', async () => {
+      const note = 'Le contenu a changé entre deux signalements : voici sa version la plus récente.'
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          kind="Projet"
+          snapshot={fields}
+          snapshotNote={note}
+          onView={jest.fn()}
+        />,
+      )
+
+      expect(screen.getByText(note)).toBeTruthy()
     })
   })
 

@@ -33,7 +33,12 @@ export const removalByLaw: Removal = {
 export const scamCommentItem: ModerationQueueItem = {
   target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
   projectId: meteoProjectId,
-  snapshot: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
+  // Tranche 7b : la copie est un tableau de champs, nommés comme au registre des entrées.
+  snapshot: [
+    { field: 'body', value: 'Envoie-moi le code de ta carte, je te débloque la version pro.' },
+  ],
+  images: [],
+  snapshotsDiffer: false,
   state: 'present',
   concernsMe: false,
   reasons: [
@@ -46,11 +51,31 @@ export const scamCommentItem: ModerationQueueItem = {
   lastReportedAt: '2026-10-21T07:30:00.000Z',
 }
 
-/** Un projet de Nora signalé une fois, sans précision. */
+/**
+ * Un projet de Nora signalé une fois, sans précision. Tranche 7b : la copie garde tous ses textes
+ * (titre, pitch, description, un prompt, outils, lien de démo), et ses images seulement par leur
+ * état : la couverture est toujours là, une photo a été supprimée ou remplacée depuis. Le projet a
+ * changé entre deux signalements (`snapshotsDiffer`) : la file montre la copie la plus récente.
+ */
 export const fakeReviewsItem: ModerationQueueItem = {
   target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
   projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
-  snapshot: 'Faux avis en masse — Cinquante avis cinq étoiles pour ta boutique, en un clic.',
+  snapshot: [
+    { field: 'title', value: 'Faux avis en masse' },
+    { field: 'pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+    {
+      field: 'description',
+      value: 'Colle l’adresse de ta boutique, choisis le nombre d’avis : le reste est automatique.',
+    },
+    { field: 'prompt', value: 'Écris 50 avis enthousiastes, chacun signé d’un prénom différent.' },
+    { field: 'tools', value: 'Claude Code, Python' },
+    { field: 'demoUrl', value: 'https://faux-avis.example/essai' },
+  ],
+  images: [
+    { field: 'cover', state: 'present' },
+    { field: 'photo', state: 'gone' },
+  ],
+  snapshotsDiffer: true,
   state: 'present',
   concernsMe: false,
   reasons: [{ reason: 'scam_spam', count: 1 }],
@@ -64,7 +89,14 @@ export const fakeReviewsItem: ModerationQueueItem = {
 export const impersonationItem: ModerationQueueItem = {
   target: { kind: 'member', id: 'u7' },
   projectId: null,
-  snapshot: 'Lucas Martin (@lucas_martin) — Je fais partie de l’équipe, écris-moi pour un accès.',
+  snapshot: [
+    { field: 'name', value: 'Lucas Martin' },
+    { field: 'handle', value: 'lucas_martin' },
+    { field: 'bio', value: 'Je fais partie de l’équipe, écris-moi pour un accès.' },
+    { field: 'favoriteTools', value: 'Claude Code' },
+  ],
+  images: [{ field: 'avatar', state: 'present' }],
+  snapshotsDiffer: false,
   state: 'present',
   concernsMe: false,
   reasons: [{ reason: 'impersonation', count: 1 }],
@@ -78,7 +110,10 @@ export const impersonationItem: ModerationQueueItem = {
 export const ownNoteItem: ModerationQueueItem = {
   target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
   projectId: 'f3041526-3748-4d59-9e6a-7b8c9daebfc0',
-  snapshot: 'v3 : export en PDF',
+  // Une copie d'avant la tranche 7b : un seul champ `text`, le texte tel qu'on le gardait alors.
+  snapshot: [{ field: 'text', value: 'v3 : export en PDF' }],
+  images: [],
+  snapshotsDiffer: false,
   state: 'present',
   concernsMe: true,
   reasons: [{ reason: 'other', count: 1 }],
@@ -95,6 +130,12 @@ export const moderationQueue: ModerationQueueItem[] = [
   impersonationItem,
   ownNoteItem,
 ]
+
+/**
+ * Le premier texte de la copie d'un signalement (le texte d'un commentaire, le titre d'un projet, le
+ * nom d'un profil) : de quoi retrouver sa carte dans la file.
+ */
+export const firstTextOf = (item: ModerationQueueItem): string => item.snapshot[0]?.value ?? ''
 
 export const moderationQueuePageOf = (
   items: ModerationQueueItem[] = moderationQueue,

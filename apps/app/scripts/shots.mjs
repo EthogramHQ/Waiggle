@@ -32,6 +32,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
+import { blockedPageOf, blockedSam } from '../src/testing/blocks.ts'
 import {
   leaEmailPreferences,
   malformedToken,
@@ -422,8 +423,52 @@ const removedComments = [
   }),
   comment(34, max, 'Ça marche aussi pour les restaurants ?', 17, 9),
 ]
+// Tranche 7b : bloquer. Léa a bloqué Sam et Théo (sa liste « Membres bloqués », du plus récent au
+// plus ancien) ; Nora, elle, a bloqué Léa : pour Léa, la page de Nora n'existe pas (404, la même
+// réponse qu'un membre inconnu). Max ne l'est pas encore : sa page sert au menu et au dialogue.
+const blockedTheo = {
+  member: { id: 'theo-id', name: 'Théo Garnier', handle: 'theo_g', avatarUrl: null },
+  blockedAt: new Date(Date.UTC(2026, 9, 12, 18)).toISOString(),
+}
+const blockedList = [blockedSam, blockedTheo]
+const blockedByNora = 'nora-id'
+// La page d'un membre que Léa a bloqué : l'en-tête seul (ni bio, ni outils, ni projets, ni
+// abonnés), comme la vraie API (règle 6 de la relecture du plan).
+const blockedMemberPage = ({ member }) => ({
+  ...leaPage,
+  ...member,
+  bio: '',
+  favoriteTools: [],
+  isMe: false,
+  isBlocked: true,
+  isFollowed: false,
+  followerCount: 0,
+  projects: [],
+})
+// Un projet de Max où un blocage remplace deux commentaires par leur emplacement, gardé pour ses
+// réponses : celui de Sam, que Léa a bloqué (« Commentaire d'un membre que tu as bloqué »), et
+// celui de Nora, qui a bloqué Léa (« Commentaire indisponible »). Les autres commentaires restent.
+const gardenProject = {
+  ...notMineProject,
+  id: '00000000-0000-4000-8000-0000000000ee',
+  title: 'Le carnet du potager',
+  pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
+  followerCount: 8,
+}
+const gardenComments = [
+  comment(41, null, '', 18, 9, {
+    state: 'blocked',
+    replies: [comment(42, ines, 'Je me posais la même question pour les courgettes.', 18, 10)],
+  }),
+  comment(43, ines, 'Les semis de tomates ont levé en cinq jours, merci pour le rappel !', 17, 9),
+  comment(44, null, '', 16, 9, {
+    state: 'unavailable',
+    replies: [comment(45, max, 'Bonne idée, je l’ajoute à la prochaine version.', 16, 12)],
+  }),
+]
 // Les commentaires de chaque projet : la première page, puis la suite (curseur « suite »).
 const commentsOf = {
+  [gardenProject.id]: [gardenComments],
   [removedProject.id]: [removedComments],
   [recipesProject.id]: [recipesComments],
   [commentedProject.id]: [notMineComments, notMineMore],
@@ -590,7 +635,19 @@ const notificationPages = (choice) => {
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
 // `admin` (tranche 7a) : Léa est administratrice, GET /v1/me le dit et la modération répond.
-const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = false) => {
+// `blocks` (tranche 7b) : 'some', Léa a bloqué Sam et Théo ; 'none', personne.
+const fakeApi = (
+  signedIn,
+  feed = 'following',
+  notifications = 'some',
+  admin = false,
+  blocks = 'some',
+) => {
+  // Les membres que Léa a bloqués, tels que ses gestes dans ce navigateur les ont laissés (bloquer
+  // Max depuis sa page, débloquer Sam depuis la liste) : chaque capture a les siens.
+  const blocked = new Map(
+    (blocks === 'none' ? [] : blockedList).map((entry) => [entry.member.id, entry]),
+  )
   // Les notifications : vues (PUT …/seen) ou non. Vues, la cloche revient à zéro.
   const notificationList = notificationPages(notifications)
   let seen = false
@@ -730,6 +787,41 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = f
     if (pathname === `/v1/members/${leaMe.id}`) {
       return json(200, { ...leaMember, name: me.name, handle: me.handle, bio: me.bio })
     }
+    if (pathname === `/v1/projects/${gardenProject.id}`) {
+      return json(200, withExtras(gardenProject))
+    }
+    // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
+    // liste et la page du membre suivent. Se bloquer soi-même : 422.
+    const block = pathname.match(/^\/v1\/members\/([^/]+)\/block$/)
+    if (block && method === 'PUT') {
+      if (block[1] === leaMe.id)
+        return json(422, { error: { code: 'cannot_block_own', message: '' } })
+      if (block[1] === blockedByNora)
+        return json(404, { error: { code: 'not_found', message: '' } })
+      const member = block[1] === max.id ? maxMember : { id: block[1], name: '', handle: '' }
+      blocked.set(block[1], {
+        member: { id: member.id, name: member.name, handle: member.handle, avatarUrl: null },
+        blockedAt: new Date().toISOString(),
+      })
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (block && method === 'DELETE') {
+      blocked.delete(block[1])
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (pathname === '/v1/me/blocks') {
+      // Du plus récent au plus ancien, en une seule page.
+      const items = [...blocked.values()].sort((a, b) => b.blockedAt.localeCompare(a.blockedAt))
+      return json(200, blockedPageOf(items))
+    }
+    // Nora a bloqué Léa : sa page répond comme celle d'un membre inconnu.
+    if (pathname === `/v1/members/${blockedByNora}`) {
+      return json(404, { error: { code: 'not_found', message: '' } })
+    }
+    const member = pathname.match(/^\/v1\/members\/([^/]+)$/)
+    if (member && blocked.has(member[1])) {
+      return json(200, blockedMemberPage(blocked.get(member[1])))
+    }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
@@ -768,6 +860,13 @@ const fakeApi = (signedIn, feed = 'following', notifications = 'some', admin = f
         target: { kind: 'comment', id: comment.id },
         text: comment.body,
         projectId: commentedProject.id,
+        // Tranche 7b : l'auteur, pour « Bloquer aussi @x » après l'envoi (absent s'il est bloqué).
+        author: {
+          id: comment.author.id,
+          name: comment.author.name,
+          handle: comment.author.id === ines.id ? 'ines_haddad' : 'max_durand',
+          isBlocked: blocked.has(comment.author.id),
+        },
       })
     }
     // La modération (tranche 7a) : pour un membre qui n'est pas administrateur, ces routes
@@ -976,6 +1075,60 @@ const pages = [
     },
   },
   { name: 'compte-admin', path: '/account', signedIn: true, admin: true, fullPage: true },
+  // Tranche 7b : bloquer. Le menu « … » de la page de Max, ouvert ; puis « Bloquer » choisi, la
+  // fenêtre qui dit ce qui change ; la page de Sam vue par Léa qui l'a bloqué (l'en-tête seul,
+  // « Tu as bloqué @sam ») ; la liste « Membres bloqués », pleine puis vide ; la confirmation d'un
+  // signalement qui propose « Bloquer aussi @ines_haddad » ; un fil où deux commentaires sont
+  // remplacés par leur emplacement ; le menu « … » d'un projet.
+  {
+    name: 'membre-menu',
+    path: `/members/${max.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Plus d.actions$/ }).click()
+      await page.getByRole('menuitem', { name: 'Bloquer' }).waitFor()
+    },
+  },
+  {
+    name: 'membre-bloquer',
+    path: `/members/${max.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Plus d.actions$/ }).click()
+      await page.getByRole('menuitem', { name: 'Bloquer' }).click()
+      // Le titre finit par « ? » derrière une espace insécable (typo:fix) : une expression suffit.
+      await page.getByRole('heading', { name: /^Bloquer @max_durand/ }).waitFor()
+    },
+  },
+  { name: 'membre-bloque', path: `/members/${blockedSam.member.id}`, signedIn: true },
+  { name: 'membres-bloques', path: '/blocks', signedIn: true, fullPage: true },
+  { name: 'membres-bloques-vide', path: '/blocks', signedIn: true, blocks: 'none' },
+  {
+    name: 'signaler-envoye',
+    path: `/report?kind=comment&id=${notMineComments[0]?.id}&project=${commentedProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: /^Arnaque ou spam/ }).click()
+      await page.getByRole('button', { name: 'Envoyer' }).click()
+      await page.getByRole('button', { name: 'Bloquer aussi @ines_haddad' }).waitFor()
+    },
+  },
+  {
+    name: 'projet-commentaires-bloques',
+    path: `/projects/${gardenProject.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'projet-menu',
+    path: `/projects/${notMineProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Plus d.actions$/ }).click()
+      await page.getByRole('menuitem', { name: 'Signaler ce projet' }).waitFor()
+    },
+  },
   // Le projet retiré de Léa, vu par elle : bandeau, note retirée, commentaires retirés.
   {
     name: 'projet-retire',
@@ -1176,13 +1329,13 @@ const settle = async (page) => {
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, { feed, notifications, admin, ...options } = {}) => {
+  const open = async (signedIn, { feed, notifications, admin, blocks, ...options } = {}) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications, admin))
+    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications, admin, blocks))
     return context
   }
   try {
@@ -1227,7 +1380,7 @@ async function layoutReport() {
     try {
       await context.route(
         `${apiUrl}/**`,
-        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin),
+        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks),
       )
       const page = await context.newPage()
       for (const width of widths) {
@@ -1352,7 +1505,7 @@ const capture = async ({ shot, device, scheme }) => {
   try {
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin),
+      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks),
     )
     const page = await context.newPage()
     // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.

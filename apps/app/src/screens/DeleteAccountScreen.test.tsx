@@ -131,4 +131,28 @@ describe('what remains after deleting the account', () => {
       screen.getAllByText(containing(fr.t('account.delete.remains.removals'))).length,
     ).toBeGreaterThan(0)
   })
+
+  // Tranche 7b (relecture juridique du plan, J11) : la copie des textes signalés reste un temps.
+  // Au conditionnel (« Si tes contenus ont été signalés »), car l'écran s'affiche pour tous.
+  it('says that the copy of the texts reported stays 30 days, or one year if removed (slice 7b)', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    expect(
+      screen.getAllByText(containing(fr.t('account.delete.remains.reportCopies'))).length,
+    ).toBeGreaterThan(0)
+  })
+})
+
+// --- Tranche 7b : les blocages partent avec le compte ---
+
+describe('the blocks of the member', () => {
+  it('says that the members blocked, and the blocks aimed at the member, go with the account', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    // « Les membres que tu as bloqués », dans la liste de ce qui disparaît, avec son détail.
+    expect(screen.getAllByText(containing(fr.t('account.delete.blocksItem'))).length).toBe(1)
+    expect(
+      screen.getAllByText(containing(fr.t('account.delete.blocksDetail'))).length,
+    ).toBeGreaterThan(0)
+  })
 })

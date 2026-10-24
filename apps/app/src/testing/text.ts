@@ -30,6 +30,19 @@ export const removalSentences = (removal: Removal): string[] => [
 ]
 
 /**
+ * Ce que dit la fenêtre « Bloquer @x ? » (tranche 7b, règle 20 de la relecture du plan, J9), phrase
+ * par phrase : ce qu'on ne verra plus, dans les deux sens ; les abonnements retirés, qui ne
+ * reviennent pas ; @x n'est pas prévenu, mais peut le remarquer ; bloquer ne prévient pas la
+ * modération (signaler d'abord). Le titre n'en fait pas partie : chaque test le cherche lui-même.
+ */
+export const blockSentences = (handle: string): string[] => [
+  fr.t('block.hidden'),
+  fr.t('block.follows'),
+  fr.t('block.notTold', { handle }),
+  fr.t('block.notModeration'),
+]
+
+/**
  * Les phrases qu'on ne lit nulle part à l'écran (ou dans la partie donnée par `within`) : un test
  * attend une liste vide, et l'échec dit lesquelles manquent.
  */

@@ -381,3 +381,104 @@ describe('a comment removed by the moderation', () => {
     expect(screen.queryByText(/Malik|Zoé|Inès/)).toBeNull()
   })
 })
+
+// --- Tranche 7b : ce qu'on voit d'un commentaire quand un blocage sépare deux membres ---
+//
+// L'API remplace le commentaire de l'autre par un emplacement sans auteur ni texte (CommentState) :
+// `blocked` pour qui a bloqué (« Commentaire d'un membre que tu as bloqué »), `unavailable` pour qui
+// est bloqué (« Commentaire indisponible »). « Commentaire masqué » reste au geste de l'auteur du
+// projet (règle 8 de la relecture du plan, J6). Comme pour un commentaire supprimé ou retiré,
+// l'emplacement n'existe que s'il reste des réponses visibles : les réponses restent lisibles.
+
+describe('a comment hidden by a block', () => {
+  /** Le commentaire de Max tel que l'API le donne quand un blocage sépare Max et Malik. */
+  const placeholderOf = (state: 'blocked' | 'unavailable') => ({
+    ...maxComment,
+    state,
+    author: null,
+    body: '',
+    mentions: [],
+    removal: null,
+  })
+
+  it('is « Commentaire d’un membre que tu as bloqué » for who blocked, and its replies stay', async () => {
+    mockComments([placeholderOf('blocked')])
+    await renderWithProviders(<Comments project={project} />)
+
+    expect(screen.getByText(fr.t('project.comments.blockedPlaceholder'))).toBeTruthy()
+    // Ni le nom de Max, ni les autres emplacements.
+    expect(screen.queryByText('Max')).toBeNull()
+    expect(screen.queryByText('Commentaire masqué')).toBeNull()
+    expect(screen.queryByText('Commentaire indisponible')).toBeNull()
+    // Les réponses des autres restent lisibles.
+    expect(screen.getByText(zoeReply.body)).toBeTruthy()
+    expect(screen.getByText(leaReply.body)).toBeTruthy()
+  })
+
+  it('is « Commentaire indisponible » for who is blocked, without a word on the block', async () => {
+    mockComments([placeholderOf('unavailable')])
+    await renderWithProviders(<Comments project={project} />)
+
+    expect(screen.getByText(fr.t('project.comments.unavailablePlaceholder'))).toBeTruthy()
+    // Rien ne dit à la personne bloquée qu'elle l'est.
+    expect(screen.queryByText(/bloqu/i)).toBeNull()
+    expect(screen.queryByText('Commentaire masqué')).toBeNull()
+    expect(screen.getByText(zoeReply.body)).toBeTruthy()
+  })
+
+  it('offers neither a reply nor a report under the placeholder', async () => {
+    mockComments([{ ...placeholderOf('blocked'), replies: [zoeReply] }])
+    await renderWithProviders(<Comments project={project} />)
+
+    // Témoin : la réponse de Zoé est là, avec son propre « Signaler ».
+    expect(screen.getByText(zoeReply.body)).toBeTruthy()
+    // Plus d'interaction avec un membre bloqué : on ne lui répond pas.
+    expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    // Un seul « Signaler » : celui de la réponse de Zoé, pas l'emplacement (rien à y lire).
+    expect(screen.queryAllByRole('button', { name: /^Signaler/ })).toHaveLength(1)
+  })
+})
+
+// Règle 2b de la relecture du plan (Louis, 24/10/2026) : mentionner un membre qu'on a bloqué est
+// refusé par l'API (422 `blocked_mention`). Le hook le dit par `reason: 'blockedMention'` (nouvelle
+// valeur de CommentFailure, comments/api.ts), et l'écran l'explique au lieu de « Réessaie ».
+describe('mentioning a member one blocked', () => {
+  // « Tu ne peux pas mentionner @x : tu l'as bloqué. » ou, sans pseudo, « … un membre que tu as
+  // bloqué. » : l'API ne dit pas quel pseudo ; l'un ou l'autre convient (question au rapport).
+  const blockedMention = /Tu ne peux pas mentionner .*bloqué/
+
+  it('says a blocked member cannot be mentioned, and keeps the comment to change it', async () => {
+    mockPost.mockResolvedValue(false)
+    jest
+      .mocked(usePostComment)
+      .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'blockedMention' })
+    await renderWithProviders(<Comments project={project} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Écrire un commentaire' }))
+    await fireEvent.changeText(screen.getByLabelText('Ton commentaire'), 'Bravo @ines_morel')
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(blockedMention)
+    expect(screen.queryByText(containing(fr.t('project.comments.error')))).toBeNull()
+    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Bravo @ines_morel')
+  })
+
+  it('says the same when an edited comment mentions a blocked member', async () => {
+    mockEdit.mockResolvedValue(false)
+    jest
+      .mocked(useEditComment)
+      .mockReturnValue({ edit: mockEdit, pending: false, error: true, reason: 'blockedMention' })
+    mockComments([{ ...maxComment, isMine: true }])
+    await renderWithProviders(<Comments project={project} />)
+
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Modifier le commentaire',
+      }),
+    )
+    await fireEvent.changeText(screen.getByLabelText('Ton commentaire'), 'Testé avec @ines_morel')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(blockedMention)
+  })
+})
