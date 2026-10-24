@@ -291,8 +291,10 @@ describe('the list of blocked members', () => {
     later(HOUR)
     await act.block(zoeId, malik)
     const zoeAt = new Date(Date.now()).toISOString()
-    // Inès bloque Malik à son tour : cela ne change rien à la liste de Malik.
-    await act.block(malikId, ines)
+    // Inès bloque Malik à son tour : cela ne change rien à la liste de Malik. Posé en base : par
+    // l'API, Inès ne peut plus atteindre Malik (règle 6, 404) ; un double blocage n'arrive que par
+    // une course.
+    await ctx.db.insert(schema.memberBlock).values({ blockerId: inesId, blockedId: malikId })
     const { handle: inesHandle } = await act.me(ines)
     const { handle: zoeHandle } = await act.me(zoe)
 
@@ -397,7 +399,9 @@ describe('the page of a blocked member', () => {
 
   it('reads as "I blocked her" when both blocked each other', async () => {
     await act.block(inesId, malik)
-    await act.block(malikId, ines)
+    // Le second blocage, posé en base : par l'API, il répond 404 (règle 6) ; il n'arrive que par une
+    // course.
+    await ctx.db.insert(schema.memberBlock).values({ blockerId: inesId, blockedId: malikId })
 
     expect((await readMember(inesId, malik)).isBlocked).toBe(true)
     expect((await readMember(malikId, ines)).isBlocked).toBe(true)
