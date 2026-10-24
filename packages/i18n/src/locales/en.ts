@@ -669,7 +669,7 @@ export const en: Translation = {
     new: 'New',
     emptyTitle: 'No notifications yet',
     empty:
-      'Nothing yet. When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
+      'When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
     emptyAction: 'Publish a project',
     more: 'Show more',
     end: 'That’s all',
