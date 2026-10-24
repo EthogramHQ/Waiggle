@@ -873,8 +873,9 @@ describe('hiding a comment', () => {
     const [thread] = CommentPage.parse(JSON.parse(text)).items
     expect(thread).toMatchObject({ id: root.id, author: null, body: '', state: 'hidden' })
     expect(thread?.replies.map((r) => r.body)).toEqual(['Réponse de Zoé'])
-    // Ni le texte ni l'auteur du commentaire masqué ne passent.
-    for (const secret of ['Un commentaire déplacé', maxId, 'Max'])
+    // Ni le texte ni l'auteur du commentaire masqué ne passent. Le nom se cherche avec sa clé :
+    // « Max » seul se trouve parfois dans un identifiant tiré au hasard (tranche 7b).
+    for (const secret of ['Un commentaire déplacé', maxId, '"name":"Max"'])
       expect(text).not.toContain(secret)
     // Les deux auteurs, eux, le lisent encore.
     expect(await threads(project.id, lea)).toEqual([
