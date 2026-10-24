@@ -467,6 +467,8 @@ export const en: Translation = {
     reasonRequired: 'Choose a reason to send your report.',
     alsoBlock: 'Also block @{{handle}}',
     alsoBlockHint: 'You won’t see their content anymore, and they won’t see yours.',
+    goodFaith:
+      'By sending, you confirm your report is sincere and accurate to the best of your knowledge.',
   },
   actionMenu: {
     label: 'More actions',
@@ -501,7 +503,11 @@ export const en: Translation = {
       more: 'Show more',
       end: 'That’s all',
       loadError: 'The list couldn’t load.',
+      unblockLabel: 'Unblock @{{handle}}',
+      detail: '@{{handle}} · {{blockedOn}}',
+      moreError: 'The rest of the list couldn’t load.',
     },
+    unblockLimited: 'You’ve reached the limit of {{max}} unblocks in 24 hours. Try again tomorrow.',
   },
   moderation: {
     title: 'Moderation',

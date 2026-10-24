@@ -16,12 +16,14 @@
 // Pour tout autre membre, la page n'existe pas (« Page introuvable ») : l'appli lit `me.isAdmin`,
 // et l'API, qui refait la vérification à chaque requête, répond 404 comme à une adresse inconnue.
 import {
+  IMAGE_INPUT_FIELDS,
   type ModerationDecisionInput,
   type ModerationQueueItem,
   REMOVAL_EXPLANATION_MAX,
   RemovalExplanation,
   type RemovalGround,
   type RemovedItem,
+  type ReportSnapshotEntry,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
@@ -56,6 +58,21 @@ import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from '
 const SETTLE_MS = 600
 
 type Tab = 'pending' | 'removed'
+
+/**
+ * Les champs d'une copie qui sont des images : la copie n'en garde que la clé, jamais le texte. La
+ * file les dit à part (`images`), seulement par leur état ; ils n'ont pas de libellé de champ.
+ */
+type ImageField = (typeof IMAGE_INPUT_FIELDS)[number]
+const imageFields: ReadonlySet<string> = new Set(IMAGE_INPUT_FIELDS)
+const isTextEntry = (
+  entry: ReportSnapshotEntry,
+): entry is ReportSnapshotEntry & { field: Exclude<ReportSnapshotEntry['field'], ImageField> } =>
+  !imageFields.has(entry.field)
+
+/** Le premier texte d'une copie (le titre d'un projet, le nom d'un profil) : de quoi la reconnaître. */
+const firstText = (snapshot: readonly ReportSnapshotEntry[]): string =>
+  snapshot.find(isTextEntry)?.value ?? ''
 
 /** Le résultat d'une décision, posé sur sa carte : une confirmation, ou « déjà décidé ». */
 type Outcome = { message: string; ok: boolean }
@@ -324,11 +341,20 @@ function AdminModeration() {
     return (
       <ReportCard
         key={key}
-        {...cardState(key, kind, item.snapshot, outcome)}
+        {...cardState(key, kind, firstText(item.snapshot), outcome)}
         kind={kind}
         count={t('moderation.count', { count: item.count })}
-        snapshot={item.snapshot}
+        // Tranche 7b : la copie champ par champ, chacun sous son libellé ; une copie d'avant 7b
+        // n'a qu'un champ, « Texte ». Les images ne sont dites que par leur état.
+        snapshot={item.snapshot.filter(isTextEntry).map(({ field, value }) => ({
+          label: t(`moderation.fields.${field}`),
+          value,
+        }))}
         snapshotLabel={t('moderation.snapshot')}
+        snapshotNote={item.snapshotsDiffer ? t('moderation.snapshotsDiffer') : undefined}
+        images={item.images.map(({ field, state }) =>
+          t(`moderation.images.${state}`, { image: t(`moderation.images.${field}`) }),
+        )}
         reasons={item.reasons.map(({ reason, count }) =>
           t('moderation.reasonCount', {
             reason: t(`report.reasons.${reasonTextKey[reason]}`),
@@ -456,7 +482,7 @@ function AdminModeration() {
           removing
             ? {
                 label: t(`moderation.kinds.${removing.item.target.kind}`),
-                text: removing.item.snapshot,
+                text: firstText(removing.item.snapshot),
               }
             : undefined
         }

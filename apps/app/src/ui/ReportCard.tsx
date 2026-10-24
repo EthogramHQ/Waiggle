@@ -2,6 +2,9 @@
 // sorte de contenu (« Commentaire ») et le nombre de signalements, le texte signalé en citation,
 // les motifs avec leur nombre, les précisions laissées par les membres, la date, un lien « Voir »,
 // puis les décisions possibles (« Retirer », « Classer sans suite », « Rétablir »).
+// Depuis la tranche 7b, la copie se lit champ par champ (« Titre », « Pitch », « Lien de démo »),
+// avec l'état de ses images (toujours affichée, ou partie depuis) et, s'il y a lieu, une phrase qui
+// dit que le contenu a changé entre deux signalements.
 //
 // Tout ce qu'un membre a écrit (le texte signalé, les précisions) s'affiche en texte brut : ni
 // Markdown, ni lien qu'on pourrait toucher par mégarde (règle 22 de la relecture du plan). Le seul
@@ -29,6 +32,9 @@ import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { useTheme } from './theme/ThemeProvider'
 
+/** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
+export type SnapshotField = { label: string; value: string }
+
 /** Une décision proposée sur la carte : un bouton nommé d'après elle. */
 export type ReportCardAction = {
   label: string
@@ -46,10 +52,24 @@ type Props = {
   kind: string
   /** Le nombre de signalements, en toutes lettres (« 3 signalements ») ; rien pour un retiré. */
   count?: string
-  /** Le texte signalé (ou le texte actuel d'un contenu retiré), en texte brut. */
-  snapshot: string
-  /** Ce que montre la citation (« Texte au moment du signalement ; images actuelles »). */
+  /**
+   * Ce qui a été signalé, en texte brut : un texte seul (le texte actuel d'un contenu retiré), ou,
+   * depuis la tranche 7b, la copie champ par champ, chacun avec son libellé déjà traduit
+   * (« Titre », « Lien de démo »), dans l'ordre donné.
+   */
+  snapshot: string | readonly SnapshotField[]
+  /** Ce que montre la citation (« Copie au moment du signalement »). */
   snapshotLabel?: string
+  /**
+   * Une phrase sur la copie elle-même (« Le contenu a changé entre deux signalements… »), posée
+   * avant elle : on la lit avant de juger le texte.
+   */
+  snapshotNote?: string | undefined
+  /**
+   * L'état de chaque image de la copie, en phrases déjà traduites (« Couverture : toujours
+   * affichée ») : la file ne montre jamais l'image elle-même (règle 15 de la relecture du plan 7b).
+   */
+  images?: readonly string[]
   /** Les motifs avec leur nombre (« Arnaque ou spam ×2 »), ou le fondement d'un retrait. */
   reasons?: readonly string[]
   /** Les précisions des membres (ou l'explication d'un retrait), en texte brut. */
@@ -87,6 +107,8 @@ export function ReportCard({
   count,
   snapshot,
   snapshotLabel,
+  snapshotNote,
+  images = [],
   reasons = [],
   details = [],
   when,
@@ -143,20 +165,53 @@ export function ReportCard({
             {snapshotLabel}
           </Text>
         ) : null}
+        {snapshotNote ? <InfoLine text={snapshotNote} /> : null}
         {/* Le texte signalé, souligné d'un trait de miel à gauche, comme une citation (NoteCard).
             En texte brut, sélectionnable (pour le copier dans un rapport), coupé n'importe où
-            plutôt que de déborder (une adresse sans espace). */}
+            plutôt que de déborder (une adresse sans espace). Une copie en champs : chacun sous
+            son libellé, dans la même citation ; un lien de démo y reste un texte. */}
         <View
           style={{
+            gap: space.sm,
             borderLeftWidth: borders.quote,
             borderLeftColor: colors.honey,
             paddingLeft: space.md,
           }}
         >
-          <Text selectable breakAnywhere>
-            {snapshot}
-          </Text>
+          {typeof snapshot === 'string' ? (
+            <Text selectable breakAnywhere>
+              {snapshot}
+            </Text>
+          ) : (
+            snapshot.map((field, index) => (
+              // Deux champs peuvent porter le même libellé (deux prompts, deux photos) : leur rang
+              // les distingue, et la copie ne change jamais d'ordre.
+              // biome-ignore lint/suspicious/noArrayIndexKey: un champ de la copie n'a pas d'autre identité que sa place
+              <View key={index} style={{ gap: space.xxs }}>
+                <Text variant="caption" weight={600} tone="muted">
+                  {field.label}
+                </Text>
+                <Text selectable breakAnywhere>
+                  {field.value}
+                </Text>
+              </View>
+            ))
+          )}
         </View>
+        {/* Les images : seulement leur état, jamais l'image (elle peut être illégale). */}
+        {images.map((image) => (
+          <View
+            key={image}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}
+          >
+            <Icon name="image" size={18} tone="muted" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="callout" tone="secondary">
+                {image}
+              </Text>
+            </View>
+          </View>
+        ))}
       </View>
 
       {reasons.length > 0 ? (
@@ -223,16 +278,7 @@ export function ReportCard({
         ) : null}
       </View>
 
-      {status ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
-          <Icon name="info" size={18} tone="amber" />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="callout" weight={600}>
-              {status}
-            </Text>
-          </View>
-        </View>
-      ) : null}
+      {status ? <InfoLine text={status} /> : null}
 
       {/* Une panne : le message reste au-dessus des boutons jusqu'à la réponse suivante. */}
       {error && !decided ? <Notice message={error} /> : null}
@@ -269,6 +315,23 @@ export function ReportCard({
         </View>
       ) : null}
       {description ? <ActionDescription id={descriptionId} text={description} /> : null}
+    </View>
+  )
+}
+
+/**
+ * Une phrase à lire avant de décider, précédée d'une pastille d'information : l'état de la cible
+ * (« Te concerne… »), ou une copie qui a changé entre deux signalements.
+ */
+function InfoLine({ text }: { text: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+      <Icon name="info" size={18} tone="amber" />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="callout" weight={600}>
+          {text}
+        </Text>
+      </View>
     </View>
   )
 }

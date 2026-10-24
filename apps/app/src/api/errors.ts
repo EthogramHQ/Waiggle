@@ -22,6 +22,10 @@ export type ApiErrorKey =
   | 'alreadyReported'
   | 'alreadyDecided'
   | 'removed'
+  // Tranche 7b : bloquer, et re-signaler un contenu déjà examiné.
+  | 'cannotBlockOwn'
+  | 'blockedMention'
+  | 'alreadyExamined'
   | 'internal'
   | 'network'
 
@@ -40,8 +44,9 @@ const byStatus: Record<number, ApiErrorKey> = {
   409: 'tooManyVisuals',
   413: 'payloadTooLarge',
   415: 'unsupportedMediaType',
-  // 422 : « demande impossible à traiter ». L'API ne s'en sert que pour son propre contenu
-  // (own_content, tranche 7a) : signaler ce qu'on a publié, ou décider de ce qui nous concerne.
+  // 422 : « demande impossible à traiter ». Sans corps lisible, le plus ancien de ses refus : son
+  // propre contenu (own_content, tranche 7a), signaler ce qu'on a publié ou décider de ce qui nous
+  // concerne. Les autres (tranche 7b) se lisent dans le corps (byCode).
   422: 'ownContent',
   // 429 : « trop de demandes ». Aussi le 6e changement de pseudo du jour (handle_change_limit),
   // qui a son propre message (réessayer demain, pas dans quelques minutes) : voir byCode.
@@ -68,6 +73,11 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   already_decided: 'alreadyDecided',
   removed: 'removed',
   own_content: 'ownContent',
+  // Tranche 7b : deux 422 de plus (se bloquer soi-même ; mentionner un membre qu'on a bloqué) et un
+  // 409 (re-signaler un contenu que la modération a déjà examiné, et qui n'a pas changé depuis).
+  cannot_block_own: 'cannotBlockOwn',
+  blocked_mention: 'blockedMention',
+  already_examined: 'alreadyExamined',
 }
 
 /**

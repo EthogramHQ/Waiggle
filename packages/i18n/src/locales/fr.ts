@@ -496,6 +496,10 @@ export const fr = {
     reasonRequired: 'Choisis un motif pour envoyer ton signalement.',
     alsoBlock: 'Bloquer aussi @{{handle}}',
     alsoBlockHint: 'Tu ne verras plus ses contenus, et il ne verra plus les tiens.',
+    // Ajouté par l'interface : la phrase de bonne foi seule, qui reste sous l'erreur « Dis-nous
+    // pourquoi… » (l'aide entière répéterait l'erreur, qui en est la première phrase).
+    goodFaith:
+      'En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
   },
   // Le menu « … » (tranche 7b) : les actions secondaires d'une page, au lieu d'un bouton chacune.
   actionMenu: {
@@ -535,7 +539,15 @@ export const fr = {
       more: 'Afficher la suite',
       end: 'C’est tout',
       loadError: 'La liste n’a pas pu se charger.',
+      // Ajoutés par l'interface : le nom lu de « Débloquer » sur chaque ligne (toutes portent le
+      // même mot), et la suite ratée de la liste.
+      unblockLabel: 'Débloquer @{{handle}}',
+      // La précision d'une ligne : le pseudo, puis la date (blockedOn).
+      detail: '@{{handle}} · {{blockedOn}}',
+      moreError: 'La suite de la liste n’a pas pu se charger.',
     },
+    // Le quota des déblocages a son propre nombre (UNBLOCKS_PER_DAY) : « blocages » serait faux.
+    unblockLimited: 'Tu as atteint la limite de {{max}} déblocages en 24 heures. Réessaie demain.',
   },
   moderation: {
     title: 'Modération',
