@@ -33,6 +33,11 @@ type Props = {
   onChangeText: (text: string) => void
   hint?: string | undefined
   error?: string | undefined
+  /**
+   * L'aide reste affichée sous l'erreur, au lieu de lui laisser la place : pour une aide qu'il faut
+   * encore lire pour corriger (la phrase de bonne foi de « Signaler », tranche 7b).
+   */
+  keepHint?: boolean
   /** Affiche « 42 / 140 » à côté de l'étiquette (la limite : maxLength, ou `limit`). */
   showCount?: boolean
   /** Une limite seulement affichée : on peut la dépasser, l'erreur vient à l'enregistrement. */
@@ -139,6 +144,7 @@ export function TextField({
   onChangeText,
   hint,
   error,
+  keepHint = false,
   showCount = false,
   limit,
   aside,
@@ -163,8 +169,9 @@ export function TextField({
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie le
   // champ au texte affiché dessous (aria-describedby).
   const messageId = useId()
-  // Ce qu'on lit sous le champ : l'erreur d'abord, sinon la confirmation, sinon l'aide.
-  const message = error || success || hint
+  // Ce qu'on lit sous le champ : l'erreur d'abord, sinon la confirmation, sinon l'aide (et l'aide
+  // après l'erreur, avec `keepHint`).
+  const message = keepHint && error && hint ? `${error} ${hint}` : error || success || hint
   const body = textStyles.body
   const max = limit ?? inputProps.maxLength
   // Le compteur compte comme la limite : en « unités » de texte (value.length), comme maxLength et
@@ -310,7 +317,9 @@ export function TextField({
         ) : null}
       </View>
       {/* Dans un groupe, le message reste dans la ligne du champ concerné. */}
-      {inGroup ? <Message id={messageId} error={error} hint={hint} success={success} /> : null}
+      {inGroup ? (
+        <Message id={messageId} error={error} hint={hint} success={success} keepHint={keepHint} />
+      ) : null}
     </Pressable>
   )
 
@@ -318,7 +327,14 @@ export function TextField({
   return (
     <View>
       <GroupFrame state={error ? 'error' : focused ? 'focus' : 'idle'}>{row}</GroupFrame>
-      <Message id={messageId} error={error} hint={hint} success={success} outside />
+      <Message
+        id={messageId}
+        error={error}
+        hint={hint}
+        success={success}
+        keepHint={keepHint}
+        outside
+      />
     </View>
   )
 }
@@ -338,6 +354,7 @@ function Message({
   error,
   hint,
   success,
+  keepHint = false,
   outside = false,
 }: {
   /** L'identifiant que le champ cite dans aria-describedby. */
@@ -345,6 +362,8 @@ function Message({
   error?: string | undefined
   hint?: string | undefined
   success?: string | undefined
+  /** L'aide reste sous l'erreur (voir TextField). */
+  keepHint?: boolean
   outside?: boolean
 }) {
   // L'écart avec le champ n'existe que s'il y a un texte : un champ sans aide garde sa hauteur.
@@ -381,6 +400,14 @@ function Message({
         </View>
       ) : null}
       <View aria-live="polite">{status}</View>
+      {/* Avec keepHint, l'aide reste là, sous l'erreur : on la lit encore pour corriger. */}
+      {status && keepHint && hint ? (
+        <View style={padding}>
+          <Text variant="caption" tone="muted">
+            {hint}
+          </Text>
+        </View>
+      ) : null}
     </View>
   )
 }

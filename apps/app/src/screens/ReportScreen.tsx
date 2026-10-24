@@ -12,22 +12,26 @@
 // restent en place pour réessayer.
 import { contactEmail } from '@ruche/brand'
 import {
+  BLOCKS_PER_DAY,
   REPORT_DETAILS_MAX,
   REPORTS_PER_DAY,
   type ReportReason,
   ReportTarget,
   type ReportTargetKind,
+  type ReportTargetPreview,
 } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiErrorKey, errorKey } from '../api/errors'
+import { useBlock } from '../blocks/api'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { sendReport, useReportTarget } from '../reports/api'
 import { Button } from '../ui/Button'
+import { Dialog } from '../ui/Dialog'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -100,6 +104,7 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
     <ReportForm
       target={target}
       text={preview.data.text}
+      author={preview.data.author}
       fallback={fallbackOf(target.kind, target.id, preview.data.projectId)}
     />
   )
@@ -109,10 +114,13 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
 function ReportForm({
   target,
   text,
+  author,
   fallback,
 }: {
   target: ReportTarget
   text: string
+  /** L'auteur de la cible (le membre lui-même pour un profil), pour « Bloquer aussi @x ». */
+  author: ReportTargetPreview['author']
   fallback: Href
 }) {
   const { t } = useTranslation()
@@ -144,8 +152,20 @@ function ReportForm({
     if (value.trim() !== '') setMissingWhy(false)
   }
 
+  // Sans motif, rien ne part : « Envoyer » reste actif, et son appui dit ce qui manque (design.md,
+  // tranche 7b) au lieu d'un bouton grisé qui ne dit pas pourquoi. Le message part au premier choix.
+  const [missingReason, setMissingReason] = useState(false)
+  const choose = (value: ReportReason) => {
+    setReason(value)
+    setMissingReason(false)
+  }
+
   const submit = async () => {
-    if (busy.current || reason === null || sent) return
+    if (busy.current || sent) return
+    if (reason === null) {
+      setMissingReason(true)
+      return
+    }
     if (illegal && details.trim() === '') {
       setMissingWhy(true)
       return
@@ -212,7 +232,7 @@ function ReportForm({
                 key={item.reason}
                 label={t(`report.reasons.${item.key}`)}
                 selected={reason === item.reason}
-                onPress={() => setReason(item.reason)}
+                onPress={() => choose(item.reason)}
               />
             ))}
           </ListGroup>
@@ -222,9 +242,12 @@ function ReportForm({
             value={details}
             onChangeText={changeDetails}
             error={illegal && missingWhy ? t('report.illegalRequired') : undefined}
+            // L'aide (la phrase de bonne foi, pas d'informations personnelles) reste sous l'erreur :
+            // on la lit encore en corrigeant. Sans sa première phrase, que l'erreur vient de dire.
+            keepHint
             hint={
               illegal
-                ? `${t('report.illegalHint')} ${t('report.detailsHint')}`
+                ? `${missingWhy ? t('report.goodFaith') : t('report.illegalHint')} ${t('report.detailsHint')}`
                 : t('report.detailsHint')
             }
             multiline
@@ -232,21 +255,128 @@ function ReportForm({
             maxLength={REPORT_DETAILS_MAX}
           />
           <Hint icon="shield-check" text={t('report.anonymity')} />
+          {/* Ce qui empêche l'envoi, juste au-dessus d'« Envoyer » : là où l'on regarde après
+              l'avoir touché, même au bas d'un téléphone. */}
+          {missingReason ? <Notice message={t('report.reasonRequired')} /> : null}
           {failureMessage ? (
             <Notice
               message={failureMessage}
               action={failure === 'unauthorized' ? signInAgain() : undefined}
             />
           ) : null}
-          {/* Sans motif, rien à envoyer : le bouton attend qu'on en choisisse un. */}
-          <Button
-            label={t('report.submit')}
-            onPress={() => void submit()}
-            loading={sending}
-            disabled={reason === null}
-          />
+          <Button label={t('report.submit')} onPress={() => void submit()} loading={sending} />
         </>
       )}
+      {sent && !author.isBlocked ? <AlsoBlock author={author} /> : null}
     </Screen>
+  )
+}
+
+/**
+ * Après l'envoi : « Bloquer aussi @x » (tranche 7b, scénario « Après un signalement »). Une action
+ * secondaire, jamais choisie d'avance, absente si @x est déjà bloqué (règle 21 de la relecture du
+ * plan, J14). Elle passe par la même fenêtre que sur la page d'un membre (règle 20) : ce qu'on ne
+ * verra plus, les abonnements retirés, que @x n'est pas prévenu, et que la modération ne l'est pas.
+ * Une fois fait, « Tu as bloqué @x. » prend sa place.
+ */
+function AlsoBlock({ author }: { author: ReportTargetPreview['author'] }) {
+  const { t } = useTranslation()
+  const signInAgain = useSignInAgain()
+  const { block } = useBlock()
+  const [asking, setAsking] = useState(false)
+  const [blocking, setBlocking] = useState(false)
+  const [failure, setFailure] = useState<ApiErrorKey | null>(null)
+  const [blocked, setBlocked] = useState(false)
+  // Un envoi à la fois : un double appui sur « Bloquer » ne bloque qu'une fois.
+  const busy = useRef(false)
+  // Le bouton touché laisse la place à la confirmation : le focus du clavier y va, une fois la
+  // fenêtre refermée (avant, elle le garde pour elle).
+  const doneRef = useRef<Focusable>(null)
+  const focusAfterClose = useRef(false)
+  const handle = author.handle
+
+  const open = () => {
+    // Une fenêtre neuve ne montre pas le refus de la précédente.
+    setFailure(null)
+    setAsking(true)
+  }
+
+  const close = () => {
+    // Pendant l'envoi, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
+    if (!busy.current) setAsking(false)
+  }
+
+  const confirm = async () => {
+    if (busy.current) return
+    busy.current = true
+    setBlocking(true)
+    const result = await block(author.id)
+    busy.current = false
+    setBlocking(false)
+    // Refusé : la fenêtre reste ouverte, avec le message ; « Bloquer » permet de réessayer.
+    if (!result.ok) {
+      setFailure(result.error)
+      return
+    }
+    setFailure(null)
+    focusAfterClose.current = true
+    setBlocked(true)
+    setAsking(false)
+  }
+
+  // Le message d'un refus : la session expirée a son lien, le quota du jour sa propre phrase.
+  const failureMessage =
+    failure === null
+      ? null
+      : failure === 'unauthorized'
+        ? t('states.expired')
+        : failure === 'rateLimited'
+          ? t('block.limited', { max: BLOCKS_PER_DAY })
+          : t('block.error')
+
+  return (
+    <>
+      {blocked ? (
+        <Notice ref={doneRef} tone="success" message={t('block.done', { handle })} polite />
+      ) : (
+        <>
+          <Hint icon="prohibit" text={t('report.alsoBlockHint')} />
+          <Button label={t('report.alsoBlock', { handle })} variant="secondary" onPress={open} />
+        </>
+      )}
+      <Dialog
+        visible={asking}
+        title={t('block.title', { handle })}
+        // Les quatre phrases du blocage (J9), chacune son paragraphe.
+        message={[
+          t('block.hidden'),
+          t('block.follows'),
+          t('block.notTold', { handle }),
+          t('block.notModeration'),
+        ].join('\n\n')}
+        onDismiss={close}
+        onClosed={() => {
+          if (!focusAfterClose.current) return
+          focusAfterClose.current = false
+          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
+          requestAnimationFrame(() => focusWithoutScroll(doneRef.current))
+        }}
+      >
+        {/* Refusé : le message reste dans la fenêtre, et « Bloquer » permet de réessayer. */}
+        {failureMessage ? (
+          <Notice
+            message={failureMessage}
+            action={failure === 'unauthorized' ? signInAgain(() => setAsking(false)) : undefined}
+          />
+        ) : null}
+        <Button
+          label={t('block.confirm')}
+          variant="confirm"
+          onPress={() => void confirm()}
+          loading={blocking}
+        />
+        <Button label={t('block.cancel')} variant="secondary" onPress={close} disabled={blocking} />
+      </Dialog>
+    </>
   )
 }

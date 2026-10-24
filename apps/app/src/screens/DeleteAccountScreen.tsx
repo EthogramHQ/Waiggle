@@ -103,6 +103,13 @@ export function DeleteAccountScreen() {
           label={t('account.delete.notificationsItem')}
           detail={t('account.delete.notificationsDetail')}
         />
+        {/* Tranche 7b : ses blocages partent avec lui, et ceux qui le visaient aussi (une ligne
+            de la base relie toujours deux comptes : sans l'un, elle n'a plus de sens). */}
+        <ListRow
+          icon="prohibit"
+          label={t('account.delete.blocksItem')}
+          detail={t('account.delete.blocksDetail')}
+        />
       </ListGroup>
 
       {/* Tranche 7a (règle 24 de la relecture du plan) : ce qui ne part pas tout de suite. Ses
@@ -110,6 +117,9 @@ export function DeleteAccountScreen() {
       <ListGroup title={t('account.delete.remains.title')}>
         <ListRow icon="flag" label={t('account.delete.remains.reports')} />
         <ListRow icon="clock" label={t('account.delete.remains.removals')} />
+        {/* Tranche 7b (relecture juridique du plan, J11) : la copie des textes signalés, gardée
+            pour que la modération puisse décider. Au conditionnel : l'écran s'affiche pour tous. */}
+        <ListRow icon="note-pencil" label={t('account.delete.remains.reportCopies')} />
       </ListGroup>
 
       {/* Deux étapes, dans l'ordre : on garde d'abord une copie, puis on confirme. */}
