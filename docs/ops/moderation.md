@@ -33,8 +33,10 @@ ssh waiggle '/srv/ruche/repo/infra/grant-admin.sh louis@example.com --revoke'   
 ## 2. Traiter la file
 
 L'écran « Modération » montre les cibles signalées, de la plus ancienne à la plus récente, avec
-les motifs comptés, les précisions des membres et le texte **au moment du signalement** (les
-images, elles, sont celles d'aujourd'hui). Il ne dit jamais qui a signalé.
+les motifs comptés, les précisions des membres et la copie **au moment du signalement** : chaque
+texte, champ par champ (titre, pitch, bio…). Les images ne sont pas copiées : la copie garde leur
+nom de fichier, et la file dit « même image », « changée » ou « supprimée depuis » (tranche 7b). Il
+ne dit jamais qui a signalé. Les blocages entre membres n'y changent rien (section 8).
 
 Pour chaque cible, trois décisions :
 
@@ -103,6 +105,9 @@ européen sur les services numériques, DSA).
 - **Signaler à Pharos** (<https://www.internet-signalement.gouv.fr>), avec l'adresse de la page.
 - **Retirer** le contenu dans l'appli, fondement « la loi ». Ne pas supprimer le compte ni les
   données soi-même : les enquêteurs peuvent en avoir besoin. La décision reste comme trace.
+- **Ne rien restaurer** : une image supprimée depuis le signalement ne reste que dans les
+  sauvegardes (14 jours). Ne jamais la rechercher ni la restaurer pour la voir : Pharos et les
+  enquêteurs savent la demander.
 
 ### Une photo ou un pseudo illicite sur un profil
 
@@ -170,4 +175,35 @@ La purge de nuit (`apps/api/src/reports/retention.ts`) applique ces durées :
 | Décision | un an après la dernière décision sur la même cible, et tant que le contenu reste retiré |
 | Signalements faits par un compte supprimé | gardés, sans son nom, jusqu'à leur terme |
 | Rôle d'administrateur révoqué | gardé (historique), effacé avec le compte |
+| Blocage entre deux membres | jusqu'au déblocage (la ligne s'efface, sans historique) ou à la suppression d'un des deux comptes |
+
+## 8. Les blocages
+
+Un membre peut en bloquer un autre (tranche 7b) : aucun des deux ne voit plus les contenus de
+l'autre (projets, notes, commentaires, réactions, notifications, suggestions après « @ »), et ils
+ne peuvent plus interagir. La personne bloquée n'est pas prévenue.
+
+- **Un blocage ne sert qu'à cacher.** Il ne prévient pas la modération, ne compte nulle part et
+  ne dit rien du comportement de la personne bloquée. Un membre qui veut qu'on agisse doit
+  signaler ; l'appli le lui dit avant de bloquer.
+- **La modération ignore les blocages.** La file, la copie et les décisions sont les mêmes, que
+  l'auteur visé ait bloqué l'administrateur ou non : sinon, bloquer l'administrateur ferait
+  échapper à la modération. Un seul effet : le lien « Voir » d'une cible peut répondre
+  « introuvable ». Cela veut dire que **l'auteur a bloqué l'administrateur** ; la copie complète
+  de la file suffit à décider.
+- **« Te concerne »** apparaît aussi quand l'administrateur a lui-même bloqué l'auteur visé : mieux
+  vaut alors laisser un autre administrateur trancher, comme pour son propre contenu (section 2).
+  L'inverse (l'auteur a bloqué l'administrateur) ne change rien.
+- **Ce que le blocage ne garantit pas** (à dire si un membre demande) :
+  - **la confidentialité** : ce qui est public reste lisible par la personne bloquée si elle se
+    déconnecte, prend un autre compte, ou si celle qui a bloqué débloque, lit, puis rebloque. Pour
+    cacher un projet, il faut le rendre privé ;
+  - **le secret du blocage** : il reste devinable (une page qui répond « introuvable », des
+    abonnements qui disparaissent). La seule promesse est qu'aucun avis ne part, et que la page
+    répond comme celle d'un membre inconnu ;
+  - **un mur instantané** : un commentaire ou une réaction écrit pendant qu'un blocage se pose est
+    rattrapé à la lecture (il n'est pas montré), pas refusé à l'écriture.
+- **Les données** : l'export de « Mon compte » contient les blocages que le membre a posés (pseudo
+  et date), jamais ceux qui le visent. Supprimer un compte efface les blocages qu'il a posés et
+  ceux qui le visaient.
 | Date de la dernière alerte d'un administrateur (`admin_member.alerted_at`) | tant que le rôle existe |

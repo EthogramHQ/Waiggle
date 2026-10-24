@@ -5,9 +5,11 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { MemberId, ProjectId } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, type SQL, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
+import { notBlockedWith } from '../blocks/visibility'
+import { blockedPair, lockPair } from '../blocks/write'
 import { errorBody, languageOf } from '../errors'
 import { visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
@@ -108,6 +110,48 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     return decision.allowed ? null : decision.retryAfterSeconds
   }
 
+  /**
+   * Écrit un abonnement, sauf s'il existe un blocage entre moi et l'autre membre (règle 5 de la
+   * relecture du plan 7b). Renvoie false s'il y en a un : la route répond alors « introuvable ».
+   *
+   * Tout se passe dans une transaction, sous le verrou de la paire (blocks/write.ts, `lockPair`),
+   * que bloquer prend aussi : un blocage en cours finit avant que le suivi ne relise quoi que ce
+   * soit, et un blocage qui arrive ensuite attend la fin du suivi, puis efface l'abonnement.
+   *
+   * L'écriture : « insert … select … where not exists (blocage) on conflict do nothing returning ».
+   * Le `select` sans `from` fabrique une seule ligne (moi, la cible, la date) ; le `where` la garde
+   * seulement s'il n'y a aucun blocage (deux `exists`, chacun servi par un index de member_block) ;
+   * `on conflict do nothing` : déjà suivi, PostgreSQL n'écrit rien et ne lève pas d'erreur, et
+   * suivre deux fois revient à suivre une fois. `returning` dit si une ligne a été écrite. Sinon,
+   * deux raisons possibles, que l'on départage par une dernière lecture, sous le même verrou :
+   * déjà suivi (c'est fait : 204), ou bloqués (404).
+   */
+  const followUnlessBlocked = ({
+    viewerId,
+    otherMemberId,
+    insert,
+  }: {
+    viewerId: string
+    otherMemberId: string
+    insert: (now: SQL) => SQL
+  }): Promise<boolean> =>
+    db.transaction(async (tx) => {
+      await lockPair(tx, viewerId, otherMemberId)
+      // La date passe par la colonne (sql.param), comme dans cursor.ts : jamais écrite dans le
+      // texte SQL, et toujours en heure UTC.
+      const now = sql`${sql.param(new Date(), schema.memberFollow.createdAt)}::timestamp`
+      const result = await tx.execute(
+        sql`${insert(now)} where ${notBlockedWith(viewerId, sql`${otherMemberId}`)}
+          on conflict do nothing returning follower_id`,
+      )
+      // Les lignes d'un `execute` brut ne sont pas typées : Zod les vérifie.
+      const { rows } = z
+        .object({ rows: z.array(z.object({ follower_id: z.string() })) })
+        .parse(result)
+      if (rows.length > 0) return true
+      return !(await blockedPair(tx, viewerId, otherMemberId))
+    })
+
   app.openapi(followMemberRoute, async (c) => {
     const viewer = c.get('user')
     if (!viewer) return unauthorized(c)
@@ -118,24 +162,34 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     // Un identifiant mal formé ne peut désigner personne : « introuvable », sans interroger la base.
     if (!MemberId.safeParse(id).success) return notFound(c)
     if (id === viewer.id) return ownThing(c)
-    // Seulement un compte vérifié (comme sa page) ; un compte supprimé n'a plus de ligne.
+    // Seulement un compte vérifié (comme sa page) ; un compte supprimé n'a plus de ligne. Un membre
+    // bloqué avec moi, dans un sens ou dans l'autre (tranche 7b) : « introuvable » aussi, comme
+    // un inconnu.
     const [member] = await db
       .select({ id: schema.user.id })
       .from(schema.user)
-      .where(and(eq(schema.user.id, id), eq(schema.user.emailVerified, true)))
+      .where(
+        and(
+          eq(schema.user.id, id),
+          eq(schema.user.emailVerified, true),
+          // L'identifiant passé comme valeur (paramètre lié), pas comme colonne : PostgreSQL lit
+          // alors chaque `exists` une seule fois, par la clé primaire de member_block, au lieu de
+          // ranger dans une table de hachage tous les blocages du visiteur.
+          notBlockedWith(viewer.id, sql`${id}`),
+        ),
+      )
     if (!member) return notFound(c)
 
-    // « insert … on conflict do nothing » : si la ligne existe déjà (même clé primaire, donc déjà
-    // suivi), PostgreSQL n'écrit rien et ne lève pas d'erreur. Suivre deux fois revient ainsi à
-    // suivre une fois, même si deux demandes arrivent en même temps.
     // La date vient de l'horloge de JavaScript, pas de la valeur par défaut de la base (now() en
     // SQL) : elle date la notification « de nouveaux abonnés » (tranche 6b), et les tests la
     // maîtrisent ainsi.
-    await db
-      .insert(schema.memberFollow)
-      .values({ followerId: viewer.id, memberId: id, createdAt: new Date() })
-      .onConflictDoNothing()
-    return ok(c)
+    const followed = await followUnlessBlocked({
+      viewerId: viewer.id,
+      otherMemberId: id,
+      insert: (now) => sql`insert into ${schema.memberFollow} (follower_id, member_id, created_at)
+        select ${viewer.id}, ${id}, ${now}`,
+    })
+    return followed ? ok(c) : notFound(c)
   })
 
   app.openapi(unfollowMemberRoute, async (c) => {
@@ -174,11 +228,14 @@ export const followRoutes = ({ db, limiter }: Deps) => {
     if (!project) return notFound(c)
     if (project.authorId === viewer.id) return ownThing(c)
 
-    await db
-      .insert(schema.projectFollow)
-      .values({ followerId: viewer.id, projectId: id, createdAt: new Date() })
-      .onConflictDoNothing()
-    return ok(c)
+    // Le verrou et le blocage portent sur la paire « moi et l'auteur du projet ».
+    const followed = await followUnlessBlocked({
+      viewerId: viewer.id,
+      otherMemberId: project.authorId,
+      insert: (now) => sql`insert into ${schema.projectFollow} (follower_id, project_id, created_at)
+        select ${viewer.id}, ${id}::uuid, ${now}`,
+    })
+    return followed ? ok(c) : notFound(c)
   })
 
   app.openapi(unfollowProjectRoute, async (c) => {
