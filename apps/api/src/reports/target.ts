@@ -21,7 +21,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
 
 import { type Blocks, blocksOf } from '../blocks/visibility'
-import { sees, type Viewer, viewerOf } from '../comments/load'
+import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { projectVisibleTo } from '../projects/visibility'
@@ -65,23 +65,6 @@ const filled = (field: MemberInputField, value: string | null | undefined): Repo
  */
 const imageField = (media: { slot: string; position: number }): MemberInputField =>
   media.slot === 'portrait' || media.position === 0 ? 'cover' : 'photo'
-
-/**
- * Le blocage laisse-t-il ce membre lire ce commentaire ? Après les règles de `sees` (masqué,
- * retiré, projet privé), qui restent celles de comments/load.ts :
- * - le sien : toujours ;
- * - règle 1 (B1) : l'auteur du projet garde la modération de son espace, quel que soit le blocage ;
- * - je l'ai bloqué (un double blocage se lit ainsi) : non ;
- * - règle 2 (B2) : il m'a bloqué, seulement si le commentaire me mentionne (écrit avant le blocage :
- *   la victime peut encore le signaler) ;
- * - aucun blocage : oui.
- */
-const blockLetsSee = (authorId: string, viewer: Viewer, blocks: Blocks, mentionsMe: boolean) => {
-  if (authorId === viewer.id || viewer.isProjectAuthor) return true
-  if (blocks.byMe.has(authorId)) return false
-  if (blocks.ofMe.has(authorId)) return mentionsMe
-  return true
-}
 
 /**
  * Le nom et le pseudo actuel de l'auteur, pour l'aperçu (une requête par la clé primaire de user,
@@ -193,8 +176,10 @@ const loadVisible = async (
     }
     case 'comment': {
       // Un commentaire se voit sur un projet visible, s'il n'est ni supprimé, ni masqué (sauf pour
-      // son auteur et l'auteur du projet : `sees`, la règle unique de comments/load.ts), ni retiré
-      // (sauf pour son auteur, règle 1 de 7a), ni caché par un blocage (blockLetsSee).
+      // son auteur et l'auteur du projet), ni retiré (sauf pour son auteur, règle 1 de 7a), ni
+      // caché par un blocage : tout cela est `sees`, la règle unique de comments/load.ts, blocages
+      // compris (tranche 7b : l'auteur du projet lit tout chez lui, règle 1 ; un commentaire qui me
+      // mentionne reste lisible si c'est son auteur qui m'a bloqué, règle 2).
       // `mentionsMe` : « exists (select 1 …) » est vrai dès qu'une ligne existe ; la clé primaire
       // de comment_mention (comment_id, member_id) y répond sans rien lire d'autre.
       const cm = schema.commentMention
@@ -214,15 +199,19 @@ const loadVisible = async (
         .innerJoin(p, eq(p.id, c.projectId))
         .where(and(eq(c.id, target.id), isNull(c.deletedAt), projectVisibleTo(viewerId)))
       if (!row || row.authorId === null) return null
-      // `viewerOf` traite un projet retiré comme privé : il lui faut donc sa date de retrait.
-      const viewer = viewerOf(viewerId, {
-        authorId: row.projectAuthorId,
-        visibility: row.visibility,
-        removedAt: row.projectRemovedAt,
-      })
-      if (!sees(row, viewer)) return null
+      // `viewerOf` traite un projet retiré comme privé : il lui faut donc sa date de retrait. Ses
+      // blocages (lus plus haut par blocksOf) et `mentionsViewer` donnent à `sees` les règles 1 et 2.
+      const viewer = viewerOf(
+        viewerId,
+        {
+          authorId: row.projectAuthorId,
+          visibility: row.visibility,
+          removedAt: row.projectRemovedAt,
+        },
+        blocks,
+      )
+      if (!sees({ ...row, mentionsViewer: row.mentionsMe }, viewer)) return null
       if (row.removedAt !== null && row.authorId !== viewerId) return null
-      if (!blockLetsSee(row.authorId, viewer, blocks, row.mentionsMe)) return null
       return {
         authorId: row.authorId,
         projectId: row.projectId,
