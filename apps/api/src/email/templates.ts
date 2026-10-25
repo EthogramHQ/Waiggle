@@ -229,6 +229,89 @@ export const existingAccountEmail = (
   }
 }
 
+// ─── Changer son adresse (tranche « adresse ») ──────────────────────────────────────────────────
+// Trois e-mails de service, sans publicité ni lien de désinscription : ils partent parce que le
+// membre l'a demandé, et ne disent que ce qu'il faut pour finir (ou arrêter) son changement.
+//
+// La nouvelle adresse s'écrit seule sur sa ligne, telle que saisie, pour qu'une faute de frappe
+// saute aux yeux (relecture de sécurité S10). Elle ne passe pas par defangLinks : le membre doit
+// reconnaître son adresse, pas lire « [lien] ». Le contrat (ChangeEmailRequest, z.email) n'y laisse
+// que des lettres ASCII, des chiffres et « . _ ' + - » ; render() l'échappe dans le HTML, comme
+// tout texte (l'apostrophe devient &#39;).
+
+/**
+ * Le premier e-mail, vers l'adresse ACTUELLE : « tu as demandé à la remplacer par celle-ci ;
+ * confirme ». Le bouton mène au premier lien (GET /api/auth/verify-email).
+ */
+export const changeEmailConfirmationEmail = (
+  language: Language,
+  { name, newEmail, url }: { name: string; newEmail: string; url: string },
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.changeEmail.subject),
+    ...render({
+      language,
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
+      paragraphs: [
+        fill(t.changeEmail.body),
+        newEmail,
+        fill(t.changeEmail.next),
+        fill(t.changeEmail.expires),
+      ],
+      button: { label: fill(t.changeEmail.button), url },
+      notes: [fill(t.changeEmail.ignore)],
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+/**
+ * Le deuxième e-mail, vers la NOUVELLE adresse, pour la vérifier. Une faute de frappe l'enverrait
+ * chez un inconnu (relecture de sécurité S6) : la salutation est neutre, sans le nom du membre, et
+ * aucune adresse n'y est écrite, ni l'ancienne ni celle-ci (seule celle du contact, dans le pied).
+ */
+export const newEmailVerificationEmail = (
+  language: Language,
+  { url }: { url: string },
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.newEmail.subject),
+    ...render({
+      language,
+      greeting: fill(t.newEmail.greeting),
+      paragraphs: [fill(t.newEmail.body), fill(t.newEmail.expires)],
+      button: { label: fill(t.newEmail.button), url },
+      notes: [fill(t.newEmail.ignore)],
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+/**
+ * Le dernier e-mail, vers l'ANCIENNE adresse, une fois le changement fait : il cite la nouvelle,
+ * pour qu'un changement fait par quelqu'un d'autre ne passe pas inaperçu, et propose de se
+ * connecter (bouton vers la page de connexion de l'appli).
+ */
+export const emailChangedEmail = (
+  language: Language,
+  { name, newEmail, signInUrl }: { name: string; newEmail: string; signInUrl: string },
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.emailChanged.subject),
+    ...render({
+      language,
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
+      paragraphs: [fill(t.emailChanged.body), newEmail, fill(t.emailChanged.after)],
+      button: { label: fill(t.emailChanged.button), url: signInUrl },
+      notes: [fill(t.emailChanged.help)],
+      footer: fill(t.footer),
+    }),
+  }
+}
+
 // ─── Les e-mails de notification (tranche 6c) ───────────────────────────────────────────────────
 
 /** Les adresses d'un e-mail de notification, toutes chez nous (appli ou API). */
