@@ -140,8 +140,9 @@ export const fr = {
     loadError: 'Impossible de charger ton compte. Vérifie ta connexion et réessaie.',
     email: {
       label: 'Adresse e-mail',
-      soon: 'modifiable bientôt',
       change: 'Changer d’adresse e-mail',
+      // Le nom lu de la ligne : l'action, puis l'adresse affichée (sinon le lecteur d'écran la tait).
+      spoken: 'Changer d’adresse e-mail : {{email}}',
     },
     // Tranche « adresse » : la page où l'on demande le changement (deux liens à suivre).
     changeEmail: {

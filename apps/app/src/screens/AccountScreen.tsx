@@ -182,12 +182,13 @@ export function AccountScreen() {
 
       <ListGroup title={t('account.section.title')}>
         {/* Tranche « adresse » : la ligne mène à la page qui change l'adresse. Elle montre
-            l'adresse actuelle ; son nom lu dit l'action (« Changer d'adresse e-mail »), et contient
-            le libellé affiché (relecture juridique du plan, J9). */}
+            l'adresse actuelle ; son nom lu dit l'action puis l'adresse (« Changer d'adresse
+            e-mail : … »), car un nom lu remplace le détail affiché (relecture juridique du
+            plan, J9). */}
         <ListRow
           label={t('account.email.label')}
           detail={data.user.email}
-          spokenLabel={t('account.email.change')}
+          spokenLabel={t('account.email.spoken', { email: data.user.email })}
           trailing="chevron"
           onPress={() => router.push('/account/email')}
         />

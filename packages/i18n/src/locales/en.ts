@@ -126,8 +126,8 @@ export const en: Translation = {
     loadError: 'Your account could not be loaded. Check your connection and try again.',
     email: {
       label: 'Email address',
-      soon: 'editable soon',
       change: 'Change email address',
+      spoken: 'Change email address: {{email}}',
     },
     changeEmail: {
       title: 'Change email address',
