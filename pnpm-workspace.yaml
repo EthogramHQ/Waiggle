@@ -47,12 +47,9 @@ auditConfig:
     # node-forge, via l'outil en ligne de commande d'Expo (certificats du serveur de développement).
     # Absent de l'appli et de l'API ; pas encore de correctif.
     - GHSA-86w9-cpqp-85rv
-    # braces, via Jest (recherche de nos propres fichiers de test). Outil de test seulement ; pas encore
-    # de correctif.
-    - GHSA-vfj7-8cjw-p6xm
-    # sprintf-js, via la couverture de code de Jest (js-yaml 3 lit nos propres fichiers de
-    # configuration). Outil de test seulement ; pas encore de correctif.
-    - GHSA-hp3w-g68c-fv3c
+    # (Les exceptions de braces, GHSA-vfj7-8cjw-p6xm, et de sprintf-js, GHSA-hp3w-g68c-fv3c, sont
+    # retirées le 25/10/2026 : GitHub a retiré ces deux avis les 22 et 23/10. Une exception qui ne
+    # sert plus cacherait l'avis s'il revenait.)
     # decode-uri-component <= 0.4.2, via query-string 7 dans expo-router : présent dans l'appli web. Un
     # lien piégé peut figer l'onglet de la personne qui l'ouvre (rien côté serveur, aucune donnée
     # exposée). La version corrigée 0.5.0 n'existe qu'en module ESM, que query-string 7 charge avec
