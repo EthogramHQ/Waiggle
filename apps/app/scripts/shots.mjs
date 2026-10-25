@@ -144,7 +144,7 @@ const session = {
 // lea.moreau@exemple.fr), et un mot de passe que l'API simulée refuse, comme la vraie
 // (INVALID_PASSWORD). Après le second lien, la page « Adresse changée » lit la nouvelle adresse
 // dans la session, jamais dans l'URL : `email: 'changed'` (option d'une page) la donne à la session
-// et au profil. Pages à déclarer avec l'interface (noms proposés) :
+// et au profil. Les pages, déclarées avec les autres pages du compte :
 //   - changer-adresse : /account/email, connectée ;
 //   - changer-adresse-envoye : la même, `prepare` remplit changeEmailShot et touche « Envoyer le
 //     lien », puis attend « Regarde ta boîte mail actuelle » ;
@@ -1004,6 +1004,41 @@ const pages = [
   },
   { name: 'compte', path: '/account', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
+  // Tranche « adresse » : la page qui change l'adresse, la demande partie (le premier lien vers
+  // l'adresse actuelle), un mot de passe refusé ; puis les pages des deux liens.
+  { name: 'changer-adresse', path: '/account/email', signedIn: true, fullPage: true },
+  {
+    name: 'changer-adresse-envoye',
+    path: '/account/email',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Confirme avec ton mot de passe').fill(changeEmailShot.password)
+      await page.getByRole('button', { name: 'Envoyer le lien' }).click()
+      await page.getByText('Regarde ta boîte mail actuelle').waitFor()
+    },
+  },
+  {
+    name: 'changer-adresse-erreur',
+    path: '/account/email',
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Confirme avec ton mot de passe').fill(wrongPasswordShot)
+      await page.getByRole('button', { name: 'Envoyer le lien' }).click()
+      await page.getByText('Mot de passe incorrect.').waitFor()
+    },
+  },
+  { name: 'adresse-confirmee', path: '/email-change/confirmed', signedIn: false },
+  { name: 'adresse-changee', path: '/email-change/done', signedIn: true, email: 'changed' },
+  { name: 'adresse-changee-deconnecte', path: '/email-change/done', signedIn: false },
+  {
+    name: 'adresse-lien-refuse',
+    path: '/email-change/done?error=INVALID_TOKEN',
+    signedIn: false,
+  },
   { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
   // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
   {

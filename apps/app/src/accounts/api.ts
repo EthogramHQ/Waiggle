@@ -2,7 +2,7 @@
 // Les écrans n'appellent que ces fonctions : ils ne connaissent ni Better Auth, ni l'adresse de
 // l'API. Avantage : dans les tests, on remplace ce fichier par de faux appels (jest.mock).
 import { appName } from '@ruche/brand'
-import type { SignInRequest, SignUpRequest } from '@ruche/contracts'
+import type { ChangeEmailRequest, SignInRequest, SignUpRequest } from '@ruche/contracts'
 import { Platform, Share } from 'react-native'
 import { apiFetch } from '../api/client'
 import { queryClient } from '../api/query-client'
@@ -66,6 +66,28 @@ export const deleteAccount = async (
   }
   if (error.code === 'INVALID_PASSWORD') return { ok: false, error: 'wrongPassword' }
   return toResult(error)
+}
+
+/**
+ * Demande à changer l'adresse du compte (tranche « adresse », POST /api/auth/change-email).
+ * Rien ne change tout de suite : le serveur envoie un premier lien à l'adresse ACTUELLE, qui doit
+ * donner son accord, puis un second à la nouvelle. Le mot de passe est exigé (contrat
+ * ChangeEmailRequest) : une session ouverte sur un téléphone trouvé ne suffit pas.
+ *
+ * On passe par `$fetch`, l'appel brut du client Better Auth : sa méthode `changeEmail` ne connaît
+ * pas le mot de passe, que notre serveur ajoute à la route. L'adresse où mènent les liens
+ * (callbackURL) est imposée par le serveur : l'appli n'en envoie pas.
+ */
+export const changeEmail = async (
+  input: ChangeEmailRequest,
+): Promise<Result<'wrongPassword' | 'sameEmail' | AuthErrorKey>> => {
+  try {
+    const { error } = await authClient.$fetch('/change-email', { method: 'POST', body: input })
+    return toResult(error)
+  } catch {
+    // Serveur injoignable : l'appel échoue au lieu de répondre. L'écran ne reste pas « occupé ».
+    return { ok: false, error: 'generic' }
+  }
 }
 
 /**

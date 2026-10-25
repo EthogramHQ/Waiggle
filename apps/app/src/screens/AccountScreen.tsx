@@ -20,7 +20,6 @@ import { useChooseLanguage } from '../profile/useChooseLanguage'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import type { IconName } from '../ui/Icon'
-import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
@@ -76,7 +75,16 @@ export function AccountScreen() {
   }
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('account.title')}>
+    <Screen
+      header={<TopNav />}
+      onBack={back}
+      title={t('account.title')}
+      // Le profil ne se charge pas (réseau en panne) : la page le dit en tête, au lieu de rester
+      // muette, et tout le reste (langue, déconnexion…) reste utilisable. Seulement sans profil
+      // déjà là : une relecture ratée garde ce qui est affiché. React Query relira de lui-même
+      // au retour du réseau.
+      notice={me.isError && !me.data ? <Notice message={t('account.loadError')} /> : undefined}
+    >
       {/* Qui est connecté, et le chemin vers son profil. */}
       <Surface variant="grouped" padding="lg">
         <Row gap="md">
@@ -173,17 +181,15 @@ export function AccountScreen() {
       </ListGroup>
 
       <ListGroup title={t('account.section.title')}>
+        {/* Tranche « adresse » : la ligne mène à la page qui change l'adresse. Elle montre
+            l'adresse actuelle ; son nom lu dit l'action (« Changer d'adresse e-mail »), et contient
+            le libellé affiché (relecture juridique du plan, J9). */}
         <ListRow
           label={t('account.email.label')}
           detail={data.user.email}
-          trailing={
-            <Row gap="xs">
-              <Icon name="lock-simple" size={14} tone="accent" />
-              <Text variant="caption" weight={600} tone="accent">
-                {t('account.email.soon')}
-              </Text>
-            </Row>
-          }
+          spokenLabel={t('account.email.change')}
+          trailing="chevron"
+          onPress={() => router.push('/account/email')}
         />
         <ListRow
           label={t('account.signOut')}

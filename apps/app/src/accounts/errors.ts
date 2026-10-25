@@ -9,6 +9,10 @@ export type AuthErrorKey =
   | 'passwordTooLong'
   | 'invalidEmail'
   | 'inviteInvalid'
+  // Tranche « adresse » : le mot de passe demandé pour changer d'adresse (ou supprimer le compte)
+  // est faux ; la nouvelle adresse est déjà celle du compte.
+  | 'wrongPassword'
+  | 'sameEmail'
   | 'generic'
 
 // Correspondance code Better Auth → clé de message. Record<string, …> : un dictionnaire.
@@ -20,6 +24,9 @@ const byCode: Record<string, AuthErrorKey> = {
   INVALID_EMAIL: 'invalidEmail',
   // Code d'invitation faux ou absent (apps/api/src/auth/auth.ts).
   INVITE_CODE_INVALID: 'inviteInvalid',
+  // Changer d'adresse (POST /api/auth/change-email, contrat ChangeEmailRequest).
+  INVALID_PASSWORD: 'wrongPassword',
+  SAME_EMAIL: 'sameEmail',
 }
 
 export const authErrorKey = ({
