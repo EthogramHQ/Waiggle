@@ -33,6 +33,75 @@ import { type Language, resources } from '@ruche/i18n'
 const ADDRESS =
   /[a-z][a-z0-9+.-]*:\/\/\S+|(?<![\p{L}\p{N}])(?:[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}])?\.)+\p{L}[\p{L}\p{M}\p{N}-]*[\p{L}\p{M}\p{N}](?:\/[^\s]*)?/giu
 
+/**
+ * Les extensions de fichier qui ne sont pas des domaines de premier niveau (audit de sécurité du
+ * 25/10/2026, C13 ; liste blanche, décision de Louis) : sans elle, « Node.js », « Vue.js » ou
+ * « fichier.txt » devenaient « [lien] » dans les e-mails. Chacune a été cherchée dans la liste
+ * officielle des domaines de premier niveau de l'IANA
+ * (https://data.iana.org/TLD/tlds-alpha-by-domain.txt, version 2026102500, lue le 25/10/2026) :
+ * aucune n'y figure. Celles qui y figurent restent neutralisées, c'est voulu : « md » (Moldavie,
+ * donc « README.md »), « py », « sh », « rs », « io », « net », « zip », « java ».
+ * Avant d'ajouter une extension, la chercher dans cette liste ; l'ICANN ouvre de nouveaux domaines
+ * par vagues (la dernière en 2026) : relire la liste à chaque vague.
+ */
+const FILE_EXTENSIONS = new Set([
+  // JavaScript et TypeScript
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'ts',
+  'tsx',
+  'vue',
+  'svelte',
+  // Données et configuration
+  'txt',
+  'json',
+  'jsonl',
+  'csv',
+  'yml',
+  'yaml',
+  'toml',
+  'xml',
+  'sql',
+  'ipynb',
+  // Pages et styles
+  'html',
+  'htm',
+  'css',
+  'scss',
+  // Documents, images et sons
+  'pdf',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'mp3',
+  'mp4',
+  'wav',
+])
+
+/**
+ * Vrai si le nom trouvé est un simple nom de fichier : un seul point, sans protocole, sans chemin,
+ * sans « www. », et une extension de la liste blanche. Un seul point, parce que « evil.com.js » ou
+ * « login.evil.json » contiennent peut-être un vrai domaine qu'une messagerie rendrait cliquable ;
+ * « jquery.min.js » devient donc « [lien] » aussi, on préfère neutraliser un nom de trop. `found`
+ * est le texte tel qu'un navigateur le lit (readAs) : « www․evil․js » y est déjà « www.evil.js ».
+ */
+const isFileName = (found: string) => {
+  const parts = found.toLowerCase().split('.')
+  const extension = parts[1]
+  return (
+    parts.length === 2 &&
+    extension !== undefined &&
+    !found.includes('/') &&
+    parts[0] !== 'www' &&
+    FILE_EXTENSIONS.has(extension)
+  )
+}
+
 /** Les points que les navigateurs lisent comme « . » dans une adresse : 。 ． ｡ ․ */
 const DOT_LOOKALIKES = /[。．｡․]/gu
 
@@ -105,6 +174,8 @@ export const defangLinks = (text: string, placeholder: string = linkPlaceholder(
     const start = owner[match.index]
     const end = owner[match.index + match[0].length - 1]
     if (start === undefined || end === undefined) continue
+    // Un nom de fichier (« Node.js ») reste tel qu'écrit : le reste du texte le reprendra (keep).
+    if (isFileName(match[0])) continue
     // Un caractère écrit qui donne plusieurs caractères lus (« ㏂ » donne « a.m. ») est remplacé en
     // entier s'il touche une adresse ; une adresse qui commence dans ce même caractère est déjà
     // remplacée avec lui.

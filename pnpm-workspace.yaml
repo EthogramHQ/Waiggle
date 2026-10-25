@@ -12,6 +12,25 @@ ignoredBuiltDependencies:
   - '@parcel/watcher'
   - unrs-resolver
 
+# Protections de la chaîne d'approvisionnement (audit de sécurité du 25/10/2026, C8). Le risque :
+# un compte de mainteneur volé publie une version piégée d'un paquet connu ; elle est repérée et
+# retirée du registre en quelques heures, mais toute installation faite entre-temps l'a prise.
+# Ces trois réglages existent dans pnpm 10.28.0 (celui de packageManager). Ils jouent quand pnpm
+# choisit une version (ajout, mise à jour) ; `pnpm install --frozen-lockfile` (la CI, le serveur)
+# reprend les versions déjà notées dans pnpm-lock.yaml sans les rechoisir.
+#
+# Âge minimum d'une version avant que pnpm accepte de l'installer, en minutes : 7 jours
+# (7 × 24 × 60). Une version piégée a presque toujours été retirée avant.
+minimumReleaseAge: 10080
+# Une dépendance indirecte ne peut pas venir d'ailleurs que du registre (dépôt Git, archive à une
+# adresse quelconque) : une telle source échappe aux vérifications du registre et peut changer sans
+# changer de numéro de version.
+blockExoticSubdeps: true
+# Refuse une version publiée avec moins de garanties que les précédentes : si un paquet était publié
+# par sa CI avec une preuve de provenance et qu'une nouvelle version arrive sans (publiée à la main,
+# depuis un compte peut-être volé), pnpm refuse de l'installer.
+trustPolicy: no-downgrade
+
 # Versions imposées à une dépendance indirecte, pour un correctif de sécurité que son parent n'a pas
 # encore adopté. Chacune est vérifiée (tests, migrations, captures) et retirée dès que le parent suit.
 overrides:
@@ -28,12 +47,9 @@ auditConfig:
     # node-forge, via l'outil en ligne de commande d'Expo (certificats du serveur de développement).
     # Absent de l'appli et de l'API ; pas encore de correctif.
     - GHSA-86w9-cpqp-85rv
-    # braces, via Jest (recherche de nos propres fichiers de test). Outil de test seulement ; pas encore
-    # de correctif.
-    - GHSA-vfj7-8cjw-p6xm
-    # sprintf-js, via la couverture de code de Jest (js-yaml 3 lit nos propres fichiers de
-    # configuration). Outil de test seulement ; pas encore de correctif.
-    - GHSA-hp3w-g68c-fv3c
+    # (Les exceptions de braces, GHSA-vfj7-8cjw-p6xm, et de sprintf-js, GHSA-hp3w-g68c-fv3c, sont
+    # retirées le 25/10/2026 : GitHub a retiré ces deux avis les 22 et 23/10. Une exception qui ne
+    # sert plus cacherait l'avis s'il revenait.)
     # decode-uri-component <= 0.4.2, via query-string 7 dans expo-router : présent dans l'appli web. Un
     # lien piégé peut figer l'onglet de la personne qui l'ouvre (rien côté serveur, aucune donnée
     # exposée). La version corrigée 0.5.0 n'existe qu'en module ESM, que query-string 7 charge avec

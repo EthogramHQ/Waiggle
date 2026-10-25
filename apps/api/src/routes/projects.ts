@@ -111,11 +111,33 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   // son auteur reçoit cette réponse : pour les autres, un projet retiré est introuvable (404).
   const removed = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'removed'), 409)
 
-  app.openapi(createProjectRoute, async (c) => {
+  // Les quotas comptent AVANT de lire le corps de la demande (audit de sécurité du 25/10/2026, C7,
+  // comme routes/notes.ts). Le corps déclaré dans une route OpenAPI est vérifié par un middleware
+  // que Hono place juste avant elle : un garde enregistré plus tôt, pour la même adresse et la même
+  // méthode, passe donc avant lui. Ainsi chaque demande compte, même mal écrite : sinon, des
+  // demandes invalides feraient travailler le serveur (lecture du JSON, schéma Zod) sans fin.
+  app.on('POST', '/v1/projects', async (c, next) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
     const decision = await limiter.hit(memberCounterKeys(user.id).projectCreate, createRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    await next()
+  })
+
+  // Modifier un projet : même garde, même quota que sa suppression et celle de ses photos. Les
+  // droits restent vérifiés par la route, après le schéma, comme avant.
+  app.on('PATCH', '/v1/projects/:id', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    await next()
+  })
+
+  app.openapi(createProjectRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    // Le garde ci-dessus a déjà compté la demande dans le quota du jour.
 
     const input = c.req.valid('json')
     // L'identifiant est tiré par le serveur ; l'auteur est le membre connecté, jamais une donnée
@@ -155,8 +177,7 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   app.openapi(updateProjectRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
-    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
-    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    // Le garde ci-dessus a déjà compté la demande dans le quota de l'heure.
 
     const { id } = c.req.valid('param')
     // Sinon : « introuvable » s'il ne le voit pas (projet privé ou retiré d'un autre, ou

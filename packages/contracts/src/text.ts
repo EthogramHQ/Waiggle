@@ -60,9 +60,14 @@ const isForbidden = (code: number) =>
 // Caractères qui ne dessinent rien à eux seuls : espaces, liants, variantes d'emoji, sélecteurs
 // mongols, et les « marques » (\p{M} : accents et signes qui se posent sur la lettre d'avant, comme
 // U+0301 ; seuls, ils ne montrent rien de lisible). U+FFFC est l'emplacement d'un objet absent.
+// Enfin, \p{Default_Ignorable_Code_Point} : les numéros qu'Unicode demande de ne pas dessiner,
+// y compris ceux qui n'ont pas encore de caractère (U+2065, U+FFF0…) ; sans eux, un nom fait de ces
+// seuls numéros paraissait vide (audit de sécurité du 25/10/2026, C11). Ils restent permis à côté
+// d'un caractère qui se voit ; ceux qui trompent vraiment (sens d'écriture…) sont refusés plus haut.
 const isInvisible = (char: string, code: number) =>
   /\s/.test(char) ||
   /\p{M}/u.test(char) ||
+  /\p{Default_Ignorable_Code_Point}/u.test(char) ||
   code === 0x200c ||
   code === 0x200d ||
   code === 0xfffc ||

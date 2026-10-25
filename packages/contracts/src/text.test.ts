@@ -1,6 +1,12 @@
 // Tests des règles de texte communes : ce qu'un nom, une bio ou un outil peut contenir.
 import { describe, expect, it } from 'vitest'
+import { NoteText } from './notes'
 import { DisplayName, FreeText, ShortLabel } from './text'
+
+// Deux numéros Unicode « à ignorer par défaut », écrits par leur numéro : tapés tels quels, ils
+// seraient invisibles dans ce fichier.
+const IGNORED_2065 = String.fromCodePoint(0x2065)
+const IGNORED_FFF0 = String.fromCodePoint(0xfff0)
 
 describe('DisplayName', () => {
   it('accepts names in any language, with accents and emoji', () => {
@@ -39,6 +45,38 @@ describe('DisplayName', () => {
     expect(DisplayName.safeParse('Léa\u202Eadmin').success).toBe(false) // inverse le sens du texte
     expect(DisplayName.safeParse('\u200B').success).toBe(false) // espace de largeur nulle
     expect(DisplayName.safeParse('Léa\nadmin').success).toBe(false) // retour à la ligne
+  })
+
+  // Audit de sécurité du 25/10/2026 (C11) : U+2065 et U+FFF0 ne sont attribués à aucun caractère,
+  // mais Unicode les range parmi ceux « à ignorer par défaut » : rien ne s'affiche. Seuls, ils
+  // donnaient un nom qui paraît vide.
+  it('refuses a name made only of code points that Unicode says to ignore', () => {
+    for (const blank of [
+      IGNORED_2065,
+      IGNORED_FFF0,
+      IGNORED_2065 + IGNORED_FFF0,
+      ` ${IGNORED_FFF0} `,
+    ]) {
+      expect(DisplayName.safeParse(blank).success).toBe(false)
+    }
+  })
+
+  it('accepts a name that shows something, even with a code point to ignore inside', () => {
+    expect(DisplayName.parse(`Léa${IGNORED_2065}`)).toBe(`Léa${IGNORED_2065}`)
+    expect(DisplayName.parse(`${IGNORED_FFF0}Léa`)).toBe(`${IGNORED_FFF0}Léa`)
+  })
+})
+
+describe('NoteText', () => {
+  it('refuses a note made only of code points that Unicode says to ignore', () => {
+    for (const blank of [IGNORED_2065, IGNORED_FFF0, `${IGNORED_2065}\n${IGNORED_FFF0}`]) {
+      expect(NoteText.safeParse(blank).success).toBe(false)
+    }
+  })
+
+  it('accepts a note that shows something, even with a code point to ignore inside', () => {
+    const note = `Bonne idée${IGNORED_2065}\n${IGNORED_FFF0} !`
+    expect(NoteText.parse(note)).toBe(note)
   })
 })
 

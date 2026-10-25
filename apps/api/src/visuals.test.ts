@@ -248,6 +248,25 @@ describe('ordering and removing photos', () => {
     expect(storedVisuals()).toHaveLength(0)
   })
 
+  it('counts removals aimed at an unknown project in the hourly limit', async () => {
+    // Le quota passe avant la recherche du projet (audit du 25/10/2026, C7) : chaque demande
+    // compte, même celle qui ne trouve rien, comme pour les autres changements d'un projet.
+    const project = await publish()
+    const withOne = await addPhoto(project.id)
+    const id = withOne.visuals[0]?.id ?? ''
+    // L'ajout de la photo ne compte pas dans ce quota-là (il a le sien).
+    for (let i = 0; i < 60; i++) {
+      const res = await sendJson('DELETE', `/v1/projects/${crypto.randomUUID()}/visuals/${id}`, lea)
+      expect(res.status).toBe(404)
+    }
+
+    // La 61e demande de l'heure, sur sa vraie photo, est refusée ; la photo reste.
+    expect((await sendJson('DELETE', `/v1/projects/${project.id}/visuals/${id}`, lea)).status).toBe(
+      429,
+    )
+    expect(storedVisuals()).toHaveLength(1)
+  })
+
   it('deletes every file together with the project', async () => {
     const project = await publish()
     await addPhoto(project.id)

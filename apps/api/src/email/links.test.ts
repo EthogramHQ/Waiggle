@@ -6,6 +6,9 @@
 import { describe, expect, it } from 'vitest'
 import { defangLinks } from './links'
 
+/** Un caractère par son numéro Unicode : tapé tel quel, un invisible ne se verrait pas ici. */
+const char = (code: number) => String.fromCodePoint(code)
+
 describe('defangLinks', () => {
   it('replaces a full address with « [lien] »', () => {
     const result = defangLinks('reconnecte-toi sur https://evil.example/login?next=1 vite')
@@ -54,6 +57,67 @@ describe('defangLinks', () => {
       'e-mail et mot-clé',
     ]) {
       expect(defangLinks(ordinary)).toBe(ordinary)
+    }
+  })
+
+  // Audit de sécurité du 25/10/2026 (C13, décision de Louis : liste blanche) : « Node.js » ou
+  // « fichier.txt » devenaient « [lien] ». Un nom de fichier dont l'extension n'est pas un domaine
+  // de premier niveau reste intact ; une extension qui en est un (« .md », la Moldavie) non.
+  it('leaves a file or library name untouched when its suffix is not a top-level domain', () => {
+    for (const ordinary of [
+      'Node.js',
+      'Vue.js vs React',
+      'mon projet Next.js',
+      'fichier.txt',
+      'données.CSV et config.yaml',
+      'le code est dans src/index.ts',
+      'Node.js, Deno et Bun.',
+    ]) {
+      expect(defangLinks(ordinary), ordinary).toBe(ordinary)
+    }
+  })
+
+  it('still replaces a name whose suffix is a real top-level domain', () => {
+    for (const written of ['README.md', 'evil.com', 'script.py', 'asp.net', 'socket.io']) {
+      expect(defangLinks(`lis ${written} ici`), written).toBe('lis [lien] ici')
+    }
+  })
+
+  it('still replaces a file-like name written with a scheme, « www. », a path or several dots', () => {
+    for (const written of [
+      'https://x.js',
+      'http://evil.txt/login',
+      'www.evil.js',
+      'WWW.evil.json',
+      'evil.js/login',
+      'evil.com.js',
+      'login.evil.json',
+      `www${char(0x2024)}evil${char(0x2024)}js`, // « www » et des points de conduite (U+2024)
+    ]) {
+      expect(defangLinks(`va sur ${written} vite`), written).toBe('va sur [lien] vite')
+    }
+  })
+
+  // Les essais d'entrées de l'audit du 25/10/2026 (essai-entrees.log) : aucun ne doit repasser
+  // intact à cause de la liste blanche.
+  it('still replaces every look-alike address tried by the audit', () => {
+    for (const written of [
+      'waiggle-login.com',
+      `evil.${char(0x034f)}com`,
+      `${char(0xff45)}${char(0xff56)}${char(0xff49)}${char(0xff4c)}.com`,
+      `evil${char(0x3002)}com`,
+      'xn--80ak6aa92e.com',
+      `htt${char(0x200b)}ps://evil.com`,
+      `evil${char(0x200b)}.com`,
+      'EVIL.COM/login',
+      `evil.c${char(0x0301)}om`,
+      `${char(0xfb01)}.com`,
+      `www${char(0x2024)}evil${char(0x2024)}com`,
+      `evil.co${char(0x200d)}m`,
+    ]) {
+      expect(defangLinks(`va sur ${written} vite`), JSON.stringify(written)).toBe(
+        'va sur [lien] vite',
+      )
     }
   })
 
