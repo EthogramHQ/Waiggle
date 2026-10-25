@@ -264,6 +264,7 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     handle:
       'le pseudo tel qu’écrit dans le commentaire, tiré de project_comment.body (au registre) : il part avec lui',
     created_at: 'date',
+    withdrawn_at: 'date',
   },
   project_reaction: {
     project_id: 'identifiant',

@@ -282,7 +282,10 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
         from comment_mention m
         join project_comment c on c.id = m.comment_id
         join project on project.id = c.project_id
-        where m.member_id = ${me} and ${during('m.created_at')} and ${readable(me)}
+        -- Une mention retirée par l'auteur à la modification (withdrawn_at, tranche 7b) ne prévient
+        -- plus : ni la cloche, ni l'e-mail de mentions, qui lit cette même source.
+        where m.member_id = ${me} and m.withdrawn_at is null and ${during('m.created_at')}
+          and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'reply', 2, c.created_at
         from project_comment root
