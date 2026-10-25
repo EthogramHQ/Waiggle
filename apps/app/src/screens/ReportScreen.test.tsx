@@ -536,6 +536,14 @@ describe('blocking the author after a report', () => {
     expect(screen.queryByRole('button', { name: alsoBlock })).toBeNull()
   })
 
+  it('offers nothing when a block already keeps us apart, the handle withheld', async () => {
+    jest.mocked(getReportTarget).mockResolvedValue({ ...preview, author: { ...sam, handle: null } })
+    await reportThenThanked()
+
+    expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Bloquer aussi/ })).toBeNull()
+  })
+
   it('says so when the block could not be saved, and offers it again', async () => {
     mockBlock.mockResolvedValue({ ok: false, error: 'internal' })
     await reportThenThanked()

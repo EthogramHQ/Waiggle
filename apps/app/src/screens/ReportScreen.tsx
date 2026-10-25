@@ -273,7 +273,11 @@ function ReportForm({
           {missingReason ? <Notice message={t('report.reasonRequired')} /> : null}
         </>
       )}
-      {sent && !author.isBlocked ? <AlsoBlock author={author} /> : null}
+      {/* Sans pseudo, un blocage nous sépare déjà (commentaire lu malgré lui, règles 1 et 2) :
+          rien à proposer, PUT block répondrait 404 si l'auteur m'a bloqué. */}
+      {sent && !author.isBlocked && author.handle !== null ? (
+        <AlsoBlock author={{ ...author, handle: author.handle }} />
+      ) : null}
     </Screen>
   )
 }
@@ -285,7 +289,7 @@ function ReportForm({
  * ce qu'on ne verra plus, ce qui reste visible, les abonnements retirés, que @x n'est pas prévenu,
  * et que la modération ne l'est pas. Une fois fait, « Tu as bloqué @x. » prend sa place.
  */
-function AlsoBlock({ author }: { author: ReportTargetPreview['author'] }) {
+function AlsoBlock({ author }: { author: ReportTargetPreview['author'] & { handle: string } }) {
   const { t } = useTranslation()
   const { block } = useBlock()
   const [asking, setAsking] = useState<BlockAsking | null>(null)
