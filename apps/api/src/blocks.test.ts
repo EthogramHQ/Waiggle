@@ -17,6 +17,7 @@ import {
   CommentPage,
   ErrorResponse,
   Member,
+  ReportTargetPreview,
   UNBLOCKS_PER_DAY,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -599,7 +600,15 @@ describe('the profile photo of a blocked member', () => {
         ines,
       )
       expect(preview.status, projectId).toBe(200)
-      expect(await preview.text(), projectId).not.toContain(photo)
+      const previewText = await preview.text()
+      expect(previewText, projectId).not.toContain(photo)
+      // Le nom reste, le pseudo non (décision du 24/10/2026) : rien à proposer à bloquer.
+      expect(ReportTargetPreview.parse(JSON.parse(previewText)).author, projectId).toEqual({
+        id: malikId,
+        name: 'Malik',
+        handle: null,
+        isBlocked: false,
+      })
     }
 
     // L'autre sens de la règle 1 : c'est Inès, l'autrice du projet, qui bloque Malik.
@@ -610,6 +619,17 @@ describe('the profile photo of a blocked member', () => {
       { id: malikId, name: 'Malik', avatarUrl: null },
     ])
     expect(text).not.toContain(photo)
+    const preview = await act.send(
+      'GET',
+      `/v1/reports/target?${new URLSearchParams({ kind: 'comment', id: atInes.id })}`,
+      ines,
+    )
+    expect(ReportTargetPreview.parse(await preview.json()).author).toEqual({
+      id: malikId,
+      name: 'Malik',
+      handle: null,
+      isBlocked: true,
+    })
 
     // Témoin : Zoé, qui n'a bloqué personne, lit la photo de Malik chez elle.
     const seen = await (await act.send('GET', `/v1/projects/${recettes.id}/comments`, zoe)).text()

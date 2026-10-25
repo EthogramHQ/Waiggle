@@ -154,9 +154,16 @@ export const ReportTargetPreview = z
     /**
      * L'auteur de la cible (le membre lui-même pour un profil), pour proposer « Bloquer aussi @x »
      * après l'envoi (tranche 7b) ; `isBlocked` : le visiteur l'a déjà bloqué (rien à proposer).
+     * `handle` vaut null quand un blocage les sépare, dans un sens ou dans l'autre (un commentaire
+     * lu malgré le blocage, règles 1 et 2) : le nom reste, le pseudo et la photo non (24/10/2026).
      */
     author: z
-      .object({ id: z.string(), name: z.string(), handle: z.string(), isBlocked: z.boolean() })
+      .object({
+        id: z.string(),
+        name: z.string(),
+        handle: z.string().nullable(),
+        isBlocked: z.boolean(),
+      })
       .strict(),
   })
   .meta({ id: 'ReportTargetPreview' })

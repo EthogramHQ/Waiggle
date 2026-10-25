@@ -84,7 +84,15 @@ const authorOf = async (
   if (!row) return null
   const handle = row.handle ?? (await ensureHandle(db, authorId))
   if (handle === null) return null
-  return { id: authorId, name: row.name, handle, isBlocked: blocks.byMe.has(authorId) }
+  // Un commentaire lu malgré un blocage (règles 1 et 2) garde le nom de l'auteur, pas son pseudo :
+  // l'appli ne propose alors pas « Bloquer aussi » (PUT block répondrait 404 si l'auteur m'a bloqué).
+  const separated = blocks.byMe.has(authorId) || blocks.ofMe.has(authorId)
+  return {
+    id: authorId,
+    name: row.name,
+    handle: separated ? null : handle,
+    isBlocked: blocks.byMe.has(authorId),
+  }
 }
 
 /**
