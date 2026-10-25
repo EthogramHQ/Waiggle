@@ -12,6 +12,7 @@
 // Ce que Jest ne prouve pas, à vérifier dans le navigateur (essai --explore du design-reviewer) :
 // la fermeture par Échap et le focus rendu au bouton une fois le menu fermé.
 import { fireEvent, screen } from '@testing-library/react-native'
+import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { ActionMenu } from './ActionMenu'
@@ -96,6 +97,37 @@ describe('ActionMenu', () => {
     expect(screen.queryByRole('menuitem')).toBeNull()
     expect(report).not.toHaveBeenCalled()
     expect(block).not.toHaveBeenCalled()
+  })
+
+  // Corrections de 7b (relecture ui-9) : Tab quitte le menu, qui se ferme sans rien faire ; le
+  // focus va alors au contrôle qui suit « … » (Maj+Tab : à « … »). Où va le focus, Jest ne le voit
+  // pas : l'essai --explore du rapport le mesure dans le navigateur.
+  describe('on the web, with the keyboard', () => {
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    for (const shiftKey of [false, true]) {
+      it(`closes without doing anything on ${shiftKey ? 'Shift+Tab' : 'Tab'}`, async () => {
+        jest.replaceProperty(Platform, 'OS', 'web')
+        await renderWithProviders(<ActionMenu items={items} />)
+
+        await fireEvent.press(trigger())
+        const preventDefault = jest.fn()
+        await fireEvent(screen.getByRole('menuitem', { name: 'Signaler ce profil' }), 'keyDown', {
+          key: 'Tab',
+          shiftKey,
+          preventDefault,
+        })
+
+        expect(screen.queryByRole('menuitem')).toBeNull()
+        expect(report).not.toHaveBeenCalled()
+        expect(block).not.toHaveBeenCalled()
+        expect(
+          screen.getByRole('button', { name: fr.t('actionMenu.label'), expanded: false }),
+        ).toBeTruthy()
+      })
+    }
   })
 
   it('opens again after being closed', async () => {

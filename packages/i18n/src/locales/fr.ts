@@ -622,6 +622,9 @@ export const fr = {
     // Le bas de la liste (ajoutés par l'interface, tranche 7a) : tout est lu, ou la suite a raté.
     end: 'C’est tout',
     moreError: 'La suite de la liste n’a pas pu se charger.',
+    // Une copie longue se replie après trois champs (ajoutés par l'interface, corrections 7b).
+    showAll: 'Afficher tout',
+    showLess: 'Replier',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de

@@ -513,6 +513,9 @@ describe('the copy of a report', () => {
     await openModeration()
 
     const card = cardOf(firstTextOf(fakeReviewsItem))
+    // Test changé aux corrections de 7b (relecture de design, point 14) : la copie d'un projet se
+    // replie après trois champs ; « Afficher tout » montre les autres.
+    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
     for (const { field, value } of fakeReviewsItem.snapshot) {
       expect(card.getByText(fr.t(`moderation.fields.${field as 'title'}`))).toBeTruthy()
       expect(card.getByText(value)).toBeTruthy()
@@ -542,6 +545,8 @@ describe('the copy of a report', () => {
     await openModeration()
 
     const card = cardOf(firstTextOf(fakeReviewsItem))
+    // Test changé aux corrections de 7b : le lien de démo, sixième champ, est replié au départ.
+    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
     expect(card.getByText('https://faux-avis.example/essai')).toBeTruthy() // témoin
     expect(card.queryByRole('link', { name: /faux-avis/ })).toBeNull()
     expect(card.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual(['Voir'])
@@ -567,6 +572,66 @@ describe('the copy of a report', () => {
     const card = cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText(firstTextOf(scamCommentItem))).toBeTruthy() // témoin
     expect(card.queryByText(/toujours affichée|supprimée ou remplacée/)).toBeNull()
+  })
+
+  it('numbers the photos when a copy has several, so that each line says which one', async () => {
+    // Relecture 7b (ui-1) : deux photos dans le même état donnaient deux lignes identiques.
+    const photos = {
+      ...fakeReviewsItem,
+      images: [
+        { field: 'cover' as const, state: 'present' as const },
+        { field: 'photo' as const, state: 'gone' as const },
+        { field: 'photo' as const, state: 'gone' as const },
+      ],
+    }
+    mockQueue([moderationQueuePageOf([scamCommentItem, photos])])
+    await openModeration()
+
+    const card = cardOf(firstTextOf(photos))
+    const line = (image: string, state: 'present' | 'gone') =>
+      containing(fr.t(`moderation.images.${state}`, { image }))
+    expect(card.getByText(line(fr.t('moderation.images.cover'), 'present'))).toBeTruthy()
+    expect(
+      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 1 }), 'gone')),
+    ).toBeTruthy()
+    expect(
+      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 2 }), 'gone')),
+    ).toBeTruthy()
+    // Plus de « Photo : supprimée… » sans rang.
+    expect(card.queryByText(line(fr.t('moderation.images.photo'), 'gone'))).toBeNull()
+  })
+
+  it('keeps « Photo » without a number when the copy has a single photo', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    expect(
+      card.getByText(
+        containing(fr.t('moderation.images.gone', { image: fr.t('moderation.images.photo') })),
+      ),
+    ).toBeTruthy()
+    expect(card.queryByText(/Photo 1/)).toBeNull()
+  })
+
+  it('folds a long copy after three fields, behind « Afficher tout »', async () => {
+    // Relecture de design 7b (point 14) : la copie entière d'un projet dépassait un écran.
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const [title, pitch, description, prompt] = fakeReviewsItem.snapshot
+    expect(card.getByText(title?.value ?? '')).toBeTruthy()
+    expect(card.getByText(pitch?.value ?? '')).toBeTruthy()
+    expect(card.getByText(description?.value ?? '')).toBeTruthy()
+    expect(card.queryByText(prompt?.value ?? '')).toBeNull()
+
+    await fireEvent.press(
+      card.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+    )
+
+    expect(card.getByText(prompt?.value ?? '')).toBeTruthy()
+    expect(
+      card.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+    ).toBeTruthy()
   })
 
   it('says when the content changed between two reports, on that card only', async () => {

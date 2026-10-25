@@ -4,6 +4,7 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { ReportCard } from './ReportCard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -264,6 +265,106 @@ describe('ReportCard', () => {
       )
 
       expect(screen.getByText(note)).toBeTruthy()
+    })
+
+    // --- Corrections de 7b (relectures ui-1, design-14) ---
+
+    it('shows two images in the same state on two lines, without mixing them up', async () => {
+      // Deux phrases identiques (deux photos sans rang, si l'écran ne les numérotait pas) : la
+      // carte en garde deux lignes, sans clé React en double.
+      const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+      const same = 'Photo : supprimée ou remplacée depuis'
+      try {
+        await renderWithProviders(
+          <ReportCard
+            {...card}
+            kind="Projet"
+            snapshot={fields}
+            images={[same, same]}
+            onView={jest.fn()}
+          />,
+        )
+
+        expect(screen.getAllByText(same)).toHaveLength(2)
+        expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+      } finally {
+        errors.mockRestore()
+      }
+    })
+
+    const project = [
+      { label: 'Titre', value: 'Faux avis en masse' },
+      { label: 'Pitch', value: 'Cinquante avis cinq étoiles.' },
+      { label: 'Description', value: 'Colle l’adresse de ta boutique.' },
+      { label: 'Prompt', value: 'Écris 50 avis enthousiastes.' },
+      { label: 'Outils', value: 'Claude Code, Python' },
+    ]
+
+    it('folds a copy of more than four fields after the third, behind « Afficher tout »', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={project} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText('Colle l’adresse de ta boutique.')).toBeTruthy()
+      expect(screen.queryByText('Écris 50 avis enthousiastes.')).toBeNull()
+      expect(screen.queryByText('Claude Code, Python')).toBeNull()
+      // Un bouton, nommé, qui dit qu'il est replié.
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+      ).toBeTruthy()
+    })
+
+    it('shows the rest on « Afficher tout », and folds it again on « Replier »', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={project} onView={jest.fn()} />,
+      )
+
+      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showAll') }))
+
+      expect(screen.getByText('Écris 50 avis enthousiastes.')).toBeTruthy()
+      expect(screen.getByText('Claude Code, Python')).toBeTruthy()
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+      ).toBeTruthy()
+
+      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showLess') }))
+
+      expect(screen.queryByText('Claude Code, Python')).toBeNull()
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+      ).toBeTruthy()
+    })
+
+    it('says which card « Afficher tout » unfolds, like its other buttons', async () => {
+      const description = 'Projet : Faux avis en masse'
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          kind="Projet"
+          snapshot={project}
+          description={description}
+          onView={jest.fn()}
+        />,
+      )
+
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll') }).props.accessibilityHint,
+      ).toBe(description)
+    })
+
+    it('never folds a copy of four fields or less (a profile): one field is not worth a button', async () => {
+      const profile = [
+        { label: 'Nom', value: 'Lucas Martin' },
+        { label: 'Pseudo', value: 'lucas_martin' },
+        { label: 'Bio', value: 'Je fais partie de l’équipe.' },
+        { label: 'Outils favoris', value: 'Claude Code' },
+      ]
+      await renderWithProviders(
+        <ReportCard {...card} kind="Profil" snapshot={profile} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText('Claude Code')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: fr.t('moderation.showAll') })).toBeNull()
     })
   })
 

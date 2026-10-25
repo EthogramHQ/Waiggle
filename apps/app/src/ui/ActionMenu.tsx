@@ -9,8 +9,11 @@
 // menu, puis la fait.
 //
 // Au clavier (web) : à l'ouverture, le focus va sur la première action ; les flèches passent d'une
-// action à l'autre (Début et Fin : la première et la dernière), Entrée ou Espace choisit, Échap ou
-// Tab referme. Une fois le menu fermé, le focus revient au bouton « … », sans faire défiler la page.
+// action à l'autre (Début et Fin : la première et la dernière), Entrée ou Espace choisit, Échap
+// referme. Une fois le menu fermé, le focus revient au bouton « … », sans faire défiler la page.
+// Tab referme aussi le menu, et le focus continue son chemin : au contrôle qui suit « … » dans la
+// page, comme si le menu, posé juste après son bouton, venait d'être traversé (modèle du bouton de
+// menu) ; Maj+Tab revient au bouton « … », le contrôle qui le précède (relecture 7b).
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -47,6 +50,13 @@ type Props = {
   label?: string
   /** glass : sur une image ou une lumière ; plain (par défaut) : sur une surface. */
   variant?: 'plain' | 'glass'
+  /**
+   * De quel côté du bouton le menu s'aligne. Sans réglage : sur son bord droit s'il est dans la
+   * moitié droite de l'écran, sur son bord gauche sinon. end : toujours sur son bord droit, le menu
+   * s'ouvrant vers la gauche, pour un « … » posé au bout d'une rangée : il reste au-dessus de sa
+   * colonne au lieu de couvrir la voisine (la colonne latérale d'un projet, relecture 7b).
+   */
+  align?: 'end'
 }
 
 /** La largeur du menu, en points : de quoi lire « Signaler ce profil » sur une ligne. */
@@ -65,7 +75,45 @@ type Rect = { x: number; y: number; width: number; height: number }
 type KeyEvent = { key: string; shiftKey?: boolean; preventDefault: () => void }
 type PressEvent = { nativeEvent?: { pageX?: number; pageY?: number } }
 
-export function ActionMenu({ items, label, variant = 'plain' }: Props) {
+// Le peu du navigateur dont on a besoin pour Tab : les éléments de la page qu'on peut atteindre,
+// dans l'ordre du document, et leur place par rapport au bouton « … ». (Les types de React Native
+// ne décrivent pas la page web.)
+type WebElement = {
+  tabIndex: number
+  focus: () => void
+  hasAttribute: (name: string) => boolean
+  closest: (selector: string) => unknown
+  getClientRects: () => { length: number }
+  compareDocumentPosition: (other: WebElement) => number
+}
+type WebDocument = { querySelectorAll: (selector: string) => ArrayLike<WebElement> }
+/** Node.DOCUMENT_POSITION_FOLLOWING : l'autre élément vient après celui-ci dans la page. */
+const FOLLOWING = 4
+const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]'
+
+/**
+ * Sur le web, le premier élément que Tab atteindrait après `node` : atteignable (tabIndex ≥ 0),
+ * actif, affiché (une page restée dessous dans la pile de navigation est cachée), hors d'une zone
+ * cachée aux lecteurs d'écran. Rien s'il n'y en a pas (le bouton est le dernier de la page).
+ */
+const nextTabbable = (node: unknown): WebElement | null => {
+  const document = (globalThis as { document?: WebDocument }).document
+  if (Platform.OS !== 'web' || !document || !node) return null
+  const from = node as WebElement
+  return (
+    Array.from(document.querySelectorAll(TABBABLE)).find(
+      (element) =>
+        element !== from &&
+        (from.compareDocumentPosition(element) & FOLLOWING) !== 0 &&
+        element.tabIndex >= 0 &&
+        !element.hasAttribute('disabled') &&
+        element.closest('[aria-hidden="true"], [inert]') === null &&
+        element.getClientRects().length > 0,
+    ) ?? null
+  )
+}
+
+export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
   const { t } = useTranslation()
   const window = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -81,6 +129,8 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
   const openedAt = useRef(0)
   // Sur le web, l'action choisie attend que le menu ait quitté la page (voir `closed`).
   const chosen = useRef<(() => void) | null>(null)
+  // Sur le web, vrai quand Tab a fermé le menu : le focus ira au contrôle qui suit « … ».
+  const tabbedOut = useRef(false)
 
   const measure = () => {
     trigger.current?.measureInWindow?.((x, y, width, height) => setAnchor({ x, y, width, height }))
@@ -110,15 +160,30 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
     else item.onPress()
   }
 
-  // Le menu a quitté la page (web) : le focus revient au bouton, puis l'action choisie part.
+  // Tab (web) : le menu se ferme, et le focus ira plus loin que « … » (voir `closed`) ; Maj+Tab
+  // le rend seulement au bouton.
+  const leave = (forward: boolean) => {
+    tabbedOut.current = forward
+    hide()
+  }
+
+  // Le menu a quitté la page (web) : le focus revient au bouton, puis l'action choisie part. Après
+  // Tab, il va au contrôle suivant, comme une vraie tabulation (la page peut défiler jusqu'à lui) ;
+  // s'il n'y en a pas, il reste au bouton.
   const closed = () => {
-    focusWithoutScroll(trigger.current)
+    const next = tabbedOut.current ? nextTabbable(trigger.current) : null
+    tabbedOut.current = false
+    if (next) next.focus()
+    else focusWithoutScroll(trigger.current)
     const action = chosen.current
     chosen.current = null
     action?.()
   }
 
   // Le fond invisible : le toucher ferme le menu, sauf la seconde tape d'une double tape sur « … ».
+  // Cette seconde tape ne ferme rien, mais le navigateur donne le focus à ce qu'elle touche (le
+  // fond, sans rôle visible : « Fermer le menu ») : on le rend à la première action, où l'ouverture
+  // l'avait posé (relecture de design 7b).
   const dismiss = (event?: PressEvent) => {
     const at = event?.nativeEvent
     if (
@@ -131,6 +196,7 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
       at.pageY >= anchor.y &&
       at.pageY <= anchor.y + anchor.height
     ) {
+      focusWithoutScroll(actions.current[0])
       return
     }
     hide()
@@ -151,14 +217,14 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
   }, [open])
 
   // Où poser le menu : sous le bouton, aligné sur son bord droit s'il est dans la moitié droite de
-  // l'écran (sur son bord gauche sinon), sans jamais sortir de l'écran. S'il manque de place en
-  // bas, au-dessus du bouton ; s'il en manque des deux côtés (texte très agrandi), contre le haut,
-  // et il défile.
+  // l'écran ou si l'écran le demande (`align`), sur son bord gauche sinon, sans jamais sortir de
+  // l'écran. S'il manque de place en bas, au-dessus du bouton ; s'il en manque des deux côtés
+  // (texte très agrandi), contre le haut, et il défile.
   const width = Math.min(MENU_WIDTH, window.width - 2 * EDGE)
   const maxHeight = window.height - 2 * EDGE
   const position = (() => {
     if (!anchor || menuHeight === null) return null
-    const alignRight = anchor.x + anchor.width / 2 > window.width / 2
+    const alignRight = align === 'end' || anchor.x + anchor.width / 2 > window.width / 2
     const wanted = alignRight ? anchor.x + anchor.width - width : anchor.x
     const left = Math.max(EDGE, Math.min(wanted, window.width - EDGE - width))
     const below = anchor.y + anchor.height + GAP
@@ -213,7 +279,7 @@ export function ActionMenu({ items, label, variant = 'plain' }: Props) {
               label={label ?? t('actionMenu.label')}
               items={items}
               onChoose={choose}
-              onLeave={hide}
+              onLeave={leave}
               actions={actions}
               maxHeight={maxHeight}
             />
@@ -238,8 +304,10 @@ type ListProps = {
   label: string
   items: ActionMenuItem[]
   onChoose: (item: ActionMenuItem) => void
-  /** Tab, sur le web : on quitte le menu (il se ferme). */
-  onLeave?: () => void
+  /**
+   * Tab, sur le web : on quitte le menu (il se ferme) ; `forward` vrai pour Tab, faux pour Maj+Tab.
+   */
+  onLeave?: (forward: boolean) => void
   /** Où ranger les actions, pour y poser le focus (la première à l'ouverture, les flèches). */
   actions?: RefObject<(View | null)[]>
   /** La hauteur au-delà de laquelle la liste défile. */
@@ -283,9 +351,11 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
               event.preventDefault()
               onChoose(item)
             } else if (event.key === 'Tab' && onLeave) {
-              // Tab quitte le menu : il se ferme, et le focus revient au bouton « … ».
+              // Tab quitte le menu : il se ferme, et l'écran pose le focus là où la tabulation
+              // mène (le contrôle après « … », ou « … » lui-même avec Maj). Le geste par défaut
+              // reste empêché : le navigateur le ferait tourner dans la couche du menu, qui part.
               event.preventDefault()
-              onLeave()
+              onLeave(event.shiftKey !== true)
             }
           },
         }
