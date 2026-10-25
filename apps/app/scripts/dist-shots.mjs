@@ -64,20 +64,27 @@ export const buildSite = () => {
   writeFileSync(stampFile, `${currentStamp()}\n`)
 }
 
-// Avec --no-build : la construction existe-t-elle, et vient-elle du code actuel ?
-export const checkStamp = () => {
+// Avec --no-build : la construction existe-t-elle, et vient-elle du code actuel ? Une construction
+// sans tampon, ou d'un autre commit, arrête le script : une mesure « après » prise sur la
+// construction d'avant ne prouverait rien. --tampon-ignore passe outre, pour un cas voulu (à dire
+// dans le rapport).
+const ignoreHint = ' (ou --tampon-ignore pour passer outre, en le disant dans ton rapport)'
+export const checkStamp = ({ ignore = false } = {}) => {
   if (!existsSync(join(build, 'index.html'))) {
     fail(`Aucune construction dans ${build} : lance la commande une fois sans --no-build.`)
   }
   const built = existsSync(stampFile) ? readFileSync(stampFile, 'utf8').trim() : null
   const now = currentStamp()
+  const stop = ignore
+    ? (message) => console.warn(`${message} --tampon-ignore : on continue.`)
+    : (message) => fail(message + ignoreHint)
   if (!built) {
-    console.warn(
-      'Attention : la construction n’a pas de tampon (dist-shots/.commit), on ne sait pas de quel code elle vient. Relance sans --no-build en cas de doute.',
+    stop(
+      'La construction n’a pas de tampon (dist-shots/.commit), on ne sait pas de quel code elle vient : relance sans --no-build.',
     )
   } else if (built !== now) {
-    console.warn(
-      `Attention : la construction vient de ${built}, mais la copie de travail est à ${now}. Elle risque de montrer l'ancien code (captures, parcours) : relance sans --no-build.`,
+    stop(
+      `La construction vient de ${built}, mais la copie de travail est à ${now} : elle montrerait l'ancien code (captures, parcours). Relance sans --no-build.`,
     )
   } else if (now.endsWith('modifié')) {
     console.warn(

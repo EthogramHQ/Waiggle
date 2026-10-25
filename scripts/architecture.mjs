@@ -90,7 +90,9 @@ for (const [from, input] of Object.entries(result.metafile.inputs)) {
 
 // --- 3. Les couches ------------------------------------------------------------------------------
 
-// Dans l'ordre : la première règle qui correspond donne la couche d'un fichier.
+// Dans l'ordre : la première règle qui correspond donne la couche d'un fichier. Une règle dont le
+// nom finit par « / » est une famille : chaque dossier qu'elle couvre devient sa propre couche (une
+// « étoile » de la carte en 3D), nommée d'après ce dossier.
 const layers = [
   ['app/pages', /^apps\/app\/app\//],
   ['app/écrans', /^apps\/app\/src\/screens\//],
@@ -98,26 +100,35 @@ const layers = [
   ['app/catalogue', /^apps\/app\/src\/catalogue\//],
   ['app/navigation', /^apps\/app\/src\/navigation\//],
   ['app/tests', /^apps\/app\/src\/testing\//],
+  // Le client de l'API (requêtes, session) : partagé par tous les domaines, ce n'en est pas un.
+  ['app/client API', /^apps\/app\/src\/api\//],
   // Les dossiers de domaine (projects, feed, follows, comments, blocks…) : les appels à l'API d'un
-  // domaine et ce qui lui est propre. Tout dossier de src/ qui n'est pas une couche plus haut en est
-  // un : un dossier ajouté par une tranche y entre seul, au lieu de tomber dans « réglages ».
-  ['app/domaines', /^apps\/app\/src\/[^/]+\//],
+  // domaine et ce qui lui est propre, une couche par dossier (décision du 25/10/2026). Un dossier
+  // ajouté par une tranche devient seul une nouvelle couche, au lieu de tomber dans « réglages ».
+  ['app/domaines/', /^apps\/app\/src\/([^/]+)\//],
   // Les fichiers posés à la racine de src/ : la configuration, la langue, quelques aides partagées.
   ['app/réglages', /^apps\/app\/src\//],
   ['api/routes', /^apps\/api\/src\/routes\//],
-  ['api/comptes', /^apps\/api\/src\/auth\//],
-  ['api/projets', /^apps\/api\/src\/projects\//],
-  ['api/médias', /^apps\/api\/src\/media\//],
-  ['api/e-mails', /^apps\/api\/src\/email\//],
   ['api/tests', /^apps\/api\/src\/testing\//],
+  // Côté API aussi, un dossier par domaine (auth, projects, blocks, reports, moderation, jobs…) :
+  // avant le 25/10/2026, la plupart étaient cachés ensemble dans « socle ».
+  ['api/domaines/', /^apps\/api\/src\/([^/]+)\//],
+  // Les fichiers posés à la racine de src/ : l'application Hono, l'environnement, les quotas.
   ['api/socle', /^apps\/api\/src\//],
   ['contrats', /^packages\/contracts\//],
   ['base de données', /^packages\/db\//],
   ['traductions', /^packages\/i18n\//],
   ['marque', /^packages\/brand\//],
 ]
-const layerOf = (file) => layers.find(([, pattern]) => pattern.test(file))?.[0] ?? null
+const layerOf = (file) => {
+  for (const [name, pattern] of layers) {
+    const match = file.match(pattern)
+    if (match) return name.endsWith('/') ? name + match[1] : name
+  }
+  return null
+}
 const isTest = (file) => /\.test\.tsx?$/.test(file)
+const isDomain = (layer) => /^(app|api)\/domaines\//.test(layer ?? '')
 
 // --- 4. Les règles ---------------------------------------------------------------------------------
 
@@ -144,7 +155,8 @@ const rules = [
     breaks: (from, to) =>
       layerOf(from) === 'app/composants' &&
       !isTest(from) &&
-      ['app/écrans', 'app/domaines', 'app/navigation', 'app/pages'].includes(layerOf(to)) &&
+      (['app/écrans', 'app/navigation', 'app/pages', 'app/client API'].includes(layerOf(to)) ||
+        isDomain(layerOf(to))) &&
       !allowed.has(`${from} -> ${to}`),
   },
   {
@@ -179,22 +191,49 @@ for (const [from, to] of edges) {
   const key = `${a}|${b}`
   links.set(key, (links.get(key) ?? 0) + 1)
 }
-const used = [...new Set([...links.keys()].flatMap((key) => key.split('|')))]
-const id = (layer) => `n${layers.findIndex(([name]) => name === layer)}`
+// L'ordre des couches : celui de la liste ci-dessus, les domaines d'une famille par ordre
+// alphabétique à la place de leur famille. Un ordre fixe garde les mêmes identifiants (n0, n1…)
+// d'une fois sur l'autre : le schéma ne change que si une relation ou un domaine change.
+// Toutes les couches qui ont du code (tests exclus), même sans flèche : un domaine dont les seuls
+// imports sont des types (effacés à la compilation) garde son étoile.
+const used = new Set([
+  ...[...links.keys()].flatMap((key) => key.split('|')),
+  ...entryPoints
+    .map((file) => toProjectPath(relative(root, file)))
+    .filter((file) => !isTest(file))
+    .map(layerOf)
+    .filter((layer) => layer && !layer.endsWith('/tests')),
+])
+const order = layers.flatMap(([name]) =>
+  name.endsWith('/')
+    ? [...used].filter((l) => l.startsWith(name)).sort()
+    : used.has(name)
+      ? [name]
+      : [],
+)
+const id = (layer) => `n${order.indexOf(layer)}`
+const label = (layer) => layer.replace(/^(app|api)\/(domaines\/)?/, '')
+// Cinq groupes, pour que la carte reste lisible sur un téléphone : l'ossature de l'appli, ses
+// domaines, l'ossature de l'API, ses domaines, et les paquets partagés.
 const group = (prefix, title, filter) => [
   `  subgraph ${prefix}["${title}"]`,
-  ...used.filter(filter).map((layer) => `    ${id(layer)}["${layer.replace(/^(app|api)\//, '')}"]`),
+  ...order.filter(filter).map((layer) => `    ${id(layer)}["${label(layer)}"]`),
   '  end',
 ]
 const mermaid = [
   'flowchart LR',
-  ...group('appli', 'apps/app (iOS, Android, web)', (l) => l.startsWith('app/')),
-  ...group('api', 'apps/api (serveur)', (l) => l.startsWith('api/')),
+  ...group('appli', 'apps/app (iOS, Android, web)', (l) => l.startsWith('app/') && !isDomain(l)),
+  ...group('appliDomaines', 'apps/app : domaines', (l) => l.startsWith('app/') && isDomain(l)),
+  ...group('api', 'apps/api (serveur)', (l) => l.startsWith('api/') && !isDomain(l)),
+  ...group('apiDomaines', 'apps/api : domaines', (l) => l.startsWith('api/') && isDomain(l)),
   ...group('paquets', 'packages (partagés)', (l) => !/^(app|api)\//.test(l)),
-  ...[...links.entries()].sort().map(([key]) => {
-    const [a, b] = key.split('|')
-    return `  ${id(a)} --> ${id(b)}`
-  }),
+  ...[...links.keys()]
+    .map((key) => key.split('|'))
+    .sort(
+      ([a1, b1], [a2, b2]) =>
+        order.indexOf(a1) - order.indexOf(a2) || order.indexOf(b1) - order.indexOf(b2),
+    )
+    .map(([a, b]) => `  ${id(a)} --> ${id(b)}`),
 ].join('\n')
 
 const doc = `# Les dépendances entre les parties du projet

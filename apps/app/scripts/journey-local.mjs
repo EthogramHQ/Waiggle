@@ -4,9 +4,9 @@
 // au lieu d'attendre la pile de production de la CI (infra/stack-test.sh) pour voir qu'un texte a
 // changé ou qu'un bouton ne répond plus.
 //
-// Usage : pnpm --filter @ruche/app journey [-- --no-build] [-- --keep]
-//   --no-build  réutilise la construction de dist-shots telle quelle (un avertissement si elle ne
-//               vient pas du code actuel) ; sans cette option, elle est refaite si besoin ;
+// Usage : pnpm --filter @ruche/app journey [-- --no-build [--tampon-ignore]] [-- --keep]
+//   --no-build  réutilise la construction de dist-shots telle quelle (arrêt si elle ne vient pas
+//               du code actuel, sauf --tampon-ignore) ; sans cette option, elle est refaite si besoin ;
 //   --keep      garde le dossier temporaire (base, médias, logs) même quand tout va bien.
 //
 // Ce que ce parcours ne vérifie pas, et que seule la CI vérifie : la porte d'entrée Caddy, HTTPS et
@@ -49,8 +49,10 @@ const started = Date.now()
 
 const args = process.argv.slice(2).filter((arg) => arg !== '--')
 for (const arg of args) {
-  if (!['--no-build', '--keep'].includes(arg)) {
-    console.error(`Option inconnue : ${arg}. Options possibles : --no-build, --keep.`)
+  if (!['--no-build', '--tampon-ignore', '--keep'].includes(arg)) {
+    console.error(
+      `Option inconnue : ${arg}. Options possibles : --no-build, --tampon-ignore, --keep.`,
+    )
     process.exit(2)
   }
 }
@@ -76,7 +78,7 @@ for (const port of [API_PORT, APP_PORT]) {
 // des changements (on ne sait pas s'ils datent d'avant ou d'après la construction).
 const built = existsSync(stampFile) ? readFileSync(stampFile, 'utf8').trim() : null
 const now = currentStamp()
-if (args.includes('--no-build')) checkStamp()
+if (args.includes('--no-build')) checkStamp({ ignore: args.includes('--tampon-ignore') })
 else if (!existsSync(join(build, 'index.html')) || built !== now || now.endsWith('modifié')) {
   step(`Construction de l'appli web (dist-shots), pour ${now}`)
   buildSite()

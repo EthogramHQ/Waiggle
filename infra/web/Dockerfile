@@ -9,7 +9,7 @@
 # apps/api/Dockerfile) ; l'étiquette n'est là que pour le lecteur.
 
 # --- Étape 1 : construction de l'appli web ---
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
 WORKDIR /repo
 RUN corepack enable
 
@@ -36,7 +36,7 @@ RUN pnpm --filter @ruche/app build
 RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 
 # --- Étape 2 : Caddy et les fichiers de l'appli, rien d'autre ---
-FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
 # Caddy tourne avec son propre utilisateur, jamais en root. Il ne peut écrire que dans /data et
