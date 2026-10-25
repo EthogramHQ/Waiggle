@@ -7,7 +7,8 @@
 // photographiée dans apps/app/shots/ (ni l'un ni l'autre n'est enregistré dans Git).
 //
 //   --no-build        réutilise la dernière construction, au lieu de reconstruire (une minute de
-//                     gagnée). Un avertissement s'affiche si elle ne correspond plus au code actuel.
+//                     gagnée). Le script s'arrête si elle ne correspond plus au code actuel.
+//   --tampon-ignore   avec --no-build : continue quand même (un cas voulu, à dire dans un rapport).
 //   --list            affiche le nom et l'adresse de chaque page, puis s'arrête.
 //   --only a,b        seulement ces pages, par leur nom (voir --list) : pour les captures comme
 //                     pour --layout. Les captures des autres pages, déjà dans le dossier, restent.
@@ -85,6 +86,7 @@ const optionValue = (flag) => {
 }
 const known = [
   '--no-build',
+  '--tampon-ignore',
   '--list',
   '--only',
   '--out',
@@ -1238,7 +1240,7 @@ if (has('--list')) {
   process.exit(0)
 }
 
-if (has('--no-build')) checkStamp()
+if (has('--no-build')) checkStamp({ ignore: has('--tampon-ignore') })
 else buildSite()
 
 // La construction, servie comme par un hébergeur (dist-shots.mjs).

@@ -32,8 +32,8 @@ est empaquetée en un seul fichier par esbuild pour la production.
 ```bash
 pnpm install
 pnpm check                       # lint + architecture + types + tests, avant chaque commit
-# Sur un PC modeste, les tests d'un paquet à la fois, avec 2 processus chacun :
-TURBO_CONCURRENCY=1 pnpm test -- --maxWorkers=2
+# Sur un PC modeste, les tests d'un paquet à la fois, avec 3 processus chacun :
+TURBO_CONCURRENCY=1 pnpm test -- --maxWorkers=3
 pnpm arch                        # vérifie les frontières entre parties, redessine le schéma
 pnpm lint:fix                    # formatage et corrections Biome
 pnpm --filter @ruche/api dev     # API sur http://localhost:3000 (/health, /openapi.json)
@@ -50,12 +50,15 @@ infra/stack-test.sh              # la pile de production complète, comme en CI 
 Chaque fonctionnalité est une tranche verticale, dans cet ordre :
 
 1. **Le scénario**, en français, dans `docs/scenarios/` (Étant donné / Quand / Alors). Louis le valide.
-2. **Le contrat** : schémas Zod dans `packages/contracts`.
+2. **Le contrat** : schémas Zod dans `packages/contracts`. Avant les tests, le plan est relu
+   (sécurité ; juridique si la tranche touche aux données, aux e-mails, à l'IA ou à la modération) :
+   ce que la relecture trouve entre au plan et devient des tests.
 3. **Les tests, qui doivent échouer** : unitaires pour les règles, intégration pour l'API
    (`app.request(...)`), test de composant pour l'écran. Lance-les et constate l'échec.
 4. **Le backend**, jusqu'au vert.
 5. **L'interface**, puis son test.
-6. **`pnpm check`** vert, puis les relectures de la branche :
+6. **`pnpm check`** vert et le parcours d'un membre (`pnpm --filter @ruche/app journey`) vert, puis
+   les relectures de la branche :
    - l'interface : les règles du code (étages, textes, accessibilité) ;
    - le design : largeurs, espacements, hiérarchie, états, parcours ;
    - la sécurité : la section « Sécurité » ci-dessous ;
