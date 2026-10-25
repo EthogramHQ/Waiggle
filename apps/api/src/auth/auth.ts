@@ -263,6 +263,16 @@ export const createAuth = ({
     //   boîte qui n'a rien demandé). L'appli ne l'appelle pas : se connecter avant d'avoir vérifié
     //   renvoie le lien (sendOnSignIn, plus haut), sous le quota de la connexion. Better Auth
     //   envoie alors l'e-mail lui-même, sans passer par la route fermée ;
+    // - les autres (C6), qu'aucun écran n'appelle : list-accounts, unlink-account, account-info,
+    //   get-access-token et refresh-token (les comptes liés et les jetons d'un fournisseur comme
+    //   Google, que nous n'avons pas) ; update-session (écrire dans sa session) ;
+    //   request-password-reset et reset-password (le mot de passe oublié, pas encore proposé) ;
+    //   delete-user/callback (suppression confirmée par e-mail : la nôtre l'est par le mot de
+    //   passe) ; change-email (rouverte, protégée, par la tranche « changer son adresse ») ; ok
+    //   (une sonde : /health suffit).
+    //   Un chemin variable (/callback/:id, /reset-password/:token) ne se ferme pas par cette
+    //   liste, qui compare des chemins exacts : sans fournisseur ni mot de passe oublié réglés, ils
+    //   ne mènent à rien (à surveiller le jour où l'on en règle un).
     // Une route fermée répond 404, comme une adresse inconnue (test dans accounts.test.ts). Le jour
     // où l'appli s'en sert, on la retire de cette liste, avec ses tests.
     disabledPaths: [
@@ -277,6 +287,17 @@ export const createAuth = ({
       '/link-social',
       '/verify-password',
       '/send-verification-email',
+      '/list-accounts',
+      '/unlink-account',
+      '/account-info',
+      '/get-access-token',
+      '/refresh-token',
+      '/update-session',
+      '/request-password-reset',
+      '/reset-password',
+      '/delete-user/callback',
+      '/change-email',
+      '/ok',
     ],
 
     rateLimit: {
