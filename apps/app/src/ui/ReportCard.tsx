@@ -4,8 +4,8 @@
 // puis les décisions possibles (« Retirer », « Classer sans suite », « Rétablir »).
 // Depuis la tranche 7b, la copie se lit champ par champ (« Titre », « Pitch », « Lien de démo »),
 // avec l'état de ses images (toujours affichée, ou partie depuis) et, s'il y a lieu, une phrase qui
-// dit que le contenu a changé entre deux signalements. Au-delà de trois champs, elle se replie
-// (« Afficher tout »).
+// dit que le contenu a changé entre deux signalements. Au-delà de quatre champs, elle se replie
+// après le troisième (« Afficher tout »).
 //
 // Tout ce qu'un membre a écrit (le texte signalé, les précisions) s'affiche en texte brut : ni
 // Markdown, ni lien qu'on pourrait toucher par mégarde (règle 22 de la relecture du plan). Le seul
