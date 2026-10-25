@@ -9,7 +9,7 @@ flowchart LR
   subgraph appli["apps/app (iOS, Android, web)"]
     n2["composants"]
     n0["pages"]
-    n5["appels API"]
+    n6["domaines"]
     n7["réglages"]
     n4["navigation"]
     n1["écrans"]
@@ -61,35 +61,31 @@ flowchart LR
   n14 --> n15
   n14 --> n18
   n14 --> n17
-  n5 --> n2
-  n5 --> n7
-  n5 --> n15
-  n5 --> n18
   n3 --> n2
   n3 --> n15
   n3 --> n18
-  n2 --> n5
+  n2 --> n6
   n2 --> n7
   n2 --> n15
   n2 --> n18
   n2 --> n17
-  n4 --> n5
+  n6 --> n2
+  n6 --> n4
+  n6 --> n7
+  n6 --> n15
+  n6 --> n18
   n4 --> n2
-  n4 --> n7
-  n0 --> n5
+  n4 --> n6
   n0 --> n3
   n0 --> n2
+  n0 --> n6
   n0 --> n4
   n0 --> n7
   n0 --> n1
   n0 --> n17
-  n7 --> n5
-  n7 --> n2
-  n7 --> n4
-  n7 --> n15
   n7 --> n17
-  n1 --> n5
   n1 --> n2
+  n1 --> n6
   n1 --> n4
   n1 --> n7
   n1 --> n15
