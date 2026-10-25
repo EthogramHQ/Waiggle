@@ -97,8 +97,12 @@ const layers = [
   ['app/composants', /^apps\/app\/src\/ui\//],
   ['app/catalogue', /^apps\/app\/src\/catalogue\//],
   ['app/navigation', /^apps\/app\/src\/navigation\//],
-  ['app/appels API', /^apps\/app\/src\/(api|accounts|profile|projects|members|media)\//],
   ['app/tests', /^apps\/app\/src\/testing\//],
+  // Les dossiers de domaine (projects, feed, follows, comments, blocks…) : les appels à l'API d'un
+  // domaine et ce qui lui est propre. Tout dossier de src/ qui n'est pas une couche plus haut en est
+  // un : un dossier ajouté par une tranche y entre seul, au lieu de tomber dans « réglages ».
+  ['app/domaines', /^apps\/app\/src\/[^/]+\//],
+  // Les fichiers posés à la racine de src/ : la configuration, la langue, quelques aides partagées.
   ['app/réglages', /^apps\/app\/src\//],
   ['api/routes', /^apps\/api\/src\/routes\//],
   ['api/comptes', /^apps\/api\/src\/auth\//],
@@ -140,7 +144,7 @@ const rules = [
     breaks: (from, to) =>
       layerOf(from) === 'app/composants' &&
       !isTest(from) &&
-      ['app/écrans', 'app/appels API', 'app/navigation', 'app/pages'].includes(layerOf(to)) &&
+      ['app/écrans', 'app/domaines', 'app/navigation', 'app/pages'].includes(layerOf(to)) &&
       !allowed.has(`${from} -> ${to}`),
   },
   {
