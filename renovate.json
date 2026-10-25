@@ -4,7 +4,13 @@
   "timezone": "Europe/Paris",
   "schedule": ["before 6am on monday"],
   "labels": ["dependencies"],
+  "minimumReleaseAge": "7 days",
   "packageRules": [
+    {
+      "description": "A version must be 7 days old before Renovate proposes it: a hijacked release is usually pulled from the registry within hours (security audit of 2026-10-25, C8). Digest updates only wait 1 day: they re-point a tag already reviewed.",
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAge": "1 day"
+    },
     {
       "description": "Major updates wait for an approval in the Dependency Dashboard: they change behaviour and are reviewed one by one.",
       "matchUpdateTypes": ["major"],

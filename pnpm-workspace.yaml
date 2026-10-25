@@ -12,6 +12,25 @@ ignoredBuiltDependencies:
   - '@parcel/watcher'
   - unrs-resolver
 
+# Protections de la chaîne d'approvisionnement (audit de sécurité du 25/10/2026, C8). Le risque :
+# un compte de mainteneur volé publie une version piégée d'un paquet connu ; elle est repérée et
+# retirée du registre en quelques heures, mais toute installation faite entre-temps l'a prise.
+# Ces trois réglages existent dans pnpm 10.28.0 (celui de packageManager). Ils jouent quand pnpm
+# choisit une version (ajout, mise à jour) ; `pnpm install --frozen-lockfile` (la CI, le serveur)
+# reprend les versions déjà notées dans pnpm-lock.yaml sans les rechoisir.
+#
+# Âge minimum d'une version avant que pnpm accepte de l'installer, en minutes : 7 jours
+# (7 × 24 × 60). Une version piégée a presque toujours été retirée avant.
+minimumReleaseAge: 10080
+# Une dépendance indirecte ne peut pas venir d'ailleurs que du registre (dépôt Git, archive à une
+# adresse quelconque) : une telle source échappe aux vérifications du registre et peut changer sans
+# changer de numéro de version.
+blockExoticSubdeps: true
+# Refuse une version publiée avec moins de garanties que les précédentes : si un paquet était publié
+# par sa CI avec une preuve de provenance et qu'une nouvelle version arrive sans (publiée à la main,
+# depuis un compte peut-être volé), pnpm refuse de l'installer.
+trustPolicy: no-downgrade
+
 # Versions imposées à une dépendance indirecte, pour un correctif de sécurité que son parent n'a pas
 # encore adopté. Chacune est vérifiée (tests, migrations, captures) et retirée dès que le parent suit.
 overrides:
