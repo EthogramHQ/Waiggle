@@ -120,6 +120,7 @@ export const fr = {
     // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
     emails: { title: 'E-mails', row: 'Choisir les e-mails reçus' },
     data: { title: 'Mes données' },
+    safety: { title: 'Sécurité' },
     export: {
       button: 'Télécharger mes données',
       done: 'Tes données ont été téléchargées.',
@@ -169,7 +170,7 @@ export const fr = {
         removals: 'Une trace des retraits de tes contenus reste un an',
         // Tranche 7b (relecture juridique, J11) : au conditionnel, l'écran s'affiche pour tous.
         reportCopies:
-          'Si tes contenus ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
+          'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
       },
     },
   },
@@ -495,7 +496,7 @@ export const fr = {
     // bloquer l'auteur est proposé, jamais présélectionné (J14).
     reasonRequired: 'Choisis un motif pour envoyer ton signalement.',
     alsoBlock: 'Bloquer aussi @{{handle}}',
-    alsoBlockHint: 'Tu ne verras plus ses contenus, et il ne verra plus les tiens.',
+    alsoBlockHint: 'Tu ne verras plus ses contenus, et @{{handle}} ne verra plus les tiens.',
     // Ajouté par l'interface : la phrase de bonne foi seule, qui reste sous l'erreur « Dis-nous
     // pourquoi… » (l'aide entière répéterait l'erreur, qui en est la première phrase).
     goodFaith:
@@ -514,19 +515,22 @@ export const fr = {
     title: 'Bloquer @{{handle}} ?',
     hidden:
       'Vous ne verrez plus les projets, les notes et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
+    // Relecture juridique (R1) : ce qui reste visible malgré le blocage (règles 1 et 2 du plan).
+    remains:
+      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, et ceux où tu as écrit son pseudo. Pour les retirer, supprime-les avant de bloquer.',
     follows:
       'Vos abonnements de l’un à l’autre sont retirés ; ils ne reviendront pas si tu débloques.',
-    notTold: '@{{handle}} n’est pas prévenu, mais pourra le remarquer.',
+    notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',
     notModeration:
       'Bloquer ne prévient pas la modération. Si un contenu pose problème, signale-le d’abord.',
     confirm: 'Bloquer',
     cancel: 'Annuler',
     done: 'Tu as bloqué @{{handle}}.',
-    notice: 'Tu as bloqué @{{handle}} : vous ne voyez plus les contenus l’un de l’autre.',
+    notice: 'Tu as bloqué @{{handle}}.',
     unblock: 'Débloquer',
     unblockTitle: 'Débloquer @{{handle}} ?',
     unblockMessage:
-      'Vous verrez de nouveau les contenus l’un de l’autre. Les abonnements retirés ne reviennent pas.',
+      'Vous verrez de nouveau les contenus l’un de l’autre. Les abonnements retirés ne reviennent pas. Les notifications d’avant le blocage peuvent réapparaître, des deux côtés.',
     unblockConfirm: 'Débloquer',
     unblocked: 'Tu as débloqué @{{handle}}.',
     error: 'Le changement n’a pas pu être enregistré. Réessaie.',
@@ -535,6 +539,7 @@ export const fr = {
       title: 'Membres bloqués',
       hint: 'Vous ne voyez plus les contenus l’un de l’autre. La personne bloquée n’est pas prévenue.',
       empty: 'Tu n’as bloqué personne.',
+      emptyHint: 'Pour bloquer un membre, ouvre le menu « … » de sa page.',
       blockedOn: 'Bloqué le {{date}}',
       more: 'Afficher la suite',
       end: 'C’est tout',
@@ -577,6 +582,7 @@ export const fr = {
       avatar: 'Photo de profil',
       cover: 'Couverture',
       photo: 'Photo',
+      photoNumbered: 'Photo {{n}}',
       present: '{{image}} : toujours affichée',
       gone: '{{image}} : supprimée ou remplacée depuis',
     },

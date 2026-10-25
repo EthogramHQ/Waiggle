@@ -108,6 +108,7 @@ export const en: Translation = {
     },
     emails: { title: 'Emails', row: 'Choose which emails you get' },
     data: { title: 'My data' },
+    safety: { title: 'Safety' },
     export: {
       button: 'Download my data',
       done: 'Your data has been downloaded.',
@@ -154,7 +155,7 @@ export const en: Translation = {
         reports: 'Your reports stay, without your name, until a year after they are handled',
         removals: 'A record of removals of your content stays for a year',
         reportCopies:
-          'If your content was reported, the copy of its text stays 30 days (a year if it was removed)',
+          'If your content or your profile was reported, the copy of its text stays 30 days (a year if it was removed)',
       },
     },
   },
@@ -466,7 +467,7 @@ export const en: Translation = {
     gone: 'This content no longer exists, or you can no longer see it.',
     reasonRequired: 'Choose a reason to send your report.',
     alsoBlock: 'Also block @{{handle}}',
-    alsoBlockHint: 'You won’t see their content anymore, and they won’t see yours.',
+    alsoBlockHint: 'You won’t see their content anymore, and @{{handle}} won’t see yours.',
     goodFaith:
       'By sending, you confirm your report is sincere and accurate to the best of your knowledge.',
   },
@@ -479,18 +480,20 @@ export const en: Translation = {
     title: 'Block @{{handle}}?',
     hidden:
       'You won’t see each other’s projects, notes and comments anymore, and you won’t be able to interact.',
+    remains:
+      'Comments already written stay. On their own projects, @{{handle}} still reads yours, and those where you wrote their handle. To remove them, delete them before blocking.',
     follows: 'Your follows of each other are removed; they won’t come back if you unblock.',
-    notTold: '@{{handle}} isn’t told, but may notice.',
+    notTold: '@{{handle}} gets no message, but may notice.',
     notModeration:
       'Blocking doesn’t alert moderation. If some content is a problem, report it first.',
     confirm: 'Block',
     cancel: 'Cancel',
     done: 'You blocked @{{handle}}.',
-    notice: 'You blocked @{{handle}}: you no longer see each other’s content.',
+    notice: 'You blocked @{{handle}}.',
     unblock: 'Unblock',
     unblockTitle: 'Unblock @{{handle}}?',
     unblockMessage:
-      'You’ll see each other’s content again. The follows that were removed don’t come back.',
+      'You’ll see each other’s content again. The follows that were removed don’t come back. Notifications from before the block may reappear, on both sides.',
     unblockConfirm: 'Unblock',
     unblocked: 'You unblocked @{{handle}}.',
     error: 'The change couldn’t be saved. Try again.',
@@ -499,6 +502,7 @@ export const en: Translation = {
       title: 'Blocked members',
       hint: 'You no longer see each other’s content. The blocked person isn’t told.',
       empty: 'You haven’t blocked anyone.',
+      emptyHint: 'To block a member, open the “…” menu on their page.',
       blockedOn: 'Blocked on {{date}}',
       more: 'Show more',
       end: 'That’s all',
@@ -537,6 +541,7 @@ export const en: Translation = {
       avatar: 'Profile photo',
       cover: 'Cover',
       photo: 'Photo',
+      photoNumbered: 'Photo {{n}}',
       present: '{{image}}: still shown',
       gone: '{{image}}: deleted or replaced since',
     },
