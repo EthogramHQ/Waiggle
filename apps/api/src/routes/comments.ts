@@ -17,7 +17,7 @@ import {
   ProjectId,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, exists, isNotNull, isNull, not, or, sql } from 'drizzle-orm'
+import { and, eq, exists, isNotNull, isNull, not, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
@@ -35,7 +35,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -197,16 +197,14 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    *
    * `undo` (tranche 7b, règle 7 de la relecture du plan) : supprimer son commentaire défait son
    * propre geste, qu'un blocage ne refuse jamais. Le projet d'un membre bloqué avec lui, caché
-   * partout ailleurs (visibleTo), reste alors trouvé : la condition est celle de visibleTo moins
-   * le blocage (`listedProject`, public et non retiré, ou le sien). Un projet privé ou retiré d'un
-   * autre reste introuvable, comme avant.
+   * partout ailleurs (visibleTo), reste alors trouvé : `projectReachableBy`
+   * (projects/visibility.ts), la condition de visibleTo moins le blocage. Un projet privé ou
+   * retiré d'un autre reste introuvable, comme avant.
    */
   const projectOf = async (projectId: string, userId: string, undo = false) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
     if (!ProjectId.safeParse(projectId).success) return null
-    const reachable = undo
-      ? or(listedProject(), eq(schema.project.authorId, userId))
-      : visibleTo(userId)
+    const reachable = undo ? projectReachableBy(userId) : visibleTo(userId)
     const [project] = await db
       .select({
         authorId: schema.project.authorId,
@@ -435,7 +433,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // non supprimé), au cas où il aurait été supprimé entre-temps. « returning » renvoie la ligne
     // modifiée : aucune, et il n'y a plus rien à modifier. Un commentaire masqué reste masqué.
     // Le texte et ses mentions changent dans la même transaction : les mentions ajoutées sont
-    // datées de la modification, celles qui ont disparu sont effacées, les autres gardent leur date
+    // datées de la modification, celles qui ont disparu sont retirées (sans lien ni notification,
+    // mais la personne mentionnée garde la lecture, tranche 7b), les autres gardent leur date
     // (saveMentions, mentions/write.ts).
     const editedAt = new Date()
     const edited = await db.transaction(async (tx) => {

@@ -29,7 +29,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { type Blocks, noBlocks, notBlockedWith } from '../blocks/visibility'
+import { type Blocks, notBlockedWith } from '../blocks/visibility'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { mentionsOf } from '../mentions/load'
 import { mediaUrl } from '../profile/me'
@@ -87,15 +87,16 @@ export type Viewer = {
  * modération (tranche 7a) compte comme privé : seul son auteur le voit encore, et il n'y lit que
  * ses propres commentaires, puisque les autres ne peuvent plus y lire les leurs.
  *
- * `blocks` (tranche 7b) : les blocages du membre, lus par `blocksOf`. Sans eux (`noBlocks`, la
- * valeur par défaut), la règle JavaScript `sees` ne connaît aucun blocage : seule une lecture qui
- * n'a pas à cacher les commentaires d'un membre bloqué peut s'en passer. `seesSql`, elle, lit les
- * blocages dans la base et ne dépend pas de ce paramètre.
+ * `blocks` (tranche 7b) : les blocages du membre, lus par `blocksOf`. Obligatoire : avec `noBlocks`,
+ * la règle JavaScript `sees` ne connaît aucun blocage, et un appelant qui l'oublierait montrerait
+ * sans bruit les commentaires d'un membre bloqué (relecture de sécurité A3). Une lecture qui n'a
+ * vraiment pas à les cacher écrit donc `noBlocks` elle-même, en le disant. `seesSql`, elle, lit
+ * les blocages dans la base et ne dépend pas de ce paramètre.
  */
 export const viewerOf = (
   memberId: string,
   project: { authorId: string; visibility: string; removedAt: Date | null },
-  blocks: Blocks = noBlocks,
+  blocks: Blocks,
 ): Viewer => ({
   id: memberId,
   isProjectAuthor: project.authorId === memberId,
@@ -118,8 +119,10 @@ export const blockBetween = (authorId: string, viewer: Viewer) =>
 
 /**
  * Ce qu'il faut savoir d'un commentaire pour `sees`. `mentionsViewer` (tranche 7b) : le texte
- * mentionne ce membre (une ligne de comment_mention le désigne) ; il ne sert qu'à la règle 2 des
- * blocages, et une lecture qui ne le connaît pas le laisse vide (faux).
+ * mentionne ou a mentionné ce membre (une ligne de comment_mention le désigne, même retirée depuis
+ * par l'auteur : « une fois mentionné, lisible tant que le commentaire existe », décision du
+ * 25/10/2026, voir mentions/write.ts) ; il ne sert qu'à la règle 2 des blocages, et une lecture
+ * qui ne le connaît pas le laisse vide (faux).
  */
 export type SeenRow = Pick<CommentRow, 'authorId' | 'hiddenAt' | 'removedAt'> & {
   mentionsViewer?: boolean
@@ -256,7 +259,10 @@ export const presentComment = (
   const removed = row.removedAt !== null
   return {
     ...base,
-    author,
+    // Un commentaire qu'il lit malgré un blocage (règles 1 et 2) : l'auteur garde son nom, pour
+    // savoir qui a écrit, mais pas sa photo (règle 11 : aucune réponse ne donne à l'un l'adresse
+    // de la photo de l'autre ; décision du 24/10/2026, relecture de sécurité A1).
+    author: block === null ? author : { ...author, avatarUrl: null },
     body: row.body,
     state: removed ? 'removed' : row.hiddenAt === null ? 'visible' : 'hidden',
     isMine: row.authorId === viewer.id,
@@ -460,7 +466,7 @@ export const loadCommentPage = async (
 
   // 3b. Les auteurs de tout ce qui est sur la page, en une requête. Jamais un auteur bloqué avec
   // ce membre, sauf pour un commentaire qu'il lit encore (règles 1 et 2) : sa place, sans nom ni
-  // photo, n'a pas besoin de lui.
+  // photo, n'a pas besoin de lui. Et même alors, presentComment ne garde que son nom.
   const authors = await authorsOf(
     db,
     rows.flatMap((row) =>

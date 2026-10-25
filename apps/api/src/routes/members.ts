@@ -8,6 +8,7 @@ import { Member, MemberId, MentionableList, MentionableQuery } from '@ruche/cont
 import { type Database, schema } from '@ruche/db'
 import { and, eq, sql } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
+import { blocksOf } from '../blocks/visibility'
 import { reachableBy } from '../blocks/write'
 import { viewerOf } from '../comments/load'
 import { errorBody, languageOf } from '../errors'
@@ -104,21 +105,27 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // Le projet, s'il est visible par ce membre (public, ou le sien). Inconnu ou privé d'un
     // autre : la même réponse « introuvable », pour ne pas révéler qu'un projet privé existe.
     // L'identifiant est déjà un UUID bien formé (MentionableQuery) ; la clé primaire le trouve.
-    const [project] = await db
-      .select({
-        id: schema.project.id,
-        authorId: schema.project.authorId,
-        visibility: schema.project.visibility,
-        // Un projet retiré compte comme privé pour la recherche (viewerOf, comments/load.ts).
-        removedAt: schema.project.removedAt,
-      })
-      .from(schema.project)
-      .where(and(eq(schema.project.id, projectId), visibleTo(user.id)))
+    // Ses blocages en même temps (blocksOf, par les deux index de member_block) : la recherche ne
+    // lit que `seesSql`, qui les lit dans la base, mais le Viewer les porte toujours (viewerOf),
+    // pour qu'une règle JavaScript ajoutée plus tard (`sees`) ne les ignore pas sans bruit.
+    const [[project], blocks] = await Promise.all([
+      db
+        .select({
+          id: schema.project.id,
+          authorId: schema.project.authorId,
+          visibility: schema.project.visibility,
+          // Un projet retiré compte comme privé pour la recherche (viewerOf, comments/load.ts).
+          removedAt: schema.project.removedAt,
+        })
+        .from(schema.project)
+        .where(and(eq(schema.project.id, projectId), visibleTo(user.id))),
+      blocksOf(db, user.id),
+    ])
     if (!project) return c.json(errorBody(languageOf(c), 'not_found'), 404)
     const members = await searchMentionable(
       db,
       q,
-      viewerOf(user.id, project),
+      viewerOf(user.id, project, blocks),
       project,
       publicApiUrl,
     )

@@ -85,6 +85,13 @@
       "when": 1792855304935,
       "tag": "0011_member_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792889226617,
+      "tag": "0012_mention_withdrawn_and_block_list",
+      "breakpoints": true
     }
   ]
 }

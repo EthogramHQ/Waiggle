@@ -14,6 +14,7 @@ import {
   BLOCKS_PAGE_SIZE,
   BLOCKS_PER_DAY,
   BlockedPage,
+  CommentPage,
   ErrorResponse,
   Member,
   UNBLOCKS_PER_DAY,
@@ -350,6 +351,27 @@ describe('the list of blocked members', () => {
     expect(second.nextCursor).toBeNull()
   })
 
+  // Relecture de sécurité A6 : le curseur vient du client. Tout ce qui ne décrit pas un vrai
+  // marque-page (pas du base64, pas du JSON, un champ de trop, une date que PostgreSQL refuse)
+  // reçoit le refus d'une demande mal formée, jamais une erreur du serveur.
+  it('refuses with 400, never 500, a cursor that means nothing', async () => {
+    await act.block(inesId, malik)
+    const encode = (value: unknown) =>
+      Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+    for (const cursor of [
+      '%%% pas du base64 %%%',
+      Buffer.from('{pas du JSON', 'utf8').toString('base64url'),
+      encode({ at: '2026-06-15T08:00:00.000Z', id: inesId, extra: 'de trop' }),
+      encode({ at: '0001-01-01T00:00:00.000Z', id: inesId }),
+    ]) {
+      const res = await act.send('GET', `/v1/me/blocks?${new URLSearchParams({ cursor })}`, malik)
+      await expectError(res, 400, 'validation')
+    }
+    // Témoin : un marque-page bien formé est accepté (rien n'est plus ancien : page vide).
+    const valid = encode({ at: '2026-01-01T00:00:00.000Z', id: inesId })
+    expect((await readBlocks(malik, valid)).items).toEqual([])
+  })
+
   it('forgets a member once unblocked', async () => {
     await act.block(inesId, malik)
     await act.unblock(inesId, malik)
@@ -531,5 +553,66 @@ describe('the profile photo of a blocked member', () => {
     // Témoin : Zoé lit la photo de Malik dans les commentaires de son projet.
     const seen = await (await act.send('GET', `/v1/projects/${zoeProject.id}/comments`, zoe)).text()
     expect(seen).toContain(avatarUrl ?? 'no avatar')
+  })
+
+  // Relecture de sécurité A1 (décision du 24/10/2026) : les exceptions des règles 1 et 2 laissent
+  // lire un commentaire malgré le blocage, avec le nom de son auteur, jamais sa photo.
+  it('stays out of a comment read despite the block, which keeps the name (rules 1 and 2)', async () => {
+    const upload = await ctx.request('/v1/me/avatar', {
+      method: 'POST',
+      headers: { cookie: malik },
+      body: avatarForm(await jpegImage(64, 64)),
+    })
+    expect(upload.status).toBe(200)
+    const { avatarUrl } = await act.me(malik)
+    expect(avatarUrl).not.toBeNull()
+    const photo = avatarUrl ?? 'no avatar'
+    const meteo = await act.publish(ines, 'Météo')
+    const recettes = await act.publish(zoe, 'Recettes')
+    const { handle: inesHandle } = await act.me(ines)
+    // Règle 1 : un commentaire de Malik chez Inès ; règle 2 : un commentaire de Malik chez Zoé qui
+    // mentionne Inès.
+    const atInes = await act.comment(meteo.id, malik, 'Un commentaire chez Inès')
+    later()
+    const mention = await act.comment(recettes.id, malik, `Tu as vu, @${inesHandle} ?`)
+    later()
+    await act.block(inesId, malik) // Malik bloque Inès
+
+    /** Ce qu'Inès lit des commentaires d'un projet : le texte brut, et les auteurs. */
+    const readAsInes = async (projectId: string) => {
+      const text = await (await act.send('GET', `/v1/projects/${projectId}/comments`, ines)).text()
+      return { text, items: CommentPage.parse(JSON.parse(text)).items }
+    }
+    for (const [projectId, commentId] of [
+      [meteo.id, atInes.id],
+      [recettes.id, mention.id],
+    ] as const) {
+      const { text, items } = await readAsInes(projectId)
+      expect(
+        items.map((item) => [item.id, item.author]),
+        projectId,
+      ).toEqual([[commentId, { id: malikId, name: 'Malik', avatarUrl: null }]])
+      expect(text, projectId).not.toContain(photo)
+      const preview = await act.send(
+        'GET',
+        `/v1/reports/target?${new URLSearchParams({ kind: 'comment', id: commentId })}`,
+        ines,
+      )
+      expect(preview.status, projectId).toBe(200)
+      expect(await preview.text(), projectId).not.toContain(photo)
+    }
+
+    // L'autre sens de la règle 1 : c'est Inès, l'autrice du projet, qui bloque Malik.
+    await act.unblock(inesId, malik)
+    await act.block(malikId, ines)
+    const { text, items } = await readAsInes(meteo.id)
+    expect(items.map((item) => item.author)).toEqual([
+      { id: malikId, name: 'Malik', avatarUrl: null },
+    ])
+    expect(text).not.toContain(photo)
+
+    // Témoin : Zoé, qui n'a bloqué personne, lit la photo de Malik chez elle.
+    const seen = await (await act.send('GET', `/v1/projects/${recettes.id}/comments`, zoe)).text()
+    expect(seen).toContain(photo)
   })
 })

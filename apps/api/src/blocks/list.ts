@@ -60,9 +60,10 @@ const afterCursor = (cursor: BlocksCursor): SQL =>
  *
  * En SQL : select … from member_block join "user" on id = blocked_id left join profile …
  * left join member_handle (pseudo actuel) where blocker_id = $moi [and (created_at, blocked_id) <
- * (curseur)] order by created_at desc, blocked_id desc limit 51. La clé primaire (blocker_id,
- * blocked_id) trouve les blocages du membre ; ils sont rangés en mémoire, ce qui reste court (au
- * plus 100 nouveaux par jour). On en lit un de plus que la page : s'il existe, il y a une suite.
+ * (curseur)] order by created_at desc, blocked_id desc limit 51. L'index
+ * member_block_blocker_created_idx (blocker_id, created_at desc, blocked_id desc) range déjà les
+ * blocages du membre dans l'ordre de la page : PostgreSQL part du curseur et s'arrête au 51e, sans
+ * tri en mémoire. On en lit un de plus que la page : s'il existe, il y a une suite.
  */
 export const loadBlockedPage = async (
   db: Database,

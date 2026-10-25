@@ -28,3 +28,13 @@ export const listedProjectFor = (viewerId: string) =>
  */
 export const projectVisibleTo = (viewerId: string) =>
   or(listedProjectFor(viewerId), eq(schema.project.authorId, viewerId))
+
+/**
+ * Un projet où ce membre peut défaire ses propres gestes (tranche 7b, règle 7 de la relecture du
+ * plan : supprimer son commentaire, retirer sa réaction) : la condition de `projectVisibleTo`
+ * moins le blocage. Un blocage, dans un sens ou dans l'autre, ne refuse jamais de défaire ce qu'on
+ * a fait chez l'autre ; un projet privé ou retiré d'un autre reste introuvable, comme partout.
+ * Écrite une fois ici pour les deux routes (routes/comments.ts, routes/reactions.ts).
+ */
+export const projectReachableBy = (viewerId: string) =>
+  or(listedProject(), eq(schema.project.authorId, viewerId))

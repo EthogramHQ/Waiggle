@@ -1,10 +1,17 @@
 // Les commentaires et les blocages (tranche 7b), au-delà des cas de comments.test.ts : les liens
 // des mentions d'un membre bloqué, une mention gardée à la modification, et la réponse refusée
 // même à l'auteur du projet. Léa publie ; Max et Zoé commentent.
-import { CommentPage, CommentReply } from '@ruche/contracts'
+import { CommentPage, CommentReply, NotificationPage } from '@ruche/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mentionEmails } from './jobs/mention-emails'
 import { activity } from './testing/activity'
-import { createTestContext, type TestContext } from './testing/context'
+import {
+  createTestContext,
+  TEST_API_URL,
+  TEST_APP_URL,
+  TEST_AUTH_SECRET,
+  type TestContext,
+} from './testing/context'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -89,6 +96,95 @@ describe('mentions and blocks', () => {
     // toujours le lien.
     const [forLea] = await readComments(project.id, lea)
     expect(forLea?.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId }])
+  })
+})
+
+// « Une fois mentionné, lisible tant que le commentaire existe » (décision du 25/10/2026, relecture
+// juridique) : retirer « @zoe » en modifiant ne cache pas le commentaire à Zoé (règle 2), mais ce
+// n'est plus une mention : ni lien, ni notification, ni e-mail.
+describe('a mention taken out by an edit', () => {
+  const edit = async (projectId: string, commentId: string, body: string) => {
+    later()
+    const res = await act.send('PATCH', `/v1/projects/${projectId}/comments/${commentId}`, max, {
+      body,
+    })
+    expect(res.status).toBe(200)
+    return CommentReply.parse(await res.json())
+  }
+
+  /** Les notifications de Zoé pour une mention. */
+  const zoeMentions = async () => {
+    const res = await act.send('GET', '/v1/notifications', zoe)
+    expect(res.status).toBe(200)
+    return NotificationPage.parse(await res.json()).items.filter(
+      (n) => n.kind === 'comment' && n.reason === 'mention',
+    )
+  }
+
+  /**
+   * La tâche des e-mails de mentions, vingt minutes plus tard (elle attend un quart d'heure) : les
+   * e-mails qu'elle envoie à Zoé (pas ceux d'avant, comme la confirmation de son adresse).
+   */
+  const runMentionEmails = async () => {
+    const before = ctx.mailer.sent.length
+    vi.setSystemTime(Date.now() + 20 * 60 * 1000)
+    await mentionEmails(
+      {
+        db: ctx.db,
+        mailer: ctx.mailer,
+        appUrl: TEST_APP_URL,
+        apiUrl: TEST_API_URL,
+        secret: TEST_AUTH_SECRET,
+      },
+      new Date(),
+    )
+    return ctx.mailer.sent.slice(before).filter((email) => email.to === 'zoe@example.com')
+  }
+
+  it('leaves the comment readable and reportable by the member once named, when its author blocked her', async () => {
+    const project = await act.publish(lea, 'Météo')
+    const { handle: zoeHandle } = await act.me(zoe)
+    later()
+    const written = await act.comment(project.id, max, `Bonjour @${zoeHandle}`)
+    later()
+    const other = await act.comment(project.id, max, 'Un autre, sans mention')
+    later()
+    await act.block(zoeId, max) // Max bloque Zoé, puis retire « @zoe »
+    await edit(project.id, written.id, 'Bonjour')
+
+    // Zoé lit encore le commentaire qui la nommait (avec le nom de Max), pas l'autre.
+    const items = await readComments(project.id, zoe)
+    expect(items.map((item) => item.id)).toEqual([written.id])
+    expect(items[0]).toMatchObject({ body: 'Bonjour', state: 'visible', mentions: [] })
+    expect(items[0]?.author?.name).toBe('Max')
+    // Et peut le signaler ; l'autre reste introuvable pour elle.
+    await act.report(zoe, { kind: 'comment', id: written.id })
+    const refused = await act.send('POST', '/v1/reports', zoe, {
+      target: { kind: 'comment', id: other.id },
+      reason: 'other',
+    })
+    expect(refused.status).toBe(404)
+  })
+
+  it('gives no link, no notification and no email, and comes back once written again', async () => {
+    await act.setPreferences(zoe, { mentionEmails: true })
+    const project = await act.publish(lea, 'Météo')
+    const { handle: zoeHandle } = await act.me(zoe)
+    later()
+    const written = await act.comment(project.id, max, `Merci @${zoeHandle}`)
+    expect(await zoeMentions()).toHaveLength(1)
+
+    expect((await edit(project.id, written.id, 'Merci')).mentions).toEqual([])
+    expect((await readComments(project.id, lea))[0]?.mentions).toEqual([])
+    expect(await zoeMentions()).toEqual([])
+    expect(await runMentionEmails()).toEqual([])
+
+    // Réécrite, la mention revient, datée de cette modification, comme une mention nouvelle.
+    const again = await edit(project.id, written.id, `Merci encore @${zoeHandle}`)
+    expect(again.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId }])
+    expect((await readComments(project.id, lea))[0]?.mentions).toEqual(again.mentions)
+    expect((await zoeMentions()).map((n) => n.at)).toEqual([again.editedAt])
+    expect(await runMentionEmails()).toHaveLength(1)
   })
 })
 

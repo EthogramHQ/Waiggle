@@ -1,7 +1,8 @@
 // Écrire les mentions d'un commentaire (tranche 6b) : trouver les membres que désignent les
 // « @pseudo » de son texte, et les ranger dans comment_mention, par identifiant. Appelé par POST et
 // PATCH des commentaires (routes/comments.ts), dans la même transaction que le commentaire : le
-// texte et ses mentions changent ensemble, ou pas du tout.
+// texte et ses mentions changent ensemble, ou pas du tout. Depuis la tranche 7b, une mention
+// effacée du texte n'efface plus sa ligne : elle est « retirée » (withdrawn_at, saveMentions).
 import { findMentions, MENTIONS_MAX, type Mention } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm'
@@ -98,25 +99,36 @@ export const resolveMentions = async (
 }
 
 /**
- * Les mentions déjà gardées d'un commentaire (à sa modification), par la clé primaire
+ * Les mentions encore écrites d'un commentaire (à sa modification), par la clé primaire
  * (comment_id, member_id), qui range les lignes par commentaire d'abord :
- *   select handle, member_id from comment_mention where comment_id = $1
+ *   select handle, member_id from comment_mention where comment_id = $1 and withdrawn_at is null
+ * Une mention retirée (tranche 7b, voir saveMentions) n'est plus « gardée » : si l'auteur réécrit
+ * ce pseudo, il est relu comme un pseudo nouveau, avec les règles des blocages d'aujourd'hui.
  */
 export const mentionsOf = (db: Pick<Database, 'select'>, commentId: string) =>
   db
     .select({ handle: cm.handle, memberId: cm.memberId })
     .from(cm)
-    .where(eq(cm.commentId, commentId))
+    .where(and(eq(cm.commentId, commentId), isNull(cm.withdrawnAt)))
 
 /**
  * Range les mentions d'un commentaire qui vient d'être écrit ou modifié, à la date `at` :
- * - celles qui n'y sont plus sont effacées (leur notification disparaît avec elles) ;
+ * - celles qui n'y sont plus sont retirées (tranche 7b) : leur ligne reste, datée par
+ *   `withdrawn_at`. « Une fois mentionné, lisible tant que le commentaire existe » (décision du
+ *   25/10/2026) : sans la ligne, un auteur qui a bloqué Inès pourrait lui cacher ce qu'il a écrit
+ *   sur elle en effaçant « @inès » (règle 2 de la relecture du plan). Une mention retirée n'est plus
+ *   qu'un droit de lecture : ni lien (mentions/load.ts), ni notification, ni e-mail
+ *   (notifications/load.ts). Les lignes partent avec le commentaire (suppression, cascade) ;
  * - les nouvelles sont ajoutées, datées de `at` (la notification arrive maintenant) ;
  * - celles qui y étaient déjà gardent leur date : « on conflict … do update » ne change, quand la
  *   clé (comment_id, member_id) est déjà prise, que le pseudo (« excluded » : la ligne qu'on
  *   voulait insérer). Ainsi, corriger une faute de frappe ne fait pas revenir une notification
  *   déjà vue ; et si l'auteur remplace l'ancien pseudo d'Inès par son nouveau, la ligne d'Inès
- *   prend le pseudo désormais écrit (resolveMentions ne garde l'ancien que s'il est encore là).
+ *   prend le pseudo désormais écrit (resolveMentions ne garde l'ancien que s'il est encore là) ;
+ * - une mention retirée puis réécrite redevient une mention : `withdrawn_at` repasse à null, et
+ *   elle prend la date `at`, comme une mention nouvelle (c'était le cas quand la ligne était
+ *   effacée puis recréée). « case when » choisit, ligne par ligne, entre la date gardée
+ *   (comment_mention.created_at) et la nouvelle (excluded.created_at).
  * La clé primaire (comment_id, member_id) sert aux deux requêtes : elle range les lignes par
  * commentaire d'abord.
  */
@@ -128,10 +140,12 @@ export const saveMentions = async (
 ) => {
   const memberIds = mentions.map((mention) => mention.memberId)
   await db
-    .delete(cm)
+    .update(cm)
+    .set({ withdrawnAt: at })
     .where(
       and(
         eq(cm.commentId, commentId),
+        isNull(cm.withdrawnAt),
         memberIds.length > 0 ? notInArray(cm.memberId, memberIds) : undefined,
       ),
     )
@@ -145,6 +159,10 @@ export const saveMentions = async (
     )
     .onConflictDoUpdate({
       target: [cm.commentId, cm.memberId],
-      set: { handle: sql`excluded.handle` },
+      set: {
+        handle: sql`excluded.handle`,
+        createdAt: sql`case when ${sql.raw('comment_mention.withdrawn_at')} is null then ${sql.raw('comment_mention.created_at')} else excluded.created_at end`,
+        withdrawnAt: null,
+      },
     })
 }

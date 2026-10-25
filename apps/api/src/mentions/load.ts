@@ -4,7 +4,7 @@
 // soit leur nombre.
 import { findMentions, type Mention } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { inArray } from 'drizzle-orm'
+import { and, inArray, isNull } from 'drizzle-orm'
 import type { Blocks } from '../blocks/visibility'
 
 type Reader = Pick<Database, 'select'>
@@ -15,17 +15,20 @@ const cm = schema.commentMention
 type MentionSource = { id: string; body: string }
 
 /**
- * Les lignes de comment_mention de ces commentaires :
- *   select comment_id, member_id, handle from comment_mention where comment_id in (…)
+ * Les mentions encore écrites de ces commentaires :
+ *   select comment_id, member_id, handle from comment_mention
+ *   where comment_id in (…) and withdrawn_at is null
  * La clé primaire (comment_id, member_id) commence par comment_id : elle trouve les mentions de
  * chaque commentaire. Un compte supprimé n'y a plus de ligne (effacement en cascade) : son pseudo
- * redevient du texte simple.
+ * redevient du texte simple. Une mention retirée par l'auteur (tranche 7b, withdrawn_at, voir
+ * mentions/write.ts) n'est plus une mention : ni lien, ni ligne dans l'export. Elle ne sert plus
+ * qu'à laisser le membre mentionné lire le commentaire (règle 2, comments/load.ts).
  */
 const mentionRows = (db: Reader, commentIds: string[]) =>
   db
     .select({ commentId: cm.commentId, memberId: cm.memberId, handle: cm.handle })
     .from(cm)
-    .where(inArray(cm.commentId, commentIds))
+    .where(and(inArray(cm.commentId, commentIds), isNull(cm.withdrawnAt)))
 
 /**
  * Les mentions de ces commentaires, dans l'ordre du texte. Le pseudo vient de comment_mention, où il
