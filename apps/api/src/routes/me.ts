@@ -145,11 +145,22 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     return c.json(me, 200)
   })
 
-  app.openapi(updateMeRoute, async (c) => {
+  // Le quota du profil compte AVANT de lire le corps de la demande (audit de sécurité du
+  // 25/10/2026, C7, comme routes/notes.ts) : le schéma ProfileUpdate est vérifié par un middleware
+  // que Hono place juste avant la route ; ce garde, enregistré plus tôt pour la même adresse et la
+  // même méthode, passe avant lui. Chaque demande compte ainsi, même mal écrite.
+  app.on('PATCH', '/v1/me', async (c, next) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
     const decision = await limiter.hit(memberCounterKeys(user.id).profile, profileRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    await next()
+  })
+
+  app.openapi(updateMeRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    // Le garde ci-dessus a déjà compté la demande dans le quota de l'heure.
 
     // c.req.valid('json') : le corps de la requête, déjà vérifié par le schéma ProfileUpdate. Le
     // pseudo y est déjà nettoyé (« @Ines » → « ines ») et de bonne forme.

@@ -230,12 +230,15 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   app.openapi(deleteVisualRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
+    // Le quota d'abord, puis le projet (audit de sécurité du 25/10/2026, C7) : chaque demande
+    // compte, même celle qui vise un projet inconnu ou celui d'un autre, et le serveur ne lit pas
+    // le projet pour un membre qui a déjà dépassé son quota.
+    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     const { id, visualId } = c.req.valid('param')
     const access = await ownProject(id, user.id)
     if (access === 'not_found') return notFound(c)
     if (access === 'forbidden') return forbidden(c)
-    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
-    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
 
     // Un identifiant mal formé ne désigne aucune photo (et ferait échouer la requête SQL).
     if (!z.uuid().safeParse(visualId).success) return notFound(c)
