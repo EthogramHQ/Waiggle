@@ -84,7 +84,6 @@ const AUTH_RATE_GENERAL = { window: 60, max: 100 }
 export const AUTH_RATE_RULES = {
   '/sign-in/email': { window: 15 * 60, max: 5 },
   '/sign-up/email': { window: 60 * 60, max: 10 },
-  '/send-verification-email': { window: 60 * 60, max: 5 },
   '/delete-user': { window: 15 * 60, max: 5 },
 } satisfies Record<string, { window: number; max: number }>
 
@@ -258,7 +257,12 @@ export const createAuth = ({
     //   Ouvertes, elles écrivent dans les logs le nom de fournisseur envoyé par n'importe qui ;
     // - verify-password (audit du 25/10/2026, C4) : elle dit seulement si un mot de passe est le
     //   bon. Avec une session volée, elle servait à deviner le mot de passe du membre, 100 essais
-    //   par minute, sans laisser de trace. La suppression du compte vérifie le sien elle-même.
+    //   par minute, sans laisser de trace. La suppression du compte vérifie le sien elle-même ;
+    // - send-verification-email (C5) : renvoyer le lien de vérification, sans session, à
+    //   n'importe quelle adresse non vérifiée (5 e-mails par heure et par adresse IP, vers une
+    //   boîte qui n'a rien demandé). L'appli ne l'appelle pas : se connecter avant d'avoir vérifié
+    //   renvoie le lien (sendOnSignIn, plus haut), sous le quota de la connexion. Better Auth
+    //   envoie alors l'e-mail lui-même, sans passer par la route fermée ;
     // Une route fermée répond 404, comme une adresse inconnue (test dans accounts.test.ts). Le jour
     // où l'appli s'en sert, on la retire de cette liste, avec ses tests.
     disabledPaths: [
@@ -272,6 +276,7 @@ export const createAuth = ({
       '/sign-in/social',
       '/link-social',
       '/verify-password',
+      '/send-verification-email',
     ],
 
     rateLimit: {

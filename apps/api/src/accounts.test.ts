@@ -106,6 +106,21 @@ describe('creating an account', () => {
     expect(ctx.mailer.sent).toHaveLength(2)
   })
 
+  it('still sends a working link when the member signs in before verifying', async () => {
+    // La route « renvoyer le lien » est fermée (audit du 25/10/2026, C5) : se connecter reste le
+    // seul moyen de recevoir un nouveau lien. Personne ne doit rester bloqué si le premier se perd.
+    await ctx.signUp(lea)
+    expect((await ctx.signIn(lea)).status).toBe(403)
+    const resent = ctx.mailer.sent.at(-1)
+    if (!resent) throw new Error('no second verification email')
+
+    const verify = await ctx.request(linkIn(resent.text).pathname + linkIn(resent.text).search)
+    const res = await ctx.request('/v1/me', { headers: { cookie: ctx.cookiesFrom(verify) } })
+
+    expect(res.status).toBe(200)
+    expect(Me.parse(await res.json()).emailVerified).toBe(true)
+  })
+
   it('refuses a verification link that would send the member to another website', async () => {
     // Sinon, un e-mail authentique de Ruche pourrait mener vers un faux site (« open redirect »).
     const res = await ctx.request('/api/auth/sign-up/email', {
@@ -355,6 +370,10 @@ describe('authentication routes the app does not use', () => {
     // Audit de sécurité du 25/10/2026, C4 : vérifier un mot de passe avec une session volée, au
     // rythme du quota général (100 essais par minute), sans rien changer au compte.
     ['POST', '/verify-password', { password: lea.password }],
+    // C5 : renvoyer le lien de vérification à n'importe quelle adresse, sans session (5 e-mails
+    // par heure et par adresse IP vers une boîte qui n'a rien demandé). L'appli ne l'appelle pas :
+    // se connecter avant d'avoir vérifié renvoie le lien (test plus haut).
+    ['POST', '/send-verification-email', { email: lea.email }],
   ] as const)('are closed: %s %s', async (method, path, body) => {
     const cookies = await signUpAndVerify()
 
