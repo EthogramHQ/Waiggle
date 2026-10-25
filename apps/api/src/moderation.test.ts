@@ -1043,4 +1043,42 @@ describe('the moderation and blocks', () => {
     await act.makeAdmin(zoeId)
     expect((await readQueue(zoe)).items.map((item) => item.concernsMe)).toEqual([false, false])
   })
+
+  // Règle 17 (relecture de la branche, B1) : le garde se vérifie sur la décision elle-même, pas
+  // seulement sur l'indicateur « Te concerne » qui l'annonce. Retirer, classer et rétablir sont
+  // refusés comme pour son propre contenu (422 « own_content »), et rien ne change en base.
+  it('refuses his decisions on a member he blocked, and lets another administrator decide', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire de Léa')
+    await report(max, { kind: 'comment', id: comment.id })
+    await report(max, projectTarget())
+    // Le commentaire est retiré avant le blocage : il y aura quelque chose à rétablir.
+    await remove({ kind: 'comment', id: comment.id })
+    later()
+    await act.block(leaId, louis) // l'administrateur bloque Léa
+    const reportsBefore = await reportsInBase()
+    const decisionsBefore = await decisionsInBase()
+
+    const decisions: ModerationDecisionInput[] = [
+      { action: 'remove', target: projectTarget(), ground: 'rules', explanation: 'Bloquée.' },
+      { action: 'dismiss', target: projectTarget() },
+      { action: 'restore', target: { kind: 'comment', id: comment.id } },
+    ]
+    for (const decision of decisions) {
+      await expectError(await decideRaw(louis, decision), 422, 'own_content')
+    }
+    expect(await reportsInBase()).toEqual(reportsBefore)
+    expect(await decisionsInBase()).toEqual(decisionsBefore)
+    expect((await readProject(meteo.id, zoe)).removal).toBeNull()
+
+    // « Retirés » annonce le refus à Louis, et à lui seul.
+    expect((await readRemoved()).items.map((item) => [item.target, item.concernsMe])).toEqual([
+      [{ kind: 'comment', id: comment.id }, true],
+    ])
+    await act.makeAdmin(zoeId)
+    expect((await readRemoved(zoe)).items.map((item) => item.concernsMe)).toEqual([false])
+    // Témoin : Zoé, administratrice, rétablit le commentaire ; le refus venait bien du blocage.
+    later()
+    await act.decide(zoe, { action: 'restore', target: { kind: 'comment', id: comment.id } })
+    expect((await readRemoved()).items).toEqual([])
+  })
 })
