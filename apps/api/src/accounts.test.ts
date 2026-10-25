@@ -352,6 +352,9 @@ describe('authentication routes the app does not use', () => {
     ['POST', '/revoke-other-sessions', {}],
     ['POST', '/sign-in/social', { provider: 'google' }],
     ['POST', '/link-social', { provider: 'google' }],
+    // Audit de sécurité du 25/10/2026, C4 : vérifier un mot de passe avec une session volée, au
+    // rythme du quota général (100 essais par minute), sans rien changer au compte.
+    ['POST', '/verify-password', { password: lea.password }],
   ] as const)('are closed: %s %s', async (method, path, body) => {
     const cookies = await signUpAndVerify()
 

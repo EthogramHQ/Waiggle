@@ -255,7 +255,10 @@ export const createAuth = ({
     //   laisserait quelqu'un qui a volé une session essayer 100 mots de passe par minute ;
     // - list-sessions et revoke-* : lister ou couper ses sessions, que l'appli ne montre pas ;
     // - sign-in/social et link-social : la connexion par Google, Apple… que l'appli ne propose pas.
-    //   Ouvertes, elles écrivent dans les logs le nom de fournisseur envoyé par n'importe qui.
+    //   Ouvertes, elles écrivent dans les logs le nom de fournisseur envoyé par n'importe qui ;
+    // - verify-password (audit du 25/10/2026, C4) : elle dit seulement si un mot de passe est le
+    //   bon. Avec une session volée, elle servait à deviner le mot de passe du membre, 100 essais
+    //   par minute, sans laisser de trace. La suppression du compte vérifie le sien elle-même.
     // Une route fermée répond 404, comme une adresse inconnue (test dans accounts.test.ts). Le jour
     // où l'appli s'en sert, on la retire de cette liste, avec ses tests.
     disabledPaths: [
@@ -268,6 +271,7 @@ export const createAuth = ({
       '/revoke-other-sessions',
       '/sign-in/social',
       '/link-social',
+      '/verify-password',
     ],
 
     rateLimit: {
