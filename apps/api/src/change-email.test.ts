@@ -494,6 +494,36 @@ describe('a link opened by another member', () => {
     expect((await accountOf('Inès')).email).toBe(ines.email)
     expect((await accountOf('Malik')).email).toBe(malik.email)
   })
+
+  // Un lien que Better Auth refuse (ici, ouvert par un autre membre connecté) n'est pas compté
+  // comme servi : l'API vérifie d'abord ce que Better Auth vérifierait, puis seulement le compteur
+  // « usage unique » (décision du 26/10/2026). Sans cet ordre, Malik, en ouvrant le lien d'Inès,
+  // le grillerait, et Inès devrait tout recommencer.
+  it('still lets Inès use her first link after Malik, signed in, opened it', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const malikCookie = await ctx.verifiedMember(malik)
+    expect((await ask(cookie)).status).toBe(200)
+    const link = linkOf('changeEmail', ines.email)
+
+    expect(landing(await open(link, malikCookie)).error).not.toBeNull()
+    const res = await open(link)
+
+    expect(landing(res)).toEqual({ page: CONFIRMED_PAGE, error: null })
+    expect(mailsOf('newEmail', NEW_EMAIL)).toHaveLength(1)
+  })
+
+  it('still lets Inès use her second link after Malik, signed in, opened it', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const malikCookie = await ctx.verifiedMember(malik)
+    const link = await askAndConfirm(cookie)
+
+    expect(landing(await open(link, malikCookie)).error).not.toBeNull()
+    const res = await open(link)
+
+    expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+    expect((await accountOf('Malik')).email).toBe(malik.email)
+  })
 })
 
 // ─── Le second lien ne connecte personne (plan, S3) ───────────────────────────────────────────
