@@ -17,8 +17,8 @@
     "journey": "node scripts/journey-local.mjs"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.7",
-    "@better-auth/utils": "0.4.2",
+    "@better-auth/expo": "1.7.13",
+    "@better-auth/utils": "0.5.1",
     "@expo-google-fonts/funnel-display": "0.4.1",
     "@expo-google-fonts/funnel-sans": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -26,7 +26,7 @@
     "@ruche/contracts": "workspace:*",
     "@ruche/i18n": "workspace:*",
     "@tanstack/react-query": "5.104.2",
-    "better-auth": "1.7.7",
+    "better-auth": "1.7.13",
     "expo": "~57.0.27",
     "expo-blur": "~57.0.3",
     "expo-constants": "~57.0.21",
