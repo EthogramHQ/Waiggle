@@ -60,6 +60,14 @@ export function EmailChangeResultScreen({ step }: Props) {
               <Text variant="callout" tone="muted" align="center">
                 {t('account.emailChange.confirmedNone')}
               </Text>
+              {/* Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
+                  sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
+                  moindre élément). En blanc : l'action attendue est d'ouvrir le second lien. */}
+              <Button
+                label={t('account.emailChange.toAccount')}
+                variant="secondary"
+                onPress={toAccount}
+              />
             </>
           ),
         }
