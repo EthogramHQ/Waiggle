@@ -87,6 +87,8 @@ export const en: Translation = {
       tooManyAttempts: 'Too many attempts. Try again in a few minutes.',
       inviteRequired: 'Enter the invite code you received.',
       inviteInvalid: 'This invite code is not valid. Ask the person who invited you for it.',
+      sameEmail: 'This is already your email address.',
+      wrongPassword: 'Incorrect password.',
       generic: 'Something went wrong. Please try again in a moment.',
     },
   },
@@ -124,6 +126,43 @@ export const en: Translation = {
     email: {
       label: 'Email address',
       soon: 'editable soon',
+      change: 'Change email address',
+    },
+    changeEmail: {
+      title: 'Change email address',
+      current: 'Your current address: {{email}}',
+      intro:
+        'Your new address will be used to sign in and to receive emails from {{appName}}. Only you can see it.',
+      steps:
+        'It only changes after two confirmations: a link sent to your current address, then a link sent to the new one.',
+      newEmail: 'New email address',
+      password: 'Confirm with your password',
+      submit: 'Send the link',
+      sending: 'Sending…',
+      noAccess: 'No longer have access to your current address? Write to us at {{contactEmail}}.',
+      sentTitle: 'Check your current inbox',
+      sentBody: 'A link has just been sent to {{email}}. It is valid for one hour.',
+      sentNext:
+        'Nothing changes until you follow this link, then the one you will receive at your new address.',
+      sentNone: 'Nothing after a few minutes? Check your spam folder.',
+      back: 'Back to My account',
+    },
+    emailChange: {
+      confirmedTitle: 'One more step',
+      confirmedBody:
+        'If your new address can be used, a second link has just been sent to it. Open it to finish: it is valid for one hour.',
+      confirmedNone:
+        'Nothing? Check your spam folder. No link is sent if the address already belongs to another account.',
+      doneTitle: 'Email address changed',
+      doneBody: 'Your address is now {{email}}. Use it to sign in from now on.',
+      doneSignedOut: 'Sign in with your new address and your usual password.',
+      doneDevices: 'Your devices that are already signed in stay signed in.',
+      signIn: 'Sign in',
+      toAccount: 'Go to My account',
+      errorTitle: 'This link no longer works',
+      errorBody:
+        'It has expired, it has already been used, another request replaced it, or another account is signed in on this device. You can start again from My account.',
+      restart: 'Start again from My account',
     },
     delete: {
       title: 'Delete my account',
@@ -706,6 +745,32 @@ export const en: Translation = {
       body: 'Someone just tried to create an account with your email address. You already have one: simply sign in.',
       button: 'Sign in',
       ignore: 'If it was not you, there is nothing to do: your account is safe.',
+    },
+    changeEmail: {
+      subject: 'Email address change on {{appName}}',
+      body: 'You asked to replace the email address of your account with:',
+      next: 'Confirm with the button below. A second link will then be sent to this new address. Once the address is changed, your current address will no longer let you sign in and will receive nothing more from {{appName}}.',
+      button: 'Confirm the change',
+      expires: 'This link is valid for one hour.',
+      ignore:
+        'Not you? Ignore this email: nothing will change. But the request was made from your account, with your password: write to us quickly at {{contactEmail}}.',
+    },
+    newEmail: {
+      subject: 'Confirm your new email address on {{appName}}',
+      greeting: 'Hello,',
+      body: 'Click the button below to make this address the one of your {{appName}} account.',
+      button: 'Confirm this address',
+      expires: 'This link is valid for one hour.',
+      ignore:
+        'If you did not ask for anything, do not click and ignore this message: this address will not be linked to any account.',
+    },
+    emailChanged: {
+      subject: 'The email address of your {{appName}} account has changed',
+      body: 'The email address of your account is now:',
+      after:
+        'This address no longer lets you sign in and will receive nothing more from {{appName}}.',
+      button: 'Sign in',
+      help: 'Not you, or a typo in the address? Write to us quickly at {{contactEmail}}.',
     },
   },
   feed: {

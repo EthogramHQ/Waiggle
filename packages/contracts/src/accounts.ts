@@ -44,6 +44,20 @@ export const SignInRequest = z.object({
 })
 export type SignInRequest = z.infer<typeof SignInRequest>
 
+/**
+ * Demande de changement d'adresse (tranche « adresse », POST /api/auth/change-email). Le mot de
+ * passe est exigé, comme pour supprimer le compte : une session ouverte ne suffit pas, sinon
+ * quelqu'un qui trouve un téléphone allumé pourrait détourner le compte vers sa propre adresse.
+ * Refus possibles, par leur code : INVALID_PASSWORD (mot de passe faux) et SAME_EMAIL (c'est déjà
+ * l'adresse du compte). Une adresse prise par un autre compte reçoit la même réponse qu'une
+ * adresse libre : on ne révèle pas qui a un compte.
+ */
+export const ChangeEmailRequest = z.object({
+  newEmail: z.email(),
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+})
+export type ChangeEmailRequest = z.infer<typeof ChangeEmailRequest>
+
 /** Le profil du membre connecté, tel que renvoyé par GET /v1/me. */
 export const Me = z
   .object({

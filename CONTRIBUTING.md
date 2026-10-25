@@ -97,7 +97,7 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
   qu'assembler des composants : aucune couleur, taille, marge ou police écrite dans un écran.
 - **Il manque quelque chose ?** On crée ou complète un composant de `src/ui` plutôt que de styler
   dans l'écran. Puis on l'ajoute au catalogue (`src/catalogue/`) dans tous ses états, et on teste
-  son comportement (rôle, nom, état) dans `src/ui/components.test.tsx`.
+  son comportement (rôle, nom, état) dans son propre fichier de test, `src/ui/<Composant>.test.tsx`.
 - **Couleurs** : par rôle (`textMuted`, `honey`), de jour et de nuit, dans
   `packages/brand/src/colors.ts`. Un texte sur un nouveau fond : ajouter le couple à
   `contrastPairs`.

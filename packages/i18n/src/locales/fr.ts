@@ -98,6 +98,9 @@ export const fr = {
       inviteRequired: 'Indique le code d’invitation que tu as reçu.',
       inviteInvalid:
         'Ce code d’invitation n’est pas valide. Demande-le à la personne qui t’a invité·e.',
+      // Tranche « adresse » : la nouvelle adresse est celle du compte ; le mot de passe est faux.
+      sameEmail: 'C’est déjà ton adresse.',
+      wrongPassword: 'Mot de passe incorrect.',
       generic: 'Une erreur est survenue. Réessaie dans un instant.',
     },
   },
@@ -136,6 +139,45 @@ export const fr = {
     email: {
       label: 'Adresse e-mail',
       soon: 'modifiable bientôt',
+      change: 'Changer d’adresse e-mail',
+    },
+    // Tranche « adresse » : la page où l'on demande le changement (deux liens à suivre).
+    changeEmail: {
+      title: 'Changer d’adresse e-mail',
+      current: 'Ton adresse actuelle : {{email}}',
+      intro:
+        'Ta nouvelle adresse servira à te connecter et à recevoir les e-mails de {{appName}}. Elle n’est visible que par toi.',
+      steps:
+        'Elle ne change qu’après deux confirmations : un lien envoyé à ton adresse actuelle, puis un lien envoyé à la nouvelle.',
+      newEmail: 'Nouvelle adresse e-mail',
+      password: 'Confirme avec ton mot de passe',
+      submit: 'Envoyer le lien',
+      sending: 'Envoi…',
+      noAccess: 'Tu n’as plus accès à ton adresse actuelle ? Écris-nous à {{contactEmail}}.',
+      sentTitle: 'Regarde ta boîte mail actuelle',
+      sentBody: 'Un lien vient de partir vers {{email}}. Il est valable une heure.',
+      sentNext:
+        'Rien ne change tant que tu n’as pas suivi ce lien, puis celui que tu recevras sur ta nouvelle adresse.',
+      sentNone: 'Rien reçu après quelques minutes ? Regarde dans les indésirables.',
+      back: 'Retour à Mon compte',
+    },
+    // Les pages où mènent les deux liens des e-mails.
+    emailChange: {
+      confirmedTitle: 'Plus qu’une étape',
+      confirmedBody:
+        'Si ta nouvelle adresse peut être utilisée, un second lien vient d’y partir. Ouvre-le pour terminer : il est valable une heure.',
+      confirmedNone:
+        'Rien reçu ? Regarde dans les indésirables. Aucun lien ne part si l’adresse est déjà celle d’un autre compte.',
+      doneTitle: 'Adresse changée',
+      doneBody: 'Ton adresse est maintenant {{email}}. Connecte-toi désormais avec elle.',
+      doneSignedOut: 'Connecte-toi avec ta nouvelle adresse et ton mot de passe habituel.',
+      doneDevices: 'Tes appareils déjà connectés le restent.',
+      signIn: 'Me connecter',
+      toAccount: 'Aller à Mon compte',
+      errorTitle: 'Ce lien ne marche plus',
+      errorBody:
+        'Il a expiré, il a déjà servi, une autre demande l’a remplacé, ou un autre compte est connecté sur cet appareil. Tu peux recommencer depuis Mon compte.',
+      restart: 'Recommencer depuis Mon compte',
     },
     delete: {
       title: 'Supprimer mon compte',
@@ -770,6 +812,36 @@ export const fr = {
       body: 'Quelqu’un vient d’essayer de créer un compte avec ton adresse. Tu as déjà un compte : il te suffit de te connecter.',
       button: 'Me connecter',
       ignore: 'Si ce n’était pas toi, tu n’as rien à faire : ton compte est en sécurité.',
+    },
+    // Tranche « adresse » : le premier lien part vers l'ancienne adresse, qui doit donner son accord.
+    changeEmail: {
+      subject: 'Changement d’adresse sur {{appName}}',
+      // La nouvelle adresse s'écrit seule sur la ligne suivante, telle que saisie (relecture J6).
+      body: 'Tu as demandé à remplacer l’adresse de ton compte par :',
+      next: 'Confirme avec le bouton ci-dessous. Ensuite, un second lien partira vers cette nouvelle adresse. Une fois l’adresse changée, ton adresse actuelle ne servira plus à te connecter et ne recevra plus rien de {{appName}}.',
+      button: 'Confirmer le changement',
+      expires: 'Ce lien est valable une heure.',
+      ignore:
+        'Ce n’est pas toi ? Ignore cet e-mail : rien ne changera. Mais la demande a été faite depuis ton compte, avec ton mot de passe : écris-nous vite à {{contactEmail}}.',
+    },
+    // … puis le second vers la nouvelle adresse, pour la vérifier.
+    newEmail: {
+      subject: 'Confirme ta nouvelle adresse sur {{appName}}',
+      // Ni nom ni ancienne adresse : avec une faute de frappe, cet e-mail part chez un inconnu (S6).
+      greeting: 'Bonjour,',
+      body: 'Clique sur le bouton ci-dessous pour que cette adresse devienne celle de ton compte {{appName}}.',
+      button: 'Confirmer cette adresse',
+      expires: 'Ce lien est valable une heure.',
+      ignore:
+        'Si tu n’as rien demandé, ne clique pas et ignore ce message : cette adresse ne sera rattachée à aucun compte.',
+    },
+    // Le dernier e-mail, à l'ancienne adresse, une fois le changement fait (décision du 25/10/2026).
+    emailChanged: {
+      subject: 'L’adresse de ton compte {{appName}} a changé',
+      body: 'L’adresse de ton compte est désormais :',
+      after: 'Cette adresse-ci ne sert plus à te connecter et ne recevra plus rien de {{appName}}.',
+      button: 'Me connecter',
+      help: 'Ce n’était pas toi, ou tu t’es trompé·e d’adresse ? Écris-nous vite à {{contactEmail}}.',
     },
   },
   feed: {

@@ -908,3 +908,60 @@ Règles détaillées :
 **Administrer**
 - Un administrateur voit la file des signalements, peut masquer un contenu, suspendre un compte et
   consulter l'historique de ces actions
+
+## Tranche « adresse » — Changer son adresse e-mail
+
+Statut : **validé par Louis** le 25/10/2026 (le second lien ne connecte personne ; les sessions
+ouvertes restent), complété le même jour après les relectures du plan (le premier e-mail part
+toujours ; un e-mail final à l'ancienne adresse ; textes toujours vrais ; risque accepté).
+
+Droit de rectification (RGPD, art. 16) : chaque membre peut remplacer l'adresse de son compte. La
+nouvelle adresse est vérifiée avant de remplacer l'ancienne, et l'ancienne doit donner son accord.
+
+**Changer son adresse**
+- Étant donné Inès, connectée, dont l'adresse est ines@exemple.fr
+- Quand elle ouvre « Mon compte », choisit « Changer d'adresse », saisit ines.b@exemple.fr et son
+  mot de passe
+- Alors elle lit qu'un e-mail vient de partir vers son adresse **actuelle**, avec un lien valable
+  une heure, et que rien ne change tant qu'elle n'a pas suivi les deux liens
+- Et cet e-mail cite la nouvelle adresse en toutes lettres, annonce la suite, et dit : « Ce n'est
+  pas toi ? Ignore cet e-mail : rien ne changera. » avec l'adresse pour nous écrire
+
+**Confirmer depuis l'ancienne adresse, puis vérifier la nouvelle**
+- Quand Inès suit le lien reçu sur ines@exemple.fr
+- Alors une page lui dit qu'un second lien vient de partir vers sa nouvelle adresse, si elle peut
+  être utilisée
+- Quand elle suit ce second lien
+- Alors son adresse devient ines.b@exemple.fr, vérifiée ; une page le lui confirme et dit que ses
+  appareils déjà connectés le restent
+- Et un dernier e-mail prévient ines@exemple.fr que l'adresse du compte a changé
+- Et elle se connecte désormais avec ines.b@exemple.fr et le même mot de passe ; ines@exemple.fr
+  ne fonctionne plus
+
+Règles détaillées :
+- **Mot de passe exigé** : sans lui, ou avec un mauvais, rien ne part (« Mot de passe incorrect. »).
+  Quelqu'un qui trouve un téléphone ouvert ne peut pas détourner le compte.
+- **Anti-abus** : 5 demandes par quart d'heure et 10 par jour pour un membre, quelle que soit sa
+  connexion ; comptées même pour une demande mal formée.
+- **Adresse déjà utilisée par un autre compte** : tout se passe pareil pour Inès (même réponse,
+  même premier e-mail, même page après le premier lien), mais aucun second lien ne part. On ne
+  révèle pas qui a un compte. **Même adresse que l'actuelle** : « C'est déjà ton adresse. »
+- **Liens** : chacun valable une heure ; chacun ne sert qu'une fois. Un lien périmé, déjà utilisé
+  ou remplacé par une autre demande mène à une page qui le dit et propose de recommencer depuis
+  « Mon compte ».
+- **Le second lien ne connecte personne** : s'il est ouvert sur un appareil sans session, l'adresse
+  change et la page invite à se connecter avec la nouvelle adresse et le mot de passe. (Une faute
+  de frappe dans la nouvelle adresse ne donne pas le compte à un inconnu.)
+- **L'e-mail à la nouvelle adresse** ne contient ni le nom du membre, ni son ancienne adresse.
+- **Les sessions déjà ouvertes restent ouvertes** sur tous les appareils.
+- **« Mon compte » montre l'adresse actuelle** (visible du seul membre, jamais des autres).
+  Aucune adresse n'est écrite dans l'adresse (URL) d'une page.
+- **Plus accès à son adresse actuelle ?** La page le dit : « Écris-nous à contact@… » ; le
+  changement se fait alors à la main, par l'éditeur.
+- **E-mails** : de service (ni publicité, ni désinscription), dans la langue du membre, sans
+  traqueur, liens directs vers waiggle.com ou api.waiggle.com (comme ceux du compte).
+- **Rien d'autre ne change** : pseudo, profil, réglages d'e-mail, abonnements restent ; l'export des
+  données donne la nouvelle adresse.
+- **Risque accepté** (Louis, 25/10/2026) : si Inès se trompe dans la nouvelle adresse et confirme
+  quand même depuis son ancienne boîte, l'inconnu qui suit le second lien reçoit ensuite les
+  e-mails du compte (sans pouvoir s'y connecter) ; Inès doit alors nous écrire.
