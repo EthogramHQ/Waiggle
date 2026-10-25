@@ -870,11 +870,19 @@ Règles détaillées :
   personnes seulement (« Commentaire d'un membre que tu as bloqué » pour qui a bloqué,
   « Commentaire indisponible » pour l'autre ; « Commentaire masqué » reste réservé au geste de
   l'auteur du projet) ; les autres membres le voient toujours, et les réponses restent. Chacun
-  peut toujours supprimer ses propres commentaires et retirer ses réactions.
+  peut toujours supprimer ses propres commentaires et retirer ses réactions. Deux exceptions
+  (24/10/2026) :
+  - **sur son projet, l'auteur garde la modération** : il lit encore le commentaire de l'autre,
+    quel que soit le sens du blocage, et peut le masquer ou le signaler ;
+  - **un commentaire qui me mentionne reste lisible pour moi**, même si son auteur m'a bloqué
+    ensuite, et même s'il retire la mention en le modifiant (25/10/2026) : je peux le signaler.
+    Pas si c'est moi qui ai bloqué l'auteur.
 - **Plus d'interaction** : ni commenter, ni répondre, ni réagir, ni suivre, chez l'autre.
 - **Les réactions déjà données** restent dans les compteurs, qui ne montrent jamais de nom.
-- **Mentions** : chacun disparaît des suggestions de l'autre après « @ » ; une mention tapée à la
-  main ne prévient pas.
+- **Mentions** : chacun disparaît des suggestions de l'autre après « @ ». Mentionner un membre
+  qu'on a bloqué est refusé (« Tu ne peux pas mentionner un membre que tu as bloqué. ») ;
+  mentionner un membre qui nous a bloqués donne du texte simple, sans lien ni notification, et
+  sans erreur : rien ne trahit le blocage.
 - **Notifications et e-mails** : ceux qui viennent de l'autre (mention, commentaire, réponse,
   abonnement, récap du lundi) disparaissent ; les anciennes peuvent réapparaître au déblocage. Une
   notification de modération (retrait, signalement traité) n'est jamais coupée par un blocage.
@@ -891,8 +899,11 @@ Règles détaillées :
   par le signalement, le blocage et l'export (le retrait s'y ajoute en 7c).
 - **Copie complète au signalement** : le texte gardé au moment du signalement comprend tous les
   textes de la cible (pour un projet : aussi description, prompts, outils, lien de démo ; pour un
-  profil : aussi les outils), pas seulement le titre et le pitch. La copie des images est à peser
-  avec la relecture juridique (garder la preuve, ou ne pas garder une image peut-être illégale).
+  profil : aussi les outils), pas seulement le titre et le pitch. Les images ne sont jamais
+  copiées (relecture juridique, 24/10/2026) : la copie garde seulement leur clé (le nom du
+  fichier), et la file dit si chaque image est toujours affichée ou supprimée ou remplacée depuis.
+  Ainsi, l'appli ne détient jamais de copie d'une image peut-être illégale ; ce choix, face aux
+  obligations de preuve, reste à faire valider par un professionnel.
 
 **Administrer**
 - Un administrateur voit la file des signalements, peut masquer un contenu, suspendre un compte et

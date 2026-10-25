@@ -2,7 +2,10 @@
 // projet, les réactions, les suggestions après « @ », les notifications et l'export. Scénario :
 // docs/scenarios/phase-1.md, « Tranche 7b — Bloquer » ; règles 3, 4, 9 et 12 de la relecture du
 // plan (24/10/2026). Les routes du blocage sont testées dans blocks.test.ts, les commentaires dans
-// comments.test.ts, les e-mails dans jobs/.
+// comments.test.ts, les e-mails dans jobs/. Après la relecture de la branche (25/10/2026), ce
+// fichier ajoute : la règle 7 dans les deux sens (A2), le geste d'un tiers sur le projet de
+// l'autre (B2), et les preuves de trois routes de l'inventaire (A5 : modifier, masquer, le fil
+// « Abonnements »).
 //
 // Trois membres : Inès (autrice du projet « Météo »), Malik (bloqué avec elle, dans un sens ou dans
 // l'autre) et Zoé (une troisième, qui montre que les autres ne voient aucune différence). Louis,
@@ -11,6 +14,7 @@
 import {
   AccountExport,
   type AccountExport as AccountExportType,
+  MENTION_EMAIL_DELAY_MINUTES,
   MentionableList,
   type Notification,
   NotificationPage,
@@ -19,9 +23,18 @@ import {
   UnreadCount,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { fill, resources } from '@ruche/i18n'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mentionEmails } from './jobs/mention-emails'
 import { activity } from './testing/activity'
-import { createTestContext, type TestContext } from './testing/context'
+import {
+  createTestContext,
+  TEST_API_URL,
+  TEST_APP_URL,
+  TEST_AUTH_SECRET,
+  type TestContext,
+} from './testing/context'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -35,6 +48,7 @@ let zoeId: string
 let meteo: Project // le projet public d'Inès
 
 const SECOND = 1000
+const MINUTE = 60 * SECOND
 const START = new Date('2026-06-15T08:00:00.000Z')
 const UNKNOWN = '00000000-0000-4000-8000-000000000000'
 const inesAccount = { name: 'Inès', email: 'ines@example.com', password: 'ines-long-password' }
@@ -155,6 +169,86 @@ describe.each(DIRECTIONS)('the contents, when %s', (_, blockNow) => {
     expect(await proposed(zoe, inesHandle)).toContain(inesHandle)
     expect(await proposed(zoe, malikHandle)).toContain(malikHandle)
   })
+
+  // Les preuves de l'inventaire des routes (route-inventory.test.ts, relecture de la branche A5) :
+  // chaque route classée « cache le membre bloqué » a un test qui le montre. Les trois suivants
+  // couvrent les routes qui n'en avaient pas.
+
+  it('refuses to edit my comment on a project of the other one, as an unknown comment', async () => {
+    const mine = await act.comment(meteo.id, malik, 'Mon commentaire chez Inès')
+    const zoes = await act.comment(meteo.id, zoe, 'Le commentaire de Zoé')
+    await blockNow()
+
+    const edit = (id: string, cookie: string) =>
+      act.send('PATCH', `/v1/projects/${meteo.id}/comments/${id}`, cookie, { body: 'Corrigé' })
+    const res = await edit(mine.id, malik)
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual(await (await edit(UNKNOWN, malik)).json())
+    // Témoin : Zoé modifie encore le sien.
+    expect((await edit(zoes.id, zoe)).status).toBe(200)
+  })
+
+  it('answers « unknown » to who hides, or shows again, a comment of the other one', async () => {
+    const recettes = await act.publish(zoe, 'Recettes')
+    const malikComment = await act.comment(recettes.id, malik, 'Le commentaire de Malik')
+    const louisComment = await act.comment(recettes.id, louis, 'Le commentaire de Louis')
+    await blockNow()
+
+    // Inès n'est pas l'autrice de « Recettes » : elle n'a pas le droit de masquer (403). Mais le
+    // commentaire de Malik, qu'elle ne lit plus, est pour elle introuvable (404), comme un inconnu.
+    for (const method of ['PUT', 'DELETE']) {
+      const hide = (id: string) =>
+        act.send(method, `/v1/projects/${recettes.id}/comments/${id}/hide`, ines)
+      const res = await hide(malikComment.id)
+      expect(res.status, method).toBe(404)
+      expect(await res.json()).toEqual(await (await hide(UNKNOWN)).json())
+      expect((await hide(louisComment.id)).status, method).toBe(403) // témoin
+    }
+  })
+
+  // Règle S7 : un abonnement écrit pendant un blocage (une course entre deux requêtes) est rattrapé
+  // à la lecture. Le test l'écrit directement en base, puisque l'API ne le permet pas.
+  it('leaves out of the following feed a follow that slipped in during the block', async () => {
+    await blockNow()
+    await ctx.db.insert(schema.memberFollow).values({ followerId: malikId, memberId: inesId })
+    await ctx.db.insert(schema.projectFollow).values({ followerId: malikId, projectId: meteo.id })
+    await act.followMember(inesId, zoe)
+
+    expect(await (await get('/v1/feed/following', malik)).text()).not.toContain(meteo.id)
+    // Témoin : Zoé, qui suit Inès, voit « Météo ».
+    expect(await (await get('/v1/feed/following', zoe)).text()).toContain(meteo.id)
+  })
+
+  // Règle 7 (J8), dans les deux sens (relecture de la branche, A2) : qui a bloqué comme qui est
+  // bloqué défait encore ses propres gestes chez l'autre. (blocks.test.ts le vérifie pour qui est
+  // bloqué ; ici, les deux.)
+  it('lets me delete my comment, remove my reaction and unfollow on a project of the other one', async () => {
+    const mine = await act.comment(meteo.id, malik, 'Mon commentaire chez Inès')
+    await act.react(meteo.id, 'bravo', malik)
+    await act.send('POST', `/v1/projects/${meteo.id}/follow`, malik)
+    await blockNow()
+
+    for (const [method, path] of [
+      ['DELETE', `/v1/projects/${meteo.id}/comments/${mine.id}`],
+      ['DELETE', `/v1/projects/${meteo.id}/reactions/bravo`],
+      ['DELETE', `/v1/projects/${meteo.id}/follow`],
+      ['DELETE', `/v1/members/${inesId}/follow`],
+    ] as const) {
+      const res = await act.send(method, path, malik)
+      expect(res.status, path).toBe(204)
+    }
+    const [comment] = await ctx.db
+      .select({ deletedAt: schema.projectComment.deletedAt })
+      .from(schema.projectComment)
+      .where(eq(schema.projectComment.id, mine.id))
+    expect(comment?.deletedAt).not.toBeNull()
+    expect(
+      await ctx.db
+        .select()
+        .from(schema.projectReaction)
+        .where(eq(schema.projectReaction.memberId, malikId)),
+    ).toEqual([])
+  })
 })
 
 // ─── Les notifications ───────────────────────────────────────────────────────────────────────────
@@ -270,6 +364,66 @@ describe.each(DIRECTIONS)('the notifications, when %s', (_, blockNow) => {
       targetKind: 'project',
       outcome: 'dismissed',
     })
+  })
+
+  // Règle 4 (relecture de la branche, B2) : le geste d'une troisième personne sur le projet d'un
+  // membre bloqué avec Inès ne la prévient plus, ni dans la liste, ni dans la cloche, ni par e-mail
+  // (`listedProjectFor` dans `readable()`, notifications/load.ts) : la notification nommerait un
+  // projet qu'elle ne peut plus ouvrir, et en citerait un extrait. Zoé n'est bloquée avec personne ;
+  // ses mêmes gestes sur son propre projet servent de témoin.
+  it('drops what a third member does on a project of the other one, and keeps the rest', async () => {
+    await act.setPreferences(ines, { mentionEmails: true })
+    const { handle } = await act.me(ines)
+    const velo = await act.publish(malik, 'Vélo')
+    const recettes = await act.publish(zoe, 'Recettes')
+    for (const [project, place] of [
+      [velo.id, 'chez Malik'],
+      [recettes.id, 'chez Zoé'],
+    ] as const) {
+      later()
+      const root = await act.comment(project, ines, `Inès commente ${place}`)
+      later()
+      await act.comment(project, zoe, `Zoé répond ${place}`, root.id)
+      later()
+      await act.comment(project, zoe, `Zoé parle de @${handle} ${place}`)
+    }
+    const before = (await readNotifications(ines)).map(describeNotification)
+    expect(before.filter((kind) => kind.startsWith('comment:'))).toHaveLength(4)
+    const unreadBefore = await unread(ines)
+    await blockNow()
+
+    const items = await readNotifications(ines)
+    expect(items.map(describeNotification).sort()).toEqual(
+      ['comment:mention:Zoé', 'comment:reply:Zoé', 'handle'].sort(),
+    )
+    const text = JSON.stringify(items)
+    expect(text).not.toContain(velo.id)
+    expect(text).not.toContain('chez Malik')
+    expect(await unread(ines)).toBe(unreadBefore - 2)
+
+    // L'e-mail de mentions, une fois le délai passé : seuls les gestes chez Zoé y sont.
+    later((MENTION_EMAIL_DELAY_MINUTES + 1) * MINUTE)
+    await mentionEmails(
+      {
+        db: ctx.db,
+        mailer: ctx.mailer,
+        appUrl: TEST_APP_URL,
+        apiUrl: TEST_API_URL,
+        secret: TEST_AUTH_SECRET,
+      },
+      new Date(),
+    )
+    const mentionSubjects = [
+      fill(resources.fr.translation.email.mentions.subject),
+      fill(resources.en.translation.email.mentions.subject),
+    ]
+    const emails = ctx.mailer.sent.filter(
+      (email) => email.to === inesAccount.email && mentionSubjects.includes(email.subject),
+    )
+    expect(emails).toHaveLength(1)
+    expect(emails[0]?.text).toContain('chez Zoé')
+    expect(`${emails[0]?.text}${emails[0]?.html}`).not.toContain('chez Malik')
+    expect(`${emails[0]?.text}${emails[0]?.html}`).not.toContain('Vélo')
   })
 })
 

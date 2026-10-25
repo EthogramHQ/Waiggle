@@ -35,8 +35,9 @@ ssh waiggle '/srv/ruche/repo/infra/grant-admin.sh louis@example.com --revoke'   
 L'écran « Modération » montre les cibles signalées, de la plus ancienne à la plus récente, avec
 les motifs comptés, les précisions des membres et la copie **au moment du signalement** : chaque
 texte, champ par champ (titre, pitch, bio…). Les images ne sont pas copiées : la copie garde leur
-nom de fichier, et la file dit « même image », « changée » ou « supprimée depuis » (tranche 7b). Il
-ne dit jamais qui a signalé. Les blocages entre membres n'y changent rien (section 8).
+nom de fichier, et la file dit, pour chacune, « Photo : toujours affichée » ou « Photo : supprimée
+ou remplacée depuis » (de même pour « Couverture » et « Photo de profil » ; « Photo 2 », « Photo 3 »
+quand il y en a plusieurs) (tranche 7b). Il ne dit jamais qui a signalé. Les blocages entre membres n'y changent rien (section 8).
 
 Pour chaque cible, trois décisions :
 
@@ -106,7 +107,8 @@ européen sur les services numériques, DSA).
 - **Retirer** le contenu dans l'appli, fondement « la loi ». Ne pas supprimer le compte ni les
   données soi-même : les enquêteurs peuvent en avoir besoin. La décision reste comme trace.
 - **Ne rien restaurer** : une image supprimée depuis le signalement ne reste que dans les
-  sauvegardes (14 jours). Ne jamais la rechercher ni la restaurer pour la voir : Pharos et les
+  sauvegardes : 14 jours pour les quotidiennes ; les 5 dernières d'avant déploiement (et les 5
+  dernières d'avant restauration), quel que soit leur âge (rotation de `infra/backup.sh`). Ne jamais la rechercher ni la restaurer pour la voir : Pharos et les
   enquêteurs savent la demander.
 
 ### Une photo ou un pseudo illicite sur un profil
@@ -176,12 +178,22 @@ La purge de nuit (`apps/api/src/reports/retention.ts`) applique ces durées :
 | Signalements faits par un compte supprimé | gardés, sans son nom, jusqu'à leur terme |
 | Rôle d'administrateur révoqué | gardé (historique), effacé avec le compte |
 | Blocage entre deux membres | jusqu'au déblocage (la ligne s'efface, sans historique) ou à la suppression d'un des deux comptes |
+| Date de la dernière alerte d'un administrateur (`admin_member.alerted_at`) | tant que le rôle existe |
 
 ## 8. Les blocages
 
 Un membre peut en bloquer un autre (tranche 7b) : aucun des deux ne voit plus les contenus de
 l'autre (projets, notes, commentaires, réactions, notifications, suggestions après « @ »), et ils
-ne peuvent plus interagir. La personne bloquée n'est pas prévenue.
+ne peuvent plus interagir. La personne bloquée n'est pas prévenue. Deux exceptions, à connaître
+pour répondre juste à un membre :
+
+- **L'auteur d'un projet garde la modération de son espace** (règle 1) : sur son projet, il lit
+  encore le commentaire d'un membre bloqué avec lui, dans un sens ou dans l'autre, avec son nom ;
+  il peut le masquer et le signaler.
+- **Un commentaire qui me mentionne reste lisible pour moi** (règle 2), même si son auteur m'a
+  bloqué depuis, et même s'il retire ensuite la mention : je peux le signaler. Pas si c'est moi
+  qui ai bloqué l'auteur. (Mentionner un membre qu'on a bloqué est refusé ; mentionner un membre
+  qui nous a bloqués donne du texte simple, sans lien ni notification.)
 
 - **Un blocage ne sert qu'à cacher.** Il ne prévient pas la modération, ne compte nulle part et
   ne dit rien du comportement de la personne bloquée. Un membre qui veut qu'on agisse doit
@@ -191,9 +203,14 @@ ne peuvent plus interagir. La personne bloquée n'est pas prévenue.
   échapper à la modération. Un seul effet : le lien « Voir » d'une cible peut répondre
   « introuvable ». Cela veut dire que **l'auteur a bloqué l'administrateur** ; la copie complète
   de la file suffit à décider.
-- **« Te concerne »** apparaît aussi quand l'administrateur a lui-même bloqué l'auteur visé : mieux
-  vaut alors laisser un autre administrateur trancher, comme pour son propre contenu (section 2).
-  L'inverse (l'auteur a bloqué l'administrateur) ne change rien.
+- **« Te concerne »** apparaît aussi quand l'administrateur a lui-même bloqué l'auteur visé : un
+  autre administrateur doit alors trancher, comme pour son propre contenu (section 2). L'appli
+  refuse sa décision (retirer, classer, rétablir), dans la file comme dans « Retirés ». L'inverse
+  (l'auteur a bloqué l'administrateur) ne change rien.
+- **Un administrateur seul** qui a bloqué un membre ne peut donc plus rien décider sur lui : ses
+  contenus signalés restent dans la file. Pour décider, il doit d'abord le débloquer (page du
+  membre ou « Mon compte », « Membres bloqués »), ou donner le rôle à un second administrateur
+  (section 1).
 - **Ce que le blocage ne garantit pas** (à dire si un membre demande) :
   - **la confidentialité** : ce qui est public reste lisible par la personne bloquée si elle se
     déconnecte, prend un autre compte, ou si celle qui a bloqué débloque, lit, puis rebloque. Pour
@@ -206,4 +223,3 @@ ne peuvent plus interagir. La personne bloquée n'est pas prévenue.
 - **Les données** : l'export de « Mon compte » contient les blocages que le membre a posés (pseudo
   et date), jamais ceux qui le visent. Supprimer un compte efface les blocages qu'il a posés et
   ceux qui le visaient.
-| Date de la dernière alerte d'un administrateur (`admin_member.alerted_at`) | tant que le rôle existe |
