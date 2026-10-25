@@ -3,7 +3,7 @@
   "private": true,
   "description": "Réseau social pour publier, suivre et tester les projets IA de ses proches.",
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "pnpm@10.34.9",
   "engines": {
     "node": ">=22.12"
   },
@@ -18,9 +18,9 @@
     "arch": "node scripts/architecture.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.3",
     "esbuild": "0.28.2",
-    "turbo": "2.11.7",
+    "turbo": "2.11.10",
     "typescript": "7.0.2"
   }
 }
