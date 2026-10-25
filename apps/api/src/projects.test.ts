@@ -3,6 +3,7 @@
 import { AccountExport, Comment, ErrorResponse, Me, Project, ProjectNote } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 
 let ctx: TestContext
@@ -338,6 +339,41 @@ describe('deleting a project', () => {
     expect((await read(id, lea)).status).toBe(200)
     // Témoin : la même demande, avec la session de l'autrice, efface le projet.
     expect((await send('DELETE', `/v1/projects/${id}`, lea)).status).toBe(204)
+  })
+})
+
+// Audit de sécurité du 25/10/2026, C13 : un blocage, dans un sens ou dans l'autre, cache le projet
+// (blocks/visibility.ts). Modifier ou supprimer le projet de l'autre répond donc « introuvable »,
+// mot pour mot comme un projet qui n'existe pas, et ne change rien.
+describe('changing or deleting a project across a block', () => {
+  /** L'identifiant d'un membre, lu dans « Mon profil ». */
+  const idOf = async (cookie: string) =>
+    Me.parse(await (await send('GET', '/v1/me', cookie)).json()).id
+
+  it.each([
+    ['the author blocked the member', 'author'],
+    ['the member blocked the author', 'member'],
+  ] as const)('answers « not found » and changes nothing when %s', async (_, blocker) => {
+    const { id } = await publish()
+    // Témoin : sans blocage, Max voit le projet public de Léa ; il est seulement « refusé ».
+    expect((await send('PATCH', `/v1/projects/${id}`, max, { title: 'Piraté' })).status).toBe(403)
+    expect((await send('DELETE', `/v1/projects/${id}`, max)).status).toBe(403)
+
+    if (blocker === 'author') await activity(ctx).block(await idOf(max), lea)
+    else await activity(ctx).block(await idOf(lea), max)
+
+    const unknown = crypto.randomUUID()
+    for (const [method, body] of [
+      ['PATCH', { title: 'Piraté' }],
+      ['DELETE', undefined],
+    ] as const) {
+      const res = await send(method, `/v1/projects/${id}`, max, body)
+      const reference = await send(method, `/v1/projects/${unknown}`, max, body)
+      expect(res.status).toBe(404)
+      expect(await res.json()).toEqual(await reference.json())
+    }
+    // Le projet est toujours là, avec son titre.
+    expect(Project.parse(await (await read(id, lea)).json()).title).toBe(recipes.title)
   })
 })
 
