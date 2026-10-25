@@ -129,6 +129,12 @@ export function ChangeEmailScreen() {
   const message = (key: AuthErrorKey | undefined) =>
     key ? t(`auth.errors.${key}`, lengths) : undefined
 
+  // Plus accès à son adresse actuelle : le changement se fait alors à la main (scénario). L'aide
+  // reste dans les deux états.
+  const noAccess = (
+    <Hint icon="envelope-simple" text={t('account.changeEmail.noAccess', { contactEmail })} />
+  )
+
   // Chaque état a sa clé (`key`) : React dessine des éléments neufs au changement, au lieu de
   // réutiliser ceux qui sont à la même place (le bouton « Envoyer » ne devient pas « Retour »).
   const content = sentTo ? (
@@ -151,6 +157,9 @@ export function ChangeEmailScreen() {
       <Text variant="callout" tone="muted">
         {t('account.changeEmail.sentNone')}
       </Text>
+      {/* L'aide passe avant « Retour » : elle l'éloigne encore de la place du bouton touché (27 pt
+          d'écart seulement sur ordinateur sans elle, mesuré dans le navigateur). */}
+      {noAccess}
       <Button label={t('account.changeEmail.back')} variant="secondary" onPress={onBackToAccount} />
     </Fragment>
   ) : (
@@ -193,14 +202,13 @@ export function ChangeEmailScreen() {
         // Impossible d'envoyer sans avoir tapé son mot de passe (comme pour supprimer le compte).
         disabled={password.length === 0}
       />
+      {noAccess}
     </Fragment>
   )
 
   return (
     <Screen onBack={back} title={t('account.changeEmail.title')}>
       {content}
-      {/* Plus accès à son adresse actuelle : le changement se fait alors à la main (scénario). */}
-      <Hint icon="envelope-simple" text={t('account.changeEmail.noAccess', { contactEmail })} />
     </Screen>
   )
 }
