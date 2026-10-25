@@ -170,8 +170,9 @@ export function TextField({
   // champ au texte affiché dessous (aria-describedby).
   const messageId = useId()
   // Ce qu'on lit sous le champ : l'erreur d'abord, sinon la confirmation, sinon l'aide (et l'aide
-  // après l'erreur, avec `keepHint`).
-  const message = keepHint && error && hint ? `${error} ${hint}` : error || success || hint
+  // après l'erreur ou la confirmation, avec `keepHint` : la même règle que l'affichage, Message).
+  const status = error || success
+  const message = keepHint && status && hint ? `${status} ${hint}` : status || hint
   const body = textStyles.body
   const max = limit ?? inputProps.maxLength
   // Le compteur compte comme la limite : en « unités » de texte (value.length), comme maxLength et

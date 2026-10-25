@@ -11,6 +11,7 @@ import type { BlockedPage } from '@ruche/contracts'
 import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { useBlockedMembers, useUnblock } from '../blocks/api'
 import { blockedInes, blockedPageOf, blockedSam } from '../testing/blocks'
+import { passTapGuard } from '../testing/dialog'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
 import { BlockedMembersScreen } from './BlockedMembersScreen'
@@ -92,9 +93,13 @@ const rowOf = (name: string) => {
 
 const unblockTitle = fr.t('block.unblockTitle', { handle: 'ines_morel' })
 
-/** Touche « Débloquer » sur la ligne d'Inès : la fenêtre de confirmation s'ouvre. */
+/**
+ * Touche « Débloquer » sur la ligne d'Inès : la fenêtre de confirmation s'ouvre, et l'on attend la
+ * fin de sa garde des tapes (Dialog `guardTaps`, corrections 7b) avant de la toucher.
+ */
 const askToUnblockInes = async () => {
   await fireEvent.press(rowOf(blockedInes.member.name).getByRole('button', { name: /^Débloquer/ }))
+  await passTapGuard()
 }
 
 describe('the list of the members I blocked', () => {
@@ -133,6 +138,16 @@ describe('the list of the members I blocked', () => {
 
     expect(await screen.findByText(containing(fr.t('block.list.empty')))).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Débloquer/ })).toBeNull()
+  })
+
+  it('says how to block someone when nobody is blocked, not what a block does', async () => {
+    // Corrections 7b (design-7) : « Vous ne voyez plus les contenus l'un de l'autre » contredisait
+    // « Tu n'as bloqué personne ».
+    mockList([blockedPageOf([])])
+    await renderWithProviders(<BlockedMembersScreen />)
+
+    expect(await screen.findByText(containing(fr.t('block.list.emptyHint')))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t('block.list.hint')))).toBeNull()
   })
 
   it('loads the next ones on request', async () => {

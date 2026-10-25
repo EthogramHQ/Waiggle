@@ -2,22 +2,20 @@
 // que j'ai bloqués, du plus récent au plus ancien, 50 par 50 (« Afficher la suite »). Chaque ligne
 // dit qui (nom, @pseudo) et depuis quand, avec « Débloquer ».
 //
-// Débloquer passe par une fenêtre de confirmation (règle 21 de la relecture du plan, J10) : on
-// verra de nouveau les contenus l'un de l'autre, mais les abonnements retirés ne reviennent pas.
-// Une fois débloqué, « Tu as débloqué @x. » le confirme en haut de la liste, et la liste se relit :
-// la ligne s'en va.
-import { UNBLOCKS_PER_DAY } from '@ruche/contracts'
+// Débloquer passe par une fenêtre de confirmation (règle 21 de la relecture du plan, J10 ;
+// BlockDialog, la même que sur la page d'un membre) : on verra de nouveau les contenus l'un de
+// l'autre, mais les abonnements retirés ne reviennent pas. Une fois débloqué, « Tu as débloqué
+// @x. » le confirme en haut de la liste, et la liste se relit : la ligne s'en va.
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import { type ApiErrorKey, errorKey } from '../api/errors'
+import { errorKey } from '../api/errors'
 import { useBlockedMembers, useUnblock } from '../blocks/api'
-import { useSignInAgain } from '../navigation/signInAgain'
+import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
-import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -35,24 +33,15 @@ export function BlockedMembersScreen() {
   return <BlockedMembers />
 }
 
-/** Le membre qu'on s'apprête à débloquer : de quoi le nommer dans la fenêtre. */
-type Pending = { id: string; handle: string }
-
 function BlockedMembers() {
   const { t, i18n } = useTranslation()
   const back = useGoBack('/account')
-  const signInAgain = useSignInAgain()
   const list = useBlockedMembers()
   const { unblock } = useUnblock()
 
-  // La fenêtre ouverte (qui débloquer), l'envoi en cours, son refus, et le dernier déblocage fait.
-  const [asking, setAsking] = useState<Pending | null>(null)
-  const [unblocking, setUnblocking] = useState(false)
-  const [failure, setFailure] = useState<ApiErrorKey | null>(null)
+  // La fenêtre ouverte (qui débloquer), et le dernier déblocage fait.
+  const [asking, setAsking] = useState<BlockAsking | null>(null)
   const [done, setDone] = useState<string | null>(null)
-  // Un envoi à la fois : un double appui sur « Débloquer » ne débloque qu'une fois (l'état
-  // `unblocking`, lui, n'est à jour qu'au dessin suivant).
-  const busy = useRef(false)
   // « Réessayer » sur une liste en erreur : React Query efface l'erreur pendant la relecture ; on
   // garde l'écran d'erreur (et le focus sur son bouton) jusqu'à la réponse.
   const [retrying, setRetrying] = useState(false)
@@ -64,51 +53,11 @@ function BlockedMembers() {
   // (polite). Sur le web, on le focalise après le fondu de la fenêtre (`onClosed`).
   const focusAfterClose = useRef(false)
 
-  const open = (member: Pending) => {
-    // Une fenêtre neuve ne montre pas le refus de la précédente.
-    setFailure(null)
-    setAsking(member)
-  }
-
-  const close = () => {
-    // Pendant l'envoi, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-    if (!busy.current) setAsking(null)
-  }
-
-  const confirm = async () => {
-    if (!asking || busy.current) return
-    busy.current = true
-    setUnblocking(true)
-    const result = await unblock(asking.id)
-    busy.current = false
-    setUnblocking(false)
-    // Refusé : la fenêtre reste ouverte, avec le message ; « Débloquer » permet de réessayer.
-    if (!result.ok) {
-      setFailure(result.error)
-      return
-    }
-    setFailure(null)
-    focusAfterClose.current = true
-    setDone(t('block.unblocked', { handle: asking.handle }))
-    setAsking(null)
-  }
-
   const onRetry = async () => {
     setRetrying(true)
     await list.refetch()
     setRetrying(false)
   }
-
-  // Le message d'un refus. Une session expirée a son lien « Me reconnecter » ; le quota du jour a
-  // sa propre phrase (« Réessaie » ne servirait à rien avant demain).
-  const failureMessage =
-    failure === null
-      ? null
-      : failure === 'unauthorized'
-        ? t('states.expired')
-        : failure === 'rateLimited'
-          ? t('block.unblockLimited', { max: UNBLOCKS_PER_DAY })
-          : t('block.error')
 
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
   // Une session expirée en arrivant : se reconnecter, pas réessayer.
@@ -135,12 +84,12 @@ function BlockedMembers() {
               reste jusqu'au déblocage suivant, au lieu de disparaître sous le doigt. */}
           {done ? <Notice ref={doneRef} tone="success" message={done} polite /> : null}
           {items.length === 0 ? (
-            // Personne : un titre (lu d'abord en parcourant la page par ses titres), et ce que fait
-            // un blocage. Rien à proposer : on bloque depuis la page d'un membre.
+            // Personne : un titre (lu d'abord en parcourant la page par ses titres), et comment
+            // bloquer (depuis la page d'un membre). « Vous ne voyez plus… » serait faux ici.
             <StateMessage
               kind="empty"
               title={t('block.list.empty')}
-              message={t('block.list.hint')}
+              message={t('block.list.emptyHint')}
             />
           ) : (
             <>
@@ -162,7 +111,12 @@ function BlockedMembers() {
                         spokenLabel={t('block.list.unblockLabel', { handle: member.handle })}
                         variant="secondary"
                         size="compact"
-                        onPress={() => open({ id: member.id, handle: member.handle })}
+                        onPress={() =>
+                          setAsking({
+                            gesture: 'unblock',
+                            member: { id: member.id, handle: member.handle },
+                          })
+                        }
                       />
                     }
                   />
@@ -192,39 +146,24 @@ function BlockedMembers() {
         </Stack>
       )}
 
-      {/* Débloquer se confirme : les abonnements retirés au blocage ne reviennent pas. */}
-      <Dialog
-        visible={asking !== null}
-        title={t('block.unblockTitle', { handle: asking?.handle ?? '' })}
-        message={t('block.unblockMessage')}
-        onDismiss={close}
+      {/* Débloquer se confirme : les abonnements retirés au blocage ne reviennent pas. La fenêtre
+          garde le pseudo pendant son fondu de fermeture (BlockDialog). */}
+      <BlockDialog
+        asking={asking}
+        send={({ member }) => unblock(member.id)}
+        onDone={({ member }) => {
+          focusAfterClose.current = true
+          setDone(t('block.unblocked', { handle: member.handle }))
+          setAsking(null)
+        }}
+        onCancel={() => setAsking(null)}
         onClosed={() => {
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
           requestAnimationFrame(() => focusWithoutScroll(doneRef.current))
         }}
-      >
-        {/* Refusé : le message reste dans la fenêtre, et « Débloquer » permet de réessayer. */}
-        {failureMessage ? (
-          <Notice
-            message={failureMessage}
-            action={failure === 'unauthorized' ? signInAgain(() => setAsking(null)) : undefined}
-          />
-        ) : null}
-        <Button
-          label={t('block.unblockConfirm')}
-          variant="confirm"
-          onPress={() => void confirm()}
-          loading={unblocking}
-        />
-        <Button
-          label={t('block.cancel')}
-          variant="secondary"
-          onPress={close}
-          disabled={unblocking}
-        />
-      </Dialog>
+      />
     </Screen>
   )
 }

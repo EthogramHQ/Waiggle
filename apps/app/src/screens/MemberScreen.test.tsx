@@ -1,10 +1,11 @@
 // Tests de la page d'un membre. L'API (members/api) est remplacée par de faux appels.
-import { BLOCKS_PER_DAY } from '@ruche/contracts'
+import { BLOCKS_PER_DAY, UNBLOCKS_PER_DAY } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useBlock, useUnblock } from '../blocks/api'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
+import { passTapGuard } from '../testing/dialog'
 import { reportsOpened, visited } from '../testing/navigation'
 import {
   blockedLeaPage,
@@ -346,10 +347,14 @@ describe('reporting a member from her page', () => {
 describe('blocking a member from her page', () => {
   const blockTitle = fr.t('block.title', { handle: 'lea' })
 
-  /** Ouvre le menu, choisit « Bloquer » : la fenêtre de confirmation s'ouvre. */
+  /**
+   * Ouvre le menu, choisit « Bloquer » : la fenêtre de confirmation s'ouvre, et l'on attend la fin
+   * de sa garde des tapes (Dialog `guardTaps`, corrections 7b) avant de la toucher.
+   */
   const askToBlock = async () => {
     await openMenu()
     await fireEvent.press(screen.getByRole('menuitem', { name: fr.t('block.action') }))
+    await passTapGuard()
   }
 
   it('offers « Signaler ce profil » and « Bloquer » in the menu of another member’s page', async () => {
@@ -432,12 +437,33 @@ describe('blocking a member from her page', () => {
       await screen.findByText(containing(fr.t('block.limited', { max: BLOCKS_PER_DAY }))),
     ).toBeTruthy()
   })
+
+  it('shows the blocked page at once, with the same notice as once read again, read politely', async () => {
+    // Relecture de l'interface 7b (ui-3) : un seul texte, avant et après la relecture de la page,
+    // lu sans interrompre (role « status », pas « alert »).
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+
+    const notice = await screen.findByText(containing(fr.t('block.notice', { handle: 'lea' })))
+    expect(notice).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Débloquer @lea' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Suivre Léa' })).toBeNull()
+  })
 })
 
 describe('the page of a member I blocked', () => {
   beforeEach(() => {
     jest.mocked(getMember).mockResolvedValue(blockedLeaPage)
   })
+
+  /** Touche « Débloquer » sur la page, puis attend la fin de la garde des tapes de la fenêtre. */
+  const askToUnblock = async () => {
+    await fireEvent.press(await screen.findByRole('button', { name: 'Débloquer @lea' }))
+    await passTapGuard()
+  }
 
   it('shows her header only, and says she is blocked', async () => {
     await renderWithProviders(<MemberScreen id="u1" />)
@@ -460,13 +486,16 @@ describe('the page of a member I blocked', () => {
     expect(screen.queryByText(/abonnés?$/)).toBeNull()
   })
 
-  it('offers « Débloquer » and « Signaler ce profil » in the menu, not « Bloquer »', async () => {
+  it('offers « Débloquer » as a button of the page, and « Signaler ce profil » in the menu, not « Bloquer »', async () => {
+    // Corrections 7b (design-4) : « Débloquer » se voit sous « Tu as bloqué @lea. », au lieu d'être
+    // caché dans le menu ; son nom lu dit qui.
     await renderWithProviders(<MemberScreen id="u1" />)
 
+    expect(await screen.findByRole('button', { name: 'Débloquer @lea' })).toBeTruthy()
     await openMenu()
 
-    expect(screen.getByRole('menuitem', { name: 'Débloquer' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Signaler ce profil' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Débloquer' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Bloquer' })).toBeNull()
   })
 
@@ -483,12 +512,12 @@ describe('the page of a member I blocked', () => {
     // Règle 21 de la relecture du plan (J10) : « Débloquer » passe par une fenêtre.
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    await openMenu()
-    await fireEvent.press(screen.getByRole('menuitem', { name: 'Débloquer' }))
+    await askToUnblock()
 
     expect(
       screen.getByRole('header', { name: fr.t('block.unblockTitle', { handle: 'lea' }) }),
     ).toBeTruthy()
+    // Relecture juridique R7 : le texte dit aussi que les anciennes notifications peuvent revenir.
     expect(screen.getAllByText(containing(fr.t('block.unblockMessage'))).length).toBeGreaterThan(0)
     expect(mockUnblock).not.toHaveBeenCalled()
 
@@ -496,16 +525,31 @@ describe('the page of a member I blocked', () => {
 
     expect(mockUnblock).toHaveBeenCalledTimes(1)
     expect(mockUnblock).toHaveBeenCalledWith('u1')
+    expect(
+      await screen.findByText(containing(fr.t('block.unblocked', { handle: 'lea' }))),
+    ).toBeTruthy()
   })
 
   it('unblocks nothing when the window is cancelled', async () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    await openMenu()
-    await fireEvent.press(screen.getByRole('menuitem', { name: 'Débloquer' }))
+    await askToUnblock()
     await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
 
     expect(mockUnblock).not.toHaveBeenCalled()
+  })
+
+  it('says when the daily limit of unblocks is reached, with its own number', async () => {
+    // Corrections 7b (ui-2) : le quota des déblocages a son message, comme dans la liste.
+    mockUnblock.mockResolvedValue({ ok: false, error: 'rateLimited' })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToUnblock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+
+    expect(
+      await screen.findByText(containing(fr.t('block.unblockLimited', { max: UNBLOCKS_PER_DAY }))),
+    ).toBeTruthy()
   })
 })
 

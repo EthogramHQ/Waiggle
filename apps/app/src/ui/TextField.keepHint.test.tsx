@@ -39,6 +39,25 @@ describe('TextField, its hint and its error', () => {
     expect(screen.getByLabelText('Précision').props.accessibilityHint).toBe(`${error} ${hint}`)
   })
 
+  it('keeps its hint under a confirmation too, and reads both', async () => {
+    // Relecture de l'interface 7b : l'aide restait affichée sous la confirmation, sans être lue.
+    const success = 'Lien vérifié'
+    await renderWithProviders(
+      <TextField
+        label="Précision"
+        value=""
+        onChangeText={() => {}}
+        hint={hint}
+        success={success}
+        keepHint
+      />,
+    )
+
+    expect(screen.getByText(success)).toBeTruthy()
+    expect(screen.getByText(hint)).toBeTruthy()
+    expect(screen.getByLabelText('Précision').props.accessibilityHint).toBe(`${success} ${hint}`)
+  })
+
   it('shows its hint alone when there is no error', async () => {
     await renderWithProviders(
       <TextField label="Précision" value="" onChangeText={() => {}} hint={hint} keepHint />,
