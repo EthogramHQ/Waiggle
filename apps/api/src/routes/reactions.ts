@@ -5,12 +5,12 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { ProjectId, REACTION_KINDS, ReactionKind } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { visibleTo } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -85,9 +85,9 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
    *
    * `undo` (tranche 7b, règle 7 de la relecture du plan) : retirer sa réaction défait son propre
    * geste, qu'un blocage ne refuse jamais. Le projet d'un membre bloqué avec lui, caché partout
-   * ailleurs (visibleTo), reste donc trouvé ici : la condition est celle de visibleTo moins le
-   * blocage (`listedProject`, public et non retiré, ou le sien). Un projet privé ou retiré d'un
-   * autre reste introuvable, comme avant.
+   * ailleurs (visibleTo), reste donc trouvé ici : `projectReachableBy` (projects/visibility.ts),
+   * la condition de visibleTo moins le blocage. Un projet privé ou retiré d'un autre reste
+   * introuvable, comme avant.
    */
   const check = async (
     c: Context<AppEnv>,
@@ -100,9 +100,7 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     const kind = ReactionKind.safeParse(rawKind)
     if (!ProjectId.safeParse(id).success || !kind.success) return notFound(c)
-    const reachable = undo
-      ? or(listedProject(), eq(schema.project.authorId, userId))
-      : visibleTo(userId)
+    const reachable = undo ? projectReachableBy(userId) : visibleTo(userId)
     const [project] = await db
       .select({ authorId: schema.project.authorId })
       .from(schema.project)
