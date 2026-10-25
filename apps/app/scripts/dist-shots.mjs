@@ -36,12 +36,23 @@ export const stampFile = join(build, '.commit')
 // expo » : sous Windows, pnpm est un script (pnpm.cmd) que spawnSync ne sait pas lancer sans
 // passer par l'interpréteur de commandes, et il échouait sans un mot. createRequire permet de
 // trouver un fichier d'un paquet installé (expo/bin/cli) comme le ferait un require().
+// WAIGGLE_WORKERS, quand il est posé, limite le nombre de processus de Metro : sur un PC modeste, on
+// garde ainsi la construction sous un plafond de mémoire ; sans lui (la CI), Metro choisit seul.
 export const buildSite = () => {
   rmSync(build, { recursive: true, force: true })
   const expo = createRequire(join(root, 'package.json')).resolve('expo/bin/cli')
+  const workers = Number(process.env.WAIGGLE_WORKERS)
   const result = spawnSync(
     process.execPath,
-    [expo, 'export', '--platform', 'web', '--output-dir', build],
+    [
+      expo,
+      'export',
+      '--platform',
+      'web',
+      '--output-dir',
+      build,
+      ...(workers > 0 ? ['--max-workers', String(workers)] : []),
+    ],
     { cwd: root, stdio: 'inherit', env: { ...process.env, EXPO_PUBLIC_CATALOGUE: '1' } },
   )
   if (result.error) fail(`Impossible de lancer la construction (expo) : ${result.error.message}`)
