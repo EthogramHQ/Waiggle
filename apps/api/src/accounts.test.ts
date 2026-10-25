@@ -376,8 +376,9 @@ describe('authentication routes the app does not use', () => {
     ['POST', '/send-verification-email', { email: lea.email }],
     // C6 : les autres routes ouvertes d'office, que l'appli n'appelle pas. Comptes liés et jetons
     // de fournisseurs (nous n'en avons aucun), session, mot de passe oublié (pas encore proposé),
-    // suppression confirmée par e-mail (la nôtre l'est par le mot de passe), changement d'adresse
-    // (rouvert, protégé, par sa propre tranche) et la sonde « ok ».
+    // suppression confirmée par e-mail (la nôtre l'est par le mot de passe) et la sonde « ok ».
+    // Le changement d'adresse, fermé ici d'abord, est rouvert et protégé par sa tranche
+    // (change-email.test.ts).
     ['GET', '/list-accounts', undefined],
     ['POST', '/unlink-account', { providerId: 'credential' }],
     ['GET', '/account-info?accountId=any-account', undefined],
@@ -388,7 +389,6 @@ describe('authentication routes the app does not use', () => {
     ['POST', '/reset-password', { newPassword: 'new-password-1', token: 'any-token' }],
     // Sans jeton : ouverte, elle répond 400 (jeton manquant) ; un faux jeton y répondait déjà 404.
     ['GET', '/delete-user/callback', undefined],
-    ['POST', '/change-email', { newEmail: 'new@example.com' }],
     ['GET', '/ok', undefined],
   ] as const)('are closed: %s %s', async (method, path, body) => {
     const cookies = await signUpAndVerify()
