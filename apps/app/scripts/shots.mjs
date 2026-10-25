@@ -140,6 +140,22 @@ const session = {
   session: { id: 's1', userId: leaMe.id, expiresAt: '2099-01-01T00:00:00.000Z' },
   user: { ...leaMe, image: null, updatedAt: leaMe.createdAt },
 }
+// Tranche « adresse » : ce que Léa tape pour changer d'adresse (lea@example.com devient
+// lea.moreau@exemple.fr), et un mot de passe que l'API simulée refuse, comme la vraie
+// (INVALID_PASSWORD). Après le second lien, la page « Adresse changée » lit la nouvelle adresse
+// dans la session, jamais dans l'URL : `email: 'changed'` (option d'une page) la donne à la session
+// et au profil. Pages à déclarer avec l'interface (noms proposés) :
+//   - changer-adresse : /account/email, connectée ;
+//   - changer-adresse-envoye : la même, `prepare` remplit changeEmailShot et touche « Envoyer le
+//     lien », puis attend « Regarde ta boîte mail actuelle » ;
+//   - changer-adresse-erreur : la même avec wrongPasswordShot, attend « Mot de passe incorrect. » ;
+//   - adresse-confirmee : /email-change/confirmed, sans session (le lien s'ouvre souvent ailleurs) ;
+//   - adresse-changee : /email-change/done, connectée, `email: 'changed'` ;
+//   - adresse-changee-deconnecte : /email-change/done, sans session ;
+//   - adresse-lien-refuse : /email-change/done?error=INVALID_TOKEN, sans session.
+const changeEmailShot = { newEmail: 'lea.moreau@exemple.fr', password: 'mot-de-passe-de-lea' }
+const wrongPasswordShot = 'pas-le-bon-mot-de-passe'
+const emailOf = { current: leaMe.email, changed: changeEmailShot.newEmail }
 // Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
 // simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
 const note = (n, body, day) => ({
@@ -638,13 +654,18 @@ const notificationPages = (choice) => {
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
 // `admin` (tranche 7a) : Léa est administratrice, GET /v1/me le dit et la modération répond.
 // `blocks` (tranche 7b) : 'some', Léa a bloqué Sam et Théo ; 'none', personne.
+// `email` (tranche « adresse ») : 'current', l'adresse de toujours ; 'changed', la nouvelle.
 const fakeApi = (
   signedIn,
   feed = 'following',
   notifications = 'some',
   admin = false,
   blocks = 'some',
+  email = 'current',
 ) => {
+  // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
+  const accountEmail = emailOf[email] ?? emailOf.current
+  const sessionNow = { ...session, user: { ...session.user, email: accountEmail } }
   // Les membres que Léa a bloqués, tels que ses gestes dans ce navigateur les ont laissés (bloquer
   // Max depuis sa page, débloquer Sam depuis la liste) : chaque capture a les siens.
   const blocked = new Map(
@@ -658,7 +679,7 @@ const fakeApi = (
   const added = {}
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
   // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
-  let me = structuredClone({ ...leaMe, isAdmin: admin })
+  let me = structuredClone({ ...leaMe, isAdmin: admin, email: accountEmail })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
@@ -674,7 +695,7 @@ const fakeApi = (
     const { pathname } = url
     const json = (status, body) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-    if (pathname === '/api/auth/get-session') return json(200, signedIn ? session : null)
+    if (pathname === '/api/auth/get-session') return json(200, signedIn ? sessionNow : null)
     const method = route.request().method()
     // Se désinscrire depuis un e-mail (tranche 6c) : sans session, comme la vraie API. Le jeton
     // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
@@ -686,6 +707,19 @@ const fakeApi = (
       return route.fulfill({ status: 204, body: '' })
     }
     if (!signedIn) return json(401, { error: { code: 'unauthorized', message: '' } })
+    // Demander un changement d'adresse (tranche « adresse ») : la route de Better Auth répond
+    // { code, message } en cas de refus, { status: true } sinon (même pour une adresse déjà prise :
+    // on ne révèle pas qui a un compte). Rien ne change avant les deux liens : l'adresse reste.
+    if (pathname === '/api/auth/change-email' && method === 'POST') {
+      const { newEmail, password } = JSON.parse(route.request().postData() ?? '{}')
+      if (password === wrongPasswordShot) {
+        return json(400, { code: 'INVALID_PASSWORD', message: 'Invalid password' })
+      }
+      if (String(newEmail).trim().toLowerCase() === accountEmail) {
+        return json(400, { code: 'SAME_EMAIL', message: 'Email is the same' })
+      }
+      return json(200, { status: true })
+    }
     // Les réglages d'e-mail (tranche 6c) : lus, puis modifiés un par un ; l'API rend l'état complet.
     if (pathname === '/v1/me/email-preferences' && method === 'PATCH') {
       emailPreferences = { ...emailPreferences, ...JSON.parse(route.request().postData() ?? '{}') }
@@ -1326,18 +1360,22 @@ const settle = async (page) => {
 //   avec sa propre API simulée ; un `context.route(...)` ajouté ensuite remplace une réponse
 //   (erreur, lenteur). options.feed: 'nobody' donne un fil vide ; options.notifications: 'none'
 //   aucune notification, 'many' la cloche à « 9+ », 'moderation' celles de la modération ;
-//   options.admin: true fait de Léa une administratrice (tranche 7a) ; le reste va à newContext.
+//   options.admin: true fait de Léa une administratrice (tranche 7a) ; options.email: 'changed'
+//   lui donne sa nouvelle adresse (tranche « adresse ») ; le reste va à newContext.
 // - apiUrl : l'adresse de l'API simulée.
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, { feed, notifications, admin, blocks, ...options } = {}) => {
+  const open = async (signedIn, { feed, notifications, admin, blocks, email, ...options } = {}) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    await context.route(`${apiUrl}/**`, fakeApi(signedIn, feed, notifications, admin, blocks))
+    await context.route(
+      `${apiUrl}/**`,
+      fakeApi(signedIn, feed, notifications, admin, blocks, email),
+    )
     return context
   }
   try {
@@ -1382,7 +1420,7 @@ async function layoutReport() {
     try {
       await context.route(
         `${apiUrl}/**`,
-        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks),
+        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks, shot.email),
       )
       const page = await context.newPage()
       for (const width of widths) {
@@ -1507,7 +1545,7 @@ const capture = async ({ shot, device, scheme }) => {
   try {
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks),
+      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks, shot.email),
     )
     const page = await context.newPage()
     // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.

@@ -188,6 +188,55 @@ describe('writing to us from my account', () => {
   })
 })
 
+// --- Tranche « adresse » : changer son adresse e-mail depuis « Mon compte » ---
+
+describe('changing my address from my account', () => {
+  it('leads to the page that changes the address, from a row named after the action', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    // Le nom lu par le lecteur d'écran dit ce que fait la ligne (« Changer d'adresse e-mail »),
+    // pas seulement ce qu'elle montre (relecture juridique du plan, J9).
+    await fireEvent.press(
+      await screen.findByRole('button', {
+        name: new RegExp(`^${fr.t('account.email.change')}`),
+      }),
+    )
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/account/email'])
+  })
+
+  it('still shows the current address on that row, and no longer says « modifiable bientôt »', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    // Témoin : la ligne de l'adresse est là, avec l'adresse actuelle.
+    expect(
+      await screen.findByRole('button', { name: new RegExp(`^${fr.t('account.email.change')}`) }),
+    ).toBeTruthy()
+    expect(screen.getByText('lea@example.com')).toBeTruthy()
+    expect(screen.queryByText('modifiable bientôt')).toBeNull()
+  })
+
+  // Point « À reprendre » du plan : en panne de réseau, le profil ne venait pas, et la page ne
+  // disait rien. Elle le dit maintenant, dans un message d'erreur.
+  it('says so when the profile cannot be loaded', async () => {
+    jest.mocked(getMe).mockRejectedValue(new TypeError('Network request failed'))
+    await renderWithI18n(<AccountScreen />)
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    // Le reste de la page reste utilisable : on peut toujours se déconnecter.
+    expect(screen.getByRole('button', { name: 'Me déconnecter' })).toBeTruthy()
+  })
+
+  it('shows no error once the profile has arrived', async () => {
+    await renderWithI18n(<AccountScreen />)
+
+    // Témoin du test précédent : le profil arrivé, aucune alerte.
+    await screen.findByRole('button', { name: /^Nous écrire/ })
+    expect(jest.mocked(getMe)).toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
 // Relecture de design globale du 22/10/2026 : « Mon compte » parlait de la langue des e-mails sans
 // mener aux réglages d'e-mail, qui sont au bas de « Mon profil ».
 describe('the e-mail settings from my account', () => {

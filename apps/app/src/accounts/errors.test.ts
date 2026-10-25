@@ -25,6 +25,15 @@ describe('authErrorKey', () => {
     expect(authErrorKey({ status: 403, code: 'INVITE_CODE_INVALID' })).toBe('inviteInvalid')
   })
 
+  // Tranche « adresse » : changer son adresse demande le mot de passe, et une adresse neuve.
+  it('recognises a wrong password', () => {
+    expect(authErrorKey({ status: 400, code: 'INVALID_PASSWORD' })).toBe('wrongPassword')
+  })
+
+  it('recognises a new address that is already the current one', () => {
+    expect(authErrorKey({ status: 400, code: 'SAME_EMAIL' })).toBe('sameEmail')
+  })
+
   it('falls back to a generic message for anything unexpected', () => {
     expect(authErrorKey({ status: 500, code: 'SOMETHING_ELSE' })).toBe('generic')
     expect(authErrorKey({ status: 0 })).toBe('generic')
