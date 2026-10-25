@@ -24,6 +24,7 @@ import {
   type RemovalGround,
   type RemovedItem,
   type ReportSnapshotEntry,
+  type SnapshotImage,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
@@ -73,6 +74,26 @@ const isTextEntry = (
 /** Le premier texte d'une copie (le titre d'un projet, le nom d'un profil) : de quoi la reconnaître. */
 const firstText = (snapshot: readonly ReportSnapshotEntry[]): string =>
   snapshot.find(isTextEntry)?.value ?? ''
+
+type T = ReturnType<typeof useTranslation>['t']
+
+/**
+ * L'état de chaque image d'une copie, en une phrase (« Couverture : toujours affichée »). Un projet
+ * peut avoir plusieurs photos : dès qu'il y en a deux, chacune porte son rang (« Photo 2 : supprimée
+ * ou remplacée depuis »), sinon deux lignes identiques ne diraient pas laquelle est partie
+ * (relecture 7b). Une photo seule reste « Photo ».
+ */
+const imageLines = (images: readonly SnapshotImage[], t: T): string[] => {
+  const photos = images.filter(({ field }) => field === 'photo').length
+  let rank = 0
+  return images.map(({ field, state }) => {
+    const image =
+      field === 'photo' && photos > 1
+        ? t('moderation.images.photoNumbered', { n: ++rank })
+        : t(`moderation.images.${field}`)
+    return t(`moderation.images.${state}`, { image })
+  })
+}
 
 /** Le résultat d'une décision, posé sur sa carte : une confirmation, ou « déjà décidé ». */
 type Outcome = { message: string; ok: boolean }
@@ -352,9 +373,7 @@ function AdminModeration() {
         }))}
         snapshotLabel={t('moderation.snapshot')}
         snapshotNote={item.snapshotsDiffer ? t('moderation.snapshotsDiffer') : undefined}
-        images={item.images.map(({ field, state }) =>
-          t(`moderation.images.${state}`, { image: t(`moderation.images.${field}`) }),
-        )}
+        images={imageLines(item.images, t)}
         reasons={item.reasons.map(({ reason, count }) =>
           t('moderation.reasonCount', {
             reason: t(`report.reasons.${reasonTextKey[reason]}`),

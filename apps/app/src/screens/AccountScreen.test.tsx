@@ -125,6 +125,30 @@ describe('the members I blocked, from my account', () => {
     // La page de la liste (app/blocks.tsx, plan de la tranche 7b).
     expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toContain('/blocks')
   })
+
+  it('puts « Membres bloqués » under a « Sécurité » heading, after « Mes données »', async () => {
+    // Relecture de design 7b : sans titre, au-dessus de « Langue », la ligne ne disait pas de quoi
+    // elle relevait.
+    await renderWithI18n(<AccountScreen />)
+
+    await screen.findByRole('button', { name: /^Membres bloqués/ })
+    // Un titre de section (« header » en natif, h2 sur le web).
+    expect(screen.getByRole('header', { name: fr.t('account.safety.title') })).toBeTruthy()
+    // Dans l'ordre de la page : « Mes données », puis « Sécurité » et sa ligne, puis « Compte ».
+    const order = screen
+      .getAllByText(
+        new RegExp(
+          `^(${fr.t('account.data.title')}|${fr.t('account.safety.title')}|Membres bloqués|${fr.t('account.section.title')})$`,
+        ),
+      )
+      .map((element) => element.props.children)
+    expect(order).toEqual([
+      fr.t('account.data.title'),
+      fr.t('account.safety.title'),
+      'Membres bloqués',
+      fr.t('account.section.title'),
+    ])
+  })
 })
 
 describe('writing to us from my account', () => {

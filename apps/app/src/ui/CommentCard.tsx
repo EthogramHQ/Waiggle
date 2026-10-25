@@ -19,7 +19,7 @@
 // une courte phrase (`description` : l'auteur et le début du texte), et le lecteur d'écran dit
 // lequel. Quand une action disparaît (le champ de modification se referme), l'écran peut ramener
 // le focus du clavier sur elle (handle).
-import { layout, radii, space } from '@ruche/brand'
+import { layout, radii, space, textStyles } from '@ruche/brand'
 import type { Mention } from '@ruche/contracts'
 import { type ReactNode, type Ref, useId, useImperativeHandle, useRef } from 'react'
 import { View } from 'react-native'
@@ -96,6 +96,8 @@ const ignore = () => {}
  * Exportée : le trait des réponses (CommentThread) part sous le milieu de la photo de la racine.
  */
 export const COMMENT_AVATAR = { root: 36, reply: 28 } as const
+/** La hauteur d'une ligne de texte « callout » : l'icône d'un emplacement se centre sur la première. */
+const CALLOUT_LINE = textStyles.callout.lineHeight
 
 export function CommentCard({
   author,
@@ -131,23 +133,36 @@ export function CommentCard({
     // Un emplacement : ni photo, ni nom, ni action ; une ligne discrète qui dit ce qu'il était, et
     // sa date. Sans fond ni hauteur de bouton : on ne peut rien en faire, il ne doit pas en avoir
     // l'air.
+    // L'icône reste à sa place, en tête de la première ligne ; la phrase et la date passent à la
+    // ligne à côté d'elle (sur téléphone, à texte agrandi), sans que l'icône parte seule sur une
+    // ligne au-dessus du texte (relecture de design 7b). flexShrink et minWidth : sur le web, une
+    // vue ne se replie pas sans eux (react-native-web lui donne flexShrink 0).
     return (
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          columnGap: space.sm,
-          rowGap: space.xxs,
-        }}
-      >
-        <Icon name="chat-circle" size={16} tone="muted" />
-        <Text variant="callout" tone="muted">
-          {placeholder ?? ''}
-        </Text>
-        <Text variant="caption" tone="muted">
-          {when}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+        <View style={{ minHeight: CALLOUT_LINE, justifyContent: 'center' }}>
+          <Icon name="chat-circle" size={16} tone="muted" />
+        </View>
+        <View
+          style={{
+            flex: 1,
+            flexShrink: 1,
+            minWidth: 0,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'baseline',
+            columnGap: space.sm,
+            rowGap: space.xxs,
+          }}
+        >
+          <View style={{ maxWidth: '100%', flexShrink: 1 }}>
+            <Text variant="callout" tone="muted">
+              {placeholder ?? ''}
+            </Text>
+          </View>
+          <Text variant="caption" tone="muted">
+            {when}
+          </Text>
+        </View>
       </View>
     )
   }

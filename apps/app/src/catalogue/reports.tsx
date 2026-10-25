@@ -69,6 +69,26 @@ const fr = {
     { label: 'Bio', value: 'Je fais partie de l’équipe, écris-moi pour un accès.' },
   ],
   avatarImage: ['Photo de profil : toujours affichée'],
+  // Corrections de 7b : une copie entière, repliée après trois champs, et des photos numérotées.
+  foldedCaption:
+    'Une copie de plus de quatre champs se replie après le troisième (« Afficher tout ») ; plusieurs photos sont numérotées.',
+  fullFields: [
+    { label: 'Titre', value: 'Faux avis en masse' },
+    { label: 'Pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+    {
+      label: 'Description',
+      value:
+        'Colle l’adresse de ta boutique, choisis le nombre d’avis : le reste est automatique. Chaque avis porte un prénom différent, et une date tirée au hasard sur les trois derniers mois.',
+    },
+    { label: 'Prompt', value: 'Écris 50 avis enthousiastes, chacun signé d’un prénom différent.' },
+    { label: 'Outils', value: 'Claude Code, Python' },
+    { label: 'Lien de démo', value: 'https://faux-avis.example/essai' },
+  ],
+  numberedImages: [
+    'Couverture : toujours affichée',
+    'Photo 1 : toujours affichée',
+    'Photo 2 : supprimée ou remplacée depuis',
+  ],
 }
 
 const en: typeof fr = {
@@ -127,6 +147,25 @@ const en: typeof fr = {
     { label: 'Bio', value: 'I’m part of the team, message me for access.' },
   ],
   avatarImage: ['Profile photo: still shown'],
+  foldedCaption:
+    'A copy of more than four fields folds after the third (“Show all”); several photos are numbered.',
+  fullFields: [
+    { label: 'Title', value: 'Fake reviews in bulk' },
+    { label: 'Pitch', value: 'Fifty five-star reviews for your shop, in one click.' },
+    {
+      label: 'Description',
+      value:
+        'Paste your shop’s address, choose how many reviews: the rest is automatic. Each review has a different first name, and a random date over the last three months.',
+    },
+    { label: 'Prompt', value: 'Write 50 enthusiastic reviews, each signed with a different name.' },
+    { label: 'Tools', value: 'Claude Code, Python' },
+    { label: 'Demo link', value: 'https://fake-reviews.example/trial' },
+  ],
+  numberedImages: [
+    'Cover: still shown',
+    'Photo 1: still shown',
+    'Photo 2: deleted or replaced since',
+  ],
 }
 
 export function ReportSamples() {
@@ -242,6 +281,26 @@ export function ReportSamples() {
         viewLabel={l.view}
         onView={() => {}}
         actions={[{ label: l.dismiss, onPress: () => {} }]}
+      />
+      {/* Corrections de 7b : la copie entière d'un projet, repliée (« Afficher tout » la déplie
+          sur place), avec ses photos numérotées. */}
+      <Text variant="caption" tone="muted">
+        {l.foldedCaption}
+      </Text>
+      <ReportCard
+        kind={l.projectKind}
+        count={l.count1}
+        snapshot={l.fullFields}
+        snapshotLabel={l.copyLabel}
+        images={l.numberedImages}
+        reasons={[l.scamReason]}
+        when={l.since}
+        viewLabel={l.view}
+        onView={() => {}}
+        actions={[
+          { label: l.remove, onPress: () => {}, tone: 'danger' },
+          { label: l.dismiss, onPress: () => {} },
+        ]}
       />
     </Stack>
   )

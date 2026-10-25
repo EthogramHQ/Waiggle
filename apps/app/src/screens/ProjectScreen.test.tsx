@@ -1594,6 +1594,24 @@ describe('reporting a project from its page', () => {
     expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
   })
 
+  it('puts the « … » menu right after « Suivre ce projet », before the reactions', async () => {
+    // Corrections de 7b (relecture de design, point 11) : seul sur sa ligne sous les réactions, le
+    // menu s'ouvrait par-dessus le Journal à 1440 points. Sa place à l'écran, Jest ne la mesure
+    // pas (essai --explore) ; l'ordre de lecture, si.
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('button', { name: fr.t('actionMenu.label') })
+    // « Suivre ce projet » est un interrupteur (switch), « … » un bouton : l'ordre des deux rôles.
+    const names = screen
+      .getAllByRole(/^(button|switch)$/)
+      .map((control) => String(control.props.accessibilityLabel ?? ''))
+    const follow = names.findIndex((name) => name.startsWith(fr.t('follow.project')))
+    const menu = names.indexOf(fr.t('actionMenu.label'))
+    expect(follow).toBeGreaterThan(-1)
+    expect(menu).toBe(follow + 1)
+  })
+
   it('never offers the author to report the project, and shows no empty menu', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 

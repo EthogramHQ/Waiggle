@@ -27,6 +27,11 @@ type Props = {
   hint?: string | undefined
   /** Pour y poser le focus du clavier quand l'élément qui l'avait disparaît (voir focus.ts). */
   ref?: Ref<View>
+  /**
+   * Un bouton qui déplie ou replie quelque chose sur place (« Afficher tout » d'une copie, 7b) :
+   * les lecteurs d'écran annoncent « replié » ou « déplié » (aria-expanded, web et téléphone).
+   */
+  expanded?: boolean
 }
 
 export function TextLink({
@@ -38,12 +43,14 @@ export function TextLink({
   describedById,
   hint,
   ref,
+  expanded,
 }: Props) {
   return (
     <Pressable
       ref={ref}
       accessibilityRole={role}
       accessibilityLabel={label}
+      {...(expanded === undefined ? null : { 'aria-expanded': expanded })}
       {...describedBy(describedById)}
       // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle (comme IconButton).
       accessibilityHint={Platform.OS === 'web' ? undefined : hint}

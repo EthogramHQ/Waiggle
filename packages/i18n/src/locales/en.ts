@@ -576,6 +576,9 @@ export const en: Translation = {
     // The end of the list (added with the interface, slice 7a): all read, or the next page failed.
     end: 'That’s all',
     moreError: 'The rest of the list could not load.',
+    // A long copy folds after three fields (added with the interface, 7b corrections).
+    showAll: 'Show all',
+    showLess: 'Show less',
   },
   removal: {
     banner: 'Removed by moderation',

@@ -273,23 +273,43 @@ function ProjectView({ project }: { project: Project }) {
         <Text tone="muted">{t('project.page.noDemo')}</Text>
       )}
       {/* Suivre, après la démo : on lit d'abord le projet, puis on décide de le suivre. Seulement le
-          projet d'un autre ; l'auteur voit seulement le nombre d'abonnés. */}
+          projet d'un autre ; l'auteur voit seulement le nombre d'abonnés.
+          Le menu « … » (tranche 7b, « Signaler ce projet ») au bout de la même rangée, en haut :
+          dans l'axe de « Suivre ce projet », même quand un message d'erreur s'ajoute dessous. Il
+          s'ouvre vers la gauche (`align="end"`), au-dessus de sa colonne : à 1440 points, ouvert
+          depuis le bord gauche de la colonne latérale, il couvrait le Journal (relecture 7b).
+          Jamais sur son propre projet, où il n'aurait rien à offrir (pas de menu vide). */}
       {project.isMine ? (
         <FollowerCount text={followers} />
       ) : (
-        <FollowButton
-          followed={project.isFollowed}
-          onPress={follow.toggle}
-          // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (voir MemberScreen).
-          label={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
-          text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
-          caption={followers}
-          error={
-            follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
-          }
-          errorAction={follow.expired ? signInAgain() : undefined}
-          prominent={false}
-        />
+        <Row align="start" gap="md">
+          <Stack grow>
+            <FollowButton
+              followed={project.isFollowed}
+              onPress={follow.toggle}
+              // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (MemberScreen).
+              label={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+              text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+              caption={followers}
+              error={
+                follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
+              }
+              errorAction={follow.expired ? signInAgain() : undefined}
+              prominent={false}
+            />
+          </Stack>
+          <ActionMenu
+            align="end"
+            items={[
+              {
+                label: t('report.project'),
+                icon: 'flag',
+                onPress: () =>
+                  router.push({ pathname: '/report', params: { kind: 'project', id: project.id } }),
+              },
+            ]}
+          />
+        </Row>
       )}
       {/* Réagir, après Suivre. L'auteur ne réagit pas à son propre projet : il voit les nombres. */}
       {project.isMine ? (
@@ -308,22 +328,6 @@ function ProjectView({ project }: { project: Project }) {
           }
           errorAction={reaction.expired ? signInAgain() : undefined}
         />
-      )}
-      {/* Le menu « … » (tranche 7b), sous les actions : « Signaler ce projet ». Jamais sur son
-          propre projet, où il n'aurait rien à offrir (pas de menu vide). */}
-      {project.isMine ? null : (
-        <Row>
-          <ActionMenu
-            items={[
-              {
-                label: t('report.project'),
-                icon: 'flag',
-                onPress: () =>
-                  router.push({ pathname: '/report', params: { kind: 'project', id: project.id } }),
-              },
-            ]}
-          />
-        </Row>
       )}
     </Stack>
   )

@@ -4,7 +4,8 @@
 // puis les décisions possibles (« Retirer », « Classer sans suite », « Rétablir »).
 // Depuis la tranche 7b, la copie se lit champ par champ (« Titre », « Pitch », « Lien de démo »),
 // avec l'état de ses images (toujours affichée, ou partie depuis) et, s'il y a lieu, une phrase qui
-// dit que le contenu a changé entre deux signalements.
+// dit que le contenu a changé entre deux signalements. Au-delà de quatre champs, elle se replie
+// après le troisième (« Afficher tout »).
 //
 // Tout ce qu'un membre a écrit (le texte signalé, les précisions) s'affiche en texte brut : ni
 // Markdown, ni lien qu'on pourrait toucher par mégarde (règle 22 de la relecture du plan). Le seul
@@ -21,7 +22,8 @@
 // remonte ainsi sous le doigt : retirer la carte faisait arriver le « Classer » de la suivante à
 // l'endroit exact qu'on venait de toucher (relecture de la tranche 7a).
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type Ref, useId } from 'react'
+import { type Ref, useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
@@ -34,6 +36,9 @@ import { useTheme } from './theme/ThemeProvider'
 
 /** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
 export type SnapshotField = { label: string; value: string }
+
+/** Le nombre de champs d'une copie montrés avant « Afficher tout ». */
+export const FOLDED_FIELDS = 3
 
 /** Une décision proposée sur la carte : un bouton nommé d'après elle. */
 export type ReportCardAction = {
@@ -122,6 +127,14 @@ export function ReportCard({
   error,
 }: Props) {
   const { colors, shadows } = useTheme()
+  const { t } = useTranslation()
+  // Une copie de plus de trois champs (un projet entier : titre, pitch, description, prompts…)
+  // faisait une carte plus haute qu'un écran de téléphone : elle se replie après les trois premiers,
+  // et « Afficher tout » montre le reste sur place (relecture de design 7b). Jamais pour cacher un
+  // seul champ : le bouton prendrait autant de place que lui (un profil : nom, pseudo, bio, outils).
+  const [unfolded, setUnfolded] = useState(false)
+  const foldable = typeof snapshot !== 'string' && snapshot.length > FOLDED_FIELDS + 1
+  const folded = foldable && !unfolded
   // L'identifiant du texte caché qui décrit la carte (aria-describedby), stable entre le pré-rendu
   // web et le navigateur (useId).
   const descriptionId = useId()
@@ -183,7 +196,7 @@ export function ReportCard({
               {snapshot}
             </Text>
           ) : (
-            snapshot.map((field, index) => (
+            (folded ? snapshot.slice(0, FOLDED_FIELDS) : snapshot).map((field, index) => (
               // Deux champs peuvent porter le même libellé (deux prompts, deux photos) : leur rang
               // les distingue, et la copie ne change jamais d'ordre.
               // biome-ignore lint/suspicious/noArrayIndexKey: un champ de la copie n'a pas d'autre identité que sa place
@@ -197,11 +210,27 @@ export function ReportCard({
               </View>
             ))
           )}
+          {/* « Afficher tout » / « Replier », au bout des champs montrés : le même bouton, qui
+              garde le focus, et dit s'il est déplié (aria-expanded). Relié à la carte, comme ses
+              autres boutons. */}
+          {foldable ? (
+            <View style={{ alignSelf: 'flex-start' }}>
+              <TextLink
+                role="button"
+                label={unfolded ? t('moderation.showLess') : t('moderation.showAll')}
+                expanded={unfolded}
+                onPress={() => setUnfolded((previous) => !previous)}
+                {...describes}
+              />
+            </View>
+          ) : null}
         </View>
-        {/* Les images : seulement leur état, jamais l'image (elle peut être illégale). */}
-        {images.map((image) => (
+        {/* Les images : seulement leur état, jamais l'image (elle peut être illégale). Deux photos
+            peuvent avoir la même phrase : leur rang les distingue (l'écran les numérote aussi). */}
+        {images.map((image, index) => (
           <View
-            key={image}
+            // biome-ignore lint/suspicious/noArrayIndexKey: l'état d'une image n'a pas d'autre identité que sa place
+            key={index}
             style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}
           >
             <Icon name="image" size={18} tone="muted" />

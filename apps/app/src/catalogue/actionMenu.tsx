@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { ActionMenu, type ActionMenuItem, ActionMenuList } from '../ui/ActionMenu'
+import { Button } from '../ui/Button'
 import { ProjectCover } from '../ui/ProjectCover'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -28,6 +29,10 @@ const fr = {
   label: 'Plus d’actions',
   chosen: 'Choisi : {{label}}',
   none: 'Rien de choisi pour l’instant.',
+  end: 'Au bout d’une rangée (align « end ») : il s’ouvre vers la gauche, au-dessus de sa colonne',
+  follow: 'Suivre ce projet',
+  // Un autre nom que les deux boutons fermés du haut : les tests du catalogue les comptent.
+  rowLabel: 'Actions du projet',
 }
 
 const en: typeof fr = {
@@ -47,6 +52,9 @@ const en: typeof fr = {
   label: 'More actions',
   chosen: 'Chosen: {{label}}',
   none: 'Nothing chosen yet.',
+  end: 'At the end of a row (align “end”): it opens to the left, over its own column',
+  follow: 'Follow this project',
+  rowLabel: 'Project actions',
 }
 
 /** La largeur d'une liste ouverte, comme dans la page (ActionMenu la pose à 260 points au plus). */
@@ -115,6 +123,25 @@ export function ActionMenuSamples() {
         <Text variant="caption" tone="secondary">
           {chosen ? l.chosen.replace('{{label}}', chosen) : l.none}
         </Text>
+      </Stack>
+      {/* Corrections de 7b : « … » au bout de la rangée de « Suivre » (la colonne latérale d'un
+          projet), aligné sur son bord droit quelle que soit sa place dans l'écran. */}
+      <Stack gap="sm">
+        <Text variant="caption" tone="muted">
+          {l.end}
+        </Text>
+        <View style={{ width: '100%', maxWidth: 360 }}>
+          <Row gap="md" justify="between">
+            <Button
+              label={l.follow}
+              icon="plus"
+              variant="secondary"
+              size="compact"
+              onPress={choose(l.follow)}
+            />
+            <ActionMenu items={projectItems} align="end" label={l.rowLabel} />
+          </Row>
+        </View>
       </Stack>
       {open(l.member, memberItems)}
       {open(l.blocked, blockedItems)}

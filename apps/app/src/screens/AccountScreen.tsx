@@ -98,27 +98,18 @@ export function AccountScreen() {
         onPress={() => router.push('/profile')}
       />
 
-      <ListGroup>
-        {/* Tranche 7b : les membres que j'ai bloqués, et de quoi les débloquer (app/blocks.tsx).
-            Pour tous les membres, même sans blocage : la page dit alors « Tu n'as bloqué personne ». */}
-        <ListRow
-          label={t('account.blocks')}
-          icon="prohibit"
-          trailing="chevron"
-          onPress={() => router.push('/blocks')}
-        />
-        {/* Tranche 7a : la modération, pour un administrateur seulement. La ligne apparaît quand le
-            profil est arrivé ; ce champ ne donne aucun droit, l'API refait la vérification. */}
-        {me.data?.isAdmin ? (
+      {/* Tranche 7a : la modération, pour un administrateur seulement. Le groupe apparaît quand le
+          profil est arrivé ; ce champ ne donne aucun droit, l'API refait la vérification. */}
+      {me.data?.isAdmin ? (
+        <ListGroup key="moderation">
           <ListRow
-            key="moderation"
             label={t('account.moderation')}
             icon="shield-check"
             trailing="chevron"
             onPress={() => router.push('/moderation')}
           />
-        ) : null}
-      </ListGroup>
+        </ListGroup>
+      ) : null}
 
       <ListGroup title={t('account.language.title')} footer={t('account.language.hint')} radio>
         {supportedLanguages.map((language) => (
@@ -167,6 +158,19 @@ export function AccountScreen() {
       {exportMessage ? (
         <Notice tone={exportMessage.ok ? 'success' : 'error'} message={exportMessage.text} />
       ) : null}
+
+      {/* Tranche 7b : les membres que j'ai bloqués, et de quoi les débloquer (app/blocks.tsx), dans
+          un groupe titré « Sécurité », près de « Mes données » : sans titre, au-dessus de « Langue »,
+          la ligne ne disait pas de quoi elle relevait (relecture de design 7b). Pour tous les
+          membres, même sans blocage : la page dit alors « Tu n'as bloqué personne ». */}
+      <ListGroup title={t('account.safety.title')}>
+        <ListRow
+          label={t('account.blocks')}
+          icon="prohibit"
+          trailing="chevron"
+          onPress={() => router.push('/blocks')}
+        />
+      </ListGroup>
 
       <ListGroup title={t('account.section.title')}>
         <ListRow
