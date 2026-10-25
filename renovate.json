@@ -4,7 +4,25 @@
   "timezone": "Europe/Paris",
   "schedule": ["before 6am on monday"],
   "labels": ["dependencies"],
+  "minimumReleaseAge": "7 days",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The gitleaks image runs from a `run:` line of the CI workflow, which no built-in manager reads: point Renovate at its tag and digest so they get updated (security audit of 2026-10-25, C12).",
+      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/"],
+      "matchStrings": [
+        "ghcr\\.io/gitleaks/gitleaks:(?<currentValue>v\\d+\\.\\d+\\.\\d+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "depNameTemplate": "ghcr.io/gitleaks/gitleaks",
+      "datasourceTemplate": "docker"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "A version must be 7 days old before Renovate proposes it: a hijacked release is usually pulled from the registry within hours (security audit of 2026-10-25, C8). Digest updates only wait 1 day: they re-point a tag already reviewed.",
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAge": "1 day"
+    },
     {
       "description": "Major updates wait for an approval in the Dependency Dashboard: they change behaviour and are reviewed one by one.",
       "matchUpdateTypes": ["major"],
