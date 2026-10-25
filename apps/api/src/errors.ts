@@ -24,6 +24,9 @@ const errorMessages = {
   already_reported: 'alreadyReported',
   already_decided: 'alreadyDecided',
   removed: 'removed',
+  cannot_block_own: 'cannotBlockOwn',
+  blocked_mention: 'blockedMention',
+  already_examined: 'alreadyExamined',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

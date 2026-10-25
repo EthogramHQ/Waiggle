@@ -7,8 +7,12 @@
 // boutons par le bas, hors d'atteinte (relecture de la tranche 7a). Toute la couche défile, voile
 // compris : on la fait glisser du doigt ou à la molette n'importe où, et la marge autour de la
 // fenêtre reste visible en haut comme en bas.
+//
+// Avec `guardTaps`, ses boutons ignorent les tapes pendant TAP_GUARD_MS après l'ouverture : la
+// fenêtre s'ouvre souvent sous le doigt qui vient de toucher l'action (« Bloquer » d'un menu), et la
+// seconde tape d'une double tape tombait sur sa confirmation (relecture de design, tranche 7b).
 import { borders, layout, space } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -25,7 +29,17 @@ export type DialogQuote = {
 type Props = {
   visible: boolean
   title: string
-  message: string
+  /**
+   * Le texte sous le titre. Une liste : un paragraphe par élément, alignés à gauche (au-delà d'une
+   * phrase ou deux, un texte centré se lit mal : chaque ligne commence ailleurs).
+   */
+  message: string | string[]
+  /**
+   * Les boutons ignorent les tapes juste après l'ouverture (TAP_GUARD_MS) : pour une fenêtre qui
+   * s'ouvre là où l'on vient de toucher (un menu, un bouton à la même hauteur que sa confirmation).
+   * Le clavier, lui, agit tout de suite : Entrée est un geste voulu, pas un rebond du doigt.
+   */
+  guardTaps?: boolean
   /** Une image au-dessus du titre (facultatif). */
   illustration?: ReactNode
   /**
@@ -47,10 +61,37 @@ type Props = {
 /** Le nombre de lignes du texte rappelé : de quoi le reconnaître, sans pousser les boutons loin. */
 const QUOTE_LINES = 3
 
+/**
+ * Le temps, après l'ouverture, pendant lequel une fenêtre `guardTaps` ignore les tapes (décision du
+ * 25/10/2026) : la seconde tape d'une double tape arrive vers 150 à 250 ms ; une tape vers 700 ms
+ * est un geste à part, qui passe.
+ */
+export const TAP_GUARD_MS = 600
+
+/**
+ * Hook : vrai quand les boutons peuvent recevoir une tape. Sans garde, toujours ; avec, à partir de
+ * TAP_GUARD_MS après chaque ouverture (la garde repart à la réouverture).
+ */
+function useTapsAllowed(visible: boolean, guarded: boolean) {
+  const [allowed, setAllowed] = useState(false)
+  // useEffect : un minuteur posé à l'ouverture, et retiré si la fenêtre se ferme avant (ou si le
+  // composant quitte l'écran), pour ne pas changer l'état d'une fenêtre déjà fermée.
+  useEffect(() => {
+    if (!visible || !guarded) {
+      setAllowed(false)
+      return
+    }
+    const timer = setTimeout(() => setAllowed(true), TAP_GUARD_MS)
+    return () => clearTimeout(timer)
+  }, [visible, guarded])
+  return !guarded || allowed
+}
+
 export function Dialog({
   visible,
   title,
   message,
+  guardTaps = false,
   illustration,
   quote,
   children,
@@ -58,6 +99,10 @@ export function Dialog({
   onClosed,
 }: Props) {
   const { colors } = useTheme()
+  const tapsAllowed = useTapsAllowed(visible, guardTaps)
+  const paragraphs = typeof message === 'string' ? [message] : message
+  // Une phrase ou deux, centrées sous le titre ; plusieurs paragraphes, à gauche.
+  const align = paragraphs.length > 1 ? 'left' : 'center'
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap.
     <Modal
@@ -83,11 +128,12 @@ export function Dialog({
           keyboardShouldPersistTaps="handled"
         >
           {/* Toucher le voile ferme la fenêtre, comme « Annuler ». Il est posé dans la zone qui
-              défile, sous la fenêtre : il suit le défilement et couvre toute la hauteur. */}
+              défile, sous la fenêtre : il suit le défilement et couvre toute la hauteur. Pendant la
+              garde, la seconde tape d'une double tape qui tombe à côté ne la referme pas. */}
           <Pressable
             accessibilityElementsHidden
             importantForAccessibility="no"
-            onPress={onDismiss}
+            onPress={tapsAllowed ? onDismiss : undefined}
             style={{ position: 'absolute', inset: 0 }}
           />
           <View
@@ -119,10 +165,22 @@ export function Dialog({
                   </Text>
                 </View>
               ) : null}
-              <Text tone="secondary" align="center">
-                {message}
-              </Text>
-              <View style={{ gap: space.md }}>{children}</View>
+              {/* Les paragraphes plus serrés entre eux qu'avec le titre et les boutons. */}
+              <View style={{ gap: space.md }}>
+                {paragraphs.map((paragraph, index) => (
+                  // Le rang comme clé : deux paragraphes peuvent dire la même chose, et leur liste
+                  // ne change pas pendant que la fenêtre est ouverte.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: liste fixe, voir ci-dessus.
+                  <Text key={index} tone="secondary" align={align}>
+                    {paragraph}
+                  </Text>
+                ))}
+              </View>
+              {/* pointerEvents « none » pendant la garde : une tape traverse les boutons et tombe
+                  sur la fenêtre elle-même, qui n'en fait rien (sur le web comme sur téléphone). */}
+              <View style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}>
+                {children}
+              </View>
             </Surface>
           </View>
         </ScrollView>

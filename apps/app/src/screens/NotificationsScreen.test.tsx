@@ -479,6 +479,22 @@ describe('a content of mine removed by the moderation', () => {
     expect(screen.queryByText(containing(t('removal.afterReport')))).toBeNull()
   })
 
+  it('keeps the reasons of a removal on the project of a member who blocked me, without its title nor a link', async () => {
+    // Tranche 7b, règle 9 : l'API vide le titre d'un projet que je ne vois plus ; la motivation
+    // du retrait (article 17 du DSA) reste.
+    const elsewhere = {
+      ...removedCommentNotification,
+      project: { ...removedCommentNotification.project, title: '' },
+    }
+    mockPages([notificationPageOf([elsewhere])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t('notifications.removed.commentElsewhere')
+    expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
+    expect(missingSentences(removalSentences(removalOf(elsewhere)), screen)).toEqual([])
+    expect(screen.queryByRole('link', { name: containing(text) })).toBeNull()
+  })
+
   it('leads to the project, which its author still sees', async () => {
     mockPages([notificationPageOf([removedCommentNotification])])
     await renderWithProviders(<NotificationsScreen />)

@@ -17,6 +17,7 @@ import { getMe } from '../profile/api'
 import { adminMe, leaMe } from '../testing/fixtures'
 import {
   fakeReviewsItem,
+  firstTextOf,
   impersonationItem,
   meteoProjectId,
   moderationQueuePageOf,
@@ -132,7 +133,7 @@ const dialogTitled = (title: string) => {
 /** Ouvre la page, en attendant le profil (qui dit si le membre est administrateur). */
 const openModeration = async () => {
   await renderWithProviders(<ModerationScreen />)
-  await screen.findByText(scamCommentItem.snapshot)
+  await screen.findByText(firstTextOf(scamCommentItem))
 }
 
 describe('who sees the moderation', () => {
@@ -142,7 +143,7 @@ describe('who sees the moderation', () => {
     expect(await screen.findByRole('header', { name: 'Modération' })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'En attente', checked: true })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Retirés', checked: false })).toBeTruthy()
-    expect(screen.getByText(scamCommentItem.snapshot)).toBeTruthy()
+    expect(screen.getByText(firstTextOf(scamCommentItem))).toBeTruthy()
     // Le groupe d'onglets porte un nom à lui, pas celui de la page (relecture de 7a).
     // (Le groupe n'est pas « accessible » : il se cherche par son nom, comme dans components.test.)
     expect(screen.getByLabelText(fr.t('moderation.list')).props.accessibilityRole).toBe(
@@ -153,10 +154,12 @@ describe('who sees the moderation', () => {
   it('recalls the content to remove in the « Retirer » window', async () => {
     await openModeration()
 
-    await fireEvent.press(cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Retirer' }))
+    await fireEvent.press(
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+    )
 
     // Le texte paraît deux fois : sur la carte, et rappelé dans la fenêtre.
-    expect(screen.getAllByText(scamCommentItem.snapshot)).toHaveLength(2)
+    expect(screen.getAllByText(firstTextOf(scamCommentItem))).toHaveLength(2)
   })
 
   it('says « not found » to a member who is not an administrator, and shows nothing of the queue', async () => {
@@ -164,7 +167,7 @@ describe('who sees the moderation', () => {
     await renderWithProviders(<ModerationScreen />)
 
     expect(await screen.findByRole('button', { name: 'Retour à l’accueil' })).toBeTruthy()
-    expect(screen.queryByText(scamCommentItem.snapshot)).toBeNull()
+    expect(screen.queryByText(firstTextOf(scamCommentItem))).toBeNull()
     expect(screen.queryByRole('radio', { name: 'En attente' })).toBeNull()
   })
 
@@ -186,7 +189,7 @@ describe('who sees the moderation', () => {
       await screen.findByRole('button', { name: /^(Me connecter|Retour à l’accueil)$/ }),
     ).toBeTruthy()
     // … mais rien de la file.
-    expect(screen.queryByText(scamCommentItem.snapshot)).toBeNull()
+    expect(screen.queryByText(firstTextOf(scamCommentItem))).toBeNull()
   })
 })
 
@@ -195,7 +198,7 @@ describe('the pending reports', () => {
     await openModeration()
 
     const snapshots = [scamCommentItem, fakeReviewsItem, impersonationItem, ownNoteItem].map(
-      (item) => item.snapshot,
+      (item) => firstTextOf(item),
     )
     // Les textes signalés, dans l'ordre où ils apparaissent à l'écran.
     const shown = screen
@@ -207,7 +210,7 @@ describe('the pending reports', () => {
   it('shows the kind, the text reported, the reasons with their count, the details and the date', async () => {
     await openModeration()
 
-    const card = cardOf(scamCommentItem.snapshot)
+    const card = cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText('Commentaire')).toBeTruthy()
     expect(card.getByText(containing(fr.t('moderation.count', { count: 3 })))).toBeTruthy()
     // Le format du motif et de son nombre vient des textes (« Arnaque ou spam : 2 » depuis 8e26421).
@@ -230,7 +233,7 @@ describe('the pending reports', () => {
   it('leads to the project of a reported comment through « Voir »', async () => {
     await openModeration()
 
-    await fireEvent.press(cardOf(scamCommentItem.snapshot).getByRole('link', { name: 'Voir' }))
+    await fireEvent.press(cardOf(firstTextOf(scamCommentItem)).getByRole('link', { name: 'Voir' }))
 
     expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual([
       `/projects/${meteoProjectId}`,
@@ -240,7 +243,9 @@ describe('the pending reports', () => {
   it('leads to the page of a reported member through « Voir »', async () => {
     await openModeration()
 
-    await fireEvent.press(cardOf(impersonationItem.snapshot).getByRole('link', { name: 'Voir' }))
+    await fireEvent.press(
+      cardOf(firstTextOf(impersonationItem)).getByRole('link', { name: 'Voir' }),
+    )
 
     expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/members/u7'])
   })
@@ -248,19 +253,21 @@ describe('the pending reports', () => {
   it('offers no decision on what concerns the administrator, and says why', async () => {
     await openModeration()
 
-    const card = cardOf(ownNoteItem.snapshot)
+    const card = cardOf(firstTextOf(ownNoteItem))
     expect(card.getByText(containing(fr.t('moderation.concernsMe')))).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Retirer' })).toBeNull()
     expect(card.queryByRole('button', { name: 'Classer sans suite' })).toBeNull()
     // Témoin : un autre signalement, lui, se décide.
-    expect(cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Retirer' })).toBeTruthy()
+    expect(
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+    ).toBeTruthy()
   })
 
   it('offers only « Classer sans suite » for a profile', async () => {
     // L'API refuse de « retirer » un profil (422) : les actions sur un compte viennent plus tard.
     await openModeration()
 
-    const card = cardOf(impersonationItem.snapshot)
+    const card = cardOf(firstTextOf(impersonationItem))
     expect(card.getByRole('button', { name: 'Classer sans suite' })).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Retirer' })).toBeNull()
   })
@@ -295,7 +302,9 @@ describe('removing a content', () => {
   /** Ouvre « Retirer » sur le commentaire de Sam. */
   const openRemove = async () => {
     await openModeration()
-    await fireEvent.press(cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Retirer' }))
+    await fireEvent.press(
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Retirer' }),
+    )
     return dialogTitled('Retirer ce contenu ?')
   }
 
@@ -372,7 +381,7 @@ describe('dismissing a report', () => {
     await openModeration()
 
     await fireEvent.press(
-      cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Classer sans suite' }),
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
     )
 
     expect(mockDecide).toHaveBeenCalledWith({ action: 'dismiss', target: scamCommentItem.target })
@@ -385,13 +394,13 @@ describe('dismissing a report', () => {
    */
   const dismissFirst = async () => {
     const { rerender } = await renderWithProviders(<ModerationScreen />)
-    await screen.findByText(scamCommentItem.snapshot)
+    await screen.findByText(firstTextOf(scamCommentItem))
     await fireEvent.press(
-      cardOf(scamCommentItem.snapshot).getByRole('button', { name: 'Classer sans suite' }),
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', { name: 'Classer sans suite' }),
     )
     mockQueue([moderationQueuePageOf([fakeReviewsItem])])
     await rerender(<ModerationScreen />)
-    return cardOf(fakeReviewsItem.snapshot).getByRole('button', { name: 'Classer sans suite' })
+    return cardOf(firstTextOf(fakeReviewsItem)).getByRole('button', { name: 'Classer sans suite' })
   }
 
   it('ignores the next « Classer sans suite » touched right after, as the second tap of a double tap', async () => {
@@ -413,12 +422,12 @@ describe('dismissing a report', () => {
     const shown = screen
       .getAllByText(
         new RegExp(
-          `^(${containing(scamCommentItem.snapshot).source}|${containing(fakeReviewsItem.snapshot).source})$`,
+          `^(${containing(firstTextOf(scamCommentItem)).source}|${containing(firstTextOf(fakeReviewsItem)).source})$`,
         ),
       )
       .map((node) => [node.props.children].flat().join(''))
-    expect(shown).toEqual([scamCommentItem.snapshot, fakeReviewsItem.snapshot])
-    const decidedCard = cardOf(scamCommentItem.snapshot)
+    expect(shown).toEqual([firstTextOf(scamCommentItem), firstTextOf(fakeReviewsItem)])
+    const decidedCard = cardOf(firstTextOf(scamCommentItem))
     expect(decidedCard.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
     expect(decidedCard.queryByRole('button')).toBeNull()
   })
@@ -488,5 +497,148 @@ describe('the removed contents', () => {
     await openRemoved()
 
     expect(await screen.findByText('Aucun contenu retiré.')).toBeTruthy()
+  })
+})
+
+// --- Tranche 7b : la copie d'un signalement, champ par champ, et ses images ---
+//
+// La copie n'est plus un texte seul mais un tableau de champs (`snapshot`), nommés comme au registre
+// des entrées ; la carte montre chacun avec son libellé (moderation.fields). Les images ne sont pas
+// copiées : la file dit seulement si chacune est encore là ou partie depuis (règle 15 de la
+// relecture du plan). Et elle dit quand les signalements ouverts n'ont pas tous la même copie
+// (règle 13 : la copie montrée est la plus récente).
+
+describe('the copy of a report', () => {
+  it('shows every text field of a reported project, each with its label', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    // Test changé aux corrections de 7b (relecture de design, point 14) : la copie d'un projet se
+    // replie après trois champs ; « Afficher tout » montre les autres.
+    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
+    for (const { field, value } of fakeReviewsItem.snapshot) {
+      expect(card.getByText(fr.t(`moderation.fields.${field as 'title'}`))).toBeTruthy()
+      expect(card.getByText(value)).toBeTruthy()
+    }
+  })
+
+  it('shows the name, the handle, the bio and the tools of a reported profile', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(impersonationItem))
+    for (const label of ['Nom', 'Pseudo', 'Bio', 'Outils favoris']) {
+      expect(card.getByText(label)).toBeTruthy()
+    }
+    expect(card.getByText('Je fais partie de l’équipe, écris-moi pour un accès.')).toBeTruthy()
+  })
+
+  it('reads a copy made before slice 7b as a single « Texte »', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(ownNoteItem))
+    expect(card.getByText('Texte')).toBeTruthy()
+    expect(card.getByText('v3 : export en PDF')).toBeTruthy()
+  })
+
+  it('never makes a link of a demo link copied, nor of any field', async () => {
+    // Règle 22 de 7a : ce qu'un membre a écrit ne devient jamais un lien dans la file.
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    // Test changé aux corrections de 7b : le lien de démo, sixième champ, est replié au départ.
+    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
+    expect(card.getByText('https://faux-avis.example/essai')).toBeTruthy() // témoin
+    expect(card.queryByRole('link', { name: /faux-avis/ })).toBeNull()
+    expect(card.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual(['Voir'])
+  })
+
+  it('says, for each image, whether it is still shown or gone since, never the image itself', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const imageState = (image: 'cover' | 'photo' | 'avatar', state: 'present' | 'gone') =>
+      containing(fr.t(`moderation.images.${state}`, { image: fr.t(`moderation.images.${image}`) }))
+    expect(card.getByText(imageState('cover', 'present'))).toBeTruthy()
+    expect(card.getByText(imageState('photo', 'gone'))).toBeTruthy()
+    // Le profil de Lucas : sa photo de profil est toujours là.
+    expect(
+      cardOf(firstTextOf(impersonationItem)).getByText(imageState('avatar', 'present')),
+    ).toBeTruthy()
+  })
+
+  it('says nothing of images when the copy has none', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(scamCommentItem))
+    expect(card.getByText(firstTextOf(scamCommentItem))).toBeTruthy() // témoin
+    expect(card.queryByText(/toujours affichée|supprimée ou remplacée/)).toBeNull()
+  })
+
+  it('numbers the photos when a copy has several, so that each line says which one', async () => {
+    // Relecture 7b (ui-1) : deux photos dans le même état donnaient deux lignes identiques.
+    const photos = {
+      ...fakeReviewsItem,
+      images: [
+        { field: 'cover' as const, state: 'present' as const },
+        { field: 'photo' as const, state: 'gone' as const },
+        { field: 'photo' as const, state: 'gone' as const },
+      ],
+    }
+    mockQueue([moderationQueuePageOf([scamCommentItem, photos])])
+    await openModeration()
+
+    const card = cardOf(firstTextOf(photos))
+    const line = (image: string, state: 'present' | 'gone') =>
+      containing(fr.t(`moderation.images.${state}`, { image }))
+    expect(card.getByText(line(fr.t('moderation.images.cover'), 'present'))).toBeTruthy()
+    expect(
+      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 1 }), 'gone')),
+    ).toBeTruthy()
+    expect(
+      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 2 }), 'gone')),
+    ).toBeTruthy()
+    // Plus de « Photo : supprimée… » sans rang.
+    expect(card.queryByText(line(fr.t('moderation.images.photo'), 'gone'))).toBeNull()
+  })
+
+  it('keeps « Photo » without a number when the copy has a single photo', async () => {
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    expect(
+      card.getByText(
+        containing(fr.t('moderation.images.gone', { image: fr.t('moderation.images.photo') })),
+      ),
+    ).toBeTruthy()
+    expect(card.queryByText(/Photo 1/)).toBeNull()
+  })
+
+  it('folds a long copy after three fields, behind « Afficher tout »', async () => {
+    // Relecture de design 7b (point 14) : la copie entière d'un projet dépassait un écran.
+    await openModeration()
+
+    const card = cardOf(firstTextOf(fakeReviewsItem))
+    const [title, pitch, description, prompt] = fakeReviewsItem.snapshot
+    expect(card.getByText(title?.value ?? '')).toBeTruthy()
+    expect(card.getByText(pitch?.value ?? '')).toBeTruthy()
+    expect(card.getByText(description?.value ?? '')).toBeTruthy()
+    expect(card.queryByText(prompt?.value ?? '')).toBeNull()
+
+    await fireEvent.press(
+      card.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+    )
+
+    expect(card.getByText(prompt?.value ?? '')).toBeTruthy()
+    expect(
+      card.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+    ).toBeTruthy()
+  })
+
+  it('says when the content changed between two reports, on that card only', async () => {
+    await openModeration()
+
+    const changed = containing(fr.t('moderation.snapshotsDiffer'))
+    expect(cardOf(firstTextOf(fakeReviewsItem)).getByText(changed)).toBeTruthy()
+    expect(screen.getAllByText(changed)).toHaveLength(1)
   })
 })

@@ -4,6 +4,7 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { ReportCard } from './ReportCard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -13,7 +14,8 @@ describe('ReportCard', () => {
   const card = {
     kind: 'Commentaire',
     snapshot: 'Envoie-moi le code de ta carte, je te débloque la version pro.',
-    snapshotLabel: 'Texte au moment du signalement ; images actuelles',
+    // Le libellé de la citation a changé avec la tranche 7b (moderation.snapshot, commit du contrat).
+    snapshotLabel: 'Copie au moment du signalement',
     count: '3 signalements',
     reasons: ['Arnaque ou spam ×2', 'Harcèlement ou haine ×1'],
     details: ['Il a écrit la même chose sous trois projets.'],
@@ -33,10 +35,10 @@ describe('ReportCard', () => {
     expect(screen.getByText('Premier signalement le 20 oct.')).toBeTruthy()
   })
 
-  it('says the text is the one reported, and the images today’s (rule 22)', async () => {
+  it('says what its quote shows: the copy made when reported (rule 22)', async () => {
     await renderWithProviders(<ReportCard {...card} onView={jest.fn()} />)
 
-    expect(screen.getByText('Texte au moment du signalement ; images actuelles')).toBeTruthy()
+    expect(screen.getByText('Copie au moment du signalement')).toBeTruthy()
   })
 
   it('shows the text and the details as plain text, without Markdown or a link to touch', async () => {
@@ -193,6 +195,176 @@ describe('ReportCard', () => {
         undefined,
         undefined,
       ])
+    })
+  })
+
+  // --- Tranche 7b : la copie champ par champ, et l'état des images ---
+  //
+  // Interface attendue : `snapshot` accepte, en plus d'un texte (un contenu retiré), une liste de
+  // champs `{ label, value }` déjà traduits (« Titre », « Faux avis en masse ») ; `images`, les
+  // phrases sur l'état des images (« Couverture : toujours affichée ») ; `snapshotNote`, la phrase
+  // qui dit que le contenu a changé entre deux signalements.
+  describe('a copy made of several fields', () => {
+    const fields = [
+      { label: 'Titre', value: 'Faux avis en masse' },
+      { label: 'Pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+      { label: 'Lien de démo', value: 'https://faux-avis.example/essai' },
+    ]
+
+    it('shows each field with its label, in the order given', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={fields} onView={jest.fn()} />,
+      )
+
+      for (const { label, value } of fields) {
+        expect(screen.getByText(label)).toBeTruthy()
+        expect(screen.getByText(value)).toBeTruthy()
+      }
+      const shown = screen
+        .getAllByText(/^(Faux avis en masse|Cinquante avis.*|https:\/\/faux-avis\.example\/essai)$/)
+        .map((element) => element.props.children)
+      expect(shown).toEqual(fields.map((field) => field.value))
+    })
+
+    it('shows each field as plain text, a link written by a member included', async () => {
+      const tricky = [
+        { label: 'Description', value: '**Gratuit** : [clique ici](https://piege.example)' },
+        { label: 'Lien de démo', value: 'https://piege.example/demo' },
+      ]
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={tricky} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(tricky[0]?.value ?? '')).toBeTruthy()
+      expect(screen.getByText(tricky[1]?.value ?? '')).toBeTruthy()
+      expect(screen.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([
+        'Voir',
+      ])
+    })
+
+    it('says the state of each image it is given', async () => {
+      const images = ['Couverture : toujours affichée', 'Photo : supprimée ou remplacée depuis']
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={fields} images={images} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(images[0] ?? '')).toBeTruthy()
+      expect(screen.getByText(images[1] ?? '')).toBeTruthy()
+    })
+
+    it('says that the content changed between two reports, when told', async () => {
+      const note = 'Le contenu a changé entre deux signalements : voici sa version la plus récente.'
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          kind="Projet"
+          snapshot={fields}
+          snapshotNote={note}
+          onView={jest.fn()}
+        />,
+      )
+
+      expect(screen.getByText(note)).toBeTruthy()
+    })
+
+    // --- Corrections de 7b (relectures ui-1, design-14) ---
+
+    it('shows two images in the same state on two lines, without mixing them up', async () => {
+      // Deux phrases identiques (deux photos sans rang, si l'écran ne les numérotait pas) : la
+      // carte en garde deux lignes, sans clé React en double.
+      const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+      const same = 'Photo : supprimée ou remplacée depuis'
+      try {
+        await renderWithProviders(
+          <ReportCard
+            {...card}
+            kind="Projet"
+            snapshot={fields}
+            images={[same, same]}
+            onView={jest.fn()}
+          />,
+        )
+
+        expect(screen.getAllByText(same)).toHaveLength(2)
+        expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
+      } finally {
+        errors.mockRestore()
+      }
+    })
+
+    const project = [
+      { label: 'Titre', value: 'Faux avis en masse' },
+      { label: 'Pitch', value: 'Cinquante avis cinq étoiles.' },
+      { label: 'Description', value: 'Colle l’adresse de ta boutique.' },
+      { label: 'Prompt', value: 'Écris 50 avis enthousiastes.' },
+      { label: 'Outils', value: 'Claude Code, Python' },
+    ]
+
+    it('folds a copy of more than four fields after the third, behind « Afficher tout »', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={project} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText('Colle l’adresse de ta boutique.')).toBeTruthy()
+      expect(screen.queryByText('Écris 50 avis enthousiastes.')).toBeNull()
+      expect(screen.queryByText('Claude Code, Python')).toBeNull()
+      // Un bouton, nommé, qui dit qu'il est replié.
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+      ).toBeTruthy()
+    })
+
+    it('shows the rest on « Afficher tout », and folds it again on « Replier »', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} kind="Projet" snapshot={project} onView={jest.fn()} />,
+      )
+
+      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showAll') }))
+
+      expect(screen.getByText('Écris 50 avis enthousiastes.')).toBeTruthy()
+      expect(screen.getByText('Claude Code, Python')).toBeTruthy()
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+      ).toBeTruthy()
+
+      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showLess') }))
+
+      expect(screen.queryByText('Claude Code, Python')).toBeNull()
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+      ).toBeTruthy()
+    })
+
+    it('says which card « Afficher tout » unfolds, like its other buttons', async () => {
+      const description = 'Projet : Faux avis en masse'
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          kind="Projet"
+          snapshot={project}
+          description={description}
+          onView={jest.fn()}
+        />,
+      )
+
+      expect(
+        screen.getByRole('button', { name: fr.t('moderation.showAll') }).props.accessibilityHint,
+      ).toBe(description)
+    })
+
+    it('never folds a copy of four fields or less (a profile): one field is not worth a button', async () => {
+      const profile = [
+        { label: 'Nom', value: 'Lucas Martin' },
+        { label: 'Pseudo', value: 'lucas_martin' },
+        { label: 'Bio', value: 'Je fais partie de l’équipe.' },
+        { label: 'Outils favoris', value: 'Claude Code' },
+      ]
+      await renderWithProviders(
+        <ReportCard {...card} kind="Profil" snapshot={profile} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText('Claude Code')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: fr.t('moderation.showAll') })).toBeNull()
     })
   })
 

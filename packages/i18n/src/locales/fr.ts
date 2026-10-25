@@ -120,6 +120,7 @@ export const fr = {
     // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
     emails: { title: 'E-mails', row: 'Choisir les e-mails reçus' },
     data: { title: 'Mes données' },
+    safety: { title: 'Sécurité' },
     export: {
       button: 'Télécharger mes données',
       done: 'Tes données ont été téléchargées.',
@@ -131,6 +132,7 @@ export const fr = {
       hint: 'En français ou en anglais. Pour une question, un contenu à signaler ou tes données.',
     },
     moderation: 'Modération',
+    blocks: 'Membres bloqués',
     email: {
       label: 'Adresse e-mail',
       soon: 'modifiable bientôt',
@@ -160,10 +162,15 @@ export const fr = {
       warning: 'C’est immédiat et sans retour.',
       submit: 'Supprimer définitivement',
       wrongPassword: 'Mot de passe incorrect.',
+      blocksItem: 'Les membres que tu as bloqués',
+      blocksDetail: 'Tes blocages partent avec ton compte, et ceux qui te visaient aussi.',
       remains: {
         title: 'Ce qui reste',
         reports: 'Tes signalements restent, sans ton nom, jusqu’à un an après leur traitement',
         removals: 'Une trace des retraits de tes contenus reste un an',
+        // Tranche 7b (relecture juridique, J11) : au conditionnel, l'écran s'affiche pour tous.
+        reportCopies:
+          'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
       },
     },
   },
@@ -397,6 +404,9 @@ export const fr = {
       deletedPlaceholder: 'Commentaire supprimé',
       hiddenPlaceholder: 'Commentaire masqué',
       removedPlaceholder: 'Contenu retiré par la modération',
+      // Tranche 7b : « Commentaire masqué » reste au geste de l'auteur du projet (J6).
+      blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',
+      unavailablePlaceholder: 'Commentaire indisponible',
       more: 'Afficher la suite',
       end: 'C’est tout',
       moreError: 'La suite des commentaires n’a pas pu se charger.',
@@ -482,6 +492,67 @@ export const fr = {
     limited:
       'Tu as atteint la limite de {{max}} signalements en 24 heures. Pour un cas urgent, écris-nous : {{contactEmail}}',
     gone: 'Ce contenu n’existe plus, ou tu ne peux plus le voir.',
+    // Tranche 7b : « Envoyer » dit pourquoi il ne part pas (design.md, À reprendre) ; après l'envoi,
+    // bloquer l'auteur est proposé, jamais présélectionné (J14).
+    reasonRequired: 'Choisis un motif pour envoyer ton signalement.',
+    alsoBlock: 'Bloquer aussi @{{handle}}',
+    alsoBlockHint: 'Tu ne verras plus ses contenus, et @{{handle}} ne verra plus les tiens.',
+    // Ajouté par l'interface : la phrase de bonne foi seule, qui reste sous l'erreur « Dis-nous
+    // pourquoi… » (l'aide entière répéterait l'erreur, qui en est la première phrase).
+    goodFaith:
+      'En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
+  },
+  // Le menu « … » (tranche 7b) : les actions secondaires d'une page, au lieu d'un bouton chacune.
+  actionMenu: {
+    label: 'Plus d’actions',
+    close: 'Fermer le menu',
+  },
+  // Bloquer un membre (tranche 7b). Le dialogue dit vrai (J9) : ce qu'on ne verra plus, les
+  // abonnements, que l'autre n'est pas prévenu mais peut le remarquer, et que la modération ne l'est
+  // pas non plus.
+  block: {
+    action: 'Bloquer',
+    title: 'Bloquer @{{handle}} ?',
+    hidden:
+      'Vous ne verrez plus les projets, les notes et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
+    // Relecture juridique (R1) : ce qui reste visible malgré le blocage (règles 1 et 2 du plan).
+    remains:
+      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, et ceux où tu as écrit son pseudo. Pour les retirer, supprime-les avant de bloquer.',
+    follows:
+      'Vos abonnements de l’un à l’autre sont retirés ; ils ne reviendront pas si tu débloques.',
+    notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',
+    notModeration:
+      'Bloquer ne prévient pas la modération. Si un contenu pose problème, signale-le d’abord.',
+    confirm: 'Bloquer',
+    cancel: 'Annuler',
+    done: 'Tu as bloqué @{{handle}}.',
+    notice: 'Tu as bloqué @{{handle}}.',
+    unblock: 'Débloquer',
+    unblockTitle: 'Débloquer @{{handle}} ?',
+    unblockMessage:
+      'Vous verrez de nouveau les contenus l’un de l’autre. Les abonnements retirés ne reviennent pas. Les notifications d’avant le blocage peuvent réapparaître, des deux côtés.',
+    unblockConfirm: 'Débloquer',
+    unblocked: 'Tu as débloqué @{{handle}}.',
+    error: 'Le changement n’a pas pu être enregistré. Réessaie.',
+    limited: 'Tu as atteint la limite de {{max}} blocages en 24 heures. Réessaie demain.',
+    list: {
+      title: 'Membres bloqués',
+      hint: 'Vous ne voyez plus les contenus l’un de l’autre. La personne bloquée n’est pas prévenue.',
+      empty: 'Tu n’as bloqué personne.',
+      emptyHint: 'Pour bloquer un membre, ouvre le menu « … » de sa page.',
+      blockedOn: 'Bloqué le {{date}}',
+      more: 'Afficher la suite',
+      end: 'C’est tout',
+      loadError: 'La liste n’a pas pu se charger.',
+      // Ajoutés par l'interface : le nom lu de « Débloquer » sur chaque ligne (toutes portent le
+      // même mot), et la suite ratée de la liste.
+      unblockLabel: 'Débloquer @{{handle}}',
+      // La précision d'une ligne : le pseudo, puis la date (blockedOn).
+      detail: '@{{handle}} · {{blockedOn}}',
+      moreError: 'La suite de la liste n’a pas pu se charger.',
+    },
+    // Le quota des déblocages a son propre nombre (UNBLOCKS_PER_DAY) : « blocages » serait faux.
+    unblockLimited: 'Tu as atteint la limite de {{max}} déblocages en 24 heures. Réessaie demain.',
   },
   moderation: {
     title: 'Modération',
@@ -492,7 +563,32 @@ export const fr = {
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',
     kinds: { project: 'Projet', note: 'Note', comment: 'Commentaire', member: 'Profil' },
-    snapshot: 'Texte au moment du signalement ; images actuelles',
+    // Tranche 7b : la copie champ par champ, et ses images (jamais copiées, seulement suivies).
+    fields: {
+      text: 'Texte',
+      name: 'Nom',
+      handle: 'Pseudo',
+      bio: 'Bio',
+      favoriteTools: 'Outils favoris',
+      title: 'Titre',
+      pitch: 'Pitch',
+      description: 'Description',
+      prompt: 'Prompt',
+      tools: 'Outils',
+      demoUrl: 'Lien de démo',
+      body: 'Texte',
+    },
+    images: {
+      avatar: 'Photo de profil',
+      cover: 'Couverture',
+      photo: 'Photo',
+      photoNumbered: 'Photo {{n}}',
+      present: '{{image}} : toujours affichée',
+      gone: '{{image}} : supprimée ou remplacée depuis',
+    },
+    snapshotsDiffer:
+      'Le contenu a changé entre deux signalements : voici sa version la plus récente.',
+    snapshot: 'Copie au moment du signalement',
     count_one: '{{count}} signalement',
     count_other: '{{count}} signalements',
     reasonCount: '{{reason}} : {{count}}',
@@ -526,6 +622,9 @@ export const fr = {
     // Le bas de la liste (ajoutés par l'interface, tranche 7a) : tout est lu, ou la suite a raté.
     end: 'C’est tout',
     moreError: 'La suite de la liste n’a pas pu se charger.',
+    // Une copie longue se replie après trois champs (ajoutés par l'interface, corrections 7b).
+    showAll: 'Afficher tout',
+    showLess: 'Replier',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de
@@ -742,6 +841,8 @@ export const fr = {
       project: 'Ton projet « {{title}} » a été retiré par la modération',
       note: 'Ta note sur « {{title}} » a été retirée par la modération',
       comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
+      // Tranche 7b, règle 9 : sur le projet d'un membre qui t'a bloqué, ni titre ni lien.
+      commentElsewhere: 'Ton commentaire a été retiré par la modération',
     },
     reportHandled: {
       // L'issue seulement : ni titre, ni extrait, ni auteur (relecture de sécurité du plan 7a).
@@ -784,6 +885,10 @@ export const fr = {
     alreadyReported: 'Tu as déjà signalé ce contenu. La modération va le regarder.',
     alreadyDecided: 'Une décision a déjà été prise sur ce contenu entre-temps.',
     removed: 'Ce contenu a été retiré par la modération : il ne peut plus être modifié.',
+    cannotBlockOwn: 'Tu ne peux pas te bloquer toi-même.',
+    blockedMention: 'Tu ne peux pas mentionner un membre que tu as bloqué.',
+    alreadyExamined:
+      'Tu as déjà signalé ce contenu, et la modération l’a déjà examiné. Il n’a pas changé depuis.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

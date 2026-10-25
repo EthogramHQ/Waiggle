@@ -511,3 +511,41 @@ describe('what the e-mail shows', () => {
     expect(email.html).toContain('<html lang="en"')
   })
 })
+
+// ─── Bloquer (tranche 7b) ────────────────────────────────────────────────────────────────────────
+
+// Scénario « Tranche 7b — Bloquer » : une mention venant d'un membre bloqué, dans un sens ou dans
+// l'autre, ne part pas par e-mail ; l'e-mail se calcule au moment de l'envoi, donc un blocage posé
+// pendant les 15 minutes d'attente suffit. Une mention d'un autre membre part toujours.
+describe('the mention e-mail and blocks', () => {
+  it.each([
+    ['Inès blocked Malik', 'ines'],
+    ['Malik blocked Inès', 'malik'],
+  ])('does not send the mention of Malik when %s', async (_, who) => {
+    const malikId = (await act.me(malik)).id
+    await act.comment(velo.id, malik, '@ines_morel tu as vu la pluie de demain ?')
+    later()
+    await act.comment(velo.id, zoe, '@ines_morel et la grêle ?')
+    later()
+    if (who === 'ines') await act.block(malikId, ines)
+    else await act.block(inesId, malik)
+
+    later(16 * MINUTE)
+    await runMentions()
+
+    const email = onlyMentionsTo(inesAccount.email)
+    expect(email.text).toContain(line('mention', 'Vélo', 'Zoé', 'zoe'))
+    expect(email.text).not.toContain('Malik')
+    expect(email.text).not.toContain('la pluie de demain')
+  })
+
+  it('sends nothing when the only mention comes from a blocked member', async () => {
+    await act.comment(velo.id, malik, '@ines_morel tu as vu la pluie de demain ?')
+    await act.block((await act.me(malik)).id, ines)
+
+    later(16 * MINUTE)
+    await runMentions()
+
+    expect(mentionsTo(inesAccount.email)).toEqual([])
+  })
+})

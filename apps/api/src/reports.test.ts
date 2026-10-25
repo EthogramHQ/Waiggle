@@ -18,6 +18,7 @@ import {
   NotificationPage,
   ProjectNote,
   REPORTS_PER_DAY,
+  ReportSnapshot,
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -242,7 +243,10 @@ describe('the copy of the reported text', () => {
       .select({ snapshot: schema.contentReport.snapshot })
       .from(schema.contentReport)
       .where(eq(schema.contentReport.id, id))
-    return row?.snapshot ?? ''
+    // Tranche 7b : la copie est un tableau de champs ; ces tests lisent tous ses textes ensemble.
+    return ReportSnapshot.parse(row?.snapshot)
+      .map((entry) => entry.value)
+      .join('\n')
   }
   const report = async (kind: string, id: string) => {
     const res = await postReport(max, target(kind, id))
@@ -537,11 +541,13 @@ describe('the preview of the target', () => {
     const note = await postNote(meteo.id, lea, 'Une note à lire')
     const comment = await act.comment(meteo.id, lea, 'Un commentaire à lire')
     const { handle } = await act.me(lea)
+    const author = { id: leaId, name: 'Léa', handle, isBlocked: false }
 
     expect(await readPreview(max, 'project', meteo.id)).toEqual({
       target: { kind: 'project', id: meteo.id },
       text: expect.stringContaining('Météo'),
       projectId: meteo.id,
+      author, // tranche 7b : l’autrice de la cible, pour « Bloquer aussi @x »
     })
     expect((await readPreview(max, 'project', meteo.id)).text).toContain(
       'La pluie de demain, quartier par quartier.',
@@ -550,14 +556,16 @@ describe('the preview of the target', () => {
       target: { kind: 'note', id: note.id },
       text: 'Une note à lire',
       projectId: meteo.id,
+      author,
     })
     expect(await readPreview(max, 'comment', comment.id)).toEqual({
       target: { kind: 'comment', id: comment.id },
       text: 'Un commentaire à lire',
       projectId: meteo.id,
+      author,
     })
     const member = await readPreview(max, 'member', leaId)
-    expect(member).toMatchObject({ target: { kind: 'member', id: leaId }, projectId: null })
+    expect(member).toMatchObject({ target: { kind: 'member', id: leaId }, projectId: null, author })
     expect(member.text).toContain('Léa')
     expect(member.text).toContain(handle)
   })
@@ -624,5 +632,204 @@ describe('the preview of the target', () => {
     ] as const) {
       await expectError(await preview(lea, kind, id), 422, 'own_content')
     }
+  })
+})
+
+// ─── Tranche 7b : copie complète, re-signaler, bloquer ───────────────────────────────────────────
+
+// Scénario « Tranche 7b — Bloquer », « Copie complète au signalement » ; règles 1, 2, 14 et 15 de
+// la relecture du plan (24/10/2026).
+describe('the full copy of a report', () => {
+  const copyOf = async (kind: string, id: string) => {
+    const res = await postReport(max, target(kind, id))
+    expect(res.status).toBe(201)
+    const [row] = await ctx.db
+      .select({ snapshot: schema.contentReport.snapshot })
+      .from(schema.contentReport)
+      .where(eq(schema.contentReport.id, CreatedReport.parse(await res.json()).id))
+    return ReportSnapshot.parse(row?.snapshot)
+  }
+
+  it('copies every text of a project, one field per entry', async () => {
+    const velo = await act.publish(lea, 'Vélo', {
+      pitch: 'Un pitch de vélo.',
+      description: 'Une description de vélo.',
+      prompts: ['Premier prompt', 'Second prompt'],
+      tools: ['Mistral', 'Cursor'],
+      demoUrl: 'https://velo.dev/',
+    })
+
+    const copy = await copyOf('project', velo.id)
+
+    expect(copy).toEqual(
+      expect.arrayContaining([
+        { field: 'title', value: 'Vélo' },
+        { field: 'pitch', value: 'Un pitch de vélo.' },
+        { field: 'description', value: 'Une description de vélo.' },
+        { field: 'prompt', value: 'Premier prompt' },
+        { field: 'prompt', value: 'Second prompt' },
+        { field: 'tools', value: 'Mistral, Cursor' },
+        { field: 'demoUrl', value: 'https://velo.dev/' },
+      ]),
+    )
+  })
+
+  it('copies every text of a profile, its favorite tools included', async () => {
+    await act.updateProfile(lea, { bio: 'Une bio de Léa.', favoriteTools: ['Claude', 'Cursor'] })
+    const { handle } = await act.me(lea)
+
+    expect(await copyOf('member', leaId)).toEqual(
+      expect.arrayContaining([
+        { field: 'name', value: 'Léa' },
+        { field: 'handle', value: handle },
+        { field: 'bio', value: 'Une bio de Léa.' },
+        { field: 'favoriteTools', value: 'Claude, Cursor' },
+      ]),
+    )
+  })
+
+  it('copies the body of a note and of a comment', async () => {
+    const note = await postNote(meteo.id, lea, 'Le texte de la note')
+    const comment = await act.comment(meteo.id, lea, 'Le texte du commentaire')
+
+    expect(await copyOf('note', note.id)).toEqual([{ field: 'body', value: 'Le texte de la note' }])
+    expect(await copyOf('comment', comment.id)).toEqual([
+      { field: 'body', value: 'Le texte du commentaire' },
+    ])
+  })
+
+  // Règle 16 : les copies d'avant 7b, un texte seul, restent lisibles (champ `text`).
+  it('reads a copy written before this slice as a single text field', () => {
+    expect(ReportSnapshot.parse([{ field: 'text', value: 'Une ancienne copie' }])).toEqual([
+      { field: 'text', value: 'Une ancienne copie' },
+    ])
+  })
+})
+
+// Règle 14 (S6, J2) : un nouveau signalement est permis quand le précédent de la même personne est
+// clos et que le contenu a changé depuis ; inchangé, un code à part (`already_examined`).
+describe('reporting again', () => {
+  const dismiss = async (id: string) => {
+    later()
+    await act.decide(zoe, { action: 'dismiss', target: { kind: 'comment', id } })
+  }
+
+  beforeEach(async () => {
+    await act.makeAdmin((await act.me(zoe)).id)
+  })
+
+  it('refuses while the first report is open', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire')
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+
+    await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_reported')
+  })
+
+  it('refuses a content unchanged since the moderation examined it, with its own code', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire')
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+    await dismiss(comment.id)
+
+    await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_examined')
+    expect(await storedReports()).toHaveLength(1)
+  })
+
+  it('accepts a new report of a content changed since', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire')
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+    await dismiss(comment.id)
+    later()
+    const edit = await act.send('PATCH', `/v1/projects/${meteo.id}/comments/${comment.id}`, lea, {
+      body: 'Un commentaire devenu méchant',
+    })
+    expect(edit.status).toBe(200)
+
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+    const rows = await storedReports()
+    expect(rows.map((r) => r.status)).toEqual(['dismissed', 'open'])
+    expect(ReportSnapshot.parse(rows[1]?.snapshot)).toEqual([
+      { field: 'body', value: 'Un commentaire devenu méchant' },
+    ])
+    // Et une seule fois : le second est ouvert.
+    await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_reported')
+  })
+})
+
+describe('reporting a blocked member', () => {
+  const block = async (memberId: string, cookie: string) => {
+    later()
+    await act.block(memberId, cookie)
+  }
+  const previewOf = (cookie: string, kind: string, id: string) =>
+    act.send('GET', `/v1/reports/target?${new URLSearchParams({ kind, id })}`, cookie)
+
+  it('answers 404 for a content of a member blocked either way, as for an unknown one', async () => {
+    const note = await postNote(meteo.id, lea, 'Une note de Léa')
+    const zoeProject = await act.publish(zoe, 'Recettes')
+    const comment = await act.comment(zoeProject.id, lea, 'Un commentaire de Léa chez Zoé')
+
+    for (const blockNow of [() => block(leaId, max), () => block(maxId, lea)]) {
+      await blockNow()
+      for (const [kind, id] of [
+        ['project', meteo.id],
+        ['note', note.id],
+        ['comment', comment.id],
+      ] as const) {
+        await expectSameNotFound(await postReport(max, target(kind, id)), await unknownProject())
+        await expectSameNotFound(await previewOf(max, kind, id), await unknownProject())
+      }
+      await act.unblock(leaId, max)
+      await act.unblock(maxId, lea)
+    }
+    expect(await storedReports()).toEqual([])
+  })
+
+  // Précision 2 : qui a bloqué peut encore signaler le profil ; qui est bloqué, non.
+  it('lets who blocked report the profile, and answers 404 to who is blocked', async () => {
+    await block(leaId, max) // Max bloque Léa
+
+    const preview = await previewOf(max, 'member', leaId)
+    expect(preview.status).toBe(200)
+    expect(ReportTargetPreview.parse(await preview.json()).author).toMatchObject({
+      id: leaId,
+      isBlocked: true,
+    })
+    expect((await postReport(max, target('member', leaId))).status).toBe(201)
+    await expectSameNotFound(
+      await postReport(lea, target('member', maxId)),
+      await postReport(lea, target('member', 'no-such-member')),
+    )
+  })
+
+  it('says whether I already blocked the author of the target', async () => {
+    const comment = await act.comment(meteo.id, zoe, 'Un commentaire de Zoé')
+    const { handle } = await act.me(zoe)
+
+    const preview = await previewOf(max, 'comment', comment.id)
+    expect(ReportTargetPreview.parse(await preview.json()).author).toEqual({
+      id: (await act.me(zoe)).id,
+      name: 'Zoé',
+      handle,
+      isBlocked: false,
+    })
+  })
+
+  // Règle 2 (B2) : un commentaire qui me mentionne, écrit avant que son auteur me bloque, reste
+  // signalable par moi.
+  it('lets me report a comment that mentions me, after its author blocked me', async () => {
+    const { handle } = await act.me(max)
+    const zoeProject = await act.publish(zoe, 'Recettes')
+    const comment = await act.comment(zoeProject.id, lea, `Je parle de @${handle} dans son dos`)
+    await block(maxId, lea) // Léa bloque Max
+
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+  })
+
+  // Règle 1 (B1) : l'auteur d'un projet signale un commentaire chez lui, quel que soit le blocage.
+  it('lets the author of a project report a comment on it, whoever blocked whom', async () => {
+    const comment = await act.comment(meteo.id, max, 'Un commentaire de Max chez Léa')
+    await block(maxId, lea)
+
+    expect((await postReport(lea, target('comment', comment.id))).status).toBe(201)
   })
 })

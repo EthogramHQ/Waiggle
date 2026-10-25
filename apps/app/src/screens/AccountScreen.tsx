@@ -1,5 +1,6 @@
 // Page « Réglages » : qui est connecté, profil, langue, apparence, e-mails, export des données,
-// déconnexion, l'adresse pour nous écrire, et la modération pour un administrateur (tranche 7a).
+// déconnexion, l'adresse pour nous écrire, la modération pour un administrateur (tranche 7a) et
+// les membres bloqués (tranche 7b).
 // La suppression du compte a sa propre page (DeleteAccountScreen), plus solennelle.
 
 import { contactEmail, sourceUrl } from '@ruche/brand'
@@ -97,10 +98,10 @@ export function AccountScreen() {
         onPress={() => router.push('/profile')}
       />
 
-      {/* Tranche 7a : la modération, pour un administrateur seulement. La ligne apparaît quand le
+      {/* Tranche 7a : la modération, pour un administrateur seulement. Le groupe apparaît quand le
           profil est arrivé ; ce champ ne donne aucun droit, l'API refait la vérification. */}
       {me.data?.isAdmin ? (
-        <ListGroup>
+        <ListGroup key="moderation">
           <ListRow
             label={t('account.moderation')}
             icon="shield-check"
@@ -157,6 +158,19 @@ export function AccountScreen() {
       {exportMessage ? (
         <Notice tone={exportMessage.ok ? 'success' : 'error'} message={exportMessage.text} />
       ) : null}
+
+      {/* Tranche 7b : les membres que j'ai bloqués, et de quoi les débloquer (app/blocks.tsx), dans
+          un groupe titré « Sécurité », près de « Mes données » : sans titre, au-dessus de « Langue »,
+          la ligne ne disait pas de quoi elle relevait (relecture de design 7b). Pour tous les
+          membres, même sans blocage : la page dit alors « Tu n'as bloqué personne ». */}
+      <ListGroup title={t('account.safety.title')}>
+        <ListRow
+          label={t('account.blocks')}
+          icon="prohibit"
+          trailing="chevron"
+          onPress={() => router.push('/blocks')}
+        />
+      </ListGroup>
 
       <ListGroup title={t('account.section.title')}>
         <ListRow

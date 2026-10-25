@@ -89,6 +89,10 @@ export const memberCounterKeys = (userId: string) => ({
   export: `export:${userId}`,
   // Signaler un contenu (tranche 7a) : 20 par jour, contre les signalements en rafale.
   report: `report:${userId}`,
+  // Bloquer et débloquer (tranche 7b) : deux compteurs, 100 par jour chacun. Séparés, pour qu'une
+  // rafale de déblocages et de reblocages (débloquer, lire, rebloquer) bute sur les deux plafonds.
+  block: `block:${userId}`,
+  unblock: `unblock:${userId}`,
 })
 
 /**

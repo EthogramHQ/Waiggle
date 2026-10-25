@@ -17,12 +17,15 @@ import {
   type ReportReason,
   ReportTarget,
   type ReportTargetKind,
+  type ReportTargetPreview,
 } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiErrorKey, errorKey } from '../api/errors'
+import { useBlock } from '../blocks/api'
+import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -83,6 +86,19 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
   if (isPending || !hydrated) return <LoadingScreen />
   if (!session) return <SignedOutScreen />
   if (!target) return <NotFoundState title={t('states.notFoundTitle')} />
+  // Une cible déjà lue garde son formulaire, même si une relecture échoue ensuite : après « Bloquer
+  // aussi @x », la cible devient invisible (404), et une relecture (retour sur l'onglet) aurait
+  // remplacé « Merci » par « Page introuvable » (relecture de l'interface, 7b).
+  if (preview.data) {
+    return (
+      <ReportForm
+        target={target}
+        text={preview.data.text}
+        author={preview.data.author}
+        fallback={fallbackOf(target.kind, target.id, preview.data.projectId)}
+      />
+    )
+  }
   if (preview.error) {
     const key = errorKey(preview.error)
     // Introuvable : le même écran, que le contenu n'existe pas ou qu'il soit invisible.
@@ -95,24 +111,20 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
     }
     return <LoadErrorScreen error={preview.error} onRetry={() => void preview.refetch()} />
   }
-  if (!preview.data) return <LoadingScreen />
-  return (
-    <ReportForm
-      target={target}
-      text={preview.data.text}
-      fallback={fallbackOf(target.kind, target.id, preview.data.projectId)}
-    />
-  )
+  return <LoadingScreen />
 }
 
 /** Le formulaire, une fois la cible lue : ses états ne redessinent pas les états de chargement. */
 function ReportForm({
   target,
   text,
+  author,
   fallback,
 }: {
   target: ReportTarget
   text: string
+  /** L'auteur de la cible (le membre lui-même pour un profil), pour « Bloquer aussi @x ». */
+  author: ReportTargetPreview['author']
   fallback: Href
 }) {
   const { t } = useTranslation()
@@ -144,8 +156,20 @@ function ReportForm({
     if (value.trim() !== '') setMissingWhy(false)
   }
 
+  // Sans motif, rien ne part : « Envoyer » reste actif, et son appui dit ce qui manque (design.md,
+  // tranche 7b) au lieu d'un bouton grisé qui ne dit pas pourquoi. Le message part au premier choix.
+  const [missingReason, setMissingReason] = useState(false)
+  const choose = (value: ReportReason) => {
+    setReason(value)
+    setMissingReason(false)
+  }
+
   const submit = async () => {
-    if (busy.current || reason === null || sent) return
+    if (busy.current || sent) return
+    if (reason === null) {
+      setMissingReason(true)
+      return
+    }
     if (illegal && details.trim() === '') {
       setMissingWhy(true)
       return
@@ -212,7 +236,7 @@ function ReportForm({
                 key={item.reason}
                 label={t(`report.reasons.${item.key}`)}
                 selected={reason === item.reason}
-                onPress={() => setReason(item.reason)}
+                onPress={() => choose(item.reason)}
               />
             ))}
           </ListGroup>
@@ -222,9 +246,12 @@ function ReportForm({
             value={details}
             onChangeText={changeDetails}
             error={illegal && missingWhy ? t('report.illegalRequired') : undefined}
+            // L'aide (la phrase de bonne foi, pas d'informations personnelles) reste sous l'erreur :
+            // on la lit encore en corrigeant. Sans sa première phrase, que l'erreur vient de dire.
+            keepHint
             hint={
               illegal
-                ? `${t('report.illegalHint')} ${t('report.detailsHint')}`
+                ? `${missingWhy ? t('report.goodFaith') : t('report.illegalHint')} ${t('report.detailsHint')}`
                 : t('report.detailsHint')
             }
             multiline
@@ -232,21 +259,77 @@ function ReportForm({
             maxLength={REPORT_DETAILS_MAX}
           />
           <Hint icon="shield-check" text={t('report.anonymity')} />
+          {/* Un refus de l'API, au-dessus d'« Envoyer » : il reste en place pendant le nouvel
+              envoi, rien ne saute sous le doigt. */}
           {failureMessage ? (
             <Notice
               message={failureMessage}
               action={failure === 'unauthorized' ? signInAgain() : undefined}
             />
           ) : null}
-          {/* Sans motif, rien à envoyer : le bouton attend qu'on en choisisse un. */}
+          <Button label={t('report.submit')} onPress={() => void submit()} loading={sending} />
+          {/* Le motif manquant, sous « Envoyer » : posé au-dessus, il faisait descendre le bouton
+              de 65 à 86 pt sous le doigt (relecture de design, 7b). */}
+          {missingReason ? <Notice message={t('report.reasonRequired')} /> : null}
+        </>
+      )}
+      {/* Sans pseudo, un blocage nous sépare déjà (commentaire lu malgré lui, règles 1 et 2) :
+          rien à proposer, PUT block répondrait 404 si l'auteur m'a bloqué. */}
+      {sent && !author.isBlocked && author.handle !== null ? (
+        <AlsoBlock author={{ ...author, handle: author.handle }} />
+      ) : null}
+    </Screen>
+  )
+}
+
+/**
+ * Après l'envoi : « Bloquer aussi @x » (tranche 7b, scénario « Après un signalement »). Une action
+ * secondaire, jamais choisie d'avance, absente si @x est déjà bloqué (règle 21 de la relecture du
+ * plan, J14). Elle passe par la même fenêtre que sur la page d'un membre (règle 20, BlockDialog) :
+ * ce qu'on ne verra plus, ce qui reste visible, les abonnements retirés, que @x n'est pas prévenu,
+ * et que la modération ne l'est pas. Une fois fait, « Tu as bloqué @x. » prend sa place.
+ */
+function AlsoBlock({ author }: { author: ReportTargetPreview['author'] & { handle: string } }) {
+  const { t } = useTranslation()
+  const { block } = useBlock()
+  const [asking, setAsking] = useState<BlockAsking | null>(null)
+  const [blocked, setBlocked] = useState(false)
+  // Le bouton touché laisse la place à la confirmation : le focus du clavier y va, une fois la
+  // fenêtre refermée (avant, elle le garde pour elle).
+  const doneRef = useRef<Focusable>(null)
+  const focusAfterClose = useRef(false)
+  const handle = author.handle
+
+  return (
+    <>
+      {blocked ? (
+        <Notice ref={doneRef} tone="success" message={t('block.done', { handle })} polite />
+      ) : (
+        <>
+          <Hint icon="prohibit" text={t('report.alsoBlockHint', { handle })} />
           <Button
-            label={t('report.submit')}
-            onPress={() => void submit()}
-            loading={sending}
-            disabled={reason === null}
+            label={t('report.alsoBlock', { handle })}
+            variant="secondary"
+            onPress={() => setAsking({ gesture: 'block', member: { id: author.id, handle } })}
           />
         </>
       )}
-    </Screen>
+      <BlockDialog
+        asking={asking}
+        send={({ member }) => block(member.id)}
+        onDone={() => {
+          focusAfterClose.current = true
+          setBlocked(true)
+          setAsking(null)
+        }}
+        onCancel={() => setAsking(null)}
+        onClosed={() => {
+          if (!focusAfterClose.current) return
+          focusAfterClose.current = false
+          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
+          requestAnimationFrame(() => focusWithoutScroll(doneRef.current))
+        }}
+      />
+    </>
   )
 }

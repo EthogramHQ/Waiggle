@@ -104,10 +104,16 @@ export const presentNotification = (notification: Notification, t: T): Presented
       // non (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment
       // contester. L'extrait d'une note ou d'un commentaire suit en citation. Elle mène au projet,
       // que son auteur voit toujours (un commentaire retiré s'y lit pour lui seul).
+      // Tranche 7b (règle 9) : un commentaire écrit sur le projet d'un membre qui m'a bloqué. L'API
+      // vide le titre de ce projet, que je ne vois plus ; la notification garde la motivation, sans
+      // titre ni lien.
       const { targetKind, project, excerpt, ground, explanation, afterReport } = notification
+      const elsewhere = targetKind === 'comment' && project.title === ''
       return {
         icon: 'prohibit',
-        text: t(`notifications.removed.${targetKind}`, { title: project.title }),
+        text: elsewhere
+          ? t('notifications.removed.commentElsewhere')
+          : t(`notifications.removed.${targetKind}`, { title: project.title }),
         detail: [
           t('removal.onlyYou'),
           afterReport ? t('removal.afterReport') : t('removal.direct'),
@@ -116,7 +122,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
           t('removal.contest'),
         ].join('\n'),
         quote: excerpt,
-        target: projectRoute(project.id),
+        target: elsewhere ? null : projectRoute(project.id),
       }
     }
     case 'report_handled': {

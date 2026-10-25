@@ -1,11 +1,21 @@
 // Tests de la page d'un membre. L'API (members/api) est remplacée par de faux appels.
+import { BLOCKS_PER_DAY, UNBLOCKS_PER_DAY } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
+import { useBlock, useUnblock } from '../blocks/api'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
+import { passTapGuard } from '../testing/dialog'
 import { reportsOpened, visited } from '../testing/navigation'
-import { draftProject, leaPage, projectWithPhotos, summaryOf } from '../testing/projects'
+import {
+  blockedLeaPage,
+  draftProject,
+  leaPage,
+  projectWithPhotos,
+  summaryOf,
+} from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { blockSentences, containing, fr, missingSentences } from '../testing/text'
 import { MemberScreen } from './MemberScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -17,6 +27,8 @@ jest.mock('../api/media', () => ({
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 // Suivre : un faux hook, dont le test lit les appels (toggle) et choisit l'erreur.
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
+// Bloquer et débloquer (tranche 7b) : de faux hooks, dont le test lit les appels.
+jest.mock('../blocks/api', () => ({ useBlock: jest.fn(), useUnblock: jest.fn() }))
 jest.mock('../members/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getMember = jest.fn()
@@ -39,10 +51,27 @@ jest.mock('expo-router', () => ({
 }))
 
 const mockToggle = jest.fn()
+const mockBlock = jest.fn()
+const mockUnblock = jest.fn()
+
+/** Ouvre le menu « … » de la page (ActionMenu), une fois la page arrivée. */
+const openMenu = async () => {
+  await fireEvent.press(await screen.findByRole('button', { name: fr.t('actionMenu.label') }))
+}
 
 beforeEach(() => {
   mockSession({ user: { id: 'u2', name: 'Max' } })
   mockToggle.mockReset()
+  mockBlock.mockReset().mockResolvedValue({ ok: true, data: null })
+  mockUnblock.mockReset().mockResolvedValue({ ok: true, data: null })
+  jest
+    .mocked(useBlock)
+    .mockReset()
+    .mockReturnValue({ block: mockBlock } as unknown as ReturnType<typeof useBlock>)
+  jest
+    .mocked(useUnblock)
+    .mockReset()
+    .mockReturnValue({ unblock: mockUnblock } as unknown as ReturnType<typeof useUnblock>)
   jest
     .mocked(useFollow)
     .mockReset()
@@ -275,22 +304,265 @@ describe('following a member from her page', () => {
 
 // --- Tranche 7a : signaler un profil ---
 
+// Tranche 7b (décision de Louis du 24/10/2026, « pas un bouton par entrée ») : « Signaler ce
+// profil » passe dans le menu « … » de la page (ActionMenu : un bouton « Plus d'actions » qui ouvre
+// une liste d'actions, de rôle menuitem). Ces tests ouvrent donc d'abord le menu.
 describe('reporting a member from her page', () => {
-  it('offers to report the profile of another member, and opens « Signaler » for her', async () => {
+  it('offers to report the profile of another member through the « … » menu, and opens « Signaler » for her', async () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    await fireEvent.press(await screen.findByRole('link', { name: 'Signaler ce profil' }))
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce profil' }))
 
     // La page « Signaler » reçoit la sorte et l'identifiant de la cible (app/report.tsx).
     expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'member', id: 'u1' })])
   })
 
-  it('never offers to report one’s own profile', async () => {
+  it('never offers to report one’s own profile, and shows no menu on one’s own page', async () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, isMe: true })
     await renderWithProviders(<MemberScreen id="u1" />)
 
     // Témoin : la page est affichée.
     expect(await screen.findByRole('header', { name: 'Léa' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce profil' })).toBeNull()
+    // Ni signaler ni se bloquer soi-même : le menu n'aurait rien à offrir.
+    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
+  })
+
+  it('no longer shows « Signaler ce profil » as a link of its own on the page', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('button', { name: fr.t('actionMenu.label') })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Signaler ce profil' })).toBeNull()
+  })
+})
+
+// --- Tranche 7b : bloquer un membre depuis sa page ---
+//
+// Scénario « Bloquer » : Malik choisit « Bloquer » dans le menu de la page d'Inès, lit ce qui va
+// changer, et confirme. Interface attendue de `src/blocks/api.ts` (écrit par ui-dev) :
+// `useBlock()` → `{ block(memberId) }` et `useUnblock()` → `{ unblock(memberId) }`, qui rendent un
+// ApiResult et relisent la page du membre (['member', id]) une fois faits.
+
+describe('blocking a member from her page', () => {
+  const blockTitle = fr.t('block.title', { handle: 'lea' })
+
+  /**
+   * Ouvre le menu, choisit « Bloquer » : la fenêtre de confirmation s'ouvre, et l'on attend la fin
+   * de sa garde des tapes (Dialog `guardTaps`, corrections 7b) avant de la toucher.
+   */
+  const askToBlock = async () => {
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: fr.t('block.action') }))
+    await passTapGuard()
+  }
+
+  it('offers « Signaler ce profil » and « Bloquer » in the menu of another member’s page', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+
+    expect(screen.getByRole('menuitem', { name: 'Signaler ce profil' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Bloquer' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Débloquer' })).toBeNull()
+  })
+
+  it('asks first, saying what changes in both directions, the follows, and that she is not told', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+
+    expect(screen.getByRole('header', { name: blockTitle })).toBeTruthy()
+    // Règle 20 de la relecture du plan (J9) : tout ce que dit la fenêtre, phrase par phrase.
+    expect(missingSentences(blockSentences('lea'), screen)).toEqual([])
+    expect(mockBlock).not.toHaveBeenCalled()
+  })
+
+  it('blocks her once confirmed', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+
+    expect(mockBlock).toHaveBeenCalledTimes(1)
+    expect(mockBlock).toHaveBeenCalledWith('u1')
+  })
+
+  it('blocks nothing when the window is cancelled', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+
+    expect(mockBlock).not.toHaveBeenCalled()
+    expect(screen.queryByRole('header', { name: blockTitle })).toBeNull()
+  })
+
+  it('blocks only once for a double tap on « Bloquer »', async () => {
+    let answer: (value: unknown) => void = () => {}
+    mockBlock.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    const confirm = screen.getByRole('button', { name: fr.t('block.confirm') })
+    await fireEvent.press(confirm)
+    await fireEvent.press(confirm)
+
+    expect(mockBlock).toHaveBeenCalledTimes(1)
+    await act(async () => answer({ ok: true, data: null }))
+  })
+
+  it('says so when the block could not be saved', async () => {
+    mockBlock.mockResolvedValue({ ok: false, error: 'internal' })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+
+    expect(await screen.findByText(containing(fr.t('block.error')))).toBeTruthy()
+  })
+
+  it('says when the daily limit of blocks is reached', async () => {
+    mockBlock.mockResolvedValue({ ok: false, error: 'rateLimited' })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+
+    expect(
+      await screen.findByText(containing(fr.t('block.limited', { max: BLOCKS_PER_DAY }))),
+    ).toBeTruthy()
+  })
+
+  it('shows the blocked page at once, with the same notice as once read again, read politely', async () => {
+    // Relecture de l'interface 7b (ui-3) : un seul texte, avant et après la relecture de la page,
+    // lu sans interrompre (role « status », pas « alert »).
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+
+    const notice = await screen.findByText(containing(fr.t('block.notice', { handle: 'lea' })))
+    expect(notice).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Débloquer @lea' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Suivre Léa' })).toBeNull()
+  })
+})
+
+describe('the page of a member I blocked', () => {
+  beforeEach(() => {
+    jest.mocked(getMember).mockResolvedValue(blockedLeaPage)
+  })
+
+  /** Touche « Débloquer » sur la page, puis attend la fin de la garde des tapes de la fenêtre. */
+  const askToUnblock = async () => {
+    await fireEvent.press(await screen.findByRole('button', { name: 'Débloquer @lea' }))
+    await passTapGuard()
+  }
+
+  it('shows her header only, and says she is blocked', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('header', { name: 'Léa' })).toBeTruthy()
+    // L'en-tête reste : nom et pseudo.
+    expect(screen.getByText('@lea')).toBeTruthy()
+    expect(
+      screen.getAllByText(containing(fr.t('block.notice', { handle: 'lea' }))).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it('shows neither her projects, nor « no project yet », nor a follow button, nor her followers', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await screen.findByRole('header', { name: 'Léa' })
+    expect(screen.queryByRole('link', { name: 'Mon agent de recettes' })).toBeNull()
+    expect(screen.queryByText(containing(fr.t('member.empty')))).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Suivre Léa' })).toBeNull()
+    expect(screen.queryByText(/abonnés?$/)).toBeNull()
+  })
+
+  it('offers « Débloquer » as a button of the page, and « Signaler ce profil » in the menu, not « Bloquer »', async () => {
+    // Corrections 7b (design-4) : « Débloquer » se voit sous « Tu as bloqué @lea. », au lieu d'être
+    // caché dans le menu ; son nom lu dit qui.
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('button', { name: 'Débloquer @lea' })).toBeTruthy()
+    await openMenu()
+
+    expect(screen.getByRole('menuitem', { name: 'Signaler ce profil' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Débloquer' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Bloquer' })).toBeNull()
+  })
+
+  it('lets her profile be reported after the block', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce profil' }))
+
+    expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'member', id: 'u1' })])
+  })
+
+  it('asks before unblocking, saying the follows do not come back, then unblocks her', async () => {
+    // Règle 21 de la relecture du plan (J10) : « Débloquer » passe par une fenêtre.
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToUnblock()
+
+    expect(
+      screen.getByRole('header', { name: fr.t('block.unblockTitle', { handle: 'lea' }) }),
+    ).toBeTruthy()
+    // Relecture juridique R7 : le texte dit aussi que les anciennes notifications peuvent revenir.
+    expect(screen.getAllByText(containing(fr.t('block.unblockMessage'))).length).toBeGreaterThan(0)
+    expect(mockUnblock).not.toHaveBeenCalled()
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+
+    expect(mockUnblock).toHaveBeenCalledTimes(1)
+    expect(mockUnblock).toHaveBeenCalledWith('u1')
+    expect(
+      await screen.findByText(containing(fr.t('block.unblocked', { handle: 'lea' }))),
+    ).toBeTruthy()
+  })
+
+  it('unblocks nothing when the window is cancelled', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToUnblock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+
+    expect(mockUnblock).not.toHaveBeenCalled()
+  })
+
+  it('says when the daily limit of unblocks is reached, with its own number', async () => {
+    // Corrections 7b (ui-2) : le quota des déblocages a son message, comme dans la liste.
+    mockUnblock.mockResolvedValue({ ok: false, error: 'rateLimited' })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await askToUnblock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+
+    expect(
+      await screen.findByText(containing(fr.t('block.unblockLimited', { max: UNBLOCKS_PER_DAY }))),
+    ).toBeTruthy()
+  })
+})
+
+describe('the page of a member who blocked me', () => {
+  it('says « not found », as for an unknown member, without a word on the block', async () => {
+    // L'API répond 404, la même réponse qu'un membre inconnu (règle 6 de la relecture du plan).
+    // Ce cas passe déjà avant la tranche (NotFoundState) : le témoin est qu'aucun texte ne trahit
+    // le blocage et qu'aucun menu n'est offert.
+    jest.mocked(getMember).mockRejectedValue(new ApiError('notFound'))
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('header', { name: 'Ce membre est introuvable' })).toBeTruthy()
+    expect(screen.queryByText(/bloqu/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
   })
 })

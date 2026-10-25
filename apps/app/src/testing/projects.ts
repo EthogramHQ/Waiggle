@@ -99,7 +99,23 @@ export const leaPage: Member = {
     { label: 'Python', slug: 'python' },
   ],
   isMe: false,
+  isBlocked: false,
   isFollowed: false,
   followerCount: 3,
   projects: [summaryOf(projectWithPhotos)],
+}
+
+/**
+ * La page de Léa vue par un membre qui l'a bloquée (tranche 7b) : l'en-tête seul (nom, pseudo,
+ * photo), pour la débloquer ou signaler son profil. L'API ne donne ni bio, ni outils, ni projets,
+ * ni abonnés (règle 6 de la relecture du plan).
+ */
+export const blockedLeaPage: Member = {
+  ...leaPage,
+  isBlocked: true,
+  bio: '',
+  favoriteTools: [],
+  isFollowed: false,
+  followerCount: 0,
+  projects: [],
 }

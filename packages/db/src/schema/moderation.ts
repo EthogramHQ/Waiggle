@@ -3,7 +3,7 @@
 // garde les faits. Le retrait lui-même est noté sur le contenu (removed_at sur project,
 // project_note et project_comment), pour que chaque lecture puisse l'exclure sans jointure.
 import { sql } from 'drizzle-orm'
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
 /**
@@ -82,8 +82,11 @@ export const contentReport = pgTable(
     reason: text('reason').notNull(),
     // La précision libre de la personne qui signale (500 caractères au plus) ; null : aucune.
     details: text('details'),
-    // Le texte visé, lu en base au moment du signalement (jamais envoyé par l'appli).
-    snapshot: text('snapshot').notNull(),
+    // La copie de la cible, lue en base au moment du signalement (jamais envoyée par l'appli) : un
+    // tableau de champs, chacun nommé comme au registre des entrées (tranche 7b,
+    // apps/api/src/moderation/inputs.ts). `jsonb` : du JSON rangé par PostgreSQL. Une image n'y est
+    // gardée que par sa clé de stockage, jamais copiée. Les copies d'avant 7b sont un champ `text`.
+    snapshot: jsonb('snapshot').$type<{ field: string; value: string }[]>().notNull(),
     // 'open' | 'removed' | 'dismissed' | 'void' (sans objet : la cible a disparu).
     status: text('status').notNull(),
     createdAt: timestamp('created_at').notNull(),
@@ -94,8 +97,12 @@ export const contentReport = pgTable(
     }),
   },
   (t) => [
-    // Un seul signalement par membre et par cible (le refaire répond « déjà signalé »).
-    uniqueIndex('content_report_reporter_target_idx').on(t.reporterId, t.targetKind, t.targetId),
+    // Un seul signalement ouvert par membre et par cible (le refaire répond « déjà signalé »). Index
+    // partiel (tranche 7b) : une fois le précédent clos, la même personne peut signaler de nouveau
+    // un contenu modifié depuis ; l'API compare les copies.
+    uniqueIndex('content_report_reporter_target_idx')
+      .on(t.reporterId, t.targetKind, t.targetId)
+      .where(sql`${t.status} = 'open'`),
     // La file : les signalements ouverts, du plus ancien au plus récent. Index partiel : les
     // signalements clos, bien plus nombreux avec le temps, n'y sont pas.
     index('content_report_open_idx').on(t.createdAt).where(sql`${t.status} = 'open'`),

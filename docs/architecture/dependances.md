@@ -18,8 +18,8 @@ flowchart LR
   subgraph api["apps/api (serveur)"]
     n14["socle"]
     n9["comptes"]
-    n10["projets"]
     n8["routes"]
+    n10["projets"]
     n12["e-mails"]
     n11["médias"]
   end
@@ -85,6 +85,7 @@ flowchart LR
   n0 --> n17
   n7 --> n5
   n7 --> n2
+  n7 --> n4
   n7 --> n15
   n7 --> n17
   n1 --> n5

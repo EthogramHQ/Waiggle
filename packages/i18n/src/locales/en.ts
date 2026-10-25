@@ -108,6 +108,7 @@ export const en: Translation = {
     },
     emails: { title: 'Emails', row: 'Choose which emails you get' },
     data: { title: 'My data' },
+    safety: { title: 'Safety' },
     export: {
       button: 'Download my data',
       done: 'Your data has been downloaded.',
@@ -119,6 +120,7 @@ export const en: Translation = {
       hint: 'In English or French. For a question, something to report, or your data.',
     },
     moderation: 'Moderation',
+    blocks: 'Blocked members',
     email: {
       label: 'Email address',
       soon: 'editable soon',
@@ -146,10 +148,14 @@ export const en: Translation = {
       warning: 'It is immediate and cannot be undone.',
       submit: 'Delete permanently',
       wrongPassword: 'Incorrect password.',
+      blocksItem: 'The members you blocked',
+      blocksDetail: 'Your blocks go with your account, and so do the blocks aimed at you.',
       remains: {
         title: 'What stays',
         reports: 'Your reports stay, without your name, until a year after they are handled',
         removals: 'A record of removals of your content stays for a year',
+        reportCopies:
+          'If your content or your profile was reported, the copy of its text stays 30 days (a year if it was removed)',
       },
     },
   },
@@ -376,6 +382,8 @@ export const en: Translation = {
       deletedPlaceholder: 'Deleted comment',
       hiddenPlaceholder: 'Hidden comment',
       removedPlaceholder: 'Removed by moderation',
+      blockedPlaceholder: 'Comment from a member you blocked',
+      unavailablePlaceholder: 'Comment unavailable',
       more: 'Show more',
       end: 'That’s all',
       moreError: 'The next comments could not load.',
@@ -457,6 +465,53 @@ export const en: Translation = {
     limited:
       'You’ve reached the limit of {{max}} reports in 24 hours. For something urgent, write to us: {{contactEmail}}',
     gone: 'This content no longer exists, or you can no longer see it.',
+    reasonRequired: 'Choose a reason to send your report.',
+    alsoBlock: 'Also block @{{handle}}',
+    alsoBlockHint: 'You won’t see their content anymore, and @{{handle}} won’t see yours.',
+    goodFaith:
+      'By sending, you confirm your report is sincere and accurate to the best of your knowledge.',
+  },
+  actionMenu: {
+    label: 'More actions',
+    close: 'Close the menu',
+  },
+  block: {
+    action: 'Block',
+    title: 'Block @{{handle}}?',
+    hidden:
+      'You won’t see each other’s projects, notes and comments anymore, and you won’t be able to interact.',
+    remains:
+      'Comments already written stay. On their own projects, @{{handle}} still reads yours, and those where you wrote their handle. To remove them, delete them before blocking.',
+    follows: 'Your follows of each other are removed; they won’t come back if you unblock.',
+    notTold: '@{{handle}} gets no message, but may notice.',
+    notModeration:
+      'Blocking doesn’t alert moderation. If some content is a problem, report it first.',
+    confirm: 'Block',
+    cancel: 'Cancel',
+    done: 'You blocked @{{handle}}.',
+    notice: 'You blocked @{{handle}}.',
+    unblock: 'Unblock',
+    unblockTitle: 'Unblock @{{handle}}?',
+    unblockMessage:
+      'You’ll see each other’s content again. The follows that were removed don’t come back. Notifications from before the block may reappear, on both sides.',
+    unblockConfirm: 'Unblock',
+    unblocked: 'You unblocked @{{handle}}.',
+    error: 'The change couldn’t be saved. Try again.',
+    limited: 'You’ve reached the limit of {{max}} blocks in 24 hours. Try again tomorrow.',
+    list: {
+      title: 'Blocked members',
+      hint: 'You no longer see each other’s content. The blocked person isn’t told.',
+      empty: 'You haven’t blocked anyone.',
+      emptyHint: 'To block a member, open the “…” menu on their page.',
+      blockedOn: 'Blocked on {{date}}',
+      more: 'Show more',
+      end: 'That’s all',
+      loadError: 'The list couldn’t load.',
+      unblockLabel: 'Unblock @{{handle}}',
+      detail: '@{{handle}} · {{blockedOn}}',
+      moreError: 'The rest of the list couldn’t load.',
+    },
+    unblockLimited: 'You’ve reached the limit of {{max}} unblocks in 24 hours. Try again tomorrow.',
   },
   moderation: {
     title: 'Moderation',
@@ -467,7 +522,30 @@ export const en: Translation = {
     more: 'Show more',
     errorTitle: 'Moderation couldn’t load',
     kinds: { project: 'Project', note: 'Note', comment: 'Comment', member: 'Profile' },
-    snapshot: 'Text at the time of the report; current images',
+    snapshot: 'Copy at the time of the report',
+    fields: {
+      text: 'Text',
+      name: 'Name',
+      handle: 'Handle',
+      bio: 'Bio',
+      favoriteTools: 'Favorite tools',
+      title: 'Title',
+      pitch: 'Pitch',
+      description: 'Description',
+      prompt: 'Prompt',
+      tools: 'Tools',
+      demoUrl: 'Demo link',
+      body: 'Text',
+    },
+    images: {
+      avatar: 'Profile photo',
+      cover: 'Cover',
+      photo: 'Photo',
+      photoNumbered: 'Photo {{n}}',
+      present: '{{image}}: still shown',
+      gone: '{{image}}: deleted or replaced since',
+    },
+    snapshotsDiffer: 'The content changed between two reports: here is its latest version.',
     count_one: '{{count}} report',
     count_other: '{{count}} reports',
     reasonCount: '{{reason}}: {{count}}',
@@ -498,6 +576,9 @@ export const en: Translation = {
     // The end of the list (added with the interface, slice 7a): all read, or the next page failed.
     end: 'That’s all',
     moreError: 'The rest of the list could not load.',
+    // A long copy folds after three fields (added with the interface, 7b corrections).
+    showAll: 'Show all',
+    showLess: 'Show less',
   },
   removal: {
     banner: 'Removed by moderation',
@@ -693,6 +774,7 @@ export const en: Translation = {
       project: 'Your project “{{title}}” was removed by moderation',
       note: 'Your note on “{{title}}” was removed by moderation',
       comment: 'Your comment on “{{title}}” was removed by moderation',
+      commentElsewhere: 'Your comment was removed by moderation',
     },
     reportHandled: {
       project: {
@@ -734,6 +816,10 @@ export const en: Translation = {
     alreadyReported: 'You’ve already reported this. Moderation will look at it.',
     alreadyDecided: 'A decision was already made on this content in the meantime.',
     removed: 'This content was removed by moderation: it can no longer be edited.',
+    cannotBlockOwn: 'You can’t block yourself.',
+    blockedMention: 'You can’t mention a member you blocked.',
+    alreadyExamined:
+      'You’ve already reported this content, and moderation has already looked at it. It hasn’t changed since.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }

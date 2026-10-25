@@ -24,6 +24,58 @@ export const REPORT_RETENTION_DAYS = 365
 /** Un signalement devenu sans objet (compte de l'auteur supprimé) est gardé 30 jours. */
 export const VOID_REPORT_RETENTION_DAYS = 30
 
+/**
+ * Les champs qu'un membre saisit (tranche 7b), nommés comme au registre des entrées
+ * (apps/api/src/moderation/inputs.ts) : profil (name, handle, bio, favoriteTools, avatar), projet
+ * (title, pitch, description, prompt, tools, demoUrl, cover, photo), note et commentaire (body).
+ * `text` : la copie d'un signalement d'avant 7b, un texte seul (il ne se retire pas comme une partie).
+ */
+export const MemberInputField = z.enum([
+  'text',
+  'name',
+  'handle',
+  'bio',
+  'favoriteTools',
+  'avatar',
+  'title',
+  'pitch',
+  'description',
+  'prompt',
+  'tools',
+  'demoUrl',
+  'cover',
+  'photo',
+  'body',
+])
+export type MemberInputField = z.infer<typeof MemberInputField>
+
+/** Les champs qui sont des images : la copie n'en garde que la clé de stockage, jamais le fichier. */
+export const IMAGE_INPUT_FIELDS = [
+  'avatar',
+  'cover',
+  'photo',
+] as const satisfies readonly MemberInputField[]
+
+/**
+ * La copie d'une cible au moment du signalement : un champ par entrée, dans l'ordre de la page (un
+ * prompt ou une photo par ligne). Lue en base par l'API, jamais envoyée par l'appli. Une image y est
+ * sa clé de stockage. Les outils sont une seule ligne, séparés par « , ».
+ */
+export const ReportSnapshotEntry = z.object({ field: MemberInputField, value: z.string() }).strict()
+export type ReportSnapshotEntry = z.infer<typeof ReportSnapshotEntry>
+export const ReportSnapshot = z.array(ReportSnapshotEntry)
+export type ReportSnapshot = z.infer<typeof ReportSnapshot>
+
+/**
+ * Une image de la copie, telle que la file la montre : jamais sa clé, seulement si elle est encore
+ * là (`present` : la même image est toujours affichée) ou partie depuis (`gone` : supprimée ou
+ * remplacée).
+ */
+export const SnapshotImage = z
+  .object({ field: z.enum(IMAGE_INPUT_FIELDS), state: z.enum(['present', 'gone']) })
+  .strict()
+export type SnapshotImage = z.infer<typeof SnapshotImage>
+
 /** Ce qu'on peut signaler. Une réponse est un commentaire. */
 export const ReportTargetKind = z.enum(['project', 'note', 'comment', 'member'])
 export type ReportTargetKind = z.infer<typeof ReportTargetKind>
@@ -99,6 +151,20 @@ export const ReportTargetPreview = z
     text: z.string(),
     /** Le projet de la cible, pour revenir à sa page ; null pour un profil. */
     projectId: ProjectId.nullable(),
+    /**
+     * L'auteur de la cible (le membre lui-même pour un profil), pour proposer « Bloquer aussi @x »
+     * après l'envoi (tranche 7b) ; `isBlocked` : le visiteur l'a déjà bloqué (rien à proposer).
+     * `handle` vaut null quand un blocage les sépare, dans un sens ou dans l'autre (un commentaire
+     * lu malgré le blocage, règles 1 et 2) : le nom reste, le pseudo et la photo non (24/10/2026).
+     */
+    author: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        handle: z.string().nullable(),
+        isBlocked: z.boolean(),
+      })
+      .strict(),
   })
   .meta({ id: 'ReportTargetPreview' })
 export type ReportTargetPreview = z.infer<typeof ReportTargetPreview>
@@ -120,8 +186,15 @@ export const ModerationQueueItem = z
     target: ReportTarget,
     /** Le projet de la cible, pour le lien « Voir » ; null pour un profil. */
     projectId: ProjectId.nullable(),
-    /** Le texte au moment du premier signalement (les images, elles, sont celles d'aujourd'hui). */
-    snapshot: z.string(),
+    /**
+     * Les textes de la copie la plus récente parmi les signalements ouverts (tranche 7b : un texte
+     * changé puis signalé de nouveau se lit tel qu'il est), sans les images.
+     */
+    snapshot: z.array(ReportSnapshotEntry),
+    /** Les images de cette copie : encore là, ou parties depuis. */
+    images: z.array(SnapshotImage),
+    /** Vrai si les signalements ouverts n'ont pas tous la même copie (le contenu a changé entre-temps). */
+    snapshotsDiffer: z.boolean(),
     state: ReportTargetState,
     /** Vrai si la cible est un contenu ou le profil de l'administrateur qui regarde : il ne peut pas en décider. */
     concernsMe: z.boolean(),

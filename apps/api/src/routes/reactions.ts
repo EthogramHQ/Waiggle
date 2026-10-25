@@ -10,6 +10,7 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { visibleTo } from '../projects/load'
+import { projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -81,16 +82,29 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
    *
    * La lecture du projet est une petite requête servie par sa clé primaire : on ne lit que son
    * auteur. Renvoie le type de réaction vérifié, ou la réponse de refus à renvoyer telle quelle.
+   *
+   * `undo` (tranche 7b, règle 7 de la relecture du plan) : retirer sa réaction défait son propre
+   * geste, qu'un blocage ne refuse jamais. Le projet d'un membre bloqué avec lui, caché partout
+   * ailleurs (visibleTo), reste donc trouvé ici : `projectReachableBy` (projects/visibility.ts),
+   * la condition de visibleTo moins le blocage. Un projet privé ou retiré d'un autre reste
+   * introuvable, comme avant.
    */
-  const check = async (c: Context<AppEnv>, userId: string, id: string, rawKind: string) => {
+  const check = async (
+    c: Context<AppEnv>,
+    userId: string,
+    id: string,
+    rawKind: string,
+    undo: boolean,
+  ) => {
     const decision = await limiter.hit(memberCounterKeys(userId).reaction, reactionRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     const kind = ReactionKind.safeParse(rawKind)
     if (!ProjectId.safeParse(id).success || !kind.success) return notFound(c)
+    const reachable = undo ? projectReachableBy(userId) : visibleTo(userId)
     const [project] = await db
       .select({ authorId: schema.project.authorId })
       .from(schema.project)
-      .where(and(eq(schema.project.id, id), visibleTo(userId)))
+      .where(and(eq(schema.project.id, id), reachable))
     if (!project) return notFound(c)
     if (project.authorId === userId) return ownProject(c)
     return kind.data
@@ -100,7 +114,7 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
     const { id, kind } = c.req.valid('param')
-    const checked = await check(c, user.id, id, kind)
+    const checked = await check(c, user.id, id, kind, false)
     if (typeof checked !== 'string') return checked
 
     // « on conflict do nothing » : la réaction existe déjà (même clé primaire) ? PostgreSQL n'écrit
@@ -118,7 +132,7 @@ export const reactionRoutes = ({ db, limiter }: Deps) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
     const { id, kind } = c.req.valid('param')
-    const checked = await check(c, user.id, id, kind)
+    const checked = await check(c, user.id, id, kind, true)
     if (typeof checked !== 'string') return checked
 
     // N'efface que la réaction du membre qui demande ; s'il n'y en avait pas, rien à faire.

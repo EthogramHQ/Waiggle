@@ -290,7 +290,8 @@ describe('the reports and decisions of the moderation', () => {
       projectId: null,
       targetAuthorId: null,
       reason: 'other',
-      snapshot: 'Le texte signalé',
+      // Tranche 7b : la copie est un tableau de champs.
+      snapshot: [{ field: 'title', value: 'Le texte signalé' }],
       status: 'open',
       createdAt: START,
       ...values,

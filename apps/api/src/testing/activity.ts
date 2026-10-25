@@ -178,6 +178,21 @@ export const activity = (ctx: TestContext) => {
     makeAdmin: async (userId: string) =>
       await ctx.db.insert(schema.adminMember).values({ userId, grantedAt: new Date() }),
 
+    // ─── Bloquer (tranche 7b) ───────────────────────────────────────────────────────────────────
+
+    /**
+     * Bloque un membre (PUT /v1/members/{id}/block, menu « … » de sa page). 204 : rien à lire. Le
+     * blocage joue dans les deux sens : ni l'un ni l'autre ne voit plus les contenus de l'autre.
+     */
+    block: async (memberId: string, cookie: string) => {
+      await expectStatus(204, 'PUT', `/v1/members/${encodeURIComponent(memberId)}/block`, cookie)
+    },
+
+    /** Débloque (DELETE /v1/members/{id}/block, liste « Membres bloqués ») : la ligne s'efface. */
+    unblock: async (memberId: string, cookie: string) => {
+      await expectStatus(204, 'DELETE', `/v1/members/${encodeURIComponent(memberId)}/block`, cookie)
+    },
+
     /** Retire le rôle (grant-admin.sh --revoke) : la ligne reste, datée de sa révocation. */
     revokeAdmin: async (userId: string) =>
       await ctx.db

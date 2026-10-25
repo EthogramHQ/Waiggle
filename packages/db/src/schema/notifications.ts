@@ -27,6 +27,13 @@ export const commentMention = pgTable(
     // La date de la mention : celle du commentaire, ou celle de la modification qui l'a ajoutée.
     // C'est la date de la notification. Écrite par l'API (horloge que les tests remplacent).
     createdAt: timestamp('created_at').notNull(),
+    // Tranche 7b (« une fois mentionné, lisible tant que le commentaire existe », décision du
+    // 25/10/2026) : la date où l'auteur a retiré « @pseudo » en modifiant son texte. La ligne
+    // reste, pour que le membre mentionné garde la lecture du commentaire malgré un blocage (règle 2
+    // de la relecture du plan) et puisse le signaler ; mais une mention retirée n'est plus un lien,
+    // ni une notification, ni un e-mail. null : la mention est dans le texte. Remise à null si
+    // l'auteur écrit de nouveau ce pseudo.
+    withdrawnAt: timestamp('withdrawn_at'),
   },
   (t) => [
     // Une clé faite de deux colonnes : un membre n'est mentionné qu'une fois par commentaire.

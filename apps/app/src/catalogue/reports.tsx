@@ -1,12 +1,14 @@
 // La section « Signaler, et ce qui est retiré » du catalogue (tranche 7a) : le bandeau d'un contenu
 // retiré, les commentaires et le journal avec leur « Signaler », et ce que lit l'auteur d'un
-// contenu retiré. Un fichier à part, avec ses propres textes : la section de la modération
+// contenu retiré ; depuis la tranche 7b, la carte de la file avec sa copie champ par champ et l'état
+// de ses images. Un fichier à part, avec ses propres textes : la section de la modération
 // (`moderation.tsx`) vit à côté, sans que deux personnes écrivent dans le même fichier.
 // Outil de développement : les exemples sont écrits ici, pas dans les traductions des membres.
 import { useTranslation } from 'react-i18next'
 import { CommentCard } from '../ui/CommentCard'
 import { NoteList } from '../ui/NoteList'
 import { RemovalNotice } from '../ui/RemovalNotice'
+import { ReportCard } from '../ui/ReportCard'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -39,6 +41,54 @@ const fr = {
   noteOlderWhen: '14 oct.',
   journalOther: 'Le journal vu par un autre membre : un drapeau par note.',
   journalAuthor: 'Le journal vu par son auteur : la note retirée garde sa place, avec le bandeau.',
+  // Tranche 7b : la copie d'un signalement champ par champ, ses images, et une copie qui a changé.
+  copyCaption:
+    'La file de modération (tranche 7b) : la copie champ par champ, l’état des images, une copie qui a changé.',
+  projectKind: 'Projet',
+  profileKind: 'Profil',
+  copyLabel: 'Copie au moment du signalement',
+  count2: '2 signalements',
+  count1: '1 signalement',
+  scamReason: 'Arnaque ou spam : 2',
+  impersonationReason: 'Usurpation d’identité : 1',
+  since: 'Premier signalement le 22 oct.',
+  view: 'Voir',
+  remove: 'Retirer',
+  dismiss: 'Classer sans suite',
+  changed: 'Le contenu a changé entre deux signalements : voici sa version la plus récente.',
+  fields: [
+    { label: 'Titre', value: 'Faux avis en masse' },
+    { label: 'Pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+    { label: 'Prompt', value: 'Écris 50 avis enthousiastes et variés pour la boutique {{nom}}.' },
+    { label: 'Lien de démo', value: 'https://faux-avis.example/essai-gratuit-sans-inscription' },
+  ],
+  images: ['Couverture : toujours affichée', 'Photo : supprimée ou remplacée depuis'],
+  profileFields: [
+    { label: 'Nom', value: 'Équipe officielle' },
+    { label: 'Pseudo', value: 'waiggle_support' },
+    { label: 'Bio', value: 'Je fais partie de l’équipe, écris-moi pour un accès.' },
+  ],
+  avatarImage: ['Photo de profil : toujours affichée'],
+  // Corrections de 7b : une copie entière, repliée après trois champs, et des photos numérotées.
+  foldedCaption:
+    'Une copie de plus de quatre champs se replie après le troisième (« Afficher tout ») ; plusieurs photos sont numérotées.',
+  fullFields: [
+    { label: 'Titre', value: 'Faux avis en masse' },
+    { label: 'Pitch', value: 'Cinquante avis cinq étoiles pour ta boutique, en un clic.' },
+    {
+      label: 'Description',
+      value:
+        'Colle l’adresse de ta boutique, choisis le nombre d’avis : le reste est automatique. Chaque avis porte un prénom différent, et une date tirée au hasard sur les trois derniers mois.',
+    },
+    { label: 'Prompt', value: 'Écris 50 avis enthousiastes, chacun signé d’un prénom différent.' },
+    { label: 'Outils', value: 'Claude Code, Python' },
+    { label: 'Lien de démo', value: 'https://faux-avis.example/essai' },
+  ],
+  numberedImages: [
+    'Couverture : toujours affichée',
+    'Photo 1 : toujours affichée',
+    'Photo 2 : supprimée ou remplacée depuis',
+  ],
 }
 
 const en: typeof fr = {
@@ -70,6 +120,52 @@ const en: typeof fr = {
   journalOther: 'The journal seen by another member: a flag per note.',
   journalAuthor:
     'The journal seen by its author: the removed note keeps its place, with the banner.',
+  copyCaption:
+    'The moderation queue (slice 7b): the copy field by field, the state of the images, a copy that changed.',
+  projectKind: 'Project',
+  profileKind: 'Profile',
+  copyLabel: 'Copy made when reported',
+  count2: '2 reports',
+  count1: '1 report',
+  scamReason: 'Scam or spam: 2',
+  impersonationReason: 'Impersonation: 1',
+  since: 'First reported on Oct 22',
+  view: 'See',
+  remove: 'Remove',
+  dismiss: 'Dismiss',
+  changed: 'The content changed between two reports: here is its latest version.',
+  fields: [
+    { label: 'Title', value: 'Fake reviews in bulk' },
+    { label: 'Pitch', value: 'Fifty five-star reviews for your shop, in one click.' },
+    { label: 'Prompt', value: 'Write 50 enthusiastic and varied reviews for the shop {{name}}.' },
+    { label: 'Demo link', value: 'https://fake-reviews.example/free-trial-no-sign-up' },
+  ],
+  images: ['Cover: still shown', 'Photo: deleted or replaced since'],
+  profileFields: [
+    { label: 'Name', value: 'Official team' },
+    { label: 'Handle', value: 'waiggle_support' },
+    { label: 'Bio', value: 'I’m part of the team, message me for access.' },
+  ],
+  avatarImage: ['Profile photo: still shown'],
+  foldedCaption:
+    'A copy of more than four fields folds after the third (“Show all”); several photos are numbered.',
+  fullFields: [
+    { label: 'Title', value: 'Fake reviews in bulk' },
+    { label: 'Pitch', value: 'Fifty five-star reviews for your shop, in one click.' },
+    {
+      label: 'Description',
+      value:
+        'Paste your shop’s address, choose how many reviews: the rest is automatic. Each review has a different first name, and a random date over the last three months.',
+    },
+    { label: 'Prompt', value: 'Write 50 enthusiastic reviews, each signed with a different name.' },
+    { label: 'Tools', value: 'Claude Code, Python' },
+    { label: 'Demo link', value: 'https://fake-reviews.example/trial' },
+  ],
+  numberedImages: [
+    'Cover: still shown',
+    'Photo 1: still shown',
+    'Photo 2: deleted or replaced since',
+  ],
 }
 
 export function ReportSamples() {
@@ -152,6 +248,60 @@ export function ReportSamples() {
           onDelete={() => {}}
         />
       </Surface>
+      {/* Tranche 7b : la carte de la file avec une copie en champs. Un projet signalé deux fois,
+          qui a changé entre-temps, avec ses deux images (l'une encore là, l'autre partie) ; puis
+          un profil, sa photo toujours affichée, sans phrase sur la copie. */}
+      <Text variant="caption" tone="muted">
+        {l.copyCaption}
+      </Text>
+      <ReportCard
+        kind={l.projectKind}
+        count={l.count2}
+        snapshot={l.fields}
+        snapshotLabel={l.copyLabel}
+        snapshotNote={l.changed}
+        images={l.images}
+        reasons={[l.scamReason]}
+        when={l.since}
+        viewLabel={l.view}
+        onView={() => {}}
+        actions={[
+          { label: l.remove, onPress: () => {}, tone: 'danger' },
+          { label: l.dismiss, onPress: () => {} },
+        ]}
+      />
+      <ReportCard
+        kind={l.profileKind}
+        count={l.count1}
+        snapshot={l.profileFields}
+        snapshotLabel={l.copyLabel}
+        images={l.avatarImage}
+        reasons={[l.impersonationReason]}
+        when={l.since}
+        viewLabel={l.view}
+        onView={() => {}}
+        actions={[{ label: l.dismiss, onPress: () => {} }]}
+      />
+      {/* Corrections de 7b : la copie entière d'un projet, repliée (« Afficher tout » la déplie
+          sur place), avec ses photos numérotées. */}
+      <Text variant="caption" tone="muted">
+        {l.foldedCaption}
+      </Text>
+      <ReportCard
+        kind={l.projectKind}
+        count={l.count1}
+        snapshot={l.fullFields}
+        snapshotLabel={l.copyLabel}
+        images={l.numberedImages}
+        reasons={[l.scamReason]}
+        when={l.since}
+        viewLabel={l.view}
+        onView={() => {}}
+        actions={[
+          { label: l.remove, onPress: () => {}, tone: 'danger' },
+          { label: l.dismiss, onPress: () => {} },
+        ]}
+      />
     </Stack>
   )
 }

@@ -1,13 +1,14 @@
 // Une décision de modération (tranche 7a) : retirer un contenu, classer ses signalements sans
 // suite, ou rétablir un contenu retiré. Règles 11 et 12 de la relecture du plan :
-// - un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil) ;
+// - un administrateur ne décide jamais de ce qui le concerne (son contenu, son profil, et depuis
+//   7b le contenu ou le profil d'un membre qu'il a bloqué) ;
 // - deux décisions en même temps sur la même cible : la seconde trouve la première déjà prise.
 //
 // Le retrait est noté sur le contenu lui-même (removed_at et removal_id) : ce sont les lectures
 // (projects/visibility.ts et les fichiers qui s'en servent) qui l'excluent pour les autres.
 import type { ModerationDecision, ModerationDecisionInput, ReportTarget } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import { loadDecidable } from './target'
 
 export type DecideResult =
@@ -71,6 +72,25 @@ const mark = async (tx: Tx, target: ReportTarget, removal: { at: Date; id: strin
 }
 
 /**
+ * Ceux de ces membres que l'administrateur a bloqués (dans ce sens-là seulement : règle 17). La
+ * file (queue.ts) s'en sert aussi, pour « Te concerne ». Servi par la clé primaire de member_block,
+ * qui commence par blocker_id : « blocked_id in (…) » n'y lit que les lignes de cet administrateur.
+ */
+export const blockedByAdmin = async (
+  db: Pick<Database, 'select'>,
+  adminId: string,
+  memberIds: string[],
+): Promise<ReadonlySet<string>> => {
+  if (memberIds.length === 0) return new Set()
+  const b = schema.memberBlock
+  const rows = await db
+    .select({ id: b.blockedId })
+    .from(b)
+    .where(and(eq(b.blockerId, adminId), inArray(b.blockedId, memberIds)))
+  return new Set(rows.map((row) => row.id))
+}
+
+/**
  * Prend la décision de l'administrateur `adminId`, à l'heure `now`. Tout se passe dans une
  * transaction : un groupe d'écritures qui réussissent toutes ensemble ou pas du tout. Si l'une
  * échoue (la décision était déjà prise), la décision enregistrée au début est annulée avec elle.
@@ -90,6 +110,14 @@ export const decide = async (
   const found = await loadDecidable(db, target)
   if (!found) return { ok: false, error: 'not_found' }
   if (found.authorId === adminId) return { ok: false, error: 'own_content' }
+  // Règle 17 de 7b (S9, J13) : un administrateur qui a lui-même bloqué l'auteur visé est concerné,
+  // comme pour son propre contenu ; un autre administrateur décidera. L'inverse (l'auteur a bloqué
+  // l'administrateur) ne compte pas : sinon bloquer l'administrateur ferait échapper à la
+  // modération (précision 7). Une ligne lue par la clé primaire (blocker_id, blocked_id).
+  const author = found.authorId
+  if (author !== null && (await blockedByAdmin(db, adminId, [author])).has(author)) {
+    return { ok: false, error: 'own_content' }
+  }
 
   const decision = { id: crypto.randomUUID(), action: input.action, createdAt: now }
   const r = schema.contentReport

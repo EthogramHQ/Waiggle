@@ -8,16 +8,18 @@ import {
   CreatedReport,
   CreateReport,
   REPORTS_PER_DAY,
+  ReportSnapshot,
   ReportTarget,
   ReportTargetKind,
   ReportTargetPreview,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
+import { and, desc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
-import { loadReportable } from '../reports/target'
+import { loadReportable, sameSnapshot } from '../reports/target'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -42,7 +44,10 @@ const postReportRoute = createRoute({
     400: errorResponse('Invalid target, reason or details.'),
     401: errorResponse('Not signed in.'),
     404: errorResponse('No such content, or a content the member cannot see.'),
-    409: errorResponse('Already reported by this member.'),
+    409: errorResponse(
+      'Already reported by this member and still open (already_reported), or unchanged since the ' +
+        'moderation examined her last report (already_examined).',
+    ),
     422: errorResponse('Her own content or profile.'),
     429: errorResponse('Too many reports today.'),
   },
@@ -81,6 +86,8 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
   const unauthorized = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'unauthorized'), 401)
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
   const ownContent = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'own_content'), 422)
+  const alreadyReported = (c: Context<AppEnv>) =>
+    c.json(errorBody(languageOf(c), 'already_reported'), 409)
 
   // Le quota passe AVANT la lecture du corps (règle 5) : ce garde, enregistré avant la route pour
   // la même adresse et la même méthode, passe avant le validateur que Hono place juste devant elle
@@ -111,9 +118,40 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
     if (!found) return notFound(c)
     if (found.authorId === user.id) return ownContent(c)
 
-    // « on conflict do nothing » : si ce membre a déjà signalé cette cible, l'index unique
-    // content_report_reporter_target_idx refuse la ligne, sans erreur, et « returning » ne rend
-    // rien. Une seule requête : deux demandes simultanées ne peuvent pas créer deux signalements.
+    // Re-signaler (tranche 7b, règle 14) : le dernier signalement de ce membre pour cette cible.
+    // Encore ouvert : « déjà signalé ». Clos (retiré, classé, sans objet) avec la même copie : la
+    // modération a déjà examiné ce contenu tel qu'il est, un code à part (« already_examined »).
+    // Clos et le contenu a changé depuis : un nouveau signalement est permis. L'index
+    // content_report_target_idx (target_kind, target_id) donne les quelques signalements de la
+    // cible, filtrés ensuite par leur auteur.
+    const [previous] = await db
+      .select({ status: schema.contentReport.status, snapshot: schema.contentReport.snapshot })
+      .from(schema.contentReport)
+      .where(
+        and(
+          eq(schema.contentReport.targetKind, target.kind),
+          eq(schema.contentReport.targetId, target.id),
+          eq(schema.contentReport.reporterId, user.id),
+        ),
+      )
+      .orderBy(desc(schema.contentReport.createdAt), desc(schema.contentReport.id))
+      .limit(1)
+    if (previous?.status === 'open') return alreadyReported(c)
+    if (previous) {
+      // safeParse : une copie mal formée en base ne fait pas tomber la route ; elle compte alors
+      // comme différente, et le signalement est accepté.
+      const before = ReportSnapshot.safeParse(previous.snapshot)
+      if (before.success && sameSnapshot(before.data, found.snapshot)) {
+        return c.json(errorBody(languageOf(c), 'already_examined'), 409)
+      }
+    }
+
+    // « on conflict do nothing » : si ce membre a déjà un signalement ouvert de cette cible,
+    // l'index unique partiel content_report_reporter_target_idx (où status = 'open') refuse la
+    // ligne, sans erreur, et « returning » ne rend rien. Sans cible nommée : PostgreSQL ne sait
+    // désigner un index partiel dans « on conflict (colonnes) » qu'avec sa condition ; sans rien,
+    // toute contrainte unique compte. Deux demandes simultanées ne créent donc jamais deux
+    // signalements ouverts, même entre la lecture ci-dessus et l'écriture.
     const id = crypto.randomUUID()
     const inserted = await db
       .insert(schema.contentReport)
@@ -133,9 +171,7 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
       })
       .onConflictDoNothing()
       .returning({ id: schema.contentReport.id })
-    if (inserted.length === 0) {
-      return c.json(errorBody(languageOf(c), 'already_reported'), 409)
-    }
+    if (inserted.length === 0) return alreadyReported(c)
     // Aucun journal ne note qui a signalé (règle 14) : rien n'est écrit dans les logs ici.
     return c.json(CreatedReport.parse({ id }), 201)
   })
@@ -153,7 +189,14 @@ export const reportRoutes = ({ db, limiter }: Deps) => {
     if (!found) return notFound(c)
     if (found.authorId === user.id) return ownContent(c)
     return c.json(
-      ReportTargetPreview.parse({ target, text: found.text, projectId: found.projectId }),
+      ReportTargetPreview.parse({
+        target,
+        text: found.text,
+        projectId: found.projectId,
+        // L'auteur (le membre lui-même pour un profil) : son nom et son pseudo publics, rien de
+        // son compte ; `isBlocked` dit si l'appli peut encore proposer « Bloquer aussi @x ».
+        author: found.author,
+      }),
       200,
     )
   })

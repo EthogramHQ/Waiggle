@@ -4,6 +4,7 @@
 import { MENTIONABLE_MAX, type Mentionable } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, isNull, ne, or, sql } from 'drizzle-orm'
+import { notBlockedWith } from '../blocks/visibility'
 import { seesSql, type Viewer } from '../comments/load'
 import { mediaUrl } from '../profile/me'
 
@@ -39,6 +40,7 @@ const OTHERS_FROM = 3
  *   left join profile on profile.user_id = "user".id
  *   where member_handle.released_at is null and starts_with(member_handle.handle, $debut)
  *     and "user".email_verified and "user".id <> $moi
+ *     and not (<l'un a bloqué l'autre>)        -- tranche 7b, blockedWith
  *   order by close desc, member_handle.handle collate "C" limit 5
  * Avec un début de moins de 3 caractères (OTHERS_FROM), la condition « close » s'ajoute au
  * « where » : seulement les proches.
@@ -100,6 +102,10 @@ export const searchMentionable = async (
         sql`starts_with(${h.handle}, ${prefix})`,
         eq(u.emailVerified, true),
         ne(u.id, viewer.id),
+        // Tranche 7b : jamais un membre bloqué avec lui, dans un sens ou dans l'autre (deux
+        // « exists » par les index de member_block, posés seulement pour les pseudos qui
+        // commencent par ce début).
+        notBlockedWith(viewer.id, u.id),
         // Trop court pour chercher dans tout le réseau : les proches seulement.
         prefix.length < OTHERS_FROM ? close : undefined,
       ),

@@ -113,6 +113,44 @@ describe('moderation in my account', () => {
   })
 })
 
+// --- Tranche 7b : les membres bloqués, une page de « Mon compte » ---
+
+describe('the members I blocked, from my account', () => {
+  it('leads every member to « Membres bloqués »', async () => {
+    // Léa n'est pas administratrice : la ligne est pour tous, pas seulement pour la modération.
+    await renderWithI18n(<AccountScreen />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: /^Membres bloqués/ }))
+
+    // La page de la liste (app/blocks.tsx, plan de la tranche 7b).
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toContain('/blocks')
+  })
+
+  it('puts « Membres bloqués » under a « Sécurité » heading, after « Mes données »', async () => {
+    // Relecture de design 7b : sans titre, au-dessus de « Langue », la ligne ne disait pas de quoi
+    // elle relevait.
+    await renderWithI18n(<AccountScreen />)
+
+    await screen.findByRole('button', { name: /^Membres bloqués/ })
+    // Un titre de section (« header » en natif, h2 sur le web).
+    expect(screen.getByRole('header', { name: fr.t('account.safety.title') })).toBeTruthy()
+    // Dans l'ordre de la page : « Mes données », puis « Sécurité » et sa ligne, puis « Compte ».
+    const order = screen
+      .getAllByText(
+        new RegExp(
+          `^(${fr.t('account.data.title')}|${fr.t('account.safety.title')}|Membres bloqués|${fr.t('account.section.title')})$`,
+        ),
+      )
+      .map((element) => element.props.children)
+    expect(order).toEqual([
+      fr.t('account.data.title'),
+      fr.t('account.safety.title'),
+      'Membres bloqués',
+      fr.t('account.section.title'),
+    ])
+  })
+})
+
 describe('writing to us from my account', () => {
   it('shows the contact address, in French or in English', async () => {
     await renderWithI18n(<AccountScreen />)

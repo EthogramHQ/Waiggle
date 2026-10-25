@@ -115,7 +115,10 @@ describe('ModerationQueueItem', () => {
   const item = {
     target: { kind: 'comment', id: commentId },
     projectId,
-    snapshot: 'Le texte au moment du signalement',
+    // Tranche 7b : la copie champ par champ, ses images, et si les copies diffèrent.
+    snapshot: [{ field: 'body', value: 'Le texte au moment du signalement' }],
+    images: [],
+    snapshotsDiffer: false,
     state: 'present',
     concernsMe: false,
     reasons: [

@@ -16,7 +16,7 @@ import { after, type CursorContent, encodeCursor } from '../cursor'
 import { followsAnyone } from '../follows/load'
 import { toNote } from '../notes/load'
 import { rowToSummary, selectMedia, selectProjects } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { listedProjectFor } from '../projects/visibility'
 
 const t = schema.project
 const n = schema.projectNote
@@ -38,8 +38,10 @@ const loadPage = async (
       and(
         // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur. L'index
         // partiel project_public_published_idx (visibility = 'public') sert toujours : « removed_at
-        // is null » écarte au passage les quelques projets retirés qu'il contient.
-        listedProject(),
+        // is null » écarte au passage les quelques projets retirés qu'il contient. Tranche 7b :
+        // ni celui d'un membre bloqué avec le visiteur (listedProjectFor), écarté par deux
+        // « exists » sur member_block, chacun servi par un index (blocks/visibility.ts).
+        listedProjectFor(viewerId),
         isNotNull(t.publishedAt),
         where,
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
@@ -142,8 +144,9 @@ const selectFollowingEntries = (
     .from(t)
     .where(
       and(
-        // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur.
-        listedProject(),
+        // Un projet privé ou retiré n'apparaît dans aucun fil, même pour son auteur ; ni celui
+        // d'un membre bloqué avec le visiteur (tranche 7b).
+        listedProjectFor(viewerId),
         isNotNull(t.publishedAt),
         inArray(t.authorId, followedMembers),
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
@@ -187,7 +190,8 @@ const selectFollowingEntries = (
     .from(f)
     // Seulement les projets encore publics et pas retirés : un projet suivi devenu privé ne montre
     // plus rien, pas même à son auteur (qui ne peut d'ailleurs pas suivre ses propres projets).
-    .innerJoin(t, and(eq(t.id, f.projectId), listedProject()))
+    // Bloquer retire déjà les abonnements ; la condition le redit (tranche 7b), au cas où.
+    .innerJoin(t, and(eq(t.id, f.projectId), listedProjectFor(viewerId)))
     .crossJoinLateral(recentNotes)
     .where(eq(f.followerId, viewerId))
     .orderBy(desc(recentNotes.createdAt), desc(recentNotes.id))
@@ -227,7 +231,7 @@ export const loadFollowingFeed = async (
   const rows =
     projectIds.length === 0
       ? []
-      : await selectProjects(db).where(and(inArray(t.id, projectIds), listedProject()))
+      : await selectProjects(db).where(and(inArray(t.id, projectIds), listedProjectFor(viewerId)))
   const media = await selectMedia(
     db,
     rows.map((row) => row.project.id),

@@ -15,9 +15,10 @@ import {
 import type { Database } from '@ruche/db'
 import { type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { blockedWith, notBlockedWith } from '../blocks/visibility'
 import { mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { listedProject, listedProjectFor } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -56,11 +57,17 @@ const parisDay = (column: string) =>
  *   projet) ;
  * - sur un projet public et pas retiré seulement (listedProject) : sur un projet privé, seul
  *   l'auteur d'un commentaire le lit (et ce n'est pas `me`) ;
- * - pas masqué, sauf pour l'auteur du projet, qui lit encore ce qu'il a masqué.
+ * - pas masqué, sauf pour l'auteur du projet, qui lit encore ce qu'il a masqué ;
+ * - (tranche 7b, règle 4 de la relecture du plan) pas écrit par un membre bloqué avec `me`, dans
+ *   un sens ou dans l'autre : le filtre porte sur l'auteur du geste (`notBlockedWith`, deux
+ *   « exists » par les index de member_block). Et pas sur le projet d'un membre bloqué avec lui
+ *   (`listedProjectFor`) : la notification nommerait un projet qu'il ne peut plus ouvrir.
+ *   Débloquer fait revenir ces notifications (règle 3) : rien n'est effacé, tout est recalculé.
  * Une mention ne notifie ainsi que qui peut lire (scénario de la tranche 6b).
  */
 const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is null
-  and c.author_id <> ${me} and ${listedProject()}
+  and c.author_id <> ${me} and ${listedProjectFor(me)}
+  and ${notBlockedWith(me, sql.raw('c.author_id'))}
   and (c.hidden_at is null or project.author_id = ${me}))`
 
 /**
@@ -125,6 +132,9 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     --    : rétabli, le contenu n'a plus de removed_at, et la notification disparaît d'elle-même.
     --    Un commentaire ne vient que d'un projet qu'il voit encore (règle 3 de la relecture du
     --    plan, comme la source 5) : sur un projet devenu privé ou retiré, rien, pas même le titre.
+    --    Mais un blocage ne coupe jamais une notification de modération (tranche 7b, règle 9) :
+    --    d'où listedProject(), sans visiteur, plutôt que visibleTo. Sur le projet d'un membre
+    --    bloqué avec lui, la motivation reste, et le titre est vidé (loadDetailedRows).
     --    Index : ses projets par project_author_created_idx (puis les notes de chacun par
     --    project_note_project_created_idx) ; ses commentaires par project_comment_author_idx. Les
     --    contenus retirés sont rares : ces lectures écartent presque tout aussitôt.
@@ -148,7 +158,8 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
       from project_comment c
       join project on project.id = c.project_id
       where c.author_id = ${me} and c.deleted_at is null and c.removed_at is not null
-        and ${during('c.removed_at')} and ${visibleTo(me)}
+        and ${during('c.removed_at')}
+        and (${listedProject()} or project.author_id = ${me})
     ) x
     where x.removal_id is not null
 
@@ -162,6 +173,8 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     --    sous-requête de la sorte de cible : l'identifiant y est converti en uuid (« ::uuid »)
     --    seulement pour un projet, une note ou un commentaire, dont l'identifiant est un uuid
     --    (vérifié par POST /v1/reports) ; chacune passe par la clé primaire de sa table.
+    --    Tranche 7b, règle 9 : la ligne reste malgré un blocage ; seul le lien vers un projet
+    --    d'un membre bloqué avec lui disparaît (visibleTo le cache), comme pour un projet privé.
     --    Index : content_report_reporter_idx (ses signalements).
     select 'report_handled', 'report:' || r.id, r.decided_at,
       case r.target_kind
@@ -194,6 +207,12 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
  */
 const socialSources = (me: string, during: (column: string) => SQL): SQL => {
   return sql`
+    -- Tranche 7b (règle 4 de la relecture du plan) : dans les sources 1 à 4, rien ne vient d'un
+    -- membre bloqué avec lui, dans un sens ou dans l'autre ; le filtre porte sur l'auteur du
+    -- geste (r.member_id, f.follower_id, c.author_id), par deux « exists » indexés
+    -- (notBlockedWith). Bloquer efface déjà les abonnements entre eux : le filtre des sources 2
+    -- et 3 ne fait que redire la règle.
+    --
     -- 1. Les réactions à ses projets publics, par projet et par jour de Paris, sans aucun nom :
     --    « count(*) filter (where …) » compte seulement les lignes qui remplissent la condition.
     --    « cross join lateral (select … as day) » calcule le jour une fois par ligne, pour s'en
@@ -213,6 +232,7 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
     cross join lateral (select ${parisDay('r.created_at')} as day) d
     where project.author_id = ${me} and ${listedProject()}
       and r.member_id <> ${me} and ${during('r.created_at')}
+      and ${notBlockedWith(me, sql.raw('r.member_id'))}
     group by r.project_id, d.day
 
     union all
@@ -226,6 +246,7 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
     cross join lateral (select ${parisDay('f.created_at')} as day) d
     where project.author_id = ${me} and ${listedProject()}
       and f.follower_id <> ${me} and ${during('f.created_at')}
+      and ${notBlockedWith(me, sql.raw('f.follower_id'))}
     group by f.project_id, d.day
 
     union all
@@ -237,6 +258,7 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
     from member_follow f
     cross join lateral (select ${parisDay('f.created_at')} as day) d
     where f.member_id = ${me} and ${during('f.created_at')}
+      and ${notBlockedWith(me, sql.raw('f.follower_id'))}
     group by d.day
 
     union all
@@ -260,7 +282,10 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
         from comment_mention m
         join project_comment c on c.id = m.comment_id
         join project on project.id = c.project_id
-        where m.member_id = ${me} and ${during('m.created_at')} and ${readable(me)}
+        -- Une mention retirée par l'auteur à la modification (withdrawn_at, tranche 7b) ne prévient
+        -- plus : ni la cloche, ni l'e-mail de mentions, qui lit cette même source.
+        where m.member_id = ${me} and m.withdrawn_at is null and ${during('m.created_at')}
+          and ${readable(me)}
         union all
         select c.id, c.project_id, c.author_id, 'reply', 2, c.created_at
         from project_comment root
@@ -533,7 +558,11 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
   const query = sql`
     select n.kind, n.key, to_char(n.at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, n.day, n.reason,
       n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
-      project.id as project_id, project.title as project_title,
+      project.id as project_id,
+      -- Tranche 7b, règle 9 : le retrait de son commentaire sur le projet d'un membre bloqué
+      -- avec lui garde sa motivation, mais ne nomme plus ce projet (titre vide).
+      case when n.kind = 'removed' and ${blockedWith(me, sql.raw('project.author_id'))}
+        then '' else project.title end as project_title,
       c.id as comment_id, c.body,
       a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
       ah.handle as author_handle, mh.handle as my_handle,

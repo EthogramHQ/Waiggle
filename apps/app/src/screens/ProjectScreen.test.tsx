@@ -1571,23 +1571,56 @@ describe('the comments, after the reviews', () => {
 
 // --- Tranche 7a : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
 
+// Tranche 7b (décision de Louis du 24/10/2026, « pas un bouton par entrée ») : « Signaler ce projet »
+// passe dans le menu « … » de la page (ActionMenu), un bouton « Plus d'actions » qui ouvre une
+// liste d'actions (rôle menuitem).
 describe('reporting a project from its page', () => {
-  it('offers another member to report the project, and opens « Signaler » for it', async () => {
+  it('offers another member to report the project through the « … » menu, and opens « Signaler » for it', async () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await fireEvent.press(await screen.findByRole('link', { name: 'Signaler ce projet' }))
+    await fireEvent.press(await screen.findByRole('button', { name: fr.t('actionMenu.label') }))
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce projet' }))
 
     expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
   })
 
-  it('never offers the author to report the project', async () => {
+  it('no longer shows « Signaler ce projet » as a link of its own on the page', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : le menu est là ; l'ancien lien texte de 7a, lui, a disparu.
+    expect(await screen.findByRole('button', { name: fr.t('actionMenu.label') })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
+  })
+
+  it('puts the « … » menu right after « Suivre ce projet », before the reactions', async () => {
+    // Corrections de 7b (relecture de design, point 11) : seul sur sa ligne sous les réactions, le
+    // menu s'ouvrait par-dessus le Journal à 1440 points. Sa place à l'écran, Jest ne la mesure
+    // pas (essai --explore) ; l'ordre de lecture, si.
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('button', { name: fr.t('actionMenu.label') })
+    // « Suivre ce projet » est un interrupteur (switch), « … » un bouton : l'ordre des deux rôles.
+    const names = screen
+      .getAllByRole(/^(button|switch)$/)
+      .map((control) => String(control.props.accessibilityLabel ?? ''))
+    const follow = names.findIndex((name) => name.startsWith(fr.t('follow.project')))
+    const menu = names.indexOf(fr.t('actionMenu.label'))
+    expect(follow).toBeGreaterThan(-1)
+    expect(menu).toBe(follow + 1)
+  })
+
+  it('never offers the author to report the project, and shows no empty menu', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     // Témoin : la page de l'auteur est affichée, avec ses actions.
     expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
+    // Le menu n'aurait rien à offrir à l'auteur : il n'est pas montré.
+    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
   })
 })
 

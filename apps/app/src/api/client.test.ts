@@ -86,6 +86,27 @@ describe('request', () => {
     expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'ownContent' })
   })
 
+  it('tells apart the refusals of blocking and re-reporting, by the code of the answer (slice 7b)', async () => {
+    // Deux « 422 » de plus (se bloquer soi-même, mentionner un membre qu'on a bloqué) et un « 409 »
+    // (re-signaler un contenu déjà examiné et inchangé) : chacun a son message.
+    const refusal = (code: string, status: number) =>
+      json({ error: { code, message: '…' } }, status)
+    fetchMock
+      .mockResolvedValueOnce(refusal('cannot_block_own', 422))
+      .mockResolvedValueOnce(refusal('blocked_mention', 422))
+      .mockResolvedValueOnce(refusal('already_examined', 409))
+
+    expect(await request('/v1/members/u1/block', {}, Me)).toEqual({
+      ok: false,
+      error: 'cannotBlockOwn',
+    })
+    expect(await request('/v1/projects/p/comments', {}, Me)).toEqual({
+      ok: false,
+      error: 'blockedMention',
+    })
+    expect(await request('/v1/reports', {}, Me)).toEqual({ ok: false, error: 'alreadyExamined' })
+  })
+
   it('says so when the server cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('Network request failed'))
 

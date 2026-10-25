@@ -17,10 +17,11 @@ import {
   ProjectId,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, exists, isNotNull, isNull, not } from 'drizzle-orm'
+import { and, eq, exists, isNotNull, isNull, not, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
+import { blockedWith, blocksOf } from '../blocks/visibility'
 import {
   authorsOf,
   type CommentRow,
@@ -34,6 +35,7 @@ import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
 import { mentionsOf, resolveMentions, saveMentions } from '../mentions/write'
 import { visibleTo } from '../projects/load'
+import { projectReachableBy } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -88,9 +90,11 @@ const postRoute = createRoute({
     401: errorResponse('Not signed in.'),
     404: errorResponse(
       'No such project, or a private project of another member; or the comment answered is ' +
-        'unknown, a reply, deleted, hidden from the member, or removed by the moderation.',
+        'unknown, a reply, deleted, hidden from the member, removed by the moderation, or written ' +
+        'by a member blocked with me (either way).',
     ),
     409: errorResponse('My own project, removed by the moderation (`removed`).'),
+    422: errorResponse('The text mentions a member I blocked (`blocked_mention`).'),
     429: errorResponse('Too many comments.'),
   },
 })
@@ -113,6 +117,7 @@ const editRoute = createRoute({
     403: errorResponse('The comment of another member.'),
     404: errorResponse(notFoundComment),
     409: errorResponse('My comment, or my project, removed by the moderation (`removed`).'),
+    422: errorResponse('The text mentions a member I blocked (`blocked_mention`).'),
     429: errorResponse('Too many comments.'),
   },
 })
@@ -189,10 +194,17 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * Le projet, s'il est visible par ce membre (public, ou le sien) : seulement son auteur, lu par
    * la clé primaire. null : identifiant mal formé, projet inconnu ou privé d'un autre, la même
    * réponse pour les trois, pour ne rien révéler.
+   *
+   * `undo` (tranche 7b, règle 7 de la relecture du plan) : supprimer son commentaire défait son
+   * propre geste, qu'un blocage ne refuse jamais. Le projet d'un membre bloqué avec lui, caché
+   * partout ailleurs (visibleTo), reste alors trouvé : `projectReachableBy`
+   * (projects/visibility.ts), la condition de visibleTo moins le blocage. Un projet privé ou
+   * retiré d'un autre reste introuvable, comme avant.
    */
-  const projectOf = async (projectId: string, userId: string) => {
+  const projectOf = async (projectId: string, userId: string, undo = false) => {
     // Un identifiant mal formé ne peut désigner aucun projet (et ferait échouer la requête SQL).
     if (!ProjectId.safeParse(projectId).success) return null
+    const reachable = undo ? projectReachableBy(userId) : visibleTo(userId)
     const [project] = await db
       .select({
         authorId: schema.project.authorId,
@@ -200,9 +212,11 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         removedAt: schema.project.removedAt,
       })
       .from(schema.project)
-      .where(and(eq(schema.project.id, projectId), visibleTo(userId)))
-    // Le projet, et qui le regarde (voir Viewer, comments/load.ts).
-    return project ? { ...project, viewer: viewerOf(userId, project) } : null
+      .where(and(eq(schema.project.id, projectId), reachable))
+    if (!project) return null
+    // Le projet, et qui le regarde (voir Viewer, comments/load.ts), avec ses blocages (tranche
+    // 7b) : une requête de plus, par les deux index de member_block (blocksOf).
+    return { ...project, viewer: viewerOf(userId, project, await blocksOf(db, userId)) }
   }
 
   /**
@@ -233,6 +247,14 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * déjà introuvable (404), et la réponse ne révèle donc rien.
    */
   const removed = (ctx: Context<AppEnv>) => ctx.json(errorBody(languageOf(ctx), 'removed'), 409)
+
+  /**
+   * 422 « blocked_mention » (tranche 7b, règle 2b) : le texte mentionne un membre que son auteur a
+   * bloqué. Seul l'auteur du blocage reçoit cette réponse, sur ses propres blocages : elle ne lui
+   * apprend rien. Un membre qui l'a bloqué, lui, ne la provoque jamais (mentions/write.ts).
+   */
+  const blockedMention = (ctx: Context<AppEnv>) =>
+    ctx.json(errorBody(languageOf(ctx), 'blocked_mention'), 422)
 
   /**
    * L'état du projet relu DANS la transaction qui écrit, sous verrou. Les gardes ont lu le projet
@@ -358,6 +380,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
             rootId: c.rootId,
             hiddenAt: c.hiddenAt,
             removedAt: c.removedAt,
+            // Tranche 7b : un blocage entre ce membre et l'auteur de la racine, relu ici, dans la
+            // transaction, plutôt que dans le Viewer lu avant elle (blockedWith : deux « exists »
+            // par les index de member_block).
+            blocked: sql<boolean>`${blockedWith(user.id, c.authorId)}`,
           })
           .from(c)
           .where(and(eq(c.id, replyTo), eq(c.projectId, id), isNull(c.deletedAt)))
@@ -366,19 +392,31 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         // répond dans le même fil, à sa racine), un commentaire que ce membre ne voit pas
         // (masqué, ou laissé par un autre sur un projet devenu privé), ou retiré par la modération,
         // même pour son auteur qui le lit encore (règle 4 : on ne répond plus à un contenu retiré).
-        if (!root || root.rootId !== null || root.removedAt !== null || !sees(root, viewer)) {
+        // Tranche 7b : ni au commentaire d'un membre bloqué avec lui, dans un sens ou dans
+        // l'autre, même s'il le lit encore (auteur du projet, règle 1 ; mention, règle 2).
+        if (
+          !root ||
+          root.rootId !== null ||
+          root.removedAt !== null ||
+          root.blocked ||
+          !sees(root, viewer)
+        ) {
           return 'gone' as const
         }
       }
-      await tx.insert(c).values(row)
-      // Les membres que mentionne le texte (« @ines_morel »), rangés dans la même transaction :
-      // un commentaire n'existe jamais sans ses mentions, ni l'inverse. Datées comme lui.
+      // Les membres que mentionne le texte (« @ines_morel »), lus AVANT d'écrire : un membre que
+      // l'auteur a bloqué refuse le texte entier (règle 2b, 422), et rien n'est alors écrit.
       const mentions = await resolveMentions(tx, body, user.id)
+      if (mentions === 'blocked_mention') return mentions
+      await tx.insert(c).values(row)
+      // Rangées dans la même transaction : un commentaire n'existe jamais sans ses mentions, ni
+      // l'inverse. Datées comme lui.
       if (mentions.length > 0) await saveMentions(tx, row.id, mentions, row.createdAt)
       return mentions
     })
     if (written === 'gone') return notFound(ctx)
     if (written === 'removed') return removed(ctx)
+    if (written === 'blocked_mention') return blockedMention(ctx)
 
     const authors = await authorsOf(db, [user.id], publicApiUrl)
     const shown = presentComment(row, viewer, authors, false, written)
@@ -395,7 +433,8 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     // non supprimé), au cas où il aurait été supprimé entre-temps. « returning » renvoie la ligne
     // modifiée : aucune, et il n'y a plus rien à modifier. Un commentaire masqué reste masqué.
     // Le texte et ses mentions changent dans la même transaction : les mentions ajoutées sont
-    // datées de la modification, celles qui ont disparu sont effacées, les autres gardent leur date
+    // datées de la modification, celles qui ont disparu sont retirées (sans lien ni notification,
+    // mais la personne mentionnée garde la lecture, tranche 7b), les autres gardent leur date
     // (saveMentions, mentions/write.ts).
     const editedAt = new Date()
     const edited = await db.transaction(async (tx) => {
@@ -403,6 +442,15 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       // plus (règle 4) ; devenu invisible pour ce membre, il est introuvable.
       const state = await lockedProjectState(tx, id, user.id)
       if (state !== 'open') return state
+      // Les mentions d'abord, avant d'écrire (règle 2b de la tranche 7b : un membre que l'auteur a
+      // bloqué refuse le texte entier, et rien n'est alors modifié). Les mentions déjà gardées
+      // d'abord : un pseudo encore écrit garde le membre qu'il désignait à l'écriture, même si ce
+      // pseudo a changé de main depuis (mentions/write.ts). Lire celles d'un commentaire qui ne
+      // serait plus le sien ne montre rien : seule l'écriture ci-dessous, qui vérifie l'auteur,
+      // décide de la réponse.
+      const kept = await mentionsOf(tx, commentId)
+      const mentions = await resolveMentions(tx, body, user.id, kept)
+      if (mentions === 'blocked_mention') return mentions
       const [row] = await tx
         .update(c)
         .set({ body, editedAt })
@@ -429,25 +477,28 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           removalId: c.removalId,
         })
       if (!row) return 'gone' as const
-      // Les mentions déjà gardées d'abord : un pseudo encore écrit garde le membre qu'il désignait
-      // à l'écriture, même si ce pseudo a changé de main depuis (mentions/write.ts).
-      const kept = await mentionsOf(tx, row.id)
-      const mentions = await resolveMentions(tx, body, user.id, kept)
       await saveMentions(tx, row.id, mentions, editedAt)
       return { row, mentions }
     })
     if (edited === 'gone') return notFound(ctx)
     if (edited === 'removed') return removed(ctx)
+    if (edited === 'blocked_mention') return blockedMention(ctx)
     const { row, mentions } = edited
-    const authors = await authorsOf(db, [user.id], publicApiUrl)
+    const [authors, blocks] = await Promise.all([
+      authorsOf(db, [user.id], publicApiUrl),
+      blocksOf(db, user.id),
+    ])
     // Son auteur voit toujours son commentaire, masqué ou non, sur un projet public ou privé :
     // savoir s'il est aussi l'auteur du projet, ou si le projet est privé, ne change rien ici.
+    // Une mention gardée d'un membre qui l'a bloqué depuis reste en base (règle 2), mais sans lien
+    // dans la réponse, comme à la lecture de la page (mentions/load.ts) : rien ne change au
+    // rechargement, et rien ne trahit le blocage.
     const shown = presentComment(
       row,
-      { id: user.id, isProjectAuthor: false, projectIsPrivate: false },
+      { id: user.id, isProjectAuthor: false, projectIsPrivate: false, blocks },
       authors,
       false,
-      mentions,
+      mentions.filter((m) => !blocks.byMe.has(m.memberId) && !blocks.ofMe.has(m.memberId)),
     )
     if (!shown) return notFound(ctx)
     return ctx.json(CommentReply.parse(shown), 200)
@@ -459,7 +510,10 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const wait = await overLimit(memberCounterKeys(user.id).projectChange, changeRule)
     if (wait !== null) return tooMany(ctx, wait)
     const { id, commentId } = ctx.req.valid('param')
-    const project = await projectOf(id, user.id)
+    // `true` : même chez un membre bloqué avec lui (règle 7). commentOf ne trouve alors que ses
+    // propres commentaires sur ce projet (sees : ceux du membre bloqué lui restent cachés), et le
+    // contrôle de l'auteur ci-dessous ne laisse supprimer que les siens.
+    const project = await projectOf(id, user.id, true)
     if (!project) return notFound(ctx)
     const comment = await commentOf(id, commentId, project.viewer)
     if (!comment) return notFound(ctx)
@@ -508,6 +562,9 @@ export const commentRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
    * Masquer et démasquer : les mêmes vérifications. Le quota d'abord, puis le projet, puis le
    * commentaire (introuvable s'il est masqué et que ce membre ne le voit pas, comme un inconnu) ;
    * seul l'auteur du projet le peut, et pas sur son propre commentaire (il le supprime plutôt).
+   * Tranche 7b, règle 1 : un blocage ne change rien ici. L'auteur du projet lit le commentaire
+   * d'un membre bloqué avec lui (`sees`, branche `isProjectAuthor`), et peut donc le masquer ;
+   * pour tout autre, ce commentaire est introuvable (404), comme un inconnu.
    * Renvoie null si tout va bien, sinon la réponse de refus.
    */
   const checkHide = async (ctx: Context<AppEnv>, userId: string, id: string, commentId: string) => {

@@ -1,20 +1,40 @@
 // Qui voit un projet, en un seul endroit (tranche 7a). Avant, chaque lecture écrivait elle-même
 // « visibility = 'public' » ; un projet retiré par la modération doit maintenant disparaître de
-// toutes ces lectures à la fois. Chaque lecture appelle donc l'une de ces deux conditions, et
-// aucune ne réécrit la règle.
+// toutes ces lectures à la fois. Chaque lecture appelle donc l'une de ces conditions, et aucune ne
+// réécrit la règle. Tranche 7b : un projet d'un membre bloqué (dans un sens ou l'autre) disparaît
+// aussi, pour le visiteur seulement.
 import { schema } from '@ruche/db'
 import { and, eq, isNull, or } from 'drizzle-orm'
+import { notBlockedWith } from '../blocks/visibility'
 
 /**
- * Un projet que tout le monde voit (fil, étiquettes, page d'un membre vue par un autre…) : public,
- * et pas retiré par la modération. `isNull` : la condition SQL « removed_at is null ».
+ * Un projet public et pas retiré par la modération, quel que soit le visiteur. Sert aux nombres,
+ * qui sont les mêmes pour tous (commentaires, réactions) : un blocage ne les change pas. Pour
+ * montrer des projets à quelqu'un, c'est `listedProjectFor`. `isNull` : « removed_at is null ».
  */
 export const listedProject = () =>
   and(eq(schema.project.visibility, 'public'), isNull(schema.project.removedAt))
 
 /**
- * Un projet que ce membre voit : un projet listé, ou l'un des siens (même privé ou retiré : son
- * auteur garde toujours accès à ce qu'il a écrit, avec l'explication du retrait).
+ * Un projet que tout le monde voit (fil, étiquettes, page d'un membre vue par un autre…), sauf
+ * celui d'un membre bloqué avec ce visiteur, dans un sens ou dans l'autre (tranche 7b).
+ */
+export const listedProjectFor = (viewerId: string) =>
+  and(listedProject(), notBlockedWith(viewerId, schema.project.authorId))
+
+/**
+ * Un projet que ce membre voit : un projet listé pour lui, ou l'un des siens (même privé ou
+ * retiré : son auteur garde toujours accès à ce qu'il a écrit, avec l'explication du retrait).
  */
 export const projectVisibleTo = (viewerId: string) =>
+  or(listedProjectFor(viewerId), eq(schema.project.authorId, viewerId))
+
+/**
+ * Un projet où ce membre peut défaire ses propres gestes (tranche 7b, règle 7 de la relecture du
+ * plan : supprimer son commentaire, retirer sa réaction) : la condition de `projectVisibleTo`
+ * moins le blocage. Un blocage, dans un sens ou dans l'autre, ne refuse jamais de défaire ce qu'on
+ * a fait chez l'autre ; un projet privé ou retiré d'un autre reste introuvable, comme partout.
+ * Écrite une fois ici pour les deux routes (routes/comments.ts, routes/reactions.ts).
+ */
+export const projectReachableBy = (viewerId: string) =>
   or(listedProject(), eq(schema.project.authorId, viewerId))

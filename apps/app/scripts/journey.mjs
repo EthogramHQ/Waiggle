@@ -3,7 +3,9 @@
 // son fil et le regarde, réagit et commente en mentionnant l'auteur (qui le voit dans ses notifications,
 // répond, puis masque le commentaire). Un troisième membre signale un second commentaire, qu'un
 // administrateur retire (tranche 7a) : celui qui a signalé est prévenu, l'auteur voit pourquoi, les
-// autres ne le voient plus. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
+// autres ne le voient plus. Depuis la confirmation de son signalement, ce membre bloque aussi
+// l'auteur du commentaire (tranche 7b) : chacun ne voit plus l'autre, puis il le débloque depuis
+// « Mon compte ». Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
 // Usage : node apps/app/scripts/journey.mjs <adresse de l'appli> <adresse de l'API>
@@ -393,15 +395,38 @@ try {
     401,
   )
 
-  // Tranche 7a : signaler, puis traiter le signalement. Sam publie un second commentaire, qu'un
-  // nouveau membre, Malik, signale ; l'administrateur le retire.
-  step('Sam publie un second commentaire ; Malik, nouveau membre, le signale')
+  // Tranche 7b : Sam publie à son tour un projet, pour qu'on voie plus bas le blocage le cacher.
+  // Un nouveau membre, Malik, le trouve d'abord dans « Découvrir » (le témoin d'avant le blocage).
+  step('Sam publie un projet ; Malik, nouveau membre, le trouve dans « Découvrir »')
+  const samProject = 'Le carnet de Sam'
+  await open(sam.page, `${appUrl}/projects/new`)
+  await sam.page.getByLabel('Titre').fill(samProject)
+  await sam.page.getByLabel('Le pitch, en une phrase').fill('Il range mes essais de prompts.')
+  await sam.page.getByRole('button', { name: 'Publier' }).last().click()
+  await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  await signUp(malik, 'Malik')
+  /** « Découvrir » sur l'accueil de Malik, une fois le projet de Léa affiché (la liste est chargée). */
+  const openDiscover = async () => {
+    await open(malik.page, `${appUrl}/`)
+    await malik.page.getByRole('radio', { name: 'Découvrir' }).click()
+    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  }
+  await openDiscover()
+  await malik.page.getByRole('link', { name: samProject }).waitFor()
+  console.log('  ok : Malik voit le projet de Sam dans « Découvrir »')
+  const samMe = await (await sam.request.get(`${apiUrl}/v1/me`)).json()
+  const malikMe = await (await malik.request.get(`${apiUrl}/v1/me`)).json()
+  const samHandle = samMe.handle
+
+  // Tranche 7a : signaler, puis traiter le signalement. Sam publie un second commentaire, que
+  // Malik signale ; l'administrateur le retire.
+  step('Sam publie un second commentaire ; Malik le signale')
   const spam = 'Gagne 500 € par jour depuis chez toi, écris-moi en privé.'
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
   await sam.page.getByLabel('Ton commentaire').fill(spam)
   await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
   await sam.page.getByText('Commentaire publié.').waitFor()
-  await signUp(malik, 'Malik')
   await open(malik.page, `${appUrl}/projects/${projectId}`)
   // La réponse de Léa a aussi son « Signaler » : on prend le bouton de la carte du commentaire de
   // Sam, c'est-à-dire le plus petit bloc qui contient à la fois son texte et un « Signaler » (les
@@ -441,6 +466,78 @@ try {
     .getByText('Merci, ton signalement a été envoyé. La modération va le regarder.')
     .waitFor()
   console.log('  ok : Malik lit le remerciement')
+
+  // Tranche 7b : la confirmation propose de bloquer l'auteur, jamais d'office. Le dialogue est le
+  // plus petit bloc qui contient son titre et son « Annuler » : son « Bloquer » est le sien.
+  step('Depuis la confirmation, Malik bloque aussi Sam, après avoir lu ce qui change')
+  /** Le dialogue ouvert dont le titre répond à `title` (une espace fine précède le « ? »). */
+  const dialogOf = (someone, title) =>
+    someone.page
+      .locator('div')
+      .filter({ has: someone.page.getByRole('heading', { name: title }) })
+      .filter({ has: someone.page.getByRole('button', { name: 'Annuler', exact: true }) })
+      .last()
+  await malik.page.getByRole('button', { name: `Bloquer aussi @${samHandle}` }).click()
+  const blockDialog = dialogOf(malik, new RegExp(`^Bloquer @${samHandle}\\s*\\?$`))
+  await blockDialog.getByText(/Bloquer ne prévient pas la modération\./).waitFor()
+  await blockDialog.getByRole('button', { name: 'Bloquer', exact: true }).click()
+  await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
+  const readSamForMalik = async () =>
+    (await malik.request.get(`${apiUrl}/v1/members/${samMe.id}`)).json()
+  await waitFor('blocage enregistré', async () => (await readSamForMalik()).isBlocked === true)
+  console.log('  ok : Malik a bloqué Sam')
+
+  step('Malik ne voit plus le projet de Sam ; la page de Sam lui dit « Tu as bloqué »')
+  await openDiscover()
+  expectEqual(
+    'projet de Sam, dans « Découvrir » de Malik',
+    await malik.page.getByRole('link', { name: samProject }).count(),
+    0,
+  )
+  await open(malik.page, `${appUrl}/members/${samMe.id}`)
+  // Le même texte qu'après le geste (corrections 7b), et « Débloquer » à la place de « Suivre ».
+  await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
+  await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).waitFor()
+  console.log('  ok : Malik lit « Tu as bloqué » sur la page de Sam, sans ses projets')
+  expectEqual(
+    'projet de Sam, sur sa page vue par Malik',
+    await malik.page.getByRole('link', { name: samProject }).count(),
+    0,
+  )
+  // Dans le fil du projet de Léa, le commentaire de Sam devient un emplacement, pour Malik seul.
+  await open(malik.page, `${appUrl}/projects/${projectId}`)
+  await malik.page.getByText('Commentaire d’un membre que tu as bloqué').first().waitFor()
+  expectEqual('commentaire de Sam, à l’écran de Malik', await malik.page.getByText(spam).count(), 0)
+
+  step('Sam ouvre la page de Malik : pour lui, elle n’existe pas')
+  await open(sam.page, `${appUrl}/members/${malikMe.id}`)
+  await sam.page.getByText('Ce membre est introuvable').waitFor()
+  expectEqual(
+    'page de Malik, pour Sam',
+    await statusFor(sam, `${apiUrl}/v1/members/${malikMe.id}`),
+    404,
+  )
+
+  step('Malik ouvre « Membres bloqués » depuis « Mon compte », et débloque Sam')
+  await open(malik.page, `${appUrl}/account`)
+  await malik.page.getByRole('button', { name: 'Membres bloqués' }).click()
+  await malik.page.waitForURL(/\/blocks$/)
+  // Le nom lu de chaque « Débloquer » dit qui il débloque.
+  await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).click()
+  const unblockDialog = dialogOf(malik, new RegExp(`^Débloquer @${samHandle}\\s*\\?$`))
+  await unblockDialog.getByRole('button', { name: 'Débloquer', exact: true }).click()
+  await malik.page.getByText(`Tu as débloqué @${samHandle}.`, { exact: true }).waitFor()
+  await malik.page.getByText('Tu n’as bloqué personne.').waitFor()
+  console.log('  ok : la liste des membres bloqués de Malik est vide')
+  await waitFor('déblocage enregistré', async () => (await readSamForMalik()).isBlocked === false)
+  await openDiscover()
+  await malik.page.getByRole('link', { name: samProject }).waitFor()
+  console.log('  ok : le projet de Sam est de retour dans « Découvrir »')
+  expectEqual(
+    'page de Malik, pour Sam',
+    await statusFor(sam, `${apiUrl}/v1/members/${malikMe.id}`),
+    200,
+  )
 
   // Léa n'est pas prévenue du signalement. Elle répond au commentaire de Sam : une fois celui-ci
   // retiré, sa réponse doit rester, sous un emplacement (comme sous un commentaire supprimé).

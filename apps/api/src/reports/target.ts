@@ -2,14 +2,25 @@
 // profil. Deux lectures :
 // - pour un membre qui signale (POST /v1/reports, GET /v1/reports/target) : seulement ce qu'il voit,
 //   avec les règles de visibilité des autres lectures (projects/visibility.ts, comments/load.ts) ;
-//   tout le reste, inconnu, privé, retiré, masqué ou supprimé, donne « rien », et la route répond
-//   le même 404 ;
+//   tout le reste, inconnu, privé, retiré, masqué, supprimé ou caché par un blocage, donne « rien »,
+//   et la route répond le même 404 ;
 // - pour un administrateur qui décide (POST /v1/moderation/decisions) : la cible telle qu'elle est
 //   en base, qu'elle soit visible ou non, pour savoir qui en est l'auteur et si elle est retirée.
-import type { ReportTarget } from '@ruche/contracts'
+//
+// Tranche 7b : la copie devient complète, un champ par entrée, nommé comme au registre des entrées
+// (moderation/inputs.ts) ; une image n'y est que sa clé de stockage, jamais le fichier (règle 15).
+// Et le blocage : un contenu d'un membre bloqué avec moi, dans un sens ou l'autre, est introuvable,
+// sauf trois cas de la relecture du plan (précision 2, règles 1 et 2, plus bas).
+import type {
+  MemberInputField,
+  ReportSnapshot,
+  ReportTarget,
+  ReportTargetPreview,
+} from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
 
+import { type Blocks, blocksOf } from '../blocks/visibility'
 import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
@@ -18,6 +29,7 @@ import { projectVisibleTo } from '../projects/visibility'
 const p = schema.project
 const n = schema.projectNote
 const c = schema.projectComment
+const m = schema.projectMedia
 
 /** Ce qu'on sait d'une cible que le membre voit. */
 export type Reportable = {
@@ -27,32 +39,127 @@ export type Reportable = {
   projectId: string | null
   /** Le texte montré sur la page « Signaler » (ReportTargetPreview.text). */
   text: string
-  /** Le texte copié dans le signalement (règle 7 : lu ici, jamais envoyé par l'appli). */
-  snapshot: string
+  /** La copie gardée dans le signalement (règle 7 : lue ici, jamais envoyée par l'appli). */
+  snapshot: ReportSnapshot
+  /** L'auteur, pour « Bloquer aussi @x » après l'envoi ; `isBlocked` : je l'ai déjà bloqué. */
+  author: ReportTargetPreview['author']
 }
 
 /** Le texte d'un projet : son titre, puis son pitch. */
 const projectText = (title: string, pitch: string) => `${title}\n\n${pitch}`
 
+/** Une liste (outils) tient sur une ligne de la copie, séparée par « , » (contrat). */
+const oneLine = (values: string[]) => values.join(', ')
+
+/**
+ * Les champs facultatifs n'entrent dans la copie que s'ils sont remplis : une description vide ou
+ * un lien absent n'ont rien à montrer à la modération. Le titre, le pitch, le nom, le pseudo et le
+ * texte d'une note ou d'un commentaire sont toujours là.
+ */
+const filled = (field: MemberInputField, value: string | null | undefined): ReportSnapshot =>
+  value === null || value === undefined || value === '' ? [] : [{ field, value }]
+
+/**
+ * Une image d'un projet, nommée comme au registre : la couverture (la première photo de la
+ * galerie, ou la couverture verticale), ou une autre photo.
+ */
+const imageField = (media: { slot: string; position: number }): MemberInputField =>
+  media.slot === 'portrait' || media.position === 0 ? 'cover' : 'photo'
+
+/**
+ * Le nom et le pseudo actuel de l'auteur, pour l'aperçu (une requête par la clé primaire de user,
+ * et l'index member_handle_current_idx). Un compte d'avant les pseudos reçoit le sien ici, comme
+ * sur sa page ; null s'il n'existe plus.
+ */
+const authorOf = async (
+  db: Database,
+  authorId: string,
+  blocks: Blocks,
+): Promise<Reportable['author'] | null> => {
+  const [row] = await db
+    .select({ name: schema.user.name, handle: schema.memberHandle.handle })
+    .from(schema.user)
+    .leftJoin(schema.memberHandle, currentHandleOf(schema.user.id))
+    .where(eq(schema.user.id, authorId))
+  if (!row) return null
+  const handle = row.handle ?? (await ensureHandle(db, authorId))
+  if (handle === null) return null
+  // Un commentaire lu malgré un blocage (règles 1 et 2) garde le nom de l'auteur, pas son pseudo :
+  // l'appli ne propose alors pas « Bloquer aussi » (PUT block répondrait 404 si l'auteur m'a bloqué).
+  const separated = blocks.byMe.has(authorId) || blocks.ofMe.has(authorId)
+  return {
+    id: authorId,
+    name: row.name,
+    handle: separated ? null : handle,
+    isBlocked: blocks.byMe.has(authorId),
+  }
+}
+
 /**
  * La cible, telle que ce membre la voit, ou null s'il ne la voit pas. L'identifiant a déjà été
- * validé selon sa sorte (ReportTarget) : chaque requête est servie par une clé primaire.
+ * validé selon sa sorte (ReportTarget) : chaque requête est servie par une clé primaire. Un nombre
+ * fixe de requêtes : les blocages du membre, la cible, ses images (projet), son auteur.
  */
 export const loadReportable = async (
   db: Database,
   viewerId: string,
   target: ReportTarget,
 ): Promise<Reportable | null> => {
+  // Les blocages posés par ce membre et ceux qui le visent, en une requête (blocks/visibility.ts) :
+  // les règles propres au signalement (précision 2, règles 1 et 2) se lisent ensuite en JavaScript.
+  const blocks = await blocksOf(db, viewerId)
+  const found = await loadVisible(db, viewerId, target, blocks)
+  if (!found) return null
+  const author = await authorOf(db, found.authorId, blocks)
+  if (!author) return null
+  return { ...found, author }
+}
+
+const loadVisible = async (
+  db: Database,
+  viewerId: string,
+  target: ReportTarget,
+  blocks: Blocks,
+): Promise<Omit<Reportable, 'author'> | null> => {
   switch (target.kind) {
     case 'project': {
-      // Public et non retiré, ou l'un des siens (projectVisibleTo) : la règle de la page du projet.
+      // Public et non retiré, ou l'un des siens (projectVisibleTo) : la règle de la page du projet,
+      // qui écarte depuis 7b le projet d'un membre bloqué avec moi, dans un sens ou l'autre.
       const [row] = await db
-        .select({ authorId: p.authorId, title: p.title, pitch: p.pitch })
+        .select({
+          authorId: p.authorId,
+          title: p.title,
+          pitch: p.pitch,
+          description: p.description,
+          prompts: p.prompts,
+          tools: p.tools,
+          demoUrl: p.demoUrl,
+        })
         .from(p)
         .where(and(eq(p.id, target.id), projectVisibleTo(viewerId)))
       if (!row) return null
-      const text = projectText(row.title, row.pitch)
-      return { authorId: row.authorId, projectId: target.id, text, snapshot: text }
+      // Les images du projet, dans l'ordre de la page (index project_media_project_idx : projet,
+      // emplacement, position). Seule leur clé est lue : aucun fichier n'est copié.
+      const media = await db
+        .select({ slot: m.slot, position: m.position, key: m.storageKey })
+        .from(m)
+        .where(eq(m.projectId, target.id))
+        .orderBy(asc(m.slot), asc(m.position))
+      const snapshot: ReportSnapshot = [
+        { field: 'title', value: row.title },
+        { field: 'pitch', value: row.pitch },
+        ...filled('description', row.description),
+        ...row.prompts.flatMap((prompt) => filled('prompt', prompt)),
+        ...filled('tools', oneLine(row.tools)),
+        ...filled('demoUrl', row.demoUrl),
+        ...media.map((item) => ({ field: imageField(item), value: item.key })),
+      ]
+      return {
+        authorId: row.authorId,
+        projectId: target.id,
+        text: projectText(row.title, row.pitch),
+        snapshot,
+      }
     }
     case 'note': {
       // Une note se voit avec son projet ; retirée, seul l'auteur du projet (qui l'a écrite) la voit.
@@ -72,13 +179,18 @@ export const loadReportable = async (
         authorId: row.authorId,
         projectId: row.projectId,
         text: row.body,
-        snapshot: row.body,
+        snapshot: [{ field: 'body', value: row.body }],
       }
     }
     case 'comment': {
       // Un commentaire se voit sur un projet visible, s'il n'est ni supprimé, ni masqué (sauf pour
-      // son auteur et l'auteur du projet : `sees`, la règle unique de comments/load.ts), ni retiré
-      // (sauf pour son auteur, règle 1).
+      // son auteur et l'auteur du projet), ni retiré (sauf pour son auteur, règle 1 de 7a), ni
+      // caché par un blocage : tout cela est `sees`, la règle unique de comments/load.ts, blocages
+      // compris (tranche 7b : l'auteur du projet lit tout chez lui, règle 1 ; un commentaire qui me
+      // mentionne reste lisible si c'est son auteur qui m'a bloqué, règle 2).
+      // `mentionsMe` : « exists (select 1 …) » est vrai dès qu'une ligne existe ; la clé primaire
+      // de comment_mention (comment_id, member_id) y répond sans rien lire d'autre.
+      const cm = schema.commentMention
       const [row] = await db
         .select({
           authorId: c.authorId,
@@ -89,24 +201,30 @@ export const loadReportable = async (
           projectAuthorId: p.authorId,
           visibility: p.visibility,
           projectRemovedAt: p.removedAt,
+          mentionsMe: sql<boolean>`exists (select 1 from ${cm} where ${cm.commentId} = ${c.id} and ${cm.memberId} = ${viewerId})`,
         })
         .from(c)
         .innerJoin(p, eq(p.id, c.projectId))
         .where(and(eq(c.id, target.id), isNull(c.deletedAt), projectVisibleTo(viewerId)))
       if (!row || row.authorId === null) return null
-      // `viewerOf` traite un projet retiré comme privé : il lui faut donc sa date de retrait.
-      const viewer = viewerOf(viewerId, {
-        authorId: row.projectAuthorId,
-        visibility: row.visibility,
-        removedAt: row.projectRemovedAt,
-      })
-      if (!sees(row, viewer)) return null
+      // `viewerOf` traite un projet retiré comme privé : il lui faut donc sa date de retrait. Ses
+      // blocages (lus plus haut par blocksOf) et `mentionsViewer` donnent à `sees` les règles 1 et 2.
+      const viewer = viewerOf(
+        viewerId,
+        {
+          authorId: row.projectAuthorId,
+          visibility: row.visibility,
+          removedAt: row.projectRemovedAt,
+        },
+        blocks,
+      )
+      if (!sees({ ...row, mentionsViewer: row.mentionsMe }, viewer)) return null
       if (row.removedAt !== null && row.authorId !== viewerId) return null
       return {
         authorId: row.authorId,
         projectId: row.projectId,
         text: row.body,
-        snapshot: row.body,
+        snapshot: [{ field: 'body', value: row.body }],
       }
     }
     case 'member': {
@@ -118,25 +236,43 @@ export const loadReportable = async (
           name: schema.user.name,
           handle: schema.memberHandle.handle,
           bio: schema.profile.bio,
+          favoriteTools: schema.profile.favoriteTools,
+          avatarKey: schema.profile.avatarKey,
         })
         .from(schema.user)
         .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
         .leftJoin(schema.memberHandle, currentHandleOf(schema.user.id))
         .where(and(eq(schema.user.id, target.id), eq(schema.user.emailVerified, true)))
       if (!row) return null
+      // Précision 2 : qui a bloqué voit encore l'en-tête de la page, et peut signaler le profil ;
+      // qui est bloqué reçoit le 404 d'un membre inconnu. Un double blocage se lit « je l'ai
+      // bloqué », comme sur la page.
+      if (blocks.ofMe.has(row.id) && !blocks.byMe.has(row.id)) return null
       const handle = row.handle ?? (await ensureHandle(db, row.id))
       if (handle === null) return null
-      const text = `${row.name} (@${handle})`
-      const bio = row.bio ?? ''
       return {
         authorId: row.id,
         projectId: null,
-        text,
-        snapshot: bio === '' ? text : `${text}\n\n${bio}`,
+        text: `${row.name} (@${handle})`,
+        snapshot: [
+          { field: 'name', value: row.name },
+          { field: 'handle', value: handle },
+          ...filled('bio', row.bio),
+          ...filled('favoriteTools', oneLine(row.favoriteTools ?? [])),
+          ...filled('avatar', row.avatarKey),
+        ],
       }
     }
   }
 }
+
+/**
+ * Deux copies disent-elles la même chose ? Champ par champ, dans l'ordre. Sert à re-signaler
+ * (règle 14 : un contenu inchangé depuis l'examen de la modération ne se signale pas de nouveau).
+ */
+export const sameSnapshot = (a: ReportSnapshot, b: ReportSnapshot) =>
+  a.length === b.length &&
+  a.every((entry, i) => entry.field === b[i]?.field && entry.value === b[i]?.value)
 
 /** Une cible vue par l'administrateur : son auteur, et si elle est retirée. */
 export type DecidableTarget = { authorId: string | null; removed: boolean }

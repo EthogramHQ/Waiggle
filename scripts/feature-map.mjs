@@ -41,6 +41,16 @@ const features = [
     routes: /^\w+ \/v1\/(email\/|me\/email-preferences$)/,
     tables: /^email_preference$/,
   },
+  // Avant « profil » et « membres » : la liste des membres bloqués est sous /v1/me/, et bloquer
+  // sous /v1/members/{id}/.
+  {
+    id: 'bloquer',
+    name: 'Bloquer',
+    tranche: 'Tranche 7b',
+    pages: /^\/blocks$/,
+    routes: /^\w+ \/v1\/(me\/blocks|members\/\{id\}\/block)$/,
+    tables: /^member_block$/,
+  },
   {
     id: 'profil',
     name: 'Profil et langue',

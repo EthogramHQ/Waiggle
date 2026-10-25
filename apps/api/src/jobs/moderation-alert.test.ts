@@ -95,7 +95,8 @@ const insertReport = (createdAt: Date, status = 'open', snapshot = 'Un texte tr�
     targetAuthorId: null,
     reason: 'harassment',
     details: 'Une précision de Max',
-    snapshot,
+    // Tranche 7b : la copie est un tableau de champs, nommés comme au registre des entrées.
+    snapshot: [{ field: 'title', value: snapshot }],
     status,
     createdAt,
   })
