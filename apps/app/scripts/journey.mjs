@@ -495,9 +495,9 @@ try {
     0,
   )
   await open(malik.page, `${appUrl}/members/${samMe.id}`)
-  await malik.page
-    .getByText(new RegExp(`^Tu as bloqué @${samHandle}\\s*: vous ne voyez plus`))
-    .waitFor()
+  // Le même texte qu'après le geste (corrections 7b), et « Débloquer » à la place de « Suivre ».
+  await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
+  await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).waitFor()
   console.log('  ok : Malik lit « Tu as bloqué » sur la page de Sam, sans ses projets')
   expectEqual(
     'projet de Sam, sur sa page vue par Malik',

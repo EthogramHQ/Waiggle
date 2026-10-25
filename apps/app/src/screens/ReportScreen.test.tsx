@@ -22,6 +22,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useBlock } from '../blocks/api'
 import { getReportTarget, sendReport } from '../reports/api'
+import { passTapGuard } from '../testing/dialog'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { blockSentences, containing, fr, missingSentences } from '../testing/text'
@@ -452,6 +453,34 @@ describe('blocking the author after a report', () => {
     await screen.findByText(containing(fr.t('report.sent')))
   }
 
+  /**
+   * Touche « Bloquer aussi @sam », puis attend la fin de la garde des tapes de la fenêtre (Dialog
+   * `guardTaps`, corrections 7b) avant de la toucher.
+   */
+  const askToBlock = async () => {
+    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await passTapGuard()
+  }
+
+  it('keeps the thanks when the target can no longer be read after the block', async () => {
+    // Relecture de l'interface 7b (ui-4) : après « Bloquer aussi », la cible répond 404 ; une
+    // relecture (retour sur l'onglet) remplaçait « Merci » par « Page introuvable ».
+    const { queryClient } = await reportComment()
+    await sendWith('Arnaque ou spam')
+    await screen.findByText(containing(fr.t('report.sent')))
+    await askToBlock()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await screen.findByText(containing(fr.t('block.done', { handle: 'sam' })))
+
+    jest.mocked(getReportTarget).mockRejectedValue(new ApiError('notFound'))
+    await act(() => queryClient.refetchQueries())
+
+    expect(jest.mocked(getReportTarget)).toHaveBeenCalledTimes(2) // témoin : la relecture a eu lieu
+    expect(screen.getByText(containing(fr.t('report.sent')))).toBeTruthy()
+    expect(screen.getByText(containing(fr.t('block.done', { handle: 'sam' })))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t('errors.notFound')))).toBeNull()
+  })
+
   it('offers to block the author too, once the report is sent, and not before', async () => {
     await reportComment()
 
@@ -462,7 +491,9 @@ describe('blocking the author after a report', () => {
     await sendWith('Arnaque ou spam')
 
     expect(await screen.findByRole('button', { name: alsoBlock })).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('report.alsoBlockHint'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t('report.alsoBlockHint', { handle: 'sam' }))).length,
+    ).toBeGreaterThan(0)
     // Une action secondaire : rien n'est bloqué tant qu'on ne la choisit pas.
     expect(mockBlock).not.toHaveBeenCalled()
   })
@@ -470,7 +501,7 @@ describe('blocking the author after a report', () => {
   it('asks first, saying what changes, then blocks the author and says so', async () => {
     await reportThenThanked()
 
-    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await askToBlock()
 
     expect(screen.getByRole('header', { name: blockTitle })).toBeTruthy()
     expect(missingSentences(blockSentences('sam'), screen)).toEqual([])
@@ -486,7 +517,7 @@ describe('blocking the author after a report', () => {
   it('blocks nothing when the window is cancelled', async () => {
     await reportThenThanked()
 
-    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await askToBlock()
     await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
 
     expect(mockBlock).not.toHaveBeenCalled()
@@ -509,7 +540,7 @@ describe('blocking the author after a report', () => {
     mockBlock.mockResolvedValue({ ok: false, error: 'internal' })
     await reportThenThanked()
 
-    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await askToBlock()
     await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(containing(fr.t('block.error')))
@@ -520,7 +551,7 @@ describe('blocking the author after a report', () => {
     mockBlock.mockResolvedValue({ ok: false, error: 'rateLimited' })
     await reportThenThanked()
 
-    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await askToBlock()
     await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
 
     expect(
@@ -538,7 +569,7 @@ describe('blocking the author after a report', () => {
     )
     await reportThenThanked()
 
-    await fireEvent.press(screen.getByRole('button', { name: alsoBlock }))
+    await askToBlock()
     const confirm = screen.getByRole('button', { name: fr.t('block.confirm') })
     await fireEvent.press(confirm)
     await fireEvent.press(confirm)

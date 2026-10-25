@@ -1,20 +1,22 @@
 // Page d'un membre : son avatar, son nom, sa bio, ses outils favoris (chacun mène à sa page
 // d'étiquette), puis ses projets, du plus récent au plus ancien. Sur sa propre page, un membre voit
 // aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil. Sur la page
-// d'un autre membre, le bouton « Suivre » et le menu « … » (tranche 7b) : « Signaler ce profil » et
-// « Bloquer » ; sur les deux, le nombre d'abonnés (jamais leurs noms).
+// d'un autre membre, le nombre d'abonnés (jamais leurs noms), puis le bouton « Suivre » et le menu
+// « … » (tranche 7b) côte à côte : « Signaler ce profil » et « Bloquer ».
 //
 // Un membre que j'ai bloqué (tranche 7b) : sa page n'est plus que son en-tête (nom, pseudo, photo),
-// avec « Tu as bloqué @x », et dans le menu « Débloquer » et « Signaler ce profil ». Un membre qui
-// m'a bloqué n'a pas de page pour moi : l'API répond « introuvable », comme pour un inconnu.
-import { BLOCKS_PER_DAY, type Member } from '@ruche/contracts'
+// avec « Tu as bloqué @x. », un bouton « Débloquer » à la place de « Suivre », et « Signaler ce
+// profil » dans le menu. Un membre qui m'a bloqué n'a pas de page pour moi : l'API répond
+// « introuvable », comme pour un inconnu.
+import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
-import { type ApiErrorKey, errorKey } from '../api/errors'
+import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useBlock, useUnblock } from '../blocks/api'
+import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { useFollow } from '../follows/api'
 import { useMember } from '../members/api'
 import { useSignInAgain } from '../navigation/signInAgain'
@@ -23,9 +25,9 @@ import { useGoBack } from '../navigation/useGoBack'
 import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Button } from '../ui/Button'
-import { Dialog } from '../ui/Dialog'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
+import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -62,9 +64,6 @@ export function MemberScreen({ id }: { id: string }) {
   return <MemberView member={member.data} />
 }
 
-/** Le geste en cours de confirmation : bloquer, ou débloquer. */
-type Asking = 'block' | 'unblock'
-
 function MemberView({ member }: { member: Member }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -78,66 +77,40 @@ function MemberView({ member }: { member: Member }) {
   const followers = t('follow.followers', { count: member.followerCount })
   const handle = member.handle
 
-  // La fenêtre de confirmation ouverte (aucune, bloquer ou débloquer), le geste en cours, son refus,
-  // et le dernier geste réussi.
-  const [asking, setAsking] = useState<Asking | null>(null)
-  const [busy, setBusy] = useState(false)
-  // Une ref en plus de l'état : deux tapes dans la même image (double tape) voient toutes deux
-  // l'ancien `busy` ; la ref, elle, est déjà à vrai pour la seconde.
-  const sending = useRef(false)
-  const [refusal, setRefusal] = useState<ApiErrorKey | null>(null)
-  const [done, setDone] = useState<Asking | null>(null)
+  // La fenêtre de confirmation ouverte (aucune, bloquer ou débloquer).
+  const [asking, setAsking] = useState<BlockAsking | null>(null)
+  // L'état annoncé par le dernier geste réussi, tant que la page relue ne le dit pas encore : la
+  // page passe à son nouvel état tout de suite, au lieu de montrer l'ancien puis de sauter.
+  const [expected, setExpected] = useState<boolean | null>(null)
+  // Changer l'état pendant le dessin est permis par React pour suivre une prop : la page relue dit
+  // la même chose, on la croit de nouveau.
+  if (expected !== null && member.isBlocked === expected) setExpected(null)
+  const blocked = expected ?? member.isBlocked
+  // « Tu as débloqué @x. » : il reste jusqu'au geste suivant, au lieu de disparaître sous le doigt.
+  const [unblocked, setUnblocked] = useState(false)
+  // Après un déblocage, « Débloquer » disparaît : le focus du clavier va au message qui le
+  // confirme, une fois la fenêtre refermée (avant, elle le garde pour elle).
+  const unblockedRef = useRef<Focusable>(null)
+  const focusAfterClose = useRef(false)
 
-  const ask = (gesture: Asking) => {
-    // Une erreur d'un essai précédent ne se montre pas à la réouverture (pôle design).
-    setRefusal(null)
-    setAsking(gesture)
-  }
+  const ask = (gesture: BlockAsking['gesture']) =>
+    setAsking({ gesture, member: { id: member.id, handle } })
 
-  // Pendant le geste, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-  const closeDialog = () => {
-    if (!sending.current) setAsking(null)
-  }
-
-  const confirm = async (gesture: Asking) => {
-    if (sending.current) return
-    sending.current = true
-    setBusy(true)
-    setRefusal(null)
-    const result = gesture === 'block' ? await block(member.id) : await unblock(member.id)
-    sending.current = false
-    setBusy(false)
-    // Refusé : la fenêtre reste ouverte, avec le message ; le bouton permet de réessayer.
-    if (!result.ok) {
-      setRefusal(result.error)
-      return
-    }
-    // Fait : la page du membre se relit (blocks/api) et passe à son nouvel état.
-    setDone(gesture)
+  const done = ({ gesture }: BlockAsking) => {
+    setExpected(gesture === 'block')
+    setUnblocked(gesture === 'unblock')
+    focusAfterClose.current = gesture === 'unblock'
     setAsking(null)
   }
-
-  // Le message d'un refus. La limite du jour et la session expirée disent pourquoi ; le reste,
-  // « Réessaie ».
-  const refusalMessage = (gesture: Asking) =>
-    refusal === 'rateLimited'
-      ? gesture === 'block'
-        ? t('block.limited', { max: BLOCKS_PER_DAY })
-        : t('errors.rateLimited')
-      : refusal === 'unauthorized'
-        ? t('states.expired')
-        : t('block.error')
 
   const report = () =>
     router.push({ pathname: '/report', params: { kind: 'member', id: member.id } })
 
-  // Le menu « … » : rien sur sa propre page (ni se signaler, ni se bloquer soi-même).
+  // Le menu « … » : rien sur sa propre page (ni se signaler, ni se bloquer soi-même). Bloqué, il
+  // garde « Signaler ce profil » ; « Débloquer » est un bouton de la page (le scénario le promet).
   const reportItem: ActionMenuItem = { label: t('report.member'), icon: 'flag', onPress: report }
-  const menuItems: ActionMenuItem[] = member.isBlocked
-    ? [
-        { label: t('block.unblock'), icon: 'check-circle', onPress: () => ask('unblock') },
-        reportItem,
-      ]
+  const menuItems: ActionMenuItem[] = blocked
+    ? [reportItem]
     : [
         reportItem,
         {
@@ -148,22 +121,11 @@ function MemberView({ member }: { member: Member }) {
         },
       ]
 
-  // La confirmation du dernier geste, tant que la page n'a pas encore l'état qu'il annonce (le
-  // temps de la relire). Lue sans interrompre (role « status »).
-  const doneNotice =
-    done === 'unblock' && !member.isBlocked ? (
-      <Notice tone="success" message={t('block.unblocked', { handle })} polite />
-    ) : done === 'block' && !member.isBlocked ? (
-      <Notice tone="success" message={t('block.done', { handle })} polite />
-    ) : null
-
-  const dialogError = (gesture: Asking) =>
-    refusal ? (
-      <Notice
-        message={refusalMessage(gesture)}
-        action={refusal === 'unauthorized' ? signInAgain(() => setAsking(null)) : undefined}
-      />
-    ) : null
+  const followError = follow.expired
+    ? t('states.expired')
+    : follow.error
+      ? t('follow.error')
+      : undefined
 
   return (
     <Screen width="page" header={<TopNav />} onBack={back} pageTitle={member.name}>
@@ -190,15 +152,34 @@ function MemberView({ member }: { member: Member }) {
             </Stack>
           ) : (
             <Stack gap="md" align="center">
-              {member.isBlocked ? (
-                <Notice tone="info" message={t('block.notice', { handle })} />
+              {/* Lus sans interrompre (role « status ») : le même texte avant et après la relecture
+                  de la page, pour une seule annonce. */}
+              {blocked ? (
+                <Notice tone="info" message={t('block.notice', { handle })} polite />
+              ) : unblocked ? (
+                <Notice
+                  ref={unblockedRef}
+                  tone="success"
+                  message={t('block.unblocked', { handle })}
+                  polite
+                />
               ) : null}
-              {doneNotice}
-              {/* « Suivre » et le menu « … » côte à côte, alignés en haut (le nombre d'abonnés
-                  est sous « Suivre »). Le menu garde sa place dans l'arbre, bloqué ou non : après
-                  « Bloquer », le focus revient à son bouton au lieu de se perdre. */}
-              <Row gap="sm" align="start" justify="center">
-                {member.isBlocked ? null : (
+              {/* Le nombre d'abonnés au-dessus : il ne bouge pas quand « Suivre » devient « Suivi ». */}
+              {blocked ? null : <FollowerCount text={followers} />}
+              {/* « Suivre » (ou « Débloquer ») et le menu « … » sur une rangée centrée. Le menu
+                  garde sa place dans l'arbre, bloqué ou non : après « Bloquer », le focus revient
+                  à son bouton au lieu de se perdre. */}
+              <Row gap="sm" align="center" justify="center">
+                {blocked ? (
+                  <Button
+                    label={t('block.unblock')}
+                    // Le nom lu contient le texte affiché, et dit qui (comme dans la liste).
+                    spokenLabel={t('block.list.unblockLabel', { handle })}
+                    variant="secondary"
+                    size="compact"
+                    onPress={() => ask('unblock')}
+                  />
+                ) : (
                   <FollowButton
                     followed={member.isFollowed}
                     onPress={follow.toggle}
@@ -210,26 +191,21 @@ function MemberView({ member }: { member: Member }) {
                         : t('follow.member', { name: member.name })
                     }
                     text={member.isFollowed ? t('follow.following') : t('follow.follow')}
-                    caption={followers}
-                    layout="stacked"
-                    error={
-                      follow.expired
-                        ? t('states.expired')
-                        : follow.error
-                          ? t('follow.error')
-                          : undefined
-                    }
-                    errorAction={follow.expired ? signInAgain() : undefined}
                   />
                 )}
                 <ActionMenu items={menuItems} />
               </Row>
+              {/* Sous la rangée, pas dans le bouton : « … » reste centré sur « Suivre ». Lu dès
+                  qu'il apparaît (role « alert »), comme les autres erreurs. */}
+              {!blocked && followError ? (
+                <Notice message={followError} action={follow.expired ? signInAgain() : undefined} />
+              ) : null}
             </Stack>
           )
         }
       />
       {/* Bloqué : ni projets, ni « Pas encore de projet public » (l'API n'en donne aucun). */}
-      {member.isBlocked ? null : (
+      {blocked ? null : (
         <>
           <Text variant="heading" heading={2}>
             {t('member.projects')}
@@ -241,52 +217,21 @@ function MemberView({ member }: { member: Member }) {
           </ProjectGrid>
         </>
       )}
-      {/* Bloquer : la fenêtre dit tout ce qui change avant le geste (relecture juridique, J9). */}
-      <Dialog
-        visible={asking === 'block'}
-        title={t('block.title', { handle })}
-        message={[
-          t('block.hidden'),
-          t('block.follows'),
-          t('block.notTold', { handle }),
-          t('block.notModeration'),
-        ].join('\n\n')}
-        onDismiss={closeDialog}
-      >
-        {dialogError('block')}
-        <Button
-          label={t('block.confirm')}
-          variant="confirm"
-          onPress={() => void confirm('block')}
-          loading={busy}
-        />
-        <Button
-          label={t('block.cancel')}
-          variant="secondary"
-          onPress={closeDialog}
-          disabled={busy}
-        />
-      </Dialog>
-      {/* Débloquer passe aussi par une fenêtre (J10) : les abonnements retirés ne reviennent pas. */}
-      <Dialog
-        visible={asking === 'unblock'}
-        title={t('block.unblockTitle', { handle })}
-        message={t('block.unblockMessage')}
-        onDismiss={closeDialog}
-      >
-        {dialogError('unblock')}
-        <Button
-          label={t('block.unblockConfirm')}
-          onPress={() => void confirm('unblock')}
-          loading={busy}
-        />
-        <Button
-          label={t('block.cancel')}
-          variant="secondary"
-          onPress={closeDialog}
-          disabled={busy}
-        />
-      </Dialog>
+      {/* Bloquer et débloquer passent par la même fenêtre, qui dit ce qui change (J9, J10). */}
+      <BlockDialog
+        asking={asking}
+        send={({ gesture, member: target }) =>
+          gesture === 'block' ? block(target.id) : unblock(target.id)
+        }
+        onDone={done}
+        onCancel={() => setAsking(null)}
+        onClosed={() => {
+          if (!focusAfterClose.current) return
+          focusAfterClose.current = false
+          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
+          requestAnimationFrame(() => focusWithoutScroll(unblockedRef.current))
+        }}
+      />
     </Screen>
   )
 }

@@ -88,8 +88,9 @@ const samples = {
 }
 
 export function CatalogueScreen() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [dialog, setDialog] = useState(false)
+  const [longDialog, setLongDialog] = useState(false)
   const { appearance, setAppearance } = useTheme()
   const l = labels[i18n.language === 'en' ? 'en' : 'fr']
 
@@ -403,6 +404,37 @@ export function CatalogueScreen() {
         >
           <Button label={l.confirmDelete} variant="confirm" onPress={() => setDialog(false)} />
           <Button label={l.cancel} variant="secondary" onPress={() => setDialog(false)} />
+        </Dialog>
+        {/* Un message en plusieurs paragraphes, alignés à gauche, et la garde des tapes (600 ms
+            après l'ouverture) : la fenêtre « Bloquer @x ? » (tranche 7b), avec ses textes. */}
+        <Button
+          label={t('block.title', { handle: 'max_durand' })}
+          variant="secondary"
+          onPress={() => setLongDialog(true)}
+        />
+        <Dialog
+          visible={longDialog}
+          title={t('block.title', { handle: 'max_durand' })}
+          message={[
+            t('block.hidden'),
+            t('block.remains', { handle: 'max_durand' }),
+            t('block.follows'),
+            t('block.notTold', { handle: 'max_durand' }),
+            t('block.notModeration'),
+          ]}
+          guardTaps
+          onDismiss={() => setLongDialog(false)}
+        >
+          <Button
+            label={t('block.confirm')}
+            variant="confirm"
+            onPress={() => setLongDialog(false)}
+          />
+          <Button
+            label={t('block.cancel')}
+            variant="secondary"
+            onPress={() => setLongDialog(false)}
+          />
         </Dialog>
       </Section>
 
@@ -1090,6 +1122,7 @@ function TypeScale({ sample }: { sample: string }) {
 }
 
 function Fields({ l }: { l: Labels }) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState(l.sampleTitle)
   const [pitch, setPitch] = useState(l.samplePitch)
   const [url, setUrl] = useState('http://192.168.1.12')
@@ -1157,6 +1190,26 @@ function Fields({ l }: { l: Labels }) {
             showCount
             hint={l.handleHint}
             error={l.handleTaken}
+          />
+          {/* keepHint (tranche 7b) : l'aide reste sous l'erreur, puis sous la confirmation, et le
+              lecteur d'écran lit les deux. Les textes de l'appli : la précision de « Signaler »,
+              et le lien d'une démo vérifié. */}
+          <TextField
+            label={t('report.illegalDetails')}
+            value=""
+            onChangeText={() => {}}
+            error={t('report.illegalRequired')}
+            hint={`${t('report.goodFaith')} ${t('report.detailsHint')}`}
+            keepHint
+            multiline
+          />
+          <TextField
+            label={t('project.fields.demoUrl')}
+            value="https://cafes.example.org"
+            onChangeText={() => {}}
+            success={t('project.fields.demoUrlOk')}
+            hint={t('project.fields.demoUrlHint')}
+            keepHint
           />
         </Stack>
       }
