@@ -31,7 +31,7 @@ x-logging: &logging
 services:
   # Base de données PostgreSQL, avec l'extension pgvector pour la future recherche sémantique.
   db:
-    image: pgvector/pgvector:0.8.7-pg17
+    image: pgvector/pgvector:0.8.7-pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
     restart: unless-stopped
     logging: *logging
     environment:
