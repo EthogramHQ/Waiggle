@@ -93,6 +93,14 @@ describe('completing my profile', () => {
     expect(res.headers.get('retry-after')).toBeTruthy()
   })
 
+  it('counts even malformed requests in the hourly limit', async () => {
+    // Le quota passe avant tout examen de la demande (audit du 25/10/2026, C7).
+    for (let i = 0; i < 30; i++) expect((await patchMe({ name: '' })).status).toBe(400)
+
+    // La 31e demande de l'heure, même valide, est refusée.
+    expect((await patchMe({ bio: 'Valide' })).status).toBe(429)
+  })
+
   it('refuses invisible characters instead of crashing on them', async () => {
     // Le caractère nul (U+0000) faisait échouer la base de données : erreur 500.
     const nul = await patchMe({ bio: 'x\u0000' })

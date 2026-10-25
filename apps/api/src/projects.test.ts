@@ -157,6 +157,16 @@ describe('publishing a project', () => {
     expect(res.status).toBe(429)
     expect(res.headers.get('retry-after')).toBeTruthy()
   })
+
+  it('counts even malformed requests in the daily limit', async () => {
+    // Le quota passe avant tout examen de la demande (audit du 25/10/2026, C7) : sinon, des
+    // demandes mal écrites feraient travailler le serveur sans jamais compter.
+    for (let i = 0; i < 20; i++)
+      expect((await send('POST', '/v1/projects', lea, {})).status).toBe(400)
+
+    // La 21e demande du jour, même valide, est refusée.
+    expect((await send('POST', '/v1/projects', lea, recipes)).status).toBe(429)
+  })
 })
 
 describe('reading a project', () => {
@@ -276,6 +286,16 @@ describe('changing a project', () => {
     }
 
     expect((await send('PATCH', `/v1/projects/${id}`, lea, { pitch: 'De trop' })).status).toBe(429)
+  })
+
+  it('counts even malformed requests in the hourly limit', async () => {
+    const { id } = await publish()
+    for (let i = 0; i < 60; i++) {
+      expect((await send('PATCH', `/v1/projects/${id}`, lea, { authorId: 'max' })).status).toBe(400)
+    }
+
+    // La 61e demande de l'heure, même valide, est refusée.
+    expect((await send('PATCH', `/v1/projects/${id}`, lea, { pitch: 'Valide' })).status).toBe(429)
   })
 
   it('is only for signed-in members', async () => {
