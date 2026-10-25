@@ -123,6 +123,7 @@ export const en: Translation = {
     },
     moderation: 'Moderation',
     blocks: 'Blocked members',
+    loadError: 'Your account could not be loaded. Check your connection and try again.',
     email: {
       label: 'Email address',
       soon: 'editable soon',

@@ -136,6 +136,8 @@ export const fr = {
     },
     moderation: 'Modération',
     blocks: 'Membres bloqués',
+    // Le profil ne se charge pas (réseau en panne) : la page le dit au lieu de rester muette.
+    loadError: 'Impossible de charger ton compte. Vérifie ta connexion et réessaie.',
     email: {
       label: 'Adresse e-mail',
       soon: 'modifiable bientôt',
