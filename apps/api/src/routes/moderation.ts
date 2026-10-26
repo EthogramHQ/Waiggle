@@ -1,12 +1,16 @@
 // Routes de la modération (tranche 7a), réservées aux administrateurs :
 // - GET /v1/moderation/reports : la file des signalements en attente, regroupés par cible ;
 // - GET /v1/moderation/removed : les contenus retirés, pour pouvoir les rétablir ;
-// - POST /v1/moderation/decisions : retirer, classer sans suite, ou rétablir.
+// - POST /v1/moderation/decisions : retirer, classer sans suite, ou rétablir ; depuis la tranche
+//   7c, suspendre un compte ou lever sa suspension ;
+// - GET /v1/moderation/decisions : l'historique des décisions (tranche 7c).
 // Pour tout autre visiteur (anonyme, membre, administrateur révoqué), ces adresses répondent
 // exactement comme une adresse qui n'existe pas (règle 9 de la relecture du plan) : rien ne dit
 // qu'une modération existe, ni qui en a le rôle.
 import { createRoute } from '@hono/zod-openapi'
 import {
+  DecisionHistoryPage,
+  DecisionHistoryQuery,
   ModerationDecision,
   ModerationDecisionInput,
   ModerationQuery,
@@ -15,10 +19,14 @@ import {
 } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
+import type { Auth } from '../auth/auth'
 import { readCursor } from '../cursor'
 import { errorBody, languageOf } from '../errors'
+import { confirmPassword, countDecision } from '../moderation/guard'
+import type { RateLimiter } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
 import { decide } from '../reports/decide'
+import { loadDecisionHistory } from '../reports/history'
 import { loadQueuePage, loadRemovedPage, voidReportsOfGoneTargets } from '../reports/queue'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -59,10 +67,12 @@ const removedRoute = createRoute({
 const decisionRoute = createRoute({
   method: 'post',
   path: '/v1/moderation/decisions',
-  summary: 'Remove a content, dismiss its reports, or restore it',
+  summary: 'Remove a content, dismiss its reports, restore it, suspend an account or lift it',
   description:
     'A decision closes every open report of its target. A profile only accepts « dismiss ». ' +
-    'An administrator never decides on his own content or profile.',
+    'An administrator never decides on his own content or profile. At most 50 decisions a day; ' +
+    'the password is asked again beyond 10 removals in an hour, beyond 3 suspensions in a day, ' +
+    'and for a suspension without end.',
   request: {
     body: {
       required: true,
@@ -75,15 +85,39 @@ const decisionRoute = createRoute({
       content: { 'application/json': { schema: ModerationDecision } },
     },
     400: errorResponse('Invalid decision (an explanation is required to remove).'),
+    403: errorResponse('The password is required, or wrong.'),
     404: errorResponse('Not an administrator, or no such target.'),
     409: errorResponse('Already decided in the meantime.'),
     422: errorResponse('His own content or profile, or another action than dismiss on a profile.'),
+    429: errorResponse('Too many decisions today, or too many wrong passwords.'),
   },
 })
 
-type Deps = { db: Database }
+const historyRoute = createRoute({
+  method: 'get',
+  path: '/v1/moderation/decisions',
+  summary: 'The history of the moderation decisions, newest first',
+  description:
+    'Optionally only those about one member (her contents and her account). Never says who reported.',
+  request: { query: DecisionHistoryQuery },
+  responses: {
+    200: {
+      description: 'A page of the history.',
+      content: { 'application/json': { schema: DecisionHistoryPage } },
+    },
+    400: errorResponse('Invalid cursor or member.'),
+    404: notFoundResponse,
+  },
+})
 
-export const moderationRoutes = ({ db }: Deps) => {
+type Deps = {
+  db: Database
+  limiter: RateLimiter
+  /** Better Auth : sa façon de vérifier un mot de passe, quand la modération le redemande. */
+  auth: Pick<Auth, '$context'>
+}
+
+export const moderationRoutes = ({ db, limiter, auth }: Deps) => {
   const app = createRouter()
 
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
@@ -117,11 +151,43 @@ export const moderationRoutes = ({ db }: Deps) => {
     return c.json(RemovedPage.parse(await loadRemovedPage(db, user.id, cursor)), 200)
   })
 
+  const rateLimited = (c: Context<AppEnv>, retryAfterSeconds: number) => {
+    c.header('Retry-After', String(retryAfterSeconds))
+    return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+  }
+
+  // Le quota des décisions (tranche 7c) : 50 par administrateur et par jour. Ce garde, enregistré
+  // après celui des administrateurs et avant la route, passe avant le validateur que Hono place
+  // juste devant elle (comme routes/reports.ts) : chaque demande compte, même mal formée. Après la
+  // garde des administrateurs (S5) : un membre reçoit toujours le même 404, jamais un 429.
+  app.on('POST', '/v1/moderation/decisions', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return notFound(c)
+    const quota = await countDecision(limiter, user.id)
+    if (!quota.allowed) return rateLimited(c, quota.retryAfterSeconds)
+    await next()
+  })
+
   app.openapi(decisionRoute, async (c) => {
     const user = c.get('user')
     if (!user) return notFound(c)
+    const input = c.req.valid('json')
+    // Le mot de passe retapé, s'il y en a un, se vérifie avant la décision : la vérification est
+    // lente, et un échec doit rester compté même si rien n'est décidé (S12). Faux : rien n'est
+    // écrit. Il n'est ni gardé ni journalisé.
+    const password = 'password' in input ? input.password : undefined
+    if (password !== undefined) {
+      const hashing = (await auth.$context).password
+      const check = await confirmPassword(db, limiter, hashing, user.id, password)
+      if (!check.ok) {
+        if (check.error === 'rate_limited') return rateLimited(c, check.retryAfterSeconds)
+        return c.json(errorBody(languageOf(c), 'wrong_password'), 403)
+      }
+    }
     // L'heure de JavaScript : la date de la décision est aussi celle du retrait (removed_at).
-    const result = await decide(db, user.id, c.req.valid('json'), new Date())
+    const result = await decide(db, user.id, input, new Date(), {
+      passwordConfirmed: password !== undefined,
+    })
     if (result.ok) return c.json(ModerationDecision.parse(result.decision), 201)
     switch (result.error) {
       case 'not_found':
@@ -133,7 +199,22 @@ export const moderationRoutes = ({ db }: Deps) => {
         return c.json(errorBody(languageOf(c), 'validation'), 422)
       case 'already_decided':
         return c.json(errorBody(languageOf(c), 'already_decided'), 409)
+      case 'password_required':
+        return c.json(errorBody(languageOf(c), 'password_required'), 403)
     }
+  })
+
+  // L'historique (tranche 7c). La garde des administrateurs passe avant le validateur : pour un
+  // non-administrateur, un `member` ou un curseur invalide reçoit le même 404 qu'une adresse
+  // inconnue (S16) ; pour un administrateur, 400.
+  app.openapi(historyRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return notFound(c)
+    const query = c.req.valid('query')
+    const cursor = readCursor(query.cursor)
+    if (cursor === 'invalid') return c.json(errorBody(languageOf(c), 'validation'), 400)
+    const page = await loadDecisionHistory(db, cursor, query.member ?? null)
+    return c.json(DecisionHistoryPage.parse(page), 200)
   })
 
   return app
