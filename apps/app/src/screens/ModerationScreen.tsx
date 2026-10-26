@@ -468,7 +468,9 @@ function AdminModeration() {
       <ReportCard
         key={key}
         {...cardState(key, kind, firstText(item.snapshot), outcome)}
-        record={recordOf(item)}
+        // Ce qui concerne l'administrateur lui-même : il n'en décide pas, le rappel de ses propres
+        // décisions n'aurait rien à éclairer.
+        record={item.concernsMe ? undefined : recordOf(item)}
         detailsLabel={t(($) => $.moderation.detailsLabel)}
         kind={kind}
         count={t(($) => $.moderation.count, { count: item.count })}
