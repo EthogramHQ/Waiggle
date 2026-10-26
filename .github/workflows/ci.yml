@@ -72,7 +72,10 @@ jobs:
     name: Screenshots
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15 # si le navigateur se bloque, on n'attend pas des heures
+    # 20 minutes : les captures prennent 6 à 7 min, mais l'installation de Chromium a déjà pris 8 min
+    # sur un runner lent (26/10/2026, main annulé à 15 min). Si le navigateur se bloque, on n'attend
+    # pas des heures.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
