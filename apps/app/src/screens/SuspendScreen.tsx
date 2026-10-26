@@ -305,6 +305,19 @@ function DecisionForm({
         />
       ) : null}
 
+      {/* Tant que le bouton est inactif, la page dit ce qui manque encore (le mot de passe, lui,
+          a son champ juste au-dessus). */}
+      {!ready && !passwordAsked ? (
+        <Hint
+          icon="info"
+          text={
+            suspending
+              ? t(($) => $.moderation.suspend.missing)
+              : t(($) => $.moderation.lift.missing)
+          }
+        />
+      ) : null}
+
       {/* Un refus, au-dessus du bouton : il reste pendant l'envoi suivant, rien ne saute. */}
       {failureMessage ? (
         <Notice

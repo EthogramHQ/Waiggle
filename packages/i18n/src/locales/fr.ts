@@ -703,6 +703,8 @@ export const fr = {
     limited:
       'Tu as atteint la limite de {{max}} décisions en 24 heures. Pour une urgence, suis la procédure à la main du guide de modération.',
     durationLine: 'Durée : {{duration}}',
+    // Dans l'historique, une suspension qui a suivi un signalement le dit (J2, Louis, 26/10/2026).
+    afterReportLine: 'Après un signalement',
     // Ce que la modération a déjà décidé pour le membre visé, sur chaque carte de la file.
     record: {
       title: 'Déjà décidé pour ce membre',
@@ -733,6 +735,8 @@ export const fr = {
         'Montrée au membre. Décris les faits et la règle, pas la personne. Ne nomme ni qui a signalé, ni le membre.',
       confirm: 'Suspendre le compte',
       done: 'Compte suspendu.',
+      // Sous le bouton inactif : ce qu'il faut encore remplir (Louis, 26/10/2026).
+      missing: 'Pour suspendre, choisis une durée et un fondement, et écris une explication.',
       notAllowed:
         'Ce compte ne peut pas être suspendu : c’est le tien, ou celui d’un administrateur.',
       errorTitle: 'La page n’a pas pu se charger',
@@ -751,6 +755,7 @@ export const fr = {
         'Une suspension levée pour erreur ne compte plus dans le rappel des décisions passées.',
       confirm: 'Lever la suspension',
       done: 'Suspension levée.',
+      missing: 'Pour lever, choisis une raison et écris une explication.',
     },
     // Le menu « … » de la page d'un membre, pour un administrateur seulement.
     memberMenu: {

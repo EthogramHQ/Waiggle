@@ -644,6 +644,7 @@ export const en: Translation = {
     limited:
       'You’ve reached the limit of {{max}} decisions in 24 hours. For an emergency, follow the manual procedure in the moderation guide.',
     durationLine: 'Duration: {{duration}}',
+    afterReportLine: 'After a report',
     record: {
       title: 'Already decided for this member',
       none: 'No past decisions for this member.',
@@ -670,6 +671,7 @@ export const en: Translation = {
         'Shown to the member. Describe the facts and the rule, not the person. Name neither who reported nor the member.',
       confirm: 'Suspend account',
       done: 'Account suspended.',
+      missing: 'To suspend, choose a duration and a ground, and write an explanation.',
       notAllowed: 'This account can’t be suspended: it’s yours, or an admin’s.',
       errorTitle: 'This page couldn’t load',
     },
@@ -686,6 +688,7 @@ export const en: Translation = {
         'A suspension lifted as a mistake no longer counts in the record of past decisions.',
       confirm: 'Lift suspension',
       done: 'Suspension lifted.',
+      missing: 'To lift, choose a reason and write an explanation.',
     },
     memberMenu: {
       suspend: 'Suspend account',

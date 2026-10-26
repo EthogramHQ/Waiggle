@@ -298,20 +298,6 @@ export function ModerationCatalogue() {
             { label: l.suspend, onPress: noop },
           ]}
         />
-        {/* Un auteur suspendu en ce moment : plus de « Suspendre », et le rappel le dit ; il reste
-            une fois la carte décidée. */}
-        <ReportCard
-          kind={l.comment}
-          count={l.one}
-          snapshot={l.scam}
-          snapshotLabel={l.snapshotLabel}
-          reasons={l.otherReasons}
-          record={{ label: l.recordTitle, lines: l.recordNow }}
-          when={l.since}
-          viewLabel={l.view}
-          onView={noop}
-          decided={{ message: l.dismissed, ok: true }}
-        />
         <ReportCard
           kind={l.note}
           count={l.one}
@@ -371,6 +357,9 @@ export function ModerationCatalogue() {
           viewLabel={l.view}
           onView={noop}
           description={l.describeScam}
+          // Un auteur suspendu en ce moment : plus de « Suspendre », et le rappel le dit ; il
+          // reste une fois la carte décidée.
+          record={{ label: l.recordTitle, lines: l.recordNow }}
           decided={{ message: l.dismissed, ok: true }}
           actions={[{ label: l.dismiss, onPress: noop }]}
         />

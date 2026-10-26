@@ -44,7 +44,8 @@ export function DecisionCard({ decision, onView }: Props) {
   // Le texte caché qui dit de quelle carte il s'agit, lu après « Voir » (toutes les cartes ont le
   // même lien) : l'action et le début de l'explication, ou le membre visé.
   const descriptionId = useId()
-  const { action, admin, member, ground, explanation, duration, liftCause, target } = decision
+  const { action, admin, member, ground, explanation, duration, liftCause, afterReport, target } =
+    decision
   const actionLabel = t(($) => $.moderation.actions[action])
   const description = t(($) => $.moderation.describe, {
     kind: actionLabel,
@@ -111,9 +112,10 @@ export function DecisionCard({ decision, onView }: Props) {
         </View>
       ) : null}
 
-      {/* Le fondement, la durée d'une suspension, la raison d'une levée : en pastilles, comme les
-          motifs d'un signalement. À texte agrandi, elles passent à la ligne. */}
-      {ground || duration || liftCause ? (
+      {/* Le fondement, la durée d'une suspension, son origine (un signalement), la raison d'une
+          levée : en pastilles, comme les motifs d'un signalement. À texte agrandi, elles passent
+          à la ligne. */}
+      {ground || duration || afterReport || liftCause ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
           {[
             ground ? t(($) => $.moderation.grounds[ground]) : null,
@@ -122,6 +124,7 @@ export function DecisionCard({ decision, onView }: Props) {
                   duration: t(($) => $.moderation.durations[duration]),
                 })
               : null,
+            afterReport ? t(($) => $.moderation.afterReportLine) : null,
             liftCause ? t(($) => $.moderation.lift.causes[liftCause]) : null,
           ]
             .filter((line): line is string => line !== null)
