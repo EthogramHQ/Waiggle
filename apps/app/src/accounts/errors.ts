@@ -13,6 +13,8 @@ export type AuthErrorKey =
   // est faux ; la nouvelle adresse est déjà celle du compte.
   | 'wrongPassword'
   | 'sameEmail'
+  // Un refus 401 sans code connu : la session a expiré en cours de route.
+  | 'sessionExpired'
   | 'generic'
 
 // Correspondance code Better Auth → clé de message. Record<string, …> : un dictionnaire.
@@ -38,5 +40,12 @@ export const authErrorKey = ({
 }): AuthErrorKey => {
   // 429 = « Too Many Requests » : la limitation de débit de l'API s'est déclenchée.
   if (status === 429) return 'tooManyAttempts'
-  return (code && byCode[code]) || 'generic'
+  // Un code connu passe d'abord : un mot de passe faux à la connexion répond aussi 401
+  // (INVALID_EMAIL_OR_PASSWORD), et ce n'est pas une session expirée.
+  const known = code ? byCode[code] : undefined
+  if (known) return known
+  // 401 = « Unauthorized » : plus de session valide (expirée, ou fermée depuis un autre appareil)
+  // quand le membre envoie le formulaire (changer d'adresse, supprimer le compte).
+  if (status === 401) return 'sessionExpired'
+  return 'generic'
 }

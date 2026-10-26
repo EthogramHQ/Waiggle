@@ -5,7 +5,8 @@
 import { contactEmail } from '@ruche/brand'
 import type { Translation } from '@ruche/i18n'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { changeEmail } from '../accounts/api'
+import { Linking } from 'react-native'
+import { changeEmail, useSession } from '../accounts/api'
 import { getMe } from '../profile/api'
 import { leaMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
@@ -110,6 +111,39 @@ describe('ChangeEmailScreen', () => {
     const field = screen.getByLabelText(passwordLabel)
     expect(field).toHaveProp('secureTextEntry', true)
     expect(field).toHaveProp('autoComplete', 'current-password')
+  })
+
+  it('offers to retry, not to sign in, when the session cannot be read', async () => {
+    // Relecture de design (des-3) : get-session en 500 montrait « Réservé aux membres ».
+    const refetch = jest.fn().mockResolvedValue(undefined)
+    jest.mocked(useSession).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: new Error('500'),
+      refetch,
+    } as unknown as ReturnType<typeof useSession>)
+    await renderWithProviders(<ChangeEmailScreen />)
+
+    expect(screen.getByRole('header', { name: fr.t('states.errorTitle') })).toBeTruthy()
+    expect(screen.queryByText(fr.t('states.signedOutTitle'))).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('common.retry') }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the contact address in the mail app, without the « leaving » page', async () => {
+    // Relecture de design (des-6) : l'adresse de l'aide est un lien mailto:, comme « Nous écrire ».
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+    await renderWithProviders(<ChangeEmailScreen />)
+
+    await fireEvent.press(screen.getByRole('link', { name: contactEmail }))
+
+    expect(openURL).toHaveBeenCalledWith(`mailto:${contactEmail}`)
+    expect(
+      visited(mockPush, mockReplace, mockNavigate, mockDismissTo).some((path) =>
+        path.startsWith('/out'),
+      ),
+    ).toBe(false)
+    openURL.mockRestore()
   })
 
   it('helps a member who no longer reaches the current address', async () => {

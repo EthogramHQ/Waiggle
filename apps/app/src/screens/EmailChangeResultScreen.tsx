@@ -17,6 +17,7 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
+import { LoadingScreen } from './states'
 
 type Props = { step: 'confirmed' | 'done' }
 
@@ -76,9 +77,9 @@ export function EmailChangeResultScreen({ step }: Props) {
           icon: 'check',
           body: (
             <>
-              {/* Le temps de lire la session, ni l'adresse ni « connecte-toi » : on ne sait pas
-                  encore à qui l'on parle. */}
-              {isPending ? null : data ? (
+              {/* La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
+                  parle. */}
+              {data ? (
                 <Text tone="secondary" align="center">
                   {t('account.emailChange.doneBody', { email: data.user.email })}
                 </Text>
@@ -90,7 +91,7 @@ export function EmailChangeResultScreen({ step }: Props) {
               <Text variant="callout" tone="muted" align="center">
                 {t('account.emailChange.doneDevices')}
               </Text>
-              {isPending ? null : data ? (
+              {data ? (
                 <Button label={t('account.emailChange.toAccount')} onPress={toAccount} />
               ) : (
                 <Button
@@ -103,9 +104,14 @@ export function EmailChangeResultScreen({ step }: Props) {
           ),
         }
 
-  // Avant l'hydratation, le titre de l'onglet seul : la page ne sait pas encore si le lien a été
-  // refusé, et n'affiche rien qu'elle devrait retirer ensuite.
-  if (!hydrated) return <Screen pageTitle={page.title}>{null}</Screen>
+  // Avant l'hydratation, ni contenu ni titre d'onglet (`pageTitle={null}`) : la page ne sait pas
+  // encore si le lien a été refusé. Le titre calculé ici serait celui de la réussite (« Adresse
+  // changée »), que l'onglet afficherait un instant avant « Ce lien ne marche plus ».
+  if (!hydrated) return <Screen pageTitle={null}>{null}</Screen>
+  // « Adresse changée », membre connecté ou non : le temps de lire la session, l'état de
+  // chargement plutôt qu'une page à moitié dessinée. L'adresse et le bouton arriveraient ensuite
+  // au-dessus et au-dessous des autres textes, et tout bougerait sous le doigt (70 pt mesurés).
+  if (step === 'done' && !refused && isPending) return <LoadingScreen />
 
   return (
     <Screen pageTitle={page.title}>

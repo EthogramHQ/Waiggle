@@ -198,7 +198,7 @@ describe('changing my address from my account', () => {
     // pas seulement ce qu'elle montre (relecture juridique du plan, J9).
     await fireEvent.press(
       await screen.findByRole('button', {
-        name: new RegExp(`^${fr.t('account.email.change')}`),
+        name: fr.t('account.email.spoken', { email: 'lea@example.com' }),
       }),
     )
 
@@ -210,7 +210,9 @@ describe('changing my address from my account', () => {
 
     // Témoin : la ligne de l'adresse est là, avec l'adresse actuelle.
     expect(
-      await screen.findByRole('button', { name: new RegExp(`^${fr.t('account.email.change')}`) }),
+      await screen.findByRole('button', {
+        name: fr.t('account.email.spoken', { email: 'lea@example.com' }),
+      }),
     ).toBeTruthy()
     expect(screen.getByText('lea@example.com')).toBeTruthy()
     expect(screen.queryByText('modifiable bientôt')).toBeNull()

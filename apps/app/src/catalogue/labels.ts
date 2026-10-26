@@ -38,6 +38,9 @@ const fr = {
   meterDone: 'C’est bon, ton mot de passe est assez long.',
   longHint:
     'une-tres-longue-adresse-de-demonstration.example.org, un site hors de l’appli, dont la note passe sur plusieurs lignes',
+  // Une note dont un morceau est un lien (Hint, prop `link`).
+  hintLink: 'Tu n’as plus accès à ton adresse ? Écris-nous à contact@example.org.',
+  hintLinkLabel: 'contact@example.org',
   stateEmptyTitle: 'Encore aucun projet ici',
   stateEmpty: 'Aucun projet public fait avec cet outil pour l’instant.',
   recipe: 'Ajouter la recette',
@@ -298,6 +301,8 @@ const en: typeof fr = {
   meterDone: 'Good, your password is long enough.',
   longHint:
     'a-very-long-demonstration-address.example.org, a site outside the app, whose note runs over several lines',
+  hintLink: 'No longer have access to your address? Write to us at contact@example.org.',
+  hintLinkLabel: 'contact@example.org',
   stateEmptyTitle: 'No project here yet',
   stateEmpty: 'No public project made with this tool yet.',
   recipe: 'Add the recipe',
