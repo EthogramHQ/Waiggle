@@ -40,24 +40,36 @@ overrides:
   # esbuild <= 0.24.2 (GHSA-67mh-4wv8-2f99), amené par @esbuild-kit/core-utils via drizzle-kit, qui
   # n'utilise que la transformation de code, pas le serveur de développement visé par la faille.
   '@esbuild-kit/core-utils>esbuild': 0.25.12
+  # zod < 4.6.6 (GHSA-mrhx-c7xc-m3w5 : mémoire épuisée sur une très grande collection), le zod 3
+  # qu'apporte l'outil en ligne de commande d'Expo. Il ne s'en sert que pour lire les greffons de ses
+  # outils de développement, avec des fonctions que zod 4 garde (object, string, enum, array, union,
+  # literal, url, strict, describe, safeParse, error.issues). Le zod de l'appli et de l'API est déjà
+  # le même (4.6.7). À retirer quand @expo/cli passe à zod 4.
+  '@expo/cli>zod': 4.6.7
+  # decode-uri-component <= 0.4.2 (GHSA-vcc3-ghjq-m6fr : un lien piégé fige l'onglet qui l'ouvre),
+  # via query-string 7 dans expo-router, donc dans l'appli web. La version corrigée 0.5.0 n'existe
+  # qu'en module ESM : query-string la charge par require(), qui rend alors l'objet du module et non
+  # la fonction. Le correctif patches/query-string@7.1.3.patch prend sa fonction `default`, et Jest
+  # transforme le paquet (`transformIgnorePatterns` d'apps/app). À retirer (avec le correctif et
+  # cette ligne de Jest) quand expo-router ne dépend plus de query-string 7 (SDK Expo 58).
+  'query-string>decode-uri-component': 0.5.0
+
+# Correctifs posés sur une dépendance (`pnpm patch`), chacun expliqué au-dessus de la version
+# imposée qui l'exige. Si le paquet change de version, l'installation échoue : on revoit alors le
+# correctif au lieu de le perdre en silence.
+patchedDependencies:
+  query-string@7.1.3: patches/query-string@7.1.3.patch
 
 # Failles acceptées après examen. Chacune a sa raison, et on la revérifie à chaque mise à jour du SDK Expo.
 auditConfig:
   ignoreGhsas:
-    # node-forge, via l'outil en ligne de commande d'Expo (certificats du serveur de développement).
-    # Absent de l'appli et de l'API ; pas encore de correctif.
+    # node-forge <= 1.4.0 (GHSA-86w9-cpqp-85rv : une signature RSA PKCS#1 v1.5 contrefaite peut être
+    # acceptée), via l'outil en ligne de commande d'Expo (@expo/cli et @expo/code-signing-certificates :
+    # certificats du serveur de développement, signature des mises à jour Expo, que Waiggle n'utilise
+    # pas). Absent de l'appli et de l'API ; aucune version corrigée publiée.
     - GHSA-86w9-cpqp-85rv
     # (Les exceptions de braces, GHSA-vfj7-8cjw-p6xm, et de sprintf-js, GHSA-hp3w-g68c-fv3c, sont
-    # retirées le 25/10/2026 : GitHub a retiré ces deux avis les 22 et 23/10. Une exception qui ne
-    # sert plus cacherait l'avis s'il revenait.)
-    # decode-uri-component <= 0.4.2, via query-string 7 dans expo-router : présent dans l'appli web. Un
-    # lien piégé peut figer l'onglet de la personne qui l'ouvre (rien côté serveur, aucune donnée
-    # exposée). La version corrigée 0.5.0 n'existe qu'en module ESM, que query-string 7 charge avec
-    # require() : l'imposer casserait la navigation. Disparaît avec le SDK Expo 58, dont expo-router ne
-    # dépend plus de query-string.
-    - GHSA-vcc3-ghjq-m6fr
-    # zod < 4.6.6 (mémoire épuisée sur une très grande collection), seulement le zod 3 qu'apporte
-    # l'outil en ligne de commande d'Expo (@expo/cli), qui ne valide que nos propres fichiers. Absent
-    # de l'appli et de l'API, dont le zod est déjà corrigé (4.6.6). À retirer quand @expo/cli passe à
-    # un zod corrigé.
-    - GHSA-mrhx-c7xc-m3w5
+    # retirées le 25/10/2026 : GitHub a retiré ces deux avis les 22 et 23/10. Celles de zod,
+    # GHSA-mrhx-c7xc-m3w5, et de decode-uri-component, GHSA-vcc3-ghjq-m6fr, le 26/10/2026 : corrigées
+    # par les versions imposées ci-dessus. Une exception qui ne sert plus cacherait l'avis s'il
+    # revenait.)
