@@ -30,15 +30,15 @@ export const presentNotification = (notification: Notification, t: T): Presented
       // Seulement les réactions reçues, dans l'ordre de la barre des réactions : « Bravo ×2 ».
       const detail = REACTION_KINDS.filter((kind) => counts[kind] > 0)
         .map((kind) =>
-          t('notifications.reactionCount', {
-            reaction: t(`project.reactions.${kind}`),
+          t(($) => $.notifications.reactionCount, {
+            reaction: t(($) => $.project.reactions[kind]),
             count: counts[kind],
           }),
         )
         .join(', ')
       return {
         icon: 'heart',
-        text: t('notifications.reactions', { count: total, title: project.title }),
+        text: t(($) => $.notifications.reactions, { count: total, title: project.title }),
         detail: detail || null,
         quote: null,
         target: projectRoute(project.id),
@@ -47,7 +47,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
     case 'project_follows':
       return {
         icon: 'bookmark-simple',
-        text: t('notifications.projectFollows', {
+        text: t(($) => $.notifications.projectFollows, {
           count: notification.count,
           title: notification.project.title,
         }),
@@ -59,7 +59,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
       // Sans nom, elle n'a rien à montrer de plus : elle ne mène nulle part.
       return {
         icon: 'user-plus',
-        text: t('notifications.memberFollows', { count: notification.count }),
+        text: t(($) => $.notifications.memberFollows, { count: notification.count }),
         detail: null,
         quote: null,
         target: null,
@@ -71,9 +71,12 @@ export const presentNotification = (notification: Notification, t: T): Presented
       // Les trois sortes (sur son projet, une mention, une réponse) écrivent la phrase, puis
       // l'extrait dessous, en citation : la même forme partout, et l'extrait se lit à part.
       const sorts = {
-        comment: { icon: 'chat-circle', text: t('notifications.comment', { name, title }) },
-        mention: { icon: 'at', text: t('notifications.mention', { name, title }) },
-        reply: { icon: 'arrow-bend-up-left', text: t('notifications.reply', { name, title }) },
+        comment: { icon: 'chat-circle', text: t(($) => $.notifications.comment, { name, title }) },
+        mention: { icon: 'at', text: t(($) => $.notifications.mention, { name, title }) },
+        reply: {
+          icon: 'arrow-bend-up-left',
+          text: t(($) => $.notifications.reply, { name, title }),
+        },
       } as const
       return {
         ...sorts[reason],
@@ -85,7 +88,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
     case 'hidden':
       return {
         icon: 'eye-slash',
-        text: t('notifications.hidden', { title: notification.project.title }),
+        text: t(($) => $.notifications.hidden, { title: notification.project.title }),
         detail: null,
         quote: notification.comment.excerpt,
         target: projectRoute(notification.project.id),
@@ -93,7 +96,7 @@ export const presentNotification = (notification: Notification, t: T): Presented
     case 'handle':
       return {
         icon: 'sparkle',
-        text: t('notifications.handle', { handle: notification.handle }),
+        text: t(($) => $.notifications.handle, { handle: notification.handle }),
         detail: null,
         quote: null,
         target: '/profile',
@@ -112,14 +115,14 @@ export const presentNotification = (notification: Notification, t: T): Presented
       return {
         icon: 'prohibit',
         text: elsewhere
-          ? t('notifications.removed.commentElsewhere')
-          : t(`notifications.removed.${targetKind}`, { title: project.title }),
+          ? t(($) => $.notifications.removed.commentElsewhere)
+          : t(($) => $.notifications.removed[targetKind], { title: project.title }),
         detail: [
-          t('removal.onlyYou'),
-          afterReport ? t('removal.afterReport') : t('removal.direct'),
-          t(`removal.grounds.${ground}`),
-          t('removal.explanation', { explanation }),
-          t('removal.contest'),
+          t(($) => $.removal.onlyYou),
+          afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+          t(($) => $.removal.grounds[ground]),
+          t(($) => $.removal.explanation, { explanation }),
+          t(($) => $.removal.contest),
         ].join('\n'),
         quote: excerpt,
         target: elsewhere ? null : projectRoute(project.id),
@@ -131,8 +134,8 @@ export const presentNotification = (notification: Notification, t: T): Presented
       const { targetKind, outcome, link } = notification
       return {
         icon: 'flag',
-        text: t(`notifications.reportHandled.${targetKind}.${outcome}`),
-        detail: t('notifications.reportHandled.contest'),
+        text: t(($) => $.notifications.reportHandled[targetKind][outcome]),
+        detail: t(($) => $.notifications.reportHandled.contest),
         quote: null,
         target: link?.memberId
           ? { pathname: '/members/[id]', params: { id: link.memberId } }

@@ -66,18 +66,20 @@ function BlockedMembers() {
   const showsError = !list.data && (list.isError || retrying)
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('block.list.title')}>
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.block.list.title)}>
       {showsError ? (
         // Une erreur avant toute page : on dit pourquoi et on propose de réessayer. Une suite
         // ratée, elle, garde les lignes déjà lues (FeedEnd, plus bas).
         <StateMessage
           kind="error"
-          title={t('block.list.loadError')}
-          message={t(`errors.${errorKey(list.error)}`)}
-          actions={[{ label: t('common.retry'), onPress: () => void onRetry(), loading: retrying }]}
+          title={t(($) => $.block.list.loadError)}
+          message={t(($) => $.errors[errorKey(list.error)])}
+          actions={[
+            { label: t(($) => $.common.retry), onPress: () => void onRetry(), loading: retrying },
+          ]}
         />
       ) : !list.data ? (
-        <StateMessage kind="loading" message={t('common.loading')} />
+        <StateMessage kind="loading" message={t(($) => $.common.loading)} />
       ) : (
         <Stack gap="lg">
           {/* Le dernier déblocage : lu sans interrompre (status), et le focus du clavier y va. Il
@@ -88,27 +90,27 @@ function BlockedMembers() {
             // bloquer (depuis la page d'un membre). « Vous ne voyez plus… » serait faux ici.
             <StateMessage
               kind="empty"
-              title={t('block.list.empty')}
-              message={t('block.list.emptyHint')}
+              title={t(($) => $.block.list.empty)}
+              message={t(($) => $.block.list.emptyHint)}
             />
           ) : (
             <>
-              <ListGroup footer={t('block.list.hint')}>
+              <ListGroup footer={t(($) => $.block.list.hint)}>
                 {items.map(({ member, blockedAt }) => (
                   <ListRow
                     key={member.id}
                     label={member.name}
-                    detail={t('block.list.detail', {
+                    detail={t(($) => $.block.list.detail, {
                       handle: member.handle,
-                      blockedOn: t('block.list.blockedOn', {
+                      blockedOn: t(($) => $.block.list.blockedOn, {
                         date: shortDate(blockedAt, i18n.language),
                       }),
                     })}
                     accessory={
                       <Button
-                        label={t('block.unblock')}
+                        label={t(($) => $.block.unblock)}
                         // Toutes les lignes ont leur « Débloquer » : le nom lu dit lequel.
-                        spokenLabel={t('block.list.unblockLabel', { handle: member.handle })}
+                        spokenLabel={t(($) => $.block.list.unblockLabel, { handle: member.handle })}
                         variant="secondary"
                         size="compact"
                         onPress={() =>
@@ -132,10 +134,10 @@ function BlockedMembers() {
                         ? 'more'
                         : 'end'
                 }
-                moreLabel={t('block.list.more')}
-                endLabel={t('block.list.end')}
-                errorLabel={t('block.list.moreError')}
-                retryLabel={t('common.retry')}
+                moreLabel={t(($) => $.block.list.more)}
+                endLabel={t(($) => $.block.list.end)}
+                errorLabel={t(($) => $.block.list.moreError)}
+                retryLabel={t(($) => $.common.retry)}
                 // Une seule demande à la fois, même après un double clic.
                 onMore={() => {
                   if (!list.isFetchingNextPage) void list.fetchNextPage()
@@ -153,7 +155,7 @@ function BlockedMembers() {
         send={({ member }) => unblock(member.id)}
         onDone={({ member }) => {
           focusAfterClose.current = true
-          setDone(t('block.unblocked', { handle: member.handle }))
+          setDone(t(($) => $.block.unblocked, { handle: member.handle }))
           setAsking(null)
         }}
         onCancel={() => setAsking(null)}

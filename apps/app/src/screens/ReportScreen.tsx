@@ -85,7 +85,7 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
 
   if (isPending || !hydrated) return <LoadingScreen />
   if (!session) return <SignedOutScreen />
-  if (!target) return <NotFoundState title={t('states.notFoundTitle')} />
+  if (!target) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   // Une cible déjà lue garde son formulaire, même si une relecture échoue ensuite : après « Bloquer
   // aussi @x », la cible devient invisible (404), et une relecture (retour sur l'onglet) aurait
   // remplacé « Merci » par « Page introuvable » (relecture de l'interface, 7b).
@@ -103,11 +103,18 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
     const key = errorKey(preview.error)
     // Introuvable : le même écran, que le contenu n'existe pas ou qu'il soit invisible.
     if (key === 'notFound') {
-      return <NotFoundState title={t('states.notFoundTitle')} message={t('errors.notFound')} />
+      return (
+        <NotFoundState
+          title={t(($) => $.states.notFoundTitle)}
+          message={t(($) => $.errors.notFound)}
+        />
+      )
     }
     // Son propre contenu (un lien fabriqué) : on le dit, sans formulaire.
     if (key === 'ownContent') {
-      return <NotFoundState title={t('report.title')} message={t('errors.ownContent')} />
+      return (
+        <NotFoundState title={t(($) => $.report.title)} message={t(($) => $.errors.ownContent)} />
+      )
     }
     return <LoadErrorScreen error={preview.error} onRetry={() => void preview.refetch()} />
   }
@@ -202,19 +209,19 @@ function ReportForm({
     failure === null
       ? null
       : failure === 'unauthorized'
-        ? t('states.expired')
+        ? t(($) => $.states.expired)
         : failure === 'rateLimited'
-          ? t('report.limited', { max: REPORTS_PER_DAY, contactEmail })
+          ? t(($) => $.report.limited, { max: REPORTS_PER_DAY, contactEmail })
           : failure === 'notFound'
-            ? t('report.gone')
-            : t(`errors.${failure}`)
+            ? t(($) => $.report.gone)
+            : t(($) => $.errors[failure])
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('report.title')}>
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.report.title)}>
       {/* Ce qui est signalé, tel que l'API le lit : on sait toujours ce qu'on envoie. */}
       <Surface variant="grouped" padding="lg" gap="xs">
         <Text variant="caption" weight={600} tone="muted">
-          {t(`report.target.${target.kind}`)}
+          {t(($) => $.report.target[target.kind])}
         </Text>
         <Text selectable breakAnywhere>
           {text}
@@ -223,18 +230,18 @@ function ReportForm({
       {sent ? (
         <>
           {/* polite : un remerciement se lit sans interrompre ; la ref lui donne le focus. */}
-          <Notice ref={thanksRef} tone="success" message={t('report.sent')} polite />
-          <Button label={t('report.back')} variant="secondary" onPress={back} />
+          <Notice ref={thanksRef} tone="success" message={t(($) => $.report.sent)} polite />
+          <Button label={t(($) => $.report.back)} variant="secondary" onPress={back} />
         </>
       ) : (
         <>
           {/* Un danger immédiat ne passe pas par un signalement : on le dit avant tout. */}
-          <Hint icon="warning" text={t('report.danger')} />
-          <ListGroup title={t('report.reasonLabel')} radio>
+          <Hint icon="warning" text={t(($) => $.report.danger)} />
+          <ListGroup title={t(($) => $.report.reasonLabel)} radio>
             {REASONS.map((item) => (
               <ListRow
                 key={item.reason}
-                label={t(`report.reasons.${item.key}`)}
+                label={t(($) => $.report.reasons[item.key])}
                 selected={reason === item.reason}
                 onPress={() => choose(item.reason)}
               />
@@ -242,23 +249,23 @@ function ReportForm({
           </ListGroup>
           {/* Pour un contenu illégal, la précision dit pourquoi, de bonne foi (article 16 du DSA). */}
           <TextField
-            label={illegal ? t('report.illegalDetails') : t('report.details')}
+            label={illegal ? t(($) => $.report.illegalDetails) : t(($) => $.report.details)}
             value={details}
             onChangeText={changeDetails}
-            error={illegal && missingWhy ? t('report.illegalRequired') : undefined}
+            error={illegal && missingWhy ? t(($) => $.report.illegalRequired) : undefined}
             // L'aide (la phrase de bonne foi, pas d'informations personnelles) reste sous l'erreur :
             // on la lit encore en corrigeant. Sans sa première phrase, que l'erreur vient de dire.
             keepHint
             hint={
               illegal
-                ? `${missingWhy ? t('report.goodFaith') : t('report.illegalHint')} ${t('report.detailsHint')}`
-                : t('report.detailsHint')
+                ? `${missingWhy ? t(($) => $.report.goodFaith) : t(($) => $.report.illegalHint)} ${t(($) => $.report.detailsHint)}`
+                : t(($) => $.report.detailsHint)
             }
             multiline
             showCount
             maxLength={REPORT_DETAILS_MAX}
           />
-          <Hint icon="shield-check" text={t('report.anonymity')} />
+          <Hint icon="shield-check" text={t(($) => $.report.anonymity)} />
           {/* Un refus de l'API, au-dessus d'« Envoyer » : il reste en place pendant le nouvel
               envoi, rien ne saute sous le doigt. */}
           {failureMessage ? (
@@ -267,10 +274,14 @@ function ReportForm({
               action={failure === 'unauthorized' ? signInAgain() : undefined}
             />
           ) : null}
-          <Button label={t('report.submit')} onPress={() => void submit()} loading={sending} />
+          <Button
+            label={t(($) => $.report.submit)}
+            onPress={() => void submit()}
+            loading={sending}
+          />
           {/* Le motif manquant, sous « Envoyer » : posé au-dessus, il faisait descendre le bouton
               de 65 à 86 pt sous le doigt (relecture de design, 7b). */}
-          {missingReason ? <Notice message={t('report.reasonRequired')} /> : null}
+          {missingReason ? <Notice message={t(($) => $.report.reasonRequired)} /> : null}
         </>
       )}
       {/* Sans pseudo, un blocage nous sépare déjà (commentaire lu malgré lui, règles 1 et 2) :
@@ -303,12 +314,12 @@ function AlsoBlock({ author }: { author: ReportTargetPreview['author'] & { handl
   return (
     <>
       {blocked ? (
-        <Notice ref={doneRef} tone="success" message={t('block.done', { handle })} polite />
+        <Notice ref={doneRef} tone="success" message={t(($) => $.block.done, { handle })} polite />
       ) : (
         <>
-          <Hint icon="prohibit" text={t('report.alsoBlockHint', { handle })} />
+          <Hint icon="prohibit" text={t(($) => $.report.alsoBlockHint, { handle })} />
           <Button
-            label={t('report.alsoBlock', { handle })}
+            label={t(($) => $.report.alsoBlock, { handle })}
             variant="secondary"
             onPress={() => setAsking({ gesture: 'block', member: { id: author.id, handle } })}
           />

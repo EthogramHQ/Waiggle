@@ -58,49 +58,52 @@ export function SignInScreen() {
 
   return (
     <Screen
-      title={t('auth.signIn.title')}
-      subtitle={t('auth.signIn.subtitle')}
+      title={t(($) => $.auth.signIn.title)}
+      subtitle={t(($) => $.auth.signIn.subtitle)}
       onBack={back}
       hero={
         <WelcomeHero
-          tagline={t('home.tagline')}
+          tagline={t(($) => $.home.tagline)}
           source={{
-            note: t('home.openSource'),
-            link: t('home.seeCode'),
+            note: t(($) => $.home.openSource),
+            link: t(($) => $.home.seeCode),
             onPress: () => openOutside(sourceUrl),
           }}
         />
       }
     >
-      {error ? <Notice message={t(`auth.errors.${error}`, lengths)} /> : null}
+      {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
       <FieldGroup>
         <TextField
-          label={t('auth.fields.email')}
+          label={t(($) => $.auth.fields.email)}
           value={email}
           onChangeText={setEmail}
           autoComplete="email"
           keyboardType="email-address"
-          error={fieldErrors.email ? t('auth.errors.invalidEmail') : undefined}
+          error={fieldErrors.email ? t(($) => $.auth.errors.invalidEmail) : undefined}
         />
         <TextField
-          label={t('auth.fields.password')}
+          label={t(($) => $.auth.fields.password)}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="current-password"
         />
       </FieldGroup>
-      <Button label={t('auth.signIn.submit')} onPress={submit} loading={loading} />
+      <Button label={t(($) => $.auth.signIn.submit)} onPress={submit} loading={loading} />
       <Row gap="sm" justify="center" wrap>
         <Text variant="callout" tone="secondary">
-          {t('auth.signIn.noAccount')}
+          {t(($) => $.auth.signIn.noAccount)}
         </Text>
-        <TextLink label={t('auth.signIn.createOne')} onPress={() => router.replace('/sign-up')} />
+        <TextLink
+          label={t(($) => $.auth.signIn.createOne)}
+          onPress={() => router.replace('/sign-up')}
+        />
       </Row>
-      <Hint icon="lock-simple" text={t('home.membersOnly')} />
+      <Hint icon="lock-simple" text={t(($) => $.home.membersOnly)} />
       {/* Tranche 7a (règle 23 de la relecture du plan) : l'adresse de contact, lisible sans compte.
           Une personne photographiée, ou une autorité, doit pouvoir nous écrire sans s'inscrire. */}
-      <Hint icon="envelope-simple" text={t('auth.contact')} />
+      <Hint icon="envelope-simple" text={t(($) => $.auth.contact)} />
     </Screen>
   )
 }

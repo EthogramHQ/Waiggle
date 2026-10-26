@@ -243,7 +243,7 @@ export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
       <IconButton
         ref={trigger}
         icon="dots-three"
-        label={label ?? t('actionMenu.label')}
+        label={label ?? t(($) => $.actionMenu.label)}
         variant={variant}
         expanded={open}
         hasMenu
@@ -276,7 +276,7 @@ export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
             }}
           >
             <ActionMenuList
-              label={label ?? t('actionMenu.label')}
+              label={label ?? t(($) => $.actionMenu.label)}
               items={items}
               onChoose={choose}
               onLeave={leave}
@@ -288,7 +288,7 @@ export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
               Tab (tabIndex -1) : au clavier, Échap ferme. */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('actionMenu.close')}
+            accessibilityLabel={t(($) => $.actionMenu.close)}
             onPress={dismiss}
             {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
             style={{ position: 'absolute', inset: 0 }}

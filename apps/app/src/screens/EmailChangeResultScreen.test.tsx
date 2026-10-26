@@ -42,7 +42,7 @@ jest.mock('expo-router', () => ({
 
 // Les textes des deux pages, tirés des traductions françaises (les mêmes que l'écran).
 const text = (key: keyof Translation['account']['emailChange'], params?: Record<string, string>) =>
-  fr.t(`account.emailChange.${key}`, params)
+  fr.t(($) => $.account.emailChange[key], params)
 /** Combien de fois ce texte se lit à l'écran (où qu'il soit, découpé ou non). */
 const seen = (sentence: string) => screen.queryAllByText(containing(sentence)).length
 
@@ -157,7 +157,7 @@ describe('after the second link (done), signed out', () => {
 
     expect(seen(text('doneTitle'))).toBe(0)
     expect(seen(text('doneDevices'))).toBe(0)
-    expect(screen.getAllByText(fr.t('common.loading')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(fr.t(($) => $.common.loading)).length).toBeGreaterThan(0)
   })
 })
 

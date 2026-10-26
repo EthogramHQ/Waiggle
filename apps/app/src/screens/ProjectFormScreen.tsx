@@ -89,8 +89,8 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
       return (
         <NotFoundState
           width={width}
-          title={t('project.page.notFoundTitle')}
-          message={t('project.page.notFound')}
+          title={t(($) => $.project.page.notFoundTitle)}
+          message={t(($) => $.project.page.notFound)}
         />
       )
     }
@@ -138,7 +138,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<ProjectFormErrors>({})
   const [message, setMessage] = useState<string | null>(
-    uploadFailed ? t('project.visuals.uploadFailed') : null,
+    uploadFailed ? t(($) => $.project.visuals.uploadFailed) : null,
   )
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<PendingVisuals>({ gallery: [], portrait: null })
@@ -150,7 +150,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       setProject(result.data)
       setMessage(null)
     } else {
-      setMessage(t(`errors.${result.error}`))
+      setMessage(t(($) => $.errors[result.error]))
     }
   }
 
@@ -223,7 +223,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
 
   // Les vignettes de l'éditeur : les photos du projet enregistré, ou celles qui attendent.
   const photoLabel = (index: number, total: number) =>
-    t('project.visuals.photo', { number: index + 1, total })
+    t(($) => $.project.visuals.photo, { number: index + 1, total })
   const galleryTiles: VisualTile[] = projectId
     ? (saved?.visuals ?? []).map((visual, index, all) => ({
         key: visual.id,
@@ -244,7 +244,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
         image: {
           source: toSource(portraitVisual.url),
           thumbhash: portraitVisual.thumbhash,
-          label: t('project.visuals.portraitLabel'),
+          label: t(($) => $.project.visuals.portraitLabel),
         },
       }
     : pending.portrait
@@ -252,30 +252,28 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
           key: pending.portrait.uri,
           image: {
             source: { uri: pending.portrait.uri },
-            label: t('project.visuals.portraitLabel'),
+            label: t(($) => $.project.visuals.portraitLabel),
           },
         }
       : null
 
   const visualLabels: VisualEditorLabels = {
-    gallery: t('project.visuals.gallery'),
+    gallery: t(($) => $.project.visuals.gallery),
     galleryHint: t(
-      projectId ? 'project.visuals.galleryHintEdit' : 'project.visuals.galleryHintNew',
-      {
-        max: VISUALS_MAX,
-      },
+      ($) => (projectId ? $.project.visuals.galleryHintEdit : $.project.visuals.galleryHintNew),
+      { max: VISUALS_MAX },
     ),
-    cover: t('project.visuals.cover'),
-    add: t('project.visuals.add'),
-    earlier: (number) => t('project.visuals.earlier', { number }),
-    later: (number) => t('project.visuals.later', { number }),
-    makeCover: (number) => t('project.visuals.makeCover', { number }),
-    remove: (number) => t('project.visuals.remove', { number }),
-    portrait: t('project.visuals.portrait'),
-    portraitHint: t('project.visuals.portraitHint'),
-    choosePortrait: t('project.visuals.choosePortrait'),
-    replacePortrait: t('project.visuals.replacePortrait'),
-    removePortrait: t('project.visuals.removePortrait'),
+    cover: t(($) => $.project.visuals.cover),
+    add: t(($) => $.project.visuals.add),
+    earlier: (number) => t(($) => $.project.visuals.earlier, { number }),
+    later: (number) => t(($) => $.project.visuals.later, { number }),
+    makeCover: (number) => t(($) => $.project.visuals.makeCover, { number }),
+    remove: (number) => t(($) => $.project.visuals.remove, { number }),
+    portrait: t(($) => $.project.visuals.portrait),
+    portraitHint: t(($) => $.project.visuals.portraitHint),
+    choosePortrait: t(($) => $.project.visuals.choosePortrait),
+    replacePortrait: t(($) => $.project.visuals.replacePortrait),
+    removePortrait: t(($) => $.project.visuals.removePortrait),
   }
 
   /**
@@ -283,7 +281,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
    * champ, et la valeur doit avoir le type de ce champ (TypeScript refuse un statut inconnu…).
    * `{ ...previous, [key]: value }` : une copie de l'objet, avec ce seul champ remplacé.
    */
-  const checkFields = t('project.errors.checkFields')
+  const checkFields = t(($) => $.project.errors.checkFields)
   const change =
     <K extends keyof ProjectForm>(key: K) =>
     (value: ProjectForm[K]) => {
@@ -299,7 +297,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
     }
 
   const errorText = (key: string | undefined) =>
-    key && t(`project.errors.${key}` as 'project.errors.titleRequired', { max: limits[key] })
+    key && t(($) => $.project.errors[key as 'titleRequired'], { max: limits[key] })
 
   const setPrompt = (index: number, text: string) =>
     change('prompts')(form.prompts.map((prompt, i) => (i === index ? text : prompt)))
@@ -320,7 +318,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       : await createProject(checked.changes)
     if (!result.ok) {
       setBusy(false)
-      setMessage(t(`errors.${result.error}`))
+      setMessage(t(($) => $.errors[result.error]))
       return
     }
     // À la création : les photos qui attendaient partent maintenant, une à une, dans l'ordre.
@@ -366,18 +364,18 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
   const hasRecipe = form.tools.trim() !== '' || form.timeSpent !== null || form.prompts.length > 0
   const back = useGoBack('/')
   const submit = {
-    label: projectId ? t('project.edit.submit') : t('project.new.submit'),
+    label: projectId ? t(($) => $.project.edit.submit) : t(($) => $.project.new.submit),
     onPress: () => void onSubmit(),
     loading: busy,
     disabled: preparing > 0,
   }
-  const title = projectId ? t('project.edit.title') : t('project.new.title')
+  const title = projectId ? t(($) => $.project.edit.title) : t(($) => $.project.new.title)
 
   const fields = (
     <>
       <FieldGroup>
         <TextField
-          label={t('project.fields.title')}
+          label={t(($) => $.project.fields.title)}
           value={form.title}
           onChangeText={change('title')}
           autoCapitalize="sentences"
@@ -386,7 +384,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
           error={errorText(errors.title)}
         />
         <TextField
-          label={t('project.fields.pitch')}
+          label={t(($) => $.project.fields.pitch)}
           value={form.pitch}
           onChangeText={change('pitch')}
           autoCapitalize="sentences"
@@ -410,86 +408,86 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       />
       {preparing > 0 ? (
         <Text variant="caption" tone="muted" accessibilityLiveRegion="polite">
-          {t('project.visuals.preparing')}
+          {t(($) => $.project.visuals.preparing)}
         </Text>
       ) : null}
       <TextField
-        label={t('project.fields.demoUrl')}
+        label={t(($) => $.project.fields.demoUrl)}
         value={form.demoUrl}
         onChangeText={change('demoUrl')}
         keyboardType="url"
-        hint={t('project.fields.demoUrlHint')}
-        success={demoOk ? t('project.fields.demoUrlOk') : undefined}
+        hint={t(($) => $.project.fields.demoUrlHint)}
+        success={demoOk ? t(($) => $.project.fields.demoUrlOk) : undefined}
         error={errorText(errors.demoUrl)}
       />
       <Choices
-        label={t('project.fields.status')}
+        label={t(($) => $.project.fields.status)}
         options={ProjectStatus.options.map((value) => ({
           value,
-          label: t(`project.status.${value}`),
+          label: t(($) => $.project.status[value]),
         }))}
         value={form.status}
         onChange={change('status')}
       />
       <Surface variant="grouped" padding="lg">
         <Switch
-          label={t('project.fields.public')}
-          hint={t('project.fields.publicHint')}
+          label={t(($) => $.project.fields.public)}
+          hint={t(($) => $.project.fields.publicHint)}
           value={form.visibility === 'public'}
           onValueChange={(isPublic) => change('visibility')(isPublic ? 'public' : 'private')}
         />
       </Surface>
       <TextField
-        label={t('project.fields.description')}
+        label={t(($) => $.project.fields.description)}
         value={form.description}
         onChangeText={change('description')}
         autoCapitalize="sentences"
         multiline
-        hint={t('project.fields.descriptionHint')}
+        hint={t(($) => $.project.fields.descriptionHint)}
         error={errorText(errors.description)}
       />
       {/* La recette est facultative : repliée, sauf si le projet en a déjà une. */}
       <Disclosure
-        title={t('project.fields.recipe')}
-        hint={t('project.fields.recipeHint')}
+        title={t(($) => $.project.fields.recipe)}
+        hint={t(($) => $.project.fields.recipeHint)}
         initiallyOpen={hasRecipe}
       >
         <TagInput
-          label={t('project.fields.tools')}
+          label={t(($) => $.project.fields.tools)}
           values={parseTools(form.tools)}
           onChange={(list) => change('tools')(list.join(', '))}
-          placeholder={t('project.fields.toolsPlaceholder')}
-          removeLabel={(item) => t('common.remove', { item })}
-          limit={t('project.fields.toolsLimit', { max: PROJECT_TOOLS_MAX })}
+          placeholder={t(($) => $.project.fields.toolsPlaceholder)}
+          removeLabel={(item) => t(($) => $.common.remove, { item })}
+          limit={t(($) => $.project.fields.toolsLimit, { max: PROJECT_TOOLS_MAX })}
           error={errorText(errors.tools)}
         />
         <Choices
-          label={t('project.fields.timeSpent')}
+          label={t(($) => $.project.fields.timeSpent)}
           // « Non précisé » correspond à null : on le représente par la valeur 'unknown'.
           options={(['unknown', ...TimeSpent.options] as const).map((value) => ({
             value,
-            label: t(`project.timeSpent.${value}`),
+            label: t(($) => $.project.timeSpent[value]),
           }))}
           value={form.timeSpent ?? 'unknown'}
           onChange={(value) => change('timeSpent')(value === 'unknown' ? null : value)}
         />
         <Stack gap="md">
-          <Text variant="headline">{t('project.fields.prompts')}</Text>
+          <Text variant="headline">{t(($) => $.project.fields.prompts)}</Text>
           <Text variant="callout" tone={errors.prompts ? 'danger' : 'muted'}>
             {errorText(errors.prompts) ||
-              t('project.fields.promptsHint', { max: PROJECT_PROMPTS_MAX })}
+              t(($) => $.project.fields.promptsHint, { max: PROJECT_PROMPTS_MAX })}
           </Text>
           {form.prompts.map((prompt, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: un prompt n'a pas d'identifiant ; sa position en tient lieu
             <Stack key={i} gap="sm">
               <TextField
-                label={t('project.fields.prompt', { number: i + 1 })}
+                label={t(($) => $.project.fields.prompt, { number: i + 1 })}
                 value={prompt}
                 onChangeText={(text) => setPrompt(i, text)}
                 multiline
               />
               <Button
-                label={t('project.fields.removePrompt', { number: i + 1 })}
+                label={t(($) => $.project.fields.removePrompt, { number: i + 1 })}
                 variant="secondary"
                 size="compact"
                 icon="trash"
@@ -499,7 +497,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
           ))}
           {form.prompts.length < PROJECT_PROMPTS_MAX ? (
             <Button
-              label={t('project.fields.addPrompt')}
+              label={t(($) => $.project.fields.addPrompt)}
               variant="secondary"
               icon="plus"
               onPress={() => change('prompts')([...form.prompts, ''])}
@@ -522,7 +520,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
         header={
           <SheetHeader
             title={title}
-            cancel={{ label: t('common.cancel'), onPress: back }}
+            cancel={{ label: t(($) => $.common.cancel), onPress: back }}
             action={submit}
           />
         }
@@ -538,37 +536,37 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
       width="page"
       header={<TopNav hideNewProject />}
       title={title}
-      {...(projectId ? null : { subtitle: t('project.new.subtitle') })}
+      {...(projectId ? null : { subtitle: t(($) => $.project.new.subtitle) })}
     >
       <Columns
         main={fields}
         side={
           <Stack gap="md">
             <Row justify="between">
-              <Text variant="heading">{t('project.preview.title')}</Text>
+              <Text variant="heading">{t(($) => $.project.preview.title)}</Text>
               <Text variant="caption" tone="muted">
-                {t('project.preview.hint')}
+                {t(($) => $.project.preview.hint)}
               </Text>
             </Row>
             <ProjectCard
-              title={form.title.trim() || t('project.preview.untitled')}
-              pitch={form.pitch.trim() || t('project.preview.noPitch')}
+              title={form.title.trim() || t(($) => $.project.preview.untitled)}
+              pitch={form.pitch.trim() || t(($) => $.project.preview.noPitch)}
               author={{ name: session?.user.name ?? '', avatar: null }}
               image={galleryTiles[0]?.image ?? null}
-              when={t('project.preview.now')}
+              when={t(($) => $.project.preview.now)}
               status={{
-                label: t(`project.status.${form.status}`),
+                label: t(($) => $.project.status[form.status]),
                 strong: form.status === 'testable',
               }}
               {...(demoOk
-                ? { tryIt: { label: t('project.page.tryDemo'), onPress: () => {} } }
+                ? { tryIt: { label: t(($) => $.project.page.tryDemo), onPress: () => {} } }
                 : null)}
             />
           </Stack>
         }
       />
       <Row gap="md" justify="end">
-        <Button label={t('common.cancel')} variant="secondary" onPress={back} />
+        <Button label={t(($) => $.common.cancel)} variant="secondary" onPress={back} />
         <Button {...submit} />
       </Row>
     </Screen>

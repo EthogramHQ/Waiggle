@@ -51,8 +51,8 @@ export function MemberScreen({ id }: { id: string }) {
       return (
         <NotFoundState
           width="page"
-          title={t('member.notFoundTitle')}
-          message={t('member.notFound')}
+          title={t(($) => $.member.notFoundTitle)}
+          message={t(($) => $.member.notFound)}
         />
       )
     }
@@ -74,7 +74,7 @@ function MemberView({ member }: { member: Member }) {
   const { block } = useBlock()
   const { unblock } = useUnblock()
   const signInAgain = useSignInAgain()
-  const followers = t('follow.followers', { count: member.followerCount })
+  const followers = t(($) => $.follow.followers, { count: member.followerCount })
   const handle = member.handle
 
   // La fenêtre de confirmation ouverte (aucune, bloquer ou débloquer).
@@ -108,13 +108,17 @@ function MemberView({ member }: { member: Member }) {
 
   // Le menu « … » : rien sur sa propre page (ni se signaler, ni se bloquer soi-même). Bloqué, il
   // garde « Signaler ce profil » ; « Débloquer » est un bouton de la page (le scénario le promet).
-  const reportItem: ActionMenuItem = { label: t('report.member'), icon: 'flag', onPress: report }
+  const reportItem: ActionMenuItem = {
+    label: t(($) => $.report.member),
+    icon: 'flag',
+    onPress: report,
+  }
   const menuItems: ActionMenuItem[] = blocked
     ? [reportItem]
     : [
         reportItem,
         {
-          label: t('block.action'),
+          label: t(($) => $.block.action),
           icon: 'prohibit',
           tone: 'danger',
           onPress: () => ask('block'),
@@ -122,19 +126,19 @@ function MemberView({ member }: { member: Member }) {
       ]
 
   const followError = follow.expired
-    ? t('states.expired')
+    ? t(($) => $.states.expired)
     : follow.error
-      ? t('follow.error')
+      ? t(($) => $.follow.error)
       : undefined
 
   return (
     <Screen width="page" header={<TopNav />} onBack={back} pageTitle={member.name}>
       <MemberHeader
         name={member.name}
-        handle={t('member.handle', { handle })}
+        handle={t(($) => $.member.handle, { handle })}
         avatar={toSource(member.avatarUrl)}
         bio={member.bio}
-        toolsTitle={t('member.favoriteTools')}
+        toolsTitle={t(($) => $.member.favoriteTools)}
         tools={member.favoriteTools.map((tool) => ({
           label: tool.label,
           onPress: () => router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } }),
@@ -144,7 +148,7 @@ function MemberView({ member }: { member: Member }) {
             <Stack gap="sm" align="center">
               <FollowerCount text={followers} />
               <Button
-                label={t('account.editProfile')}
+                label={t(($) => $.account.editProfile)}
                 variant="secondary"
                 icon="pencil-simple"
                 onPress={() => router.push('/profile')}
@@ -155,12 +159,12 @@ function MemberView({ member }: { member: Member }) {
               {/* Lus sans interrompre (role « status ») : le même texte avant et après la relecture
                   de la page, pour une seule annonce. */}
               {blocked ? (
-                <Notice tone="info" message={t('block.notice', { handle })} polite />
+                <Notice tone="info" message={t(($) => $.block.notice, { handle })} polite />
               ) : unblocked ? (
                 <Notice
                   ref={unblockedRef}
                   tone="success"
-                  message={t('block.unblocked', { handle })}
+                  message={t(($) => $.block.unblocked, { handle })}
                   polite
                 />
               ) : null}
@@ -172,9 +176,9 @@ function MemberView({ member }: { member: Member }) {
               <Row gap="sm" align="center" justify="center">
                 {blocked ? (
                   <Button
-                    label={t('block.unblock')}
+                    label={t(($) => $.block.unblock)}
                     // Le nom lu contient le texte affiché, et dit qui (comme dans la liste).
-                    spokenLabel={t('block.list.unblockLabel', { handle })}
+                    spokenLabel={t(($) => $.block.list.unblockLabel, { handle })}
                     variant="secondary"
                     size="compact"
                     onPress={() => ask('unblock')}
@@ -187,10 +191,12 @@ function MemberView({ member }: { member: Member }) {
                     // suit) : dire « touche Suivi » à la commande vocale trouve bien ce bouton.
                     label={
                       member.isFollowed
-                        ? t('follow.memberFollowing', { name: member.name })
-                        : t('follow.member', { name: member.name })
+                        ? t(($) => $.follow.memberFollowing, { name: member.name })
+                        : t(($) => $.follow.member, { name: member.name })
                     }
-                    text={member.isFollowed ? t('follow.following') : t('follow.follow')}
+                    text={
+                      member.isFollowed ? t(($) => $.follow.following) : t(($) => $.follow.follow)
+                    }
                   />
                 )}
                 <ActionMenu items={menuItems} />
@@ -208,9 +214,11 @@ function MemberView({ member }: { member: Member }) {
       {blocked ? null : (
         <>
           <Text variant="heading" heading={2}>
-            {t('member.projects')}
+            {t(($) => $.member.projects)}
           </Text>
-          <ProjectGrid empty={member.isMe ? t('member.emptyMine') : t('member.empty')}>
+          <ProjectGrid
+            empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}
+          >
             {member.projects.map((project) => (
               <SummaryCard key={project.id} project={project} />
             ))}

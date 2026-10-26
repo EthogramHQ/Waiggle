@@ -48,7 +48,7 @@ export function TopNav({ hideNewProject = false }: Props) {
         <Row gap="md">
           {hideNewProject ? null : (
             <Button
-              label={t('home.publish')}
+              label={t(($) => $.home.publish)}
               icon="plus"
               size="compact"
               variant="glass"
@@ -57,7 +57,7 @@ export function TopNav({ hideNewProject = false }: Props) {
           )}
           {/* La cloche des notifications, avec le nombre de nouveautés (tranche 6b). */}
           <NotificationBell />
-          <Pressed label={t('home.account')} onPress={() => router.push('/account')}>
+          <Pressed label={t(($) => $.home.account)} onPress={() => router.push('/account')}>
             <Avatar name={name} source={toSource(me.data?.avatarUrl)} label={name} size={44} />
           </Pressed>
         </Row>

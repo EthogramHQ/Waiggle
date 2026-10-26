@@ -321,7 +321,7 @@ describe('a comment removed by the moderation', () => {
     await renderWithProviders(<Comments project={{ ...project, isMine: true }} />)
 
     expect(screen.getByText('Contenu retiré par la modération')).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('removal.onlyYou')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.removal.onlyYou)))).toBeNull()
     expect(screen.queryByText('Super idée, je teste ce soir.')).toBeNull()
   })
 
@@ -348,7 +348,7 @@ describe('a comment removed by the moderation', () => {
 
     // Son texte, qu'il est désormais seul à lire, et le bandeau qui le dit.
     expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
     // Ce qui est retiré, pour qui, après un signalement, par une personne, pourquoi, et comment
     // contester (règle 13 de la relecture du plan, article 17 du DSA).
     expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
@@ -367,7 +367,7 @@ describe('a comment removed by the moderation', () => {
     expect(card.getByRole('button', { name: 'Supprimer le commentaire' })).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
     // Témoin : le bandeau du retrait est bien là (la carte est celle d'un commentaire retiré).
-    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
   })
 
   it('names nobody who reported it, even to its author', async () => {
@@ -377,7 +377,9 @@ describe('a comment removed by the moderation', () => {
     await renderWithProviders(<Comments project={project} />)
 
     // « Après un signalement » : jamais de qui (la file ne le dit pas non plus à l'appli).
-    expect(screen.getAllByText(containing(fr.t('removal.afterReport'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.removal.afterReport))).length,
+    ).toBeGreaterThan(0)
     expect(screen.queryByText(/Malik|Zoé|Inès/)).toBeNull()
   })
 })
@@ -405,7 +407,7 @@ describe('a comment hidden by a block', () => {
     mockComments([placeholderOf('blocked')])
     await renderWithProviders(<Comments project={project} />)
 
-    expect(screen.getByText(fr.t('project.comments.blockedPlaceholder'))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.project.comments.blockedPlaceholder))).toBeTruthy()
     // Ni le nom de Max, ni les autres emplacements.
     expect(screen.queryByText('Max')).toBeNull()
     expect(screen.queryByText('Commentaire masqué')).toBeNull()
@@ -419,7 +421,7 @@ describe('a comment hidden by a block', () => {
     mockComments([placeholderOf('unavailable')])
     await renderWithProviders(<Comments project={project} />)
 
-    expect(screen.getByText(fr.t('project.comments.unavailablePlaceholder'))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.project.comments.unavailablePlaceholder))).toBeTruthy()
     // Rien ne dit à la personne bloquée qu'elle l'est.
     expect(screen.queryByText(/bloqu/i)).toBeNull()
     expect(screen.queryByText('Commentaire masqué')).toBeNull()
@@ -459,7 +461,7 @@ describe('mentioning a member one blocked', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(blockedMention)
-    expect(screen.queryByText(containing(fr.t('project.comments.error')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.project.comments.error)))).toBeNull()
     expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Bravo @ines_morel')
   })
 

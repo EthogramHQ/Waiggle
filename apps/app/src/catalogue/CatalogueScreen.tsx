@@ -414,30 +414,30 @@ export function CatalogueScreen() {
         {/* Un message en plusieurs paragraphes, alignés à gauche, et la garde des tapes (600 ms
             après l'ouverture) : la fenêtre « Bloquer @x ? » (tranche 7b), avec ses textes. */}
         <Button
-          label={t('block.title', { handle: 'max_durand' })}
+          label={t(($) => $.block.title, { handle: 'max_durand' })}
           variant="secondary"
           onPress={() => setLongDialog(true)}
         />
         <Dialog
           visible={longDialog}
-          title={t('block.title', { handle: 'max_durand' })}
+          title={t(($) => $.block.title, { handle: 'max_durand' })}
           message={[
-            t('block.hidden'),
-            t('block.remains', { handle: 'max_durand' }),
-            t('block.follows'),
-            t('block.notTold', { handle: 'max_durand' }),
-            t('block.notModeration'),
+            t(($) => $.block.hidden),
+            t(($) => $.block.remains, { handle: 'max_durand' }),
+            t(($) => $.block.follows),
+            t(($) => $.block.notTold, { handle: 'max_durand' }),
+            t(($) => $.block.notModeration),
           ]}
           guardTaps
           onDismiss={() => setLongDialog(false)}
         >
           <Button
-            label={t('block.confirm')}
+            label={t(($) => $.block.confirm)}
             variant="confirm"
             onPress={() => setLongDialog(false)}
           />
           <Button
-            label={t('block.cancel')}
+            label={t(($) => $.block.cancel)}
             variant="secondary"
             onPress={() => setLongDialog(false)}
           />
@@ -1201,20 +1201,20 @@ function Fields({ l }: { l: Labels }) {
               lecteur d'écran lit les deux. Les textes de l'appli : la précision de « Signaler »,
               et le lien d'une démo vérifié. */}
           <TextField
-            label={t('report.illegalDetails')}
+            label={t(($) => $.report.illegalDetails)}
             value=""
             onChangeText={() => {}}
-            error={t('report.illegalRequired')}
-            hint={`${t('report.goodFaith')} ${t('report.detailsHint')}`}
+            error={t(($) => $.report.illegalRequired)}
+            hint={`${t(($) => $.report.goodFaith)} ${t(($) => $.report.detailsHint)}`}
             keepHint
             multiline
           />
           <TextField
-            label={t('project.fields.demoUrl')}
+            label={t(($) => $.project.fields.demoUrl)}
             value="https://cafes.example.org"
             onChangeText={() => {}}
-            success={t('project.fields.demoUrlOk')}
-            hint={t('project.fields.demoUrlHint')}
+            success={t(($) => $.project.fields.demoUrlOk)}
+            hint={t(($) => $.project.fields.demoUrlHint)}
             keepHint
           />
         </Stack>
@@ -1491,10 +1491,10 @@ function Choicesample({ l }: { l: Labels }) {
         onChange={setStatus}
       />
       <Choices
-        label={t('moderation.groundLabel')}
+        label={t(($) => $.moderation.groundLabel)}
         options={[
-          { value: 'illegal', label: t('moderation.grounds.illegal') },
-          { value: 'rules', label: t('moderation.grounds.rules') },
+          { value: 'illegal', label: t(($) => $.moderation.grounds.illegal) },
+          { value: 'rules', label: t(($) => $.moderation.grounds.rules) },
         ]}
         value={ground}
         onChange={setGround}

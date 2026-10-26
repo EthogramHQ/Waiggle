@@ -78,7 +78,7 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
                 <Icon name="megaphone-simple" size={16} tone="amber" />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="caption" weight={700} tone="accent">
-                    {t('feed.noteKicker')}
+                    {t(($) => $.feed.noteKicker)}
                   </Text>
                 </View>
               </View>

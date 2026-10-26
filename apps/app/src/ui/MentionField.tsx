@@ -267,7 +267,7 @@ export function MentionField({
                 key={suggestion.id}
                 nativeID={optionId(index)}
                 role="option"
-                accessibilityLabel={t('mentions.option', {
+                accessibilityLabel={t(($) => $.mentions.option, {
                   name: suggestion.name,
                   handle: suggestion.handle,
                 })}

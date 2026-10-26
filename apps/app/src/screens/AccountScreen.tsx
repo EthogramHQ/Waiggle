@@ -79,8 +79,8 @@ export function AccountScreen() {
     setExporting(false)
     setExportMessage(
       result.ok
-        ? { text: t('account.export.done'), ok: true }
-        : { text: t(`auth.errors.${result.error}`, lengths), ok: false },
+        ? { text: t(($) => $.account.export.done), ok: true }
+        : { text: t(($) => $.auth.errors[result.error], lengths), ok: false },
     )
   }
 
@@ -88,7 +88,7 @@ export function AccountScreen() {
     <Screen
       header={<TopNav />}
       onBack={back}
-      title={t('account.title')}
+      title={t(($) => $.account.title)}
       // Le profil ne se charge pas (réseau en panne) : la page le dit en tête, au lieu de rester
       // muette, et tout le reste (langue, déconnexion…) reste utilisable. Seulement sans profil
       // déjà là : une relecture ratée garde ce qui est affiché. React Query relira de lui-même
@@ -99,8 +99,8 @@ export function AccountScreen() {
       notice={
         (me.isError || retryingMe) && !me.data ? (
           <Notice
-            message={t('account.loadError')}
-            action={{ label: t('common.retry'), onPress: retryMe }}
+            message={t(($) => $.account.loadError)}
+            action={{ label: t(($) => $.common.retry), onPress: retryMe }}
           />
         ) : undefined
       }
@@ -111,7 +111,7 @@ export function AccountScreen() {
           <Avatar
             name={data.user.name}
             source={toSource(me.data?.avatarUrl)}
-            label={t('profile.avatar.label')}
+            label={t(($) => $.profile.avatar.label)}
             size={56}
           />
           <Stack gap="xxs" grow>
@@ -120,7 +120,7 @@ export function AccountScreen() {
         </Row>
       </Surface>
       <Button
-        label={t('account.editProfile')}
+        label={t(($) => $.account.editProfile)}
         variant="secondary"
         icon="pencil-simple"
         onPress={() => router.push('/profile')}
@@ -131,7 +131,7 @@ export function AccountScreen() {
       {me.data?.isAdmin ? (
         <ListGroup key="moderation">
           <ListRow
-            label={t('account.moderation')}
+            label={t(($) => $.account.moderation)}
             icon="shield-check"
             trailing="chevron"
             onPress={() => router.push('/moderation')}
@@ -139,11 +139,15 @@ export function AccountScreen() {
         </ListGroup>
       ) : null}
 
-      <ListGroup title={t('account.language.title')} footer={t('account.language.hint')} radio>
+      <ListGroup
+        title={t(($) => $.account.language.title)}
+        footer={t(($) => $.account.language.hint)}
+        radio
+      >
         {supportedLanguages.map((language) => (
           <ListRow
             key={language}
-            label={t(`common.languages.${language}`)}
+            label={t(($) => $.common.languages[language])}
             selected={language === current}
             onPress={() => void choose(language)}
           />
@@ -152,11 +156,15 @@ export function AccountScreen() {
 
       {/* Une liste à cocher, comme la langue : les trois libellés tiennent même sur un petit
           téléphone, quelle que soit la taille du texte. */}
-      <ListGroup title={t('account.appearance.title')} footer={t('account.appearance.hint')} radio>
+      <ListGroup
+        title={t(($) => $.account.appearance.title)}
+        footer={t(($) => $.account.appearance.hint)}
+        radio
+      >
         {appearances.map(({ value, icon }) => (
           <ListRow
             key={value}
-            label={t(`account.appearance.${value}`)}
+            label={t(($) => $.account.appearance[value])}
             icon={icon}
             selected={value === appearance}
             onPress={() => setAppearance(value)}
@@ -167,18 +175,20 @@ export function AccountScreen() {
       {/* Les réglages d'e-mail vivent dans « Mon profil », tout en bas : la ligne y mène et la
           page amène la section à l'écran (?section=emails). La langue, plus haut, dit déjà que les
           e-mails suivent la langue choisie : on trouve ici le reste. */}
-      <ListGroup title={t('account.emails.title')}>
+      <ListGroup title={t(($) => $.account.emails.title)}>
         <ListRow
-          label={t('account.emails.row')}
+          label={t(($) => $.account.emails.row)}
           trailing="chevron"
           onPress={() => router.push({ pathname: '/profile', params: { section: 'emails' } })}
         />
       </ListGroup>
 
-      <ListGroup title={t('account.data.title')}>
+      <ListGroup title={t(($) => $.account.data.title)}>
         <ListRow
-          label={t('account.export.button')}
-          trailing={exporting ? <Text tone="muted">{t('common.loading')}</Text> : 'download-simple'}
+          label={t(($) => $.account.export.button)}
+          trailing={
+            exporting ? <Text tone="muted">{t(($) => $.common.loading)}</Text> : 'download-simple'
+          }
           onPress={() => void onExport()}
           disabled={exporting} // pas de deuxième export tant que le premier n'est pas fini
         />
@@ -191,34 +201,34 @@ export function AccountScreen() {
           un groupe titré « Sécurité », près de « Mes données » : sans titre, au-dessus de « Langue »,
           la ligne ne disait pas de quoi elle relevait (relecture de design 7b). Pour tous les
           membres, même sans blocage : la page dit alors « Tu n'as bloqué personne ». */}
-      <ListGroup title={t('account.safety.title')}>
+      <ListGroup title={t(($) => $.account.safety.title)}>
         <ListRow
-          label={t('account.blocks')}
+          label={t(($) => $.account.blocks)}
           icon="prohibit"
           trailing="chevron"
           onPress={() => router.push('/blocks')}
         />
       </ListGroup>
 
-      <ListGroup title={t('account.section.title')}>
+      <ListGroup title={t(($) => $.account.section.title)}>
         {/* Tranche « adresse » : la ligne mène à la page qui change l'adresse. Elle montre
             l'adresse actuelle ; son nom lu dit l'action puis l'adresse (« Changer d'adresse
             e-mail : … »), car un nom lu remplace le détail affiché (relecture juridique du
             plan, J9). */}
         <ListRow
-          label={t('account.email.label')}
+          label={t(($) => $.account.email.label)}
           detail={data.user.email}
-          spokenLabel={t('account.email.spoken', { email: data.user.email })}
+          spokenLabel={t(($) => $.account.email.spoken, { email: data.user.email })}
           trailing="chevron"
           onPress={() => router.push('/account/email')}
         />
         <ListRow
-          label={t('account.signOut')}
+          label={t(($) => $.account.signOut)}
           trailing="sign-out"
           onPress={() => void onSignOut()}
         />
         <ListRow
-          label={t('account.delete.title')}
+          label={t(($) => $.account.delete.title)}
           tone="danger"
           trailing="trash"
           onPress={() => router.push('/account/delete')}
@@ -228,11 +238,11 @@ export function AccountScreen() {
       {/* Tranche 7a : nous écrire, à l'adresse de contact (écrite dans @ruche/brand seulement).
           Elle s'affiche en clair, pour qui veut la recopier, et s'ouvre directement dans la
           messagerie : c'est notre adresse, pas un site tiers, donc sans la page « Tu quittes… ». */}
-      <ListGroup footer={t('account.contact.hint')}>
+      <ListGroup footer={t(($) => $.account.contact.hint)}>
         <ListRow
-          label={t('account.contact.label')}
+          label={t(($) => $.account.contact.label)}
           detail={contactEmail}
-          spokenLabel={t('account.contact.spoken', { contactEmail })}
+          spokenLabel={t(($) => $.account.contact.spoken, { contactEmail })}
           trailing="envelope-simple"
           onPress={() => void Linking.openURL(`mailto:${contactEmail}`)}
         />
@@ -240,9 +250,9 @@ export function AccountScreen() {
 
       {/* Le code source, accessible depuis l'appli et pas seulement depuis l'accueil des visiteurs :
           un logiciel libre doit pouvoir être consulté par ceux qui l'utilisent. */}
-      <ListGroup title={t('account.about.title')} footer={t('home.openSource')}>
+      <ListGroup title={t(($) => $.account.about.title)} footer={t(($) => $.home.openSource)}>
         <ListRow
-          label={t('home.seeCode')}
+          label={t(($) => $.home.seeCode)}
           trailing="arrow-up-right"
           onPress={() => openOutside(sourceUrl)}
         />

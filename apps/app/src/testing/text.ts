@@ -22,11 +22,11 @@ export const containing = (text: string) =>
  * cherche à sa façon (bandeau, notification).
  */
 export const removalSentences = (removal: Removal): string[] => [
-  fr.t('removal.onlyYou'),
-  removal.afterReport ? fr.t('removal.afterReport') : fr.t('removal.direct'),
-  fr.t(`removal.grounds.${removal.ground}`),
-  fr.t('removal.explanation', { explanation: removal.explanation }),
-  fr.t('removal.contest'),
+  fr.t(($) => $.removal.onlyYou),
+  removal.afterReport ? fr.t(($) => $.removal.afterReport) : fr.t(($) => $.removal.direct),
+  fr.t(($) => $.removal.grounds[removal.ground]),
+  fr.t(($) => $.removal.explanation, { explanation: removal.explanation }),
+  fr.t(($) => $.removal.contest),
 ]
 
 /**
@@ -37,11 +37,11 @@ export const removalSentences = (removal: Removal): string[] => [
  * (signaler d'abord). Le titre n'en fait pas partie : chaque test le cherche lui-même.
  */
 export const blockSentences = (handle: string): string[] => [
-  fr.t('block.hidden'),
-  fr.t('block.remains', { handle }),
-  fr.t('block.follows'),
-  fr.t('block.notTold', { handle }),
-  fr.t('block.notModeration'),
+  fr.t(($) => $.block.hidden),
+  fr.t(($) => $.block.remains, { handle }),
+  fr.t(($) => $.block.follows),
+  fr.t(($) => $.block.notTold, { handle }),
+  fr.t(($) => $.block.notModeration),
 ]
 
 /**

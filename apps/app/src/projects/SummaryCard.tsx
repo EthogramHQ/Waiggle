@@ -33,10 +33,10 @@ export function SummaryCard({ project, at = project.createdAt }: Props) {
       }
       when={shortDate(at, i18n.language)}
       status={{
-        label: t(`project.status.${project.status}`),
+        label: t(($) => $.project.status[project.status]),
         strong: project.status === 'testable',
       }}
-      badge={project.visibility === 'private' ? t('member.private') : undefined}
+      badge={project.visibility === 'private' ? t(($) => $.member.private) : undefined}
       onPress={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
     />
   )

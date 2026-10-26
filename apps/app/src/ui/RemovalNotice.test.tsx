@@ -42,22 +42,22 @@ describe('removalBanner', () => {
   it('says who decided, on what ground, why, and how to contest, without a report', () => {
     const { title, lines } = removalBanner(removal, fr.t)
 
-    expect(title).toBe(fr.t('removal.banner'))
+    expect(title).toBe(fr.t(($) => $.removal.banner))
     expect(lines).toEqual([
-      fr.t('removal.onlyYou'),
-      fr.t('removal.direct'),
-      fr.t('removal.grounds.illegal'),
-      fr.t('removal.explanation', { explanation: removal.explanation }),
-      fr.t('removal.contest'),
+      fr.t(($) => $.removal.onlyYou),
+      fr.t(($) => $.removal.direct),
+      fr.t(($) => $.removal.grounds.illegal),
+      fr.t(($) => $.removal.explanation, { explanation: removal.explanation }),
+      fr.t(($) => $.removal.contest),
     ])
   })
 
   it('says when a report came first, never by whom', () => {
     const { lines } = removalBanner({ ...removal, afterReport: true, ground: 'rules' }, fr.t)
 
-    expect(lines).toContain(fr.t('removal.afterReport'))
-    expect(lines).toContain(fr.t('removal.grounds.rules'))
-    expect(lines).not.toContain(fr.t('removal.direct'))
+    expect(lines).toContain(fr.t(($) => $.removal.afterReport))
+    expect(lines).toContain(fr.t(($) => $.removal.grounds.rules))
+    expect(lines).not.toContain(fr.t(($) => $.removal.direct))
   })
 
   it('writes the explanation as typed, characters included', () => {

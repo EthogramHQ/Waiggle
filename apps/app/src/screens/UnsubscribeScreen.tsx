@@ -112,20 +112,21 @@ export function UnsubscribeScreen() {
   const invalid = hydrated && (kind === null || step === 'invalid')
   // Le titre de l'onglet reste court ; le titre de la page pose la question tant qu'on n'y a pas
   // répondu (relecture de design de 6c), puis redevient « Tes e-mails ».
-  const pageTitle = invalid ? t('unsubscribe.invalidTitle') : t('unsubscribe.title')
-  const question = kind === 'mentions' ? t('unsubscribe.askMentions') : t('unsubscribe.askRecap')
+  const pageTitle = invalid ? t(($) => $.unsubscribe.invalidTitle) : t(($) => $.unsubscribe.title)
+  const question =
+    kind === 'mentions' ? t(($) => $.unsubscribe.askMentions) : t(($) => $.unsubscribe.askRecap)
   const heading = hydrated && !invalid && step === 'ask' ? question : pageTitle
   const manage = (
     <Stack align="center">
-      <TextLink label={t('unsubscribe.manage')} onPress={() => router.push('/profile')} />
+      <TextLink label={t(($) => $.unsubscribe.manage)} onPress={() => router.push('/profile')} />
     </Stack>
   )
   const accountEmails = (
     <Text variant="callout" tone="muted" align="center">
-      {t('unsubscribe.accountEmails')}
+      {t(($) => $.unsubscribe.accountEmails)}
     </Text>
   )
-  const failureNotice = failure ? <Notice message={t(`errors.${failure}`)} /> : null
+  const failureNotice = failure ? <Notice message={t(($) => $.errors[failure])} /> : null
 
   // Chaque étape a sa clé (`key`) : React dessine des éléments neufs à chaque changement, au lieu
   // de réutiliser ceux qui sont à la même place. Sans elle, le bouton « Confirmer » devenait
@@ -137,16 +138,20 @@ export function UnsubscribeScreen() {
           l'ouverture n'a rien remplacé : le message reste une alerte annoncée. */}
       <Notice
         ref={step === 'invalid' ? messageRef : undefined}
-        message={t('unsubscribe.invalid')}
+        message={t(($) => $.unsubscribe.invalid)}
       />
       {manage}
     </Fragment>
   ) : step === 'ask' ? (
     <Fragment key="ask">
       {failureNotice}
-      <Button label={t('unsubscribe.confirm')} onPress={() => void send()} loading={sending} />
+      <Button
+        label={t(($) => $.unsubscribe.confirm)}
+        onPress={() => void send()}
+        loading={sending}
+      />
       <Stack align="center">
-        <TextLink label={t('unsubscribe.keep')} onPress={() => router.replace('/')} />
+        <TextLink label={t(($) => $.unsubscribe.keep)} onPress={() => router.replace('/')} />
       </Stack>
     </Fragment>
   ) : step === 'done' ? (
@@ -156,7 +161,11 @@ export function UnsubscribeScreen() {
         ref={messageRef}
         tone="success"
         polite
-        message={kind === 'mentions' ? t('unsubscribe.doneMentions') : t('unsubscribe.doneRecap')}
+        message={
+          kind === 'mentions'
+            ? t(($) => $.unsubscribe.doneMentions)
+            : t(($) => $.unsubscribe.doneRecap)
+        }
       />
       {/* « Gérer mes e-mails » vient avant « Tout couper », pour l'éloigner de la place qu'avait
           « Confirmer » : la page se centre dans la hauteur, et le titre raccourcit après la
@@ -168,7 +177,7 @@ export function UnsubscribeScreen() {
       {accountEmails}
       {failureNotice}
       <Button
-        label={t('unsubscribe.allOff')}
+        label={t(($) => $.unsubscribe.allOff)}
         variant="secondary"
         onPress={() => void send('all')}
         loading={sending}
@@ -176,7 +185,7 @@ export function UnsubscribeScreen() {
     </Fragment>
   ) : (
     <Fragment key="allDone">
-      <Notice ref={messageRef} tone="success" polite message={t('unsubscribe.allDone')} />
+      <Notice ref={messageRef} tone="success" polite message={t(($) => $.unsubscribe.allDone)} />
       {accountEmails}
       {manage}
     </Fragment>

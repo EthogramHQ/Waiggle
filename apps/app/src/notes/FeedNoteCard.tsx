@@ -20,7 +20,7 @@ export function FeedNoteCard({ note, project }: Props) {
   const visual = project.cover
   return (
     <NoteCard
-      label={t('feed.noteLabel', {
+      label={t(($) => $.feed.noteLabel, {
         // nameOf : « Note d’Inès sur… », « Note de Léa sur… », « Inès’s note on… ».
         nameOf: nameOf(project.author.name),
         title: project.title,

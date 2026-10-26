@@ -133,20 +133,20 @@ describe('the members I blocked, from my account', () => {
 
     await screen.findByRole('button', { name: /^Membres bloqués/ })
     // Un titre de section (« header » en natif, h2 sur le web).
-    expect(screen.getByRole('header', { name: fr.t('account.safety.title') })).toBeTruthy()
+    expect(screen.getByRole('header', { name: fr.t(($) => $.account.safety.title) })).toBeTruthy()
     // Dans l'ordre de la page : « Mes données », puis « Sécurité » et sa ligne, puis « Compte ».
     const order = screen
       .getAllByText(
         new RegExp(
-          `^(${fr.t('account.data.title')}|${fr.t('account.safety.title')}|Membres bloqués|${fr.t('account.section.title')})$`,
+          `^(${fr.t(($) => $.account.data.title)}|${fr.t(($) => $.account.safety.title)}|Membres bloqués|${fr.t(($) => $.account.section.title)})$`,
         ),
       )
       .map((element) => element.props.children)
     expect(order).toEqual([
-      fr.t('account.data.title'),
-      fr.t('account.safety.title'),
+      fr.t(($) => $.account.data.title),
+      fr.t(($) => $.account.safety.title),
       'Membres bloqués',
-      fr.t('account.section.title'),
+      fr.t(($) => $.account.section.title),
     ])
   })
 })
@@ -182,7 +182,7 @@ describe('writing to us from my account', () => {
 
     expect(
       screen.getByRole('button', {
-        name: fr.t('account.contact.spoken', { contactEmail }),
+        name: fr.t(($) => $.account.contact.spoken, { contactEmail }),
       }),
     ).toBeTruthy()
   })
@@ -198,7 +198,7 @@ describe('changing my address from my account', () => {
     // pas seulement ce qu'elle montre (relecture juridique du plan, J9).
     await fireEvent.press(
       await screen.findByRole('button', {
-        name: fr.t('account.email.spoken', { email: 'lea@example.com' }),
+        name: fr.t(($) => $.account.email.spoken, { email: 'lea@example.com' }),
       }),
     )
 
@@ -211,7 +211,7 @@ describe('changing my address from my account', () => {
     // Témoin : la ligne de l'adresse est là, avec l'adresse actuelle.
     expect(
       await screen.findByRole('button', {
-        name: fr.t('account.email.spoken', { email: 'lea@example.com' }),
+        name: fr.t(($) => $.account.email.spoken, { email: 'lea@example.com' }),
       }),
     ).toBeTruthy()
     expect(screen.getByText('lea@example.com')).toBeTruthy()

@@ -502,7 +502,7 @@ describe('the notification bell on the home screen of a phone', () => {
 
     expect(screen.getByRole('button', { name: 'Mes projets' })).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: t('notifications.bellNew', { count: 1 }) }),
+      screen.getByRole('button', { name: t(($) => $.notifications.bellNew, { count: 1 }) }),
     ).toBeTruthy()
     expect(screen.getByText('1', { includeHiddenElements: true })).toBeTruthy()
   })
@@ -512,7 +512,7 @@ describe('the notification bell on the home screen of a phone', () => {
     await renderMemberHome()
 
     expect(
-      screen.getByRole('button', { name: t('notifications.bellNewMany', { max: 9 }) }),
+      screen.getByRole('button', { name: t(($) => $.notifications.bellNewMany, { max: 9 }) }),
     ).toBeTruthy()
     expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy()
   })
@@ -520,14 +520,14 @@ describe('the notification bell on the home screen of a phone', () => {
   it('shows no badge when nothing is new', async () => {
     await renderMemberHome()
 
-    expect(screen.getByRole('button', { name: t('notifications.bell') })).toBeTruthy()
+    expect(screen.getByRole('button', { name: t(($) => $.notifications.bell) })).toBeTruthy()
     expect(screen.queryByText('0', { includeHiddenElements: true })).toBeNull()
   })
 
   it('opens the notifications', async () => {
     await renderMemberHome()
 
-    await fireEvent.press(screen.getByRole('button', { name: t('notifications.bell') }))
+    await fireEvent.press(screen.getByRole('button', { name: t(($) => $.notifications.bell) }))
 
     expect(mockPush).toHaveBeenCalledWith('/notifications')
   })
@@ -537,6 +537,6 @@ describe('the notification bell on the home screen of a phone', () => {
 
     // Témoin : l'accueil du visiteur est bien affiché.
     expect(screen.getByRole('button', { name: 'Créer un compte' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: t('notifications.bell') })).toBeNull()
+    expect(screen.queryByRole('button', { name: t(($) => $.notifications.bell) })).toBeNull()
   })
 })

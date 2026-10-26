@@ -121,14 +121,16 @@ describe('what remains after deleting the account', () => {
   it('says that the reports of the member and a trace of the removals stay one year', async () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
-    expect(screen.getAllByText(containing(fr.t('account.delete.remains.title'))).length).toBe(1)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.remains.title))).length,
+    ).toBe(1)
     // « Tes signalements restent, sans ton nom, un an »
     expect(
-      screen.getAllByText(containing(fr.t('account.delete.remains.reports'))).length,
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.remains.reports))).length,
     ).toBeGreaterThan(0)
     // « Une trace des retraits de tes contenus reste un an »
     expect(
-      screen.getAllByText(containing(fr.t('account.delete.remains.removals'))).length,
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.remains.removals))).length,
     ).toBeGreaterThan(0)
   })
 
@@ -138,7 +140,7 @@ describe('what remains after deleting the account', () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
     expect(
-      screen.getAllByText(containing(fr.t('account.delete.remains.reportCopies'))).length,
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.remains.reportCopies))).length,
     ).toBeGreaterThan(0)
   })
 })
@@ -150,9 +152,9 @@ describe('the blocks of the member', () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
     // « Les membres que tu as bloqués », dans la liste de ce qui disparaît, avec son détail.
-    expect(screen.getAllByText(containing(fr.t('account.delete.blocksItem'))).length).toBe(1)
+    expect(screen.getAllByText(containing(fr.t(($) => $.account.delete.blocksItem))).length).toBe(1)
     expect(
-      screen.getAllByText(containing(fr.t('account.delete.blocksDetail'))).length,
+      screen.getAllByText(containing(fr.t(($) => $.account.delete.blocksDetail))).length,
     ).toBeGreaterThan(0)
   })
 })

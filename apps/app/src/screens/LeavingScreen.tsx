@@ -38,25 +38,25 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   // on n'affiche la destination qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
 
-  if (!hydrated) return <Screen title={t('leaving.title')}>{null}</Screen>
+  if (!hydrated) return <Screen title={t(($) => $.leaving.title)}>{null}</Screen>
   if (!target) {
     return (
-      <Screen title={t('leaving.title')}>
-        <Notice message={t('leaving.invalid')} />
-        <Button label={t('leaving.back')} variant="secondary" onPress={back} />
+      <Screen title={t(($) => $.leaving.title)}>
+        <Notice message={t(($) => $.leaving.invalid)} />
+        <Button label={t(($) => $.leaving.back)} variant="secondary" onPress={back} />
       </Screen>
     )
   }
 
   return (
-    <Screen pageTitle={t('leaving.title')}>
+    <Screen pageTitle={t(($) => $.leaving.title)}>
       {/* La porte vers l'extérieur : des anneaux de lumière autour d'une flèche. */}
       <PortalRings />
       {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se
           coupe au lieu de sortir de l'écran. */}
       <Stack gap="xs" align="stretch">
         <Text variant="callout" weight={600} tone="secondary" align="center" heading={1}>
-          {t('leaving.title')}
+          {t(($) => $.leaving.title)}
         </Text>
         {/* Le nom du site, en grand : c'est lui qu'on doit reconnaître (ou pas). */}
         <Text variant="title2" align="center" breakAnywhere>
@@ -65,7 +65,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
       </Stack>
       <Stack gap="sm">
         <Text variant="caption" weight={600} tone="muted">
-          {t('leaving.destination')}
+          {t(($) => $.leaving.destination)}
         </Text>
         {/* L'adresse complète, telle qu'elle sera ouverte : un nom de site écrit avec des lettres d'un
             autre alphabet y apparaît sous sa forme réelle (« xn--… »), ou il a été refusé plus haut. */}
@@ -79,19 +79,19 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
         <Row gap="md" align="start">
           <Icon name="key" size={22} tone="amber" />
           <Stack gap="xs" grow>
-            <Text weight={700}>{t('leaving.safety')}</Text>
+            <Text weight={700}>{t(($) => $.leaving.safety)}</Text>
             <Text variant="callout" tone="secondary">
-              {t('leaving.body')}
+              {t(($) => $.leaving.body)}
             </Text>
           </Stack>
         </Row>
       </Surface>
       <Button
-        label={t('leaving.continue', { host: target.host })}
+        label={t(($) => $.leaving.continue, { host: target.host })}
         icon="arrow-up-right"
         onPress={() => void Linking.openURL(target.href)}
       />
-      <Button label={t('leaving.back')} variant="secondary" onPress={back} />
+      <Button label={t(($) => $.leaving.back)} variant="secondary" onPress={back} />
     </Screen>
   )
 }

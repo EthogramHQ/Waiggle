@@ -33,7 +33,7 @@ beforeEach(() => {
 })
 
 /** Le bouton qui ouvre le menu. */
-const trigger = () => screen.getByRole('button', { name: fr.t('actionMenu.label') })
+const trigger = () => screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label) })
 
 describe('ActionMenu', () => {
   it('is a single button named « Plus d’actions », its actions hidden while closed', async () => {
@@ -49,7 +49,7 @@ describe('ActionMenu', () => {
 
     // aria-expanded sur le web, accessibilityState.expanded sur téléphone.
     expect(
-      screen.getByRole('button', { name: fr.t('actionMenu.label'), expanded: false }),
+      screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label), expanded: false }),
     ).toBeTruthy()
   })
 
@@ -92,7 +92,7 @@ describe('ActionMenu', () => {
     await renderWithProviders(<ActionMenu items={items} />)
 
     await fireEvent.press(trigger())
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('actionMenu.close') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.actionMenu.close) }))
 
     expect(screen.queryByRole('menuitem')).toBeNull()
     expect(report).not.toHaveBeenCalled()
@@ -124,7 +124,7 @@ describe('ActionMenu', () => {
         expect(report).not.toHaveBeenCalled()
         expect(block).not.toHaveBeenCalled()
         expect(
-          screen.getByRole('button', { name: fr.t('actionMenu.label'), expanded: false }),
+          screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label), expanded: false }),
         ).toBeTruthy()
       })
     }

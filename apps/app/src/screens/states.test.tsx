@@ -71,12 +71,12 @@ describe('SessionErrorScreen', () => {
     const onRetry = jest.fn()
     await renderWithProviders(<SessionErrorScreen onRetry={onRetry} />)
 
-    expect(screen.getByRole('header', { name: fr.t('states.errorTitle') })).toBeTruthy()
-    expect(screen.queryByText(fr.t('states.signedOutTitle'))).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('common.retry') }))
+    expect(screen.getByRole('header', { name: fr.t(($) => $.states.errorTitle) })).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.states.signedOutTitle))).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
 
     expect(onRetry).toHaveBeenCalledTimes(1)
     // Toujours une issue de plus : revenir.
-    expect(screen.getByRole('button', { name: fr.t('states.back') })).toBeTruthy()
+    expect(screen.getByRole('button', { name: fr.t(($) => $.states.back) })).toBeTruthy()
   })
 })

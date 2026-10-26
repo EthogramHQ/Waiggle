@@ -25,25 +25,27 @@ export function CheckEmailScreen() {
   const hydrated = useHydrated()
 
   return (
-    <Screen pageTitle={t('auth.checkEmail.title')}>
+    <Screen pageTitle={t(($) => $.auth.checkEmail.title)}>
       <Stack align="center">
         <Emblem icon="envelope-simple" />
       </Stack>
       <Text variant="title2" align="center" heading={1}>
-        {t('auth.checkEmail.title')}
+        {t(($) => $.auth.checkEmail.title)}
       </Text>
       {hydrated ? (
         <>
           <Text tone="secondary" align="center">
-            {email ? t('auth.checkEmail.body', { email }) : t('auth.checkEmail.bodyNoEmail')}
+            {email
+              ? t(($) => $.auth.checkEmail.body, { email })
+              : t(($) => $.auth.checkEmail.bodyNoEmail)}
           </Text>
-          <Notice tone="info" message={t('auth.checkEmail.locked')} />
+          <Notice tone="info" message={t(($) => $.auth.checkEmail.locked)} />
           {/* La purge de nuit efface une inscription jamais vérifiée (tranche 6c) : on le dit. */}
           <Text variant="callout" tone="muted" align="center">
-            {t('auth.checkEmail.expires', { days: UNVERIFIED_ACCOUNT_DAYS })}
+            {t(($) => $.auth.checkEmail.expires, { days: UNVERIFIED_ACCOUNT_DAYS })}
           </Text>
           <Button
-            label={t('auth.checkEmail.back')}
+            label={t(($) => $.auth.checkEmail.back)}
             variant="secondary"
             onPress={() => router.replace('/sign-in')}
           />

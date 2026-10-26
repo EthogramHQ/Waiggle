@@ -13,12 +13,12 @@ type T = ReturnType<typeof useTranslation>['t']
 
 /** Le bandeau d'un contenu retiré, phrase par phrase, dans la langue de l'appli. */
 export const removalBanner = (removal: Removal, t: T): RemovedBanner => ({
-  title: t('removal.banner'),
+  title: t(($) => $.removal.banner),
   lines: [
-    t('removal.onlyYou'),
-    removal.afterReport ? t('removal.afterReport') : t('removal.direct'),
-    t(`removal.grounds.${removal.ground}`),
-    t('removal.explanation', { explanation: removal.explanation }),
-    t('removal.contest'),
+    t(($) => $.removal.onlyYou),
+    removal.afterReport ? t(($) => $.removal.afterReport) : t(($) => $.removal.direct),
+    t(($) => $.removal.grounds[removal.ground]),
+    t(($) => $.removal.explanation, { explanation: removal.explanation }),
+    t(($) => $.removal.contest),
   ],
 })

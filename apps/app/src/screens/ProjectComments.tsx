@@ -75,12 +75,12 @@ type MentionFrom = 'root' | 'reply' | 'edit'
 // Le texte de l'emplacement d'un commentaire sans auteur, selon son état. Un commentaire « visible »
 // a toujours son auteur : sa ligne ne sert pas, elle garde l'ancien texte par défaut.
 const placeholderKey = {
-  visible: 'project.comments.hiddenPlaceholder',
-  hidden: 'project.comments.hiddenPlaceholder',
-  deleted: 'project.comments.deletedPlaceholder',
-  removed: 'project.comments.removedPlaceholder',
-  blocked: 'project.comments.blockedPlaceholder',
-  unavailable: 'project.comments.unavailablePlaceholder',
+  visible: 'hiddenPlaceholder',
+  hidden: 'hiddenPlaceholder',
+  deleted: 'deletedPlaceholder',
+  removed: 'removedPlaceholder',
+  blocked: 'blockedPlaceholder',
+  unavailable: 'unavailablePlaceholder',
 } as const satisfies Record<CommentState, string>
 
 export function Comments({ project }: { project: Project }) {
@@ -195,14 +195,14 @@ export function Comments({ project }: { project: Project }) {
   const failure = (
     reason: CommentFailure | undefined,
     otherwise: string,
-    limited = t('project.comments.limited'),
+    limited = t(($) => $.project.comments.limited),
   ) =>
     reason === 'limited'
       ? limited
       : reason === 'expired'
-        ? t('states.expired')
+        ? t(($) => $.states.expired)
         : reason === 'blockedMention'
-          ? t('errors.blockedMention')
+          ? t(($) => $.errors.blockedMention)
           : otherwise
   // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
   // doit l'être avant de partir (la fenêtre de confirmation).
@@ -215,7 +215,7 @@ export function Comments({ project }: { project: Project }) {
     if (checked.success) return { body: checked.data, error: undefined }
     return {
       body: null,
-      error: text.trim() === '' ? required : t('project.errors.invalidCharacters'),
+      error: text.trim() === '' ? required : t(($) => $.project.errors.invalidCharacters),
     }
   }
 
@@ -232,7 +232,7 @@ export function Comments({ project }: { project: Project }) {
             avatar: toSource(member.avatarUrl),
           }))
         : [],
-    label: t('mentions.suggestions'),
+    label: t(($) => $.mentions.suggestions),
     onQueryChange: (query: string | null) =>
       setMentioning((current) =>
         query !== null
@@ -259,7 +259,10 @@ export function Comments({ project }: { project: Project }) {
 
   const submit = async () => {
     if (sending.current) return
-    const { body, error } = check(draft, t('project.comments.required'))
+    const { body, error } = check(
+      draft,
+      t(($) => $.project.comments.required),
+    )
     if (body === null) {
       setDraftError(error)
       return
@@ -303,7 +306,10 @@ export function Comments({ project }: { project: Project }) {
 
   const submitReply = async () => {
     if (!replying || sending.current) return
-    const { body, error } = check(replyDraft, t('project.comments.replyRequired'))
+    const { body, error } = check(
+      replyDraft,
+      t(($) => $.project.comments.replyRequired),
+    )
     if (body === null) {
       setReplyError(error)
       return
@@ -341,7 +347,10 @@ export function Comments({ project }: { project: Project }) {
 
   const submitEdit = async (threadId: string) => {
     if (!editing || saving.current) return
-    const { body, error } = check(editDraft, t('project.comments.required'))
+    const { body, error } = check(
+      editDraft,
+      t(($) => $.project.comments.required),
+    )
     if (body === null) {
       setEditError(error)
       return
@@ -437,15 +446,15 @@ export function Comments({ project }: { project: Project }) {
     switch (id) {
       case 'edit':
         return {
-          label: t('project.comments.edit'),
-          text: t('project.comments.editShort'),
+          label: t(($) => $.project.comments.edit),
+          text: t(($) => $.project.comments.editShort),
           icon: 'pencil-simple',
           onPress: () => openEdit(comment),
         }
       case 'delete':
         return {
-          label: t('project.comments.delete'),
-          text: t('project.comments.deleteShort'),
+          label: t(($) => $.project.comments.delete),
+          text: t(($) => $.project.comments.deleteShort),
           icon: 'trash',
           tone: 'danger',
           onPress: () => {
@@ -457,7 +466,7 @@ export function Comments({ project }: { project: Project }) {
       case 'report':
         // Une réponse est un commentaire comme un autre : la même sorte de cible.
         return {
-          label: t('report.action'),
+          label: t(($) => $.report.action),
           icon: 'flag',
           onPress: () =>
             router.push({ pathname: '/report', params: { kind: 'comment', id: comment.id } }),
@@ -466,8 +475,10 @@ export function Comments({ project }: { project: Project }) {
         // 'hide' : masquer, ou démasquer un commentaire déjà masqué.
         const hidden = comment.state === 'hidden'
         return {
-          label: hidden ? t('project.comments.unhide') : t('project.comments.hide'),
-          text: hidden ? t('project.comments.unhideShort') : t('project.comments.hideShort'),
+          label: hidden ? t(($) => $.project.comments.unhide) : t(($) => $.project.comments.hide),
+          text: hidden
+            ? t(($) => $.project.comments.unhideShort)
+            : t(($) => $.project.comments.hideShort),
           icon: hidden ? 'eye' : 'eye-slash',
           pending: hiding.has(comment.id),
           onPress: () => void setHidden(comment, !hidden, rootId),
@@ -479,20 +490,23 @@ export function Comments({ project }: { project: Project }) {
   /** Ce que les lecteurs d'écran entendent après le nom d'une action : l'auteur, le début du texte. */
   const describe = (comment: CommentReply) =>
     comment.author
-      ? t('project.comments.about', { name: comment.author.name, text: excerpt(comment.body) })
+      ? t(($) => $.project.comments.about, {
+          name: comment.author.name,
+          text: excerpt(comment.body),
+        })
       : undefined
 
   // L'aide du champ de modification : qui lira la nouvelle version.
   const editHint = (comment: CommentReply) =>
     isPrivate
-      ? t('project.comments.hintPrivate')
+      ? t(($) => $.project.comments.hintPrivate)
       : comment.state === 'hidden'
-        ? t('project.comments.editHintHidden')
-        : t('project.comments.editHint')
+        ? t(($) => $.project.comments.editHintHidden)
+        : t(($) => $.project.comments.editHint)
 
   // « Ton commentaire a été supprimé. » : lu sans interrompre (role « status »).
   const deletedNotice = (
-    <Notice key="deleted" tone="success" message={t('project.comments.deleted')} polite />
+    <Notice key="deleted" tone="success" message={t(($) => $.project.comments.deleted)} polite />
   )
   const deleted = done?.kind === 'deleted' ? done.at : null
 
@@ -508,7 +522,7 @@ export function Comments({ project }: { project: Project }) {
         author={author ? { name: author.name, avatar: toSource(author.avatarUrl) } : null}
         {...(author
           ? {
-              authorLabel: t('member.open', {
+              authorLabel: t(($) => $.member.open, {
                 nameOf: nameOf(author.name),
               }),
               onAuthorPress: () =>
@@ -519,15 +533,15 @@ export function Comments({ project }: { project: Project }) {
         body={comment.body}
         mentions={comment.mentions}
         onMemberPress={openMember}
-        edited={comment.editedAt ? t('project.comments.edited') : undefined}
+        edited={comment.editedAt ? t(($) => $.project.comments.edited) : undefined}
         // Le bandeau, pour les deux auteurs qui lisent encore un commentaire masqué : l'auteur du
         // projet l'a masqué lui-même ; l'auteur du commentaire apprend que les autres ne le voient
         // plus. Les autres ne voient qu'un emplacement, sans auteur.
         hidden={
           comment.state === 'hidden' && author
             ? project.isMine
-              ? t('project.comments.hiddenByMe')
-              : t('project.comments.hiddenBanner')
+              ? t(($) => $.project.comments.hiddenByMe)
+              : t(($) => $.project.comments.hiddenBanner)
             : undefined
         }
         // Retiré par la modération (tranche 7a) : son auteur, seul à le lire encore, voit pourquoi
@@ -541,12 +555,16 @@ export function Comments({ project }: { project: Project }) {
         // textes : « Commentaire d'un membre que tu as bloqué » pour qui a bloqué, « Commentaire
         // indisponible » pour qui l'est (rien ne lui dit qu'il est bloqué). « Commentaire masqué »
         // reste au geste de l'auteur du projet.
-        placeholder={t(placeholderKey[comment.state])}
+        placeholder={t(($) => $.project.comments[placeholderKey[comment.state]])}
         actions={actionsOf(comment, rootId)}
         description={describe(comment)}
         error={
           hideFailed === comment.id
-            ? failure(hide.reason, t('project.comments.hideError'), t('errors.rateLimited'))
+            ? failure(
+                hide.reason,
+                t(($) => $.project.comments.hideError),
+                t(($) => $.errors.rateLimited),
+              )
             : undefined
         }
         errorAction={hideFailed === comment.id ? failureAction(hide.reason) : undefined}
@@ -567,16 +585,19 @@ export function Comments({ project }: { project: Project }) {
               reveal
               mentions={mentionsFor('edit')}
               labels={{
-                open: t('project.comments.edit'),
-                field: t('project.comments.field'),
+                open: t(($) => $.project.comments.edit),
+                field: t(($) => $.project.comments.field),
                 hint: editHint(comment),
-                submit: t('project.comments.editSubmit'),
-                cancel: t('common.cancel'),
+                submit: t(($) => $.project.comments.editSubmit),
+                cancel: t(($) => $.common.cancel),
               }}
               fieldError={editError}
               error={
                 showEditError && edit.error
-                  ? failure(edit.reason, t('project.comments.editError'))
+                  ? failure(
+                      edit.reason,
+                      t(($) => $.project.comments.editError),
+                    )
                   : undefined
               }
               errorAction={showEditError && edit.error ? failureAction(edit.reason) : undefined}
@@ -603,21 +624,24 @@ export function Comments({ project }: { project: Project }) {
         reveal
         mentions={mentionsFor('reply')}
         labels={{
-          open: t('project.comments.reply'),
-          field: t('project.comments.replyField'),
+          open: t(($) => $.project.comments.reply),
+          field: t(($) => $.project.comments.replyField),
           hint: isPrivate
-            ? t('project.comments.replyHintPrivate')
-            : t('project.comments.replyHint'),
-          submit: t('project.comments.replySubmit'),
-          cancel: t('common.cancel'),
+            ? t(($) => $.project.comments.replyHintPrivate)
+            : t(($) => $.project.comments.replyHint),
+          submit: t(($) => $.project.comments.replySubmit),
+          cancel: t(($) => $.common.cancel),
         }}
         fieldError={replyError}
         error={
           postFrom === 'reply' && post.error
             ? // 404 : le fil n'accepte plus de réponse (racine supprimée ou masquée entre-temps).
               post.reason === 'gone'
-              ? t('project.comments.replyGone')
-              : failure(post.reason, t('project.comments.replyError'))
+              ? t(($) => $.project.comments.replyGone)
+              : failure(
+                  post.reason,
+                  t(($) => $.project.comments.replyError),
+                )
             : undefined
         }
         errorAction={postFrom === 'reply' && post.error ? failureAction(post.reason) : undefined}
@@ -628,10 +652,10 @@ export function Comments({ project }: { project: Project }) {
   const footerOf = (root: Comment) => {
     if (!done || !('threadId' in done) || done.threadId !== root.id) return null
     const message = {
-      replied: t('project.comments.replyPublished'),
-      saved: t('project.comments.saved'),
-      hidden: t('project.comments.hiddenDone'),
-      shown: t('project.comments.shownDone'),
+      replied: t(($) => $.project.comments.replyPublished),
+      saved: t(($) => $.project.comments.saved),
+      hidden: t(($) => $.project.comments.hiddenDone),
+      shown: t(($) => $.project.comments.shownDone),
     }[done.kind]
     // polite : une confirmation se lit sans interrompre (role « status »).
     return <Notice tone="success" message={message} polite />
@@ -666,7 +690,7 @@ export function Comments({ project }: { project: Project }) {
           canReply(root)
             ? {
                 id: 'reply',
-                label: t('project.comments.reply'),
+                label: t(($) => $.project.comments.reply),
                 icon: 'arrow-bend-up-left',
                 onPress: () => openReply(root.id),
                 // À quel commentaire on répond, pour les lecteurs d'écran (« Max : Super idée… »).
@@ -690,19 +714,19 @@ export function Comments({ project }: { project: Project }) {
   const expired = errorKey(comments.error) === 'unauthorized'
 
   const list = comments.isPending ? (
-    <Text tone="muted">{t('project.comments.loading')}</Text>
+    <Text tone="muted">{t(($) => $.project.comments.loading)}</Text>
   ) : comments.isError && threads.length === 0 ? (
     // La première page n'a pas pu se charger : on le dit, et on propose de réessayer. Le reste
     // de la page (le projet, son journal) reste là. 401 : réessayer ne servirait à rien, il faut
     // se reconnecter ; pas de bouton.
     <>
       <Notice
-        message={expired ? t('states.expired') : t('project.comments.loadError')}
+        message={expired ? t(($) => $.states.expired) : t(($) => $.project.comments.loadError)}
         action={expired ? signInAgain() : undefined}
       />
       {expired ? null : (
         <Button
-          label={t('common.retry')}
+          label={t(($) => $.common.retry)}
           variant="secondary"
           size="compact"
           onPress={() => void comments.refetch()}
@@ -727,11 +751,11 @@ export function Comments({ project }: { project: Project }) {
           // Une seule demande à la fois, même après un double clic.
           if (!comments.isFetchingNextPage) void comments.fetchNextPage()
         }}
-        moreLabel={t('project.comments.more')}
-        endLabel={t('project.comments.end')}
-        errorLabel={t('project.comments.moreError')}
-        retryLabel={t('common.retry')}
-        empty={t('project.comments.empty')}
+        moreLabel={t(($) => $.project.comments.more)}
+        endLabel={t(($) => $.project.comments.end)}
+        errorLabel={t(($) => $.project.comments.moreError)}
+        retryLabel={t(($) => $.common.retry)}
+        empty={t(($) => $.project.comments.empty)}
       >
         {threadNodes}
       </CommentList>
@@ -744,8 +768,8 @@ export function Comments({ project }: { project: Project }) {
       <Text variant="heading" heading={2}>
         {/* Sans commentaire, le titre seul : « (0) » n'apprend rien que la liste vide ne dise. */}
         {project.commentCount > 0
-          ? t('project.comments.title', { count: project.commentCount })
-          : t('project.comments.titleNone')}
+          ? t(($) => $.project.comments.title, { count: project.commentCount })
+          : t(($) => $.project.comments.titleNone)}
       </Text>
       {/* Pas encore de commentaire : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
@@ -768,34 +792,39 @@ export function Comments({ project }: { project: Project }) {
         max={COMMENT_MAX}
         mentions={mentionsFor('root')}
         labels={{
-          open: t('project.comments.add'),
+          open: t(($) => $.project.comments.add),
           // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».
-          openShort: t('project.comments.addShort'),
-          field: t('project.comments.field'),
+          openShort: t(($) => $.project.comments.addShort),
+          field: t(($) => $.project.comments.field),
           // L'aide dit qui lira : tous les membres, ou personne d'autre sur un projet privé.
-          hint: isPrivate ? t('project.comments.hintPrivate') : t('project.comments.hint'),
-          submit: t('project.comments.submit'),
-          cancel: t('common.cancel'),
+          hint: isPrivate
+            ? t(($) => $.project.comments.hintPrivate)
+            : t(($) => $.project.comments.hint),
+          submit: t(($) => $.project.comments.submit),
+          cancel: t(($) => $.common.cancel),
         }}
         fieldError={draftError}
         error={
           postFrom === 'root' && post.error
-            ? failure(post.reason, t('project.comments.error'))
+            ? failure(
+                post.reason,
+                t(($) => $.project.comments.error),
+              )
             : undefined
         }
         errorAction={postFrom === 'root' && post.error ? failureAction(post.reason) : undefined}
-        success={done?.kind === 'published' ? t('project.comments.published') : undefined}
+        success={done?.kind === 'published' ? t(($) => $.project.comments.published) : undefined}
       />
       {empty ? null : list}
       {/* Supprimer un commentaire est définitif : une fenêtre demande confirmation. */}
       <Dialog
         visible={deleting !== null}
-        title={t('project.comments.deleteTitle')}
+        title={t(($) => $.project.comments.deleteTitle)}
         // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit.
         message={
           deleting?.hasReplies
-            ? t('project.comments.deleteBodyReplies')
-            : t('project.comments.deleteBody')
+            ? t(($) => $.project.comments.deleteBodyReplies)
+            : t(($) => $.project.comments.deleteBody)
         }
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
         onDismiss={() => {
@@ -823,20 +852,20 @@ export function Comments({ project }: { project: Project }) {
           <Notice
             message={failure(
               remove.reason,
-              t('project.comments.deleteError'),
-              t('errors.rateLimited'),
+              t(($) => $.project.comments.deleteError),
+              t(($) => $.errors.rateLimited),
             )}
             action={failureAction(remove.reason, () => setDeleting(null))}
           />
         ) : null}
         <Button
-          label={t('project.comments.confirmDelete')}
+          label={t(($) => $.project.comments.confirmDelete)}
           variant="confirm"
           onPress={() => void confirmDelete()}
           loading={removing}
         />
         <Button
-          label={t('common.cancel')}
+          label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setDeleting(null)}
           disabled={removing}

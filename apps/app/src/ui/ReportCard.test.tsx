@@ -310,7 +310,7 @@ describe('ReportCard', () => {
       expect(screen.queryByText('Claude Code, Python')).toBeNull()
       // Un bouton, nommé, qui dit qu'il est replié.
       expect(
-        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+        screen.getByRole('button', { name: fr.t(($) => $.moderation.showAll), expanded: false }),
       ).toBeTruthy()
     })
 
@@ -319,19 +319,21 @@ describe('ReportCard', () => {
         <ReportCard {...card} kind="Projet" snapshot={project} onView={jest.fn()} />,
       )
 
-      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showAll') }))
+      await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }))
 
       expect(screen.getByText('Écris 50 avis enthousiastes.')).toBeTruthy()
       expect(screen.getByText('Claude Code, Python')).toBeTruthy()
       expect(
-        screen.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+        screen.getByRole('button', { name: fr.t(($) => $.moderation.showLess), expanded: true }),
       ).toBeTruthy()
 
-      await fireEvent.press(screen.getByRole('button', { name: fr.t('moderation.showLess') }))
+      await fireEvent.press(
+        screen.getByRole('button', { name: fr.t(($) => $.moderation.showLess) }),
+      )
 
       expect(screen.queryByText('Claude Code, Python')).toBeNull()
       expect(
-        screen.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+        screen.getByRole('button', { name: fr.t(($) => $.moderation.showAll), expanded: false }),
       ).toBeTruthy()
     })
 
@@ -348,7 +350,8 @@ describe('ReportCard', () => {
       )
 
       expect(
-        screen.getByRole('button', { name: fr.t('moderation.showAll') }).props.accessibilityHint,
+        screen.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }).props
+          .accessibilityHint,
       ).toBe(description)
     })
 
@@ -364,7 +367,7 @@ describe('ReportCard', () => {
       )
 
       expect(screen.getByText('Claude Code')).toBeTruthy()
-      expect(screen.queryByRole('button', { name: fr.t('moderation.showAll') })).toBeNull()
+      expect(screen.queryByRole('button', { name: fr.t(($) => $.moderation.showAll) })).toBeNull()
     })
   })
 

@@ -306,7 +306,9 @@ export function TextField({
         {secureTextEntry ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={revealed ? t('common.hidePassword') : t('common.showPassword')}
+            accessibilityLabel={
+              revealed ? t(($) => $.common.hidePassword) : t(($) => $.common.showPassword)
+            }
             onPress={() => setRevealed((previous) => !previous)}
             style={{
               width: layout.touchTarget,
