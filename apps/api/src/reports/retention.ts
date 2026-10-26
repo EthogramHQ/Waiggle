@@ -8,6 +8,11 @@
 // - un signalement clos (retiré, classé), un an après la décision ;
 // - une décision, un an après la dernière décision sur la même cible, sauf si son contenu est
 //   encore retiré (removal_id la cite) : sinon l'auteur perdrait l'explication du retrait.
+// Tranche 7c (relecture juridique J1 et J7) :
+// - une suspension est gardée 365 jours après sa fin réelle (la levée, la clôture au départ du
+//   compte, ou la fin prévue) ; une suspension sans fin et jamais levée n'est jamais purgée ;
+// - une décision citée par une suspension encore gardée (sa pose ou sa levée) n'est pas purgée :
+//   la preuve d'une suspension reste entière, même si le compte est parti.
 //
 // L'heure vient du paramètre `now` et entre dans le SQL par utc() (voir nightly-purge.ts).
 import { REPORT_RETENTION_DAYS, VOID_REPORT_RETENTION_DAYS } from '@ruche/contracts'
@@ -46,12 +51,28 @@ export const purgeModeration = async (db: Database, now: Date) => {
     )
     .returning({ id: r.id })
 
+  // Les suspensions finies depuis un an ou plus (J1). « coalesce » prend la première valeur non
+  // nulle : la fin réelle (`lifted_at`, levée, départ ou clôture à la date) si elle est notée, sinon
+  // la fin prévue (`ends_at`), qui peut être passée sans que l'API l'ait encore notée. Sans fin et
+  // jamais levée, les deux sont nulles : « null <= date » n'est pas vrai, la ligne reste. Elles
+  // partent avant les décisions, pour que la règle suivante ne protège que celles qui restent.
+  // Une ligne par suspension jamais posée, une purge par nuit : la table, petite, est lue en
+  // entier (aucun index ne range coalesce(lifted_at, ends_at) ; à surveiller si elle grandit).
+  const cutoff = utc(daysBefore(now, REPORT_RETENTION_DAYS))
+  const s = schema.accountSuspension
+  const suspensions = await db
+    .delete(s)
+    .where(sql`coalesce(${s.liftedAt}, ${s.endsAt}) <= ${cutoff}`)
+    .returning({ id: s.id })
+
   // Les décisions : la plus récente décision sur la même cible date d'un an ou plus (le premier
   // « not exists » cherche une décision plus récente, dans l'index moderation_decision_target_idx),
   // et aucun contenu ne la cite encore comme son retrait (chaque contenu est cherché par la clé
   // primaire de sa table, targetUuid). On écrit "moderation_decision".<colonne> en toutes lettres :
   // la colonne visée est bien celle de la décision à effacer, pas celle de la sous-requête.
-  const cutoff = utc(daysBefore(now, REPORT_RETENTION_DAYS))
+  // Tranche 7c (J7) : ni une décision qui a posé ou levé une suspension encore gardée ; deux
+  // « not exists », un par colonne, pour que chacun lise son index (account_suspension_decision_idx,
+  // account_suspension_lift_decision_idx) plutôt qu'un « or » qui lirait toute la table.
   const id = targetUuid('moderation_decision')
   const decisions = await db
     .delete(schema.moderationDecision)
@@ -67,7 +88,12 @@ export const purgeModeration = async (db: Database, now: Date) => {
         and not exists (
           select 1 from project_note n where n.id = ${id} and n.removal_id = moderation_decision.id)
         and not exists (
-          select 1 from project_comment c where c.id = ${id} and c.removal_id = moderation_decision.id)`,
+          select 1 from project_comment c where c.id = ${id} and c.removal_id = moderation_decision.id)
+        and not exists (
+          select 1 from account_suspension kept where kept.decision_id = moderation_decision.id)
+        and not exists (
+          select 1 from account_suspension kept
+          where kept.lift_decision_id = moderation_decision.id)`,
     )
     .returning({ id: schema.moderationDecision.id })
 
@@ -75,6 +101,7 @@ export const purgeModeration = async (db: Database, now: Date) => {
     voidedReports: voided,
     voidReports: voidReports.length,
     closedReports: closedReports.length,
+    suspensions: suspensions.length,
     decisions: decisions.length,
   }
 }

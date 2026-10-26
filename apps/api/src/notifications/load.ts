@@ -9,6 +9,7 @@ import {
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
+  RemovalGround,
   ReportTargetKind,
   UNREAD_COUNT_MAX,
 } from '@ruche/contracts'
@@ -20,6 +21,9 @@ import { mediaUrl } from '../profile/me'
 import { visibleTo } from '../projects/load'
 import { listedProject, listedProjectFor } from '../projects/visibility'
 import { afterReportSql, toRemoval } from '../removals/load'
+// suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
+// C'est sans risque ici, car chacun n'utilise l'autre que dans ses fonctions, jamais au chargement.
+import { activeSuspensionSql } from '../suspension/load'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -91,10 +95,21 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  *   5. ses commentaires masqués : project_comment_author_idx ;
  *   6. son pseudo : la clé primaire de notification_state ;
  *   7. ses contenus retirés par la modération (tranche 7a) ;
- *   8. ses signalements traités (tranche 7a).
- * Les sources 7 et 8 ajoutent cinq colonnes : target_kind (la sorte de contenu), note_id (une note
- * retirée), decision_id (la décision de retrait), outcome (l'issue d'un signalement) et member_id
- * (le membre visé par un signalement, pour le lien) ; null pour les six premières.
+ *   8. ses signalements traités (tranche 7a) ;
+ *   9. la suspension de son compte (tranche 7c) : account_suspension_user_idx, avec la date dans
+ *      la condition de l'index (« user_id = me and starts_at > since ») ;
+ *  10. la fin de cette suspension, à sa date ou par une levée (tranche 7c) : le même index, sur
+ *      user_id seul, puis un filtre sur ses quelques suspensions. Mesuré par EXPLAIN ANALYZE avec
+ *      5 000 autres suspensions en base (26/10/2026) : une recherche d'index chacune, trois pages
+ *      lues ; la jointure finale (account_suspension sus) passe par la clé primaire.
+ * Les sources 7 à 10 ajoutent six colonnes : target_kind (la sorte de contenu), note_id (une note
+ * retirée), decision_id (la décision de retrait, de suspension ou de levée), outcome (l'issue d'un
+ * signalement), member_id (le membre visé par un signalement, pour le lien) et suspension_id (la
+ * ligne account_suspension) ; null pour les six premières.
+ *
+ * `now` (tranche 7c) : l'heure de l'API, pour dire si une suspension a pris fin (source 10). C'est
+ * la règle unique de suspension/load.ts (activeSuspensionSql, S10), qui compare à cette heure et
+ * jamais à now() de SQL : la fin arrive à la milliseconde, quel que soit le fuseau de la connexion.
  *
  * `until` (les e-mails seulement, tranche 6c, suite de la relecture de sécurité A7) : rien de daté
  * après cet instant. Une tâche lit ses membres l'un après l'autre, parfois pendant des minutes,
@@ -103,7 +118,7 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  * haute ne change pas l'index de chaque source : elle écarte des lignes déjà trouvées par lui (ou
  * resserre l'intervalle lu dans project_comment_root_created_idx, qui porte la date).
  */
-const sources = (me: string, since: Date, until?: Date): SQL => {
+const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
   const after = utc(since)
   const upTo = until ? utc(until) : null
   /**
@@ -115,14 +130,14 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     upTo
       ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
       : sql`${sql.raw(column)} > ${after}`
-  // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; les deux de la modération (tranche 7a)
-  // en ont besoin de cinq de plus. Plutôt que d'ajouter cinq « null » à chacune des six, on les
-  // ajoute une fois autour d'elles (« select u.*, null… from (…) u »), et les sources 7 et 8
-  // donnent les dix-neuf colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
+  // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; celles de la modération (tranches 7a et
+  // 7c) en ont besoin de six de plus. Plutôt que d'ajouter six « null » à chacune des six, on les
+  // ajoute une fois autour d'elles (« select u.*, null… from (…) u »), et les sources 7 à 10
+  // donnent les vingt colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
   // garde son index.
   return sql`
     select u.*, null::text as target_kind, null::uuid as note_id, null::uuid as decision_id,
-      null::text as outcome, null::text as member_id
+      null::text as outcome, null::text as member_id, null::uuid as suspension_id
     from (${socialSources(me, during)}) u
 
     union all
@@ -140,7 +155,7 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
     --    contenus retirés sont rares : ces lectures écartent presque tout aussitôt.
     select 'removed', 'removed:' || x.removal_id, x.removed_at, x.project_id, x.comment_id,
       null, null, null, null, null, null, null, null, null,
-      x.target_kind, x.note_id, x.removal_id, null, null
+      x.target_kind, x.note_id, x.removal_id, null, null, null
     from (
       select 'project' as target_kind, project.id as project_id, null::uuid as comment_id,
         null::uuid as note_id, project.removal_id, project.removed_at
@@ -194,10 +209,41 @@ const sources = (me: string, since: Date, until?: Date): SQL => {
       end,
       null, null, null, null, null, null, null, null, null, null,
       r.target_kind, null, null, r.status,
-      case when r.target_kind = 'member' then (select u.id from "user" u where u.id = r.target_id) end
+      case when r.target_kind = 'member' then (select u.id from "user" u where u.id = r.target_id) end,
+      null
     from content_report r
     where r.reporter_id = ${me} and r.status in ('removed', 'dismissed')
       and ${during('r.decided_at')}
+
+    union all
+
+    -- 9. La suspension de son compte (tranche 7c), datée de sa pose, repérée par sa ligne
+    --    (« suspended:<id> »). Elle reste après la fin de la suspension. La fin prévue, le fondement
+    --    et l'explication se lisent ensuite par la ligne et par sa décision (loadDetailedRows) ;
+    --    jamais l'administrateur qui a décidé (S17). Seul le membre visé la reçoit (« user_id = me »),
+    --    et aucun blocage ne la coupe (pas de notBlockedWith : la modération n'est pas un geste
+    --    social, comme la source 7). Index : account_suspension_user_idx (user_id, starts_at), qui
+    --    donne ses suspensions dans la fenêtre de dates.
+    select 'suspended', 'suspended:' || s.id, s.starts_at,
+      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, s.decision_id, null, null, s.id
+    from account_suspension s
+    where s.user_id = ${me} and ${during('s.starts_at')}
+
+    union all
+
+    -- 10. La fin de sa suspension (tranche 7c) : une suspension qui n'est plus active à l'heure de
+    --     l'API (« not » de la règle unique, S10). Datée de sa fin réelle : « coalesce » prend
+    --     lifted_at s'il est noté (une levée, ou la clôture à la date), sinon la fin prévue, déjà
+    --     passée. Aucune tâche ne la crée : elle apparaît d'elle-même à l'instant de la fin. Une
+    --     levée se reconnaît à lift_decision_id (J6), dont la décision donne l'explication ; une fin à
+    --     la date n'en a pas. Même index que la source 9 (ses suspensions, quelques lignes).
+    select 'suspension_ended', 'suspension_ended:' || s.id, coalesce(s.lifted_at, s.ends_at),
+      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, s.lift_decision_id, null, null, s.id
+    from account_suspension s
+    where s.user_id = ${me} and not ${activeSuspensionSql('s', now)}
+      and ${during('coalesce(s.lifted_at, s.ends_at)')}
   `
 }
 
@@ -333,8 +379,10 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
   `
 }
 
-/** Les cinq colonnes des sources de la modération (7 et 8), à reprendre dans chaque lecture. */
-const moderationColumns = sql.raw('target_kind, note_id, decision_id, outcome, member_id')
+/** Les six colonnes des sources de la modération (7 à 10), à reprendre dans chaque lecture. */
+const moderationColumns = sql.raw(
+  'target_kind, note_id, decision_id, outcome, member_id, suspension_id',
+)
 
 // ─── Le marque-page ─────────────────────────────────────────────────────────────────────────────
 
@@ -386,6 +434,8 @@ const ListRow = z.object({
     'handle',
     'removed',
     'report_handled',
+    'suspended',
+    'suspension_ended',
   ]),
   key: z.string(),
   at: z.string(),
@@ -414,6 +464,11 @@ const ListRow = z.object({
   ground: z.string().nullable(),
   explanation: z.string().nullable(),
   after_report: z.boolean().nullable(),
+  // Tranche 7c : le projet d'un commentaire retiré, caché par un blocage ; la fin prévue d'une
+  // suspension ; sa levée par un administrateur.
+  project_hidden: z.boolean(),
+  ends_at: z.string().nullable(),
+  lifted: z.boolean(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -527,10 +582,32 @@ export const present = (
         ground: removal.ground,
         explanation: removal.explanation,
         afterReport: removal.afterReport,
-        // 7c : provisoire (commit du contrat) ; backend-dev B2 le calcule explicitement.
-        projectHidden: project.title === '',
+        // Calculé dans la requête (loadDetailedRows), avec le titre vidé : plus de devinette.
+        projectHidden: row.project_hidden,
       }
     }
+    case 'suspended': {
+      // Sans sa décision (elle est gardée tant que la suspension l'est, J7), la notification ne
+      // saurait dire ni le fondement ni l'explication : elle n'est pas montrée.
+      const ground = RemovalGround.safeParse(row.ground)
+      if (!ground.success) return null
+      return {
+        ...common,
+        kind: 'suspended',
+        endsAt: row.ends_at,
+        ground: ground.data,
+        explanation: row.explanation ?? '',
+        afterReport: row.after_report ?? false,
+      }
+    }
+    case 'suspension_ended':
+      // Une levée donne son explication ; une fin à la date prévue n'en a pas (null).
+      return {
+        ...common,
+        kind: 'suspension_ended',
+        lifted: row.lifted,
+        explanation: row.lifted ? (row.explanation ?? '') : null,
+      }
     case 'report_handled': {
       // La sorte de cible et l'issue, rien d'autre (règle 2) : la ligne porte aussi le titre du
       // projet (jointure commune à toutes les sources), qui n'est volontairement pas repris ici.
@@ -562,22 +639,34 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       n.amazing, n.inspiring, n.useful, n.funny, n.bravo, n.total,
       project.id as project_id,
       -- Tranche 7b, règle 9 : le retrait de son commentaire sur le projet d'un membre bloqué
-      -- avec lui garde sa motivation, mais ne nomme plus ce projet (titre vide).
-      case when n.kind = 'removed' and ${blockedWith(me, sql.raw('project.author_id'))}
-        then '' else project.title end as project_title,
+      -- avec lui garde sa motivation, mais ne nomme plus ce projet (titre vide). Tranche 7c :
+      -- l'appli le sait par project_hidden, calculé une fois (« hid », plus bas).
+      case when hid.hidden then '' else project.title end as project_title,
+      coalesce(hid.hidden, false) as project_hidden,
       c.id as comment_id, c.body,
       a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
       ah.handle as author_handle, mh.handle as my_handle,
       n.target_kind, n.outcome, n.member_id, nt.body as note_body,
       md.ground, md.explanation,
-      (md.id is not null and ${afterReportSql({
-        id: sql.raw('md.id'),
-        targetKind: sql.raw('md.target_kind'),
-        targetId: sql.raw('md.target_id'),
-        adminId: sql.raw('md.admin_id'),
-      })}) as after_report
+      -- Une suspension porte elle-même « après un signalement » (J2) ; un retrait le déduit des
+      -- signalements de sa cible (afterReportSql). « case » ne lance que la branche utile.
+      case when n.kind = 'suspended' then sus.after_report
+        else (md.id is not null and ${afterReportSql({
+          id: sql.raw('md.id'),
+          targetKind: sql.raw('md.target_kind'),
+          targetId: sql.raw('md.target_id'),
+          adminId: sql.raw('md.admin_id'),
+        })}) end as after_report,
+      to_char(sus.ends_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as ends_at,
+      (sus.lift_decision_id is not null) as lifted
     from (${chosen}) n
     left join project on project.id = n.project_id
+    -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
+    -- projet), calculée une fois par ligne et réutilisée par deux colonnes. Deux « exists » par les
+    -- index de member_block (blockedWith), seulement pour un retrait.
+    left join lateral (
+      select n.kind = 'removed' and ${blockedWith(me, sql.raw('project.author_id'))} as hidden
+    ) hid on true
     left join project_comment c on c.id = n.comment_id
     left join "user" a on a.id = n.author_id
     left join profile ap on ap.user_id = n.author_id
@@ -586,6 +675,8 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     -- Tranche 7a : le texte d'une note retirée, et la décision d'un retrait (clés primaires).
     left join project_note nt on nt.id = n.note_id
     left join moderation_decision md on md.id = n.decision_id
+    -- Tranche 7c : la suspension d'une notification de suspension ou de fin (clé primaire).
+    left join account_suspension sus on sus.id = n.suspension_id
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
@@ -614,7 +705,7 @@ export const loadNotificationsSince = async (
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
-      from (${sources(me, since, until)}) u
+      from (${sources(me, since, until, until)}) u
     `,
   )
   return rows.flatMap((row) => {
@@ -661,7 +752,7 @@ export const loadNotificationPage = async (
     sql`
       select kind, key, date_trunc('milliseconds', at) as at, project_id, comment_id, reason,
         author_id, day, amazing, inspiring, useful, funny, bravo, total, ${moderationColumns}
-      from (${sources(me, notificationCutoff(now))}) u
+      from (${sources(me, notificationCutoff(now), now)}) u
       ${cursor ? sql`where (date_trunc('milliseconds', at), key) < (${utc(cursor.at)}, ${cursor.key})` : sql``}
       order by at desc, key desc
       limit ${NOTIFICATION_PAGE_SIZE + 1}
@@ -696,7 +787,7 @@ export const countUnread = async (db: Database, me: string, seenAt: Date | null,
   const since = seenAt && seenAt > cutoff ? seenAt : cutoff
   const query = sql`
     select count(*)::int as count
-    from (select 1 from (${sources(me, since)}) s limit ${UNREAD_COUNT_MAX}) x
+    from (select 1 from (${sources(me, since, now)}) s limit ${UNREAD_COUNT_MAX}) x
   `
   const { rows } = z
     .object({ rows: z.array(z.object({ count: z.number().int() })) })

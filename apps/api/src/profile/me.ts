@@ -7,6 +7,7 @@ import { defaultLanguage, type Language, supportedLanguages } from '@ruche/i18n'
 import { and, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { loadActiveSuspension } from '../suspension/load'
 
 const isLanguage = (value: unknown): value is Language =>
   typeof value === 'string' && (supportedLanguages as readonly string[]).includes(value)
@@ -50,6 +51,11 @@ export const loadMe = async (
   const { user, profile } = row
   const handle = row.handle ?? (user.emailVerified ? await ensureHandle(db, user.id) : null)
   if (handle === null) return null
+  // Tranche 7c : sa suspension en cours, ou null. La règle « active » est celle de
+  // suspension/load.ts (S10), à l'heure de l'API ; une requête de plus, par l'index unique partiel
+  // account_suspension_open_idx (une ligne au plus). Le membre y lit la fin, le fondement et
+  // l'explication, jamais l'administrateur qui a décidé.
+  const suspension = (await loadActiveSuspension(db, user.id, new Date()))?.suspension ?? null
   return {
     id: user.id,
     name: user.name,
@@ -62,9 +68,9 @@ export const loadMe = async (
     favoriteTools: profile?.favoriteTools ?? [],
     avatarUrl: profile?.avatarKey ? mediaUrl(publicApiUrl, profile.avatarKey) : null,
     // Seulement pour que l'appli montre l'entrée « Modération » : les routes de modération relisent
-    // elles-mêmes admin_member à chaque demande, sans croire l'appli.
-    isAdmin: row.adminSince !== null,
-    // 7c : provisoire (commit du contrat) ; backend-dev B1 lit la suspension en cours.
-    suspension: null,
+    // elles-mêmes admin_member à chaque demande, sans croire l'appli. Un administrateur suspendu
+    // n'en est plus un tant que dure sa suspension (S19, reports/admin.ts) : l'entrée disparaît.
+    isAdmin: row.adminSince !== null && suspension === null,
+    suspension,
   }
 }
