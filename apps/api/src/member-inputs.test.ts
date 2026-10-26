@@ -66,6 +66,41 @@ describe('the register of member inputs', () => {
     expect(names).toEqual(expect.arrayContaining(['member_block', 'content_report', 'project']))
   })
 
+  // Tranche 7c (plan, « Données ») : la suspension d'un compte et les colonnes nouvelles des
+  // décisions. Aucune n'est une saisie d'un membre : l'explication est celle d'un administrateur,
+  // la durée et la raison d'une levée des listes fermées. Les deux tests échouent tant que la
+  // migration n'existe pas, puis tant qu'une colonne n'est pas classée avec sa raison.
+  const SLICE_7C = {
+    moderation_decision: ['target_member_id', 'duration', 'after_report', 'lift_cause'],
+    account_suspension: [
+      'id',
+      'user_id',
+      'decision_id',
+      'starts_at',
+      'ends_at',
+      'lifted_at',
+      'lift_decision_id',
+      'after_report',
+    ],
+  }
+
+  it('reads the tables and columns of slice 7c', () => {
+    for (const [table, columns] of Object.entries(SLICE_7C)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the columns of slice 7c as written by the moderation, not by a member', () => {
+    const wrong = Object.entries(SLICE_7C).flatMap(([table, columns]) =>
+      columns
+        .filter((column) => inRegister(table, column) || !notAnInput(table, column))
+        .map((column) => `${table}.${column}`),
+    )
+
+    expect(wrong).toEqual([])
+  })
+
   it('classes every column of every table', () => {
     const unclassified = tables.flatMap((table) =>
       table.columns
