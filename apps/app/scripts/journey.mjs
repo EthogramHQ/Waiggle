@@ -677,13 +677,13 @@ try {
   expectEqual('commentaire retiré, dans l’API pour Léa', leaComments.includes(spam), false)
 
   // --- Tranche 7c : suspendre un compte, puis lever la suspension ---
-  step('Karim s’inscrit : il a « Publier » dans la barre du haut')
+  step('Karim s’inscrit : il a « Publier un projet » sur son accueil')
   await signUp(karim, 'Karim')
   const karimMe = async () => (await karim.request.get(`${apiUrl}/v1/me`)).json()
   const karimId = (await karimMe()).id
   await open(karim.page, `${appUrl}/`)
   // Le témoin de l'absence qui suivra : avant la suspension, le bouton est bien là.
-  await karim.page.getByRole('button', { name: 'Publier', exact: true }).first().waitFor()
+  await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).first().waitFor()
   console.log('  ok : Karim voit « Publier »')
 
   step('L’administrateur suspend Karim 7 jours, depuis la page de Karim')
@@ -718,7 +718,7 @@ try {
   await banner.first().getByText(new RegExp(suspensionExplanation)).waitFor()
   expectEqual(
     '« Publier » pour Karim suspendu',
-    await karim.page.getByRole('button', { name: 'Publier', exact: true }).count(),
+    await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).count(),
     0,
   )
   console.log('  ok : Karim lit le bandeau et son explication ; « Publier » a disparu')
@@ -742,7 +742,7 @@ try {
     async () => (await karimMe()).suspension === null,
   )
   await open(karim.page, `${appUrl}/`)
-  await karim.page.getByRole('button', { name: 'Publier', exact: true }).first().waitFor()
+  await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).first().waitFor()
   expectEqual('bandeau pour Karim, après la levée', await banner.count(), 0)
   console.log('  ok : Karim retrouve « Publier », sans bandeau')
 
