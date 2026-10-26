@@ -40,7 +40,7 @@ jobs:
     name: Lint, types, tests, build
     # Pas pendant l'audit planifié du lundi (voir `schedule`, en tête) : le code n'a pas changé.
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0 ; version de pnpm lue dans package.json
@@ -71,7 +71,7 @@ jobs:
   shots:
     name: Screenshots
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # 20 minutes : les captures prennent 6 à 7 min, mais l'installation de Chromium a déjà pris 8 min
     # sur un runner lent (26/10/2026, main annulé à 15 min). Si le navigateur se bloque, on n'attend
     # pas des heures.
@@ -97,7 +97,7 @@ jobs:
   secrets:
     name: Secret scan
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,7 +113,7 @@ jobs:
   # Signale les failles connues dans les dépendances (exceptions justifiées dans pnpm-workspace.yaml).
   audit:
     name: Dependency audit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -128,7 +128,7 @@ jobs:
   docker:
     name: API image builds and runs
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -f apps/api/Dockerfile -t ruche-api:ci .
@@ -140,7 +140,7 @@ jobs:
   stack:
     name: Production stack
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -173,7 +173,7 @@ jobs:
     name: Publish images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [check, shots, secrets, audit, docker, stack]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write # publier les images sur ghcr.io
