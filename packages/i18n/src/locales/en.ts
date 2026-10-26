@@ -770,7 +770,6 @@ export const en: Translation = {
       body: 'The email address of your account is now:',
       after:
         'This address no longer lets you sign in and will receive nothing more from {{appName}}.',
-      button: 'Sign in',
       help: 'Not you, or a typo in the address? Write to us quickly at {{contactEmail}}.',
     },
   },

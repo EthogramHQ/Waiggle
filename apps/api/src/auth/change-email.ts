@@ -147,7 +147,7 @@ const visitorLanguage = (ctx: AuthContext) =>
 export type EmailChangeOptions = {
   mailer: Mailer
   rateLimiter: RateLimiter
-  /** Adresse de l'appli web : les deux pages où mènent les liens, et la page de connexion. */
+  /** Adresse de l'appli web : les deux pages où mènent les liens. */
   appUrl: string
   /** BETTER_AUTH_SECRET : la clé qui chiffre le jeton du second lien en est dérivée. */
   secret: string
@@ -306,11 +306,7 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       sendInBackground(
         {
           to: payload.email,
-          ...emailChangedEmail(languageOfMember(user), {
-            name: user.name,
-            newEmail: user.email,
-            signInUrl: `${appUrl}/sign-in`,
-          }),
+          ...emailChangedEmail(languageOfMember(user), { name: user.name, newEmail: user.email }),
         },
         LINK,
       )

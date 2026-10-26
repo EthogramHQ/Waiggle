@@ -843,7 +843,6 @@ export const fr = {
       subject: 'L’adresse de ton compte {{appName}} a changé',
       body: 'L’adresse de ton compte est désormais :',
       after: 'Cette adresse-ci ne sert plus à te connecter et ne recevra plus rien de {{appName}}.',
-      button: 'Me connecter',
       help: 'Ce n’était pas toi, ou tu t’es trompé·e d’adresse ? Écris-nous vite à {{contactEmail}}.',
     },
   },

@@ -119,12 +119,7 @@ const variants: [string, (language: Language) => EmailContent][] = [
   ['new-email', (language) => newEmailVerificationEmail(language, { url: secondLink })],
   [
     'email-changed',
-    (language) =>
-      emailChangedEmail(language, {
-        name: 'Inès Morel',
-        newEmail: NEW_EMAIL,
-        signInUrl: `${APP_URL}/sign-in`,
-      }),
+    (language) => emailChangedEmail(language, { name: 'Inès Morel', newEmail: NEW_EMAIL }),
   ],
 ]
 
