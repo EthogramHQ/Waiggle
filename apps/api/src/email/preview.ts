@@ -1,20 +1,24 @@
-// L'aperçu des e-mails de notification (tranche 6c) et de ceux du changement d'adresse (tranche
-// « adresse »), pour les relectures de design et juridique : les e-mails rendus, en français et en
-// anglais, avec les données des tests (Inès reçoit, Malik, Zoé et Sam commentent, répondent et la
-// mentionnent ; Inès change d'adresse). Rien ici n'est envoyé ni lu par l'API :
+// L'aperçu de chaque e-mail de templates.ts (notifications de la tranche 6c, changement d'adresse,
+// inscription, alerte de modération), pour les relectures de design et juridique : les e-mails
+// rendus, en français et en anglais, avec les données des tests (Inès reçoit, Malik, Zoé et Sam
+// commentent, répondent et la mentionnent ; Inès change d'adresse). preview.test.ts refuse un
+// modèle sans aperçu ni exception écrite. Rien ici n'est envoyé ni lu par l'API :
 // `pnpm --filter @ruche/api email:preview <dossier>` (scripts/email-preview.ts) écrit ces fichiers.
 import { type Language, supportedLanguages } from '@ruche/i18n'
 import {
   changeEmailConfirmationEmail,
   type EmailContent,
   emailChangedEmail,
+  existingAccountEmail,
   type MentionData,
   mentionEmail,
+  moderationAlertEmail,
   type NotificationLinks,
   newEmailVerificationEmail,
   type RecapData,
   type RecapLine,
   recapEmail,
+  verificationEmail,
 } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
 
@@ -122,6 +126,27 @@ const variants: [string, (language: Language) => EmailContent][] = [
   [
     'email-changed',
     (language) => emailChangedEmail(language, { name: 'Inès Morel', newEmail: NEW_EMAIL }),
+  ],
+  // Les e-mails de service de l'inscription (tranche 2) : le lien qui active le compte, et
+  // l'avertissement au propriétaire d'une adresse déjà inscrite.
+  [
+    'verification',
+    (language) =>
+      verificationEmail(language, {
+        name: 'Inès Morel',
+        url: verifyLink('eyJhbGciOiJIUzI1NiJ9.inscription.signature', '/verified'),
+      }),
+  ],
+  [
+    'existing-account',
+    (language) =>
+      existingAccountEmail(language, { name: 'Inès Morel', signInUrl: `${APP_URL}/sign-in` }),
+  ],
+  // L'alerte de modération (tranche 7a), à un administrateur : le nombre et le lien, rien d'autre.
+  [
+    'moderation-alert',
+    (language) =>
+      moderationAlertEmail(language, { name: 'Malik', count: 3, url: `${APP_URL}/moderation` }),
   ],
 ]
 

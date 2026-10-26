@@ -1,0 +1,14 @@
+diff --git a/index.js b/index.js
+index d45e67d91d38c91d05e68e8b338e4bc2de591dcc..db3a9272cc7de0b651a992055014295199670e75 100644
+--- a/index.js
++++ b/index.js
+@@ -1,6 +1,8 @@
+ 'use strict';
+ const strictUriEncode = require('strict-uri-encode');
+-const decodeComponent = require('decode-uri-component');
++// decode-uri-component 0.5.0 (GHSA-vcc3-ghjq-m6fr fix) is ESM only: require() returns its namespace.
++const decodeUriComponentModule = require('decode-uri-component');
++const decodeComponent = typeof decodeUriComponentModule === 'function' ? decodeUriComponentModule : decodeUriComponentModule.default;
+ const splitOnFirst = require('split-on-first');
+ const filterObject = require('filter-obj');
+ 

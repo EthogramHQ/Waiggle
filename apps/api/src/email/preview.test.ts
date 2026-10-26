@@ -1,9 +1,11 @@
 // Tests de l'aperçu des e-mails (tranches 6c et « adresse ») : chaque variante se rend, dans les
 // deux langues, en suivant les règles des e-mails (liens chez nous seulement, aucune image, la
 // langue de la page ; les en-têtes de désinscription en un clic pour les notifications, aucun pour
-// les e-mails de service du changement d'adresse).
+// les e-mails de service). Chaque modèle de templates.ts a son aperçu, ou une exception écrite.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { emailPreviews } from './preview'
+import * as templates from './templates'
 
 // Les e-mails de notification ; les autres sont des e-mails de service, sans désinscription.
 const NOTIFICATIONS = [
@@ -13,9 +15,40 @@ const NOTIFICATIONS = [
   'recap-short',
   'recap-third-without-visit',
 ]
-const SERVICE = ['change-email', 'email-changed', 'new-email']
+const SERVICE = [
+  'change-email',
+  'email-changed',
+  'existing-account',
+  'moderation-alert',
+  'new-email',
+  'verification',
+]
+
+// Les modèles de templates.ts qui n'ont pas d'aperçu, chacun avec sa raison (efficacité,
+// adresse-E1 : un e-mail sans aperçu n'est vu par aucune relecture de design). Aucun aujourd'hui.
+const WITHOUT_PREVIEW: Record<string, string> = {}
 
 describe('emailPreviews', () => {
+  it('has a preview for every e-mail of templates.ts, or a written reason not to', () => {
+    // Le code de preview.ts : un aperçu appelle son modèle par son nom.
+    const source = readFileSync(new URL('./preview.ts', import.meta.url), 'utf8')
+    const models = Object.entries(templates)
+      .filter(([name, value]) => name.endsWith('Email') && typeof value === 'function')
+      .map(([name]) => name)
+
+    expect(models.length).toBeGreaterThan(0)
+    for (const model of models) {
+      if (model in WITHOUT_PREVIEW) {
+        expect(WITHOUT_PREVIEW[model]?.trim(), model).toBeTruthy()
+        expect(source, `${model} has a preview: remove its exception`).not.toContain(`${model}(`)
+      } else {
+        expect(source, `${model} has no preview in emailPreviews()`).toContain(`${model}(`)
+      }
+    }
+    // Une exception qui ne nomme plus aucun modèle se retire.
+    for (const model of Object.keys(WITHOUT_PREVIEW)) expect(models).toContain(model)
+  })
+
   it('renders every variant in French and in English, following the rules of the e-mails', () => {
     const previews = emailPreviews()
 

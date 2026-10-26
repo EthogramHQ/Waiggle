@@ -14,8 +14,9 @@ WORKDIR /repo
 RUN corepack enable
 
 # Les dépendances d'abord, d'après le fichier de verrouillage (mises en cache par Docker tant que
-# ces fichiers ne changent pas). Voir apps/api/Dockerfile pour le détail.
+# ces fichiers ne changent pas). Voir apps/api/Dockerfile pour le détail, et pour patches/.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm fetch
 
 COPY . .
