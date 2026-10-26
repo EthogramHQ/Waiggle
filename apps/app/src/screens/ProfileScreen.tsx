@@ -1,6 +1,7 @@
 // Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
 // Puis la section « E-mails » (tranche 6c) : deux interrupteurs, enregistrés chacun dès qu'on le
 // touche, sans passer par « Enregistrer » (qui ne concerne que le formulaire au-dessus).
+// Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier, et garde ses e-mails.
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX_LENGTH,
@@ -36,6 +37,7 @@ import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll, revealWithoutJump } from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
+import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { SheetHeader } from '../ui/SheetHeader'
@@ -61,8 +63,41 @@ export function ProfileScreen() {
     )
   }
   if (!me.data) return <LoadingScreen />
+  // Un compte suspendu (tranche 7c) ne modifie plus son profil : il le lit tel que les autres le
+  // voient, et garde ses réglages d'e-mail.
+  if (me.data.suspension) return <LockedProfile me={me.data} />
   // Le formulaire n'est affiché qu'une fois le profil chargé : il part ainsi des bonnes valeurs.
   return <ProfileForm me={me.data} />
+}
+
+/**
+ * « Mon profil » pendant une suspension : ni champ, ni photo à changer, ni « Enregistrer » (l'API
+ * refuserait tout changement autre que la langue). Une phrase dit pourquoi, puis le profil tel
+ * que les autres membres le lisent (le même en-tête que sa page), puis les réglages d'e-mail, qui
+ * restent permis. La barre du haut, sur toutes les largeurs, porte le bandeau de la suspension.
+ */
+function LockedProfile({ me }: { me: Me }) {
+  const { t } = useTranslation()
+  const toSource = useMediaSources()
+  const back = useGoBack('/account')
+  return (
+    // Le nom du membre est le titre de la page (niveau 1), comme sur sa page : « Mon profil » ne
+    // vient que dans l'onglet.
+    <Screen pageTitle={t(($) => $.profile.title)} header={<TopNav />} onBack={back}>
+      {/* Lue à son tour (role « status ») : elle est là dès l'ouverture, ce n'est pas une alerte. */}
+      <Notice tone="info" message={t(($) => $.suspension.profileLocked)} polite />
+      <MemberHeader
+        name={me.name}
+        handle={t(($) => $.member.handle, { handle: me.handle })}
+        avatar={toSource(me.avatarUrl)}
+        bio={me.bio}
+        toolsTitle={t(($) => $.member.favoriteTools)}
+        // De simples pastilles : le profil ne connaît que le nom des outils, pas leur étiquette.
+        tools={me.favoriteTools.map((tool) => ({ label: tool }))}
+      />
+      <EmailSettings />
+    </Screen>
+  )
 }
 
 type Message = { text: string; ok: boolean } | null

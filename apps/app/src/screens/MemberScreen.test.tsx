@@ -741,3 +741,50 @@ describe('the page of a member, seen by a suspended member', () => {
     expect(await screen.findByRole('switch', { name: 'Suivre Léa' })).toBeTruthy()
   })
 })
+
+// Décision de Louis (26/10/2026, choix a) : un membre suspendu peut retirer ce qu'il a déjà donné,
+// jamais ajouter (scénario : « retirer ses réactions et ses abonnements »). S'il suit déjà ce
+// membre, « Suivi » reste pour ne plus le suivre ; le suivi retiré, le bouton reste à sa place
+// (le focus avec lui), mais inactif : il ne suit pas de nouveau.
+describe('the page of a member a suspended member already follows', () => {
+  const suspendedMax = {
+    ...leaMe,
+    id: 'u2',
+    name: 'Max',
+    handle: 'max',
+    suspension: sevenDaySuspension,
+  }
+
+  it('keeps « Suivi » so that he can stop following her', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMax)
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: true, followerCount: 13 })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    // Le profil arrivé (la suspension est connue), le bouton est toujours là.
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+    const button = await screen.findByRole('switch', { name: 'Suivi : Léa' })
+    await fireEvent.press(button)
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the button in place, but inactive, once he no longer follows her', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMax)
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: true, followerCount: 13 })
+    const { queryClient } = await renderWithProviders(<MemberScreen id="u1" />)
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await screen.findByRole('switch', { name: 'Suivi : Léa' })
+
+    // Le suivi retiré (ce que fait la mise à jour optimiste de useFollow) : la page le dit aussitôt.
+    await act(async () => {
+      queryClient.setQueryData(['member', 'u1'], {
+        ...leaPage,
+        isFollowed: false,
+        followerCount: 12,
+      })
+    })
+
+    expect(await screen.findByRole('switch', { name: 'Suivre Léa' })).toBeDisabled()
+  })
+})
