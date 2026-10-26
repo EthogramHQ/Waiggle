@@ -78,6 +78,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { labels } from './labels'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
+import { SuspensionCatalogue } from './suspension'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -1030,6 +1031,8 @@ export function CatalogueScreen() {
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
+      {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
+      <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
 

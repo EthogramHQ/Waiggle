@@ -31,7 +31,7 @@ import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
-import { useMySuspension } from '../moderation/mySuspension'
+import { useSuspension } from '../moderation/suspension'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
@@ -133,7 +133,7 @@ function ProjectView({ project }: { project: Project }) {
   // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne suit plus, ne réagit plus et
   // n'écrit plus de note ; il peut encore supprimer, et retirer ce qu'il a déjà donné (décision de
   // Louis du 26/10/2026 : ne plus suivre, retirer une réaction).
-  const suspended = useMySuspension() !== null
+  const suspended = useSuspension().suspended
   // Ce qu'il peut encore retirer : ce qu'il avait donné à un moment de la visite. Une fois retiré,
   // le bouton reste à sa place jusqu'à la fin de la visite : s'il disparaissait, le focus se
   // perdrait et la rangée bougerait sous le doigt. Un nouvel appui serait refusé par l'API.

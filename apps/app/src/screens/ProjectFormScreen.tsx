@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiResult, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { useMySuspension } from '../moderation/mySuspension'
+import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { parseTools } from '../profile/form'
@@ -84,7 +84,7 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   // Un compte suspendu (tranche 7c) ne publie ni ne modifie : le formulaire, ouvert par l'adresse,
   // laisse la place à une page qui le dit. Le formulaire s'affiche sans attendre le profil (presque
   // toujours déjà en cache) ; s'il dit « suspendu », la page change.
-  const suspended = useMySuspension() !== null
+  const suspended = useSuspension().suspended
 
   if (isPending) return <LoadingScreen width={width} />
   if (!session) return <SignedOutScreen width={width} />

@@ -32,7 +32,7 @@ import {
   usePostComment,
 } from '../comments/api'
 import { useMentionable } from '../mentions/api'
-import { useMySuspension } from '../moderation/mySuspension'
+import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { shortDate } from '../projects/format'
 import { removalBanner } from '../reports/removal'
@@ -99,7 +99,7 @@ export function Comments({ project }: { project: Project }) {
   const isPrivate = project.visibility === 'private'
   // Un compte suspendu (tranche 7c) lit les commentaires, mais n'en écrit plus, ne répond plus et
   // ne modifie plus les siens ; il peut encore les supprimer, et masquer ceux de son projet.
-  const suspended = useMySuspension() !== null
+  const suspended = useSuspension().suspended
 
   // Un nouveau commentaire : le champ ouvert ou non, son texte, et le problème du texte s'il y en a un.
   const [composing, setComposing] = useState(false)
