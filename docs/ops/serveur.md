@@ -530,7 +530,10 @@ pas** : on prévient Louis.
      - pour chaque `Email changed <identifiant>` : la requête des désinscriptions ci-dessus, avec
        `R` et `M` à `false`, pour qu'aucun e-mail ne parte vers l'ancienne adresse ; puis Louis
        prévient le membre (sa nouvelle adresse est dans la sauvegarde `avant-restauration`), qui
-       refait le changement dans l'appli et rallume ses e-mails dans Mon profil ;
+       refait le changement dans l'appli et rallume ses e-mails dans Mon profil. Si ce compte est
+       celui d'un administrateur, les alertes de modération (`moderation-alert.ts`) partent vers
+       son adresse sans tenir compte de ces réglages : Louis lui remet donc sa nouvelle adresse
+       dans la base avant l'étape 4, sinon les contenus signalés iraient à l'ancienne ;
   4. remettre `EMAIL_JOBS=on` (ou vide) dans `secrets.env`, puis redémarrer l'API comme en 1 ;
   5. effacer le fichier de l'étape 0 (`rm /srv/ruche/backups/refus-<nom>.txt`) : il garde des
      identifiants de membres, et n'a plus d'usage.
