@@ -270,6 +270,7 @@ export const changeEmailConfirmationEmail = (
  * Le deuxième e-mail, vers la NOUVELLE adresse, pour la vérifier. Une faute de frappe l'enverrait
  * chez un inconnu (relecture de sécurité S6) : la salutation est neutre, sans le nom du membre, et
  * aucune adresse n'y est écrite, ni l'ancienne ni celle-ci (seule celle du contact, dans le pied).
+ * Le lien non plus ne la dit pas : son jeton est chiffré (auth/change-email.ts, relecture R1).
  */
 export const newEmailVerificationEmail = (
   language: Language,

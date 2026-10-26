@@ -121,8 +121,14 @@ export const createAuth = ({
   // son avatar et les photos de tous ses projets).
   const filesToDelete = new Map<string, string[]>()
   // Changer son adresse (tranche « adresse ») : les hooks et les envois de ce parcours, avec leurs
-  // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes.
-  const emailChange = createEmailChange({ mailer, rateLimiter: createRateLimiter(db), appUrl })
+  // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
+  // à chiffrer le jeton du second lien.
+  const emailChange = createEmailChange({
+    mailer,
+    rateLimiter: createRateLimiter(db),
+    appUrl,
+    secret,
+  })
 
   return betterAuth({
     ...authSchemaOptions,
