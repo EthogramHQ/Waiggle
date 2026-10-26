@@ -373,6 +373,12 @@ export function CatalogueScreen() {
         <HoneyMeter value={12} max={12} label={l.meterDone} />
         <Hint icon="lock-simple" text={l.stateSignedOut} />
         <Hint icon="globe-simple" text={l.longHint} />
+        {/* Un morceau de la note est un lien (ici sans effet : le catalogue n'ouvre rien). */}
+        <Hint
+          icon="envelope-simple"
+          text={l.hintLink}
+          link={{ label: l.hintLinkLabel, onPress: () => undefined }}
+        />
         <Disclosure title={l.recipe} hint={l.recipeHint}>
           <Text tone="secondary">{l.plain}</Text>
         </Disclosure>

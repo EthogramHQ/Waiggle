@@ -101,6 +101,8 @@ export const fr = {
       // Tranche « adresse » : la nouvelle adresse est celle du compte ; le mot de passe est faux.
       sameEmail: 'C’est déjà ton adresse.',
       wrongPassword: 'Mot de passe incorrect.',
+      // Un refus 401 sans autre code : la session a expiré entre l'ouverture de la page et l'envoi.
+      sessionExpired: 'Ta session a expiré. Reconnecte-toi, puis recommence.',
       generic: 'Une erreur est survenue. Réessaie dans un instant.',
     },
   },
@@ -140,16 +142,17 @@ export const fr = {
     loadError: 'Impossible de charger ton compte. Vérifie ta connexion et réessaie.',
     email: {
       label: 'Adresse e-mail',
-      change: 'Changer d’adresse e-mail',
       // Le nom lu de la ligne : l'action, puis l'adresse affichée (sinon le lecteur d'écran la tait).
       spoken: 'Changer d’adresse e-mail : {{email}}',
     },
     // Tranche « adresse » : la page où l'on demande le changement (deux liens à suivre).
     changeEmail: {
-      title: 'Changer d’adresse e-mail',
+      // Trait d'union insécable (U+2011) dans « e‑mail » : le titre ne se coupe plus entre « e- » et
+      // « mail » sur un petit téléphone (relecture de design, 360 et 390 px).
+      title: 'Changer d’adresse e‑mail',
       current: 'Ton adresse actuelle : {{email}}',
       intro:
-        'Ta nouvelle adresse servira à te connecter et à recevoir les e-mails de {{appName}}. Elle n’est visible que par toi.',
+        'Ta nouvelle adresse servira à te connecter et à recevoir les e-mails de {{appName}}. Les autres membres ne la voient pas.',
       steps:
         'Elle ne change qu’après deux confirmations : un lien envoyé à ton adresse actuelle, puis un lien envoyé à la nouvelle.',
       newEmail: 'Nouvelle adresse e-mail',
@@ -170,7 +173,7 @@ export const fr = {
       confirmedBody:
         'Si ta nouvelle adresse peut être utilisée, un second lien vient d’y partir. Ouvre-le pour terminer : il est valable une heure.',
       confirmedNone:
-        'Rien reçu ? Regarde dans les indésirables. Aucun lien ne part si l’adresse est déjà celle d’un autre compte.',
+        'Rien reçu ? Regarde dans les indésirables. Aucun lien ne part si l’adresse est déjà celle d’un autre compte, ni après trois liens dans l’heure.',
       doneTitle: 'Adresse changée',
       doneBody: 'Ton adresse est maintenant {{email}}. Connecte-toi désormais avec elle.',
       doneSignedOut: 'Connecte-toi avec ta nouvelle adresse et ton mot de passe habituel.',
@@ -179,7 +182,7 @@ export const fr = {
       toAccount: 'Aller à Mon compte',
       errorTitle: 'Ce lien ne marche plus',
       errorBody:
-        'Il a expiré, il a déjà servi, une autre demande l’a remplacé, ou un autre compte est connecté sur cet appareil. Tu peux recommencer depuis Mon compte.',
+        'Il a expiré, il a déjà servi, une autre demande l’a remplacé, un autre compte est connecté sur cet appareil, ou ta nouvelle adresse ne peut plus être utilisée. Tu peux recommencer depuis Mon compte.',
       restart: 'Recommencer depuis Mon compte',
     },
     delete: {

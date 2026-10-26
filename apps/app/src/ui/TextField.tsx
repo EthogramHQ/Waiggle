@@ -196,6 +196,10 @@ export function TextField({
     <Pressable
       accessible={false}
       focusable={false}
+      // Sur le web, react-native-web pose quand même tabIndex=0 sur un Pressable (même avec
+      // focusable à faux) : la rangée devenait un arrêt de Tab vide avant chaque champ. -1 l'en sort ;
+      // le clic de la souris donne toujours le focus au champ (onPress ci-dessous).
+      {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
       onPress={() => {
         if (inputProps.editable !== false) input.current?.focus()
       }}

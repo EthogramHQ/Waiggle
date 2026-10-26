@@ -148,6 +148,17 @@ describe('after the second link (done), signed out', () => {
     expect(seen(text('doneSignedOut'))).toBe(0)
     expect(screen.queryByRole('button', { name: text('signIn') })).toBeNull()
   })
+
+  it('shows the loading state while the session is read, not half a page', async () => {
+    // Relecture de design (des-7) : le titre puis l'adresse et le bouton arrivaient en deux fois,
+    // et la page bougeait de 70 pt sous le doigt.
+    mockSession(null, true)
+    await open('done')
+
+    expect(seen(text('doneTitle'))).toBe(0)
+    expect(seen(text('doneDevices'))).toBe(0)
+    expect(screen.getAllByText(fr.t('common.loading')).length).toBeGreaterThan(0)
+  })
 })
 
 describe('a link that no longer works (?error=…)', () => {

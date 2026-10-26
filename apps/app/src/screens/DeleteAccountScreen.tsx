@@ -18,7 +18,7 @@ import { Step } from '../ui/StepNumber'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
-import { LoadingScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -26,7 +26,7 @@ const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 export function DeleteAccountScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending } = useSession()
+  const { data, isPending, error: sessionError, refetch } = useSession()
   // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà).
   const me = useMe(Boolean(data))
   const [password, setPassword] = useState('')
@@ -37,6 +37,8 @@ export function DeleteAccountScreen() {
   const back = useGoBack('/account')
 
   if (isPending) return <LoadingScreen />
+  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
   if (!data) return <SignedOutScreen />
 
   const onExport = async () => {

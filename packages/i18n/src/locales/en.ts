@@ -89,6 +89,7 @@ export const en: Translation = {
       inviteInvalid: 'This invite code is not valid. Ask the person who invited you for it.',
       sameEmail: 'This is already your email address.',
       wrongPassword: 'Incorrect password.',
+      sessionExpired: 'Your session has expired. Sign in again, then start over.',
       generic: 'Something went wrong. Please try again in a moment.',
     },
   },
@@ -126,14 +127,13 @@ export const en: Translation = {
     loadError: 'Your account could not be loaded. Check your connection and try again.',
     email: {
       label: 'Email address',
-      change: 'Change email address',
       spoken: 'Change email address: {{email}}',
     },
     changeEmail: {
       title: 'Change email address',
       current: 'Your current address: {{email}}',
       intro:
-        'Your new address will be used to sign in and to receive emails from {{appName}}. Only you can see it.',
+        'Your new address will be used to sign in and to receive emails from {{appName}}. Other members never see it.',
       steps:
         'It only changes after two confirmations: a link sent to your current address, then a link sent to the new one.',
       newEmail: 'New email address',
@@ -153,7 +153,7 @@ export const en: Translation = {
       confirmedBody:
         'If your new address can be used, a second link has just been sent to it. Open it to finish: it is valid for one hour.',
       confirmedNone:
-        'Nothing? Check your spam folder. No link is sent if the address already belongs to another account.',
+        'Nothing? Check your spam folder. No link is sent if the address already belongs to another account, or after three links within the hour.',
       doneTitle: 'Email address changed',
       doneBody: 'Your address is now {{email}}. Use it to sign in from now on.',
       doneSignedOut: 'Sign in with your new address and your usual password.',
@@ -162,7 +162,7 @@ export const en: Translation = {
       toAccount: 'Go to My account',
       errorTitle: 'This link no longer works',
       errorBody:
-        'It has expired, it has already been used, another request replaced it, or another account is signed in on this device. You can start again from My account.',
+        'It has expired, it has already been used, another request replaced it, another account is signed in on this device, or your new address can no longer be used. You can start again from My account.',
       restart: 'Start again from My account',
     },
     delete: {

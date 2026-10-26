@@ -28,7 +28,7 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import type { Appearance } from '../ui/theme/appearance'
 import { useTheme } from '../ui/theme/ThemeProvider'
-import { LoadingScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -43,7 +43,7 @@ const appearances: { value: Appearance; icon: IconName }[] = [
 export function AccountScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending } = useSession()
+  const { data, isPending, error: sessionError, refetch } = useSession()
   const me = useMe(Boolean(data))
   const toSource = useMediaSources()
   const { current, choose } = useChooseLanguage()
@@ -51,10 +51,20 @@ export function AccountScreen() {
   const openOutside = useOpenOutside()
   const [exportMessage, setExportMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [exporting, setExporting] = useState(false)
+  // Une relecture du profil demandée par « Réessayer » est en cours (voir le message plus bas).
+  const [retryingMe, setRetryingMe] = useState(false)
+  const retryMe = async () => {
+    if (retryingMe) return
+    setRetryingMe(true)
+    await me.refetch()
+    setRetryingMe(false)
+  }
 
   const back = useGoBack('/')
 
   if (isPending) return <LoadingScreen />
+  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
 
@@ -83,7 +93,17 @@ export function AccountScreen() {
       // muette, et tout le reste (langue, déconnexion…) reste utilisable. Seulement sans profil
       // déjà là : une relecture ratée garde ce qui est affiché. React Query relira de lui-même
       // au retour du réseau.
-      notice={me.isError && !me.data ? <Notice message={t('account.loadError')} /> : undefined}
+      // « Réessayer » relance la lecture tout de suite, sans attendre le retour du réseau. Pendant
+      // la relecture, React Query efface l'erreur : le message reste (`retryingMe`), sinon il
+      // disparaîtrait avec le lien qui a le focus, puis reviendrait si la panne dure.
+      notice={
+        (me.isError || retryingMe) && !me.data ? (
+          <Notice
+            message={t('account.loadError')}
+            action={{ label: t('common.retry'), onPress: retryMe }}
+          />
+        ) : undefined
+      }
     >
       {/* Qui est connecté, et le chemin vers son profil. */}
       <Surface variant="grouped" padding="lg">

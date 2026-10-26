@@ -8,6 +8,7 @@ import { ChangeEmailRequest, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@r
 import { useRouter } from 'expo-router'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Linking } from 'react-native'
 import { changeEmail, useSession } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
 import { useGoBack } from '../navigation/useGoBack'
@@ -20,7 +21,7 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
-import { LoadingScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe (le message générique d'une
 // erreur inattendue peut en être un).
@@ -42,7 +43,7 @@ const fieldOf = (error: AuthErrorKey): keyof FieldErrors | null => {
 export function ChangeEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending } = useSession()
+  const { data, isPending, error: sessionError, refetch } = useSession()
   const back = useGoBack('/account')
   const [newEmail, setNewEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -67,6 +68,8 @@ export function ChangeEmailScreen() {
   })
 
   if (isPending) return <LoadingScreen />
+  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
   const current = data.user.email
@@ -131,8 +134,14 @@ export function ChangeEmailScreen() {
 
   // Plus accès à son adresse actuelle : le changement se fait alors à la main (scénario). L'aide
   // reste dans les deux états.
+  // L'adresse de contact s'ouvre droit dans la messagerie, comme « Nous écrire » de Mon compte :
+  // c'est notre adresse, pas un site tiers, donc sans la page « Tu quittes… » (/out).
   const noAccess = (
-    <Hint icon="envelope-simple" text={t('account.changeEmail.noAccess', { contactEmail })} />
+    <Hint
+      icon="envelope-simple"
+      text={t('account.changeEmail.noAccess', { contactEmail })}
+      link={{ label: contactEmail, onPress: () => void Linking.openURL(`mailto:${contactEmail}`) }}
+    />
   )
 
   // Chaque état a sa clé (`key`) : React dessine des éléments neufs au changement, au lieu de
@@ -153,8 +162,12 @@ export function ChangeEmailScreen() {
         polite
         message={t('account.changeEmail.sentBody', { email: sentTo })}
       />
-      <Text tone="secondary">{t('account.changeEmail.sentNext')}</Text>
-      <Text variant="callout" tone="muted">
+      {/* Centrés, comme le titre au-dessus et comme la page « Vérifie ta boîte mail » de
+          l'inscription (CheckEmailScreen) : un état de confirmation se lit au milieu. */}
+      <Text tone="secondary" align="center">
+        {t('account.changeEmail.sentNext')}
+      </Text>
+      <Text variant="callout" tone="muted" align="center">
         {t('account.changeEmail.sentNone')}
       </Text>
       {/* L'aide passe avant « Retour » : elle l'éloigne encore de la place du bouton touché (27 pt
