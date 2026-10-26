@@ -126,8 +126,9 @@ export const useDecide = (): {
       if (result.ok) {
         // Une lecture de la liste déjà en route est annulée : elle remettrait la cible décidée.
         await queryClient.cancelQueries({ queryKey: touched })
+        // 7c : provisoire (commit du contrat) ; une suspension n'a pas de cible dans ces listes.
         queryClient.setQueryData(touched, (data: Parameters<typeof without>[0]) =>
-          without(data, input.target),
+          'target' in input ? without(data, input.target) : data,
         )
         // L'autre liste a changé aussi (un contenu retiré y entre, un rétabli peut revenir dans la
         // file) : marquée périmée, elle se relira quand on l'ouvrira, pas sous les yeux.

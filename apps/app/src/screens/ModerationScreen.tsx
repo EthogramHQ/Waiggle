@@ -236,7 +236,8 @@ function AdminModeration() {
    * des boutons, qui restent pour réessayer.
    */
   const run = async (
-    input: ModerationDecisionInput,
+    // 7c : provisoire (commit du contrat) ; les décisions sur une cible seulement, pas la suspension.
+    input: Extract<ModerationDecisionInput, { target: unknown }>,
     done: string,
     onSettled: (outcome: Outcome) => void,
   ) => {

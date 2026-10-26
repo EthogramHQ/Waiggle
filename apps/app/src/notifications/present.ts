@@ -101,6 +101,17 @@ export const presentNotification = (notification: Notification, t: T): Presented
         quote: null,
         target: '/profile',
       }
+    // 7c : provisoire (commit du contrat) ; ui-dev C écrit le texte complet (date, fondement,
+    // explication, recours).
+    case 'suspended':
+    case 'suspension_ended':
+      return {
+        icon: 'sparkle',
+        text: t(($) => $.suspension.title),
+        detail: null,
+        quote: null,
+        target: null,
+      }
     case 'removed': {
       // Tranche 7a, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
       // phrase), puis, une phrase par ligne, que lui seul le voit encore, après un signalement ou
