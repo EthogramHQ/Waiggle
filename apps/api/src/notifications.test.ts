@@ -1047,22 +1047,6 @@ describe('the notifications of the moderation', () => {
       expect(text).not.toContain(meteo.id)
     })
 
-    // Tranche 7c (design 7b ui-11) : l'appli ne devine plus « projet caché » à un titre vide, l'API
-    // le dit. Le titre reste vide dans ce cas.
-    it('says the project is hidden, for a removed comment on a project that became private', async () => {
-      const meteo = await publish(ines)
-      const published = await comment(meteo.id, malik, 'Un commentaire insultant')
-      await report(zoe, { kind: 'comment', id: published.id })
-      await remove({ kind: 'comment', id: published.id })
-      expect(await ofKind(malik, 'removed')).toMatchObject([{ projectHidden: false }]) // témoin
-
-      await setVisibility(meteo.id, ines, 'private')
-
-      expect(await ofKind(malik, 'removed')).toMatchObject([
-        { targetKind: 'comment', projectHidden: true, project: { title: '' } },
-      ])
-    })
-
     it('says the project is hidden once its author blocks the author of the comment', async () => {
       const meteo = await publish(ines)
       const published = await comment(meteo.id, malik, 'Un commentaire insultant')

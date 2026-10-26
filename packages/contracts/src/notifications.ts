@@ -115,9 +115,9 @@ export const RemovedNotification = z.object({
   explanation: z.string(),
   afterReport: z.boolean(),
   /**
-   * Vrai quand le commentaire retiré est sur un projet que le membre ne voit plus (un blocage, un
-   * projet devenu privé) : son titre est alors vide, et l'appli ne mène nulle part (tranche 7c ;
-   * l'appli le devinait avant à un titre vide).
+   * Vrai quand le commentaire retiré est sur le projet d'un membre qui l'a bloqué depuis (règle 9 de
+   * 7b) : son titre est alors vide, et l'appli ne mène nulle part (tranche 7c ; l'appli le devinait
+   * avant à un titre vide). Sur un projet devenu privé, la notification disparaît (règle 3 de 7a).
    */
   projectHidden: z.boolean(),
 })
