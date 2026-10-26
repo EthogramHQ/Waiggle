@@ -129,6 +129,13 @@ describe('ModerationQueueItem', () => {
     count: 3,
     firstReportedAt: '2026-10-21T09:30:00.000Z',
     lastReportedAt: at,
+    authorRecord: {
+      memberId: 'u7',
+      removals: 1,
+      suspensions: 0,
+      suspendedNow: false,
+      canSuspend: true,
+    },
   }
 
   it('describes a target with its reasons counted, its details and its dates', () => {
@@ -234,6 +241,7 @@ describe('the two notifications of moderation', () => {
     ground: 'rules',
     explanation: 'Publicité déguisée.',
     afterReport: true,
+    projectHidden: false,
   }
   const handled = {
     id: 'report:0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f9',

@@ -29,6 +29,7 @@ const lea = {
   isFollowed: false,
   followerCount: 3,
   projects: [summary],
+  moderation: null,
 }
 
 describe('Member', () => {
