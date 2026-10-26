@@ -18,7 +18,10 @@ RUN corepack enable
 # Docker garde cette étape en cache tant que ces fichiers ne changent pas : constructions plus rapides.
 # package.json est indispensable ici : son champ "packageManager" fixe la version exacte de pnpm.
 # Sans lui, corepack télécharge la toute dernière version, qui peut se comporter autrement.
+# patches/ aussi : pnpm applique dès ici les correctifs déclarés dans pnpm-workspace.yaml
+# (patchedDependencies), et refuse de continuer si l'un d'eux manque.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm fetch
 
 COPY . .
