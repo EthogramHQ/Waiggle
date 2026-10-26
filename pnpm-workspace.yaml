@@ -49,8 +49,9 @@ overrides:
   # decode-uri-component <= 0.4.2 (GHSA-vcc3-ghjq-m6fr : un lien piégé fige l'onglet qui l'ouvre),
   # via query-string 7 dans expo-router, donc dans l'appli web. La version corrigée 0.5.0 n'existe
   # qu'en module ESM : query-string la charge par require(), qui rend alors l'objet du module et non
-  # la fonction. Le correctif patches/query-string@7.1.3.patch prend sa fonction `default`. À retirer
-  # (avec le correctif) quand expo-router ne dépend plus de query-string 7 (SDK Expo 58).
+  # la fonction. Le correctif patches/query-string@7.1.3.patch prend sa fonction `default`, et Jest
+  # transforme le paquet (`transformIgnorePatterns` d'apps/app). À retirer (avec le correctif et
+  # cette ligne de Jest) quand expo-router ne dépend plus de query-string 7 (SDK Expo 58).
   'query-string>decode-uri-component': 0.5.0
 
 # Correctifs posés sur une dépendance (`pnpm patch`), chacun expliqué au-dessus de la version
