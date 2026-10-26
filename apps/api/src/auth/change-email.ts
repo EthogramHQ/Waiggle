@@ -268,7 +268,11 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
         NEW_EMAIL_LINK_RULE,
       )
       if (!decision.allowed) return true
-      const link = new URL(withPage(url, pageOf['change-email-verification']))
+      // Pas de page de retour (callbackURL) dans ce lien : beforeLink l'impose à l'ouverture (S2),
+      // et sans elle l'adresse perd une soixantaine de caractères, déjà longue avec le jeton chiffré
+      // (relecture de design des-E6 : 15 lignes à 320 px dans la version texte).
+      const link = new URL(url)
+      link.searchParams.delete('callbackURL')
       link.searchParams.set('token', await sealToken(token))
       sendInBackground(
         {
