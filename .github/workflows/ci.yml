@@ -17,11 +17,12 @@ on:
   schedule:
     - cron: '0 5 * * 1'
 
-# Toutes les tâches tournent sur Ubuntu 24.04, nommé en clair, et non sur « ubuntu-latest » :
-# le 22/10/2026, GitHub a fait passer « ubuntu-latest » à Ubuntu 26.04, où Playwright (le
-# navigateur des captures et du parcours de production) ne s'installe pas encore. Une machine
-# nommée ne change pas sous nos pieds. On reviendra à « ubuntu-latest » quand Playwright prendra
-# en charge Ubuntu 26.04 : Renovate propose ses nouvelles versions, dont les notes le diront.
+# Toutes les tâches tournent sur Ubuntu 26.04, nommé en clair, et non sur « ubuntu-latest » : une
+# machine nommée ne change pas sous nos pieds. Le 22/10/2026, GitHub a fait passer
+# « ubuntu-latest » à Ubuntu 26.04 alors que Playwright (le navigateur des captures et du
+# parcours de production) ne s'y installait pas encore ; depuis Playwright 1.64.1, il y est pris
+# en charge (26/10/2026). Renovate propose la version suivante d'Ubuntu, et la CI dit si
+# Playwright y passe.
 
 # Droits minimaux : la CI peut lire le code, rien de plus.
 permissions:
@@ -40,7 +41,7 @@ jobs:
     name: Lint, types, tests, build
     # Pas pendant l'audit planifié du lundi (voir `schedule`, en tête) : le code n'a pas changé.
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 ; version de pnpm lue dans package.json
@@ -71,7 +72,7 @@ jobs:
   shots:
     name: Screenshots
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # 20 minutes : les captures prennent 6 à 7 min, mais l'installation de Chromium a déjà pris 8 min
     # sur un runner lent (26/10/2026, main annulé à 15 min). Si le navigateur se bloque, on n'attend
     # pas des heures.
@@ -97,7 +98,7 @@ jobs:
   secrets:
     name: Secret scan
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,7 +114,7 @@ jobs:
   # Signale les failles connues dans les dépendances (exceptions justifiées dans pnpm-workspace.yaml).
   audit:
     name: Dependency audit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -128,7 +129,7 @@ jobs:
   docker:
     name: API image builds and runs
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -f apps/api/Dockerfile -t ruche-api:ci .
@@ -140,7 +141,7 @@ jobs:
   stack:
     name: Production stack
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -173,7 +174,7 @@ jobs:
     name: Publish images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [check, shots, secrets, audit, docker, stack]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write # publier les images sur ghcr.io
