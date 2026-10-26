@@ -15,7 +15,7 @@
 //
 // Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 7a, règle 23), écrite en
 // texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
-import { appName, palettes, radii } from '@ruche/brand'
+import { appName, contactEmail, palettes, radii } from '@ruche/brand'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
 
@@ -48,10 +48,51 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
 
-type Link = { label: string; url: string }
+type Link = {
+  label: string
+  url: string
+  /**
+   * Le libellé de la version texte, s'il diffère : sans bouton, l'adresse du lien suit sur la
+   * ligne d'en dessous, d'où « Confirmer cette adresse : » (relecture de design des-E6).
+   */
+  textLabel?: string
+}
 
 /** Un élément d'une liste : une ligne, et éventuellement un extrait en dessous. */
 type Item = { line: string; excerpt?: string }
+
+/** Un morceau de paragraphe : du texte, en gras s'il faut le retenir (l'adresse de contact). */
+type Run = { text: string; bold?: boolean }
+/** Un paragraphe : un texte simple, ou une suite de morceaux dont certains sont en gras. */
+type Paragraph = string | Run[]
+
+/**
+ * Remplit un texte et met en gras la valeur d'un de ses paramètres : on coupe le modèle à
+ * l'endroit du paramètre (`{{contactEmail}}`), on remplit chaque morceau, et la valeur passe entre
+ * eux. La version texte, qui recolle les morceaux, est identique à `fill(template)`.
+ */
+const withBold = (template: string, name: string, value: string): Run[] =>
+  template
+    .split(`{{${name}}}`)
+    .flatMap((part, index) => [
+      ...(index > 0 ? [{ text: value, bold: true }] : []),
+      { text: fill(part) },
+    ])
+    .filter((run) => run.text !== '')
+
+/** Le paragraphe en texte brut : les morceaux recollés, sans marque de gras. */
+const plain = (paragraph: Paragraph) =>
+  typeof paragraph === 'string' ? paragraph : paragraph.map((run) => run.text).join('')
+
+/** Le paragraphe en HTML : chaque morceau échappé, les morceaux en gras dans un <strong>. */
+const richHtml = (paragraph: Paragraph) =>
+  typeof paragraph === 'string'
+    ? escapeHtml(paragraph)
+    : paragraph
+        .map((run) =>
+          run.bold ? `<strong>${escapeHtml(run.text)}</strong>` : escapeHtml(run.text),
+        )
+        .join('')
 
 type Layout = {
   /** La langue de l'e-mail, annoncée dans `<html lang>` (lecteurs d'écran, traduction). */
@@ -60,12 +101,22 @@ type Layout = {
   heading?: string
   greeting: string
   paragraphs: string[]
+  /**
+   * Une donnée à vérifier d'un coup d'œil (la nouvelle adresse), seule sur sa ligne sous les
+   * paragraphes, en gras, et coupée n'importe où : une adresse n'a pas d'espace (des-E1, des-E3).
+   */
+  highlight?: string
   /** Une liste (les notifications d'un récap ou d'un e-mail de mentions). */
   items?: Item[]
   /** Des paragraphes après la liste (« Et 2 autres », les nombres). */
-  after?: string[]
+  after?: Paragraph[]
   /** Le bouton ; absent d'un e-mail qui ne demande aucun geste (l'adresse changée, jur-R6). */
   button?: Link
+  /**
+   * Des paragraphes au corps normal sous le bouton : une consigne qui compte trop pour une petite
+   * note grise (« Ce n'est pas toi ? », des-E4).
+   */
+  closing?: Paragraph[]
   /** Les petites lignes sous le bouton (« si tu n'as rien demandé, ignore cet e-mail »). */
   notes: string[]
   /** Le pied : pourquoi on reçoit cet e-mail, puis les liens (se désinscrire, gérer). */
@@ -89,9 +140,11 @@ const render = ({
   heading,
   greeting,
   paragraphs,
+  highlight,
   items = [],
   after = [],
   button,
+  closing = [],
   notes,
   reason,
   links = [],
@@ -108,9 +161,11 @@ const render = ({
     greeting,
     '',
     ...paragraphs.flatMap((p) => [p, '']),
+    ...(highlight === undefined ? [] : [highlight, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
-    ...after.flatMap((p) => [p, '']),
-    ...(button ? [button.label, button.url, ''] : []),
+    ...after.flatMap((p) => [plain(p), '']),
+    ...(button ? [button.textLabel ?? button.label, button.url, ''] : []),
+    ...closing.flatMap((p) => [plain(p), '']),
     ...notes.flatMap((note) => [note, '']),
     '—',
     ...(reason ? [reason, ''] : []),
@@ -118,8 +173,17 @@ const render = ({
     footer,
   ].join('\n')
 
-  const p = (value: string, style = 'font-size:16px;line-height:1.5') =>
-    `<p style="${style}">${escapeHtml(value)}</p>`
+  const body = 'font-size:16px;line-height:1.5'
+  const p = (value: Paragraph, style = body) => `<p style="${style}">${richHtml(value)}</p>`
+  // La donnée à vérifier : en gras, et coupée n'importe où (`word-break:break-all`, et
+  // `overflow-wrap:anywhere` pour les moteurs qui ne connaissent que lui). Un <p> ordinaire ne se
+  // coupe qu'aux espaces et aux tirets : à 320 px, une adresse de 88 caractères faisait défiler
+  // tout l'e-mail de 224 px à l'horizontale (des-E1). Le gras passe par le style du paragraphe, pas
+  // par un <strong> : le texte reste seul entre deux balises, comme le vérifient les tests.
+  const htmlHighlight =
+    highlight === undefined
+      ? ''
+      : p(highlight, `${body};font-weight:bold;word-break:break-all;overflow-wrap:anywhere`)
   const htmlItems =
     items.length === 0
       ? ''
@@ -170,9 +234,11 @@ const render = ({
     ${top}
     ${p(greeting, 'font-size:16px')}
     ${paragraphs.map((value) => p(value)).join('\n    ')}
+    ${htmlHighlight}
     ${htmlItems}
     ${after.map((value) => p(value)).join('\n    ')}
     ${htmlButton}
+    ${closing.map((value) => p(value)).join('\n    ')}
     ${notes.map((note) => p(note, muted)).join('\n    ')}
   </div>
   <div style="max-width:520px;margin:16px auto 0">
@@ -235,11 +301,15 @@ export const existingAccountEmail = (
 // Trois e-mails de service, sans publicité ni lien de désinscription : ils partent parce que le
 // membre l'a demandé, et ne disent que ce qu'il faut pour finir (ou arrêter) son changement.
 //
-// La nouvelle adresse s'écrit seule sur sa ligne, telle que saisie, pour qu'une faute de frappe
-// saute aux yeux (relecture de sécurité S10). Elle ne passe pas par defangLinks : le membre doit
+// La nouvelle adresse s'écrit seule sur sa ligne (`highlight`), telle que saisie, en gras et coupée
+// n'importe où, pour qu'une faute de frappe saute aux yeux sur tout écran (relecture de sécurité
+// S10, de design des-E1 et des-E3). Elle ne passe pas par defangLinks : le membre doit
 // reconnaître son adresse, pas lire « [lien] ». Le contrat (ChangeEmailRequest, z.email) n'y laisse
 // que des lettres ASCII, des chiffres et « . _ ' + - » ; render() l'échappe dans le HTML, comme
 // tout texte (l'apostrophe devient &#39;).
+//
+// « Ce n'est pas toi ? » est le geste qui compte en cas de vol de compte : un paragraphe normal,
+// l'adresse de contact en gras (en texte, jamais en lien), et non une note grise (des-E2, des-E4).
 
 /**
  * Le premier e-mail, vers l'adresse ACTUELLE : « tu as demandé à la remplacer par celle-ci ;
@@ -255,14 +325,12 @@ export const changeEmailConfirmationEmail = (
     ...render({
       language,
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
-      paragraphs: [
-        fill(t.changeEmail.body),
-        newEmail,
-        fill(t.changeEmail.next),
-        fill(t.changeEmail.expires),
-      ],
+      paragraphs: [fill(t.changeEmail.body)],
+      highlight: newEmail,
+      after: [fill(t.changeEmail.next), fill(t.changeEmail.expires)],
       button: { label: fill(t.changeEmail.button), url },
-      notes: [fill(t.changeEmail.ignore)],
+      closing: [withBold(t.changeEmail.ignore, 'contactEmail', contactEmail)],
+      notes: [],
       footer: fill(t.footer),
     }),
   }
@@ -285,7 +353,7 @@ export const newEmailVerificationEmail = (
       language,
       greeting: fill(t.newEmail.greeting),
       paragraphs: [fill(t.newEmail.body), fill(t.newEmail.expires)],
-      button: { label: fill(t.newEmail.button), url },
+      button: { label: fill(t.newEmail.button), textLabel: fill(t.newEmail.textLink), url },
       notes: [fill(t.newEmail.ignore)],
       footer: fill(t.footer),
     }),
@@ -308,8 +376,14 @@ export const emailChangedEmail = (
     ...render({
       language,
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
-      paragraphs: [fill(t.emailChanged.body), newEmail, fill(t.emailChanged.after)],
-      notes: [fill(t.emailChanged.help)],
+      paragraphs: [fill(t.emailChanged.body)],
+      highlight: newEmail,
+      // Sans bouton, l'appel à écrire au contact est le dernier paragraphe de la carte (des-E2).
+      after: [
+        fill(t.emailChanged.after),
+        withBold(t.emailChanged.help, 'contactEmail', contactEmail),
+      ],
+      notes: [],
       footer: fill(t.footer),
     }),
   }

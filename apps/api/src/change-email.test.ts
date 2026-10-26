@@ -278,6 +278,19 @@ describe('the pages the links lead to', () => {
     expect(await done.text()).not.toContain('"user"')
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
+
+  // Relecture de design des-E6 (décision de Louis du 26/10/2026) : le second lien, déjà long avec
+  // son jeton chiffré, ne porte pas de page de retour ; l'API l'impose quand on l'ouvre.
+  it('send the second link without a return address, and it still leads to our page', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const second = await askAndConfirm(cookie)
+
+    expect(second.searchParams.has('callbackURL')).toBe(false)
+    const done = await open(second)
+    expect(done.status).toBe(302)
+    expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+  })
 })
 
 // ─── Chaque lien ne sert qu'une fois (plan, S1) ───────────────────────────────────────────────

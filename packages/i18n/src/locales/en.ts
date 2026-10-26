@@ -750,11 +750,11 @@ export const en: Translation = {
     changeEmail: {
       subject: 'Email address change on {{appName}}',
       body: 'You asked to replace the email address of your account with:',
-      next: 'Confirm with the button below. A second link will then be sent to this new address. Once the address is changed, your current address will no longer let you sign in and will receive nothing more from {{appName}}.',
+      next: 'Once the address is changed, your current address will no longer let you sign in and will receive nothing more from {{appName}}. Confirm with the button below: a second link will then be sent to the new address.',
       button: 'Confirm the change',
       expires: 'This link is valid for one hour.',
       ignore:
-        'Not you? Ignore this email: nothing will change. But the request was made from your account, with your password: write to us quickly at {{contactEmail}}.',
+        'Wasn’t you? Don’t click: nothing will change. But someone knows your password: write to us quickly at {{contactEmail}}.',
     },
     newEmail: {
       subject: 'Confirm your new email address on {{appName}}',
@@ -764,6 +764,7 @@ export const en: Translation = {
       expires: 'This link is valid for one hour.',
       ignore:
         'If you did not ask for anything, do not click and ignore this message: this address will not be linked to any account.',
+      textLink: 'Confirm this address:',
     },
     emailChanged: {
       subject: 'The email address of your {{appName}} account has changed',
