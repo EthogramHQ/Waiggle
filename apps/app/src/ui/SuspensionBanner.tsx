@@ -8,7 +8,7 @@
 // (`TopNav`) n'a qu'à le poser, une seule fois pour toutes les pages. Ce n'est pas une alerte : il
 // est là dès l'ouverture de la page, et se lit à son tour, sans couper le lecteur d'écran (rôle
 // « status »).
-import { radii, space } from '@ruche/brand'
+import { radii, readableWidth, space } from '@ruche/brand'
 import type { Suspension } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -71,8 +71,9 @@ export function SuspensionBanner({ suspension }: Props) {
         <Icon name="lock-simple" size={ICON_SIZE} tone="amber" />
       </View>
       {/* flex 1 et minWidth 0 : les lignes passent à la ligne au lieu de sortir du cadre, même à
-          200 % de texte et sur un petit téléphone. */}
-      <View style={{ flex: 1, minWidth: 0, gap: space.xxs }}>
+          200 % de texte et sur un petit téléphone. readableWidth : sur ordinateur, le bandeau a la
+          largeur de la barre, mais ses lignes gardent une longueur qui se lit d'un coup d'œil. */}
+      <View style={{ flex: 1, minWidth: 0, maxWidth: readableWidth, gap: space.xxs }}>
         <Text variant="callout" weight={700}>
           {t(($) => $.suspension.title)}
         </Text>
