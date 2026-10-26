@@ -17,11 +17,12 @@ on:
   schedule:
     - cron: '0 5 * * 1'
 
-# Toutes les tâches tournent sur Ubuntu 24.04, nommé en clair, et non sur « ubuntu-latest » :
-# le 22/10/2026, GitHub a fait passer « ubuntu-latest » à Ubuntu 26.04, où Playwright (le
-# navigateur des captures et du parcours de production) ne s'installe pas encore. Une machine
-# nommée ne change pas sous nos pieds. On reviendra à « ubuntu-latest » quand Playwright prendra
-# en charge Ubuntu 26.04 : Renovate propose ses nouvelles versions, dont les notes le diront.
+# Toutes les tâches tournent sur Ubuntu 26.04, nommé en clair, et non sur « ubuntu-latest » : une
+# machine nommée ne change pas sous nos pieds. Le 22/10/2026, GitHub a fait passer
+# « ubuntu-latest » à Ubuntu 26.04 alors que Playwright (le navigateur des captures et du
+# parcours de production) ne s'y installait pas encore ; depuis Playwright 1.64.1, il y est pris
+# en charge (26/10/2026). Renovate propose la version suivante d'Ubuntu, et la CI dit si
+# Playwright y passe.
 
 # Droits minimaux : la CI peut lire le code, rien de plus.
 permissions:
