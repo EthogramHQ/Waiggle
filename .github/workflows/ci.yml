@@ -10,12 +10,14 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Chaque lundi à 5 h (heure UTC), sur main : le seul audit des dépendances. Une faille publiée
+  # Chaque lundi à 4 h 23 (heure UTC), sur main : le seul audit des dépendances. Une faille publiée
   # pendant une semaine sans commit serait sinon passée inaperçue. GitHub prévient par e-mail
   # quand une exécution planifiée échoue (la personne qui a écrit cette ligne `cron` en dernier),
-  # et suspend la planification d'un dépôt public resté 60 jours sans activité.
+  # et suspend la planification d'un dépôt public resté 60 jours sans activité. Pas à l'heure pile :
+  # GitHub retarde, voire abandonne, les exécutions planifiées quand la charge est forte, surtout
+  # au début de chaque heure ; celle de 5 h n'a pas tourné le lundi 26/10/2026.
   schedule:
-    - cron: '0 5 * * 1'
+    - cron: '23 4 * * 1'
 
 # Toutes les tâches tournent sur Ubuntu 26.04, nommé en clair, et non sur « ubuntu-latest » : une
 # machine nommée ne change pas sous nos pieds. Le 22/10/2026, GitHub a fait passer
