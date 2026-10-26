@@ -200,6 +200,8 @@ const visitor = await person('Visiteur')
 // Tranche 7a : Malik signale un commentaire, l'administrateur de la modération le traite.
 const malik = await person('Malik')
 const admin = await person('Admin')
+// Tranche 7c : Karim, que l'administrateur suspend 7 jours, puis dont il lève la suspension.
+const karim = await person('Karim')
 
 try {
   step('Deux personnes s’inscrivent avec le code d’invitation, et vérifient leur adresse')
@@ -674,6 +676,87 @@ try {
   ).text()
   expectEqual('commentaire retiré, dans l’API pour Léa', leaComments.includes(spam), false)
 
+  // --- Tranche 7c : suspendre un compte, puis lever la suspension ---
+  step('Karim s’inscrit : il a « Publier » dans la barre du haut')
+  await signUp(karim, 'Karim')
+  const karimMe = async () => (await karim.request.get(`${apiUrl}/v1/me`)).json()
+  const karimId = (await karimMe()).id
+  await open(karim.page, `${appUrl}/`)
+  // Le témoin de l'absence qui suivra : avant la suspension, le bouton est bien là.
+  await karim.page.getByRole('button', { name: 'Publier', exact: true }).first().waitFor()
+  console.log('  ok : Karim voit « Publier »')
+
+  step('L’administrateur suspend Karim 7 jours, depuis la page de Karim')
+  await open(admin.page, `${appUrl}/members/${karimId}`)
+  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
+  await admin.page.getByRole('menuitem', { name: 'Suspendre le compte' }).click()
+  await admin.page.waitForURL(/\/suspend\?/)
+  await admin.page.getByRole('heading', { name: 'Suspendre le compte de Karim' }).waitFor()
+  await admin.page.getByRole('radio', { name: '7 jours', exact: true }).click()
+  await admin.page.getByRole('radio', { name: /^Les règles de / }).click()
+  const suspensionExplanation = 'Des messages publicitaires répétés sous les projets des autres.'
+  await admin.page.getByLabel('Explication', { exact: true }).fill(suspensionExplanation)
+  await admin.page.getByRole('button', { name: 'Suspendre le compte', exact: true }).click()
+  await admin.page.getByText('Compte suspendu.', { exact: true }).waitFor()
+  await waitFor(
+    'suspension de Karim, dans l’API',
+    async () => (await karimMe()).suspension !== null,
+  )
+  const { suspension } = await karimMe()
+  // La fin à la seconde près : l'heure de la pose, 7 jours plus tard (relecture juridique J4).
+  expectEqual(
+    'durée de la suspension, en millisecondes',
+    Date.parse(suspension.endsAt) - Date.parse(suspension.since),
+    7 * 24 * 60 * 60 * 1000,
+  )
+  console.log('  ok : Karim est suspendu 7 jours')
+
+  step('Karim voit le bandeau de la suspension, et n’a plus « Publier »')
+  await open(karim.page, `${appUrl}/`)
+  const banner = karim.page.getByRole('status').filter({ hasText: 'Ton compte est suspendu' })
+  await banner.first().waitFor()
+  await banner.first().getByText(new RegExp(suspensionExplanation)).waitFor()
+  expectEqual(
+    '« Publier » pour Karim suspendu',
+    await karim.page.getByRole('button', { name: 'Publier', exact: true }).count(),
+    0,
+  )
+  console.log('  ok : Karim lit le bandeau et son explication ; « Publier » a disparu')
+
+  step('L’administrateur lève la suspension, plus tôt que prévu')
+  await open(admin.page, `${appUrl}/members/${karimId}`)
+  // La ligne que seul un administrateur lit, avec l'heure de Paris.
+  await admin.page.getByText(/^Compte suspendu jusqu’au .+\(heure de Paris\)$/).waitFor()
+  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
+  await admin.page.getByRole('menuitem', { name: 'Lever la suspension' }).click()
+  await admin.page.waitForURL(/\/suspend\?/)
+  await admin.page.getByRole('heading', { name: 'Lever la suspension de Karim' }).waitFor()
+  await admin.page.getByRole('radio', { name: 'Plus tôt que prévu', exact: true }).click()
+  await admin.page
+    .getByLabel('Explication', { exact: true })
+    .fill('Karim a supprimé ses messages et s’est excusé.')
+  await admin.page.getByRole('button', { name: 'Lever la suspension', exact: true }).click()
+  await admin.page.getByText('Suspension levée.', { exact: true }).waitFor()
+  await waitFor(
+    'levée de la suspension, dans l’API',
+    async () => (await karimMe()).suspension === null,
+  )
+  await open(karim.page, `${appUrl}/`)
+  await karim.page.getByRole('button', { name: 'Publier', exact: true }).first().waitFor()
+  expectEqual('bandeau pour Karim, après la levée', await banner.count(), 0)
+  console.log('  ok : Karim retrouve « Publier », sans bandeau')
+
+  step('L’historique de modération de Karim montre la suspension et la levée')
+  await open(admin.page, `${appUrl}/members/${karimId}`)
+  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
+  await admin.page.getByRole('menuitem', { name: 'Historique de modération' }).click()
+  await admin.page.waitForURL(/\/moderation\?.*member=/)
+  await admin.page.getByText(/^Décisions qui visent @/).waitFor()
+  await admin.page.getByText('Levée de la suspension', { exact: true }).first().waitFor()
+  await admin.page.getByText('Suspension', { exact: true }).first().waitFor()
+  await admin.page.getByText(suspensionExplanation).first().waitFor()
+  console.log('  ok : l’historique montre les deux décisions')
+
   step('Léa passe le projet en privé : la photo devient introuvable, même pour qui a l’adresse')
   await open(lea.page, `${appUrl}/projects/${projectId}/edit`)
   await lea.page.getByRole('switch', { name: 'Public' }).click()
@@ -717,7 +800,7 @@ try {
 } catch (error) {
   // Une capture de chaque navigateur, et le texte qu'il affiche : de quoi comprendre où le
   // parcours s'est arrêté, même sans ouvrir les captures (gardées par la CI).
-  for (const [who, someone] of Object.entries({ lea, sam, malik, admin })) {
+  for (const [who, someone] of Object.entries({ lea, sam, malik, admin, karim })) {
     await someone.page.screenshot({ path: `journey-${who}.png`, fullPage: true }).catch(() => {})
     const text = await someone.page
       .locator('body')

@@ -6,6 +6,7 @@ import type { NotificationPage } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createI18n } from '../i18n'
 import { useMarkSeen, useNotifications, useUnreadCount } from '../notifications/api'
+import { withParisEnd } from '../testing/moderation'
 import {
   allNotifications,
   commentNotification,
@@ -25,6 +26,10 @@ import {
   replyNotification,
   reportDismissedNotification,
   reportHandledNotification,
+  suspendedIndefinitelyNotification,
+  suspendedNotification,
+  suspensionEndedNotification,
+  suspensionLiftedNotification,
 } from '../testing/notifications'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { missingSentences, removalSentences } from '../testing/text'
@@ -491,9 +496,12 @@ describe('a content of mine removed by the moderation', () => {
   it('keeps the reasons of a removal on the project of a member who blocked me, without its title nor a link', async () => {
     // Tranche 7b, règle 9 : l'API vide le titre d'un projet que je ne vois plus ; la motivation
     // du retrait (article 17 du DSA) reste.
+    // Tranche 7c : l'API le dit par `projectHidden` (test adapté au contrat de 7c : le titre vide
+    // venait avec `projectHidden: false`, un état que l'API n'envoie plus).
     const elsewhere = {
       ...removedCommentNotification,
       project: { ...removedCommentNotification.project, title: '' },
+      projectHidden: true,
     }
     mockPages([notificationPageOf([elsewhere])])
     await renderWithProviders(<NotificationsScreen />)
@@ -502,6 +510,21 @@ describe('a content of mine removed by the moderation', () => {
     expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
     expect(missingSentences(removalSentences(removalOf(elsewhere)), screen)).toEqual([])
     expect(screen.queryByRole('link', { name: containing(text) })).toBeNull()
+  })
+
+  it('reads a hidden project from projectHidden, not from an empty title (slice 7c)', async () => {
+    // Relecture de design 7b (ui-11) : l'appli devinait le projet caché à son titre vide. Ici,
+    // l'API dit `projectHidden` et le titre est encore là : l'appli ne le nomme pas, ne mène
+    // nulle part, et garde la motivation du retrait.
+    const hidden = { ...removedCommentNotification, projectHidden: true }
+    mockPages([notificationPageOf([hidden])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const text = t(($) => $.notifications.removed.commentElsewhere)
+    expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Météo/)).toBeNull()
+    expect(screen.queryByRole('link', { name: containing(text) })).toBeNull()
+    expect(missingSentences(removalSentences(removalOf(hidden)), screen)).toEqual([])
   })
 
   it('leads to the project, which its author still sees', async () => {
@@ -573,5 +596,77 @@ describe('a report of mine that was handled', () => {
     await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
 
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u7' } })
+  })
+})
+
+// --- Tranche 7c : la suspension de son compte, et sa fin ---
+//
+// Scénario « Suspendre un compte » : Karim reçoit une notification qui dit la mesure, sa fin (ou
+// « jusqu'à nouvel ordre »), si elle suit un signalement (jamais de qui), qu'une personne a
+// décidé, le fondement, l'explication, et comment contester (article 17 du DSA ; relecture
+// juridique J2, J3, J4). Jamais l'administrateur qui a décidé.
+
+describe('my account suspended by the moderation', () => {
+  /** Les phrases de la motivation, comme pour un retrait : qui a décidé, pourquoi, et le recours. */
+  const reasonsOf = (notification: typeof suspendedNotification) => [
+    notification.afterReport ? t(($) => $.suspension.afterReport) : t(($) => $.suspension.direct),
+    t(($) => $.removal.grounds[notification.ground]),
+    t(($) => $.suspension.explanation, { explanation: notification.explanation }),
+    t(($) => $.suspension.contest),
+  ]
+
+  it('says until when, at the hour of Paris (J4: 23:30 UTC is 0:30 the next day)', async () => {
+    // La fin tombe le 2 novembre à 23 h 30 UTC : l'appli écrit le 3 novembre à 0 h 30. Sur ce PC
+    // (Europe/Paris), une heure de l'appareil passerait aussi ; la CI, en UTC, la refuse.
+    mockPages([notificationPageOf([suspendedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const until = withParisEnd(t(($) => $.notifications.suspended, { date: 'DATE', time: 'TIME' }))
+    expect(screen.getAllByText(until).length).toBeGreaterThan(0)
+  })
+
+  it('says it follows a report, decided by a person, why, and how to contest', async () => {
+    mockPages([notificationPageOf([suspendedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(missingSentences(reasonsOf(suspendedNotification), screen)).toEqual([])
+  })
+
+  it('says « until further notice » for a suspension without end, decided without a report', async () => {
+    mockPages([notificationPageOf([suspendedIndefinitelyNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(
+      screen.getAllByText(containing(t(($) => $.notifications.suspendedIndefinite))).length,
+    ).toBeGreaterThan(0)
+    expect(missingSentences(reasonsOf(suspendedIndefinitelyNotification), screen)).toEqual([])
+    expect(screen.queryByText(containing(t(($) => $.suspension.afterReport)))).toBeNull()
+  })
+
+  it('says the suspension ended at its date, with nothing to explain', async () => {
+    mockPages([notificationPageOf([suspensionEndedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(
+      screen.getAllByText(containing(t(($) => $.notifications.suspensionEnded.ended))).length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.queryByText(containing(t(($) => $.notifications.suspensionEnded.lifted))),
+    ).toBeNull()
+  })
+
+  it('says the suspension was lifted earlier, with the explanation of the moderation', async () => {
+    mockPages([notificationPageOf([suspensionLiftedNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    expect(
+      screen.getAllByText(containing(t(($) => $.notifications.suspensionEnded.lifted))).length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(suspensionLiftedNotification.explanation ?? '')).length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.queryByText(containing(t(($) => $.notifications.suspensionEnded.ended))),
+    ).toBeNull()
   })
 })

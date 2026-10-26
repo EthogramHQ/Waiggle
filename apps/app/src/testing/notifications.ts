@@ -198,6 +198,56 @@ export const moderationNotifications: Notification[] = [
   memberReportDismissedNotification,
 ]
 
+// --- Tranche 7c : la suspension de son compte, et sa fin ---
+// Jamais l'administrateur qui a décidé, jamais qui a signalé (le contrat n'a pas ces champs).
+
+/**
+ * Le compte d'Inès suspendu 7 jours après un signalement, au nom des règles. La fin, 23 h 30 UTC
+ * le 2 novembre, s'écrit « 3 novembre à 0 h 30 (heure de Paris) » (relecture juridique, J4).
+ */
+export const suspendedNotification: Of<'suspended'> = {
+  kind: 'suspended',
+  id: 'suspended:5f607182-93a4-4fb0-9bc2-4d5e6f708192',
+  at: '2026-10-26T23:30:00.000Z',
+  isNew: true,
+  endsAt: '2026-11-02T23:30:00.000Z',
+  ground: 'rules',
+  explanation: 'Trois messages d’arnaque en deux jours, après deux retraits.',
+  afterReport: true,
+}
+
+/** Le compte d'Inès suspendu sans fin, sans signalement, au nom de la loi. */
+export const suspendedIndefinitelyNotification: Of<'suspended'> = {
+  kind: 'suspended',
+  id: 'suspended:60718293-a4b5-4c01-8cd3-5e6f708192a3',
+  at: '2026-10-25T08:00:00.000Z',
+  isNew: false,
+  endsAt: null,
+  ground: 'illegal',
+  explanation: 'Publication répétée de photos de personnes sans leur accord.',
+  afterReport: false,
+}
+
+/** La suspension d'Inès a pris fin à la date prévue : rien à expliquer. */
+export const suspensionEndedNotification: Of<'suspension_ended'> = {
+  kind: 'suspension_ended',
+  id: 'suspension_ended:718293a4-b5c6-4d12-9de4-6f708192a3b4',
+  at: '2026-11-02T23:30:00.000Z',
+  isNew: true,
+  lifted: false,
+  explanation: null,
+}
+
+/** La suspension d'Inès a été levée plus tôt par un administrateur, avec son explication. */
+export const suspensionLiftedNotification: Of<'suspension_ended'> = {
+  kind: 'suspension_ended',
+  id: 'suspension_ended:8293a4b5-c6d7-4e23-8ef5-708192a3b4c5',
+  at: '2026-10-28T10:00:00.000Z',
+  isNew: true,
+  lifted: true,
+  explanation: 'Les messages en cause ont été supprimés ; la suspension n’a plus lieu d’être.',
+}
+
 /** L'heure du serveur au moment de la lecture : l'appli la renvoie pour marquer vu. */
 export const notificationsAsOf = '2026-10-20T12:30:00.000Z'
 

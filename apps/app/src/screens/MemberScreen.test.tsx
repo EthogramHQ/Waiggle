@@ -1,12 +1,15 @@
 // Tests de la page d'un membre. L'API (members/api) est remplacée par de faux appels.
 import { BLOCKS_PER_DAY, UNBLOCKS_PER_DAY } from '@ruche/contracts'
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useBlock, useUnblock } from '../blocks/api'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
+import { getMe } from '../profile/api'
 import { passTapGuard } from '../testing/dialog'
-import { reportsOpened, visited } from '../testing/navigation'
+import { adminMe, leaMe } from '../testing/fixtures'
+import { indefiniteSuspension, sevenDaySuspension, withParisEnd } from '../testing/moderation'
+import { pathOf, reportsOpened, visited } from '../testing/navigation'
 import {
   blockedLeaPage,
   draftProject,
@@ -574,5 +577,167 @@ describe('the page of a member who blocked me', () => {
     expect(await screen.findByRole('header', { name: 'Ce membre est introuvable' })).toBeTruthy()
     expect(screen.queryByText(/bloqu/i)).toBeNull()
     expect(screen.queryByRole('button', { name: fr.t(($) => $.actionMenu.label) })).toBeNull()
+  })
+})
+
+// --- Tranche 7c : la modération depuis la page d'un membre ---
+//
+// Scénario « Suspendre un compte » et « L'historique des décisions » : sur la page de Léa, un
+// administrateur trouve dans le menu « … » « Suspendre le compte » (ou « Lever la suspension »)
+// et « Historique de modération » ; il lit « Compte suspendu jusqu'au … » quand elle l'est. Rien de
+// tout cela pour un autre membre : l'API ne lui envoie pas `Member.moderation` (null). Et un
+// membre suspendu n'a plus « Suivre » (`Me.suspension`, lu par `useSuspension()`, qui lit
+// `useMe`, donc `getMe` ici).
+
+describe('the moderation from the page of a member', () => {
+  const menuItem = (name: string) => screen.getByRole('menuitem', { name })
+  const suspendItem = fr.t(($) => $.moderation.memberMenu.suspend)
+  const liftItem = fr.t(($) => $.moderation.memberMenu.lift)
+  const historyItem = fr.t(($) => $.moderation.memberMenu.history)
+
+  /** Léa, vue par un administrateur : pas suspendue, et elle peut l'être. */
+  const leaForAdmin = {
+    ...leaPage,
+    moderation: { isAdmin: false, suspension: null, decisions: 2, canSuspend: true },
+  }
+  /** Léa suspendue 7 jours : fin le 3 novembre à 0 h 30, heure de Paris. */
+  const suspendedLea = {
+    ...leaPage,
+    moderation: {
+      isAdmin: false,
+      suspension: sevenDaySuspension,
+      decisions: 3,
+      canSuspend: false,
+    },
+  }
+
+  beforeEach(() => {
+    mockSession({ user: { id: adminMe.id, name: adminMe.name } })
+    jest.mocked(getMe).mockReset().mockResolvedValue(adminMe)
+  })
+
+  it('offers an administrator to suspend the account, and leads to « Suspendre »', async () => {
+    jest.mocked(getMember).mockResolvedValue(leaForAdmin)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+    await fireEvent.press(menuItem(suspendItem))
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/suspend?member=u1'])
+    expect(screen.queryByRole('menuitem', { name: liftItem })).toBeNull()
+  })
+
+  it('offers an administrator the history of the decisions aimed at the member', async () => {
+    jest.mocked(getMember).mockResolvedValue(leaForAdmin)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+    await fireEvent.press(menuItem(historyItem))
+
+    const [path] = mockPush.mock.calls.map(([href]) => pathOf(href))
+    expect(path?.split('?')[0]).toBe('/moderation')
+    expect(Object.fromEntries(new URLSearchParams(path?.split('?')[1]))).toEqual({
+      tab: 'history',
+      member: 'u1',
+    })
+  })
+
+  it('offers « Lever la suspension » instead for a suspended member, on the same page', async () => {
+    jest.mocked(getMember).mockResolvedValue(suspendedLea)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+    expect(screen.queryByRole('menuitem', { name: suspendItem })).toBeNull()
+    await fireEvent.press(menuItem(liftItem))
+
+    expect(mockPush.mock.calls.map(([href]) => pathOf(href))).toEqual(['/suspend?member=u1'])
+  })
+
+  it('offers no suspension of another administrator, but still the history', async () => {
+    jest.mocked(getMember).mockResolvedValue({
+      ...leaPage,
+      moderation: { isAdmin: true, suspension: null, decisions: 0, canSuspend: false },
+    })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+
+    expect(menuItem(historyItem)).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: suspendItem })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: liftItem })).toBeNull()
+  })
+
+  it('tells an administrator until when the member is suspended, at the hour of Paris (J4)', async () => {
+    // La fin, 23 h 30 UTC le 2 novembre, s'écrit le 3 novembre à 0 h 30. Sur ce PC (Europe/Paris),
+    // une heure de l'appareil passerait aussi ; la CI, en UTC, la refuse.
+    jest.mocked(getMember).mockResolvedValue(suspendedLea)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(
+      await screen.findByText(
+        withParisEnd(fr.t(($) => $.moderation.memberSuspended, { date: 'DATE', time: 'TIME' })),
+      ),
+    ).toBeTruthy()
+  })
+
+  it('tells an administrator when the suspension has no end', async () => {
+    jest.mocked(getMember).mockResolvedValue({
+      ...suspendedLea,
+      moderation: {
+        isAdmin: false,
+        suspension: indefiniteSuspension,
+        decisions: 1,
+        canSuspend: false,
+      },
+    })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.moderation.memberSuspendedIndefinite))),
+    ).toBeTruthy()
+  })
+
+  it('shows nothing of the moderation to another member', async () => {
+    // L'API n'envoie `moderation` qu'aux administrateurs : null pour Max.
+    mockSession({ user: { id: 'u2', name: 'Max' } })
+    jest.mocked(getMe).mockResolvedValue({ ...leaMe, id: 'u2', name: 'Max', handle: 'max' })
+    jest.mocked(getMember).mockResolvedValue(leaPage)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await openMenu()
+
+    expect(screen.getByRole('menuitem', { name: 'Signaler ce profil' })).toBeTruthy() // témoin
+    for (const name of [suspendItem, liftItem, historyItem]) {
+      expect(screen.queryByRole('menuitem', { name })).toBeNull()
+    }
+    expect(screen.queryByText(/Compte suspendu/)).toBeNull()
+  })
+})
+
+describe('the page of a member, seen by a suspended member', () => {
+  it('offers no « Suivre », but still shows how many follow her', async () => {
+    // Scénario « Un compte suspendu » : Max ne peut plus suivre ; la page reste lisible.
+    jest.mocked(getMe).mockResolvedValue({
+      ...leaMe,
+      id: 'u2',
+      name: 'Max',
+      handle: 'max',
+      suspension: sevenDaySuspension,
+    })
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: false, followerCount: 12 })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByText('12 abonnés')).toBeTruthy() // témoin
+    await waitFor(() => expect(screen.queryByRole('switch', { name: 'Suivre Léa' })).toBeNull())
+    expect(screen.queryByText('Suivre')).toBeNull()
+  })
+
+  it('still offers « Suivre » to a member who is not suspended', async () => {
+    // Témoin du précédent : le même visiteur, sans suspension, a son bouton.
+    jest.mocked(getMe).mockResolvedValue({ ...leaMe, id: 'u2', name: 'Max', handle: 'max' })
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: false, followerCount: 12 })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('switch', { name: 'Suivre Léa' })).toBeTruthy()
   })
 })
