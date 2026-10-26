@@ -821,11 +821,13 @@ export const fr = {
       subject: 'Changement d’adresse sur {{appName}}',
       // La nouvelle adresse s'écrit seule sur la ligne suivante, telle que saisie (relecture J6).
       body: 'Tu as demandé à remplacer l’adresse de ton compte par :',
-      next: 'Confirme avec le bouton ci-dessous. Ensuite, un second lien partira vers cette nouvelle adresse. Une fois l’adresse changée, ton adresse actuelle ne servira plus à te connecter et ne recevra plus rien de {{appName}}.',
+      // Les conséquences d'abord, la consigne ensuite, juste avant la durée et le bouton (des-E5).
+      next: 'Une fois l’adresse changée, ton adresse actuelle ne servira plus à te connecter et ne recevra plus rien de {{appName}}. Confirme avec le bouton ci-dessous : un second lien partira ensuite vers la nouvelle adresse.',
       button: 'Confirmer le changement',
       expires: 'Ce lien est valable une heure.',
+      // Un paragraphe normal sous le bouton, l'adresse de contact en gras (des-E4, 26/10/2026).
       ignore:
-        'Ce n’est pas toi ? Ignore cet e-mail : rien ne changera. Mais la demande a été faite depuis ton compte, avec ton mot de passe : écris-nous vite à {{contactEmail}}.',
+        'Ce n’est pas toi ? Ne clique pas : rien ne changera. Mais quelqu’un connaît ton mot de passe : écris-nous vite à {{contactEmail}}.',
     },
     // … puis le second vers la nouvelle adresse, pour la vérifier.
     newEmail: {
@@ -837,6 +839,8 @@ export const fr = {
       expires: 'Ce lien est valable une heure.',
       ignore:
         'Si tu n’as rien demandé, ne clique pas et ignore ce message : cette adresse ne sera rattachée à aucun compte.',
+      // La version texte n'a pas de bouton : ce libellé, puis l'adresse du lien en dessous (des-E6).
+      textLink: 'Confirmer cette adresse :',
     },
     // Le dernier e-mail, à l'ancienne adresse, une fois le changement fait (décision du 25/10/2026).
     emailChanged: {

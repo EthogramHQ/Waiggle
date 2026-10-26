@@ -87,10 +87,12 @@ const mentions: MentionData = {
 // Le changement d'adresse d'Inès. Les jetons des liens sont des exemples : le premier est un JWT
 // lisible, le second un jeton chiffré (auth/change-email.ts) ; aucun ne vaut rien sur le serveur.
 const NEW_EMAIL = 'ines.morel@exemple.fr'
-const verifyLink = (token: string, page: string) =>
-  `${API_URL}/api/auth/verify-email?${new URLSearchParams({ token, callbackURL: `${APP_URL}${page}` })}`
+// Le second lien n'a pas de page de retour (callbackURL) : l'API l'impose à l'ouverture
+// (auth/change-email.ts, sendNewEmailLink ; relecture de design des-E6).
+const verifyLink = (token: string, page?: string) =>
+  `${API_URL}/api/auth/verify-email?${new URLSearchParams({ token, ...(page && { callbackURL: `${APP_URL}${page}` }) })}`
 const firstLink = verifyLink('eyJhbGciOiJIUzI1NiJ9.apercu.signature', '/email-change/confirmed')
-const secondLink = verifyLink('9f2c4e7a1b3d5f60apercu', '/email-change/done')
+const secondLink = verifyLink('9f2c4e7a1b3d5f60apercu')
 
 /** Les variantes montrées : le nom du fichier (sans la langue) et l'e-mail rendu. */
 const variants: [string, (language: Language) => EmailContent][] = [
