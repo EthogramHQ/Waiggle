@@ -41,12 +41,17 @@ import {
   recapToken,
   refusedToken,
 } from '../src/testing/email.ts'
-import { leaMe } from '../src/testing/fixtures.ts'
+import { leaMe, suspendedMe } from '../src/testing/fixtures.ts'
 import {
+  decisionHistory,
+  decisionHistoryPageOf,
   moderationQueuePageOf,
   removalAfterReport,
   removalByLaw,
   removedPageOf,
+  samMember,
+  scamCommentItem,
+  sevenDaySuspension,
 } from '../src/testing/moderation.ts'
 import {
   memberReportDismissedNotification,
@@ -54,6 +59,10 @@ import {
   removedProjectNotification,
   reportDismissedNotification,
   reportHandledNotification,
+  suspendedIndefinitelyNotification,
+  suspendedNotification,
+  suspensionEndedNotification,
+  suspensionLiftedNotification,
 } from '../src/testing/notifications.ts'
 import {
   draftProject,
@@ -305,6 +314,43 @@ const maxMember = {
     .filter((item) => item.project.author.id === max.id)
     .map((item) => item.project),
 }
+// Tranche 7c : deux membres que la modération connaît. Sam (celui de la file, testing/moderation.ts)
+// peut être suspendu ; Karim l'est déjà, 7 jours après un signalement.
+const samPage = {
+  ...leaPage,
+  id: samMember.id,
+  name: samMember.name,
+  handle: samMember.handle,
+  bio: 'Je teste des robots de messagerie.',
+  favoriteTools: ['ChatGPT'],
+  isMe: false,
+  isFollowed: false,
+  followerCount: 1,
+  projects: [],
+}
+const karim = { id: 'karim-id', name: 'Karim Benali', avatarUrl: null }
+const karimPage = {
+  ...leaPage,
+  id: karim.id,
+  name: karim.name,
+  handle: 'karim_b',
+  bio: 'Des petits jeux faits avec Cursor.',
+  favoriteTools: ['Cursor'],
+  isMe: false,
+  isFollowed: false,
+  followerCount: 4,
+  projects: [],
+}
+// Ce que la page d'un membre dit à un administrateur seul (`Member.moderation`) ; null pour les
+// autres, comme la vraie API. Karim, déjà suspendu, ne peut pas l'être de nouveau : on lève.
+const moderationOf = {
+  [samMember.id]: { isAdmin: false, suspension: null, decisions: 3, canSuspend: true },
+  [karim.id]: { isAdmin: false, suspension: sevenDaySuspension, decisions: 2, canSuspend: false },
+}
+const moderatedPage = (page, admin) => ({
+  ...page,
+  moderation: admin ? (moderationOf[page.id] ?? null) : null,
+})
 // Le fil « Abonnements » mêle aux nouveaux projets les notes des projets suivis (tranche 4b) : une
 // note du tri des photos (avec sa couverture) tout en haut, une de l'agent de recettes (sans photo,
 // la lumière miel) plus bas. « Découvrir » ne montre jamais de note.
@@ -550,6 +596,19 @@ const notificationPages = (choice) => {
       ],
     ]
   }
+  // Tranche 7c : la suspension de son compte (7 jours après un signalement, puis sans fin, sans
+  // signalement) et sa fin (à la date prévue, ou levée plus tôt avec une explication). Jamais
+  // l'administrateur qui a décidé, jamais qui a signalé.
+  if (choice === 'suspension') {
+    return [
+      [
+        { ...suspensionLiftedNotification, at: hoursAgo(1) },
+        { ...suspendedNotification, at: hoursAgo(26), isNew: false },
+        { ...suspensionEndedNotification, at: hoursAgo(24 * 9), isNew: false },
+        { ...suspendedIndefinitelyNotification, at: hoursAgo(24 * 20) },
+      ],
+    ]
+  }
   const reactionsAt = hoursAgo(1)
   const followsAt = hoursAgo(26)
   const oldAt = hoursAgo(24 * 12)
@@ -655,6 +714,7 @@ const notificationPages = (choice) => {
 // `admin` (tranche 7a) : Léa est administratrice, GET /v1/me le dit et la modération répond.
 // `blocks` (tranche 7b) : 'some', Léa a bloqué Sam et Théo ; 'none', personne.
 // `email` (tranche « adresse ») : 'current', l'adresse de toujours ; 'changed', la nouvelle.
+// `suspended` (tranche 7c) : le compte de Léa est suspendu 7 jours (GET /v1/me le dit).
 const fakeApi = (
   signedIn,
   feed = 'following',
@@ -662,6 +722,7 @@ const fakeApi = (
   admin = false,
   blocks = 'some',
   email = 'current',
+  suspended = false,
 ) => {
   // L'adresse du compte, dans la session comme dans le profil (GET /v1/me).
   const accountEmail = emailOf[email] ?? emailOf.current
@@ -679,7 +740,12 @@ const fakeApi = (
   const added = {}
   // Son profil, tel que le dernier PATCH /v1/me l'a laissé : une relecture (retour sur la page,
   // en-tête, page de membre) montre le nouveau pseudo, comme la vraie API.
-  let me = structuredClone({ ...leaMe, isAdmin: admin, email: accountEmail })
+  let me = structuredClone({
+    ...leaMe,
+    isAdmin: admin,
+    email: accountEmail,
+    suspension: suspended ? suspendedMe.suspension : null,
+  })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
@@ -859,6 +925,11 @@ const fakeApi = (
       return json(200, blockedMemberPage(blocked.get(member[1])))
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
+    // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
+    // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
+    // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
+    if (pathname === `/v1/members/${samMember.id}`) return json(200, moderatedPage(samPage, admin))
+    if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
@@ -919,9 +990,21 @@ const fakeApi = (
       return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
     }
     if (pathname === '/v1/moderation/decisions' && method === 'POST') {
-      const { action, target } = JSON.parse(route.request().postData() ?? '{}')
-      decided.add(target?.id)
+      // Tranche 7c : suspendre et lever visent un membre (`memberId`), pas une cible de la file.
+      const { action, target, memberId } = JSON.parse(route.request().postData() ?? '{}')
+      decided.add(target?.id ?? memberId)
       return json(201, { id: crypto.randomUUID(), action, createdAt: new Date().toISOString() })
+    }
+    // L'historique des décisions (tranche 7c), de la plus récente à la plus ancienne, en une page ;
+    // `?member=` ne garde que celles qui visent ce membre (ses contenus et son compte).
+    if (pathname === '/v1/moderation/decisions') {
+      const member = url.searchParams.get('member')
+      return json(
+        200,
+        decisionHistoryPageOf(
+          member ? decisionHistory.filter((d) => d.member?.id === member) : decisionHistory,
+        ),
+      )
     }
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
@@ -1215,6 +1298,60 @@ const pages = [
     notifications: 'moderation',
     fullPage: true,
   },
+  // Tranche 7c : le compte de Léa suspendu. Le bandeau en haut de l'accueil et d'un projet ; sur
+  // son projet, ni « Modifier » ni note à écrire ; sur celui de Max, ni suivre, ni réagir, ni
+  // commenter ; le formulaire remplacé par l'état « suspendu » ; le profil fermé, les e-mails
+  // réglables.
+  { name: 'suspendu-accueil', path: '/', signedIn: true, suspended: true },
+  { name: 'suspendu-projet', path: project, signedIn: true, suspended: true, fullPage: true },
+  {
+    name: 'suspendu-projet-autre',
+    path: `/projects/${notMineProject.id}`,
+    signedIn: true,
+    suspended: true,
+    fullPage: true,
+  },
+  { name: 'suspendu-publier', path: '/projects/new', signedIn: true, suspended: true },
+  { name: 'suspendu-profil', path: '/profile', signedIn: true, suspended: true, fullPage: true },
+  // La suspension et sa fin, dans les notifications.
+  {
+    name: 'notifications-suspension',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'suspension',
+    fullPage: true,
+  },
+  // Côté administrateur (Léa) : « Suspendre » Sam depuis la carte de son commentaire signalé (la
+  // carte et son rappel « Déjà pour @sam… » sont sur la capture « moderation ») ; « Lever » la
+  // suspension de Karim ; l'historique, entier puis filtré sur Sam.
+  {
+    name: 'suspendre',
+    path: `/suspend?member=${samMember.id}&fromKind=comment&fromId=${scamCommentItem.target.id}`,
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+  },
+  {
+    name: 'lever',
+    path: `/suspend?member=${karim.id}`,
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+  },
+  {
+    name: 'moderation-historique',
+    path: '/moderation?tab=history',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+  },
+  {
+    name: 'moderation-historique-membre',
+    path: `/moderation?tab=history&member=${samMember.id}`,
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+  },
   { name: 'publier', path: '/projects/new', signedIn: true, fullPage: true },
   { name: 'projet', path: project, signedIn: true, fullPage: true },
   // Après un changement de statut, le formulaire ramène l'auteur sur son projet avec une note
@@ -1401,7 +1538,10 @@ const settle = async (page) => {
 const script = optionValue('--explore')
 if (script) {
   const browser = await chromium.launch()
-  const open = async (signedIn, { feed, notifications, admin, blocks, email, ...options } = {}) => {
+  const open = async (
+    signedIn,
+    { feed, notifications, admin, blocks, email, suspended, ...options } = {},
+  ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
       viewport: { width: 390, height: 844 },
@@ -1409,7 +1549,7 @@ if (script) {
     })
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(signedIn, feed, notifications, admin, blocks, email),
+      fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended),
     )
     return context
   }
@@ -1455,7 +1595,15 @@ async function layoutReport() {
     try {
       await context.route(
         `${apiUrl}/**`,
-        fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks, shot.email),
+        fakeApi(
+          shot.signedIn,
+          shot.feed,
+          shot.notifications,
+          shot.admin,
+          shot.blocks,
+          shot.email,
+          shot.suspended,
+        ),
       )
       const page = await context.newPage()
       for (const width of widths) {
@@ -1580,7 +1728,15 @@ const capture = async ({ shot, device, scheme }) => {
   try {
     await context.route(
       `${apiUrl}/**`,
-      fakeApi(shot.signedIn, shot.feed, shot.notifications, shot.admin, shot.blocks, shot.email),
+      fakeApi(
+        shot.signedIn,
+        shot.feed,
+        shot.notifications,
+        shot.admin,
+        shot.blocks,
+        shot.email,
+        shot.suspended,
+      ),
     )
     const page = await context.newPage()
     // Une erreur dans la page (ou une page qui ne s'hydrate pas) est signalée à la fin.

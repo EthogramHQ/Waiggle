@@ -5,9 +5,10 @@ import { request } from '../api/client'
 import type { ApiResult } from '../api/errors'
 import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { leaEmailPreferences } from '../testing/email'
-import { leaMe } from '../testing/fixtures'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import * as focusModule from '../ui/focus'
 import { ProfileScreen } from './ProfileScreen'
 
@@ -701,5 +702,64 @@ describe('ProfileScreen, the e-mail settings after the global design review', ()
     } finally {
       reveal.mockRestore()
     }
+  })
+})
+
+// --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
+//
+// Pendant une suspension, le profil ne se modifie plus : ni le nom, ni le pseudo, ni la bio, ni
+// les outils, ni la photo (l'API refuserait tout PATCH /v1/me autre que la langue). Les réglages
+// d'e-mail, eux, restent (« régler ses e-mails »).
+describe('ProfileScreen, for a suspended member', () => {
+  /** Vrai si ce champ est à l'écran et modifiable : absent ou en lecture seule, il ne compte pas. */
+  const editable = (label: string) => {
+    const field = screen.queryByLabelText(label)
+    return field !== null && field.props.editable !== false
+  }
+
+  it('says the profile cannot be changed during the suspension', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderWithProviders(<ProfileScreen />)
+
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.suspension.profileLocked))),
+    ).toBeTruthy()
+  })
+
+  it('offers no field to edit, no photo to change and nothing to save', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderWithProviders(<ProfileScreen />)
+
+    await screen.findByText(containing(fr.t(($) => $.suspension.profileLocked)))
+    for (const label of ['Nom affiché', 'Pseudo', 'Bio', 'Outils favoris']) {
+      expect({ label, editable: editable(label) }).toEqual({ label, editable: false })
+    }
+    expect(screen.queryByRole('button', { name: 'Retirer Cursor' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Changer la photo' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+    expect(updateProfile).not.toHaveBeenCalled()
+  })
+
+  it('still lets a suspended member set her e-mails', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderWithProviders(<ProfileScreen />)
+
+    await screen.findByText(containing(fr.t(($) => $.suspension.profileLocked)))
+    const recap = await screen.findByRole('switch', { name: 'Le récap de la semaine' })
+    await fireEvent.press(recap)
+
+    await waitFor(() => expect(emailPatches()).toEqual([{ weeklyRecap: false }]))
+  })
+
+  it('keeps every field for a member who is not suspended', async () => {
+    // Témoin : Léa, pas suspendue (beforeEach), peut tout modifier.
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    for (const label of ['Nom affiché', 'Pseudo', 'Bio', 'Outils favoris']) {
+      expect({ label, editable: editable(label) }).toEqual({ label, editable: true })
+    }
+    expect(screen.getByRole('button', { name: 'Changer la photo' })).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.suspension.profileLocked)))).toBeNull()
   })
 })

@@ -3,13 +3,16 @@
 // On cherche les éléments par ce que l'utilisateur voit (texte, rôle), pas par leur code interne.
 import { appName, palettes } from '@ruche/brand'
 import type { FeedItem, FeedPage, FollowingFeedPage, Project } from '@ruche/contracts'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
+import { getMe } from '../profile/api'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithI18n, setDesktopWindow } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import { HomeScreen } from './HomeScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
@@ -116,6 +119,8 @@ beforeEach(() => {
   jest.mocked(useDiscoverFeed).mockReset()
   jest.mocked(useFeedNews).mockReset()
   jest.mocked(useUnreadCount).mockReset().mockReturnValue(0)
+  // Tranche 7c : le profil, lu pour savoir si le compte est suspendu ; Léa ne l'est pas.
+  jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   mockFollowing()
   mockDiscover()
   mockNews({ count: null, more: false })
@@ -538,5 +543,55 @@ describe('the notification bell on the home screen of a phone', () => {
     // Témoin : l'accueil du visiteur est bien affiché.
     expect(screen.getByRole('button', { name: 'Créer un compte' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: t(($) => $.notifications.bell) })).toBeNull()
+  })
+})
+
+// --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
+//
+// Le profil (GET /v1/me) dit si le compte est suspendu (`Me.suspension`). L'accueil d'un membre
+// suspendu montre le bandeau, en haut, et ne propose plus « Publier » ; le reste de l'accueil (son
+// fil, ses projets) reste lisible.
+describe('the home screen of a suspended member', () => {
+  const banner = () => screen.findByText(containing(fr.t(($) => $.suspension.title)))
+
+  it('shows the suspension banner at the top of the page', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderMemberHome()
+
+    expect(await banner()).toBeTruthy()
+  })
+
+  it('offers no « Publier » on a phone, but keeps the feed and her projects', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderMemberHome()
+
+    await banner()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.publish) })).toBeNull()
+    // Témoins : il lit tout ce qu'il lisait avant.
+    expect(screen.getByRole('button', { name: fr.t(($) => $.home.myProjects) })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+  })
+
+  it('offers no « Publier » on a computer either', async () => {
+    const restore = setDesktopWindow()
+    try {
+      jest.mocked(getMe).mockResolvedValue(suspendedMe)
+      await renderMemberHome()
+
+      await banner()
+      expect(screen.queryAllByRole('button', { name: fr.t(($) => $.home.publish) })).toHaveLength(0)
+      expect(screen.getByRole('radio', { name: 'Abonnements', checked: true })).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('still offers to publish to a member who is not suspended, once her profile is read', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    await renderMemberHome()
+
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: fr.t(($) => $.home.publish) })).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
   })
 })
