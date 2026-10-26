@@ -710,6 +710,7 @@ export const en: Translation = {
     contest: 'To appeal: write to {{contactEmail}}. You can also go to court.',
     formBody: 'You can’t post or edit a project while suspended.',
     profileLocked: 'Your profile can’t be edited while suspended.',
+    formTitle: 'Publishing isn’t possible for now',
   },
   removal: {
     banner: 'Removed by moderation',

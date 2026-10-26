@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { type ApiResult, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useMySuspension } from '../moderation/mySuspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { parseTools } from '../profile/form'
@@ -63,6 +64,7 @@ import {
   NotFoundState,
   NotMineState,
   SignedOutScreen,
+  SuspendedState,
 } from './states'
 
 type ScreenProps = {
@@ -79,9 +81,14 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   // Sur ordinateur, le formulaire occupe toute la largeur : ses états aussi, pour que la barre du
   // haut ne change pas de largeur quand le formulaire arrive.
   const width = useLayout().sizeClass === 'wide' ? 'page' : 'form'
+  // Un compte suspendu (tranche 7c) ne publie ni ne modifie : le formulaire, ouvert par l'adresse,
+  // laisse la place à une page qui le dit. Le formulaire s'affiche sans attendre le profil (presque
+  // toujours déjà en cache) ; s'il dit « suspendu », la page change.
+  const suspended = useMySuspension() !== null
 
   if (isPending) return <LoadingScreen width={width} />
   if (!session) return <SignedOutScreen width={width} />
+  if (suspended) return <SuspendedState projectId={id} width={width} />
   if (!id) return <ProjectFormView initial={emptyProjectForm} />
 
   if (project.error) {

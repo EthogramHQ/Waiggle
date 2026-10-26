@@ -1845,6 +1845,45 @@ describe('a project page seen by a suspended member', () => {
   })
 })
 
+// Décision de Louis du 26/10/2026 (choix a) : un membre suspendu peut retirer ce qu'il a déjà
+// donné, jamais ajouter (scénario : « retirer ses réactions et ses abonnements »). Un projet qu'il
+// suit garde son interrupteur, pour ne plus le suivre ; une réaction donnée garde son bouton, pour
+// la retirer ; les autres réactions ne montrent que leur nombre.
+describe('a suspended member takes back what she gave, and gives nothing more', () => {
+  beforeEach(() => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+  })
+
+  it('lets her stop following a project she follows', async () => {
+    seenByOther({ ...withNotes, isFollowed: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    // Témoin du profil lu : aucune réaction à poser.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets her take back a reaction she gave, but not add another one', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: ['bravo'] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle),/ }),
+      ).toBeNull(),
+    )
+    // Les autres réactions restent lisibles, sans bouton.
+    expect(screen.getByLabelText('Utile, 0')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 3' }))
+
+    expect(mockReact).toHaveBeenCalledWith('bravo')
+  })
+})
+
 // Design 7b (`guardTaps`) : les fenêtres de la page s'ouvrent sous le doigt qui vient de toucher
 // « Supprimer » ; une seconde tape trop rapide ne doit rien y décider.
 describe('the windows of the project page, right after opening', () => {

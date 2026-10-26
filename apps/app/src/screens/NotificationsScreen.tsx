@@ -92,7 +92,7 @@ function MemberNotifications() {
           {/* Une liste annoncée : « liste, 20 éléments », et on saute d'une notification à l'autre. */}
           <Stack gap="sm" accessibilityRole="list">
             {items.map((notification) => {
-              const shown = presentNotification(notification, t)
+              const shown = presentNotification(notification, t, i18n.language)
               const target = shown.target
               return (
                 <NotificationCard

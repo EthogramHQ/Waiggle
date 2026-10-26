@@ -3,6 +3,7 @@
 import { type Notification, REACTION_KINDS } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
+import { parisDateTime } from '../moderation/parisTime'
 import type { IconName } from '../ui/Icon'
 
 type T = ReturnType<typeof useTranslation>['t']
@@ -23,7 +24,12 @@ const projectRoute = (id: string): Href => ({ pathname: '/projects/[id]', params
  * personne ; un commentaire nomme son auteur, déjà visible sous le commentaire. Celles de la
  * modération (tranche 7a) ne nomment jamais qui a signalé, ni qui a décidé.
  */
-export const presentNotification = (notification: Notification, t: T): Presented => {
+export const presentNotification = (
+  notification: Notification,
+  t: T,
+  /** La langue de l'écran (« fr », « en ») : elle écrit la date de fin d'une suspension. */
+  language: string,
+): Presented => {
   switch (notification.kind) {
     case 'reactions': {
       const { counts, total, project } = notification
@@ -101,28 +107,55 @@ export const presentNotification = (notification: Notification, t: T): Presented
         quote: null,
         target: '/profile',
       }
-    // 7c : provisoire (commit du contrat) ; ui-dev C écrit le texte complet (date, fondement,
-    // explication, recours).
-    case 'suspended':
-    case 'suspension_ended':
+    case 'suspended': {
+      // Tranche 7c (article 17 du DSA ; relecture juridique J2, J3, J4) : la mesure et sa fin, à
+      // l'heure de Paris (la même valeur que l'e-mail), puis, une phrase par ligne, si elle suit un
+      // signalement (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et
+      // comment contester. Jamais l'administrateur. Elle ne mène nulle part : le bandeau, en haut de
+      // chaque page, en dit autant tant que la suspension dure.
+      // « Ce qui reste possible » n'y est pas : la notification reste après la fin de la mesure.
+      const { endsAt, ground, explanation, afterReport } = notification
+      const end = endsAt ? parisDateTime(endsAt, language) : null
       return {
-        icon: 'sparkle',
-        text: t(($) => $.suspension.title),
-        detail: null,
+        icon: 'lock-simple',
+        text: end
+          ? t(($) => $.notifications.suspended, { date: end.date, time: end.time })
+          : t(($) => $.notifications.suspendedIndefinite),
+        detail: [
+          afterReport ? t(($) => $.suspension.afterReport) : t(($) => $.suspension.direct),
+          t(($) => $.removal.grounds[ground]),
+          t(($) => $.suspension.explanation, { explanation }),
+          t(($) => $.suspension.contest),
+        ].join('\n'),
         quote: null,
         target: null,
       }
+    }
+    case 'suspension_ended': {
+      // À la date prévue, ou levée plus tôt (J6) ; une levée dit pourquoi.
+      const { lifted, explanation } = notification
+      return {
+        icon: 'lock-simple-open',
+        text: lifted
+          ? t(($) => $.notifications.suspensionEnded.lifted)
+          : t(($) => $.notifications.suspensionEnded.ended),
+        detail: explanation ? t(($) => $.suspension.explanation, { explanation }) : null,
+        quote: null,
+        target: null,
+      }
+    }
     case 'removed': {
       // Tranche 7a, règle 13 de la relecture du plan (article 17 du DSA) : ce qui est retiré (la
       // phrase), puis, une phrase par ligne, que lui seul le voit encore, après un signalement ou
       // non (jamais de qui), qu'une personne a décidé, le fondement, l'explication, et comment
       // contester. L'extrait d'une note ou d'un commentaire suit en citation. Elle mène au projet,
       // que son auteur voit toujours (un commentaire retiré s'y lit pour lui seul).
-      // Tranche 7b (règle 9) : un commentaire écrit sur le projet d'un membre qui m'a bloqué. L'API
-      // vide le titre de ce projet, que je ne vois plus ; la notification garde la motivation, sans
-      // titre ni lien.
-      const { targetKind, project, excerpt, ground, explanation, afterReport } = notification
-      const elsewhere = targetKind === 'comment' && project.title === ''
+      // Tranche 7b (règle 9) : un commentaire écrit sur le projet d'un membre qui m'a bloqué, que je
+      // ne vois plus. L'API le dit par `projectHidden` (tranche 7c ; avant, l'appli le devinait à
+      // un titre vide) : la notification garde la motivation, sans titre ni lien.
+      const { targetKind, project, excerpt, ground, explanation, afterReport, projectHidden } =
+        notification
+      const elsewhere = targetKind === 'comment' && projectHidden
       return {
         icon: 'prohibit',
         text: elsewhere

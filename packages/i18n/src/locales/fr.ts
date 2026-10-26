@@ -785,6 +785,9 @@ export const fr = {
     // À la place d'un formulaire de projet, et sur « Mon profil ».
     formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',
     profileLocked: 'Ton profil ne peut pas être modifié pendant la suspension.',
+    // Le titre de la page qui remplace le formulaire de projet (ui-dev C, 7c) : le bandeau dit
+    // déjà « Ton compte est suspendu », le titre ne le répète pas.
+    formTitle: 'Publication impossible pour l’instant',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de

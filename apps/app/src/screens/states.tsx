@@ -185,6 +185,44 @@ export function NotFoundState({
   )
 }
 
+/**
+ * Un compte suspendu ouvre le formulaire d'un projet (tranche 7c), par l'adresse ou un ancien
+ * lien : il ne peut ni publier ni modifier. La page le dit et mène au projet (en modification), ou
+ * ramène d'où il vient. Le bandeau de la barre du haut dit jusqu'à quand.
+ */
+export function SuspendedState({
+  projectId,
+  width = 'form',
+}: {
+  projectId?: string | undefined
+  width?: Width
+}) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const back = useGoBack('/')
+  return (
+    <Screen header={<TopNav />} width={width} pageTitle={t(($) => $.suspension.formTitle)}>
+      <StateMessage
+        kind="signedOut"
+        level={1}
+        title={t(($) => $.suspension.formTitle)}
+        message={t(($) => $.suspension.formBody)}
+        actions={
+          projectId
+            ? [
+                {
+                  label: t(($) => $.states.seeProject),
+                  onPress: () =>
+                    router.replace({ pathname: '/projects/[id]', params: { id: projectId } }),
+                },
+              ]
+            : [{ label: t(($) => $.states.back), onPress: back }]
+        }
+      />
+    </Screen>
+  )
+}
+
 /** Un membre ouvre la modification d'un projet qui n'est pas le sien : il peut le voir, pas le changer. */
 export function NotMineState({ projectId, width = 'form' }: { projectId: string; width?: Width }) {
   const { t } = useTranslation()

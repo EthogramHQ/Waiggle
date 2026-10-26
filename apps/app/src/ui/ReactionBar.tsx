@@ -8,6 +8,8 @@
 // - pour l'auteur du projet (`readOnly`) : on ne réagit pas à son propre projet. Les cinq nombres
 //   forment une simple liste, nommée par sa légende (« Les réactions à ton projet »), sans bordure
 //   ni allure de bouton : rien n'invite à toucher. « 0 » s'y affiche aussi.
+// - pour un compte suspendu (tranche 7c, réactions `locked`) : il ne réagit plus, mais retire
+//   encore une réaction déjà donnée. Celle-ci garde sa pastille ; les autres montrent leur nombre.
 //
 // Les lecteurs d'écran entendent le nom donné par l'écran (« Bravo, réagi, 4 »), qui reprend le
 // texte affiché, et l'état « activé » (aria-pressed). Les pastilles passent à la ligne quand la
@@ -33,6 +35,11 @@ export type ReactionBarItem = {
   mine: boolean
   /** Le nom lu par les lecteurs d'écran (« Bravo, réagi, 4 »). */
   label: string
+  /**
+   * Cette réaction ne se pose pas (compte suspendu, tranche 7c) : son nombre seul, sans bouton.
+   * Les autres restent des boutons, pour retirer une réaction déjà donnée.
+   */
+  locked?: boolean
 }
 
 type Props = {
@@ -92,17 +99,33 @@ export function ReactionBar({
       </View>
     )
   }
+  // Des réactions verrouillées parmi les autres (compte suspendu) : la rangée devient une liste,
+  // chaque réaction un élément ; les verrouillées montrent leur nombre, les autres gardent leur
+  // bouton (liste > élément > bouton, que les lecteurs d'écran savent lire).
+  const mixed = items.some((item) => item.locked)
   return (
     <View style={{ gap: space.sm }}>
       {/* role « group » : les cinq boutons forment un ensemble, annoncé avec son nom. */}
       <View
-        role="group"
+        role={mixed ? 'list' : 'group'}
         {...(label ? { accessibilityLabel: label } : null)}
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
+        style={[
+          { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+          // Un nombre seul est moins haut qu'une pastille : il se place au milieu de la rangée.
+          mixed && { alignItems: 'center' },
+        ]}
       >
-        {items.map((item) => (
-          <Chip key={item.kind} item={item} onPress={() => onToggle(item.kind)} />
-        ))}
+        {items.map((item) =>
+          item.locked ? (
+            <Count key={item.kind} item={item} />
+          ) : mixed ? (
+            <View key={item.kind} role="listitem" style={{ maxWidth: '100%' }}>
+              <Chip item={item} onPress={() => onToggle(item.kind)} />
+            </View>
+          ) : (
+            <Chip key={item.kind} item={item} onPress={() => onToggle(item.kind)} />
+          ),
+        )}
       </View>
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
       {error ? <Notice message={error} action={errorAction} /> : null}

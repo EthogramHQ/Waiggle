@@ -769,6 +769,9 @@ export function CatalogueScreen() {
         <ReactionSample l={l} mine={['useful', 'bravo']} />
         <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
         <ReactionSample l={l} mine={[]} readOnly />
+        {/* Un compte suspendu (tranche 7c) : sa réaction donnée garde son bouton, pour la retirer ;
+            les autres ne montrent que leur nombre. */}
+        <ReactionSample l={l} mine={['bravo']} lockedExceptMine />
         {/* Les cartes d'un commentaire : sans action (« Répondre » est au bout du fil ; « Signaler »,
             tranche 7a, est dans la section suivante), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
             son auteur), masqué vu par l'auteur du projet (Démasquer), Masquer en cours d'envoi, un
@@ -1356,11 +1359,14 @@ function ReactionSample({
   mine,
   readOnly = false,
   error,
+  lockedExceptMine = false,
 }: {
   l: Labels
   mine: ReactionKind[]
   readOnly?: boolean
   error?: string
+  /** Compte suspendu : seules les réactions posées restent des boutons. */
+  lockedExceptMine?: boolean
 }) {
   const counts: Record<ReactionKind, number> = {
     amazing: 2,
@@ -1378,6 +1384,7 @@ function ReactionSample({
       count: counts[kind],
       mine: isMine,
       label: isMine ? `${text}, ${l.reacted}, ${counts[kind]}` : `${text}, ${counts[kind]}`,
+      locked: lockedExceptMine && !isMine,
     }
   })
   return readOnly ? (
