@@ -3,8 +3,8 @@
 import { type Notification, REACTION_KINDS } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 import type { useTranslation } from 'react-i18next'
-import { parisDateTime } from '../moderation/parisTime'
 import type { IconName } from '../ui/Icon'
+import { parisDateTime } from '../ui/parisTime'
 
 type T = ReturnType<typeof useTranslation>['t']
 
