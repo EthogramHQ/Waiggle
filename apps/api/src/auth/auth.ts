@@ -26,8 +26,9 @@ import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
 import { mediaKeysOf } from '../projects/load'
-import { deleteMemberCounters } from '../rate-limit'
+import { createRateLimiter, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
+import { createEmailChange } from './change-email'
 import { authSchemaOptions } from './schema-options'
 
 /**
@@ -85,6 +86,10 @@ export const AUTH_RATE_RULES = {
   '/sign-in/email': { window: 15 * 60, max: 5 },
   '/sign-up/email': { window: 60 * 60, max: 10 },
   '/delete-user': { window: 15 * 60, max: 5 },
+  // Changer d'adresse (tranche « adresse ») : la demande, et l'ouverture des deux liens reçus par
+  // e-mail. Un plafond par membre s'y ajoute (auth/change-email.ts) : celui-ci suit l'adresse IP.
+  '/change-email': { window: 15 * 60, max: 5 },
+  '/verify-email': { window: 15 * 60, max: 30 },
 } satisfies Record<string, { window: number; max: number }>
 
 /**
@@ -115,6 +120,15 @@ export const createAuth = ({
   // Fichiers à effacer après la suppression d'un compte (identifiant du membre → ses fichiers :
   // son avatar et les photos de tous ses projets).
   const filesToDelete = new Map<string, string[]>()
+  // Changer son adresse (tranche « adresse ») : les hooks et les envois de ce parcours, avec leurs
+  // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
+  // à chiffrer le jeton du second lien.
+  const emailChange = createEmailChange({
+    mailer,
+    rateLimiter: createRateLimiter(db),
+    appUrl,
+    secret,
+  })
 
   return betterAuth({
     ...authSchemaOptions,
@@ -159,7 +173,10 @@ export const createAuth = ({
       // Cliquer sur le lien vérifie l'adresse ET connecte le membre.
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60, // le lien est valable une heure
-      sendVerificationEmail: async ({ user, url }) => {
+      // Le même réglage envoie le second lien d'un changement d'adresse, vers la nouvelle adresse :
+      // emailChange le reconnaît à son jeton et envoie son propre e-mail (auth/change-email.ts).
+      sendVerificationEmail: async ({ user, url, token }) => {
+        if (await emailChange.sendNewEmailLink({ user, url, token })) return
         await mailer.send({
           to: user.email,
           ...verificationEmail(languageOf(user), { name: user.name, url }),
@@ -169,7 +186,10 @@ export const createAuth = ({
       // (tranche 6a) : pas avant, pour qu'un compte jamais vérifié n'en bloque aucun. Une panne ici
       // ne doit pas faire échouer la vérification, déjà enregistrée : on la note dans les logs, et
       // le pseudo sera donné en filet à la première lecture de « Mon profil ».
-      afterEmailVerification: async (user) => {
+      // Après le second lien d'un changement d'adresse, le membre a déjà son pseudo : emailChange
+      // écrit le journal et prévient l'ancienne adresse (auth/change-email.ts).
+      afterEmailVerification: async (user, request) => {
+        if (await emailChange.afterEmailChanged(user, request)) return
         try {
           await ensureHandle(db, user.id)
         } catch (error) {
@@ -183,6 +203,13 @@ export const createAuth = ({
 
     user: {
       ...authSchemaOptions.user,
+      // Changer son adresse (route POST /api/auth/change-email), après l'accord de l'adresse
+      // actuelle puis la vérification de la nouvelle : deux liens envoyés par e-mail. Jamais
+      // `updateEmailWithoutVerification`, qui changerait l'adresse sans aucun lien.
+      changeEmail: {
+        enabled: true,
+        sendChangeEmailConfirmation: emailChange.sendChangeEmailConfirmation,
+      },
       // Suppression du compte par le membre lui-même (route POST /api/auth/delete-user),
       // après confirmation de son mot de passe. Les sessions et méthodes de connexion
       // disparaissent avec lui (suppression « en cascade » dans la base).
@@ -268,8 +295,9 @@ export const createAuth = ({
     //   Google, que nous n'avons pas) ; update-session (écrire dans sa session) ;
     //   request-password-reset et reset-password (le mot de passe oublié, pas encore proposé) ;
     //   delete-user/callback (suppression confirmée par e-mail : la nôtre l'est par le mot de
-    //   passe) ; change-email (rouverte, protégée, par la tranche « changer son adresse ») ; ok
-    //   (une sonde : /health suffit).
+    //   passe) ; ok (une sonde : /health suffit).
+    //   change-email n'y est plus : la tranche « adresse » l'a rouverte, protégée par ses hooks
+    //   (mot de passe, quotas par membre, liens à usage unique : auth/change-email.ts).
     //   Un chemin variable (/callback/:id, /reset-password/:token) ne se ferme pas par cette
     //   liste, qui compare des chemins exacts : sans fournisseur ni mot de passe oublié réglés, ils
     //   ne mènent à rien (à surveiller le jour où l'on en règle un).
@@ -296,7 +324,6 @@ export const createAuth = ({
       '/request-password-reset',
       '/reset-password',
       '/delete-user/callback',
-      '/change-email',
       '/ok',
     ],
 
@@ -331,8 +358,13 @@ export const createAuth = ({
     // contente d'une session de moins d'un jour (« fraîche ») ; quelqu'un qui trouverait un
     // téléphone ouvert pourrait alors tout effacer. Le champ `token` (suppression confirmée par
     // e-mail, que nous n'utilisons pas) est refusé pour la même raison.
+    //
+    // Pour changer d'adresse : la demande et les deux liens passent par emailChange
+    // (auth/change-email.ts), qui dit dans l'ordre ce qu'il vérifie.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/change-email') return emailChange.beforeRequest(ctx)
+        if (ctx.path === '/verify-email') return emailChange.beforeLink(ctx)
         const body: object = typeof ctx.body === 'object' && ctx.body !== null ? ctx.body : {}
         if (ctx.path === '/delete-user') {
           const password = 'password' in body ? body.password : undefined
@@ -359,6 +391,11 @@ export const createAuth = ({
         if (!DisplayName.safeParse(name).success) {
           throw new APIError('BAD_REQUEST', { message: 'Invalid name' })
         }
+      }),
+      // Un hook `after` s'exécute après la route, même quand elle a répondu par une redirection.
+      // Le second lien d'un changement d'adresse ne doit connecter personne (auth/change-email.ts).
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/verify-email') await emailChange.afterLink(ctx)
       }),
     },
 

@@ -5,7 +5,8 @@
 // administrateur retire (tranche 7a) : celui qui a signalé est prévenu, l'auteur voit pourquoi, les
 // autres ne le voient plus. Depuis la confirmation de son signalement, ce membre bloque aussi
 // l'auteur du commentaire (tranche 7b) : chacun ne voit plus l'autre, puis il le débloque depuis
-// « Mon compte ». Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
+// « Mon compte ». Au début, le premier membre change aussi d'adresse e-mail (tranche « adresse »),
+// puis se reconnecte avec la nouvelle. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
 // membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
 //
 // Usage : node apps/app/scripts/journey.mjs <adresse de l'appli> <adresse de l'API>
@@ -121,13 +122,18 @@ const expectMedia = async (what, added) => {
   expectEqual(`${what} : photos sur le disque`, files.visuals, expected.visuals)
 }
 
-/** Le lien de vérification envoyé à cette adresse (la console de l'API écrit l'e-mail entier). */
-const verificationLink = (email) =>
+/**
+ * Le lien de vérification envoyé à cette adresse (la console de l'API écrit l'e-mail entier) : celui
+ * du dernier e-mail reçu. `except` (tranche « adresse ») : un lien déjà lu, qu'on ne veut pas ; on
+ * attend alors l'e-mail suivant (l'adresse de Léa a déjà reçu celui de son inscription).
+ */
+const verificationLink = (email, except) =>
   waitFor(`lien de vérification pour ${email}`, () => {
     const logs = execSync(mailCommand, { encoding: 'utf8', shell, maxBuffer: 64 * 1024 * 1024 })
     const block = logs.split(`E-mail pour ${email}`).at(-1)
     if (block === logs) return null
-    return block.match(/https?:\/\/\S+verify-email\S+/)?.[0] ?? null
+    const link = block.match(/https?:\/\/\S+verify-email\S+/)?.[0] ?? null
+    return link === except ? null : link
   })
 
 // --- Le navigateur ---------------------------------------------------------------------------
@@ -181,10 +187,11 @@ const signUp = async (someone, name) => {
   await page.getByRole('button', { name: 'Créer un compte' }).click()
   await page.waitForURL(/\/check-email/)
   // Le lien connecte au compte, puis mène à la page « Adresse vérifiée ».
-  await open(page, await verificationLink(email))
+  const link = await verificationLink(email)
+  await open(page, link)
   await page.getByText('Adresse vérifiée').waitFor()
   console.log(`  ok : ${name} inscrite et vérifiée`)
-  return email
+  return { email, link }
 }
 
 const lea = await person('Léa')
@@ -196,7 +203,7 @@ const admin = await person('Admin')
 
 try {
   step('Deux personnes s’inscrivent avec le code d’invitation, et vérifient leur adresse')
-  await signUp(lea, 'Lea')
+  const leaSignUp = await signUp(lea, 'Lea')
   await signUp(sam, 'Sam')
 
   step('Léa choisit une photo de profil')
@@ -229,6 +236,55 @@ try {
   await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: false }).waitFor()
   const emails = await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()
   expectEqual('récap de Léa', emails.weeklyRecap, false)
+
+  // Tranche « adresse » : deux liens, l'un à l'ancienne adresse (son accord), l'autre à la nouvelle
+  // (sa vérification). Léa les ouvre dans son navigateur, où elle est connectée : elle le reste.
+  step('Léa change d’adresse e-mail : un lien à l’ancienne, puis un à la nouvelle')
+  const newEmail = `lea-nouvelle-${randomBytes(4).toString('hex')}@example.com`
+  await open(lea.page, `${appUrl}/account`)
+  await lea.page.getByRole('button', { name: /^Changer d.adresse e-mail/ }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/account/email')
+  await lea.page.getByLabel('Nouvelle adresse e-mail').fill(newEmail)
+  await lea.page.getByLabel('Confirme avec ton mot de passe').fill(password)
+  await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
+  await lea.page.getByText('Regarde ta boîte mail actuelle').waitFor()
+  // Le premier lien part vers l'adresse ACTUELLE, qui a déjà reçu celui de l'inscription.
+  await open(lea.page, await verificationLink(leaSignUp.email, leaSignUp.link))
+  await lea.page.waitForURL((url) => url.pathname === '/email-change/confirmed')
+  await lea.page.getByRole('heading', { name: 'Plus qu’une étape' }).waitFor()
+  // Rien n'a encore changé : il faut aussi le second lien.
+  const halfway = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
+  expectEqual('adresse de Léa après le premier lien', halfway.email, leaSignUp.email)
+  await open(lea.page, await verificationLink(newEmail))
+  await lea.page.waitForURL((url) => url.pathname === '/email-change/done')
+  await lea.page.getByRole('heading', { name: 'Adresse changée' }).waitFor()
+  // La page lit la nouvelle adresse dans la session, jamais dans l'adresse de la page (scénario).
+  await lea.page.getByText(newEmail, { exact: false }).first().waitFor()
+  const doneUrl = lea.page.url()
+  expectEqual(
+    'adresse e-mail absente de l’URL',
+    doneUrl.includes(newEmail) || doneUrl.includes(encodeURIComponent(newEmail)),
+    false,
+  )
+  const changed = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
+  expectEqual('nouvelle adresse de Léa', changed.email, newEmail)
+  expectEqual('nouvelle adresse vérifiée', changed.emailVerified, true)
+
+  step('Léa se déconnecte : l’ancienne adresse ne la connecte plus, la nouvelle oui')
+  await open(lea.page, `${appUrl}/account`)
+  await lea.page.getByRole('button', { name: 'Me déconnecter' }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/')
+  await open(lea.page, `${appUrl}/sign-in`)
+  await lea.page.getByLabel('Adresse e-mail').fill(leaSignUp.email)
+  await lea.page.getByLabel('Mot de passe', { exact: true }).fill(password)
+  await lea.page.getByRole('button', { name: 'Me connecter' }).click()
+  await lea.page.getByText('Adresse e-mail ou mot de passe incorrect.').waitFor()
+  console.log('  ok : l’ancienne adresse est refusée')
+  await lea.page.getByLabel('Adresse e-mail').fill(newEmail)
+  await lea.page.getByRole('button', { name: 'Me connecter' }).click()
+  await lea.page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
+  const again = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
+  expectEqual('Léa reconnectée avec sa nouvelle adresse', again.email, newEmail)
 
   step('Sam ne suit personne : son fil le dit ; il lit le pseudo de Léa et la suit depuis sa page')
   await open(sam.page, `${appUrl}/`)
@@ -557,7 +613,7 @@ try {
   console.log('  ok : Léa a répondu au commentaire signalé')
 
   step('Un administrateur ouvre « Modération » depuis « Mon compte », et retire le commentaire')
-  const adminEmail = await signUp(admin, 'Admin')
+  const { email: adminEmail } = await signUp(admin, 'Admin')
   // Le rôle ne se donne par aucune route de l'API. Sur la pile d'essai, le script de production
   // (infra/grant-admin.sh, JOURNEY_ADMIN_CMD) l'écrit dans la base ; le parcours local, lui, a
   // préparé sa base pour qu'un compte « admin-… » vérifié le reçoive (journey-local.mjs).

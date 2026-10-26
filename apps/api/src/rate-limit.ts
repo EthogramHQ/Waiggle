@@ -93,6 +93,14 @@ export const memberCounterKeys = (userId: string) => ({
   // rafale de déblocages et de reblocages (débloquer, lire, rebloquer) bute sur les deux plafonds.
   block: `block:${userId}`,
   unblock: `unblock:${userId}`,
+  // Demander à changer d'adresse (tranche « adresse ») : 5 par quart d'heure et 10 par jour,
+  // toutes connexions confondues (relecture de sécurité S4). Sans eux, en changeant d'adresse IP,
+  // on pourrait tester sans fin le mot de passe d'une session volée, ou quelles adresses ont un
+  // compte (le premier lien d'une adresse prise n'envoie rien).
+  emailChange: `email-change:${userId}`,
+  emailChangeDay: `email-change-day:${userId}`,
+  // Les e-mails envoyés à une nouvelle adresse (le second lien) : 3 par heure (S1).
+  emailChangeLink: `email-change-link:${userId}`,
 })
 
 /**

@@ -455,7 +455,9 @@ pas** : on prévient Louis.
      - `Unsubscribe <identifiant> recap` (ou `mentions`, ou `all` pour les deux) : un e-mail coupé,
        par le lien d'un e-mail, par le bouton « Se désabonner » de la messagerie, ou dans l'appli
        (Mon profil) ;
-     - `Account deleted <identifiant>` : un compte supprimé par son membre.
+     - `Account deleted <identifiant>` : un compte supprimé par son membre ;
+     - `Email changed <identifiant>` : une adresse changée par son membre (tranche « adresse ») ;
+       la sauvegarde ramènerait l'ancienne, peut-être rendue depuis à quelqu'un d'autre.
 
      Ces journaux vivent avec le conteneur de l'API : couper les envois (étape 1) ou redéployer
      le remplace, et les efface. On les copie donc d'abord dans un fichier, sur le serveur, à côté
@@ -465,7 +467,7 @@ pas** : on prévient Louis.
      un refus réappliqué deux fois ne change rien.
 
      ```bash
-     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all)|Account deleted [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
+     ssh waiggle 'source /srv/ruche/repo/infra/lib.sh && compose logs --no-color --no-log-prefix --since 2026-10-21T02:55:00 api | grep -E "^(Unsubscribe [A-Za-z0-9]+ (recap|mentions|all)|Account deleted [A-Za-z0-9]+|Email changed [A-Za-z0-9]+)\$" > /srv/ruche/backups/refus-<nom de la sauvegarde>.txt; wc -l < /srv/ruche/backups/refus-<nom de la sauvegarde>.txt'
      ```
 
      `grep -E` ne garde que les lignes exactement de cette forme, avec un identifiant fait de
@@ -525,6 +527,13 @@ pas** : on prévient Louis.
        auteur, jusqu'à la prochaine suppression d'un compte par un membre, qui les balaie ; son
        avatar et ses photos restent dans le volume des fichiers. Un outil qui rejoue la suppression
        complète reste à écrire ;
+     - pour chaque `Email changed <identifiant>` : la requête des désinscriptions ci-dessus, avec
+       `R` et `M` à `false`, pour qu'aucun e-mail ne parte vers l'ancienne adresse ; puis Louis
+       prévient le membre (sa nouvelle adresse est dans la sauvegarde `avant-restauration`), qui
+       refait le changement dans l'appli et rallume ses e-mails dans Mon profil. Si ce compte est
+       celui d'un administrateur, les alertes de modération (`moderation-alert.ts`) partent vers
+       son adresse sans tenir compte de ces réglages : Louis lui remet donc sa nouvelle adresse
+       dans la base avant l'étape 4, sinon les contenus signalés iraient à l'ancienne ;
   4. remettre `EMAIL_JOBS=on` (ou vide) dans `secrets.env`, puis redémarrer l'API comme en 1 ;
   5. effacer le fichier de l'étape 0 (`rm /srv/ruche/backups/refus-<nom>.txt`) : il garde des
      identifiants de membres, et n'a plus d'usage.

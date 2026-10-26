@@ -162,7 +162,7 @@ Ils tournent dans `pnpm check`, donc à chaque pull request :
 1. Créer `apps/app/src/ui/MonComposant.tsx`, avec une phrase en tête qui dit à quoi il sert.
 2. Lire les couleurs avec `useTheme()` et les tailles dans `@ruche/brand`.
 3. L'ajouter au catalogue (`src/catalogue/CatalogueScreen.tsx`) dans tous ses états.
-4. Tester son comportement (rôle, nom, état) dans `src/ui/components.test.tsx`.
+4. Tester son comportement (rôle, nom, état) dans son propre fichier, `src/ui/MonComposant.test.tsx`.
 
 **Ajouter une icône.** Ajouter son nom (celui du catalogue <https://phosphoricons.com>) à la liste
 de `apps/app/scripts/icons.mts`, puis lancer `pnpm --filter @ruche/app icons`.

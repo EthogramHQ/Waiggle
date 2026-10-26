@@ -5,7 +5,8 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
-import { SignedOutScreen } from './states'
+import { fr } from '../testing/text'
+import { SessionErrorScreen, SignedOutScreen } from './states'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 // La barre de navigation (ordinateur) lit le profil pour l'avatar : on remplace l'appel.
@@ -60,5 +61,22 @@ describe('SignedOutScreen', () => {
     await signIn()
 
     expect(visited(mockPush)).toEqual(['/sign-in?next=/projects/abc'])
+  })
+})
+
+// --- Tranche « adresse » (des-3) : la session ne se lit pas (serveur en panne) ---
+
+describe('SessionErrorScreen', () => {
+  it('says the account could not load and retries on demand, without « Réservé aux membres »', async () => {
+    const onRetry = jest.fn()
+    await renderWithProviders(<SessionErrorScreen onRetry={onRetry} />)
+
+    expect(screen.getByRole('header', { name: fr.t('states.errorTitle') })).toBeTruthy()
+    expect(screen.queryByText(fr.t('states.signedOutTitle'))).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t('common.retry') }))
+
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    // Toujours une issue de plus : revenir.
+    expect(screen.getByRole('button', { name: fr.t('states.back') })).toBeTruthy()
   })
 })

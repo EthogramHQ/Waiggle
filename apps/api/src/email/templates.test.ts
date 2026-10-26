@@ -2,11 +2,14 @@ import { appName, contactEmail } from '@ruche/brand'
 import { fill, resources } from '@ruche/i18n'
 import { describe, expect, it } from 'vitest'
 import {
+  changeEmailConfirmationEmail,
+  emailChangedEmail,
   existingAccountEmail,
   type MentionData,
   mentionEmail,
   moderationAlertEmail,
   type NotificationLinks,
+  newEmailVerificationEmail,
   type RecapData,
   recapEmail,
   verificationEmail,
@@ -262,5 +265,291 @@ describe('moderationAlertEmail', () => {
     const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
     expect(hrefs).toContain(url)
     for (const href of hrefs) expect(href.startsWith('https://waiggle.com/'), href).toBe(true)
+  })
+})
+
+// ─── Tranche « adresse » : les trois e-mails d'un changement d'adresse ──────────────────────────
+// 1. à l'adresse actuelle, pour donner son accord (changeEmailConfirmationEmail) ;
+// 2. à la nouvelle adresse, pour la vérifier (newEmailVerificationEmail) ;
+// 3. à l'ancienne adresse, une fois le changement fait (emailChangedEmail).
+// Ce sont des e-mails de service : ni publicité, ni lien de désinscription.
+
+describe('changeEmailConfirmationEmail', () => {
+  const url = 'https://api.waiggle.com/api/auth/verify-email?token=abc'
+  const data = { name: 'Inès', newEmail: 'ines.b@exemple.fr', url }
+
+  it('is written in French, cites the new address, and links to the confirmation', () => {
+    const email = changeEmailConfirmationEmail('fr', data)
+
+    expect(email.subject).toBe(fill(fr.changeEmail.subject))
+    expect(email.text).toContain(fill(fr.greeting, { name: 'Inès' }))
+    for (const sentence of [
+      fr.changeEmail.body,
+      fr.changeEmail.next,
+      fr.changeEmail.expires,
+      fr.changeEmail.ignore,
+    ]) {
+      expect(email.text).toContain(fill(sentence))
+    }
+    expect(email.text).toContain(url)
+    expect(email.html).toContain(`href="${url}"`)
+    expect(email.html).toContain(`>${fill(fr.changeEmail.button)}</a>`)
+  })
+
+  it('is written in English for an English-speaking member', () => {
+    const email = changeEmailConfirmationEmail('en', { ...data, name: 'Sam' })
+
+    expect(email.subject).toBe(fill(en.changeEmail.subject))
+    expect(email.text).toContain(fill(en.greeting, { name: 'Sam' }))
+    expect(email.text).toContain(fill(en.changeEmail.ignore))
+  })
+})
+
+describe('newEmailVerificationEmail', () => {
+  const url = 'https://api.waiggle.com/api/auth/verify-email?token=def'
+
+  it('is written in French, with the link in the text and in the button', () => {
+    const email = newEmailVerificationEmail('fr', { url })
+
+    expect(email.subject).toBe(fill(fr.newEmail.subject))
+    for (const sentence of [fr.newEmail.body, fr.newEmail.expires, fr.newEmail.ignore]) {
+      expect(email.text).toContain(fill(sentence))
+    }
+    expect(email.text).toContain(url)
+    expect(email.html).toContain(`href="${url}"`)
+    expect(email.html).toContain(`>${fill(fr.newEmail.button)}</a>`)
+  })
+
+  // Avec une faute de frappe, cet e-mail part chez un inconnu (plan, S6 et J6) : il ne lui
+  // apprend ni le nom du membre ni son adresse actuelle. La salutation est neutre, et la seule
+  // adresse écrite est celle pour nous écrire.
+  it('greets nobody by name and gives no address but the contact one', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = newEmailVerificationEmail(language, { url })
+      const t = resources[language].translation.email
+
+      expect(email.subject).toBe(fill(t.newEmail.subject))
+      expect(email.text.split('\n')[0]).toBe(fill(t.newEmail.greeting))
+      const addresses = (email.text.match(/[^\s@]+@[^\s@]+/g) ?? []).map((found: string) =>
+        found.replace(/[.,;:!?)]+$/, ''),
+      )
+      expect(new Set(addresses)).toEqual(new Set([contactEmail]))
+    }
+  })
+})
+
+describe('emailChangedEmail', () => {
+  const data = { name: 'Inès', newEmail: 'ines.b@exemple.fr' }
+
+  // Décision de Louis du 26/10/2026 (relecture juridique R6) : aucun bouton ni lien ; le seul
+  // geste proposé est d'écrire au contact, en texte.
+  it('tells the old address the new one, with no button nor link, only the contact to write to', () => {
+    const email = emailChangedEmail('fr', data)
+
+    expect(email.subject).toBe(fill(fr.emailChanged.subject))
+    expect(email.text).toContain(fill(fr.greeting, { name: 'Inès' }))
+    for (const sentence of [fr.emailChanged.body, fr.emailChanged.after, fr.emailChanged.help]) {
+      expect(email.text).toContain(fill(sentence))
+    }
+    expect(email.html).not.toMatch(/<a\s/i)
+    expect(email.text).not.toMatch(/https?:\/\//)
+  })
+
+  it('is written in English for an English-speaking member', () => {
+    const email = emailChangedEmail('en', { ...data, name: 'Sam' })
+
+    expect(email.subject).toBe(fill(en.emailChanged.subject))
+    expect(email.text).toContain(fill(en.greeting, { name: 'Sam' }))
+    expect(email.text).toContain(fill(en.emailChanged.help))
+  })
+})
+
+describe('the new address written in the e-mails of an address change', () => {
+  // Une adresse valide, avec une apostrophe à échapper en HTML et un « + ».
+  const newEmail = "o'brien+x@exemple.fr"
+  const emails = () => [
+    changeEmailConfirmationEmail('fr', {
+      name: 'Inès',
+      newEmail,
+      url: 'https://api.waiggle.com/v',
+    }),
+    emailChangedEmail('en', { name: 'Sam', newEmail }),
+  ]
+
+  // Plan, S10 et J6 : l'adresse se lit telle que saisie, seule sur sa ligne, pour qu'une faute de
+  // frappe saute aux yeux. Elle n'est pas filtrée en « [lien] » (le membre doit la reconnaître),
+  // mais échappée dans le HTML.
+  it('stands alone on its line, as typed, escaped in the HTML', () => {
+    for (const email of emails()) {
+      expect(email.text.split('\n'), email.subject).toContain(newEmail)
+      expect(email.html, email.subject).toMatch(/>o&#39;brien\+x@exemple\.fr</)
+      expect(email.html, email.subject).not.toContain("o'brien")
+      for (const part of [email.text, email.html]) {
+        expect(part, email.subject).not.toMatch(/\[lien\]|\[link\]/)
+      }
+    }
+  })
+
+  // Relecture de design des-E1 et des-E3 : une adresse n'a pas d'espace ; un paragraphe ordinaire
+  // ne la coupe qu'aux tirets, et à 320 px une adresse de 88 caractères faisait défiler l'e-mail
+  // de 224 px. Son paragraphe la coupe n'importe où, et la met en gras pour qu'elle se voie.
+  it('is drawn in bold in a paragraph of its own that may break it anywhere', () => {
+    for (const email of emails()) {
+      const paragraph = email.html.match(/<p style="([^"]*)">o&#39;brien\+x@exemple\.fr<\/p>/)
+      expect(paragraph, email.subject).not.toBeNull()
+      const style = paragraph?.[1] ?? ''
+      for (const rule of ['font-weight:bold', 'word-break:break-all', 'overflow-wrap:anywhere']) {
+        expect(style, email.subject).toContain(rule)
+      }
+    }
+  })
+})
+
+describe('the help to write to us in the e-mails of an address change', () => {
+  // des-E2 et des-E4 (décisions de Louis du 26/10/2026) : « Ce n'est pas toi ? » est le geste qui
+  // compte s'il s'agit d'un vol de compte. Un paragraphe au corps normal, pas une note grise, et
+  // l'adresse de contact en gras, en texte (jamais en lien « mailto: »).
+  const cases = () => [
+    {
+      email: changeEmailConfirmationEmail('fr', {
+        name: 'Inès',
+        newEmail: 'ines.b@exemple.fr',
+        url: 'https://api.waiggle.com/v',
+      }),
+      sentence: fr.changeEmail.ignore,
+    },
+    {
+      email: changeEmailConfirmationEmail('en', {
+        name: 'Sam',
+        newEmail: 'ines.b@exemple.fr',
+        url: 'https://api.waiggle.com/v',
+      }),
+      sentence: en.changeEmail.ignore,
+    },
+    {
+      email: emailChangedEmail('fr', { name: 'Inès', newEmail: 'ines.b@exemple.fr' }),
+      sentence: fr.emailChanged.help,
+    },
+    {
+      email: emailChangedEmail('en', { name: 'Sam', newEmail: 'ines.b@exemple.fr' }),
+      sentence: en.emailChanged.help,
+    },
+  ]
+
+  it('is a paragraph of normal size, with the contact address in bold', () => {
+    for (const { email, sentence } of cases()) {
+      const [before = ''] = sentence.split('{{contactEmail}}')
+      const opening = escapeForTest(fill(before))
+      const paragraph = email.html.match(new RegExp(`<p style="([^"]*)">${opening}(.*?)</p>`))
+      expect(paragraph, email.subject).not.toBeNull()
+      expect(paragraph?.[1], email.subject).toBe('font-size:16px;line-height:1.5')
+      expect(paragraph?.[2], email.subject).toContain(`<strong>${contactEmail}</strong>`)
+      expect(email.text, email.subject).toContain(fill(sentence))
+    }
+  })
+})
+
+/** Un texte rendu cherchable mot pour mot dans une expression régulière (le « ? » de la question). */
+const escapeForTest = (value: string) =>
+  value.replaceAll("'", '&#39;').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+describe('the order of the e-mails of an address change', () => {
+  // des-E5 : les conséquences d'abord, puis la consigne, juste avant la durée et le bouton.
+  it('asks to confirm right before the validity and the button', () => {
+    const email = changeEmailConfirmationEmail('fr', {
+      name: 'Inès',
+      newEmail: 'ines.b@exemple.fr',
+      url: 'https://api.waiggle.com/v',
+    })
+    const lines = email.text.split('\n').filter((line) => line !== '')
+    const next = lines.indexOf(fill(fr.changeEmail.next))
+    expect(lines.slice(next, next + 4)).toEqual([
+      fill(fr.changeEmail.next),
+      fill(fr.changeEmail.expires),
+      fill(fr.changeEmail.button),
+      'https://api.waiggle.com/v',
+    ])
+  })
+
+  // des-E6 : la version texte n'a pas de bouton ; l'adresse du lien, longue avec son jeton chiffré,
+  // suit un libellé qui dit à quoi elle sert.
+  it('writes « Confirm this address: » above the link in the text of the second e-mail', () => {
+    const url = 'https://api.waiggle.com/api/auth/verify-email?token=def'
+    for (const [language, label] of [
+      ['fr', fr.newEmail.textLink],
+      ['en', en.newEmail.textLink],
+    ] as const) {
+      const lines = newEmailVerificationEmail(language, { url }).text.split('\n')
+      expect(lines[lines.indexOf(url) - 1]).toBe(fill(label))
+    }
+    expect(fill(en.newEmail.textLink)).toBe('Confirm this address:')
+  })
+})
+
+describe('a name written to trap the e-mails of an address change', () => {
+  const trap = 'Ton compte est bloqué, va sur waiggle-login.com'
+
+  it('turns the address of a name into « [lien] », in the language of the e-mail', () => {
+    const confirmation = changeEmailConfirmationEmail('fr', {
+      name: trap,
+      newEmail: 'ines.b@exemple.fr',
+      url: 'https://api.waiggle.com/v',
+    })
+    const changed = emailChangedEmail('en', { name: trap, newEmail: 'ines.b@exemple.fr' })
+
+    for (const part of [confirmation.text, confirmation.html]) {
+      expect(part).not.toContain('waiggle-login.com')
+      expect(part).toContain('[lien]')
+    }
+    for (const part of [changed.text, changed.html]) {
+      expect(part).not.toContain('waiggle-login.com')
+      expect(part).toContain('[link]')
+    }
+  })
+})
+
+describe('the rules shared by the e-mails of an address change', () => {
+  const emails = () => [
+    changeEmailConfirmationEmail('fr', {
+      name: 'Inès',
+      newEmail: 'ines.b@exemple.fr',
+      url: 'https://api.waiggle.com/api/auth/verify-email?token=abc',
+    }),
+    newEmailVerificationEmail('en', {
+      url: 'https://api.waiggle.com/api/auth/verify-email?token=def',
+    }),
+    emailChangedEmail('fr', { name: 'Inès', newEmail: 'ines.b@exemple.fr' }),
+  ]
+
+  it('give the contact address, as text and never as a link', () => {
+    for (const email of emails()) {
+      expect(email.text, email.subject).toContain(contactEmail)
+      expect(email.html, email.subject).toContain(contactEmail)
+      expect(email.html, email.subject).not.toContain('mailto:')
+    }
+  })
+
+  it('link to the app or the API only, with no image and no unsubscribe link', () => {
+    for (const email of emails()) {
+      const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+      // Le bouton, rien d'autre ; et aucun dans l'e-mail final (décision de Louis du 26/10, R6).
+      const final =
+        email.subject === fill(en.emailChanged.subject) ||
+        email.subject === fill(fr.emailChanged.subject)
+      expect(hrefs, email.subject).toHaveLength(final ? 0 : 1)
+      for (const href of hrefs) {
+        expect(/^https:\/\/(api\.)?waiggle\.com\//.test(href), href).toBe(true)
+      }
+      expect(email.html, email.subject).not.toMatch(/<img|unsubscribe/i)
+      expect(email.headers, email.subject).toBeUndefined()
+    }
+  })
+
+  // Un objet s'affiche sur un écran verrouillé : il ne cite aucune adresse.
+  it('have a fixed subject, without any address', () => {
+    for (const email of emails()) {
+      expect(email.subject).not.toContain('@')
+      expect(email.subject).not.toContain('exemple.fr')
+    }
   })
 })

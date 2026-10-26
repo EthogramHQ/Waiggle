@@ -124,6 +124,40 @@ export function LoadErrorScreen({
   )
 }
 
+/**
+ * La session ne se lit pas (le serveur répond 500, le réseau coupe) : on ne sait pas si quelqu'un
+ * est connecté. Ce n'est pas un visiteur, on ne lui dit donc pas « Réservé aux membres » : la page
+ * dit que le compte ne se charge pas et propose de réessayer (`onRetry`, le `refetch` de
+ * `useSession`). Une seule demande par toucher : rien ne relit la session tout seul en boucle.
+ */
+export function SessionErrorScreen({
+  onRetry,
+  width = 'form',
+}: {
+  onRetry: () => void
+  width?: Width
+}) {
+  const { t } = useTranslation()
+  const back = useGoBack('/')
+  return (
+    // Les textes de la page en panne (« Cette page n'a pas pu se charger ») et du message de
+    // « Mon compte » (« Impossible de charger ton compte… ») : deux clés de plus faisaient dépasser
+    // à TypeScript sa profondeur de calcul des clés de t() (TS2589).
+    <Screen header={<TopNav />} width={width} pageTitle={t('states.errorTitle')}>
+      <StateMessage
+        kind="error"
+        level={1}
+        title={t('states.errorTitle')}
+        message={t('account.loadError')}
+        actions={[
+          { label: t('common.retry'), onPress: onRetry },
+          { label: t('states.back'), onPress: back },
+        ]}
+      />
+    </Screen>
+  )
+}
+
 /** Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil. */
 export function NotFoundState({
   title,
