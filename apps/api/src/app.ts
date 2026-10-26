@@ -14,6 +14,7 @@ import { HTTPException } from 'hono/http-exception'
 import { secureHeaders } from 'hono/secure-headers'
 import type { Auth } from './auth/auth'
 import { sessionMiddleware } from './auth/session'
+import type { Mailer } from './email/mailer'
 import { errorBody, languageOf } from './errors'
 import { describeError } from './log'
 import type { FileStorage } from './media/storage'
@@ -35,6 +36,7 @@ import { reportRoutes } from './routes/reports'
 import { tagRoutes } from './routes/tags'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
+import { suspensionGuard } from './suspension/guard'
 import type { AppEnv } from './types'
 
 export type AppOptions = {
@@ -52,6 +54,11 @@ export type AppOptions = {
    * en est dérivée (tranche 6c, email/unsubscribe-token.ts).
    */
   secret: string
+  /**
+   * L'envoi des e-mails : depuis la tranche 7c, la modération prévient un membre suspendu
+   * (moderation/suspend.ts). Le même que celui de Better Auth.
+   */
+  mailer: Mailer
 }
 
 // Déclaration de la route GET /health. createRoute décrit la route ET sa réponse attendue :
@@ -88,6 +95,7 @@ export const createApp = ({
   appUrl,
   publicApiUrl,
   secret,
+  mailer,
 }: AppOptions) => {
   const app = new OpenAPIHono<AppEnv>()
 
@@ -199,6 +207,10 @@ export const createApp = ({
     await next()
     c.header('Cache-Control', 'no-store')
   })
+  // Un compte suspendu (tranche 7c) passe en lecture seule : la garde refuse ses écritures avant
+  // toutes les routes, donc avant leur validateur et leur quota (suspension/guard.ts). Après
+  // « no-store » (S14) : son refus n'est gardé par aucun cache non plus.
+  app.use('/v1/*', suspensionGuard(db))
 
   // La route de santé : `as const` garantit que status vaut exactement 'ok', comme l'exige le schéma.
   app.openapi(healthRoute, (c) => c.json({ status: 'ok' as const, version }, 200))
@@ -221,7 +233,7 @@ export const createApp = ({
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
-  app.route('/', moderationRoutes({ db, limiter, auth }))
+  app.route('/', moderationRoutes({ db, limiter, auth, mailer }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

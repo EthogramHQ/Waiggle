@@ -981,6 +981,8 @@ export const fr = {
         'Pendant la suspension, tu peux tout lire, supprimer tes contenus, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir ni suivre.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
+      // La salutation, sans le nom : l'e-mail ne cite que la décision (backend-dev 7c).
+      greeting: 'Bonjour,',
     },
   },
   feed: {

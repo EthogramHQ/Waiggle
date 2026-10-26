@@ -21,6 +21,8 @@ const SERVICE = [
   'existing-account',
   'moderation-alert',
   'new-email',
+  'suspension-7d',
+  'suspension-indefinite',
   'verification',
 ]
 

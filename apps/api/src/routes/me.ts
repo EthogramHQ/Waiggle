@@ -34,6 +34,7 @@ import { loadProjectsOf } from '../projects/load'
 import { listedProject } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
+import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -71,6 +72,7 @@ const updateMeRoute = createRoute({
     200: meResponse,
     400: errorResponse('Invalid data.'),
     401: errorResponse('Not signed in.'),
+    403: errorResponse('A suspended account may only change its language.'),
     409: errorResponse('Handle already taken, or still reserved for its former owner.'),
     429: errorResponse('Too many changes.'),
   },
@@ -154,6 +156,18 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!user) return unauthorized(c)
     const decision = await limiter.hit(memberCounterKeys(user.id).profile, profileRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    // Un compte suspendu (tranche 7c, S9) : la garde (suspension/guard.ts) le laisse entrer ici
+    // pour changer de langue, et rien d'autre. Toute autre clé du corps, même avec sa valeur
+    // actuelle ou null, reçoit 403 `suspended`, avant le validateur et avant toute lecture du
+    // pseudo. `c.req.json()` garde le corps lu : le validateur le relit sans le redemander. Un corps
+    // qui n'est pas un objet JSON passe : le validateur répond 400, comme à tout membre.
+    if (await isSuspended(db, user.id, new Date())) {
+      const body: unknown = await c.req.json().catch(() => null)
+      const keys = typeof body === 'object' && body !== null ? Object.keys(body) : []
+      if (keys.some((key) => key !== 'language')) {
+        return c.json(errorBody(languageOf(c), 'suspended'), 403)
+      }
+    }
     await next()
   })
 
@@ -395,6 +409,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // actuel et la date. Jamais ceux qui l'ont bloqué : ce n'est pas son geste, et le lui dire
     // trahirait leur blocage (blocks/list.ts).
     const blocks = await blocksOfMember(db, user.id)
+    // Les suspensions de son compte (tranche 7c, J8), avec leur fin réelle et la raison d'une
+    // levée ; jamais l'administrateur qui a décidé, jamais qui a signalé (suspension/load.ts).
+    const moderation = await suspensionsOfMember(db, user.id, new Date())
 
     // Content-Disposition: attachment → le navigateur propose d'enregistrer le fichier.
     // Le nom du fichier porte le nom de l'appli que voient les membres, jamais le nom de code.
@@ -414,8 +431,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         })),
         reports,
         blocks,
-        // 7c : provisoire (commit du contrat) ; backend-dev B1 lit les suspensions et levées.
-        moderation: [],
+        moderation,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

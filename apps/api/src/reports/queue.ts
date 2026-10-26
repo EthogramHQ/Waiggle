@@ -28,6 +28,7 @@ import { z } from 'zod'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { isoDate } from '../jobs/shared'
 import { utc } from '../notifications/load'
+import { activeSuspensionSql } from '../suspension/load'
 import { blockedByAdmin } from './decide'
 import { targetUuid } from './target'
 
@@ -360,7 +361,7 @@ const authorRecords = async (db: Database, memberIds: string[], now: Date): Prom
         where l.lift_cause is distinct from 'error'
           and (coalesce(s.lifted_at, s.ends_at) is null
             or coalesce(s.lifted_at, s.ends_at) > ${utc(yearAgo)})) as n,
-      coalesce(bool_or(s.lifted_at is null and (s.ends_at is null or s.ends_at > ${utc(now)})), false)
+      coalesce(bool_or(${activeSuspensionSql('s', now)}), false)
         as active
     from account_suspension s
     left join moderation_decision l on l.id = s.lift_decision_id
