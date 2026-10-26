@@ -15,24 +15,43 @@
 //
 // Pour tout autre membre, la page n'existe pas (« Page introuvable ») : l'appli lit `me.isAdmin`,
 // et l'API, qui refait la vérification à chaque requête, répond 404 comme à une adresse inconnue.
+//
+// Tranche 7c :
+// - chaque carte rappelle ce que la modération a déjà décidé pour le membre visé (« 2 retraits,
+//   1 suspension ») et propose « Suspendre le compte », qui mène à la page « Suspendre » en disant
+//   de quel signalement on part (J2) ;
+// - un troisième onglet, « Historique », liste toutes les décisions, ou celles qui visent un membre
+//   (`?tab=history&member=<id>`, depuis la page du membre) ;
+// - l'API peut redemander le mot de passe (`password_required`) : la fenêtre « Retirer » le demande
+//   alors, puis renvoie la même décision avec lui ;
+// - la limite de décisions par jour (J15) a sa propre phrase.
 import {
   IMAGE_INPUT_FIELDS,
   type ModerationDecisionInput,
   type ModerationQueueItem,
   REMOVAL_EXPLANATION_MAX,
+  REMOVALS_BEFORE_PASSWORD,
   RemovalExplanation,
   type RemovalGround,
   type RemovedItem,
   type ReportSnapshotEntry,
   type SnapshotImage,
+  SUSPENSIONS_BEFORE_PASSWORD,
 } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
-import { useDecide, useModerationQueue, useRemovedItems } from '../moderation/api'
+import {
+  useDecide,
+  useDecisionHistory,
+  useModerationQueue,
+  useRemovedItems,
+} from '../moderation/api'
+import { decisionFailure } from '../moderation/failure'
 import { reasonTextKey, targetKey, viewHref } from '../moderation/present'
+import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
@@ -40,16 +59,20 @@ import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { excerpt } from '../ui/CommentAction'
+import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
 import { Screen } from '../ui/Screen'
-import { Segmented } from '../ui/Segmented'
+import { Segmented, type SegmentedHandle } from '../ui/Segmented'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
+import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
+import { TextLink } from '../ui/TextLink'
+import { useHydrated } from '../ui/theme/hydration'
 import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
 
 /**
@@ -58,7 +81,7 @@ import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from '
  */
 const SETTLE_MS = 600
 
-type Tab = 'pending' | 'removed'
+type Tab = 'pending' | 'removed' | 'history'
 
 /**
  * Les champs d'une copie qui sont des images : la copie n'en garde que la clé, jamais le texte. La
@@ -154,11 +177,24 @@ function AdminModeration() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const back = useGoBack('/account')
-  const [tab, setTab] = useState<Tab>('pending')
+  // L'adresse peut ouvrir l'historique, filtré sur un membre (`?tab=history&member=<id>`, depuis la
+  // page du membre). Elle n'est connue que dans le navigateur : la page pré-rendue l'ignore, et
+  // l'onglet s'ouvre une fois hydratée (ui/theme/hydration.ts).
+  const hydrated = useHydrated()
+  const params = useLocalSearchParams<{ tab?: string | string[]; member?: string | string[] }>()
+  const tabParam = hydrated ? firstParam(params.tab) : undefined
+  const memberFilter = (hydrated ? firstParam(params.member) : undefined) || undefined
+  const [tab, setTab] = useState<Tab>(() => (tabParam === 'history' ? 'history' : 'pending'))
+  useEffect(() => {
+    if (tabParam === 'history') setTab('history')
+  }, [tabParam])
   const queue = useModerationQueue()
-  // Les retirés ne sont demandés qu'une fois l'onglet ouvert.
+  // Les retirés et l'historique ne sont demandés qu'une fois leur onglet ouvert.
   const removed = useRemovedItems(tab === 'removed')
+  const history = useDecisionHistory(memberFilter, tab === 'history')
   const { decide } = useDecide()
+  // Les onglets : « Tout voir » y rend le focus, une fois son lien disparu.
+  const tabsRef = useRef<SegmentedHandle>(null)
 
   // Les cartes décidées de chaque onglet, gardées à leur place jusqu'au changement d'onglet.
   const [decidedQueue, setDecidedQueue] = useState<Decided<ModerationQueueItem>[]>([])
@@ -219,6 +255,12 @@ function AdminModeration() {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const focusAfterClose = useRef(false)
+  // Le mot de passe, quand l'API le redemande (`password_required`, au-delà de
+  // REMOVALS_BEFORE_PASSWORD retraits en une heure) : le champ apparaît, et « Confirmer » renvoie la
+  // même décision avec lui. Le focus va au champ (autoFocus), que l'on tape aussitôt : le bouton
+  // touché, lui, a laissé la place à « Confirmer ».
+  const [passwordAsked, setPasswordAsked] = useState(false)
+  const [password, setPassword] = useState('')
 
   // « Réessayer » sur une file en erreur : React Query efface l'erreur pendant la relecture ; on
   // garde l'écran d'erreur (et le focus sur son bouton) jusqu'à la réponse.
@@ -236,7 +278,7 @@ function AdminModeration() {
    * des boutons, qui restent pour réessayer.
    */
   const run = async (
-    // 7c : provisoire (commit du contrat) ; les décisions sur une cible seulement, pas la suspension.
+    // Les décisions en un geste portent sur une cible (classer, rétablir) ; la suspension a sa page.
     input: Extract<ModerationDecisionInput, { target: unknown }>,
     done: string,
     onSettled: (outcome: Outcome) => void,
@@ -256,7 +298,7 @@ function AdminModeration() {
           : { message: t(($) => $.errors[result.error]), ok: false },
       )
     } else {
-      setFailures((previous) => ({ ...previous, [key]: t(($) => $.errors[result.error]) }))
+      setFailures((previous) => ({ ...previous, [key]: decisionFailure(t, result.error) }))
     }
   }
 
@@ -265,6 +307,8 @@ function AdminModeration() {
     setExplanation('')
     setFieldError(null)
     setDialogError(null)
+    setPasswordAsked(false)
+    setPassword('')
     setRemoving({ item, index })
     setRemoveOpen(true)
   }
@@ -283,12 +327,26 @@ function AdminModeration() {
       setFieldError(t(($) => $.profile.errors.invalidCharacters))
       return
     }
+    // Le champ du mot de passe ouvert : rien ne part tant qu'il est vide.
+    if (passwordAsked && password === '') return
     setFieldError(null)
     deciding.current = true
     setSubmitting(true)
-    const result = await decide({ action: 'remove', target, ground, explanation: text })
+    const result = await decide({
+      action: 'remove',
+      target,
+      ground,
+      explanation: text,
+      ...(passwordAsked ? { password } : null),
+    })
     deciding.current = false
     setSubmitting(false)
+    if (!result.ok && result.error === 'passwordRequired') {
+      // L'API redemande le mot de passe : le champ apparaît, ce qui a été choisi et écrit reste.
+      setDialogError(passwordAsked ? t(($) => $.errors.passwordRequired) : null)
+      setPasswordAsked(true)
+      return
+    }
     if (result.ok || settledElsewhere.has(result.error)) {
       settledAt.current = Date.now()
       focusAfterClose.current = true
@@ -302,13 +360,14 @@ function AdminModeration() {
       })
       setRemoveOpen(false)
     } else {
-      // Une panne (réseau, serveur) : la fenêtre reste, avec ce qui a été tapé, pour réessayer.
-      setDialogError(t(($) => $.errors[result.error]))
+      // Une panne (réseau, serveur), un mot de passe faux, la limite du jour : la fenêtre reste,
+      // avec ce qui a été tapé, pour réessayer.
+      setDialogError(decisionFailure(t, result.error, { passwordSent: passwordAsked }))
     }
   }
 
   // La lecture de la liste affichée, et ses refus qui changent toute la page.
-  const list = tab === 'pending' ? queue : removed
+  const list = tab === 'pending' ? queue : tab === 'removed' ? removed : history
   const fatal = !list.data && list.isError ? errorKey(list.error) : null
   // Un administrateur révoqué : l'API ne connaît plus la page.
   if (fatal === 'notFound') return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
@@ -330,9 +389,40 @@ function AdminModeration() {
     error: failures[key],
   })
 
+  /**
+   * Ce que la modération a déjà décidé pour le membre visé, en lignes : les retraits, les
+   * suspensions, la suspension en cours ; « aucune décision » sinon. Rien si son compte est parti.
+   */
+  const recordOf = ({ authorRecord }: ModerationQueueItem) => {
+    if (!authorRecord) return undefined
+    const { removals, suspensions, suspendedNow } = authorRecord
+    const lines = [
+      ...(removals > 0 ? [t(($) => $.moderation.record.removals, { count: removals })] : []),
+      ...(suspensions > 0
+        ? [t(($) => $.moderation.record.suspensions, { count: suspensions })]
+        : []),
+      ...(suspendedNow ? [t(($) => $.moderation.record.suspendedNow)] : []),
+    ]
+    return {
+      label: t(($) => $.moderation.record.title),
+      lines: lines.length > 0 ? lines : [t(($) => $.moderation.record.none)],
+    }
+  }
+
+  /**
+   * La page « Suspendre » pour le membre visé par une carte, en disant de quel signalement on part
+   * (J2) : l'API vérifie qu'il est ouvert et vise ce membre.
+   */
+  const openSuspend = (item: ModerationQueueItem, memberId: string) =>
+    router.push({
+      pathname: '/suspend',
+      params: { member: memberId, fromKind: item.target.kind, fromId: item.target.id },
+    })
+
   const queueCard = ({ key, index, item, outcome }: Shown<ModerationQueueItem>) => {
     const kind = t(($) => $.moderation.kinds[item.target.kind])
     const actions: ReportCardAction[] = []
+    const record = item.authorRecord
     if (!item.concernsMe) {
       // Un profil ne se retire pas (l'API le refuse) ; un contenu déjà retiré ou disparu non plus.
       if (item.target.kind !== 'member' && item.state === 'present') {
@@ -354,17 +444,34 @@ function AdminModeration() {
             ),
         ),
       })
+      // Suspendre l'auteur (ou le membre lui-même, pour un profil), quand l'API le permet : pas
+      // l'administrateur qui regarde, ni un autre administrateur, ni un membre déjà suspendu.
+      if (record?.canSuspend) {
+        const memberId = record.memberId
+        actions.push({
+          label: t(($) => $.moderation.suspendAction),
+          onPress: guarded(() => openSuspend(item, memberId)),
+        })
+      }
     }
     const { state } = item
+    // Ce qui explique les boutons absents : un contenu qui concerne l'administrateur, déjà retiré
+    // ou disparu ; un profil, qui ne se retire pas en entier (relecture de design 7a).
     const status = item.concernsMe
       ? t(($) => $.moderation.concernsMe)
-      : state === 'present'
-        ? undefined
-        : t(($) => $.moderation.state[state])
+      : state !== 'present'
+        ? t(($) => $.moderation.state[state])
+        : item.target.kind === 'member'
+          ? t(($) => $.moderation.profileNoRemove)
+          : undefined
     return (
       <ReportCard
         key={key}
         {...cardState(key, kind, firstText(item.snapshot), outcome)}
+        // Ce qui concerne l'administrateur lui-même : il n'en décide pas, le rappel de ses propres
+        // décisions n'aurait rien à éclairer.
+        record={item.concernsMe ? undefined : recordOf(item)}
+        detailsLabel={t(($) => $.moderation.detailsLabel)}
         kind={kind}
         count={t(($) => $.moderation.count, { count: item.count })}
         // Tranche 7b : la copie champ par champ, chacun sous son libellé ; une copie d'avant 7b
@@ -440,8 +547,30 @@ function AdminModeration() {
   const removedItems = removed.data?.pages.flatMap((page) => page.items) ?? []
   const shownQueue = keepDecided(queueItems, decidedQueue)
   const shownRemoved = keepDecided(removedItems, decidedRemoved)
-  const count = tab === 'pending' ? shownQueue.length : shownRemoved.length
+  const decisions = history.data?.pages.flatMap((page) => page.items) ?? []
+  const count =
+    tab === 'pending'
+      ? shownQueue.length
+      : tab === 'removed'
+        ? shownRemoved.length
+        : decisions.length
   const showsError = (!list.data && list.isError) || (retrying && !list.data)
+
+  // Le membre filtré, nommé par son pseudo tel que les décisions le donnent ; un compte parti
+  // n'a plus de pseudo : « ce membre ».
+  const filteredHandle = decisions.find(({ member }) => member?.id === memberFilter)?.member?.handle
+
+  /** « Tout voir » : l'adresse perd son filtre ; le focus revient aux onglets (le lien disparaît). */
+  const seeAll = () => {
+    router.setParams({ member: undefined })
+    requestAnimationFrame(() => tabsRef.current?.focusChecked())
+  }
+
+  /** « Voir » d'une décision : la page du membre, ou celle du projet qui porte le contenu. */
+  const viewDecision = (decision: (typeof decisions)[number]) =>
+    decision.target.kind === 'member'
+      ? decision.member && router.push(viewHref(decision.target, null))
+      : decision.projectId && router.push(viewHref(decision.target, decision.projectId))
 
   return (
     <Screen header={<TopNav />} onBack={back} title={t(($) => $.moderation.title)}>
@@ -450,10 +579,24 @@ function AdminModeration() {
         options={[
           { value: 'pending', label: t(($) => $.moderation.pending) },
           { value: 'removed', label: t(($) => $.moderation.removed) },
+          { value: 'history', label: t(($) => $.moderation.history) },
         ]}
         value={tab}
         onChange={changeTab}
+        handle={tabsRef}
       />
+
+      {/* Le filtre de l'historique, sous les onglets : qui il vise, et comment l'enlever. */}
+      {tab === 'history' && memberFilter && history.data ? (
+        <Stack direction="row" wrap align="center" justify="between" gap="md">
+          <Text variant="callout" weight={600}>
+            {filteredHandle
+              ? t(($) => $.moderation.historyFor, { handle: filteredHandle })
+              : t(($) => $.moderation.historyForGone)}
+          </Text>
+          <TextLink role="button" label={t(($) => $.moderation.historyAll)} onPress={seeAll} />
+        </Stack>
+      ) : null}
 
       {showsError ? (
         <StateMessage
@@ -470,14 +613,28 @@ function AdminModeration() {
         <StateMessage
           kind="empty"
           message={
-            tab === 'pending' ? t(($) => $.moderation.empty) : t(($) => $.moderation.emptyRemoved)
+            tab === 'pending'
+              ? t(($) => $.moderation.empty)
+              : tab === 'removed'
+                ? t(($) => $.moderation.emptyRemoved)
+                : t(($) => $.moderation.emptyHistory)
           }
         />
       ) : (
         <Stack gap="lg">
           {/* Une liste annoncée : « liste, 4 éléments », et on saute d'une carte à l'autre. */}
           <Stack gap="md" accessibilityRole="list">
-            {tab === 'pending' ? shownQueue.map(queueCard) : shownRemoved.map(removedCard)}
+            {tab === 'pending'
+              ? shownQueue.map(queueCard)
+              : tab === 'removed'
+                ? shownRemoved.map(removedCard)
+                : decisions.map((decision) => (
+                    <DecisionCard
+                      key={decision.id}
+                      decision={decision}
+                      onView={() => viewDecision(decision)}
+                    />
+                  ))}
           </Stack>
           <FeedEnd
             state={
@@ -514,6 +671,9 @@ function AdminModeration() {
             : undefined
         }
         message={t(($) => $.moderation.removeMessage)}
+        // La fenêtre s'ouvre sous le doigt qui vient de toucher « Retirer » : ses boutons ignorent
+        // la seconde tape d'une double tape (design 7b).
+        guardTaps
         onDismiss={closeRemove}
         onClosed={() => {
           if (!focusAfterClose.current) return
@@ -542,14 +702,41 @@ function AdminModeration() {
           maxLength={REMOVAL_EXPLANATION_MAX}
           showCount
         />
+        {/* Le mot de passe redemandé par l'API : le champ arrive au-dessus du bouton, qui devient
+            « Confirmer », inactif tant que rien n'est tapé (une double tape sur « Retirer » ne
+            confirme rien). */}
+        {passwordAsked ? (
+          <TextField
+            label={t(($) => $.moderation.password.label)}
+            value={password}
+            onChangeText={setPassword}
+            hint={t(($) => $.moderation.password.hint, {
+              suspensions: SUSPENSIONS_BEFORE_PASSWORD,
+              removals: REMOVALS_BEFORE_PASSWORD,
+            })}
+            secureTextEntry
+            autoComplete="current-password"
+            textContentType="password"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+        ) : null}
         {dialogError ? <Notice message={dialogError} /> : null}
         <Button
-          label={t(($) => $.moderation.confirmRemove)}
+          key={passwordAsked ? 'password' : 'remove'}
+          label={
+            passwordAsked
+              ? t(($) => $.moderation.password.confirm)
+              : t(($) => $.moderation.confirmRemove)
+          }
           variant="confirm"
           onPress={() => void confirmRemove()}
           loading={submitting}
           // Impossible de retirer sans fondement ni explication (l'auteur doit savoir pourquoi).
-          disabled={ground === null || explanation.trim() === ''}
+          disabled={
+            ground === null || explanation.trim() === '' || (passwordAsked && password === '')
+          }
         />
         <Button
           label={t(($) => $.moderation.cancel)}
