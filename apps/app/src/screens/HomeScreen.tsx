@@ -17,6 +17,7 @@ import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { type FeedKind, useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { feedItemId } from '../feed/items'
+import { useMySuspension } from '../moderation/mySuspension'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
@@ -124,6 +125,9 @@ function MemberHome({ id, name }: { id: string; name: string }) {
     requestAnimationFrame(() => tabs.current?.focusChecked())
   }
   const myProjects = () => router.push({ pathname: '/members/[id]', params: { id } })
+  // Un compte suspendu (tranche 7c) ne publie plus : « Publier » disparaît ; le reste de l'accueil
+  // (ses projets, son compte, le fil) reste. Le bandeau vient de la barre du haut.
+  const suspended = useMySuspension() !== null
   return (
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
     <Screen
@@ -137,13 +141,15 @@ function MemberHome({ id, name }: { id: string; name: string }) {
       <Row gap="sm" wrap>
         {/* Sur téléphone, « Publier » tout court (le nom lu reste « Publier un projet ») : la rangée
             tient sur une ligne, même sur un écran de 320 points. */}
-        <Button
-          label={compact ? t(($) => $.home.publishShort) : t(($) => $.home.publish)}
-          spokenLabel={t(($) => $.home.publish)}
-          icon="plus"
-          size="compact"
-          onPress={() => router.push('/projects/new')}
-        />
+        {suspended ? null : (
+          <Button
+            label={compact ? t(($) => $.home.publishShort) : t(($) => $.home.publish)}
+            spokenLabel={t(($) => $.home.publish)}
+            icon="plus"
+            size="compact"
+            onPress={() => router.push('/projects/new')}
+          />
+        )}
         {compact ? (
           <>
             <IconButton

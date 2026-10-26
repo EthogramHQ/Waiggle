@@ -32,6 +32,7 @@ import {
   usePostComment,
 } from '../comments/api'
 import { useMentionable } from '../mentions/api'
+import { useMySuspension } from '../moderation/mySuspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { shortDate } from '../projects/format'
 import { removalBanner } from '../reports/removal'
@@ -96,6 +97,9 @@ export function Comments({ project }: { project: Project }) {
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
   const isPrivate = project.visibility === 'private'
+  // Un compte suspendu (tranche 7c) lit les commentaires, mais n'en écrit plus, ne répond plus et
+  // ne modifie plus les siens ; il peut encore les supprimer, et masquer ceux de son projet.
+  const suspended = useMySuspension() !== null
 
   // Un nouveau commentaire : le champ ouvert ou non, son texte, et le problème du texte s'il y en a un.
   const [composing, setComposing] = useState(false)
@@ -151,7 +155,10 @@ export function Comments({ project }: { project: Project }) {
   const actionIds = (comment: CommentReply): ActionId[] => {
     // Son propre commentaire retiré par la modération : on ne le modifie plus (l'API refuserait,
     // 409 `removed`), on peut encore le supprimer.
-    if (comment.isMine) return comment.state === 'removed' ? ['delete'] : ['edit', 'delete']
+    // Suspendu (tranche 7c) : plus de modification non plus.
+    if (comment.isMine) {
+      return comment.state === 'removed' || suspended ? ['delete'] : ['edit', 'delete']
+    }
     // Un emplacement (supprimé, masqué, retiré, ou caché par un blocage, pour qui regarde) n'a
     // aucune action : rien à y lire, donc rien à signaler, et on n'interagit plus avec un membre
     // bloqué.
@@ -172,9 +179,9 @@ export function Comments({ project }: { project: Project }) {
   /**
    * On répond à un fil dont la racine est visible : pas sous un emplacement (supprimé, ou masqué
    * pour qui regarde), ni sous une racine masquée (la réponse s'afficherait sous « Commentaire
-   * masqué » pour les autres).
+   * masqué » pour les autres). Jamais depuis un compte suspendu (tranche 7c).
    */
-  const canReply = (root: Comment) => root.state === 'visible' && root.author !== null
+  const canReply = (root: Comment) => !suspended && root.state === 'visible' && root.author !== null
 
   // Après chaque dessin : si un champ de modification vient de se refermer, le focus revient sur
   // « Modifier », revenu à sa place (sur le web ; ailleurs, rien à faire).
@@ -773,52 +780,58 @@ export function Comments({ project }: { project: Project }) {
       </Text>
       {/* Pas encore de commentaire : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
-      <NoteComposer
-        open={composing}
-        onOpen={() => {
-          setDone(null)
-          if (postFrom === 'root') setPostFrom(null)
-          setComposing(true)
-        }}
-        onCancel={() => {
-          setComposing(false)
-          setDraftError(undefined)
-          if (postFrom === 'root') setPostFrom(null)
-        }}
-        value={draft}
-        onChangeText={changeDraft}
-        onSubmit={() => void submit()}
-        pending={post.pending && postFrom === 'root'}
-        max={COMMENT_MAX}
-        mentions={mentionsFor('root')}
-        labels={{
-          open: t(($) => $.project.comments.add),
-          // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».
-          openShort: t(($) => $.project.comments.addShort),
-          field: t(($) => $.project.comments.field),
-          // L'aide dit qui lira : tous les membres, ou personne d'autre sur un projet privé.
-          hint: isPrivate
-            ? t(($) => $.project.comments.hintPrivate)
-            : t(($) => $.project.comments.hint),
-          submit: t(($) => $.project.comments.submit),
-          cancel: t(($) => $.common.cancel),
-        }}
-        fieldError={draftError}
-        error={
-          postFrom === 'root' && post.error
-            ? failure(
-                post.reason,
-                t(($) => $.project.comments.error),
-              )
-            : undefined
-        }
-        errorAction={postFrom === 'root' && post.error ? failureAction(post.reason) : undefined}
-        success={done?.kind === 'published' ? t(($) => $.project.comments.published) : undefined}
-      />
+      {/* Un compte suspendu n'écrit plus de commentaire (tranche 7c) : ni bouton, ni champ. */}
+      {suspended ? null : (
+        <NoteComposer
+          open={composing}
+          onOpen={() => {
+            setDone(null)
+            if (postFrom === 'root') setPostFrom(null)
+            setComposing(true)
+          }}
+          onCancel={() => {
+            setComposing(false)
+            setDraftError(undefined)
+            if (postFrom === 'root') setPostFrom(null)
+          }}
+          value={draft}
+          onChangeText={changeDraft}
+          onSubmit={() => void submit()}
+          pending={post.pending && postFrom === 'root'}
+          max={COMMENT_MAX}
+          mentions={mentionsFor('root')}
+          labels={{
+            open: t(($) => $.project.comments.add),
+            // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».
+            openShort: t(($) => $.project.comments.addShort),
+            field: t(($) => $.project.comments.field),
+            // L'aide dit qui lira : tous les membres, ou personne d'autre sur un projet privé.
+            hint: isPrivate
+              ? t(($) => $.project.comments.hintPrivate)
+              : t(($) => $.project.comments.hint),
+            submit: t(($) => $.project.comments.submit),
+            cancel: t(($) => $.common.cancel),
+          }}
+          fieldError={draftError}
+          error={
+            postFrom === 'root' && post.error
+              ? failure(
+                  post.reason,
+                  t(($) => $.project.comments.error),
+                )
+              : undefined
+          }
+          errorAction={postFrom === 'root' && post.error ? failureAction(post.reason) : undefined}
+          success={done?.kind === 'published' ? t(($) => $.project.comments.published) : undefined}
+        />
+      )}
       {empty ? null : list}
-      {/* Supprimer un commentaire est définitif : une fenêtre demande confirmation. */}
+      {/* Supprimer un commentaire est définitif : une fenêtre demande confirmation. guardTaps :
+          elle s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une seconde tape trop
+          rapide n'y décide rien (design 7b). */}
       <Dialog
         visible={deleting !== null}
+        guardTaps
         title={t(($) => $.project.comments.deleteTitle)}
         // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit.
         message={
