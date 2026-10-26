@@ -1,13 +1,17 @@
-// L'aperçu des e-mails de notification (tranche 6c), pour les relectures de design et juridique :
-// les e-mails rendus, en français et en anglais, avec les données des tests (Inès reçoit, Malik,
-// Zoé et Sam commentent, répondent et la mentionnent). Rien ici n'est envoyé ni lu par l'API :
+// L'aperçu des e-mails de notification (tranche 6c) et de ceux du changement d'adresse (tranche
+// « adresse »), pour les relectures de design et juridique : les e-mails rendus, en français et en
+// anglais, avec les données des tests (Inès reçoit, Malik, Zoé et Sam commentent, répondent et la
+// mentionnent ; Inès change d'adresse). Rien ici n'est envoyé ni lu par l'API :
 // `pnpm --filter @ruche/api email:preview <dossier>` (scripts/email-preview.ts) écrit ces fichiers.
 import { type Language, supportedLanguages } from '@ruche/i18n'
 import {
+  changeEmailConfirmationEmail,
   type EmailContent,
+  emailChangedEmail,
   type MentionData,
   mentionEmail,
   type NotificationLinks,
+  newEmailVerificationEmail,
   type RecapData,
   type RecapLine,
   recapEmail,
@@ -80,6 +84,14 @@ const mentions: MentionData = {
   links: linksFor('mentions'),
 }
 
+// Le changement d'adresse d'Inès. Les jetons des liens sont des exemples : le premier est un JWT
+// lisible, le second un jeton chiffré (auth/change-email.ts) ; aucun ne vaut rien sur le serveur.
+const NEW_EMAIL = 'ines.morel@exemple.fr'
+const verifyLink = (token: string, page: string) =>
+  `${API_URL}/api/auth/verify-email?${new URLSearchParams({ token, callbackURL: `${APP_URL}${page}` })}`
+const firstLink = verifyLink('eyJhbGciOiJIUzI1NiJ9.apercu.signature', '/email-change/confirmed')
+const secondLink = verifyLink('9f2c4e7a1b3d5f60apercu', '/email-change/done')
+
 /** Les variantes montrées : le nom du fichier (sans la langue) et l'e-mail rendu. */
 const variants: [string, (language: Language) => EmailContent][] = [
   ['recap-short', (language) => recapEmail(language, recap({}))],
@@ -94,6 +106,26 @@ const variants: [string, (language: Language) => EmailContent][] = [
   ['recap-first', (language) => recapEmail(language, recap({ first: true }))],
   ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }))],
   ['mentions', (language) => mentionEmail(language, mentions)],
+  // Les trois e-mails de service du changement d'adresse : ni publicité ni désinscription.
+  [
+    'change-email',
+    (language) =>
+      changeEmailConfirmationEmail(language, {
+        name: 'Inès Morel',
+        newEmail: NEW_EMAIL,
+        url: firstLink,
+      }),
+  ],
+  ['new-email', (language) => newEmailVerificationEmail(language, { url: secondLink })],
+  [
+    'email-changed',
+    (language) =>
+      emailChangedEmail(language, {
+        name: 'Inès Morel',
+        newEmail: NEW_EMAIL,
+        signInUrl: `${APP_URL}/sign-in`,
+      }),
+  ],
 ]
 
 /** Tous les aperçus : un fichier HTML par variante et par langue (« recap-short.fr.html »…). */
