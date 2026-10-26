@@ -905,9 +905,7 @@ Règles détaillées :
   Ainsi, l'appli ne détient jamais de copie d'une image peut-être illégale ; ce choix, face aux
   obligations de preuve, reste à faire valider par un professionnel.
 
-**Administrer**
-- Un administrateur voit la file des signalements, peut masquer un contenu, suspendre un compte et
-  consulter l'historique de ces actions
+**Administrer** : tranche 7c, plus bas (suspendre, retrait partiel, historique).
 
 ## Tranche « adresse » — Changer son adresse e-mail
 
@@ -965,3 +963,120 @@ Règles détaillées :
 - **Risque accepté** (Louis, 25/10/2026) : si Inès se trompe dans la nouvelle adresse et confirme
   quand même depuis son ancienne boîte, l'inconnu qui suit le second lien reçoit ensuite les
   e-mails du compte (sans pouvoir s'y connecter) ; Inès doit alors nous écrire.
+
+## Tranche 7c — Administrer
+
+Statut : **validé par Louis** le 26/10/2026, avec les règles détaillées. Ses décisions : la suspension met
+le compte en lecture seule, pour 7 jours, 30 jours ou sans fin ; un nom ou un pseudo retiré devient
+provisoire, à changer ; un membre suspendu peut supprimer ses propres contenus. **Livré en deux
+tranches** (Louis, 26/10/2026) : **7c**, la suspension, l'historique et les garde-fous ; **7d**,
+signaler une partie, le retrait d'une partie, le nom et le pseudo provisoires.
+
+La suite de 7a (signaler, retirer, classer) et de 7b (bloquer) : la modération peut suspendre un
+compte, retirer une seule partie d'un profil ou d'un projet, et relire toutes ses décisions. Le
+membre qui signale peut dire quelle partie pose problème.
+
+**Signaler une partie**
+- Étant donné Malik, connecté, sur le projet « Météo » d'Inès
+- Quand il choisit « Signaler » dans le menu du projet
+- Alors la page lui demande d'abord ce qui pose problème : « Tout le projet » (choisi d'avance), ou
+  une partie présente sur la page (titre, pitch, description, un prompt, outils, lien de démo,
+  couverture, une photo)
+- Quand il choisit la deuxième photo, puis un motif, et envoie
+- Alors il lit la même confirmation qu'en 7a, et la modération voit quelle partie est visée
+- Même chose sur la page d'un membre : « Tout le profil », ou le nom, le pseudo, la bio, les outils,
+  la photo. Une note ou un commentaire se signalent en entier, comme avant.
+
+**Retirer une partie** (l'administrateur)
+- Étant donné Louis, administrateur, devant le signalement de la deuxième photo de « Météo »
+- Quand il choisit « Retirer », puis « Seulement cette partie », avec le fondement et une phrase
+  d'explication
+- Alors cette photo disparaît pour les autres membres ; le reste du projet reste affiché
+- Et Inès est prévenue par une notification qui nomme la partie retirée, avec l'explication
+- Et Inès voit encore la photo dans son projet, avec « Retiré par la modération » et l'explication ;
+  elle peut la remplacer ou la supprimer
+- Et la personne qui a signalé est prévenue que son signalement a été traité
+- L'administrateur peut aussi retirer tout le projet, quelle que soit la partie signalée, ou une
+  autre partie que celle signalée.
+
+**Un nom ou un pseudo retiré**
+- Étant donné Louis devant le signalement du pseudo de Karim
+- Quand il retire le pseudo
+- Alors le pseudo de Karim devient un pseudo provisoire neutre (par exemple « membre_4f2a » : un pseudo n'a pas de tiret), partout
+- Et l'ancien pseudo n'est pas libéré pendant 30 jours : personne ne peut le prendre
+- Et Karim est prévenu ; à sa prochaine visite, l'appli lui demande de choisir un nouveau pseudo
+- Même chose pour le nom, qui devient « Membre » jusqu'à ce que Karim en choisisse un autre
+
+**Suspendre un compte** (l'administrateur)
+- Étant donné Louis sur la page de Karim, ou devant un signalement qui le concerne
+- Quand il choisit « Suspendre le compte », une durée (7 jours, 30 jours, sans fin), le fondement et
+  une explication, puis confirme
+- Alors le compte de Karim passe en lecture seule
+- Et Karim reçoit un e-mail et une notification : la raison, l'explication, la date de fin (ou
+  « jusqu'à nouvel ordre »), et comment contester (écrire à l'adresse de contact)
+- Et la décision est tracée : qui, quand, quelle durée, quel fondement, quelle explication
+
+**Un compte suspendu** (Karim)
+- Étant donné Karim, suspendu, qui se connecte
+- Alors un bandeau en haut de chaque page lui dit qu'il est suspendu, pourquoi et jusqu'à quand
+- Et il lit tout ce qu'il lisait avant
+- Mais il ne peut ni publier, ni modifier un projet ou une note, ni commenter, ni répondre, ni
+  réagir, ni suivre, ni modifier son profil : ces actions sont absentes, et l'API les refuse (« Ton
+  compte est suspendu jusqu'au … »)
+- Et il peut supprimer ses projets, ses notes, ses commentaires, ses photos, retirer ses réactions
+  et ses abonnements
+- Et il peut toujours exporter ses données, supprimer son compte, régler ses e-mails, sa langue et
+  son apparence, changer son adresse, bloquer, débloquer et signaler ; et choisir un nouveau nom
+  ou pseudo si la modération a retiré le sien
+- Et ses contenus restent visibles des autres (sauf ce qui a été retiré) ; rien ne montre aux
+  autres qu'il est suspendu
+
+**Fin d'une suspension**
+- Quand la date de fin arrive, ou que Louis choisit « Lever la suspension » (avec une phrase
+  d'explication)
+- Alors Karim retrouve toutes ses actions, et une notification le lui dit
+- Et la levée est tracée comme la pose
+
+**L'historique des décisions** (l'administrateur)
+- Étant donné Louis dans « Modération »
+- Quand il ouvre l'onglet « Historique »
+- Alors il voit toutes les décisions, de la plus récente à la plus ancienne : la date,
+  l'administrateur, l'action (retrait, retrait d'une partie, rétablissement, classement,
+  suspension, levée), la cible avec un lien, le fondement et l'explication
+- Et il peut ne garder que les décisions qui visent un membre (ses contenus et son compte), aussi
+  depuis la page de ce membre (« Historique de modération », visible des seuls administrateurs)
+- Et sur chaque signalement de la file, il lit ce que la modération a déjà décidé pour l'auteur
+  (par exemple « 2 retraits, 1 suspension levée »)
+
+Règles détaillées :
+- **Parties retirables** : d'un profil, le nom, le pseudo, la bio, les outils, la photo ; d'un
+  projet, la description, un prompt, les outils, le lien de démo, la couverture, une photo. Le
+  titre et le pitch sont obligatoires : on peut les signaler, mais on retire alors tout le projet.
+  Une note et un commentaire se retirent en entier (7a). Le registre des entrées (7b) dit, pour
+  chaque champ, s'il est retirable ; un test échoue si un champ n'y est pas classé.
+- **Remplacer une partie retirée** : l'auteur peut mettre une autre valeur ; elle s'affiche, et
+  peut être signalée à son tour. Rétablir une partie : l'administrateur, tracé comme en 7a.
+- **Un administrateur ne décide pas de ce qui le concerne** (7a) : ni retrait de ses parties, ni
+  suspension de son propre compte. Un administrateur ne suspend pas un autre administrateur : on
+  retire d'abord son rôle par le script du dépôt.
+- **Garde-fous de la modération** (relecture du plan de 7a) : au plus 50 décisions par
+  administrateur et par jour ; une suspension sans fin, ou plus de 10 retraits en une heure,
+  demandent de retaper son mot de passe. Un compte d'administrateur volé ne peut donc pas tout
+  retirer d'un coup.
+- **Une seule décision à la fois par cible** : si deux administrateurs (ou deux onglets) décident en
+  même temps, le second lit « Déjà traité » ; jamais un contenu retiré avec des signalements
+  classés sans suite.
+- **Signaler de nouveau** : un contenu classé sans suite puis modifié peut être signalé de nouveau
+  par la même personne ; à l'identique, non (« déjà signalé »), y compris pour les signalements
+  d'avant 7b.
+- **Suspension et signalements** : suspendre ne clôt pas les signalements ouverts ; chacun reçoit
+  sa décision. Les signalements faits par un membre suspendu restent dans la file.
+- **Suppression du compte pendant une suspension** : permise. Les décisions qui le visaient restent
+  un an, sans son nom (comme les signalements, 7a).
+- **Export des données** : les décisions qui visent le membre (retraits entiers ou partiels,
+  suspensions et levées : date, partie, fondement, explication) ; jamais l'administrateur qui a
+  décidé, jamais qui a signalé.
+- **Conservation** : une décision est gardée un an après la fin de son effet (une suspension, un an
+  après sa levée) ; à faire valider par un professionnel.
+- **E-mails** : de service, dans la langue du membre, avec l'adresse de contact ; un seul, à la pose
+  d'une suspension. La levée et le retrait d'une partie : une notification seulement.

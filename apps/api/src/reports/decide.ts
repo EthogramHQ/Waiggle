@@ -101,6 +101,9 @@ export const decide = async (
   input: ModerationDecisionInput,
   now: Date,
 ): Promise<DecideResult> => {
+  // 7c : provisoire (commit du contrat) ; backend-dev A puis B1 traitent la suspension et la levée.
+  if (input.action === 'suspend' || input.action === 'lift')
+    return { ok: false, error: 'not_found' }
   const { target } = input
   // Un profil n'accepte que « classer » (il n'y a rien à retirer : une photo ou un pseudo illicite
   // se traite par script, docs/ops/moderation.md).

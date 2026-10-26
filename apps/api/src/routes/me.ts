@@ -414,6 +414,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         })),
         reports,
         blocks,
+        // 7c : provisoire (commit du contrat) ; backend-dev B1 lit les suspensions et levées.
+        moderation: [],
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),

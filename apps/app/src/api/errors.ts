@@ -26,6 +26,12 @@ export type ApiErrorKey =
   | 'cannotBlockOwn'
   | 'blockedMention'
   | 'alreadyExamined'
+  // Tranche 7c : un compte suspendu ; le mot de passe redemandé à un administrateur ; suspendre un
+  // administrateur.
+  | 'suspended'
+  | 'passwordRequired'
+  | 'wrongPassword'
+  | 'cannotSuspendAdmin'
   | 'internal'
   | 'network'
 
@@ -60,7 +66,7 @@ export const errorKeyForStatus = (status: number): ApiErrorKey => byStatus[statu
  * Les statuts partagés par plusieurs refus : pour eux seuls, on lit le code du corps. Un 429 sans
  * corps JSON (un serveur placé devant l'API) reste « trop de demandes ».
  */
-export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([409, 422, 429])
+export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([403, 409, 422, 429])
 
 // Code du corps (« handle_taken ») → message, pour les refus qu'un statut seul ne distingue pas.
 // Partial : seuls quelques codes sont listés ; les autres retombent sur le statut.
@@ -78,6 +84,12 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   cannot_block_own: 'cannotBlockOwn',
   blocked_mention: 'blockedMention',
   already_examined: 'alreadyExamined',
+  // Tranche 7c : trois 403 de plus (compte suspendu ; mot de passe absent ou faux) et un 422
+  // (suspendre un administrateur). Un 403 sans code reste « action non autorisée ».
+  suspended: 'suspended',
+  password_required: 'passwordRequired',
+  wrong_password: 'wrongPassword',
+  cannot_suspend_admin: 'cannotSuspendAdmin',
 }
 
 /**

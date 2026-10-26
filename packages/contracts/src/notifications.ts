@@ -114,6 +114,40 @@ export const RemovedNotification = z.object({
   ground: RemovalGround,
   explanation: z.string(),
   afterReport: z.boolean(),
+  /**
+   * Vrai quand le commentaire retiré est sur un projet que le membre ne voit plus (un blocage, un
+   * projet devenu privé) : son titre est alors vide, et l'appli ne mène nulle part (tranche 7c ;
+   * l'appli le devinait avant à un titre vide).
+   */
+  projectHidden: z.boolean(),
+})
+
+/**
+ * Son compte a été suspendu (tranche 7c) : la durée, le fondement, l'explication, et comment
+ * contester. Jamais l'administrateur qui a décidé. Elle reste après la fin de la suspension.
+ */
+export const SuspendedNotification = z.object({
+  ...Common,
+  kind: z.literal('suspended'),
+  /** La fin prévue ; null : jusqu'à ce qu'un administrateur la lève. */
+  endsAt: z.iso.datetime().nullable(),
+  ground: RemovalGround,
+  explanation: z.string(),
+  /** Vrai si elle a suivi un signalement (jamais de qui). */
+  afterReport: z.boolean(),
+})
+
+/**
+ * Sa suspension a pris fin (tranche 7c) : à la date prévue, ou levée plus tôt par un administrateur,
+ * avec l'explication de la levée.
+ */
+export const SuspensionEndedNotification = z.object({
+  ...Common,
+  kind: z.literal('suspension_ended'),
+  /** Vrai si un administrateur l'a levée avant la date prévue (ou d'une suspension sans fin). */
+  lifted: z.boolean(),
+  /** L'explication de la levée ; null pour une fin à la date prévue. */
+  explanation: z.string().nullable(),
 })
 
 /**
@@ -148,6 +182,8 @@ export const Notification = z
     HandleNotification,
     RemovedNotification,
     ReportHandledNotification,
+    SuspendedNotification,
+    SuspensionEndedNotification,
   ])
   .meta({ id: 'Notification' })
 export type Notification = z.infer<typeof Notification>

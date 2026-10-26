@@ -28,6 +28,12 @@ export const ErrorCode = z.enum([
   'cannot_block_own',
   'blocked_mention',
   'already_examined',
+  // Tranche 7c : une action refusée à un compte suspendu ; le mot de passe redemandé à un
+  // administrateur, absent ou faux ; suspendre un administrateur en fonction.
+  'suspended',
+  'password_required',
+  'wrong_password',
+  'cannot_suspend_admin',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

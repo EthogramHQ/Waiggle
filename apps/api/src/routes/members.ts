@@ -191,6 +191,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           isFollowed: false,
           followerCount: 0,
           projects: [],
+          // 7c : provisoire (commit du contrat) ; backend-dev B2 le remplit pour un administrateur.
+          moderation: null,
         }),
         200,
       )
@@ -215,6 +217,8 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         isBlocked: false,
         ...follow,
         projects,
+        // 7c : provisoire (commit du contrat) ; backend-dev B2 le remplit pour un administrateur.
+        moderation: null,
       }),
       200,
     )

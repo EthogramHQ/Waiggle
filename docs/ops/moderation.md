@@ -223,3 +223,41 @@ pour répondre juste à un membre :
 - **Les données** : l'export de « Mon compte » contient les blocages que le membre a posés (pseudo
   et date), jamais ceux qui le visent. Supprimer un compte efface les blocages qu'il a posés et
   ceux qui le visaient.
+
+## 9. Suspendre un compte
+
+Depuis la tranche 7c, un administrateur suspend un compte depuis l'appli : sur la page du membre
+(menu « … », « Suspendre le compte »), ou depuis une carte de la file. Il choisit une durée
+(7 jours, 30 jours, sans fin), un fondement (la loi ou les règles) et une explication, montrée au
+membre. La décision est gardée dans l'historique (onglet « Historique » de « Modération »).
+
+- **Ce que fait la suspension** : le compte passe en lecture seule. Le membre lit tout, supprime
+  ses contenus, exporte ses données, supprime son compte, règle ses e-mails et sa langue, change
+  d'adresse, bloque et signale. Il ne publie plus, ne modifie plus, ne commente plus, ne réagit
+  plus, ne suit plus. L'API refuse ces actions (`suspended`), même si l'appli les montrait.
+- **Ce qu'elle ne fait pas** : ses contenus restent visibles des autres (sauf ce qui a été
+  retiré) ; rien ne montre aux autres qu'il est suspendu. Elle ne clôt aucun signalement : chacun
+  reçoit sa propre décision.
+- **Le membre est prévenu** par un e-mail et une notification : la durée, le fondement,
+  l'explication, et l'adresse de contact pour contester. À la fin (date atteinte, ou levée), une
+  notification le lui dit.
+- **Lever** : même page, « Lever la suspension », avec une phrase d'explication.
+- **Garde-fous** : 50 décisions par administrateur et par jour ; le mot de passe est redemandé
+  pour une suspension sans fin, au-delà de 3 suspensions dans la journée, et au-delà de 10 retraits
+  dans l'heure ; 5 mots de passe faux par jour, puis plus rien de ce qui le demande jusqu'au
+  lendemain. Un administrateur ne se suspend pas lui-même, ni un membre qu'il a bloqué ; on ne
+  suspend pas un administrateur en fonction : retirer d'abord son rôle (section 1). Un membre
+  suspendu nommé administrateur n'a pas accès à la modération tant que dure la suspension.
+- **Si le quota est épuisé par un tiers** (un compte d'administrateur volé qui a suspendu à tour
+  de bras) : d'abord changer le mot de passe et fermer les sessions de ce compte, ou retirer son
+  rôle (section 1). Puis, pour lever tout de suite, remettre son compteur à zéro sur le serveur,
+  après une sauvegarde : effacer ses lignes de `api_rate_limit` dont la clé commence par
+  `moderation-decision:` suivi de l'identifiant de l'administrateur (le nom exact de la clé est
+  dans `apps/api/src/rate-limit.ts`, `memberCounterKeys`). Rien d'autre ne s'efface.
+- **Une contestation** (section 5) : relire la décision, la lever si elle était injustifiée, et
+  répondre par e-mail.
+- **Si l'appli est en panne** : ne rien écrire à la main en base. Attendre le retour de l'appli,
+  ou suivre la procédure de la section 4 pour un cas grave.
+- **Les données** : la suspension est gardée un an après sa fin ; une suspension sans fin, tant
+  qu'elle dure. L'export du membre la contient, sans le nom de l'administrateur. Supprimer le
+  compte efface la suspension ; la décision reste un an, sans le nom du membre.

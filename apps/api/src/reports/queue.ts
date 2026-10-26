@@ -219,6 +219,8 @@ export const loadQueuePage = async (
       target,
       projectId: first?.projectId ?? null,
       // Les textes de la copie ; ses images à part, sans leur clé : encore là, ou parties depuis.
+      // 7c : provisoire (commit du contrat) ; backend-dev A calcule le rappel des décisions.
+      authorRecord: null,
       snapshot: copy.filter((entry) => !isImageField(entry.field)),
       images: copy.flatMap((entry): SnapshotImage[] =>
         isImageField(entry.field)

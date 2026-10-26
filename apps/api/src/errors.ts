@@ -27,6 +27,10 @@ const errorMessages = {
   cannot_block_own: 'cannotBlockOwn',
   blocked_mention: 'blockedMention',
   already_examined: 'alreadyExamined',
+  suspended: 'suspended',
+  password_required: 'passwordRequired',
+  wrong_password: 'wrongPassword',
+  cannot_suspend_admin: 'cannotSuspendAdmin',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

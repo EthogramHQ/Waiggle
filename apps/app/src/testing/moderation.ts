@@ -49,6 +49,14 @@ export const scamCommentItem: ModerationQueueItem = {
   count: 3,
   firstReportedAt: '2026-10-20T08:00:00.000Z',
   lastReportedAt: '2026-10-21T07:30:00.000Z',
+  // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
+  authorRecord: {
+    memberId: 'u5',
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
 }
 
 /**
@@ -83,6 +91,14 @@ export const fakeReviewsItem: ModerationQueueItem = {
   count: 1,
   firstReportedAt: '2026-10-20T15:00:00.000Z',
   lastReportedAt: '2026-10-20T15:00:00.000Z',
+  // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
+  authorRecord: {
+    memberId: 'u4',
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
 }
 
 /** Le profil de « Lucas Martin », signalé pour usurpation : pas de projet, donc pas de lien vers un projet. */
@@ -104,6 +120,14 @@ export const impersonationItem: ModerationQueueItem = {
   count: 1,
   firstReportedAt: '2026-10-21T06:00:00.000Z',
   lastReportedAt: '2026-10-21T06:00:00.000Z',
+  // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
+  authorRecord: {
+    memberId: 'u7',
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: true,
+  },
 }
 
 /** Une note de Louis lui-même : il ne peut pas en décider (« Te concerne »). */
@@ -121,6 +145,14 @@ export const ownNoteItem: ModerationQueueItem = {
   count: 1,
   firstReportedAt: '2026-10-21T08:00:00.000Z',
   lastReportedAt: '2026-10-21T08:00:00.000Z',
+  // Tranche 7c : ce que la modération a déjà décidé pour le membre visé.
+  authorRecord: {
+    memberId: 'u9',
+    removals: 0,
+    suspensions: 0,
+    suspendedNow: false,
+    canSuspend: false,
+  },
 }
 
 /** Toute la file, du plus ancien signalement au plus récent (l'ordre de l'API). */

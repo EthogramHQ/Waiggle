@@ -14,6 +14,8 @@ export const leaMe: Me = {
   avatarUrl: null,
   // Tranche 7a : Léa n'est pas administratrice (voir `adminMe` pour Louis).
   isAdmin: false,
+  // Tranche 7c : pas suspendue.
+  suspension: null,
 }
 
 /** Louis, administrateur (tranche 7a) : il voit « Modération » dans Mon compte. */

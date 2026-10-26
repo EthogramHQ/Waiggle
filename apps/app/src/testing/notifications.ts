@@ -136,6 +136,7 @@ export const removedCommentNotification: Of<'removed'> = {
   ground: 'rules',
   explanation: 'Demander un code de carte bancaire n’est pas permis ici.',
   afterReport: true,
+  projectHidden: false,
 }
 
 /** Le projet « Météo » lui-même a été retiré, sans signalement, au nom de la loi. */
@@ -150,6 +151,7 @@ export const removedProjectNotification: Of<'removed'> = {
   ground: 'illegal',
   explanation: 'Ces photos montrent des personnes sans leur accord.',
   afterReport: false,
+  projectHidden: false,
 }
 
 /**

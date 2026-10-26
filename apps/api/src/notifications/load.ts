@@ -527,6 +527,8 @@ export const present = (
         ground: removal.ground,
         explanation: removal.explanation,
         afterReport: removal.afterReport,
+        // 7c : provisoire (commit du contrat) ; backend-dev B2 le calcule explicitement.
+        projectHidden: project.title === '',
       }
     }
     case 'report_handled': {

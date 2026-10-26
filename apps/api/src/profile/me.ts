@@ -64,5 +64,7 @@ export const loadMe = async (
     // Seulement pour que l'appli montre l'entrée « Modération » : les routes de modération relisent
     // elles-mêmes admin_member à chaque demande, sans croire l'appli.
     isAdmin: row.adminSince !== null,
+    // 7c : provisoire (commit du contrat) ; backend-dev B1 lit la suspension en cours.
+    suspension: null,
   }
 }

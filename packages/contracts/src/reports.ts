@@ -3,12 +3,14 @@
 // retire le contenu ou classe le signalement. Chaque décision est gardée : qui, quand, quoi,
 // pourquoi. La personne qui signale n'apparaît dans aucune réponse destinée à l'auteur du contenu.
 import { z } from 'zod'
+import { PASSWORD_MAX_LENGTH } from './accounts'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { MemberId } from './members'
 import { ProjectNoteId } from './notes'
 import { ProjectId } from './projects'
 import { REMOVAL_EXPLANATION_MAX, RemovalGround } from './removal'
+import { LiftCause, SuspensionDuration } from './suspension'
 import { FreeText, isClean, VisibleFreeText } from './text'
 
 /** La précision libre d'un signalement : 500 caractères au plus. */
@@ -23,6 +25,20 @@ export const MODERATION_DETAILS_SHOWN = 20
 export const REPORT_RETENTION_DAYS = 365
 /** Un signalement devenu sans objet (compte de l'auteur supprimé) est gardé 30 jours. */
 export const VOID_REPORT_RETENTION_DAYS = 30
+/**
+ * Au plus 50 décisions par administrateur et par jour (tranche 7c) : un compte d'administrateur
+ * volé ne peut pas tout retirer d'un coup.
+ */
+export const MODERATION_DECISIONS_PER_DAY = 50
+/** Au-delà de 10 retraits dans l'heure, l'administrateur retape son mot de passe (tranche 7c). */
+export const REMOVALS_BEFORE_PASSWORD = 10
+/**
+ * Au-delà de 3 suspensions de 7 ou 30 jours dans la journée, il le retape aussi (relecture de
+ * sécurité S11, Louis, 26/10/2026) ; une suspension sans fin le demande toujours.
+ */
+export const SUSPENSIONS_BEFORE_PASSWORD = 3
+/** Au plus 5 mots de passe faux par administrateur et par jour, puis 429 (relecture S12). */
+export const MODERATION_PASSWORD_FAILURES_PER_DAY = 5
 
 /**
  * Les champs qu'un membre saisit (tranche 7b), nommés comme au registre des entrées
@@ -205,6 +221,23 @@ export const ModerationQueueItem = z
     count: z.int().positive(),
     firstReportedAt: z.iso.datetime(),
     lastReportedAt: z.iso.datetime(),
+    /**
+     * Ce que la modération a déjà décidé pour le membre visé (l'auteur, ou le membre lui-même pour
+     * un profil), sur l'année gardée (tranche 7c) ; null si son compte a été supprimé. Ne comptent
+     * ni les retraits rétablis depuis, ni les suspensions levées pour erreur (J10).
+     * `canSuspend` : faux pour l'administrateur qui regarde, pour un administrateur en fonction, ou
+     * un membre déjà suspendu.
+     */
+    authorRecord: z
+      .object({
+        memberId: z.string(),
+        removals: z.int().nonnegative(),
+        suspensions: z.int().nonnegative(),
+        suspendedNow: z.boolean(),
+        canSuspend: z.boolean(),
+      })
+      .strict()
+      .nullable(),
   })
   .strict()
   .meta({ id: 'ModerationQueueItem' })
@@ -252,8 +285,16 @@ export type RemovedPage = z.infer<typeof RemovedPage>
 export const RemovalExplanation = VisibleFreeText(REMOVAL_EXPLANATION_MAX)
 
 /**
+ * Le mot de passe de l'administrateur, redemandé pour une suspension sans fin ou au-delà de
+ * REMOVALS_BEFORE_PASSWORD retraits dans l'heure (tranche 7c). Facultatif : sans lui, l'API répond
+ * `password_required` quand il le faut. Jamais gardé ni journalisé.
+ */
+export const ModerationPassword = z.string().min(1).max(PASSWORD_MAX_LENGTH)
+
+/**
  * Une décision (POST /v1/moderation/decisions) : retirer (avec un fondement et une explication),
- * classer sans suite, ou rétablir un contenu retiré. Un profil n'accepte que « classer ».
+ * classer sans suite, ou rétablir un contenu retiré ; suspendre un compte ou lever sa suspension
+ * (tranche 7c). Un profil n'accepte que « classer » (le retrait d'une partie vient en 7d).
  */
 export const ModerationDecisionInput = z
   .discriminatedUnion('action', [
@@ -262,14 +303,34 @@ export const ModerationDecisionInput = z
       target: ReportTarget,
       ground: RemovalGround,
       explanation: RemovalExplanation,
+      password: ModerationPassword.optional(),
     }),
     z.object({ action: z.literal('dismiss'), target: ReportTarget }),
     z.object({ action: z.literal('restore'), target: ReportTarget }),
+    z.object({
+      action: z.literal('suspend'),
+      memberId: MemberId,
+      duration: SuspensionDuration,
+      ground: RemovalGround,
+      explanation: RemovalExplanation,
+      /**
+       * Le signalement d'où part la suspension (la carte de la file), s'il y en a un : l'API vérifie
+       * qu'il est ouvert et vise ce membre, et la suspension est dite « après un signalement » (J2).
+       */
+      fromReport: ReportTarget.optional(),
+      password: ModerationPassword.optional(),
+    }),
+    z.object({
+      action: z.literal('lift'),
+      memberId: MemberId,
+      cause: LiftCause,
+      explanation: RemovalExplanation,
+    }),
   ])
   .meta({ id: 'ModerationDecisionInput' })
 export type ModerationDecisionInput = z.infer<typeof ModerationDecisionInput>
 
-export const ModerationAction = z.enum(['remove', 'dismiss', 'restore'])
+export const ModerationAction = z.enum(['remove', 'dismiss', 'restore', 'suspend', 'lift'])
 export type ModerationAction = z.infer<typeof ModerationAction>
 
 /** La décision enregistrée. */
@@ -277,6 +338,59 @@ export const ModerationDecision = z
   .object({ id: z.uuid(), action: ModerationAction, createdAt: z.iso.datetime() })
   .meta({ id: 'ModerationDecision' })
 export type ModerationDecision = z.infer<typeof ModerationDecision>
+
+/** Les paramètres de l'historique : sans curseur, la première page ; `member` filtre sur un membre. */
+export const DecisionHistoryQuery = z.object({
+  cursor: FeedCursor.optional(),
+  member: MemberId.optional(),
+})
+export type DecisionHistoryQuery = z.infer<typeof DecisionHistoryQuery>
+
+/** Un membre nommé dans l'historique : l'administrateur qui décide, ou le membre visé. */
+const HistoryMember = z
+  .object({ id: z.string(), name: z.string(), handle: z.string().nullable() })
+  .strict()
+
+/**
+ * Une décision dans l'historique (GET /v1/moderation/decisions, tranche 7c), lu par les seuls
+ * administrateurs. Jamais qui a signalé.
+ */
+export const DecisionHistoryItem = z
+  .object({
+    id: z.uuid(),
+    action: ModerationAction,
+    at: z.iso.datetime(),
+    /** L'administrateur qui a décidé ; null si son compte a été supprimé. */
+    admin: HistoryMember.nullable(),
+    /** La cible : un contenu, ou le membre pour un profil, une suspension ou une levée. */
+    target: ReportTarget,
+    /** Le projet de la cible, pour le lien ; null pour un membre, ou un contenu supprimé depuis. */
+    projectId: ProjectId.nullable(),
+    /** Le membre visé (l'auteur du contenu, ou le membre lui-même) ; null si son compte est parti. */
+    member: HistoryMember.nullable(),
+    /** Le fondement d'un retrait ou d'une suspension ; null sinon. */
+    ground: RemovalGround.nullable(),
+    /** L'explication d'un retrait, d'une suspension ou d'une levée ; null sinon. */
+    explanation: z.string().nullable(),
+    /** La durée d'une suspension ; null sinon. */
+    duration: SuspensionDuration.nullable(),
+    /** La raison d'une levée (plus tôt, ou erreur) ; null sinon. */
+    liftCause: LiftCause.nullable(),
+    /** Vrai pour une suspension partie d'un signalement ; faux sinon (et pour toute autre action). */
+    afterReport: z.boolean(),
+  })
+  .strict()
+  .meta({ id: 'DecisionHistoryItem' })
+export type DecisionHistoryItem = z.infer<typeof DecisionHistoryItem>
+
+/** L'historique, de la décision la plus récente à la plus ancienne. */
+export const DecisionHistoryPage = z
+  .object({
+    items: z.array(DecisionHistoryItem).max(MODERATION_PAGE_SIZE),
+    nextCursor: FeedCursor.nullable(),
+  })
+  .meta({ id: 'DecisionHistoryPage' })
+export type DecisionHistoryPage = z.infer<typeof DecisionHistoryPage>
 
 /** L'issue d'un signalement : en attente, contenu retiré, classé sans suite, ou sans objet. */
 export const ReportOutcome = z.enum(['open', 'removed', 'dismissed', 'void'])
