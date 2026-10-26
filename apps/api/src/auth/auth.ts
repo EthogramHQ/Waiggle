@@ -25,9 +25,11 @@ import { existingAccountEmail, verificationEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
+import { suspensionEmailKey } from '../moderation/suspend'
 import { mediaKeysOf } from '../projects/load'
 import { createRateLimiter, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
+import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { createEmailChange } from './change-email'
 import { authSchemaOptions } from './schema-options'
 
@@ -263,6 +265,22 @@ export const createAuth = ({
           } catch (error) {
             console.error(
               'Reports not voided after deletion',
+              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
+            )
+          }
+          // Sa suspension en cours (tranche 7c, J1) : partir est permis, et n'efface pas la
+          // preuve. Elle est close à la date du départ, sans décision de levée, et gardée un an
+          // avec ses décisions. Ici, après la suppression : une suppression refusée laisse la
+          // suspension en cours. Le compteur de ses e-mails de suspension (S18) porte son
+          // identifiant : effacé aussi. Une panne ne fait pas échouer la suppression, déjà faite.
+          try {
+            await closeSuspensionsOfDeparted(db, new Date())
+            await db
+              .delete(schema.apiRateLimit)
+              .where(eq(schema.apiRateLimit.key, suspensionEmailKey(user.id)))
+          } catch (error) {
+            console.error(
+              'Suspension not closed after deletion',
               describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
             )
           }

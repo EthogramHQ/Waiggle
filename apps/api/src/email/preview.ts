@@ -4,6 +4,7 @@
 // commentent, répondent et la mentionnent ; Inès change d'adresse). preview.test.ts refuse un
 // modèle sans aperçu ni exception écrite. Rien ici n'est envoyé ni lu par l'API :
 // `pnpm --filter @ruche/api email:preview <dossier>` (scripts/email-preview.ts) écrit ces fichiers.
+import { REMOVAL_EXPLANATION_MAX } from '@ruche/contracts'
 import { type Language, supportedLanguages } from '@ruche/i18n'
 import {
   changeEmailConfirmationEmail,
@@ -18,6 +19,7 @@ import {
   type RecapData,
   type RecapLine,
   recapEmail,
+  suspensionEmail,
   verificationEmail,
 } from './templates'
 import { createUnsubscribeToken } from './unsubscribe-token'
@@ -98,6 +100,15 @@ const verifyLink = (token: string, page?: string) =>
 const firstLink = verifyLink('eyJhbGciOiJIUzI1NiJ9.apercu.signature', '/email-change/confirmed')
 const secondLink = verifyLink('9f2c4e7a1b3d5f60apercu')
 
+// L'explication la plus longue qu'un administrateur peut écrire (REMOVAL_EXPLANATION_MAX), avec un
+// mot de 88 caractères sans espace (une adresse) : la carte de l'e-mail doit la couper sans
+// défiler à l'horizontale (adresse-E1).
+const LONG_EXPLANATION =
+  `${'Annonces répétées pour un service payant, malgré deux rappels des règles. '.repeat(5)}Voir ${'a'.repeat(76)}@exemple.fr et meteo.example.org/inscription ; `.padEnd(
+    REMOVAL_EXPLANATION_MAX,
+    '.',
+  )
+
 /** Les variantes montrées : le nom du fichier (sans la langue) et l'e-mail rendu. */
 const variants: [string, (language: Language) => EmailContent][] = [
   ['recap-short', (language) => recapEmail(language, recap({}))],
@@ -147,6 +158,30 @@ const variants: [string, (language: Language) => EmailContent][] = [
     'moderation-alert',
     (language) =>
       moderationAlertEmail(language, { name: 'Malik', count: 3, url: `${APP_URL}/moderation` }),
+  ],
+  // La suspension d'un compte (tranche 7c), e-mail de service : 7 jours après un signalement, avec
+  // la fin à l'heure de Paris (23 h 30 UTC un soir de novembre : le lendemain à 0 h 30), puis sans
+  // fin, à l'initiative de la modération, avec l'explication la plus longue permise (500
+  // caractères) et une adresse écrite dedans, qui devient « [lien] ».
+  [
+    'suspension-7d',
+    (language) =>
+      suspensionEmail(language, {
+        endsAt: new Date('2026-11-03T23:30:00.000Z'),
+        ground: 'rules',
+        explanation: 'Messages insultants répétés sous les projets des autres membres.',
+        afterReport: true,
+      }),
+  ],
+  [
+    'suspension-indefinite',
+    (language) =>
+      suspensionEmail(language, {
+        endsAt: null,
+        ground: 'illegal',
+        explanation: LONG_EXPLANATION,
+        afterReport: false,
+      }),
   ],
 ]
 

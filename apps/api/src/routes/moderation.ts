@@ -21,8 +21,10 @@ import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import type { Auth } from '../auth/auth'
 import { readCursor } from '../cursor'
+import type { Mailer } from '../email/mailer'
 import { errorBody, languageOf } from '../errors'
 import { confirmPassword, countDecision } from '../moderation/guard'
+import { sendSuspensionEmail } from '../moderation/suspend'
 import type { RateLimiter } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
 import { decide } from '../reports/decide'
@@ -115,9 +117,11 @@ type Deps = {
   limiter: RateLimiter
   /** Better Auth : sa façon de vérifier un mot de passe, quand la modération le redemande. */
   auth: Pick<Auth, '$context'>
+  /** L'e-mail au membre suspendu (tranche 7c), envoyé après la décision. */
+  mailer: Mailer
 }
 
-export const moderationRoutes = ({ db, limiter, auth }: Deps) => {
+export const moderationRoutes = ({ db, limiter, auth, mailer }: Deps) => {
   const app = createRouter()
 
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
@@ -185,17 +189,29 @@ export const moderationRoutes = ({ db, limiter, auth }: Deps) => {
       }
     }
     // L'heure de JavaScript : la date de la décision est aussi celle du retrait (removed_at).
-    const result = await decide(db, user.id, input, new Date(), {
+    const now = new Date()
+    const result = await decide(db, user.id, input, now, {
       passwordConfirmed: password !== undefined,
     })
-    if (result.ok) return c.json(ModerationDecision.parse(result.decision), 201)
+    if (result.ok) {
+      // Une suspension prévient le membre par e-mail, une fois la décision validée (tranche 7c) ;
+      // un échec d'envoi est journalisé sans défaire la décision (moderation/suspend.ts).
+      if (input.action === 'suspend') {
+        await sendSuspensionEmail({ db, mailer, limiter }, input.memberId, now)
+      }
+      return c.json(ModerationDecision.parse(result.decision), 201)
+    }
     switch (result.error) {
       case 'not_found':
         return notFound(c)
       case 'own_content':
         return c.json(errorBody(languageOf(c), 'own_content'), 422)
+      case 'cannot_suspend_admin':
+        return c.json(errorBody(languageOf(c), 'cannot_suspend_admin'), 422)
       case 'profile':
-        // Une décision bien formée, mais qu'un profil n'accepte pas.
+      case 'validation':
+        // Une décision bien formée, mais qu'un profil n'accepte pas, ou une suspension qui cite un
+        // signalement qui ne vise pas ce membre (J2).
         return c.json(errorBody(languageOf(c), 'validation'), 422)
       case 'already_decided':
         return c.json(errorBody(languageOf(c), 'already_decided'), 409)

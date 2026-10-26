@@ -18,14 +18,17 @@ import {
   removalNeedsPassword,
   type Tx,
 } from '../moderation/guard'
+import { SuspensionChanged, type SuspensionError, suspendOrLift } from '../moderation/suspend'
 import { loadDecidable } from './target'
 
+/** Les refus d'une décision ; ceux de la suspension (SuspensionError) en plus, tranche 7c. */
 export type DecideError =
   | 'not_found'
   | 'own_content'
   | 'profile'
   | 'already_decided'
   | 'password_required'
+  | SuspensionError
 
 export type DecideResult =
   | { ok: true; decision: ModerationDecision }
@@ -119,11 +122,20 @@ export const decide = async (
   now: Date,
   { passwordConfirmed }: { passwordConfirmed: boolean },
 ): Promise<DecideResult> => {
-  // 7c : provisoire (commit du contrat) ; backend-dev B1 traite la suspension et la levée
-  // (moderation/suspend.ts), dans la même transaction, après lockDecision(tx, adminId, { kind:
-  // 'member', id: input.memberId }), avec suspensionNeedsPassword (moderation/guard.ts).
-  if (input.action === 'suspend' || input.action === 'lift')
-    return { ok: false, error: 'not_found' }
+  // Suspendre un compte ou lever sa suspension (tranche 7c) : moderation/suspend.ts, avec les mêmes
+  // verrous (l'administrateur, puis le membre) et le même mot de passe. Les mêmes conflits aussi :
+  // une suspension changée entre-temps, l'index unique partiel (23505) ou un interblocage (40P01)
+  // deviennent « déjà décidé ».
+  if (input.action === 'suspend' || input.action === 'lift') {
+    try {
+      return await suspendOrLift(db, adminId, input, now, { passwordConfirmed })
+    } catch (error) {
+      if (error instanceof SuspensionChanged || isDecisionConflict(error)) {
+        return { ok: false, error: 'already_decided' }
+      }
+      throw error
+    }
+  }
   const { target } = input
   // Un profil n'accepte que « classer » (il n'y a rien à retirer : une photo ou un pseudo illicite
   // se traite par script, docs/ops/moderation.md).

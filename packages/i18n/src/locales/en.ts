@@ -882,6 +882,7 @@ export const en: Translation = {
         'While suspended, you can read everything, delete your content, export your data or delete your account. You can no longer post, comment, react or follow.',
       contest:
         'Disagree? Write to us at {{contactEmail}}: a person will review the decision and reply. You can also go to court.',
+      greeting: 'Hello,',
     },
   },
   feed: {
