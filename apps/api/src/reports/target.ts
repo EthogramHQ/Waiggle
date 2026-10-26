@@ -267,12 +267,40 @@ const loadVisible = async (
 }
 
 /**
+ * La copie d'une note ou d'un commentaire, ramenée à la forme de la tranche 7b. La tranche 7a ne
+ * gardait qu'un texte ; la migration de 7b l'a rangé tel quel sous le champ `text`
+ * (`[{ field: 'text', value }]`). Pour une note ou un commentaire, ce texte était **tout** leur
+ * contenu (`snapshot: row.body` dans le target.ts de 7a) : il vaut donc la copie 7b
+ * `[{ field: 'body', value }]` du même texte (tranche 7c, relecture de sécurité S3).
+ *
+ * On ne la réécrit que si la copie d'aujourd'hui (`current`) est elle-même une copie de note ou de
+ * commentaire : un seul champ, `body`. C'est la seule forme qui n'ait qu'un `body` (loadReportable,
+ * plus haut) : un projet commence par `title`, un profil par `name`. Pour eux, 7a n'avait copié
+ * qu'une partie (le titre et l'accroche, pas le lien de démo) : leur copie 7a reste telle quelle,
+ * et n'est jamais égale à une copie 7b. La file fait la même réécriture en SQL (queue.ts,
+ * `snapshotHash`), pour ne pas dire « les copies diffèrent » à tort.
+ */
+const asSlice7b = (old: ReportSnapshot, current: ReportSnapshot): ReportSnapshot => {
+  const [entry] = old
+  const noteOrComment = current.length === 1 && current[0]?.field === 'body'
+  if (entry && old.length === 1 && entry.field === 'text' && noteOrComment) {
+    return [{ field: 'body', value: entry.value }]
+  }
+  return old
+}
+
+/**
  * Deux copies disent-elles la même chose ? Champ par champ, dans l'ordre. Sert à re-signaler
  * (règle 14 : un contenu inchangé depuis l'examen de la modération ne se signale pas de nouveau).
+ * `before` est la copie du signalement précédent, peut-être d'avant 7b ; `now`, celle d'aujourd'hui.
  */
-export const sameSnapshot = (a: ReportSnapshot, b: ReportSnapshot) =>
-  a.length === b.length &&
-  a.every((entry, i) => entry.field === b[i]?.field && entry.value === b[i]?.value)
+export const sameSnapshot = (before: ReportSnapshot, now: ReportSnapshot) => {
+  const a = asSlice7b(before, now)
+  return (
+    a.length === now.length &&
+    a.every((entry, i) => entry.field === now[i]?.field && entry.value === now[i]?.value)
+  )
+}
 
 /** Une cible vue par l'administrateur : son auteur, et si elle est retirée. */
 export type DecidableTarget = { authorId: string | null; removed: boolean }
