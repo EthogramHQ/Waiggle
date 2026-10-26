@@ -3,21 +3,23 @@ packages:
   - apps/api/runtime
   - packages/*
 
-# Only these dependencies may run install scripts (supply-chain protection).
-onlyBuiltDependencies:
-  - esbuild
-
-# Install scripts we reviewed and deliberately do not run (prebuilt binaries are used instead).
-ignoredBuiltDependencies:
-  - '@parcel/watcher'
-  - unrs-resolver
+# Scripts d'installation des dépendances (protection de la chaîne d'approvisionnement) : `true`, le
+# seul autorisé à tourner ; `false`, relu et volontairement pas lancé (on prend leurs binaires déjà
+# compilés). Un paquet absent de la liste ne lance rien, et pnpm 11 ou plus refuse l'installation
+# tant qu'il n'y est pas classé. `allowBuilds` existe depuis pnpm 10.26 et remplace
+# `onlyBuiltDependencies` et `ignoredBuiltDependencies`, que pnpm 11 a retirés.
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': false
+  unrs-resolver: false
 
 # Protections de la chaîne d'approvisionnement (audit de sécurité du 25/10/2026, C8). Le risque :
 # un compte de mainteneur volé publie une version piégée d'un paquet connu ; elle est repérée et
 # retirée du registre en quelques heures, mais toute installation faite entre-temps l'a prise.
-# Ces trois réglages existent dans pnpm 10.28.0 (celui de packageManager). Ils jouent quand pnpm
-# choisit une version (ajout, mise à jour) ; `pnpm install --frozen-lockfile` (la CI, le serveur)
-# reprend les versions déjà notées dans pnpm-lock.yaml sans les rechoisir.
+# Ces trois réglages existent depuis pnpm 10.28.0. Avec pnpm 10, ils jouent quand pnpm choisit une
+# version (ajout, mise à jour) ; `pnpm install --frozen-lockfile` (la CI, le serveur) reprend les
+# versions déjà notées dans pnpm-lock.yaml sans les revérifier. Depuis pnpm 12, toute installation,
+# même figée, revérifie aussi chaque entrée du verrou contre ces règles.
 #
 # Âge minimum d'une version avant que pnpm accepte de l'installer, en minutes : 7 jours
 # (7 × 24 × 60). Une version piégée a presque toujours été retirée avant.
