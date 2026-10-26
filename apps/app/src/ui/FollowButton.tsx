@@ -35,6 +35,12 @@ type Props = {
    * d'une page de membre, dans l'axe de l'avatar et du nom).
    */
   layout?: 'row' | 'stacked'
+  /**
+   * Inactif (annoncé « désactivé ») : un compte suspendu (tranche 7c) qui vient de ne plus suivre
+   * ne peut pas suivre de nouveau. Le bouton reste à sa place, et le focus avec lui, au lieu de
+   * disparaître sous le doigt.
+   */
+  disabled?: boolean
 }
 
 export function FollowButton({
@@ -47,6 +53,7 @@ export function FollowButton({
   errorAction,
   prominent = true,
   layout = 'row',
+  disabled = false,
 }: Props) {
   const stacked = layout === 'stacked'
   const button = (
@@ -55,6 +62,7 @@ export function FollowButton({
       spokenLabel={label}
       checked={followed}
       onPress={onPress}
+      disabled={disabled}
       variant={followed || !prominent ? 'secondary' : 'primary'}
       icon={followed ? 'check' : 'plus'}
       size="compact"

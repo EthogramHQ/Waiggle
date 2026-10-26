@@ -4,17 +4,24 @@
 // « Publier un projet » est un bouton secondaire : l'action principale (en miel) reste celle de la
 // page (« Publier », « Tester la démo »). Le formulaire de projet le masque (`hideNewProject`).
 // Elle ne montre que des destinations qui existent déjà : pas de lien vers une page à venir.
+//
+// Tranche 7c : elle porte aussi le bandeau d'un compte suspendu (`SuspensionBanner`), sous la
+// capsule. Toutes les pages la posent : le bandeau est ainsi monté une seule fois, jamais écran par
+// écran. Sur téléphone, où la capsule n'apparaît pas, la barre ne montre que lui. Un membre suspendu
+// n'y trouve plus « Publier un projet ».
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
+import { useSuspension } from '../moderation/suspension'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Pressed } from '../ui/Pressed'
-import { Row } from '../ui/Stack'
+import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
+import { SuspensionBanner } from '../ui/SuspensionBanner'
 import { useLayout } from '../ui/theme/layout'
 import { Wordmark } from '../ui/Wordmark'
 
@@ -29,24 +36,30 @@ export function TopNav({ hideNewProject = false }: Props) {
   const { sizeClass } = useLayout()
   const { data: session } = useSession()
   const shown = sizeClass !== 'compact'
-  // Le profil (pour l'avatar) n'est demandé que si la barre est affichée.
+  // Le profil est lu sur toutes les largeurs : pour l'avatar de la capsule, et, sur téléphone aussi,
+  // pour savoir si le compte est suspendu (le bandeau). Une seule copie en cache pour toute l'appli.
   // retryOnMount: false, pour éviter une boucle. Les écrans de chargement et d'erreur ont chacun
   // leur propre barre : quand « Mon profil » passe de l'un à l'autre, une nouvelle barre apparaît.
   // Par défaut, React Query relance alors la lecture du profil qui vient d'échouer, ce qui efface
   // l'erreur : la page revient à « Chargement… », la lecture échoue, l'erreur remonte une nouvelle
   // barre, et ainsi de suite (une requête par seconde, sans jamais montrer l'erreur). La barre se
   // contente donc du nom de la session tant que le profil manque ; « Réessayer » relance la lecture.
-  const me = useMe(Boolean(session) && shown, { retryOnMount: false })
+  const me = useMe(Boolean(session), { retryOnMount: false })
+  const { suspension } = useSuspension()
   const toSource = useMediaSources(shown)
 
-  if (!shown || !session) return null
+  if (!session) return null
+  const banner = suspension ? <SuspensionBanner suspension={suspension} /> : null
+  // Téléphone : pas de capsule ; le bandeau seul, s'il y a lieu.
+  if (!shown) return banner
   const name = me.data?.name ?? session.user.name
-  return (
+  const capsule = (
     <Surface variant="glass" radius="pill" padding="sm">
       <Row gap="lg" paddingX="md" justify="between">
         <Wordmark onPress={() => router.push('/')} />
         <Row gap="md">
-          {hideNewProject ? null : (
+          {/* Un compte suspendu ne publie plus : le bouton disparaît (l'API refuserait). */}
+          {hideNewProject || suspension ? null : (
             <Button
               label={t(($) => $.home.publish)}
               icon="plus"
@@ -63,5 +76,12 @@ export function TopNav({ hideNewProject = false }: Props) {
         </Row>
       </Row>
     </Surface>
+  )
+  if (!banner) return capsule
+  return (
+    <Stack gap="md">
+      {capsule}
+      {banner}
+    </Stack>
   )
 }
