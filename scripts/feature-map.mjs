@@ -28,7 +28,8 @@ const features = [
     id: 'comptes',
     name: 'Comptes',
     tranche: 'Tranche 1 · Mise en ligne',
-    pages: /^\/(sign-up|sign-in|check-email|verified|account\/delete)$/,
+    pages:
+      /^\/(sign-up|sign-in|check-email|verified|account\/delete|account\/email|email-change\/(confirmed|done))$/,
     routes: /^(ALL \/api\/auth)/,
     tables: /^(user|session|account|verification|rate_limit)$/,
   },
