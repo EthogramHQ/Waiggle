@@ -56,7 +56,9 @@ const mockUnblock = jest.fn()
 
 /** Ouvre le menu « … » de la page (ActionMenu), une fois la page arrivée. */
 const openMenu = async () => {
-  await fireEvent.press(await screen.findByRole('button', { name: fr.t('actionMenu.label') }))
+  await fireEvent.press(
+    await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }),
+  )
 }
 
 beforeEach(() => {
@@ -326,13 +328,15 @@ describe('reporting a member from her page', () => {
     expect(await screen.findByRole('header', { name: 'Léa' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce profil' })).toBeNull()
     // Ni signaler ni se bloquer soi-même : le menu n'aurait rien à offrir.
-    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.actionMenu.label) })).toBeNull()
   })
 
   it('no longer shows « Signaler ce profil » as a link of its own on the page', async () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    expect(await screen.findByRole('button', { name: fr.t('actionMenu.label') })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }),
+    ).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce profil' })).toBeNull()
   })
 })
@@ -345,7 +349,7 @@ describe('reporting a member from her page', () => {
 // ApiResult et relisent la page du membre (['member', id]) une fois faits.
 
 describe('blocking a member from her page', () => {
-  const blockTitle = fr.t('block.title', { handle: 'lea' })
+  const blockTitle = fr.t(($) => $.block.title, { handle: 'lea' })
 
   /**
    * Ouvre le menu, choisit « Bloquer » : la fenêtre de confirmation s'ouvre, et l'on attend la fin
@@ -353,7 +357,7 @@ describe('blocking a member from her page', () => {
    */
   const askToBlock = async () => {
     await openMenu()
-    await fireEvent.press(screen.getByRole('menuitem', { name: fr.t('block.action') }))
+    await fireEvent.press(screen.getByRole('menuitem', { name: fr.t(($) => $.block.action) }))
     await passTapGuard()
   }
 
@@ -382,7 +386,7 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
     expect(mockBlock).toHaveBeenCalledTimes(1)
     expect(mockBlock).toHaveBeenCalledWith('u1')
@@ -392,7 +396,7 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.cancel) }))
 
     expect(mockBlock).not.toHaveBeenCalled()
     expect(screen.queryByRole('header', { name: blockTitle })).toBeNull()
@@ -408,7 +412,7 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    const confirm = screen.getByRole('button', { name: fr.t('block.confirm') })
+    const confirm = screen.getByRole('button', { name: fr.t(($) => $.block.confirm) })
     await fireEvent.press(confirm)
     await fireEvent.press(confirm)
 
@@ -421,9 +425,9 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
-    expect(await screen.findByText(containing(fr.t('block.error')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.block.error)))).toBeTruthy()
   })
 
   it('says when the daily limit of blocks is reached', async () => {
@@ -431,10 +435,10 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
     expect(
-      await screen.findByText(containing(fr.t('block.limited', { max: BLOCKS_PER_DAY }))),
+      await screen.findByText(containing(fr.t(($) => $.block.limited, { max: BLOCKS_PER_DAY }))),
     ).toBeTruthy()
   })
 
@@ -444,9 +448,11 @@ describe('blocking a member from her page', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
-    const notice = await screen.findByText(containing(fr.t('block.notice', { handle: 'lea' })))
+    const notice = await screen.findByText(
+      containing(fr.t(($) => $.block.notice, { handle: 'lea' })),
+    )
     expect(notice).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByRole('button', { name: 'Débloquer @lea' })).toBeTruthy()
@@ -472,7 +478,7 @@ describe('the page of a member I blocked', () => {
     // L'en-tête reste : nom et pseudo.
     expect(screen.getByText('@lea')).toBeTruthy()
     expect(
-      screen.getAllByText(containing(fr.t('block.notice', { handle: 'lea' }))).length,
+      screen.getAllByText(containing(fr.t(($) => $.block.notice, { handle: 'lea' }))).length,
     ).toBeGreaterThan(0)
   })
 
@@ -481,7 +487,7 @@ describe('the page of a member I blocked', () => {
 
     await screen.findByRole('header', { name: 'Léa' })
     expect(screen.queryByRole('link', { name: 'Mon agent de recettes' })).toBeNull()
-    expect(screen.queryByText(containing(fr.t('member.empty')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.member.empty)))).toBeNull()
     expect(screen.queryByRole('switch', { name: 'Suivre Léa' })).toBeNull()
     expect(screen.queryByText(/abonnés?$/)).toBeNull()
   })
@@ -515,18 +521,20 @@ describe('the page of a member I blocked', () => {
     await askToUnblock()
 
     expect(
-      screen.getByRole('header', { name: fr.t('block.unblockTitle', { handle: 'lea' }) }),
+      screen.getByRole('header', { name: fr.t(($) => $.block.unblockTitle, { handle: 'lea' }) }),
     ).toBeTruthy()
     // Relecture juridique R7 : le texte dit aussi que les anciennes notifications peuvent revenir.
-    expect(screen.getAllByText(containing(fr.t('block.unblockMessage'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.block.unblockMessage))).length,
+    ).toBeGreaterThan(0)
     expect(mockUnblock).not.toHaveBeenCalled()
 
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.unblockConfirm) }))
 
     expect(mockUnblock).toHaveBeenCalledTimes(1)
     expect(mockUnblock).toHaveBeenCalledWith('u1')
     expect(
-      await screen.findByText(containing(fr.t('block.unblocked', { handle: 'lea' }))),
+      await screen.findByText(containing(fr.t(($) => $.block.unblocked, { handle: 'lea' }))),
     ).toBeTruthy()
   })
 
@@ -534,7 +542,7 @@ describe('the page of a member I blocked', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToUnblock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.cancel) }))
 
     expect(mockUnblock).not.toHaveBeenCalled()
   })
@@ -545,10 +553,12 @@ describe('the page of a member I blocked', () => {
     await renderWithProviders(<MemberScreen id="u1" />)
 
     await askToUnblock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.unblockConfirm) }))
 
     expect(
-      await screen.findByText(containing(fr.t('block.unblockLimited', { max: UNBLOCKS_PER_DAY }))),
+      await screen.findByText(
+        containing(fr.t(($) => $.block.unblockLimited, { max: UNBLOCKS_PER_DAY })),
+      ),
     ).toBeTruthy()
   })
 })
@@ -563,6 +573,6 @@ describe('the page of a member who blocked me', () => {
 
     expect(await screen.findByRole('header', { name: 'Ce membre est introuvable' })).toBeTruthy()
     expect(screen.queryByText(/bloqu/i)).toBeNull()
-    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.actionMenu.label) })).toBeNull()
   })
 })

@@ -197,21 +197,25 @@ describe('the form', () => {
     await reportComment()
 
     await screen.findByText(commentText)
-    expect(screen.getAllByText(containing(fr.t('report.anonymity'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.report.anonymity))).length).toBeGreaterThan(
+      0,
+    )
   })
 
   it('asks not to add needless personal information', async () => {
     await reportComment()
 
     await screen.findByText(commentText)
-    expect(screen.getAllByText(containing(fr.t('report.detailsHint'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.report.detailsHint))).length,
+    ).toBeGreaterThan(0)
   })
 
   it('says to call 112 when someone is in danger', async () => {
     await reportComment()
 
     await screen.findByText(commentText)
-    expect(screen.getAllByText(containing(fr.t('report.danger'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.report.danger))).length).toBeGreaterThan(0)
   })
 
   it('offers an optional precision of 500 characters at most, with a counter', async () => {
@@ -231,7 +235,9 @@ describe('the form', () => {
     await fireEvent.press(await screen.findByRole('radio', { name: /^Contenu illégal/ }))
 
     expect(screen.getByLabelText('Dis-nous pourquoi')).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('report.illegalHint'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.report.illegalHint))).length,
+    ).toBeGreaterThan(0)
   })
 
   it('sends nothing for an illegal content without an explanation', async () => {
@@ -240,7 +246,7 @@ describe('the form', () => {
 
     await sendWith('Contenu illégal')
 
-    expect(await screen.findByText(containing(fr.t('report.illegalRequired')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.report.illegalRequired)))).toBeTruthy()
     expect(sendReport).not.toHaveBeenCalled()
 
     await fireEvent.changeText(screen.getByLabelText('Dis-nous pourquoi'), 'Il donne une adresse.')
@@ -257,7 +263,7 @@ describe('the form', () => {
 
     // Témoin : le champ de la précision est là, sous son nom habituel.
     expect(screen.getByLabelText('Précision (facultatif)')).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('report.illegalHint')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.report.illegalHint)))).toBeNull()
   })
 })
 
@@ -295,10 +301,10 @@ describe('sending a report', () => {
 
     await screen.findByText(commentText)
     // Témoin : le message n'est pas là avant le premier essai.
-    expect(screen.queryByText(containing(fr.t('report.reasonRequired')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.report.reasonRequired)))).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Envoyer' }))
 
-    expect(await screen.findByText(containing(fr.t('report.reasonRequired')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.report.reasonRequired)))).toBeTruthy()
     await sendWith('Arnaque ou spam')
     expect(sendReport).toHaveBeenCalledTimes(1)
   })
@@ -309,7 +315,7 @@ describe('sending a report', () => {
     await sendWith('Arnaque ou spam')
 
     expect(await screen.findByText(containing('Merci, ton signalement a été envoyé.'))).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('report.sent'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.report.sent))).length).toBeGreaterThan(0)
     // Le formulaire a laissé la place au remerciement.
     expect(screen.queryByRole('button', { name: 'Envoyer' })).toBeNull()
   })
@@ -359,8 +365,8 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('errors.alreadyReported')))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
+    expect(await screen.findByText(containing(fr.t(($) => $.errors.alreadyReported)))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.report.sent)))).toBeNull()
   })
 
   it('says when the daily limit of reports is reached', async () => {
@@ -371,11 +377,11 @@ describe('a report refused by the API', () => {
 
     // Décision du 23/10 (plan, règle 35) : une phrase propre au quota de 20 par jour. La limite et
     // l'adresse de contact y arrivent en paramètres (`{{max}}`, `{{contactEmail}}`), jamais vides.
-    const limited = fr.t('report.limited', { max: REPORTS_PER_DAY, contactEmail })
+    const limited = fr.t(($) => $.report.limited, { max: REPORTS_PER_DAY, contactEmail })
     expect(limited).toContain(String(REPORTS_PER_DAY))
     expect(limited).toContain(contactEmail)
     expect(await screen.findByText(containing(limited))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.report.sent)))).toBeNull()
   })
 
   it('says when the content is no longer there', async () => {
@@ -385,8 +391,8 @@ describe('a report refused by the API', () => {
     await sendWith('Arnaque ou spam')
 
     // Décision du 23/10 (plan, règle 37, qui remplace la règle 27) : une phrase sur le contenu.
-    expect(await screen.findByText(containing(fr.t('report.gone')))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('report.sent')))).toBeNull()
+    expect(await screen.findByText(containing(fr.t(($) => $.report.gone)))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.report.sent)))).toBeNull()
   })
 
   it('says one cannot report one’s own content', async () => {
@@ -396,7 +402,7 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('errors.ownContent')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.errors.ownContent)))).toBeTruthy()
   })
 
   it('offers to sign in again, back to this page, when the session expired', async () => {
@@ -405,7 +411,7 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('states.expired')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.states.expired)))).toBeTruthy()
     await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
     expect(visited(mockPush)).toContain('/sign-in?next=/report')
   })
@@ -418,7 +424,7 @@ describe('a report refused by the API', () => {
     await fireEvent.changeText(screen.getByLabelText('Précision (facultatif)'), 'Trois fois.')
     await fireEvent.press(screen.getByRole('button', { name: 'Envoyer' }))
 
-    expect(await screen.findByText(containing(fr.t('errors.internal')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.errors.internal)))).toBeTruthy()
     expect(screen.getByRole('radio', { name: /^Arnaque ou spam/, checked: true })).toBeTruthy()
     expect(screen.getByLabelText('Précision (facultatif)')).toHaveDisplayValue('Trois fois.')
   })
@@ -431,8 +437,8 @@ describe('a report refused by the API', () => {
 
     await sendWith('Arnaque ou spam')
 
-    expect(await screen.findByText(containing(fr.t('errors.alreadyExamined')))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('errors.alreadyReported')))).toBeNull()
+    expect(await screen.findByText(containing(fr.t(($) => $.errors.alreadyExamined)))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.errors.alreadyReported)))).toBeNull()
   })
 })
 
@@ -444,13 +450,13 @@ describe('a report refused by the API', () => {
 
 describe('blocking the author after a report', () => {
   const alsoBlock = 'Bloquer aussi @sam'
-  const blockTitle = fr.t('block.title', { handle: 'sam' })
+  const blockTitle = fr.t(($) => $.block.title, { handle: 'sam' })
 
   /** Signale le commentaire de Sam, puis attend la confirmation. */
   const reportThenThanked = async () => {
     await reportComment()
     await sendWith('Arnaque ou spam')
-    await screen.findByText(containing(fr.t('report.sent')))
+    await screen.findByText(containing(fr.t(($) => $.report.sent)))
   }
 
   /**
@@ -467,18 +473,18 @@ describe('blocking the author after a report', () => {
     // relecture (retour sur l'onglet) remplaçait « Merci » par « Page introuvable ».
     const { queryClient } = await reportComment()
     await sendWith('Arnaque ou spam')
-    await screen.findByText(containing(fr.t('report.sent')))
+    await screen.findByText(containing(fr.t(($) => $.report.sent)))
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
-    await screen.findByText(containing(fr.t('block.done', { handle: 'sam' })))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
+    await screen.findByText(containing(fr.t(($) => $.block.done, { handle: 'sam' })))
 
     jest.mocked(getReportTarget).mockRejectedValue(new ApiError('notFound'))
     await act(() => queryClient.refetchQueries())
 
     expect(jest.mocked(getReportTarget)).toHaveBeenCalledTimes(2) // témoin : la relecture a eu lieu
-    expect(screen.getByText(containing(fr.t('report.sent')))).toBeTruthy()
-    expect(screen.getByText(containing(fr.t('block.done', { handle: 'sam' })))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('errors.notFound')))).toBeNull()
+    expect(screen.getByText(containing(fr.t(($) => $.report.sent)))).toBeTruthy()
+    expect(screen.getByText(containing(fr.t(($) => $.block.done, { handle: 'sam' })))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.errors.notFound)))).toBeNull()
   })
 
   it('offers to block the author too, once the report is sent, and not before', async () => {
@@ -492,7 +498,8 @@ describe('blocking the author after a report', () => {
 
     expect(await screen.findByRole('button', { name: alsoBlock })).toBeTruthy()
     expect(
-      screen.getAllByText(containing(fr.t('report.alsoBlockHint', { handle: 'sam' }))).length,
+      screen.getAllByText(containing(fr.t(($) => $.report.alsoBlockHint, { handle: 'sam' })))
+        .length,
     ).toBeGreaterThan(0)
     // Une action secondaire : rien n'est bloqué tant qu'on ne la choisit pas.
     expect(mockBlock).not.toHaveBeenCalled()
@@ -505,11 +512,13 @@ describe('blocking the author after a report', () => {
 
     expect(screen.getByRole('header', { name: blockTitle })).toBeTruthy()
     expect(missingSentences(blockSentences('sam'), screen)).toEqual([])
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
     expect(mockBlock).toHaveBeenCalledTimes(1)
     expect(mockBlock).toHaveBeenCalledWith(sam.id)
-    expect(await screen.findByText(containing(fr.t('block.done', { handle: 'sam' })))).toBeTruthy()
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.block.done, { handle: 'sam' }))),
+    ).toBeTruthy()
     // Fait : on ne le propose plus.
     expect(screen.queryByRole('button', { name: alsoBlock })).toBeNull()
   })
@@ -518,7 +527,7 @@ describe('blocking the author after a report', () => {
     await reportThenThanked()
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.cancel) }))
 
     expect(mockBlock).not.toHaveBeenCalled()
     expect(screen.queryByRole('header', { name: blockTitle })).toBeNull()
@@ -549,10 +558,12 @@ describe('blocking the author after a report', () => {
     await reportThenThanked()
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(containing(fr.t('block.error')))
-    expect(screen.queryByText(containing(fr.t('block.done', { handle: 'sam' })))).toBeNull()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      containing(fr.t(($) => $.block.error)),
+    )
+    expect(screen.queryByText(containing(fr.t(($) => $.block.done, { handle: 'sam' })))).toBeNull()
   })
 
   it('says when the daily limit of blocks is reached', async () => {
@@ -560,10 +571,10 @@ describe('blocking the author after a report', () => {
     await reportThenThanked()
 
     await askToBlock()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.confirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.confirm) }))
 
     expect(
-      await screen.findByText(containing(fr.t('block.limited', { max: BLOCKS_PER_DAY }))),
+      await screen.findByText(containing(fr.t(($) => $.block.limited, { max: BLOCKS_PER_DAY }))),
     ).toBeTruthy()
   })
 
@@ -578,7 +589,7 @@ describe('blocking the author after a report', () => {
     await reportThenThanked()
 
     await askToBlock()
-    const confirm = screen.getByRole('button', { name: fr.t('block.confirm') })
+    const confirm = screen.getByRole('button', { name: fr.t(($) => $.block.confirm) })
     await fireEvent.press(confirm)
     await fireEvent.press(confirm)
 

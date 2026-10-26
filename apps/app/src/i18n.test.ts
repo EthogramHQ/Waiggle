@@ -21,8 +21,10 @@ describe('member content in translated texts', () => {
   const { t } = createI18n('fr')
 
   it('shows a tool or a title containing {{appName}} as typed', () => {
-    expect(t('common.remove', { item: 'Hello {{appName}}' })).toBe('Retirer Hello {{appName}}')
-    expect(t('project.page.deleteTitle', { title: 'Mon {{appName}}' })).toBe(
+    expect(t(($) => $.common.remove, { item: 'Hello {{appName}}' })).toBe(
+      'Retirer Hello {{appName}}',
+    )
+    expect(t(($) => $.project.page.deleteTitle, { title: 'Mon {{appName}}' })).toBe(
       // Les espaces typographiques du français : une insécable (U+00A0) dans les guillemets, une fine (U+202F) avant le point d’interrogation.
       'Supprimer «\u00a0Mon {{appName}}\u00a0»\u202f?',
     )
@@ -30,13 +32,15 @@ describe('member content in translated texts', () => {
 
   it('shows a member text as typed even when it names a placeholder further in the text', () => {
     // i18next remplaçait ici le {{appName}} tapé par le membre, et laissait le vrai vide.
-    expect(t('project.page.external', { host: '{{appName}}' })).toBe(
+    expect(t(($) => $.project.page.external, { host: '{{appName}}' })).toBe(
       `{{appName}}, un site hors de ${appName}`,
     )
   })
 
   it('never reads a member text as a nested translation', () => {
-    expect(t('common.remove', { item: '$t(common.cancel)' })).toBe('Retirer $t(common.cancel)')
+    expect(t(($) => $.common.remove, { item: '$t(common.cancel)' })).toBe(
+      'Retirer $t(common.cancel)',
+    )
   })
 
   // Pour chaque texte de l'appli, dans chaque langue : chaque paramètre reçoit un texte piégé qui

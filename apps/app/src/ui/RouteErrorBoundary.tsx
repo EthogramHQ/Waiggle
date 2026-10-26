@@ -17,13 +17,13 @@ export function RouteErrorBoundary({ retry }: Props) {
   // L'état remplace toute la page : son titre est celui de la page (niveau 1), comme les autres
   // pages d'état (screens/states.tsx), et le message reste une alerte, lue dès qu'il paraît.
   return (
-    <Screen pageTitle={t('common.crashedTitle')}>
+    <Screen pageTitle={t(($) => $.common.crashedTitle)}>
       <StateMessage
         kind="error"
         level={1}
-        title={t('common.crashedTitle')}
-        message={t('common.crashed')}
-        actions={[{ label: t('common.retry'), onPress: () => void retry() }]}
+        title={t(($) => $.common.crashedTitle)}
+        message={t(($) => $.common.crashed)}
+        actions={[{ label: t(($) => $.common.retry), onPress: () => void retry() }]}
       />
     </Screen>
   )

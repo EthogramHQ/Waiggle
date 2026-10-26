@@ -60,10 +60,10 @@ function VisitorHome() {
     <Screen
       hero={
         <WelcomeHero
-          tagline={t('home.tagline')}
+          tagline={t(($) => $.home.tagline)}
           source={{
-            note: t('home.openSource'),
-            link: t('home.seeCode'),
+            note: t(($) => $.home.openSource),
+            link: t(($) => $.home.seeCode),
             onPress: () => openOutside(sourceUrl),
           }}
         />
@@ -75,35 +75,35 @@ function VisitorHome() {
       {/* Sur ordinateur, la scène de gauche montre déjà la constellation et le logo. */}
       {wide ? (
         <Text variant="title3" heading={1}>
-          {t('home.title')}
+          {t(($) => $.home.title)}
         </Text>
       ) : (
         <>
           <Constellation height={280} />
           <Stack gap="sm">
-            <Wordmark size="huge" header={t('home.title')} />
+            <Wordmark size="huge" header={t(($) => $.home.title)} />
             <Text variant="headline" tone="secondary" weight={400}>
-              {t('home.tagline')}
+              {t(($) => $.home.tagline)}
             </Text>
           </Stack>
         </>
       )}
       <Stack gap="md">
-        <Button label={t('home.signUp')} onPress={() => router.push('/sign-up')} />
+        <Button label={t(($) => $.home.signUp)} onPress={() => router.push('/sign-up')} />
         <Button
-          label={t('home.haveAccount')}
+          label={t(($) => $.home.haveAccount)}
           variant="secondary"
           onPress={() => router.push('/sign-in')}
         />
       </Stack>
-      <Hint icon="lock-simple" text={t('home.membersOnly')} />
+      <Hint icon="lock-simple" text={t(($) => $.home.membersOnly)} />
       {/* Sur téléphone, pas de scène à gauche : le lien vers le code source se place ici. */}
       {wide ? null : (
         <Row gap="xs" justify="center" wrap>
           <Text variant="caption" tone="muted">
-            {t('home.openSource')}
+            {t(($) => $.home.openSource)}
           </Text>
-          <TextLink label={t('home.seeCode')} onPress={() => openOutside(sourceUrl)} />
+          <TextLink label={t(($) => $.home.seeCode)} onPress={() => openOutside(sourceUrl)} />
         </Row>
       )}
     </Screen>
@@ -129,7 +129,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
     <Screen
       width="page"
       header={<TopNav hideNewProject />}
-      title={t('home.greeting', { name })}
+      title={t(($) => $.home.greeting, { name })}
       pageTitle={null}
     >
       {/* Sur téléphone, une seule rangée : « Publier » en clair, ses projets et son compte en
@@ -138,34 +138,38 @@ function MemberHome({ id, name }: { id: string; name: string }) {
         {/* Sur téléphone, « Publier » tout court (le nom lu reste « Publier un projet ») : la rangée
             tient sur une ligne, même sur un écran de 320 points. */}
         <Button
-          label={compact ? t('home.publishShort') : t('home.publish')}
-          spokenLabel={t('home.publish')}
+          label={compact ? t(($) => $.home.publishShort) : t(($) => $.home.publish)}
+          spokenLabel={t(($) => $.home.publish)}
           icon="plus"
           size="compact"
           onPress={() => router.push('/projects/new')}
         />
         {compact ? (
           <>
-            <IconButton icon="squares-four" label={t('home.myProjects')} onPress={myProjects} />
+            <IconButton
+              icon="squares-four"
+              label={t(($) => $.home.myProjects)}
+              onPress={myProjects}
+            />
             {/* Sur téléphone, pas de barre du haut : la cloche se range avec les raccourcis. */}
             <NotificationBell />
             <IconButton
               icon="user"
-              label={t('home.account')}
+              label={t(($) => $.home.account)}
               onPress={() => router.push('/account')}
             />
           </>
         ) : (
           <>
             <Button
-              label={t('home.myProjects')}
+              label={t(($) => $.home.myProjects)}
               variant="secondary"
               icon="squares-four"
               size="compact"
               onPress={myProjects}
             />
             <Button
-              label={t('home.account')}
+              label={t(($) => $.home.account)}
               variant="secondary"
               icon="user"
               size="compact"
@@ -176,10 +180,10 @@ function MemberHome({ id, name }: { id: string; name: string }) {
       </Row>
       <Segmented
         handle={tabs}
-        label={t('feed.label')}
+        label={t(($) => $.feed.label)}
         options={[
-          { value: 'following', label: t('feed.tabs.following'), icon: 'users' },
-          { value: 'discover', label: t('feed.tabs.discover'), icon: 'compass' },
+          { value: 'following', label: t(($) => $.feed.tabs.following), icon: 'users' },
+          { value: 'discover', label: t(($) => $.feed.tabs.discover), icon: 'compass' },
         ]}
         value={feed}
         onChange={setFeed}
@@ -204,7 +208,7 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
     return feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
     ) : (
-      <StateMessage kind="loading" message={t('common.loading')} />
+      <StateMessage kind="loading" message={t(($) => $.common.loading)} />
     )
   }
   if (items.length === 0) {
@@ -214,9 +218,11 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
     return (
       <StateMessage
         kind="empty"
-        title={followsAnyone ? undefined : t('feed.nobodyTitle')}
-        message={followsAnyone ? t('feed.quiet') : t('feed.nobodyBody')}
-        actions={[{ label: t('feed.nobodyAction'), onPress: onDiscover, variant: 'secondary' }]}
+        title={followsAnyone ? undefined : t(($) => $.feed.nobodyTitle)}
+        message={followsAnyone ? t(($) => $.feed.quiet) : t(($) => $.feed.nobodyBody)}
+        actions={[
+          { label: t(($) => $.feed.nobodyAction), onPress: onDiscover, variant: 'secondary' },
+        ]}
       />
     )
   }
@@ -225,8 +231,8 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
       feed={feed}
       items={items}
       news={news}
-      empty={t('feed.quiet')}
-      caption={t('feed.followingCaption')}
+      empty={t(($) => $.feed.quiet)}
+      caption={t(($) => $.feed.followingCaption)}
     />
   )
 }
@@ -242,10 +248,10 @@ function DiscoverFeed() {
   return (
     <Stack gap="lg">
       <Segmented
-        label={t('feed.filter.label')}
+        label={t(($) => $.feed.filter.label)}
         options={[
-          { value: 'all', label: t('feed.filter.all') },
-          { value: 'testers', label: t('feed.filter.testers') },
+          { value: 'all', label: t(($) => $.feed.filter.all) },
+          { value: 'testers', label: t(($) => $.feed.filter.testers) },
         ]}
         value={testers ? 'testers' : 'all'}
         onChange={(value) => setTesters(value === 'testers')}
@@ -255,15 +261,15 @@ function DiscoverFeed() {
         feed.isError ? (
           <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
         ) : (
-          <StateMessage kind="loading" message={t('common.loading')} />
+          <StateMessage kind="loading" message={t(($) => $.common.loading)} />
         )
       ) : (
         <FeedList
           feed={feed}
           items={items}
           news={news}
-          empty={testers ? t('feed.testersEmpty') : t('feed.discoverEmpty')}
-          caption={testers ? t('feed.testersCaption') : t('feed.discoverCaption')}
+          empty={testers ? t(($) => $.feed.testersEmpty) : t(($) => $.feed.discoverEmpty)}
+          caption={testers ? t(($) => $.feed.testersCaption) : t(($) => $.feed.discoverCaption)}
         />
       )}
     </Stack>
@@ -304,15 +310,15 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
           news.count === null
             ? null
             : news.more
-              ? t('feed.newsMany', { max: FEED_PAGE_SIZE })
-              : t('feed.news', { count: news.count })
+              ? t(($) => $.feed.newsMany, { max: FEED_PAGE_SIZE })
+              : t(($) => $.feed.news, { count: news.count })
         }
         // Relire le fil depuis le début : les nouveautés arrivent en haut, à la place du bandeau.
         onPress={() => feed.refetch()}
         caption={caption}
       />
       {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
-      {feed.isRefetchError ? <Notice message={t(`errors.${errorKey(feed.error)}`)} /> : null}
+      {feed.isRefetchError ? <Notice message={t(($) => $.errors[errorKey(feed.error)])} /> : null}
       <ProjectGrid empty={empty}>
         {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
             discrète, qui mène elle aussi au projet. */}
@@ -335,10 +341,10 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
                   ? 'more'
                   : 'end'
           }
-          moreLabel={t('feed.more')}
-          endLabel={t('feed.end')}
-          errorLabel={t('feed.moreError')}
-          retryLabel={t('common.retry')}
+          moreLabel={t(($) => $.feed.more)}
+          endLabel={t(($) => $.feed.end)}
+          errorLabel={t(($) => $.feed.moreError)}
+          retryLabel={t(($) => $.common.retry)}
           // Une seule demande à la fois, même après un double clic.
           onMore={() => {
             if (!feed.isFetchingNextPage) void feed.fetchNextPage()
@@ -355,11 +361,11 @@ function FeedError({ error, onRetry }: { error: unknown; onRetry: () => void }) 
   return (
     <StateMessage
       kind="error"
-      title={t('feed.errorTitle')}
-      message={t(`errors.${errorKey(error)}`)}
+      title={t(($) => $.feed.errorTitle)}
+      message={t(($) => $.errors[errorKey(error)])}
       // « Réessayer » en blanc : sur l'accueil, la seule action miel reste « Publier un projet »,
       // dans la barre du haut (une seule action miel par écran).
-      actions={[{ label: t('common.retry'), onPress: onRetry, variant: 'secondary' }]}
+      actions={[{ label: t(($) => $.common.retry), onPress: onRetry, variant: 'secondary' }]}
     />
   )
 }

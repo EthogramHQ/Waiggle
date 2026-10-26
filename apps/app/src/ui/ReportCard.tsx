@@ -217,7 +217,7 @@ export function ReportCard({
             <View style={{ alignSelf: 'flex-start' }}>
               <TextLink
                 role="button"
-                label={unfolded ? t('moderation.showLess') : t('moderation.showAll')}
+                label={unfolded ? t(($) => $.moderation.showLess) : t(($) => $.moderation.showAll)}
                 expanded={unfolded}
                 onPress={() => setUnfolded((previous) => !previous)}
                 {...describes}

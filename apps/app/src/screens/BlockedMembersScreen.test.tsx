@@ -91,7 +91,7 @@ const rowOf = (name: string) => {
   return within(node)
 }
 
-const unblockTitle = fr.t('block.unblockTitle', { handle: 'ines_morel' })
+const unblockTitle = fr.t(($) => $.block.unblockTitle, { handle: 'ines_morel' })
 
 /**
  * Touche « Débloquer » sur la ligne d'Inès : la fenêtre de confirmation s'ouvre, et l'on attend la
@@ -106,8 +106,12 @@ describe('the list of the members I blocked', () => {
   it('has a title, and says what a block does', async () => {
     await renderWithProviders(<BlockedMembersScreen />)
 
-    expect(await screen.findByRole('header', { name: fr.t('block.list.title') })).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('block.list.hint'))).length).toBeGreaterThan(0)
+    expect(
+      await screen.findByRole('header', { name: fr.t(($) => $.block.list.title) }),
+    ).toBeTruthy()
+    expect(screen.getAllByText(containing(fr.t(($) => $.block.list.hint))).length).toBeGreaterThan(
+      0,
+    )
   })
 
   it('shows each member blocked, with name, handle and the date, from the most recent', async () => {
@@ -136,7 +140,7 @@ describe('the list of the members I blocked', () => {
     mockList([blockedPageOf([])])
     await renderWithProviders(<BlockedMembersScreen />)
 
-    expect(await screen.findByText(containing(fr.t('block.list.empty')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.block.list.empty)))).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Débloquer/ })).toBeNull()
   })
 
@@ -146,15 +150,17 @@ describe('the list of the members I blocked', () => {
     mockList([blockedPageOf([])])
     await renderWithProviders(<BlockedMembersScreen />)
 
-    expect(await screen.findByText(containing(fr.t('block.list.emptyHint')))).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t('block.list.hint')))).toBeNull()
+    expect(await screen.findByText(containing(fr.t(($) => $.block.list.emptyHint)))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.block.list.hint)))).toBeNull()
   })
 
   it('loads the next ones on request', async () => {
     const list = mockList([blockedPageOf([blockedInes], 'curseur-suivant')], { hasNextPage: true })
     await renderWithProviders(<BlockedMembersScreen />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: fr.t('block.list.more') }))
+    await fireEvent.press(
+      await screen.findByRole('button', { name: fr.t(($) => $.block.list.more) }),
+    )
 
     expect(list.fetchNextPage).toHaveBeenCalledTimes(1)
   })
@@ -163,7 +169,7 @@ describe('the list of the members I blocked', () => {
     const list = mockList([], { error: new Error('réseau coupé') })
     await renderWithProviders(<BlockedMembersScreen />)
 
-    expect(await screen.findByText(containing(fr.t('block.list.loadError')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.block.list.loadError)))).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
 
     expect(list.refetch).toHaveBeenCalledTimes(1)
@@ -186,7 +192,9 @@ describe('unblocking a member', () => {
     await askToUnblockInes()
 
     expect(screen.getByRole('header', { name: unblockTitle })).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('block.unblockMessage'))).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(containing(fr.t(($) => $.block.unblockMessage))).length,
+    ).toBeGreaterThan(0)
     expect(mockUnblock).not.toHaveBeenCalled()
   })
 
@@ -195,12 +203,12 @@ describe('unblocking a member', () => {
     await screen.findByText(blockedInes.member.name)
 
     await askToUnblockInes()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.unblockConfirm) }))
 
     expect(mockUnblock).toHaveBeenCalledTimes(1)
     expect(mockUnblock).toHaveBeenCalledWith(blockedInes.member.id)
     expect(
-      await screen.findByText(containing(fr.t('block.unblocked', { handle: 'ines_morel' }))),
+      await screen.findByText(containing(fr.t(($) => $.block.unblocked, { handle: 'ines_morel' }))),
     ).toBeTruthy()
   })
 
@@ -209,7 +217,7 @@ describe('unblocking a member', () => {
     await screen.findByText(blockedInes.member.name)
 
     await askToUnblockInes()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.cancel') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.cancel) }))
 
     expect(mockUnblock).not.toHaveBeenCalled()
     expect(screen.queryByRole('header', { name: unblockTitle })).toBeNull()
@@ -226,7 +234,7 @@ describe('unblocking a member', () => {
     await screen.findByText(blockedInes.member.name)
 
     await askToUnblockInes()
-    const confirm = screen.getByRole('button', { name: fr.t('block.unblockConfirm') })
+    const confirm = screen.getByRole('button', { name: fr.t(($) => $.block.unblockConfirm) })
     await fireEvent.press(confirm)
     await fireEvent.press(confirm)
 
@@ -240,11 +248,11 @@ describe('unblocking a member', () => {
     await screen.findByText(blockedInes.member.name)
 
     await askToUnblockInes()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('block.unblockConfirm') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.block.unblockConfirm) }))
 
-    expect(await screen.findByText(containing(fr.t('block.error')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.block.error)))).toBeTruthy()
     expect(
-      screen.queryByText(containing(fr.t('block.unblocked', { handle: 'ines_morel' }))),
+      screen.queryByText(containing(fr.t(($) => $.block.unblocked, { handle: 'ines_morel' }))),
     ).toBeNull()
   })
 })

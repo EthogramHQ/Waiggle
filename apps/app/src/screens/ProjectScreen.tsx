@@ -86,8 +86,8 @@ export function ProjectScreen({ id }: { id: string }) {
       return (
         <NotFoundState
           width="page"
-          title={t('project.page.notFoundTitle')}
-          message={t('project.page.notFound')}
+          title={t(($) => $.project.page.notFoundTitle)}
+          message={t(($) => $.project.page.notFound)}
         />
       )
     }
@@ -121,14 +121,15 @@ function ProjectView({ project }: { project: Project }) {
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
   const back = useGoBack('/')
   const follow = useFollow({ kind: 'project', id: project.id })
-  const followers = t('follow.followers', { count: project.followerCount })
+  const followers = t(($) => $.follow.followers, { count: project.followerCount })
   const reaction = useReaction(project.id)
+  const { timeSpent } = project
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
   // Les cinq réactions, telles que la barre les affiche. Le nom lu reprend le texte affiché et dit
   // si la réaction est la sienne (« Bravo, réagi, 4 »).
   const reactions = REACTION_KINDS.map((kind) => {
-    const text = t(`project.reactions.${kind}`)
+    const text = t(($) => $.project.reactions[kind])
     const count = project.reactions.counts[kind]
     const mine = !project.isMine && project.reactions.mine.includes(kind)
     return {
@@ -136,7 +137,7 @@ function ProjectView({ project }: { project: Project }) {
       text,
       count,
       mine,
-      label: t(mine ? 'project.reactions.labelMine' : 'project.reactions.label', {
+      label: t(($) => (mine ? $.project.reactions.labelMine : $.project.reactions.label), {
         name: text,
         count,
       }),
@@ -149,7 +150,7 @@ function ProjectView({ project }: { project: Project }) {
     setBusy(false)
     if (!result.ok) {
       setConfirming(false)
-      setError(t(`errors.${result.error}`))
+      setError(t(($) => $.errors[result.error]))
       return
     }
     forgetProject(project.id) // le projet n'existe plus : on l'oublie aussi dans le cache
@@ -161,13 +162,13 @@ function ProjectView({ project }: { project: Project }) {
   // La photo affichée en couverture, et ce qu'en annoncent les lecteurs d'écran.
   const gallery = project.visuals
   const photoLabel = (index: number) =>
-    t('project.visuals.photo', { number: index + 1, total: gallery.length })
+    t(($) => $.project.visuals.photo, { number: index + 1, total: gallery.length })
   const portrait = large ? null : project.portraitCover
   const shown: { visual: ProjectVisual; label: string } | null =
     selected !== null && gallery[selected]
       ? { visual: gallery[selected], label: photoLabel(selected) }
       : portrait
-        ? { visual: portrait, label: t('project.visuals.portraitLabel') }
+        ? { visual: portrait, label: t(($) => $.project.visuals.portraitLabel) }
         : gallery[0]
           ? { visual: gallery[0], label: photoLabel(0) }
           : null
@@ -208,7 +209,7 @@ function ProjectView({ project }: { project: Project }) {
     >
       {large ? null : (
         <Row padding="lg">
-          <IconButton icon="arrow-left" label={t('common.back')} onPress={back} />
+          <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={back} />
         </Row>
       )}
     </ProjectCover>
@@ -217,7 +218,7 @@ function ProjectView({ project }: { project: Project }) {
   const info = (
     <Stack gap="lg">
       <StatusPill
-        label={t(`project.status.${project.status}`)}
+        label={t(($) => $.project.status[project.status])}
         strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
       />
       {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
@@ -227,7 +228,7 @@ function ProjectView({ project }: { project: Project }) {
         </Text>
       )}
       <Pressed
-        label={t('member.open', {
+        label={t(($) => $.member.open, {
           nameOf: nameOf(project.author.name),
         })}
         role="link"
@@ -245,13 +246,15 @@ function ProjectView({ project }: { project: Project }) {
           <Stack gap="xxs" grow>
             <Text weight={700}>{project.author.name}</Text>
             <Text variant="caption" tone="muted">
-              {t('project.page.published', { date: shortDate(project.createdAt, i18n.language) })}
+              {t(($) => $.project.page.published, {
+                date: shortDate(project.createdAt, i18n.language),
+              })}
             </Text>
           </Stack>
         </Row>
       </Pressed>
       {project.visibility === 'private' ? (
-        <Notice tone="info" message={t('project.page.private')} />
+        <Notice tone="info" message={t(($) => $.project.page.private)} />
       ) : null}
       <Text variant="headline" tone="secondary" weight={400} readable>
         {project.pitch}
@@ -259,18 +262,18 @@ function ProjectView({ project }: { project: Project }) {
       {project.demoUrl ? (
         <Stack gap="sm">
           <Button
-            label={t('project.page.tryDemo')}
+            label={t(($) => $.project.page.tryDemo)}
             icon="arrow-up-right"
             onPress={() => openOutside(project.demoUrl ?? '')}
           />
           {/* On annonce toujours le site extérieur, avant même la page d'avertissement. */}
           <Hint
             icon="globe-simple"
-            text={t('project.page.external', { host: hostOf(project.demoUrl) })}
+            text={t(($) => $.project.page.external, { host: hostOf(project.demoUrl) })}
           />
         </Stack>
       ) : (
-        <Text tone="muted">{t('project.page.noDemo')}</Text>
+        <Text tone="muted">{t(($) => $.project.page.noDemo)}</Text>
       )}
       {/* Suivre, après la démo : on lit d'abord le projet, puis on décide de le suivre. Seulement le
           projet d'un autre ; l'auteur voit seulement le nombre d'abonnés.
@@ -288,11 +291,23 @@ function ProjectView({ project }: { project: Project }) {
               followed={project.isFollowed}
               onPress={follow.toggle}
               // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (MemberScreen).
-              label={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
-              text={project.isFollowed ? t('follow.projectFollowing') : t('follow.project')}
+              label={
+                project.isFollowed
+                  ? t(($) => $.follow.projectFollowing)
+                  : t(($) => $.follow.project)
+              }
+              text={
+                project.isFollowed
+                  ? t(($) => $.follow.projectFollowing)
+                  : t(($) => $.follow.project)
+              }
               caption={followers}
               error={
-                follow.expired ? t('states.expired') : follow.error ? t('follow.error') : undefined
+                follow.expired
+                  ? t(($) => $.states.expired)
+                  : follow.error
+                    ? t(($) => $.follow.error)
+                    : undefined
               }
               errorAction={follow.expired ? signInAgain() : undefined}
               prominent={false}
@@ -302,7 +317,7 @@ function ProjectView({ project }: { project: Project }) {
             align="end"
             items={[
               {
-                label: t('report.project'),
+                label: t(($) => $.report.project),
                 icon: 'flag',
                 onPress: () =>
                   router.push({ pathname: '/report', params: { kind: 'project', id: project.id } }),
@@ -313,17 +328,17 @@ function ProjectView({ project }: { project: Project }) {
       )}
       {/* Réagir, après Suivre. L'auteur ne réagit pas à son propre projet : il voit les nombres. */}
       {project.isMine ? (
-        <ReactionBar items={reactions} readOnly caption={t('project.reactions.own')} />
+        <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.own)} />
       ) : (
         <ReactionBar
           items={reactions}
           onToggle={reaction.toggle}
-          label={t('project.reactions.group')}
+          label={t(($) => $.project.reactions.group)}
           error={
             reaction.expired
-              ? t('states.expired')
+              ? t(($) => $.states.expired)
               : reaction.error
-                ? t('project.reactions.error')
+                ? t(($) => $.project.reactions.error)
                 : undefined
           }
           errorAction={reaction.expired ? signInAgain() : undefined}
@@ -339,12 +354,12 @@ function ProjectView({ project }: { project: Project }) {
   const recipe = hasRecipe ? (
     <Surface variant="grouped" padding="xl" gap="lg">
       <Text variant="heading" heading={2}>
-        {t('project.page.recipe')}
+        {t(($) => $.project.page.recipe)}
       </Text>
       {project.tools.length > 0 ? (
         <Stack gap="sm">
           <Text variant="caption" weight={600} tone="muted">
-            {t('project.page.tools')}
+            {t(($) => $.project.page.tools)}
           </Text>
           <Stack direction="row" gap="sm" wrap>
             {project.tools.map((tool) => (
@@ -359,21 +374,21 @@ function ProjectView({ project }: { project: Project }) {
           </Stack>
         </Stack>
       ) : null}
-      {project.timeSpent ? (
+      {timeSpent ? (
         <Stack gap="sm">
           <Text variant="caption" weight={600} tone="muted">
-            {t('project.page.timeSpent')}
+            {t(($) => $.project.page.timeSpent)}
           </Text>
           <Row gap="sm">
             <Icon name="clock" size={20} tone="amber" />
-            <Text weight={600}>{t(`project.timeSpent.${project.timeSpent}`)}</Text>
+            <Text weight={600}>{t(($) => $.project.timeSpent[timeSpent])}</Text>
           </Row>
         </Stack>
       ) : null}
       {project.prompts.length > 0 ? (
         <Stack gap="sm">
           <Text variant="caption" weight={600} tone="muted">
-            {t('project.page.prompts')}
+            {t(($) => $.project.page.prompts)}
           </Text>
           {project.prompts.map((prompt, i) => (
             // Les prompts sont affichés tels quels, sans mise en forme : on voit le vrai texte.
@@ -388,7 +403,7 @@ function ProjectView({ project }: { project: Project }) {
   const description = project.description ? (
     <Stack gap="md">
       <Text variant="heading" heading={2}>
-        {t('project.page.description')}
+        {t(($) => $.project.page.description)}
       </Text>
       <Markdown text={project.description} onLinkPress={openOutside} />
     </Stack>
@@ -400,7 +415,7 @@ function ProjectView({ project }: { project: Project }) {
       {/* Un projet retiré ne se modifie plus (l'API refuserait, 409 `removed`) ; il se supprime. */}
       {project.removal ? null : (
         <Button
-          label={t('project.page.edit')}
+          label={t(($) => $.project.page.edit)}
           variant="secondary"
           icon="pencil-simple"
           onPress={() =>
@@ -409,7 +424,7 @@ function ProjectView({ project }: { project: Project }) {
         />
       )}
       <Button
-        label={t('project.page.delete')}
+        label={t(($) => $.project.page.delete)}
         variant="danger"
         icon="trash"
         onPress={() => setConfirming(true)}
@@ -417,18 +432,18 @@ function ProjectView({ project }: { project: Project }) {
       {/* Supprimer est définitif : une fenêtre demande confirmation, avec le titre du projet. */}
       <Dialog
         visible={confirming}
-        title={t('project.page.deleteTitle', { title: project.title })}
-        message={t('project.page.deleteConfirm')}
+        title={t(($) => $.project.page.deleteTitle, { title: project.title })}
+        message={t(($) => $.project.page.deleteConfirm)}
         onDismiss={() => setConfirming(false)}
       >
         <Button
-          label={t('project.page.deleteConfirmButton')}
+          label={t(($) => $.project.page.deleteConfirmButton)}
           variant="confirm"
           onPress={() => void onDelete()}
           loading={busy}
         />
         <Button
-          label={t('common.cancel')}
+          label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setConfirming(false)}
         />
@@ -558,7 +573,9 @@ function Journal({ project }: { project: Project }) {
     const status = ProjectStatus.safeParse(announced)
     if (!status.success) return
     proposed.current = status.data
-    const text = t('project.notes.statusPrefill', { status: t(`project.status.${status.data}`) })
+    const text = t(($) => $.project.notes.statusPrefill, {
+      status: t(($) => $.project.status[status.data]),
+    })
     latestDraft.current = text
     setDraft(text)
     setAnnouncing(status.data)
@@ -574,7 +591,9 @@ function Journal({ project }: { project: Project }) {
     const checked = NoteText.safeParse(draft)
     if (!checked.success) {
       setDraftError(
-        draft.trim() === '' ? t('project.notes.required') : t('project.errors.invalidCharacters'),
+        draft.trim() === ''
+          ? t(($) => $.project.notes.required)
+          : t(($) => $.project.errors.invalidCharacters),
       )
       return
     }
@@ -612,9 +631,9 @@ function Journal({ project }: { project: Project }) {
   // Le message d'un envoi refusé. 429 et 401 : « Réessaie » ne servirait à rien, on dit pourquoi.
   const failure = (reason: NoteFailure | undefined, otherwise: string) =>
     reason === 'limited'
-      ? t('project.notes.limited')
+      ? t(($) => $.project.notes.limited)
       : reason === 'expired'
-        ? t('states.expired')
+        ? t(($) => $.states.expired)
         : otherwise
   // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
   // doit l'être avant de partir (la fenêtre de confirmation).
@@ -639,18 +658,18 @@ function Journal({ project }: { project: Project }) {
               setDone(null)
               setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
             },
-            deleteLabel: t('project.notes.delete'),
+            deleteLabel: t(($) => $.project.notes.delete),
             // Sur un projet privé, personne d'autre ne verra ses notes : on le dit.
             empty:
               project.visibility === 'private'
-                ? t('project.notes.emptyPrivate')
-                : t('project.notes.empty'),
+                ? t(($) => $.project.notes.emptyPrivate)
+                : t(($) => $.project.notes.empty),
           }
         : {
             // Un autre membre peut signaler chaque note (tranche 7a).
             onReport: (id: string) =>
               router.push({ pathname: '/report', params: { kind: 'note', id } }),
-            reportLabel: t('report.note'),
+            reportLabel: t(($) => $.report.note),
           })}
     />
   )
@@ -659,7 +678,7 @@ function Journal({ project }: { project: Project }) {
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
       <Text variant="heading" heading={2}>
-        {t('project.notes.title')}
+        {t(($) => $.project.notes.title)}
       </Text>
       {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
@@ -685,43 +704,46 @@ function Journal({ project }: { project: Project }) {
           pending={publishNote.pending}
           max={PROJECT_NOTE_MAX}
           labels={{
-            open: t('project.notes.add'),
-            field: t('project.notes.field'),
+            open: t(($) => $.project.notes.add),
+            field: t(($) => $.project.notes.field),
             // L'aide dit à qui ira la note : à personne d'autre (projet privé), aux abonnés après
             // un changement de statut (et pourquoi le champ s'est ouvert tout seul), sinon l'usage.
             hint:
               project.visibility === 'private'
-                ? t('project.notes.hintPrivate')
+                ? t(($) => $.project.notes.hintPrivate)
                 : announcing
-                  ? t('project.notes.hintAnnounce', {
-                      status: t(`project.status.${announcing}`),
+                  ? t(($) => $.project.notes.hintAnnounce, {
+                      status: t(($) => $.project.status[announcing]),
                     })
-                  : t('project.notes.hint'),
-            submit: t('project.notes.submit'),
-            cancel: t('common.cancel'),
+                  : t(($) => $.project.notes.hint),
+            submit: t(($) => $.project.notes.submit),
+            cancel: t(($) => $.common.cancel),
           }}
           fieldError={draftError}
           error={
             showPublishError && publishNote.error
-              ? failure(publishNote.reason, t('project.notes.error'))
+              ? failure(
+                  publishNote.reason,
+                  t(($) => $.project.notes.error),
+                )
               : undefined
           }
           errorAction={
             showPublishError && publishNote.error ? failureAction(publishNote.reason) : undefined
           }
-          success={done === 'published' ? t('project.notes.published') : undefined}
+          success={done === 'published' ? t(($) => $.project.notes.published) : undefined}
         />
       ) : null}
       {/* Après une suppression : la confirmation, lue sans interrompre (role « status »). */}
       {done === 'deleted' ? (
-        <Notice tone="success" message={t('project.notes.deleted')} polite />
+        <Notice tone="success" message={t(($) => $.project.notes.deleted)} polite />
       ) : null}
       {empty ? null : list}
       {/* Supprimer une note est définitif : une fenêtre demande confirmation. */}
       <Dialog
         visible={deleting !== null}
-        title={t('project.notes.deleteTitle')}
-        message={t('project.notes.deleteBody')}
+        title={t(($) => $.project.notes.deleteTitle)}
+        message={t(($) => $.project.notes.deleteBody)}
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
         onDismiss={() => {
           if (!removing) setDeleting(null)
@@ -736,18 +758,21 @@ function Journal({ project }: { project: Project }) {
         {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer. */}
         {showDeleteError && deleteNote.error ? (
           <Notice
-            message={failure(deleteNote.reason, t('project.notes.deleteError'))}
+            message={failure(
+              deleteNote.reason,
+              t(($) => $.project.notes.deleteError),
+            )}
             action={failureAction(deleteNote.reason, () => setDeleting(null))}
           />
         ) : null}
         <Button
-          label={t('project.notes.confirmDelete')}
+          label={t(($) => $.project.notes.confirmDelete)}
           variant="confirm"
           onPress={() => void confirmDelete()}
           loading={removing}
         />
         <Button
-          label={t('common.cancel')}
+          label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setDeleting(null)}
           disabled={removing}

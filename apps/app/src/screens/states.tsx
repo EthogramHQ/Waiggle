@@ -38,8 +38,10 @@ export function LoadingScreen({ width = 'form' }: { width?: Width }) {
     <Screen header={<TopNav />} width={width}>
       <StateMessage
         kind="loading"
-        message={t('common.loading')}
-        actions={slow ? [{ label: t('states.back'), onPress: back, variant: 'secondary' }] : []}
+        message={t(($) => $.common.loading)}
+        actions={
+          slow ? [{ label: t(($) => $.states.back), onPress: back, variant: 'secondary' }] : []
+        }
       />
     </Screen>
   )
@@ -65,21 +67,21 @@ export function SignedOutScreen({
   // usePathname : le chemin de la page affichée (« /members/abc »).
   const pathname = usePathname()
   return (
-    <Screen header={<TopNav />} width={width} pageTitle={t('states.signedOutTitle')}>
+    <Screen header={<TopNav />} width={width} pageTitle={t(($) => $.states.signedOutTitle)}>
       <StateMessage
         kind="signedOut"
         level={1}
-        title={t('states.signedOutTitle')}
-        message={expired ? t('states.expired') : t('home.membersOnly')}
+        title={t(($) => $.states.signedOutTitle)}
+        message={expired ? t(($) => $.states.expired) : t(($) => $.home.membersOnly)}
         actions={[
           {
-            label: t('home.signIn'),
+            label: t(($) => $.home.signIn),
             // push (et non replace) : le retour depuis la connexion ramène sur cette page, avec
             // les paramètres de son adresse quand la connexion les accepte (?announce=…).
             onPress: () =>
               router.push({ pathname: '/sign-in', params: { next: nextAfterSignIn(pathname) } }),
           },
-          { label: t('home.signUp'), onPress: () => router.push('/sign-up') },
+          { label: t(($) => $.home.signUp), onPress: () => router.push('/sign-up') },
         ]}
       />
     </Screen>
@@ -109,15 +111,15 @@ export function LoadErrorScreen({
   const key = errorKey(error)
   if (key === 'unauthorized') return <SignedOutScreen width={width} expired />
   return (
-    <Screen header={<TopNav />} width={width} pageTitle={t('states.errorTitle')}>
+    <Screen header={<TopNav />} width={width} pageTitle={t(($) => $.states.errorTitle)}>
       <StateMessage
         kind="error"
         level={1}
-        title={t('states.errorTitle')}
-        message={t(`errors.${key}`)}
+        title={t(($) => $.states.errorTitle)}
+        message={t(($) => $.errors[key])}
         actions={[
-          { label: t('common.retry'), onPress: onRetry },
-          { label: t('states.back'), onPress: back },
+          { label: t(($) => $.common.retry), onPress: onRetry },
+          { label: t(($) => $.states.back), onPress: back },
         ]}
       />
     </Screen>
@@ -143,15 +145,15 @@ export function SessionErrorScreen({
     // Les textes de la page en panne (« Cette page n'a pas pu se charger ») et du message de
     // « Mon compte » (« Impossible de charger ton compte… ») : deux clés de plus faisaient dépasser
     // à TypeScript sa profondeur de calcul des clés de t() (TS2589).
-    <Screen header={<TopNav />} width={width} pageTitle={t('states.errorTitle')}>
+    <Screen header={<TopNav />} width={width} pageTitle={t(($) => $.states.errorTitle)}>
       <StateMessage
         kind="error"
         level={1}
-        title={t('states.errorTitle')}
-        message={t('account.loadError')}
+        title={t(($) => $.states.errorTitle)}
+        message={t(($) => $.account.loadError)}
         actions={[
-          { label: t('common.retry'), onPress: onRetry },
-          { label: t('states.back'), onPress: back },
+          { label: t(($) => $.common.retry), onPress: onRetry },
+          { label: t(($) => $.states.back), onPress: back },
         ]}
       />
     </Screen>
@@ -177,7 +179,7 @@ export function NotFoundState({
         level={1}
         title={title}
         {...(message ? { message } : null)}
-        actions={[{ label: t('states.home'), onPress: () => router.replace('/') }]}
+        actions={[{ label: t(($) => $.states.home), onPress: () => router.replace('/') }]}
       />
     </Screen>
   )
@@ -188,19 +190,19 @@ export function NotMineState({ projectId, width = 'form' }: { projectId: string;
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <Screen header={<TopNav />} width={width} pageTitle={t('states.notMineTitle')}>
+    <Screen header={<TopNav />} width={width} pageTitle={t(($) => $.states.notMineTitle)}>
       <StateMessage
         kind="signedOut"
         level={1}
-        title={t('states.notMineTitle')}
-        message={t('project.page.notMine')}
+        title={t(($) => $.states.notMineTitle)}
+        message={t(($) => $.project.page.notMine)}
         actions={[
           {
-            label: t('states.seeProject'),
+            label: t(($) => $.states.seeProject),
             onPress: () =>
               router.replace({ pathname: '/projects/[id]', params: { id: projectId } }),
           },
-          { label: t('states.home'), onPress: () => router.replace('/') },
+          { label: t(($) => $.states.home), onPress: () => router.replace('/') },
         ]}
       />
     </Screen>

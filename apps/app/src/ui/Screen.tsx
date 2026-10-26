@@ -91,7 +91,9 @@ export function Screen({
   // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
   const body = (
     <>
-      {onBack ? <IconButton icon="arrow-left" label={t('common.back')} onPress={onBack} /> : null}
+      {onBack ? (
+        <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
+      ) : null}
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (

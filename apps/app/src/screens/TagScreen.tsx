@@ -34,18 +34,20 @@ export function TagScreen({ slug }: { slug: string }) {
       // Le nom tapé par l'auteur du projet le plus récent ; sans projet, l'étiquette elle-même.
       title={tag.data.label ?? tag.data.slug}
       // Le sous-titre décrit la liste : sans liste, il n'a rien à décrire.
-      {...(empty ? null : { subtitle: t('tag.subtitle') })}
+      {...(empty ? null : { subtitle: t(($) => $.tag.subtitle) })}
     >
       {empty ? (
         // Une étiquette sans projet public invite à publier le premier, au lieu d'une page vide.
         <StateMessage
           kind="empty"
-          title={t('tag.emptyTitle')}
-          message={t('tag.empty')}
-          actions={[{ label: t('home.publish'), onPress: () => router.push('/projects/new') }]}
+          title={t(($) => $.tag.emptyTitle)}
+          message={t(($) => $.tag.empty)}
+          actions={[
+            { label: t(($) => $.home.publish), onPress: () => router.push('/projects/new') },
+          ]}
         />
       ) : (
-        <ProjectGrid empty={t('tag.empty')}>
+        <ProjectGrid empty={t(($) => $.tag.empty)}>
           {tag.data.projects.map((project) => (
             <SummaryCard key={project.id} project={project} />
           ))}

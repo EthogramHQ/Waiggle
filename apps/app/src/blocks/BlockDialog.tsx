@@ -87,29 +87,31 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
   const refusalMessage =
     refusal === 'rateLimited'
       ? blocking
-        ? t('block.limited', { max: BLOCKS_PER_DAY })
-        : t('block.unblockLimited', { max: UNBLOCKS_PER_DAY })
+        ? t(($) => $.block.limited, { max: BLOCKS_PER_DAY })
+        : t(($) => $.block.unblockLimited, { max: UNBLOCKS_PER_DAY })
       : refusal === 'unauthorized'
-        ? t('states.expired')
-        : t('block.error')
+        ? t(($) => $.states.expired)
+        : t(($) => $.block.error)
 
   return (
     <Dialog
       visible={asking !== null}
-      title={blocking ? t('block.title', { handle }) : t('block.unblockTitle', { handle })}
+      title={
+        blocking ? t(($) => $.block.title, { handle }) : t(($) => $.block.unblockTitle, { handle })
+      }
       // Bloquer : ce qu'on ne verra plus, ce qui reste visible (R1), les abonnements, que @x n'est
       // pas prévenu, et que la modération non plus ; chacun son paragraphe. Débloquer : ce qui
       // revient et ce qui ne revient pas (J10, R7).
       message={
         blocking
           ? [
-              t('block.hidden'),
-              t('block.remains', { handle }),
-              t('block.follows'),
-              t('block.notTold', { handle }),
-              t('block.notModeration'),
+              t(($) => $.block.hidden),
+              t(($) => $.block.remains, { handle }),
+              t(($) => $.block.follows),
+              t(($) => $.block.notTold, { handle }),
+              t(($) => $.block.notModeration),
             ]
-          : t('block.unblockMessage')
+          : t(($) => $.block.unblockMessage)
       }
       // Elle s'ouvre là où l'on vient de toucher (un menu, « Bloquer aussi ») : la seconde tape
       // d'une double tape ne confirme rien (relecture de design, 7b).
@@ -125,12 +127,17 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
       ) : null}
       {/* Bloquer en rouge plein, comme une suppression ; débloquer en miel, partout le même. */}
       <Button
-        label={blocking ? t('block.confirm') : t('block.unblockConfirm')}
+        label={blocking ? t(($) => $.block.confirm) : t(($) => $.block.unblockConfirm)}
         variant={blocking ? 'confirm' : 'primary'}
         onPress={() => void confirm()}
         loading={busy}
       />
-      <Button label={t('block.cancel')} variant="secondary" onPress={close} disabled={busy} />
+      <Button
+        label={t(($) => $.block.cancel)}
+        variant="secondary"
+        onPress={close}
+        disabled={busy}
+      />
     </Dialog>
   )
 }

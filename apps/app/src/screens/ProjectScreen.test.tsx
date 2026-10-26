@@ -1579,7 +1579,9 @@ describe('reporting a project from its page', () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: fr.t('actionMenu.label') }))
+    await fireEvent.press(
+      await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }),
+    )
     await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce projet' }))
 
     expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
@@ -1590,7 +1592,9 @@ describe('reporting a project from its page', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     // Témoin : le menu est là ; l'ancien lien texte de 7a, lui, a disparu.
-    expect(await screen.findByRole('button', { name: fr.t('actionMenu.label') })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }),
+    ).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
   })
 
@@ -1601,13 +1605,13 @@ describe('reporting a project from its page', () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await screen.findByRole('button', { name: fr.t('actionMenu.label') })
+    await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) })
     // « Suivre ce projet » est un interrupteur (switch), « … » un bouton : l'ordre des deux rôles.
     const names = screen
       .getAllByRole(/^(button|switch)$/)
       .map((control) => String(control.props.accessibilityLabel ?? ''))
-    const follow = names.findIndex((name) => name.startsWith(fr.t('follow.project')))
-    const menu = names.indexOf(fr.t('actionMenu.label'))
+    const follow = names.findIndex((name) => name.startsWith(fr.t(($) => $.follow.project)))
+    const menu = names.indexOf(fr.t(($) => $.actionMenu.label))
     expect(follow).toBeGreaterThan(-1)
     expect(menu).toBe(follow + 1)
   })
@@ -1620,7 +1624,7 @@ describe('reporting a project from its page', () => {
     expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
     // Le menu n'aurait rien à offrir à l'auteur : il n'est pas montré.
-    expect(screen.queryByRole('button', { name: fr.t('actionMenu.label') })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.actionMenu.label) })).toBeNull()
   })
 })
 
@@ -1666,11 +1670,11 @@ describe('a project removed by the moderation, seen by its author', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
     expect(missingSentences(removalSentences(removalByLaw), screen)).toEqual([])
     // Le fondement de la loi, pas celui des règles ; aucun signalement mentionné.
-    expect(screen.queryByText(containing(fr.t('removal.grounds.rules')))).toBeNull()
-    expect(screen.queryByText(containing(fr.t('removal.afterReport')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.removal.grounds.rules)))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.removal.afterReport)))).toBeNull()
   })
 
   it('says when the removal followed a report, without saying who reported', async () => {
@@ -1686,8 +1690,8 @@ describe('a project removed by the moderation, seen by its author', () => {
 
     // Témoin : la page est là, sans bandeau de retrait.
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    expect(screen.queryByText(containing(fr.t('removal.banner')))).toBeNull()
-    expect(screen.queryByText(containing(fr.t('removal.contest')))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.removal.banner)))).toBeNull()
+    expect(screen.queryByText(containing(fr.t(($) => $.removal.contest)))).toBeNull()
   })
 })
 
@@ -1700,10 +1704,10 @@ describe('a note removed by the moderation, seen by the author of the project', 
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByText('v2 : mode hors ligne')).toBeTruthy()
-    expect(screen.getAllByText(containing(fr.t('removal.banner'))).length).toBe(1)
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBe(1)
     expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
     // L'autre note, visible, n'a pas de bandeau : un seul « Pour contester ».
-    expect(screen.getAllByText(containing(fr.t('removal.contest')))).toHaveLength(1)
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.contest)))).toHaveLength(1)
   })
 })
 

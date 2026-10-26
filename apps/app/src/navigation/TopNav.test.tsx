@@ -41,7 +41,7 @@ describe('the bell of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     expect(
-      screen.getByRole('button', { name: t('notifications.bellNew', { count: 3 }) }),
+      screen.getByRole('button', { name: t(($) => $.notifications.bellNew, { count: 3 }) }),
     ).toBeTruthy()
     expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy()
   })
@@ -52,7 +52,7 @@ describe('the bell of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     expect(
-      screen.getByRole('button', { name: t('notifications.bellNewMany', { max: 9 }) }),
+      screen.getByRole('button', { name: t(($) => $.notifications.bellNewMany, { max: 9 }) }),
     ).toBeTruthy()
     // Le nom lu dit le même nombre que la pastille.
     expect(screen.getByRole('button', { name: /plus de 9 nouvelles/ })).toBeTruthy()
@@ -64,7 +64,7 @@ describe('the bell of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     // Témoin : la cloche est là, avec son seul nom…
-    expect(screen.getByRole('button', { name: t('notifications.bell') })).toBeTruthy()
+    expect(screen.getByRole('button', { name: t(($) => $.notifications.bell) })).toBeTruthy()
     // … sans pastille.
     expect(screen.queryByText('0', { includeHiddenElements: true })).toBeNull()
   })
@@ -74,7 +74,7 @@ describe('the bell of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     await fireEvent.press(
-      screen.getByRole('button', { name: t('notifications.bellNew', { count: 1 }) }),
+      screen.getByRole('button', { name: t(($) => $.notifications.bellNew, { count: 1 }) }),
     )
 
     expect(mockPush).toHaveBeenCalledWith('/notifications')
@@ -85,6 +85,6 @@ describe('the bell of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     expect(screen.queryByRole('button', { name: /Notifications/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: t('notifications.bell') })).toBeNull()
+    expect(screen.queryByRole('button', { name: t(($) => $.notifications.bell) })).toBeNull()
   })
 })

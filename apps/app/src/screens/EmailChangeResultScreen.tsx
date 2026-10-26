@@ -38,34 +38,34 @@ export function EmailChangeResultScreen({ step }: Props) {
 
   const page: { title: string; icon: IconName; body: ReactNode } = refused
     ? {
-        title: t('account.emailChange.errorTitle'),
+        title: t(($) => $.account.emailChange.errorTitle),
         icon: 'warning-circle',
         body: (
           <>
             <Text tone="secondary" align="center">
-              {t('account.emailChange.errorBody')}
+              {t(($) => $.account.emailChange.errorBody)}
             </Text>
-            <Button label={t('account.emailChange.restart')} onPress={toAccount} />
+            <Button label={t(($) => $.account.emailChange.restart)} onPress={toAccount} />
           </>
         ),
       }
     : step === 'confirmed'
       ? {
-          title: t('account.emailChange.confirmedTitle'),
+          title: t(($) => $.account.emailChange.confirmedTitle),
           icon: 'envelope-simple',
           body: (
             <>
               <Text tone="secondary" align="center">
-                {t('account.emailChange.confirmedBody')}
+                {t(($) => $.account.emailChange.confirmedBody)}
               </Text>
               <Text variant="callout" tone="muted" align="center">
-                {t('account.emailChange.confirmedNone')}
+                {t(($) => $.account.emailChange.confirmedNone)}
               </Text>
               {/* Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
                   sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
                   moindre élément). En blanc : l'action attendue est d'ouvrir le second lien. */}
               <Button
-                label={t('account.emailChange.toAccount')}
+                label={t(($) => $.account.emailChange.toAccount)}
                 variant="secondary"
                 onPress={toAccount}
               />
@@ -73,7 +73,7 @@ export function EmailChangeResultScreen({ step }: Props) {
           ),
         }
       : {
-          title: t('account.emailChange.doneTitle'),
+          title: t(($) => $.account.emailChange.doneTitle),
           icon: 'check',
           body: (
             <>
@@ -81,21 +81,21 @@ export function EmailChangeResultScreen({ step }: Props) {
                   parle. */}
               {data ? (
                 <Text tone="secondary" align="center">
-                  {t('account.emailChange.doneBody', { email: data.user.email })}
+                  {t(($) => $.account.emailChange.doneBody, { email: data.user.email })}
                 </Text>
               ) : (
                 <Text tone="secondary" align="center">
-                  {t('account.emailChange.doneSignedOut')}
+                  {t(($) => $.account.emailChange.doneSignedOut)}
                 </Text>
               )}
               <Text variant="callout" tone="muted" align="center">
-                {t('account.emailChange.doneDevices')}
+                {t(($) => $.account.emailChange.doneDevices)}
               </Text>
               {data ? (
-                <Button label={t('account.emailChange.toAccount')} onPress={toAccount} />
+                <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
               ) : (
                 <Button
-                  label={t('account.emailChange.signIn')}
+                  label={t(($) => $.account.emailChange.signIn)}
                   // push : le retour depuis la connexion ramène ici.
                   onPress={() => router.push('/sign-in')}
                 />

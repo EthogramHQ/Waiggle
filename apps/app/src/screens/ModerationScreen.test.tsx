@@ -146,7 +146,7 @@ describe('who sees the moderation', () => {
     expect(screen.getByText(firstTextOf(scamCommentItem))).toBeTruthy()
     // Le groupe d'onglets porte un nom à lui, pas celui de la page (relecture de 7a).
     // (Le groupe n'est pas « accessible » : il se cherche par son nom, comme dans components.test.)
-    expect(screen.getByLabelText(fr.t('moderation.list')).props.accessibilityRole).toBe(
+    expect(screen.getByLabelText(fr.t(($) => $.moderation.list)).props.accessibilityRole).toBe(
       'radiogroup',
     )
   })
@@ -212,15 +212,15 @@ describe('the pending reports', () => {
 
     const card = cardOf(firstTextOf(scamCommentItem))
     expect(card.getByText('Commentaire')).toBeTruthy()
-    expect(card.getByText(containing(fr.t('moderation.count', { count: 3 })))).toBeTruthy()
+    expect(card.getByText(containing(fr.t(($) => $.moderation.count, { count: 3 })))).toBeTruthy()
     // Le format du motif et de son nombre vient des textes (« Arnaque ou spam : 2 » depuis 8e26421).
     const reasonCount = (reason: string, count: number) =>
-      containing(fr.t('moderation.reasonCount', { reason, count }))
+      containing(fr.t(($) => $.moderation.reasonCount, { reason, count }))
     expect(card.getByText(reasonCount('Arnaque ou spam', 2))).toBeTruthy()
     expect(card.getByText(reasonCount('Harcèlement ou haine', 1))).toBeTruthy()
     expect(card.getByText('Il a écrit la même chose sous trois projets.')).toBeTruthy()
     expect(card.getByText(/Premier signalement le /)).toBeTruthy()
-    expect(card.getByText(containing(fr.t('moderation.snapshot')))).toBeTruthy()
+    expect(card.getByText(containing(fr.t(($) => $.moderation.snapshot)))).toBeTruthy()
   })
 
   it('never says who reported', async () => {
@@ -254,7 +254,7 @@ describe('the pending reports', () => {
     await openModeration()
 
     const card = cardOf(firstTextOf(ownNoteItem))
-    expect(card.getByText(containing(fr.t('moderation.concernsMe')))).toBeTruthy()
+    expect(card.getByText(containing(fr.t(($) => $.moderation.concernsMe)))).toBeTruthy()
     expect(card.queryByRole('button', { name: 'Retirer' })).toBeNull()
     expect(card.queryByRole('button', { name: 'Classer sans suite' })).toBeNull()
     // Témoin : un autre signalement, lui, se décide.
@@ -312,17 +312,21 @@ describe('removing a content', () => {
     // Règle 21 de la relecture du plan.
     const dialog = await openRemove()
 
-    expect(dialog.getByText(containing(fr.t('moderation.removeMessage')))).toBeTruthy()
+    expect(dialog.getByText(containing(fr.t(($) => $.moderation.removeMessage)))).toBeTruthy()
     expect(dialog.getByRole('radio', { name: 'La loi' })).toBeTruthy()
-    expect(dialog.getByRole('radio', { name: fr.t('moderation.grounds.rules') })).toBeTruthy()
+    expect(
+      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
+    ).toBeTruthy()
     expect(dialog.getByLabelText('Explication')).toBeTruthy()
-    expect(dialog.getByText(containing(fr.t('moderation.explanationHint')))).toBeTruthy()
+    expect(dialog.getByText(containing(fr.t(($) => $.moderation.explanationHint)))).toBeTruthy()
   })
 
   it('removes nothing without an explanation', async () => {
     const dialog = await openRemove()
 
-    await fireEvent.press(dialog.getByRole('radio', { name: fr.t('moderation.grounds.rules') }))
+    await fireEvent.press(
+      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
+    )
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
     expect(mockDecide).not.toHaveBeenCalled()
@@ -340,7 +344,9 @@ describe('removing a content', () => {
   it('removes the content with its ground and explanation, and says so', async () => {
     const dialog = await openRemove()
 
-    await fireEvent.press(dialog.getByRole('radio', { name: fr.t('moderation.grounds.rules') }))
+    await fireEvent.press(
+      dialog.getByRole('radio', { name: fr.t(($) => $.moderation.grounds.rules) }),
+    )
     await fireEvent.changeText(dialog.getByLabelText('Explication'), 'Arnaque à la carte bancaire.')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
@@ -371,7 +377,7 @@ describe('removing a content', () => {
     await fireEvent.changeText(dialog.getByLabelText('Explication'), 'Photos sans accord.')
     await fireEvent.press(dialog.getByRole('button', { name: 'Retirer' }))
 
-    expect(await screen.findByText(containing(fr.t('errors.alreadyDecided')))).toBeTruthy()
+    expect(await screen.findByText(containing(fr.t(($) => $.errors.alreadyDecided)))).toBeTruthy()
     expect(screen.queryByText('Contenu retiré.')).toBeNull()
   })
 })
@@ -515,9 +521,9 @@ describe('the copy of a report', () => {
     const card = cardOf(firstTextOf(fakeReviewsItem))
     // Test changé aux corrections de 7b (relecture de design, point 14) : la copie d'un projet se
     // replie après trois champs ; « Afficher tout » montre les autres.
-    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
+    await fireEvent.press(card.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }))
     for (const { field, value } of fakeReviewsItem.snapshot) {
-      expect(card.getByText(fr.t(`moderation.fields.${field as 'title'}`))).toBeTruthy()
+      expect(card.getByText(fr.t(($) => $.moderation.fields[field as 'title']))).toBeTruthy()
       expect(card.getByText(value)).toBeTruthy()
     }
   })
@@ -546,7 +552,7 @@ describe('the copy of a report', () => {
 
     const card = cardOf(firstTextOf(fakeReviewsItem))
     // Test changé aux corrections de 7b : le lien de démo, sixième champ, est replié au départ.
-    await fireEvent.press(card.getByRole('button', { name: fr.t('moderation.showAll') }))
+    await fireEvent.press(card.getByRole('button', { name: fr.t(($) => $.moderation.showAll) }))
     expect(card.getByText('https://faux-avis.example/essai')).toBeTruthy() // témoin
     expect(card.queryByRole('link', { name: /faux-avis/ })).toBeNull()
     expect(card.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual(['Voir'])
@@ -557,7 +563,9 @@ describe('the copy of a report', () => {
 
     const card = cardOf(firstTextOf(fakeReviewsItem))
     const imageState = (image: 'cover' | 'photo' | 'avatar', state: 'present' | 'gone') =>
-      containing(fr.t(`moderation.images.${state}`, { image: fr.t(`moderation.images.${image}`) }))
+      containing(
+        fr.t(($) => $.moderation.images[state], { image: fr.t(($) => $.moderation.images[image]) }),
+      )
     expect(card.getByText(imageState('cover', 'present'))).toBeTruthy()
     expect(card.getByText(imageState('photo', 'gone'))).toBeTruthy()
     // Le profil de Lucas : sa photo de profil est toujours là.
@@ -589,16 +597,40 @@ describe('the copy of a report', () => {
 
     const card = cardOf(firstTextOf(photos))
     const line = (image: string, state: 'present' | 'gone') =>
-      containing(fr.t(`moderation.images.${state}`, { image }))
-    expect(card.getByText(line(fr.t('moderation.images.cover'), 'present'))).toBeTruthy()
+      containing(fr.t(($) => $.moderation.images[state], { image }))
     expect(
-      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 1 }), 'gone')),
+      card.getByText(
+        line(
+          fr.t(($) => $.moderation.images.cover),
+          'present',
+        ),
+      ),
     ).toBeTruthy()
     expect(
-      card.getByText(line(fr.t('moderation.images.photoNumbered', { n: 2 }), 'gone')),
+      card.getByText(
+        line(
+          fr.t(($) => $.moderation.images.photoNumbered, { n: 1 }),
+          'gone',
+        ),
+      ),
+    ).toBeTruthy()
+    expect(
+      card.getByText(
+        line(
+          fr.t(($) => $.moderation.images.photoNumbered, { n: 2 }),
+          'gone',
+        ),
+      ),
     ).toBeTruthy()
     // Plus de « Photo : supprimée… » sans rang.
-    expect(card.queryByText(line(fr.t('moderation.images.photo'), 'gone'))).toBeNull()
+    expect(
+      card.queryByText(
+        line(
+          fr.t(($) => $.moderation.images.photo),
+          'gone',
+        ),
+      ),
+    ).toBeNull()
   })
 
   it('keeps « Photo » without a number when the copy has a single photo', async () => {
@@ -607,7 +639,9 @@ describe('the copy of a report', () => {
     const card = cardOf(firstTextOf(fakeReviewsItem))
     expect(
       card.getByText(
-        containing(fr.t('moderation.images.gone', { image: fr.t('moderation.images.photo') })),
+        containing(
+          fr.t(($) => $.moderation.images.gone, { image: fr.t(($) => $.moderation.images.photo) }),
+        ),
       ),
     ).toBeTruthy()
     expect(card.queryByText(/Photo 1/)).toBeNull()
@@ -625,19 +659,19 @@ describe('the copy of a report', () => {
     expect(card.queryByText(prompt?.value ?? '')).toBeNull()
 
     await fireEvent.press(
-      card.getByRole('button', { name: fr.t('moderation.showAll'), expanded: false }),
+      card.getByRole('button', { name: fr.t(($) => $.moderation.showAll), expanded: false }),
     )
 
     expect(card.getByText(prompt?.value ?? '')).toBeTruthy()
     expect(
-      card.getByRole('button', { name: fr.t('moderation.showLess'), expanded: true }),
+      card.getByRole('button', { name: fr.t(($) => $.moderation.showLess), expanded: true }),
     ).toBeTruthy()
   })
 
   it('says when the content changed between two reports, on that card only', async () => {
     await openModeration()
 
-    const changed = containing(fr.t('moderation.snapshotsDiffer'))
+    const changed = containing(fr.t(($) => $.moderation.snapshotsDiffer))
     expect(cardOf(firstTextOf(fakeReviewsItem)).getByText(changed)).toBeTruthy()
     expect(screen.getAllByText(changed)).toHaveLength(1)
   })

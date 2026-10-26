@@ -13,17 +13,17 @@ export function VerifiedScreen() {
   const router = useRouter()
 
   return (
-    <Screen pageTitle={t('auth.verified.title')}>
+    <Screen pageTitle={t(($) => $.auth.verified.title)}>
       <Stack align="center">
         <Emblem icon="check" />
       </Stack>
       <Text variant="title2" align="center" heading={1}>
-        {t('auth.verified.title')}
+        {t(($) => $.auth.verified.title)}
       </Text>
       <Text tone="secondary" align="center">
-        {t('auth.verified.body')}
+        {t(($) => $.auth.verified.body)}
       </Text>
-      <Button label={t('auth.verified.continue')} onPress={() => router.replace('/')} />
+      <Button label={t(($) => $.auth.verified.continue)} onPress={() => router.replace('/')} />
     </Screen>
   )
 }

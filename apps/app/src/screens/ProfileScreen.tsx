@@ -143,7 +143,7 @@ function ProfileForm({ me }: { me: Me }) {
         setErrors({ handle: result.error })
         return
       }
-      setMessage({ text: t(`errors.${result.error}`), ok: false })
+      setMessage({ text: t(($) => $.errors[result.error]), ok: false })
       return
     }
     setMe(result.data) // le cache partagé reçoit le profil à jour
@@ -163,8 +163,8 @@ function ProfileForm({ me }: { me: Me }) {
     setMessage({
       text:
         result.data.handle === former
-          ? t('profile.saved')
-          : t('profile.savedHandle', { former, days: HANDLE_RESERVATION_DAYS }),
+          ? t(($) => $.profile.saved)
+          : t(($) => $.profile.savedHandle, { former, days: HANDLE_RESERVATION_DAYS }),
       ok: true,
     })
   }
@@ -178,13 +178,13 @@ function ProfileForm({ me }: { me: Me }) {
       const result = await uploadAvatar(picked)
       if (result.ok) {
         setMe(result.data)
-        setMessage({ text: t('profile.avatar.updated'), ok: true })
+        setMessage({ text: t(($) => $.profile.avatar.updated), ok: true })
       } else {
         setMessage({ text: avatarError(result.error), ok: false })
       }
     } catch {
       // Image illisible sur l'appareil, par exemple.
-      setMessage({ text: t('errors.internal'), ok: false })
+      setMessage({ text: t(($) => $.errors.internal), ok: false })
     } finally {
       // finally : exécuté dans tous les cas, réussite ou erreur.
       setBusy(null)
@@ -194,43 +194,48 @@ function ProfileForm({ me }: { me: Me }) {
   // Pour l'avatar, des messages plus précis que les messages génériques.
   const avatarError = (error: ApiErrorKey) => {
     if (error === 'payloadTooLarge') {
-      return t('profile.errors.avatarTooLarge', { max: AVATAR_MAX_BYTES / (1024 * 1024) })
+      return t(($) => $.profile.errors.avatarTooLarge, { max: AVATAR_MAX_BYTES / (1024 * 1024) })
     }
-    if (error === 'unsupportedMediaType') return t('profile.errors.avatarType')
-    return t(`errors.${error}`)
+    if (error === 'unsupportedMediaType') return t(($) => $.profile.errors.avatarType)
+    return t(($) => $.errors[error])
   }
 
   // Messages d'erreur des champs (undefined : pas d'erreur).
-  const invalid = t('profile.errors.invalidCharacters')
+  const invalid = t(($) => $.profile.errors.invalidCharacters)
   const nameMessages = {
-    nameRequired: t('auth.errors.nameRequired'),
-    nameTooLong: t('profile.errors.nameTooLong', { max: NAME_MAX_LENGTH }),
+    nameRequired: t(($) => $.auth.errors.nameRequired),
+    nameTooLong: t(($) => $.profile.errors.nameTooLong, { max: NAME_MAX_LENGTH }),
     invalidCharacters: invalid,
   }
   const nameError = errors.name && nameMessages[errors.name]
   const handleMessages = {
-    handleTooShort: t('profile.errors.handleTooShort', { min: HANDLE_MIN_LENGTH }),
-    handleTooLong: t('profile.errors.handleTooLong', { max: HANDLE_MAX_LENGTH }),
-    handleInvalid: t('profile.errors.handleInvalid'),
-    handleReserved: t('profile.errors.handleReserved'),
-    handleTaken: t('errors.handleTaken'),
-    handleChangeLimit: t('errors.handleChangeLimit'),
+    handleTooShort: t(($) => $.profile.errors.handleTooShort, { min: HANDLE_MIN_LENGTH }),
+    handleTooLong: t(($) => $.profile.errors.handleTooLong, { max: HANDLE_MAX_LENGTH }),
+    handleInvalid: t(($) => $.profile.errors.handleInvalid),
+    handleReserved: t(($) => $.profile.errors.handleReserved),
+    handleTaken: t(($) => $.errors.handleTaken),
+    handleChangeLimit: t(($) => $.errors.handleChangeLimit),
   }
   const handleError = errors.handle && handleMessages[errors.handle]
   const bioError =
     errors.bio === 'invalidCharacters'
       ? invalid
-      : errors.bio && t('profile.errors.bioTooLong', { max: BIO_MAX_LENGTH })
+      : errors.bio && t(($) => $.profile.errors.bioTooLong, { max: BIO_MAX_LENGTH })
+  const toolsKey = errors.tools
   const toolsError =
-    errors.tools === 'invalidCharacters'
+    toolsKey === 'invalidCharacters'
       ? invalid
-      : errors.tools &&
-        t(`profile.errors.${errors.tools}`, {
-          max: errors.tools === 'tooManyTools' ? FAVORITE_TOOLS_MAX : TOOL_MAX_LENGTH,
+      : toolsKey &&
+        t(($) => $.profile.errors[toolsKey], {
+          max: toolsKey === 'tooManyTools' ? FAVORITE_TOOLS_MAX : TOOL_MAX_LENGTH,
         })
 
   const back = useGoBack('/account')
-  const save = { label: t('profile.save'), onPress: () => void onSave(), loading: busy === 'save' }
+  const save = {
+    label: t(($) => $.profile.save),
+    onPress: () => void onSave(),
+    loading: busy === 'save',
+  }
   // Entrée dans un champ d'une ligne enregistre, comme dans un formulaire web.
   const submitOnEnter = { onSubmitEditing: save.onPress, returnKeyType: 'done' } as const
 
@@ -240,7 +245,7 @@ function ProfileForm({ me }: { me: Me }) {
 
   return (
     <Screen
-      pageTitle={t('profile.title')}
+      pageTitle={t(($) => $.profile.title)}
       // Sur téléphone, « Annuler » et « Enregistrer » restent en haut, à portée de pouce ; sur
       // ordinateur, la barre de navigation en haut et les deux boutons sous le formulaire.
       header={
@@ -248,25 +253,25 @@ function ProfileForm({ me }: { me: Me }) {
           <TopNav />
         ) : (
           <SheetHeader
-            title={t('profile.title')}
-            cancel={{ label: t('common.cancel'), onPress: back }}
+            title={t(($) => $.profile.title)}
+            cancel={{ label: t(($) => $.common.cancel), onPress: back }}
             action={save}
           />
         )
       }
       stickyHeader={!wide}
       {...(wide ? null : { notice })}
-      {...(wide ? { title: t('profile.title') } : null)}
+      {...(wide ? { title: t(($) => $.profile.title) } : null)}
     >
       <Stack gap="md" align="center">
         <Avatar
           name={name}
           source={toSource(me.avatarUrl)}
-          label={t('profile.avatar.label')}
+          label={t(($) => $.profile.avatar.label)}
           size={132}
         />
         <Button
-          label={t('profile.avatar.change')}
+          label={t(($) => $.profile.avatar.change)}
           variant="glass"
           size="compact"
           icon="camera"
@@ -277,7 +282,7 @@ function ProfileForm({ me }: { me: Me }) {
           <Icon name="shield-check" size={18} tone="amber" />
           <Stack grow>
             <Text variant="caption" tone="muted">
-              {t('profile.avatar.privacy')}
+              {t(($) => $.profile.avatar.privacy)}
             </Text>
           </Stack>
         </Row>
@@ -285,7 +290,7 @@ function ProfileForm({ me }: { me: Me }) {
 
       <FieldGroup>
         <TextField
-          label={t('profile.fields.name')}
+          label={t(($) => $.profile.fields.name)}
           value={name}
           onChangeText={edit('name', setName)}
           autoCapitalize="words"
@@ -299,7 +304,7 @@ function ProfileForm({ me }: { me: Me }) {
             montre la limite sans couper (pas de maxLength) : un « @ » collé ne prend pas la
             place d'une lettre. autoComplete « off » : le navigateur ne propose pas d'adresse. */}
         <TextField
-          label={t('profile.fields.handle')}
+          label={t(($) => $.profile.fields.handle)}
           value={handle}
           onChangeText={edit('handle', setHandle)}
           prefix="@"
@@ -308,12 +313,15 @@ function ProfileForm({ me }: { me: Me }) {
           autoComplete="off"
           limit={HANDLE_MAX_LENGTH}
           showCount
-          hint={t('profile.fields.handleHint', { min: HANDLE_MIN_LENGTH, max: HANDLE_MAX_LENGTH })}
+          hint={t(($) => $.profile.fields.handleHint, {
+            min: HANDLE_MIN_LENGTH,
+            max: HANDLE_MAX_LENGTH,
+          })}
           error={handleError}
           {...submitOnEnter}
         />
         <TextField
-          label={t('profile.fields.bio')}
+          label={t(($) => $.profile.fields.bio)}
           value={bio}
           onChangeText={edit('bio', setBio)}
           autoCapitalize="sentences"
@@ -325,12 +333,12 @@ function ProfileForm({ me }: { me: Me }) {
         />
       </FieldGroup>
       <TagInput
-        label={t('profile.fields.tools')}
+        label={t(($) => $.profile.fields.tools)}
         values={parseTools(tools)}
         onChange={(list) => edit('tools', setTools)(list.join(', '))}
-        placeholder={t('profile.fields.toolsPlaceholder')}
-        removeLabel={(item) => t('common.remove', { item })}
-        limit={t('profile.fields.toolsLimit', { max: FAVORITE_TOOLS_MAX })}
+        placeholder={t(($) => $.profile.fields.toolsPlaceholder)}
+        removeLabel={(item) => t(($) => $.common.remove, { item })}
+        limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
         error={toolsError || undefined}
       />
 
@@ -338,7 +346,7 @@ function ProfileForm({ me }: { me: Me }) {
       {wide && notice}
       {wide ? (
         <Row gap="md" justify="end">
-          <Button label={t('common.cancel')} variant="secondary" onPress={back} />
+          <Button label={t(($) => $.common.cancel)} variant="secondary" onPress={back} />
           <Button {...save} />
         </Row>
       ) : null}
@@ -443,16 +451,16 @@ function EmailSettings() {
           key="weeklyRecap"
           ref={firstSwitch}
           inGroup
-          label={t('profile.emails.weeklyRecap')}
-          hint={t('profile.emails.weeklyRecapHint')}
+          label={t(($) => $.profile.emails.weeklyRecap)}
+          hint={t(($) => $.profile.emails.weeklyRecapHint)}
           value={data.weeklyRecap}
           onValueChange={(weeklyRecap) => save.update({ weeklyRecap })}
         />,
         <Switch
           key="mentionEmails"
           inGroup
-          label={t('profile.emails.mentionEmails')}
-          hint={t('profile.emails.mentionEmailsHint')}
+          label={t(($) => $.profile.emails.mentionEmails)}
+          hint={t(($) => $.profile.emails.mentionEmailsHint)}
           value={data.mentionEmails}
           onValueChange={(mentionEmails) => save.update({ mentionEmails })}
         />,
@@ -464,14 +472,14 @@ function EmailSettings() {
           // session expirée a sa propre notice, au-dessus du groupe, avec son lien.
           <ListRow
             key="loadError"
-            label={t('profile.emails.loadError')}
+            label={t(($) => $.profile.emails.loadError)}
             {...(loadFailure === 'unauthorized'
               ? null
-              : { detail: t(`errors.${loadFailure}`), detailAlert: failedRetries })}
+              : { detail: t(($) => $.errors[loadFailure]), detailAlert: failedRetries })}
             accessory={
               loadFailure === 'unauthorized' ? null : (
                 <Button
-                  label={t('common.retry')}
+                  label={t(($) => $.common.retry)}
                   variant="secondary"
                   size="compact"
                   loading={retrying}
@@ -481,7 +489,7 @@ function EmailSettings() {
             }
           />,
         ]
-      : [<ListRow key="loading" label={t('common.loading')} busy />]
+      : [<ListRow key="loading" label={t(($) => $.common.loading)} busy />]
 
   // Le message entre le titre et le groupe. Une session expirée (à la lecture ou au changement) :
   // le lien mène à la connexion. Une autre panne de lecture : rien ici, la ligne du groupe dit
@@ -490,22 +498,24 @@ function EmailSettings() {
   const failure = loadFailure ?? (last === 'saved' ? null : last)
   const notice =
     failure === 'unauthorized' ? (
-      <Notice message={t('states.expired')} action={signInAgain()} />
+      <Notice message={t(($) => $.states.expired)} action={signInAgain()} />
     ) : loadFailure ? null : failure ? (
-      <Notice message={t(`errors.${failure}`)} />
+      <Notice message={t(($) => $.errors[failure])} />
     ) : last === 'saved' ? (
       // Une confirmation, lue sans couper ce que disait le lecteur d'écran (role « status »).
-      <Notice tone="success" message={t('profile.emails.saved')} polite />
+      <Notice tone="success" message={t(($) => $.profile.emails.saved)} polite />
     ) : null
 
   // paddingY : un peu plus d'air au-dessus du titre, pour que la section se détache du formulaire.
   return (
     <Stack gap="md" paddingY="lg" ref={sectionRef}>
       <Text variant="heading" heading={2}>
-        {t('profile.emails.title')}
+        {t(($) => $.profile.emails.title)}
       </Text>
       {notice}
-      <ListGroup footer={[t('profile.emails.instant'), t('profile.emails.accountEmails')]}>
+      <ListGroup
+        footer={[t(($) => $.profile.emails.instant), t(($) => $.profile.emails.accountEmails)]}
+      >
         {rows}
       </ListGroup>
     </Stack>

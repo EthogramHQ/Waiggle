@@ -109,21 +109,25 @@ beforeEach(() => {
 
 // Les textes de chaque notification d'exemple (testing/notifications.ts).
 const texts = {
-  reactions: t('notifications.reactions', { count: 2, title: 'Météo' }),
-  comment: t('notifications.comment', { name: 'Malik', title: 'Météo', excerpt: 'Super idée…' }),
-  mention: t('notifications.mention', { name: 'Malik', title: 'Météo' }),
-  reply: t('notifications.reply', { name: 'Malik', title: 'Météo' }),
-  memberFollows: t('notifications.memberFollows', { count: 3 }),
-  projectFollows: t('notifications.projectFollows', { count: 2, title: 'Météo' }),
-  hidden: t('notifications.hidden', { title: 'Météo' }),
-  handle: t('notifications.handle', { handle: 'ines_morel' }),
+  reactions: t(($) => $.notifications.reactions, { count: 2, title: 'Météo' }),
+  comment: t(($) => $.notifications.comment, {
+    name: 'Malik',
+    title: 'Météo',
+    excerpt: 'Super idée…',
+  }),
+  mention: t(($) => $.notifications.mention, { name: 'Malik', title: 'Météo' }),
+  reply: t(($) => $.notifications.reply, { name: 'Malik', title: 'Météo' }),
+  memberFollows: t(($) => $.notifications.memberFollows, { count: 3 }),
+  projectFollows: t(($) => $.notifications.projectFollows, { count: 2, title: 'Météo' }),
+  hidden: t(($) => $.notifications.hidden, { title: 'Météo' }),
+  handle: t(($) => $.notifications.handle, { handle: 'ines_morel' }),
 }
 
 describe('NotificationsScreen', () => {
   it('has a title', async () => {
     await renderWithProviders(<NotificationsScreen />)
 
-    expect(screen.getByRole('header', { name: t('notifications.title') })).toBeTruthy()
+    expect(screen.getByRole('header', { name: t(($) => $.notifications.title) })).toBeTruthy()
   })
 
   it('writes a sentence for each kind of notification', async () => {
@@ -170,23 +174,25 @@ describe('NotificationsScreen', () => {
     await renderWithProviders(<NotificationsScreen />)
 
     expect(
-      screen.getByText(containing(t('notifications.reactions', { count: 3, title: 'Météo' }))),
+      screen.getByText(
+        containing(t(($) => $.notifications.reactions, { count: 3, title: 'Météo' })),
+      ),
     ).toBeTruthy()
-    const bravo = t('project.reactions.bravo')
-    const useful = t('project.reactions.useful')
+    const bravo = t(($) => $.project.reactions.bravo)
+    const useful = t(($) => $.project.reactions.useful)
     expect(
       screen.getAllByText(
-        containing(t('notifications.reactionCount', { reaction: bravo, count: 2 })),
+        containing(t(($) => $.notifications.reactionCount, { reaction: bravo, count: 2 })),
       ).length,
     ).toBeGreaterThan(0)
     expect(
       screen.getAllByText(
-        containing(t('notifications.reactionCount', { reaction: useful, count: 1 })),
+        containing(t(($) => $.notifications.reactionCount, { reaction: useful, count: 1 })),
       ).length,
     ).toBeGreaterThan(0)
     // Les types sans réaction ne sont pas cités.
-    expect(screen.queryByText(containing(t('project.reactions.funny')))).toBeNull()
-    expect(screen.queryByText(containing(t('project.reactions.amazing')))).toBeNull()
+    expect(screen.queryByText(containing(t(($) => $.project.reactions.funny)))).toBeNull()
+    expect(screen.queryByText(containing(t(($) => $.project.reactions.amazing)))).toBeNull()
   })
 
   it('names nobody for reactions and followers', async () => {
@@ -242,7 +248,10 @@ describe('NotificationsScreen', () => {
     const newOnes = allNotifications.filter((notification) => notification.isNew).length
     expect(newOnes).toBe(2)
     expect(
-      screen.getAllByText(t('notifications.new'), { includeHiddenElements: true }),
+      screen.getAllByText(
+        t(($) => $.notifications.new),
+        { includeHiddenElements: true },
+      ),
     ).toHaveLength(newOnes)
   })
 
@@ -336,7 +345,7 @@ describe('the end of the list', () => {
     mockPages([notificationPageOf([])])
     await renderWithProviders(<NotificationsScreen />)
 
-    expect(screen.getByText(t('notifications.empty'))).toBeTruthy()
+    expect(screen.getByText(t(($) => $.notifications.empty))).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
   })
 
@@ -344,7 +353,7 @@ describe('the end of the list', () => {
     mockPages([notificationPageOf([])])
     await renderWithProviders(<NotificationsScreen />)
 
-    expect(screen.getByRole('header', { name: t('notifications.emptyTitle') })).toBeTruthy()
+    expect(screen.getByRole('header', { name: t(($) => $.notifications.emptyTitle) })).toBeTruthy()
   })
 
   it('offers to publish a project when there is nothing yet', async () => {
@@ -420,7 +429,7 @@ describe('when something goes wrong', () => {
     await renderWithProviders(<NotificationsScreen />)
 
     expect(screen.getAllByText(containing(texts.reactions)).length).toBeGreaterThan(0)
-    expect(screen.getByRole('alert')).toHaveTextContent(t('notifications.moreError'))
+    expect(screen.getByRole('alert')).toHaveTextContent(t(($) => $.notifications.moreError))
     await fireEvent.press(screen.getByRole('button', { name: 'Réessayer' }))
     expect(result.fetchNextPage).toHaveBeenCalledTimes(1)
   })
@@ -450,7 +459,7 @@ describe('a content of mine removed by the moderation', () => {
     mockPages([notificationPageOf([removedCommentNotification])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const text = t('notifications.removed.comment', { title: 'Météo' })
+    const text = t(($) => $.notifications.removed.comment, { title: 'Météo' })
     expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
     expect(screen.getByText(removedCommentNotification.excerpt ?? '')).toBeTruthy()
   })
@@ -470,13 +479,13 @@ describe('a content of mine removed by the moderation', () => {
     await renderWithProviders(<NotificationsScreen />)
 
     expect(
-      screen.getAllByText(containing(t('notifications.removed.project', { title: 'Météo' })))
+      screen.getAllByText(containing(t(($) => $.notifications.removed.project, { title: 'Météo' })))
         .length,
     ).toBeGreaterThan(0)
     expect(
       missingSentences(removalSentences(removalOf(removedProjectNotification)), screen),
     ).toEqual([])
-    expect(screen.queryByText(containing(t('removal.afterReport')))).toBeNull()
+    expect(screen.queryByText(containing(t(($) => $.removal.afterReport)))).toBeNull()
   })
 
   it('keeps the reasons of a removal on the project of a member who blocked me, without its title nor a link', async () => {
@@ -489,7 +498,7 @@ describe('a content of mine removed by the moderation', () => {
     mockPages([notificationPageOf([elsewhere])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const text = t('notifications.removed.commentElsewhere')
+    const text = t(($) => $.notifications.removed.commentElsewhere)
     expect(screen.getAllByText(containing(text)).length).toBeGreaterThan(0)
     expect(missingSentences(removalSentences(removalOf(elsewhere)), screen)).toEqual([])
     expect(screen.queryByRole('link', { name: containing(text) })).toBeNull()
@@ -499,7 +508,7 @@ describe('a content of mine removed by the moderation', () => {
     mockPages([notificationPageOf([removedCommentNotification])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const text = t('notifications.removed.comment', { title: 'Météo' })
+    const text = t(($) => $.notifications.removed.comment, { title: 'Météo' })
     await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
 
     expect(mockPush).toHaveBeenCalledWith({
@@ -510,7 +519,7 @@ describe('a content of mine removed by the moderation', () => {
 })
 
 describe('a report of mine that was handled', () => {
-  const removedText = t('notifications.reportHandled.comment.removed')
+  const removedText = t(($) => $.notifications.reportHandled.comment.removed)
 
   it('says only the kind of content and the outcome, and how to disagree', async () => {
     mockPages([notificationPageOf([reportHandledNotification])])
@@ -518,7 +527,7 @@ describe('a report of mine that was handled', () => {
 
     expect(screen.getAllByText(containing(removedText)).length).toBeGreaterThan(0)
     expect(
-      screen.getAllByText(containing(t('notifications.reportHandled.contest'))).length,
+      screen.getAllByText(containing(t(($) => $.notifications.reportHandled.contest))).length,
     ).toBeGreaterThan(0)
   })
 
@@ -531,7 +540,7 @@ describe('a report of mine that was handled', () => {
     expect(screen.getAllByText(containing(removedText)).length).toBeGreaterThan(0)
     // … sans rien de ce qui appartient au contenu.
     expect(screen.queryByText(/Météo|Malik/)).toBeNull()
-    expect(screen.queryByText(containing(t('removal.contest')))).toBeNull()
+    expect(screen.queryByText(containing(t(($) => $.removal.contest)))).toBeNull()
   })
 
   it('leads nowhere when the content is no longer visible', async () => {
@@ -547,7 +556,7 @@ describe('a report of mine that was handled', () => {
     mockPages([notificationPageOf([reportDismissedNotification])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const text = t('notifications.reportHandled.project.dismissed')
+    const text = t(($) => $.notifications.reportHandled.project.dismissed)
     await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
 
     expect(mockPush).toHaveBeenCalledWith({
@@ -560,7 +569,7 @@ describe('a report of mine that was handled', () => {
     mockPages([notificationPageOf([memberReportDismissedNotification])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const text = t('notifications.reportHandled.member.dismissed')
+    const text = t(($) => $.notifications.reportHandled.member.dismissed)
     await fireEvent.press(screen.getByRole('link', { name: containing(text) }))
 
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u7' } })

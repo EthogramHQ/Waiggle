@@ -153,7 +153,7 @@ export function NoteList({
                     }}
                     icon="trash"
                     variant="plain"
-                    label={deleteLabel ?? t('project.notes.delete')}
+                    label={deleteLabel ?? t(($) => $.project.notes.delete)}
                     describedBy={bodyId}
                     // Array.from compte en caractères (un emoji entier), là où slice compterait en « unités ».
                     hint={shorten(note.body, 80)}
@@ -165,7 +165,7 @@ export function NoteList({
                   <IconButton
                     icon="flag"
                     variant="plain"
-                    label={reportLabel ?? t('report.note')}
+                    label={reportLabel ?? t(($) => $.report.note)}
                     describedBy={bodyId}
                     hint={shorten(note.body, 80)}
                     onPress={() => onReport(note.id)}

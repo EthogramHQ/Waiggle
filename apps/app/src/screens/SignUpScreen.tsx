@@ -90,40 +90,40 @@ export function SignUpScreen() {
 
   // Traduit une clé d'erreur de champ en message (ou rien s'il n'y a pas d'erreur).
   const fieldMessage = (key: FieldErrors[keyof FieldErrors]) =>
-    key ? t(`auth.errors.${key}`, lengths) : undefined
+    key ? t(($) => $.auth.errors[key], lengths) : undefined
 
   const missing = Math.max(0, PASSWORD_MIN_LENGTH - Array.from(password).length)
 
   return (
     <Screen
-      title={t('auth.signUp.title')}
-      subtitle={t('auth.signUp.subtitle')}
+      title={t(($) => $.auth.signUp.title)}
+      subtitle={t(($) => $.auth.signUp.subtitle)}
       onBack={back}
       hero={
         <WelcomeHero
-          tagline={t('home.tagline')}
+          tagline={t(($) => $.home.tagline)}
           source={{
-            note: t('home.openSource'),
-            link: t('home.seeCode'),
+            note: t(($) => $.home.openSource),
+            link: t(($) => $.home.seeCode),
             onPress: () => openOutside(sourceUrl),
           }}
         />
       }
     >
-      {error ? <Notice message={t(`auth.errors.${error}`, lengths)} /> : null}
+      {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
       <TextField
-        label={t('auth.fields.inviteCode')}
+        label={t(($) => $.auth.fields.inviteCode)}
         value={inviteCode}
         onChangeText={setInviteCode}
-        hint={t('auth.fields.inviteCodeHint')}
+        hint={t(($) => $.auth.fields.inviteCodeHint)}
         autoCapitalize="none"
         autoComplete="off"
         error={fieldMessage(fieldErrors.inviteCode)}
       />
       <FieldGroup>
         <TextField
-          label={t('auth.fields.name')}
-          hint={t('auth.fields.nameHint')}
+          label={t(($) => $.auth.fields.name)}
+          hint={t(($) => $.auth.fields.nameHint)}
           value={name}
           onChangeText={setName}
           autoComplete="name"
@@ -131,7 +131,7 @@ export function SignUpScreen() {
           error={fieldMessage(fieldErrors.name)}
         />
         <TextField
-          label={t('auth.fields.email')}
+          label={t(($) => $.auth.fields.email)}
           value={email}
           onChangeText={setEmail}
           autoComplete="email"
@@ -141,7 +141,7 @@ export function SignUpScreen() {
       </FieldGroup>
       <Stack gap="md">
         <TextField
-          label={t('auth.fields.password')}
+          label={t(($) => $.auth.fields.password)}
           value={password}
           onChangeText={setPassword}
           secureTextEntry // masque les caractères tapés (un bouton permet de les afficher)
@@ -156,16 +156,19 @@ export function SignUpScreen() {
           // l'air d'un reproche alors que rien n'est encore tapé.
           label={
             password.length === 0
-              ? t('auth.fields.passwordHint', lengths)
+              ? t(($) => $.auth.fields.passwordHint, lengths)
               : missing > 0
-                ? t('auth.passwordMeter.remaining', { count: missing })
-                : t('auth.passwordMeter.done')
+                ? t(($) => $.auth.passwordMeter.remaining, { count: missing })
+                : t(($) => $.auth.passwordMeter.done)
           }
         />
       </Stack>
-      <Button label={t('auth.signUp.submit')} onPress={submit} loading={loading} />
+      <Button label={t(($) => $.auth.signUp.submit)} onPress={submit} loading={loading} />
       <Row justify="center">
-        <TextLink label={t('auth.signUp.haveAccount')} onPress={() => router.replace('/sign-in')} />
+        <TextLink
+          label={t(($) => $.auth.signUp.haveAccount)}
+          onPress={() => router.replace('/sign-in')}
+        />
       </Row>
     </Screen>
   )

@@ -36,7 +36,7 @@ jest.mock('expo-router', () => ({
 
 // Les textes de la page, tirés des traductions françaises (les mêmes que l'écran).
 const text = (key: keyof Translation['account']['changeEmail'], params?: Record<string, string>) =>
-  fr.t(`account.changeEmail.${key}`, params)
+  fr.t(($) => $.account.changeEmail[key], params)
 const newEmailLabel = text('newEmail') // « Nouvelle adresse e-mail »
 const passwordLabel = text('password') // « Confirme avec ton mot de passe »
 // Pendant l'envoi, le bouton peut garder son nom ou dire « Envoi… » : les deux sont acceptés.
@@ -124,9 +124,9 @@ describe('ChangeEmailScreen', () => {
     } as unknown as ReturnType<typeof useSession>)
     await renderWithProviders(<ChangeEmailScreen />)
 
-    expect(screen.getByRole('header', { name: fr.t('states.errorTitle') })).toBeTruthy()
-    expect(screen.queryByText(fr.t('states.signedOutTitle'))).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('common.retry') }))
+    expect(screen.getByRole('header', { name: fr.t(($) => $.states.errorTitle) })).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.states.signedOutTitle))).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
@@ -185,7 +185,7 @@ describe('ChangeEmailScreen', () => {
 
     await send({ newEmail: 'pas-une-adresse', password: typed.password })
 
-    const message = fr.t('auth.errors.invalidEmail')
+    const message = fr.t(($) => $.auth.errors.invalidEmail)
     expect(await screen.findByText(message)).toBeTruthy()
     // L'erreur est reliée à son champ : le lecteur d'écran la lit après le nom du champ.
     expect(screen.getByLabelText(newEmailLabel)).toHaveProp(
@@ -200,7 +200,7 @@ describe('ChangeEmailScreen', () => {
 
     await send({ newEmail: current, password: typed.password })
 
-    const message = fr.t('auth.errors.sameEmail') // « C'est déjà ton adresse. »
+    const message = fr.t(($) => $.auth.errors.sameEmail) // « C'est déjà ton adresse. »
     expect(await screen.findByText(message)).toBeTruthy()
     expect(screen.getByLabelText(newEmailLabel)).toHaveProp(
       'accessibilityHint',
@@ -215,7 +215,7 @@ describe('ChangeEmailScreen', () => {
 
     await send({ newEmail: 'LEA@Example.com', password: typed.password })
 
-    expect(await screen.findByText(fr.t('auth.errors.sameEmail'))).toBeTruthy()
+    expect(await screen.findByText(fr.t(($) => $.auth.errors.sameEmail))).toBeTruthy()
     expect(changeEmail).not.toHaveBeenCalled()
   })
 
@@ -247,7 +247,7 @@ describe('ChangeEmailScreen', () => {
 
     await send(typed)
 
-    const message = fr.t('auth.errors.wrongPassword') // « Mot de passe incorrect. »
+    const message = fr.t(($) => $.auth.errors.wrongPassword) // « Mot de passe incorrect. »
     expect(await screen.findByText(message)).toBeTruthy()
     expect(screen.getByLabelText(passwordLabel)).toHaveProp(
       'accessibilityHint',
@@ -264,7 +264,7 @@ describe('ChangeEmailScreen', () => {
 
     await send(typed)
 
-    const message = fr.t('auth.errors.sameEmail')
+    const message = fr.t(($) => $.auth.errors.sameEmail)
     expect(await screen.findByText(message)).toBeTruthy()
     expect(screen.getByLabelText(newEmailLabel)).toHaveProp(
       'accessibilityHint',
@@ -279,7 +279,7 @@ describe('ChangeEmailScreen', () => {
     await send(typed)
 
     expect(
-      (await screen.findAllByText(containing(fr.t('auth.errors.tooManyAttempts')))).length,
+      (await screen.findAllByText(containing(fr.t(($) => $.auth.errors.tooManyAttempts)))).length,
     ).toBeGreaterThan(0)
     expect(screen.queryByText(containing(text('sentTitle')))).toBeNull()
   })
@@ -314,7 +314,7 @@ describe('ChangeEmailScreen', () => {
     mockSession(null)
     await renderWithProviders(<ChangeEmailScreen />)
 
-    expect(screen.getAllByText(fr.t('states.signedOutTitle')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(fr.t(($) => $.states.signedOutTitle)).length).toBeGreaterThan(0)
     expect(screen.queryByLabelText(newEmailLabel)).toBeNull()
   })
 })

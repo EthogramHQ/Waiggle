@@ -19,10 +19,10 @@ describe('ActionMenu, once opened', () => {
   it('says that it is open', async () => {
     await renderWithProviders(<ActionMenu items={items} />)
 
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('actionMenu.label') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
 
     expect(
-      screen.getByRole('button', { name: fr.t('actionMenu.label'), expanded: true }),
+      screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label), expanded: true }),
     ).toBeTruthy()
     // (Le rôle « menu » de la liste ne se cherche pas ici : RNTL ne trouve un rôle que sur un
     // élément `accessible`, qu'on ne met pas sur un conteneur. À relever dans le navigateur.)
@@ -31,11 +31,11 @@ describe('ActionMenu, once opened', () => {
   it('says again that it is closed once an action is chosen', async () => {
     await renderWithProviders(<ActionMenu items={items} />)
 
-    await fireEvent.press(screen.getByRole('button', { name: fr.t('actionMenu.label') }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
     await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce profil' }))
 
     expect(
-      screen.getByRole('button', { name: fr.t('actionMenu.label'), expanded: false }),
+      screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label), expanded: false }),
     ).toBeTruthy()
   })
 })

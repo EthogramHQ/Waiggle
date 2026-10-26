@@ -130,7 +130,7 @@ export function ChangeEmailScreen() {
   }
 
   const message = (key: AuthErrorKey | undefined) =>
-    key ? t(`auth.errors.${key}`, lengths) : undefined
+    key ? t(($) => $.auth.errors[key], lengths) : undefined
 
   // Plus accès à son adresse actuelle : le changement se fait alors à la main (scénario). L'aide
   // reste dans les deux états.
@@ -139,7 +139,7 @@ export function ChangeEmailScreen() {
   const noAccess = (
     <Hint
       icon="envelope-simple"
-      text={t('account.changeEmail.noAccess', { contactEmail })}
+      text={t(($) => $.account.changeEmail.noAccess, { contactEmail })}
       link={{ label: contactEmail, onPress: () => void Linking.openURL(`mailto:${contactEmail}`) }}
     />
   )
@@ -152,7 +152,7 @@ export function ChangeEmailScreen() {
         <Emblem icon="envelope-simple" />
       </Stack>
       <Text variant="title3" align="center" heading={2}>
-        {t('account.changeEmail.sentTitle')}
+        {t(($) => $.account.changeEmail.sentTitle)}
       </Text>
       {/* Une confirmation, lue sans couper le lecteur d'écran (role « status »), et qui reçoit le
           focus du clavier sur le web. L'adresse citée est l'actuelle, pas la nouvelle. */}
@@ -160,31 +160,35 @@ export function ChangeEmailScreen() {
         ref={messageRef}
         tone="success"
         polite
-        message={t('account.changeEmail.sentBody', { email: sentTo })}
+        message={t(($) => $.account.changeEmail.sentBody, { email: sentTo })}
       />
       {/* Centrés, comme le titre au-dessus et comme la page « Vérifie ta boîte mail » de
           l'inscription (CheckEmailScreen) : un état de confirmation se lit au milieu. */}
       <Text tone="secondary" align="center">
-        {t('account.changeEmail.sentNext')}
+        {t(($) => $.account.changeEmail.sentNext)}
       </Text>
       <Text variant="callout" tone="muted" align="center">
-        {t('account.changeEmail.sentNone')}
+        {t(($) => $.account.changeEmail.sentNone)}
       </Text>
       {/* L'aide passe avant « Retour » : elle l'éloigne encore de la place du bouton touché (27 pt
           d'écart seulement sur ordinateur sans elle, mesuré dans le navigateur). */}
       {noAccess}
-      <Button label={t('account.changeEmail.back')} variant="secondary" onPress={onBackToAccount} />
+      <Button
+        label={t(($) => $.account.changeEmail.back)}
+        variant="secondary"
+        onPress={onBackToAccount}
+      />
     </Fragment>
   ) : (
     <Fragment key="form">
       <Stack gap="sm">
-        <Text weight={600}>{t('account.changeEmail.current', { email: current })}</Text>
-        <Text tone="secondary">{t('account.changeEmail.intro')}</Text>
-        <Text tone="secondary">{t('account.changeEmail.steps')}</Text>
+        <Text weight={600}>{t(($) => $.account.changeEmail.current, { email: current })}</Text>
+        <Text tone="secondary">{t(($) => $.account.changeEmail.intro)}</Text>
+        <Text tone="secondary">{t(($) => $.account.changeEmail.steps)}</Text>
       </Stack>
       <FieldGroup>
         <TextField
-          label={t('account.changeEmail.newEmail')}
+          label={t(($) => $.account.changeEmail.newEmail)}
           value={newEmail}
           onChangeText={setNewEmail}
           keyboardType="email-address"
@@ -195,7 +199,7 @@ export function ChangeEmailScreen() {
           error={message(fieldErrors.newEmail)}
         />
         <TextField
-          label={t('account.changeEmail.password')}
+          label={t(($) => $.account.changeEmail.password)}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -206,9 +210,11 @@ export function ChangeEmailScreen() {
           error={message(fieldErrors.password)}
         />
       </FieldGroup>
-      {error ? <Notice message={t(`auth.errors.${error}`, lengths)} /> : null}
+      {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
       <Button
-        label={sending ? t('account.changeEmail.sending') : t('account.changeEmail.submit')}
+        label={
+          sending ? t(($) => $.account.changeEmail.sending) : t(($) => $.account.changeEmail.submit)
+        }
         icon="paper-plane-tilt"
         onPress={() => void submit()}
         loading={sending}
@@ -220,7 +226,7 @@ export function ChangeEmailScreen() {
   )
 
   return (
-    <Screen onBack={back} title={t('account.changeEmail.title')}>
+    <Screen onBack={back} title={t(($) => $.account.changeEmail.title)}>
       {content}
     </Screen>
   )

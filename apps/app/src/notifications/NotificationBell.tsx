@@ -20,10 +20,10 @@ export function NotificationBell() {
   const count = useUnreadCount()
   const label =
     count === 0
-      ? t('notifications.bell')
+      ? t(($) => $.notifications.bell)
       : count > SHOWN_MAX
-        ? t('notifications.bellNewMany', { max: SHOWN_MAX })
-        : t('notifications.bellNew', { count })
+        ? t(($) => $.notifications.bellNewMany, { max: SHOWN_MAX })
+        : t(($) => $.notifications.bellNew, { count })
   return (
     <IconButton
       icon="bell"

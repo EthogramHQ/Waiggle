@@ -57,7 +57,7 @@ function MemberNotifications() {
       // Liste vide : l'écran propose lui-même « Publier un projet » ; la barre ne le répète pas.
       header={<TopNav hideNewProject={list.data !== undefined && items.length === 0} />}
       onBack={back}
-      title={t('notifications.title')}
+      title={t(($) => $.notifications.title)}
     >
       {!list.data ? (
         // Une erreur avant toute page : on dit pourquoi et on propose de réessayer. Une suite
@@ -65,12 +65,12 @@ function MemberNotifications() {
         list.isError ? (
           <StateMessage
             kind="error"
-            title={t('notifications.errorTitle')}
-            message={t(`errors.${errorKey(list.error)}`)}
-            actions={[{ label: t('common.retry'), onPress: () => void list.refetch() }]}
+            title={t(($) => $.notifications.errorTitle)}
+            message={t(($) => $.errors[errorKey(list.error)])}
+            actions={[{ label: t(($) => $.common.retry), onPress: () => void list.refetch() }]}
           />
         ) : (
-          <StateMessage kind="loading" message={t('common.loading')} />
+          <StateMessage kind="loading" message={t(($) => $.common.loading)} />
         )
       ) : items.length === 0 ? (
         // Rien encore : ce qui en fera venir, c'est un projet publié (les autres y réagiront).
@@ -78,10 +78,13 @@ function MemberNotifications() {
         // qui parcourt la page par ses titres.
         <StateMessage
           kind="empty"
-          title={t('notifications.emptyTitle')}
-          message={t('notifications.empty')}
+          title={t(($) => $.notifications.emptyTitle)}
+          message={t(($) => $.notifications.empty)}
           actions={[
-            { label: t('notifications.emptyAction'), onPress: () => router.push('/projects/new') },
+            {
+              label: t(($) => $.notifications.emptyAction),
+              onPress: () => router.push('/projects/new'),
+            },
           ]}
         />
       ) : (
@@ -100,7 +103,7 @@ function MemberNotifications() {
                   quote={shown.quote}
                   when={shortDate(notification.at, i18n.language)}
                   isNew={notification.isNew}
-                  newLabel={t('notifications.new')}
+                  newLabel={t(($) => $.notifications.new)}
                   onPress={target ? () => router.push(target) : null}
                 />
               )
@@ -116,10 +119,10 @@ function MemberNotifications() {
                     ? 'more'
                     : 'end'
             }
-            moreLabel={t('notifications.more')}
-            endLabel={t('notifications.end')}
-            errorLabel={t('notifications.moreError')}
-            retryLabel={t('common.retry')}
+            moreLabel={t(($) => $.notifications.more)}
+            endLabel={t(($) => $.notifications.end)}
+            errorLabel={t(($) => $.notifications.moreError)}
+            retryLabel={t(($) => $.common.retry)}
             // Une seule demande à la fois, même après un double clic.
             onMore={() => {
               if (!list.isFetchingNextPage) void list.fetchNextPage()

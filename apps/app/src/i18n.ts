@@ -20,7 +20,7 @@ export const detectLanguage = (): Language =>
   resolveLanguage(getLocales().map((locale) => locale.languageTag))
 
 /*
- * Les valeurs passées à t() viennent souvent des membres : t('common.remove', { item: outil }).
+ * Les valeurs passées à t() viennent souvent des membres : t(($) => $.common.remove, { item: outil }).
  * i18next les insère dans le texte, puis continue de chercher les {{…}} dans ce même texte. Il
  * saute bien la valeur qu'il vient d'insérer (option `skipOnVariables`, active par défaut), mais
  * pour remplir la variable suivante il remplace la *première* occurrence de `{{nom}}` trouvée, qui

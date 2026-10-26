@@ -89,9 +89,9 @@ const imageLines = (images: readonly SnapshotImage[], t: T): string[] => {
   return images.map(({ field, state }) => {
     const image =
       field === 'photo' && photos > 1
-        ? t('moderation.images.photoNumbered', { n: ++rank })
-        : t(`moderation.images.${field}`)
-    return t(`moderation.images.${state}`, { image })
+        ? t(($) => $.moderation.images.photoNumbered, { n: ++rank })
+        : t(($) => $.moderation.images[field])
+    return t(($) => $.moderation.images[state], { image })
   })
 }
 
@@ -146,7 +146,7 @@ export function ModerationScreen() {
     return <LoadingScreen />
   }
   // Un membre qui n'est pas administrateur : la page n'existe pas pour lui, rien n'est demandé.
-  if (!me.data.isAdmin) return <NotFoundState title={t('states.notFoundTitle')} />
+  if (!me.data.isAdmin) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   return <AdminModeration />
 }
 
@@ -252,10 +252,10 @@ function AdminModeration() {
       onSettled(
         result.ok
           ? { message: done, ok: true }
-          : { message: t(`errors.${result.error}`), ok: false },
+          : { message: t(($) => $.errors[result.error]), ok: false },
       )
     } else {
-      setFailures((previous) => ({ ...previous, [key]: t(`errors.${result.error}`) }))
+      setFailures((previous) => ({ ...previous, [key]: t(($) => $.errors[result.error]) }))
     }
   }
 
@@ -279,7 +279,7 @@ function AdminModeration() {
     // Le bouton est inactif tant qu'il manque le fondement ou l'explication ; on vérifie quand même.
     if (!removing || !target || !ground || text === '' || deciding.current) return
     if (!RemovalExplanation.safeParse(text).success) {
-      setFieldError(t('profile.errors.invalidCharacters'))
+      setFieldError(t(($) => $.profile.errors.invalidCharacters))
       return
     }
     setFieldError(null)
@@ -296,13 +296,13 @@ function AdminModeration() {
         index: removing.index,
         item: removing.item,
         outcome: result.ok
-          ? { message: t('moderation.removedDone'), ok: true }
-          : { message: t(`errors.${result.error}`), ok: false },
+          ? { message: t(($) => $.moderation.removedDone), ok: true }
+          : { message: t(($) => $.errors[result.error]), ok: false },
       })
       setRemoveOpen(false)
     } else {
       // Une panne (réseau, serveur) : la fenêtre reste, avec ce qui a été tapé, pour réessayer.
-      setDialogError(t(`errors.${result.error}`))
+      setDialogError(t(($) => $.errors[result.error]))
     }
   }
 
@@ -310,7 +310,7 @@ function AdminModeration() {
   const list = tab === 'pending' ? queue : removed
   const fatal = !list.data && list.isError ? errorKey(list.error) : null
   // Un administrateur révoqué : l'API ne connaît plus la page.
-  if (fatal === 'notFound') return <NotFoundState title={t('states.notFoundTitle')} />
+  if (fatal === 'notFound') return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   if (fatal === 'unauthorized') return <SignedOutScreen expired />
 
   const onRetry = async () => {
@@ -323,67 +323,70 @@ function AdminModeration() {
   const cardState = (key: string, kind: string, text: string, outcome: Outcome | undefined) => ({
     // « Commentaire : Envoie-moi le code… », lu après « Retirer », « Voir »… : de quelle carte il
     // s'agit, quand toutes ont les mêmes boutons.
-    description: t('moderation.describe', { kind, excerpt: excerpt(text) }),
+    description: t(($) => $.moderation.describe, { kind, excerpt: excerpt(text) }),
     decided: outcome,
     decidedRef: key === lastDecided ? outcomeRef : undefined,
     error: failures[key],
   })
 
   const queueCard = ({ key, index, item, outcome }: Shown<ModerationQueueItem>) => {
-    const kind = t(`moderation.kinds.${item.target.kind}`)
+    const kind = t(($) => $.moderation.kinds[item.target.kind])
     const actions: ReportCardAction[] = []
     if (!item.concernsMe) {
       // Un profil ne se retire pas (l'API le refuse) ; un contenu déjà retiré ou disparu non plus.
       if (item.target.kind !== 'member' && item.state === 'present') {
         actions.push({
-          label: t('moderation.remove'),
+          label: t(($) => $.moderation.remove),
           tone: 'danger',
           onPress: guarded(() => openRemove(item, index)),
         })
       }
       actions.push({
-        label: t('moderation.dismiss'),
+        label: t(($) => $.moderation.dismiss),
         loading: pending === key,
         onPress: guarded(
           () =>
             void run(
               { action: 'dismiss', target: item.target },
-              t('moderation.dismissed'),
+              t(($) => $.moderation.dismissed),
               (done) => settle(setDecidedQueue, { key, index, item, outcome: done }),
             ),
         ),
       })
     }
+    const { state } = item
     const status = item.concernsMe
-      ? t('moderation.concernsMe')
-      : item.state === 'present'
+      ? t(($) => $.moderation.concernsMe)
+      : state === 'present'
         ? undefined
-        : t(`moderation.state.${item.state}`)
+        : t(($) => $.moderation.state[state])
     return (
       <ReportCard
         key={key}
         {...cardState(key, kind, firstText(item.snapshot), outcome)}
         kind={kind}
-        count={t('moderation.count', { count: item.count })}
+        count={t(($) => $.moderation.count, { count: item.count })}
         // Tranche 7b : la copie champ par champ, chacun sous son libellé ; une copie d'avant 7b
         // n'a qu'un champ, « Texte ». Les images ne sont dites que par leur état.
         snapshot={item.snapshot.filter(isTextEntry).map(({ field, value }) => ({
-          label: t(`moderation.fields.${field}`),
+          label: t(($) => $.moderation.fields[field]),
           value,
         }))}
-        snapshotLabel={t('moderation.snapshot')}
-        snapshotNote={item.snapshotsDiffer ? t('moderation.snapshotsDiffer') : undefined}
+        snapshotLabel={t(($) => $.moderation.snapshot)}
+        snapshotNote={item.snapshotsDiffer ? t(($) => $.moderation.snapshotsDiffer) : undefined}
         images={imageLines(item.images, t)}
         reasons={item.reasons.map(({ reason, count }) =>
-          t('moderation.reasonCount', {
-            reason: t(`report.reasons.${reasonTextKey[reason]}`),
+          t(($) => $.moderation.reasonCount, {
+            reason: t(($) => $.report.reasons[reasonTextKey[reason]]),
             count,
           }),
         )}
         details={item.details}
-        when={t('moderation.since', { date: shortDate(item.firstReportedAt, i18n.language) })}
+        when={t(($) => $.moderation.since, {
+          date: shortDate(item.firstReportedAt, i18n.language),
+        })}
         {...(status ? { status } : null)}
-        viewLabel={t('moderation.view')}
+        viewLabel={t(($) => $.moderation.view)}
         onView={() => router.push(viewHref(item.target, item.projectId))}
         actions={actions}
       />
@@ -391,23 +394,23 @@ function AdminModeration() {
   }
 
   const removedCard = ({ key, index, item, outcome }: Shown<RemovedItem>) => {
-    const kind = t(`moderation.kinds.${item.target.kind}`)
+    const kind = t(($) => $.moderation.kinds[item.target.kind])
     return (
       <ReportCard
         key={key}
         {...cardState(key, kind, item.text, outcome)}
         kind={kind}
         snapshot={item.text}
-        reasons={[t(`moderation.grounds.${item.ground}`)]}
+        reasons={[t(($) => $.moderation.grounds[item.ground])]}
         details={[item.explanation]}
-        when={t('moderation.removedOn', { date: shortDate(item.removedAt, i18n.language) })}
-        {...(item.concernsMe ? { status: t('moderation.concernsMe') } : null)}
+        when={t(($) => $.moderation.removedOn, { date: shortDate(item.removedAt, i18n.language) })}
+        {...(item.concernsMe ? { status: t(($) => $.moderation.concernsMe) } : null)}
         // Un projet retiré n'a plus de page, même pour l'administrateur : pas de lien. Une note ou
         // un commentaire retiré : on va voir le projet qui le portait (le contenu n'y est plus).
         {...(item.target.kind === 'project'
           ? null
           : {
-              viewLabel: t('moderation.viewProject'),
+              viewLabel: t(($) => $.moderation.viewProject),
               onView: () => router.push(viewHref(item.target, item.projectId)),
             })}
         actions={
@@ -415,13 +418,13 @@ function AdminModeration() {
             ? []
             : [
                 {
-                  label: t('moderation.restore'),
+                  label: t(($) => $.moderation.restore),
                   loading: pending === key,
                   onPress: guarded(
                     () =>
                       void run(
                         { action: 'restore', target: item.target },
-                        t('moderation.restoredDone'),
+                        t(($) => $.moderation.restoredDone),
                         (done) => settle(setDecidedRemoved, { key, index, item, outcome: done }),
                       ),
                   ),
@@ -440,12 +443,12 @@ function AdminModeration() {
   const showsError = (!list.data && list.isError) || (retrying && !list.data)
 
   return (
-    <Screen header={<TopNav />} onBack={back} title={t('moderation.title')}>
+    <Screen header={<TopNav />} onBack={back} title={t(($) => $.moderation.title)}>
       <Segmented<Tab>
-        label={t('moderation.list')}
+        label={t(($) => $.moderation.list)}
         options={[
-          { value: 'pending', label: t('moderation.pending') },
-          { value: 'removed', label: t('moderation.removed') },
+          { value: 'pending', label: t(($) => $.moderation.pending) },
+          { value: 'removed', label: t(($) => $.moderation.removed) },
         ]}
         value={tab}
         onChange={changeTab}
@@ -454,16 +457,20 @@ function AdminModeration() {
       {showsError ? (
         <StateMessage
           kind="error"
-          title={t('moderation.errorTitle')}
-          message={t(`errors.${errorKey(list.error)}`)}
-          actions={[{ label: t('common.retry'), onPress: () => void onRetry(), loading: retrying }]}
+          title={t(($) => $.moderation.errorTitle)}
+          message={t(($) => $.errors[errorKey(list.error)])}
+          actions={[
+            { label: t(($) => $.common.retry), onPress: () => void onRetry(), loading: retrying },
+          ]}
         />
       ) : !list.data ? (
-        <StateMessage kind="loading" message={t('common.loading')} />
+        <StateMessage kind="loading" message={t(($) => $.common.loading)} />
       ) : count === 0 ? (
         <StateMessage
           kind="empty"
-          message={tab === 'pending' ? t('moderation.empty') : t('moderation.emptyRemoved')}
+          message={
+            tab === 'pending' ? t(($) => $.moderation.empty) : t(($) => $.moderation.emptyRemoved)
+          }
         />
       ) : (
         <Stack gap="lg">
@@ -481,10 +488,10 @@ function AdminModeration() {
                     ? 'more'
                     : 'end'
             }
-            moreLabel={t('moderation.more')}
-            endLabel={t('moderation.end')}
-            errorLabel={t('moderation.moreError')}
-            retryLabel={t('common.retry')}
+            moreLabel={t(($) => $.moderation.more)}
+            endLabel={t(($) => $.moderation.end)}
+            errorLabel={t(($) => $.moderation.moreError)}
+            retryLabel={t(($) => $.common.retry)}
             // Une seule demande à la fois, même après un double clic.
             onMore={() => {
               if (!list.isFetchingNextPage) void list.fetchNextPage()
@@ -495,17 +502,17 @@ function AdminModeration() {
 
       <Dialog
         visible={removeOpen}
-        title={t('moderation.removeTitle')}
+        title={t(($) => $.moderation.removeTitle)}
         // Le contenu visé, rappelé sous le titre : la fenêtre couvre la carte qu'on a touchée.
         quote={
           removing
             ? {
-                label: t(`moderation.kinds.${removing.item.target.kind}`),
+                label: t(($) => $.moderation.kinds[removing.item.target.kind]),
                 text: firstText(removing.item.snapshot),
               }
             : undefined
         }
-        message={t('moderation.removeMessage')}
+        message={t(($) => $.moderation.removeMessage)}
         onDismiss={closeRemove}
         onClosed={() => {
           if (!focusAfterClose.current) return
@@ -516,19 +523,19 @@ function AdminModeration() {
         }}
       >
         <Choices<RemovalGround>
-          label={t('moderation.groundLabel')}
+          label={t(($) => $.moderation.groundLabel)}
           options={[
-            { value: 'illegal', label: t('moderation.grounds.illegal') },
-            { value: 'rules', label: t('moderation.grounds.rules') },
+            { value: 'illegal', label: t(($) => $.moderation.grounds.illegal) },
+            { value: 'rules', label: t(($) => $.moderation.grounds.rules) },
           ]}
           value={ground}
           onChange={setGround}
         />
         <TextField
-          label={t('moderation.explanation')}
+          label={t(($) => $.moderation.explanation)}
           value={explanation}
           onChangeText={setExplanation}
-          hint={t('moderation.explanationHint')}
+          hint={t(($) => $.moderation.explanationHint)}
           error={fieldError ?? undefined}
           multiline
           maxLength={REMOVAL_EXPLANATION_MAX}
@@ -536,7 +543,7 @@ function AdminModeration() {
         />
         {dialogError ? <Notice message={dialogError} /> : null}
         <Button
-          label={t('moderation.confirmRemove')}
+          label={t(($) => $.moderation.confirmRemove)}
           variant="confirm"
           onPress={() => void confirmRemove()}
           loading={submitting}
@@ -544,7 +551,7 @@ function AdminModeration() {
           disabled={ground === null || explanation.trim() === ''}
         />
         <Button
-          label={t('moderation.cancel')}
+          label={t(($) => $.moderation.cancel)}
           variant="secondary"
           onPress={closeRemove}
           disabled={submitting}

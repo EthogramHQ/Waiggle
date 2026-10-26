@@ -16,13 +16,13 @@ export function LanguageSwitcher({ compact = false }: Props) {
 
   return (
     <Segmented
-      label={t('common.language')}
+      label={t(($) => $.common.language)}
       // .map() transforme chaque langue en option du contrôle
       options={supportedLanguages.map((language) => ({
         value: language,
         // En version compacte, on affiche le code (« FR ») mais on lit le nom (« Français »).
-        label: compact ? language.toUpperCase() : t(`common.languages.${language}`),
-        spokenLabel: t(`common.languages.${language}`),
+        label: compact ? language.toUpperCase() : t(($) => $.common.languages[language]),
+        spokenLabel: t(($) => $.common.languages[language]),
       }))}
       value={current}
       onChange={(language) => void choose(language)}

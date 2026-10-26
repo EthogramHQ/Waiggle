@@ -103,7 +103,7 @@ describe('the contact address on the sign-in page', () => {
     // Une personne photographiée ou une autorité n'a pas de compte : elle doit pouvoir écrire.
     await renderWithI18n(<SignInScreen />)
 
-    expect(screen.getAllByText(containing(fr.t('auth.contact'))).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(containing(fr.t(($) => $.auth.contact))).length).toBeGreaterThan(0)
     expect(screen.getAllByText(containing(contactEmail)).length).toBeGreaterThan(0)
   })
 
@@ -111,7 +111,7 @@ describe('the contact address on the sign-in page', () => {
     await renderWithI18n(<SignInScreen />, 'en')
 
     expect(
-      screen.getAllByText(containing(createI18n('en').t('auth.contact'))).length,
+      screen.getAllByText(containing(createI18n('en').t(($) => $.auth.contact))).length,
     ).toBeGreaterThan(0)
   })
 })
