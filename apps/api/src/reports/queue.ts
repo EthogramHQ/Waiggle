@@ -11,6 +11,7 @@ import {
   MODERATION_PAGE_SIZE,
   type ModerationQueueItem,
   type ModerationQueuePage,
+  REPORT_RETENTION_DAYS,
   RemovalGround,
   type RemovedItem,
   type RemovedPage,
@@ -33,6 +34,9 @@ import { targetUuid } from './target'
 const r = schema.contentReport
 const d = schema.moderationDecision
 const ISO = 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+const DAY = 24 * 60 * 60 * 1000
+/** La forme d'un uuid, pour une expression régulière de PostgreSQL (« ~ »). Écrite ici, jamais reçue. */
+const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 
 // ─── Classer « sans objet » ──────────────────────────────────────────────────────────────────────
 
@@ -48,7 +52,12 @@ const ISO = 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
  * une colonne homonyme de la sous-requête.
  */
 export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
-  const id = targetUuid('content_report')
+  // L'identifiant en uuid, seulement s'il en a la forme (tranche 7c) : une ligne posée à la main
+  // avec un identifiant mal formé ferait sinon échouer la conversion, et toute la file avec elle.
+  // Elle ne trouve alors aucune cible, et passe « sans objet » comme une cible disparue.
+  const id = sql.raw(
+    `(case when content_report.target_kind <> 'member' and content_report.target_id ~ '${UUID_PATTERN}' then content_report.target_id::uuid end)`,
+  )
   const rows = await db
     .update(r)
     .set({ status: 'void', decidedAt: now })
@@ -164,7 +173,16 @@ export const loadQueuePage = async (
       details: r.details,
       // mapWith : la valeur se lit comme la colonne (du JSON rendu en objet).
       snapshot: sql<unknown>`case when ${newest} then ${r.snapshot} end`.mapWith(r.snapshot),
-      snapshotHash: sql<string>`md5(${r.snapshot}::text)`,
+      // Une copie d'avant 7b d'une note ou d'un commentaire ([{field:'text'}], tout leur texte)
+      // compte comme la copie 7b du même texte ([{field:'body'}]) : on la réécrit ainsi avant
+      // l'empreinte (tranche 7c, S3). Pour un projet ou un profil, 7a n'en gardait qu'une partie :
+      // la copie reste telle quelle, et diffère. `->` sur une copie mal formée rend null, sans
+      // erreur ; jsonb_build_object écrit ses clés comme la copie rangée en base.
+      snapshotHash: sql<string>`md5((case
+        when ${r.targetKind} in ('note', 'comment') and ${r.snapshot}->0->>'field' = 'text'
+          and ${r.snapshot}->1 is null
+        then jsonb_build_array(jsonb_build_object('field', 'body', 'value', ${r.snapshot}->0->'value'))
+        else ${r.snapshot} end)::text)`,
       createdAt: r.createdAt,
     })
     .from(r)
@@ -180,9 +198,18 @@ export const loadQueuePage = async (
     )
     .orderBy(r.createdAt, r.id)
 
+  // Chaque groupe avec sa cible validée, appariés par la clé `kind:id` (tranche 7c) : une ligne
+  // invalide en base (identifiant mal formé, sorte inconnue) est écartée avec un avertissement
+  // sans donnée personnelle, et ne décale ni les nombres ni les dates des cartes voisines.
+  const groupsByKey = new Map<string, z.infer<typeof Group>>()
   const targets = page.flatMap((g) => {
     const parsed = ReportTarget.safeParse({ kind: g.target_kind, id: g.target_id })
-    return parsed.success ? [parsed.data] : []
+    if (!parsed.success) {
+      console.warn(`Moderation queue: report ${g.first_id} has an invalid target, left out`)
+      return []
+    }
+    groupsByKey.set(keyOf(parsed.data), g)
+    return [parsed.data]
   })
   const states = await statesOf(db, targets)
 
@@ -198,18 +225,26 @@ export const loadQueuePage = async (
     ...new Set(reports.flatMap((x) => (x.targetAuthorId ? [x.targetAuthorId] : []))),
   ]
   const blocked = await blockedByAdmin(db, adminId, authorIds)
+  // Tranche 7c : le rappel des décisions passées pour chaque membre visé (trois requêtes pour la
+  // page).
+  const records = await authorRecords(db, authorIds, new Date())
 
-  const items = targets.map((target, index): ModerationQueueItem => {
-    const group = page[index]
+  const items = targets.map((target): ModerationQueueItem => {
+    const group = groupsByKey.get(keyOf(target))
     const mine = reports.filter((x) => x.targetKind === target.kind && x.targetId === target.id)
     const first = mine[0]
     const copy = copies.get(keyOf(target)) ?? []
+    // Le membre visé : l'auteur du contenu, ou le membre lui-même pour un profil ; null si son
+    // compte est parti (la base a remis target_author_id à null).
+    const memberId = mine.find((x) => x.targetAuthorId !== null)?.targetAuthorId ?? null
     // Les motifs comptés, du plus fréquent au moins fréquent ; à égalité, dans l'ordre où l'appli
-    // les propose (ReportReason).
+    // les propose (ReportReason). Un motif inconnu en base (ligne posée à la main) est laissé de
+    // côté plutôt que de faire tomber la file.
     const counts = new Map<ReportReason, number>()
     for (const report of mine) {
-      const reason = ReportReason.parse(report.reason)
-      counts.set(reason, (counts.get(reason) ?? 0) + 1)
+      const reason = ReportReason.safeParse(report.reason)
+      if (!reason.success) continue
+      counts.set(reason.data, (counts.get(reason.data) ?? 0) + 1)
     }
     const order = ReportReason.options
     const reasons = [...counts.entries()]
@@ -219,8 +254,7 @@ export const loadQueuePage = async (
       target,
       projectId: first?.projectId ?? null,
       // Les textes de la copie ; ses images à part, sans leur clé : encore là, ou parties depuis.
-      // 7c : provisoire (commit du contrat) ; backend-dev A calcule le rappel des décisions.
-      authorRecord: null,
+      authorRecord: memberId === null ? null : recordOf(records, memberId, adminId, blocked),
       snapshot: copy.filter((entry) => !isImageField(entry.field)),
       images: copy.flatMap((entry): SnapshotImage[] =>
         isImageField(entry.field)
@@ -256,6 +290,123 @@ export const loadQueuePage = async (
 }
 
 const keyOf = (target: ReportTarget) => `${target.kind}:${target.id}`
+
+// ─── Le rappel des décisions passées (tranche 7c) ────────────────────────────────────────────────
+
+/** Ce que la modération sait déjà des membres visés par une page de la file. */
+type Records = {
+  removals: Map<string, number>
+  suspensions: Map<string, number>
+  suspendedNow: ReadonlySet<string>
+  admins: ReadonlySet<string>
+}
+
+const MemberCount = z.object({ member_id: z.string(), n: z.coerce.number() })
+const MemberSuspensions = z.object({
+  member_id: z.string(),
+  n: z.coerce.number(),
+  active: z.boolean(),
+})
+
+/** `in (…)` pour une liste d'identifiants, chacun en paramètre lié. */
+const inList = (ids: string[]) =>
+  sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `,
+  )
+
+/**
+ * Le rappel de chaque membre visé, sur l'année gardée (REPORT_RETENTION_DAYS), en trois requêtes
+ * pour toute la page (J10) :
+ * 1. ses retraits de l'année, sauf ceux qu'une décision « restore » a suivis sur la même cible.
+ *    Index moderation_decision_member_idx (target_member_id, created_at) ; « not exists » cherche
+ *    le rétablissement par moderation_decision_target_idx (target_kind, target_id, created_at). Les
+ *    colonnes sont écrites avec leur table (d., rs.) : la sous-requête lit la même table ;
+ * 2. ses suspensions finies depuis moins d'un an, ou en cours, sauf celles levées pour erreur
+ *    (lift_cause de la décision de levée) ; et s'il est suspendu en ce moment : non levée, et
+ *    sans fin ou finissant plus tard que `now` (l'heure de JavaScript, `utc`, jamais now() de SQL ;
+ *    S10). Index account_suspension_user_idx ;
+ * 3. lesquels sont administrateurs en fonction (clé primaire de admin_member).
+ */
+const authorRecords = async (db: Database, memberIds: string[], now: Date): Promise<Records> => {
+  const records: Records = {
+    removals: new Map(),
+    suspensions: new Map(),
+    suspendedNow: new Set(),
+    admins: new Set(),
+  }
+  if (memberIds.length === 0) return records
+  const yearAgo = new Date(now.getTime() - REPORT_RETENTION_DAYS * DAY)
+
+  const removals = await db.execute(sql`
+    select d.target_member_id as member_id, count(*) as n
+    from moderation_decision d
+    where d.target_member_id in (${inList(memberIds)})
+      and d.action = 'remove'
+      and d.created_at > ${utc(yearAgo)}
+      and not exists (
+        select 1 from moderation_decision rs
+        where rs.target_kind = d.target_kind and rs.target_id = d.target_id
+          and rs.action = 'restore' and rs.created_at > d.created_at)
+    group by d.target_member_id
+  `)
+  for (const row of z.object({ rows: z.array(MemberCount) }).parse(removals).rows) {
+    records.removals.set(row.member_id, row.n)
+  }
+
+  const suspensions = await db.execute(sql`
+    select s.user_id as member_id,
+      count(*) filter (
+        where l.lift_cause is distinct from 'error'
+          and (coalesce(s.lifted_at, s.ends_at) is null
+            or coalesce(s.lifted_at, s.ends_at) > ${utc(yearAgo)})) as n,
+      coalesce(bool_or(s.lifted_at is null and (s.ends_at is null or s.ends_at > ${utc(now)})), false)
+        as active
+    from account_suspension s
+    left join moderation_decision l on l.id = s.lift_decision_id
+    where s.user_id in (${inList(memberIds)})
+    group by s.user_id
+  `)
+  const active = new Set<string>()
+  for (const row of z.object({ rows: z.array(MemberSuspensions) }).parse(suspensions).rows) {
+    records.suspensions.set(row.member_id, row.n)
+    if (row.active) active.add(row.member_id)
+  }
+  records.suspendedNow = active
+
+  const a = schema.adminMember
+  const admins = await db
+    .select({ id: a.userId })
+    .from(a)
+    .where(and(inArray(a.userId, memberIds), isNull(a.revokedAt)))
+  records.admins = new Set(admins.map((row) => row.id))
+  return records
+}
+
+/**
+ * Le rappel d'un membre sur une carte. `canSuspend` : faux pour l'administrateur qui regarde
+ * lui-même, pour un administrateur en fonction, pour un membre déjà suspendu, et pour un membre que
+ * cet administrateur a bloqué (il est concerné : S4, J13 ; la suspension lui serait refusée).
+ */
+const recordOf = (
+  records: Records,
+  memberId: string,
+  adminId: string,
+  blocked: ReadonlySet<string>,
+): NonNullable<ModerationQueueItem['authorRecord']> => {
+  const suspendedNow = records.suspendedNow.has(memberId)
+  return {
+    memberId,
+    removals: records.removals.get(memberId) ?? 0,
+    suspensions: records.suspensions.get(memberId) ?? 0,
+    suspendedNow,
+    canSuspend:
+      memberId !== adminId &&
+      !records.admins.has(memberId) &&
+      !suspendedNow &&
+      !blocked.has(memberId),
+  }
+}
 
 type ImageField = (typeof IMAGE_INPUT_FIELDS)[number]
 const isImageField = (field: MemberInputField): field is ImageField =>
@@ -448,9 +599,11 @@ export const loadRemovedPage = async (
 
   const items = page.flatMap((row): RemovedItem[] => {
     const target = ReportTarget.safeParse({ kind: row.targetKind, id: row.targetId })
-    if (!target.success || row.ground === null || row.explanation === null) return []
-    const ground = RemovalGround.parse(row.ground)
-    const base = { target: target.data, ground, explanation: row.explanation }
+    // safeParse plutôt que parse (tranche 7c) : un fondement inconnu en base écarte la ligne, pas
+    // toute la page.
+    const ground = RemovalGround.safeParse(row.ground)
+    if (!target.success || !ground.success || row.explanation === null) return []
+    const base = { target: target.data, ground: ground.data, explanation: row.explanation }
     if (row.projectTitle !== null && row.projectRemovedAt !== null) {
       return [
         {

@@ -3,7 +3,16 @@
 // garde les faits. Le retrait lui-même est noté sur le contenu (removed_at sur project,
 // project_note et project_comment), pour que chaque lecture puisse l'exclure sans jointure.
 import { sql } from 'drizzle-orm'
-import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
 /**
@@ -40,7 +49,7 @@ export const moderationDecision = pgTable(
     targetKind: text('target_kind').notNull(),
     // L'identifiant de la cible : un uuid (projet, note, commentaire) ou l'id d'un membre (texte).
     targetId: text('target_id').notNull(),
-    // 'remove' | 'restore' | 'dismiss'.
+    // 'remove' | 'restore' | 'dismiss', et depuis 7c 'suspend' | 'lift' (cible : le membre).
     action: text('action').notNull(),
     // Le fondement d'un retrait : 'illegal' (la loi) ou 'rules' (les règles de l'appli) ; null pour
     // rétablir ou classer.
@@ -50,10 +59,87 @@ export const moderationDecision = pgTable(
     // L'administrateur qui a décidé. onDelete: 'set null' : la décision reste si son compte part.
     adminId: text('admin_id').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').notNull(),
+    // Tranche 7c. Le membre visé : l'auteur du contenu, ou le membre lui-même (profil, suspension,
+    // levée). Écrit à chaque décision, pour l'historique filtré par membre et le rappel des
+    // décisions passées sur une carte de la file. onDelete: 'set null' : la décision reste quand
+    // son compte part, sans son nom.
+    targetMemberId: text('target_member_id').references(() => user.id, { onDelete: 'set null' }),
+    // La durée d'une suspension : '7d' | '30d' | 'indefinite' (SuspensionDuration) ; null sinon.
+    // Gardée sur la décision elle-même (relecture de sécurité S20) : l'historique se lit sans la
+    // ligne de la suspension, qui peut avoir été purgée.
+    duration: text('duration'),
+    // Vrai pour une suspension partie d'un signalement (relecture juridique J2) ; faux sinon.
+    // « default false » remplit les décisions d'avant 7c, qui n'étaient pas des suspensions.
+    afterReport: boolean('after_report').notNull().default(false),
+    // La raison d'une levée : 'early' | 'error' (LiftCause) ; null sinon. Une suspension levée
+    // pour erreur ne compte plus dans le rappel des décisions passées (J10).
+    liftCause: text('lift_cause'),
   },
   (t) => [
     // L'historique d'une cible (la dernière décision, le rétablissement) et la purge.
     index('moderation_decision_target_idx').on(t.targetKind, t.targetId, t.createdAt),
+    // L'onglet « Historique » : toutes les décisions, de la plus récente à la plus ancienne, et la
+    // page suivante reprise au curseur (date, id). `.desc().nullsFirst()` : l'ordre exact de
+    // « order by created_at desc, id desc », que PostgreSQL lit alors tel quel.
+    index('moderation_decision_created_idx').on(
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
+    // Le même historique filtré par membre (?member=), et le rappel d'une carte (ses retraits de
+    // l'année). Il sert aussi la base quand le compte part (« set null » cherche ses décisions).
+    index('moderation_decision_member_idx').on(
+      t.targetMemberId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
+    // Les garde-fous (apps/api/src/moderation/guard.ts) : les retraits d'un administrateur dans
+    // l'heure, ses suspensions du jour. Et « set null » au départ de son compte.
+    index('moderation_decision_admin_idx').on(t.adminId, t.createdAt),
+  ],
+)
+
+/**
+ * La suspension d'un compte (tranche 7c) : le membre passe en lecture seule, pour 7 jours, 30 jours
+ * ou jusqu'à la levée. Une suspension est **active** si elle n'est pas levée (`lifted_at` null) et
+ * que sa fin n'est pas passée (`ends_at` null, ou plus tard que maintenant). Aucune tâche planifiée
+ * ne la clôt à sa fin : la fin se lit à chaque requête ; l'API ne note `lifted_at = ends_at` qu'au
+ * moment d'en poser une nouvelle.
+ */
+export const accountSuspension = pgTable(
+  'account_suspension',
+  {
+    id: uuid('id').primaryKey(),
+    // Le membre suspendu. onDelete: 'set null' (relecture juridique J1) : partir n'efface pas la
+    // preuve. La ligne reste un an après sa fin, sans le compte, comme les décisions.
+    userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+    // La décision « suspend » qui l'a posée, et la décision « lift » qui l'a levée. 'set null' :
+    // la purge d'une décision ne fait pas tomber la suspension (la purge les protège, J7).
+    decisionId: uuid('decision_id').references(() => moderationDecision.id, {
+      onDelete: 'set null',
+    }),
+    startsAt: timestamp('starts_at').notNull(),
+    // La fin prévue, à la seconde : la pose plus 7 ou 30 jours ; null : sans fin.
+    endsAt: timestamp('ends_at'),
+    // La fin réelle : la levée, ou la fin prévue quand l'API clôt une suspension échue ; null tant
+    // qu'elle n'est pas close. Une levée se reconnaît à lift_decision_id (J6).
+    liftedAt: timestamp('lifted_at'),
+    liftDecisionId: uuid('lift_decision_id').references(() => moderationDecision.id, {
+      onDelete: 'set null',
+    }),
+    // Vrai si la suspension a suivi un signalement (J2), comme sur sa décision.
+    afterReport: boolean('after_report').notNull().default(false),
+  },
+  (t) => [
+    // Une seule suspension non close par membre : un index « unique partiel », qui ne range que
+    // les lignes où lifted_at est null et y refuse un doublon. Deux suspensions posées en même
+    // temps : la seconde échoue (erreur 23505), et l'API répond « déjà décidé ». Il sert aussi la
+    // lecture « suspendu en ce moment ? ».
+    uniqueIndex('account_suspension_open_idx').on(t.userId).where(sql`${t.liftedAt} is null`),
+    // Toutes les suspensions d'un membre (le rappel de la file, l'export), et « set null » au départ.
+    index('account_suspension_user_idx').on(t.userId, t.startsAt),
+    // La purge des décisions vérifie qu'aucune suspension gardée ne les cite (J7).
+    index('account_suspension_decision_idx').on(t.decisionId),
+    index('account_suspension_lift_decision_idx').on(t.liftDecisionId),
   ],
 )
 

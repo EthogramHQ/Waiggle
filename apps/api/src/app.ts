@@ -221,7 +221,7 @@ export const createApp = ({
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
-  app.route('/', moderationRoutes({ db }))
+  app.route('/', moderationRoutes({ db, limiter, auth }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

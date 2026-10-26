@@ -2,7 +2,7 @@
 // Les compteurs sont dans la base (table api_rate_limit) : ils survivent à un redémarrage et
 // seraient partagés si l'API tournait un jour sur plusieurs serveurs.
 import { type Database, schema } from '@ruche/db'
-import { inArray, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 
 export type RateRule = { windowMs: number; max: number }
 
@@ -18,6 +18,12 @@ export type RateDecision = { allowed: true } | { allowed: false; retryAfterSecon
 export type RateLimiter = {
   /** Compte une requête pour cette clé et dit si elle est autorisée. */
   hit(key: string, rule: RateRule): Promise<RateDecision>
+  /**
+   * Rend une unité comptée par `hit` (tranche 7c) : pour un compteur d'échecs, on compte l'essai
+   * d'abord, puis on le rend s'il a réussi (moderation/guard.ts). Compter d'abord borne aussi les
+   * essais lancés en même temps : chacun prend sa place avant d'être vérifié.
+   */
+  refund(key: string): Promise<void>
 }
 
 /**
@@ -52,6 +58,15 @@ export const createRateLimiter = (db: Database, clock: () => number = Date.now):
       allowed: false,
       retryAfterSeconds: Math.ceil((row.windowStart + windowMs - now) / 1000),
     }
+  },
+  async refund(key) {
+    const t = schema.apiRateLimit
+    // « count - 1 » calculé par PostgreSQL sur la ligne à jour, jamais au-dessous de zéro : deux
+    // remboursements simultanés ne se marchent pas dessus. Lu par la clé primaire (key).
+    await db
+      .update(t)
+      .set({ count: sql`${t.count} - 1` })
+      .where(and(eq(t.key, key), gt(t.count, 0)))
   },
 })
 
@@ -101,6 +116,11 @@ export const memberCounterKeys = (userId: string) => ({
   emailChangeDay: `email-change-day:${userId}`,
   // Les e-mails envoyés à une nouvelle adresse (le second lien) : 3 par heure (S1).
   emailChangeLink: `email-change-link:${userId}`,
+  // Les décisions d'un administrateur (tranche 7c) : 50 par jour, toutes actions confondues, mal
+  // formées comprises. Un compte d'administrateur volé ne peut pas tout retirer d'un coup.
+  moderationDecision: `moderation-decision:${userId}`,
+  // Ses mots de passe faux quand la modération le redemande (S12) : 5 par jour, puis 429.
+  moderationPassword: `moderation-password:${userId}`,
 })
 
 /**
