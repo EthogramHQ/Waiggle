@@ -339,10 +339,11 @@ describe('newEmailVerificationEmail', () => {
 })
 
 describe('emailChangedEmail', () => {
-  const signInUrl = 'https://waiggle.com/sign-in'
-  const data = { name: 'Inès', newEmail: 'ines.b@exemple.fr', signInUrl }
+  const data = { name: 'Inès', newEmail: 'ines.b@exemple.fr' }
 
-  it('tells the old address the new one, and offers to sign in', () => {
+  // Décision de Louis du 26/10/2026 (relecture juridique R6) : aucun bouton ni lien ; le seul
+  // geste proposé est d'écrire au contact, en texte.
+  it('tells the old address the new one, with no button nor link, only the contact to write to', () => {
     const email = emailChangedEmail('fr', data)
 
     expect(email.subject).toBe(fill(fr.emailChanged.subject))
@@ -350,9 +351,8 @@ describe('emailChangedEmail', () => {
     for (const sentence of [fr.emailChanged.body, fr.emailChanged.after, fr.emailChanged.help]) {
       expect(email.text).toContain(fill(sentence))
     }
-    expect(email.text).toContain(signInUrl)
-    expect(email.html).toContain(`href="${signInUrl}"`)
-    expect(email.html).toContain(`>${fill(fr.emailChanged.button)}</a>`)
+    expect(email.html).not.toMatch(/<a\s/i)
+    expect(email.text).not.toMatch(/https?:\/\//)
   })
 
   it('is written in English for an English-speaking member', () => {
@@ -360,7 +360,7 @@ describe('emailChangedEmail', () => {
 
     expect(email.subject).toBe(fill(en.emailChanged.subject))
     expect(email.text).toContain(fill(en.greeting, { name: 'Sam' }))
-    expect(email.text).toContain(fill(en.emailChanged.button))
+    expect(email.text).toContain(fill(en.emailChanged.help))
   })
 })
 
@@ -373,7 +373,7 @@ describe('the new address written in the e-mails of an address change', () => {
       newEmail,
       url: 'https://api.waiggle.com/v',
     }),
-    emailChangedEmail('en', { name: 'Sam', newEmail, signInUrl: 'https://waiggle.com/sign-in' }),
+    emailChangedEmail('en', { name: 'Sam', newEmail }),
   ]
 
   // Plan, S10 et J6 : l'adresse se lit telle que saisie, seule sur sa ligne, pour qu'une faute de
@@ -400,11 +400,7 @@ describe('a name written to trap the e-mails of an address change', () => {
       newEmail: 'ines.b@exemple.fr',
       url: 'https://api.waiggle.com/v',
     })
-    const changed = emailChangedEmail('en', {
-      name: trap,
-      newEmail: 'ines.b@exemple.fr',
-      signInUrl: 'https://waiggle.com/sign-in',
-    })
+    const changed = emailChangedEmail('en', { name: trap, newEmail: 'ines.b@exemple.fr' })
 
     for (const part of [confirmation.text, confirmation.html]) {
       expect(part).not.toContain('waiggle-login.com')
@@ -427,11 +423,7 @@ describe('the rules shared by the e-mails of an address change', () => {
     newEmailVerificationEmail('en', {
       url: 'https://api.waiggle.com/api/auth/verify-email?token=def',
     }),
-    emailChangedEmail('fr', {
-      name: 'Inès',
-      newEmail: 'ines.b@exemple.fr',
-      signInUrl: 'https://waiggle.com/sign-in',
-    }),
+    emailChangedEmail('fr', { name: 'Inès', newEmail: 'ines.b@exemple.fr' }),
   ]
 
   it('give the contact address, as text and never as a link', () => {
@@ -445,7 +437,11 @@ describe('the rules shared by the e-mails of an address change', () => {
   it('link to the app or the API only, with no image and no unsubscribe link', () => {
     for (const email of emails()) {
       const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
-      expect(hrefs, email.subject).toHaveLength(1) // le bouton, rien d'autre
+      // Le bouton, rien d'autre ; et aucun dans l'e-mail final (décision de Louis du 26/10, R6).
+      const final =
+        email.subject === fill(en.emailChanged.subject) ||
+        email.subject === fill(fr.emailChanged.subject)
+      expect(hrefs, email.subject).toHaveLength(final ? 0 : 1)
       for (const href of hrefs) {
         expect(/^https:\/\/(api\.)?waiggle\.com\//.test(href), href).toBe(true)
       }

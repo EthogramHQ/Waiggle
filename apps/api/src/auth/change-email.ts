@@ -11,15 +11,19 @@
 //
 // Les liens portent un « jeton » JWT : un petit texte signé avec notre secret, qui contient
 // l'adresse du compte (`email`), la nouvelle (`updateTo`), l'étape (`requestType`) et sa date
-// d'émission (`iat`, en secondes). Il est signé, pas chiffré : n'importe qui peut le lire. Ne
-// jamais journaliser l'adresse d'une requête de /verify-email, ni une adresse tout court.
+// d'émission (`iat`, en secondes). Il est signé, pas chiffré : n'importe qui peut le lire. Le
+// premier lien part vers l'adresse du membre, qui connaît les deux adresses ; le second part vers
+// une adresse pas encore vérifiée (peut-être celle d'un inconnu, après une faute de frappe) : son
+// jeton y est donc chiffré (relecture juridique R1, décision de Louis du 26/10/2026), voir
+// `sealToken`. Ne jamais journaliser l'adresse d'une requête de /verify-email, ni une adresse tout
+// court.
 
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { ChangeEmailRequest } from '@ruche/contracts'
 import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { APIError, createEmailVerificationToken, getSessionFromCtx } from 'better-auth/api'
 import { expireCookie } from 'better-auth/cookies'
-import { verifyJWT } from 'better-auth/crypto'
+import { symmetricDecrypt, symmetricEncrypt, verifyJWT } from 'better-auth/crypto'
 import { z } from 'zod'
 import { languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
@@ -94,10 +98,33 @@ const stepOf = (token: string): ChangeEmailStep | undefined =>
   z.object({ requestType: ChangeEmailStep }).safeParse(unverifiedPayload(token)).data?.requestType
 
 /**
- * L'empreinte (SHA-256) d'un jeton : la clé de son compteur « usage unique » ne garde pas le
- * jeton lui-même, qui contient les deux adresses.
+ * Un jeton qui nomme une nouvelle adresse (`updateTo`), quelle que soit son étape. Better Auth a un
+ * ancien parcours sans étape, qui change l'adresse aussitôt et connecte l'appareil : aucun de nos
+ * liens n'en est un (relecture de sécurité A1).
  */
-const digest = (token: string) => createHash('sha256').update(token).digest('hex')
+const namesNewAddress = (token: string) =>
+  z.object({ updateTo: z.string() }).safeParse(unverifiedPayload(token)).success
+
+/**
+ * La partie signée d'un JWT, « en-tête.contenu », sans la signature. La bibliothèque des JWT
+ * accepte plusieurs écritures d'une même signature (des blancs, un « = » final, les bits de
+ * remplissage du dernier caractère : relecture de sécurité B1) ; la partie signée, elle, n'en a
+ * qu'une une fois la signature vérifiée, puisque la signature est calculée sur ces caractères
+ * exacts. C'est donc elle qui identifie un lien.
+ */
+const signedPart = (token: string) => token.split('.').slice(0, 2).join('.')
+
+/**
+ * L'empreinte (SHA-256) d'un texte : la clé du compteur « usage unique » ne garde pas le jeton
+ * lui-même, qui contient les deux adresses.
+ */
+const digest = (text: string) => createHash('sha256').update(text).digest('hex')
+
+/**
+ * Un jeton chiffré s'écrit en hexadécimal (0-9, a-f) ; un JWT contient toujours deux points. Les
+ * deux ne se confondent jamais.
+ */
+const SEALED = /^[0-9a-f]+$/i
 
 /**
  * Remplace la page de retour (callbackURL) d'un lien fabriqué par Better Auth. Il y écrit celle de
@@ -120,11 +147,40 @@ const visitorLanguage = (ctx: AuthContext) =>
 export type EmailChangeOptions = {
   mailer: Mailer
   rateLimiter: RateLimiter
-  /** Adresse de l'appli web : les deux pages où mènent les liens, et la page de connexion. */
+  /** Adresse de l'appli web : les deux pages où mènent les liens. */
   appUrl: string
+  /** BETTER_AUTH_SECRET : la clé qui chiffre le jeton du second lien en est dérivée. */
+  secret: string
 }
 
-export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOptions) => {
+export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: EmailChangeOptions) => {
+  // La clé du chiffrement des seconds liens : un HMAC du secret sur une étiquette fixe, comme pour
+  // les jetons de désinscription (email/unsubscribe-token.ts). Une clé à part pour chaque usage :
+  // un texte chiffré par Better Auth avec le secret lui-même ne se déchiffre pas ici.
+  const sealKey = createHmac('sha256', secret).update('waiggle:email-change-link:v1').digest('hex')
+
+  /**
+   * Chiffre le JWT du second lien (relecture juridique R1). `symmetricEncrypt` (Better Auth) le
+   * chiffre en XChaCha20-Poly1305, un chiffrement « authentifié » : sans la clé, on ne peut ni le
+   * lire ni le modifier sans que le déchiffrement échoue. Chaque appel tire un nombre au hasard
+   * (le « nonce ») : deux chiffrements du même jeton ne se ressemblent pas. Le résultat est en
+   * hexadécimal, sûr dans une adresse.
+   */
+  const sealToken = (token: string) => symmetricEncrypt({ key: sealKey, data: token })
+
+  /**
+   * Le JWT d'un lien : tel quel pour un lien d'inscription ou un premier lien, déchiffré pour un
+   * second lien ; null pour un jeton chiffré abîmé ou fabriqué, qui ne se déchiffre pas.
+   */
+  const jwtOf = async (token: string): Promise<string | null> => {
+    if (!SEALED.test(token)) return token
+    try {
+      return await symmetricDecrypt({ key: sealKey, data: token })
+    } catch {
+      return null
+    }
+  }
+
   // Où mène chaque lien, quoi qu'en dise son adresse (relecture de sécurité S2) : le premier vers
   // « Plus qu'une étape », le second vers « Adresse changée ».
   const pageOf: Record<ChangeEmailStep, string> = {
@@ -194,6 +250,8 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
      * sinon répond false, et l'e-mail d'inscription part comme avant. Better Auth vient de fabriquer
      * ce jeton : le lire sans le vérifier ne fait courir aucun risque.
      * Au plus 3 seconds liens par heure et par membre (S1) : au-delà, rien ne part, sans le dire.
+     * Le lien porte le jeton chiffré (R1) : il contient l'ancienne adresse, et part vers une
+     * adresse qui n'a encore rien prouvé. beforeLink le déchiffre à l'ouverture.
      */
     sendNewEmailLink: async ({
       user,
@@ -210,12 +268,12 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
         NEW_EMAIL_LINK_RULE,
       )
       if (!decision.allowed) return true
+      const link = new URL(withPage(url, pageOf['change-email-verification']))
+      link.searchParams.set('token', await sealToken(token))
       sendInBackground(
         {
           to: user.email,
-          ...newEmailVerificationEmail(languageOfMember(user), {
-            url: withPage(url, pageOf['change-email-verification']),
-          }),
+          ...newEmailVerificationEmail(languageOfMember(user), { url: link.toString() }),
         },
         LINK,
       )
@@ -226,13 +284,20 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
      * Appelée par `emailVerification.afterEmailVerification` (auth.ts), après une vérification
      * réussie. Si c'était le second lien d'un changement d'adresse : une ligne de journal, puis le
      * dernier e-mail à l'ancienne adresse ; répond true. Sinon (une inscription) répond false.
-     * Better Auth vient de vérifier le jeton de la requête : on le relit sans le revérifier.
+     * Better Auth vient de vérifier le jeton de la requête : on le relit sans le revérifier, après
+     * l'avoir déchiffré (l'adresse de la requête garde le jeton chiffré du second lien).
+     * `user` peut manquer (relecture de sécurité A2) : si deux seconds liens du même membre sont
+     * ouverts en même temps, chacun change « le compte de l'ancienne adresse » ; le premier l'a
+     * déjà changée, le second ne trouve plus de compte et nous passe null. Le premier a prévenu
+     * l'ancienne adresse ; rien à faire ici.
      */
     afterEmailChanged: async (
-      user: { id: string; name: string; email: string },
+      user: { id: string; name: string; email: string } | null | undefined,
       request: Request | undefined,
     ) => {
-      const token = request ? new URL(request.url).searchParams.get('token') : null
+      if (!user) return true
+      const raw = request ? new URL(request.url).searchParams.get('token') : null
+      const token = raw ? await jwtOf(raw) : null
       const payload = token ? ChangeEmailToken.safeParse(unverifiedPayload(token)).data : undefined
       if (payload?.requestType !== 'change-email-verification') return false
       // Une sauvegarde restaurée ramènerait l'ancienne adresse : cette ligne dit à qui demander de
@@ -241,11 +306,7 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
       sendInBackground(
         {
           to: payload.email,
-          ...emailChangedEmail(languageOfMember(user), {
-            name: user.name,
-            newEmail: user.email,
-            signInUrl: `${appUrl}/sign-in`,
-          }),
+          ...emailChangedEmail(languageOfMember(user), { name: user.name, newEmail: user.email }),
         },
         LINK,
       )
@@ -347,16 +408,26 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
      * Ce que Better Auth refuse déjà lui-même (jeton faux ou périmé, compte introuvable, lien
      * ouvert par un autre membre connecté), on le lui laisse : il redirige avec son code d'erreur,
      * vers la page imposée, sans que le lien soit compté comme servi.
+     * Le jeton chiffré d'un second lien (R1) est d'abord déchiffré, puis rendu en clair à Better
+     * Auth ; s'il ne se déchiffre pas, le lien est refusé. Un jeton qui nomme une nouvelle adresse
+     * sans étape connue est refusé (A1).
      */
     beforeLink: async (ctx: AuthContext) => {
-      const token: unknown = ctx.query?.token
-      if (typeof token !== 'string') return
+      const raw: unknown = ctx.query?.token
+      if (typeof raw !== 'string') return
+      const token = await jwtOf(raw)
+      const refused = (page: string) => ctx.redirect(`${page}?error=INVALID_TOKEN`)
+      // Seul un second lien porte un jeton chiffré : sa page, même abîmé.
+      if (token === null) throw refused(pageOf['change-email-verification'])
       const step = stepOf(token)
-      if (!step) return
+      if (!step) {
+        if (namesNewAddress(token)) throw refused(pageOf['change-email-verification'])
+        return // un lien d'inscription
+      }
       const page = pageOf[step]
       // Ce qu'un hook `before` retourne dans `context` est fusionné dans la requête : Better Auth
-      // lira cette page de retour à la place de celle de l'adresse du lien.
-      const proceed = { context: { query: { ...ctx.query, callbackURL: page } } }
+      // lira ce jeton (déchiffré) et cette page de retour à la place de ceux de l'adresse du lien.
+      const proceed = { context: { query: { ...ctx.query, token, callbackURL: page } } }
       const redirect = (code?: string) => ctx.redirect(code ? `${page}?error=${code}` : page)
 
       const payload = ChangeEmailToken.safeParse(await verifyJWT(token, ctx.context.secret)).data
@@ -372,8 +443,12 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
         throw redirect('INVALID_TOKEN')
       }
 
-      // Le compteur ne laisse passer qu'une ouverture (insertion atomique, rate-limit.ts).
-      const firstUse = await rateLimiter.hit(`email-change-token:${digest(token)}`, SINGLE_USE_RULE)
+      // Le compteur ne laisse passer qu'une ouverture (insertion atomique, rate-limit.ts). Sa clé
+      // vient de la partie signée du jeton, la même pour toutes ses écritures (B1).
+      const firstUse = await rateLimiter.hit(
+        `email-change-token:${digest(signedPart(token))}`,
+        SINGLE_USE_RULE,
+      )
       if (!firstUse.allowed) throw redirect('LINK_USED')
 
       if (await ctx.context.internalAdapter.findUserByEmail(payload.updateTo)) {
@@ -398,8 +473,11 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl }: EmailChangeOp
      * Une vérification d'inscription n'est pas concernée : elle connecte toujours.
      */
     afterLink: async (ctx: AuthContext) => {
-      const token: unknown = ctx.query?.token
-      if (typeof token !== 'string' || stepOf(token) !== 'change-email-verification') return
+      // beforeLink a déjà remplacé le jeton chiffré par le JWT ; on déchiffre quand même, au cas
+      // où une version de Better Auth ne transmettrait plus ce remplacement aux hooks `after`.
+      const raw: unknown = ctx.query?.token
+      const token = typeof raw === 'string' ? await jwtOf(raw) : null
+      if (token === null || stepOf(token) !== 'change-email-verification') return
       const created = ctx.context.newSession
       if (!created) return
       const presented = await ctx.getSignedCookie(

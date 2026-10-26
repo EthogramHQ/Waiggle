@@ -64,7 +64,8 @@ type Layout = {
   items?: Item[]
   /** Des paragraphes après la liste (« Et 2 autres », les nombres). */
   after?: string[]
-  button: Link
+  /** Le bouton ; absent d'un e-mail qui ne demande aucun geste (l'adresse changée, jur-R6). */
+  button?: Link
   /** Les petites lignes sous le bouton (« si tu n'as rien demandé, ignore cet e-mail »). */
   notes: string[]
   /** Le pied : pourquoi on reçoit cet e-mail, puis les liens (se désinscrire, gérer). */
@@ -109,9 +110,7 @@ const render = ({
     ...paragraphs.flatMap((p) => [p, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
     ...after.flatMap((p) => [p, '']),
-    button.label,
-    button.url,
-    '',
+    ...(button ? [button.label, button.url, ''] : []),
     ...notes.flatMap((note) => [note, '']),
     '—',
     ...(reason ? [reason, ''] : []),
@@ -155,6 +154,11 @@ const render = ({
         `<p style="margin:0;text-align:center;font-size:14px;line-height:1.4"><a href="${escapeHtml(link.url)}" style="display:inline-block;padding:10px 4px;color:${c.textMuted}">${escapeHtml(link.label)}</a></p>`,
     )
     .join('\n    ')
+  const htmlButton = button
+    ? `<p style="margin:28px 0">
+      <a href="${escapeHtml(button.url)}" style="background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(button.label)}</a>
+    </p>`
+    : ''
   const html = `<!doctype html>
 <html lang="${language}"><head>
 <meta charset="utf-8">
@@ -168,9 +172,7 @@ const render = ({
     ${paragraphs.map((value) => p(value)).join('\n    ')}
     ${htmlItems}
     ${after.map((value) => p(value)).join('\n    ')}
-    <p style="margin:28px 0">
-      <a href="${escapeHtml(button.url)}" style="background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(button.label)}</a>
-    </p>
+    ${htmlButton}
     ${notes.map((note) => p(note, muted)).join('\n    ')}
   </div>
   <div style="max-width:520px;margin:16px auto 0">
@@ -270,6 +272,7 @@ export const changeEmailConfirmationEmail = (
  * Le deuxième e-mail, vers la NOUVELLE adresse, pour la vérifier. Une faute de frappe l'enverrait
  * chez un inconnu (relecture de sécurité S6) : la salutation est neutre, sans le nom du membre, et
  * aucune adresse n'y est écrite, ni l'ancienne ni celle-ci (seule celle du contact, dans le pied).
+ * Le lien non plus ne la dit pas : son jeton est chiffré (auth/change-email.ts, relecture R1).
  */
 export const newEmailVerificationEmail = (
   language: Language,
@@ -291,12 +294,13 @@ export const newEmailVerificationEmail = (
 
 /**
  * Le dernier e-mail, vers l'ANCIENNE adresse, une fois le changement fait : il cite la nouvelle,
- * pour qu'un changement fait par quelqu'un d'autre ne passe pas inaperçu, et propose de se
- * connecter (bouton vers la page de connexion de l'appli).
+ * pour qu'un changement fait par quelqu'un d'autre ne passe pas inaperçu. Aucun bouton (relecture
+ * juridique R6, décision de Louis du 26/10/2026) : cette adresse ne sert plus à se connecter, et
+ * le seul geste utile est d'écrire au contact si ce n'était pas le membre.
  */
 export const emailChangedEmail = (
   language: Language,
-  { name, newEmail, signInUrl }: { name: string; newEmail: string; signInUrl: string },
+  { name, newEmail }: { name: string; newEmail: string },
 ): EmailContent => {
   const t = resources[language].translation.email
   return {
@@ -305,7 +309,6 @@ export const emailChangedEmail = (
       language,
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
       paragraphs: [fill(t.emailChanged.body), newEmail, fill(t.emailChanged.after)],
-      button: { label: fill(t.emailChanged.button), url: signInUrl },
       notes: [fill(t.emailChanged.help)],
       footer: fill(t.footer),
     }),

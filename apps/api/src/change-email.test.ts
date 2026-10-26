@@ -760,3 +760,129 @@ describe('the trace of an address change', () => {
     expect(linesOf(spies).join('\n')).not.toContain('Email changed')
   })
 })
+
+// ─── Corrections après la relecture de la branche (sec-B1, jur-R1, sec-A1 à A4) ─────────────────
+
+/**
+ * Le même lien, avec un autre jeton écrit tel quel dans l'adresse (sans réencodage : un « %20 »
+ * reste un « %20 »), et la même page de retour.
+ */
+const withRawToken = (link: URL, raw: string) => {
+  const rest = new URLSearchParams(link.search)
+  rest.delete('token')
+  return new URL(`${link.origin}${link.pathname}?token=${raw}&${rest}`)
+}
+
+// L'alphabet du base64url, dans l'ordre : un caractère vaut sa position (6 bits).
+const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+describe('a first link written another way (sec-B1)', () => {
+  // La bibliothèque des JWT accepte plusieurs écritures d'une même signature : des blancs au
+  // milieu, ou un dernier caractère dont seuls les bits de remplissage changent. Chacune est le
+  // même lien, et ne doit pas envoyer un second e-mail à la nouvelle adresse.
+  it('refuses the same first link with a space in its signature, or its last character changed', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    expect((await ask(cookie)).status).toBe(200)
+    const link = linkOf('changeEmail', ines.email)
+    const token = link.searchParams.get('token') ?? ''
+    const [header, payload, signature = ''] = token.split('.')
+    const last = BASE64URL.indexOf(signature.at(-1) ?? '')
+    const variants = [
+      `${header}.${payload}.${signature.slice(0, 10)}%20${signature.slice(10)}`,
+      `${header}.${payload}.${signature.slice(0, -1)}${BASE64URL[last ^ 1]}`,
+    ]
+
+    expect(landing(await open(link))).toEqual({ page: CONFIRMED_PAGE, error: null })
+    for (const variant of variants) {
+      const res = await open(withRawToken(link, variant))
+      expect(res.status, variant).toBe(302)
+      expect(landing(res), variant).toEqual({ page: CONFIRMED_PAGE, error: 'LINK_USED' })
+    }
+    expect(mailsOf('newEmail', NEW_EMAIL)).toHaveLength(1)
+  })
+})
+
+describe('the link of the second e-mail (jur-R1)', () => {
+  // Le second e-mail part vers une adresse pas encore vérifiée, peut-être celle d'un inconnu (une
+  // faute de frappe) : son lien ne doit pas laisser lire l'ancienne adresse ni le nom du membre.
+  it('carries neither the old address nor the name of the member, however it is decoded', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const link = await askAndConfirm(cookie)
+    const raw = link.toString()
+    const pieces = [raw, decodeURIComponent(raw), ...decodeURIComponent(raw).split(/[?&=./:]/)]
+    const readings = pieces.flatMap((piece) => [
+      piece,
+      Buffer.from(piece, 'base64url').toString('utf8'),
+      Buffer.from(piece, 'hex').toString('utf8'),
+    ])
+
+    for (const secret of [ines.email, ines.name]) expect(readings.join('\n')).not.toContain(secret)
+    // Témoin : le lien marche toujours.
+    expect(landing(await open(link))).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+  })
+
+  it('refuses a second link whose token was damaged, and changes nothing', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const link = await askAndConfirm(cookie)
+    const token = link.searchParams.get('token') ?? ''
+    const middle = Math.floor(token.length / 2)
+    const damaged = `${token.slice(0, middle)}${token[middle] === '0' ? '1' : '0'}${token.slice(middle + 1)}`
+    const sessions = await sessionCount()
+
+    const res = await open(withRawToken(link, damaged))
+
+    expect(res.status).toBe(302)
+    expect(landing(res)).toEqual({ page: DONE_PAGE, error: 'INVALID_TOKEN' })
+    expect(await accountOf('Inès')).toMatchObject({ email: ines.email, emailVerified: true })
+    expect(await sessionCount()).toBe(sessions)
+  })
+})
+
+describe('a link with a new address but no known step (sec-A1)', () => {
+  // Better Auth a un ancien parcours, sans étape : il change l'adresse aussitôt, la marque non
+  // vérifiée et connecte l'appareil. Aucun de nos liens n'en est un ; un tel jeton est refusé.
+  it('is refused, and neither the address, its verification nor the sessions change', async () => {
+    await ctx.verifiedMember(ines)
+    const sessions = await sessionCount()
+    const before = ctx.mailer.sent.length
+    const token = await createEmailVerificationToken(
+      TEST_AUTH_SECRET,
+      ines.email,
+      'pirate@exemple.fr',
+      60 * 60,
+    )
+
+    const res = await ctx.request(`/api/auth/verify-email?token=${token}`)
+
+    expect(res.status).toBe(302)
+    expect(landing(res)).toEqual({ page: DONE_PAGE, error: 'INVALID_TOKEN' })
+    expect(await accountOf('Inès')).toMatchObject({ email: ines.email, emailVerified: true })
+    expect(await sessionCount()).toBe(sessions)
+    expect(ctx.mailer.sent.slice(before)).toEqual([])
+  })
+})
+
+describe('the limits, counted before anything else (sec-A3, sec-A4)', () => {
+  it('counts malformed requests in the quota of the member', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    for (let i = 1; i <= 5; i++) expect((await ask(cookie, {})).status).toBe(400)
+    const before = ctx.mailer.sent.length
+
+    // D'une autre connexion : seul le compteur d'Inès peut refuser.
+    const res = await ask(cookie, undefined, { 'x-real-ip': '198.51.100.30' })
+
+    expect(res.status).toBe(429)
+    expect(ctx.mailer.sent.slice(before)).toEqual([])
+  })
+
+  it('refuses a 31st opening of a link from the same connection within 15 minutes', async () => {
+    const openFrom = () =>
+      ctx.request('/api/auth/verify-email?token=not-a-token', {
+        headers: { 'x-real-ip': '198.51.100.31' },
+      })
+    for (let i = 1; i <= 30; i++) expect((await openFrom()).status, `opening ${i}`).not.toBe(429)
+
+    expect((await openFrom()).status).toBe(429)
+  })
+})
