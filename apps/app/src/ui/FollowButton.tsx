@@ -38,7 +38,7 @@ type Props = {
   /**
    * Inactif (annoncé « désactivé ») : un compte suspendu (tranche 7c) qui vient de ne plus suivre
    * ne peut pas suivre de nouveau. Le bouton reste à sa place, et le focus avec lui, au lieu de
-   * disparaître sous le doigt.
+   * disparaître sous le doigt. Il est alors toujours blanc, même quand il serait l'action principale.
    */
   disabled?: boolean
 }
@@ -63,7 +63,9 @@ export function FollowButton({
       checked={followed}
       onPress={onPress}
       disabled={disabled}
-      variant={followed || !prominent ? 'secondary' : 'primary'}
+      // Inactif, il passe en blanc : le miel pâle d'un bouton principal inactif attirerait encore
+      // l'œil vers un geste impossible (relecture de design 7c).
+      variant={followed || !prominent || disabled ? 'secondary' : 'primary'}
       icon={followed ? 'check' : 'plus'}
       size="compact"
     />

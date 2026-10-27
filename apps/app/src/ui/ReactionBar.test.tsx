@@ -2,6 +2,7 @@
 // montrent leur nombre, celle qu'il a donnée garde son bouton pour la retirer. Les autres états de
 // la barre sont testés dans components.test.tsx.
 import { fireEvent, screen } from '@testing-library/react-native'
+import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { ReactionBar, type ReactionBarItem } from './ReactionBar'
 
@@ -24,5 +25,39 @@ describe('ReactionBar with locked reactions', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 3' }))
     expect(onToggle).toHaveBeenCalledWith('bravo')
+  })
+
+  // Une réaction retirée pendant la visite : sa pastille reste à sa place (le focus aussi, la
+  // rangée ne bouge pas sous le doigt), mais inactive. La remettre serait refusé par l'API.
+  it('keeps the reaction just taken back in place, inactive, and sends nothing', async () => {
+    const onToggle = jest.fn()
+    const takenBack: ReactionBarItem[] = [
+      items[0] as ReactionBarItem,
+      { kind: 'bravo', text: 'Bravo', count: 2, mine: false, label: 'Bravo, 2', disabled: true },
+    ]
+    await renderWithProviders(<ReactionBar items={takenBack} onToggle={onToggle} label="Réagir" />)
+
+    const chip = screen.getByRole('button', { name: 'Bravo, 2' })
+    expect(chip).toBeDisabled()
+    await fireEvent.press(chip)
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it('announces the inactive reaction to screen readers on the web, and keeps it focusable', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const takenBack: ReactionBarItem[] = [
+        { kind: 'bravo', text: 'Bravo', count: 2, mine: false, label: 'Bravo, 2', disabled: true },
+      ]
+      await renderWithProviders(<ReactionBar items={takenBack} onToggle={jest.fn()} label="R" />)
+
+      const chip = screen.getByRole('button', { name: 'Bravo, 2' })
+      // aria-disabled (React Native le range dans l'état lu par les lecteurs d'écran).
+      expect(chip).toBeDisabled()
+      // Toujours atteignable au clavier : le focus ne se perd pas quand la réaction est retirée.
+      expect(chip.props.focusable).not.toBe(false)
+    } finally {
+      jest.restoreAllMocks()
+    }
   })
 })

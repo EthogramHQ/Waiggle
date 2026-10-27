@@ -10,13 +10,14 @@
 //   ni allure de bouton : rien n'invite à toucher. « 0 » s'y affiche aussi.
 // - pour un compte suspendu (tranche 7c, réactions `locked`) : il ne réagit plus, mais retire
 //   encore une réaction déjà donnée. Celle-ci garde sa pastille ; les autres montrent leur nombre.
+//   Une fois retirée, sa pastille reste à sa place, inactive (`disabled`).
 //
 // Les lecteurs d'écran entendent le nom donné par l'écran (« Bravo, réagi, 4 »), qui reprend le
 // texte affiché, et l'état « activé » (aria-pressed). Les pastilles passent à la ligne quand la
 // place manque (téléphone étroit, texte agrandi).
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
-import { Pressable, View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { pressed } from './aria'
 import { Icon, type IconName } from './Icon'
@@ -40,6 +41,12 @@ export type ReactionBarItem = {
    * Les autres restent des boutons, pour retirer une réaction déjà donnée.
    */
   locked?: boolean
+  /**
+   * Cette pastille ne répond plus (compte suspendu qui vient de retirer cette réaction, relecture
+   * de design 7c) : elle reste à sa place, et le focus avec elle, pour que la rangée ne bouge pas
+   * sous le doigt, mais elle pâlit, se dit « désactivée » et n'envoie rien (l'API refuserait).
+   */
+  disabled?: boolean
 }
 
 type Props = {
@@ -140,15 +147,26 @@ function Chip({ item, onPress }: { item: ReactionBarItem; onPress: () => void })
   // Comme les boutons : la pastille s'enfonce légèrement sous le doigt, avec un ressort.
   const scale = useSharedValue(1)
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  const inactive = item.disabled === true
   return (
     <Animated.View style={animated}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={item.label}
         {...pressed(item.mine)}
-        onPress={onPress}
+        // « Désactivé » pour les lecteurs d'écran : aria-disabled, seule forme que react-native-web
+        // transmet au navigateur (comme Button).
+        aria-disabled={inactive}
+        // Sur le web, la pastille inactive reste dans le parcours au clavier : `disabled` la
+        // retirerait (tabIndex -1) au moment même où l'on vient de la toucher, et le focus se
+        // perdrait. Sur téléphone, ce souci n'existe pas : elle est désactivée. (Pas
+        // `disabled={false}` sur le web : il écraserait aria-disabled.)
+        {...(Platform.OS === 'web' ? null : { disabled: inactive })}
+        onPress={() => {
+          if (!inactive) onPress()
+        }}
         onPressIn={() => {
-          scale.value = spring(pressScale, 'firm')
+          if (!inactive) scale.value = spring(pressScale, 'firm')
         }}
         onPressOut={() => {
           scale.value = spring(1)
@@ -163,7 +181,9 @@ function Chip({ item, onPress }: { item: ReactionBarItem; onPress: () => void })
             backgroundColor: item.mine ? colors.honeySoft : colors.surface,
             borderColor: item.mine ? colors.honey : colors.outline,
           },
-          down && !item.mine && { backgroundColor: colors.surfaceGrouped },
+          down && !item.mine && !inactive && { backgroundColor: colors.surfaceGrouped },
+          // Inactive : la même pâleur qu'un bouton blanc inactif (Button).
+          inactive && { opacity: 0.55 },
         ]}
       >
         <Icon
