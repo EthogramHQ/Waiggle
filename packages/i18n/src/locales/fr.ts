@@ -797,7 +797,8 @@ export const fr = {
       'Tu peux toujours tout lire, supprimer tes projets, notes et commentaires, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir ni suivre.',
     // Les recours (J3, formulation à faire valider par un professionnel).
     // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
-    contest: 'Pour contester, écris à la modération :',
+    contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
+    contestLead: 'Pour contester, écris à la modération :',
     contestCourt: 'Tu peux aussi saisir la justice.',
     // À la place d'un formulaire de projet, et sur « Mon profil ».
     formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',

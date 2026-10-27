@@ -715,7 +715,8 @@ export const en: Translation = {
     explanation: 'Explanation: {{explanation}}',
     canStill:
       'You can still read everything, delete your projects, notes and comments, export your data, manage your account, block and report. You can no longer post, comment, react or follow.',
-    contest: 'To appeal, write to moderation:',
+    contest: 'To appeal: write to {{contactEmail}}. You can also go to court.',
+    contestLead: 'To appeal, write to moderation:',
     contestCourt: 'You can also go to court.',
     formBody: 'You can’t post or edit a project while suspended.',
     profileLocked: 'Your profile can’t be edited while suspended.',
