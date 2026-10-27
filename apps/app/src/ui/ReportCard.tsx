@@ -21,6 +21,11 @@
 // résultat (« Signalement classé sans suite. »), sur une ligne au moins aussi haute. Rien ne
 // remonte ainsi sous le doigt : retirer la carte faisait arriver le « Classer » de la suivante à
 // l'endroit exact qu'on venait de toucher (relecture de la tranche 7a).
+//
+// Tranche 7c : les précisions des membres passent sous leur propre libellé (`detailsLabel`), pour
+// ne plus ressembler à la citation ; et la carte rappelle ce que la modération a déjà décidé pour le
+// membre visé (`record` : « 2 retraits », « 1 suspension »), avant les boutons, pour décider en le
+// sachant. Ce rappel reste une fois la carte décidée : il est toujours vrai.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -79,6 +84,18 @@ type Props = {
   reasons?: readonly string[]
   /** Les précisions des membres (ou l'explication d'un retrait), en texte brut. */
   details?: readonly string[]
+  /**
+   * Le libellé posé au-dessus des précisions (« Précisions des personnes qui ont signalé ») ; il
+   * n'apparaît que s'il y a des précisions.
+   */
+  detailsLabel?: string | undefined
+  /**
+   * Ce que la modération a déjà décidé pour le membre visé, déjà traduit : un titre (« Déjà décidé
+   * pour ce membre ») et ses lignes (« 2 retraits », « suspendu en ce moment »), lues en une
+   * phrase séparée par des virgules. `onPress` : le titre devient un bouton souligné qui ouvre
+   * l'historique des décisions de ce membre. Rien : pas de rappel (un auteur dont le compte est supprimé).
+   */
+  record?: { label: string; lines: readonly string[]; onPress?: () => void } | undefined
   /** Quand (« Premier signalement le 20 oct. », « Retiré le 21 oct. »). */
   when: string
   /** Une phrase sur l'état de la cible (« Te concerne… », « Déjà retiré »). */
@@ -116,6 +133,8 @@ export function ReportCard({
   images = [],
   reasons = [],
   details = [],
+  detailsLabel,
+  record,
   when,
   status,
   viewLabel,
@@ -268,6 +287,11 @@ export function ReportCard({
 
       {details.length > 0 ? (
         <View style={{ gap: space.xs }}>
+          {detailsLabel ? (
+            <Text variant="caption" tone="muted">
+              {detailsLabel}
+            </Text>
+          ) : null}
           {details.map((detail, index) => (
             // Deux précisions peuvent être identiques (deux membres, la même phrase) : leur rang
             // les distingue, et la liste ne change pas d'ordre.
@@ -306,6 +330,52 @@ export function ReportCard({
           <TextLink label={viewLabel} onPress={onView} {...describes} />
         ) : null}
       </View>
+
+      {/* Le rappel des décisions passées, sur fond groupé : une information sur le membre, pas sur
+          ce contenu. Les lignes se suivent sur une rangée, et passent à la ligne à texte agrandi. */}
+      {record ? (
+        <View
+          style={{
+            gap: space.xxs,
+            padding: space.md,
+            borderRadius: radii.small,
+            backgroundColor: colors.surfaceGrouped,
+          }}
+        >
+          {/* Le titre ouvre l'historique filtré sur ce membre, quand l'écran le donne. Un bouton
+              souligné, qui agit sur place (l'onglet de la même page) : le seul lien de la carte
+              reste « Voir » (règle 22). Relié à la carte comme ses boutons : chaque carte porte le
+              même titre. Une carte décidée n'a plus de bouton (son résultat en tient lieu) : le
+              titre redevient un texte, sur une ligne de la même hauteur, pour que rien ne
+              remonte sous le doigt. */}
+          {record.onPress && !decided ? (
+            <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+              <TextLink
+                role="button"
+                label={record.label}
+                onPress={record.onPress}
+                {...describes}
+              />
+            </View>
+          ) : (
+            <View
+              style={{
+                minHeight: record.onPress ? layout.touchTarget : undefined,
+                justifyContent: 'center',
+              }}
+            >
+              <Text variant="caption" weight={600} tone="muted">
+                {record.label}
+              </Text>
+            </View>
+          )}
+          {/* Les nombres se lisent comme une phrase (« 2 retraits, 1 suspension ») : un seul
+              texte, qui passe à la ligne à texte agrandi. */}
+          <Text variant="callout" weight={600} tone="secondary">
+            {record.lines.join(', ')}
+          </Text>
+        </View>
+      ) : null}
 
       {status ? <InfoLine text={status} /> : null}
 

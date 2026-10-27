@@ -320,5 +320,22 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
       "la motivation écrite par un administrateur dans son rôle de modération, montrée à l'auteur : pas une publication de membre, donc ni signalée ni cachée par un blocage (précision 7)",
     admin_id: 'identifiant',
     created_at: 'date',
+    // Tranche 7c.
+    target_member_id: 'identifiant',
+    duration: "la durée d'une suspension, une liste fermée par Zod (SuspensionDuration)",
+    after_report: 'booléen',
+    lift_cause: "la raison d'une levée, une liste fermée par Zod (LiftCause)",
+  },
+  // La suspension d'un compte (tranche 7c) : écrite par l'API sur la décision d'un administrateur ;
+  // son explication est sur la décision (moderation_decision.explanation), pas ici.
+  account_suspension: {
+    id: 'identifiant',
+    user_id: 'identifiant',
+    decision_id: 'identifiant',
+    starts_at: 'date',
+    ends_at: 'date',
+    lifted_at: 'date',
+    lift_decision_id: 'identifiant',
+    after_report: 'booléen',
   },
 }

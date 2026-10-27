@@ -3,9 +3,11 @@
 // qui l'importe en une ligne : deux personnes y travaillaient en même temps. Ses exemples (un outil
 // de développement, absent de l'appli publiée) sont écrits ici, en français et en anglais.
 import { appName, contactEmail } from '@ruche/brand'
+import type { DecisionHistoryItem } from '@ruche/contracts'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/Button'
+import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { NotificationCard } from '../ui/NotificationCard'
 import { ReportCard } from '../ui/ReportCard'
@@ -79,6 +81,16 @@ const fr = {
   today: 'Aujourd’hui',
   yesterday: 'Hier',
   isNew: 'Nouveau',
+  // Tranche 7c : le rappel des décisions passées, les précisions sous leur libellé, « Suspendre ».
+  detailsLabel: 'Précisions des personnes qui ont signalé',
+  recordTitle: 'Déjà décidé pour ce membre',
+  recordLines: ['2 retraits', '1 suspension'],
+  recordNone: ['Aucune décision passée pour ce membre.'],
+  recordNow: ['1 retrait', '1 suspension', 'suspendu en ce moment'],
+  suspend: 'Suspendre le compte',
+  profileNoRemove:
+    'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
+  history: 'Historique des décisions',
 }
 
 const en: typeof fr = {
@@ -147,7 +159,139 @@ const en: typeof fr = {
   today: 'Today',
   yesterday: 'Yesterday',
   isNew: 'New',
+  detailsLabel: 'Details from the people who reported',
+  recordTitle: 'Already decided for this member',
+  recordLines: ['2 removals', '1 suspension'],
+  recordNone: ['No past decision for this member.'],
+  recordNow: ['1 removal', '1 suspension', 'Suspended right now'],
+  suspend: 'Suspend the account',
+  profileNoRemove:
+    'A profile is not removed as a whole: dismiss the report, or suspend the account.',
+  history: 'History of decisions',
 }
+
+// Les décisions d'exemple de l'historique (DecisionCard écrit lui-même ses textes, dans la langue
+// de l'appli) : un retrait, une suspension, sa levée, un classement par un administrateur parti,
+// une restauration, une levée pour erreur, des suspensions de 30 jours et sans fin, et un retrait
+// dont le contenu et le membre ont disparu depuis.
+const louis = { id: 'u0', name: 'Louis', handle: 'louis' }
+const sam = { id: 'u5', name: 'Sam', handle: 'sam' }
+const blank = {
+  projectId: null,
+  ground: null,
+  explanation: null,
+  duration: null,
+  liftCause: null,
+  afterReport: false,
+}
+const decisions: DecisionHistoryItem[] = [
+  {
+    ...blank,
+    id: '1b2c3d4e-5f60-4b7c-9d8e-0f1a2b3c4d5e',
+    action: 'lift',
+    at: '2026-10-24T09:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: sam.id },
+    member: sam,
+    explanation: 'Sam s’est excusé et a supprimé ses messages.',
+    liftCause: 'early',
+  },
+  {
+    ...blank,
+    id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+    action: 'suspend',
+    at: '2026-10-22T10:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: sam.id },
+    member: sam,
+    ground: 'rules',
+    explanation: 'Trois messages d’arnaque en deux jours, après deux retraits.',
+    duration: '7d',
+    afterReport: true,
+  },
+  {
+    ...blank,
+    id: '2c3d4e5f-6071-4c8d-8e9f-1a2b3c4d5e6f',
+    action: 'remove',
+    at: '2026-10-21T09:00:00.000Z',
+    admin: louis,
+    target: { kind: 'comment', id: 'c0d1e2f3-0415-4a26-8b37-48596a7b8c9d' },
+    projectId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+    member: sam,
+    ground: 'rules',
+    explanation: 'Demander un code de carte bancaire n’est pas permis ici.',
+  },
+  {
+    ...blank,
+    id: '3d4e5f60-7182-4d9e-9fa0-2b3c4d5e6f70',
+    action: 'dismiss',
+    at: '2026-10-20T16:00:00.000Z',
+    admin: null,
+    target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
+    projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
+    member: { id: 'u4', name: 'Nora', handle: 'nora' },
+  },
+  // Les autres états de la carte (relecture de design 7c) : une restauration, une suspension de
+  // 30 jours décidée depuis la page du membre (sans signalement), une sans fin, et une levée pour
+  // erreur.
+  {
+    ...blank,
+    id: '5f607182-93a4-4fb0-9bc2-4d5e6f708192',
+    action: 'restore',
+    at: '2026-10-19T11:00:00.000Z',
+    admin: louis,
+    target: { kind: 'comment', id: 'f3041526-3748-4d59-8e6a-7b8c9daebfc0' },
+    projectId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+    member: { id: 'u4', name: 'Nora', handle: 'nora' },
+  },
+  {
+    ...blank,
+    id: '60718293-a4b5-4ac1-8cd3-5e6f708192a3',
+    action: 'lift',
+    at: '2026-10-18T15:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u6' },
+    member: { id: 'u6', name: 'Malik', handle: 'malik' },
+    explanation: 'La suspension visait le mauvais compte.',
+    liftCause: 'error',
+  },
+  {
+    ...blank,
+    id: '718293a4-b5c6-4bd2-9de4-6f708192a3b4',
+    action: 'suspend',
+    at: '2026-10-18T09:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u6' },
+    member: { id: 'u6', name: 'Malik', handle: 'malik' },
+    ground: 'rules',
+    explanation: 'Des invitations répétées à acheter un service, malgré deux retraits.',
+    duration: '30d',
+  },
+  {
+    ...blank,
+    id: '8293a4b5-c6d7-4ce3-8ef5-708192a3b4c5',
+    action: 'suspend',
+    at: '2026-10-17T20:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u8' },
+    member: { id: 'u8', name: 'Yan', handle: 'yan' },
+    ground: 'illegal',
+    explanation: 'Des menaces de mort envoyées à un membre (article 222-17 du code pénal).',
+    duration: 'indefinite',
+    afterReport: true,
+  },
+  {
+    ...blank,
+    id: '4e5f6071-8293-4eaf-8ab1-3c4d5e6f7081',
+    action: 'remove',
+    at: '2025-12-19T08:00:00.000Z',
+    admin: louis,
+    target: { kind: 'note', id: 'e2f30415-2637-4c48-8d59-6a7b8c9daebf' },
+    member: null,
+    ground: 'illegal',
+    explanation: 'Ces photos montrent des personnes sans leur accord.',
+  },
+]
 
 const noop = () => {}
 
@@ -174,6 +318,8 @@ export function ModerationCatalogue() {
           snapshotLabel={l.snapshotLabel}
           reasons={l.scamReasons}
           details={l.scamDetails}
+          detailsLabel={l.detailsLabel}
+          record={{ label: l.recordTitle, lines: l.recordLines }}
           when={l.since}
           viewLabel={l.view}
           onView={noop}
@@ -181,6 +327,7 @@ export function ModerationCatalogue() {
           actions={[
             { label: l.remove, tone: 'danger', onPress: noop },
             { label: l.dismiss, onPress: noop },
+            { label: l.suspend, onPress: noop },
           ]}
         />
         <ReportCard
@@ -190,10 +337,16 @@ export function ModerationCatalogue() {
           snapshotLabel={l.snapshotLabel}
           reasons={l.impersonationReasons}
           details={l.impersonationDetails}
+          detailsLabel={l.detailsLabel}
+          record={{ label: l.recordTitle, lines: l.recordNone }}
           when={l.since}
+          status={l.profileNoRemove}
           viewLabel={l.view}
           onView={noop}
-          actions={[{ label: l.dismiss, onPress: noop, loading: true }]}
+          actions={[
+            { label: l.dismiss, onPress: noop, loading: true },
+            { label: l.suspend, onPress: noop },
+          ]}
         />
         <ReportCard
           kind={l.note}
@@ -254,6 +407,9 @@ export function ModerationCatalogue() {
           viewLabel={l.view}
           onView={noop}
           description={l.describeScam}
+          // Un auteur suspendu en ce moment : plus de « Suspendre », et le rappel le dit ; il
+          // reste une fois la carte décidée.
+          record={{ label: l.recordTitle, lines: l.recordNow }}
           decided={{ message: l.dismissed, ok: true }}
           actions={[{ label: l.dismiss, onPress: noop }]}
         />
@@ -335,6 +491,16 @@ export function ModerationCatalogue() {
           newLabel={l.isNew}
           onPress={noop}
         />
+      </Stack>
+      {/* L'historique (tranche 7c) : chaque sorte de décision ; « Voir » vers le membre ou le
+          contenu, jamais vers ce qui a disparu (la dernière carte, sans lien). */}
+      <Text variant="headline" heading={3}>
+        {l.history}
+      </Text>
+      <Stack gap="md" accessibilityRole="list">
+        {decisions.map((decision) => (
+          <DecisionCard key={decision.id} decision={decision} onView={noop} />
+        ))}
       </Stack>
     </Stack>
   )

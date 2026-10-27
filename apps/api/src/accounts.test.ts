@@ -686,6 +686,102 @@ describe('reports and removals of an account', () => {
       ])
     })
 
+    // Tranche 7c, J8 et S17 : les suspensions de mon compte, avec leur fin réelle (à la date
+    // prévue, ou levée, avec la raison et l'explication de la levée) ; jamais l'administrateur qui
+    // a décidé, jamais qui a signalé.
+    it('gives the suspensions of my account with their real end, never who decided nor who reported', async () => {
+      const DAY = 24 * 60 * 60 * 1000
+      await act.report(max, { kind: 'member', id: leaId }, 'harassment')
+      later()
+      await act.decide(louis, {
+        action: 'suspend',
+        memberId: leaId,
+        duration: '7d',
+        ground: 'rules',
+        explanation: 'Messages insultants.',
+        fromReport: { kind: 'member', id: leaId },
+      })
+      const first = Date.now()
+      later()
+      await act.decide(louis, {
+        action: 'lift',
+        memberId: leaId,
+        cause: 'error',
+        explanation: 'Erreur de personne.',
+      })
+      const lifted = Date.now()
+      later()
+      await act.decide(louis, {
+        action: 'suspend',
+        memberId: leaId,
+        duration: '30d',
+        ground: 'illegal',
+        explanation: 'Contenu illicite.',
+      })
+      const second = Date.now()
+
+      const { raw, data } = await exportOf(leaCookie)
+
+      expect(data.moderation).toEqual([
+        {
+          since: new Date(first).toISOString(),
+          duration: '7d',
+          endsAt: new Date(first + 7 * DAY).toISOString(),
+          ground: 'rules',
+          explanation: 'Messages insultants.',
+          afterReport: true,
+          endedAt: new Date(lifted).toISOString(),
+          endedBy: 'lift',
+          liftCause: 'error',
+          liftExplanation: 'Erreur de personne.',
+        },
+        {
+          since: new Date(second).toISOString(),
+          duration: '30d',
+          endsAt: new Date(second + 30 * DAY).toISOString(),
+          ground: 'illegal',
+          explanation: 'Contenu illicite.',
+          afterReport: false,
+          endedAt: null,
+          endedBy: null,
+          liftCause: null,
+          liftExplanation: null,
+        },
+      ])
+      for (const leak of [louisId, maxId, 'louis@example.com', 'max@example.com']) {
+        expect(raw, leak).not.toContain(leak)
+      }
+      // Les suspensions de Léa ne sont que dans son export.
+      expect((await exportOf(max)).data.moderation).toEqual([])
+    })
+
+    it('gives the end at the date of a suspension that ran its course', async () => {
+      const DAY = 24 * 60 * 60 * 1000
+      later()
+      await act.decide(louis, {
+        action: 'suspend',
+        memberId: leaId,
+        duration: '7d',
+        ground: 'rules',
+        explanation: 'Messages insultants.',
+      })
+      const since = Date.now()
+
+      // Une session dure 7 jours : Léa se reconnecte pour exporter.
+      vi.setSystemTime(since + 7 * DAY + 1000)
+      const cookie = await act.signInAgain(lea)
+
+      expect((await exportOf(cookie)).data.moderation).toMatchObject([
+        {
+          endsAt: new Date(since + 7 * DAY).toISOString(),
+          endedAt: new Date(since + 7 * DAY).toISOString(),
+          endedBy: 'term',
+          liftCause: null,
+          liftExplanation: null,
+        },
+      ])
+    })
+
     it('gives the removals of my projects, notes and comments, with ground and explanation', async () => {
       const meteo = await act.publish(leaCookie, 'Météo')
       const velo = await act.publish(zoe, 'Vélo')

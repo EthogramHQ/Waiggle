@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { languageOfMember } from '../email/language'
 import { moderationAlertEmail } from '../email/templates'
 import { utc } from '../notifications/load'
+import { activeSuspensionSql } from '../suspension/load'
 import { type JobDeps, logMemberFailure } from './shared'
 
 const HOUR = 60 * 60 * 1000
@@ -23,6 +24,9 @@ const Taken = z.object({ email: z.string(), name: z.string(), language: z.string
  * date d'envoi (`now`) de chaque administrateur qui doit être prévenu, et rend son adresse. Les
  * conditions, relues au moment d'écrire :
  * - administrateur en fonction (revoked_at is null), compte vérifié ;
+ * - pas suspendu à `now` (tranche 7c, règle S19 : la même règle que isActiveAdmin de
+ *   reports/admin.ts, écrite par activeSuspensionSql de suspension/load.ts). Un administrateur
+ *   suspendu ne reçoit rien ; sa suspension finie, il est prévenu de nouveau, sans rien rétablir ;
  * - dernier e-mail il y a au moins une heure, ou jamais ;
  * - au moins un signalement ouvert créé après ce dernier e-mail, et au plus tard à `now` (ce qui
  *   arrive pendant le passage partira au suivant).
@@ -32,13 +36,19 @@ const Taken = z.object({ email: z.string(), name: z.string(), language: z.string
  * envoyeur en panne).
  *
  * admin_member est minuscule (un ou deux administrateurs) ; le « exists » lit l'index partiel des
- * signalements ouverts (content_report_open_idx, rangé par created_at) et s'arrête au premier.
+ * signalements ouverts (content_report_open_idx, rangé par created_at) et s'arrête au premier. Le
+ * « not exists » de la suspension cherche, pour chacun de ces quelques administrateurs, sa
+ * suspension ouverte dans l'index unique partiel account_suspension_open_idx (une ligne au plus).
  */
 const take = async (db: Database, now: Date) => {
   const query = sql`
     update admin_member am set alerted_at = ${utc(now)}
     from "user" u
     where u.id = am.user_id and am.revoked_at is null and u.email_verified
+      and not exists (
+        select 1 from account_suspension s
+        where s.user_id = am.user_id and ${activeSuspensionSql('s', now)}
+      )
       and (am.alerted_at is null or am.alerted_at <= ${utc(new Date(now.getTime() - HOUR))})
       and exists (
         select 1 from content_report r

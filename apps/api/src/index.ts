@@ -94,6 +94,7 @@ const app = createApp({
   appUrl: env.appUrl,
   publicApiUrl: env.publicApiUrl,
   secret: env.authSecret,
+  mailer,
 })
 
 const server = serve({ fetch: app.fetch, port: env.port }, ({ port }) => {

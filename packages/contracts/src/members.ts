@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { FollowState } from './follows'
 import { PROJECT_LIST_MAX, ProjectSummary, ProjectTool } from './projects'
+import { Suspension } from './suspension'
 
 /**
  * L'identifiant d'un membre dans une adresse. Ceux de Better Auth sont faits de lettres, de
@@ -34,6 +35,21 @@ export const Member = z
     ...FollowState.shape,
     /** Ses projets que le visiteur a le droit de voir, du plus récent au plus ancien. */
     projects: z.array(ProjectSummary).max(PROJECT_LIST_MAX),
+    /**
+     * Ce que seul un administrateur voit de ce membre (tranche 7c) ; null pour tout autre visiteur.
+     * `canSuspend` : faux pour soi-même, pour un administrateur en fonction ou un membre déjà
+     * suspendu. `decisions` : le nombre de décisions de modération qui le visent (ses contenus et
+     * son compte), pour mener à son historique.
+     */
+    moderation: z
+      .object({
+        isAdmin: z.boolean(),
+        suspension: Suspension.nullable(),
+        decisions: z.int().nonnegative(),
+        canSuspend: z.boolean(),
+      })
+      .strict()
+      .nullable(),
   })
   .meta({ id: 'Member' })
 export type Member = z.infer<typeof Member>

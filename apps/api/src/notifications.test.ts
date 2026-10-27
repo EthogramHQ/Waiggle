@@ -24,7 +24,7 @@ import {
   UnreadCount,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadNotificationsSince } from './notifications/load'
 import { memberCounterKeys } from './rate-limit'
@@ -979,6 +979,9 @@ describe('the notifications of the moderation', () => {
           ground: 'rules',
           explanation: 'Publicité déguisée.',
           afterReport: true,
+          // Tranche 7c : un booléen explicite ; vrai seulement pour un commentaire sur un projet
+          // que le membre ne voit plus.
+          projectHidden: false,
         },
       ])
       expect(await unread(ines)).toBe(before + 1)
@@ -1042,6 +1045,133 @@ describe('the notifications of the moderation', () => {
       expect(page.status).toBe(200)
       expect(text).not.toContain('Météo')
       expect(text).not.toContain(meteo.id)
+    })
+
+    it('says the project is hidden once its author blocks the author of the comment', async () => {
+      const meteo = await publish(ines)
+      const published = await comment(meteo.id, malik, 'Un commentaire insultant')
+      await report(zoe, { kind: 'comment', id: published.id })
+      await remove({ kind: 'comment', id: published.id })
+
+      later()
+      await act.block(malikId, ines)
+
+      expect(await ofKind(malik, 'removed')).toMatchObject([
+        { targetKind: 'comment', projectHidden: true, project: { title: '' } },
+      ])
+    })
+  })
+
+  // Tranche 7c : la suspension d'un compte et sa fin, deux notifications calculées à la lecture
+  // (aucune tâche planifiée). Seul le membre visé les reçoit, sans le nom de l'administrateur
+  // (S17) ; un blocage ne les coupe jamais. Inès est suspendue par Sam, administrateur.
+  describe('« suspended » and « suspension_ended », to the suspended member', () => {
+    const EXPLANATION = 'Messages insultants répétés.'
+    const suspend = async (
+      duration: '7d' | '30d' | 'indefinite' = '7d',
+      fromReport?: ReportTarget,
+    ) => {
+      later()
+      await act.decide(sam, {
+        action: 'suspend',
+        memberId: inesId,
+        duration,
+        ground: 'rules',
+        explanation: EXPLANATION,
+        ...(fromReport && { fromReport }),
+        ...(duration === 'indefinite' && { password: 'sam-long-password' }),
+      })
+      return Date.now()
+    }
+    const iso = (ms: number) => new Date(ms).toISOString()
+
+    it('tells the suspended member, with the end, the ground and the explanation', async () => {
+      const before = await unread(ines)
+
+      const at = await suspend('7d')
+
+      expect(await ofKind(ines, 'suspended')).toEqual([
+        {
+          id: expect.any(String),
+          kind: 'suspended',
+          at: iso(at),
+          isNew: true,
+          endsAt: iso(at + 7 * DAY),
+          ground: 'rules',
+          explanation: EXPLANATION,
+          afterReport: false,
+        },
+      ])
+      expect(await unread(ines)).toBe(before + 1)
+      // Personne d'autre, ni l'administrateur ; et jamais son nom.
+      for (const cookie of [malik, zoe, sam]) {
+        expect(await ofKind(cookie, 'suspended')).toEqual([])
+      }
+      expect(await (await send('GET', '/v1/notifications', ines)).text()).not.toContain('Sam')
+    })
+
+    it('says « after a report » for a suspension that followed one, and no end for an endless one', async () => {
+      later()
+      await act.report(malik, { kind: 'member', id: inesId })
+
+      await suspend('indefinite', { kind: 'member', id: inesId })
+
+      expect(await ofKind(ines, 'suspended')).toMatchObject([{ endsAt: null, afterReport: true }])
+    })
+
+    // S10 : la copie en SQL de « suspension active » compare à l'heure de l'API, à la
+    // milliseconde, même si la connexion est réglée sur l'heure de Paris.
+    it('tells the end at its date, not one millisecond before, whatever the time zone of the base', async () => {
+      await ctx.db.execute(sql`set time zone 'Europe/Paris'`)
+      const at = await suspend('7d')
+      const end = at + 7 * DAY
+
+      vi.setSystemTime(end - 1)
+      ines = await signInAgain(inesAccount)
+      expect(await ofKind(ines, 'suspension_ended')).toEqual([])
+
+      vi.setSystemTime(end)
+      expect(await ofKind(ines, 'suspension_ended')).toEqual([
+        {
+          id: expect.any(String),
+          kind: 'suspension_ended',
+          at: iso(end),
+          isNew: true,
+          lifted: false,
+          explanation: null,
+        },
+      ])
+      // La notification de la pose reste.
+      expect(await ofKind(ines, 'suspended')).toHaveLength(1)
+    })
+
+    // J6 : une levée se distingue d'une fin à la date prévue, avec son explication.
+    it('tells a lift, with its explanation, at the time of the lift', async () => {
+      await suspend('30d')
+      later()
+      await act.decide(sam, {
+        action: 'lift',
+        memberId: inesId,
+        cause: 'early',
+        explanation: 'Excuses présentées.',
+      })
+      const liftedAt = Date.now()
+
+      expect(await ofKind(ines, 'suspension_ended')).toMatchObject([
+        { at: iso(liftedAt), lifted: true, explanation: 'Excuses présentées.' },
+      ])
+      expect(await ofKind(sam, 'suspension_ended')).toEqual([])
+    })
+
+    it('is never cut by a block between the member and the administrator', async () => {
+      const at = await suspend('7d')
+      later()
+      await act.block(samId, ines)
+
+      expect(await ofKind(ines, 'suspended')).toHaveLength(1)
+      vi.setSystemTime(at + 7 * DAY)
+      ines = await signInAgain(inesAccount)
+      expect(await ofKind(ines, 'suspension_ended')).toHaveLength(1)
     })
   })
 

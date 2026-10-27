@@ -362,6 +362,7 @@ export const en: Translation = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, reacted, {{count}}',
       own: 'Reactions to your project',
+      readOnly: 'Reactions to this project',
       group: 'React to this project',
       error: 'Your reaction could not be saved. Try again.',
     },
@@ -607,7 +608,7 @@ export const en: Translation = {
     grounds: { illegal: 'The law', rules: '{{appName}}’s rules' },
     explanation: 'Explanation',
     explanationHint:
-      'Shown to the author. Say which rule or which law; never name who reported it.',
+      'Shown to the author. Say which rule, or which law (image rights…); never name who reported it.',
     confirmRemove: 'Remove',
     cancel: 'Cancel',
     dismissed: 'Report dismissed.',
@@ -619,6 +620,104 @@ export const en: Translation = {
     // A long copy folds after three fields (added with the interface, 7b corrections).
     showAll: 'Show all',
     showLess: 'Show less',
+    detailsLabel: 'Details from the people who reported',
+    profileNoRemove:
+      'A profile can’t be removed as a whole: dismiss the report, or suspend the account.',
+    history: 'History',
+    emptyHistory: 'No decisions yet.',
+    historyFor: 'Decisions about @{{handle}}',
+    historyForGone: 'Decisions about this member',
+    historyAll: 'See all',
+    actions: {
+      remove: 'Removal',
+      restore: 'Restoration',
+      dismiss: 'Dismissal',
+      suspend: 'Suspension',
+      lift: 'Suspension lifted',
+    },
+    decidedBy: 'By {{name}}',
+    decidedByGone: 'By an admin whose account was deleted',
+    decidedOn: 'On {{date}}',
+    memberLine: 'Member concerned: {{name}}',
+    memberGone: 'Member concerned: account deleted',
+    targetGone: 'Content deleted since',
+    durations: { '7d': '7 days', '30d': '30 days', indefinite: 'No end date' },
+    limited:
+      'You’ve reached the limit of {{max}} decisions in 24 hours. For an emergency, follow the manual procedure in the moderation guide.',
+    durationLine: 'Duration: {{duration}}',
+    afterReportLine: 'After a report',
+    record: {
+      title: 'Already decided for this member',
+      none: 'No past decisions for this member.',
+      removals_one: '{{count}} removal',
+      removals_other: '{{count}} removals',
+      suspensions_one: '{{count}} suspension',
+      suspensions_other: '{{count}} suspensions',
+      suspendedNow: 'currently suspended',
+    },
+    suspendAction: 'Suspend account',
+    password: {
+      label: 'Your password',
+      hint: 'Needed for a suspension with no end date, after {{suspensions}} suspensions in 24 hours, or after {{removals}} removals in an hour.',
+      tooManyFailures:
+        'Too many wrong passwords: decisions that need it will have to wait, for 24 hours at most.',
+      confirm: 'Confirm',
+    },
+    suspend: {
+      title: 'Suspend {{name}}’s account',
+      intro:
+        'The account becomes read-only: the person can read everything and delete their content, but can no longer post or interact. They’re told by email and notification, with your explanation.',
+      durationLabel: 'Duration',
+      explanationHint:
+        'Shown to the member. Describe the facts and the rule, not the person; if the ground is the law, say which one. Name neither who reported nor the member.',
+      confirm: 'Suspend account',
+      done: 'Account suspended.',
+      missing: 'To suspend, choose a duration and a ground, and write an explanation.',
+      notAllowedSelf: 'You can’t suspend your own account.',
+      notAllowedAdmin: 'This account belongs to an admin: it can’t be suspended.',
+      errorTitle: 'This page couldn’t load',
+    },
+    lift: {
+      title: 'Lift {{name}}’s suspension',
+      intro:
+        'The account gets all its actions back. The person is told by a notification, with your explanation.',
+      current: 'Suspended since {{since}}, until {{endsAt}} (Paris time).',
+      currentIndefinite: 'Suspended since {{since}}, until further notice.',
+      explanationHint: 'One sentence, kept in the history and shown to the member.',
+      causeLabel: 'Why lift it now?',
+      causes: { early: 'Earlier than planned', error: 'It was a mistake' },
+      causeHint:
+        'A suspension lifted as a mistake no longer counts in the record of past decisions.',
+      confirm: 'Lift suspension',
+      done: 'Suspension lifted.',
+      missing: 'To lift, choose a reason and write an explanation.',
+    },
+    memberMenu: {
+      suspend: 'Suspend account',
+      lift: 'Lift suspension',
+      history: 'Moderation history',
+    },
+    blockedTarget: 'You blocked this member: another admin has to decide.',
+    memberSuspended: 'Account suspended until {{date}} at {{time}} (Paris time)',
+    memberSuspendedIndefinite: 'Account suspended until further notice',
+  },
+  suspension: {
+    title: 'Your account is suspended',
+    headline: 'Your account is suspended until {{date}} at {{time}} (Paris time)',
+    headlineIndefinite: 'Your account is suspended until further notice',
+    details: 'Details',
+    decisionLine: '{{decision}} {{ground}}',
+    afterReport: 'After a report, a person from moderation decided to suspend your account.',
+    direct: 'A person from moderation decided to suspend your account.',
+    explanation: 'Explanation: {{explanation}}',
+    canStill:
+      'You can still read everything, delete your projects, notes and comments, export your data, manage your account, block and report. You can no longer post, comment, react or follow.',
+    contest: 'To appeal: write to {{contactEmail}}. You can also go to court.',
+    contestLead: 'To appeal, write to moderation:',
+    contestCourt: 'You can also go to court.',
+    formBody: 'You can’t post or edit a project while suspended.',
+    profileLocked: 'Your profile can’t be edited while suspended.',
+    formTitle: 'Publishing isn’t possible for now',
   },
   removal: {
     banner: 'Removed by moderation',
@@ -773,6 +872,26 @@ export const en: Translation = {
         'This address no longer lets you sign in and will receive nothing more from {{appName}}.',
       help: 'Not you, or a typo in the address? Write to us quickly at {{contactEmail}}.',
     },
+    suspension: {
+      subject: 'Your {{appName}} account is suspended',
+      heading: 'Your account is suspended',
+      body: 'A person from moderation decided to suspend your {{appName}} account.',
+      bodyAfterReport:
+        'After a report, a person from moderation decided to suspend your {{appName}} account.',
+      until: 'The suspension lasts until {{date}} at {{time}} (Paris time).',
+      earlier: 'If it’s lifted earlier, {{appName}} will tell you.',
+      indefinite: 'The suspension lasts until further notice: moderation can lift it at any time.',
+      grounds: {
+        illegal: 'Grounds: the law.',
+        rules: 'Grounds: {{appName}}’s rules.',
+      },
+      explanation: 'Explanation: {{explanation}}',
+      meanwhile:
+        'While suspended, you can read everything, delete your projects, notes and comments, export your data or delete your account. You can no longer post, comment, react or follow.',
+      contest:
+        'Disagree? Write to us at {{contactEmail}}: a person will review the decision and reply. You can also go to court.',
+      greeting: 'Hello,',
+    },
   },
   feed: {
     label: 'The feed',
@@ -818,6 +937,7 @@ export const en: Translation = {
     emptyTitle: 'No notifications yet',
     empty:
       'When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
+    emptyActionSuspended: 'Discover projects',
     emptyAction: 'Publish a project',
     more: 'Show more',
     end: 'That’s all',
@@ -861,6 +981,12 @@ export const en: Translation = {
       },
       contest: 'Disagree? Write to us: {{contactEmail}}',
     },
+    suspended: 'Your account has been suspended until {{date}} at {{time}} (Paris time)',
+    suspendedIndefinite: 'Your account has been suspended until further notice',
+    suspensionEnded: {
+      ended: 'Your suspension has ended: you can post and interact again.',
+      lifted: 'Your suspension has been lifted: you can post and interact again.',
+    },
   },
   errors: {
     notFound: 'This page does not exist.',
@@ -886,6 +1012,10 @@ export const en: Translation = {
     blockedMention: 'You can’t mention a member you blocked.',
     alreadyExamined:
       'You’ve already reported this content, and moderation has already looked at it. It hasn’t changed since.',
+    suspended: 'Your account is suspended: this action isn’t available for now.',
+    passwordRequired: 'Type your password again to confirm this decision.',
+    wrongPassword: 'Incorrect password.',
+    cannotSuspendAdmin: 'An admin can’t be suspended: remove their role first.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }

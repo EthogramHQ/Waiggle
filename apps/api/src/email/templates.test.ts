@@ -12,6 +12,7 @@ import {
   newEmailVerificationEmail,
   type RecapData,
   recapEmail,
+  suspensionEmail,
   verificationEmail,
 } from './templates'
 
@@ -221,6 +222,12 @@ describe('the contact address in the footer', () => {
     recapEmail('fr', recapData()),
     mentionEmail('en', mentionData()),
     moderationAlertEmail('fr', { name: 'Louis', count: 2, url: 'https://waiggle.com/moderation' }),
+    suspensionEmail('en', {
+      endsAt: null,
+      ground: 'rules',
+      explanation: 'Repeated insults.',
+      afterReport: false,
+    }),
   ]
 
   it('is written in every e-mail, as text and never as a link', () => {
@@ -265,6 +272,116 @@ describe('moderationAlertEmail', () => {
     const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
     expect(hrefs).toContain(url)
     for (const href of hrefs) expect(href.startsWith('https://waiggle.com/'), href).toBe(true)
+  })
+})
+
+// ─── Tranche 7c : l'e-mail de suspension ─────────────────────────────────────────────────────────
+// Un e-mail de service (article 17 du DSA), le seul de la suspension : la raison, l'explication,
+// la fin (ou « jusqu'à nouvel ordre »), ce qu'on peut encore faire, comment contester. Ni le nom de
+// l'administrateur, ni qui a signalé, ni lien de désinscription, ni image.
+describe('suspensionEmail', () => {
+  // J4 : une fin à 23 h 30 UTC, un soir de novembre (Paris est alors à UTC+1), s'écrit le
+  // lendemain à 0 h 30, heure de Paris, quelle que soit la langue.
+  const endsAt = new Date('2026-11-03T23:30:00.000Z')
+  const explanation = 'Messages insultants répétés sous les projets des autres.'
+
+  it('gives the ground, the explanation, the end at Paris time, what stays possible and how to contest', () => {
+    const email = suspensionEmail('fr', { endsAt, ground: 'rules', explanation, afterReport: true })
+    const t = fr.suspension
+
+    expect(email.subject).toBe(fill(t.subject))
+    for (const line of [
+      fill(t.bodyAfterReport),
+      fill(t.until, { date: '4 novembre 2026', time: '00:30' }),
+      fill(t.earlier),
+      fill(t.grounds.rules),
+      fill(t.explanation, { explanation }),
+      fill(t.meanwhile),
+      fill(t.contest),
+    ]) {
+      expect(email.text).toContain(line)
+    }
+    expect(email.text).not.toContain('3 novembre')
+    expect(email.text).toContain(contactEmail)
+  })
+
+  it('says « until further notice » for an endless suspension, in English for an English-speaking member', () => {
+    const email = suspensionEmail('en', {
+      endsAt: null,
+      ground: 'illegal',
+      explanation: 'Illegal content.',
+      afterReport: false,
+    })
+    const t = en.suspension
+
+    expect(email.subject).toBe(fill(t.subject))
+    expect(email.text).toContain(fill(t.body))
+    expect(email.text).toContain(fill(t.indefinite))
+    expect(email.text).toContain(fill(t.grounds.illegal))
+    expect(email.text).not.toContain(fill(t.bodyAfterReport))
+    expect(email.text).not.toContain('(Paris time)')
+  })
+
+  it('writes the end at Paris time in English too', () => {
+    const email = suspensionEmail('en', {
+      endsAt,
+      ground: 'rules',
+      explanation,
+      afterReport: false,
+    })
+
+    expect(email.text).toContain('November 4, 2026')
+    expect(email.text).not.toContain('November 3')
+    expect(email.text).toContain('(Paris time)')
+  })
+
+  it('turns an address in the explanation into « [lien] », and escapes its HTML', () => {
+    const email = suspensionEmail('fr', {
+      endsAt,
+      ground: 'rules',
+      explanation: 'Va voir https://evil.example/piege et <b>clique</b>.',
+      afterReport: false,
+    })
+
+    expect(email.text).not.toContain('evil.example')
+    expect(email.html).not.toContain('evil.example')
+    expect(email.text).toContain(fr.link)
+    expect(email.html).not.toContain('<b>clique')
+    expect(email.html).toContain('&lt;b&gt;')
+  })
+
+  // Relecture de design de la branche (7c) : l'explication est un texte libre. Un mot de 76
+  // caractères sans espace faisait défiler l'e-mail de 431 px à l'horizontale sur un écran de
+  // 320 px. Son paragraphe, et lui seul, se coupe n'importe où quand un mot ne tient pas.
+  it('lets a very long word of the explanation break anywhere, and only in its paragraph', () => {
+    const longWord = 'a'.repeat(76)
+    const email = suspensionEmail('fr', {
+      endsAt,
+      ground: 'rules',
+      explanation: `Voir ${longWord}.`,
+      afterReport: false,
+    })
+
+    const paragraphs = [...email.html.matchAll(/<p style="([^"]*)">([^<]*)<\/p>/g)]
+    const styleOf = (text: string) => paragraphs.find(([, , inner]) => inner?.includes(text))?.[1]
+    expect(styleOf(longWord)).toContain('overflow-wrap:anywhere')
+    expect(styleOf(longWord)).toContain('word-break:break-word')
+    // Témoin : un autre paragraphe garde le corps ordinaire.
+    const meanwhile = fill(fr.suspension.meanwhile)
+    expect(styleOf(meanwhile.slice(0, 20))).toBeDefined()
+    expect(styleOf(meanwhile.slice(0, 20))).not.toContain('overflow-wrap')
+  })
+
+  it('links to nothing outside the app, with no image, no unsubscribe link and no tracker', () => {
+    for (const email of [
+      suspensionEmail('fr', { endsAt, ground: 'rules', explanation, afterReport: false }),
+      suspensionEmail('en', { endsAt: null, ground: 'illegal', explanation, afterReport: true }),
+    ]) {
+      const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+      for (const href of hrefs) expect(href.startsWith('https://waiggle.com/'), href).toBe(true)
+      expect(email.html).not.toMatch(/<img|unsubscribe|mailto:/i)
+      expect(email.headers).toBeUndefined()
+    }
   })
 })
 

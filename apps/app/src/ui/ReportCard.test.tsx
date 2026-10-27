@@ -4,7 +4,7 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
+import { containing, fr } from '../testing/text'
 import { ReportCard } from './ReportCard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -376,5 +376,133 @@ describe('ReportCard', () => {
 
     expect(screen.getByText(card.snapshot)).toBeTruthy() // témoin
     expect(screen.queryByText('Il a écrit la même chose sous trois projets.')).toBeNull()
+  })
+
+  // --- Tranche 7c : les précisions sous leur libellé, et le rappel des décisions passées ---
+  //
+  // Interface attendue :
+  // - `detailsLabel?: string` : le libellé posé au-dessus des précisions des membres
+  //   (« Précisions des personnes qui ont signalé »), pour qu'on ne les confonde plus avec la
+  //   citation (relecture de design 7a) ; rien s'il n'y a aucune précision ;
+  // - `record?: { label: string; lines: readonly string[] }` : ce que la modération a déjà décidé
+  //   pour le membre visé, déjà traduit (« Déjà décidé pour ce membre » ; « 2 retraits »,
+  //   « 1 suspension », « suspendu en ce moment »).
+  describe('slice 7c', () => {
+    const detailsLabel = fr.t(($) => $.moderation.detailsLabel)
+
+    it('puts the precisions of the members under their own label', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} detailsLabel={detailsLabel} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(detailsLabel)).toBeTruthy()
+      expect(screen.getByText('Il a écrit la même chose sous trois projets.')).toBeTruthy()
+    })
+
+    it('shows no label for precisions when there is none', async () => {
+      await renderWithProviders(
+        <ReportCard {...card} details={[]} detailsLabel={detailsLabel} onView={jest.fn()} />,
+      )
+
+      expect(screen.getByText(card.snapshot)).toBeTruthy() // témoin
+      expect(screen.queryByText(detailsLabel)).toBeNull()
+    })
+
+    it('recalls what the moderation already decided for the member, line by line', async () => {
+      const record = {
+        label: fr.t(($) => $.moderation.record.title),
+        lines: ['2 retraits', '1 suspension'],
+      }
+      await renderWithProviders(<ReportCard {...card} record={record} onView={jest.fn()} />)
+
+      expect(screen.getByText(record.label)).toBeTruthy()
+      expect(screen.getByText(containing('2 retraits'))).toBeTruthy()
+      expect(screen.getByText(containing('1 suspension'))).toBeTruthy()
+    })
+
+    it('recalls nothing when it is given no record (an author whose account is gone)', async () => {
+      await renderWithProviders(<ReportCard {...card} onView={jest.fn()} />)
+
+      expect(screen.getByText(card.snapshot)).toBeTruthy() // témoin
+      expect(screen.queryByText(fr.t(($) => $.moderation.record.title))).toBeNull()
+    })
+
+    it('keeps the record once decided, as it stays true', async () => {
+      const record = { label: fr.t(($) => $.moderation.record.title), lines: ['2 retraits'] }
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          record={record}
+          onView={jest.fn()}
+          decided={{ message: 'Signalement classé sans suite.', ok: true }}
+        />,
+      )
+
+      expect(screen.getByRole('status', { name: 'Signalement classé sans suite.' })).toBeTruthy()
+      expect(screen.getByText(containing('2 retraits'))).toBeTruthy()
+    })
+
+    // Correction de la relecture de design 7c : les nombres se lisent comme une phrase, séparés
+    // par une virgule, et le titre du rappel mène à l'historique du membre.
+    it('reads the numbers of the record as one sentence, separated by a comma', async () => {
+      const record = {
+        label: fr.t(($) => $.moderation.record.title),
+        lines: ['2 retraits', '1 suspension'],
+      }
+      await renderWithProviders(<ReportCard {...card} record={record} onView={jest.fn()} />)
+
+      expect(screen.getByText('2 retraits, 1 suspension')).toBeTruthy()
+    })
+
+    // Un bouton souligné qui agit sur place (l'onglet « Historique ») : le seul lien d'une carte
+    // reste « Voir » (règle 22).
+    it('makes the title of the record a button to the history of the member, tied to its card', async () => {
+      const onHistory = jest.fn()
+      const record = {
+        label: fr.t(($) => $.moderation.record.title),
+        lines: ['2 retraits'],
+        onPress: onHistory,
+      }
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          record={record}
+          onView={jest.fn()}
+          description="Commentaire : Envoie"
+        />,
+      )
+
+      const link = screen.getByRole('button', { name: record.label })
+      expect(link.props.accessibilityHint).toBe('Commentaire : Envoie')
+      await fireEvent.press(link)
+      expect(onHistory).toHaveBeenCalledTimes(1)
+    })
+
+    it('turns the title of the record back into a text once the card is decided', async () => {
+      const record = {
+        label: fr.t(($) => $.moderation.record.title),
+        lines: ['2 retraits'],
+        onPress: jest.fn(),
+      }
+      await renderWithProviders(
+        <ReportCard
+          {...card}
+          record={record}
+          onView={jest.fn()}
+          decided={{ message: 'Signalement classé sans suite.', ok: true }}
+        />,
+      )
+
+      expect(screen.getByText(record.label)).toBeTruthy() // témoin
+      expect(screen.queryByRole('button', { name: record.label })).toBeNull()
+    })
+
+    it('keeps the title of the record a plain text when it leads nowhere', async () => {
+      const record = { label: fr.t(($) => $.moderation.record.title), lines: ['2 retraits'] }
+      await renderWithProviders(<ReportCard {...card} record={record} onView={jest.fn()} />)
+
+      expect(screen.getByText(record.label)).toBeTruthy() // témoin
+      expect(screen.queryByRole('button', { name: record.label })).toBeNull()
+    })
   })
 })

@@ -3,9 +3,13 @@
 // rétablir). Les écrans n'appellent que ces hooks ; leurs tests les remplacent par de faux résultats.
 // L'API refait la vérification « administrateur » à chaque requête : pour tout autre membre, ces
 // routes répondent 404, comme une adresse qui n'existe pas.
+// Tranche 7c : suspendre un compte et lever une suspension (deux décisions de plus, sur un membre
+// plutôt que sur un contenu), et l'historique de toutes les décisions, filtrable sur un membre.
 import {
+  DecisionHistoryPage,
   ModerationDecision,
   type ModerationDecisionInput,
+  type ModerationQueueItem,
   ModerationQueuePage,
   RemovedPage,
 } from '@ruche/contracts'
@@ -18,11 +22,16 @@ import { ApiError, type ApiResult } from '../api/errors'
 export const moderationQueryKey = ['moderation'] as const
 const queueKey = ['moderation', 'queue'] as const
 const removedKey = ['moderation', 'removed'] as const
+/** L'historique : une liste par filtre (`null` : toutes les décisions). */
+const historyKey = ['moderation', 'history'] as const
 
 // L'adresse d'une page. Le curseur est un texte opaque rendu par l'API avec la page précédente ;
 // URLSearchParams l'encode : il reste un paramètre, sans pouvoir changer le reste de l'adresse.
-const withCursor = (path: string, cursor?: string) =>
-  cursor ? `${path}?${new URLSearchParams({ cursor }).toString()}` : path
+// Les autres paramètres (le membre filtré) passent de la même façon.
+const withCursor = (path: string, cursor?: string, extra: Record<string, string> = {}) => {
+  const params = new URLSearchParams({ ...extra, ...(cursor ? { cursor } : null) }).toString()
+  return params ? `${path}?${params}` : path
+}
 
 /** Une page de la file (GET /v1/moderation/reports). Lève une ApiError en cas d'échec. */
 export const getQueuePage = async (cursor?: string): Promise<ModerationQueuePage> => {
@@ -79,6 +88,37 @@ export const useRemovedItems = (enabled = true) =>
     refetchOnReconnect: false,
   })
 
+/** Une page de l'historique (GET /v1/moderation/decisions), filtrée sur un membre si `member`. */
+export const getHistoryPage = async (
+  member: string | undefined,
+  cursor?: string,
+): Promise<DecisionHistoryPage> => {
+  const result = await request(
+    withCursor('/v1/moderation/decisions', cursor, member ? { member } : {}),
+    {},
+    DecisionHistoryPage,
+  )
+  if (!result.ok) throw new ApiError(result.error)
+  return result.data
+}
+
+/**
+ * Hook : l'historique des décisions, de la plus récente à la plus ancienne, 20 par 20 ; seulement
+ * celles qui visent `member` s'il est donné (la page d'un membre y mène). `enabled` : faux tant que
+ * l'onglet « Historique » est fermé, comme les retirés.
+ */
+export const useDecisionHistory = (member?: string, enabled = true) =>
+  useInfiniteQuery({
+    queryKey: [...historyKey, member ?? null],
+    queryFn: ({ pageParam }) => getHistoryPage(member, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled,
+    retry,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
 /** POST /v1/moderation/decisions : la décision, telle que l'API l'a enregistrée. */
 export const postDecision = (input: ModerationDecisionInput) =>
   request(
@@ -106,6 +146,30 @@ const without = <Item extends { target: { kind: string; id: string } }>(
     })),
   }
 
+/** Ce que la file sait du membre visé (`authorRecord`), après une suspension ou une levée. */
+type RecordChange = (record: NonNullable<ModerationQueueItem['authorRecord']>) => typeof record
+
+/**
+ * Les pages de la file, où le rappel de chaque carte qui vise `memberId` est changé par `change`.
+ * Aucune carte n'entre ni ne sort : seules leurs lignes « Déjà décidé » changent.
+ */
+const withRecord = (
+  data: InfiniteData<ModerationQueuePage> | undefined,
+  memberId: string,
+  change: RecordChange,
+) =>
+  data && {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) =>
+        item.authorRecord?.memberId === memberId
+          ? { ...item, authorRecord: change(item.authorRecord) }
+          : item,
+      ),
+    })),
+  }
+
 /**
  * Hook : `decide(input)` envoie une décision et rend son résultat (`{ ok, data }` ou
  * `{ ok: false, error }`), que l'écran annonce. Une décision réussie ôte la cible de sa liste
@@ -113,6 +177,11 @@ const without = <Item extends { target: { kind: string; id: string } }>(
  * relire toute la file ; l'autre liste sera relue à sa prochaine ouverture. Une décision refusée
  * (prise entre-temps par quelqu'un d'autre, contenu disparu) fait relire la file, qui montre alors
  * l'état réel.
+ *
+ * Tranche 7c : une suspension ou une levée ne retire aucune carte de la file ; elle change le
+ * rappel des cartes de ce membre (« suspendu en ce moment », et plus de « Suspendre le compte »),
+ * en place, sans relire la file sous les yeux. La page du membre est relue (elle dit la suspension).
+ * Toute décision réussie entre dans l'historique, marqué périmé.
  */
 export const useDecide = (): {
   decide: (input: ModerationDecisionInput) => Promise<ApiResult<ModerationDecision>>
@@ -121,6 +190,30 @@ export const useDecide = (): {
   const decide = useCallback(
     async (input: ModerationDecisionInput) => {
       const result = await postDecision(input)
+      if (result.ok) {
+        // L'historique se relira à sa prochaine ouverture, avec cette décision en tête.
+        void queryClient.invalidateQueries({ queryKey: historyKey, refetchType: 'none' })
+      }
+      if (input.action === 'suspend' || input.action === 'lift') {
+        if (result.ok) {
+          const lifted = input.action === 'lift'
+          queryClient.setQueryData(
+            queueKey,
+            (data: InfiniteData<ModerationQueuePage> | undefined) =>
+              withRecord(data, input.memberId, (record) => ({
+                ...record,
+                // Une suspension levée pour erreur ne compte plus dans le rappel (J10).
+                suspensions: lifted
+                  ? record.suspensions - (input.cause === 'error' ? 1 : 0)
+                  : record.suspensions + 1,
+                suspendedNow: !lifted,
+                canSuspend: lifted,
+              })),
+          )
+          void queryClient.invalidateQueries({ queryKey: ['member', input.memberId] })
+        }
+        return result
+      }
       const touched = input.action === 'restore' ? removedKey : queueKey
       const other = input.action === 'restore' ? queueKey : removedKey
       if (result.ok) {

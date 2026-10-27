@@ -17,22 +17,31 @@
 //   l'explication ; un commentaire retiré ne se lit plus, même par l'auteur du projet ;
 // - chaque décision est gardée : qui, quand, quelle action, quel fondement, quelle explication.
 //
+// Tranche 7c (« Administrer », fin du fichier) : les garde-fous de la modération (une décision à
+// la fois par cible, 50 décisions par jour, le mot de passe redemandé), le rappel des décisions
+// passées sur chaque carte (`authorRecord`) et une ligne invalide en base qui n'abîme pas la file.
+//
 // PGlite n'a qu'une connexion : deux décisions « en même temps » y passent l'une après l'autre. Le
 // test de la règle 12 vérifie donc la seconde décision, pas la course elle-même.
+import { randomUUID } from 'node:crypto'
 import {
   CommentPage,
   ErrorResponse,
+  MODERATION_DECISIONS_PER_DAY,
+  MODERATION_PASSWORD_FAILURES_PER_DAY,
   type ModerationDecisionInput,
   ModerationQueuePage,
   NotificationPage,
   Project,
   ProjectNote,
+  REMOVALS_BEFORE_PASSWORD,
   RemovedPage,
   type ReportTarget,
+  SUSPENSIONS_BEFORE_PASSWORD,
   toolSlug,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -51,6 +60,9 @@ let louisId: string
 let meteo: Project // le projet public de Léa
 
 const SECOND = 1000
+const HOUR = 60 * 60 * SECOND
+const DAY = 24 * HOUR
+const LOUIS_PASSWORD = 'louis-long-password'
 const START = new Date('2026-06-15T08:00:00.000Z')
 const UNKNOWN = '00000000-0000-4000-8000-000000000000'
 
@@ -78,7 +90,7 @@ beforeEach(async () => {
   louis = await ctx.verifiedMember({
     name: 'Louis',
     email: 'louis@example.com',
-    password: 'louis-long-password',
+    password: LOUIS_PASSWORD,
   })
   leaId = (await act.me(lea)).id
   maxId = (await act.me(max)).id
@@ -275,6 +287,14 @@ describe('the queue', () => {
       count: 3,
       firstReportedAt: first,
       lastReportedAt: last,
+      // Tranche 7c : le rappel de ce que la modération a déjà décidé pour Léa (rien encore).
+      authorRecord: {
+        memberId: leaId,
+        removals: 0,
+        suspensions: 0,
+        suspendedNow: false,
+        canSuspend: true,
+      },
     })
     expect(page.items[1]).toMatchObject({
       projectId: meteo.id,
@@ -1080,5 +1100,388 @@ describe('the moderation and blocks', () => {
     later()
     await act.decide(zoe, { action: 'restore', target: { kind: 'comment', id: comment.id } })
     expect((await readRemoved()).items).toEqual([])
+  })
+})
+
+// ─── Tranche 7c : les garde-fous de la modération ────────────────────────────────────────────────
+
+/** Un membre de plus, pour les tests qui suspendent plusieurs comptes. */
+const newMember = async (name: string, email: string) => {
+  const cookie = await ctx.verifiedMember({ name, email, password: 'a-long-password-1' })
+  return { cookie, id: (await act.me(cookie)).id }
+}
+
+/** Suspend un membre (Louis), avec un fondement et une explication ; rend la réponse brute. */
+const suspend = (
+  memberId: string,
+  duration: '7d' | '30d' | 'indefinite',
+  extra: { password?: string; fromReport?: ReportTarget } = {},
+) =>
+  decideRaw(louis, {
+    action: 'suspend',
+    memberId,
+    duration,
+    ground: 'rules',
+    explanation: 'Des messages insultants, plusieurs fois.',
+    ...extra,
+  })
+
+/** Lève la suspension d'un membre (Louis) : plus tôt que prévu, ou parce qu'elle était une erreur. */
+const lift = (memberId: string, cause: 'early' | 'error') =>
+  decideRaw(louis, { action: 'lift', memberId, cause, explanation: 'Levée après relecture.' })
+
+/** Retire une cible (Louis), avec ou sans mot de passe ; rend la réponse brute. */
+const removeRaw = (target: ReportTarget, password?: string) =>
+  decideRaw(louis, {
+    action: 'remove',
+    target,
+    ground: 'rules',
+    explanation: 'Publicité déguisée.',
+    ...(password !== undefined && { password }),
+  })
+
+/** `n` commentaires de Léa, chacun signalé par Max (au plus 20 par jour). */
+const reportedComments = async (n: number) => {
+  const targets: ReportTarget[] = []
+  for (let i = 1; i <= n; i++) {
+    const comment = await act.comment(meteo.id, lea, `Commentaire ${i}`)
+    const target: ReportTarget = { kind: 'comment', id: comment.id }
+    await report(max, target)
+    targets.push(target)
+  }
+  return targets
+}
+
+/** La carte de la file qui porte cette cible. */
+const cardOf = async (target: ReportTarget) =>
+  (await readQueue()).items.find(
+    (item) => item.target.kind === target.kind && item.target.id === target.id,
+  )
+
+// Règle « une seule décision à la fois par cible » (plan 7c, Décisions) : retirer et classer
+// exigent un signalement ouvert. PGlite n'a qu'une connexion : la course vraie (deux onglets au
+// même instant) ne se rejoue pas ici ; on vérifie la seconde décision, dans les deux ordres.
+describe('one decision at a time on a target', () => {
+  it('refuses to remove what was just dismissed, and to dismiss what was just removed', async () => {
+    await report(max, projectTarget())
+    later()
+    await act.decide(louis, { action: 'dismiss', target: projectTarget() })
+
+    await expectError(await removeRaw(projectTarget()), 409, 'already_decided')
+    // Le projet reste affiché : jamais un contenu retiré avec des signalements classés.
+    expect((await readProject(meteo.id, zoe)).removal).toBeNull()
+    expect((await reportsInBase()).map((r) => r.status)).toEqual(['dismissed'])
+
+    const note = await postNote(meteo.id, lea, 'Une note publicitaire')
+    await report(max, { kind: 'note', id: note.id })
+    await remove({ kind: 'note', id: note.id })
+    await expectError(
+      await decideRaw(louis, { action: 'dismiss', target: { kind: 'note', id: note.id } }),
+      409,
+      'already_decided',
+    )
+    expect((await decisionsInBase()).map((d) => d.action)).toEqual(['dismiss', 'remove'])
+  })
+})
+
+// Garde-fou : au plus 50 décisions par administrateur et par jour (MODERATION_DECISIONS_PER_DAY).
+describe('the limit of decisions', () => {
+  it('answers 50 decisions a day, counting malformed ones, then asks to wait', async () => {
+    await report(max, projectTarget())
+    // 50 demandes mal formées : chacune compte, le compteur passe avant la lecture du corps.
+    for (let i = 1; i <= MODERATION_DECISIONS_PER_DAY; i++) {
+      await expectError(await decideRaw(louis, { action: 'explode' }), 400, 'validation')
+    }
+
+    const res = await decideRaw(louis, { action: 'dismiss', target: projectTarget() })
+    await expectError(res, 429, 'rate_limited')
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(await decisionsInBase()).toEqual([])
+    expect((await reportsInBase()).map((r) => r.status)).toEqual(['open'])
+
+    // Chaque administrateur a son compteur ; un jour plus tard, Louis décide de nouveau.
+    await act.makeAdmin(zoeId)
+    await report(max, { kind: 'member', id: leaId })
+    expect(
+      (await decideRaw(zoe, { action: 'dismiss', target: { kind: 'member', id: leaId } })).status,
+    ).toBe(201)
+    later(DAY)
+    expect((await decideRaw(louis, { action: 'dismiss', target: projectTarget() })).status).toBe(
+      201,
+    )
+  })
+
+  // S5 : le compteur passe APRÈS la garde. Sinon un membre saurait, à la 51e réponse (429 au lieu
+  // de 404), qu'une route de modération existe.
+  it('counts nothing for who is not an administrator: 60 times the same 404', async () => {
+    const body = { action: 'dismiss', target: projectTarget() }
+    for (let i = 1; i <= MODERATION_DECISIONS_PER_DAY + 10; i++) {
+      const res = await decideRaw(max, body)
+      await expectSame(res, await act.send('POST', '/v1/inexistant', max, body), `request ${i}`)
+    }
+
+    // Devenu administrateur, Max décide aussitôt : rien n'a été compté pendant qu'il ne l'était pas.
+    await act.makeAdmin(maxId)
+    await report(zoe, projectTarget())
+    expect((await decideRaw(max, body)).status).toBe(201)
+  })
+})
+
+// Garde-fou : le mot de passe redemandé au 11e retrait de l'heure (REMOVALS_BEFORE_PASSWORD), à la
+// 4e suspension de 7 ou 30 jours du jour (SUSPENSIONS_BEFORE_PASSWORD, S11), et toujours pour une
+// suspension sans fin. Absent : 403 `password_required` ; faux : 403 `wrong_password` ; dans les
+// deux cas, rien n'est écrit.
+describe('the password asked again', () => {
+  it('is asked at the 11th removal of the hour: absent, wrong, then right', async () => {
+    const targets = await reportedComments(REMOVALS_BEFORE_PASSWORD + 1)
+    for (const target of targets.slice(0, REMOVALS_BEFORE_PASSWORD)) {
+      expect((await removeRaw(target)).status).toBe(201)
+    }
+    const eleventh = targets[REMOVALS_BEFORE_PASSWORD] as ReportTarget
+
+    await expectError(await removeRaw(eleventh), 403, 'password_required')
+    await expectError(await removeRaw(eleventh, 'not-the-password'), 403, 'wrong_password')
+    expect(await decisionsInBase()).toHaveLength(REMOVALS_BEFORE_PASSWORD)
+    expect((await reportsInBase()).filter((r) => r.status === 'open')).toHaveLength(1)
+
+    expect((await removeRaw(eleventh, LOUIS_PASSWORD)).status).toBe(201)
+    expect(await decisionsInBase()).toHaveLength(REMOVALS_BEFORE_PASSWORD + 1)
+  })
+
+  it('is not asked again once the hour has passed', async () => {
+    const targets = await reportedComments(REMOVALS_BEFORE_PASSWORD + 1)
+    for (const target of targets.slice(0, REMOVALS_BEFORE_PASSWORD)) {
+      expect((await removeRaw(target)).status).toBe(201)
+    }
+
+    later(HOUR)
+    expect((await removeRaw(targets[REMOVALS_BEFORE_PASSWORD] as ReportTarget)).status).toBe(201)
+  })
+
+  it('is not asked to classify: dismissing never needs it', async () => {
+    const targets = await reportedComments(REMOVALS_BEFORE_PASSWORD + 1)
+    for (const target of targets.slice(0, REMOVALS_BEFORE_PASSWORD)) {
+      expect((await removeRaw(target)).status).toBe(201)
+    }
+    // Témoin : un retrait de plus le demande.
+    const last = targets[REMOVALS_BEFORE_PASSWORD] as ReportTarget
+    await expectError(await removeRaw(last), 403, 'password_required')
+
+    expect((await decideRaw(louis, { action: 'dismiss', target: last })).status).toBe(201)
+  })
+
+  it('is asked at the 4th suspension of 7 or 30 days in the day', async () => {
+    const karim = await newMember('Karim', 'karim@example.com')
+    const durations = ['7d', '30d', '7d'] as const
+    const firstThree = [leaId, maxId, zoeId]
+    expect(firstThree).toHaveLength(SUSPENSIONS_BEFORE_PASSWORD)
+    for (const [i, memberId] of firstThree.entries()) {
+      expect((await suspend(memberId, durations[i] ?? '7d')).status, memberId).toBe(201)
+    }
+
+    await expectError(await suspend(karim.id, '30d'), 403, 'password_required')
+    await expectError(
+      await suspend(karim.id, '30d', { password: 'not-the-password' }),
+      403,
+      'wrong_password',
+    )
+    expect(await decisionsInBase()).toHaveLength(SUSPENSIONS_BEFORE_PASSWORD)
+
+    expect((await suspend(karim.id, '30d', { password: LOUIS_PASSWORD })).status).toBe(201)
+    expect((await act.me(karim.cookie)).suspension).not.toBeNull()
+  })
+
+  it('is always asked for a suspension without end, even the first of the day', async () => {
+    await expectError(await suspend(leaId, 'indefinite'), 403, 'password_required')
+    await expectError(
+      await suspend(leaId, 'indefinite', { password: 'not-the-password' }),
+      403,
+      'wrong_password',
+    )
+    expect(await decisionsInBase()).toEqual([])
+    expect((await act.me(lea)).suspension).toBeNull()
+
+    expect((await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD })).status).toBe(201)
+    expect((await act.me(lea)).suspension).toMatchObject({ endsAt: null })
+  })
+
+  // S12 : au plus 5 mots de passe faux par jour ; ensuite 429, même avec le bon, et rien d'écrit.
+  // Sans ce plafond, un compte d'administrateur volé (sa session) pourrait deviner le mot de passe.
+  it('answers 429 after 5 wrong passwords in the day, even to the right one', async () => {
+    for (let i = 1; i <= MODERATION_PASSWORD_FAILURES_PER_DAY; i++) {
+      await expectError(
+        await suspend(leaId, 'indefinite', { password: `wrong-${i}` }),
+        403,
+        'wrong_password',
+      )
+    }
+
+    await expectError(
+      await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD }),
+      429,
+      'rate_limited',
+    )
+    expect(await decisionsInBase()).toEqual([])
+    expect((await act.me(lea)).suspension).toBeNull()
+
+    // Un jour plus tard, le bon mot de passe passe de nouveau (la session de 7 jours dure encore).
+    later(DAY)
+    expect((await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD })).status).toBe(201)
+  })
+
+  // Relecture de sécurité de la branche (7c) : le premier refus du jour laisse une ligne dans les
+  // journaux, une seule, sans identifiant ni corps (un compte volé peut-être, à aller voir).
+  it('logs the first refusal of the day once, with no identifier and no password', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      for (let i = 1; i <= MODERATION_PASSWORD_FAILURES_PER_DAY; i++) {
+        await suspend(leaId, 'indefinite', { password: `wrong-${i}` })
+      }
+      expect(warn).not.toHaveBeenCalled()
+
+      for (let i = 0; i < 3; i++) await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD })
+
+      expect(warn.mock.calls).toEqual([['Moderation password: daily failures reached']])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  // S12 : un compte sans mot de passe (connexion par un autre moyen) ne peut pas confirmer.
+  it('refuses as a wrong password the confirmation of an account without a password', async () => {
+    await ctx.db
+      .delete(schema.account)
+      .where(and(eq(schema.account.userId, louisId), eq(schema.account.providerId, 'credential')))
+
+    await expectError(
+      await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD }),
+      403,
+      'wrong_password',
+    )
+    expect(await decisionsInBase()).toEqual([])
+  })
+})
+
+// Le rappel sur chaque carte de la file (plan 7c, File et copies ; J10) : ce que la modération a
+// déjà décidé pour le membre visé, sur l'année gardée. Ne comptent ni les retraits rétablis, ni
+// les suspensions levées pour erreur.
+describe('the record of the author on a card', () => {
+  it('counts the removals and suspensions, but neither a restored removal nor a lift for error', async () => {
+    const [first, second, third] = await reportedComments(3)
+    await removeRaw(first as ReportTarget)
+    await removeRaw(second as ReportTarget)
+    later()
+    await act.decide(louis, { action: 'restore', target: second as ReportTarget })
+    // Une suspension levée pour erreur ne compte pas ; une levée plus tôt que prévu, si.
+    expect((await suspend(leaId, '7d')).status).toBe(201)
+    expect((await lift(leaId, 'error')).status).toBe(201)
+    expect((await suspend(leaId, '7d')).status).toBe(201)
+    expect((await lift(leaId, 'early')).status).toBe(201)
+
+    expect((await cardOf(third as ReportTarget))?.authorRecord).toEqual({
+      memberId: leaId,
+      removals: 1,
+      suspensions: 1,
+      suspendedNow: false,
+      canSuspend: true,
+    })
+
+    // Suspendue de nouveau : elle l'est en ce moment, et ne peut pas l'être deux fois.
+    expect((await suspend(leaId, '30d', { password: LOUIS_PASSWORD })).status).toBe(201)
+    expect((await cardOf(third as ReportTarget))?.authorRecord).toEqual({
+      memberId: leaId,
+      removals: 1,
+      suspensions: 2,
+      suspendedNow: true,
+      canSuspend: false,
+    })
+  })
+
+  it('cannot suspend oneself, nor an administrator in office', async () => {
+    const zoeComment = await act.comment(meteo.id, zoe, 'Le commentaire de Zoé')
+    await report(max, { kind: 'member', id: louisId })
+    await report(max, { kind: 'comment', id: zoeComment.id })
+    await report(max, projectTarget())
+    await act.makeAdmin(zoeId)
+
+    expect((await cardOf({ kind: 'member', id: louisId }))?.authorRecord).toMatchObject({
+      memberId: louisId,
+      canSuspend: false,
+    })
+    expect((await cardOf({ kind: 'comment', id: zoeComment.id }))?.authorRecord).toMatchObject({
+      memberId: zoeId,
+      canSuspend: false,
+    })
+    // Témoin : Léa, simple membre, peut l'être.
+    expect((await cardOf(projectTarget()))?.authorRecord).toMatchObject({
+      memberId: leaId,
+      canSuspend: true,
+    })
+  })
+
+  it('forgets a removal older than a year', async () => {
+    const [old, recent] = await reportedComments(2)
+    await removeRaw(old as ReportTarget)
+    expect((await cardOf(recent as ReportTarget))?.authorRecord?.removals).toBe(1) // témoin
+
+    // 366 jours plus tard (les sessions durent 7 jours : on se reconnecte).
+    later(366 * DAY)
+    louis = await act.signInAgain({ email: 'louis@example.com', password: LOUIS_PASSWORD })
+
+    expect((await cardOf(recent as ReportTarget))?.authorRecord?.removals).toBe(0)
+  })
+})
+
+// Plan 7c (File et copies) : chaque groupe de la file se retrouve par sa cible, plus par sa
+// position. Une ligne invalide en base (posée à la main, ou par une version ancienne) est écartée
+// sans décaler les nombres ni les dates des cartes voisines, et la file répond toujours.
+describe('a broken row in the queue', () => {
+  it('leaves out a report with an invalid target, and counts the others right', async () => {
+    const note = await postNote(meteo.id, lea, 'Une note signalée')
+    await report(max, projectTarget())
+    const first = nowIso()
+    // Deux lignes invalides, entre deux signalements valides : un identifiant qui n'est pas un
+    // uuid, et une sorte de cible inconnue.
+    later()
+    for (const [targetKind, targetId] of [
+      ['project', 'not-a-uuid'],
+      ['planet', meteo.id],
+    ] as const) {
+      await ctx.db.insert(schema.contentReport).values({
+        id: randomUUID(),
+        reporterId: zoeId,
+        targetKind,
+        targetId,
+        projectId: null,
+        targetAuthorId: leaId,
+        reason: 'other',
+        details: 'Une ligne invalide',
+        snapshot: [{ field: 'title', value: 'Invalide' }],
+        status: 'open',
+        createdAt: new Date(Date.now()),
+      })
+    }
+    await report(zoe, projectTarget())
+    const last = nowIso()
+    await report(zoe, { kind: 'note', id: note.id })
+    const noteAt = nowIso()
+
+    const page = await readQueue()
+
+    expect(page.items.map((item) => item.target)).toEqual([
+      projectTarget(),
+      { kind: 'note', id: note.id },
+    ])
+    expect(page.items[0]).toMatchObject({
+      count: 2,
+      firstReportedAt: first,
+      lastReportedAt: last,
+      details: [],
+    })
+    expect(page.items[1]).toMatchObject({
+      count: 1,
+      firstReportedAt: noteAt,
+      lastReportedAt: noteAt,
+    })
   })
 })

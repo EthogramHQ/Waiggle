@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
+import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useMarkSeen, useNotifications } from '../notifications/api'
@@ -36,6 +37,7 @@ function MemberNotifications() {
   const back = useGoBack('/')
   const list = useNotifications()
   const { markSeen } = useMarkSeen()
+  const suspended = useSuspension().suspended
 
   // « Vu » une seule fois par ouverture, avec l'heure du serveur de la première page. Un ref
   // (useRef) garde une valeur d'un affichage à l'autre sans redessiner l'écran : ici, « déjà fait ».
@@ -76,15 +78,22 @@ function MemberNotifications() {
         // Rien encore : ce qui en fera venir, c'est un projet publié (les autres y réagiront).
         // Un titre, comme tous les états de l'appli : c'est lui que lit d'abord un lecteur d'écran
         // qui parcourt la page par ses titres.
+        // Un compte suspendu ne publie plus (tranche 7c) : on lui propose plutôt de découvrir des
+        // projets, à l'accueil, là où mène le fil vide (relecture de design 7c).
         <StateMessage
           kind="empty"
           title={t(($) => $.notifications.emptyTitle)}
           message={t(($) => $.notifications.empty)}
           actions={[
-            {
-              label: t(($) => $.notifications.emptyAction),
-              onPress: () => router.push('/projects/new'),
-            },
+            suspended
+              ? {
+                  label: t(($) => $.notifications.emptyActionSuspended),
+                  onPress: () => router.push('/'),
+                }
+              : {
+                  label: t(($) => $.notifications.emptyAction),
+                  onPress: () => router.push('/projects/new'),
+                },
           ]}
         />
       ) : (
@@ -92,7 +101,7 @@ function MemberNotifications() {
           {/* Une liste annoncée : « liste, 20 éléments », et on saute d'une notification à l'autre. */}
           <Stack gap="sm" accessibilityRole="list">
             {items.map((notification) => {
-              const shown = presentNotification(notification, t)
+              const shown = presentNotification(notification, t, i18n.language)
               const target = shown.target
               return (
                 <NotificationCard

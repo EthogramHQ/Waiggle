@@ -2,6 +2,7 @@
 // L'appli s'en sert pour valider les formulaires avant envoi ; l'API, pour valider ses réponses.
 import { supportedLanguages } from '@ruche/i18n'
 import { z } from 'zod'
+import { Suspension } from './suspension'
 import { DisplayName } from './text'
 
 export const LanguageSchema = z.enum(supportedLanguages)
@@ -78,6 +79,11 @@ export const Me = z
      * L'API refait la vérification à chaque route d'administration : ce champ ne donne aucun droit.
      */
     isAdmin: z.boolean(),
+    /**
+     * La suspension en cours (tranche 7c) ; null si le compte n'est pas suspendu. L'appli montre
+     * alors le bandeau et retire les actions refusées ; l'API refuse ces actions de toute façon.
+     */
+    suspension: Suspension.nullable(),
   })
   .meta({ id: 'Me' })
 export type Me = z.infer<typeof Me>

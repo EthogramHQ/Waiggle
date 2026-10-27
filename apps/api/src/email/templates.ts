@@ -16,6 +16,7 @@
 // Le pied de chaque e-mail (`footer`) donne l'adresse de contact (tranche 7a, règle 23), écrite en
 // texte et jamais en lien « mailto: » : tout lien d'un e-mail mène à l'appli ou à l'API.
 import { appName, contactEmail, palettes, radii } from '@ruche/brand'
+import type { RemovalGround } from '@ruche/contracts'
 import { fill, type Language, resources } from '@ruche/i18n'
 import { defangLinks, linkPlaceholder } from './links'
 
@@ -94,13 +95,26 @@ const richHtml = (paragraph: Paragraph) =>
         )
         .join('')
 
+/**
+ * Un paragraphe du corps : un texte, ou un texte libre écrit par quelqu'un (l'explication d'une
+ * suspension) qui peut contenir un mot très long. Celui-là se coupe n'importe où quand un mot ne
+ * tient pas dans la largeur (`overflow-wrap:anywhere`, et `word-break:break-word` pour les moteurs
+ * qui ne connaissent que lui) : un <p> ordinaire ne se coupe qu'aux espaces, et un mot de 76
+ * caractères faisait défiler l'e-mail de 431 px à l'horizontale sur un écran de 320 px (relecture
+ * de design de 7c). Les autres paragraphes, écrits par nous, gardent les coupures ordinaires.
+ */
+type BodyParagraph = string | { freeText: string }
+
+const paragraphText = (paragraph: BodyParagraph) =>
+  typeof paragraph === 'string' ? paragraph : paragraph.freeText
+
 type Layout = {
   /** La langue de l'e-mail, annoncée dans `<html lang>` (lecteurs d'écran, traduction). */
   language: Language
   /** La phrase titre, en gras sous le nom de l'appli (« Du nouveau cette semaine »). */
   heading?: string
   greeting: string
-  paragraphs: string[]
+  paragraphs: BodyParagraph[]
   /**
    * Une donnée à vérifier d'un coup d'œil (la nouvelle adresse), seule sur sa ligne sous les
    * paragraphes, en gras, et coupée n'importe où : une adresse n'a pas d'espace (des-E1, des-E3).
@@ -160,7 +174,7 @@ const render = ({
   const text = [
     greeting,
     '',
-    ...paragraphs.flatMap((p) => [p, '']),
+    ...paragraphs.flatMap((p) => [paragraphText(p), '']),
     ...(highlight === undefined ? [] : [highlight, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
     ...after.flatMap((p) => [plain(p), '']),
@@ -233,7 +247,13 @@ const render = ({
   <div class="card" style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
     ${top}
     ${p(greeting, 'font-size:16px')}
-    ${paragraphs.map((value) => p(value)).join('\n    ')}
+    ${paragraphs
+      .map((value) =>
+        typeof value === 'string'
+          ? p(value)
+          : p(value.freeText, `${body};overflow-wrap:anywhere;word-break:break-word`),
+      )
+      .join('\n    ')}
     ${htmlHighlight}
     ${htmlItems}
     ${after.map((value) => p(value)).join('\n    ')}
@@ -547,6 +567,80 @@ export const moderationAlertEmail = (
       notes: [],
       reason: fill(t.moderationAlert.reason),
       footer: fill(t.footer),
+    }),
+  }
+}
+
+// ─── La suspension d'un compte (tranche 7c) ──────────────────────────────────────────────────────
+
+export type SuspensionEmailData = {
+  /** La fin prévue, à la seconde ; null : jusqu'à nouvel ordre. */
+  endsAt: Date | null
+  ground: RemovalGround
+  /** L'explication écrite par l'administrateur, montrée telle quelle (adresses désarmées). */
+  explanation: string
+  /** Vrai si la suspension a suivi un signalement (J2) ; jamais de qui. */
+  afterReport: boolean
+}
+
+/** Le fuseau de toutes les dates de la modération, quelle que soit la langue (J4). */
+const PARIS_TIME_ZONE = 'Europe/Paris'
+
+/**
+ * La fin écrite à l'heure de Paris : « 4 novembre 2026 » et « 00:30 » (« November 4, 2026 » et
+ * « 12:30 AM » en anglais). `Intl.DateTimeFormat` met une date en forme selon la langue ;
+ * `timeZone` impose Paris, jamais le fuseau du serveur : 23 h 30 UTC un soir de novembre, c'est
+ * déjà le lendemain à Paris. L'année est toujours écrite : un e-mail se relit longtemps après.
+ */
+const parisEnd = (language: Language, endsAt: Date) => {
+  const format = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(language, { ...options, timeZone: PARIS_TIME_ZONE }).format(endsAt)
+  return {
+    date: format({ day: 'numeric', month: 'long', year: 'numeric' }),
+    time: format({ hour: '2-digit', minute: '2-digit' }),
+  }
+}
+
+/**
+ * L'e-mail de service envoyé à un membre suspendu (article 17 du DSA), le seul de la suspension
+ * (la levée n'est qu'une notification). Il dit : la décision, après un signalement ou non ; la fin
+ * à l'heure de Paris, ou « jusqu'à nouvel ordre » ; le fondement et l'explication ; ce que le
+ * membre peut encore faire ; comment contester. Ni le nom de l'administrateur, ni qui a signalé, ni
+ * lien de désinscription (c'est un e-mail de service), ni bouton, ni image. La salutation est
+ * neutre : l'e-mail n'a besoin d'aucune donnée du compte.
+ */
+export const suspensionEmail = (
+  language: Language,
+  { endsAt, ground, explanation, afterReport }: SuspensionEmailData,
+): EmailContent => {
+  const t = resources[language].translation.email.suspension
+  return {
+    subject: fill(t.subject),
+    ...render({
+      language,
+      heading: fill(t.heading),
+      greeting: fill(t.greeting),
+      paragraphs: [
+        fill(afterReport ? t.bodyAfterReport : t.body),
+        ...(endsAt === null
+          ? [fill(t.indefinite)]
+          : [fill(t.until, parisEnd(language, endsAt)), fill(t.earlier)]),
+        fill(t.grounds[ground]),
+        // L'explication vient d'un administrateur, mais elle part chez l'envoyeur d'e-mails et
+        // s'affiche dans une messagerie : aucune adresse cliquable (« [lien] »), et le HTML est
+        // échappé par render, comme tout le reste. Un texte libre : son paragraphe se coupe
+        // n'importe où si un mot est trop long (BodyParagraph).
+        {
+          freeText: fill(t.explanation, {
+            explanation: defangLinks(explanation, linkPlaceholder(language)),
+          }),
+        },
+        fill(t.meanwhile),
+      ],
+      // Contester : l'adresse de contact, en gras et en texte, jamais en lien « mailto: ».
+      after: [withBold(t.contest, 'contactEmail', contactEmail)],
+      notes: [],
+      footer: fill(resources[language].translation.email.footer),
     }),
   }
 }

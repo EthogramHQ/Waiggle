@@ -78,6 +78,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { labels } from './labels'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
+import { SuspensionCatalogue } from './suspension'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -600,6 +601,17 @@ export function CatalogueScreen() {
           caption={l.followers}
           layout="stacked"
         />
+        {/* Un compte suspendu (tranche 7c) qui vient de ne plus suivre : inactif, en blanc même là
+            où il serait l'action principale. */}
+        <FollowButton
+          followed={false}
+          onPress={() => {}}
+          label={l.followLea}
+          text={l.follow}
+          caption={l.followers}
+          layout="stacked"
+          disabled
+        />
         {/* Le nombre d'abonnés seul, sur sa propre page. */}
         <FollowerCount text={l.followers} />
         {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
@@ -769,6 +781,11 @@ export function CatalogueScreen() {
         <ReactionSample l={l} mine={['useful', 'bravo']} />
         <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
         <ReactionSample l={l} mine={[]} readOnly />
+        {/* Un compte suspendu (tranche 7c) : sa réaction donnée garde son bouton, pour la retirer ;
+            les autres ne montrent que leur nombre. */}
+        <ReactionSample l={l} mine={['bravo']} lockedExceptMine />
+        {/* Le même compte, qui vient de retirer « Utile » : la pastille reste, inactive. */}
+        <ReactionSample l={l} mine={['bravo']} lockedExceptMine takenBack={['useful']} />
         {/* Les cartes d'un commentaire : sans action (« Répondre » est au bout du fil ; « Signaler »,
             tranche 7a, est dans la section suivante), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
             son auteur), masqué vu par l'auteur du projet (Démasquer), Masquer en cours d'envoi, un
@@ -1027,6 +1044,8 @@ export function CatalogueScreen() {
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
       <ModerationCatalogue />
+      {/* Tranche 7c : le bandeau d'un compte suspendu (suspension.tsx). */}
+      <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
 
@@ -1356,11 +1375,17 @@ function ReactionSample({
   mine,
   readOnly = false,
   error,
+  lockedExceptMine = false,
+  takenBack = [],
 }: {
   l: Labels
   mine: ReactionKind[]
   readOnly?: boolean
   error?: string
+  /** Compte suspendu : seules les réactions posées restent des boutons. */
+  lockedExceptMine?: boolean
+  /** Compte suspendu : les réactions retirées pendant la visite, restées en place, inactives. */
+  takenBack?: ReactionKind[]
 }) {
   const counts: Record<ReactionKind, number> = {
     amazing: 2,
@@ -1378,6 +1403,8 @@ function ReactionSample({
       count: counts[kind],
       mine: isMine,
       label: isMine ? `${text}, ${l.reacted}, ${counts[kind]}` : `${text}, ${counts[kind]}`,
+      locked: lockedExceptMine && !isMine && !takenBack.includes(kind),
+      disabled: takenBack.includes(kind),
     }
   })
   return readOnly ? (

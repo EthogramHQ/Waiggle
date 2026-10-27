@@ -103,6 +103,8 @@ export const leaPage: Member = {
   isFollowed: false,
   followerCount: 3,
   projects: [summaryOf(projectWithPhotos)],
+  // Tranche 7c : réservé aux administrateurs.
+  moderation: null,
 }
 
 /**

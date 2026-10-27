@@ -389,6 +389,8 @@ export const fr = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, réagi, {{count}}',
       own: 'Les réactions à ton projet',
+      // La légende des réactions qu’un compte suspendu lit sans pouvoir réagir.
+      readOnly: 'Les réactions à ce projet',
       group: 'Réagir à ce projet',
       error: 'Ta réaction n’a pas pu être enregistrée. Réessaie.',
     },
@@ -569,8 +571,9 @@ export const fr = {
     follows:
       'Vos abonnements de l’un à l’autre sont retirés ; ils ne reviendront pas si tu débloques.',
     notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',
+    // Tranche 7c : sans « signale-le », dont le trait d'union se coupait en fin de ligne à 390 px.
     notModeration:
-      'Bloquer ne prévient pas la modération. Si un contenu pose problème, signale-le d’abord.',
+      'Bloquer ne prévient pas la modération. Si un contenu pose problème, fais d’abord un signalement.',
     confirm: 'Bloquer',
     cancel: 'Annuler',
     done: 'Tu as bloqué @{{handle}}.',
@@ -661,7 +664,7 @@ export const fr = {
     grounds: { illegal: 'La loi', rules: 'Les règles de {{appName}}' },
     explanation: 'Explication',
     explanationHint:
-      'Montrée à l’auteur. Dis quelle règle ou quelle loi ; ne nomme jamais qui a signalé.',
+      'Montrée à l’auteur. Dis quelle règle, ou quelle loi (droit à l’image…) ; ne nomme jamais qui a signalé.',
     confirmRemove: 'Retirer',
     cancel: 'Annuler',
     dismissed: 'Signalement classé sans suite.',
@@ -673,6 +676,131 @@ export const fr = {
     // Une copie longue se replie après trois champs (ajoutés par l'interface, corrections 7b).
     showAll: 'Afficher tout',
     showLess: 'Replier',
+    // Tranche 7c : les précisions des membres, sous leur propre libellé (distinctes de la copie).
+    detailsLabel: 'Précisions des personnes qui ont signalé',
+    // Un profil ne se retire pas en entier : la carte dit pourquoi elle n'a pas « Retirer ».
+    profileNoRemove:
+      'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
+    // L'historique des décisions (tranche 7c), troisième onglet.
+    history: 'Historique',
+    emptyHistory: 'Aucune décision pour l’instant.',
+    historyFor: 'Décisions qui visent @{{handle}}',
+    historyForGone: 'Décisions qui visent ce membre',
+    historyAll: 'Tout voir',
+    actions: {
+      remove: 'Retrait',
+      restore: 'Rétablissement',
+      dismiss: 'Classement sans suite',
+      suspend: 'Suspension',
+      lift: 'Levée de la suspension',
+    },
+    decidedBy: 'Par {{name}}',
+    decidedByGone: 'Par un administrateur dont le compte a été supprimé',
+    decidedOn: 'Le {{date}}',
+    memberLine: 'Membre visé : {{name}}',
+    memberGone: 'Membre visé : compte supprimé',
+    targetGone: 'Contenu supprimé depuis',
+    durations: { '7d': '7 jours', '30d': '30 jours', indefinite: 'Sans fin' },
+    // Le quota des décisions (J15) : pour une urgence, la procédure à la main reste possible.
+    limited:
+      'Tu as atteint la limite de {{max}} décisions en 24 heures. Pour une urgence, suis la procédure à la main du guide de modération.',
+    durationLine: 'Durée : {{duration}}',
+    // Dans l'historique, une suspension qui a suivi un signalement le dit (J2, Louis, 26/10/2026).
+    afterReportLine: 'Après un signalement',
+    // Ce que la modération a déjà décidé pour le membre visé, sur chaque carte de la file.
+    record: {
+      title: 'Déjà décidé pour ce membre',
+      none: 'Aucune décision passée pour ce membre.',
+      removals_one: '{{count}} retrait',
+      removals_other: '{{count}} retraits',
+      suspensions_one: '{{count}} suspension',
+      suspensions_other: '{{count}} suspensions',
+      suspendedNow: 'suspendu en ce moment',
+    },
+    suspendAction: 'Suspendre le compte',
+    // Le mot de passe redemandé (tranche 7c) : suspension sans fin, ou trop de retraits d'affilée.
+    password: {
+      label: 'Ton mot de passe',
+      // Relecture de sécurité (S11, S12, Louis, 26/10/2026).
+      hint: 'Demandé pour une suspension sans fin, après {{suspensions}} suspensions en 24 heures, ou après {{removals}} retraits en une heure.',
+      tooManyFailures:
+        'Trop de mots de passe faux : les décisions qui le demandent attendront, pendant 24 heures au plus.',
+      confirm: 'Confirmer',
+    },
+    suspend: {
+      title: 'Suspendre le compte de {{name}}',
+      intro:
+        'Le compte passe en lecture seule : la personne lit tout, peut supprimer ses contenus, mais ne publie plus et n’interagit plus. Elle est prévenue par e-mail et par notification, avec ton explication.',
+      durationLabel: 'Durée',
+      // Relecture juridique (J9) : les faits et la règle, jamais un jugement sur la personne.
+      explanationHint:
+        'Montrée au membre. Décris les faits et la règle, pas la personne ; si le fondement est la loi, dis laquelle. Ne nomme ni qui a signalé, ni le membre.',
+      confirm: 'Suspendre le compte',
+      done: 'Compte suspendu.',
+      // Sous le bouton inactif : ce qu'il faut encore remplir (Louis, 26/10/2026).
+      missing: 'Pour suspendre, choisis une durée et un fondement, et écris une explication.',
+      // Le refus dit sa vraie raison (relecture juridique R3, 27/10/2026).
+      notAllowedSelf: 'Tu ne peux pas suspendre ton propre compte.',
+      notAllowedAdmin: 'Ce compte est celui d’un administrateur : il ne peut pas être suspendu.',
+      errorTitle: 'La page n’a pas pu se charger',
+    },
+    lift: {
+      title: 'Lever la suspension de {{name}}',
+      intro:
+        'Le compte retrouve toutes ses actions. La personne est prévenue par une notification, avec ton explication.',
+      current: 'Suspendu depuis le {{since}}, jusqu’au {{endsAt}} (heure de Paris).',
+      currentIndefinite: 'Suspendu depuis le {{since}}, jusqu’à nouvel ordre.',
+      explanationHint: 'Une phrase, gardée dans l’historique et montrée au membre.',
+      // La levée dit sa raison (J10) : une suspension levée pour erreur ne pèse plus sur le membre.
+      causeLabel: 'Pourquoi la lever maintenant ?',
+      causes: { early: 'Plus tôt que prévu', error: 'C’était une erreur' },
+      causeHint:
+        'Une suspension levée pour erreur ne compte plus dans le rappel des décisions passées.',
+      confirm: 'Lever la suspension',
+      done: 'Suspension levée.',
+      missing: 'Pour lever, choisis une raison et écris une explication.',
+    },
+    // Le menu « … » de la page d'un membre, pour un administrateur seulement.
+    memberMenu: {
+      suspend: 'Suspendre le compte',
+      lift: 'Lever la suspension',
+      history: 'Historique de modération',
+    },
+    // Un administrateur qui a bloqué le membre ne suspend ni ne lève : un autre décide (R3).
+    blockedTarget: 'Tu as bloqué ce membre : un autre administrateur doit décider.',
+    memberSuspended: 'Compte suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
+    memberSuspendedIndefinite: 'Compte suspendu jusqu’à nouvel ordre',
+  },
+  // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa
+  // durée, le fondement, l'explication, ce qui reste possible, et comment contester.
+  suspension: {
+    title: 'Ton compte est suspendu',
+    // Le bandeau replié (Louis, 27/10/2026) : la mesure et sa fin sur une ligne forte, le reste
+    // sous « Détails ».
+    headline: 'Ton compte est suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
+    headlineIndefinite: 'Ton compte est suspendu jusqu’à nouvel ordre',
+    details: 'Détails',
+    // Qui a décidé, puis le fondement : une seule phrase, dont une autre langue peut changer
+    // l’ordre.
+    decisionLine: '{{decision}} {{ground}}',
+    // Qui a décidé, et après quoi (DSA art. 17.3, J2) : jamais qui a signalé.
+    afterReport:
+      'Après un signalement, une personne de la modération a décidé de suspendre ton compte.',
+    direct: 'Une personne de la modération a décidé de suspendre ton compte.',
+    explanation: 'Explication : {{explanation}}',
+    canStill:
+      'Tu peux toujours tout lire, supprimer tes projets, notes et commentaires, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir ni suivre.',
+    // Les recours (J3, formulation à faire valider par un professionnel).
+    // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
+    contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
+    contestLead: 'Pour contester, écris à la modération :',
+    contestCourt: 'Tu peux aussi saisir la justice.',
+    // À la place d'un formulaire de projet, et sur « Mon profil ».
+    formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',
+    profileLocked: 'Ton profil ne peut pas être modifié pendant la suspension.',
+    // Le titre de la page qui remplace le formulaire de projet (ui-dev C, 7c) : le bandeau dit
+    // déjà « Ton compte est suspendu », le titre ne le répète pas.
+    formTitle: 'Publication impossible pour l’instant',
   },
   removal: {
     // Ce que lit l'auteur d'un contenu retiré (article 17 du DSA) : quoi, que c'est visible de
@@ -852,6 +980,31 @@ export const fr = {
       after: 'Cette adresse-ci ne sert plus à te connecter et ne recevra plus rien de {{appName}}.',
       help: 'Ce n’était pas toi, ou tu t’es trompé·e d’adresse ? Écris-nous vite à {{contactEmail}}.',
     },
+    // Tranche 7c : un seul e-mail, à la pose d'une suspension (article 17 du DSA). Ni le nom de
+    // l'administrateur, ni qui a signalé.
+    suspension: {
+      subject: 'Ton compte {{appName}} est suspendu',
+      heading: 'Ton compte est suspendu',
+      body: 'Une personne de la modération a décidé de suspendre ton compte {{appName}}.',
+      bodyAfterReport:
+        'Après un signalement, une personne de la modération a décidé de suspendre ton compte {{appName}}.',
+      until: 'La suspension dure jusqu’au {{date}} à {{time}} (heure de Paris).',
+      // J5 : le texte reste vrai si la suspension est levée plus tôt.
+      earlier: 'Si elle est levée plus tôt, {{appName}} te le dira.',
+      indefinite:
+        'La suspension dure jusqu’à nouvel ordre : la modération peut la lever à tout moment.',
+      grounds: {
+        illegal: 'Fondement : la loi.',
+        rules: 'Fondement : les règles de {{appName}}.',
+      },
+      explanation: 'Explication : {{explanation}}',
+      meanwhile:
+        'Pendant la suspension, tu peux tout lire, supprimer tes projets, notes et commentaires, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir ni suivre.',
+      contest:
+        'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
+      // La salutation, sans le nom : l'e-mail ne cite que la décision (backend-dev 7c).
+      greeting: 'Bonjour,',
+    },
   },
   feed: {
     label: 'Le fil',
@@ -900,6 +1053,8 @@ export const fr = {
     emptyTitle: 'Pas encore de notification',
     empty:
       'Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
+    // Un compte suspendu ne publie pas : l'état vide propose de lire (7c).
+    emptyActionSuspended: 'Découvrir des projets',
     emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
     end: 'C’est tout',
@@ -945,6 +1100,13 @@ export const fr = {
       },
       contest: 'Pas d’accord ? Écris-nous : {{contactEmail}}',
     },
+    // Tranche 7c : la suspension de son compte, et sa fin.
+    suspended: 'Ton compte a été suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
+    suspendedIndefinite: 'Ton compte a été suspendu jusqu’à nouvel ordre',
+    suspensionEnded: {
+      ended: 'Ta suspension a pris fin : tu peux de nouveau publier et interagir.',
+      lifted: 'Ta suspension a été levée : tu peux de nouveau publier et interagir.',
+    },
   },
   errors: {
     notFound: 'Cette page n’existe pas.',
@@ -970,6 +1132,11 @@ export const fr = {
     blockedMention: 'Tu ne peux pas mentionner un membre que tu as bloqué.',
     alreadyExamined:
       'Tu as déjà signalé ce contenu, et la modération l’a déjà examiné. Il n’a pas changé depuis.',
+    // Tranche 7c.
+    suspended: 'Ton compte est suspendu : cette action n’est pas possible pour l’instant.',
+    passwordRequired: 'Retape ton mot de passe pour confirmer cette décision.',
+    wrongPassword: 'Mot de passe incorrect.',
+    cannotSuspendAdmin: 'Un administrateur ne peut pas être suspendu : retire d’abord son rôle.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

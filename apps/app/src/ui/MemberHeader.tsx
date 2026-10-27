@@ -17,7 +17,11 @@ type Props = {
   bio: string
   /** Le titre de la liste des outils (« Outils favoris »). */
   toolsTitle: string
-  tools: { label: string; onPress: () => void }[]
+  /**
+   * Les outils ; sans `onPress`, une simple pastille (le profil d'un compte suspendu, tranche 7c,
+   * où seuls les noms des outils sont connus, pas leur étiquette).
+   */
+  tools: { label: string; onPress?: (() => void) | undefined }[]
   /** Un bouton sous l'en-tête (« Modifier mon profil », sur sa propre page). */
   action?: ReactNode
 }
@@ -59,7 +63,11 @@ export function MemberHeader({ name, handle, avatar, bio, toolsTitle, tools, act
           </Text>
           <Stack direction="row" gap="sm" wrap justify="center">
             {tools.map((tool) => (
-              <Tag key={tool.label} label={tool.label} onPress={tool.onPress} />
+              <Tag
+                key={tool.label}
+                label={tool.label}
+                {...(tool.onPress ? { onPress: tool.onPress } : null)}
+              />
             ))}
           </Stack>
         </Stack>

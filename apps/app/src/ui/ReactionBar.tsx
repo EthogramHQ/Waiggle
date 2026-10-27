@@ -8,13 +8,16 @@
 // - pour l'auteur du projet (`readOnly`) : on ne réagit pas à son propre projet. Les cinq nombres
 //   forment une simple liste, nommée par sa légende (« Les réactions à ton projet »), sans bordure
 //   ni allure de bouton : rien n'invite à toucher. « 0 » s'y affiche aussi.
+// - pour un compte suspendu (tranche 7c, réactions `locked`) : il ne réagit plus, mais retire
+//   encore une réaction déjà donnée. Celle-ci garde sa pastille ; les autres montrent leur nombre.
+//   Une fois retirée, sa pastille reste à sa place, inactive (`disabled`).
 //
 // Les lecteurs d'écran entendent le nom donné par l'écran (« Bravo, réagi, 4 »), qui reprend le
 // texte affiché, et l'état « activé » (aria-pressed). Les pastilles passent à la ligne quand la
 // place manque (téléphone étroit, texte agrandi).
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
-import { Pressable, View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { pressed } from './aria'
 import { Icon, type IconName } from './Icon'
@@ -33,6 +36,17 @@ export type ReactionBarItem = {
   mine: boolean
   /** Le nom lu par les lecteurs d'écran (« Bravo, réagi, 4 »). */
   label: string
+  /**
+   * Cette réaction ne se pose pas (compte suspendu, tranche 7c) : son nombre seul, sans bouton.
+   * Les autres restent des boutons, pour retirer une réaction déjà donnée.
+   */
+  locked?: boolean
+  /**
+   * Cette pastille ne répond plus (compte suspendu qui vient de retirer cette réaction, relecture
+   * de design 7c) : elle reste à sa place, et le focus avec elle, pour que la rangée ne bouge pas
+   * sous le doigt, mais elle pâlit, se dit « désactivée » et n'envoie rien (l'API refuserait).
+   */
+  disabled?: boolean
 }
 
 type Props = {
@@ -92,17 +106,33 @@ export function ReactionBar({
       </View>
     )
   }
+  // Des réactions verrouillées parmi les autres (compte suspendu) : la rangée devient une liste,
+  // chaque réaction un élément ; les verrouillées montrent leur nombre, les autres gardent leur
+  // bouton (liste > élément > bouton, que les lecteurs d'écran savent lire).
+  const mixed = items.some((item) => item.locked)
   return (
     <View style={{ gap: space.sm }}>
       {/* role « group » : les cinq boutons forment un ensemble, annoncé avec son nom. */}
       <View
-        role="group"
+        role={mixed ? 'list' : 'group'}
         {...(label ? { accessibilityLabel: label } : null)}
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
+        style={[
+          { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+          // Un nombre seul est moins haut qu'une pastille : il se place au milieu de la rangée.
+          mixed && { alignItems: 'center' },
+        ]}
       >
-        {items.map((item) => (
-          <Chip key={item.kind} item={item} onPress={() => onToggle(item.kind)} />
-        ))}
+        {items.map((item) =>
+          item.locked ? (
+            <Count key={item.kind} item={item} />
+          ) : mixed ? (
+            <View key={item.kind} role="listitem" style={{ maxWidth: '100%' }}>
+              <Chip item={item} onPress={() => onToggle(item.kind)} />
+            </View>
+          ) : (
+            <Chip key={item.kind} item={item} onPress={() => onToggle(item.kind)} />
+          ),
+        )}
       </View>
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
       {error ? <Notice message={error} action={errorAction} /> : null}
@@ -117,15 +147,26 @@ function Chip({ item, onPress }: { item: ReactionBarItem; onPress: () => void })
   // Comme les boutons : la pastille s'enfonce légèrement sous le doigt, avec un ressort.
   const scale = useSharedValue(1)
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  const inactive = item.disabled === true
   return (
     <Animated.View style={animated}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={item.label}
         {...pressed(item.mine)}
-        onPress={onPress}
+        // « Désactivé » pour les lecteurs d'écran. Sur le web, react-native-web écrit aria-disabled
+        // d'après `disabled` seul (il écrase un aria-disabled donné à part) : c'est donc `disabled`
+        // qui le pose, et qui coupe aussi l'appui.
+        aria-disabled={inactive}
+        disabled={inactive}
+        // Mais `disabled` la sortirait aussi du parcours au clavier (tabIndex -1), au moment même où
+        // l'on vient de la toucher : le focus se perdrait. Elle y reste (tabIndex 0).
+        {...(Platform.OS === 'web' && inactive ? { tabIndex: 0 as const } : null)}
+        onPress={() => {
+          if (!inactive) onPress()
+        }}
         onPressIn={() => {
-          scale.value = spring(pressScale, 'firm')
+          if (!inactive) scale.value = spring(pressScale, 'firm')
         }}
         onPressOut={() => {
           scale.value = spring(1)
@@ -140,7 +181,9 @@ function Chip({ item, onPress }: { item: ReactionBarItem; onPress: () => void })
             backgroundColor: item.mine ? colors.honeySoft : colors.surface,
             borderColor: item.mine ? colors.honey : colors.outline,
           },
-          down && !item.mine && { backgroundColor: colors.surfaceGrouped },
+          down && !item.mine && !inactive && { backgroundColor: colors.surfaceGrouped },
+          // Inactive : la même pâleur qu'un bouton blanc inactif (Button).
+          inactive && { opacity: 0.55 },
         ]}
       >
         <Icon

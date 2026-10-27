@@ -9,6 +9,7 @@ import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal } from './removal'
 import { ReportExport } from './reports'
+import { SuspensionExport } from './suspension'
 
 /**
  * L'export des données d'un membre (droit d'accès du RGPD), renvoyé par GET /v1/me/export.
@@ -84,6 +85,11 @@ export const AccountExport = z
     reports: z.array(ReportExport),
     /** Les membres qu'il a bloqués (tranche 7b), des plus anciens aux plus récents ; jamais qui l'a bloqué. */
     blocks: z.array(BlockExport),
+    /**
+     * Les suspensions de son compte, avec leur fin (tranche 7c), des plus anciennes aux plus
+     * récentes. Les retraits de ses contenus sont déjà dans `removal` de chacun.
+     */
+    moderation: z.array(SuspensionExport),
     /** Ses réglages d'e-mail et les dates d'envoi gardées (tranche 6c). */
     emailPreferences: EmailPreferencesExport,
     loginMethods: z.array(z.object({ provider: z.string(), createdAt: z.iso.datetime() })),

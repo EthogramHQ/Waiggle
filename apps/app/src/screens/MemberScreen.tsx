@@ -8,6 +8,10 @@
 // avec « Tu as bloqué @x. », un bouton « Débloquer » à la place de « Suivre », et « Signaler ce
 // profil » dans le menu. Un membre qui m'a bloqué n'a pas de page pour moi : l'API répond
 // « introuvable », comme pour un inconnu.
+//
+// Tranche 7c : un administrateur trouve dans le menu « Suspendre le compte » (ou « Lever la
+// suspension ») et « Historique de modération », et lit jusqu'à quand le compte est suspendu. Un
+// visiteur suspendu n'a plus « Suivre », sauf pour ne plus suivre un membre qu'il suit déjà.
 import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
@@ -19,6 +23,7 @@ import { useBlock, useUnblock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { useFollow } from '../follows/api'
 import { useMember } from '../members/api'
+import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -31,6 +36,7 @@ import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
+import { parisDateTime } from '../ui/parisTime'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -65,7 +71,7 @@ export function MemberScreen({ id }: { id: string }) {
 }
 
 function MemberView({ member }: { member: Member }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
@@ -76,6 +82,15 @@ function MemberView({ member }: { member: Member }) {
   const signInAgain = useSignInAgain()
   const followers = t(($) => $.follow.followers, { count: member.followerCount })
   const handle = member.handle
+  // Tranche 7c : un compte suspendu ne suit plus personne de nouveau, mais peut retirer ce qu'il a
+  // déjà donné (décision de Louis, 26/10/2026). S'il suit ce membre, « Suivi » reste, pour ne plus
+  // le suivre ; s'il ne le suit pas, « Suivre » est absent.
+  const { suspended } = useSuspension()
+  // Vu « Suivi » pendant la suspension : le bouton reste toute la visite, inactif une fois le suivi
+  // retiré. Sans cela, il disparaîtrait sous le doigt (et le focus avec lui) dès le geste fait.
+  const [keepFollow, setKeepFollow] = useState(false)
+  if (suspended && member.isFollowed && !keepFollow) setKeepFollow(true)
+  const showFollow = !suspended || keepFollow
 
   // La fenêtre de confirmation ouverte (aucune, bloquer ou débloquer).
   const [asking, setAsking] = useState<BlockAsking | null>(null)
@@ -113,7 +128,7 @@ function MemberView({ member }: { member: Member }) {
     icon: 'flag',
     onPress: report,
   }
-  const menuItems: ActionMenuItem[] = blocked
+  const memberItems: ActionMenuItem[] = blocked
     ? [reportItem]
     : [
         reportItem,
@@ -124,6 +139,53 @@ function MemberView({ member }: { member: Member }) {
           onPress: () => ask('block'),
         },
       ]
+  // Tranche 7c : ce que seul un administrateur voit (l'API n'envoie `moderation` qu'à lui).
+  // Suspendre, ou lever une suspension en cours (la même page, /suspend), puis l'historique des
+  // décisions qui visent ce membre. Jamais de suspension d'un autre administrateur (`canSuspend`).
+  const { moderation } = member
+  const adminItems: ActionMenuItem[] = moderation
+    ? [
+        ...(moderation.suspension
+          ? [
+              {
+                label: t(($) => $.moderation.memberMenu.lift),
+                icon: 'lock-simple-open' as const,
+                onPress: () => router.push({ pathname: '/suspend', params: { member: member.id } }),
+              },
+            ]
+          : moderation.canSuspend
+            ? [
+                {
+                  label: t(($) => $.moderation.memberMenu.suspend),
+                  icon: 'lock-simple' as const,
+                  onPress: () =>
+                    router.push({ pathname: '/suspend', params: { member: member.id } }),
+                },
+              ]
+            : []),
+        {
+          label: t(($) => $.moderation.memberMenu.history),
+          icon: 'clock',
+          onPress: () =>
+            router.push({
+              pathname: '/moderation',
+              params: { tab: 'history', member: member.id },
+            }),
+        },
+      ]
+    : []
+  const menuItems = [...memberItems, ...adminItems]
+  // La fin de sa suspension, pour l'administrateur seul : le jour et l'heure de Paris (J4).
+  const suspension = moderation?.suspension ?? null
+  const suspensionEnd = suspension?.endsAt ? parisDateTime(suspension.endsAt, i18n.language) : null
+  const suspensionLine = suspension
+    ? suspensionEnd
+      ? t(($) => $.moderation.memberSuspended, {
+          date: suspensionEnd.date,
+          time: suspensionEnd.time,
+        })
+      : t(($) => $.moderation.memberSuspendedIndefinite)
+    : null
 
   const followError = follow.expired
     ? t(($) => $.states.expired)
@@ -156,6 +218,9 @@ function MemberView({ member }: { member: Member }) {
             </Stack>
           ) : (
             <Stack gap="md" align="center">
+              {/* Pour l'administrateur seul : jusqu'à quand le compte est suspendu. Lue à son tour
+                  (role « status ») : elle est là dès l'ouverture de la page. */}
+              {suspensionLine ? <Notice tone="info" message={suspensionLine} polite /> : null}
               {/* Lus sans interrompre (role « status ») : le même texte avant et après la relecture
                   de la page, pour une seule annonce. */}
               {blocked ? (
@@ -183,10 +248,12 @@ function MemberView({ member }: { member: Member }) {
                     size="compact"
                     onPress={() => ask('unblock')}
                   />
-                ) : (
+                ) : showFollow ? (
                   <FollowButton
                     followed={member.isFollowed}
                     onPress={follow.toggle}
+                    // Suspendu, le suivi retiré : plus de nouveau suivi (l'API le refuserait).
+                    disabled={suspended && !member.isFollowed}
                     // Le nom lu contient toujours le texte affiché (« Suivi : Léa » quand on la
                     // suit) : dire « touche Suivi » à la commande vocale trouve bien ce bouton.
                     label={
@@ -198,7 +265,7 @@ function MemberView({ member }: { member: Member }) {
                       member.isFollowed ? t(($) => $.follow.following) : t(($) => $.follow.follow)
                     }
                   />
-                )}
+                ) : null}
                 <ActionMenu items={menuItems} />
               </Row>
               {/* Sous la rangée, pas dans le bouton : « … » reste centré sur « Suivre ». Lu dès

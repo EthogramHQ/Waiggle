@@ -1,6 +1,6 @@
 // Tests de la page d'un projet. L'API (projects/api) est remplacée par de faux appels.
 import { type Comment, NO_REACTIONS, type Project, type ProjectNote } from '@ruche/contracts'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { useState } from 'react'
 import { ApiError } from '../api/errors'
 import {
@@ -12,7 +12,9 @@ import {
 } from '../comments/api'
 import { useFollow } from '../follows/api'
 import { useDeleteNote, usePublishNote } from '../notes/api'
+import { getMe } from '../profile/api'
 import { deleteProject, getProject } from '../projects/api'
+import { projectQueryKey } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
 import {
   commentOf,
@@ -22,6 +24,8 @@ import {
   zoeComment,
   zoeReply,
 } from '../testing/comments'
+import { passTapGuard } from '../testing/dialog'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { removalAfterReport, removalByLaw } from '../testing/moderation'
 import { reportsOpened, visited } from '../testing/navigation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
@@ -84,6 +88,8 @@ beforeEach(() => {
   mockSession({ user: { id: 'u1', name: 'Léa' } })
   jest.mocked(getProject).mockReset().mockResolvedValue(recipesProject)
   jest.mocked(deleteProject).mockReset()
+  // Tranche 7c : le profil, lu pour savoir si le compte est suspendu ; Léa ne l'est pas.
+  jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   mockPush.mockReset()
   mockReplace.mockReset()
 })
@@ -162,6 +168,7 @@ describe('ProjectScreen', () => {
     await renderWithProviders(<ProjectScreen id={recipesProject.id} />)
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
+    await passTapGuard()
     await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
 
     expect(deleteProject).not.toHaveBeenCalled()
@@ -174,6 +181,7 @@ describe('ProjectScreen', () => {
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
     expect(deleteProject).not.toHaveBeenCalled() // il faut d'abord confirmer
+    await passTapGuard()
     await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le projet' }))
 
     expect(deleteProject).toHaveBeenCalledWith(id)
@@ -475,6 +483,7 @@ describe('publishing a note from the project page', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
     await screen.findByRole('alert')
 
+    await passTapGuard()
     await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
     await fireEvent.press(screen.getByRole('button', { name: 'Publier une note' }))
 
@@ -506,6 +515,7 @@ describe('deleting a note from the project page', () => {
     await fireEvent.press(await deleteButton(0))
     expect(mockRemove).not.toHaveBeenCalled() // il faut d'abord confirmer
     const dialog = dialogTitled('Supprimer cette note ?')
+    await passTapGuard()
     await fireEvent.press(dialog.getByRole('button', { name: 'Supprimer' }))
 
     expect(useDeleteNote).toHaveBeenCalledWith(id)
@@ -516,6 +526,7 @@ describe('deleting a note from the project page', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent.press(await deleteButton(1))
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Annuler' }),
     )
@@ -652,6 +663,7 @@ describe('after deleting a note', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent.press(await deleteButton(0))
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
     )
@@ -660,6 +672,7 @@ describe('after deleting a note', () => {
     expect(dialog.getByRole('alert')).toHaveTextContent(
       'La note n’a pas pu être supprimée. Réessaie.',
     )
+    await passTapGuard()
     await fireEvent.press(dialog.getByRole('button', { name: 'Supprimer' }))
     expect(mockRemove).toHaveBeenCalledTimes(2)
   })
@@ -668,6 +681,7 @@ describe('after deleting a note', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent.press(await deleteButton(0))
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
     )
@@ -1171,6 +1185,7 @@ describe('editing and deleting one’s comment', () => {
 
     await pressOnMaxComment('Supprimer le commentaire')
     expect(mockRemoveComment).not.toHaveBeenCalled() // il faut d'abord confirmer
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
     )
@@ -1184,6 +1199,7 @@ describe('editing and deleting one’s comment', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await pressOnMaxComment('Supprimer le commentaire')
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Annuler' }),
     )
@@ -1198,6 +1214,7 @@ describe('editing and deleting one’s comment', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await pressOnMaxComment('Supprimer le commentaire')
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
     )
@@ -1446,6 +1463,7 @@ describe('the comments, after the reviews', () => {
     expect(
       screen.getByText(/^Ton texte et ton nom disparaîtront pour tout le monde\./),
     ).toBeTruthy()
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Annuler' }),
     )
@@ -1467,6 +1485,7 @@ describe('the comments, after the reviews', () => {
     await fireEvent.press(
       cardOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Supprimer le commentaire' }),
     )
+    await passTapGuard()
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
     )
@@ -1739,5 +1758,231 @@ describe('a session that expired during two actions on the page', () => {
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
     await signInAgain()
+  })
+})
+
+// --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
+//
+// Le profil (GET /v1/me) dit si le compte est suspendu. Sur la page d'un projet, un membre suspendu
+// lit tout, mais ne modifie plus son projet, n'écrit plus de note, ne suit plus et ne réagit plus ;
+// il peut encore supprimer son projet et ses notes.
+describe('a project page seen by a suspended member', () => {
+  beforeEach(() => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+  })
+
+  it('shows the suspension banner at the top of the page', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText(containing(fr.t(($) => $.suspension.title)))).toBeTruthy()
+  })
+
+  it('offers the author neither to edit the project nor to write a note, but still to delete', async () => {
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Publier une note' })).toBeNull()
+    expect(screen.queryByLabelText('Ta note')).toBeNull()
+    // Supprimer reste possible : le projet, chacune de ses notes.
+    expect(screen.getByRole('button', { name: 'Supprimer' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
+    // Le journal reste lisible.
+    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+  })
+
+  it('offers neither to follow nor to react on the project of another member, but shows the numbers', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() =>
+      expect(screen.queryByRole('switch', { name: 'Suivre ce projet' })).toBeNull(),
+    )
+    expect(
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Bravo),/ }),
+    ).toBeNull()
+    // Il lit tout ce qu'il lisait avant : les nombres restent, comme pour l'auteur.
+    expect(screen.getByLabelText('Bravo, 3')).toBeTruthy()
+  })
+
+  it('offers no comment to write, but keeps the comments readable', async () => {
+    seenByOther()
+    mockComments([maxComment])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull(),
+    )
+  })
+
+  it('keeps every action for a member who is not suspended', async () => {
+    // Témoin : Léa, pas suspendue, une fois son profil lu.
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
+  })
+
+  it('keeps following and reacting for another member who is not suspended', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.getByRole('switch', { name: 'Suivre ce projet' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Bravo, 3' })).toBeTruthy()
+  })
+})
+
+// Décision de Louis du 26/10/2026 (choix a) : un membre suspendu peut retirer ce qu'il a déjà
+// donné, jamais ajouter (scénario : « retirer ses réactions et ses abonnements »). Un projet qu'il
+// suit garde son interrupteur, pour ne plus le suivre ; une réaction donnée garde son bouton, pour
+// la retirer ; les autres réactions ne montrent que leur nombre.
+describe('a suspended member takes back what she gave, and gives nothing more', () => {
+  beforeEach(() => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+  })
+
+  it('lets her stop following a project she follows', async () => {
+    seenByOther({ ...withNotes, isFollowed: true })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    // Témoin du profil lu : aucune réaction à poser.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets her take back a reaction she gave, but not add another one', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: ['bravo'] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle),/ }),
+      ).toBeNull(),
+    )
+    // Les autres réactions restent lisibles, sans bouton.
+    expect(screen.getByLabelText('Utile, 0')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 3' }))
+
+    expect(mockReact).toHaveBeenCalledWith('bravo')
+  })
+
+  // Relecture de design 7c : une fois le suivi retiré, l'interrupteur restait actif, et une seconde
+  // tape envoyait un suivi que l'API refuse (403). Il reste à sa place, inactif.
+  it('keeps « Follow this project » in place but inactive once she stopped following', async () => {
+    seenByOther({ ...withNotes, isFollowed: true })
+    const { queryClient } = await renderWithProviders(<ProjectScreen id={id} />)
+    // Le faux hook fait ce que fait le vrai au toucher : le projet n'est plus suivi, dans le cache.
+    mockToggle.mockImplementation(() =>
+      queryClient.setQueryData<Project>(projectQueryKey(id), (project) =>
+        project ? { ...project, isFollowed: false } : project,
+      ),
+    )
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
+
+    const follow = await screen.findByRole('switch', { name: 'Suivre ce projet' })
+    expect(follow).toBeDisabled()
+    await fireEvent.press(follow)
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  // Même défaut pour une réaction retirée pendant la visite : sa pastille reste, inactive.
+  it('keeps a reaction she took back in place but inactive', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: ['bravo'] }))
+    const { queryClient } = await renderWithProviders(<ProjectScreen id={id} />)
+    mockReact.mockImplementation(() =>
+      queryClient.setQueryData<Project>(projectQueryKey(id), (project) =>
+        project
+          ? {
+              ...project,
+              reactions: { counts: { ...NO_REACTIONS.counts, bravo: 2 }, mine: [] },
+            }
+          : project,
+      ),
+    )
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Bravo, réagi, 3' }))
+
+    const chip = await screen.findByRole('button', { name: 'Bravo, 2' })
+    expect(chip).toBeDisabled()
+    await fireEvent.press(chip)
+    expect(mockReact).toHaveBeenCalledTimes(1)
+  })
+
+  // Relecture d'interface 7c : sans réaction à retirer, les nombres seuls forment une liste, qui a
+  // besoin d'un nom, comme celle de l'auteur (« Les réactions à ton projet »).
+  it('names the list of numbers when she has no reaction to take back', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    expect(screen.getByLabelText(fr.t(($) => $.project.reactions.readOnly))).toBeTruthy()
+  })
+})
+
+// Design 7b (`guardTaps`) : les fenêtres de la page s'ouvrent sous le doigt qui vient de toucher
+// « Supprimer » ; une seconde tape trop rapide ne doit rien y décider.
+describe('the windows of the project page, right after opening', () => {
+  it('ignores a tap in the window to delete the project', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le projet' }))
+
+    // « Supprimer le projet » touché pendant la garde : rien n'est supprimé, la fenêtre reste.
+    expect(deleteProject).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Supprimer le projet' })).toBeTruthy()
+  })
+
+  it('ignores a tap in the window to delete a note', async () => {
+    jest.mocked(getProject).mockResolvedValue(withNotes)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await deleteButton(0))
+    await fireEvent.press(
+      dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    expect(mockRemove).not.toHaveBeenCalled()
+    expect(screen.getByRole('header', { name: 'Supprimer cette note ?' })).toBeTruthy()
+  })
+
+  it('ignores a tap in the window to delete a comment', async () => {
+    mockComments([{ ...maxComment, isMine: true }])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Supprimer le commentaire',
+      }),
+    )
+    await fireEvent.press(
+      dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
+    )
+
+    expect(mockRemoveComment).not.toHaveBeenCalled()
+    expect(screen.getByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeTruthy()
   })
 })

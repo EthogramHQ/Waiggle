@@ -12,9 +12,11 @@
 // - 20 signalements par jour au plus, compteur consulté avant même de lire le corps.
 //
 // Le temps est maîtrisé par le test (fausse horloge, voir comments.test.ts).
+import { randomUUID } from 'node:crypto'
 import {
   CreatedReport,
   ErrorResponse,
+  ModerationQueuePage,
   NotificationPage,
   ProjectNote,
   REPORTS_PER_DAY,
@@ -752,6 +754,104 @@ describe('reporting again', () => {
     ])
     // Et une seule fois : le second est ouvert.
     await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_reported')
+  })
+})
+
+// Tranche 7c (S3, plan « File et copies ») : une copie d'avant 7b, un texte seul (`text`), compte
+// égale à une copie de 7b si ce texte est celui que 7a aurait copié de la même cible. Cela ne vaut
+// que pour une note ou un commentaire (7a en gardait tout le texte) ; pour un projet ou un profil,
+// 7a ne gardait qu'une partie (titre et pitch, nom et pseudo) : jamais égale.
+describe('a copy written before slice 7b', () => {
+  beforeEach(async () => {
+    await act.makeAdmin((await act.me(zoe)).id)
+  })
+
+  /** Un signalement de Max tel que 7a l'écrivait : la copie est un texte seul. */
+  const oldReport = async (
+    kind: 'project' | 'note' | 'comment' | 'member',
+    id: string,
+    text: string,
+    status: 'open' | 'dismissed',
+  ) => {
+    later()
+    await ctx.db.insert(schema.contentReport).values({
+      id: randomUUID(),
+      reporterId: maxId,
+      targetKind: kind,
+      targetId: id,
+      projectId: kind === 'member' ? null : meteo.id,
+      targetAuthorId: leaId,
+      reason: 'other',
+      details: null,
+      snapshot: [{ field: 'text', value: text }],
+      status,
+      createdAt: new Date(Date.now()),
+      decidedAt: status === 'open' ? null : new Date(Date.now()),
+    })
+  }
+
+  it('refuses to report again a comment or a note unchanged since a dismissal of slice 7a', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire')
+    const note = await postNote(meteo.id, lea, 'Une note')
+    await oldReport('comment', comment.id, 'Un commentaire', 'dismissed')
+    await oldReport('note', note.id, 'Une note', 'dismissed')
+
+    await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_examined')
+    await expectError(await postReport(max, target('note', note.id)), 409, 'already_examined')
+    expect((await storedReports()).map((r) => r.status)).toEqual(['dismissed', 'dismissed'])
+  })
+
+  it('accepts a new report of a comment changed since a dismissal of slice 7a', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire devenu méchant')
+    await oldReport('comment', comment.id, 'Un commentaire', 'dismissed')
+
+    expect((await postReport(max, target('comment', comment.id))).status).toBe(201)
+  })
+
+  // S3 : un projet classé en 7a, dont le lien de démo a changé depuis (7a ne l'avait pas copié).
+  it('never takes a copy of slice 7a as equal for a project or a profile', async () => {
+    await oldReport(
+      'project',
+      meteo.id,
+      'Météo\n\nLa pluie de demain, quartier par quartier.',
+      'dismissed',
+    )
+    await oldReport('member', leaId, 'Léa', 'dismissed')
+    later()
+    const edit = await act.send('PATCH', `/v1/projects/${meteo.id}`, lea, {
+      demoUrl: 'https://example.com/une-autre-demo',
+    })
+    expect(edit.status).toBe(200)
+
+    expect((await postReport(max, target('project', meteo.id))).status).toBe(201)
+    expect((await postReport(max, target('member', leaId))).status).toBe(201)
+  })
+
+  it('does not say that the copies differ between a 7a copy and an equal 7b copy', async () => {
+    const comment = await act.comment(meteo.id, lea, 'Un commentaire')
+    await oldReport('comment', comment.id, 'Un commentaire', 'open')
+    // Zoé signale le même commentaire, inchangé : sa copie est celle de 7b ({ field: 'body' }).
+    expect((await postReport(zoe, target('comment', comment.id))).status).toBe(201)
+
+    const res = await act.send('GET', '/v1/moderation/reports', zoe)
+    expect(res.status).toBe(200)
+    const [item] = ModerationQueuePage.parse(await res.json()).items
+    expect(item).toMatchObject({ target: { kind: 'comment', id: comment.id }, count: 2 })
+    expect(item?.snapshotsDiffer).toBe(false)
+  })
+
+  it('says that the copies differ between a 7a copy of a project and a 7b copy', async () => {
+    await oldReport(
+      'project',
+      meteo.id,
+      'Météo\n\nLa pluie de demain, quartier par quartier.',
+      'open',
+    )
+    expect((await postReport(zoe, target('project', meteo.id))).status).toBe(201)
+
+    const res = await act.send('GET', '/v1/moderation/reports', zoe)
+    const [item] = ModerationQueuePage.parse(await res.json()).items
+    expect(item?.snapshotsDiffer).toBe(true)
   })
 })
 

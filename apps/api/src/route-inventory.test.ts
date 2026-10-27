@@ -11,74 +11,99 @@
 // - admin : l'administration, qui ignore les blocages (précision 7 : sinon bloquer l'administrateur
 //   ferait échapper à la modération) ;
 // - public : sans contenu d'un membre (santé, contrat, connexion, fichiers à clé aléatoire).
+//
+// Tranche 7c (relecture de sécurité S2) : une seconde colonne dit si la route reste permise à un
+// compte suspendu (`allowed`) ou s'il reçoit 403 `suspended` (`refused`). La garde laisse passer
+// tout GET et tout DELETE (lire, supprimer ses contenus, ne plus suivre, débloquer), et quelques
+// exceptions : signaler, bloquer, masquer un commentaire sur son projet, marquer ses
+// notifications vues, régler ses e-mails, se désinscrire par le lien d'un e-mail, `PATCH /v1/me`
+// (la route n'y accepte que la langue, S9). Better Auth (`/api/auth/*` : changer d'adresse,
+// supprimer son compte, se déconnecter) n'est pas sous `/v1`. `POST /v1/moderation/decisions` est
+// permise par la garde : un administrateur suspendu n'en est plus un (S19), et la garde de la
+// modération lui répond le même 404 qu'à tout membre (S16). Une boucle sur chaque route, avec un
+// membre suspendu et un corps invalide, prouve la colonne.
 import { readFileSync } from 'node:fs'
+import { ErrorResponse } from '@ruche/contracts'
+import { schema } from '@ruche/db'
 import { describe, expect, it } from 'vitest'
+import { memberCounterKeys } from './rate-limit'
+import { activity } from './testing/activity'
 import { createTestContext } from './testing/context'
 
 type RouteClass = 'hidesBlocked' | 'own' | 'admin' | 'public'
+/** Ce que la garde des comptes suspendus fait de la route (tranche 7c). */
+type DuringSuspension = 'allowed' | 'refused'
 
-/** Chaque route, « MÉTHODE /chemin » tel que Hono l'écrit (`:id` pour un paramètre). */
-const ROUTES: Record<string, RouteClass> = {
-  'GET /health': 'public',
-  'GET /openapi.json': 'public',
+/**
+ * Chaque route, « MÉTHODE /chemin » tel que Hono l'écrit (`:id` pour un paramètre), avec ses deux
+ * colonnes : ce qu'elle fait d'un blocage, et si elle reste permise pendant une suspension.
+ */
+const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
+  'GET /health': ['public', 'allowed'],
+  'GET /openapi.json': ['public', 'allowed'],
   // Better Auth : inscription, connexion, vérification, suppression du compte.
-  'GET /api/auth/*': 'public',
-  'POST /api/auth/*': 'public',
+  'GET /api/auth/*': ['public', 'allowed'],
+  'POST /api/auth/*': ['public', 'allowed'],
   // Les fichiers : une clé tirée au hasard, neuve à chaque photo (règle 11).
-  'GET /media/:folder{(?:avatars|visuals)}/:file': 'public',
+  'GET /media/:folder{(?:avatars|visuals)}/:file': ['public', 'allowed'],
   // Mon compte.
-  'GET /v1/me': 'own',
-  'PATCH /v1/me': 'own',
-  'POST /v1/me/avatar': 'own',
-  'GET /v1/me/export': 'own',
-  'GET /v1/me/email-preferences': 'own',
-  'PATCH /v1/me/email-preferences': 'own',
-  'GET /v1/me/blocks': 'own',
+  'GET /v1/me': ['own', 'allowed'],
+  'PATCH /v1/me': ['own', 'allowed'],
+  'POST /v1/me/avatar': ['own', 'refused'],
+  'GET /v1/me/export': ['own', 'allowed'],
+  'GET /v1/me/email-preferences': ['own', 'allowed'],
+  'PATCH /v1/me/email-preferences': ['own', 'allowed'],
+  'GET /v1/me/blocks': ['own', 'allowed'],
   // Le lien de désinscription d'un e-mail : signé, sans session.
-  'GET /v1/email/unsubscribe': 'public',
-  'POST /v1/email/unsubscribe': 'public',
+  'GET /v1/email/unsubscribe': ['public', 'allowed'],
+  'POST /v1/email/unsubscribe': ['public', 'allowed'],
   // Les projets, leurs notes, visuels, réactions et commentaires.
-  'POST /v1/projects': 'own',
-  'GET /v1/projects/:id': 'hidesBlocked',
-  'PATCH /v1/projects/:id': 'own',
-  'DELETE /v1/projects/:id': 'own',
-  'POST /v1/projects/:id/visuals': 'own',
-  'DELETE /v1/projects/:id/visuals/:visualId': 'own',
-  'POST /v1/projects/:id/notes': 'own',
-  'DELETE /v1/projects/:id/notes/:noteId': 'own',
-  'PUT /v1/projects/:id/reactions/:kind': 'hidesBlocked',
-  'DELETE /v1/projects/:id/reactions/:kind': 'own',
-  'GET /v1/projects/:id/comments': 'hidesBlocked',
-  'POST /v1/projects/:id/comments': 'hidesBlocked',
-  'PATCH /v1/projects/:id/comments/:commentId': 'hidesBlocked',
-  'DELETE /v1/projects/:id/comments/:commentId': 'own',
-  'PUT /v1/projects/:id/comments/:commentId/hide': 'hidesBlocked',
-  'DELETE /v1/projects/:id/comments/:commentId/hide': 'hidesBlocked',
+  'POST /v1/projects': ['own', 'refused'],
+  'GET /v1/projects/:id': ['hidesBlocked', 'allowed'],
+  'PATCH /v1/projects/:id': ['own', 'refused'],
+  'DELETE /v1/projects/:id': ['own', 'allowed'],
+  'POST /v1/projects/:id/visuals': ['own', 'refused'],
+  'DELETE /v1/projects/:id/visuals/:visualId': ['own', 'allowed'],
+  'POST /v1/projects/:id/notes': ['own', 'refused'],
+  'DELETE /v1/projects/:id/notes/:noteId': ['own', 'allowed'],
+  'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
+  'DELETE /v1/projects/:id/reactions/:kind': ['own', 'allowed'],
+  'GET /v1/projects/:id/comments': ['hidesBlocked', 'allowed'],
+  'POST /v1/projects/:id/comments': ['hidesBlocked', 'refused'],
+  'PATCH /v1/projects/:id/comments/:commentId': ['hidesBlocked', 'refused'],
+  'DELETE /v1/projects/:id/comments/:commentId': ['own', 'allowed'],
+  'PUT /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/projects/:id/comments/:commentId/hide': ['hidesBlocked', 'allowed'],
   // Suivre.
-  'POST /v1/members/:id/follow': 'hidesBlocked',
-  'DELETE /v1/members/:id/follow': 'own',
-  'POST /v1/projects/:id/follow': 'hidesBlocked',
-  'DELETE /v1/projects/:id/follow': 'own',
+  'POST /v1/members/:id/follow': ['hidesBlocked', 'refused'],
+  'DELETE /v1/members/:id/follow': ['own', 'allowed'],
+  'POST /v1/projects/:id/follow': ['hidesBlocked', 'refused'],
+  'DELETE /v1/projects/:id/follow': ['own', 'allowed'],
   // Les membres, les étiquettes, le fil.
-  'GET /v1/members/mentionable': 'hidesBlocked',
-  'GET /v1/members/:id': 'hidesBlocked',
-  'PUT /v1/members/:id/block': 'hidesBlocked',
-  'DELETE /v1/members/:id/block': 'own',
-  'GET /v1/tags/:slug': 'hidesBlocked',
-  'GET /v1/feed/following': 'hidesBlocked',
-  'GET /v1/feed/discover': 'hidesBlocked',
+  'GET /v1/members/mentionable': ['hidesBlocked', 'allowed'],
+  'GET /v1/members/:id': ['hidesBlocked', 'allowed'],
+  'PUT /v1/members/:id/block': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/members/:id/block': ['own', 'allowed'],
+  'GET /v1/tags/:slug': ['hidesBlocked', 'allowed'],
+  'GET /v1/feed/following': ['hidesBlocked', 'allowed'],
+  'GET /v1/feed/discover': ['hidesBlocked', 'allowed'],
   // Les notifications.
-  'GET /v1/notifications': 'hidesBlocked',
-  'GET /v1/notifications/unread': 'hidesBlocked',
-  'PUT /v1/notifications/seen': 'own',
+  'GET /v1/notifications': ['hidesBlocked', 'allowed'],
+  'GET /v1/notifications/unread': ['hidesBlocked', 'allowed'],
+  'PUT /v1/notifications/seen': ['own', 'allowed'],
   // Signaler : la cible d'un membre bloqué répond 404 (sauf les exceptions des règles 1 et 2).
-  'POST /v1/reports': 'hidesBlocked',
-  'GET /v1/reports/target': 'hidesBlocked',
+  'POST /v1/reports': ['hidesBlocked', 'allowed'],
+  'GET /v1/reports/target': ['hidesBlocked', 'allowed'],
   // La modération.
-  'GET /v1/moderation/reports': 'admin',
-  'GET /v1/moderation/removed': 'admin',
-  'POST /v1/moderation/decisions': 'admin',
+  'GET /v1/moderation/reports': ['admin', 'allowed'],
+  'GET /v1/moderation/removed': ['admin', 'allowed'],
+  'POST /v1/moderation/decisions': ['admin', 'allowed'],
+  // L'historique des décisions (tranche 7c).
+  'GET /v1/moderation/decisions': ['admin', 'allowed'],
 }
+
+/** La classe « blocage » d'une route (première colonne). */
+const blockClass = (route: string) => ROUTES[route]?.[0]
 
 /**
  * Le test qui prouve chaque route « hidesBlocked » (relecture de la branche 7b, A5) : son fichier
@@ -214,9 +239,9 @@ describe('the inventory of routes', () => {
   })
 
   it('cites the test that proves each route hiding a blocked member, and only those', () => {
-    const hiding = Object.keys(ROUTES).filter((route) => ROUTES[route] === 'hidesBlocked')
+    const hiding = Object.keys(ROUTES).filter((route) => blockClass(route) === 'hidesBlocked')
     const withoutProof = hiding.filter((route) => PROOFS[route] === undefined)
-    const notHiding = Object.keys(PROOFS).filter((route) => ROUTES[route] !== 'hidesBlocked')
+    const notHiding = Object.keys(PROOFS).filter((route) => blockClass(route) !== 'hidesBlocked')
 
     expect(withoutProof.join('\n')).toBe('')
     expect(notHiding.join('\n')).toBe('')
@@ -231,5 +256,96 @@ describe('the inventory of routes', () => {
     // Témoin : un titre qui n'existe pas n'est pas trouvé, ni un titre de `describe`.
     expect(hasTest('blocks.test.ts', 'a test that does not exist')).toBe(false)
     expect(hasTest('blocks.test.ts', 'blocking a member')).toBe(false)
+  })
+
+  it('allows every GET and every DELETE during a suspension', () => {
+    const refused = Object.entries(ROUTES)
+      .filter(([route, [, during]]) => /^(GET|DELETE) /.test(route) && during !== 'allowed')
+      .map(([route]) => route)
+
+    expect(refused).toEqual([])
+  })
+})
+
+// ─── S2 : la garde des comptes suspendus, route par route ─────────────────────────────────────────
+
+/** Un identifiant bien formé, qui ne désigne rien (un uuid convient aussi à l'id d'un membre). */
+const UNKNOWN = '00000000-0000-4000-8000-000000000000'
+
+/** Une adresse concrète pour un modèle de route : chaque paramètre reçoit une valeur bien formée. */
+const concrete = (path: string) =>
+  path
+    .replace(':folder{(?:avatars|visuals)}', 'avatars')
+    .replace(':kind', 'bravo')
+    .replace(':slug', 'mistral')
+    .replace(/:\w+/g, UNKNOWN)
+    // Toutes les « * » : replace avec un texte ne remplace que la première (alerte CodeQL).
+    .replaceAll('*', 'zz-unknown')
+
+describe('the guard of a suspended account', () => {
+  it('refuses with 403 suspended every route it does not allow, before its validator and its quota', async () => {
+    const ctx = await createTestContext()
+    try {
+      const act = activity(ctx)
+      const louis = await ctx.verifiedMember({
+        name: 'Louis',
+        email: 'louis@example.com',
+        password: 'louis-long-password',
+      })
+      const karim = await ctx.verifiedMember({
+        name: 'Karim',
+        email: 'karim@example.com',
+        password: 'karim-long-password',
+      })
+      const lea = await ctx.verifiedMember({
+        name: 'Léa',
+        email: 'lea@example.com',
+        password: 'lea-long-password',
+      })
+      await act.makeAdmin((await act.me(louis)).id)
+      const karimId = (await act.me(karim)).id
+      const suspended = await act.send('POST', '/v1/moderation/decisions', louis, {
+        action: 'suspend',
+        memberId: karimId,
+        duration: '7d',
+        ground: 'rules',
+        explanation: 'Des messages insultants, plusieurs fois.',
+      })
+      expect(suspended.status).toBe(201)
+      // Tous les compteurs de Karim au plafond : une route qui compterait avant la garde
+      // répondrait 429, pas 403.
+      await ctx.db.insert(schema.apiRateLimit).values(
+        Object.values(memberCounterKeys(karimId)).map((key) => ({
+          key,
+          count: 1_000_000,
+          windowStart: Date.now(),
+        })),
+      )
+
+      const wrong: string[] = []
+      for (const [route, [, during]] of Object.entries(ROUTES)) {
+        const [method = 'GET', path = '/'] = route.split(' ')
+        // Un corps invalide pour toute route : une chaîne JSON là où un objet est attendu.
+        const body = method === 'GET' || method === 'DELETE' ? undefined : 'x'
+        const res = await act.send(method, concrete(path), karim, body)
+        const text = await res.text()
+        const isSuspended = res.status === 403 && text.includes('"suspended"')
+        if (during === 'refused') {
+          if (!isSuspended || ErrorResponse.parse(JSON.parse(text)).error.code !== 'suspended') {
+            wrong.push(`${route}: ${res.status} instead of 403 suspended`)
+          }
+        } else if (isSuspended) {
+          wrong.push(`${route}: refused, but allowed during a suspension`)
+        }
+      }
+      expect(wrong.join('\n')).toBe('')
+
+      // Témoins : Léa, non suspendue, reçoit l'erreur de validation ; un anonyme, 401 (S14 : sans
+      // session, la garde laisse passer, et la session obligatoire répond).
+      expect((await act.send('POST', '/v1/projects', lea, 'x')).status).toBe(400)
+      expect((await act.send('POST', '/v1/projects', null, 'x')).status).toBe(401)
+    } finally {
+      await ctx.close()
+    }
   })
 })

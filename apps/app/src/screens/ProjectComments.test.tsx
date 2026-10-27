@@ -3,7 +3,7 @@
 // texte. Une fois publié, « @ines_morel » est un lien vers la page d'Inès (par son identifiant).
 // Le reste des commentaires (tranche 5) est testé dans ProjectScreen.test.tsx.
 import type { Comment, Project } from '@ruche/contracts'
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import {
   useComments,
@@ -13,6 +13,7 @@ import {
   usePostComment,
 } from '../comments/api'
 import { useMentionable } from '../mentions/api'
+import { getMe } from '../profile/api'
 import {
   inesMember,
   inesMention,
@@ -22,6 +23,8 @@ import {
   zoeComment,
   zoeReply,
 } from '../testing/comments'
+import { passTapGuard } from '../testing/dialog'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { removalAfterReport } from '../testing/moderation'
 import { reportsOpened } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
@@ -43,6 +46,8 @@ jest.mock('../comments/api', () => ({
 }))
 // Les suggestions après « @ » : un faux hook, qui propose Inès et Iniko pour « in ».
 jest.mock('../mentions/api', () => ({ useMentionable: jest.fn() }))
+// Le profil du membre connecté (tranche 7c) : il dit si son compte est suspendu.
+jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 const mockPush = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/projects/abc',
@@ -76,6 +81,11 @@ const mockComments = (items: Comment[]) =>
 beforeEach(() => {
   mockPush.mockReset()
   mockSession({ user: { id: 'u4', name: 'Malik' } })
+  // Tranche 7c : Malik n'est pas suspendu (son profil, tel que GET /v1/me le rend).
+  jest
+    .mocked(getMe)
+    .mockReset()
+    .mockResolvedValue({ ...leaMe, id: 'u4', name: 'Malik', handle: 'malik' })
   mockPost.mockReset().mockResolvedValue(true)
   mockEdit.mockReset().mockResolvedValue(true)
   jest
@@ -482,5 +492,106 @@ describe('mentioning a member one blocked', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(blockedMention)
+  })
+})
+
+// --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
+//
+// Un membre suspendu lit les commentaires, mais n'en écrit plus, ne répond plus et ne modifie plus
+// les siens ; il peut encore les supprimer, et l'auteur du projet peut encore en masquer. Les
+// commentaires lisent eux-mêmes la suspension dans le profil (GET /v1/me) : la page du projet n'a
+// rien à leur passer.
+describe('the comments, for a suspended member', () => {
+  const ownComment: Comment = { ...maxComment, isMine: true }
+
+  it('offers a suspended member neither to write, nor to reply, nor to edit', async () => {
+    jest.mocked(getMe).mockResolvedValue({ ...suspendedMe, id: 'u4', name: 'Malik' })
+    mockComments([ownComment, zoeComment])
+    await renderWithProviders(<Comments project={project} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull(),
+    )
+    expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
+    // Supprimer le sien reste possible.
+    expect(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Supprimer le commentaire',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('still lets a suspended author hide a comment on her project', async () => {
+    jest.mocked(getMe).mockResolvedValue({ ...suspendedMe, id: 'u4', name: 'Malik' })
+    mockComments([zoeComment])
+    await renderWithProviders(<Comments project={{ ...project, isMine: true }} />)
+
+    await screen.findByText('Ça marche aussi en anglais ?')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull(),
+    )
+    expect(
+      cardOf('Ça marche aussi en anglais ?').getByRole('button', {
+        name: 'Masquer le commentaire',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('keeps writing, replying and editing for a member who is not suspended', async () => {
+    // Témoin : Malik, pas suspendu (beforeEach), une fois son profil lu.
+    mockComments([ownComment, zoeComment])
+    await renderWithProviders(<Comments project={project} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Répondre' }).length).toBeGreaterThan(0)
+    expect(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Modifier le commentaire',
+      }),
+    ).toBeTruthy()
+  })
+})
+
+// Design 7b (`guardTaps`) : la fenêtre « Supprimer ce commentaire ? » s'ouvre sous le doigt qui
+// vient de toucher « Supprimer » ; une seconde tape trop rapide ne doit rien y décider.
+describe('the window to delete a comment', () => {
+  it('ignores a tap on its buttons right after opening, as the second tap of a double tap', async () => {
+    mockComments([{ ...maxComment, isMine: true }])
+    await renderWithProviders(<Comments project={project} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Supprimer le commentaire',
+      }),
+    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+
+    // « Annuler » touché pendant la garde : la fenêtre reste ouverte.
+    expect(screen.getByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeTruthy()
+  })
+
+  it('answers a tap once the guard is over', async () => {
+    // Témoin : après la garde, « Annuler » ferme la fenêtre.
+    mockComments([{ ...maxComment, isMine: true }])
+    await renderWithProviders(<Comments project={project} />)
+
+    await screen.findByText('Super idée, je teste ce soir.')
+    await fireEvent.press(
+      cardOf('Super idée, je teste ce soir.').getByRole('button', {
+        name: 'Supprimer le commentaire',
+      }),
+    )
+    await passTapGuard()
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeNull(),
+    )
   })
 })

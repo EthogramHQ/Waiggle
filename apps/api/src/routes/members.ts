@@ -1,12 +1,13 @@
 // Les routes des membres, réservées aux membres connectés :
 // - GET /v1/members/{id} : la page d'un membre, son profil public et ses projets. Un membre
 //   inconnu, supprimé ou jamais vérifié : « introuvable ». Tranche 7b : un membre qui m'a bloqué
-//   aussi, mot pour mot ; un membre que j'ai bloqué, son en-tête seul (`isBlocked`) ;
+//   aussi, mot pour mot ; un membre que j'ai bloqué, son en-tête seul (`isBlocked`). Tranche 7c :
+//   `moderation` (sa suspension, ses décisions), pour un administrateur en fonction seulement ;
 // - GET /v1/members/mentionable : les membres proposés après « @ » dans un commentaire (tranche 6b).
 import { createRoute, z } from '@hono/zod-openapi'
 import { Member, MemberId, MentionableList, MentionableQuery } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { blocksOf } from '../blocks/visibility'
 import { reachableBy } from '../blocks/write'
@@ -19,6 +20,8 @@ import { searchMentionable } from '../mentions/search'
 import { mediaUrl } from '../profile/me'
 import { loadSummaries, visibleTo, withSlugs } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { isActiveAdmin } from '../reports/admin'
+import { loadActiveSuspension } from '../suspension/load'
 import { createRouter, errorResponse } from './router'
 
 // Anti-abus des suggestions (scénario 6b, « Suggestions ») : 600 recherches par heure et par
@@ -70,6 +73,49 @@ const readMemberRoute = createRoute({
 })
 
 type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
+
+/**
+ * Tranche 7c : ce que la page d'un membre dit de lui à un administrateur en fonction (relecture de
+ * sécurité S15 : null pour tout autre lecteur, le membre suspendu compris ; un tiers voit la même
+ * page avant et après une suspension). Il y lit :
+ * - `isAdmin` : ce membre est-il administrateur en fonction (on ne suspend pas un administrateur) ;
+ * - `suspension` : sa suspension active, avec la règle unique de suspension/load.ts (S10) ;
+ * - `decisions` : le nombre de décisions qui le visent, pour mener à son historique ;
+ * - `canSuspend` : la même règle que le rappel de la file (queue.ts) et que la décision elle-même
+ *   (moderation/suspend.ts) : ni soi-même, ni un administrateur, ni un membre déjà suspendu, ni un
+ *   membre que l'administrateur a bloqué (S4, J13). L'appli s'en sert pour montrer le bouton ; la
+ *   décision revérifie tout sous son verrou.
+ *
+ * Quatre lectures courtes, chacune par un index, quelle que soit l'activité du membre :
+ * - le rôle du lecteur et celui du membre : clé primaire de admin_member, plus l'index
+ *   account_suspension_open_idx (isActiveAdmin, S19 : un administrateur suspendu n'en est plus un) ;
+ * - la suspension : account_suspension_open_idx, une ligne au plus ;
+ * - le nombre de décisions : moderation_decision_member_idx (target_member_id, …), dont
+ *   PostgreSQL ne lit que les entrées de ce membre.
+ * `isBlocked` : le lecteur a-t-il bloqué ce membre (déjà lu par la page).
+ */
+const moderationOf = async (
+  db: Database,
+  viewerId: string,
+  memberId: string,
+  isBlocked: boolean,
+): Promise<Member['moderation']> => {
+  const now = new Date()
+  if (!(await isActiveAdmin(db, viewerId, now))) return null
+  const d = schema.moderationDecision
+  const [isAdmin, active, [counted]] = await Promise.all([
+    isActiveAdmin(db, memberId, now),
+    loadActiveSuspension(db, memberId, now),
+    db.select({ decisions: count() }).from(d).where(eq(d.targetMemberId, memberId)),
+  ])
+  const suspension = active?.suspension ?? null
+  return {
+    isAdmin,
+    suspension,
+    decisions: counted?.decisions ?? 0,
+    canSuspend: memberId !== viewerId && !isAdmin && suspension === null && !isBlocked,
+  }
+}
 
 export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
@@ -191,6 +237,9 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
           isFollowed: false,
           followerCount: 0,
           projects: [],
+          // Un administrateur qui l'a bloqué lit encore sa suspension et ses décisions, mais ne
+          // peut pas le suspendre (canSuspend faux, S4).
+          moderation: await moderationOf(db, viewer.id, row.id, true),
         }),
         200,
       )
@@ -215,6 +264,7 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         isBlocked: false,
         ...follow,
         projects,
+        moderation: await moderationOf(db, viewer.id, row.id, false),
       }),
       200,
     )

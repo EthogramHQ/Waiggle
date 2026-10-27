@@ -85,6 +85,7 @@ export const createTestContext = async ({
     appUrl: TEST_APP_URL,
     publicApiUrl,
     secret: TEST_AUTH_SECRET,
+    mailer,
   })
 
   /**

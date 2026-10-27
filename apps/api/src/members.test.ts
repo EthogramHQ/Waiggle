@@ -163,6 +163,7 @@ describe('the page of a member', () => {
         'isBlocked', // tranche 7b : si le visiteur l'a bloquée
         'isFollowed',
         'isMe',
+        'moderation', // tranche 7c : null, sauf pour un administrateur
         'name',
         'projects',
       ].sort(),

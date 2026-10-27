@@ -13,6 +13,8 @@
 // La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
 // première photo ; sur ordinateur, la première photo. Des vignettes permettent de voir les autres,
 // et la lumière d'ambiance prend la couleur de la photo affichée.
+// Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre
+// et retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
 import {
   NoteText,
   PROJECT_NOTE_MAX,
@@ -20,6 +22,7 @@ import {
   ProjectStatus,
   type ProjectVisual,
   REACTION_KINDS,
+  type ReactionKind,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -28,6 +31,7 @@ import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
+import { useSuspension } from '../moderation/suspension'
 import { useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
@@ -126,6 +130,17 @@ function ProjectView({ project }: { project: Project }) {
   const { timeSpent } = project
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
+  // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne suit plus, ne réagit plus et
+  // n'écrit plus de note ; il peut encore supprimer, et retirer ce qu'il a déjà donné (décision de
+  // Louis du 26/10/2026 : ne plus suivre, retirer une réaction).
+  const suspended = useSuspension().suspended
+  // Ce qu'il peut encore retirer : ce qu'il avait donné à un moment de la visite. Une fois retiré,
+  // le bouton reste à sa place jusqu'à la fin de la visite : s'il disparaissait, le focus se
+  // perdrait et la rangée bougerait sous le doigt. Un nouvel appui serait refusé par l'API.
+  const given = useRef({ follow: false, reactions: new Set<ReactionKind>() })
+  if (project.isFollowed) given.current.follow = true
+  for (const kind of project.reactions.mine) given.current.reactions.add(kind)
+  const canFollow = !suspended || given.current.follow
   // Les cinq réactions, telles que la barre les affiche. Le nom lu reprend le texte affiché et dit
   // si la réaction est la sienne (« Bravo, réagi, 4 »).
   const reactions = REACTION_KINDS.map((kind) => {
@@ -137,6 +152,10 @@ function ProjectView({ project }: { project: Project }) {
       text,
       count,
       mine,
+      locked: suspended && !given.current.reactions.has(kind),
+      // Donnée puis retirée pendant la visite : la pastille reste, inactive (la remettre serait
+      // refusé par l'API, 403).
+      disabled: suspended && !mine,
       label: t(($) => (mine ? $.project.reactions.labelMine : $.project.reactions.label), {
         name: text,
         count,
@@ -287,31 +306,40 @@ function ProjectView({ project }: { project: Project }) {
       ) : (
         <Row align="start" gap="md">
           <Stack grow>
-            <FollowButton
-              followed={project.isFollowed}
-              onPress={follow.toggle}
-              // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (MemberScreen).
-              label={
-                project.isFollowed
-                  ? t(($) => $.follow.projectFollowing)
-                  : t(($) => $.follow.project)
-              }
-              text={
-                project.isFollowed
-                  ? t(($) => $.follow.projectFollowing)
-                  : t(($) => $.follow.project)
-              }
-              caption={followers}
-              error={
-                follow.expired
-                  ? t(($) => $.states.expired)
-                  : follow.error
-                    ? t(($) => $.follow.error)
-                    : undefined
-              }
-              errorAction={follow.expired ? signInAgain() : undefined}
-              prominent={false}
-            />
+            {/* Suspendu, sans suivre ce projet (tranche 7c) : le nombre d'abonnés seul, comme pour
+                l'auteur ; le menu « … » reste (signaler est toujours permis). */}
+            {canFollow ? (
+              <FollowButton
+                followed={project.isFollowed}
+                onPress={follow.toggle}
+                // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (MemberScreen).
+                label={
+                  project.isFollowed
+                    ? t(($) => $.follow.projectFollowing)
+                    : t(($) => $.follow.project)
+                }
+                text={
+                  project.isFollowed
+                    ? t(($) => $.follow.projectFollowing)
+                    : t(($) => $.follow.project)
+                }
+                caption={followers}
+                error={
+                  follow.expired
+                    ? t(($) => $.states.expired)
+                    : follow.error
+                      ? t(($) => $.follow.error)
+                      : undefined
+                }
+                errorAction={follow.expired ? signInAgain() : undefined}
+                prominent={false}
+                // Suspendu, le suivi retiré : il reste à sa place, inactif (un nouveau suivi serait
+                // refusé par l'API, 403), comme sur la page d'un membre.
+                disabled={suspended && !project.isFollowed}
+              />
+            ) : (
+              <FollowerCount text={followers} />
+            )}
           </Stack>
           <ActionMenu
             align="end"
@@ -329,6 +357,10 @@ function ProjectView({ project }: { project: Project }) {
       {/* Réagir, après Suivre. L'auteur ne réagit pas à son propre projet : il voit les nombres. */}
       {project.isMine ? (
         <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.own)} />
+      ) : reactions.every((item) => item.locked) ? (
+        // Suspendu, sans réaction à retirer : les nombres seuls (il lit tout ce qu'il lisait). La
+        // légende nomme la liste, comme pour l'auteur.
+        <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.readOnly)} />
       ) : (
         <ReactionBar
           items={reactions}
@@ -412,8 +444,9 @@ function ProjectView({ project }: { project: Project }) {
   const ownerActions = project.isMine ? (
     <Stack gap="md">
       {error ? <Notice message={error} /> : null}
-      {/* Un projet retiré ne se modifie plus (l'API refuserait, 409 `removed`) ; il se supprime. */}
-      {project.removal ? null : (
+      {/* Un projet retiré ne se modifie plus (l'API refuserait, 409 `removed`) ; il se supprime.
+          Un compte suspendu non plus (tranche 7c) : il peut encore supprimer. */}
+      {project.removal || suspended ? null : (
         <Button
           label={t(($) => $.project.page.edit)}
           variant="secondary"
@@ -430,8 +463,11 @@ function ProjectView({ project }: { project: Project }) {
         onPress={() => setConfirming(true)}
       />
       {/* Supprimer est définitif : une fenêtre demande confirmation, avec le titre du projet. */}
+      {/* guardTaps : la fenêtre s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une
+          seconde tape trop rapide n'y décide rien (design 7b). */}
       <Dialog
         visible={confirming}
+        guardTaps
         title={t(($) => $.project.page.deleteTitle, { title: project.title })}
         message={t(($) => $.project.page.deleteConfirm)}
         onDismiss={() => setConfirming(false)}
@@ -452,7 +488,10 @@ function ProjectView({ project }: { project: Project }) {
   ) : null
 
   // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
-  const journal = project.isMine || project.notes.length > 0 ? <Journal project={project} /> : null
+  const journal =
+    project.isMine || project.notes.length > 0 ? (
+      <Journal project={project} suspended={suspended} />
+    ) : null
   // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
   const comments = <Comments project={project} />
 
@@ -504,6 +543,10 @@ function ProjectView({ project }: { project: Project }) {
       // Sur tablette : toute la largeur, la barre du haut, et le retour hors de la couverture.
       {...(large ? { width: 'page' as const, header: <TopNav />, onBack: back } : null)}
     >
+      {/* Sur téléphone, la barre du haut ne montre que le bandeau d'un compte suspendu (tranche
+          7c), au-dessus de la couverture ; sinon elle ne dessine rien. Posée dans le contenu
+          plutôt qu'en `header` : vide, elle n'y ajoute aucun écart au-dessus de la couverture. */}
+      {large ? null : <TopNav />}
       {cover}
       {thumbnails}
       {removal}
@@ -524,7 +567,7 @@ function ProjectView({ project }: { project: Project }) {
  * composant à part : ses états (le texte en cours, la note à supprimer) ne redessinent pas toute la
  * page à chaque lettre tapée.
  */
-function Journal({ project }: { project: Project }) {
+function Journal({ project, suspended }: { project: Project; suspended: boolean }) {
   const { t, i18n } = useTranslation()
   const publishNote = usePublishNote(project.id)
   const deleteNote = useDeleteNote(project.id)
@@ -683,8 +726,9 @@ function Journal({ project }: { project: Project }) {
       {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}
       {empty ? list : null}
       {/* Un projet retiré par la modération ne reçoit plus de note (l'API refuserait, 409
-          `removed`) : le champ disparaît jusqu'à un rétablissement. */}
-      {project.isMine && !project.removal ? (
+          `removed`) : le champ disparaît jusqu'à un rétablissement. Un compte suspendu n'en
+          publie pas non plus (tranche 7c) ; il peut encore supprimer les siennes. */}
+      {project.isMine && !project.removal && !suspended ? (
         <NoteComposer
           open={composing}
           onOpen={() => {
@@ -742,6 +786,7 @@ function Journal({ project }: { project: Project }) {
       {/* Supprimer une note est définitif : une fenêtre demande confirmation. */}
       <Dialog
         visible={deleting !== null}
+        guardTaps
         title={t(($) => $.project.notes.deleteTitle)}
         message={t(($) => $.project.notes.deleteBody)}
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.

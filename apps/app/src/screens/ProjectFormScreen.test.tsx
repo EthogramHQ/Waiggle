@@ -1,5 +1,6 @@
 // Tests du formulaire de projet : publier, puis modifier. L'API est remplacée par de faux appels.
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { getMe } from '../profile/api'
 import {
   createProject,
   deleteVisual,
@@ -8,8 +9,10 @@ import {
   updateProject,
   uploadVisual,
 } from '../projects/api'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { photo, projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
+import { containing, fr } from '../testing/text'
 import { ProjectFormScreen } from './ProjectFormScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -45,6 +48,8 @@ beforeEach(() => {
   jest.mocked(uploadVisual).mockReset()
   jest.mocked(deleteVisual).mockReset()
   mockReplace.mockReset()
+  // Tranche 7c : le profil, lu pour savoir si le compte est suspendu ; Léa ne l'est pas.
+  jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
 })
 
 describe('ProjectFormScreen, publishing', () => {
@@ -449,5 +454,43 @@ describe('ProjectFormScreen, announcing a new status', () => {
         params: { id: recipesProject.id },
       }),
     )
+  })
+})
+
+// --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
+//
+// Un membre suspendu ne publie ni ne modifie de projet. Le formulaire, ouvert par l'adresse
+// (/projects/new, /projects/[id]/edit), laisse la place à un état « suspendu » qui le dit.
+describe('ProjectFormScreen, for a suspended member', () => {
+  const suspendedState = () => screen.findByText(containing(fr.t(($) => $.suspension.formBody)))
+
+  it('shows the suspended state instead of the form of a new project', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderWithProviders(<ProjectFormScreen />)
+
+    expect(await suspendedState()).toBeTruthy()
+    expect(screen.queryByLabelText('Titre')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Publier' })).toBeNull()
+  })
+
+  it('shows the suspended state instead of the form of an existing project', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderWithProviders(<ProjectFormScreen id={recipesProject.id} />)
+
+    expect(await suspendedState()).toBeTruthy()
+    expect(screen.queryByLabelText('Titre')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+    expect(updateProject).not.toHaveBeenCalled()
+  })
+
+  it('keeps the form for a member who is not suspended', async () => {
+    // Témoin : Léa, pas suspendue (beforeEach), une fois son profil lu.
+    await renderWithProviders(<ProjectFormScreen />)
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+
+    expect(screen.getByLabelText('Titre')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Publier' })).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.suspension.formBody)))).toBeNull()
   })
 })
