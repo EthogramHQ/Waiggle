@@ -350,6 +350,28 @@ describe('suspensionEmail', () => {
     expect(email.html).toContain('&lt;b&gt;')
   })
 
+  // Relecture de design de la branche (7c) : l'explication est un texte libre. Un mot de 76
+  // caractères sans espace faisait défiler l'e-mail de 431 px à l'horizontale sur un écran de
+  // 320 px. Son paragraphe, et lui seul, se coupe n'importe où quand un mot ne tient pas.
+  it('lets a very long word of the explanation break anywhere, and only in its paragraph', () => {
+    const longWord = 'a'.repeat(76)
+    const email = suspensionEmail('fr', {
+      endsAt,
+      ground: 'rules',
+      explanation: `Voir ${longWord}.`,
+      afterReport: false,
+    })
+
+    const paragraphs = [...email.html.matchAll(/<p style="([^"]*)">([^<]*)<\/p>/g)]
+    const styleOf = (text: string) => paragraphs.find(([, , inner]) => inner?.includes(text))?.[1]
+    expect(styleOf(longWord)).toContain('overflow-wrap:anywhere')
+    expect(styleOf(longWord)).toContain('word-break:break-word')
+    // Témoin : un autre paragraphe garde le corps ordinaire.
+    const meanwhile = fill(fr.suspension.meanwhile)
+    expect(styleOf(meanwhile.slice(0, 20))).toBeDefined()
+    expect(styleOf(meanwhile.slice(0, 20))).not.toContain('overflow-wrap')
+  })
+
   it('links to nothing outside the app, with no image, no unsubscribe link and no tracker', () => {
     for (const email of [
       suspensionEmail('fr', { endsAt, ground: 'rules', explanation, afterReport: false }),
