@@ -12,7 +12,8 @@
 // - une suspension est gardée 365 jours après sa fin réelle (la levée, la clôture au départ du
 //   compte, ou la fin prévue) ; une suspension sans fin et jamais levée n'est jamais purgée ;
 // - une décision citée par une suspension encore gardée (sa pose ou sa levée) n'est pas purgée :
-//   la preuve d'une suspension reste entière, même si le compte est parti.
+//   la preuve d'une suspension reste entière, même si le compte est parti ; et elle n'est gardée
+//   que par cela, jamais par une décision plus récente sur le même membre.
 //
 // L'heure vient du paramètre `now` et entre dans le SQL par utc() (voir nightly-purge.ts).
 import { REPORT_RETENTION_DAYS, VOID_REPORT_RETENTION_DAYS } from '@ruche/contracts'
@@ -73,6 +74,16 @@ export const purgeModeration = async (db: Database, now: Date) => {
   // Tranche 7c (J7) : ni une décision qui a posé ou levé une suspension encore gardée ; deux
   // « not exists », un par colonne, pour que chacun lise son index (account_suspension_decision_idx,
   // account_suspension_lift_decision_idx) plutôt qu'un « or » qui lirait toute la table.
+  //
+  // Relecture juridique de la branche (7c) : une suspension et sa levée ont leur propre durée de
+  // garde, celle de leur ligne account_suspension (les deux derniers « not exists »). Elles restent
+  // donc hors de la règle « une décision plus récente sur la même cible », dans les deux sens :
+  // - une décision `suspend` ou `lift` n'est jamais gardée par une décision plus récente sur le
+  //   membre (une seconde suspension, un profil classé) : la condition sur l'action de la décision
+  //   à effacer rend la sous-requête vide d'emblée ;
+  // - une décision plus récente `suspend` ou `lift` ne garde pas une décision sur le profil
+  //   (`member:<id>`) : elle ne compte pas comme « later ».
+  // Sinon une suspension finie depuis des années resterait tant que le membre en reçoit d'autres.
   const id = targetUuid('moderation_decision')
   const decisions = await db
     .delete(schema.moderationDecision)
@@ -80,7 +91,9 @@ export const purgeModeration = async (db: Database, now: Date) => {
       sql`moderation_decision.created_at <= ${cutoff}
         and not exists (
           select 1 from moderation_decision later
-          where later.target_kind = moderation_decision.target_kind
+          where moderation_decision.action not in ('suspend', 'lift')
+            and later.action not in ('suspend', 'lift')
+            and later.target_kind = moderation_decision.target_kind
             and later.target_id = moderation_decision.target_id
             and later.created_at > ${cutoff})
         and not exists (

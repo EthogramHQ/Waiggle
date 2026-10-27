@@ -903,6 +903,67 @@ describe('keeping the decisions of a suspension', () => {
     expect(await decisionActions()).toEqual([])
   })
 
+  // Relecture juridique de la branche (7c) : une décision de suspension ou de levée n'est gardée
+  // que par sa ligne account_suspension, jamais par « une décision plus récente sur la même
+  // cible » (le membre). Sinon une seconde suspension, ou un profil classé, garderait sans fin la
+  // première. Et l'inverse : une suspension récente ne garde pas une vieille décision du profil.
+  const MALIK = { email: 'malik@example.com', password: 'malik-long-password' }
+
+  /** Suspend Karim (A), puis lève sa suspension un jour plus tard ; rend l'heure de la levée. */
+  const suspendThenLift = async () => {
+    await suspend({ duration: '7d' })
+    vi.setSystemTime(Date.now() + DAY)
+    await lift()
+    return Date.now()
+  }
+
+  /** Signale le profil de Karim (Malik), puis le classe (Louis). */
+  const dismissProfileOfKarim = async () => {
+    await act.report(malik, { kind: 'member', id: karimId })
+    later()
+    await act.decide(louis, { action: 'dismiss', target: { kind: 'member', id: karimId } })
+  }
+
+  /** Avance l'horloge et reconnecte Louis et Malik (une session dure 7 jours). */
+  const jumpTo = async (ms: number) => {
+    vi.setSystemTime(ms)
+    louis = await act.signInAgain(LOUIS)
+    malik = await act.signInAgain(MALIK)
+  }
+
+  it('purges an ended suspension and its two decisions, even when a newer suspension is kept', async () => {
+    const endA = await suspendThenLift()
+    await jumpTo(endA + 370 * DAY)
+    await suspend({ duration: '30d' })
+
+    await purgeModeration(ctx.db, new Date(endA + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['suspend'])
+    expect(await suspensionRows()).toHaveLength(1)
+  })
+
+  it('purges an ended suspension and its two decisions, even when the profile was dismissed lately', async () => {
+    const endA = await suspendThenLift()
+    await jumpTo(endA + 370 * DAY)
+    await dismissProfileOfKarim()
+
+    await purgeModeration(ctx.db, new Date(endA + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['dismiss'])
+    expect(await suspensionRows()).toEqual([])
+  })
+
+  it('purges an old decision on the profile, even when a newer suspension is kept', async () => {
+    await dismissProfileOfKarim()
+    const dismissedAt = Date.now()
+    await jumpTo(dismissedAt + 370 * DAY)
+    await suspend({ duration: '30d' })
+
+    await purgeModeration(ctx.db, new Date(dismissedAt + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['suspend'])
+  })
+
   it('keeps the decision of the suspension and that of its lift together', async () => {
     await suspend({ duration: '30d' })
     vi.setSystemTime(Date.now() + 2 * DAY)
