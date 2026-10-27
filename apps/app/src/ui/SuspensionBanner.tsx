@@ -29,7 +29,14 @@ import { useHydrated } from './theme/hydration'
 import { useTheme } from './theme/ThemeProvider'
 
 /** La taille de l'icône : les lignes dépliées s'alignent sur la ligne forte, juste après elle. */
-const ICON_SIZE = 20
+const ICON_SIZE = 16
+/**
+ * L'écart entre le cadenas et la ligne forte. Serré, comme l'icône et le cadre : sur un téléphone de
+ * 320 points à 200 % de texte, chaque point rendu à la phrase lui évite une ligne de plus (mesuré :
+ * 6 lignes et 320 px de haut avec l'icône de 20 et des marges de 12, décision du 27/10/2026 :
+ * moins de 300 px replié).
+ */
+const ICON_GAP = space.xs
 
 /**
  * La largeur en dessous de laquelle la ligne forte ne partage plus sa rangée avec « Détails » : le
@@ -102,7 +109,9 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
       role="status"
       style={{
         gap: space.sm,
-        padding: space.md,
+        // Des marges serrées (voir ICON_GAP) : le bandeau replié tient en peu de hauteur.
+        paddingVertical: space.sm,
+        paddingHorizontal: space.sm,
         borderRadius: radii.small,
         // Le fond miel pâle des informations, comme le bandeau d'un contenu retiré : le texte normal
         // s'y lit (contrastPairs : text sur honeySoft).
@@ -124,7 +133,7 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
           style={{
             flexDirection: 'row',
             alignItems: 'flex-start',
-            gap: space.sm,
+            gap: ICON_GAP,
             flexGrow: 1,
             flexShrink: 1,
             flexBasis: HEADLINE_MIN_WIDTH,
@@ -132,7 +141,9 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
           }}
         >
           {/* Le cadenas est décoratif : la ligne forte dit tout. */}
-          <View aria-hidden>
+          {/* Un léger retrait en haut : l'icône, plus petite que la ligne de texte, se centre sur
+              la première ligne. */}
+          <View aria-hidden style={{ paddingTop: space.xxs }}>
             <Icon name="lock-simple" size={ICON_SIZE} tone="amber" />
           </View>
           {/* flex 1 et minWidth 0 : la phrase passe à la ligne au lieu de sortir du cadre. */}
@@ -157,7 +168,7 @@ export function SuspensionBanner({ suspension, initiallyOpen }: Props) {
         <View
           style={{
             gap: space.sm,
-            paddingLeft: ICON_SIZE + space.sm,
+            paddingLeft: ICON_SIZE + ICON_GAP,
             maxWidth: readableWidth,
           }}
         >
