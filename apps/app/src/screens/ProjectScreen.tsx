@@ -153,6 +153,9 @@ function ProjectView({ project }: { project: Project }) {
       count,
       mine,
       locked: suspended && !given.current.reactions.has(kind),
+      // Donnée puis retirée pendant la visite : la pastille reste, inactive (la remettre serait
+      // refusé par l'API, 403).
+      disabled: suspended && !mine,
       label: t(($) => (mine ? $.project.reactions.labelMine : $.project.reactions.label), {
         name: text,
         count,
@@ -330,6 +333,9 @@ function ProjectView({ project }: { project: Project }) {
                 }
                 errorAction={follow.expired ? signInAgain() : undefined}
                 prominent={false}
+                // Suspendu, le suivi retiré : il reste à sa place, inactif (un nouveau suivi serait
+                // refusé par l'API, 403), comme sur la page d'un membre.
+                disabled={suspended && !project.isFollowed}
               />
             ) : (
               <FollowerCount text={followers} />
@@ -352,8 +358,9 @@ function ProjectView({ project }: { project: Project }) {
       {project.isMine ? (
         <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.own)} />
       ) : reactions.every((item) => item.locked) ? (
-        // Suspendu, sans réaction à retirer : les nombres seuls (il lit tout ce qu'il lisait).
-        <ReactionBar items={reactions} readOnly />
+        // Suspendu, sans réaction à retirer : les nombres seuls (il lit tout ce qu'il lisait). La
+        // légende nomme la liste, comme pour l'auteur.
+        <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.readOnly)} />
       ) : (
         <ReactionBar
           items={reactions}

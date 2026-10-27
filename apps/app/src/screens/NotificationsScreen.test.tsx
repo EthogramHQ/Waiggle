@@ -6,6 +6,8 @@ import type { NotificationPage } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createI18n } from '../i18n'
 import { useMarkSeen, useNotifications, useUnreadCount } from '../notifications/api'
+import { getMe } from '../profile/api'
+import { suspendedMe } from '../testing/fixtures'
 import { withParisEnd } from '../testing/moderation'
 import {
   allNotifications,
@@ -668,5 +670,30 @@ describe('my account suspended by the moderation', () => {
     expect(
       screen.queryByText(containing(t(($) => $.notifications.suspensionEnded.ended))),
     ).toBeNull()
+  })
+})
+
+// Relecture de design 7c : un compte suspendu ne publie plus. L'état vide lui proposait pourtant
+// « Publier un projet », vers un formulaire fermé ; il propose de découvrir des projets, à
+// l'accueil, comme le fil vide (« Découvrir des projets »).
+describe('the empty list of a suspended member', () => {
+  beforeEach(() => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+  })
+  afterEach(() => {
+    jest.mocked(getMe).mockReset()
+  })
+
+  it('offers to discover projects instead of publishing one', async () => {
+    mockPages([notificationPageOf([])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const discover = await screen.findByRole('button', {
+      name: t(($) => $.notifications.emptyActionSuspended),
+    })
+    expect(screen.queryByRole('button', { name: 'Publier un projet' })).toBeNull()
+    await fireEvent.press(discover)
+
+    expect(mockPush).toHaveBeenCalledWith('/')
   })
 })

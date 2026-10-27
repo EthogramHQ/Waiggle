@@ -1,7 +1,7 @@
 // Tests des composants d'interface : ce qu'un membre (ou un lecteur d'écran) peut faire avec eux.
 // Ils ne vérifient pas l'apparence (couleurs, tailles), qui peut changer librement : seulement le
 // comportement, qui ne doit pas changer.
-import { appName, fontWeights, maxTextScale } from '@ruche/brand'
+import { appName, fontWeights, maxTextScale, palettes } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput, type View } from 'react-native'
@@ -226,6 +226,33 @@ describe('FollowButton', () => {
 
     await fireEvent.press(screen.getByRole('link', { name: 'Me reconnecter' }))
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  // Tranche 7c : un compte suspendu qui vient de ne plus suivre garde le bouton, inactif. Il ne
+  // prend pas le miel pâle d'un bouton principal inactif, qui attirerait l'œil vers un geste
+  // impossible : il passe en blanc, comme une action secondaire.
+  it('stays in place when inactive, says so, does nothing, and is not honey', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={onPress}
+        label="Suivre Léa"
+        text="Suivre"
+        caption="12 abonnés"
+        disabled
+      />,
+    )
+
+    const button = screen.getByRole('switch', { name: 'Suivre Léa' })
+    expect(button).toBeDisabled()
+    expect(button).not.toBeChecked()
+    const background = StyleSheet.flatten(button.props.style)?.backgroundColor
+    expect([palettes.day.honey, palettes.day.honeyDisabled]).not.toContain(background)
+
+    await fireEvent.press(button)
+
+    expect(onPress).not.toHaveBeenCalled()
   })
 
   it('reads out its error as soon as it appears', async () => {

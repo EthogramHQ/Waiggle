@@ -14,6 +14,7 @@ import { useFollow } from '../follows/api'
 import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getMe } from '../profile/api'
 import { deleteProject, getProject } from '../projects/api'
+import { projectQueryKey } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
 import {
   commentOf,
@@ -1881,6 +1882,62 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 3' }))
 
     expect(mockReact).toHaveBeenCalledWith('bravo')
+  })
+
+  // Relecture de design 7c : une fois le suivi retiré, l'interrupteur restait actif, et une seconde
+  // tape envoyait un suivi que l'API refuse (403). Il reste à sa place, inactif.
+  it('keeps « Follow this project » in place but inactive once she stopped following', async () => {
+    seenByOther({ ...withNotes, isFollowed: true })
+    const { queryClient } = await renderWithProviders(<ProjectScreen id={id} />)
+    // Le faux hook fait ce que fait le vrai au toucher : le projet n'est plus suivi, dans le cache.
+    mockToggle.mockImplementation(() =>
+      queryClient.setQueryData<Project>(projectQueryKey(id), (project) =>
+        project ? { ...project, isFollowed: false } : project,
+      ),
+    )
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
+
+    const follow = await screen.findByRole('switch', { name: 'Suivre ce projet' })
+    expect(follow).toBeDisabled()
+    await fireEvent.press(follow)
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  // Même défaut pour une réaction retirée pendant la visite : sa pastille reste, inactive.
+  it('keeps a reaction she took back in place but inactive', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: ['bravo'] }))
+    const { queryClient } = await renderWithProviders(<ProjectScreen id={id} />)
+    mockReact.mockImplementation(() =>
+      queryClient.setQueryData<Project>(projectQueryKey(id), (project) =>
+        project
+          ? {
+              ...project,
+              reactions: { counts: { ...NO_REACTIONS.counts, bravo: 2 }, mine: [] },
+            }
+          : project,
+      ),
+    )
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Bravo, réagi, 3' }))
+
+    const chip = await screen.findByRole('button', { name: 'Bravo, 2' })
+    expect(chip).toBeDisabled()
+    await fireEvent.press(chip)
+    expect(mockReact).toHaveBeenCalledTimes(1)
+  })
+
+  // Relecture d'interface 7c : sans réaction à retirer, les nombres seuls forment une liste, qui a
+  // besoin d'un nom, comme celle de l'auteur (« Les réactions à ton projet »).
+  it('names the list of numbers when she has no reaction to take back', async () => {
+    seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 3 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    expect(screen.getByLabelText(fr.t(($) => $.project.reactions.readOnly))).toBeTruthy()
   })
 })
 
