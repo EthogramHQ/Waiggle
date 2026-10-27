@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
+import { fr } from '../../../packages/i18n/src/locales/fr.ts'
 import { blockedPageOf, blockedSam } from '../src/testing/blocks.ts'
 import {
   leaEmailPreferences,
@@ -72,6 +73,7 @@ import {
   summaryOf,
 } from '../src/testing/projects.ts'
 import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
+import { loadingProblem, unfinishedTexts } from './loading-guard.ts'
 
 const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
@@ -1420,6 +1422,27 @@ const pages = [
     signedIn: true,
   },
 ]
+// Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
+// habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
+// charger ». Sinon la capture photographie une attente ou une panne (des données simulées
+// invalides, en 7c), et le script échoue en la nommant. Les textes viennent des traductions
+// françaises, la langue de toutes les captures (locale fr-FR plus bas).
+const unfinished = unfinishedTexts(fr)
+// Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
+// « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
+const intendedUnfinished = ['catalogue', 'erreur']
+// Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
+// (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
+const visibleText = (page) =>
+  // biome-ignore lint/performance/useDomNodeTextContent: on veut le texte rendu (voir ci-dessus).
+  page.evaluate(() => document.body.innerText)
+const unfinishedProblem = async (page, shot, name) =>
+  loadingProblem(name, await visibleText(page), {
+    texts: unfinished,
+    page: shot.name,
+    intended: intendedUnfinished,
+  })
+
 const devices = [
   { name: 'telephone', viewport: { width: 390, height: 844 } },
   { name: 'ordinateur', viewport: { width: 1440, height: 900 } },
@@ -1522,7 +1545,8 @@ const settle = async (page) => {
 // --layout : au lieu des captures habituelles, chaque page est mesurée à neuf largeurs d'écran, du
 // petit téléphone au grand écran. Le rapport (<dossier>/layout/rapport.md) signale ce qui dépasse de la
 // largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
-// par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification.
+// par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification,
+// sauf une page restée en chargement ou en panne (le garde des captures, voir intendedUnfinished).
 // --explore <script.mjs> : l'appli tourne sur les mêmes données simulées, et le navigateur est confié
 // à un script écrit pour l'occasion (par l'agent de relecture du design, hors du dépôt). Il y clique,
 // tape, appuie deux fois, navigue au clavier… pour vérifier le comportement des boutons et les cas
@@ -1584,6 +1608,8 @@ async function layoutReport() {
   // Le rapport de chaque page, rangé à sa place dans la liste : les pages finissent dans le
   // désordre (trois à la fois), mais le rapport garde l'ordre de la liste.
   const sections = new Map()
+  // Les captures restées en chargement (ou en panne), signalées à la fin.
+  const unloadedPages = []
   // Un travail par page, dans son propre contexte : sa fenêtre et son API simulée neuve, gardée
   // d'une largeur à l'autre (le pseudo enregistré à 320 px se retrouve à 360 px).
   const measure = async (shot) => {
@@ -1615,6 +1641,10 @@ async function layoutReport() {
           await page.waitForTimeout(300)
         }
         await settle(page) // la page entière, pas seulement son haut (voir settle)
+        // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
+        // échoue à la fin (voir intendedUnfinished).
+        const unloaded = await unfinishedProblem(page, shot, `${shot.name}-${width}`)
+        if (unloaded) unloadedPages.push(unloaded)
         // Mesures faites dans la page : ce que le navigateur a réellement dessiné.
         const found = await page.evaluate(() => {
           const width = window.innerWidth
@@ -1656,6 +1686,7 @@ async function layoutReport() {
         })
         await page.screenshot({ path: join(dir, `${shot.name}-${width}.png`), fullPage: true })
         const notes = []
+        if (unloaded) notes.push('**page non chargée**')
         if (found.scroll > 0) notes.push(`défilement horizontal de ${found.scroll} px`)
         if (found.outside.length > 0) notes.push(`hors de l'écran : ${found.outside.join(' ; ')}`)
         if (found.small.length > 0) notes.push(`zones à toucher < 44 : ${found.small.join(' ; ')}`)
@@ -1681,6 +1712,11 @@ async function layoutReport() {
   ]
   writeFileSync(join(dir, 'rapport.md'), `${lines.join('\n')}\n`)
   console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
+  if (unloadedPages.length > 0) {
+    console.error(`Pages non chargées :\n${unloadedPages.join('\n')}`)
+    server.close()
+    process.exit(1)
+  }
 }
 
 // Le dossier des captures : sans --only, on repart d'un dossier vide ; avec --only, on n'efface
@@ -1749,6 +1785,14 @@ const capture = async ({ shot, device, scheme }) => {
       await page.waitForTimeout(300)
     }
     const height = await settle(page)
+    // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
+    // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.
+    const unloaded = await unfinishedProblem(
+      page,
+      shot,
+      `${shot.name}-${device.name}-${scheme.name}`,
+    )
+    if (unloaded) problems.push(unloaded)
     // Le nom du fichier : sans numéro pour une seule image ; ensuite catalogue, catalogue-2…
     // ou, avec --read, nom-1, nom-2…
     const file = (part, parts) => {
