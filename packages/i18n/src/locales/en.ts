@@ -707,8 +707,6 @@ export const en: Translation = {
     headlineIndefinite: 'Your account is suspended until further notice',
     details: 'Details',
     decisionLine: '{{decision}} {{ground}}',
-    until: 'Until {{date}} at {{time}} (Paris time).',
-    indefinite: 'Until further notice.',
     afterReport: 'After a report, a person from moderation decided to suspend your account.',
     direct: 'A person from moderation decided to suspend your account.',
     explanation: 'Explanation: {{explanation}}',

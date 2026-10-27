@@ -783,9 +783,6 @@ export const fr = {
     // Qui a décidé, puis le fondement : une seule phrase, dont une autre langue peut changer
     // l’ordre.
     decisionLine: '{{decision}} {{ground}}',
-    // La date, l'heure et le fuseau (J4) : une date seule tromperait d'un jour.
-    until: 'Jusqu’au {{date}} à {{time}} (heure de Paris).',
-    indefinite: 'Jusqu’à nouvel ordre.',
     // Qui a décidé, et après quoi (DSA art. 17.3, J2) : jamais qui a signalé.
     afterReport:
       'Après un signalement, une personne de la modération a décidé de suspendre ton compte.',
