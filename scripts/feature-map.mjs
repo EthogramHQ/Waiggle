@@ -72,10 +72,10 @@ const features = [
   {
     id: 'moderation',
     name: 'Signaler et modérer',
-    tranche: 'Tranche 7a',
-    pages: /^\/(report|moderation)$/,
+    tranche: 'Tranches 7a et 7c',
+    pages: /^\/(report|moderation|suspend)$/,
     routes: /^\w+ \/v1\/(reports|moderation)(\/|$)/,
-    tables: /^(content_report|moderation_decision|admin_member)$/,
+    tables: /^(content_report|moderation_decision|admin_member|account_suspension)$/,
   },
   // Avant « projets » : ses routes sont sous /v1/projects/{id}/.
   {
