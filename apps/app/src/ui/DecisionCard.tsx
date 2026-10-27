@@ -128,9 +128,12 @@ export function DecisionCard({ decision, onView }: Props) {
             liftCause ? t(($) => $.moderation.lift.causes[liftCause]) : null,
           ]
             .filter((line): line is string => line !== null)
-            .map((line) => (
+            .map((line, index) => (
               <View
-                key={line}
+                // Deux pastilles peuvent avoir le même texte dans une langue (des phrases traduites) :
+                // leur rang les distingue, et la liste ne change pas d'ordre.
+                // biome-ignore lint/suspicious/noArrayIndexKey: une pastille n'a pas d'autre identité que sa place
+                key={index}
                 style={{
                   maxWidth: '100%',
                   paddingHorizontal: space.sm,

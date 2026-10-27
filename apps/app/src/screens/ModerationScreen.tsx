@@ -406,6 +406,14 @@ function AdminModeration() {
     return {
       label: t(($) => $.moderation.record.title),
       lines: lines.length > 0 ? lines : [t(($) => $.moderation.record.none)],
+      // Le titre mène au détail de ces décisions : l'onglet « Historique » filtré sur ce membre,
+      // sur place (la même adresse que « Historique de modération » depuis sa page). Comme
+      // « Tout voir », le focus va aux onglets : la carte touchée a disparu avec la file.
+      onPress: () => {
+        router.setParams({ tab: 'history', member: authorRecord.memberId })
+        changeTab('history')
+        requestAnimationFrame(() => tabsRef.current?.focusChecked())
+      },
     }
   }
 

@@ -172,7 +172,8 @@ const en: typeof fr = {
 
 // Les décisions d'exemple de l'historique (DecisionCard écrit lui-même ses textes, dans la langue
 // de l'appli) : un retrait, une suspension, sa levée, un classement par un administrateur parti,
-// et un retrait dont le contenu et le membre ont disparu depuis.
+// une restauration, une levée pour erreur, des suspensions de 30 jours et sans fin, et un retrait
+// dont le contenu et le membre ont disparu depuis.
 const louis = { id: 'u0', name: 'Louis', handle: 'louis' }
 const sam = { id: 'u5', name: 'Sam', handle: 'sam' }
 const blank = {
@@ -229,6 +230,55 @@ const decisions: DecisionHistoryItem[] = [
     target: { kind: 'project', id: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae' },
     projectId: 'd1e2f304-1526-4b37-9c48-596a7b8c9dae',
     member: { id: 'u4', name: 'Nora', handle: 'nora' },
+  },
+  // Les autres états de la carte (relecture de design 7c) : une restauration, une suspension de
+  // 30 jours décidée depuis la page du membre (sans signalement), une sans fin, et une levée pour
+  // erreur.
+  {
+    ...blank,
+    id: '5f607182-93a4-4fb0-9bc2-4d5e6f708192',
+    action: 'restore',
+    at: '2026-10-19T11:00:00.000Z',
+    admin: louis,
+    target: { kind: 'comment', id: 'f3041526-3748-4d59-8e6a-7b8c9daebfc0' },
+    projectId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+    member: { id: 'u4', name: 'Nora', handle: 'nora' },
+  },
+  {
+    ...blank,
+    id: '60718293-a4b5-4ac1-8cd3-5e6f708192a3',
+    action: 'lift',
+    at: '2026-10-18T15:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u6' },
+    member: { id: 'u6', name: 'Malik', handle: 'malik' },
+    explanation: 'La suspension visait le mauvais compte.',
+    liftCause: 'error',
+  },
+  {
+    ...blank,
+    id: '718293a4-b5c6-4bd2-9de4-6f708192a3b4',
+    action: 'suspend',
+    at: '2026-10-18T09:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u6' },
+    member: { id: 'u6', name: 'Malik', handle: 'malik' },
+    ground: 'rules',
+    explanation: 'Des invitations répétées à acheter un service, malgré deux retraits.',
+    duration: '30d',
+  },
+  {
+    ...blank,
+    id: '8293a4b5-c6d7-4ce3-8ef5-708192a3b4c5',
+    action: 'suspend',
+    at: '2026-10-17T20:00:00.000Z',
+    admin: louis,
+    target: { kind: 'member', id: 'u8' },
+    member: { id: 'u8', name: 'Yan', handle: 'yan' },
+    ground: 'illegal',
+    explanation: 'Des menaces de mort envoyées à un membre (article 222-17 du code pénal).',
+    duration: 'indefinite',
+    afterReport: true,
   },
   {
     ...blank,

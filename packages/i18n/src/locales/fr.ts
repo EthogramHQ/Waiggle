@@ -739,8 +739,6 @@ export const fr = {
       done: 'Compte suspendu.',
       // Sous le bouton inactif : ce qu'il faut encore remplir (Louis, 26/10/2026).
       missing: 'Pour suspendre, choisis une durée et un fondement, et écris une explication.',
-      notAllowed:
-        'Ce compte ne peut pas être suspendu : c’est le tien, ou celui d’un administrateur.',
       // Le refus dit sa vraie raison (relecture juridique R3, 27/10/2026).
       notAllowedSelf: 'Tu ne peux pas suspendre ton propre compte.',
       notAllowedAdmin: 'Ce compte est celui d’un administrateur : il ne peut pas être suspendu.',

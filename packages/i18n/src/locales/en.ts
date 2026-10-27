@@ -673,7 +673,6 @@ export const en: Translation = {
       confirm: 'Suspend account',
       done: 'Account suspended.',
       missing: 'To suspend, choose a duration and a ground, and write an explanation.',
-      notAllowed: 'This account can’t be suspended: it’s yours, or an admin’s.',
       notAllowedSelf: 'You can’t suspend your own account.',
       notAllowedAdmin: 'This account belongs to an admin: it can’t be suspended.',
       errorTitle: 'This page couldn’t load',
