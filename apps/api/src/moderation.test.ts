@@ -1329,6 +1329,24 @@ describe('the password asked again', () => {
     expect((await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD })).status).toBe(201)
   })
 
+  // Relecture de sécurité de la branche (7c) : le premier refus du jour laisse une ligne dans les
+  // journaux, une seule, sans identifiant ni corps (un compte volé peut-être, à aller voir).
+  it('logs the first refusal of the day once, with no identifier and no password', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      for (let i = 1; i <= MODERATION_PASSWORD_FAILURES_PER_DAY; i++) {
+        await suspend(leaId, 'indefinite', { password: `wrong-${i}` })
+      }
+      expect(warn).not.toHaveBeenCalled()
+
+      for (let i = 0; i < 3; i++) await suspend(leaId, 'indefinite', { password: LOUIS_PASSWORD })
+
+      expect(warn.mock.calls).toEqual([['Moderation password: daily failures reached']])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   // S12 : un compte sans mot de passe (connexion par un autre moyen) ne peut pas confirmer.
   it('refuses as a wrong password the confirmation of an account without a password', async () => {
     await ctx.db

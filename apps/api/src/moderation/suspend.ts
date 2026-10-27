@@ -127,7 +127,10 @@ const suspendMember = async (
 ): Promise<SuspensionResult> => {
   const refusal = await concernedRefusal(tx, adminId, input.memberId)
   if (refusal) return { ok: false, error: refusal }
-  if (await isActiveAdmin(tx, input.memberId)) return { ok: false, error: 'cannot_suspend_admin' }
+  // À l'heure de la décision (`now`), pas à celle de l'horloge : la même heure que la pose et la fin.
+  if (await isActiveAdmin(tx, input.memberId, now)) {
+    return { ok: false, error: 'cannot_suspend_admin' }
+  }
 
   // Une suspension échue mais pas encore close se clôt d'abord à sa date (J6) : sinon l'index
   // unique partiel refuserait la nouvelle. Puis la règle unique de suspension/load.ts (S10).
@@ -226,8 +229,12 @@ export const suspendOrLift = (
   now: Date,
   { passwordConfirmed }: { passwordConfirmed: boolean },
 ): Promise<SuspensionResult> =>
-  db.transaction(async (tx) => {
+  db.transaction(async (tx): Promise<SuspensionResult> => {
     await lockDecision(tx, adminId, { kind: 'member', id: input.memberId })
+    // Le rôle de l'acteur, relu sous les verrous et à l'heure de la décision : la route l'a vérifié
+    // avant la transaction, mais il a pu être retiré ou suspendu entre-temps (isActiveAdmin).
+    // Même réponse que la garde de la route : l'adresse inconnue.
+    if (!(await isActiveAdmin(tx, adminId, now))) return { ok: false, error: 'not_found' }
     return input.action === 'suspend'
       ? suspendMember(tx, adminId, input, now, passwordConfirmed)
       : liftSuspension(tx, adminId, input, now)

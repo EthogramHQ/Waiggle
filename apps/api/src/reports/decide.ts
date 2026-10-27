@@ -19,6 +19,7 @@ import {
   type Tx,
 } from '../moderation/guard'
 import { SuspensionChanged, type SuspensionError, suspendOrLift } from '../moderation/suspend'
+import { isActiveAdmin } from './admin'
 import { loadDecidable } from './target'
 
 /** Les refus d'une décision ; ceux de la suspension (SuspensionError) en plus, tranche 7c. */
@@ -112,7 +113,7 @@ export const blockedByAdmin = async (
  *
  * Tout se passe dans une transaction : un groupe d'écritures qui réussissent toutes ensemble ou pas
  * du tout. Elle prend d'abord les verrous de l'administrateur et de la cible (lockDecision), puis
- * relit tout par `tx`, sous ces verrous (S6) : la cible, le blocage, les signalements ouverts, les
+ * relit tout par `tx`, sous ces verrous (S6) : le rôle de l'administrateur, la cible, le blocage, les signalements ouverts, les
  * retraits de l'heure. Ce qui a été lu ne peut donc plus changer avant l'écriture.
  */
 export const decide = async (
@@ -150,6 +151,10 @@ export const decide = async (
   try {
     return await db.transaction(async (tx): Promise<DecideResult> => {
       await lockDecision(tx, adminId, target)
+      // Le rôle de l'acteur, relu sous les verrous et à l'heure de la décision : la route l'a
+      // vérifié avant la transaction, mais il a pu être retiré (grant-admin.sh --revoke) ou
+      // suspendu entre-temps. Même réponse que la garde de la route : l'adresse inconnue.
+      if (!(await isActiveAdmin(tx, adminId, now))) return { ok: false, error: 'not_found' }
 
       // La cible, visible ou non : elle doit exister, et ne pas concerner l'administrateur (règle
       // 11).

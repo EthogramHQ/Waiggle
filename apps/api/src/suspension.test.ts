@@ -29,6 +29,7 @@ import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUnsubscribeToken } from './email/unsubscribe-token'
+import { decide } from './reports/decide'
 import { purgeModeration } from './reports/retention'
 import { activity } from './testing/activity'
 import { createTestContext, TEST_AUTH_SECRET, type TestContext } from './testing/context'
@@ -781,6 +782,68 @@ describe('a suspended administrator', () => {
     // Témoin : levée, la même route lui répond.
     await lift()
     expect((await act.send('GET', '/v1/moderation/reports', karim)).status).toBe(200)
+  })
+})
+
+// Relecture de sécurité de la branche (7c) : la route vérifie le rôle avant la transaction, mais il
+// peut être retiré entre-temps (grant-admin.sh --revoke). decide() le relit donc sous les verrous,
+// à l'heure de la décision. Ces tests appellent decide() directement : c'est le seul moyen de
+// placer la révocation entre la garde de la route et la décision.
+describe('an administrator whose role changes during the decision', () => {
+  const suspendInput: SuspendInput = {
+    action: 'suspend',
+    memberId: '',
+    duration: '7d',
+    ground: 'rules',
+    explanation: EXPLANATION,
+  }
+
+  it('decides nothing once his role is taken back, on a content or on an account', async () => {
+    const project = await act.publish(karim, 'Insultes')
+    later()
+    await act.report(malik, { kind: 'project', id: project.id })
+    await act.revokeAdmin(louisId)
+    later()
+    const options = { passwordConfirmed: false }
+    const dismiss: ModerationDecisionInput = {
+      action: 'dismiss',
+      target: { kind: 'project', id: project.id },
+    }
+
+    expect(await decide(ctx.db, louisId, dismiss, new Date(), options)).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+    expect(
+      await decide(ctx.db, louisId, { ...suspendInput, memberId: karimId }, new Date(), options),
+    ).toEqual({ ok: false, error: 'not_found' })
+    expect(await decisionActions()).toEqual([])
+    expect(await suspensionRows()).toEqual([])
+
+    // Témoin : Sam, toujours administrateur, prend les deux décisions.
+    expect(await decide(ctx.db, samId, dismiss, new Date(), options)).toMatchObject({ ok: true })
+    expect(
+      await decide(ctx.db, samId, { ...suspendInput, memberId: karimId }, new Date(), options),
+    ).toMatchObject({ ok: true })
+  })
+
+  it('tells whether the member is an administrator in office at the hour of the decision', async () => {
+    const { at } = await suspend()
+    await act.makeAdmin(karimId)
+    const input = { ...suspendInput, memberId: karimId }
+    const options = { passwordConfirmed: false }
+
+    // À l'heure de la fin de sa suspension, Karim est administrateur en fonction : on ne le
+    // suspend pas, même si l'horloge de l'appel est encore pendant sa suspension.
+    expect(await decide(ctx.db, samId, input, new Date(at + 7 * DAY), options)).toEqual({
+      ok: false,
+      error: 'cannot_suspend_admin',
+    })
+    // Témoin : une milliseconde avant, il est encore suspendu (donc pas administrateur).
+    expect(await decide(ctx.db, samId, input, new Date(at + 7 * DAY - 1), options)).toEqual({
+      ok: false,
+      error: 'already_decided',
+    })
   })
 })
 

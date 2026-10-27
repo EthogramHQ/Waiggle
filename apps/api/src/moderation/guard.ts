@@ -83,12 +83,17 @@ export const lockDecision = async (
  * interblocage) : la base refuse la seconde par l'index unique (23505) ou casse l'interblocage
  * (40P01). Pour l'administrateur, c'est « déjà décidé » (S8). Drizzle range l'erreur de la base
  * dans `cause`.
+ *
+ * 23503 (clé étrangère cassée) : le compte visé, ou celui de l'administrateur, est supprimé pendant
+ * la décision. Le départ ne prend pas nos verrous : la ligne `account_suspension` ou la décision
+ * cite alors un membre qui n'existe plus, et la base refuse l'écriture. Rien n'est écrit, et
+ * l'état a changé sous la décision : c'est aussi « déjà décidé », jamais une erreur 500.
  */
 export const isDecisionConflict = (error: unknown) => {
   const codeOf = (value: unknown) =>
     typeof value === 'object' && value !== null && 'code' in value ? value.code : undefined
   const codes = [codeOf(error), error instanceof Error ? codeOf(error.cause) : undefined]
-  return codes.some((code) => code === '23505' || code === '40P01')
+  return codes.some((code) => code === '23505' || code === '23503' || code === '40P01')
 }
 
 // ─── Les seuils du mot de passe ──────────────────────────────────────────────────────────────────
@@ -166,6 +171,18 @@ export const verifyPassword = async (
   return row?.hash ? hashing.verify({ hash: row.hash, password }) : false
 }
 
+/**
+ * Ce refus est-il le premier de la journée ? Les essais refusés restent comptés (seul un bon mot
+ * de passe accepté est rendu) : le compteur vaut 6 au premier refus, puis 7, 8… Lu par la clé
+ * primaire d'api_rate_limit, et seulement après un refus (rare) : la vérification ordinaire ne
+ * coûte aucune requête de plus.
+ */
+const isFirstRefusal = async (db: Database, key: string) => {
+  const t = schema.apiRateLimit
+  const [row] = await db.select({ count: t.count }).from(t).where(eq(t.key, key))
+  return row?.count === PASSWORD_FAILURE_RULE.max + 1
+}
+
 export type PasswordCheck =
   | { ok: true }
   | { ok: false; error: 'wrong_password' }
@@ -177,6 +194,11 @@ export type PasswordCheck =
  * lieu). L'essai est compté d'abord, puis rendu s'il était juste : le compteur ne garde que les
  * échecs, et des essais lancés en même temps prennent chacun leur place avant d'être vérifiés. Au
  * 6e échec du jour, même le bon mot de passe reçoit 429 (décision du 26/10/2026).
+ *
+ * Au premier de ces refus, une ligne dans les journaux : cinq mots de passe faux en un jour, c'est
+ * peut-être un compte d'administrateur volé, que Louis doit pouvoir repérer. La ligne ne dit ni qui
+ * ni quoi (aucun identifiant, aucun corps) : elle signale qu'il faut aller voir, une fois par
+ * fenêtre, sans remplir les journaux à chaque essai suivant.
  */
 export const confirmPassword = async (
   db: Database,
@@ -188,6 +210,9 @@ export const confirmPassword = async (
   const key = memberCounterKeys(adminId).moderationPassword
   const attempt = await limiter.hit(key, PASSWORD_FAILURE_RULE)
   if (!attempt.allowed) {
+    if (await isFirstRefusal(db, key)) {
+      console.warn('Moderation password: daily failures reached')
+    }
     return { ok: false, error: 'rate_limited', retryAfterSeconds: attempt.retryAfterSeconds }
   }
   if (!(await verifyPassword(db, hashing, adminId, password))) {
