@@ -91,10 +91,11 @@ type Props = {
   detailsLabel?: string | undefined
   /**
    * Ce que la modération a déjà décidé pour le membre visé, déjà traduit : un titre (« Déjà décidé
-   * pour ce membre ») et ses lignes (« 2 retraits », « Suspendu en ce moment »). Rien : pas de
-   * rappel (un auteur dont le compte est supprimé).
+   * pour ce membre ») et ses lignes (« 2 retraits », « Suspendu en ce moment »), lues en une
+   * phrase séparée par des virgules. `onPress` : le titre devient un bouton souligné qui ouvre
+   * l'historique des décisions de ce membre. Rien : pas de rappel (un auteur dont le compte est supprimé).
    */
-  record?: { label: string; lines: readonly string[] } | undefined
+  record?: { label: string; lines: readonly string[]; onPress?: () => void } | undefined
   /** Quand (« Premier signalement le 20 oct. », « Retiré le 21 oct. »). */
   when: string
   /** Une phrase sur l'état de la cible (« Te concerne… », « Déjà retiré »). */
@@ -341,19 +342,38 @@ export function ReportCard({
             backgroundColor: colors.surfaceGrouped,
           }}
         >
-          <Text variant="caption" weight={600} tone="muted">
-            {record.label}
+          {/* Le titre ouvre l'historique filtré sur ce membre, quand l'écran le donne. Un bouton
+              souligné, qui agit sur place (l'onglet de la même page) : le seul lien de la carte
+              reste « Voir » (règle 22). Relié à la carte comme ses boutons : chaque carte porte le
+              même titre. Une carte décidée n'a plus de bouton (son résultat en tient lieu) : le
+              titre redevient un texte, sur une ligne de la même hauteur, pour que rien ne
+              remonte sous le doigt. */}
+          {record.onPress && !decided ? (
+            <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+              <TextLink
+                role="button"
+                label={record.label}
+                onPress={record.onPress}
+                {...describes}
+              />
+            </View>
+          ) : (
+            <View
+              style={{
+                minHeight: record.onPress ? layout.touchTarget : undefined,
+                justifyContent: 'center',
+              }}
+            >
+              <Text variant="caption" weight={600} tone="muted">
+                {record.label}
+              </Text>
+            </View>
+          )}
+          {/* Les nombres se lisent comme une phrase (« 2 retraits, 1 suspension ») : un seul
+              texte, qui passe à la ligne à texte agrandi. */}
+          <Text variant="callout" weight={600} tone="secondary">
+            {record.lines.join(', ')}
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg }}>
-            {record.lines.map((line, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: une ligne du rappel n'a pas d'autre identité que sa place
-              <View key={index} style={{ maxWidth: '100%' }}>
-                <Text variant="callout" weight={600} tone="secondary">
-                  {line}
-                </Text>
-              </View>
-            ))}
-          </View>
         </View>
       ) : null}
 

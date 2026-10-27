@@ -76,7 +76,20 @@ export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
     const { moderation } = member.data
     // Tout autre visiteur qu'un administrateur : la page n'existe pas pour lui.
     if (!moderation) return notFound
+    // Un administrateur qui a bloqué ce membre ne le suspend ni ne lève sa suspension (l'API
+    // refuse, 422) : un autre administrateur décide. La page le dit avant tout formulaire.
+    const blocked = (
+      <NotFoundState
+        title={
+          moderation.suspension
+            ? t(($) => $.moderation.lift.title, { name: member.data.name })
+            : t(($) => $.moderation.suspend.title, { name: member.data.name })
+        }
+        message={t(($) => $.moderation.blockedTarget)}
+      />
+    )
     if (moderation.suspension) {
+      if (member.data.isBlocked) return blocked
       return (
         <DecisionForm
           mode="lift"
@@ -85,12 +98,20 @@ export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
         />
       )
     }
-    // Son propre compte, ou celui d'un administrateur : rien à proposer, on dit pourquoi.
+    // Son propre compte, celui d'un administrateur, ou un membre bloqué : rien à proposer, on dit
+    // la vraie raison. Sa propre page passe avant (l'administrateur qui la regarde est lui-même
+    // administrateur), puis le rôle : aucun administrateur ne suspend un autre administrateur, le
+    // blocage n'y change rien.
     if (!moderation.canSuspend) {
+      if (member.data.isBlocked && !member.data.isMe && !moderation.isAdmin) return blocked
       return (
         <NotFoundState
           title={t(($) => $.moderation.suspend.title, { name: member.data.name })}
-          message={t(($) => $.moderation.suspend.notAllowed)}
+          message={
+            member.data.isMe
+              ? t(($) => $.moderation.suspend.notAllowedSelf)
+              : t(($) => $.moderation.suspend.notAllowedAdmin)
+          }
         />
       )
     }

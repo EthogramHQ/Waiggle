@@ -1141,3 +1141,24 @@ describe('the history of decisions', () => {
     ).toBeTruthy()
   })
 })
+
+// En fin de fichier : ce test ouvre l'historique, et « is a third tab » (plus haut) lit tous les
+// appels de `useDecisionHistory` depuis le début du fichier.
+describe('the record of a card, after the design review of slice 7c', () => {
+  it('leads from the record of a card to the history of its author', async () => {
+    await openModeration()
+
+    // Un bouton qui agit sur place (l'onglet et son filtre), comme « Tout voir » : le seul lien
+    // d'une carte reste « Voir » (règle 22).
+    await fireEvent.press(
+      cardOf(firstTextOf(scamCommentItem)).getByRole('button', {
+        name: fr.t(($) => $.moderation.record.title),
+      }),
+    )
+
+    expect(mockParams).toEqual({ tab: 'history', member: 'u5' })
+    expect(
+      await screen.findByRole('button', { name: fr.t(($) => $.moderation.historyAll) }),
+    ).toBeTruthy()
+  })
+})

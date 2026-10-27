@@ -424,7 +424,7 @@ describe('lifting a suspension', () => {
 })
 
 describe('who can use the page', () => {
-  it('says the account cannot be suspended (one’s own, or an administrator’s), and offers no confirmation', async () => {
+  it('says an administrator’s account cannot be suspended, and offers no confirmation', async () => {
     jest.mocked(getMember).mockResolvedValue({
       ...leaPage,
       moderation: { isAdmin: true, suspension: null, decisions: 0, canSuspend: false },
@@ -432,10 +432,66 @@ describe('who can use the page', () => {
     await renderWithProviders(<SuspendScreen memberId="u1" />)
 
     expect(
-      await screen.findByText(containing(fr.t(($) => $.moderation.suspend.notAllowed))),
+      await screen.findByText(containing(fr.t(($) => $.moderation.suspend.notAllowedAdmin))),
     ).toBeTruthy()
     expect(
       screen.queryByRole('button', { name: fr.t(($) => $.moderation.suspend.confirm) }),
+    ).toBeNull()
+  })
+
+  it('says one cannot suspend one’s own account, and offers no confirmation', async () => {
+    // Sa propre page : l'administrateur qui regarde est aussi administrateur (isAdmin vrai) ; la
+    // raison dite est pourtant « ton propre compte », la plus juste.
+    jest.mocked(getMember).mockResolvedValue({
+      ...leaPage,
+      isMe: true,
+      moderation: { isAdmin: true, suspension: null, decisions: 0, canSuspend: false },
+    })
+    await renderWithProviders(<SuspendScreen memberId="u1" />)
+
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.moderation.suspend.notAllowedSelf))),
+    ).toBeTruthy()
+    expect(
+      screen.queryByText(containing(fr.t(($) => $.moderation.suspend.notAllowedAdmin))),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: fr.t(($) => $.moderation.suspend.confirm) }),
+    ).toBeNull()
+  })
+
+  it('tells an administrator who blocked the member that another one has to decide', async () => {
+    jest.mocked(getMember).mockResolvedValue({
+      ...leaPage,
+      isBlocked: true,
+      moderation: { isAdmin: false, suspension: null, decisions: 0, canSuspend: false },
+    })
+    await renderWithProviders(<SuspendScreen memberId="u1" />)
+
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.moderation.blockedTarget))),
+    ).toBeTruthy()
+    expect(
+      screen.queryByText(containing(fr.t(($) => $.moderation.suspend.notAllowedAdmin))),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: fr.t(($) => $.moderation.suspend.confirm) }),
+    ).toBeNull()
+  })
+
+  it('offers no lift to an administrator who blocked the suspended member, and says why', async () => {
+    // L'API refuserait la levée (422) : la page le dit d'avance plutôt qu'après le formulaire.
+    jest.mocked(getMember).mockResolvedValue({ ...suspendedLea, isBlocked: true })
+    await renderWithProviders(<SuspendScreen memberId="u1" />)
+
+    expect(
+      await screen.findByText(containing(fr.t(($) => $.moderation.blockedTarget))),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: fr.t(($) => $.moderation.lift.confirm) }),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('radio', { name: fr.t(($) => $.moderation.lift.causes.error) }),
     ).toBeNull()
   })
 

@@ -92,6 +92,11 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: space.xs,
+                // À texte agrandi sur un petit écran, un choix long (« Les règles de Waiggle »)
+                // passe à la ligne dans sa pastille au lieu de sortir de l'écran : sur le web,
+                // react-native-web donne `flexShrink: 0` à toute vue (relecture de design 7c).
+                maxWidth: '100%',
+                flexShrink: 1,
                 minHeight: layout.touchTarget,
                 paddingHorizontal: space.lg,
                 borderRadius: radii.pill,
