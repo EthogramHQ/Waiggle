@@ -386,7 +386,7 @@ describe('ReportCard', () => {
   //   citation (relecture de design 7a) ; rien s'il n'y a aucune précision ;
   // - `record?: { label: string; lines: readonly string[] }` : ce que la modération a déjà décidé
   //   pour le membre visé, déjà traduit (« Déjà décidé pour ce membre » ; « 2 retraits »,
-  //   « 1 suspension », « Suspendu en ce moment »).
+  //   « 1 suspension », « suspendu en ce moment »).
   describe('slice 7c', () => {
     const detailsLabel = fr.t(($) => $.moderation.detailsLabel)
 

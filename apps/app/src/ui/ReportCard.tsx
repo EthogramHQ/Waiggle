@@ -91,7 +91,7 @@ type Props = {
   detailsLabel?: string | undefined
   /**
    * Ce que la modération a déjà décidé pour le membre visé, déjà traduit : un titre (« Déjà décidé
-   * pour ce membre ») et ses lignes (« 2 retraits », « Suspendu en ce moment »), lues en une
+   * pour ce membre ») et ses lignes (« 2 retraits », « suspendu en ce moment »), lues en une
    * phrase séparée par des virgules. `onPress` : le titre devient un bouton souligné qui ouvre
    * l'historique des décisions de ce membre. Rien : pas de rappel (un auteur dont le compte est supprimé).
    */

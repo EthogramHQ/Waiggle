@@ -179,7 +179,7 @@ const withRecord = (
  * l'état réel.
  *
  * Tranche 7c : une suspension ou une levée ne retire aucune carte de la file ; elle change le
- * rappel des cartes de ce membre (« Suspendu en ce moment », et plus de « Suspendre le compte »),
+ * rappel des cartes de ce membre (« suspendu en ce moment », et plus de « Suspendre le compte »),
  * en place, sans relire la file sous les yeux. La page du membre est relue (elle dit la suspension).
  * Toute décision réussie entre dans l'historique, marqué périmé.
  */

@@ -715,7 +715,7 @@ export const fr = {
       removals_other: '{{count}} retraits',
       suspensions_one: '{{count}} suspension',
       suspensions_other: '{{count}} suspensions',
-      suspendedNow: 'Suspendu en ce moment',
+      suspendedNow: 'suspendu en ce moment',
     },
     suspendAction: 'Suspendre le compte',
     // Le mot de passe redemandé (tranche 7c) : suspension sans fin, ou trop de retraits d'affilée.

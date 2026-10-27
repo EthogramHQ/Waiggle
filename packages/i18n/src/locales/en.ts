@@ -653,7 +653,7 @@ export const en: Translation = {
       removals_other: '{{count}} removals',
       suspensions_one: '{{count}} suspension',
       suspensions_other: '{{count}} suspensions',
-      suspendedNow: 'Currently suspended',
+      suspendedNow: 'currently suspended',
     },
     suspendAction: 'Suspend account',
     password: {

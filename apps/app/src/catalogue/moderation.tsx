@@ -86,7 +86,7 @@ const fr = {
   recordTitle: 'Déjà décidé pour ce membre',
   recordLines: ['2 retraits', '1 suspension'],
   recordNone: ['Aucune décision passée pour ce membre.'],
-  recordNow: ['1 retrait', '1 suspension', 'Suspendu en ce moment'],
+  recordNow: ['1 retrait', '1 suspension', 'suspendu en ce moment'],
   suspend: 'Suspendre le compte',
   profileNoRemove:
     'Un profil ne se retire pas en entier : classe le signalement, ou suspends le compte.',
