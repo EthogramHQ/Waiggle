@@ -52,10 +52,10 @@ describe('ReactionBar with locked reactions', () => {
       await renderWithProviders(<ReactionBar items={takenBack} onToggle={jest.fn()} label="R" />)
 
       const chip = screen.getByRole('button', { name: 'Bravo, 2' })
-      // aria-disabled (React Native le range dans l'état lu par les lecteurs d'écran).
       expect(chip).toBeDisabled()
       // Toujours atteignable au clavier : le focus ne se perd pas quand la réaction est retirée.
-      expect(chip.props.focusable).not.toBe(false)
+      // (react-native-web donnerait tabIndex -1 à un bouton `disabled` sans tabIndex.)
+      expect(chip.props.tabIndex).toBe(0)
     } finally {
       jest.restoreAllMocks()
     }

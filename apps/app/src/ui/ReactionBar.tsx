@@ -154,14 +154,14 @@ function Chip({ item, onPress }: { item: ReactionBarItem; onPress: () => void })
         accessibilityRole="button"
         accessibilityLabel={item.label}
         {...pressed(item.mine)}
-        // « Désactivé » pour les lecteurs d'écran : aria-disabled, seule forme que react-native-web
-        // transmet au navigateur (comme Button).
+        // « Désactivé » pour les lecteurs d'écran. Sur le web, react-native-web écrit aria-disabled
+        // d'après `disabled` seul (il écrase un aria-disabled donné à part) : c'est donc `disabled`
+        // qui le pose, et qui coupe aussi l'appui.
         aria-disabled={inactive}
-        // Sur le web, la pastille inactive reste dans le parcours au clavier : `disabled` la
-        // retirerait (tabIndex -1) au moment même où l'on vient de la toucher, et le focus se
-        // perdrait. Sur téléphone, ce souci n'existe pas : elle est désactivée. (Pas
-        // `disabled={false}` sur le web : il écraserait aria-disabled.)
-        {...(Platform.OS === 'web' ? null : { disabled: inactive })}
+        disabled={inactive}
+        // Mais `disabled` la sortirait aussi du parcours au clavier (tabIndex -1), au moment même où
+        // l'on vient de la toucher : le focus se perdrait. Elle y reste (tabIndex 0).
+        {...(Platform.OS === 'web' && inactive ? { tabIndex: 0 as const } : null)}
         onPress={() => {
           if (!inactive) onPress()
         }}
