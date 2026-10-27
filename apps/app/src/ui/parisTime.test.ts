@@ -38,6 +38,14 @@ describe('parisDateTime', () => {
     expect(plain(time)).toBe('12:30 AM')
   })
 
+  it('writes the hour on two digits, like the e-mail', () => {
+    // « 00:30 », comme l'e-mail de la suspension : « 0:30 » donnerait deux heures différentes.
+    const { time, dateTime } = parisDateTime('2026-11-02T23:30:00.000Z', 'fr', now)
+
+    expect(plain(time)).toBe('00:30')
+    expect(plain(dateTime)).toBe('3 novembre à 00:30')
+  })
+
   it('writes the year only when it is not the current one, in Paris', () => {
     // Le 31 décembre à 23 h 30 UTC, c'est déjà le 1er janvier 2027 à Paris.
     expect(plain(parisDateTime('2026-12-31T23:30:00.000Z', 'fr', now).date)).toBe('1 janvier 2027')

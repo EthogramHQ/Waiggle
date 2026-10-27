@@ -28,9 +28,14 @@ import { Wordmark } from '../ui/Wordmark'
 type Props = {
   /** Masque « Publier un projet » (sur le formulaire de projet, où il n'a pas de sens). */
   hideNewProject?: boolean
+  /**
+   * Le bandeau de suspension s'ouvre déplié, même déjà vu (l'accueil, décision de Louis du
+   * 27/10/2026) ; ailleurs, il est replié dès la deuxième page (SuspensionBanner).
+   */
+  openSuspension?: boolean
 }
 
-export function TopNav({ hideNewProject = false }: Props) {
+export function TopNav({ hideNewProject = false, openSuspension = false }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const { sizeClass } = useLayout()
@@ -49,7 +54,10 @@ export function TopNav({ hideNewProject = false }: Props) {
   const toSource = useMediaSources(shown)
 
   if (!session) return null
-  const banner = suspension ? <SuspensionBanner suspension={suspension} /> : null
+  const banner = suspension ? (
+    // Ailleurs que sur l'accueil, rien d'imposé : le bandeau suit la mémoire de l'appareil.
+    <SuspensionBanner suspension={suspension} initiallyOpen={openSuspension ? true : undefined} />
+  ) : null
   // Téléphone : pas de capsule ; le bandeau seul, s'il y a lieu.
   if (!shown) return banner
   const name = me.data?.name ?? session.user.name

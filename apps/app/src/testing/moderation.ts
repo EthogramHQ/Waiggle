@@ -242,7 +242,7 @@ export const parisEndTime = '(?:0|00)(?: h |:)30'
 /**
  * Une expression qui retrouve à l'écran un texte qui écrit la fin de `sevenDaySuspension`. On lui
  * donne le texte traduit avec « DATE » et « TIME » à la place des paramètres
- * (`fr.t(($) => $.suspension.until, { date: 'DATE', time: 'TIME' })`) : le reste du texte est
+ * (`fr.t(($) => $.suspension.headline, { date: 'DATE', time: 'TIME' })`) : le reste du texte est
  * cherché tel quel, les blancs ramenés à des espaces simples, comme le fait getByText.
  */
 export const withParisEnd = (text: string): RegExp =>

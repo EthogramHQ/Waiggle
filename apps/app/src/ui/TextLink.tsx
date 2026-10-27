@@ -32,6 +32,11 @@ type Props = {
    * les lecteurs d'écran annoncent « replié » ou « déplié » (aria-expanded, web et téléphone).
    */
   expanded?: boolean
+  /**
+   * Le libellé peut se couper n'importe où : pour une donnée sans espace (une adresse e-mail), qui
+   * sortirait sinon du cadre sur un petit téléphone, à 200 % de texte (bandeau de suspension, 7c).
+   */
+  breakAnywhere?: boolean
 }
 
 export function TextLink({
@@ -44,6 +49,7 @@ export function TextLink({
   hint,
   ref,
   expanded,
+  breakAnywhere = false,
 }: Props) {
   return (
     <Pressable
@@ -65,10 +71,13 @@ export function TextLink({
         minHeight: layout.touchTarget,
         minWidth: layout.touchTarget,
         justifyContent: 'center',
+        // Sur le web, react-native-web interdit à toute vue de rétrécir (flexShrink 0) : sans ces
+        // deux réglages, le lien garderait la largeur de son libellé entier et sortirait du cadre.
+        ...(breakAnywhere ? { flexShrink: 1, maxWidth: '100%' as const } : null),
         opacity: disabled ? 0.55 : pressed ? 0.6 : 1,
       })}
     >
-      <Text variant="callout" weight={700} tone={tone} underline>
+      <Text variant="callout" weight={700} tone={tone} underline breakAnywhere={breakAnywhere}>
         {label}
       </Text>
     </Pressable>

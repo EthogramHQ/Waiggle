@@ -1,5 +1,5 @@
 // L'heure de Paris d'une date de la modération (tranche 7c, relecture juridique J4). La fin d'une
-// suspension s'écrit « le 3 novembre à 0 h 30 (heure de Paris) », quelle que soit la langue et quel
+// suspension s'écrit « le 3 novembre à 00:30 (heure de Paris) », quelle que soit la langue et quel
 // que soit le fuseau de l'appareil : la même valeur que dans l'e-mail, à la seconde près. Une date
 // écrite dans le fuseau de l'appareil (ou en UTC) pourrait tomber un jour plus tôt : 23 h 30 UTC
 // le 2 novembre, c'est déjà le 3 novembre à Paris.
@@ -38,7 +38,10 @@ export const parisDateTime = (iso: string, language: string, now = new Date()): 
     month: 'long',
     ...(parisYear(when) === parisYear(now) ? null : { year: 'numeric' as const }),
   }
-  const hour: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
+  // L'heure sur deux chiffres (« 00:30 », pas « 0:30 »), comme l'e-mail de la suspension
+  // (apps/api/src/email/templates.ts) : le membre lit la même heure aux deux endroits. L'anglais,
+  // qui compte sur douze heures, garde « 12:30 AM ».
+  const hour: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' }
   const format = (options: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat(language, { ...options, timeZone: PARIS_TIME_ZONE }).format(when)
   return { date: format(day), time: format(hour), dateTime: format({ ...day, ...hour }) }

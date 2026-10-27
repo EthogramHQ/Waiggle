@@ -132,7 +132,8 @@ function MemberHome({ id, name }: { id: string; name: string }) {
     // pageTitle null : l'onglet porte le seul nom de l'appli, pas « Bonjour Léa ! ».
     <Screen
       width="page"
-      header={<TopNav hideNewProject />}
+      // openSuspension : sur l'accueil, le bandeau d'un compte suspendu s'ouvre déplié.
+      header={<TopNav hideNewProject openSuspension />}
       title={t(($) => $.home.greeting, { name })}
       pageTitle={null}
     >
