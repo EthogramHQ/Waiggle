@@ -243,9 +243,11 @@ membre. La décision est gardée dans l'historique (onglet « Historique » de �
   notification le lui dit.
 - **Lever** : même page, « Lever la suspension », avec une phrase d'explication.
 - **Garde-fous** : 50 décisions par administrateur et par jour ; le mot de passe est redemandé
-  pour une suspension sans fin, au-delà de 3 suspensions dans la journée, et au-delà de 10 retraits
-  dans l'heure ; 5 mots de passe faux par jour, puis plus rien de ce qui le demande jusqu'au
-  lendemain. Un administrateur ne se suspend pas lui-même, ni un membre qu'il a bloqué ; on ne
+  pour une suspension sans fin, au-delà de 3 suspensions en 24 heures, et au-delà de 10 retraits
+  dans l'heure ; 5 mots de passe faux en 24 heures, puis plus rien de ce qui le demande pendant
+  24 heures au plus. Le mot de passe ne garde que les actions graves, suspendre et retirer :
+  rétablir, classer sans suite et lever ne le demandent jamais, parce qu'elles sont favorables au
+  membre et tracées dans l'historique (décision du 27/10/2026). Un administrateur ne se suspend pas lui-même, ni un membre qu'il a bloqué ; on ne
   suspend pas un administrateur en fonction : retirer d'abord son rôle (section 1). Un membre
   suspendu nommé administrateur n'a pas accès à la modération tant que dure la suspension.
 - **Si le quota est épuisé par un tiers** (un compte d'administrateur volé qui a suspendu à tour
@@ -254,10 +256,12 @@ membre. La décision est gardée dans l'historique (onglet « Historique » de �
   après une sauvegarde : effacer ses lignes de `api_rate_limit` dont la clé commence par
   `moderation-decision:` suivi de l'identifiant de l'administrateur (le nom exact de la clé est
   dans `apps/api/src/rate-limit.ts`, `memberCounterKeys`). Rien d'autre ne s'efface.
-- **Une contestation** (section 5) : relire la décision, la lever si elle était injustifiée, et
-  répondre par e-mail.
+- **Une contestation** (section 5) : relire la décision ; si elle était injustifiée, la lever
+  avec la raison « C'était une erreur » (elle ne compte plus alors dans le rappel des décisions
+  passées), et répondre par e-mail.
 - **Si l'appli est en panne** : ne rien écrire à la main en base. Attendre le retour de l'appli,
   ou suivre la procédure de la section 4 pour un cas grave.
 - **Les données** : la suspension est gardée un an après sa fin ; une suspension sans fin, tant
   qu'elle dure. L'export du membre la contient, sans le nom de l'administrateur. Supprimer le
-  compte efface la suspension ; la décision reste un an, sans le nom du membre.
+  compte ne l'efface pas : une suspension en cours est close à la date du départ, puis gardée un
+  an avec ses décisions, sans le nom du membre.
