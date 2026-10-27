@@ -10,6 +10,7 @@
 //   un compte qui a déjà reçu un pseudo (un ancien membre : voir plus bas) ;
 // - les signalements et les décisions de modération arrivés au terme de leur durée de garde
 //   (tranche 7a, reports/retention.ts).
+// Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
 // L'heure vient du paramètre `now` et entre dans le SQL par utc() (un texte ISO lu comme un instant,
@@ -23,6 +24,7 @@ import { purgeExpiredHandles } from '../handles/claim'
 import { utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
+import { closeSuspensionsOfDeparted } from '../suspension/load'
 
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
@@ -81,6 +83,12 @@ export const nightlyPurge = async (db: Database, now: Date) => {
       ),
     )
     .returning({ id: schema.user.id })
+  // Tranche 7c : les suspensions encore ouvertes d'un compte parti, closes à l'heure de la purge.
+  // La suppression du compte les clôt d'ordinaire elle-même (auth/auth.ts, afterDelete), mais
+  // cette clôture, faite après la suppression, peut échouer ; sans ce rattrapage, une suspension
+  // sans fin resterait ouverte, donc gardée pour toujours. Avant la purge de la modération : la
+  // date de fin ainsi notée compte déjà pour la durée de garde (365 jours après la fin).
+  await closeSuspensionsOfDeparted(db, now)
   // Les signalements et les décisions de modération (tranche 7a) : reports/retention.ts.
   const moderation = await purgeModeration(db, now)
 

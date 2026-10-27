@@ -29,6 +29,7 @@ import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUnsubscribeToken } from './email/unsubscribe-token'
+import { nightlyPurge } from './jobs/nightly-purge'
 import { decide } from './reports/decide'
 import { purgeModeration } from './reports/retention'
 import { activity } from './testing/activity'
@@ -866,6 +867,30 @@ describe('leaving during a suspension', () => {
       .from(schema.moderationDecision)
       .where(eq(schema.moderationDecision.id, decision.id))
     expect(stored).toMatchObject({ action: 'suspend', adminId: louisId })
+  })
+
+  // Relecture de sécurité de la branche (7c) : la clôture au départ (auth.ts, afterDelete) peut
+  // échouer après la suppression du compte. La purge de nuit la rattrape, à son heure : sans elle,
+  // une suspension sans fin d'un compte parti resterait ouverte, donc gardée pour toujours. L'échec
+  // se pose en base (la ligne rouverte), aucune route ne permettant de le provoquer.
+  it('is closed by the nightly purge when the closure at departure failed', async () => {
+    await suspend({ duration: 'indefinite' })
+    await act.deleteAccount(karim, KARIM.password)
+    await ctx.db.update(schema.accountSuspension).set({ liftedAt: null })
+    const purgedAt = Date.now() + HOUR
+    // La purge note ses nombres dans les journaux : on les tait le temps du test.
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await nightlyPurge(ctx.db, new Date(purgedAt))
+
+      expect(await suspensionRows()).toEqual([
+        { user_id: null, ended: purgedAt, lift_decision_id: null },
+      ])
+      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY))
+      expect(await suspensionRows()).toEqual([])
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('keeps an endless suspension forever, then 365 days after the departure', async () => {
