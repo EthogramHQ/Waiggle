@@ -95,13 +95,26 @@ const richHtml = (paragraph: Paragraph) =>
         )
         .join('')
 
+/**
+ * Un paragraphe du corps : un texte, ou un texte libre écrit par quelqu'un (l'explication d'une
+ * suspension) qui peut contenir un mot très long. Celui-là se coupe n'importe où quand un mot ne
+ * tient pas dans la largeur (`overflow-wrap:anywhere`, et `word-break:break-word` pour les moteurs
+ * qui ne connaissent que lui) : un <p> ordinaire ne se coupe qu'aux espaces, et un mot de 76
+ * caractères faisait défiler l'e-mail de 431 px à l'horizontale sur un écran de 320 px (relecture
+ * de design de 7c). Les autres paragraphes, écrits par nous, gardent les coupures ordinaires.
+ */
+type BodyParagraph = string | { freeText: string }
+
+const paragraphText = (paragraph: BodyParagraph) =>
+  typeof paragraph === 'string' ? paragraph : paragraph.freeText
+
 type Layout = {
   /** La langue de l'e-mail, annoncée dans `<html lang>` (lecteurs d'écran, traduction). */
   language: Language
   /** La phrase titre, en gras sous le nom de l'appli (« Du nouveau cette semaine »). */
   heading?: string
   greeting: string
-  paragraphs: string[]
+  paragraphs: BodyParagraph[]
   /**
    * Une donnée à vérifier d'un coup d'œil (la nouvelle adresse), seule sur sa ligne sous les
    * paragraphes, en gras, et coupée n'importe où : une adresse n'a pas d'espace (des-E1, des-E3).
@@ -161,7 +174,7 @@ const render = ({
   const text = [
     greeting,
     '',
-    ...paragraphs.flatMap((p) => [p, '']),
+    ...paragraphs.flatMap((p) => [paragraphText(p), '']),
     ...(highlight === undefined ? [] : [highlight, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
     ...after.flatMap((p) => [plain(p), '']),
@@ -234,7 +247,13 @@ const render = ({
   <div class="card" style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
     ${top}
     ${p(greeting, 'font-size:16px')}
-    ${paragraphs.map((value) => p(value)).join('\n    ')}
+    ${paragraphs
+      .map((value) =>
+        typeof value === 'string'
+          ? p(value)
+          : p(value.freeText, `${body};overflow-wrap:anywhere;word-break:break-word`),
+      )
+      .join('\n    ')}
     ${htmlHighlight}
     ${htmlItems}
     ${after.map((value) => p(value)).join('\n    ')}
@@ -609,8 +628,13 @@ export const suspensionEmail = (
         fill(t.grounds[ground]),
         // L'explication vient d'un administrateur, mais elle part chez l'envoyeur d'e-mails et
         // s'affiche dans une messagerie : aucune adresse cliquable (« [lien] »), et le HTML est
-        // échappé par render, comme tout le reste.
-        fill(t.explanation, { explanation: defangLinks(explanation, linkPlaceholder(language)) }),
+        // échappé par render, comme tout le reste. Un texte libre : son paragraphe se coupe
+        // n'importe où si un mot est trop long (BodyParagraph).
+        {
+          freeText: fill(t.explanation, {
+            explanation: defangLinks(explanation, linkPlaceholder(language)),
+          }),
+        },
         fill(t.meanwhile),
       ],
       // Contester : l'adresse de contact, en gras et en texte, jamais en lien « mailto: ».

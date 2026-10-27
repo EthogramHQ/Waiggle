@@ -29,6 +29,8 @@ import { fill, resources } from '@ruche/i18n'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUnsubscribeToken } from './email/unsubscribe-token'
+import { nightlyPurge } from './jobs/nightly-purge'
+import { decide } from './reports/decide'
 import { purgeModeration } from './reports/retention'
 import { activity } from './testing/activity'
 import { createTestContext, TEST_AUTH_SECRET, type TestContext } from './testing/context'
@@ -669,12 +671,23 @@ describe('what the others see', () => {
       Promise.all(paths.map(async (path) => (await act.send('GET', path, ines)).text()))
     const before = await read()
 
-    await suspend()
+    const { at } = await suspend()
 
     expect(await read()).toEqual(before)
     expect((await readMember(karimId, ines)).moderation).toBeNull()
-    // Témoin : l'administrateur, lui, lit la suspension sur la même page.
-    expect((await readMember(karimId, louis)).moderation?.suspension).not.toBeNull()
+    // Témoin : l'administrateur, lui, lit la suspension sur la même page. L'objet entier : avec
+    // `?.suspension`, un `moderation: null` donnait `undefined`, qui n'est pas null, et passait.
+    expect((await readMember(karimId, louis)).moderation).toMatchObject({
+      isAdmin: false,
+      suspension: {
+        since: iso(at),
+        endsAt: iso(at + 7 * DAY),
+        ground: 'rules',
+        explanation: EXPLANATION,
+        afterReport: false,
+      },
+      canSuspend: false,
+    })
   })
 
   it('gives an administrator the moderation of a member: suspension, decisions, canSuspend', async () => {
@@ -784,6 +797,68 @@ describe('a suspended administrator', () => {
   })
 })
 
+// Relecture de sécurité de la branche (7c) : la route vérifie le rôle avant la transaction, mais il
+// peut être retiré entre-temps (grant-admin.sh --revoke). decide() le relit donc sous les verrous,
+// à l'heure de la décision. Ces tests appellent decide() directement : c'est le seul moyen de
+// placer la révocation entre la garde de la route et la décision.
+describe('an administrator whose role changes during the decision', () => {
+  const suspendInput: SuspendInput = {
+    action: 'suspend',
+    memberId: '',
+    duration: '7d',
+    ground: 'rules',
+    explanation: EXPLANATION,
+  }
+
+  it('decides nothing once his role is taken back, on a content or on an account', async () => {
+    const project = await act.publish(karim, 'Insultes')
+    later()
+    await act.report(malik, { kind: 'project', id: project.id })
+    await act.revokeAdmin(louisId)
+    later()
+    const options = { passwordConfirmed: false }
+    const dismiss: ModerationDecisionInput = {
+      action: 'dismiss',
+      target: { kind: 'project', id: project.id },
+    }
+
+    expect(await decide(ctx.db, louisId, dismiss, new Date(), options)).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+    expect(
+      await decide(ctx.db, louisId, { ...suspendInput, memberId: karimId }, new Date(), options),
+    ).toEqual({ ok: false, error: 'not_found' })
+    expect(await decisionActions()).toEqual([])
+    expect(await suspensionRows()).toEqual([])
+
+    // Témoin : Sam, toujours administrateur, prend les deux décisions.
+    expect(await decide(ctx.db, samId, dismiss, new Date(), options)).toMatchObject({ ok: true })
+    expect(
+      await decide(ctx.db, samId, { ...suspendInput, memberId: karimId }, new Date(), options),
+    ).toMatchObject({ ok: true })
+  })
+
+  it('tells whether the member is an administrator in office at the hour of the decision', async () => {
+    const { at } = await suspend()
+    await act.makeAdmin(karimId)
+    const input = { ...suspendInput, memberId: karimId }
+    const options = { passwordConfirmed: false }
+
+    // À l'heure de la fin de sa suspension, Karim est administrateur en fonction : on ne le
+    // suspend pas, même si l'horloge de l'appel est encore pendant sa suspension.
+    expect(await decide(ctx.db, samId, input, new Date(at + 7 * DAY), options)).toEqual({
+      ok: false,
+      error: 'cannot_suspend_admin',
+    })
+    // Témoin : une milliseconde avant, il est encore suspendu (donc pas administrateur).
+    expect(await decide(ctx.db, samId, input, new Date(at + 7 * DAY - 1), options)).toEqual({
+      ok: false,
+      error: 'already_decided',
+    })
+  })
+})
+
 // J1 et J7 : partir pendant une suspension est permis, et n'efface pas la preuve. La suspension est
 // close à la date du départ, sans décision de levée, et gardée 365 jours après sa fin avec ses
 // décisions.
@@ -803,6 +878,30 @@ describe('leaving during a suspension', () => {
       .from(schema.moderationDecision)
       .where(eq(schema.moderationDecision.id, decision.id))
     expect(stored).toMatchObject({ action: 'suspend', adminId: louisId })
+  })
+
+  // Relecture de sécurité de la branche (7c) : la clôture au départ (auth.ts, afterDelete) peut
+  // échouer après la suppression du compte. La purge de nuit la rattrape, à son heure : sans elle,
+  // une suspension sans fin d'un compte parti resterait ouverte, donc gardée pour toujours. L'échec
+  // se pose en base (la ligne rouverte), aucune route ne permettant de le provoquer.
+  it('is closed by the nightly purge when the closure at departure failed', async () => {
+    await suspend({ duration: 'indefinite' })
+    await act.deleteAccount(karim, KARIM.password)
+    await ctx.db.update(schema.accountSuspension).set({ liftedAt: null })
+    const purgedAt = Date.now() + HOUR
+    // La purge note ses nombres dans les journaux : on les tait le temps du test.
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await nightlyPurge(ctx.db, new Date(purgedAt))
+
+      expect(await suspensionRows()).toEqual([
+        { user_id: null, ended: purgedAt, lift_decision_id: null },
+      ])
+      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY))
+      expect(await suspensionRows()).toEqual([])
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('keeps an endless suspension forever, then 365 days after the departure', async () => {
@@ -838,6 +937,67 @@ describe('keeping the decisions of a suspension', () => {
 
     await purgeModeration(ctx.db, new Date(end + 366 * DAY))
     expect(await decisionActions()).toEqual([])
+  })
+
+  // Relecture juridique de la branche (7c) : une décision de suspension ou de levée n'est gardée
+  // que par sa ligne account_suspension, jamais par « une décision plus récente sur la même
+  // cible » (le membre). Sinon une seconde suspension, ou un profil classé, garderait sans fin la
+  // première. Et l'inverse : une suspension récente ne garde pas une vieille décision du profil.
+  const MALIK = { email: 'malik@example.com', password: 'malik-long-password' }
+
+  /** Suspend Karim (A), puis lève sa suspension un jour plus tard ; rend l'heure de la levée. */
+  const suspendThenLift = async () => {
+    await suspend({ duration: '7d' })
+    vi.setSystemTime(Date.now() + DAY)
+    await lift()
+    return Date.now()
+  }
+
+  /** Signale le profil de Karim (Malik), puis le classe (Louis). */
+  const dismissProfileOfKarim = async () => {
+    await act.report(malik, { kind: 'member', id: karimId })
+    later()
+    await act.decide(louis, { action: 'dismiss', target: { kind: 'member', id: karimId } })
+  }
+
+  /** Avance l'horloge et reconnecte Louis et Malik (une session dure 7 jours). */
+  const jumpTo = async (ms: number) => {
+    vi.setSystemTime(ms)
+    louis = await act.signInAgain(LOUIS)
+    malik = await act.signInAgain(MALIK)
+  }
+
+  it('purges an ended suspension and its two decisions, even when a newer suspension is kept', async () => {
+    const endA = await suspendThenLift()
+    await jumpTo(endA + 370 * DAY)
+    await suspend({ duration: '30d' })
+
+    await purgeModeration(ctx.db, new Date(endA + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['suspend'])
+    expect(await suspensionRows()).toHaveLength(1)
+  })
+
+  it('purges an ended suspension and its two decisions, even when the profile was dismissed lately', async () => {
+    const endA = await suspendThenLift()
+    await jumpTo(endA + 370 * DAY)
+    await dismissProfileOfKarim()
+
+    await purgeModeration(ctx.db, new Date(endA + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['dismiss'])
+    expect(await suspensionRows()).toEqual([])
+  })
+
+  it('purges an old decision on the profile, even when a newer suspension is kept', async () => {
+    await dismissProfileOfKarim()
+    const dismissedAt = Date.now()
+    await jumpTo(dismissedAt + 370 * DAY)
+    await suspend({ duration: '30d' })
+
+    await purgeModeration(ctx.db, new Date(dismissedAt + 400 * DAY))
+
+    expect(await decisionActions()).toEqual(['suspend'])
   })
 
   it('keeps the decision of the suspension and that of its lift together', async () => {

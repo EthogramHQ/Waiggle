@@ -279,7 +279,8 @@ const concrete = (path: string) =>
     .replace(':kind', 'bravo')
     .replace(':slug', 'mistral')
     .replace(/:\w+/g, UNKNOWN)
-    .replace('*', 'zz-unknown')
+    // Toutes les « * » : replace avec un texte ne remplace que la première (alerte CodeQL).
+    .replaceAll('*', 'zz-unknown')
 
 describe('the guard of a suspended account', () => {
   it('refuses with 403 suspended every route it does not allow, before its validator and its quota', async () => {
