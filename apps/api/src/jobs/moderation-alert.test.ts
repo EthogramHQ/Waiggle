@@ -210,6 +210,42 @@ describe('the moderation alert', () => {
     expect(alertsTo(maxAccount.email)).toHaveLength(1)
   })
 
+  // Tranche 7c, règle S19 : un administrateur suspendu n'en est plus un le temps de sa suspension.
+  // La tâche écrit sa propre copie SQL de « administrateur en fonction » : elle doit l'exclure
+  // aussi, puis le prévenir de nouveau une fois la suspension finie, sans rien rétablir.
+  it('sends nothing to a suspended administrator, until the suspension ends', async () => {
+    const karimAccount = {
+      name: 'Karim',
+      email: 'karim@example.com',
+      password: 'karim-long-password',
+    }
+    const karimId = (await act.me(await ctx.verifiedMember(karimAccount))).id
+    const louis = await act.signInAgain(louisAccount)
+    vi.setSystemTime(at(MINUTE))
+    const suspended = await act.send('POST', '/v1/moderation/decisions', louis, {
+      action: 'suspend',
+      memberId: karimId,
+      duration: '7d',
+      ground: 'rules',
+      explanation: 'Messages insultants répétés sous les projets des autres.',
+    })
+    expect(suspended.status).toBe(201)
+    await act.makeAdmin(karimId)
+    await insertReport(at(2 * MINUTE))
+
+    await runAt(at(10 * MINUTE))
+
+    expect(alertsTo(karimAccount.email)).toEqual([])
+    // Témoin : Louis, administrateur en fonction, la reçoit au même passage.
+    expect(alertsTo(louisAccount.email)).toHaveLength(1)
+
+    // La suspension finie (7 jours après la pose, à la milliseconde), le rôle revient seul.
+    await insertReport(at(7 * 24 * HOUR + 2 * MINUTE))
+    await runAt(at(7 * 24 * HOUR + 10 * MINUTE))
+
+    expect(alertsTo(karimAccount.email)).toHaveLength(1)
+  })
+
   it('notes the date before sending: a failed sending is not retried at the next pass', async () => {
     const refused: string[] = []
     const failing: Mailer = {
