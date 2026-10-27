@@ -671,12 +671,23 @@ describe('what the others see', () => {
       Promise.all(paths.map(async (path) => (await act.send('GET', path, ines)).text()))
     const before = await read()
 
-    await suspend()
+    const { at } = await suspend()
 
     expect(await read()).toEqual(before)
     expect((await readMember(karimId, ines)).moderation).toBeNull()
-    // Témoin : l'administrateur, lui, lit la suspension sur la même page.
-    expect((await readMember(karimId, louis)).moderation?.suspension).not.toBeNull()
+    // Témoin : l'administrateur, lui, lit la suspension sur la même page. L'objet entier : avec
+    // `?.suspension`, un `moderation: null` donnait `undefined`, qui n'est pas null, et passait.
+    expect((await readMember(karimId, louis)).moderation).toMatchObject({
+      isAdmin: false,
+      suspension: {
+        since: iso(at),
+        endsAt: iso(at + 7 * DAY),
+        ground: 'rules',
+        explanation: EXPLANATION,
+        afterReport: false,
+      },
+      canSuspend: false,
+    })
   })
 
   it('gives an administrator the moderation of a member: suspension, decisions, canSuspend', async () => {
