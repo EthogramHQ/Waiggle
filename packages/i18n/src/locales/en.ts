@@ -362,6 +362,7 @@ export const en: Translation = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, reacted, {{count}}',
       own: 'Reactions to your project',
+      readOnly: 'Reactions to this project',
       group: 'React to this project',
       error: 'Your reaction could not be saved. Try again.',
     },
@@ -607,7 +608,7 @@ export const en: Translation = {
     grounds: { illegal: 'The law', rules: '{{appName}}’s rules' },
     explanation: 'Explanation',
     explanationHint:
-      'Shown to the author. Say which rule or which law; never name who reported it.',
+      'Shown to the author. Say which rule, or which law (image rights…); never name who reported it.',
     confirmRemove: 'Remove',
     cancel: 'Cancel',
     dismissed: 'Report dismissed.',
@@ -657,9 +658,9 @@ export const en: Translation = {
     suspendAction: 'Suspend account',
     password: {
       label: 'Your password',
-      hint: 'Needed for a suspension with no end date, after {{suspensions}} suspensions in a day, or after {{removals}} removals in an hour.',
+      hint: 'Needed for a suspension with no end date, after {{suspensions}} suspensions in 24 hours, or after {{removals}} removals in an hour.',
       tooManyFailures:
-        'Too many wrong passwords today: decisions that need it will have to wait until tomorrow.',
+        'Too many wrong passwords: decisions that need it will have to wait, for 24 hours at most.',
       confirm: 'Confirm',
     },
     suspend: {
@@ -668,11 +669,13 @@ export const en: Translation = {
         'The account becomes read-only: the person can read everything and delete their content, but can no longer post or interact. They’re told by email and notification, with your explanation.',
       durationLabel: 'Duration',
       explanationHint:
-        'Shown to the member. Describe the facts and the rule, not the person. Name neither who reported nor the member.',
+        'Shown to the member. Describe the facts and the rule, not the person; if the ground is the law, say which one. Name neither who reported nor the member.',
       confirm: 'Suspend account',
       done: 'Account suspended.',
       missing: 'To suspend, choose a duration and a ground, and write an explanation.',
       notAllowed: 'This account can’t be suspended: it’s yours, or an admin’s.',
+      notAllowedSelf: 'You can’t suspend your own account.',
+      notAllowedAdmin: 'This account belongs to an admin: it can’t be suspended.',
       errorTitle: 'This page couldn’t load',
     },
     lift: {
@@ -695,19 +698,25 @@ export const en: Translation = {
       lift: 'Lift suspension',
       history: 'Moderation history',
     },
+    blockedTarget: 'You blocked this member: another admin has to decide.',
     memberSuspended: 'Account suspended until {{date}} at {{time}} (Paris time)',
     memberSuspendedIndefinite: 'Account suspended until further notice',
   },
   suspension: {
     title: 'Your account is suspended',
+    headline: 'Your account is suspended until {{date}} at {{time}} (Paris time)',
+    headlineIndefinite: 'Your account is suspended until further notice',
+    details: 'Details',
+    decisionLine: '{{decision}} {{ground}}',
     until: 'Until {{date}} at {{time}} (Paris time).',
     indefinite: 'Until further notice.',
     afterReport: 'After a report, a person from moderation decided to suspend your account.',
     direct: 'A person from moderation decided to suspend your account.',
     explanation: 'Explanation: {{explanation}}',
     canStill:
-      'You can still read everything, delete your content, export your data, manage your account, block and report. You can no longer post, comment, react or follow.',
-    contest: 'To appeal: write to {{contactEmail}}. You can also go to court.',
+      'You can still read everything, delete your projects, notes and comments, export your data, manage your account, block and report. You can no longer post, comment, react or follow.',
+    contest: 'To appeal, write to moderation:',
+    contestCourt: 'You can also go to court.',
     formBody: 'You can’t post or edit a project while suspended.',
     profileLocked: 'Your profile can’t be edited while suspended.',
     formTitle: 'Publishing isn’t possible for now',
@@ -880,7 +889,7 @@ export const en: Translation = {
       },
       explanation: 'Explanation: {{explanation}}',
       meanwhile:
-        'While suspended, you can read everything, delete your content, export your data or delete your account. You can no longer post, comment, react or follow.',
+        'While suspended, you can read everything, delete your projects, notes and comments, export your data or delete your account. You can no longer post, comment, react or follow.',
       contest:
         'Disagree? Write to us at {{contactEmail}}: a person will review the decision and reply. You can also go to court.',
       greeting: 'Hello,',
@@ -930,6 +939,7 @@ export const en: Translation = {
     emptyTitle: 'No notifications yet',
     empty:
       'When a member reacts to your projects, comments on them, follows them or mentions you, you will read it here.',
+    emptyActionSuspended: 'Discover projects',
     emptyAction: 'Publish a project',
     more: 'Show more',
     end: 'That’s all',
@@ -975,8 +985,6 @@ export const en: Translation = {
     },
     suspended: 'Your account has been suspended until {{date}} at {{time}} (Paris time)',
     suspendedIndefinite: 'Your account has been suspended until further notice',
-    suspendedDetail:
-      'A person from moderation decided to suspend your account. You can read everything and delete your content, but you can no longer post or interact.',
     suspensionEnded: {
       ended: 'Your suspension has ended: you can post and interact again.',
       lifted: 'Your suspension has been lifted: you can post and interact again.',

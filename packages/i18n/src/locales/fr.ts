@@ -389,6 +389,8 @@ export const fr = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, réagi, {{count}}',
       own: 'Les réactions à ton projet',
+      // La légende des réactions qu’un compte suspendu lit sans pouvoir réagir.
+      readOnly: 'Les réactions à ce projet',
       group: 'Réagir à ce projet',
       error: 'Ta réaction n’a pas pu être enregistrée. Réessaie.',
     },
@@ -662,7 +664,7 @@ export const fr = {
     grounds: { illegal: 'La loi', rules: 'Les règles de {{appName}}' },
     explanation: 'Explication',
     explanationHint:
-      'Montrée à l’auteur. Dis quelle règle ou quelle loi ; ne nomme jamais qui a signalé.',
+      'Montrée à l’auteur. Dis quelle règle, ou quelle loi (droit à l’image…) ; ne nomme jamais qui a signalé.',
     confirmRemove: 'Retirer',
     cancel: 'Annuler',
     dismissed: 'Signalement classé sans suite.',
@@ -720,9 +722,9 @@ export const fr = {
     password: {
       label: 'Ton mot de passe',
       // Relecture de sécurité (S11, S12, Louis, 26/10/2026).
-      hint: 'Demandé pour une suspension sans fin, après {{suspensions}} suspensions dans la journée, ou après {{removals}} retraits en une heure.',
+      hint: 'Demandé pour une suspension sans fin, après {{suspensions}} suspensions en 24 heures, ou après {{removals}} retraits en une heure.',
       tooManyFailures:
-        'Trop de mots de passe faux aujourd’hui : les décisions qui le demandent attendront demain.',
+        'Trop de mots de passe faux : les décisions qui le demandent attendront, pendant 24 heures au plus.',
       confirm: 'Confirmer',
     },
     suspend: {
@@ -732,13 +734,16 @@ export const fr = {
       durationLabel: 'Durée',
       // Relecture juridique (J9) : les faits et la règle, jamais un jugement sur la personne.
       explanationHint:
-        'Montrée au membre. Décris les faits et la règle, pas la personne. Ne nomme ni qui a signalé, ni le membre.',
+        'Montrée au membre. Décris les faits et la règle, pas la personne ; si le fondement est la loi, dis laquelle. Ne nomme ni qui a signalé, ni le membre.',
       confirm: 'Suspendre le compte',
       done: 'Compte suspendu.',
       // Sous le bouton inactif : ce qu'il faut encore remplir (Louis, 26/10/2026).
       missing: 'Pour suspendre, choisis une durée et un fondement, et écris une explication.',
       notAllowed:
         'Ce compte ne peut pas être suspendu : c’est le tien, ou celui d’un administrateur.',
+      // Le refus dit sa vraie raison (relecture juridique R3, 27/10/2026).
+      notAllowedSelf: 'Tu ne peux pas suspendre ton propre compte.',
+      notAllowedAdmin: 'Ce compte est celui d’un administrateur : il ne peut pas être suspendu.',
       errorTitle: 'La page n’a pas pu se charger',
     },
     lift: {
@@ -763,6 +768,8 @@ export const fr = {
       lift: 'Lever la suspension',
       history: 'Historique de modération',
     },
+    // Un administrateur qui a bloqué le membre ne suspend ni ne lève : un autre décide (R3).
+    blockedTarget: 'Tu as bloqué ce membre : un autre administrateur doit décider.',
     memberSuspended: 'Compte suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
     memberSuspendedIndefinite: 'Compte suspendu jusqu’à nouvel ordre',
   },
@@ -770,6 +777,14 @@ export const fr = {
   // durée, le fondement, l'explication, ce qui reste possible, et comment contester.
   suspension: {
     title: 'Ton compte est suspendu',
+    // Le bandeau replié (Louis, 27/10/2026) : la mesure et sa fin sur une ligne forte, le reste
+    // sous « Détails ».
+    headline: 'Ton compte est suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
+    headlineIndefinite: 'Ton compte est suspendu jusqu’à nouvel ordre',
+    details: 'Détails',
+    // Qui a décidé, puis le fondement : une seule phrase, dont une autre langue peut changer
+    // l’ordre.
+    decisionLine: '{{decision}} {{ground}}',
     // La date, l'heure et le fuseau (J4) : une date seule tromperait d'un jour.
     until: 'Jusqu’au {{date}} à {{time}} (heure de Paris).',
     indefinite: 'Jusqu’à nouvel ordre.',
@@ -779,9 +794,11 @@ export const fr = {
     direct: 'Une personne de la modération a décidé de suspendre ton compte.',
     explanation: 'Explication : {{explanation}}',
     canStill:
-      'Tu peux toujours tout lire, supprimer tes contenus, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir ni suivre.',
+      'Tu peux toujours tout lire, supprimer tes projets, notes et commentaires, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir ni suivre.',
     // Les recours (J3, formulation à faire valider par un professionnel).
-    contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
+    // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
+    contest: 'Pour contester, écris à la modération :',
+    contestCourt: 'Tu peux aussi saisir la justice.',
     // À la place d'un formulaire de projet, et sur « Mon profil ».
     formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',
     profileLocked: 'Ton profil ne peut pas être modifié pendant la suspension.',
@@ -986,7 +1003,7 @@ export const fr = {
       },
       explanation: 'Explication : {{explanation}}',
       meanwhile:
-        'Pendant la suspension, tu peux tout lire, supprimer tes contenus, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir ni suivre.',
+        'Pendant la suspension, tu peux tout lire, supprimer tes projets, notes et commentaires, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir ni suivre.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
       // La salutation, sans le nom : l'e-mail ne cite que la décision (backend-dev 7c).
@@ -1040,6 +1057,8 @@ export const fr = {
     emptyTitle: 'Pas encore de notification',
     empty:
       'Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
+    // Un compte suspendu ne publie pas : l'état vide propose de lire (7c).
+    emptyActionSuspended: 'Découvrir des projets',
     emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
     end: 'C’est tout',
@@ -1088,8 +1107,6 @@ export const fr = {
     // Tranche 7c : la suspension de son compte, et sa fin.
     suspended: 'Ton compte a été suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
     suspendedIndefinite: 'Ton compte a été suspendu jusqu’à nouvel ordre',
-    suspendedDetail:
-      'Une personne de la modération a décidé de suspendre ton compte. Tu peux tout lire et supprimer tes contenus, mais plus publier ni interagir.',
     suspensionEnded: {
       ended: 'Ta suspension a pris fin : tu peux de nouveau publier et interagir.',
       lifted: 'Ta suspension a été levée : tu peux de nouveau publier et interagir.',
