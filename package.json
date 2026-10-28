@@ -3,7 +3,7 @@
   "private": true,
   "description": "Réseau social pour publier, suivre et tester les projets IA de ses proches.",
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@10.34.9",
+  "packageManager": "pnpm@12.15.0",
   "engines": {
     "node": ">=22.12"
   },
