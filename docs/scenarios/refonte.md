@@ -78,8 +78,12 @@ redessine ses écrans avec ces fondations. Aucun contrat d'API ne change.
 - Les grands moments du prototype (la carte qui devient la page, la goutte des onglets, la
   réaction, l'éventail, le portail, la danse de publication, la sphère, la vague de miel)
   arrivent chacun avec la tranche de leur écran, construits sur ces jetons
-- « Réduire les animations » (règle A11) : les grands déplacements deviennent des fondus, les
-  petits mouvements et la lumière restent
+- « Réduire les animations » (règle A11, précisée le 29/10/2026) : les grands déplacements
+  deviennent des fondus, les petits mouvements (appui, interrupteur) restent, et **la lumière
+  d'ambiance devient immobile** : elle garde sa couleur et change encore de teinte en fondu
+  d'un projet à l'autre, mais ne respire plus, ne suit plus la souris et n'a plus de reflets
+  (WCAG 2.2.2 : un mouvement qui démarre seul, dure plus de 5 secondes et accompagne du contenu
+  doit pouvoir s'arrêter). L'abeille du lancement, seule à l'écran, est exemptée
 
 **La lumière vivante**
 - Sur ordinateur : la lumière prend la couleur de la carte au centre de l'écran, change en fondu
@@ -87,6 +91,7 @@ redessine ses écrans avec ces fondations. Aucun contrat d'API ne change.
 - Sur téléphone, une version allégée : la couleur des cartes et le fondu, sans reflets d'eau
 - Quand l'appli passe en arrière-plan, la lumière s'arrête, et repart au retour
 - Un écran sans photo garde la lumière miel
+- Avec « Réduire les animations », la lumière est immobile (voir « Le mouvement, la base »)
 
 **Les deux ambiances**
 - Le miel vif, en haut de l'écran, pour les moments de marque : l'accueil, la connexion,
