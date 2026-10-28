@@ -16,7 +16,7 @@ export const user = pgTable('user', {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date()) // mis à jour automatiquement à chaque modification
     .notNull(),
-  // Ajouté par Ruche : langue des e-mails et notifications ('fr' ou 'en').
+  // Ajouté par Waiggle : langue des e-mails et notifications ('fr' ou 'en').
   language: text('language').default('fr').notNull(),
 })
 

@@ -10,7 +10,7 @@ import * as schema from './schema'
 
 export { schema }
 
-/** Une base Ruche, quel que soit le moteur derrière (vrai PostgreSQL ou PGlite). */
+/** Une base Waiggle, quel que soit le moteur derrière (vrai PostgreSQL ou PGlite). */
 export type Database = PgDatabase<PgQueryResultHKT, typeof schema>
 
 /** Une base ouverte, et la fonction pour la refermer proprement. */

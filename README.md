@@ -3,8 +3,8 @@
 *[English version](README.en.md)*
 
 Waiggle est un réseau social pour publier ses projets IA, suivre ceux de ses proches, les tester et
-s'encourager mutuellement à en créer de nouveaux. Dans le code, il porte le nom de code « Ruche »
-(les paquets `@ruche/…`).
+s'encourager mutuellement à en créer de nouveaux. Les identifiants techniques gardent le nom de
+code « Ruche » (les paquets `@ruche/…`).
 
 > Phase 1 en cours : un premier cercle restreint, sur invitation.
 

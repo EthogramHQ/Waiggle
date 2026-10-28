@@ -1,7 +1,7 @@
 // Tests des composants d'interface : ce qu'un membre (ou un lecteur d'écran) peut faire avec eux.
 // Ils ne vérifient pas l'apparence (couleurs, tailles), qui peut changer librement : seulement le
 // comportement, qui ne doit pas changer.
-import { appName, fontWeights, maxTextScale, palettes } from '@ruche/brand'
+import { appName, fontWeights, layout, maxTextScale, palettes } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput, type View } from 'react-native'
@@ -828,6 +828,18 @@ describe('Tag', () => {
 
     await rerender(<Tag label="Claude Code" />)
     expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  it('keeps a plain label as tall as a touchable one, so both line up in a row', async () => {
+    // Au catalogue, « Expo » (simple pastille) remontait de 4 points à côté de « Claude » et
+    // « Python » (touchables, dans leur zone de 44 points).
+    await renderWithProviders(<Tag label="Expo" />)
+    // Les hauteurs minimales de tout ce qui entoure le texte : la pastille (36) et son cadre (44).
+    const heights: unknown[] = []
+    for (let node = screen.getByText('Expo').parent; node; node = node.parent) {
+      heights.push(StyleSheet.flatten(node.props.style)?.minHeight)
+    }
+    expect(heights).toContain(layout.touchTarget)
   })
 })
 

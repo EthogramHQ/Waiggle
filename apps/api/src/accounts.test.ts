@@ -122,7 +122,7 @@ describe('creating an account', () => {
   })
 
   it('refuses a verification link that would send the member to another website', async () => {
-    // Sinon, un e-mail authentique de Ruche pourrait mener vers un faux site (« open redirect »).
+    // Sinon, un e-mail authentique de Waiggle pourrait mener vers un faux site (« open redirect »).
     const res = await ctx.request('/api/auth/sign-up/email', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

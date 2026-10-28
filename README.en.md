@@ -3,7 +3,7 @@
 *[Version française](README.md)*
 
 Waiggle is a social network where friends and family share their AI projects, follow and try each
-other's work, and encourage one another to build more. In the code it goes by the code name
+other's work, and encourage one another to build more. Technical identifiers keep the code name
 "Ruche" (French for *beehive*), as in the `@ruche/…` packages.
 
 > Phase 1 in progress: a first small circle, invite only.

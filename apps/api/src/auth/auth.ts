@@ -1,7 +1,7 @@
 // Configuration de Better Auth, la bibliothèque qui gère les comptes : inscription, connexion,
 // sessions, vérification de l'adresse e-mail, suppression du compte.
 // Écrire soi-même ces mécanismes est risqué (stockage des mots de passe, jetons, attaques) :
-// on s'appuie sur une bibliothèque éprouvée, et on règle ici son comportement pour Ruche.
+// on s'appuie sur une bibliothèque éprouvée, et on règle ici son comportement pour Waiggle.
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { expo } from '@better-auth/expo'
