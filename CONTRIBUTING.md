@@ -1,9 +1,17 @@
-# Ruche — règles du projet
+# Waiggle — règles du projet
 
-Ruche est un réseau social open source (AGPL-3.0) où des proches publient leurs projets IA, les
+Waiggle est un réseau social open source (AGPL-3.0) où des proches publient leurs projets IA, les
 suivent, les testent et s'encouragent. On n'héberge rien d'exécutable : chaque projet pointe vers
-une démo externe. Le produit est bilingue français / anglais. « Ruche » est un nom de code : les membres voient
-« Waiggle », défini dans `packages/brand/src/name.ts` et nulle part ailleurs.
+une démo externe. Le produit est bilingue français / anglais.
+
+**Deux « ruches » à ne pas confondre.**
+
+- **« Ruche », le nom de code technique.** Il reste dans les identifiants : les paquets
+  `@ruche/*`, le dossier `/srv/ruche` du serveur, les images `ruche-api` et `ruche-web`. La
+  documentation appelle le projet « Waiggle ». Dans l'appli, le nom affiché vient de
+  `packages/brand/src/name.ts` et de nulle part ailleurs.
+- **Les ruches, une fonction de l'appli** (refonte) : des groupes de proches, comme « Ma ruche
+  Famille ». Dans le code, cette fonction s'appelle `hive` (tables, routes, composants).
 
 L'équipe : Louis, qui décide, relit et valide tout, aidé d'un assistant de code qui écrit l'essentiel
 du code. Ces règles valent pour toute personne, ou tout outil, qui contribue.

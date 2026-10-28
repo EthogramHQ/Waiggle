@@ -1733,11 +1733,14 @@ for (const name of readdirSync(out)) {
 }
 
 // Une page longue est photographiée en plusieurs tranches, en faisant défiler sa zone de
-// défilement. Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; près de cette
-// limite, il laisse même des zones non peintes, sans erreur. On coupe donc au-delà de 12 000
-// points (le catalogue : catalogue, catalogue-2…). Avec --read, les tranches font environ 1 600
-// pixels, la hauteur qu'un agent lit confortablement, et sont numérotées dès la première (nom-1).
-const PART = read ? 1600 : 12000
+// défilement. Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; bien avant, il
+// laisse des zones non peintes, sans erreur, quand l'image est grande en pixels. Les captures
+// sont prises à l'échelle 2 : des tranches de 12 000 points faisaient 23 000 pixels de haut, et
+// sur ordinateur (2 880 pixels de large) les champs et les choix du catalogue sortaient en
+// blanc. On coupe donc au-delà de 6 000 points, soit 12 000 pixels (le catalogue : catalogue,
+// catalogue-2…). Avec --read, les tranches font environ 1 600 pixels, la hauteur qu'un agent lit
+// confortablement, et sont numérotées dès la première (nom-1).
+const PART = read ? 1600 : 6000
 const scale = read ? 1 : 2
 
 // Les travaux de la file : une capture par page, appareil et thème. Le catalogue, le plus long,

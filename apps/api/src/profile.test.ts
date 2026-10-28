@@ -329,7 +329,7 @@ describe('serving images', () => {
 })
 
 describe('requests coming from another website', () => {
-  // Attaque « CSRF » : une page piégée pousse le navigateur de Léa, connecté à Ruche, à envoyer
+  // Attaque « CSRF » : une page piégée pousse le navigateur de Léa, connecté à Waiggle, à envoyer
   // une requête à notre API. Le navigateur y joint le cookie de Léa… et l'en-tête Origin, qui
   // trahit la page d'où vient la requête.
   const evil = { origin: 'https://evil.example' }

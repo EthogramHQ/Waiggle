@@ -140,7 +140,7 @@ Règles détaillées :
 - **Lien de démo** : `https://` uniquement. Sont refusés `localhost`, les noms sans point, les noms
   en `.local`, `.internal`, `.home.arpa` ou `.localhost`, et toute adresse IP privée, locale ou
   réservée. Le serveur n'ouvre jamais ce lien. Un clic passe par une page d'avertissement
-  (« Tu quittes Ruche pour… »), comme tous les liens externes.
+  (« Tu quittes Waiggle pour… »), comme tous les liens externes.
 - **Visuels** : de 0 à 6 par projet, en JPEG, PNG ou WebP de 5 Mo au plus. Ils sont ré-encodés en
   WebP de 1 600 px au plus, sans métadonnées. Le premier sert de couverture, et l'ordre est
   modifiable.
@@ -363,7 +363,7 @@ Ajouts après la relecture de sécurité :
 - Il montre les projets publics récents de tous les membres, et ceux qui cherchent des testeurs
 
 **Ouvrir une démo**
-- Quand un membre ouvre un lien de démo, une page lui indique qu'il quitte Ruche et vers quel domaine
+- Quand un membre ouvre un lien de démo, une page lui indique qu'il quitte Waiggle et vers quel domaine
 
 ### Précisions (tranche 4) — validées le 19/10/2026
 

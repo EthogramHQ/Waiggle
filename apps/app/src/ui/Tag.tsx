@@ -34,7 +34,22 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
       {label}
     </Text>
   )
-  if (!onPress) return <View style={box}>{content}</View>
+  // La pastille dessinée fait 36 points de haut ; autour d'elle, une zone de 44. Touchable, c'est
+  // la zone à toucher ; simple pastille, elle garde la même hauteur, pour que les deux sortes
+  // restent alignées sur une même ligne (sinon la simple pastille remontait de 4 points).
+  const frame: ViewStyle = {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minHeight: layout.touchTarget,
+    justifyContent: 'center',
+  }
+  if (!onPress) {
+    return (
+      <View style={frame}>
+        <View style={box}>{content}</View>
+      </View>
+    )
+  }
   return (
     <Pressable
       accessibilityRole="link"
@@ -42,14 +57,7 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
       // Entrée ouvre l'étiquette sur le web, comme un vrai lien (voir keyboard.ts).
       {...enterActivates(onPress)}
       onPress={onPress}
-      // La pastille dessinée fait 36 points de haut ; la zone à toucher autour d'elle, 44.
-      style={{
-        alignSelf: 'flex-start',
-        maxWidth: '100%',
-        minHeight: layout.touchTarget,
-        minWidth: layout.touchTarget,
-        justifyContent: 'center',
-      }}
+      style={{ ...frame, minWidth: layout.touchTarget }}
     >
       {({ pressed }) => (
         <View style={[box, pressed && { backgroundColor: colors.honeySoft }]}>{content}</View>
