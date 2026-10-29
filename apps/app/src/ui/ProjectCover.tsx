@@ -2,7 +2,7 @@
 // et son résumé flou (ThumbHash) affiché le temps qu'elle arrive. Sans photo : la lumière miel,
 // avec le titre écrit dessus en grand, pour que chaque projet ait une couverture chaleureuse
 // plutôt qu'un cadre vide.
-import { honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
+import { borders, honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
@@ -31,14 +31,40 @@ type Props = {
   image?: CoverImage | null
   /** Ce qui se pose sur la couverture (boutons ronds, panneau de verre). */
   children?: ReactNode
+  /**
+   * `card` : la couverture est une carte posée sur la page (celle du fil), avec l'ombre d'une carte
+   * et, la nuit, un fin liseré qui la détache du noir. Sans ombre par défaut (une couverture en tête
+   * de page, une vignette dans une note).
+   */
+  shadow?: 'card' | 'none'
 }
 
-export function ProjectCover({ title, height: size, radius = 'sheet', image, children }: Props) {
-  const { scheme, colors } = useTheme()
+export function ProjectCover({
+  title,
+  height: size,
+  radius = 'sheet',
+  image,
+  children,
+  shadow = 'none',
+}: Props) {
+  const { scheme, colors, shadows } = useTheme()
   const height = typeof size === 'number' ? size : layout.cover[size]
   const id = `cover-${scheme}`
-  return (
-    <View style={{ height, borderRadius: radii[radius], overflow: 'hidden', alignSelf: 'stretch' }}>
+  const card = shadow === 'card'
+  const cover = (
+    <View
+      style={{
+        height,
+        borderRadius: radii[radius],
+        overflow: 'hidden',
+        alignSelf: 'stretch',
+        // Le liseré de nuit : une ombre noire ne se voit pas sur le fond de nuit, le trait si.
+        // L'image, posée dans le cadre, s'arrête à l'intérieur du trait.
+        ...(card && scheme === 'night'
+          ? { borderWidth: borders.hairline, borderColor: colors.surfaceBorder }
+          : null),
+      }}
+    >
       {image ? (
         <Image
           source={image.source}
@@ -74,6 +100,14 @@ export function ProjectCover({ title, height: size, radius = 'sheet', image, chi
         </View>
       ) : null}
       {children}
+    </View>
+  )
+  if (!card) return cover
+  // Deux boîtes : l'extérieure porte l'ombre, l'intérieure rogne la photo aux coins arrondis
+  // (overflow: 'hidden'), ce qui rognerait aussi l'ombre si elles étaient ensemble.
+  return (
+    <View style={{ borderRadius: radii[radius], boxShadow: shadows.card, alignSelf: 'stretch' }}>
+      {cover}
     </View>
   )
 }

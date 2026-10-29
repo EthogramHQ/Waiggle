@@ -75,7 +75,16 @@ import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
+import { AmbiancesCatalogue } from './ambiances'
+import { LoadingCatalogue } from './chargement'
+import { ControlsCatalogue } from './controles'
+import { FeedEndCatalogue } from './fin-de-fil'
+import { FormSamples } from './formulaire'
+import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
+import { LightCatalogue } from './lumiere'
+import { BrandCatalogue } from './marque'
+import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
@@ -222,50 +231,6 @@ export function CatalogueScreen() {
           message={l.expiredAgain}
           action={{ label: l.signInAgain, onPress: () => {}, single: 'catalogue' }}
         />
-      </Section>
-
-      <Section title={l.surfaces}>
-        <Columns
-          main={
-            <OnLight thumbhash={samples.papillon}>
-              <Surface variant="panel" padding="lg" gap="sm">
-                <Stack direction="row" gap="sm" align="center">
-                  <Avatar name="Léa Moreau" source={null} label="Léa Moreau" size={28} />
-                  <Text variant="callout" weight={700}>
-                    Léa Moreau
-                  </Text>
-                </Stack>
-                <Text variant="title3">{l.sampleTitle}</Text>
-                <Text variant="callout" tone="secondary">
-                  {l.samplePitch}
-                </Text>
-              </Surface>
-              <Surface variant="glass" padding="md" fill={false}>
-                <Text variant="callout" weight={600}>
-                  {l.glass}
-                </Text>
-              </Surface>
-            </OnLight>
-          }
-          side={
-            <Stack gap="md">
-              <Surface padding="lg">
-                <Text>{l.plain}</Text>
-              </Surface>
-              <Surface variant="grouped" padding="lg">
-                <Text>{l.grouped}</Text>
-              </Surface>
-            </Stack>
-          }
-        />
-      </Section>
-
-      <Section title={l.avatars}>
-        <Stack direction="row" gap="lg" align="center" wrap>
-          <Avatar name="Léa" source={null} label="Léa" size={96} />
-          <Avatar name="Max" source={null} label="Max" size={44} />
-          <Avatar name="Inès" source={null} label="Inès" size={28} />
-        </Stack>
       </Section>
 
       <Section title={l.text}>
@@ -1063,6 +1028,15 @@ export function CatalogueScreen() {
       <Section title={l.icons}>
         <Icons />
       </Section>
+      <BrandCatalogue />
+      <ControlsCatalogue />
+      <MaterialsCatalogue />
+      <FormSamples />
+      <TokensCatalogue />
+      <LightCatalogue />
+      <AmbiancesCatalogue />
+      <LoadingCatalogue />
+      <FeedEndCatalogue />
     </Screen>
   )
 }

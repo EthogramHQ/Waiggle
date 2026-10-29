@@ -23,12 +23,19 @@ export function CheckEmailScreen() {
   // L'adresse est dans l'URL du visiteur, inconnue du serveur qui prépare la page web : on ne
   // l'affiche qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
+  // L'image de la page : l'enveloppe sur sa tuile de miel, du décor (cachée aux lecteurs d'écran).
+  const picture = (
+    <Stack align="center">
+      {/* R1 F2 : Mascot fly ici (l'abeille en vol remplace l'enveloppe, à cette même place). */}
+      <Emblem icon="envelope-simple" />
+    </Stack>
+  )
 
   return (
-    <Screen pageTitle={t(($) => $.auth.checkEmail.title)}>
-      <Stack align="center">
-        <Emblem icon="envelope-simple" />
-      </Stack>
+    // Le « miel vif » des moments de marque, comme l'inscription d'où l'on arrive : l'image est le
+    // décor (`scene`), que l'ambiance place selon la largeur (sur le miel, ou en tête de la carte) ;
+    // le texte est sur la feuille claire.
+    <Screen ambiance="brand" scene={picture} pageTitle={t(($) => $.auth.checkEmail.title)}>
       <Text variant="title2" align="center" heading={1}>
         {t(($) => $.auth.checkEmail.title)}
       </Text>

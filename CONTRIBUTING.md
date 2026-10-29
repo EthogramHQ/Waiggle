@@ -62,7 +62,10 @@ Chaque fonctionnalité est une tranche verticale, dans cet ordre :
    (sécurité ; juridique si la tranche touche aux données, aux e-mails, à l'IA ou à la modération) :
    ce que la relecture trouve entre au plan et devient des tests.
 3. **Les tests, qui doivent échouer** : unitaires pour les règles, intégration pour l'API
-   (`app.request(...)`), test de composant pour l'écran. Lance-les et constate l'échec.
+   (`app.request(...)`), test de composant pour l'écran, écrits à partir du contrat, sans voir le
+   code. Lance-les et constate l'échec. L'interface peut commencer en même temps par ce qui ne
+   dépend pas des tests (catalogue, composants visuels, captures) ; avant tout code d'écran, elle
+   reprend ces tests et constate leur échec à son tour.
 4. **Le backend**, jusqu'au vert.
 5. **L'interface**, puis son test.
 6. **`pnpm check`** vert et le parcours d'un membre (`pnpm --filter @ruche/app journey`) vert, puis
@@ -115,7 +118,8 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
   - zones à toucher de 44 points au moins ;
   - les textes suivent la taille de texte de l'appareil.
 - **Animations** : complètes par défaut. Seuls les grands déplacements deviennent des fondus si la
-  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance reste.
+  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance garde sa
+  couleur mais devient immobile (WCAG 2.2.2).
 - **Web** : la page est pré-rendue sans connaître le visiteur. Ce qui dépend du navigateur (thème,
   largeur, langue, paramètres d'URL) attend `useHydrated()` (`ui/theme/hydration.ts`). Sinon React
   signale un écart et redessine tout. La CI des captures échoue sur ces erreurs.

@@ -15,10 +15,12 @@ import { Platform, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
+import { BrandAmbiance } from './BrandAmbiance'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { AmbientProvider, useAmbient } from './theme/ambient'
 import { markHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -60,6 +62,21 @@ type Props = {
   ambient?: boolean
   /** Le résumé flou du visuel qui colore la lumière (sinon : lumière miel). */
   thumbhash?: string | null
+  /**
+   * L'ambiance de l'écran :
+   * - light (par défaut) : la lumière d'ambiance derrière le contenu ;
+   * - brand : le « miel vif » des moments de marque (accueil d'un visiteur, connexion,
+   *   inscription) : un dégradé de miel en haut, et le contenu sur une feuille claire qui remonte
+   *   dessus (ui/BrandAmbiance.tsx). La lumière d'ambiance est alors coupée, et la barre du haut
+   *   ne reste pas fixe : elle se pose sur le miel, au-dessus de la feuille.
+   */
+  ambiance?: 'brand' | 'light'
+  /**
+   * Avec l'ambiance « brand » : le décor de l'écran (la constellation, l'enveloppe), caché aux
+   * lecteurs d'écran. BrandAmbiance le place selon la largeur : sur le miel (téléphone, tablette)
+   * ou en tête de la carte (ordinateur, sans `hero`). Jamais un bouton ni un texte à lire.
+   */
+  scene?: ReactNode
 }
 
 export function Screen({
@@ -75,6 +92,8 @@ export function Screen({
   hero,
   ambient = true,
   thumbhash = null,
+  ambiance = 'light',
+  scene,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -87,7 +106,9 @@ export function Screen({
   useBrowserLanguage()
 
   const withHero = hero !== undefined && sizeClass === 'wide'
-  const pinned = header !== undefined && stickyHeader
+  const brand = ambiance === 'brand'
+  // Sur le miel, pas de barre fixe : elle se poserait sur le dégradé, hors de la feuille.
+  const pinned = header !== undefined && stickyHeader && !brand
   // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
   const body = (
     <>
@@ -120,96 +141,136 @@ export function Screen({
     // NoticeScope : les messages d'un même groupe (une seule « session expirée ») se comptent par
     // écran ; la page restée montée sous celle-ci a les siens (ui/Notice.tsx).
     <NoticeScope>
-      {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
+      {/* La lumière de cet écran : sa source (le visuel donné par `thumbhash`, ou ce qu'un composant
+          de l'écran choisit par useAmbient()) et ses impulsions. Un fournisseur par écran : sur le
+          web, la page précédente reste montée sous la nouvelle et garde sa propre lumière. */}
+      <AmbientProvider initialSource={thumbhash ? { thumbhash } : null}>
+        <AmbientSourceSync thumbhash={thumbhash} />
+        {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
           horizontal). */}
-      <View style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}>
-        {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
-          téléphone, il n'y a pas d'onglet : rien à faire. */}
-        {Platform.OS === 'web' ? (
-          <Head>
-            <title>{tabTitle}</title>
-          </Head>
-        ) : null}
-        {ambient ? <AmbientLight thumbhash={thumbhash} /> : null}
-        {pinned ? (
-          // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
-          // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
-          // s'arrête plus net sous la barre.
-          <View
-            style={{
-              paddingTop: insets.top + space.sm,
-              paddingBottom: space.sm,
-              paddingHorizontal: padding,
-              alignItems: 'center',
-              backgroundColor: colors.sheet,
-              borderBottomWidth: borders.hairline,
-              borderBottomColor: colors.line,
-            }}
-          >
-            <View style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}>
-              {header}
-              {notice}
-            </View>
-          </View>
-        ) : null}
-        {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
-        <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            alignItems: 'center',
-            // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
-            paddingTop: (pinned ? 0 : insets.top) + space.lg,
-            paddingBottom: insets.bottom + space.huge,
-            paddingHorizontal: padding,
-            gap: space.xl,
+        <View
+          style={{
+            flex: 1,
+            // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
+            // dans le bas de l'écran.
+            backgroundColor: brand ? colors.surface : colors.background,
+            overflow: 'hidden',
           }}
-          keyboardShouldPersistTaps="handled"
         >
-          {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
-            change pas de taille d'une page à l'autre. */}
-          {header && !pinned ? (
-            <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+          {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
+          téléphone, il n'y a pas d'onglet : rien à faire. */}
+          {Platform.OS === 'web' ? (
+            <Head>
+              <title>{tabTitle}</title>
+            </Head>
           ) : null}
-          {withHero ? (
-            // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+          {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. */}
+          {ambient && !brand ? <AmbientLight /> : null}
+          {pinned ? (
+            // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
+            // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
+            // s'arrête plus net sous la barre.
             <View
               style={{
-                width: '100%',
-                maxWidth: layout.maxContentWidth,
-                flexGrow: 1,
-                // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                // mais s'affiche à droite de la scène.
-                flexDirection: 'row-reverse',
+                paddingTop: insets.top + space.sm,
+                paddingBottom: space.sm,
+                paddingHorizontal: padding,
                 alignItems: 'center',
-                gap: space.huge,
+                backgroundColor: colors.sheet,
+                borderBottomWidth: borders.hairline,
+                borderBottomColor: colors.line,
               }}
             >
-              <View style={{ width: layout.formWidth - 80 }}>
-                <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                  {body}
-                </Surface>
+              <View
+                style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}
+              >
+                {header}
+                {notice}
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
             </View>
+          ) : null}
+          {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
+          {brand ? (
+            // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
+            // miel), le décor et la feuille qui porte le contenu.
+            <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+              <BrandAmbiance header={header} scene={scene} hero={withHero ? hero : undefined}>
+                {body}
+              </BrandAmbiance>
+            </ScrollView>
           ) : (
-            <View
-              style={{
-                width: '100%',
-                maxWidth: maxWidthFor(width, false),
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                alignItems: 'center',
+                // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
+                paddingTop: (pinned ? 0 : insets.top) + space.lg,
+                paddingBottom: insets.bottom + space.huge,
+                paddingHorizontal: padding,
                 gap: space.xl,
-                // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                ...(width === 'form' && !onBack && !header
-                  ? { flexGrow: 1, justifyContent: 'center' }
-                  : null),
               }}
+              keyboardShouldPersistTaps="handled"
             >
-              {body}
-            </View>
+              {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
+            change pas de taille d'une page à l'autre. */}
+              {header && !pinned ? (
+                <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+              ) : null}
+              {withHero ? (
+                // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                <View
+                  style={{
+                    width: '100%',
+                    maxWidth: layout.maxContentWidth,
+                    flexGrow: 1,
+                    // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                    // mais s'affiche à droite de la scène.
+                    flexDirection: 'row-reverse',
+                    alignItems: 'center',
+                    gap: space.huge,
+                  }}
+                >
+                  <View style={{ width: layout.formWidth - 80 }}>
+                    <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                      {body}
+                    </Surface>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    maxWidth: maxWidthFor(width, false),
+                    gap: space.xl,
+                    // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                    ...(width === 'form' && !onBack && !header
+                      ? { flexGrow: 1, justifyContent: 'center' }
+                      : null),
+                  }}
+                >
+                  {body}
+                </View>
+              )}
+            </ScrollView>
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </AmbientProvider>
     </NoticeScope>
   )
+}
+
+/**
+ * Passe le visuel de l'écran (`thumbhash`) à la lumière quand il change : un projet chargé après
+ * l'ouverture de sa page fait glisser la lumière du miel vers ses couleurs. Au premier affichage,
+ * le fournisseur l'a déjà (initialSource) : rien ne glisse.
+ */
+function AmbientSourceSync({ thumbhash }: { thumbhash: string | null }) {
+  const { setSource } = useAmbient()
+  useEffect(() => {
+    setSource(thumbhash ? { thumbhash } : null)
+  }, [setSource, thumbhash])
+  return null
 }
 
 // Un onglet n'affiche qu'une trentaine de caractères : au-delà de 60, le titre est abrégé (« … »),

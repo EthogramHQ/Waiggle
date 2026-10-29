@@ -1,11 +1,25 @@
 // Une liste de réglages : un groupe blanc arrondi, des lignes séparées par un trait fin.
 // Une ligne peut mener ailleurs (chevron), lancer une action (icône à droite), être un choix
 // (coche) ou simplement afficher une information. Les réglages du compte en sont faits.
+// En mode `radio` (une liste de choix : la langue, l'apparence, le motif d'un signalement), le
+// groupe se parcourt au clavier comme tout groupe de boutons radio (et comme Segmented, Choices) :
+// Tab ne s'y arrête qu'une fois, sur le choix coché (le premier tant qu'aucun ne l'est), les
+// flèches cochent le choix voisin en faisant le tour, Espace et Entrée cochent le choix qui a le
+// focus. Avant (point de liste de R1), la page « Signaler » demandait sept Tab pour traverser
+// ses motifs.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { Children, Fragment, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, View } from 'react-native'
+import {
+  Children,
+  createContext,
+  Fragment,
+  isValidElement,
+  type ReactNode,
+  useContext,
+  useRef,
+} from 'react'
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
-import { spaceToggles } from './keyboard'
+import { RadioMark } from './Radio'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -23,9 +37,62 @@ type GroupProps = {
   radio?: boolean
 }
 
+/**
+ * Ce qu'un groupe de choix donne à chacune de ses lignes : sa place dans le parcours au clavier.
+ * Un « contexte » React : une valeur posée par un composant parent, que ses descendants lisent
+ * (useContext) sans qu'on la passe de main en main. Une ligne hors d'un groupe radio n'en a pas.
+ */
+type RadioSlot = {
+  /** 0 pour le seul choix que Tab atteint, -1 pour les autres (« tabIndex itinérant »). */
+  tabIndex: 0 | -1
+  /** Une flèche : cocher le choix voisin (1 : le suivant, -1 : le précédent) et lui donner le focus. */
+  onArrow: (step: 1 | -1) => void
+  /** Pour que le groupe retrouve l'élément de la ligne, et y pose le focus. */
+  setNode: (node: View | null) => void
+}
+
+const RadioSlotContext = createContext<RadioSlot | null>(null)
+
+type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
+
 export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
+  // Les éléments des choix, par rang de ligne, pour y poser le focus quand une flèche passe au
+  // voisin.
+  const nodes = useRef<(View | null)[]>([])
+  // Les choix du groupe : les lignes qui ont un état (`selected`) et une action. Le groupe lit
+  // leurs propriétés pour savoir laquelle est cochée, et appeler l'action d'une voisine.
+  const choices = radio
+    ? rows.map((row) =>
+        isValidElement<RowBase>(row) && row.props.selected !== undefined && row.props.onPress
+          ? row.props
+          : null,
+      )
+    : []
+  const checked = choices.findIndex((choice) => choice?.selected === true)
+  const tabStop = checked === -1 ? choices.findIndex((choice) => choice !== null) : checked
+  // Une flèche depuis la ligne `from` : le prochain choix actif dans ce sens, en faisant le tour
+  // (après le dernier, le premier). Un choix inactif est sauté.
+  const move = (from: number, step: 1 | -1) => {
+    const count = choices.length
+    for (let k = 1; k <= count; k++) {
+      const index = (((from + step * k) % count) + count) % count
+      const choice = choices[index]
+      if (choice?.onPress && !choice.disabled) {
+        choice.onPress()
+        nodes.current[index]?.focus()
+        return
+      }
+    }
+  }
+  const slot = (index: number): RadioSlot => ({
+    tabIndex: index === tabStop ? 0 : -1,
+    onArrow: (step) => move(index, step),
+    setNode: (node) => {
+      nodes.current[index] = node
+    },
+  })
   const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
   return (
     <View style={{ gap: space.sm }}>
@@ -60,7 +127,11 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
                 }}
               />
             ) : null}
-            {row}
+            {choices[i] ? (
+              <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
+            ) : (
+              row
+            )}
           </Fragment>
         ))}
       </View>
@@ -146,12 +217,14 @@ export function ListRow({
   spokenLabel,
 }: RowProps) {
   const { colors } = useTheme()
+  // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
+  const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
   const right =
     trailing === 'chevron' ? (
       <Icon name="caret-right" size={18} tone="muted" />
     ) : trailing === 'check' || isChoice ? (
-      <Check selected={selected === true} />
+      <RadioMark selected={selected === true} />
     ) : typeof trailing === 'string' ? (
       <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
     ) : (
@@ -178,6 +251,9 @@ export function ListRow({
         minHeight: layout.controlHeight.regular,
         paddingHorizontal: space.lg,
         paddingVertical: space.md,
+        // Inactive, la ligne pâlit, comme un bouton, une case ou un rond inactifs : on voit
+        // qu'elle ne répondra pas avant de la toucher.
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       {icon ? (
@@ -223,16 +299,46 @@ export function ListRow({
   )
 
   if (!onPress) return content
+
+  // Un choix (bouton radio) au clavier, sur le web : react-native-web ne fait réagir aux touches
+  // que les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a) ne pouvait pas
+  // s'envoyer au clavier : aucun motif ne se cochait. Espace et Entrée cochent ; dans un groupe
+  // radio, les flèches passent au voisin et seul un choix est dans le parcours de Tab.
+  const choiceKeys = (press: () => void) =>
+    Platform.OS === 'web'
+      ? {
+          ...(slot ? { tabIndex: slot.tabIndex } : null),
+          onKeyDown: (event: KeyEvent) => {
+            if (event.key === ' ' || event.key === 'Enter') {
+              // preventDefault : l'espace ne fait pas défiler la page. Une touche gardée enfoncée
+              // (repeat) ne coche pas dix fois.
+              event.preventDefault()
+              if (!event.repeat && !disabled) press()
+              return
+            }
+            const step =
+              event.key === 'ArrowDown' || event.key === 'ArrowRight'
+                ? 1
+                : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+                  ? -1
+                  : 0
+            if (step === 0 || !slot) return
+            // preventDefault : la flèche ne fait pas défiler la page.
+            event.preventDefault()
+            slot.onArrow(step)
+          },
+        }
+      : null
+
   return (
     <Pressable
       accessibilityRole={isChoice ? 'radio' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
       aria-disabled={disabled}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
-      // Un choix (bouton radio) se coche avec la barre d'espace, sur le web : react-native-web ne
-      // le fait que pour les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a)
-      // ne pouvait pas s'envoyer au clavier : aucun motif ne se cochait.
-      {...(isChoice ? spaceToggles(onPress, disabled) : null)}
+      // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
+      ref={isChoice ? slot?.setNode : undefined}
+      {...(isChoice ? choiceKeys(onPress) : null)}
       disabled={disabled}
       onPress={onPress}
       // Le groupe rogne ce qui dépasse : l'anneau de focus se dessine à l'intérieur de la ligne.
@@ -241,26 +347,5 @@ export function ListRow({
     >
       {content}
     </Pressable>
-  )
-}
-
-/** La coche ronde d'un choix : pleine de miel quand il est choisi, vide sinon. */
-function Check({ selected }: { selected: boolean }) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: radii.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: selected ? colors.honey : 'transparent',
-        borderWidth: selected ? 0 : borders.strong,
-        borderColor: colors.lineStrong,
-      }}
-    >
-      {selected ? <Icon name="check" size={16} tone="onHoney" /> : null}
-    </View>
   )
 }

@@ -14,21 +14,29 @@ import { errorKey } from '../api/errors'
 import { nextAfterSignIn } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { Button } from '../ui/Button'
 import { Screen } from '../ui/Screen'
+import { SkeletonList } from '../ui/Skeleton'
+import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 
 /** form : un écran étroit (profil, formulaire) ; page : une page large (projet, membre). */
 type Width = 'form' | 'page'
 
 /**
- * Pendant le chargement. Pas de titre d'onglet propre : la page web pré-rendue (celle que montrent
- * les aperçus d'un lien partagé) en reste à ce stade, et y lirait « Chargement… ».
+ * Pendant le chargement : le squelette de la page (Miel 2), des formes pleines à la place du
+ * contenu qui arrive, plutôt que le mot « Chargement… » seul. Pour un lecteur d'écran, le squelette
+ * s'appelle « Chargement… » et se dit occupé (ui/Skeleton.tsx). Une page large (projet, membre) a
+ * trois cartes, un formulaire deux.
+ * Pas de titre d'onglet propre : la page web pré-rendue (celle que montrent les aperçus d'un lien
+ * partagé) en reste à ce stade, et y lirait « Chargement… ».
  */
 export function LoadingScreen({ width = 'form' }: { width?: Width }) {
   const { t } = useTranslation()
   const back = useGoBack('/')
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
-  // « Revenir » apparaît, pour ne jamais laisser le membre sans issue.
+  // « Revenir » apparaît sous le squelette (rien ne bouge au-dessus), pour ne jamais laisser le
+  // membre sans issue.
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), SLOW_LOADING_MS)
@@ -36,13 +44,14 @@ export function LoadingScreen({ width = 'form' }: { width?: Width }) {
   }, [])
   return (
     <Screen header={<TopNav />} width={width}>
-      <StateMessage
-        kind="loading"
-        message={t(($) => $.common.loading)}
-        actions={
-          slow ? [{ label: t(($) => $.states.back), onPress: back, variant: 'secondary' }] : []
-        }
-      />
+      <Stack gap="xl" align="stretch">
+        <SkeletonList count={width === 'page' ? 3 : 2} />
+        {slow ? (
+          <Stack align="center">
+            <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
+          </Stack>
+        ) : null}
+      </Stack>
     </Screen>
   )
 }
@@ -160,20 +169,29 @@ export function SessionErrorScreen({
   )
 }
 
-/** Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil. */
+/**
+ * Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil.
+ *
+ * `ambiance` : « light » (par défaut) pour un contenu introuvable à l'intérieur de l'appli (un
+ * projet, un membre) ; « brand » pour une adresse qui ne mène nulle part (NotFoundScreen), un moment
+ * de marque sur le miel vif (R1). Dans les deux cas, la barre de navigation reste (« Mon compte »
+ * partout, décision de Louis du 29/10/2026) : sur le miel, elle se pose au-dessus de la feuille.
+ */
 export function NotFoundState({
   title,
   message,
   width = 'form',
+  ambiance = 'light',
 }: {
   title: string
   message?: string
   width?: Width
+  ambiance?: 'brand' | 'light'
 }) {
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <Screen header={<TopNav />} width={width} pageTitle={title}>
+    <Screen header={<TopNav />} width={width} pageTitle={title} ambiance={ambiance}>
       <StateMessage
         kind="notFound"
         level={1}

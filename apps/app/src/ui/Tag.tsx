@@ -30,7 +30,8 @@ export function Tag({ label, onPress, onGlass = false }: Props) {
   const content = (
     // Un nom très long tient sur une ligne, abrégé par « … » : la pastille garde sa forme. Le nom
     // complet reste lu par les lecteurs d'écran (accessibilityLabel) et présent dans la page.
-    <Text variant="callout" weight={600} numberOfLines={1}>
+    // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe.
+    <Text variant="mono" numberOfLines={1}>
       {label}
     </Text>
   )

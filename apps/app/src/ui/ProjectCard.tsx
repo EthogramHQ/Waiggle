@@ -44,8 +44,9 @@ export function ProjectCard({
   onPress,
   height = 476,
 }: Props) {
+  // L'ombre est sous la carte (la couverture), jamais sous le panneau de verre posé dedans.
   const card = (
-    <ProjectCover height={height} image={image ?? null}>
+    <ProjectCover height={height} image={image ?? null} shadow="card">
       <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm }}>
         <Surface variant="panel" padding="lg" gap="sm">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -85,7 +86,8 @@ export function ProjectCard({
   )
   if (!onPress) return card
   return (
-    <Pressed label={title} onPress={onPress} role="link">
+    // radius : l'anneau de focus suit le rayon de la couverture (« sheet », son rayon par défaut).
+    <Pressed label={title} onPress={onPress} role="link" radius="sheet">
       {card}
     </Pressed>
   )

@@ -188,7 +188,8 @@ describe('MemberScreen', () => {
 
     // Sans donnée déjà reçue, la nouvelle tentative remet la page en chargement : le membre voit
     // que sa demande est partie.
-    expect(await screen.findByText('Chargement…')).toBeTruthy()
+    // Depuis Miel 2, le chargement est un squelette : « Chargement… » est son nom, plus un texte.
+    expect(await screen.findByRole('progressbar', { name: 'Chargement…' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull()
   })
 

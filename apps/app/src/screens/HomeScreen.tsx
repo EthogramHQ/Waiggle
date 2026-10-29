@@ -34,6 +34,7 @@ import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { Segmented, type SegmentedHandle } from '../ui/Segmented'
+import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
@@ -58,7 +59,12 @@ function VisitorHome() {
   const wide = sizeClass === 'wide'
 
   return (
+    // Le « miel vif » des moments de marque : sur téléphone, la constellation flotte sur le miel et
+    // tout le reste (le nom, l'accroche, les deux portes d'entrée) est posé sur la feuille claire.
+    // Sur ordinateur, la scène de gauche (`hero`) la montre déjà : l'ambiance ne la répète pas.
     <Screen
+      ambiance="brand"
+      scene={<Constellation height={280} />}
       hero={
         <WelcomeHero
           tagline={t(($) => $.home.tagline)}
@@ -79,15 +85,13 @@ function VisitorHome() {
           {t(($) => $.home.title)}
         </Text>
       ) : (
-        <>
-          <Constellation height={280} />
-          <Stack gap="sm">
-            <Wordmark size="huge" header={t(($) => $.home.title)} />
-            <Text variant="headline" tone="secondary" weight={400}>
-              {t(($) => $.home.tagline)}
-            </Text>
-          </Stack>
-        </>
+        // Sur téléphone, la constellation flotte sur le miel (`scene`) ; la feuille porte le nom.
+        <Stack gap="sm">
+          <Wordmark size="huge" header={t(($) => $.home.title)} />
+          <Text variant="headline" tone="secondary" weight={400}>
+            {t(($) => $.home.tagline)}
+          </Text>
+        </Stack>
       )}
       <Stack gap="md">
         <Button label={t(($) => $.home.signUp)} onPress={() => router.push('/sign-up')} />
@@ -215,7 +219,8 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
     return feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
     ) : (
-      <StateMessage kind="loading" message={t(($) => $.common.loading)} />
+      // Le squelette du fil : trois cartes, un seul « Chargement… » pour un lecteur d'écran.
+      <SkeletonList count={3} />
     )
   }
   if (items.length === 0) {
@@ -268,7 +273,7 @@ function DiscoverFeed() {
         feed.isError ? (
           <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
         ) : (
-          <StateMessage kind="loading" message={t(($) => $.common.loading)} />
+          <SkeletonList count={3} />
         )
       ) : (
         <FeedList
@@ -350,6 +355,8 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
           }
           moreLabel={t(($) => $.feed.more)}
           endLabel={t(($) => $.feed.end)}
+          // « Tu es à jour » : le bout du fil est un petit moment de marque, sur le miel vif.
+          ambiance="brand"
           errorLabel={t(($) => $.feed.moreError)}
           retryLabel={t(($) => $.common.retry)}
           // Une seule demande à la fois, même après un double clic.

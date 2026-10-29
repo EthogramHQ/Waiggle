@@ -58,6 +58,8 @@ export function SignInScreen() {
 
   return (
     <Screen
+      // Le « miel vif » des moments de marque : le formulaire est posé sur la feuille claire.
+      ambiance="brand"
       title={t(($) => $.auth.signIn.title)}
       subtitle={t(($) => $.auth.signIn.subtitle)}
       onBack={back}

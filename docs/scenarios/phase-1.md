@@ -266,6 +266,8 @@ miel). Ces scénarios valent pour tous les écrans, présents et à venir.
   (une option d'accessibilité pour qui a le mal des transports), les grands déplacements (une carte
   qui s'envole, la lumière qui suit l'inclinaison) deviennent des fondus. Le reste ne change pas,
   lumière d'ambiance comprise
+- Précision du 29/10/2026 (refonte, R1) : avec « Réduire les animations », la lumière d'ambiance
+  devient immobile (couleur gardée, fondus gardés, plus de respiration) ; voir `refonte.md`
 
 **Texte agrandi**
 - Étant donné un appareil réglé avec une grande taille de texte
