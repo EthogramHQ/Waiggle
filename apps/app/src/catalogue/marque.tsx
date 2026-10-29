@@ -117,7 +117,11 @@ export function BrandCatalogue() {
       <Block title={l.withLogo}>
         <Wordmark size="small" logo />
         <Wordmark size="large" logo />
-        <Wordmark size="huge" logo />
+        {/* À sa vraie taille, plus large qu'un téléphone de 390 : on glisse de côté (comme les
+            grands logos), plutôt qu'il ne sorte de sa carte. */}
+        <ScrollView horizontal>
+          <Wordmark size="huge" logo />
+        </ScrollView>
       </Block>
     </Stack>
   )

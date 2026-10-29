@@ -219,6 +219,97 @@ describe('AmbientLight on a computer (web)', () => {
   })
 })
 
+/**
+ * Un faux IntersectionObserver : le test dit lui-même quand la lumière entre dans l'écran ou en
+ * sort (seeLight(false) : la page est cachée dans la pile de navigation).
+ */
+const watchVisibility = () => {
+  const watchers: ((entries: { isIntersecting: boolean }[]) => void)[] = []
+  lend(
+    globalThis,
+    'IntersectionObserver',
+    class {
+      constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+        watchers.push(callback)
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+  return async (isIntersecting: boolean) => {
+    await act(async () => {
+      for (const watcher of watchers) watcher([{ isIntersecting }])
+    })
+  }
+}
+
+/** Un faux contexte WebGL dont on peut savoir s'il a été rendu au navigateur (loseContext). */
+const releasableWebGL = () => {
+  const loseContext = jest.fn()
+  const webgl = fakeWebGL() as { getExtension: jest.Mock }
+  webgl.getExtension.mockReturnValue({ loseContext })
+  return { webgl, loseContext }
+}
+
+/** Le dernier écouteur « contexte perdu » posé sur le canvas (l'élément de test prêté). */
+const loseLastContext = async () => {
+  const element = Object.getPrototypeOf(screen.container) as { addEventListener: jest.Mock }
+  const calls = element.addEventListener.mock.calls.filter(([type]) => type === 'webglcontextlost')
+  const listener = calls[calls.length - 1]?.[1] as ((event: object) => void) | undefined
+  await act(async () => listener?.({ preventDefault: jest.fn() }))
+}
+
+describe('AmbientLight in a stack of pages (web, review C4)', () => {
+  // Expo Router garde montées les pages quittées : sans garde, chacune gardait son contexte WebGL
+  // et sa boucle ; au-delà de 16, Chrome retirait les plus anciens, et la lumière d'une page où
+  // l'on revenait restait figée.
+  it('removes its canvas and gives back its WebGL context while its page is hidden', async () => {
+    setWindow(1440, 900)
+    const seeLight = watchVisibility()
+    const { webgl, loseContext } = releasableWebGL()
+    await showLight(webgl)
+    expect(drawnTypes()).toContain('canvas') // témoin
+
+    await seeLight(false)
+
+    expect(drawnTypes()).not.toContain('canvas')
+    expect(loseContext).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws again on a new context when its page comes back', async () => {
+    setWindow(1440, 900)
+    const seeLight = watchVisibility()
+    const { getContext } = await showLight(releasableWebGL().webgl)
+    await seeLight(false)
+
+    await seeLight(true)
+
+    expect(drawnTypes()).toContain('canvas')
+    expect(getContext).toHaveBeenCalledTimes(2)
+  })
+
+  // Un contexte retiré par le navigateur ne revient pas : un canvas neuf le remplace.
+  it('replaces a lost WebGL context with a new canvas', async () => {
+    setWindow(1440, 900)
+    const { getContext } = await showLight(fakeWebGL())
+
+    await loseLastContext()
+
+    expect(getContext).toHaveBeenCalledTimes(2)
+    expect(drawnTypes()).toContain('canvas')
+  })
+
+  it('falls back to the still light after losing its context again and again', async () => {
+    setWindow(1440, 900)
+    const { getContext } = await showLight(fakeWebGL())
+
+    for (let loss = 0; loss < 4; loss++) await loseLastContext()
+
+    expect(getContext).toHaveBeenCalledTimes(4) // le premier canvas, puis trois remplaçants
+    expect(drawnTypes()).not.toContain('canvas')
+  })
+})
+
 describe('AmbientLight on a phone (web)', () => {
   // Témoin : sans réglage, la version allégée respire, en boucle.
   it('breathes in a loop', async () => {

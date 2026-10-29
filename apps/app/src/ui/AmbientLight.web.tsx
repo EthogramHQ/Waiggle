@@ -14,13 +14,16 @@
 //   basse consommation ; refusé, ou si le shader ne compile pas, c'est la version allégée ;
 // - le dessin est petit (0,45 de la taille affichée, sans tenir compte des écrans haute densité, au
 //   plus 1920 × 1080) : le navigateur l'agrandit, et le flou de la matière ne s'en voit pas ;
-// - la boucle d'images s'arrête quand la page est cachée, quand le contexte est perdu (la carte
-//   graphique reprise par le système) et au démontage ; elle reprend au retour ;
+// - la boucle d'images s'arrête quand l'onglet est caché ; le canvas lui-même est retiré (et son
+//   contexte WebGL rendu) quand la lumière ne se voit plus : page quittée mais gardée dans la pile
+//   de navigation, ou sortie de l'écran ; un canvas neuf reprend au retour ;
+// - un contexte perdu (la carte graphique reprise, ou retiré par le navigateur) est remplacé par un
+//   canvas neuf, trois fois au plus, puis par la version allégée ;
 // - la source du shader est une constante, jamais composée à partir d'une donnée : les couleurs
 //   n'y entrent que par des « uniformes » (des paramètres numériques), bornés ;
 // - le canvas est muet pour les lecteurs d'écran et laisse passer les clics.
 import { palettes } from '@ruche/brand'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { SoftLight, Veil } from './AmbientLightSoft'
 import {
@@ -51,7 +54,43 @@ export function AmbientLight(props: AmbientLightProps) {
   // version allégée, immobile, pour ne pas faire travailler la machine à chaque image.
   if (refused) return <SoftLight source={source} still />
   if (!hydrated || sizeClass !== 'wide' || calm) return <SoftLight source={source} />
-  return <LiveLight palette={palette} onRefused={() => setRefused(true)} />
+  return (
+    <>
+      {/* Dessous, la version allégée immobile : elle se voit le temps que le canvas dessine sa
+          première image (retour sur une page, contexte remplacé), au lieu d'un fond vide. Une fois
+          dessiné, le canvas, opaque, la couvre. */}
+      <SoftLight source={source} still />
+      <LiveLight palette={palette} onRefused={() => setRefused(true)} />
+    </>
+  )
+}
+
+// Un contexte WebGL perdu pendant que la page se voit (le navigateur l'a retiré, la carte
+// graphique a été reprise) est remplacé par un canvas neuf, au plus ce nombre de fois ; au-delà,
+// la machine peine : la version allégée, immobile.
+const MAX_LOSSES = 3
+
+/**
+ * La lumière se voit-elle ? Sur le web, Expo Router garde montées les pages précédentes de la pile
+ * (cachées par display: none) : sans cette garde, chacune garderait son contexte WebGL et sa boucle
+ * d'images, et au-delà d'environ 16 contextes, Chrome retire les plus anciens (relecture C4).
+ * IntersectionObserver prévient quand un élément entre dans l'écran ou en sort ; un élément caché
+ * n'y est jamais. Sans lui (un vieux navigateur, Jest), la lumière se croit toujours visible.
+ */
+function useOnScreen(frame: RefObject<View | null>) {
+  const [onScreen, setOnScreen] = useState(true)
+  useEffect(() => {
+    // Sur le web, la ref d'une View de react-native-web est l'élément du DOM lui-même.
+    const element = frame.current as unknown as Element | null
+    if (!element || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver((entries) => {
+      const last = entries[entries.length - 1]
+      if (last) setOnScreen(last.isIntersecting)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [frame])
+  return onScreen
 }
 
 /** Ce que la boucle d'images lit à chaque image, sans redessiner le composant. */
@@ -88,32 +127,53 @@ function LiveLight({ palette, onRefused }: { palette: AmbientPalette; onRefused:
     [onPulse],
   )
 
+  // Le canvas n'existe que quand la lumière se voit : caché (page quittée, hors de l'écran), il est
+  // retiré, ce qui arrête sa boucle d'images et rend son contexte WebGL ; revenu, un canvas neuf
+  // reprend avec un contexte neuf. « generation » compte les canvas : la changer (la clé du
+  // canvas) en fabrique un nouveau, après un contexte perdu.
+  const frame = useRef<View | null>(null)
+  const onScreen = useOnScreen(frame)
+  const [generation, setGeneration] = useState(0)
+  const losses = useRef(0)
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: generation n'est pas lue, mais un nouveau canvas (nouvelle clé) doit relancer la lumière
   useEffect(() => {
     const element = canvas.current
-    if (!element) return
-    const stop = startLight(element, live.current)
+    if (!onScreen || !element) return
+    const stop = startLight(element, live.current, () => {
+      losses.current += 1
+      if (losses.current > MAX_LOSSES) refusedRef.current()
+      else setGeneration((count) => count + 1)
+    })
     if (!stop) {
       refusedRef.current()
       return
     }
     return stop
-  }, [])
+  }, [onScreen, generation])
 
   return (
     // overflow: 'hidden' : le canvas ne déborde jamais de son cadre.
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
-      <canvas
-        ref={canvas}
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          pointerEvents: 'none',
-        }}
-      />
+    <View
+      ref={frame}
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
+    >
+      {onScreen ? (
+        <canvas
+          key={generation}
+          ref={canvas}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+      ) : null}
       {/* Le même voile que la version allégée : le texte posé plus bas reste lisible. */}
       <Veil id={`live${scheme}`} night={scheme === 'night'} background={colors.background} />
     </View>
@@ -258,12 +318,17 @@ const DARK = hexToRgb(palettes.night.background).map((channel) => channel * 0.9)
 
 /**
  * Lance la lumière sur un canvas. Renvoie de quoi l'arrêter, ou null si WebGL est refusé : la
- * lumière prend alors sa version allégée.
+ * lumière prend alors sa version allégée. onLost : le contexte est perdu, la boucle est arrêtée ;
+ * c'est à l'appelant de fournir un canvas neuf (ou la version allégée).
  */
-function startLight(canvas: HTMLCanvasElement, live: Live): (() => void) | null {
+function startLight(
+  canvas: HTMLCanvasElement,
+  live: Live,
+  onLost: () => void,
+): (() => void) | null {
   const gl = canvas.getContext('webgl', CONTEXT_OPTIONS)
   if (!gl) return null
-  let uniforms = buildProgram(gl)
+  const uniforms = buildProgram(gl)
   if (!uniforms) return null
 
   // L'état du dessin. Les couleurs affichées glissent vers celles de la source (en 0,25 s environ),
@@ -297,7 +362,6 @@ function startLight(canvas: HTMLCanvasElement, live: Live): (() => void) | null 
     frame = requestAnimationFrame(draw)
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000))
     last = now
-    if (!uniforms) return
     resize()
     const towardColor = 1 - Math.exp(-dt / 0.25)
     const towardNight = 1 - Math.exp(-dt / 0.15)
@@ -349,18 +413,14 @@ function startLight(canvas: HTMLCanvasElement, live: Live): (() => void) | null 
     frame = 0
   }
 
-  // Le contexte perdu (le système a repris la carte graphique) : on arrête de dessiner, et
-  // preventDefault dit au navigateur qu'on veut le récupérer. Rendu : on recompile, on reprend.
-  const onLost = (event: Event) => {
-    event.preventDefault()
+  // Le contexte perdu (le système a repris la carte graphique, ou Chrome l'a retiré parce que
+  // trop de contextes étaient ouverts) : on arrête de dessiner, et l'appelant remplace le canvas.
+  // Attendre que le navigateur le rende (webglcontextrestored) ne suffit pas : un contexte retiré
+  // pour faire de la place ne revient jamais, et la lumière restait figée (relecture C4).
+  const onContextLost = () => {
     lost = true
     pause()
-  }
-  const onRestored = () => {
-    uniforms = buildProgram(gl)
-    if (!uniforms) return
-    lost = false
-    play()
+    onLost()
   }
   // La page cachée (un autre onglet, la fenêtre réduite) : plus rien à dessiner.
   const onVisibility = () => {
@@ -374,16 +434,14 @@ function startLight(canvas: HTMLCanvasElement, live: Live): (() => void) | null 
     mouse = { x: event.clientX, y: event.clientY }
   }
 
-  canvas.addEventListener('webglcontextlost', onLost)
-  canvas.addEventListener('webglcontextrestored', onRestored)
+  canvas.addEventListener('webglcontextlost', onContextLost)
   document.addEventListener('visibilitychange', onVisibility)
   globalThis.addEventListener('pointermove', onPointer, { passive: true })
   play()
 
   return () => {
     pause()
-    canvas.removeEventListener('webglcontextlost', onLost)
-    canvas.removeEventListener('webglcontextrestored', onRestored)
+    canvas.removeEventListener('webglcontextlost', onContextLost)
     document.removeEventListener('visibilitychange', onVisibility)
     globalThis.removeEventListener('pointermove', onPointer)
     // Rendre la carte graphique tout de suite plutôt qu'au ramasse-miettes : le navigateur limite
