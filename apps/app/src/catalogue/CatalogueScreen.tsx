@@ -78,6 +78,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
 import { LoadingCatalogue } from './chargement'
 import { ControlsCatalogue } from './controles'
+import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
@@ -1035,6 +1036,7 @@ export function CatalogueScreen() {
       <LightCatalogue />
       <AmbiancesCatalogue />
       <LoadingCatalogue />
+      <FeedEndCatalogue />
     </Screen>
   )
 }
