@@ -1150,6 +1150,8 @@ export const fr = {
     passwordRequired: 'Retape ton mot de passe pour confirmer cette décision.',
     wrongPassword: 'Mot de passe incorrect.',
     cannotSuspendAdmin: 'Un administrateur ne peut pas être suspendu : retire d’abord son rôle.',
+    // Tranche R2.
+    alreadyVerified: 'Cette adresse est déjà vérifiée : connecte-toi.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
   },
 } as const

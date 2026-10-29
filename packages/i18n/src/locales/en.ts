@@ -1026,6 +1026,8 @@ export const en: Translation = {
     passwordRequired: 'Type your password again to confirm this decision.',
     wrongPassword: 'Incorrect password.',
     cannotSuspendAdmin: 'An admin can’t be suspended: remove their role first.',
+    // Tranche R2.
+    alreadyVerified: 'This address is already verified: sign in.',
     network: 'Can’t reach {{appName}}. Check your connection and try again.',
   },
 }
