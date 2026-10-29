@@ -8,9 +8,9 @@
 // Les images sont fabriquées par scripts/images.mts (assets/mascot/*.png, sans métadonnées).
 import { Image } from 'expo-image'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { Surface } from './Surface'
-import { ThemeProvider } from './theme/ThemeProvider'
+import { useTheme } from './theme/ThemeProvider'
 
 export type MascotPose = 'fly' | 'wave' | 'sleep' | 'search'
 
@@ -45,6 +45,7 @@ type Props = {
 
 export function Mascot({ pose, size = 'md', decorative = false }: Props) {
   const { t } = useTranslation()
+  const { colors } = useTheme()
   const side = sizes[size]
   const inline = size === 'inline'
   const bee = (
@@ -83,18 +84,23 @@ export function Mascot({ pose, size = 'md', decorative = false }: Props) {
       {inline ? (
         bee
       ) : (
-        // Le disque garde le verre de jour, même de nuit : l'abeille est dessinée à l'encre noire,
-        // et son contour (les antennes surtout) disparaîtrait sur le verre sombre. Ce thème imposé
-        // ne vaut que pour le disque, pas pour la page.
-        <ThemeProvider appearance="day">
-          <Surface variant="glass" radius="pill" fill={false}>
+        // Le disque a sa couleur, `mascotDisc` : l'abeille est dessinée à l'encre noire, et son
+        // contour (les antennes surtout) disparaîtrait sur le verre sombre de la nuit. Le verre
+        // (Surface) donne le bord, l'ombre et le flou ; de jour, il est lui-même la couleur du
+        // disque ; de nuit, un miel pâle opaque le recouvre (contraste vérifié : contrastPairs).
+        <Surface variant="glass" radius="pill" fill={false}>
+          {colors.mascotDisc === colors.glass ? null : (
             <View
-              style={{ width: side, height: side, alignItems: 'center', justifyContent: 'center' }}
-            >
-              {bee}
-            </View>
-          </Surface>
-        </ThemeProvider>
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.mascotDisc }]}
+              aria-hidden
+            />
+          )}
+          <View
+            style={{ width: side, height: side, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {bee}
+          </View>
+        </Surface>
       )}
     </View>
   )
