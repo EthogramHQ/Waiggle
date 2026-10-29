@@ -62,7 +62,10 @@ Chaque fonctionnalité est une tranche verticale, dans cet ordre :
    (sécurité ; juridique si la tranche touche aux données, aux e-mails, à l'IA ou à la modération) :
    ce que la relecture trouve entre au plan et devient des tests.
 3. **Les tests, qui doivent échouer** : unitaires pour les règles, intégration pour l'API
-   (`app.request(...)`), test de composant pour l'écran. Lance-les et constate l'échec.
+   (`app.request(...)`), test de composant pour l'écran, écrits à partir du contrat, sans voir le
+   code. Lance-les et constate l'échec. L'interface peut commencer en même temps par ce qui ne
+   dépend pas des tests (catalogue, composants visuels, captures) ; avant tout code d'écran, elle
+   reprend ces tests et constate leur échec à son tour.
 4. **Le backend**, jusqu'au vert.
 5. **L'interface**, puis son test.
 6. **`pnpm check`** vert et le parcours d'un membre (`pnpm --filter @ruche/app journey`) vert, puis
