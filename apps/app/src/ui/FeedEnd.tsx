@@ -98,9 +98,12 @@ export function FeedEnd({
         <HoneyGlow scheme={scheme} />
         {/* R1 F2 : Mascot sleep ici (l'abeille endormie, au-dessus du verre, centrée). */}
         {/* Le verre au centre du bloc, à la largeur de son texte (Surface, sans `fill`, se range à
-            gauche : la vue autour le centre). */}
+            gauche : la vue autour le centre). Son arrondi est celui d'un panneau, pas d'une
+            pilule : à 200 % de texte, « Tu es à jour » passe sur deux lignes, et le rayon d'une
+            pilule (la moitié de la hauteur) rognait le « j » de la dernière ligne. Le texte est
+            centré, comme l'icône qui part seule sur sa ligne. */}
         <View style={{ alignSelf: 'center', maxWidth: '100%' }}>
-          <Surface variant="panel" radius="pill">
+          <Surface variant="panel" radius="panel">
             <View
               style={{
                 flexDirection: 'row',
@@ -113,7 +116,9 @@ export function FeedEnd({
               }}
             >
               <Icon name="check-circle" size={24} tone="default" />
-              <Text variant="title3">{endLabel}</Text>
+              <Text variant="title3" align="center">
+                {endLabel}
+              </Text>
             </View>
           </Surface>
         </View>

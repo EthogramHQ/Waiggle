@@ -13,11 +13,13 @@
 // « Réduire les animations ». (Le décor qu'un écran pose sur le miel, la constellation, suit déjà
 // ce réglage de son côté.)
 //
-// Deux mises en page :
+// Deux mises en page, choisies ici selon la largeur (les écrans n'ont pas à s'en soucier) :
 // - téléphone et tablette : une bande de miel en haut (300 points au moins, plus si le décor est
-//   plus grand), puis la feuille, pleine largeur, qui remonte de 40 points sur la bande ;
-// - ordinateur : le miel couvre toute la page, la scène (`hero`) à gauche, la feuille en carte à
-//   droite (comme la maquette de la connexion sur ordinateur).
+//   plus grand), avec la barre de navigation et le décor (`scene`), puis la feuille, pleine largeur,
+//   qui remonte de 40 points sur la bande et descend jusqu'au bas de la fenêtre ;
+// - ordinateur : le miel couvre toute la page, la barre de navigation en haut, la scène (`hero`) à
+//   gauche, la feuille en carte à droite (comme la maquette de la connexion sur ordinateur). Sans
+//   `hero`, le décor passe en tête de la carte.
 import { honeyLight, layout, radii, type Scheme, space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'
 import { type LayoutChangeEvent, StyleSheet, View } from 'react-native'
@@ -36,9 +38,16 @@ type Props = {
   /** Le contenu de l'écran : il est posé sur la feuille claire. */
   children: ReactNode
   /**
-   * Un décor posé sur le miel, au-dessus de la feuille (la constellation de l'accueil), sur
-   * téléphone et tablette seulement. Jamais un bouton ni un texte à lire : rien n'y garantit le
-   * contraste.
+   * La barre de navigation (`TopNav` : « Mon compte »), posée sur le miel, au-dessus de la feuille
+   * (décision de Louis du 29/10/2026 pour la page introuvable). Elle porte sa propre matière (le
+   * verre) : ce n'est pas un bouton encre posé à nu sur le miel.
+   */
+  header?: ReactNode
+  /**
+   * Le décor de l'écran (la constellation, l'enveloppe, le portail). Sur téléphone et tablette, il
+   * flotte sur le miel, au-dessus de la feuille ; sur ordinateur, il passe en tête de la carte, sauf
+   * si une scène `hero` le montre déjà à gauche. Toujours caché aux lecteurs d'écran : jamais un
+   * bouton ni un texte à lire (rien n'y garantit le contraste).
    */
   scene?: ReactNode
   /** Sur ordinateur : la scène de gauche, la feuille devenant une carte à droite. */
@@ -50,7 +59,7 @@ type Props = {
   size?: SizeClass
 }
 
-export function BrandAmbiance({ children, scene, hero, size }: Props) {
+export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   const { scheme } = useTheme()
   const window = useLayout()
   const insets = useSafeAreaInsets()
@@ -61,6 +70,7 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
   // contenu, avec un bas de feuille arrondi au milieu de l'écran.
   const [band, setBand] = useState(BAND)
   const onBandLayout = (event: LayoutChangeEvent) => setBand(event.nativeEvent.layout.height)
+  const decor = scene ? <Decor>{scene}</Decor> : null
 
   if (sizeClass === 'wide') {
     return (
@@ -70,15 +80,20 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
           // Le miel couvre toute la fenêtre (le catalogue, lui, n'a pas de fenêtre à remplir).
           minHeight: size ? undefined : window.height,
           alignItems: 'center',
-          justifyContent: 'center',
           paddingTop: insets.top + space.huge,
           paddingBottom: insets.bottom + space.huge,
           paddingHorizontal: padding,
+          gap: space.xl,
         }}
       >
         <HoneyGradient scheme={scheme} />
+        {header === undefined ? null : (
+          <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+        )}
         <View
           style={{
+            // La place qui reste sous la barre : la carte s'y centre en hauteur.
+            flexGrow: 1,
             width: '100%',
             maxWidth: layout.maxContentWidth,
             // row-reverse : la feuille vient d'abord dans la page (lecteurs d'écran, touche Tab),
@@ -91,6 +106,9 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
         >
           <View style={{ width: layout.formWidth - 80 }}>
             <Surface variant="plain" radius="ambiance" padding="xxl" gap="xl" shadow="card">
+              {/* Pas de bande de miel ici : le décor passe en tête de la carte, sauf si la scène
+                  de gauche le montre déjà (l'accueil). */}
+              {hero ? null : decor}
               {children}
             </Surface>
           </View>
@@ -102,8 +120,8 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
 
   return (
     <View style={{ flexGrow: 1, alignSelf: 'stretch' }}>
-      {/* La bande de miel. Le décor y est posé ; sans décor, elle reste vide et la feuille remonte
-          plus haut, pour que le formulaire arrive vite. */}
+      {/* La bande de miel : la barre de navigation en haut, puis le décor. Sans décor, elle reste
+          vide et la feuille remonte plus haut, pour que le formulaire arrive vite. */}
       <View
         onLayout={onBandLayout}
         style={{
@@ -111,35 +129,61 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
           paddingTop: insets.top + space.lg,
           paddingBottom: OVERLAP + space.sm,
           paddingHorizontal: padding,
-          justifyContent: 'center',
+          gap: space.md,
         }}
       >
         {/* Le dégradé garde toujours au moins 300 points de haut, même quand la bande est plus
             courte : écrasé dans 150 points, il devenait une ellipse plate (surtout la nuit). La
             feuille, dessinée après lui, en cache le bas. */}
         <HoneyGradient scheme={scheme} height={Math.max(BAND, band)} />
-        {scene}
+        {header}
+        <View style={{ flexGrow: 1, justifyContent: 'center' }}>{decor}</View>
       </View>
-      {/* La feuille claire, en pleine largeur : elle remonte sur la bande (marge négative). Sa
-          hauteur minimale la fait descendre jusqu'au bas de la fenêtre ; ses coins du bas, arrondis
-          eux aussi, s'y perdent dans les coins de l'écran. */}
-      <View style={{ marginTop: -OVERLAP }}>
-        <Surface variant="plain" radius="ambiance">
-          <View
-            style={{
-              minHeight: size ? undefined : Math.max(0, window.height - band + OVERLAP),
-              paddingTop: space.xxl,
-              paddingBottom: insets.bottom + space.huge,
-              paddingHorizontal: padding,
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ width: '100%', maxWidth: layout.formWidth, gap: space.xl }}>
-              {children}
+      {/* La feuille claire, en pleine largeur : elle remonte sur la bande (marge négative), et sa
+          hauteur minimale la fait descendre jusqu'au bas de la fenêtre. Elle n'est arrondie qu'en
+          haut, comme une feuille qui sort du bas de l'écran (`Surface variant="sheet"`) : arrondis,
+          ses coins du bas laissaient voir le fond dans les deux coins de l'écran. Pour garder sa
+          matière (`plain`), on la prolonge sous un cadre qui rogne (overflow: hidden) de la hauteur
+          de son arrondi : les coins du bas passent sous le bord du cadre, hors de la vue. */}
+      <View style={{ marginTop: -OVERLAP, overflow: 'hidden' }}>
+        <View style={{ marginBottom: -OVERLAP }}>
+          <Surface variant="plain" radius="ambiance">
+            <View
+              style={{
+                // La partie rognée (OVERLAP) s'ajoute à la hauteur et à la marge du bas : la partie
+                // visible garde sa taille, et le contenu ne passe jamais sous le bord du cadre.
+                minHeight: size ? undefined : Math.max(0, window.height - band + OVERLAP) + OVERLAP,
+                paddingTop: space.xxl,
+                paddingBottom: insets.bottom + space.huge + OVERLAP,
+                paddingHorizontal: padding,
+                alignItems: 'center',
+              }}
+            >
+              <View style={{ width: '100%', maxWidth: layout.formWidth, gap: space.xl }}>
+                {children}
+              </View>
             </View>
-          </View>
-        </Surface>
+          </Surface>
+        </View>
       </View>
+    </View>
+  )
+}
+
+/**
+ * Le décor d'un écran de marque, caché aux lecteurs d'écran (iOS : accessibilityElementsHidden ;
+ * Android : importantForAccessibility ; web : aria-hidden) et au doigt (pointerEvents) : la règle
+ * « sur le miel, seulement du décor » est tenue ici, pas laissée à chaque écran.
+ */
+function Decor({ children }: { children: ReactNode }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      aria-hidden
+      pointerEvents="none"
+    >
+      {children}
     </View>
   )
 }

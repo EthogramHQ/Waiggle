@@ -61,9 +61,10 @@ function VisitorHome() {
   return (
     // Le « miel vif » des moments de marque : sur téléphone, la constellation flotte sur le miel et
     // tout le reste (le nom, l'accroche, les deux portes d'entrée) est posé sur la feuille claire.
+    // Sur ordinateur, la scène de gauche (`hero`) la montre déjà : l'ambiance ne la répète pas.
     <Screen
       ambiance="brand"
-      scene={wide ? undefined : <Constellation height={280} />}
+      scene={<Constellation height={280} />}
       hero={
         <WelcomeHero
           tagline={t(($) => $.home.tagline)}

@@ -95,7 +95,17 @@ html :focus-visible:not(input, textarea, [data-focus="inset"]) {
   z-index: 1;
 }
 :focus:not(:focus-visible), input:focus-visible, textarea:focus-visible { outline: none; }
+@media (forced-colors: active) { [data-wordmark="copy"] { display: none; } }
 `
+
+/**
+ * Le mot-symbole (`Wordmark`) en contraste élevé de Windows (`forced-colors: active`) : le
+ * navigateur y impose ses couleurs, et le vrai mot, transparent pour laisser voir la copie au point
+ * miel, redevient visible. Avec la copie par-dessus, on lirait le mot deux fois, décalé : la règle
+ * de `documentCss` cache alors la copie (marquée par cet attribut), et seul le vrai mot reste, dans
+ * la couleur du système. À étaler sur la copie (`{...wordmarkCopy}`).
+ */
+export const wordmarkCopy: object = Platform.OS === 'web' ? { dataSet: { wordmark: 'copy' } } : {}
 
 /**
  * À étaler sur un élément touchable rangé dans un cadre qui rogne (`{...insetFocus}`) : sur le web,

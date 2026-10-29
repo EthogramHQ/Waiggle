@@ -11,12 +11,10 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
-import { useLayout } from '../ui/theme/layout'
 
 export function CheckEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const wide = useLayout().sizeClass === 'wide'
   const params = useLocalSearchParams<{ email?: string }>()
   // L'adresse vient de l'URL : n'importe qui peut fabriquer un lien avec un autre texte. On ne
   // l'affiche que si c'est vraiment une adresse e-mail (même règle que l'inscription).
@@ -34,15 +32,10 @@ export function CheckEmailScreen() {
   )
 
   return (
-    // Le « miel vif » des moments de marque, comme l'inscription d'où l'on arrive : sur téléphone,
-    // l'image flotte sur le miel (`scene`) et le texte est sur la feuille claire ; sur ordinateur, le
-    // miel couvre la page et l'image passe en tête de la carte.
-    <Screen
-      ambiance="brand"
-      scene={wide ? undefined : picture}
-      pageTitle={t(($) => $.auth.checkEmail.title)}
-    >
-      {wide ? picture : null}
+    // Le « miel vif » des moments de marque, comme l'inscription d'où l'on arrive : l'image est le
+    // décor (`scene`), que l'ambiance place selon la largeur (sur le miel, ou en tête de la carte) ;
+    // le texte est sur la feuille claire.
+    <Screen ambiance="brand" scene={picture} pageTitle={t(($) => $.auth.checkEmail.title)}>
       <Text variant="title2" align="center" heading={1}>
         {t(($) => $.auth.checkEmail.title)}
       </Text>

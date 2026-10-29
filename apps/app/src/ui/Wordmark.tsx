@@ -19,6 +19,7 @@ import { Logo } from './Logo'
 import { Pressed } from './Pressed'
 import { Stack } from './Stack'
 import { Text } from './Text'
+import { wordmarkCopy } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -70,12 +71,15 @@ export function Wordmark({ size = 'small', onPress, header, logo = false }: Prop
     ) : (
       <View>
         {text}
-        {/* La copie muette, posée sur le texte : intouchable, cachée aux lecteurs d'écran. */}
+        {/* La copie muette, posée sur le texte : intouchable, cachée aux lecteurs d'écran, et
+            retirée en contraste élevé de Windows, où le vrai mot redevient visible
+            (wordmarkCopy, theme/document.ts). */}
         <View
           pointerEvents="none"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           aria-hidden
+          {...wordmarkCopy}
           style={{ position: 'absolute', top: 0, left: 0, flexDirection: 'row' }}
         >
           {piece(before)}
