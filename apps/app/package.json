@@ -21,6 +21,7 @@
     "@better-auth/utils": "0.5.1",
     "@expo-google-fonts/funnel-display": "0.4.1",
     "@expo-google-fonts/funnel-sans": "0.4.2",
+    "@expo-google-fonts/geist-mono": "0.4.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@ruche/brand": "workspace:*",
     "@ruche/contracts": "workspace:*",
@@ -53,6 +54,7 @@
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.4",
     "react-native-worklets": "0.10.1",
+    "thumbhash": "0.1.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -64,13 +66,14 @@
     "jest": "^30.5.2",
     "jest-expo": "~57.0.5",
     "playwright": "1.64.1",
+    "sharp": "0.35.5",
     "typescript": "7.0.2"
   },
   "jest": {
     "preset": "jest-expo",
     "testTimeout": 15000,
     "transformIgnorePatterns": [
-      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|marked|decode-uri-component))",
+      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|marked|decode-uri-component|thumbhash))",
       "/node_modules/react-native-reanimated/plugin/",
       "/node_modules/@react-native/babel-preset/"
     ],

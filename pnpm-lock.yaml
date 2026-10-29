@@ -116,6 +116,9 @@ importers:
       '@expo-google-fonts/funnel-sans':
         specifier: 0.4.2
         version: 0.4.2
+      '@expo-google-fonts/geist-mono':
+        specifier: 0.4.3
+        version: 0.4.3
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.86.3(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.2.3))
@@ -212,6 +215,9 @@ importers:
       react-native-worklets:
         specifier: 0.10.1
         version: 0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/jest-preset@0.86.3(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3)
+      thumbhash:
+        specifier: 0.1.1
+        version: 0.1.1
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -240,6 +246,9 @@ importers:
       playwright:
         specifier: 1.64.1
         version: 1.64.1
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@26.6.5)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -1332,6 +1341,9 @@ packages:
 
   '@expo-google-fonts/funnel-sans@0.4.2':
     resolution: {integrity: sha512-YVTJCBOxYM2ciGcP/GhXvY9yq75WQOnXCTaFV8aMCv4XFYbc2z0YyoAykI70xBb3rzUryXv8hhwGqIKI58pPCQ==}
+
+  '@expo-google-fonts/geist-mono@0.4.3':
+    resolution: {integrity: sha512-gjnwv1QOG4meZpMhrLjTIPC/+lhyNu8EcXa2eJPVbPrYvguVjCfBq+Ezq6cWKWW8ung6fqb2TjvuTalE6lqlnw==}
 
   '@expo-google-fonts/material-symbols@0.4.51':
     resolution: {integrity: sha512-QkNQK848WG/vHFqfBqYcX/vM8dweAR/ORRK1r6qii5V/hdaqn4eYKxmKGj6mg61ty70SPgG1R5uP9XX9jJ3ehQ==}
@@ -7149,6 +7161,8 @@ snapshots:
   '@expo-google-fonts/funnel-display@0.4.1': {}
 
   '@expo-google-fonts/funnel-sans@0.4.2': {}
+
+  '@expo-google-fonts/geist-mono@0.4.3': {}
 
   '@expo-google-fonts/material-symbols@0.4.51': {}
 

@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { firstParam } from '../navigation/params'
 import { Button } from '../ui/Button'
-import { Emblem } from '../ui/Illustrations'
+import { Mascot } from '../ui/Mascot'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
@@ -23,11 +23,12 @@ export function CheckEmailScreen() {
   // L'adresse est dans l'URL du visiteur, inconnue du serveur qui prépare la page web : on ne
   // l'affiche qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
-  // L'image de la page : l'enveloppe sur sa tuile de miel, du décor (cachée aux lecteurs d'écran).
+  // L'image de la page : l'abeille en vol, qui part porter le message. Seule sur son décor, elle
+  // garde son nom pour les lecteurs d'écran (J10).
   const picture = (
     <Stack align="center">
-      {/* R1 F2 : Mascot fly ici (l'abeille en vol remplace l'enveloppe, à cette même place). */}
-      <Emblem icon="envelope-simple" />
+      {/* R1 F2 : Mascot fly (à la place de l'enveloppe). */}
+      <Mascot pose="fly" />
     </Stack>
   )
 

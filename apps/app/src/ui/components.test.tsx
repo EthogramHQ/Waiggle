@@ -1181,7 +1181,7 @@ describe('MemberHeader', () => {
 
 describe('fonts', () => {
   it('ships a file for every weight the type scale may ask for', () => {
-    for (const family of ['display', 'text'] as const) {
+    for (const family of ['display', 'text', 'mono'] as const) {
       for (const weight of fontWeights[family]) {
         expect(Object.keys(fontFiles)).toContain(fontName(family, weight))
       }
@@ -1192,6 +1192,8 @@ describe('fonts', () => {
     // Funnel Display n'est livrée qu'en 700 : un titre demandé en 500 prend le 700.
     expect(fontName('display', 500)).toBe('FunnelDisplay-700')
     expect(fontName('text', 600)).toBe('FunnelSans-600')
+    // Geist Mono n'est livrée qu'en 400 et 500 : un code demandé en 700 prend le 500.
+    expect(fontName('mono', 700)).toBe('GeistMono-500')
   })
 })
 
@@ -2764,4 +2766,23 @@ describe('Wordmark, with its bee (R1)', () => {
     // Témoin : l'abeille est bien là, seulement cachée aux lecteurs d'écran.
     expect(screen.getByRole('img', { name: logoAlt, includeHiddenElements: true })).toBeTruthy()
   })
+})
+
+describe('StateMessage, with the mascot (R1, J10)', () => {
+  // Le titre dit déjà l'état : la mascotte est un décor, cachée aux lecteurs d'écran (comme
+  // l'indicateur de chargement). Elle est pourtant dessinée, dans la pose qui va avec l'état.
+  it.each([
+    ['notFound', 'Page introuvable', fr.t(($) => $.mascot.search)],
+    ['empty', 'Pas encore de notification', fr.t(($) => $.mascot.sleep)],
+    ['signedOut', 'Réservé aux membres', fr.t(($) => $.mascot.wave)],
+  ] as const)(
+    'shows the mascot of « %s », hidden from screen readers',
+    async (kind, title, pose) => {
+      await renderWithProviders(<StateMessage kind={kind} title={title} />)
+
+      expect(screen.getByRole('header', { name: title })).toBeTruthy()
+      expect(screen.queryByRole('img', { name: pose })).toBeNull()
+      expect(screen.getByRole('img', { name: pose, includeHiddenElements: true })).toBeTruthy()
+    },
+  )
 })

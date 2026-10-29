@@ -80,6 +80,13 @@ const day = {
   sheet: 'rgba(255,255,255,0.86)', // feuille qui monte du bas de l'écran
   scrim: 'rgba(28,27,25,0.32)', // voile derrière une feuille ou une fenêtre
   focusRing: '#C77F00', // contour de l'élément choisi au clavier (sur ordinateur)
+
+  // La mascotte (ui/Mascot.tsx). Son dessin est une image, à l'encre presque noire de jour comme de
+  // nuit : `mascotInk` est cette encre (le contour, mesuré sur les images), qui ne sert qu'à vérifier
+  // son contraste ; `mascotDisc` est le disque sur lequel elle est posée. De jour, le verre ; de
+  // nuit, un miel pâle : sur un verre sombre, le contour noir (les antennes) disparaîtrait.
+  mascotInk: '#1C1B19',
+  mascotDisc: 'rgba(255,255,255,0.66)',
 }
 
 // `satisfies` : TypeScript vérifie que la nuit a exactement les mêmes noms que le jour,
@@ -144,6 +151,10 @@ const night = {
   sheet: 'rgba(26,23,18,0.94)',
   scrim: 'rgba(0,0,0,0.5)',
   focusRing: '#FFC933',
+
+  // L'encre de l'image ne change pas avec le thème ; le disque devient un miel pâle et chaud.
+  mascotInk: '#1C1B19',
+  mascotDisc: '#F3DFA8',
 } satisfies Record<keyof typeof day, string>
 
 /** Le nom d'une couleur : 'text' | 'honey' | … (déduit de la liste ci-dessus). */
@@ -247,6 +258,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'controlBorder', on: 'background', min: 3 },
   { text: 'controlChecked', on: 'surface', min: 3 },
   { text: 'controlChecked', on: 'background', min: 3 },
+  // Le contour de la mascotte sur son disque (une forme, pas un texte : 3), sur la Cire, le noir
+  // et le miel vif des écrans de marque, où le disque de verre de jour est posé.
+  { text: 'mascotInk', on: 'mascotDisc', min: 3, base: onAnyBackdrop },
   // La pastille blanche posée sur la piste éteinte d'un interrupteur.
   { text: 'knob', on: 'controlBorder', min: 3 },
   // Les formes d'un squelette, sur la page et sur une carte. Sur la lumière miel de jour, chaque
