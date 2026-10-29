@@ -79,8 +79,10 @@ export function LoadingCatalogue() {
       </Block>
       <Block title={l.phases}>
         <Stack direction="row" gap="xl" wrap align="end">
+          {/* paddingX : à 3 %, l'abeille arrive de la gauche, hors du cadre du logo ; cette marge
+              la garde dans la carte (et garde les phases alignées entre elles). */}
           {l.moments.map((moment) => (
-            <Stack key={moment.at} gap="sm" align="center">
+            <Stack key={moment.at} gap="sm" align="center" paddingX="xl">
               <LoadingLogo width={160} moment={moment.at} />
               <Text variant="micro" tone="muted">
                 {moment.label}

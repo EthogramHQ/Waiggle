@@ -49,6 +49,9 @@ const fr = {
   toolLong: 'Un nom d’outil long rétrécit (toolName)',
   sample: 'Carnet de cafés',
   tool: 'Claude Code',
+  // Un nom court pour toolNameWide (100 points) : il tient à sa vraie taille dès 320 points, là où
+  // « Claude Code » rétrécissait à une cinquantaine de points sur téléphone.
+  toolWide: 'Bolt',
   toolLongName: 'Stable Diffusion XL Turbo',
   lead: 'Tu photographies ta tasse, il note le café.',
   mono: 'v2.3.1 · 12 testeurs · 4 h',
@@ -93,6 +96,7 @@ const en: typeof fr = {
   toolLong: 'A long tool name shrinks (toolName)',
   sample: 'Coffee notebook',
   tool: 'Claude Code',
+  toolWide: 'Bolt',
   toolLongName: 'Stable Diffusion XL Turbo',
   lead: 'Snap your cup: it rates the coffee.',
   mono: 'v2.3.1 · 12 testers · 4 h',
@@ -219,7 +223,8 @@ function TypeRoles({ l }: { l: Labels }) {
   const variants = Object.keys(textStyles) as TextVariant[]
   // L'exemple de chaque rôle : le nom d'un outil pour les noms géants, du code pour le mono.
   const sampleOf = (variant: TextVariant): string => {
-    if (variant === 'toolName' || variant === 'toolNameWide') return l.tool
+    if (variant === 'toolNameWide') return l.toolWide
+    if (variant === 'toolName') return l.tool
     if (variant === 'mono') return l.mono
     if (variant === 'code') return l.code
     if (variant === 'lead') return l.lead
@@ -362,7 +367,12 @@ function Shapes({ l }: { l: Labels }) {
 }
 
 function Shadows() {
-  const { colors, shadows } = useTheme()
+  const { colors, shadows, scheme } = useTheme()
+  // highlight est un liseré clair d'un point en haut, à l'intérieur : invisible sur une carte
+  // blanche. On le montre sur ce qu'il éclaire dans l'appli : le miel de jour, un fond sombre de
+  // nuit.
+  const backgroundOf = (name: keyof typeof shadows) =>
+    name !== 'highlight' ? colors.surface : scheme === 'night' ? colors.background : colors.honey
   return (
     <Stack direction="row" gap="xl" wrap>
       {(Object.keys(shadows) as (keyof typeof shadows)[]).map((name) => (
@@ -372,7 +382,7 @@ function Shadows() {
               width: 120,
               height: 72,
               borderRadius: radii.small,
-              backgroundColor: colors.surface,
+              backgroundColor: backgroundOf(name),
               boxShadow: shadows[name],
             }}
           />
