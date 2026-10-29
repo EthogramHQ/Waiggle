@@ -6,6 +6,7 @@
 // - À côté d'un texte qui dit déjà tout (un titre d'état, un toast), elle est `decorative` : un
 //   décor muet, caché aux lecteurs d'écran, qui sinon liraient deux fois la même chose (J10).
 // Les images sont fabriquées par scripts/images.mts (assets/mascot/*.png, sans métadonnées).
+import { radii } from '@ruche/brand'
 import { Image } from 'expo-image'
 import { useTranslation } from 'react-i18next'
 import { StyleSheet, View } from 'react-native'
@@ -15,9 +16,9 @@ import { useTheme } from './theme/ThemeProvider'
 export type MascotPose = 'fly' | 'wave' | 'sleep' | 'search'
 
 /**
- * Les tailles de la mascotte, en points : `inline` devant un texte (un toast), sans disque ; les
- * autres sur leur disque de verre, de la petite (un état dans une page) à la grande (un écran de
- * marque).
+ * Les tailles de la mascotte, en points : `inline` devant un texte (un toast), sur un petit disque
+ * plein ; les autres sur leur disque de verre, de la petite (un état dans une page) à la grande (un
+ * écran de marque).
  */
 export type MascotSize = 'inline' | 'sm' | 'md' | 'lg'
 const sizes: Record<MascotSize, number> = { inline: 28, sm: 96, md: 144, lg: 200 }
@@ -53,10 +54,7 @@ export function Mascot({ pose, size = 'md', decorative = false }: Props) {
       source={sources[pose]}
       // contain : la pose garde ses proportions (le vol est plus large que haut) dans le carré.
       contentFit="contain"
-      style={{
-        width: inline ? side : side * BEE_IN_DISC,
-        height: inline ? side : side * BEE_IN_DISC,
-      }}
+      style={{ width: side * BEE_IN_DISC, height: side * BEE_IN_DISC }}
       // L'image elle-même est muette : c'est la vue qui l'entoure qui porte le nom.
       accessible={false}
       accessibilityElementsHidden
@@ -82,7 +80,22 @@ export function Mascot({ pose, size = 'md', decorative = false }: Props) {
       style={{ alignSelf: 'center' }}
     >
       {inline ? (
-        bee
+        // Devant un texte (un toast), un petit disque plein de la même couleur `mascotDisc`, sans
+        // verre ni ombre : sur la pilule sombre de la nuit, le contour noir s'y lit. Il garde la
+        // taille de la ligne (28 points), la pilule ne grandit pas.
+        <View
+          testID="mascot-disc"
+          style={{
+            width: side,
+            height: side,
+            borderRadius: radii.pill,
+            backgroundColor: colors.mascotDisc,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {bee}
+        </View>
       ) : (
         // Le disque a sa couleur, `mascotDisc` : l'abeille est dessinée à l'encre noire, et son
         // contour (les antennes surtout) disparaîtrait sur le verre sombre de la nuit. Le verre
