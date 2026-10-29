@@ -26,7 +26,6 @@ import { Columns } from '../ui/Columns'
 import { CommentCard } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
-import { Constellation } from '../ui/Constellation'
 import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
@@ -37,7 +36,6 @@ import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { Emblem, Honeycomb, PortalRings } from '../ui/Illustrations'
 import { type IconName, iconPaths } from '../ui/icons.generated'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -84,6 +82,7 @@ import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
+import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
@@ -1014,17 +1013,6 @@ export function CatalogueScreen() {
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
 
-      <Section title={l.illustrations}>
-        <Stack direction="row" gap="lg" wrap align="center">
-          <Emblem icon="envelope-simple" />
-          <PortalRings />
-          <Honeycomb />
-        </Stack>
-        <Constellation height={260} />
-        {/* La scène d'accueil sur ordinateur : le centre reste libre pour le logo. */}
-        <Constellation height={420} layout="scene" />
-      </Section>
-
       <Section title={l.icons}>
         <Icons />
       </Section>
@@ -1037,6 +1025,7 @@ export function CatalogueScreen() {
       <AmbiancesCatalogue />
       <LoadingCatalogue />
       <FeedEndCatalogue />
+      <MascotCatalogue />
     </Screen>
   )
 }
