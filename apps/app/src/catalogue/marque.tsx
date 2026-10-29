@@ -16,11 +16,11 @@ import { Wordmark } from '../ui/Wordmark'
 const fr = {
   title: 'Marque',
   intro:
-    'Le logo vectoriel : l’abeille dont le vol écrit le « w ». Il suit l’apparence (encre de jour, crème de nuit). Louis le valide sur ces captures avant qu’il remplace l’ancien.',
+    'Le logo vectoriel : l’abeille dont le vol écrit le « w ». Il suit l’apparence (encre de jour, crème de nuit). Louis le valide sur ces captures avant qu’il remplace l’ancien.',
   full: 'Le logo entier (full)',
   bee: 'L’abeille seule (bee), pour les petites tailles',
   tinted: 'D’une seule couleur (tinted)',
-  large: 'En grand : 240 et 480 points de haut (glisser sur téléphone)',
+  large: 'En grand : 240 et 480 points de haut (glisser sur téléphone)',
   wordmark: 'Le nom (Wordmark), le point du i en miel',
   wordmarkSizes: 'small, large, huge',
   withLogo: 'Avec l’abeille devant (logo)',
