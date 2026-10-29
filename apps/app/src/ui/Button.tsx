@@ -2,8 +2,12 @@
 // - primary   : l'action principale de l'écran, en miel (une seule par écran, idéalement) ;
 // - secondary : une action possible, blanche et bordée ;
 // - danger    : une action qui supprime, en rouge pâle ;
-// - confirm   : la confirmation finale d'une suppression, en rouge plein ;
+// - confirm   : la confirmation finale d'une suppression, en rouge plein, avec un reflet et un halo ;
 // - glass     : un bouton posé sur une image ou une lumière d'ambiance.
+// Quatre tailles (Miel 2), lues dans le jeton `layout.controlHeight` : xl (56, l'action d'une page
+// d'accueil), regular (52, par défaut), compact (44, dans une carte, une barre) et small (36, une
+// action discrète). Le petit bouton se dessine sur 36 points, mais le doigt garde ses 44 : voir
+// plus bas, « cadre ».
 // Sous le doigt, le bouton s'enfonce légèrement avec un ressort (voir theme/motion.ts).
 // Pendant une action en cours (loading), il ignore les appuis pour éviter les doubles envois, mais
 // garde le focus du clavier : désactivé pour de bon, le navigateur le retirerait du parcours au
@@ -11,11 +15,12 @@
 // Avec `checked`, il devient un interrupteur (« Suivre » / « Suivi ») : le lecteur d'écran annonce
 // son état, activé ou non, au lieu d'un simple bouton.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
-import type { Ref } from 'react'
+import type { ReactNode, Ref } from 'react'
 import {
   ActivityIndicator,
   Platform,
   Pressable,
+  type StyleProp,
   StyleSheet,
   View,
   type ViewStyle,
@@ -30,12 +35,15 @@ import { useTheme } from './theme/ThemeProvider'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'confirm' | 'glass'
 
+/** Les tailles du bouton, dans l'ordre : leur hauteur dessinée vient de `layout.controlHeight`. */
+export type ButtonSize = keyof typeof layout.controlHeight
+
 type Props = {
   label: string
   onPress: () => void
   variant?: ButtonVariant
-  /** regular : 52 points de haut ; compact : 44 (dans une carte, une barre). */
-  size?: 'regular' | 'compact'
+  /** xl : 56 points ; regular : 52 ; compact : 44 (carte, barre) ; small : 36 dessinés, 44 à toucher. */
+  size?: ButtonSize
   icon?: IconName
   loading?: boolean
   disabled?: boolean
@@ -70,6 +78,12 @@ export function Button({
 }: Props) {
   const { colors, shadows } = useTheme()
   const inactive = disabled || loading
+  const small = size === 'small'
+  // La hauteur dessinée. Plus basse que la zone à toucher (le petit bouton), la pilule se pose
+  // dans un « cadre » invisible de 44 points : c'est lui que le doigt touche. Un débord invisible
+  // (hitSlop) ne suffirait pas : react-native-web l'ignore, et le web aussi se touche du doigt.
+  const drawn = layout.controlHeight[size]
+  const framed = drawn < layout.touchTarget
 
   // Une « valeur partagée » : un nombre que Reanimated anime sans redessiner le composant.
   const scale = useSharedValue(1)
@@ -96,8 +110,10 @@ export function Button({
       pressed: { borderWidth: borders.strong, borderColor: colors.dangerBorder },
       tone: 'danger',
     },
+    // Le geste qui ne se défait pas : le rouge plein reçoit le même reflet que le miel, et son halo
+    // rouge (jeton shadows.danger) le détache de la fenêtre de confirmation.
     confirm: {
-      box: { backgroundColor: colors.danger },
+      box: { backgroundColor: colors.danger, boxShadow: `${shadows.highlight}, ${shadows.danger}` },
       pressed: { opacity: 0.85 },
       tone: 'onDanger',
     },
@@ -116,6 +132,77 @@ export function Button({
   // Un bouton miel inactif garde sa forme mais pâlit, sans ombre.
   const inactiveHoney = inactive && variant === 'primary'
   const tone: Tone = inactiveHoney ? 'disabled' : look.tone
+
+  // La pilule dessinée : sa hauteur, sa forme et son apparence, selon qu'elle est appuyée.
+  const pill = (pressed: boolean): StyleProp<ViewStyle> => [
+    {
+      minHeight: drawn,
+      borderRadius: radii.pill,
+      paddingHorizontal: small ? space.lg : space.xl,
+      // Si le texte agrandi passe sur deux lignes, il garde de l'air au-dessus et au-dessous.
+      paddingVertical: small ? space.xs : space.sm,
+      flexDirection: 'row',
+      gap: space.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    look.box,
+    // Un interrupteur blanc activé (« Projet suivi ») prend une teinte miel légère : on voit
+    // son état d'un coup d'œil, pas seulement à son icône.
+    checked && variant === 'secondary' && { backgroundColor: colors.honeySoft },
+    pressed && look.pressed,
+    inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
+    inactive && !inactiveHoney && { opacity: 0.55 },
+    // Inactif, le bouton rouge perd son halo : il n'appelle plus le geste.
+    inactive && variant === 'confirm' && { boxShadow: 'none' },
+  ]
+
+  const content: ReactNode = (
+    <>
+      {/* Pendant le chargement, le libellé reste en place mais invisible et l'indicateur se pose
+          par-dessus : le bouton garde sa largeur, et ce qui l'entoure (le titre d'un en-tête)
+          ne saute pas. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: space.sm,
+          alignItems: 'center',
+          justifyContent: 'center',
+          // minWidth: 0 : sans lui, une rangée ne descend pas sous la largeur de son contenu, et
+          // le libellé ne se replierait pas.
+          flexShrink: 1,
+          minWidth: 0,
+          opacity: loading ? 0 : 1,
+        }}
+      >
+        {/* flexShrink: 0 : l'icône garde sa taille quand le libellé passe sur deux lignes. */}
+        {icon ? (
+          <View style={{ flexShrink: 0 }}>
+            <Icon name={icon} size={small ? 16 : 20} tone={tone} />
+          </View>
+        ) : null}
+        {/* selectable={false} : un double-clic n'y surligne pas de texte. breakAnywhere : un nom de
+            site très long (« Continuer vers … ») se coupe au lieu de sortir du bouton. Le petit
+            bouton prend le texte d'une carte, en gras : celui des boutons ne tiendrait pas dans
+            ses 36 points. */}
+        <Text
+          variant={small ? 'callout' : 'button'}
+          {...(small ? { weight: 700 as const } : null)}
+          tone={tone}
+          align="center"
+          selectable={false}
+          breakAnywhere
+        >
+          {label}
+        </Text>
+      </View>
+      {loading ? (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <ActivityIndicator color={colors.textMuted} />
+        </View>
+      ) : null}
+    </>
+  )
 
   return (
     // Deux couches : Animated.View porte l'enfoncement animé, Pressable reçoit le doigt.
@@ -153,64 +240,15 @@ export function Button({
           scale.value = spring(1)
         }}
         // Le style dépend de l'état « appuyé ». Le contour du focus clavier, lui, est commun à tous
-        // les éléments touchables : une règle CSS dans app/+html.tsx (« :focus-visible »).
-        style={(state) => {
-          return [
-            {
-              minHeight: layout.controlHeight[size],
-              borderRadius: radii.pill,
-              paddingHorizontal: space.xl,
-              paddingVertical: space.sm, // si le texte agrandi passe sur deux lignes
-              flexDirection: 'row',
-              gap: space.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            look.box,
-            // Un interrupteur blanc activé (« Projet suivi ») prend une teinte miel légère : on voit
-            // son état d'un coup d'œil, pas seulement à son icône.
-            checked && variant === 'secondary' && { backgroundColor: colors.honeySoft },
-            state.pressed && look.pressed,
-            inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
-            inactive && !inactiveHoney && { opacity: 0.55 },
-          ]
-        }}
+        // les éléments touchables : une règle CSS dans app/+html.tsx (« :focus-visible »). Le cadre
+        // du petit bouton est arrondi lui aussi : ce contour y garde la forme d'une pilule.
+        style={(state) =>
+          framed
+            ? { minHeight: layout.touchTarget, justifyContent: 'center', borderRadius: radii.pill }
+            : pill(state.pressed)
+        }
       >
-        {/* Pendant le chargement, le libellé reste en place mais invisible et l'indicateur se pose
-            par-dessus : le bouton garde sa largeur, et ce qui l'entoure (le titre d'un en-tête)
-            ne saute pas. */}
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: space.sm,
-            alignItems: 'center',
-            justifyContent: 'center',
-            // minWidth: 0 : sans lui, une rangée ne descend pas sous la largeur de son contenu, et
-            // le libellé ne se replierait pas.
-            flexShrink: 1,
-            minWidth: 0,
-            opacity: loading ? 0 : 1,
-          }}
-        >
-          {/* flexShrink: 0 : l'icône garde sa taille quand le libellé passe sur deux lignes. */}
-          {icon ? (
-            <View style={{ flexShrink: 0 }}>
-              <Icon name={icon} size={20} tone={tone} />
-            </View>
-          ) : null}
-          {/* selectable={false} : un double-clic n'y surligne pas de texte. breakAnywhere : un nom de
-              site très long (« Continuer vers … ») se coupe au lieu de sortir du bouton. */}
-          <Text variant="button" tone={tone} align="center" selectable={false} breakAnywhere>
-            {label}
-          </Text>
-        </View>
-        {loading ? (
-          <View
-            style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
-          >
-            <ActivityIndicator color={colors.textMuted} />
-          </View>
-        ) : null}
+        {(state) => (framed ? <View style={pill(state.pressed)}>{content}</View> : content)}
       </Pressable>
     </Animated.View>
   )

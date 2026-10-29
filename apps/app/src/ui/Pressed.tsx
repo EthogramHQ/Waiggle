@@ -1,5 +1,6 @@
 // Rend touchable un contenu qui n'est pas un bouton (un avatar, une carte), avec un nom pour les
-// lecteurs d'écran. Il s'enfonce légèrement sous le doigt, comme les boutons.
+// lecteurs d'écran. Il s'enfonce légèrement sous le doigt, comme les boutons : à 96 % de sa taille
+// (jeton `pressScale` de Miel 2, dans packages/brand/src/motion.ts), avec le ressort « ferme ».
 import { layout, pressScale } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { Pressable } from 'react-native'

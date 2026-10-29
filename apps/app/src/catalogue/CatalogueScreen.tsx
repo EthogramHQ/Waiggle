@@ -75,6 +75,7 @@ import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
+import { ControlsCatalogue } from './controles'
 import { labels } from './labels'
 import { BrandCatalogue } from './marque'
 import { ModerationCatalogue } from './moderation'
@@ -1065,6 +1066,7 @@ export function CatalogueScreen() {
         <Icons />
       </Section>
       <BrandCatalogue />
+      <ControlsCatalogue />
     </Screen>
   )
 }
