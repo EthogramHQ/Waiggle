@@ -7,10 +7,6 @@
 // montée sous la nouvelle, et chacune garde ainsi sa lumière. Un composant de l'écran y accède par
 // useAmbient() ; la lumière elle-même (AmbientLight) lit la source par useAmbientSource().
 import { palettes } from '@ruche/brand'
-// Le décodeur de résumés flous (thumbhash) fourni avec expo-image : le même algorithme que le paquet
-// `thumbhash` de l'API (Evan Wallace, licence MIT), déjà présent dans l'appli. On ne prend que
-// cette fonction, qui transforme le résumé en une minuscule image (au plus 32 × 32 points).
-import { thumbHashToRGBA } from 'expo-image/src/utils/thumbhash/thumbhash'
 import {
   createContext,
   type ReactNode,
@@ -20,6 +16,11 @@ import {
   useRef,
   useState,
 } from 'react'
+// Le décodeur de résumés flous : le paquet `thumbhash` (Evan Wallace, licence MIT), le même que
+// celui qui les fabrique dans l'API. On le prend par son nom plutôt que par la copie interne
+// d'expo-image, dont le chemin peut changer à chaque version. On ne prend que cette fonction, qui
+// transforme le résumé en une minuscule image (au plus 32 × 32 points).
+import { thumbHashToRGBA } from 'thumbhash'
 
 /** Trois couleurs (#rrggbb) : la principale, la claire, la profonde. */
 export type AmbientPalette = readonly [string, string, string]
