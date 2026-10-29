@@ -13,6 +13,7 @@ import { Platform } from 'react-native'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { LanguageSync } from '../src/profile/LanguageSync'
+import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { fontFiles } from '../src/ui/theme/fonts'
 import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
 import { ToastProvider } from '../src/ui/theme/toast'
@@ -43,7 +44,11 @@ export default function RootLayout() {
     return () => i18n.off('languageChanged', apply)
   }, [i18n])
 
-  if (!fontsLoaded && !isWeb) return null
+  // Sur téléphone, tant que les polices chargent : l'écran du lancement, le logo animé sur le fond
+  // de l'appli (plutôt qu'un écran vide). Il a besoin des traductions (son nom pour les lecteurs
+  // d'écran) et du thème : il se pose donc à la place de la navigation, dans les fournisseurs. Sur
+  // le web, rien de plus : la page est pré-rendue, ses polices déclarées dans la page.
+  const launching = !fontsLoaded && !isWeb
 
   return (
     // Les « Provider » rendent une ressource disponible à tous les écrans placés à l'intérieur,
@@ -54,9 +59,7 @@ export default function RootLayout() {
           {/* Applique la langue enregistrée sur le compte du membre connecté */}
           <LanguageSync />
           {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
-          <ToastProvider>
-            <ThemedChrome />
-          </ToastProvider>
+          <ToastProvider>{launching ? <LaunchScreen /> : <ThemedChrome />}</ToastProvider>
         </ThemeProvider>
       </I18nextProvider>
     </QueryClientProvider>

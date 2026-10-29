@@ -34,6 +34,7 @@ import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { Segmented, type SegmentedHandle } from '../ui/Segmented'
+import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
@@ -217,7 +218,8 @@ function FollowingFeed({ onDiscover }: { onDiscover: () => void }) {
     return feed.isError ? (
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
     ) : (
-      <StateMessage kind="loading" message={t(($) => $.common.loading)} />
+      // Le squelette du fil : trois cartes, un seul « Chargement… » pour un lecteur d'écran.
+      <SkeletonList count={3} />
     )
   }
   if (items.length === 0) {
@@ -270,7 +272,7 @@ function DiscoverFeed() {
         feed.isError ? (
           <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
         ) : (
-          <StateMessage kind="loading" message={t(($) => $.common.loading)} />
+          <SkeletonList count={3} />
         )
       ) : (
         <FeedList
