@@ -4,8 +4,8 @@
 //   `wing` les ailes), sans couleur ni script ;
 // - chemin-centre.txt : la ligne centrale du « w » (73 points), son épaisseur et sa longueur,
 //   mesurées sur l'image du logo (1194 × 653 pixels).
-// Lancer `pnpm --filter @ruche/app logo` après avoir changé l'un des deux (ou
-// `node scripts/logo.mts` depuis apps/app). Le fichier produit est enregistré dans le dépôt.
+// Lancer `node scripts/logo.mts` depuis apps/app après avoir changé l'un des deux. Le fichier
+// produit est enregistré dans le dépôt.
 //
 // D'où viennent ces deux fichiers (fait une fois, hors du dépôt, le 29/10/2026) :
 // 1. L'abeille est décalquée de l'image validée par Louis (`abeille-jour.png`, 479 × 479, le logo
