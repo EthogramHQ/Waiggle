@@ -78,6 +78,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { ControlsCatalogue } from './controles'
 import { labels } from './labels'
 import { BrandCatalogue } from './marque'
+import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
@@ -1067,6 +1068,7 @@ export function CatalogueScreen() {
       </Section>
       <BrandCatalogue />
       <ControlsCatalogue />
+      <MaterialsCatalogue />
     </Screen>
   )
 }
