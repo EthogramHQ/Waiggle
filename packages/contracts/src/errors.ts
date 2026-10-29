@@ -34,6 +34,8 @@ export const ErrorCode = z.enum([
   'password_required',
   'wrong_password',
   'cannot_suspend_admin',
+  // Tranche R2 : corriger l'adresse d'un compte déjà vérifié (il suffit de se connecter).
+  'already_verified',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>
