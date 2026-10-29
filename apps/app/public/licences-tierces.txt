@@ -4,6 +4,10 @@
 L'appli est un logiciel libre, sous licence AGPL-3.0 : son code est public (lien « Voir le code »
 dans l'appli).
 
+Le nom Waiggle, le logo (l'abeille et son vol en w) et la mascotte sont des signes distinctifs du
+projet ; ils ne sont pas couverts par l'AGPL-3.0 : une version modifiée ne les utilise pas comme
+si elle était Waiggle.
+
 L'appli inclut aussi les éléments suivants, chacun sous sa propre licence.
 
 
@@ -33,10 +37,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-Polices Funnel Display et Funnel Sans
--------------------------------------
+Polices Funnel Display, Funnel Sans et Geist Mono
+-------------------------------------------------
 
 Copyright 2024 The Funnel Project Authors (https://github.com/Dicotype/Funnel)
+Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

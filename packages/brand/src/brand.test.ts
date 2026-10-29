@@ -2,6 +2,7 @@
 // puisse changer une couleur ou une taille sans craindre de casser l'appli sans le voir.
 import { describe, expect, it } from 'vitest'
 import {
+  type ColorName,
   contrastPairs,
   contrastRatio,
   fontWeights,
@@ -30,11 +31,16 @@ describe('colors', () => {
   // it.each : le même test, répété pour le jour puis pour la nuit.
   it.each(schemes)('keeps every text readable on its background (%s)', (scheme) => {
     const palette = palettes[scheme]
-    for (const { text, on, min } of contrastPairs) {
-      const ratio = contrastRatio(palette[text], palette[on], palette.background)
-      expect(ratio, `${scheme}: ${text} on ${on} = ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
-        min,
-      )
+    for (const { text, on, min, base = ['background'] } of contrastPairs) {
+      // Un fond transparent se mesure sur chacun des fonds qu'il peut recouvrir.
+      for (const backdrop of base) {
+        const below = backdrop.startsWith('#') ? backdrop : palette[backdrop as ColorName]
+        const ratio = contrastRatio(palette[text], palette[on], below)
+        expect(
+          ratio,
+          `${scheme}: ${text} on ${on} over ${backdrop} = ${ratio.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(min)
+      }
     }
   })
 })
@@ -62,8 +68,12 @@ describe('type scale', () => {
   })
 
   it('gives every text a line height at least as tall as the letters', () => {
+    // Les noms géants d'un outil (64 et 100 points, maquettes Miel 2 du 28/10/2026) se serrent à
+    // 0,92 : en titre si grand, des lignes à 1 paraissent décollées. Seuls les titres de 56 points
+    // et plus y ont droit, jamais en dessous de 0,9 (en deçà, les accents seraient coupés).
     for (const [variant, style] of Object.entries(textStyles)) {
-      expect(style.lineHeight, variant).toBeGreaterThanOrEqual(style.size)
+      const tightest = style.family === 'display' && style.size >= 56 ? 0.9 : 1
+      expect(style.lineHeight, variant).toBeGreaterThanOrEqual(style.size * tightest)
     }
   })
 })

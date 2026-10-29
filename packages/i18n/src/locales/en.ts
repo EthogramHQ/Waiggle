@@ -18,6 +18,16 @@ export const en: Translation = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     crashedTitle: 'Something went wrong',
+    loadingApp: '{{appName}} is starting…',
+  },
+  brand: {
+    logoAlt: '{{appName}} logo',
+  },
+  mascot: {
+    search: 'The {{appName}} bee searching with a magnifying glass',
+    wave: 'The {{appName}} bee waving hello',
+    fly: 'The {{appName}} bee flying off',
+    sleep: 'The {{appName}} bee asleep',
   },
   home: {
     title: 'Welcome to {{appName}}',

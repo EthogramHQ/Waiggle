@@ -25,6 +25,19 @@ export const fr = {
     hidePassword: 'Masquer le mot de passe',
     /** Le titre de l'écran de secours, au-dessus de « Cette page n’a pas pu s’afficher. ». */
     crashedTitle: 'Un problème est survenu',
+    /** Le nom du logo animé pendant le lancement de l'appli (lu par les lecteurs d'écran). */
+    loadingApp: '{{appName}} se lance…',
+  },
+  /** Les signes de la marque, tels que les lecteurs d'écran les lisent. */
+  brand: {
+    logoAlt: 'Logo de {{appName}}',
+  },
+  /** La mascotte, une pose par texte de remplacement (quand elle n'est pas décorative). */
+  mascot: {
+    search: 'L’abeille de {{appName}} cherche avec une loupe',
+    wave: 'L’abeille de {{appName}} fait coucou',
+    fly: 'L’abeille de {{appName}} s’envole',
+    sleep: 'L’abeille de {{appName}} dort',
   },
   home: {
     title: 'Bienvenue sur {{appName}}',

@@ -3,6 +3,7 @@
 // l'appli, l'API (e-mails) et un futur site partagent. Ce paquet ne dépend de rien : il ne contient
 // que des valeurs, pas de composants.
 export {
+  brandNames,
   type ColorName,
   contrastPairs,
   honeyLight,
@@ -12,7 +13,15 @@ export {
   schemes,
 } from './colors'
 export { contrastRatio, parseColor } from './contrast'
-export { type DurationName, durations, pressScale, type SpringName, springs } from './motion'
+export {
+  type DurationName,
+  durations,
+  easings,
+  pressScale,
+  pressScaleFab,
+  type SpringName,
+  springs,
+} from './motion'
 export { appName, contactEmail, sourceUrl } from './name'
 export { type ShadowName, shadows } from './shadows'
 export { borders, layout, type Radius, radii, type Space, space } from './shape'
@@ -21,6 +30,7 @@ export {
   type FontWeight,
   fontFamilies,
   fontWeights,
+  initialsWeight,
   maxTextScale,
   readableWidth,
   type TextVariant,

@@ -15,12 +15,14 @@ export const space = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
+  xxxxl: 40, // l'air autour d'une affiche (Miel 2)
   huge: 48,
 } as const
 export type Space = keyof typeof space
 
 /** Les rayons des coins, du plus rond au plus serré. Plus un objet est grand, plus il est arrondi. */
 export const radii = {
+  ambiance: 40, // la feuille claire posée sur l'ambiance miel vif des écrans de marque
   sheet: 34, // cartes immersives du fil, feuilles qui montent du bas
   tile: 28, // tuiles et grandes cartes
   panel: 26, // panneau de verre posé dans une carte
@@ -61,5 +63,8 @@ export const layout = {
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur
   // téléphone (une photo plus haute que large a besoin de hauteur pour ne pas être trop recadrée).
   cover: { hero: 520, band: 240, portrait: 480 },
-  controlHeight: { regular: 52, compact: 44 }, // hauteur des boutons et des champs
+  // Hauteur des boutons et des champs : xl pour l'action principale d'un écran de marque, small
+  // pour un petit bouton dessiné (sa zone à toucher, autour, fait quand même 44).
+  controlHeight: { xl: 56, regular: 52, compact: 44, small: 36 },
+  fab: 64, // le bouton rond flottant (« Publier »)
 } as const
