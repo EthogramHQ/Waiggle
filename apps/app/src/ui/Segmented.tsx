@@ -1,8 +1,11 @@
-// Un contrôle segmenté : deux à quatre choix côte à côte dans une capsule, le choix actif en blanc
-// plein (la « goutte »). Sert pour l'apparence (Automatique / Jour / Nuit), la langue ou le fil de
-// l'accueil. Annoncé comme un groupe de boutons radio, comme Choices.
-// Au clavier (web) : Tab arrive sur les choix, la barre d'espace ou Entrée en choisit un, et les
-// flèches passent au choix voisin, comme dans tout groupe de boutons radio.
+// Un contrôle segmenté : deux à quatre choix côte à côte dans une capsule, le choix actif en relief
+// (la « goutte ») : blanc le jour, crème la nuit (jeton `surfaceRaised`). Sur cette goutte, le texte
+// est toujours à l'encre (ton `onHoney`) : la nuit, le texte clair ordinaire y était illisible.
+// Sert pour l'apparence (Automatique / Jour / Nuit), la langue ou le fil de l'accueil. Annoncé
+// comme un groupe de boutons radio, comme Choices.
+// Au clavier (web) : Tab ne s'arrête qu'une fois dans le groupe, sur le choix actif (« tabIndex
+// itinérant ») ; la barre d'espace ou Entrée choisit, et les flèches passent au choix voisin en le
+// choisissant, comme dans tout groupe de boutons radio.
 // Quand le texte est très agrandi, les choix vont à la ligne au lieu de se chevaucher.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useImperativeHandle, useRef } from 'react'
@@ -34,7 +37,7 @@ type Props<T extends string> = {
   handle?: Ref<SegmentedHandle>
 }
 
-type KeyEvent = { key: string; preventDefault: () => void }
+type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
 
 export function Segmented<T extends string>({
   label,
@@ -54,11 +57,17 @@ export function Segmented<T extends string>({
     focusChecked: () => refs.current[options.findIndex((o) => o.value === value)]?.focus(),
   }))
 
-  // Sur le web : l'espace choisit (react-native-web ne le fait que pour les boutons), les flèches
-  // passent au choix voisin, qui reçoit aussi le focus.
+  // Le seul choix que Tab atteint : le choix actif (le premier, si la valeur n'est pas parmi les
+  // choix). Sans cela, Tab s'arrêtait sur chaque segment avant de quitter le groupe.
+  const checkedIndex = options.findIndex((option) => option.value === value)
+  const tabStop = checkedIndex === -1 ? 0 : checkedIndex
+
+  // Sur le web : l'espace et Entrée choisissent (react-native-web ne le fait que pour les boutons),
+  // les flèches passent au choix voisin, qui reçoit aussi le focus.
   const keys = (index: number) =>
     Platform.OS === 'web'
       ? {
+          tabIndex: index === tabStop ? (0 as const) : (-1 as const),
           onKeyDown: (event: KeyEvent) => {
             const step =
               event.key === 'ArrowRight' || event.key === 'ArrowDown'
@@ -66,9 +75,11 @@ export function Segmented<T extends string>({
                 : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
                   ? -1
                   : 0
-            if (event.key === ' ') {
+            if (event.key === ' ' || event.key === 'Enter') {
+              // preventDefault : l'espace ne fait pas défiler la page. Une touche gardée enfoncée
+              // (repeat) ne rechoisit pas dix fois le même choix.
               event.preventDefault()
-              onChange(options[index]?.value ?? value)
+              if (!event.repeat) onChange(options[index]?.value ?? value)
             } else if (step !== 0) {
               event.preventDefault()
               const next = (index + step + options.length) % options.length
@@ -131,12 +142,14 @@ export function Segmented<T extends string>({
             }}
           >
             {option.icon ? (
-              <Icon name={option.icon} size={18} tone={checked ? 'default' : 'muted'} />
+              <Icon name={option.icon} size={18} tone={checked ? 'onHoney' : 'muted'} />
             ) : null}
+            {/* Le choix actif : l'encre sur la goutte, jour et nuit (paire de contraste
+                onHoney / surfaceRaised dans packages/brand/src/colors.ts). */}
             <Text
               variant="callout"
               weight={checked ? 700 : 500}
-              tone={checked ? 'default' : 'muted'}
+              tone={checked ? 'onHoney' : 'muted'}
               align="center"
             >
               {option.label}

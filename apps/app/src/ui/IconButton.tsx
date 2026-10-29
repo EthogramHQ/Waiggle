@@ -1,7 +1,7 @@
 // Un bouton rond qui n'affiche qu'une icône (retour, partager, plus…). Comme on ne voit pas de texte,
 // le nom (`label`) est obligatoire : c'est lui que lisent les lecteurs d'écran (« Retour »), et
 // lui qui permet aux tests de retrouver le bouton.
-import { borders, layout, pressScale, radii, space } from '@ruche/brand'
+import { borders, layout, pressScale, pressScaleFab, radii, space } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
@@ -17,8 +17,14 @@ type Props = {
   onPress: () => void
   /** glass : sur une image ou une lumière ; plain : sur une surface ; honey : action principale. */
   variant?: 'glass' | 'plain' | 'honey'
-  /** regular : 44 points ; large : 64 (le bouton « Publier » de la barre d'onglets). */
+  /** regular : 44 points ; large : 64 (jeton `layout.fab`), sans l'enfoncement du bouton flottant. */
   size?: 'regular' | 'large'
+  /**
+   * Le bouton rond flottant (« + », publier un projet, Miel 2) : 64 points (jeton `layout.fab`),
+   * et il s'enfonce davantage sous le doigt (`pressScaleFab`, 0,92 au lieu de 0,96) : plus petit
+   * qu'une carte, il doit répondre de façon plus « physique ».
+   */
+  fab?: boolean
   disabled?: boolean
   /**
    * Le `nativeID` d'un texte qui précise sur quoi porte le bouton (voir aria.ts) : plusieurs
@@ -64,11 +70,14 @@ export function IconButton({
   badge,
   expanded,
   hasMenu = false,
+  fab = false,
 }: Props) {
   const { colors, shadows } = useTheme()
   const scale = useSharedValue(1)
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
-  const diameter = size === 'large' ? 64 : layout.touchTarget
+  // Le grand rond (« large ») et le bouton flottant ont le diamètre du jeton `layout.fab`.
+  const big = fab || size === 'large'
+  const diameter = big ? layout.fab : layout.touchTarget
 
   const looks: Record<NonNullable<Props['variant']>, { box: ViewStyle; tone: IconTone }> = {
     glass: {
@@ -103,7 +112,7 @@ export function IconButton({
         disabled={disabled}
         onPress={onPress}
         onPressIn={() => {
-          scale.value = spring(pressScale, 'firm')
+          scale.value = spring(fab ? pressScaleFab : pressScale, 'firm')
         }}
         onPressOut={() => {
           scale.value = spring(1)
@@ -121,7 +130,7 @@ export function IconButton({
           disabled && { opacity: 0.55 },
         ]}
       >
-        <Icon name={icon} size={size === 'large' ? 28 : 22} tone={look.tone} />
+        <Icon name={icon} size={big ? 28 : 22} tone={look.tone} />
       </Pressable>
       {badge ? (
         // Par-dessus le coin haut droit : elle déborde un peu du rond, sans agrandir la zone à
