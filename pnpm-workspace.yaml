@@ -24,6 +24,31 @@ allowBuilds:
 # Âge minimum d'une version avant que pnpm accepte de l'installer, en minutes : 7 jours
 # (7 × 24 × 60). Une version piégée a presque toujours été retirée avant.
 minimumReleaseAge: 10080
+# Exceptions à cet âge minimum (accord de Louis du 29/10/2026), chacune datée et retirée à sa date :
+# - les 33 versions entrées par la PR Renovate #39 (25/10/2026), fusionnée 23 minutes avant
+#   l'arrivée de cette règle (Biome 2.6.3, Better Auth 1.7.13, Hono, i18next, Babel…). Tant que l'une
+#   a moins de 7 jours, pnpm refuse toute installation. Elles sont déjà installées, et en ligne
+#   depuis le 28/10 : l'exception ne fait entrer rien de neuf. À retirer le 1/11/2026 après 18 h 30
+#   (la plus jeune date du 25/10 à 17 h 29 UTC).
+# - decode-uri-component : la 0.5.1 corrige une faille (GHSA-qr28-fpjm-wq7f, voir `overrides`) et
+#   n'a que 6 jours le 29/10/2026. À retirer le 30/10/2026 après 13 h 50.
+minimumReleaseAgeExclude:
+  - '@babel/helper-string-parser'
+  - '@babel/parser'
+  - '@babel/plugin-transform-block-scoping'
+  - '@babel/plugin-transform-classes'
+  - '@babel/types'
+  - '@better-auth/*'
+  - '@better-fetch/fetch'
+  - '@biomejs/*'
+  - auth
+  - baseline-browser-mapping
+  - better-auth
+  - electron-to-chromium
+  - hono
+  - i18next
+  - react-i18next
+  - decode-uri-component
 # Une dépendance indirecte ne peut pas venir d'ailleurs que du registre (dépôt Git, archive à une
 # adresse quelconque) : une telle source échappe aux vérifications du registre et peut changer sans
 # changer de numéro de version.
@@ -32,6 +57,21 @@ blockExoticSubdeps: true
 # par sa CI avec une preuve de provenance et qu'une nouvelle version arrive sans (publiée à la main,
 # depuis un compte peut-être volé), pnpm refuse de l'installer.
 trustPolicy: no-downgrade
+# Exceptions à cette règle (accord de Louis du 29/10/2026). pnpm compare les versions par date, toutes
+# lignes confondues : une ligne ancienne encore maintenue, publiée à la main par son mainteneur
+# habituel, paraît « moins sûre » qu'une ligne récente publiée par CI avec preuve de provenance.
+# - Expo SDK 57 : depuis septembre 2026, Expo publie la ligne 58 par sa CI (avec preuve), et les
+#   correctifs de la 57 à la main, par le mainteneur qui publie toute la 57 depuis juin. À retirer
+#   au passage au SDK 58.
+# - semver 6.3.1 et ua-parser-js 1.0.41 : anciennes lignes, mêmes mainteneurs ; à la version exacte.
+trustPolicyExclude:
+  - expo
+  - 'expo-*'
+  - '@expo/*'
+  - babel-preset-expo
+  - jest-expo
+  - semver@6.3.1
+  - ua-parser-js@1.0.41
 
 # Versions imposées à une dépendance indirecte, pour un correctif de sécurité que son parent n'a pas
 # encore adopté. Chacune est vérifiée (tests, migrations, captures) et retirée dès que le parent suit.
@@ -54,7 +94,9 @@ overrides:
   # la fonction. Le correctif patches/query-string@7.1.3.patch prend sa fonction `default`, et Jest
   # transforme le paquet (`transformIgnorePatterns` d'apps/app). À retirer (avec le correctif et
   # cette ligne de Jest) quand expo-router ne dépend plus de query-string 7 (SDK Expo 58).
-  'query-string>decode-uri-component': 0.5.0
+  # 0.5.1 (29/10/2026) corrige aussi GHSA-qr28-fpjm-wq7f (une longue suite de « %xx » rend le
+  # décodage quadratique : un lien piégé fige l'onglet). Toujours en module ESM, même correctif.
+  'query-string>decode-uri-component': 0.5.1
 
 # Correctifs posés sur une dépendance (`pnpm patch`), chacun expliqué au-dessus de la version
 # imposée qui l'exige. Si le paquet change de version, l'installation échoue : on revoit alors le
