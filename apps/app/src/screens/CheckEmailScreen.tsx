@@ -11,10 +11,12 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
+import { useLayout } from '../ui/theme/layout'
 
 export function CheckEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
+  const wide = useLayout().sizeClass === 'wide'
   const params = useLocalSearchParams<{ email?: string }>()
   // L'adresse vient de l'URL : n'importe qui peut fabriquer un lien avec un autre texte. On ne
   // l'affiche que si c'est vraiment une adresse e-mail (même règle que l'inscription).
@@ -23,12 +25,24 @@ export function CheckEmailScreen() {
   // L'adresse est dans l'URL du visiteur, inconnue du serveur qui prépare la page web : on ne
   // l'affiche qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
+  // L'image de la page : l'enveloppe sur sa tuile de miel, du décor (cachée aux lecteurs d'écran).
+  const picture = (
+    <Stack align="center">
+      {/* R1 F2 : Mascot fly ici (l'abeille en vol remplace l'enveloppe, à cette même place). */}
+      <Emblem icon="envelope-simple" />
+    </Stack>
+  )
 
   return (
-    <Screen pageTitle={t(($) => $.auth.checkEmail.title)}>
-      <Stack align="center">
-        <Emblem icon="envelope-simple" />
-      </Stack>
+    // Le « miel vif » des moments de marque, comme l'inscription d'où l'on arrive : sur téléphone,
+    // l'image flotte sur le miel (`scene`) et le texte est sur la feuille claire ; sur ordinateur, le
+    // miel couvre la page et l'image passe en tête de la carte.
+    <Screen
+      ambiance="brand"
+      scene={wide ? undefined : picture}
+      pageTitle={t(($) => $.auth.checkEmail.title)}
+    >
+      {wide ? picture : null}
       <Text variant="title2" align="center" heading={1}>
         {t(($) => $.auth.checkEmail.title)}
       </Text>

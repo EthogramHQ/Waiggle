@@ -354,6 +354,8 @@ function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
           }
           moreLabel={t(($) => $.feed.more)}
           endLabel={t(($) => $.feed.end)}
+          // « Tu es à jour » : le bout du fil est un petit moment de marque, sur le miel vif.
+          ambiance="brand"
           errorLabel={t(($) => $.feed.moreError)}
           retryLabel={t(($) => $.common.retry)}
           // Une seule demande à la fois, même après un double clic.

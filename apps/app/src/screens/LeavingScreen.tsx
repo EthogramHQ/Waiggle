@@ -15,6 +15,7 @@ import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
+import { useLayout } from '../ui/theme/layout'
 
 /**
  * L'adresse si c'est un lien https vers un site public, sinon null. Même règle que pour le lien de
@@ -37,11 +38,26 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   // Sur le web, la page est préparée sans connaître l'adresse (elle est dans l'URL du visiteur) :
   // on n'affiche la destination qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
+  const wide = useLayout().sizeClass === 'wide'
+  // Miel 2 (R1) : le portail est un moment de marque, sur le « miel vif » (ui/BrandAmbiance.tsx).
+  // La porte vers l'extérieur, des anneaux de lumière autour d'une flèche, flotte sur le miel
+  // (`scene`) sur téléphone ; sur ordinateur, où le miel n'a pas de bande, elle passe en tête de la
+  // carte. Textes et boutons restent sur la feuille claire. (La refonte du reste de la page : R5a.)
+  // Les trois états de la page ont le même décor : la bande de miel ne change pas de hauteur quand
+  // la page passe de « préparée sans l'adresse » à « adresse lue ».
+  const scene = wide ? undefined : <PortalRings />
+  const inSheet = wide ? <PortalRings /> : null
 
-  if (!hydrated) return <Screen title={t(($) => $.leaving.title)}>{null}</Screen>
+  if (!hydrated) {
+    return (
+      <Screen ambiance="brand" scene={scene} title={t(($) => $.leaving.title)}>
+        {inSheet}
+      </Screen>
+    )
+  }
   if (!target) {
     return (
-      <Screen title={t(($) => $.leaving.title)}>
+      <Screen ambiance="brand" scene={scene} title={t(($) => $.leaving.title)}>
         <Notice message={t(($) => $.leaving.invalid)} />
         <Button label={t(($) => $.leaving.back)} variant="secondary" onPress={back} />
       </Screen>
@@ -49,9 +65,8 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   }
 
   return (
-    <Screen pageTitle={t(($) => $.leaving.title)}>
-      {/* La porte vers l'extérieur : des anneaux de lumière autour d'une flèche. */}
-      <PortalRings />
+    <Screen ambiance="brand" scene={scene} pageTitle={t(($) => $.leaving.title)}>
+      {inSheet}
       {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se
           coupe au lieu de sortir de l'écran. */}
       <Stack gap="xs" align="stretch">
