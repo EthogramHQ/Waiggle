@@ -19,6 +19,7 @@ import {
 } from 'react'
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
+import { RadioMark } from './Radio'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -223,7 +224,7 @@ export function ListRow({
     trailing === 'chevron' ? (
       <Icon name="caret-right" size={18} tone="muted" />
     ) : trailing === 'check' || isChoice ? (
-      <RadioDot selected={selected === true} />
+      <RadioMark selected={selected === true} />
     ) : typeof trailing === 'string' ? (
       <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
     ) : (
@@ -343,41 +344,5 @@ export function ListRow({
     >
       {content}
     </Pressable>
-  )
-}
-
-/**
- * Le rond d'un choix (Miel 2) : 24 points, bordé ; choisi, sa bordure passe au miel, un point de
- * miel le remplit à 4 points du bord, et un halo miel pâle de 3 points l'entoure. Dessin seul :
- * c'est la ligne qui porte le rôle « radio » et l'état. À remplacer par `RadioMark` (ui/Radio.tsx),
- * écrit en même temps dans une autre branche de la tranche R1.
- */
-function RadioDot({ selected }: { selected: boolean }) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: radii.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: borders.strong,
-        borderColor: selected ? colors.honey : colors.lineStrong,
-        ...(selected ? { boxShadow: `0 0 0 3px ${colors.honeySoft}` } : null),
-      }}
-    >
-      {selected ? (
-        <View
-          style={{
-            // 24 de côté, moins 4 points de chaque côté : le point fait 16.
-            width: 24 - 2 * space.xs,
-            height: 24 - 2 * space.xs,
-            borderRadius: radii.pill,
-            backgroundColor: colors.honey,
-          }}
-        />
-      ) : null}
-    </View>
   )
 }

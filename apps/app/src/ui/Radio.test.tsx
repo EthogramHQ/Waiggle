@@ -42,7 +42,9 @@ describe('RadioGroup', () => {
   it('is a radio group named by its label, with one radio per choice', async () => {
     await renderWithProviders(<Sample />)
 
-    expect(screen.getByRole('radiogroup', { name: 'Taille' })).toBeTruthy()
+    // Pas de getByRole : RNTL ne trouve un rôle que sur un élément « accessible », qui, sur iOS,
+    // cacherait les radios à VoiceOver (charte design). On lit le rôle de l'élément nommé.
+    expect(screen.getByLabelText('Taille').props.accessibilityRole).toBe('radiogroup')
     expect(screen.getAllByRole('radio')).toHaveLength(3)
     expect(screen.queryByRole('radio', { checked: true })).toBeNull()
   })

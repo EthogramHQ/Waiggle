@@ -228,50 +228,6 @@ export function CatalogueScreen() {
         />
       </Section>
 
-      <Section title={l.surfaces}>
-        <Columns
-          main={
-            <OnLight thumbhash={samples.papillon}>
-              <Surface variant="panel" padding="lg" gap="sm">
-                <Stack direction="row" gap="sm" align="center">
-                  <Avatar name="Léa Moreau" source={null} label="Léa Moreau" size={28} />
-                  <Text variant="callout" weight={700}>
-                    Léa Moreau
-                  </Text>
-                </Stack>
-                <Text variant="title3">{l.sampleTitle}</Text>
-                <Text variant="callout" tone="secondary">
-                  {l.samplePitch}
-                </Text>
-              </Surface>
-              <Surface variant="glass" padding="md" fill={false}>
-                <Text variant="callout" weight={600}>
-                  {l.glass}
-                </Text>
-              </Surface>
-            </OnLight>
-          }
-          side={
-            <Stack gap="md">
-              <Surface padding="lg">
-                <Text>{l.plain}</Text>
-              </Surface>
-              <Surface variant="grouped" padding="lg">
-                <Text>{l.grouped}</Text>
-              </Surface>
-            </Stack>
-          }
-        />
-      </Section>
-
-      <Section title={l.avatars}>
-        <Stack direction="row" gap="lg" align="center" wrap>
-          <Avatar name="Léa" source={null} label="Léa" size={96} />
-          <Avatar name="Max" source={null} label="Max" size={44} />
-          <Avatar name="Inès" source={null} label="Inès" size={28} />
-        </Stack>
-      </Section>
-
       <Section title={l.text}>
         <Surface padding="xl">
           <Markdown text={l.markdown} onLinkPress={() => {}} />

@@ -15,6 +15,7 @@ import { createI18n, detectLanguage } from '../src/i18n'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { fontFiles } from '../src/ui/theme/fonts'
 import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
+import { ToastProvider } from '../src/ui/theme/toast'
 
 const isWeb = Platform.OS === 'web'
 
@@ -52,7 +53,10 @@ export default function RootLayout() {
         <ThemeProvider>
           {/* Applique la langue enregistrée sur le compte du membre connecté */}
           <LanguageSync />
-          <ThemedChrome />
+          {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
+          <ToastProvider>
+            <ThemedChrome />
+          </ToastProvider>
         </ThemeProvider>
       </I18nextProvider>
     </QueryClientProvider>
