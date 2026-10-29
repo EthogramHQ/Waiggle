@@ -97,22 +97,26 @@ export function FeedEnd({
       >
         <HoneyGlow scheme={scheme} />
         {/* R1 F2 : Mascot sleep ici (l'abeille endormie, au-dessus du verre, centrée). */}
-        <Surface variant="panel" radius="pill" fill={false}>
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: space.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: space.md,
-              paddingHorizontal: space.xl,
-            }}
-          >
-            <Icon name="check-circle" size={24} tone="default" />
-            <Text variant="headline">{endLabel}</Text>
-          </View>
-        </Surface>
+        {/* Le verre au centre du bloc, à la largeur de son texte (Surface, sans `fill`, se range à
+            gauche : la vue autour le centre). */}
+        <View style={{ alignSelf: 'center', maxWidth: '100%' }}>
+          <Surface variant="panel" radius="pill">
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: space.sm,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: space.md,
+                paddingHorizontal: space.xl,
+              }}
+            >
+              <Icon name="check-circle" size={24} tone="default" />
+              <Text variant="title3">{endLabel}</Text>
+            </View>
+          </Surface>
+        </View>
       </View>
     )
   }
@@ -174,10 +178,11 @@ function HoneyGlow({ scheme }: { scheme: Scheme }) {
           <RadialGradient
             id={id}
             cx={0.5}
-            cy={0.35}
+            cy={0.3}
             r={1}
-            // Un dégradé SVG ne connaît que des cercles : on l'étire en ellipse autour de son centre.
-            gradientTransform="translate(0.5 0.35) scale(0.9 0.9) translate(-0.5 -0.35)"
+            // Un dégradé SVG ne connaît que des cercles : on l'étire en ellipse autour de son centre,
+            // plus large que haute, pour que la lumière s'étale sous le message.
+            gradientTransform="translate(0.5 0.3) scale(0.75 1.1) translate(-0.5 -0.3)"
           >
             {honeyLight[scheme].map((stop) => (
               <Stop key={stop.at} offset={stop.at} stopColor={stop.color} />
