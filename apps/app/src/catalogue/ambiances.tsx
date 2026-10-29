@@ -15,6 +15,7 @@ import { AmbientLight } from '../ui/AmbientLight'
 import { BrandAmbiance } from '../ui/BrandAmbiance'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
+import { Emblem } from '../ui/Illustrations'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -29,6 +30,7 @@ const fr = {
   phone: 'Miel vif, téléphone',
   desktop: 'Miel vif, ordinateur',
   desktopOnWide: 'La version ordinateur se voit sur un écran large (1 100 points et plus).',
+  desktopDecor: 'Miel vif, ordinateur, sans scène à gauche : le décor en tête de la carte',
   light: 'Lumière (les autres écrans)',
   day: 'jour',
   night: 'nuit',
@@ -45,6 +47,7 @@ const en: typeof fr = {
   phone: 'Bright honey, phone',
   desktop: 'Bright honey, computer',
   desktopOnWide: 'The computer version shows on a wide screen (1,100 points and more).',
+  desktopDecor: 'Bright honey, computer, no scene on the left: the decor tops the card',
   light: 'Light (the other screens)',
   day: 'day',
   night: 'night',
@@ -131,17 +134,28 @@ export function AmbiancesCatalogue() {
       </Stack>
 
       {wide ? (
-        schemes.map((scheme) => (
-          <ThemeProvider key={scheme} appearance={scheme}>
-            <Example caption={`${l.desktop} — ${l[scheme]}`}>
-              <Frame>
-                <BrandAmbiance size="wide" hero={<Constellation height={420} layout="scene" />}>
-                  <SheetContent l={l} />
-                </BrandAmbiance>
-              </Frame>
-            </Example>
-          </ThemeProvider>
-        ))
+        <>
+          {schemes.map((scheme) => (
+            <ThemeProvider key={scheme} appearance={scheme}>
+              <Example caption={`${l.desktop} — ${l[scheme]}`}>
+                <Frame>
+                  <BrandAmbiance size="wide" hero={<Constellation height={420} layout="scene" />}>
+                    <SheetContent l={l} />
+                  </BrandAmbiance>
+                </Frame>
+              </Example>
+            </ThemeProvider>
+          ))}
+          {/* Sans `hero` (vérification de l'e-mail, portail) : le décor, posé sur le miel sur
+              téléphone, passe en tête de la carte ; l'ambiance le place seule. */}
+          <Example caption={l.desktopDecor}>
+            <Frame>
+              <BrandAmbiance size="wide" scene={<Emblem icon="envelope-simple" />}>
+                <SheetContent l={l} />
+              </BrandAmbiance>
+            </Frame>
+          </Example>
+        </>
       ) : (
         <Text variant="caption" tone="muted">
           {l.desktopOnWide}
