@@ -13,7 +13,11 @@ export function VerifiedScreen() {
   const router = useRouter()
 
   return (
-    <Screen pageTitle={t(($) => $.auth.verified.title)}>
+    <Screen
+      // Un moment de marque (l'adresse est confirmée) : le « miel vif », le contenu sur la feuille.
+      ambiance="brand"
+      pageTitle={t(($) => $.auth.verified.title)}
+    >
       <Stack align="center">
         <Emblem icon="check" />
       </Stack>

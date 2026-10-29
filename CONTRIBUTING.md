@@ -115,7 +115,8 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
   - zones à toucher de 44 points au moins ;
   - les textes suivent la taille de texte de l'appareil.
 - **Animations** : complètes par défaut. Seuls les grands déplacements deviennent des fondus si la
-  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance reste.
+  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance garde sa
+  couleur mais devient immobile (WCAG 2.2.2).
 - **Web** : la page est pré-rendue sans connaître le visiteur. Ce qui dépend du navigateur (thème,
   largeur, langue, paramètres d'URL) attend `useHydrated()` (`ui/theme/hydration.ts`). Sinon React
   signale un écart et redessine tout. La CI des captures échoue sur ces erreurs.
