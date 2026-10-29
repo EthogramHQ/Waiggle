@@ -10,6 +10,7 @@ import { Image } from 'expo-image'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Surface } from './Surface'
+import { ThemeProvider } from './theme/ThemeProvider'
 
 export type MascotPose = 'fly' | 'wave' | 'sleep' | 'search'
 
@@ -82,13 +83,18 @@ export function Mascot({ pose, size = 'md', decorative = false }: Props) {
       {inline ? (
         bee
       ) : (
-        <Surface variant="glass" radius="pill" fill={false}>
-          <View
-            style={{ width: side, height: side, alignItems: 'center', justifyContent: 'center' }}
-          >
-            {bee}
-          </View>
-        </Surface>
+        // Le disque garde le verre de jour, même de nuit : l'abeille est dessinée à l'encre noire,
+        // et son contour (les antennes surtout) disparaîtrait sur le verre sombre. Ce thème imposé
+        // ne vaut que pour le disque, pas pour la page.
+        <ThemeProvider appearance="day">
+          <Surface variant="glass" radius="pill" fill={false}>
+            <View
+              style={{ width: side, height: side, alignItems: 'center', justifyContent: 'center' }}
+            >
+              {bee}
+            </View>
+          </Surface>
+        </ThemeProvider>
       )}
     </View>
   )
