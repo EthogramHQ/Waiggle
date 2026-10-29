@@ -20,8 +20,8 @@ import { AmbientProvider, type AmbientSource, sourcePalette, useAmbient } from '
 const fr = {
   title: 'Lumière vivante',
   intro:
-    'Sur ordinateur, la lumière est dessinée par la carte graphique (WebGL) : une matière qui coule, des reflets de miel, une lueur qui suit la souris. Sur téléphone, sans WebGL ou avec « Réduire les animations », c’est la version allégée ; les captures, faites sans carte graphique, la montrent aussi.',
-  live: 'Une lumière, trois sources : le fondu dure 900 ms',
+    'Sur ordinateur, la lumière est dessinée par la carte graphique (WebGL) : une matière qui coule, des reflets de miel, une lueur qui suit la souris. Sur téléphone, sans WebGL ou avec « Réduire les animations », c’est la version allégée ; les captures de la CI, sans carte graphique, la montrent aussi.',
+  live: 'Une lumière, trois sources, et le fondu de l’une à l’autre',
   source: 'Source de la lumière',
   honey: 'Miel',
   photo: 'Photo',
@@ -34,8 +34,8 @@ const fr = {
 const en: typeof fr = {
   title: 'Living light',
   intro:
-    'On a computer, the light is drawn by the graphics card (WebGL): a flowing matter, honey glints, a glow that follows the mouse. On a phone, without WebGL or with “Reduce motion”, it is the light version; the screenshots, taken without a graphics card, show it too.',
-  live: 'One light, three sources: the fade lasts 900 ms',
+    'On a computer, the light is drawn by the graphics card (WebGL): a flowing matter, honey glints, a glow that follows the mouse. On a phone, without WebGL or with “Reduce motion”, it is the light version; the CI screenshots, without a graphics card, show it too.',
+  live: 'One light, three sources, and the fade from one to the next',
   source: 'Light source',
   honey: 'Honey',
   photo: 'Photo',
