@@ -15,7 +15,7 @@ import { Segmented } from '../ui/Segmented'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
-import { AmbientProvider, type AmbientSource, useAmbient } from '../ui/theme/ambient'
+import { AmbientProvider, type AmbientSource, sourcePalette, useAmbient } from '../ui/theme/ambient'
 
 const fr = {
   title: 'Lumière vivante',
@@ -48,11 +48,13 @@ const en: typeof fr = {
 type Choice = 'honey' | 'photo' | 'palette'
 
 // Les trois sources de démonstration : rien (le miel), le résumé flou d'une photo de café, et
-// trois couleurs d'un ciel du soir (celles d'un projet qui choisirait sa palette).
+// trois couleurs données telles quelles (celles qu'un écran choisirait). Aucune couleur n'est
+// écrite à la main hors de @ruche/brand (design-rules.test.ts) : les trois couleurs sont celles
+// que la lumière tire d'une autre photo, un papillon.
 const sources: Record<Choice, AmbientSource> = {
   honey: null,
   photo: { thumbhash: 'GIoKDYSlqIdPUXd3eEeHh9J/YIkI' }, // gitleaks:allow
-  palette: { palette: ['#3A3F6E', '#FFC86A', '#1A1D33'] },
+  palette: { palette: sourcePalette({ thumbhash: 'GdkFJYTHYFSbVnaPWUZndpajf7QG' }) }, // gitleaks:allow
 }
 
 /** Un cadre où la lumière est posée, comme derrière un écran. */
