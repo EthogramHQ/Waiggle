@@ -79,6 +79,7 @@ import { ControlsCatalogue } from './controles'
 import { FormSamples } from './formulaire'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
+import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
@@ -1029,6 +1030,7 @@ export function CatalogueScreen() {
       <MaterialsCatalogue />
       <FormSamples />
       <TokensCatalogue />
+      <LightCatalogue />
     </Screen>
   )
 }
