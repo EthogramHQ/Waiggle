@@ -58,7 +58,11 @@ function VisitorHome() {
   const wide = sizeClass === 'wide'
 
   return (
+    // Le « miel vif » des moments de marque : sur téléphone, la constellation flotte sur le miel et
+    // tout le reste (le nom, l'accroche, les deux portes d'entrée) est posé sur la feuille claire.
     <Screen
+      ambiance="brand"
+      scene={wide ? undefined : <Constellation height={280} />}
       hero={
         <WelcomeHero
           tagline={t(($) => $.home.tagline)}
@@ -80,7 +84,6 @@ function VisitorHome() {
         </Text>
       ) : (
         <>
-          <Constellation height={280} />
           <Stack gap="sm">
             <Wordmark size="huge" header={t(($) => $.home.title)} />
             <Text variant="headline" tone="secondary" weight={400}>
