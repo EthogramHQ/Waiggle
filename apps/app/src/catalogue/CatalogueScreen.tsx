@@ -76,6 +76,7 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { labels } from './labels'
+import { BrandCatalogue } from './marque'
 import { ModerationCatalogue } from './moderation'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
@@ -1063,6 +1064,7 @@ export function CatalogueScreen() {
       <Section title={l.icons}>
         <Icons />
       </Section>
+      <BrandCatalogue />
     </Screen>
   )
 }
