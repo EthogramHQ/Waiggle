@@ -21,6 +21,7 @@
     "@better-auth/utils": "0.5.1",
     "@expo-google-fonts/funnel-display": "0.4.1",
     "@expo-google-fonts/funnel-sans": "0.4.2",
+    "@expo-google-fonts/geist-mono": "0.4.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@ruche/brand": "workspace:*",
     "@ruche/contracts": "workspace:*",

@@ -1181,7 +1181,7 @@ describe('MemberHeader', () => {
 
 describe('fonts', () => {
   it('ships a file for every weight the type scale may ask for', () => {
-    for (const family of ['display', 'text'] as const) {
+    for (const family of ['display', 'text', 'mono'] as const) {
       for (const weight of fontWeights[family]) {
         expect(Object.keys(fontFiles)).toContain(fontName(family, weight))
       }
@@ -1192,6 +1192,8 @@ describe('fonts', () => {
     // Funnel Display n'est livrée qu'en 700 : un titre demandé en 500 prend le 700.
     expect(fontName('display', 500)).toBe('FunnelDisplay-700')
     expect(fontName('text', 600)).toBe('FunnelSans-600')
+    // Geist Mono n'est livrée qu'en 400 et 500 : un code demandé en 700 prend le 500.
+    expect(fontName('mono', 700)).toBe('GeistMono-500')
   })
 })
 
