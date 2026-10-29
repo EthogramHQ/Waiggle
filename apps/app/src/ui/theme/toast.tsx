@@ -30,16 +30,14 @@ import {
 } from 'react'
 import { AccessibilityInfo, Platform, View, type ViewStyle } from 'react-native'
 import type { IconName } from '../Icon'
+import { Mascot, type MascotPose } from '../Mascot'
 import { readingTime, Toast } from '../Toast'
 import { useLayout } from './layout'
 import { useCalmMotion } from './motion'
 import { layerPosition, ToastLayer } from './toastLayer'
 
-/**
- * Les poses de la mascotte qu'un toast peut montrer devant son texte. La mascotte arrive avec son
- * composant (ui/Mascot.tsx, même tranche) ; d'ici là, l'option est acceptée et rien ne s'affiche.
- */
-export type ToastMascot = 'search' | 'wave' | 'fly' | 'sleep'
+/** Les poses de la mascotte (ui/Mascot.tsx) qu'un toast peut montrer devant son texte. */
+export type ToastMascot = MascotPose
 
 /** Ce qui peut accompagner le texte : une icône ou la mascotte, décoratives. Rien d'autre. */
 export type ToastOptions = { icon?: IconName; mascot?: ToastMascot }
@@ -155,6 +153,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={shown.id}
               text={shown.text}
               icon={shown.icon}
+              // La mascotte, petite et décorative (le texte dit tout), à la place de l'icône.
+              leading={
+                shown.mascot ? <Mascot pose={shown.mascot} size="inline" decorative /> : undefined
+              }
               leaving={leaving}
               calm={calm}
               onHoverChange={hoverChange}

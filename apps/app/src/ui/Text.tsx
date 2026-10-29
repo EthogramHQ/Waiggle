@@ -62,9 +62,9 @@ const toneColor = {
 } as const satisfies Record<TextTone, string>
 
 /**
- * La police d'un rôle de texte. Geist Mono (les rôles `mono` et `code`) n'est pas encore livrée :
- * tant que son fichier manque à `fontFiles`, on prend la police à chasse fixe du système
- * (`monoFont`). Le jour où Geist Mono y entre, ce texte la prend sans autre changement.
+ * La police d'un rôle de texte. Geist Mono (les rôles `mono` et `code`) est livrée en 400 et 500 ;
+ * si une graisse manquait un jour à `fontFiles`, on prendrait `monoFont` plutôt qu'une police que
+ * l'appli n'a pas chargée.
  */
 const fontFamilyOf = (family: FontFamily, weight: FontWeight): string => {
   const name = fontName(family, weight)

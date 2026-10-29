@@ -4,13 +4,21 @@
 import { layout, space } from '@ruche/brand'
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
-import { Emblem, Honeycomb } from './Illustrations'
+import { Emblem } from './Illustrations'
+import { Mascot, type MascotPose } from './Mascot'
 import { Stack } from './Stack'
 import { type HeadingLevel, Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty'
+
+/** La pose de la mascotte pour chaque état qui la montre. */
+const mascotPoses: Record<Exclude<StateKind, 'loading' | 'error'>, MascotPose> = {
+  notFound: 'search',
+  empty: 'sleep',
+  signedOut: 'wave',
+}
 
 /** Une issue : un bouton, éventuellement en chargement (« Réessayer » pendant la nouvelle tentative). */
 type Action = { label: string; onPress: () => void; variant?: ButtonVariant; loading?: boolean }
@@ -40,18 +48,18 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
   // Quand la place manque (écran bas, texte très agrandi), l'image s'efface : le titre, le message
   // et les issues restent sur le premier écran, sans avoir à faire défiler.
   const cramped = fontScale >= 1.5 || (height > 0 && height < 600)
-  // L'image qui accompagne l'état : une indication de chargement, la ruche vide pour « introuvable »,
-  // une tuile de miel avec une icône pour l'erreur et la page réservée.
+  // L'image qui accompagne l'état : une indication de chargement ; la mascotte pour « introuvable »
+  // (la loupe), « liste vide » (le sommeil) et « réservé aux membres » (le salut) ; une tuile de
+  // miel avec une icône pour l'erreur, où l'abeille n'aurait pas le ton juste.
+  // La mascotte est décorative (J10) : le titre dit déjà l'état, comme l'indicateur de chargement.
   const picture =
     kind === 'loading' ? (
       // aria-hidden : l'indicateur ne dit rien de plus que le texte « Chargement… » qui le suit.
       <ActivityIndicator size="large" color={colors.amber} aria-hidden />
-    ) : kind === 'notFound' ? (
-      <Honeycomb />
+    ) : kind === 'error' ? (
+      <Emblem icon="warning-circle" />
     ) : (
-      <Emblem
-        icon={kind === 'error' ? 'warning-circle' : kind === 'empty' ? 'sparkle' : 'lock-simple'}
-      />
+      <Mascot pose={mascotPoses[kind]} size="sm" decorative />
     )
 
   return (

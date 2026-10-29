@@ -12,6 +12,7 @@ import { Platform, StyleSheet, View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import { Button } from './Button'
 import { Icon } from './Icon'
+import { Mascot } from './Mascot'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -96,7 +97,9 @@ export function FeedEnd({
         }}
       >
         <HoneyGlow scheme={scheme} />
-        {/* R1 F2 : Mascot sleep ici (l'abeille endormie, au-dessus du verre, centrée). */}
+        {/* R1 F2 : Mascot sleep. L'abeille endormie, au-dessus du verre, centrée. Elle garde son
+            nom (J10) : c'est le moment de marque du bout du fil, pas un simple décor d'état. */}
+        <Mascot pose="sleep" size="sm" />
         {/* Le verre au centre du bloc, à la largeur de son texte (Surface, sans `fill`, se range à
             gauche : la vue autour le centre). Son arrondi est celui d'un panneau, pas d'une
             pilule : à 200 % de texte, « Tu es à jour » passe sur deux lignes, et le rayon d'une
