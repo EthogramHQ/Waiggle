@@ -20,6 +20,10 @@ export const fr = {
     retry: 'Réessayer',
     back: 'Retour',
     cancel: 'Annuler',
+    /** Le bouton qui ferme une feuille ou une fenêtre (R2). */
+    close: 'Fermer',
+    /** Ce que les lecteurs d'écran ajoutent après le nom d'un lien qui quitte l'appli (R2). */
+    externalSite: 'ouvre un site externe',
     remove: 'Retirer {{item}}',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
@@ -46,11 +50,13 @@ export const fr = {
     signUp: 'Créer un compte',
     signIn: 'Me connecter',
     haveAccount: 'J’ai déjà un compte',
-    account: 'Mon compte',
+    // R2 : « Mon compte » devient la page « Réglages ».
+    account: 'Réglages',
     publish: 'Publier un projet',
     publishShort: 'Publier',
     myProjects: 'Mes projets',
-    membersOnly: 'Les projets et les profils ne sont visibles que par les membres connectés.',
+    // R2 (décision D2) : vrai tant que rien n'est public ; R12 dira « Rien n’est public sans ton accord. »
+    membersOnly: 'Rien n’est visible sans compte, ni trouvé par un moteur de recherche.',
     openSource: '{{appName}} est un logiciel libre.',
     seeCode: 'Voir le code',
   },
@@ -72,10 +78,15 @@ export const fr = {
       remaining_other: 'Encore {{count}} caractères',
       done: 'C’est bon, ton mot de passe est assez long.',
     },
+    // R2 : sur ordinateur, connexion et inscription sont deux onglets d'un même panneau.
+    tabs: {
+      signIn: 'Se connecter',
+      signUp: 'Créer un compte',
+    },
     signUp: {
-      title: 'Créer un compte',
+      title: 'Créer ton compte',
       subtitle: 'Tes proches te reconnaîtront à ton nom affiché.',
-      submit: 'Créer un compte',
+      submit: 'Créer mon compte',
       haveAccount: 'J’ai déjà un compte',
     },
     signIn: {
@@ -84,15 +95,64 @@ export const fr = {
       submit: 'Me connecter',
       noAccount: 'Pas encore de compte ?',
       createOne: 'Créer un compte',
+      forgotPassword: 'Mot de passe oublié ?',
+      // Affiché sur « Se connecter » après « Choisir un nouveau mot de passe » (R2).
+      passwordChanged: 'Mot de passe changé. Connecte-toi avec le nouveau.',
+    },
+    // R2, « Trop d'essais » : une heure fixe, rien qui défile ; sans « tu », l'adresse IP est
+    // partagée par toute une famille (relecture juridique, jur-14, décision D3).
+    retryAt: 'Nouvel essai possible à {{time}}',
+    chooseNewPassword: 'Choisir un nouveau mot de passe',
+    // R2 : « J'ai oublié mon mot de passe ». La réponse est la même qu'un compte existe ou non.
+    forgotPassword: {
+      title: 'Mot de passe oublié ?',
+      intro: 'Indique ton adresse : nous t’envoyons un lien pour choisir un nouveau mot de passe.',
+      submit: 'Envoyer le lien',
+      sentTitle: 'C’est envoyé',
+      sent: 'Si un compte existe pour cette adresse, un e-mail vient de partir.',
+      sentExpires: 'Le lien est valable une heure.',
+      noneReceived:
+        'Rien reçu après quelques minutes ? Regarde dans les indésirables, ou vérifie l’adresse tapée.',
+      resend: 'Renvoyer le lien',
+      back: 'Retour à la connexion',
+    },
+    // R2 : la page ouverte par le lien de l'e-mail (/reset-password).
+    resetPassword: {
+      title: 'Choisis un nouveau mot de passe',
+      newPassword: 'Nouveau mot de passe',
+      // La conséquence est dite avant le geste (relecture juridique, jur-3).
+      consequences: 'Une fois le mot de passe changé, tous tes appareils seront déconnectés.',
+      submit: 'Enregistrer le mot de passe',
+      // Un seul texte, vrai pour toutes les causes : expiré, déjà servi, abîmé (jur-16).
+      invalidTitle: 'Ce lien ne marche plus',
+      invalidBody: 'Il a expiré (une heure), il a déjà servi, ou il est incomplet.',
+      requestNew: 'Demander un nouveau lien',
     },
     checkEmail: {
       title: 'Vérifie ta boîte mail',
-      body: 'Nous avons envoyé un lien à {{email}}. Clique dessus pour activer ton compte.',
+      body: 'Un e-mail part vers {{email}}. Ouvre le lien qu’il contient pour activer ton compte : la connexion se fait directement.',
       bodyNoEmail: 'Nous t’avons envoyé un lien par e-mail. Clique dessus pour activer ton compte.',
       locked: 'Tant que tu n’as pas ouvert ce lien, tu ne peux pas te connecter.',
       expires:
         'Sans vérification dans les {{days}} jours qui suivent l’inscription, elle est effacée.',
       back: 'Retour à la connexion',
+      // R2 : renvoyer le lien, ouvrir sa messagerie, corriger une faute de frappe dans l'adresse.
+      openMailbox: 'Ouvrir ma messagerie',
+      resend: 'Renvoyer l’e-mail',
+      // La même phrase que l'adresse ait un compte ou non.
+      resent: 'Un nouvel e-mail vient de partir.',
+      noneReceived: 'Rien reçu ? Regarde dans les indésirables, ou renvoie l’e-mail.',
+      change: {
+        title: 'Changer d’adresse',
+        intro:
+          'Une faute de frappe ? Indique la bonne adresse et ton mot de passe : un nouveau lien y partira, et l’ancien ne marchera plus.',
+        newEmail: 'Nouvelle adresse e-mail',
+        password: 'Ton mot de passe',
+        submit: 'Envoyer le lien',
+        // Décision D4 : on ne révèle pas qui a un compte.
+        sent: 'Si cette adresse n’est pas déjà utilisée, un lien vient d’y partir.',
+        alreadyVerified: 'Ton adresse est déjà vérifiée : il te suffit de te connecter.',
+      },
     },
     verified: {
       title: 'Adresse vérifiée',
@@ -107,8 +167,16 @@ export const fr = {
       invalidCredentials: 'Adresse e-mail ou mot de passe incorrect.',
       emailNotVerified:
         'Ton adresse n’est pas encore vérifiée : nous venons de te renvoyer le lien par e-mail.',
-      tooManyAttempts: 'Trop de tentatives. Réessaie dans quelques minutes.',
+      // R2 (jur-14) : sans « tu », l'adresse IP est partagée ; l'heure du prochain essai suit (retryAt).
+      tooManyAttempts: 'Trop d’essais pour l’instant.',
       inviteRequired: 'Indique le code d’invitation que tu as reçu.',
+      // R2 : à l'envoi, chaque champ vide dit ce qui manque.
+      emailRequired: 'Indique ton adresse e-mail.',
+      passwordRequired: 'Choisis un mot de passe.',
+      // R2 : le lien du mot de passe oublié a expiré, a déjà servi ou est abîmé (INVALID_TOKEN).
+      invalidToken: 'Ce lien ne marche plus.',
+      // R2 : changer d'adresse avant la vérification, mais le compte est déjà vérifié (409).
+      alreadyVerified: 'Ton adresse est déjà vérifiée : il te suffit de te connecter.',
       inviteInvalid:
         'Ce code d’invitation n’est pas valide. Demande-le à la personne qui t’a invité·e.',
       // Tranche « adresse » : la nouvelle adresse est celle du compte ; le mot de passe est faux.
@@ -178,7 +246,7 @@ export const fr = {
       sentNext:
         'Rien ne change tant que tu n’as pas suivi ce lien, puis celui que tu recevras sur ta nouvelle adresse.',
       sentNone: 'Rien reçu après quelques minutes ? Regarde dans les indésirables.',
-      back: 'Retour à Mon compte',
+      back: 'Retour aux réglages',
     },
     // Les pages où mènent les deux liens des e-mails.
     emailChange: {
@@ -192,11 +260,15 @@ export const fr = {
       doneSignedOut: 'Connecte-toi avec ta nouvelle adresse et ton mot de passe habituel.',
       doneDevices: 'Tes appareils déjà connectés le restent.',
       signIn: 'Me connecter',
-      toAccount: 'Aller à Mon compte',
+      toAccount: 'Aller aux réglages',
       errorTitle: 'Ce lien ne marche plus',
       errorBody:
-        'Il a expiré, il a déjà servi, une autre demande l’a remplacé, un autre compte est connecté sur cet appareil, ou ta nouvelle adresse ne peut plus être utilisée. Tu peux recommencer depuis Mon compte.',
-      restart: 'Recommencer depuis Mon compte',
+        'Il a expiré, il a déjà servi, une autre demande l’a remplacé, un autre compte est connecté sur cet appareil, ou ta nouvelle adresse ne peut plus être utilisée. Tu peux recommencer depuis les réglages.',
+      restart: 'Recommencer depuis les réglages',
+      // R2 (décision D1) : le second lien n'aboutit que dans la session du membre.
+      signInFirstTitle: 'Connecte-toi d’abord',
+      signInFirstBody:
+        'Ce lien ne marche que depuis ton compte. Connecte-toi, puis ouvre-le à nouveau : rien ne change avant.',
     },
     delete: {
       title: 'Supprimer mon compte',
@@ -223,6 +295,8 @@ export const fr = {
       warning: 'C’est immédiat et sans retour.',
       submit: 'Supprimer définitivement',
       wrongPassword: 'Mot de passe incorrect.',
+      // R2 : la suppression se fait dans une feuille posée sur les réglages.
+      sheetTitle: 'Supprimer ton compte',
       blocksItem: 'Les membres que tu as bloqués',
       blocksDetail: 'Tes blocages partent avec ton compte, et ceux qui te visaient aussi.',
       remains: {
@@ -233,6 +307,54 @@ export const fr = {
         reportCopies:
           'Si tes contenus ou ton profil ont été signalés, la copie de leurs textes reste 30 jours (un an s’ils ont été retirés)',
       },
+    },
+  },
+  // R2 : une seule page « Réglages » remplace « Mon compte ». Sur téléphone, une liste de rubriques ;
+  // sur ordinateur, les rubriques en colonne à gauche, la rubrique choisie à droite.
+  settings: {
+    title: 'Réglages',
+    // La carte du membre, en haut : sa photo, son nom, et deux actions.
+    viewPage: 'Voir ma page',
+    edit: 'Modifier',
+    sections: {
+      profile: 'Mon profil',
+      notifications: 'Notifications',
+      language: 'Langue',
+      appearance: 'Apparence',
+      data: 'Mes données',
+      security: 'Sécurité',
+      account: 'Compte',
+      about: 'À propos',
+      moderation: 'Modération',
+    },
+    // Ce que contient chaque rubrique, sous son nom dans la liste du téléphone.
+    hints: {
+      profile: 'Photo, nom, pseudo et présentation',
+      notifications: 'Les e-mails que tu reçois',
+      language: 'Celle de l’appli et de tes e-mails',
+      appearance: 'Jour, nuit ou automatique',
+      data: 'Télécharger tes données',
+      security: 'Mot de passe, membres bloqués',
+      account: 'Adresse e-mail, déconnexion, suppression',
+      about: 'Le code source, nous écrire',
+      moderation: 'Les signalements à traiter',
+    },
+    // Rubrique « Sécurité » : changer son mot de passe.
+    changePassword: {
+      title: 'Changer mon mot de passe',
+      screenTitle: 'Changer ton mot de passe',
+      intro: 'Pour le confirmer, indique d’abord celui que tu utilises aujourd’hui.',
+      current: 'Mot de passe actuel',
+      new: 'Nouveau mot de passe',
+      // Les conséquences, dites avant le geste (relecture juridique, jur-3).
+      consequencesTitle: 'Tes autres appareils seront déconnectés',
+      consequences:
+        'Cet appareil reste connecté. Sur les autres, il faudra le nouveau mot de passe.',
+      submit: 'Changer le mot de passe',
+      // Le toast, une fois le mot de passe changé.
+      done: 'Mot de passe changé',
+      // Le mot de passe actuel est faux : le champ le dit, rien ne change.
+      wrongCurrent: 'Ce n’est pas ton mot de passe actuel.',
     },
   },
   profile: {
@@ -954,11 +1076,42 @@ export const fr = {
       expires: 'Ce lien est valable une heure.',
       ignore: 'Si tu n’as pas créé de compte, ignore simplement ce message.',
     },
+    // Vrai pour une inscription et pour un changement d'adresse avant vérification (R2, jur-B2).
     existingAccount: {
-      subject: 'Tentative d’inscription sur {{appName}}',
-      body: 'Quelqu’un vient d’essayer de créer un compte avec ton adresse. Tu as déjà un compte : il te suffit de te connecter.',
+      subject: 'Quelqu’un a utilisé ton adresse sur {{appName}}',
+      body: 'Quelqu’un vient d’essayer d’utiliser ton adresse pour un compte {{appName}}. Tu as déjà un compte : il te suffit de te connecter.',
       button: 'Me connecter',
       ignore: 'Si ce n’était pas toi, tu n’as rien à faire : ton compte est en sécurité.',
+    },
+    // R2 : le lien pour choisir un nouveau mot de passe. Il peut partir vers une adresse jamais
+    // vérifiée : la salutation ne porte pas de nom (jur-2). L'adresse du lien ne contient que le jeton.
+    resetPassword: {
+      subject: 'Choisis un nouveau mot de passe sur {{appName}}',
+      heading: 'Choisis un nouveau mot de passe',
+      greeting: 'Bonjour,',
+      body: 'Une demande vient d’arriver pour changer le mot de passe de ton compte {{appName}}. Pour en choisir un nouveau, utilise le bouton ci-dessous.',
+      button: 'Choisir un nouveau mot de passe',
+      // La durée vient du réglage du serveur (jur-4) ; la conséquence est dite avant le geste (jur-3).
+      expires:
+        'Ce lien est valable {{hours}} h et ne sert qu’une fois. Une fois le mot de passe changé, tous tes appareils seront déconnectés.',
+      ignore: 'Si tu n’as rien demandé, ignore cet e-mail : ton mot de passe ne change pas.',
+      // Un e-mail de sécurité : il dit pourquoi il arrive, et qu'il arrive toujours (jur-1).
+      reason:
+        'Tu reçois cet e-mail parce qu’une demande a été faite sur {{appName}} avec ton adresse. Les e-mails de sécurité du compte arrivent toujours.',
+      // La version texte n'a pas de bouton : ce libellé, puis l'adresse du lien en dessous.
+      textLink: 'Choisir un nouveau mot de passe :',
+    },
+    // R2 : après tout changement de mot de passe (lien ou réglages), sans jamais le mot de passe.
+    passwordChanged: {
+      subject: 'Ton mot de passe {{appName}} a changé',
+      heading: 'Ton mot de passe a changé',
+      body: 'Le mot de passe de ton compte {{appName}} vient d’être changé. Tes autres appareils ont été déconnectés : il leur faudra le nouveau mot de passe.',
+      // « Ce n'est pas toi ? » : d'abord reprendre la main, puis nous écrire (jur-5).
+      notYou:
+        'Ce n’est pas toi ? Change ton mot de passe tout de suite (Réglages, Sécurité) ou, si tu ne peux plus te connecter, choisis-en un nouveau depuis « Mot de passe oublié ? ». Puis écris-nous à {{contactEmail}}.',
+      button: 'Ouvrir mes réglages',
+      reason:
+        'Tu reçois cet e-mail parce que le mot de passe de ton compte a changé. Les e-mails de sécurité du compte arrivent toujours.',
     },
     // Tranche « adresse » : le premier lien part vers l'ancienne adresse, qui doit donner son accord.
     changeEmail: {
@@ -970,8 +1123,9 @@ export const fr = {
       button: 'Confirmer le changement',
       expires: 'Ce lien est valable une heure.',
       // Un paragraphe normal sous le bouton, l'adresse de contact en gras (des-E4, 26/10/2026).
+      // R2 (jur-5) : d'abord reprendre la main sur le compte, puis nous écrire.
       ignore:
-        'Ce n’est pas toi ? Ne clique pas : rien ne changera. Mais quelqu’un connaît ton mot de passe : écris-nous vite à {{contactEmail}}.',
+        'Ce n’est pas toi ? Ne clique pas : rien ne changera. Mais quelqu’un connaît ton mot de passe : change-le tout de suite (Réglages, Sécurité), puis écris-nous à {{contactEmail}}.',
     },
     // … puis le second vers la nouvelle adresse, pour la vérifier.
     newEmail: {
