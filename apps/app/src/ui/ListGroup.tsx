@@ -251,6 +251,9 @@ export function ListRow({
         minHeight: layout.controlHeight.regular,
         paddingHorizontal: space.lg,
         paddingVertical: space.md,
+        // Inactive, la ligne pâlit, comme un bouton, une case ou un rond inactifs : on voit
+        // qu'elle ne répondra pas avant de la toucher.
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       {icon ? (

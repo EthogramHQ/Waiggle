@@ -8,7 +8,9 @@ import {
   contrastRatio,
   durations,
   easings,
+  focusHaloOpacity,
   fontWeights,
+  honeyLight,
   palettes,
   parseColor,
   pressScale,
@@ -72,6 +74,48 @@ describe('Miel 2 colors', () => {
     // Le verre laisse voir ce qu'il y a dessous (J7) : sa paire se mesure sur plusieurs fonds.
     const onGlass = contrastPairs.find(({ text, on }) => text === 'textOnGlass' && on === 'glass')
     expect(onGlass?.base).toEqual(expect.arrayContaining(['background', 'honey']))
+  })
+})
+
+describe('controls and skeletons', () => {
+  // Relecture de R1 (B1, C1) : le rond choisi n'était qu'un point miel sur du blanc (1,6:1) et le
+  // bord d'une case vide un trait de séparateur (1,4:1). La forme d'un contrôle dit son état : elle
+  // se mesure à 3:1 contre la carte et contre la page (WCAG 1.4.11).
+  it.each([
+    'controlBorder on surface',
+    'controlBorder on background',
+    'controlChecked on surface',
+    'controlChecked on background',
+  ])('measures the control outline %s at 3:1 or more', (pair) => {
+    const found = contrastPairs.find(({ text, on }) => `${text} on ${on}` === pair)
+    expect(found?.min).toBe(3)
+  })
+
+  it('no longer draws a control outline with a separator line', () => {
+    // Le témoin de l'ancien défaut : lineStrong ne tiendrait pas les 3:1 qu'on exige d'un bord.
+    expect(contrastRatio(palettes.day.lineStrong, palettes.day.surface)).toBeLessThan(3)
+    expect(contrastRatio(palettes.day.controlBorder, palettes.day.surface)).toBeGreaterThanOrEqual(
+      3,
+    )
+  })
+
+  it.each(schemes)('keeps the skeleton shapes visible on a page and a card (%s)', (scheme) => {
+    // Une forme sans texte doit seulement se voir : 1,5:1 (de nuit, surfaceGrouped faisait 1,08:1).
+    const palette = palettes[scheme]
+    for (const on of ['background', 'surface'] as const) {
+      expect(contrastRatio(palette.skeleton, palette[on])).toBeGreaterThanOrEqual(1.5)
+    }
+  })
+
+  it('keeps the skeleton shapes visible on every stop of the day honey light', () => {
+    for (const { color } of honeyLight.day) {
+      expect(contrastRatio(palettes.day.skeleton, color), color).toBeGreaterThanOrEqual(1.5)
+    }
+  })
+
+  it('gives the focus halo a partial opacity', () => {
+    expect(focusHaloOpacity).toBeGreaterThan(0)
+    expect(focusHaloOpacity).toBeLessThan(1)
   })
 })
 

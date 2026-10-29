@@ -49,13 +49,15 @@ const useBreath = () => {
   return useAnimatedStyle(() => ({ opacity: opacity.value }))
 }
 
-/** Une forme pleine, de cette hauteur et de cette largeur (en part de la carte). */
+/**
+ * Une forme pleine, de cette hauteur et de cette largeur (en part de la carte). Sa couleur, le rôle
+ * `skeleton`, se voit à 1,5:1 au moins sur la page, sur une carte et (de jour) sur la lumière miel :
+ * l'ancien fond groupé ne faisait que 1,1:1 et disparaissait, de nuit surtout.
+ */
 function Shape({ height, width }: { height: number; width: `${number}%` }) {
   const { colors } = useTheme()
   return (
-    <View
-      style={{ height, width, borderRadius: radii.small, backgroundColor: colors.surfaceGrouped }}
-    />
+    <View style={{ height, width, borderRadius: radii.small, backgroundColor: colors.skeleton }} />
   )
 }
 

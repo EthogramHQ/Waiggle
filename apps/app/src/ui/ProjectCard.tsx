@@ -86,7 +86,8 @@ export function ProjectCard({
   )
   if (!onPress) return card
   return (
-    <Pressed label={title} onPress={onPress} role="link">
+    // radius : l'anneau de focus suit le rayon de la couverture (« sheet », son rayon par défaut).
+    <Pressed label={title} onPress={onPress} role="link" radius="sheet">
       {card}
     </Pressed>
   )

@@ -2,7 +2,7 @@
 // écrite dans le squelette HTML (app/+html.tsx) et les réglages que le thème y ajoute ensuite.
 // Elle vit ici, avec le thème, parce qu'elle lit les jetons de @ruche/brand (seuls les composants
 // et le thème les lisent, pas les pages).
-import { borders, durations, easings, type Palette, palettes } from '@ruche/brand'
+import { borders, durations, easings, focusHaloOpacity, type Palette, palettes } from '@ruche/brand'
 import { Platform } from 'react-native'
 
 /**
@@ -18,14 +18,15 @@ export const SCHEME_FADING = 'data-scheme-fading'
  */
 export const SCHEME_FADE_MS = durations.scheme + durations.quick
 
-// Le halo du focus : le miel du thème, à 28 % d'opacité, sur 4 points autour du contour.
-const FOCUS_HALO_PERCENT = 28
+// Le halo du focus : le miel du thème, à l'opacité du jeton `focusHaloOpacity` (packages/brand),
+// sur 4 points autour du contour. En pourcentage, l'unité qu'attend `color-mix`.
+const FOCUS_HALO_PERCENT = Math.round(focusHaloOpacity * 100)
 const FOCUS_HALO_WIDTH = 2 * borders.focus
 
 /**
  * La couleur du halo de focus d'un thème (`--focus-halo`) : son miel, rendu transparent. CSS
- * `color-mix` mélange le miel et le transparent (28 % de miel) : la couleur reste celle du jeton,
- * sans code couleur écrit ici.
+ * `color-mix` mélange le miel et le transparent (le jeton dit la part de miel) : la couleur reste
+ * celle du jeton, sans code couleur écrit ici.
  */
 export const focusHalo = (colors: Palette): string =>
   `color-mix(in srgb, ${colors.honey} ${FOCUS_HALO_PERCENT}%, transparent)`
