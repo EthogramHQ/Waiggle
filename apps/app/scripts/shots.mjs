@@ -368,10 +368,11 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
+// feed: 'end' : le fil tient en une page, son bas dit « Tu es à jour » (R1, le miel vif local).
 const followingFeed = (feed) =>
   feed === 'nobody'
     ? { items: [], nextCursor: null, followsAnyone: false }
-    : { items: followingItems, nextCursor: 'suite', followsAnyone: true }
+    : { items: followingItems, nextCursor: feed === 'end' ? null : 'suite', followsAnyone: true }
 
 // Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son
 // identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
@@ -1043,6 +1044,10 @@ const pages = [
   // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
   { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
+  { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
+  // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
+  { name: 'introuvable', path: '/nulle-part', signedIn: false },
   // Les notifications (tranche 6b) : la liste (avec sa suite), l'écran vide, et la cloche à « 9+ ».
   { name: 'notifications', path: '/notifications', signedIn: true, fullPage: true },
   { name: 'notifications-vide', path: '/notifications', signedIn: true, notifications: 'none' },
