@@ -77,6 +77,7 @@ import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { ControlsCatalogue } from './controles'
 import { FormSamples } from './formulaire'
+import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { BrandCatalogue } from './marque'
 import { MaterialsCatalogue } from './matieres'
@@ -1027,6 +1028,7 @@ export function CatalogueScreen() {
       <ControlsCatalogue />
       <MaterialsCatalogue />
       <FormSamples />
+      <TokensCatalogue />
     </Screen>
   )
 }

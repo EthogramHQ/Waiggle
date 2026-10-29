@@ -2702,6 +2702,9 @@ describe('Notice, polite, on a phone (R1)', () => {
   it('is read out by VoiceOver as it appears (iOS)', async () => {
     jest.replaceProperty(Platform, 'OS', 'ios')
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility')
+    // La fonction est déjà simulée par React Native : son compte garde les annonces des tests
+    // d'avant (iOS est la plateforme par défaut de Jest). On le remet à zéro.
+    announce.mockClear()
     try {
       await renderWithProviders(<Notice message="C’est fait." polite />)
       expect(announce).toHaveBeenCalledTimes(1)
