@@ -83,6 +83,9 @@ export function Wordmark({ size = 'small', onPress, header, logo = false }: Prop
             <Text variant={variant} maxScale={maxScale}>
               <NativeText style={honey}>i</NativeText>
             </Text>
+            {/* L'encre deux fois : le bord adouci d'une seule couche laisse voir un liseré de
+                miel le long de la tige ; deux couches le couvrent presque entièrement. */}
+            <View style={{ position: 'absolute', top: 0, left: 0 }}>{piece('ı')}</View>
             <View style={{ position: 'absolute', top: 0, left: 0 }}>{piece('ı')}</View>
           </View>
           {piece(after)}

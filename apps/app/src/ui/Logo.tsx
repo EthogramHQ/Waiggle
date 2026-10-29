@@ -42,18 +42,18 @@ export function Logo({ variant = 'full', size = 48, decorative = false }: Props)
   const ink = colors.text
   return (
     <View
-      // Le dessin est une image pour les lecteurs d'écran : un seul élément, avec un nom.
+      // Le dessin est une image pour les lecteurs d'écran : un seul élément, avec un nom. Décoratif,
+      // il garde son rôle et son nom (un test le retrouve), mais il est caché aux lecteurs d'écran.
+      accessible
+      role="img"
+      accessibilityLabel={t(($) => $.brand.logoAlt)}
       {...(decorative
         ? {
             accessibilityElementsHidden: true,
             importantForAccessibility: 'no-hide-descendants' as const,
             'aria-hidden': true,
           }
-        : {
-            accessible: true,
-            role: 'img' as const,
-            accessibilityLabel: t(($) => $.brand.logoAlt),
-          })}
+        : null)}
     >
       <Svg
         width={size * aspect(box)}
