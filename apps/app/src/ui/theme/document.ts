@@ -54,9 +54,10 @@ const haloSpread = 2 * borders.focus + FOCUS_HALO_WIDTH
  *   react-native-web, sans `!important`.
  * - L'anneau de focus : le même contour miel pour tous les éléments touchables, allumé seulement au
  *   clavier (:focus-visible), dans la couleur du thème choisi (--focus-ring, posée par le thème), et
- *   entouré d'un halo de miel transparent (--focus-halo, une ombre sans flou). Le sélecteur commence
- *   par `html` pour passer devant l'ombre propre d'un bouton (classe de react-native-web) : pendant
- *   le focus, le halo la remplace.
+ *   entouré d'un halo de miel transparent (--focus-halo, une ombre sans flou). Pendant le focus, le
+ *   halo remplace l'ombre propre de l'élément : `!important`, car l'ombre du bouton miel est écrite
+ *   sur l'élément lui-même (mesuré dans le navigateur : sans lui, le bouton miel n'avait pas de
+ *   halo), et une règle de feuille de style ne passe pas devant un style posé sur l'élément.
  *   Les éléments rangés dans un cadre qui rogne ce qui dépasse (lignes d'une liste, vignettes)
  *   dessinent l'anneau à l'intérieur (data-focus="inset", voir insetFocus) : un cadre posé
  *   par-dessus leur contenu (::after), sinon une photo le recouvrirait ; leur halo est à l'intérieur
@@ -80,7 +81,7 @@ html[${SCHEME_FADING}], html[${SCHEME_FADING}] body, html[${SCHEME_FADING}] body
   outline-offset: ${borders.focus}px;
 }
 html :focus-visible:not(input, textarea, [data-focus="inset"]) {
-  box-shadow: 0 0 0 ${haloSpread}px var(--focus-halo, ${focusHalo(palettes.day)});
+  box-shadow: 0 0 0 ${haloSpread}px var(--focus-halo, ${focusHalo(palettes.day)}) !important;
 }
 [data-focus="inset"]:focus-visible { outline: none; }
 [data-focus="inset"]:focus-visible::after {
