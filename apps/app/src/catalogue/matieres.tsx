@@ -176,6 +176,9 @@ function Materials({ l, scheme }: { l: Labels; scheme: Scheme }) {
       <Text variant="caption" tone="muted">
         {l.onLight}
       </Text>
+      <Text variant="caption" tone="muted">
+        {l.glass}
+      </Text>
       {/* La lumière miel d'une couverture sans photo : ce que le verre floute et avive. */}
       <ProjectCover height={240} radius="tile">
         <Stack padding="lg" gap="md">
@@ -194,14 +197,14 @@ function Materials({ l, scheme }: { l: Labels; scheme: Scheme }) {
           </Surface>
         </Stack>
       </ProjectCover>
-      <Text variant="caption" tone="muted">
-        {l.glass}
-      </Text>
-      <Sample caption={l.sheet}>
-        <Surface variant="sheet" centered padding="lg">
-          <Text>{l.sheetText}</Text>
-        </Surface>
-      </Sample>
+      {/* Dans une rangée, comme les deux premiers : la base de 240 points est une largeur. */}
+      <Stack direction="row" wrap>
+        <Sample caption={l.sheet}>
+          <Surface variant="sheet" centered padding="lg">
+            <Text>{l.sheetText}</Text>
+          </Surface>
+        </Sample>
+      </Stack>
     </Stack>
   )
 }
