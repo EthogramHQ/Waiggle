@@ -4,8 +4,10 @@
 import { appName, fontWeights, layout, maxTextScale, palettes } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, useState } from 'react'
-import { Platform, StyleSheet, TextInput, type View } from 'react-native'
+import { AccessibilityInfo, Platform, StyleSheet, TextInput, type View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
+import { Avatar } from './Avatar'
 import { Button } from './Button'
 import { Choices } from './Choices'
 import { CommentCard, type CommentCardHandle } from './CommentCard'
@@ -2604,4 +2606,178 @@ describe('ListRow, with the reason of a failure', () => {
     expect(screen.getByText('Léa Moreau')).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
   })
+})
+
+// --- Refonte R1 : les fondations Miel 2 (composants changés) ---
+
+describe('Avatar, without a photo (R1)', () => {
+  // R1 : deux initiales, le prénom et le nom ; un seul mot donne ses deux premières lettres. Une
+  // lettre accentuée compte comme une lettre (« Émile » commence par « É »).
+  it.each([
+    ['Léa Martin', 'LM'],
+    ['Papi', 'PA'],
+    ['émile zola', 'ÉZ'],
+    ['  Léa   Martin  ', 'LM'],
+  ])('shows « %s » as « %s », under the name given for screen readers', async (name, initials) => {
+    await renderWithProviders(
+      <Avatar name={name} source={null} label={`Photo de ${name.trim()}`} />,
+    )
+
+    expect(screen.getByLabelText(`Photo de ${name.trim()}`)).toBeTruthy()
+    expect(screen.getByText(initials)).toBeTruthy()
+  })
+})
+
+/**
+ * La hauteur de la zone qu'on peut toucher : celle de l'élément touchable (sa hauteur minimale),
+ * plus le débord invisible qui l'agrandit sous le doigt (hitSlop, en points, en haut et en bas).
+ * Une boîte autour qui ne réagit pas au doigt n'agrandit rien : seul l'élément touchable compte.
+ */
+const touchHeight = (node: ReturnType<typeof screen.getByRole>): number => {
+  const style = StyleSheet.flatten(node.props.style) as { minHeight?: unknown; height?: unknown }
+  const own = Math.max(
+    typeof style?.minHeight === 'number' ? style.minHeight : 0,
+    typeof style?.height === 'number' ? style.height : 0,
+  )
+  const slop: unknown = node.props.hitSlop
+  const extra =
+    typeof slop === 'number'
+      ? 2 * slop
+      : slop && typeof slop === 'object'
+        ? Number((slop as { top?: number }).top ?? 0) +
+          Number((slop as { bottom?: number }).bottom ?? 0)
+        : 0
+  return own + extra
+}
+
+describe('Button, small and confirm (R1)', () => {
+  // Le petit bouton se dessine sur 36 points, mais le doigt a toujours ses 44 points (règle
+  // d'accessibilité du projet) : par un débord invisible ou une zone touchable plus grande.
+  it('keeps a touch zone of 44 points when small', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<Button label="Voir" size="small" onPress={onPress} />)
+
+    const button = screen.getByRole('button', { name: 'Voir' })
+    expect(touchHeight(button)).toBeGreaterThanOrEqual(layout.touchTarget)
+    await fireEvent.press(button)
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  // Témoin de la mesure : le bouton ordinaire a déjà sa zone de 44 points.
+  it('measures the touch zone of a regular button as at least 44 points', async () => {
+    await renderWithProviders(<Button label="Voir" onPress={() => {}} />)
+
+    expect(touchHeight(screen.getByRole('button', { name: 'Voir' }))).toBeGreaterThanOrEqual(
+      layout.touchTarget,
+    )
+  })
+
+  // Le bouton rouge de confirmation reçoit un reflet et un halo : il reste un bouton nommé.
+  it('stays a named button when it confirms a deletion', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Button variant="confirm" label="Supprimer le projet" onPress={onPress} />,
+    )
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le projet' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Notice, polite, on a phone (R1)', () => {
+  // Un message poli (« C’est fait. ») n'est pas une alerte : sur Android, il faut une « région
+  // vivante » pour que TalkBack le lise quand il paraît ; le rôle seul ne suffit pas.
+  it('is read out by TalkBack as it appears (live region, Android)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(screen.getByRole('status')).toHaveProp('accessibilityLiveRegion', 'polite')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  // Sur iOS, il n'y a pas de région vivante : VoiceOver lit le message parce qu'on le lui demande,
+  // une fois, quand il paraît.
+  it('is read out by VoiceOver as it appears (iOS)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios')
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility')
+    try {
+      await renderWithProviders(<Notice message="C’est fait." polite />)
+      expect(announce).toHaveBeenCalledTimes(1)
+      expect(announce).toHaveBeenCalledWith('C’est fait.')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+describe('Segmented, with the keyboard (R1)', () => {
+  function Appearance() {
+    const [value, setValue] = useState<'auto' | 'day' | 'night'>('auto')
+    return (
+      <Segmented
+        label="Apparence"
+        options={[
+          { value: 'auto', label: 'Automatique' },
+          { value: 'day', label: 'Jour' },
+          { value: 'night', label: 'Nuit' },
+        ]}
+        value={value}
+        onChange={setValue}
+      />
+    )
+  }
+
+  // Comme Choices : Tab ne s'arrête qu'une fois dans le groupe, sur le choix actif (« tabIndex
+  // itinérant ») ; les flèches font le reste.
+  it('is a single stop for Tab: the checked choice', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<Appearance />)
+      const tabIndexes = () =>
+        screen.getAllByRole('radio').map((radio) => radio.props.tabIndex as number | undefined)
+
+      expect(tabIndexes()).toEqual([0, -1, -1])
+
+      await fireEvent.press(screen.getByRole('radio', { name: 'Nuit' }))
+      expect(tabIndexes()).toEqual([-1, -1, 0])
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})
+
+describe('Wordmark, with its bee (R1)', () => {
+  const logoAlt = fr.t(($) => $.brand.logoAlt)
+
+  // Le mot et l'abeille qui le précède disent la même chose : le lecteur d'écran lit le nom de
+  // l'appli une fois, et l'abeille reste muette (sinon : « Logo de Waiggle, Waiggle »).
+  it('is read once as the app name, its bee being hidden', async () => {
+    await renderWithProviders(<Wordmark logo />)
+
+    expect(screen.getAllByLabelText(appName)).toHaveLength(1)
+    expect(screen.queryByRole('img', { name: logoAlt })).toBeNull()
+    // Témoin : l'abeille est bien là, seulement cachée aux lecteurs d'écran.
+    expect(screen.getByRole('img', { name: logoAlt, includeHiddenElements: true })).toBeTruthy()
+  })
+})
+
+describe('StateMessage, with the mascot (R1, J10)', () => {
+  // Le titre dit déjà l'état : la mascotte est un décor, cachée aux lecteurs d'écran (comme
+  // l'indicateur de chargement). Elle est pourtant dessinée, dans la pose qui va avec l'état.
+  it.each([
+    ['notFound', 'Page introuvable', fr.t(($) => $.mascot.search)],
+    ['empty', 'Pas encore de notification', fr.t(($) => $.mascot.sleep)],
+    ['signedOut', 'Réservé aux membres', fr.t(($) => $.mascot.wave)],
+  ] as const)(
+    'shows the mascot of « %s », hidden from screen readers',
+    async (kind, title, pose) => {
+      await renderWithProviders(<StateMessage kind={kind} title={title} />)
+
+      expect(screen.getByRole('header', { name: title })).toBeTruthy()
+      expect(screen.queryByRole('img', { name: pose })).toBeNull()
+      expect(screen.getByRole('img', { name: pose, includeHiddenElements: true })).toBeTruthy()
+    },
+  )
 })
