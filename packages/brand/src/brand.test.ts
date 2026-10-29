@@ -2,12 +2,17 @@
 // puisse changer une couleur ou une taille sans craindre de casser l'appli sans le voir.
 import { describe, expect, it } from 'vitest'
 import {
+  brandNames,
   type ColorName,
   contrastPairs,
   contrastRatio,
+  durations,
+  easings,
   fontWeights,
   palettes,
   parseColor,
+  pressScale,
+  pressScaleFab,
   schemes,
   shadows,
   springs,
@@ -42,6 +47,31 @@ describe('colors', () => {
         ).toBeGreaterThanOrEqual(min)
       }
     }
+  })
+})
+
+describe('Miel 2 colors', () => {
+  it('measures every new text on its background', () => {
+    // Les rôles ajoutés par Miel 2 (refonte, R1) : le texte sur le verre, le bandeau d'erreur, le
+    // nom de l'auteur sur une tuile miel, et le choix actif d'un segmenté (crème la nuit). Un rôle
+    // de texte absent de contrastPairs ne serait jamais mesuré.
+    const measured = contrastPairs.map(({ text, on }) => `${text} on ${on}`)
+    for (const pair of [
+      'text on background',
+      'textMuted on background',
+      'textOnGlass on glass',
+      'dangerText on errorBand',
+      'onHoneyTile on honey',
+      'onHoney on surfaceRaised',
+    ]) {
+      expect(measured).toContain(pair)
+    }
+  })
+
+  it('measures a text on glass over the page and over the honey light', () => {
+    // Le verre laisse voir ce qu'il y a dessous (J7) : sa paire se mesure sur plusieurs fonds.
+    const onGlass = contrastPairs.find(({ text, on }) => text === 'textOnGlass' && on === 'glass')
+    expect(onGlass?.base).toEqual(expect.arrayContaining(['background', 'honey']))
   })
 })
 
@@ -86,5 +116,45 @@ describe('motion', () => {
     const overshoot = Math.exp((-zeta * Math.PI) / Math.sqrt(1 - zeta ** 2))
     expect(overshoot).toBeGreaterThan(0.03)
     expect(overshoot).toBeLessThan(0.07)
+  })
+
+  it('presses the round button deeper than the others, and both stay smaller than at rest', () => {
+    // Le bouton « + » flottant s'enfonce plus (0,92) que les autres (0,96) ; une échelle de 1 ou
+    // plus ne s'enfoncerait pas du tout.
+    expect(pressScaleFab).toBeLessThan(pressScale)
+    expect(pressScale).toBeLessThan(1)
+    expect(pressScaleFab).toBeGreaterThan(0)
+  })
+
+  it('makes the honey curve overshoot its target, like the spring', () => {
+    // Une courbe de Bézier dépasse sa cible quand l'un de ses points de contrôle passe au-dessus
+    // de 1 (en ordonnée : les nombres 2 et 4 de la liste).
+    const [, y1, , y2] = easings.honey
+    expect(Math.max(y1, y2)).toBeGreaterThan(1)
+    // La courbe de sortie, elle, ne revient jamais en arrière.
+    expect(easings.exit.every((value) => value >= 0 && value <= 1)).toBe(true)
+  })
+
+  it('gives every duration a positive length', () => {
+    for (const [name, duration] of Object.entries(durations)) {
+      expect(duration, name).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('brand names', () => {
+  it.each(schemes)('only names colors the palette has (%s)', (scheme) => {
+    // Le catalogue affiche le nom de marque à côté du rôle : un nom posé sur un rôle disparu ne
+    // s'afficherait nulle part sans qu'on le voie.
+    for (const [color, name] of Object.entries(brandNames[scheme])) {
+      expect(Object.keys(palettes[scheme]), `${scheme}: ${name}`).toContain(color)
+      expect(name, color).not.toBe('')
+    }
+  })
+
+  it('names the seven colors of the brand', () => {
+    // Miel, Ambre, Pollen, Crème, Encre et Cire le jour ; la Nuit est le fond de nuit.
+    const names = schemes.flatMap((scheme) => Object.values(brandNames[scheme]))
+    expect(names.sort()).toEqual(['Ambre', 'Cire', 'Crème', 'Encre', 'Miel', 'Nuit', 'Pollen'])
   })
 })
