@@ -2,8 +2,8 @@
 // le « w »), à partir de deux fichiers texte relisibles du dossier scripts/logo/ :
 // - abeille.svg : l'abeille, en trois tracés par rôle de couleur (`ink` l'encre, `honey` le miel,
 //   `wing` les ailes), sans couleur ni script ;
-// - chemin-centre.txt : la ligne centrale du « w » (73 points), son épaisseur et sa longueur,
-//   mesurées sur l'image du logo (1194 × 653 pixels).
+// - chemin-centre.txt : la ligne centrale du « w » (un point tous les 14 px environ), son
+//   épaisseur et sa longueur, mesurées sur l'image du logo (1194 × 653 pixels).
 // Lancer `node scripts/logo.mts` depuis apps/app après avoir changé l'un des deux. Le fichier
 // produit est enregistré dans le dépôt.
 //
@@ -27,14 +27,29 @@
 //    f. relu sur une planche à 2 × : un seul tracé d'encre (les ailes et les anneaux sont ses
 //       trous), trois pièces de miel, deux ailes, aucune miette. Le bas du ventre, là où sortait
 //       le chemin, est un peu plus plat que l'original : le chemin le recouvre dans le logo.
-// 2. La ligne centrale est copiée telle quelle des outils du chargement (`chemin-centre.txt`) ;
-//    elle a été mesurée sur la même image.
+// 2. La ligne centrale est tirée de l'image du logo entier (`logo-jour.png`, 1194 × 653), dans le
+//    même dossier temporaire (pngjs seul). La première version, copiée du prototype de
+//    chargement, n'avait pas été mesurée sur l'image : sa première bosse tombait 80 px trop bas.
+//    a. le masque d'encre du « w » : les points sombres (couverture d'encre d'au moins 50 %, lue
+//       sur le bord adouci), à plus de 32 px du miel et des ailes (le contour de l'abeille),
+//       dans la plus grande pièce d'un seul tenant ;
+//    b. on suit le trait depuis son bout gauche, par pas de 3 px : à chaque pas, une coupe
+//       perpendiculaire à la direction trouve les deux bords (couverture à 50 %, interpolée
+//       entre les pixels) ; le milieu est le point central, l'écart est l'épaisseur ;
+//    c. l'épaisseur retenue est la médiane des coupes (42,56 px ; de 40 près de l'abeille à 45
+//       dans la première bosse) ;
+//    d. le départ est le premier point où le bout rond du trait reste dans l'encre de l'original ;
+//    e. la fin : le suivi s'arrête au contour de l'abeille, puis la ligne continue tout droit
+//       jusqu'à ce que le bout rond du trait soit caché sous le ventre ;
+//    f. les points sont lissés (moyenne de 5) puis repris tous les 14 px ;
+//    g. mesuré contre l'original : 98,7 % de l'encre du « w » couverte, 1,4 % du trait hors de
+//       l'encre, écart maximal 2,8 px ;
+//    h. l'abeille est décalquée de nouveau (1.c) avec cette ligne.
 //
 // Ce que le script calcule (comme l'outil du prototype de chargement, `loop-snake.cjs`) :
 // - `trail`, le « w » : une courbe lisse qui passe par les points de la ligne centrale
 //   (Catmull-Rom convertie en courbes de Bézier cubiques : sans elle, le trait fait des angles à
-//   chaque point), sans les 3 derniers points (ils tombent dans le bout arrondi du trait et
-//   dévient), prolongée de 30 à son début pour retrouver le bout arrondi de l'original ;
+//   chaque point), du centre du bout arrondi de gauche jusque sous le ventre de l'abeille ;
 // - `flight`, le vol de l'abeille au lancement : 170 d'élan avant le « w », le « w », puis une
 //   sortie qui finit à l'horizontale ; `restOffset` est la fraction de ce vol où elle se pose
 //   (c'est le logo) ;
@@ -75,7 +90,7 @@ const direction = (a: Point, b: Point): Point => {
 }
 const along = (p: Point, d: Point, k: number): Point => [p[0] + d[0] * k, p[1] + d[1] * k]
 
-const points = trailPoints.slice(0, -3)
+const points = trailPoints
 const first = points[0] as Point
 const last = points[points.length - 1] as Point
 const at = (i: number) => points[i] as Point
@@ -122,8 +137,13 @@ const f = (n: number) => String(Math.round(n * 10) / 10)
 const pt = (p: Point) => `${f(p[0])} ${f(p[1])}`
 const smooth = segments.map((s) => ` C${pt(s[1])} ${pt(s[2])} ${pt(s[3])}`).join('')
 
-const START = 30
-const trail = `M${pt(along(first, departure, START))} L${pt(first)}${smooth}`
+// Le prolongement du départ : la ligne centrale commence déjà au centre du bout arrondi de
+// l'original (mesuré sur l'image), donc le bout rond du trait suffit et il n'y a rien à ajouter.
+// Un chemin qui commencerait plus loin dans le trait se prolongerait ici de la distance manquante.
+const START = 0
+const trail = START
+  ? `M${pt(along(first, departure, START))} L${pt(first)}${smooth}`
+  : `M${pt(first)}${smooth}`
 
 // Le vol : l'élan, le « w », puis une sortie (Bézier quadratique) qui part dans l'axe du chemin et
 // finit à l'horizontale.
