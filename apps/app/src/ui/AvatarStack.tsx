@@ -4,9 +4,9 @@
 // et à comparer ; les réactions et les abonnés restent des nombres et des listes nommées.
 // Pour un lecteur d'écran, la pile est une seule image, nommée par l'écran (« 5 membres ») : les
 // visages et la pastille sont cachés, sinon il égrènerait chaque nom avant d'arriver à la suite.
-import { borders, space } from '@ruche/brand'
+import { borders, initialsWeight, space } from '@ruche/brand'
 import { Platform, View } from 'react-native'
-import { Avatar } from './Avatar'
+import { Avatar, initialsOf } from './Avatar'
 import type { ImageSource } from './image'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -37,6 +37,31 @@ const hiddenFromReaders = {
   ...(Platform.OS === 'web' ? { 'aria-hidden': true } : null),
 }
 
+/**
+ * Les initiales d'un membre sans photo, à la taille de la pile. L'Avatar commun les écrit en 13
+ * points à cette taille : « MD » touchait alors le bord du rond, et le rond suivant, qui le
+ * chevauche, en mangeait la fin. Ici, un cran plus petit (micro), toujours en graisse très forte.
+ */
+function Initials({ name }: { name: string }) {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        width: SIZE,
+        height: SIZE,
+        borderRadius: SIZE / 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.honey,
+      }}
+    >
+      <Text variant="micro" weight={initialsWeight} tone="onHoney" maxScale={1}>
+        {initialsOf(name)}
+      </Text>
+    </View>
+  )
+}
+
 export function AvatarStack({ members, label, max = 3 }: Props) {
   const { colors } = useTheme()
   const shown = members.slice(0, max)
@@ -64,7 +89,11 @@ export function AvatarStack({ members, label, max = 3 }: Props) {
           {...hiddenFromReaders}
           style={[ring, index > 0 ? { marginLeft: -OVERLAP } : null]}
         >
-          <Avatar name={member.name} source={member.source} label={member.name} size={SIZE} />
+          {member.source ? (
+            <Avatar name={member.name} source={member.source} label={member.name} size={SIZE} />
+          ) : (
+            <Initials name={member.name} />
+          )}
         </View>
       ))}
       {others > 0 ? (

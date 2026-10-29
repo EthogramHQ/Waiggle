@@ -66,7 +66,7 @@ const fr = {
   easings: 'Courbes',
   press: (normal: number, fab: number) => `Enfoncement : ${normal} (bouton), ${fab} (bouton « + »)`,
   stacks: 'Piles d’avatars (des membres, jamais qui a réagi ni qui suit)',
-  members: (n: number) => `${n} membres`,
+  members: (n: number) => (n === 1 ? '1 membre' : `${n} membres`),
   tiles: 'Tuiles : miel, crème, encre ; avec photo ; la tuile « + Ajouter »',
   tileTitles: ['Carnet de cafés', 'Le tri des photos', 'Météo du jardin'],
   tileLong: 'Un carnet de dégustation de cafés de spécialité, avec la mouture',
@@ -110,7 +110,7 @@ const en: typeof fr = {
   easings: 'Curves',
   press: (normal: number, fab: number) => `Press: ${normal} (button), ${fab} (“+” button)`,
   stacks: 'Avatar stacks (members, never who reacted or who follows)',
-  members: (n: number) => `${n} members`,
+  members: (n: number) => (n === 1 ? '1 member' : `${n} members`),
   tiles: 'Tiles: honey, cream, ink; with a photo; the “+ Add” tile',
   tileTitles: ['Coffee notebook', 'Photo sorter', 'Garden weather'],
   tileLong: 'A tasting notebook for specialty coffees, with the grind',
@@ -158,9 +158,21 @@ const people = [
   'Nina Faure',
 ].map((name) => ({ name, source: null }))
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * Un cadre d'exemples. Groupé par défaut ; « plain » (surface pleine) pour ce qui se pose sur un
+ * fond groupé dans l'appli, comme les squelettes, qui s'y fondraient.
+ */
+function Block({
+  title,
+  children,
+  variant = 'grouped',
+}: {
+  title: string
+  children: ReactNode
+  variant?: 'grouped' | 'plain'
+}) {
   return (
-    <Surface variant="grouped" padding="lg" gap="md">
+    <Surface variant={variant} padding="lg" gap="md">
       <Text variant="headline" tone="secondary">
         {title}
       </Text>
@@ -536,7 +548,7 @@ export function TokensCatalogue() {
       <Block title={l.tiles}>
         <Tiles l={l} />
       </Block>
-      <Block title={l.skeletons}>
+      <Block title={l.skeletons} variant="plain">
         <Skeletons />
       </Block>
       <Block title={l.notices}>
