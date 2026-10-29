@@ -1,21 +1,24 @@
 // Un message encadré : une erreur, une information ou une confirmation, avec son icône.
-// accessibilityRole="alert" : les lecteurs d'écran lisent le message dès qu'il apparaît.
+// accessibilityRole="alert" : les lecteurs d'écran lisent le message dès qu'il apparaît. Un message
+// poli (« C’est fait. ») est un « status » : lu sans couper la parole, sur chaque plateforme à sa
+// façon (rôle sur le web, région vivante sur Android, annonce demandée sur iOS).
 // Une action peut suivre le message, dans le même cadre (« Me reconnecter » après « Ta session a
 // expiré », tranche 6c) : c'est un lien à part, hors de l'alerte, pour que l'alerte ne lise que le
 // message et que le lien reste atteignable au clavier et par VoiceOver.
 // Une action peut appartenir à un groupe (`single`) : une seule notice du groupe à la fois sur
 // l'écran, la première arrivée (« Ta session a expiré » une fois, même après deux actions refusées).
-import { radii, space } from '@ruche/brand'
+import { borders, radii, space } from '@ruche/brand'
 import {
   createContext,
   type ReactNode,
   type Ref,
   useContext,
+  useEffect,
   useId,
   useLayoutEffect,
   useSyncExternalStore,
 } from 'react'
-import { Platform, View } from 'react-native'
+import { AccessibilityInfo, Platform, View } from 'react-native'
 import { Icon, type IconName, type IconTone } from './Icon'
 import { Text, type Tone } from './Text'
 import { TextLink } from './TextLink'
@@ -116,6 +119,17 @@ const useSingle = (single: string | undefined): { hidden: boolean; alertKey: num
   return { hidden: group.queue[0] !== id, alertKey: group.repeats }
 }
 
+/**
+ * Hook : sur iOS, fait lire un message poli par VoiceOver quand il paraît, et à chaque fois que son
+ * texte change. iOS n'a pas de région vivante : on demande la lecture, une fois, comme le toast
+ * (theme/toast.tsx). Les alertes, elles, gardent leur rôle « alert ».
+ */
+const useIosAnnouncement = (active: boolean, message: string) => {
+  useEffect(() => {
+    if (active && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message)
+  }, [active, message])
+}
+
 type Props = {
   message: string
   tone?: 'error' | 'info' | 'success'
@@ -140,16 +154,20 @@ type Props = {
 export function Notice({ message, tone = 'error', polite = false, action, ref }: Props) {
   const { colors } = useTheme()
   const { hidden, alertKey } = useSingle(action?.single)
+  useIosAnnouncement(polite && !hidden, message)
   if (hidden) return null
   const looks: Record<
     NonNullable<Props['tone']>,
-    { icon: IconName; iconTone: IconTone; text: Tone; background: string }
+    { icon: IconName; iconTone: IconTone; text: Tone; background: string; border?: string }
   > = {
+    // Miel 2 : l'erreur est un bandeau pâle cerné d'un trait rose (errorBand, errorBorder), plus
+    // doux que l'ancien fond rose plein ; le texte rouge y garde son contraste (contrastPairs).
     error: {
       icon: 'warning-circle',
       iconTone: 'danger',
       text: 'danger',
-      background: colors.dangerSoft,
+      background: colors.errorBand,
+      border: colors.errorBorder,
     },
     info: { icon: 'info', iconTone: 'amber', text: 'default', background: colors.honeySoft },
     success: {
@@ -160,7 +178,12 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
     },
   }
   const look = looks[tone]
-  const frame = { padding: space.md, borderRadius: radii.small, backgroundColor: look.background }
+  const frame = {
+    padding: space.md,
+    borderRadius: radii.small,
+    backgroundColor: look.background,
+    ...(look.border ? { borderWidth: borders.hairline, borderColor: look.border } : null),
+  }
   // accessible : le message est lu d'un seul tenant (l'icône est décorative, seul le texte compte).
   // key : une alerte neuve quand un autre message du groupe arrive, pour qu'elle soit relue (seule
   // l'alerte change, le lien qui suit garde son focus).
@@ -170,6 +193,12 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
       ref={ref}
       accessible
       {...(polite ? { role: 'status' as const } : { accessibilityRole: 'alert' as const })}
+      // Sur Android, un rôle ne suffit pas à TalkBack : il lit un message poli quand il paraît
+      // parce que c'est une « région vivante ». Pas sur le web, où react-native-web en ferait un
+      // aria-live : le rôle « status » y est déjà annoncé (et la ref doit pouvoir le couper).
+      {...(polite && Platform.OS === 'android'
+        ? { accessibilityLiveRegion: 'polite' as const }
+        : null)}
       {...(ref && Platform.OS === 'web'
         ? { tabIndex: -1 as const, 'aria-live': 'off' as const }
         : null)}
