@@ -76,6 +76,7 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
+import { LoadingCatalogue } from './chargement'
 import { ControlsCatalogue } from './controles'
 import { FormSamples } from './formulaire'
 import { TokensCatalogue } from './jetons'
@@ -1033,6 +1034,7 @@ export function CatalogueScreen() {
       <TokensCatalogue />
       <LightCatalogue />
       <AmbiancesCatalogue />
+      <LoadingCatalogue />
     </Screen>
   )
 }

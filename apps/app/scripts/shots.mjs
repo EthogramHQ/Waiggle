@@ -1433,9 +1433,17 @@ const unfinished = unfinishedTexts(fr)
 const intendedUnfinished = ['catalogue', 'erreur']
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
+// Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
+// c'est leur nom pour les lecteurs d'écran (aria-label). On ajoute donc au texte le nom de chaque
+// élément occupé (aria-busy), une ligne chacun, pour que le garde les voie encore.
 const visibleText = (page) =>
-  // biome-ignore lint/performance/useDomNodeTextContent: on veut le texte rendu (voir ci-dessus).
-  page.evaluate(() => document.body.innerText)
+  page.evaluate(() => {
+    const busy = [...document.querySelectorAll('[aria-busy="true"]')]
+      .map((element) => element.getAttribute('aria-label'))
+      .filter(Boolean)
+    // biome-ignore lint/performance/useDomNodeTextContent: on veut le texte rendu (voir ci-dessus).
+    return [document.body.innerText, ...busy].join('\n')
+  })
 const unfinishedProblem = async (page, shot, name) =>
   loadingProblem(name, await visibleText(page), {
     texts: unfinished,

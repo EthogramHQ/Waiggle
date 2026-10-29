@@ -157,7 +157,10 @@ describe('after the second link (done), signed out', () => {
 
     expect(seen(text('doneTitle'))).toBe(0)
     expect(seen(text('doneDevices'))).toBe(0)
-    expect(screen.getAllByText(fr.t(($) => $.common.loading)).length).toBeGreaterThan(0)
+    // Depuis Miel 2, le chargement est un squelette : « Chargement… » est son nom, plus un texte.
+    expect(
+      screen.getAllByRole('progressbar', { name: fr.t(($) => $.common.loading) }).length,
+    ).toBeGreaterThan(0)
   })
 })
 
