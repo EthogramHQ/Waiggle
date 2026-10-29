@@ -114,7 +114,10 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
           justifyContent: 'center',
         }}
       >
-        <HoneyGradient scheme={scheme} />
+        {/* Le dégradé garde toujours au moins 300 points de haut, même quand la bande est plus
+            courte : écrasé dans 150 points, il devenait une ellipse plate (surtout la nuit). La
+            feuille, dessinée après lui, en cache le bas. */}
+        <HoneyGradient scheme={scheme} height={Math.max(BAND, band)} />
         {scene}
       </View>
       {/* La feuille claire, en pleine largeur : elle remonte sur la bande (marge négative). Sa
@@ -152,7 +155,7 @@ export function BrandAmbiance({ children, scene, hero, size }: Props) {
  * dépend du thème seulement (pas de useId) : la page préparée sur le serveur et le navigateur doivent
  * écrire le même ; deux dégradés identiques peuvent partager le même nom.
  */
-function HoneyGradient({ scheme }: { scheme: Scheme }) {
+function HoneyGradient({ scheme, height }: { scheme: Scheme; height?: number }) {
   const id = `brand-ambiance-${scheme}`
   // Le jour, l'ellipse fait 120 % de la largeur ; la nuit, 110 % (la lanterne est plus serrée).
   const width = scheme === 'night' ? 1.1 : 1.2
@@ -162,7 +165,12 @@ function HoneyGradient({ scheme }: { scheme: Scheme }) {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
-      style={StyleSheet.absoluteFill}
+      // Sans hauteur donnée, toute la zone ; avec, depuis le haut, quitte à déborder dessous.
+      style={
+        height === undefined
+          ? StyleSheet.absoluteFill
+          : { position: 'absolute', top: 0, left: 0, right: 0, height }
+      }
     >
       <Svg width="100%" height="100%">
         <Defs>

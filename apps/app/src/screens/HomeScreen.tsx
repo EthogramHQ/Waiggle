@@ -83,14 +83,13 @@ function VisitorHome() {
           {t(($) => $.home.title)}
         </Text>
       ) : (
-        <>
-          <Stack gap="sm">
-            <Wordmark size="huge" header={t(($) => $.home.title)} />
-            <Text variant="headline" tone="secondary" weight={400}>
-              {t(($) => $.home.tagline)}
-            </Text>
-          </Stack>
-        </>
+        // Sur téléphone, la constellation flotte sur le miel (`scene`) ; la feuille porte le nom.
+        <Stack gap="sm">
+          <Wordmark size="huge" header={t(($) => $.home.title)} />
+          <Text variant="headline" tone="secondary" weight={400}>
+            {t(($) => $.home.tagline)}
+          </Text>
+        </Stack>
       )}
       <Stack gap="md">
         <Button label={t(($) => $.home.signUp)} onPress={() => router.push('/sign-up')} />

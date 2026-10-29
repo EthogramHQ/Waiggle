@@ -103,6 +103,9 @@ export function AmbiancesCatalogue() {
   // carte se chevaucheraient.
   const wide = useLayout().sizeClass === 'wide'
   const schemes = ['day', 'night'] as const
+  // Les exemples « téléphone » côte à côte quand la place le permet ; sinon l'un sous l'autre (en
+  // rangée, un cadre de 390 points débordait d'un catalogue de 390).
+  const pair = wide ? 'row' : 'column'
   return (
     <Stack gap="lg">
       <Text variant="headline" heading={2}>
@@ -110,7 +113,7 @@ export function AmbiancesCatalogue() {
       </Text>
       <Text tone="secondary">{l.intro}</Text>
 
-      <Stack direction="row" gap="lg" wrap>
+      <Stack direction={pair} gap="lg" wrap>
         {schemes.map((scheme) => (
           // Un thème imposé autour de l'exemple : le jour et la nuit côte à côte, quel que soit le
           // thème du catalogue (ce ThemeProvider-là ne touche pas à la page).
@@ -144,7 +147,7 @@ export function AmbiancesCatalogue() {
         </Text>
       )}
 
-      <Stack direction="row" gap="lg" wrap>
+      <Stack direction={pair} gap="lg" wrap>
         {schemes.map((scheme) => (
           <ThemeProvider key={scheme} appearance={scheme}>
             <Example caption={`${l.light} — ${l[scheme]}`}>
