@@ -2,13 +2,16 @@
 // gras), le point du i en miel. Il vient de @ruche/brand : si l'appli change de nom, le mot suit.
 // Touchable s'il mène quelque part (l'accueil). `logo` pose l'abeille devant le mot.
 //
-// Le point du i en miel, sans mesurer la police : deux textes identiques, l'un sur l'autre.
-// - Dessous, le vrai texte, celui que lisent les lecteurs d'écran : « waiggle », le i en miel
-//   (tige et point).
-// - Dessus, une copie muette, transparente sauf un « ı » (i sans point) à l'encre, posé
-//   exactement sur la tige du i : dans Funnel Display, « i » est « ı » plus un point, de même
-//   chasse ; seul le point reste en miel. Les deux textes ont la même police, la même taille et
-//   la même largeur : ils se mettent en page de la même façon, sur toutes les plateformes.
+// Le point du i en miel, sans mesurer la police (la place de la ligne de base change d'une
+// plateforme à l'autre) :
+// - le vrai texte, « waiggle », celui que lisent les lecteurs d'écran et qu'on copie, donne sa
+//   place au mot ; ses lettres sont transparentes ;
+// - par-dessus, une copie muette en trois morceaux : « wa », le i, « ggle ». Le i est un « i » en
+//   miel recouvert d'un « ı » (i sans point) à l'encre : dans Funnel Display, « i » est « ı » plus
+//   un point, de même chasse ; seul le point reste en miel. Le i a sa propre boîte : sans elle,
+//   l'approche (le crénage) entre « a » et « i » n'est pas celle entre « a » et « ı », et la tige
+//   en miel dépassait d'un point de l'encre (vu sur les captures). La copie perd ces deux
+//   approches, imperceptibles à l'œil.
 // Si le nom ne contient pas de « i », le mot s'écrit simplement, sans copie.
 import { appName, textStyles } from '@ruche/brand'
 import { Text as NativeText, View } from 'react-native'
@@ -51,15 +54,13 @@ export function Wordmark({ size = 'small', onPress, header, logo = false }: Prop
       {...(header ? { heading: 1 as const } : null)}
       maxScale={maxScale}
     >
-      {dot < 0 ? (
-        word
-      ) : (
-        <>
-          {before}
-          <NativeText style={honey}>i</NativeText>
-          {after}
-        </>
-      )}
+      {dot < 0 ? word : <NativeText style={hidden}>{word}</NativeText>}
+    </Text>
+  )
+
+  const piece = (children: string) => (
+    <Text variant={variant} maxScale={maxScale}>
+      {children}
     </Text>
   )
 
@@ -69,19 +70,22 @@ export function Wordmark({ size = 'small', onPress, header, logo = false }: Prop
     ) : (
       <View>
         {text}
-        {/* La copie muette, posée sur le texte : invisible et intouchable, sauf la tige du i. */}
+        {/* La copie muette, posée sur le texte : intouchable, cachée aux lecteurs d'écran. */}
         <View
           pointerEvents="none"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           aria-hidden
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, flexDirection: 'row' }}
         >
-          <Text variant={variant} maxScale={maxScale}>
-            <NativeText style={hidden}>{before}</NativeText>
-            {'ı'}
-            <NativeText style={hidden}>{after}</NativeText>
-          </Text>
+          {piece(before)}
+          <View>
+            <Text variant={variant} maxScale={maxScale}>
+              <NativeText style={honey}>i</NativeText>
+            </Text>
+            <View style={{ position: 'absolute', top: 0, left: 0 }}>{piece('ı')}</View>
+          </View>
+          {piece(after)}
         </View>
       </View>
     )
