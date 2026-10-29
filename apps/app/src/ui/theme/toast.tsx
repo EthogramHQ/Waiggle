@@ -33,6 +33,7 @@ import type { IconName } from '../Icon'
 import { readingTime, Toast } from '../Toast'
 import { useLayout } from './layout'
 import { useCalmMotion } from './motion'
+import { layerPosition, ToastLayer } from './toastLayer'
 
 /**
  * Les poses de la mascotte qu'un toast peut montrer devant son texte. La mascotte arrive avec son
@@ -60,11 +61,10 @@ export const useToast = (): ToastApi => useContext(ToastContext)
 const BOTTOM = { compact: 104, wide: 32 } as const
 
 // Sur le web, la couche reste collée en bas de la fenêtre même si la page défile (position fixe,
-// que react-native-web comprend mais que les types de React Native ignorent). Sur téléphone, elle
-// est posée en bas de l'écran racine, qui ne défile pas.
-const pinned = (Platform.OS === 'web' ? { position: 'fixed' } : { position: 'absolute' }) as
-  | ViewStyle
-  | undefined
+// que react-native-web comprend mais que les types de React Native ignorent ; elle est rendue dans
+// <body>, voir toastLayer.web.tsx). Sur téléphone, elle est posée en bas de l'écran racine, qui ne
+// défile pas.
+const pinned = { position: layerPosition } as ViewStyle
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [shown, setShown] = useState<Shown | null>(null)
@@ -131,35 +131,37 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <View
-        // La région vivante, toujours présente. box-none : elle laisse passer les touchers vers la
-        // page ; seule la pilule les reçoit (pour le survol).
-        pointerEvents="box-none"
-        {...(Platform.OS === 'web'
-          ? { role: 'status' as const, 'aria-live': 'polite' as const }
-          : { accessibilityLiveRegion: 'polite' as const })}
-        style={{
-          ...pinned,
-          left: 0,
-          right: 0,
-          bottom: sizeClass === 'compact' ? BOTTOM.compact : BOTTOM.wide,
-          alignItems: 'center',
-          paddingHorizontal: layout.screenPadding.compact,
-        }}
-      >
-        {shown ? (
-          <Toast
-            // Une clé par toast : le nouveau entre avec sa propre animation au lieu de reprendre
-            // celle de l'ancien.
-            key={shown.id}
-            text={shown.text}
-            icon={shown.icon}
-            leaving={leaving}
-            calm={calm}
-            onHoverChange={hoverChange}
-          />
-        ) : null}
-      </View>
+      <ToastLayer>
+        <View
+          // La région vivante, toujours présente. box-none : elle laisse passer les touchers vers la
+          // page ; seule la pilule les reçoit (pour le survol).
+          pointerEvents="box-none"
+          {...(Platform.OS === 'web'
+            ? { role: 'status' as const, 'aria-live': 'polite' as const }
+            : { accessibilityLiveRegion: 'polite' as const })}
+          style={{
+            ...pinned,
+            left: 0,
+            right: 0,
+            bottom: sizeClass === 'compact' ? BOTTOM.compact : BOTTOM.wide,
+            alignItems: 'center',
+            paddingHorizontal: layout.screenPadding.compact,
+          }}
+        >
+          {shown ? (
+            <Toast
+              // Une clé par toast : le nouveau entre avec sa propre animation au lieu de reprendre
+              // celle de l'ancien.
+              key={shown.id}
+              text={shown.text}
+              icon={shown.icon}
+              leaving={leaving}
+              calm={calm}
+              onHoverChange={hoverChange}
+            />
+          ) : null}
+        </View>
+      </ToastLayer>
     </ToastContext.Provider>
   )
 }
