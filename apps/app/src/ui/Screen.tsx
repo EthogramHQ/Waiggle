@@ -68,12 +68,13 @@ type Props = {
    * - brand : le « miel vif » des moments de marque (accueil d'un visiteur, connexion,
    *   inscription) : un dégradé de miel en haut, et le contenu sur une feuille claire qui remonte
    *   dessus (ui/BrandAmbiance.tsx). La lumière d'ambiance est alors coupée, et la barre du haut
-   *   ne reste pas fixe : elle se place en tête de la feuille.
+   *   ne reste pas fixe : elle se pose sur le miel, au-dessus de la feuille.
    */
   ambiance?: 'brand' | 'light'
   /**
-   * Avec l'ambiance « brand », sur téléphone et tablette : un décor posé sur le miel, au-dessus de
-   * la feuille (la constellation de l'accueil). Jamais un bouton ni un texte à lire.
+   * Avec l'ambiance « brand » : le décor de l'écran (la constellation, l'enveloppe), caché aux
+   * lecteurs d'écran. BrandAmbiance le place selon la largeur : sur le miel (téléphone, tablette)
+   * ou en tête de la carte (ordinateur, sans `hero`). Jamais un bouton ni un texte à lire.
    */
   scene?: ReactNode
 }
@@ -190,11 +191,10 @@ export function Screen({
           ) : null}
           {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
           {brand ? (
-            // Le miel vif : BrandAmbiance pose le dégradé, ses marges et la feuille qui porte le
-            // contenu ; la barre du haut se place en tête de la feuille.
+            // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
+            // miel), le décor et la feuille qui porte le contenu.
             <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              <BrandAmbiance scene={scene} hero={withHero ? hero : undefined}>
-                {header}
+              <BrandAmbiance header={header} scene={scene} hero={withHero ? hero : undefined}>
                 {body}
               </BrandAmbiance>
             </ScrollView>

@@ -169,20 +169,29 @@ export function SessionErrorScreen({
   )
 }
 
-/** Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil. */
+/**
+ * Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil.
+ *
+ * `ambiance` : « light » (par défaut) pour un contenu introuvable à l'intérieur de l'appli (un
+ * projet, un membre) ; « brand » pour une adresse qui ne mène nulle part (NotFoundScreen), un moment
+ * de marque sur le miel vif (R1). Dans les deux cas, la barre de navigation reste (« Mon compte »
+ * partout, décision de Louis du 29/10/2026) : sur le miel, elle se pose au-dessus de la feuille.
+ */
 export function NotFoundState({
   title,
   message,
   width = 'form',
+  ambiance = 'light',
 }: {
   title: string
   message?: string
   width?: Width
+  ambiance?: 'brand' | 'light'
 }) {
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <Screen header={<TopNav />} width={width} pageTitle={title}>
+    <Screen header={<TopNav />} width={width} pageTitle={title} ambiance={ambiance}>
       <StateMessage
         kind="notFound"
         level={1}
