@@ -16,19 +16,25 @@ import { spaceToggles } from './keyboard'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
-// Dimensions de la maquette : un rond de 24, un point intérieur à 4 du bord, un halo de 3.
+// Dimensions : un rond de 24, un point clair de 8 au centre du rond choisi, un halo de 3.
 const SIZE = 24
-const DOT_INSET = 4
+const DOT = 8
 const HALO = 3
 
 type MarkProps = {
-  /** Le choix est coché : le rond prend le miel. */
+  /** Le choix est coché : le rond se remplit de miel, avec un point clair au centre. */
   selected: boolean
   /** Le choix ne peut pas être pris : le rond pâlit. */
   disabled?: boolean
 }
 
-/** Le rond d'un bouton radio, sans rôle ni geste : c'est la ligne qui le porte qui réagit. */
+/**
+ * Le rond d'un bouton radio, sans rôle ni geste : c'est la ligne qui le porte qui réagit.
+ * Choisi, c'est un rond plein de miel avec un point clair au centre (décision du 29/10/2026) : un
+ * simple point miel sur du blanc ne faisait que 1,6:1, trop peu pour dire un état (WCAG 1.4.11).
+ * Le bord du rond tient 3:1 contre le fond, vide (controlBorder) comme choisi (controlChecked) :
+ * les deux couples sont mesurés dans contrastPairs (packages/brand/src/colors.ts).
+ */
 export function RadioMark({ selected, disabled = false }: MarkProps) {
   const { colors } = useTheme()
   return (
@@ -42,8 +48,8 @@ export function RadioMark({ selected, disabled = false }: MarkProps) {
         height: SIZE,
         borderRadius: SIZE / 2,
         borderWidth: borders.focus,
-        borderColor: selected ? colors.honey : colors.lineStrong,
-        backgroundColor: colors.surface,
+        borderColor: selected ? colors.controlChecked : colors.controlBorder,
+        backgroundColor: selected ? colors.honey : colors.surface,
         alignItems: 'center',
         justifyContent: 'center',
         // Le halo : un anneau de miel pâle autour du rond choisi (une ombre sans flou ni décalage).
@@ -54,11 +60,11 @@ export function RadioMark({ selected, disabled = false }: MarkProps) {
       {selected ? (
         <View
           style={{
-            width: SIZE - 2 * DOT_INSET,
-            height: SIZE - 2 * DOT_INSET,
-            borderRadius: (SIZE - 2 * DOT_INSET) / 2,
-            // Le point est mesuré depuis le bord extérieur : la bordure fait partie de l'inset.
-            backgroundColor: colors.honey,
+            width: DOT,
+            height: DOT,
+            borderRadius: DOT / 2,
+            // Le point clair, le même blanc que la pastille d'un interrupteur, de jour et de nuit.
+            backgroundColor: colors.knob,
           }}
         />
       ) : null}

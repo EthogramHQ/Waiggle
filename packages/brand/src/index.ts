@@ -6,6 +6,7 @@ export {
   brandNames,
   type ColorName,
   contrastPairs,
+  focusHaloOpacity,
   honeyLight,
   type Palette,
   palettes,

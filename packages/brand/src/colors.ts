@@ -46,7 +46,17 @@ const day = {
   groupBorder: '#EFEBE1', // bordure d'un groupe de champs
   groupSeparator: '#F1EDE3', // trait entre deux champs d'un groupe
   handle: '#D8D3C6', // poignée d'une feuille qu'on fait glisser
-  knob: '#FFFFFF', // pastille d'un interrupteur
+  knob: '#FFFFFF', // pastille d'un interrupteur, point clair d'un bouton radio choisi
+
+  // Contrôles (case à cocher, bouton radio, interrupteur). Leur forme dit leur état : elle doit se
+  // voir à 3:1 au moins contre le fond (WCAG 1.4.11), là où un séparateur (lineStrong) fait 1,4:1.
+  controlBorder: '#8F887A', // bord d'une case ou d'un rond vide, piste d'un interrupteur éteint
+  // Le liseré d'un contrôle choisi, autour du miel : le miel seul fait 1,6:1 sur le blanc et ne
+  // dessinerait pas le rond ; ce brun ambré le détache du fond.
+  controlChecked: '#B87700',
+  // Les formes d'un squelette (chargement). De jour, une ombre transparente, qui assombrit ce qu'il
+  // y a dessous (la page, une carte, la lumière miel) et s'y voit donc partout, à 1,5:1 environ.
+  skeleton: 'rgba(28,27,25,0.22)',
 
   // Messages
   danger: '#D92D20', // fond du bouton de suppression définitive
@@ -109,6 +119,13 @@ const night = {
   handle: 'rgba(255,255,255,0.22)',
   knob: '#FFFFFF',
 
+  controlBorder: '#766F62',
+  // La nuit, le miel se détache seul du fond sombre (11:1) : le liseré reste du miel.
+  controlChecked: '#FFC933',
+  // La nuit, une forme pleine, un peu plus claire que la page : un blanc transparent se perdrait
+  // dans le cœur clair de la lanterne (1,1:1), une forme pleine s'y détache.
+  skeleton: '#3F3930',
+
   danger: '#D92D20',
   onDanger: '#FFFFFF',
   dangerText: '#FDA29B',
@@ -161,7 +178,11 @@ type Backdrop = ColorName | `#${string}`
 type ContrastPair = {
   text: ColorName
   on: ColorName
-  min: 3 | 4.5
+  /**
+   * 4,5 pour un texte, 3 pour une icône, un gros titre ou la forme d'un contrôle ; 1,5 pour une
+   * forme sans texte ni état, qui doit seulement se voir (un squelette de chargement).
+   */
+  min: 1.5 | 3 | 4.5
   /** Les fonds sur lesquels poser `on` avant de mesurer ; le fond de page si rien n'est dit. */
   base?: readonly Backdrop[]
 }
@@ -220,7 +241,25 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'onBadge', on: 'badge', min: 4.5 },
   { text: 'success', on: 'background', min: 4.5 },
   { text: 'focusRing', on: 'background', min: 3 },
+  // Les contrôles (WCAG 1.4.11) : le bord d'une case ou d'un rond vide, la piste d'un interrupteur
+  // éteint, et le liseré du rond ou de la case choisis, sur une carte comme sur la page.
+  { text: 'controlBorder', on: 'surface', min: 3 },
+  { text: 'controlBorder', on: 'background', min: 3 },
+  { text: 'controlChecked', on: 'surface', min: 3 },
+  { text: 'controlChecked', on: 'background', min: 3 },
+  // La pastille blanche posée sur la piste éteinte d'un interrupteur.
+  { text: 'knob', on: 'controlBorder', min: 3 },
+  // Les formes d'un squelette, sur la page et sur une carte. Sur la lumière miel de jour, chaque
+  // arrêt du dégradé est mesuré à part (brand.test.ts) : un couple ne sait pas viser le seul jour.
+  { text: 'skeleton', on: 'background', min: 1.5 },
+  { text: 'skeleton', on: 'surface', min: 1.5 },
 ]
+
+/**
+ * Le halo du focus clavier : le miel du thème, rendu transparent à cette opacité (de 0 à 1),
+ * autour de l'anneau. Assez pour adoucir l'anneau, trop peu pour cacher ce qu'il entoure.
+ */
+export const focusHaloOpacity = 0.28
 
 /**
  * La « lumière miel » : le dégradé rond qui sert de lumière d'ambiance quand un écran n'a pas de

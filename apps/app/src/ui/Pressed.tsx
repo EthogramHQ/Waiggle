@@ -1,9 +1,12 @@
 // Rend touchable un contenu qui n'est pas un bouton (un avatar, une carte), avec un nom pour les
 // lecteurs d'écran. Il s'enfonce légèrement sous le doigt, comme les boutons : à 96 % de sa taille
 // (jeton `pressScale` de Miel 2, dans packages/brand/src/motion.ts), avec le ressort « ferme ».
-import { layout, pressScale } from '@ruche/brand'
-import type { ReactNode } from 'react'
-import { Pressable } from 'react-native'
+// L'anneau de focus du clavier (web) et son halo se dessinent autour de l'élément touchable : ils
+// suivent son rayon. Ce rayon est celui du contenu, donné par `radius` ou lu dans le style du
+// contenu (une carte arrondie à 28) : sinon l'anneau restait carré autour d'une carte arrondie.
+import { layout, pressScale, type Radius, radii } from '@ruche/brand'
+import { isValidElement, type ReactNode } from 'react'
+import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { enterActivates } from './keyboard'
@@ -21,6 +24,19 @@ type Props = {
   fill?: boolean
   /** Le `nativeID` d'un texte qui décrit l'élément, lu après son nom (voir aria.ts). */
   describedBy?: string
+  /**
+   * Le rayon du contenu, que l'anneau de focus doit suivre. Inutile si le contenu est une vue dont
+   * le style porte déjà son rayon (`borderRadius`) : il y est lu.
+   */
+  radius?: Radius
+}
+
+/** Le rayon écrit dans le style du contenu, s'il est une seule vue qui en a un. */
+const radiusOf = (children: ReactNode): number | undefined => {
+  if (!isValidElement<{ style?: StyleProp<ViewStyle> }>(children)) return undefined
+  // StyleSheet.flatten : un style peut être une liste de styles ; on obtient leur fusion.
+  const radius = StyleSheet.flatten(children.props.style)?.borderRadius
+  return typeof radius === 'number' ? radius : undefined
 }
 
 export function Pressed({
@@ -30,7 +46,9 @@ export function Pressed({
   role = 'button',
   fill = false,
   describedBy,
+  radius,
 }: Props) {
+  const borderRadius = radius === undefined ? radiusOf(children) : radii[radius]
   const scale = useSharedValue(1)
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
   return (
@@ -53,6 +71,7 @@ export function Pressed({
           minHeight: layout.touchTarget,
           minWidth: layout.touchTarget,
           justifyContent: 'center',
+          ...(borderRadius === undefined ? null : { borderRadius }),
           ...(fill ? { flexGrow: 1 } : null),
         }}
       >

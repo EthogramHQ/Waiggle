@@ -8,7 +8,7 @@
 // - Une erreur s'écrit sous la ligne, en rouge ; sur le web, la case est marquée « invalide »
 //   (aria-invalid) et décrite par l'erreur (aria-describedby) ; sur téléphone, l'erreur est lue
 //   dans l'indice. Le nom donné au Pressable cache le texte qu'il contient, d'où ces liens à part.
-import { borders, layout, space } from '@ruche/brand'
+import { borders, layout, radii, space } from '@ruche/brand'
 import { type Ref, useId } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { describedBy, invalid } from './aria'
@@ -60,6 +60,9 @@ export function Checkbox({ label, value, onValueChange, disabled = false, error,
           alignItems: 'center',
           gap: space.md,
           minHeight: layout.touchTarget,
+          // L'anneau de focus du clavier (web) suit le contour de la rangée : arrondi, comme celui
+          // des choix d'un RadioGroup, et non un rectangle à angles vifs.
+          borderRadius: radii.small,
         }}
       >
         <View
@@ -68,8 +71,13 @@ export function Checkbox({ label, value, onValueChange, disabled = false, error,
             height: BOX,
             borderRadius: BOX_RADIUS,
             borderWidth: borders.focus,
-            // Cochée : le miel remplit la case, bordure comprise. En erreur : la bordure du champ refusé.
-            borderColor: value ? colors.honey : error ? colors.dangerText : colors.lineStrong,
+            // Le bord dit qu'il y a une case : 3:1 au moins contre le fond, vide (controlBorder) ou
+            // cochée (controlChecked, autour du miel qui la remplit). En erreur : le rouge du refus.
+            borderColor: value
+              ? colors.controlChecked
+              : error
+                ? colors.dangerText
+                : colors.controlBorder,
             backgroundColor: value ? colors.honey : colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
