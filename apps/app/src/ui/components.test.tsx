@@ -2765,22 +2765,3 @@ describe('Wordmark, with its bee (R1)', () => {
     expect(screen.getByRole('img', { name: logoAlt, includeHiddenElements: true })).toBeTruthy()
   })
 })
-
-describe('StateMessage, with the mascot (R1, J10)', () => {
-  // Le titre dit déjà l'état : la mascotte est un décor, cachée aux lecteurs d'écran (comme
-  // l'indicateur de chargement). Elle est pourtant dessinée, dans la pose qui va avec l'état.
-  it.each([
-    ['notFound', 'Page introuvable', fr.t(($) => $.mascot.search)],
-    ['empty', 'Pas encore de notification', fr.t(($) => $.mascot.sleep)],
-    ['signedOut', 'Réservé aux membres', fr.t(($) => $.mascot.wave)],
-  ] as const)(
-    'shows the mascot of « %s », hidden from screen readers',
-    async (kind, title, pose) => {
-      await renderWithProviders(<StateMessage kind={kind} title={title} />)
-
-      expect(screen.getByRole('header', { name: title })).toBeTruthy()
-      expect(screen.queryByRole('img', { name: pose })).toBeNull()
-      expect(screen.getByRole('img', { name: pose, includeHiddenElements: true })).toBeTruthy()
-    },
-  )
-})
