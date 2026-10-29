@@ -75,6 +75,7 @@ import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
 import { LoadingCatalogue } from './chargement'
+import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
@@ -1012,6 +1013,8 @@ export function CatalogueScreen() {
       <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
+      {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
+      <AccountCatalogue />
 
       <Section title={l.icons}>
         <Icons />

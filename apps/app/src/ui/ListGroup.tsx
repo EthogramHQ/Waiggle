@@ -54,6 +54,8 @@ type RadioSlot = {
 const RadioSlotContext = createContext<RadioSlot | null>(null)
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
+/** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
+export type PressEvent = { preventDefault?: () => void }
 
 export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
   const { colors, shadows } = useTheme()
@@ -182,7 +184,11 @@ type RowBase = {
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
   tone?: 'default' | 'danger'
-  onPress?: () => void
+  /**
+   * Le geste. Une ligne-lien (`href`) reçoit l'événement du clic : l'écran qui navigue par son
+   * routeur empêche le navigateur de recharger la page (`preventDefault`).
+   */
+  onPress?: (event?: PressEvent) => void
   /** Pour un choix : coché ou non (la ligne devient un bouton radio). */
   selected?: boolean
   /** Le contenu de droite qui n'est pas une icône (un contrôle segmenté, par exemple). */
@@ -199,6 +205,14 @@ type RowBase = {
    * contact@… ») : le nom d'un bouton cache le texte qu'il contient, la précision comprise.
    */
   spokenLabel?: string
+  /**
+   * L'adresse de la page où mène la ligne (les rubriques des réglages, R2) : la ligne devient un
+   * lien, et sur le web un vrai `<a>` (ouvrir dans un nouvel onglet, Entrée). Le geste ordinaire
+   * reste `onPress`, que l'écran branche sur son routeur.
+   */
+  href?: string
+  /** Avec `href` : la ligne mène à la page ouverte (`aria-current="page"`). */
+  current?: boolean
 }
 
 export function ListRow({
@@ -215,6 +229,8 @@ export function ListRow({
   disabled = false,
   busy = false,
   spokenLabel,
+  href,
+  current = false,
 }: RowProps) {
   const { colors } = useTheme()
   // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
@@ -332,9 +348,13 @@ export function ListRow({
 
   return (
     <Pressable
-      accessibilityRole={isChoice ? 'radio' : 'button'}
+      accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
       aria-disabled={disabled}
+      // Un lien avec adresse (web) : `href` et `aria-current` manquent aux types de React Native.
+      {...(href && Platform.OS === 'web'
+        ? { href, ...(current ? { 'aria-current': 'page' } : null) }
+        : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
       ref={isChoice ? slot?.setNode : undefined}
