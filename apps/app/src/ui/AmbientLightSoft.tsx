@@ -197,10 +197,11 @@ function Glow({ source, scheme, id }: { source: AmbientSource; scheme: Scheme; i
             { at: 0.35, color: source.palette[2] },
             { at: 1, color: colors.background },
           ]
-        : [
-            { at: 0, color: colors.surface },
-            { at: 0.38, color: source.palette[1] },
-            { at: 0.78, color: source.palette[0] },
+        : // Sans le cœur blanc du miel : avec lui, une palette pâle ne se distinguait plus du miel
+          // sous le voile.
+          [
+            { at: 0, color: source.palette[1] },
+            { at: 0.5, color: source.palette[0] },
             { at: 1, color: source.palette[2] },
           ]
   return (
