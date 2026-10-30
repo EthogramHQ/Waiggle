@@ -30,8 +30,6 @@ minimumReleaseAge: 10080
 #   a moins de 7 jours, pnpm refuse toute installation. Elles sont déjà installées, et en ligne
 #   depuis le 28/10 : l'exception ne fait entrer rien de neuf. À retirer le 1/11/2026 après 18 h 30
 #   (la plus jeune date du 25/10 à 17 h 29 UTC).
-# - decode-uri-component : la 0.5.1 corrige une faille (GHSA-qr28-fpjm-wq7f, voir `overrides`) et
-#   n'a que 6 jours le 29/10/2026. À retirer le 30/10/2026 après 13 h 50.
 minimumReleaseAgeExclude:
   - '@babel/helper-string-parser'
   - '@babel/parser'
@@ -48,7 +46,6 @@ minimumReleaseAgeExclude:
   - hono
   - i18next
   - react-i18next
-  - decode-uri-component
 # Une dépendance indirecte ne peut pas venir d'ailleurs que du registre (dépôt Git, archive à une
 # adresse quelconque) : une telle source échappe aux vérifications du registre et peut changer sans
 # changer de numéro de version.
