@@ -77,6 +77,7 @@ import { AmbiancesCatalogue } from './ambiances'
 import { LoadingCatalogue } from './chargement'
 import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
+import { EntryCatalogue } from './entrer'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
 import { TokensCatalogue } from './jetons'
@@ -1015,6 +1016,8 @@ export function CatalogueScreen() {
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
       <AccountCatalogue />
+      {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
+      <EntryCatalogue />
 
       <Section title={l.icons}>
         <Icons />

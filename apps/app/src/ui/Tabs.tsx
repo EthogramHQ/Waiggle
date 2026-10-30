@@ -12,7 +12,7 @@
 // choisissant (en faisant le tour), Début et Fin vont au premier et au dernier. Choisir un onglet
 // au clavier le montre aussitôt : il n'y a rien à valider.
 import { layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useId, useRef } from 'react'
+import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import { Surface, type SurfaceVariant } from './Surface'
@@ -38,6 +38,11 @@ type Props<K extends string> = {
    * surface pleine.
    */
   variant?: Extract<SurfaceVariant, 'glass' | 'grouped'>
+  /**
+   * Donne le focus à l'onglet choisi dès l'affichage (web) : quand changer d'onglet a aussi changé
+   * de page (connexion → inscription, R2), le focus revient où il était au lieu de se perdre.
+   */
+  focusOnMount?: boolean
 }
 
 type KeyEvent = { key: string; preventDefault: () => void }
@@ -48,6 +53,7 @@ export function Tabs<K extends string>({
   selected,
   onSelect,
   variant = 'glass',
+  focusOnMount = false,
 }: Props<K>) {
   const { colors, shadows } = useTheme()
   // fontScale : la taille de texte choisie sur l'appareil. Très agrandis, les onglets vont à la
@@ -107,6 +113,14 @@ export function Tabs<K extends string>({
       : null
 
   const current = tabs[tabStop]
+
+  // Une seule fois, à l'affichage : la valeur de départ de `focusOnMount` compte, pas ses
+  // changements (le focus ne saute pas pendant qu'on lit).
+  const focusAtStart = useRef(focusOnMount)
+  const startIndex = useRef(tabStop)
+  useEffect(() => {
+    if (focusAtStart.current) focusWithoutScroll(refs.current[startIndex.current])
+  }, [])
 
   return (
     <View style={{ gap: space.xl }}>

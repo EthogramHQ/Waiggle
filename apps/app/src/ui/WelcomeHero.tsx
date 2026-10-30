@@ -53,7 +53,8 @@ export function WelcomeHero({ tagline, source }: Props) {
             {/* Le texte principal (`text`), pas le secondaire : seul lui a son couple sur le verre
                 posé sur le miel. */}
             <Text variant="callout">{source.note}</Text>
-            <TextLink label={source.link} onPress={source.onPress} />
+            {/* Le code est sur un site tiers : le lien le dit (flèche, et nom lu). */}
+            <TextLink label={source.link} onPress={source.onPress} external />
           </View>
         </Surface>
       </View>

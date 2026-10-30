@@ -105,7 +105,7 @@ export function Screen({
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { padding, sizeClass } = useLayout()
+  const { padding, sizeClass, card } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
@@ -113,8 +113,9 @@ export function Screen({
   useEffect(() => markHydrated(), [])
   useBrowserLanguage()
 
-  const withHero = hero !== undefined && sizeClass === 'wide'
   const brand = ambiance === 'brand'
+  // Sur le miel, la carte arrive dès 1 000 points (`card`) ; ailleurs, avec la mise en colonnes.
+  const withHero = hero !== undefined && (brand ? card : sizeClass === 'wide')
   // Sur le miel, pas de barre fixe : elle se poserait sur le dégradé, hors de la feuille.
   const pinned = header !== undefined && stickyHeader && !brand
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.

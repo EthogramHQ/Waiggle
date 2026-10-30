@@ -112,6 +112,12 @@ function GroupFrame({
 }
 
 /** Regroupe plusieurs champs dans un même cadre, séparés par un trait fin. */
+/**
+ * La saisie d'un champ, pour qu'un écran y pose le focus (`inputRef`) sans importer React Native
+ * lui-même (les écrans n'assemblent que des composants de src/ui).
+ */
+export type TextFieldInput = TextInput
+
 export function FieldGroup({ children }: { children: ReactNode }) {
   const { colors } = useTheme()
   // Children.toArray : la liste des enfants, sans les vides (un champ affiché sous condition).
