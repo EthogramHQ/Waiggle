@@ -28,6 +28,7 @@ import { type Email, passwordChangedEmail, resetPasswordEmail } from '../email/t
 import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import {
+  ADDRESS_COUNTER_PURPOSES,
   addressCounterKey,
   addressDigest,
   memberCounterKeys,
@@ -81,9 +82,9 @@ const RESET = { method: 'POST', path: '/api/auth/reset-password' }
 const CHANGE = { method: 'POST', path: '/api/auth/change-password' }
 
 /** Les clés des compteurs d'une adresse pour le mot de passe oublié (empreinte HMAC, sec-S2). */
-export const resetAddressCounterKeys = (secret: string, email: string) => ({
-  hour: addressCounterKey(secret, 'password-reset', email),
-  day: addressCounterKey(secret, 'password-reset-day', email),
+const resetAddressCounterKeys = (secret: string, email: string) => ({
+  hour: addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.passwordReset, email),
+  day: addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.passwordResetDay, email),
 })
 
 /**
@@ -123,6 +124,28 @@ export const forgetResetLinks = (db: Pick<Database, 'delete'>, userId: string) =
         sql`starts_with(${schema.verification.value}, ${`${userId}:`})`,
       ),
     )
+
+/**
+ * Efface seulement les jetons de Better Auth d'un membre (la première sorte de lignes ci-dessus) :
+ * ce sont eux qui ouvrent le changement de mot de passe. Les lignes `sentTo` restent, le temps que
+ * le hook `after` du reset relise celle de son lien (afterReset) ; sans leur jeton, elles ne
+ * peuvent plus rien.
+ */
+const forgetResetTokens = (db: Pick<Database, 'delete'>, userId: string) =>
+  db.delete(schema.verification).where(eq(schema.verification.value, userId))
+
+/**
+ * Le jeton d'un reset, lu exactement comme Better Auth 1.7.13 le lit (`ctx.body.token ||
+ * ctx.query?.token`, dans better-auth/dist/api/routes/password.mjs) : celui du corps, sauf s'il
+ * est absent ou vide, sinon celui de l'adresse. Le lire autrement suivrait un autre jeton que
+ * celui qui a changé le mot de passe (relecture de sécurité de R2, B1).
+ */
+const resetTokenOf = (ctx: AuthContext) => {
+  const fromBody = objectBody(ctx).token
+  if (typeof fromBody === 'string' && fromBody !== '') return fromBody
+  const fromQuery: unknown = ctx.query?.token
+  return typeof fromQuery === 'string' && fromQuery !== '' ? fromQuery : undefined
+}
 
 export type PasswordFlowsOptions = {
   db: Database
@@ -255,21 +278,34 @@ export const createPasswordFlows = ({
     },
 
     /**
-     * Hook `after` de POST /api/auth/reset-password, une fois le mot de passe changé (Better Auth a
-     * déjà coupé toutes les sessions et consommé le jeton) :
-     * 1. si l'adresse du compte n'était pas vérifiée et que le lien lui a bien été envoyé (sa
-     *    ligne `sentTo`, B1), le lien la vérifie : il prouve qu'on lit cette boîte (décision de
-     *    Louis du 29/10/2026). Le membre reçoit alors son pseudo, comme après le lien
-     *    d'inscription (auth.ts, afterEmailVerification) ;
-     * 2. tous ses autres liens de mot de passe oublié tombent (B2) ;
-     * 3. « Ton mot de passe a changé » part à son adresse.
+     * Réglage `emailAndPassword.onPasswordReset` de Better Auth : il l'appelle à la fin de
+     * POST /api/auth/reset-password, une fois le mot de passe changé (sessions coupées, jeton
+     * consommé), avec le membre lui-même. C'est ici, et pas dans le hook `after`, que se fait ce
+     * qui doit toujours suivre un reset, parce que Better Auth donne le membre sans qu'on ait à le
+     * retrouver par le jeton (relecture de sécurité de R2, B1 : un jeton lu autrement que lui
+     * faisait sauter ces deux étapes) :
+     * 1. tous ses autres liens de mot de passe oublié tombent (B2) ;
+     * 2. « Ton mot de passe a changé » part à son adresse (jur-5).
+     * Une panne à l'étape 1 n'est pas cachée : l'erreur remonte (500, notée dans les journaux).
+     */
+    onPasswordReset: async ({ user }: { user: { id: string; name: string; email: string } }) => {
+      await forgetResetTokens(db, user.id)
+      sendPasswordChanged(user, RESET)
+    },
+
+    /**
+     * Hook `after` de POST /api/auth/reset-password, après onPasswordReset : si l'adresse du compte
+     * n'était pas vérifiée et que le lien lui a bien été envoyé (sa ligne `sentTo`, B1), le lien la
+     * vérifie : il prouve qu'on lit cette boîte (décision de Louis du 29/10/2026). Le membre reçoit
+     * alors son pseudo, comme après le lien d'inscription (auth.ts, afterEmailVerification). Puis
+     * ses lignes `sentTo` sont effacées. Si ce hook ne retrouve pas la ligne, le pire est une
+     * adresse qui reste à vérifier : le reste du reset est déjà fait.
      * Un membre suspendu le reste : rien ici ne touche à sa suspension (S14).
      */
     afterReset: async (ctx: AuthContext) => {
       if (failed(ctx)) return
-      const body = objectBody(ctx)
-      const token = typeof body.token === 'string' ? body.token : ctx.query?.token
-      if (typeof token !== 'string') return
+      const token = resetTokenOf(ctx)
+      if (token === undefined) return
       const [sentTo] = await db
         .select({ value: schema.verification.value })
         .from(schema.verification)
@@ -295,7 +331,6 @@ export const createPasswordFlows = ({
         }
       }
       await forgetResetLinks(db, userId)
-      sendPasswordChanged(user, RESET)
     },
 
     /**

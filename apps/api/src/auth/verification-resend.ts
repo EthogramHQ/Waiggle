@@ -22,6 +22,8 @@ import type { Mailer } from '../email/mailer'
 import { type Email, verificationEmail } from '../email/templates'
 import { describeError } from '../log'
 import {
+  ADDRESS_COUNTER_PURPOSES,
+  type AddressCounterPurpose,
   addressCounterKey,
   memberCounterKeys,
   type RateDecision,
@@ -42,10 +44,10 @@ const DAY = 24 * HOUR
 // Les quotas du renvoi, par adresse (plan A3, relecture de sécurité S4) : un renvoi par minute
 // (le temps de regarder sa boîte), 5 par heure, 10 par jour. Celui par adresse IP (5 par quart
 // d'heure) est compté par Better Auth lui-même (AUTH_RATE_RULES, auth.ts).
-const RESEND_RULES: ReadonlyArray<{ name: string; rule: RateRule }> = [
-  { name: 'minute', rule: { windowMs: MINUTE, max: 1 } },
-  { name: 'hour', rule: { windowMs: HOUR, max: 5 } },
-  { name: 'day', rule: { windowMs: DAY, max: 10 } },
+const RESEND_RULES: ReadonlyArray<{ purpose: AddressCounterPurpose; rule: RateRule }> = [
+  { purpose: ADDRESS_COUNTER_PURPOSES.verifyMinute, rule: { windowMs: MINUTE, max: 1 } },
+  { purpose: ADDRESS_COUNTER_PURPOSES.verifyHour, rule: { windowMs: HOUR, max: 5 } },
+  { purpose: ADDRESS_COUNTER_PURPOSES.verifyDay, rule: { windowMs: DAY, max: 10 } },
 ]
 // Le renvoi par la connexion (S3) : 3 par heure et par membre. Au-delà, rien ne part, sans le dire :
 // la connexion répond toujours « adresse pas encore vérifiée ».
@@ -135,8 +137,8 @@ export const createVerificationResend = ({
       const { email } = parsed.data
       const decision = await hitInOrder(
         rateLimiter,
-        RESEND_RULES.map(({ name, rule }) => ({
-          key: addressCounterKey(secret, `verify-${name}`, email),
+        RESEND_RULES.map(({ purpose, rule }) => ({
+          key: addressCounterKey(secret, purpose, email),
           rule,
         })),
       )
