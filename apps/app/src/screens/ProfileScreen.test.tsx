@@ -1,6 +1,6 @@
 // Tests de l'écran « Mon profil ». L'API (profile/api) est remplacée par de faux appels.
 import type { EmailPreferences } from '@ruche/contracts'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { request } from '../api/client'
 import type { ApiResult } from '../api/errors'
 import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
@@ -28,11 +28,19 @@ jest.mock('../profile/api', () => ({
 }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
+// R2 : la feuille du profil se ferme en revenant aux réglages (back, ou replace sans historique).
+const mockBack = jest.fn()
+let mockCanGoBack = false
 // Les paramètres de l'adresse de la page (?section=emails, depuis « Mon compte »), choisis par test.
 let mockParams: Record<string, string | undefined> = {}
 jest.mock('expo-router', () => ({
   usePathname: () => '/page/actuelle',
-  useRouter: () => ({ push: mockPush, replace: mockReplace, canGoBack: () => false }),
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
   useLocalSearchParams: () => mockParams,
 }))
 
@@ -761,5 +769,92 @@ describe('ProfileScreen, for a suspended member', () => {
     }
     expect(screen.getByRole('button', { name: 'Changer la photo' })).toBeTruthy()
     expect(screen.queryByText(containing(fr.t(($) => $.suspension.profileLocked)))).toBeNull()
+  })
+})
+
+// --- Tranche R2 : le profil se modifie dans une feuille posée sur les réglages ---
+// Ce que Jest ne mesure pas : la photo floutée derrière, l'anneau de verre, « Changer la photo » qui
+// chevauche la photo. C'est l'affaire des captures et de la relecture de design. Les règles du
+// profil (longueurs, pseudo, photo ré-encodée) ne changent pas : les tests ci-dessus les gardent.
+
+/** Le rôle d'un élément, qu'il soit écrit `role` (web) ou `accessibilityRole`. */
+const roleOf = (props: Record<string, unknown>) => props.role ?? props.accessibilityRole
+/** La feuille : l'élément nommé par son titre « Mon profil » (comme dans Sheet.test.tsx). */
+const sheet = () => screen.getByLabelText(fr.t(($) => $.profile.title))
+
+describe('ProfileScreen in a sheet (R2)', () => {
+  beforeEach(() => {
+    mockBack.mockReset()
+    mockCanGoBack = true
+  })
+
+  it('opens as a modal dialog named « Mon profil », with « Changer la photo » and the fields inside', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    expect(roleOf(sheet().props)).toBe('dialog')
+    expect(
+      sheet().props['aria-modal'] === true || sheet().props.accessibilityViewIsModal === true,
+    ).toBe(true)
+    const inside = within(sheet())
+    expect(inside.getByRole('button', { name: fr.t(($) => $.profile.avatar.change) })).toBeTruthy()
+    expect(inside.getByLabelText('Nom affiché')).toBeTruthy()
+    expect(inside.getByRole('button', { name: fr.t(($) => $.profile.save) })).toBeTruthy()
+  })
+
+  it('closes through « Fermer » (jur-15), back to the settings, without saving', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+    await fireEvent.changeText(screen.getByLabelText('Nom affiché'), 'Léa Moreau')
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.close) }))
+
+    expect(updateProfile).not.toHaveBeenCalled()
+    const left =
+      mockBack.mock.calls.length > 0 || visited(mockReplace, mockPush).includes('/settings')
+    expect(left).toBe(true)
+  })
+
+  it('closes through « Fermer » even without a page to go back to', async () => {
+    mockCanGoBack = false
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.close) }))
+
+    expect(visited(mockReplace, mockPush)).toContain('/settings')
+  })
+
+  it('updates the preview of the page while the name is typed, on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(<ProfileScreen />)
+      await screen.findByDisplayValue('Léa')
+      // Témoin : l'aperçu (MemberHeader) montre le nom actuel, en titre, comme sur sa page.
+      expect(screen.getByRole('header', { name: 'Léa' })).toBeTruthy()
+
+      await fireEvent.changeText(screen.getByLabelText('Nom affiché'), 'Léa Moreau')
+
+      expect(screen.getByRole('header', { name: 'Léa Moreau' })).toBeTruthy()
+      // Rien n'est envoyé pour autant : l'aperçu est local, « Enregistrer » reste à faire.
+      expect(updateProfile).not.toHaveBeenCalled()
+    } finally {
+      restore()
+    }
+  })
+
+  it('updates the preview of the bio too', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(<ProfileScreen />)
+      await screen.findByDisplayValue('Léa')
+
+      await fireEvent.changeText(screen.getByLabelText('Bio'), 'Je fabrique des robots en carton.')
+
+      // La bio tapée se lit deux fois : dans le champ, et dans l'aperçu.
+      expect(screen.getAllByText('Je fabrique des robots en carton.').length).toBeGreaterThan(0)
+    } finally {
+      restore()
+    }
   })
 })
