@@ -270,7 +270,8 @@ const forgetSession = () => {
 export const signOut = async (): Promise<void> => {
   try {
     const { error } = await authClient.signOut()
-    // Un refus du serveur : le membre est encore connecté, sa session reste.
+    // Un refus du serveur : sur le web, le cookie vaut encore, la session reste (la relecture
+    // suivante la redonnerait). Sur téléphone, le plugin Expo a déjà effacé la session locale.
     if (!error) forgetSession()
   } finally {
     // On vide le cache des données (profil…), même si le serveur n'a pas répondu : sur un appareil
