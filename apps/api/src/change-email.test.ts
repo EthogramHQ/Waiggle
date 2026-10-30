@@ -546,21 +546,10 @@ describe('a link opened by another member', () => {
 // pas ; l'API l'efface aussitôt. Le cache de session dans un cookie (`cookieCache`) reste coupé,
 // comme en production : avec lui, un cookie « session_data » laisserait entrer quelques minutes
 // même après l'effacement de la session.
+// R2 (D1, décision de Louis du 29/10/2026) : le test « changes the address without signing in a
+// device that has no session » est retiré. Sans session, le second lien ne change plus rien et ne
+// connecte personne (bloc « D1 » plus bas, qui vérifie aussi qu'aucune session n'est créée).
 describe('the second link', () => {
-  it('changes the address without signing in a device that has no session', async () => {
-    const cookie = await ctx.verifiedMember(ines)
-    const link = await askAndConfirm(cookie)
-    const sessions = await sessionCount()
-
-    const res = await open(link)
-
-    expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
-    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
-    expect(await sessionCount()).toBe(sessions)
-    expect(res.headers.getSetCookie().join('\n')).not.toContain('session_data')
-    expect((await me(ctx.cookiesFrom(res))).status).toBe(401)
-  })
-
   // Une session lue plus d'un jour après sa dernière lecture est rafraîchie : Better Auth la repose
   // alors dans un cookie, comme une nouvelle. Ce n'en est pas une : elle reste ouverte. Le
   // téléphone d'Inès ne sert pas pendant 25 heures ; elle fait la demande depuis son ordinateur,
@@ -607,6 +596,8 @@ describe('the second link, which only works in the session of the member (D1)', 
     expect((await accountOf('Inès')).email).toBe(ines.email)
     expect(await sessionCount()).toBe(sessions)
     expect(anonymous.headers.getSetCookie().join(';')).not.toContain('session_token=')
+    // Repris du test retiré : pas de cookie « session_data » non plus (`cookieCache` coupé).
+    expect(anonymous.headers.getSetCookie().join(';')).not.toContain('session_data')
     if (anonymous.status === 302) {
       // Une redirection : vers une page de l'appli, jamais la page « Adresse changée ».
       expect(landing(anonymous).page.startsWith(TEST_APP_URL)).toBe(true)
