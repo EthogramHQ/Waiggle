@@ -5,6 +5,7 @@
 // « Réservé aux membres » à un membre bien connecté. Ce hook fait la différence à un seul endroit,
 // pour que chaque écran affiche « Réessayer » plutôt que « Me connecter » quand c'est la lecture
 // qui a échoué.
+import { useRef, useState } from 'react'
 import { useSession } from './api'
 
 /** Le membre connecté et sa session, tels que Better Auth les rend. */
@@ -28,9 +29,29 @@ export type MemberSession =
  */
 export function useMemberSession(): MemberSession {
   const { data, isPending, error, refetch } = useSession()
-  const retry = () => void refetch()
-  if (isPending) return { state: 'pending', session: null, retry }
+  // Pendant que « Réessayer » relit la session, Better Auth repasse `isPending` à vrai (il n'a
+  // aucune session à montrer) : sans ce drapeau, l'écran d'erreur laisserait la place au
+  // chargement puis reviendrait, et le focus du clavier, posé sur « Réessayer », se perdrait.
+  // On garde donc l'état d'erreur jusqu'à la réponse. Le `useRef` ignore une seconde tape tant
+  // que la première n'a pas abouti : une seule relecture à la fois.
+  const [retrying, setRetrying] = useState(false)
+  const busy = useRef(false)
+  const retry = () => {
+    if (busy.current) return
+    busy.current = true
+    setRetrying(true)
+    void Promise.resolve(refetch()).finally(() => {
+      busy.current = false
+      setRetrying(false)
+    })
+  }
+  if (isPending)
+    return retrying
+      ? { state: 'error', session: null, retry }
+      : { state: 'pending', session: null, retry }
   if (data) return { state: 'signedIn', session: data, retry }
-  if (error) return { state: 'error', session: null, retry }
+  // Un 401 veut dire « pas de session » (Better Auth vide alors `data`) : se connecter, pas
+  // réessayer, qui redonnerait le même refus.
+  if (error && error.status !== 401) return { state: 'error', session: null, retry }
   return { state: 'signedOut', session: null, retry }
 }

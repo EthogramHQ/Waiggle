@@ -3,7 +3,7 @@
 // par un faux, dont chaque test choisit la réponse. Le défaut corrigé : `data: null` venait aussi
 // d'une lecture en échec (429, panne, réseau), et l'écran disait « Réservé aux membres » à un membre
 // connecté.
-import { renderHook } from '@testing-library/react-native'
+import { act, renderHook } from '@testing-library/react-native'
 import { useSession } from './api'
 import { useMemberSession } from './session'
 
@@ -96,5 +96,38 @@ describe('useMemberSession', () => {
     session.retry()
 
     expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers to sign in, not to retry, when the server says there is no session (401)', async () => {
+    // Relecture de l'interface (PR #62) : sur un 401, Better Auth vide `data` et remplit `error` ;
+    // « Réessayer » redonnerait le même refus, sans fin.
+    readSession({
+      data: null,
+      isPending: false,
+      error: { status: 401, statusText: 'Unauthorized' },
+    })
+
+    const session = await memberSession()
+
+    expect(session.state).toBe('signedOut')
+  })
+
+  it('keeps the error state while retrying, and reads only once for repeated taps', async () => {
+    // Relecture de l'interface (PR #62) : pendant la relecture, Better Auth repasse `isPending` à
+    // vrai ; l'écran d'erreur laissait la place au chargement et le focus de « Réessayer » se perdait.
+    const refetch = readSession({ data: null, isPending: false, error: tooManyRequests })
+    // Une relecture qui ne répond pas encore.
+    refetch.mockReturnValue(new Promise(() => {}))
+    const { result, rerender } = await renderHook(() => useMemberSession())
+
+    await act(async () => result.current.retry())
+    // Better Auth relit : `isPending` à vrai, plus d'erreur, toujours pas de session.
+    const refetchAgain = readSession({ data: null, isPending: true, error: null })
+    await rerender({})
+    await act(async () => result.current.retry())
+
+    expect(result.current.state).toBe('error')
+    expect(refetch).toHaveBeenCalledTimes(1)
+    expect(refetchAgain).not.toHaveBeenCalled()
   })
 })

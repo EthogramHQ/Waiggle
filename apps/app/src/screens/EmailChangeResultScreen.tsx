@@ -115,7 +115,16 @@ export function EmailChangeResultScreen({ step }: Props) {
                 {data ? (
                   <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
                 ) : state === 'error' ? (
-                  <Button label={t(($) => $.common.retry)} onPress={retry} />
+                  // Deux issues : relire la session, ou aller à « Mon compte », qui sait lui-même
+                  // proposer de réessayer ou de revenir si la panne dure.
+                  <>
+                    <Button label={t(($) => $.common.retry)} onPress={retry} />
+                    <Button
+                      label={t(($) => $.account.emailChange.toAccount)}
+                      variant="secondary"
+                      onPress={toAccount}
+                    />
+                  </>
                 ) : (
                   <Button
                     label={t(($) => $.account.emailChange.signIn)}
