@@ -10,7 +10,8 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { deleteAccount, downloadMyData, useSession } from '../accounts/api'
+import { deleteAccount, downloadMyData } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { useMediaSources } from '../api/media'
 import { useMember } from '../members/api'
 import { useRouteSheet } from '../navigation/useRouteSheet'
@@ -37,7 +38,7 @@ const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 export function DeleteAccountScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending, error: sessionError, refetch } = useSession()
+  const { state, session: data, retry: retrySession } = useMemberSession()
   // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà).
   const me = useMe(Boolean(data))
   const [password, setPassword] = useState('')
@@ -60,9 +61,9 @@ export function DeleteAccountScreen() {
   const member = useMember(me.data?.id ?? '', Boolean(me.data))
   const toSource = useMediaSources()
 
-  if (isPending) return <LoadingScreen />
-  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
   if (!data) return <SignedOutScreen />
 
   const onExport = async () => {

@@ -10,8 +10,9 @@ import { useRouter } from 'expo-router'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
-import { changeEmail, useSession } from '../accounts/api'
+import { changeEmail } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
+import { useMemberSession } from '../accounts/session'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
@@ -46,7 +47,7 @@ const fieldOf = (error: AuthErrorKey): keyof FieldErrors | null => {
 export function ChangeEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending, error: sessionError, refetch } = useSession()
+  const { state, session: data, retry: retrySession } = useMemberSession()
   // Arrivé par un lien direct : le retour mène à la rubrique « Compte » des réglages (R2).
   const back = useGoBack('/settings/account')
   const [newEmail, setNewEmail] = useState('')
@@ -71,9 +72,9 @@ export function ChangeEmailScreen() {
     focusWithoutScroll(messageRef.current)
   })
 
-  if (isPending) return <LoadingScreen />
-  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
   const current = data.user.email

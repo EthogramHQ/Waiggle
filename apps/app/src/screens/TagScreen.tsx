@@ -3,7 +3,7 @@
 // liste vide : elle ne dit jamais si des projets privés la portent.
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { useTag } from '../members/api'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -11,16 +11,18 @@ import { SummaryCard } from '../projects/SummaryCard'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { Screen } from '../ui/Screen'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 export function TagScreen({ slug }: { slug: string }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   const tag = useTag(slug, Boolean(session))
   const back = useGoBack('/')
 
-  if (isPending) return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="page" />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
   if (tag.error)
     return <LoadErrorScreen error={tag.error} onRetry={() => void tag.refetch()} width="page" />

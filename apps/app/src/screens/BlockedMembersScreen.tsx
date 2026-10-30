@@ -8,7 +8,7 @@
 // @x. » le confirme en haut de la liste, et la liste se relit : la ligne s'en va.
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useBlockedMembers, useUnblock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
@@ -23,13 +23,15 @@ import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadingScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 export function BlockedMembersScreen() {
-  const { data: session, isPending } = useSession()
-  if (isPending) return <LoadingScreen />
+  const { state, retry } = useMemberSession()
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   // Un visiteur : se connecter d'abord (et revenir ici ensuite).
-  if (!session) return <SignedOutScreen />
+  if (state === 'signedOut') return <SignedOutScreen />
   return <BlockedMembers />
 }
 

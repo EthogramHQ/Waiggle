@@ -27,7 +27,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
@@ -73,15 +73,24 @@ import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
 import { Comments } from './ProjectComments'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 export function ProjectScreen({ id }: { id: string }) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
   const project = useProject(id, Boolean(session))
 
-  if (isPending) return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="page" />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là,
+  // on propose de réessayer plutôt que de se connecter.
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui

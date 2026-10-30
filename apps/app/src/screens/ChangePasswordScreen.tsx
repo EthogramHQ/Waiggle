@@ -7,8 +7,9 @@ import { ChangePasswordRequest, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from 
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { changePassword, useSession } from '../accounts/api'
+import { changePassword } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
+import { useMemberSession } from '../accounts/session'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Callout } from '../ui/Callout'
@@ -36,7 +37,7 @@ type FieldErrors = {
 export function ChangePasswordScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending, error: sessionError, refetch } = useSession()
+  const { state, session: data, retry: retrySession } = useMemberSession()
   const back = useGoBack('/settings')
   const [current, setCurrent] = useState('')
   const [fresh, setFresh] = useState('')
@@ -57,9 +58,9 @@ export function ChangePasswordScreen() {
     focusWithoutScroll(messageRef.current)
   })
 
-  if (isPending) return <LoadingScreen />
-  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
 

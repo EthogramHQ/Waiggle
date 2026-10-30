@@ -27,7 +27,7 @@ import {
 } from '@ruche/contracts'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useMember } from '../members/api'
 import { useDecide } from '../moderation/api'
@@ -45,7 +45,13 @@ import { Screen } from '../ui/Screen'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 type Mode = 'suspend' | 'lift'
 
@@ -59,7 +65,7 @@ type Props = {
 
 export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // L'adresse n'est connue que dans le navigateur : la page pré-rendue en reste au chargement.
   const hydrated = useHydrated()
   const member = useMember(memberId, Boolean(session) && hydrated && memberId !== '')
@@ -67,7 +73,9 @@ export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
   // relue (une suspension faite la ferait devenir « Lever la suspension » sous les yeux).
   const [done, setDone] = useState<{ mode: Mode; name: string } | null>(null)
 
-  if (isPending || !hydrated) return <LoadingScreen />
+  if (state === 'pending' || !hydrated) return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
   const notFound = <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   if (memberId === '') return notFound

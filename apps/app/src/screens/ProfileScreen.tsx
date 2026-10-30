@@ -20,6 +20,7 @@ import {
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useRouteSheet } from '../navigation/useRouteSheet'
@@ -45,13 +46,15 @@ import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { useCalmMotion } from '../ui/theme/motion'
-import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
+import { LoadErrorScreen, LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 export function ProfileScreen() {
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   const me = useMe(Boolean(session))
 
-  if (isPending) return <LoadingScreen />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
   if (me.error) {
     return (

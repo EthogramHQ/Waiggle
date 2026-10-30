@@ -10,7 +10,7 @@ import { Redirect, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform } from 'react-native'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { useMediaSources } from '../api/media'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
@@ -59,7 +59,7 @@ export function SettingsScreen({ section }: Props) {
   const router = useRouter()
   const { sizeClass } = useLayout()
   const wide = sizeClass === 'wide'
-  const { data, isPending, error: sessionError, refetch } = useSession()
+  const { state, session: data, retry: retrySession } = useMemberSession()
   const me = useMe(Boolean(data))
   const toSource = useMediaSources()
   // Une relecture du profil demandée par « Réessayer » est en cours : pendant ce temps, React Query
@@ -77,9 +77,9 @@ export function SettingsScreen({ section }: Props) {
   // Mon profil et Modération ont leur propre page : une adresse qui les nomme y mène.
   if (section === 'profile' || section === 'moderation')
     return <Redirect href={ownPages[section]} />
-  if (isPending) return <LoadingScreen />
-  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
 
