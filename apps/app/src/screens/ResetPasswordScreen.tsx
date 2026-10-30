@@ -12,6 +12,7 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { firstParam } from '../navigation/params'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { HeldSpace } from '../ui/HeldSpace'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Emblem } from '../ui/Illustrations'
 import { Notice } from '../ui/Notice'
@@ -126,9 +127,9 @@ export function ResetPasswordScreen() {
   }
 
   const missing = Math.max(0, PASSWORD_MIN_LENGTH - Array.from(password).length)
-  // « Trop d'essais » ne reste qu'en attendant l'heure dite (ou jusqu'au prochain envoi, sans heure).
-  const shownError =
-    error === 'tooManyAttempts' && waitSeconds !== null && !retry.blocked ? null : error
+  // « Trop d'essais » ne reste qu'en attendant l'heure dite (ou jusqu'au prochain envoi, sans heure) :
+  // à l'heure dite, il s'efface en gardant sa place jusqu'au prochain envoi (C6).
+  const vacated = Boolean(retry.ended) && error === 'tooManyAttempts'
 
   return (
     <Screen
@@ -180,8 +181,10 @@ export function ResetPasswordScreen() {
       </Stack>
       {/* La conséquence, dite avant le geste (jur-3). */}
       <Notice tone="info" polite message={t(($) => $.auth.resetPassword.consequences)} />
-      {shownError ? (
-        <Notice ref={messageRef} message={t(($) => $.auth.errors[shownError], lengths)} />
+      {error ? (
+        <HeldSpace vacated={vacated}>
+          <Notice ref={messageRef} message={t(($) => $.auth.errors[error], lengths)} />
+        </HeldSpace>
       ) : null}
     </Screen>
   )

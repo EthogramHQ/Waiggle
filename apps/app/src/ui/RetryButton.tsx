@@ -10,6 +10,7 @@
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, type ButtonProps } from './Button'
+import { HeldSpace } from './HeldSpace'
 import { formatRetryTime, RetryAt, type RetryState } from './RetryAt'
 
 type Props = Omit<ButtonProps, 'describedById' | 'hint'> & {
@@ -43,8 +44,14 @@ export function RetryButton({ retry, format, disabled = false, ...button }: Prop
         describedById={explained ? phraseId : undefined}
         hint={explained ? phrase : undefined}
       />
-      {retry.until ? (
-        <RetryAt until={retry.until} nativeID={phraseId} {...(format ? { format } : null)} />
+      {/* À la fin de l'attente, la phrase s'efface mais garde sa place (HeldSpace) jusqu'au
+          prochain envoi : ce qui est dessous ne remonte pas sous le doigt (relecture de design C6). */}
+      {retry.until || retry.ended ? (
+        <HeldSpace vacated={!retry.until}>
+          {retry.until ? (
+            <RetryAt until={retry.until} nativeID={phraseId} {...(format ? { format } : null)} />
+          ) : null}
+        </HeldSpace>
       ) : null}
     </>
   )

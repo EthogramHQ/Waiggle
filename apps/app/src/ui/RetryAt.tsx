@@ -20,6 +20,13 @@ export type RetryState = {
   blocked: boolean
   /** L'heure à partir de laquelle réessayer, ou null quand rien ne bloque. */
   until: Date | null
+  /**
+   * Vrai quand l'attente vient de finir d'elle-même (l'heure est passée), jusqu'au prochain délai
+   * ou jusqu'à ce que l'écran remette le délai à null (son prochain envoi). Pendant ce temps, la
+   * phrase de l'heure et le message « trop d'essais » s'effacent en gardant leur place
+   * (`HeldSpace`) : rien ne remonte sous le doigt sans geste du membre (relecture de design R2, C6).
+   */
+  ended?: boolean
 }
 
 /**
@@ -29,19 +36,26 @@ export type RetryState = {
  */
 export const useRetryAt = (retryAfterSeconds: number | null): RetryState => {
   const [until, setUntil] = useState<Date | null>(null)
+  // L'attente a-t-elle fini d'elle-même ? Seul le minuteur le met à vrai ; un nouveau délai, ou
+  // aucun délai (l'écran repart de rien à son prochain envoi), le remet à faux.
+  const [ended, setEnded] = useState(false)
   // useEffect : à chaque nouveau délai, on calcule l'heure et on pose un minuteur qui libère ; le
   // minuteur est retiré si un autre délai arrive avant, ou si l'écran se ferme.
   useEffect(() => {
+    setEnded(false)
     if (retryAfterSeconds === null || retryAfterSeconds <= 0) {
       setUntil(null)
       return
     }
     const ms = retryAfterSeconds * 1000
     setUntil(new Date(Date.now() + ms))
-    const timer = setTimeout(() => setUntil(null), ms)
+    const timer = setTimeout(() => {
+      setUntil(null)
+      setEnded(true)
+    }, ms)
     return () => clearTimeout(timer)
   }, [retryAfterSeconds])
-  return { blocked: until !== null, until }
+  return { blocked: until !== null, until, ended }
 }
 
 type Props = {

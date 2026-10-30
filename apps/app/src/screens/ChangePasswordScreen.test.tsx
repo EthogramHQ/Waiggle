@@ -20,6 +20,7 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn(), changePassword: jes
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
+const mockDismissTo = jest.fn()
 jest.mock('expo-router', () => ({
   usePathname: () => '/settings/security/password',
   useRouter: () => ({
@@ -28,7 +29,7 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
     // R2 : après le succès, l'écran revient à la rubrique Sécurité par `dismissTo` (relecture de
     // l'interface, B2) ; le faux routeur doit l'avoir.
-    dismissTo: jest.fn(),
+    dismissTo: mockDismissTo,
     canGoBack: () => true,
     setParams: jest.fn(),
   }),
@@ -67,6 +68,7 @@ beforeEach(() => {
   jest.mocked(changePassword).mockReset().mockResolvedValue({ ok: true })
   mockPush.mockReset()
   mockReplace.mockReset()
+  mockDismissTo.mockReset()
 })
 
 afterEach(() => {
@@ -129,13 +131,16 @@ describe('ChangePasswordScreen', () => {
     expect(screen.getByLabelText(text('new'))).toHaveProp('value', fresh)
   })
 
-  it('changes the password and shows the toast « Mot de passe changé »', async () => {
+  // Relecture de design R2, C3 : le toast faisait annoncer « Mot de passe changé » deux fois, avec
+  // le message de la rubrique Sécurité. Seule la rubrique le dit (SettingsScreen.announce.test.tsx).
+  it('changes the password and goes back to the Security section, which says it, without a toast', async () => {
     await renderScreen()
 
     await change({ old: current, next: fresh })
 
     expect(changePassword).toHaveBeenCalledWith({ currentPassword: current, newPassword: fresh })
-    expect(await screen.findByText(text('done'))).toBeTruthy()
+    expect(mockDismissTo).toHaveBeenCalledWith('/settings/security?announce=passwordChanged')
+    expect(screen.queryByText(text('done'))).toBeNull()
   })
 
   it('tells at what fixed time to try again when the quota is reached', async () => {

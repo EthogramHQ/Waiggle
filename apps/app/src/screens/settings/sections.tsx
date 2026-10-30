@@ -6,13 +6,14 @@ import { contactEmail, sourceUrl } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking, Platform } from 'react-native'
 import { downloadMyData, signOut } from '../../accounts/api'
 import { useOpenOutside } from '../../navigation/links'
 import { firstParam } from '../../navigation/params'
 import { useChooseLanguage } from '../../profile/useChooseLanguage'
+import { type Focusable, focusWithoutScroll } from '../../ui/focus'
 import type { IconName } from '../../ui/Icon'
 import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
@@ -166,10 +167,26 @@ function SecuritySection() {
     setChanged(true)
     router.setParams({ announce: undefined })
   }, [hydrated, changed, announce, router])
+  // Le focus du clavier va au message dès qu'il paraît (web) : la page « Changer ton mot de passe »
+  // vient de se fermer, et le focus serait retombé sur la page entière (relecture de design C3).
+  // Le message, lu par le focus, n'est plus annoncé en plus (Notice coupe aria-live avec une ref).
+  // Une seule fois, au premier dessin du message (un effet sans liste : il suit chaque dessin).
+  const messageRef = useRef<Focusable>(null)
+  const focused = useRef(false)
+  useEffect(() => {
+    if (!changed || focused.current) return
+    focused.current = true
+    focusWithoutScroll(messageRef.current)
+  })
   return (
     <>
       {changed ? (
-        <Notice tone="success" polite message={t(($) => $.settings.changePassword.done)} />
+        <Notice
+          ref={messageRef}
+          tone="success"
+          polite
+          message={t(($) => $.settings.changePassword.done)}
+        />
       ) : null}
       <SecurityRows go={go} />
     </>
