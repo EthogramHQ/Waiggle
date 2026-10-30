@@ -955,7 +955,9 @@ export const en: Translation = {
       body: 'A request has just come in to change the password of your {{appName}} account. To choose a new one, use the button below.',
       button: 'Choose a new password',
       expires:
-        'This link is valid for {{hours}} h and works only once. Once the password is changed, all your devices will be signed out.',
+        'This link is valid for {{duration}} and works only once. Once the password is changed, all your devices will be signed out.',
+      oneHour: 'one hour',
+      hours: '{{hours}} hours',
       ignore: 'If you did not ask for this, ignore this email: your password does not change.',
       reason:
         'You receive this email because a request was made on {{appName}} with your address. Account security emails are always sent.',

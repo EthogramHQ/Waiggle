@@ -687,6 +687,16 @@ describe('the rules shared by the e-mails of an address change', () => {
 describe('resetPasswordEmail', () => {
   // Le lien mène à la page de l'appli et ne porte que le jeton (sec-S6, jur-2).
   const url = 'https://waiggle.com/reset-password?token=abc123'
+  // La phrase de validité, remplie avec la durée en toutes lettres (décision du 30/10/2026) :
+  // « une heure » pour 1, « N heures » au-delà.
+  // `typeof en` : la forme des textes, sans les phrases françaises figées dans le type.
+  const expiresIn = (t: typeof en, hours: number) =>
+    fill(t.resetPassword.expires, {
+      duration:
+        hours === 1
+          ? fill(t.resetPassword.oneHour)
+          : fill(t.resetPassword.hours, { hours: String(hours) }),
+    })
 
   it('is written in French, with the link in the text and in the button, and says why it arrives', () => {
     const email = resetPasswordEmail('fr', { url, hours: 1 })
@@ -696,7 +706,7 @@ describe('resetPasswordEmail', () => {
     for (const sentence of [t.body, t.ignore, t.reason]) {
       expect(email.text).toContain(fill(sentence))
     }
-    expect(email.text).toContain(fill(t.expires, { hours: '1' }))
+    expect(email.text).toContain(expiresIn(fr, 1))
     expect(email.text).toContain(url)
     expect(email.html).toContain(`href="${url}"`)
     expect(email.html).toContain(`>${fill(t.button)}</a>`)
@@ -710,7 +720,7 @@ describe('resetPasswordEmail', () => {
     const email = resetPasswordEmail('en', { url, hours: 1 })
 
     expect(email.subject).toBe(fill(en.resetPassword.subject))
-    expect(email.text).toContain(fill(en.resetPassword.expires, { hours: '1' }))
+    expect(email.text).toContain(expiresIn(en, 1))
     expect(email.text).not.toContain(fill(fr.resetPassword.body))
     expect(email.html).toContain('<html lang="en"')
   })
@@ -730,16 +740,31 @@ describe('resetPasswordEmail', () => {
     const one = resetPasswordEmail('fr', { url, hours: 1 })
     const two = resetPasswordEmail('fr', { url, hours: 2 })
 
-    expect(one.text).toContain(fill(fr.resetPassword.expires, { hours: '1' }))
-    expect(two.text).toContain(fill(fr.resetPassword.expires, { hours: '2' }))
-    expect(two.text).not.toContain(fill(fr.resetPassword.expires, { hours: '1' }))
+    expect(one.text).toContain(expiresIn(fr, 1))
+    expect(two.text).toContain(expiresIn(fr, 2))
+    expect(two.text).not.toContain(expiresIn(fr, 1))
+  })
+
+  // Décision du 30/10/2026 : la durée s'écrit en toutes lettres, « une heure », puis « 2 heures ».
+  it('writes the duration in words: one hour, then a number of hours', () => {
+    const one = (language: 'fr' | 'en') => resetPasswordEmail(language, { url, hours: 1 }).text
+    const two = (language: 'fr' | 'en') => resetPasswordEmail(language, { url, hours: 2 }).text
+
+    expect(one('fr')).toContain('valable une heure')
+    expect(two('fr')).toContain('valable 2 heures')
+    expect(one('en')).toContain('valid for one hour')
+    expect(two('en')).toContain('valid for 2 hours')
+    // L'ancienne écriture abrégée ne revient pas.
+    for (const text of [one('fr'), two('fr'), one('en'), two('en')]) {
+      expect(text).not.toMatch(/\d h\b/)
+    }
   })
 
   // jur-3 : la conséquence (tous les appareils déconnectés) est dite avant le geste (le lien).
   it('tells the consequence before the link', () => {
     const email = resetPasswordEmail('fr', { url, hours: 1 })
 
-    const consequence = email.text.indexOf(fill(fr.resetPassword.expires, { hours: '1' }))
+    const consequence = email.text.indexOf(expiresIn(fr, 1))
     expect(consequence).toBeGreaterThan(0)
     expect(consequence).toBeLessThan(email.text.indexOf(url))
   })
