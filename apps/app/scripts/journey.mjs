@@ -413,7 +413,9 @@ try {
   step('Léa a oublié son mot de passe : elle en choisit un nouveau par le lien reçu')
   await lea.page.getByRole('link', { name: /^Mot de passe oublié/ }).click()
   await lea.page.waitForURL((url) => url.pathname === '/forgot-password')
-  await lea.page.getByLabel('Adresse e-mail').fill(newEmail)
+  // Par le rôle : sous Expo Router web, « Se connecter » reste dans la page, cachée, avec son
+  // propre champ « Adresse e-mail » (getByLabel trouverait les deux ; getByRole ignore le caché).
+  await lea.page.getByRole('textbox', { name: 'Adresse e-mail' }).fill(newEmail)
   // On compte les e-mails déjà reçus à cette adresse : le lien attendu est dans le suivant.
   const mailsBeforeReset = mailsTo(newEmail).length
   await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
