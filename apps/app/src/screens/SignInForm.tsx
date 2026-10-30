@@ -4,7 +4,7 @@
 // le bouton reste inactif jusqu'à l'heure dite, écrite en clair, puis se libère tout seul.
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, SignInRequest } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { signIn } from '../accounts/api'
 import type { AuthDraft } from '../accounts/authHandoff'
@@ -19,6 +19,7 @@ import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
+import { useHydrated } from '../ui/theme/hydration'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
 const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
@@ -36,7 +37,24 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
   const router = useRouter()
   // useLocalSearchParams : les paramètres de l'adresse (?next=/members/abc). La page où revenir
   // après la connexion, seulement si c'est bien une page de l'appli (voir navigation/next.ts).
-  const next = safeNext(firstParam(useLocalSearchParams<{ next?: string | string[] }>().next))
+  const params = useLocalSearchParams<{ next?: string | string[]; announce?: string | string[] }>()
+  const next = safeNext(firstParam(params.next))
+  // « Mot de passe changé » (R2) : la page du nouveau mot de passe envoie ici avec
+  // ?announce=passwordChanged. L'adresse n'est connue que dans le navigateur : on attend d'y être
+  // (ui/theme/hydration.ts). Seule cette valeur exacte affiche le message : une adresse fabriquée
+  // ne fait rien dire d'autre à la page. Puis le paramètre quitte l'adresse (un rechargement ne
+  // redit rien), et le message reste, gardé ici.
+  const announce = firstParam(params.announce)
+  const hydrated = useHydrated()
+  const [passwordChanged, setPasswordChanged] = useState(false)
+  // Une seule fois : le faux routeur des tests est neuf à chaque dessin, et relancerait l'effet.
+  const announced = useRef(false)
+  useEffect(() => {
+    if (!hydrated || announced.current || announce !== 'passwordChanged') return
+    announced.current = true
+    setPasswordChanged(true)
+    router.setParams({ announce: undefined })
+  }, [hydrated, announce, router])
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<AuthErrorKey | null>(null)
@@ -83,6 +101,10 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
         </Text>
         <Text tone="secondary">{t(($) => $.auth.signIn.subtitle)}</Text>
       </Stack>
+      {passwordChanged && !error ? (
+        // Une confirmation, lue sans couper le lecteur d'écran (role « status »).
+        <Notice tone="success" polite message={t(($) => $.auth.signIn.passwordChanged)} />
+      ) : null}
       {error ? (
         <Notice
           message={t(($) => $.auth.errors[error], lengths)}
