@@ -116,6 +116,13 @@ export const memberCounterKeys = (userId: string) => ({
   emailChangeDay: `email-change-day:${userId}`,
   // Les e-mails envoyés à une nouvelle adresse (le second lien) : 3 par heure (S1).
   emailChangeLink: `email-change-link:${userId}`,
+  // Le lien de vérification renvoyé quand un compte non vérifié essaie de se connecter (R2,
+  // relecture de sécurité S3) : 3 par heure, à part du quota par adresse de « Renvoyer l'e-mail ».
+  verificationOnSignIn: `verification-on-sign-in:${userId}`,
+  // Corriger son adresse avant de l'avoir vérifiée (R2, A4, S7) : 3 par heure et 5 par jour, comptés
+  // après un mot de passe juste.
+  unverifiedEmail: `unverified-email:${userId}`,
+  unverifiedEmailDay: `unverified-email-day:${userId}`,
   // Les décisions d'un administrateur (tranche 7c) : 50 par jour, toutes actions confondues, mal
   // formées comprises. Un compte d'administrateur volé ne peut pas tout retirer d'un coup.
   moderationDecision: `moderation-decision:${userId}`,
