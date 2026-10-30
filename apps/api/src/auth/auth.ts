@@ -394,7 +394,18 @@ export const createAuth = ({
       enabled: rateLimit,
       // Les règles, écrites plus haut (AUTH_RATE_RULES) : la purge de nuit lit leur durée.
       ...AUTH_RATE_GENERAL,
-      customRules: AUTH_RATE_RULES,
+      customRules: {
+        ...AUTH_RATE_RULES,
+        // La lecture de session sort de tout quota (`false` retire la règle, générale comprise ;
+        // tranche R2, BE-5). Elle ne fait que lire un cookie signé, ce que chaque route `/v1` fait
+        // déjà sans quota, et l'appli la refait à chaque chargement de page. Comptée, la 101e
+        // lecture d'une même adresse IP (un foyer, un bureau) recevait un 429, que l'appli prenait
+        // pour « pas de session ». Un plafond plus haut ne réglerait rien : la fenêtre de Better
+        // Auth court « depuis la dernière demande », elle ne repart qu'après une minute sans aucune
+        // lecture, et un trafic continu finit toujours par l'atteindre. Elle n'est pas dans
+        // AUTH_RATE_RULES : ses règles ont toutes une fenêtre, que la purge de nuit lit.
+        '/get-session': false,
+      },
     },
 
     advanced: {
