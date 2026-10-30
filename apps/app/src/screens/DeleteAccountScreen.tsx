@@ -8,7 +8,7 @@
 // triste ni phrase qui culpabilise.
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { deleteAccount, downloadMyData, useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
@@ -16,6 +16,7 @@ import { useMember } from '../members/api'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
+import { focusAndReveal } from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -25,8 +26,9 @@ import { Sheet } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
 import { Step } from '../ui/StepNumber'
 import { Text } from '../ui/Text'
-import { TextField } from '../ui/TextField'
+import { TextField, type TextFieldInput } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
+import { useCalmMotion } from '../ui/theme/motion'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
@@ -39,7 +41,13 @@ export function DeleteAccountScreen() {
   // Le profil, pour citer le pseudo qui redevient libre (lu dans le cache s'il y est déjà).
   const me = useMe(Boolean(data))
   const [password, setPassword] = useState('')
+  // Le refus du dernier essai : écrit dans le pied de la feuille, près du bouton touché (relecture
+  // de design R2, B2) ; le champ, lui, passe en erreur sans répéter la phrase.
   const [error, setError] = useState<string | null>(null)
+  // Le champ du mot de passe, tout en bas de la feuille : une tape sans mot de passe l'amène dans
+  // l'écran avec le focus (C2).
+  const passwordInput = useRef<TextFieldInput>(null)
+  const calm = useCalmMotion()
   const [exportMessage, setExportMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null)
 
@@ -69,6 +77,14 @@ export function DeleteAccountScreen() {
   }
 
   const onDelete = async () => {
+    // Sans mot de passe, le bouton reste actif (relecture de design R2, C2) : grisé, il ne disait
+    // rien, et le champ était loin sous le pied. La tape dit quoi faire, dans le pied, et amène le
+    // champ dans l'écran, avec le focus. Rien n'est envoyé.
+    if (password.length === 0) {
+      setError(t(($) => $.errors.passwordRequired))
+      focusAndReveal(passwordInput.current, calm)
+      return
+    }
     setBusy('delete')
     const result = await deleteAccount(password)
     setBusy(null)
@@ -103,6 +119,9 @@ export function DeleteAccountScreen() {
         subtitle={t(($) => $.account.delete.intro)}
         // La feuille est toute la page : son titre est celui de la page (niveau 1).
         heading={1}
+        // Le refus, en tête du pied, juste au-dessus de « Supprimer définitivement » : en vue, et
+        // lu dès qu'il paraît (une alerte).
+        notice={error ? { message: error } : null}
         decoration={
           <PhotoStack name={data.user.name} avatar={toSource(me.data?.avatarUrl)} covers={covers} />
         }
@@ -121,8 +140,6 @@ export function DeleteAccountScreen() {
               icon="trash"
               onPress={() => void onDelete()}
               loading={deleting}
-              // impossible de supprimer sans avoir tapé son mot de passe
-              disabled={password.length === 0}
             />
             <Row justify="center">
               <TextLink
@@ -217,10 +234,16 @@ export function DeleteAccountScreen() {
               <TextField
                 label={t(($) => $.account.delete.password)}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value)
+                  // Le membre corrige : le refus d'avant s'efface (le pied rétrécit vers le bas, le
+                  // bouton ne bouge pas).
+                  setError(null)
+                }}
                 secureTextEntry
                 autoComplete="current-password"
-                error={error ?? undefined}
+                inputRef={passwordInput}
+                invalid={error !== null}
               />
               {/* Mot de passe oublié : on en choisit un nouveau d'abord (relecture juridique, jur-12). */}
               <Row justify="end">

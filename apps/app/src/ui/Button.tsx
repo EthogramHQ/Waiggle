@@ -117,7 +117,9 @@ export function Button({
     // rouge (jeton shadows.danger) le détache de la fenêtre de confirmation.
     confirm: {
       box: { backgroundColor: colors.danger, boxShadow: `${shadows.highlight}, ${shadows.danger}` },
-      pressed: { opacity: 0.85 },
+      // Appuyé, un rouge plus sombre plutôt qu'un bouton transparent : le blanc y garde 6,6:1 au
+      // lieu de tomber à 4,0:1 sur une feuille claire (relecture de design R2).
+      pressed: { backgroundColor: colors.dangerPressed },
       tone: 'onDanger',
     },
     glass: {

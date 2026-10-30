@@ -33,6 +33,7 @@ import {
 import { useMe, useSetMe } from '../profile/hooks'
 import { AvatarCover } from '../ui/AvatarCover'
 import { Button } from '../ui/Button'
+import { focusAndReveal } from '../ui/focus'
 import { Icon } from '../ui/Icon'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
@@ -42,7 +43,8 @@ import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
-import { FieldGroup, TextField } from '../ui/TextField'
+import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
+import { useCalmMotion } from '../ui/theme/motion'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function ProfileScreen() {
@@ -121,6 +123,20 @@ function ProfileForm({ me }: { me: Me }) {
   // Un envoi à la fois : Entrée tapée deux fois, ou Entrée puis « Enregistrer », n'envoie qu'une
   // fois (l'état busy, lui, n'est à jour qu'au dessin suivant).
   const saving = useRef(false)
+  // Les champs, dans l'ordre de la feuille : un refus amène le premier en erreur dans l'écran, avec
+  // le focus. Sinon, l'erreur d'un champ du bas (les outils) restait sous le pied collé, et le focus
+  // sur « Enregistrer » (relecture de design R2, comme la feuille de suppression).
+  const inputs = {
+    name: useRef<TextFieldInput>(null),
+    handle: useRef<TextFieldInput>(null),
+    bio: useRef<TextFieldInput>(null),
+    tools: useRef<TextFieldInput>(null),
+  }
+  const calm = useCalmMotion()
+  const revealFirst = (found: ProfileFormErrors) => {
+    const first = (['name', 'handle', 'bio', 'tools'] as const).find((field) => found[field])
+    if (first) focusAndReveal(inputs[first].current, calm)
+  }
 
   /**
    * Ce qui se passe à chaque lettre tapée dans un champ : la valeur change, et l'erreur de ce champ
@@ -158,6 +174,7 @@ function ProfileForm({ me }: { me: Me }) {
       // reste pas à côté d'eux.
       setMessage(null)
       setErrors(checked.errors)
+      revealFirst(checked.errors)
       return
     }
     setErrors({})
@@ -178,6 +195,7 @@ function ProfileForm({ me }: { me: Me }) {
       if ((result.error === 'handleTaken' || result.error === 'handleChangeLimit') && handleKept) {
         setMessage(null)
         setErrors({ handle: result.error })
+        revealFirst({ handle: result.error })
         return
       }
       setMessage({ text: t(($) => $.errors[result.error]), ok: false })
@@ -278,9 +296,13 @@ function ProfileForm({ me }: { me: Me }) {
   // Entrée dans un champ d'une ligne enregistre, comme dans un formulaire web.
   const submitOnEnter = { onSubmitEditing: save.onPress, returnKeyType: 'done' } as const
 
-  const notice = message ? (
-    <Notice tone={message.ok ? 'success' : 'error'} message={message.text} />
-  ) : null
+  // Le message de l'envoi, dans le pied (Sheet `notice`) : une alerte pour un refus, un statut poli
+  // pour « Profil enregistré. ».
+  const notice = message
+    ? message.ok
+      ? { message: message.text, tone: 'success' as const, polite: true }
+      : { message: message.text }
+    : null
   const avatar = toSource(me.avatarUrl)
 
   return (
@@ -293,22 +315,20 @@ function ProfileForm({ me }: { me: Me }) {
         heading={1}
         // « Enregistrer » collé en bas, toujours à portée de pouce ; le message juste au-dessus,
         // en vue du bouton, même après un appui depuis le haut d'un long formulaire.
-        footer={
-          <>
-            {notice}
-            <Button {...save} />
-          </>
-        }
+        notice={notice}
+        footer={<Button {...save} />}
         // Sur ordinateur, l'aperçu de sa page, à droite : il suit ce qui est tapé, avant même
         // « Enregistrer » (rien n'est envoyé pour autant).
         // Sa légende, « Aperçu de ta page », dit ce qu'est ce second nom en grand : un titre de
         // niveau 2 sous celui de la feuille, et le nom du membre en niveau 3, dans l'aperçu.
+        // La légende est dans la carte de l'aperçu, sur son fond blanc : posée sur le voile, son
+        // gris tombait à 2,7:1 de jour (relecture de design R2 ; 5,6:1 sur la carte).
         aside={
-          <Stack gap="sm">
-            <Text variant="caption" tone="muted" heading={2}>
-              {t(($) => $.profile.previewTitle)}
-            </Text>
-            <Surface variant="plain" padding="xl">
+          <Surface variant="plain" padding="xl">
+            <Stack gap="lg">
+              <Text variant="caption" tone="muted" heading={2}>
+                {t(($) => $.profile.previewTitle)}
+              </Text>
               <MemberHeader
                 name={name.trim() || me.name}
                 handle={t(($) => $.member.handle, { handle: handle.trim() || me.handle })}
@@ -318,8 +338,8 @@ function ProfileForm({ me }: { me: Me }) {
                 tools={parseTools(tools).map((tool) => ({ label: tool }))}
                 heading={3}
               />
-            </Surface>
-          </Stack>
+            </Stack>
+          </Surface>
         }
       >
         <AvatarCover
@@ -346,6 +366,7 @@ function ProfileForm({ me }: { me: Me }) {
             label={t(($) => $.profile.fields.name)}
             value={name}
             onChangeText={edit('name', setName)}
+            inputRef={inputs.name}
             autoCapitalize="words"
             maxLength={NAME_MAX_LENGTH}
             showCount
@@ -360,6 +381,7 @@ function ProfileForm({ me }: { me: Me }) {
             label={t(($) => $.profile.fields.handle)}
             value={handle}
             onChangeText={edit('handle', setHandle)}
+            inputRef={inputs.handle}
             prefix="@"
             autoCorrect={false}
             spellCheck={false}
@@ -377,6 +399,7 @@ function ProfileForm({ me }: { me: Me }) {
             label={t(($) => $.profile.fields.bio)}
             value={bio}
             onChangeText={edit('bio', setBio)}
+            inputRef={inputs.bio}
             autoCapitalize="sentences"
             multiline
             // Pas de maxLength ici : le compteur montre la limite sans couper le texte en plein milieu.
@@ -393,6 +416,7 @@ function ProfileForm({ me }: { me: Me }) {
           removeLabel={(item) => t(($) => $.common.remove, { item })}
           limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
           error={toolsError || undefined}
+          inputRef={inputs.tools}
         />
       </Sheet>
     </Screen>

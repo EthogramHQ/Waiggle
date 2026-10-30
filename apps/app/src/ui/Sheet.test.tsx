@@ -410,3 +410,68 @@ const scrim = () => {
   if (!found) throw new Error('no scrim')
   return found as never
 }
+
+// Relecture de design R2 (B2) : l'erreur d'un envoi s'écrivait sous un champ du bas, cachée par le
+// pied collé. Elle se montre dans le pied, avec le bouton touché, et elle est annoncée.
+describe('the message of the pinned footer', () => {
+  it('shows an error as an alert in the footer, next to the button touched', async () => {
+    await renderWithProviders(
+      <Sheet
+        open
+        title="Supprimer ton compte"
+        onClose={() => {}}
+        notice={{ message: 'Mot de passe incorrect.' }}
+        footer={<Button label="Supprimer définitivement" onPress={() => {}} />}
+      >
+        <Text>Ce qui disparaît</Text>
+      </Sheet>,
+    )
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Mot de passe incorrect.')
+    // Le pied : le plus petit bloc qui porte le message et le bouton. Le contenu qui défile n'y est pas.
+    let footer = alert.parent
+    while (
+      footer &&
+      within(footer).queryByRole('button', { name: 'Supprimer définitivement' }) === null
+    ) {
+      footer = footer.parent
+    }
+    expect(footer).not.toBeNull()
+    expect(within(footer as never).queryByText('Ce qui disparaît')).toBeNull()
+  })
+
+  it('says a confirmation politely, without an alert', async () => {
+    await renderWithProviders(
+      <Sheet
+        open
+        title="Mon profil"
+        onClose={() => {}}
+        notice={{ message: 'Profil enregistré.', tone: 'success', polite: true }}
+        footer={<Button label="Enregistrer" onPress={() => {}} />}
+      >
+        <Text>Nom</Text>
+      </Sheet>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Profil enregistré.')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows no message when there is none (témoin)', async () => {
+    await renderWithProviders(
+      <Sheet
+        open
+        title="Mon profil"
+        onClose={() => {}}
+        notice={null}
+        footer={<Button label="Enregistrer" onPress={() => {}} />}
+      >
+        <Text>Nom</Text>
+      </Sheet>,
+    )
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy()
+  })
+})
