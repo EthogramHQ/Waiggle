@@ -39,7 +39,16 @@ export function MemberCard({ name, loadingLabel, avatar, avatarLabel, viewPage, 
       {/* flexWrap : à 200 % de texte, « Modifier » passe sous le nom au lieu de le couper. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.md }}>
         <Avatar name={name ?? ''} source={avatar} label={avatarLabel} size={56} />
-        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 96, minWidth: 0, gap: space.xxs }}>
+        <View
+          style={{
+            flexGrow: 1,
+            flexShrink: 1, // La place de « Voir ma page › » sur une ligne : si « Modifier » ne tient plus à côté, il
+            // passe dessous plutôt que de couper le lien en deux lignes (390 px).
+            flexBasis: 136,
+            minWidth: 0,
+            gap: space.xxs,
+          }}
+        >
           <Text variant="headline" tone={name === null ? 'muted' : 'default'}>
             {name ?? loadingLabel}
           </Text>
