@@ -5,6 +5,7 @@ import { appName, palettes } from '@ruche/brand'
 import type { FeedItem, FeedPage, FollowingFeedPage, Project } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
+import { useSession } from '../accounts/api'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
@@ -649,5 +650,45 @@ describe('the visitor home after the redesign (R2)', () => {
     } finally {
       restore()
     }
+  })
+})
+
+describe('the home screen when the session cannot be read', () => {
+  // Relecture de l'interface (PR #62) : un 429 ou une panne de la lecture de session montrait
+  // l'accueil des visiteurs (« Créer un compte », « J'ai déjà un compte ») à un membre connecté.
+  const failSessionRead = () => {
+    const refetch = jest.fn().mockResolvedValue(undefined)
+    jest.mocked(useSession).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: { status: 429, statusText: 'Too Many Requests' },
+      refetch,
+    } as unknown as ReturnType<typeof useSession>)
+    return refetch
+  }
+
+  it('offers to retry, not to sign in or sign up', async () => {
+    const refetch = failSessionRead()
+    await renderWithI18n(<HomeScreen />)
+
+    expect(screen.getByRole('header', { name: fr.t(($) => $.states.errorTitle) })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.haveAccount) })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no « Retour » button, which would lead back to this same page', async () => {
+    failSessionRead()
+    await renderWithI18n(<HomeScreen />)
+
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.states.back) })).toBeNull()
+  })
+
+  it('still shows the visitor home while the session is being read (the pre-rendered page)', async () => {
+    mockSession(null, true)
+    await renderWithI18n(<HomeScreen />)
+
+    expect(screen.getByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeTruthy()
   })
 })
