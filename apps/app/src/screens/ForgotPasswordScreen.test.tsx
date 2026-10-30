@@ -141,4 +141,15 @@ describe('too many attempts on the forgotten password', () => {
     expect(screen.getByRole('button', { name: text('submit') })).toBeEnabled()
     expect(screen.queryByText(containing(tooMany))).toBeNull()
   })
+
+  // Relecture juridique R2 (C2) : au-delà de trois demandes par heure, « Renvoyer le lien » n'envoie
+  // plus rien ; la page le dit d'avance, pour toute adresse (sans dire si un compte existe).
+  it('says once sent that three links per hour at most leave, the last one staying valid', async () => {
+    await renderWithProviders(<ForgotPasswordScreen />)
+
+    expect(screen.queryByText(containing(text('sentLimit')))).toBeNull()
+    await send()
+
+    expect(await screen.findByText(containing(text('sentLimit')))).toBeTruthy()
+  })
 })

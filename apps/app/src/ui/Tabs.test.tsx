@@ -209,5 +209,23 @@ describe('Tabs', () => {
       expect(onSelect).not.toHaveBeenCalled()
       expect(screen.getByRole('tab', { name: 'Se connecter', selected: true })).toBeTruthy()
     })
+
+    // react-native-web n'active à la barre d'espace que role="button" : sans aide, Espace sur un
+    // onglet ne fait rien et fait défiler la page (relecture R2, C2).
+    it('selects the tab with the space bar, without scrolling the page', async () => {
+      const onSelect = jest.fn()
+      const preventDefault = jest.fn()
+      await renderWithProviders(<Sample onSelect={onSelect} />)
+
+      await fireEvent(screen.getByRole('tab', { name: 'Aide' }), 'keyDown', {
+        key: ' ',
+        repeat: false,
+        preventDefault,
+      })
+
+      expect(onSelect).toHaveBeenCalledWith('help')
+      expect(preventDefault).toHaveBeenCalled()
+      expect(screen.getByRole('tab', { name: 'Aide', selected: true })).toBeTruthy()
+    })
   })
 })

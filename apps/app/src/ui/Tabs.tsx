@@ -15,6 +15,7 @@ import { layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
+import { spaceToggles } from './keyboard'
 import { Surface, type SurfaceVariant } from './Surface'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -82,13 +83,22 @@ export function Tabs<K extends string>({
     focusWithoutScroll(refs.current[index])
   }
 
-  // Sur le web : les flèches, Début et Fin. Espace et Entrée : react-native-web les gère déjà pour
-  // un onglet (il le traite comme un bouton).
+  // Sur le web : les flèches, Début et Fin, et la barre d'espace. Entrée, react-native-web la gère
+  // déjà ; Espace, il ne l'active que pour role="button" : sans `spaceToggles`, Espace sur un onglet
+  // ne faisait rien et faisait défiler la page (relecture R2, C2).
   const webProps = (index: number) =>
     Platform.OS === 'web'
       ? {
           tabIndex: index === tabStop ? (0 as const) : (-1 as const),
           onKeyDown: (event: KeyEvent) => {
+            const choose = tabs[index]
+            if (event.key === ' ' && choose) {
+              const space = spaceToggles(() => onSelect(choose.key)) as {
+                onKeyDown?: (spaceEvent: KeyEvent) => void
+              }
+              space.onKeyDown?.(event)
+              return
+            }
             const last = tabs.length - 1
             const target =
               event.key === 'ArrowRight'

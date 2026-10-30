@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router'
 import { Platform, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { ListGroup, ListRow, type PressEvent } from './ListGroup'
+import { noteSectionChosen } from './SettingsColumns'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -55,8 +56,11 @@ export function SettingsNav<K extends string>({ label, items, current }: Props<K
 
   // Le geste sur un lien : le routeur change de page, et sur le web le navigateur ne recharge pas
   // la page (preventDefault sur le clic du `<a>`).
+  // Sur ordinateur, la page de la rubrique choisie prend le focus sur son titre (SettingsColumns) :
+  // il ne retombe pas tout en haut de la nouvelle page.
   const press = (item: SettingsNavItem<K>) => (event?: PressEvent) => {
     if (Platform.OS === 'web') event?.preventDefault?.()
+    if (sizeClass === 'wide') noteSectionChosen(item.key)
     router.push(item.href)
   }
 

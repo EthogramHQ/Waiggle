@@ -13,7 +13,8 @@ import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Notice } from '../ui/Notice'
-import { RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -128,26 +129,25 @@ export function ForgotPasswordScreen() {
                 onPress={() => openMailbox(sentTo)}
               />
             ) : null}
-            <Button
+            {/* Bloqué, le bouton dit pourquoi (RetryButton, jur-13). */}
+            <RetryButton
               label={t(($) => $.auth.forgotPassword.resend)}
               variant="secondary"
               onPress={() => void submit()}
               loading={sending}
-              disabled={retry.blocked}
+              retry={retry}
             />
-            {retry.until ? <RetryAt until={retry.until} /> : null}
             {exit}
           </Fragment>
         ) : (
           <Fragment key="form">
-            <Button
+            <RetryButton
               label={t(($) => $.auth.forgotPassword.submit)}
               icon="paper-plane-tilt"
               onPress={() => void submit()}
               loading={sending}
-              disabled={retry.blocked}
+              retry={retry}
             />
-            {retry.until ? <RetryAt until={retry.until} /> : null}
             {exit}
           </Fragment>
         )
@@ -186,6 +186,9 @@ export function ForgotPasswordScreen() {
             message={t(($) => $.auth.forgotPassword.sent)}
           />
           <Text tone="secondary">{t(($) => $.auth.forgotPassword.sentExpires)}</Text>
+          {/* Le quota, dit d'avance (relecture juridique R2, C2) : au-delà, « Renvoyer le lien »
+              n'envoie plus rien. Vrai pour toute adresse : il ne dit pas si un compte existe. */}
+          <Text tone="secondary">{t(($) => $.auth.forgotPassword.sentLimit)}</Text>
           <Text variant="callout" tone="muted">
             {t(($) => $.auth.forgotPassword.noneReceived)}
           </Text>

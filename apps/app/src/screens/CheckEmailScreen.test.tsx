@@ -209,6 +209,47 @@ describe('changing the address before it is verified', () => {
       await screen.findByRole('button', { name: fr.t(($) => $.auth.signIn.forgotPassword) }),
     ).toBeTruthy()
   })
+
+  // Relecture juridique R2 (B1, D4, jur-B3) : la nouvelle adresse peut être déjà prise, et rien ne
+  // part alors ; le serveur ne le dit pas. Aucun texte de la page ne doit affirmer l'envoi sans
+  // condition, ni le corps, ni la confirmation d'un renvoi.
+  const sentence = /part vers|vient de partir|vient d’y partir/
+  /** Les textes de la page qui parlent d'un envoi. */
+  const sendingTexts = () =>
+    screen.getAllByText(sentence).map((node) => String(node.props.children).replace(/\s+/g, ' '))
+
+  it('never claims without condition that a link left after a correction', async () => {
+    await renderWithProviders(<CheckEmailScreen />)
+
+    await correct({ newEmail: 'ines.haddad@example.fr', password: 'mot-de-passe-d-ines' })
+
+    expect(await screen.findByText(containing(change('sent')))).toBeTruthy()
+    expect(
+      screen.getByText(
+        containing(fr.t(($) => $.auth.checkEmail.bodyChanged, { email: 'ines.haddad@example.fr' })),
+      ),
+    ).toBeTruthy()
+    expect(
+      screen.queryByText(
+        containing(fr.t(($) => $.auth.checkEmail.body, { email: 'ines.haddad@example.fr' })),
+      ),
+    ).toBeNull()
+    for (const said of sendingTexts()) expect(said).toMatch(/^Si /)
+  })
+
+  it('keeps every sentence conditional when the link is sent again after a correction', async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(now)
+    await renderWithProviders(<CheckEmailScreen />)
+    await correct({ newEmail: 'ines.haddad@example.fr', password: 'mot-de-passe-d-ines' })
+    await screen.findByText(containing(change('sent')))
+
+    await fireEvent.press(screen.getByRole('button', { name: text('resend') }))
+
+    expect(resendVerification).toHaveBeenCalledWith({ email: 'ines.haddad@example.fr' })
+    expect(await screen.findByText(containing(text('resent')))).toBeTruthy()
+    for (const said of sendingTexts()) expect(said).toMatch(/^Si /)
+  })
 })
 
 describe('opening the mailbox', () => {

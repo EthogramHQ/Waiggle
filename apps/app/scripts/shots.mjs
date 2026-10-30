@@ -1244,6 +1244,14 @@ const pages = [
   { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
   { name: 'reglages-donnees', path: '/settings/data', signedIn: true, fullPage: true },
   { name: 'reglages-securite', path: '/settings/security', signedIn: true, fullPage: true },
+  // Retour de « Changer ton mot de passe » (relecture R2, B2) : la rubrique dit elle-même
+  // « Mot de passe changé », le toast n'est plus la seule trace.
+  {
+    name: 'reglages-securite-change',
+    path: '/settings/security?announce=passwordChanged',
+    signedIn: true,
+    fullPage: true,
+  },
   { name: 'reglages-compte', path: '/settings/account', signedIn: true, fullPage: true },
   { name: 'reglages-a-propos', path: '/settings/about', signedIn: true, fullPage: true },
   { name: 'supprimer-compte', path: '/settings/account/delete', signedIn: true, fullPage: true },

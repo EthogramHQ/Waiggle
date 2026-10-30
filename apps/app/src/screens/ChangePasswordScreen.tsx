@@ -10,16 +10,14 @@ import { useTranslation } from 'react-i18next'
 import { changePassword, useSession } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
 import { useGoBack } from '../navigation/useGoBack'
-import { Button } from '../ui/Button'
+import { Callout } from '../ui/Callout'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HoneyMeter } from '../ui/HoneyMeter'
-import { Icon } from '../ui/Icon'
 import { Notice } from '../ui/Notice'
-import { RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
-import { Surface } from '../ui/Surface'
-import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useToast } from '../ui/theme/toast'
@@ -94,12 +92,16 @@ export function ChangePasswordScreen() {
     setSending(false)
     if (result.ok) {
       setError(null)
-      // Le toast survit au changement de page : il se lit sur la rubrique où l'on revient.
+      // Le toast survit au changement de page ; mais un toast ne porte aucune information absente
+      // de l'écran (décision R1) : la rubrique où l'on revient le dit aussi, dans un message poli
+      // (?announce=passwordChanged, relecture de l'interface R2, B2). dismissTo revient à la
+      // rubrique déjà ouverte dans l'historique au lieu d'en empiler une seconde ; arrivé ici par
+      // un lien direct, elle prend la place de cette page.
       toast.show(
         t(($) => $.settings.changePassword.done),
         { icon: 'check-circle' },
       )
-      back()
+      router.dismissTo('/settings/security?announce=passwordChanged')
       return
     }
     if (result.error === 'wrongPassword') {
@@ -130,15 +132,16 @@ export function ChangePasswordScreen() {
           {shownError ? (
             <Notice ref={messageRef} message={t(($) => $.auth.errors[shownError], lengths)} />
           ) : null}
-          <Button
+          {/* Bloqué par « trop d'essais », le bouton dit pourquoi (RetryButton, jur-13). */}
+          <RetryButton
             label={t(($) => $.settings.changePassword.submit)}
             onPress={() => void submit()}
             loading={sending}
+            retry={retry}
             // Impossible d'envoyer sans avoir tapé son mot de passe actuel (comme pour changer
             // d'adresse), ni pendant l'attente d'un « trop d'essais ».
-            disabled={current.length === 0 || retry.blocked}
+            disabled={current.length === 0}
           />
-          {retry.until ? <RetryAt until={retry.until} /> : null}
         </>
       }
     >
@@ -194,17 +197,11 @@ export function ChangePasswordScreen() {
         </Stack>
       </Stack>
       {/* Les conséquences, dites avant le geste (jur-3). */}
-      <Surface padding="lg">
-        <Row gap="md" align="start">
-          <Icon name="device-mobile" size={24} tone="secondary" />
-          <Stack gap="xs" grow>
-            <Text weight={600}>{t(($) => $.settings.changePassword.consequencesTitle)}</Text>
-            <Text variant="callout" tone="secondary">
-              {t(($) => $.settings.changePassword.consequences)}
-            </Text>
-          </Stack>
-        </Row>
-      </Surface>
+      <Callout
+        icon="device-mobile"
+        title={t(($) => $.settings.changePassword.consequencesTitle)}
+        body={t(($) => $.settings.changePassword.consequences)}
+      />
     </Screen>
   )
 }
