@@ -177,3 +177,80 @@ describe('ListGroup as a radio group, on the web', () => {
     }
   })
 })
+
+// Les lignes-liens des réglages (R2) : `href` en fait un lien vers une vraie adresse, `current`
+// dit la page ouverte, `hint` ce que contient la rubrique (relecture de l'interface, C7).
+describe('a row that leads to a page', () => {
+  const propsOf = (element: { props: unknown }) => element.props as Record<string, unknown>
+
+  it('is a link carrying its address, and the gesture goes to the screen', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Langue" href="/settings/language" trailing="chevron" onPress={onPress} />
+      </ListGroup>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Langue' })
+    expect(propsOf(link).href).toBe('/settings/language')
+    expect(propsOf(link)['aria-current']).toBeUndefined()
+    await fireEvent.press(link)
+    expect(onPress).toHaveBeenCalled()
+  })
+
+  it('says it leads to the open page (aria-current)', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Langue" href="/settings/language" current onPress={() => {}} />
+        <ListRow label="Sécurité" href="/settings/security" onPress={() => {}} />
+      </ListGroup>,
+    )
+
+    expect(propsOf(screen.getByRole('link', { name: 'Langue' }))['aria-current']).toBe('page')
+    expect(propsOf(screen.getByRole('link', { name: 'Sécurité' }))['aria-current']).toBeUndefined()
+  })
+
+  it('reads its hint after its name on a phone', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow
+          label="Sécurité"
+          href="/settings/security"
+          hint="Mot de passe, membres bloqués"
+          onPress={() => {}}
+        />
+      </ListGroup>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Sécurité' })
+    expect(propsOf(link).accessibilityHint).toBe('Mot de passe, membres bloqués')
+  })
+
+  it('links its hint as a description on the web (aria-describedby)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <ListGroup>
+          <ListRow
+            label="Sécurité"
+            href="/settings/security"
+            hint="Mot de passe, membres bloqués"
+            onPress={() => {}}
+          />
+        </ListGroup>,
+      )
+
+      const link = screen.getByRole('link', { name: 'Sécurité' })
+      const id = propsOf(link)['aria-describedby']
+      expect(id).toBeTruthy()
+      expect(propsOf(link).accessibilityHint).toBeUndefined()
+      // Le texte décrit existe, caché, sous l'identifiant désigné.
+      const hint = screen.getByText('Mot de passe, membres bloqués', {
+        includeHiddenElements: true,
+      })
+      expect(propsOf(hint.parent as { props: unknown }).nativeID).toBe(id)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+})

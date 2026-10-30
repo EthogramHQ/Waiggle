@@ -5,18 +5,20 @@
 import { contactEmail, sourceUrl } from '@ruche/brand'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
 import { supportedLanguages } from '@ruche/i18n'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking, Platform } from 'react-native'
 import { downloadMyData, signOut } from '../../accounts/api'
 import { useOpenOutside } from '../../navigation/links'
+import { firstParam } from '../../navigation/params'
 import { useChooseLanguage } from '../../profile/useChooseLanguage'
 import type { IconName } from '../../ui/Icon'
 import { ListGroup, ListRow, type PressEvent } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { Text } from '../../ui/Text'
 import type { Appearance } from '../../ui/theme/appearance'
+import { useHydrated } from '../../ui/theme/hydration'
 import { useTheme } from '../../ui/theme/ThemeProvider'
 import { EmailSettings } from './EmailSettings'
 
@@ -150,6 +152,33 @@ function DataSection() {
 function SecuritySection() {
   const { t } = useTranslation()
   const go = useGo()
+  const router = useRouter()
+  // Retour de « Changer ton mot de passe » : ?announce=passwordChanged (relecture de l'interface
+  // R2, B2 : le toast ne doit pas être la seule trace). L'adresse n'est connue que dans le
+  // navigateur : on attend d'y être (useHydrated). Le message reste, le paramètre quitte l'adresse
+  // (setParams) : une page rechargée ou partagée ne le redit pas.
+  const params = useLocalSearchParams<{ announce?: string | string[] }>()
+  const announce = firstParam(params.announce)
+  const hydrated = useHydrated()
+  const [changed, setChanged] = useState(false)
+  useEffect(() => {
+    if (!hydrated || changed || announce !== 'passwordChanged') return
+    setChanged(true)
+    router.setParams({ announce: undefined })
+  }, [hydrated, changed, announce, router])
+  return (
+    <>
+      {changed ? (
+        <Notice tone="success" polite message={t(($) => $.settings.changePassword.done)} />
+      ) : null}
+      <SecurityRows go={go} />
+    </>
+  )
+}
+
+/** Les deux lignes de la rubrique Sécurité : le mot de passe, les membres bloqués. */
+function SecurityRows({ go }: { go: ReturnType<typeof useGo> }) {
+  const { t } = useTranslation()
   return (
     <ListGroup>
       <ListRow

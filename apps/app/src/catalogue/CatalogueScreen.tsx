@@ -81,6 +81,7 @@ import { EntryCatalogue } from './entrer'
 import { SheetsCatalogue } from './feuilles'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
+import { SafeguardsCatalogue } from './garde-fous'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
@@ -1023,6 +1024,8 @@ export function CatalogueScreen() {
       <EntryCatalogue />
       {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
       <SettingsCatalogue />
+      {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
+      <SafeguardsCatalogue />
 
       <Section title={l.icons}>
         <Icons />

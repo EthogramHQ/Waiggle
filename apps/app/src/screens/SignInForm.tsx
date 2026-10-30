@@ -4,7 +4,7 @@
 // le bouton reste inactif jusqu'à l'heure dite, écrite en clair, puis se libère tout seul.
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, SignInRequest } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { signIn } from '../accounts/api'
 import type { AuthDraft } from '../accounts/authHandoff'
@@ -12,9 +12,9 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { safeNext } from '../navigation/next'
 import { firstParam } from '../navigation/params'
-import { Button } from '../ui/Button'
 import { Notice } from '../ui/Notice'
-import { formatRetryTime, RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
@@ -33,7 +33,7 @@ type Props = {
 }
 
 export function SignInForm({ draft, onDraft, onSignUp }: Props) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const router = useRouter()
   // useLocalSearchParams : les paramètres de l'adresse (?next=/members/abc). La page où revenir
   // après la connexion, seulement si c'est bien une page de l'appli (voir navigation/next.ts).
@@ -62,8 +62,6 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
   // Le délai donné par le serveur après « trop d'essais » ; le hook en tire l'heure et le blocage.
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
-  // L'identifiant de la phrase « Nouvel essai possible à… », qui dit pourquoi le bouton est inactif.
-  const retryId = useId()
 
   const submit = async () => {
     if (retry.blocked) return
@@ -87,11 +85,6 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
     setError(result.error)
     if (result.error === 'tooManyAttempts') setRetryAfter(result.retryAfterSeconds)
   }
-
-  // La même phrase que RetryAt, en indice du bouton sur téléphone.
-  const retryText = retry.until
-    ? t(($) => $.auth.retryAt, { time: formatRetryTime(retry.until, i18n.language) })
-    : undefined
 
   return (
     <>
@@ -145,16 +138,13 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
         </Row>
       </Stack>
       <Stack gap="sm">
-        <Button
+        {/* Inactif, le bouton dit pourquoi : la phrase de l'heure (web), un indice (téléphone). */}
+        <RetryButton
           label={t(($) => $.auth.signIn.submit)}
           onPress={submit}
           loading={loading}
-          disabled={retry.blocked}
-          // Inactif, le bouton dit pourquoi : la phrase de l'heure (web), un indice (téléphone).
-          describedById={retry.blocked ? retryId : undefined}
-          hint={retry.blocked ? retryText : undefined}
+          retry={retry}
         />
-        {retry.until ? <RetryAt until={retry.until} nativeID={retryId} /> : null}
       </Stack>
       {onSignUp ? (
         <Row gap="sm" justify="center" wrap>

@@ -10,7 +10,7 @@ import {
   SignUpRequest,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { signUp } from '../accounts/api'
 import type { AuthDraft } from '../accounts/authHandoff'
@@ -18,11 +18,11 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { setPendingEmail } from '../accounts/pendingVerification'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { firstParam } from '../navigation/params'
-import { Button } from '../ui/Button'
 import { focusWithoutScroll } from '../ui/focus'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Notice } from '../ui/Notice'
-import { formatRetryTime, RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
@@ -52,7 +52,6 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
   const [loading, setLoading] = useState(false)
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
-  const retryId = useId()
   // useRef garde une valeur entre deux affichages sans redessiner : ici, les champs, pour y poser
   // le focus du clavier.
   const inputs = {
@@ -120,9 +119,6 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
     key ? t(($) => $.auth.errors[key], lengths) : undefined
 
   const missing = Math.max(0, PASSWORD_MIN_LENGTH - Array.from(password).length)
-  const retryText = retry.until
-    ? t(($) => $.auth.retryAt, { time: formatRetryTime(retry.until, i18n.language) })
-    : undefined
 
   return (
     <>
@@ -190,15 +186,13 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
         />
       </Stack>
       <Stack gap="sm">
-        <Button
+        {/* Inactif, le bouton dit pourquoi (RetryButton, jur-13). */}
+        <RetryButton
           label={t(($) => $.auth.signUp.submit)}
           onPress={submit}
           loading={loading}
-          disabled={retry.blocked}
-          describedById={retry.blocked ? retryId : undefined}
-          hint={retry.blocked ? retryText : undefined}
+          retry={retry}
         />
-        {retry.until ? <RetryAt until={retry.until} nativeID={retryId} /> : null}
       </Stack>
       {onSignIn ? (
         <Row justify="center">

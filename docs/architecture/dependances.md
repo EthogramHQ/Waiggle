@@ -113,6 +113,7 @@ flowchart LR
   n5 --> n22
   n6 --> n5
   n6 --> n22
+  n6 --> n45
   n6 --> n48
   n7 --> n2
   n7 --> n4

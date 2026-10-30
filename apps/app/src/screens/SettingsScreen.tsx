@@ -148,6 +148,7 @@ export function SettingsScreen({ section }: Props) {
         <SettingsColumns
           nav={<SettingsNav label={navLabel} items={items} current={shown} />}
           title={label(shown)}
+          current={shown}
         >
           <SettingsSection section={shown} email={data.user.email} />
         </SettingsColumns>

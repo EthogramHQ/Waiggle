@@ -15,7 +15,8 @@ import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Emblem } from '../ui/Illustrations'
 import { Notice } from '../ui/Notice'
-import { RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -135,13 +136,13 @@ export function ResetPasswordScreen() {
       title={t(($) => $.auth.resetPassword.title)}
       footer={
         <>
-          <Button
+          {/* Bloqué, le bouton dit pourquoi (RetryButton, jur-13). */}
+          <RetryButton
             label={t(($) => $.auth.resetPassword.submit)}
             onPress={() => void submit()}
             loading={sending}
-            disabled={retry.blocked}
+            retry={retry}
           />
-          {retry.until ? <RetryAt until={retry.until} /> : null}
           <Row justify="center">
             <TextLink
               label={t(($) => $.common.cancel)}

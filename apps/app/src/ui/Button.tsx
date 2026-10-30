@@ -38,6 +38,9 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'confirm' | 'gl
 /** Les tailles du bouton, dans l'ordre : leur hauteur dessinée vient de `layout.controlHeight`. */
 export type ButtonSize = keyof typeof layout.controlHeight
 
+/** Les propriétés du bouton, reprises par ceux qui l'enrobent (RetryButton). */
+export type ButtonProps = Props
+
 type Props = {
   label: string
   onPress: () => void

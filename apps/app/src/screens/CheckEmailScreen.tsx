@@ -27,7 +27,8 @@ import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Mascot } from '../ui/Mascot'
 import { Notice } from '../ui/Notice'
-import { RetryAt, useRetryAt } from '../ui/RetryAt'
+import { useRetryAt } from '../ui/RetryAt'
+import { RetryButton } from '../ui/RetryButton'
 import { Screen } from '../ui/Screen'
 import { Sheet } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
@@ -67,6 +68,8 @@ export function CheckEmailScreen() {
   })
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  // Vrai après une correction d'adresse : la page ne sait plus si un lien est parti.
+  const [addressChanged, setAddressChanged] = useState(false)
 
   const resend = async () => {
     if (busy.current || retry.blocked || !email) return
@@ -122,15 +125,15 @@ export function CheckEmailScreen() {
             ) : null}
             {email ? (
               <>
-                <Button
+                {/* Bloqué, le bouton dit pourquoi (RetryButton, jur-13). */}
+                <RetryButton
                   label={t(($) => $.auth.checkEmail.resend)}
                   variant="secondary"
                   icon="paper-plane-tilt"
                   onPress={() => void resend()}
                   loading={resending}
-                  disabled={retry.blocked}
+                  retry={retry}
                 />
-                {retry.until ? <RetryAt until={retry.until} /> : null}
                 <Text variant="callout" tone="muted">
                   {t(($) => $.auth.checkEmail.noneReceived)}
                 </Text>
@@ -159,8 +162,13 @@ export function CheckEmailScreen() {
       {hydrated ? (
         <>
           <Text tone="secondary">
+            {/* Après une correction, la nouvelle adresse peut être déjà prise, et rien ne part
+                alors (le serveur ne le dit pas) : le corps devient conditionnel, comme tout ce
+                que la page dit d'un envoi (D4, relecture juridique R2, B1). */}
             {email
-              ? t(($) => $.auth.checkEmail.body, { email })
+              ? addressChanged
+                ? t(($) => $.auth.checkEmail.bodyChanged, { email })
+                : t(($) => $.auth.checkEmail.body, { email })
               : t(($) => $.auth.checkEmail.bodyNoEmail)}
           </Text>
           {shownError ? (
@@ -198,6 +206,7 @@ export function CheckEmailScreen() {
             setSheetOpen(false)
             // La page parle désormais de la nouvelle adresse ; renvoyer le lien vise celle-ci.
             setPendingEmail(sentTo)
+            setAddressChanged(true)
             setError(null)
             setConfirmation('changed')
           }}
@@ -281,16 +290,15 @@ function ChangeAddressSheet({ open, email, onClose, onForgot, onChanged }: Sheet
       title={t(($) => $.auth.checkEmail.change.title)}
       subtitle={t(($) => $.auth.checkEmail.change.intro)}
       footer={
-        <>
-          <Button
-            label={t(($) => $.auth.checkEmail.change.submit)}
-            icon="paper-plane-tilt"
-            onPress={() => void submit()}
-            loading={sending}
-            disabled={password.length === 0 || retry.blocked}
-          />
-          {retry.until ? <RetryAt until={retry.until} /> : null}
-        </>
+        // Bloqué, le bouton dit pourquoi (RetryButton, jur-13).
+        <RetryButton
+          label={t(($) => $.auth.checkEmail.change.submit)}
+          icon="paper-plane-tilt"
+          onPress={() => void submit()}
+          loading={sending}
+          retry={retry}
+          disabled={password.length === 0}
+        />
       }
     >
       <FieldGroup>
