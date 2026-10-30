@@ -295,6 +295,10 @@ describe('a session that cannot be read', () => {
     expect(screen.queryByText(fr.t(($) => $.states.signedOutTitle))).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
     expect(refetch).toHaveBeenCalledTimes(1)
+    // Relecture de sécurité (PR #62, S1) : sans session lue, aucune donnée réservée n'est demandée.
+    for (const read of [request, getMe, getProject, getMember, getTag, getReportTarget]) {
+      expect(read).not.toHaveBeenCalled()
+    }
   })
 })
 
