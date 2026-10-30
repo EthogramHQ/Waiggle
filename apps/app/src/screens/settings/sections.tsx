@@ -220,9 +220,26 @@ function AccountSection({ email }: { email: string }) {
   const { t } = useTranslation()
   const router = useRouter()
   const go = useGo()
+  // La déconnexion refusée (serveur, réseau) : on le dit et on reste ici, sinon le membre partirait
+  // en se croyant déconnecté (relecture de sécurité de la PR #64). Une seule demande à la fois.
+  const [signOutFailed, setSignOutFailed] = useState(false)
+  const signingOut = useRef(false)
   const onSignOut = async () => {
-    await signOut()
-    router.replace('/')
+    if (signingOut.current) return
+    signingOut.current = true
+    setSignOutFailed(false)
+    try {
+      const result = await signOut()
+      if (result.ok) {
+        router.replace('/')
+        return
+      }
+    } catch {
+      // Pas de réponse du serveur : même message qu'un refus.
+    } finally {
+      signingOut.current = false
+    }
+    setSignOutFailed(true)
   }
   // Notre adresse de contact (écrite dans @ruche/brand seulement), en clair pour qui veut la
   // recopier, et un lien qui ouvre la messagerie : c'est notre adresse, pas un site tiers, donc
@@ -255,6 +272,8 @@ function AccountSection({ email }: { email: string }) {
           onPress={go('/settings/account/delete')}
         />
       </ListGroup>
+      {/* Juste sous la ligne touchée, pour que le message se voie là où le membre regarde. */}
+      {signOutFailed ? <Notice tone="error" message={t(($) => $.account.signOutError)} /> : null}
       <ListGroup footer={t(($) => $.account.contact.hint)}>
         <ListRow
           label={t(($) => $.account.contact.label)}

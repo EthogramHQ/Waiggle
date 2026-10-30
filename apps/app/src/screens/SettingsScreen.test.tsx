@@ -324,13 +324,36 @@ describe('the « Compte » section', () => {
   })
 
   it('signs out and goes back home', async () => {
-    jest.mocked(signOut).mockResolvedValue(undefined)
+    // signOut rend maintenant un résultat (relecture de sécurité de la PR #64, A2).
+    jest.mocked(signOut).mockResolvedValue({ ok: true })
     await renderWithI18n(<SettingsScreen section="account" />)
 
     await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.account.signOut) }))
 
     expect(signOut).toHaveBeenCalled()
     expect(mockReplace).toHaveBeenCalledWith('/')
+  })
+
+  // Relecture de sécurité de la PR #64 (A2) : un refus menait quand même à l'accueil, sans un mot ;
+  // sur un ordinateur partagé, le membre partait en se croyant déconnecté.
+  it('shows an error and stays when sign-out is refused', async () => {
+    jest.mocked(signOut).mockResolvedValue({ ok: false, error: 'generic' })
+    await renderWithI18n(<SettingsScreen section="account" />)
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.account.signOut) }))
+
+    expect(await screen.findByText(fr.t(($) => $.account.signOutError))).toBeTruthy()
+    expect(mockReplace).not.toHaveBeenCalledWith('/')
+  })
+
+  it('shows an error and stays when the network fails during sign-out', async () => {
+    jest.mocked(signOut).mockRejectedValue(new Error('network'))
+    await renderWithI18n(<SettingsScreen section="account" />)
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.account.signOut) }))
+
+    expect(await screen.findByText(fr.t(($) => $.account.signOutError))).toBeTruthy()
+    expect(mockReplace).not.toHaveBeenCalledWith('/')
   })
 
   it('leads to the sheet that deletes the account', async () => {
