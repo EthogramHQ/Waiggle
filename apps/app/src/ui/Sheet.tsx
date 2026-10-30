@@ -12,10 +12,11 @@
 // l'avait avant à la fermeture (le bouton d'origine) ; Échap ferme, comme le bouton retour sur
 // Android. Toucher le voile ferme aussi. (Relecture juridique du plan, jur-15.)
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useId } from 'react'
+import { type ReactNode, type Ref, useEffect, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -42,11 +43,32 @@ type PanelProps = {
   layout: 'phone' | 'desktop'
   /** La hauteur disponible, pour que le panneau d'ordinateur ne dépasse pas de la fenêtre. */
   maxHeight?: number
+  /** Pour Sheet : le bouton « Fermer » (où le focus arrive) et la feuille (où Tab tourne). */
+  closeRef?: Ref<View>
+  panelRef?: Ref<View>
+  /** Pour Sheet : les touches de la feuille sur le web (Échap, Tab). */
+  keys?: object
 }
 
-type Props = Omit<PanelProps, 'layout' | 'maxHeight'> & {
+type Props = Omit<PanelProps, 'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys'> & {
   open: boolean
 }
+
+type KeyEvent = { key: string; shiftKey?: boolean; preventDefault: () => void }
+
+// Le peu du navigateur dont Tab a besoin : les éléments de la feuille qu'on peut atteindre, dans
+// l'ordre du document. (Les types de React Native ne décrivent pas la page web.)
+type WebElement = {
+  tabIndex: number
+  hasAttribute: (name: string) => boolean
+  getClientRects: () => { length: number }
+}
+type WebRoot = { querySelectorAll?: (selector: string) => ArrayLike<WebElement> }
+const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]'
+
+/** L'élément qui a le focus dans la page, sur le web ; null ailleurs ou sans document. */
+const activeElement = (): unknown =>
+  (globalThis as { document?: { activeElement?: unknown } }).document?.activeElement ?? null
 
 /** La poignée : ce qu'on saisit pour faire glisser la feuille vers le bas. */
 const HANDLE = { width: 36, height: 5 }
@@ -60,6 +82,72 @@ export function Sheet({ open, onClose, ...panel }: Props) {
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
   const phone = sizeClass === 'compact'
+  const closeRef = useRef<View>(null)
+  const panelRef = useRef<View>(null)
+  // L'élément qui avait le focus avant l'ouverture (le bouton d'origine) : il le retrouve à la
+  // fermeture, sans faire défiler la page.
+  const opener = useRef<unknown>(null)
+
+  // useEffect : à l'ouverture (web), on retient qui avait le focus et on le pose sur « Fermer »,
+  // le premier élément de la feuille ; à la fermeture, on le rend. Le Modal de react-native-web
+  // fait de même de son côté : les deux gestes se recouvrent, sans se gêner.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    if (open) {
+      opener.current = activeElement()
+      focusWithoutScroll(closeRef.current)
+      return
+    }
+    const back = opener.current
+    opener.current = null
+    if (back) focusWithoutScroll(back)
+  }, [open])
+
+  // Tab (web) : le focus tourne dans la feuille. Après le dernier élément, le premier ; avant le
+  // premier (Maj+Tab), le dernier. Sans page web à parcourir, « Fermer ».
+  const trapTab = (backwards: boolean) => {
+    const root = panelRef.current as unknown as WebRoot | null
+    const nodes = root?.querySelectorAll
+      ? Array.from(root.querySelectorAll(TABBABLE)).filter(
+          (element) =>
+            element.tabIndex >= 0 &&
+            !element.hasAttribute('disabled') &&
+            element.getClientRects().length > 0,
+        )
+      : []
+    if (nodes.length === 0) {
+      focusWithoutScroll(closeRef.current)
+      return
+    }
+    const index = nodes.indexOf(activeElement() as WebElement)
+    const last = nodes.length - 1
+    const next = backwards
+      ? index <= 0
+        ? last
+        : index - 1
+      : index === -1 || index === last
+        ? 0
+        : index + 1
+    focusWithoutScroll(nodes[next])
+  }
+
+  // Les touches de la feuille (web) : Échap ferme, Tab reste dedans. Les touches montent depuis
+  // l'élément qui a le focus jusqu'à la feuille.
+  const keys =
+    Platform.OS === 'web'
+      ? {
+          onKeyDown: (event: KeyEvent) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              onClose()
+            } else if (event.key === 'Tab') {
+              event.preventDefault()
+              trapTab(event.shiftKey === true)
+            }
+          },
+        }
+      : {}
+
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap. Sur
     // téléphone, la feuille glisse du bas ; sur ordinateur, le panneau paraît par un fondu.
@@ -79,6 +167,9 @@ export function Sheet({ open, onClose, ...panel }: Props) {
             onClose={onClose}
             layout={phone ? 'phone' : 'desktop'}
             maxHeight={window.height - 2 * PANEL_MARGIN}
+            closeRef={closeRef}
+            panelRef={panelRef}
+            keys={keys}
           />
         </View>
         {/* Toucher le voile ferme la feuille, comme « Fermer ». Caché aux lecteurs d'écran (ils
@@ -108,6 +199,9 @@ export function SheetPanel({
   closeLabel,
   layout: disposition,
   maxHeight,
+  closeRef,
+  panelRef,
+  keys,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -136,7 +230,13 @@ export function SheetPanel({
         {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
             feuille, où le focus arrive à l'ouverture. */}
         <View style={{ position: 'absolute', right: 0 }}>
-          <IconButton icon="x" label={close} variant="plain" onPress={onClose} />
+          <IconButton
+            icon="x"
+            label={close}
+            variant="plain"
+            onPress={onClose}
+            {...(closeRef ? { ref: closeRef } : null)}
+          />
         </View>
       </View>
       <View style={{ gap: space.xs, paddingRight: layout.touchTarget + space.md }}>
@@ -157,6 +257,8 @@ export function SheetPanel({
       aria-modal
       aria-labelledby={titleId}
       accessibilityViewIsModal
+      {...(panelRef ? { ref: panelRef } : null)}
+      {...keys}
       style={
         phone
           ? { flex: 1, marginTop: insets.top + SHEET_TOP_GAP }

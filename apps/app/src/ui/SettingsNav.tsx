@@ -5,13 +5,15 @@
 //
 // Pour les lecteurs d'écran : une région de navigation (`navigation`, nommée), un lien par rubrique,
 // et la rubrique ouverte dite par `aria-current="page"` (le lecteur d'écran lit « page actuelle »).
-// Sur le web, chaque lien a une vraie adresse (`href`) : le navigateur offre « ouvrir dans un nouvel
-// onglet » et la touche Entrée ; le geste ordinaire passe par `onNavigate`, que l'écran branche sur
-// le routeur (src/ui n'importe pas expo-router), pour changer de page sans la recharger.
+// Chaque lien porte sa vraie adresse (`href`) : sur le web, react-native-web en fait un `<a>`, et
+// le navigateur offre « ouvrir dans un nouvel onglet ». Le geste ordinaire passe par le routeur
+// d'Expo Router (`useRouter().push`), qui change de page sans la recharger : c'est, avec le titre
+// de l'onglet (Screen), le seul endroit où src/ui touche à expo-router.
 import { layout, radii, space } from '@ruche/brand'
+import { useRouter } from 'expo-router'
 import { Platform, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
-import { ListGroup, ListRow } from './ListGroup'
+import { ListGroup, ListRow, type PressEvent } from './ListGroup'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -29,31 +31,28 @@ type Props<K extends string> = {
   label: string
   items: readonly SettingsNavItem<K>[]
   /** La clé de la rubrique ouverte, s'il y en a une (sur téléphone, la liste seule : aucune). */
-  current?: K
-  /**
-   * Ouvrir une rubrique (l'écran y branche son routeur). Sans elle, sur le web, le lien ordinaire
-   * du navigateur fait le travail (la page se recharge).
-   */
-  onNavigate?: (item: SettingsNavItem<K>) => void
+  current?: K | null
 }
 
 /**
- * Ce qu'un lien avec adresse donne au web : `href` (react-native-web dessine alors un vrai `<a>`)
- * et `aria-current` pour la page ouverte. Ces propriétés manquent aux types de React Native.
+ * Ce qu'un lien avec adresse porte : `href` et, pour la page ouverte, `aria-current`. Ces
+ * propriétés manquent aux types de React Native (sur téléphone, elles sont ignorées).
  */
-export const linkProps = (href: string, current: boolean): object =>
-  Platform.OS === 'web' ? { href, ...(current ? { 'aria-current': 'page' } : null) } : {}
+export const linkProps = (href: string, current: boolean): object => ({
+  href,
+  ...(current ? { 'aria-current': 'page' } : null),
+})
 
-export function SettingsNav<K extends string>({ label, items, current, onNavigate }: Props<K>) {
+export function SettingsNav<K extends string>({ label, items, current }: Props<K>) {
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
+  const router = useRouter()
 
-  // Le geste sur un lien : l'écran navigue, et le navigateur ne recharge pas la page
-  // (preventDefault sur le clic du `<a>`). Sans `onNavigate`, on laisse le lien faire.
-  const press = (item: SettingsNavItem<K>) => (event?: { preventDefault?: () => void }) => {
-    if (!onNavigate) return
-    event?.preventDefault?.()
-    onNavigate(item)
+  // Le geste sur un lien : le routeur change de page, et sur le web le navigateur ne recharge pas
+  // la page (preventDefault sur le clic du `<a>`).
+  const press = (item: SettingsNavItem<K>) => (event?: PressEvent) => {
+    if (Platform.OS === 'web') event?.preventDefault?.()
+    router.push(item.href)
   }
 
   if (sizeClass !== 'wide') {

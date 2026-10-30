@@ -351,10 +351,9 @@ export function ListRow({
       accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
       aria-disabled={disabled}
-      // Un lien avec adresse (web) : `href` et `aria-current` manquent aux types de React Native.
-      {...(href && Platform.OS === 'web'
-        ? { href, ...(current ? { 'aria-current': 'page' } : null) }
-        : null)}
+      // Un lien avec adresse : `href` et `aria-current` manquent aux types de React Native (sur
+      // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).
+      {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
       ref={isChoice ? slot?.setNode : undefined}

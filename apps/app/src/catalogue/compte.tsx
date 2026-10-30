@@ -185,7 +185,7 @@ export function AccountCatalogue() {
       />
 
       <Text tone="secondary">{l.nav}</Text>
-      <SettingsNav label={l.navLabel} items={sections} current="security" onNavigate={() => {}} />
+      <SettingsNav label={l.navLabel} items={sections} current="security" />
 
       <Text tone="secondary">{l.sheetPhone}</Text>
       <View

@@ -14,6 +14,7 @@
 import { layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useId, useRef } from 'react'
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native'
+import { focusWithoutScroll } from './focus'
 import { Surface, type SurfaceVariant } from './Surface'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -71,16 +72,16 @@ export function Tabs<K extends string>({
     const tab = tabs[index]
     if (!tab) return
     onSelect(tab.key)
-    refs.current[index]?.focus()
+    // Sans défilement : la page reste où elle est, l'onglet est déjà en vue.
+    focusWithoutScroll(refs.current[index])
   }
 
   // Sur le web : les flèches, Début et Fin. Espace et Entrée : react-native-web les gère déjà pour
-  // un onglet (il le traite comme un bouton). `aria-controls` manque aux types de React Native.
-  const webProps = (index: number, key: K) =>
+  // un onglet (il le traite comme un bouton).
+  const webProps = (index: number) =>
     Platform.OS === 'web'
       ? {
           tabIndex: index === tabStop ? (0 as const) : (-1 as const),
-          'aria-controls': panelId(key),
           onKeyDown: (event: KeyEvent) => {
             const last = tabs.length - 1
             const target =
@@ -129,8 +130,11 @@ export function Tabs<K extends string>({
                 role="tab"
                 accessibilityLabel={tab.label}
                 aria-selected={chosen}
+                // Le panneau que l'onglet commande (`aria-controls` manque aux types de React
+                // Native ; sur téléphone, la propriété est ignorée).
+                {...{ 'aria-controls': panelId(tab.key) }}
                 onPress={() => onSelect(tab.key)}
-                {...webProps(index, tab.key)}
+                {...webProps(index)}
                 style={{
                   // Les onglets se partagent la largeur ; chacun part de la taille de son texte
                   // (flexBasis auto) et passe à la ligne s'il ne tient plus. Très agrandis, chacun
