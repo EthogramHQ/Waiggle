@@ -15,9 +15,11 @@ import {
   isValidElement,
   type ReactNode,
   useContext,
+  useId,
   useRef,
 } from 'react'
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
+import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { RadioMark } from './Radio'
 import { Text } from './Text'
@@ -213,6 +215,13 @@ type RowBase = {
   href?: string
   /** Avec `href` : la ligne mène à la page ouverte (`aria-current="page"`). */
   current?: boolean
+  /**
+   * Ce que les lecteurs d'écran lisent après le nom d'une ligne qu'on touche (R2) : ce que contient
+   * une rubrique des réglages, « ouvre un site externe ». Le nom d'un lien cache le texte qu'il
+   * contient : sur téléphone, c'est l'indice (`accessibilityHint`) ; sur le web, une description
+   * (`aria-describedby`) vers un texte caché, que le navigateur lit quand même.
+   */
+  hint?: string
 }
 
 export function ListRow({
@@ -231,8 +240,12 @@ export function ListRow({
   spokenLabel,
   href,
   current = false,
+  hint,
 }: RowProps) {
   const { colors } = useTheme()
+  // L'identifiant du texte caché qui décrit la ligne (web) : useId en donne un, unique dans la page.
+  const hintId = useId()
+  const webHint = Platform.OS === 'web' && hint !== undefined && onPress !== undefined
   // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
   const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
@@ -311,6 +324,12 @@ export function ListRow({
       {accessory}
       {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
       {right}
+      {/* La description de la ligne, cachée à l'œil (display: none) mais lue par aria-describedby. */}
+      {webHint ? (
+        <View nativeID={hintId} style={{ display: 'none' }}>
+          <Text>{hint}</Text>
+        </View>
+      ) : null}
     </View>
   )
 
@@ -350,6 +369,8 @@ export function ListRow({
     <Pressable
       accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
+      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
+      {...describedBy(webHint ? hintId : undefined)}
       aria-disabled={disabled}
       // Un lien avec adresse : `href` et `aria-current` manquent aux types de React Native (sur
       // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).

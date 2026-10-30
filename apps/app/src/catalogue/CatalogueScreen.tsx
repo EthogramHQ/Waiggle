@@ -86,6 +86,7 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
+import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 
@@ -1015,6 +1016,8 @@ export function CatalogueScreen() {
       <ActionMenuSamples />
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
       <AccountCatalogue />
+      {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
+      <SettingsCatalogue />
 
       <Section title={l.icons}>
         <Icons />

@@ -1092,14 +1092,27 @@ const pages = [
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()
     },
   },
-  { name: 'compte', path: '/account', signedIn: true, fullPage: true },
-  { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
+  // Tranche R2 : la page « Réglages » (qui remplace « Mon compte ») et chacune de ses rubriques.
+  { name: 'reglages', path: '/settings', signedIn: true, fullPage: true },
+  {
+    name: 'reglages-notifications',
+    path: '/settings/notifications',
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'reglages-langue', path: '/settings/language', signedIn: true, fullPage: true },
+  { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
+  { name: 'reglages-donnees', path: '/settings/data', signedIn: true, fullPage: true },
+  { name: 'reglages-securite', path: '/settings/security', signedIn: true, fullPage: true },
+  { name: 'reglages-compte', path: '/settings/account', signedIn: true, fullPage: true },
+  { name: 'reglages-a-propos', path: '/settings/about', signedIn: true, fullPage: true },
+  { name: 'supprimer-compte', path: '/settings/account/delete', signedIn: true, fullPage: true },
   // Tranche « adresse » : la page qui change l'adresse, la demande partie (le premier lien vers
   // l'adresse actuelle), un mot de passe refusé ; puis les pages des deux liens.
-  { name: 'changer-adresse', path: '/account/email', signedIn: true, fullPage: true },
+  { name: 'changer-adresse', path: '/settings/account/email', signedIn: true, fullPage: true },
   {
     name: 'changer-adresse-envoye',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1111,7 +1124,7 @@ const pages = [
   },
   {
     name: 'changer-adresse-erreur',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1129,11 +1142,11 @@ const pages = [
     path: '/email-change/done?error=INVALID_TOKEN',
     signedIn: false,
   },
-  { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
+  { name: 'profil', path: '/settings/profile', signedIn: true, fullPage: true },
   // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
   {
     name: 'profil-pseudo-pris',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1145,7 +1158,7 @@ const pages = [
   // Un nouveau pseudo enregistré : la confirmation rappelle que l'ancien reste réservé.
   {
     name: 'profil-pseudo-change',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1159,7 +1172,7 @@ const pages = [
   // Tranche 6c : un réglage d'e-mail touché, enregistré tout de suite (« Réglage enregistré. »).
   {
     name: 'profil-email',
-    path: '/profile',
+    path: '/settings/notifications',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1235,7 +1248,7 @@ const pages = [
       await page.getByRole('heading', { name: 'Retirer ce contenu ?' }).waitFor()
     },
   },
-  { name: 'compte-admin', path: '/account', signedIn: true, admin: true, fullPage: true },
+  { name: 'reglages-admin', path: '/settings', signedIn: true, admin: true, fullPage: true },
   // Tranche 7b : bloquer. Le menu « … » de la page de Max, ouvert ; puis « Bloquer » choisi, la
   // fenêtre qui dit ce qui change ; la page de Sam vue par Léa qui l'a bloqué (l'en-tête seul,
   // « Tu as bloqué @sam ») ; la liste « Membres bloqués », pleine puis vide ; la confirmation d'un
@@ -1319,7 +1332,13 @@ const pages = [
     fullPage: true,
   },
   { name: 'suspendu-publier', path: '/projects/new', signedIn: true, suspended: true },
-  { name: 'suspendu-profil', path: '/profile', signedIn: true, suspended: true, fullPage: true },
+  {
+    name: 'suspendu-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    suspended: true,
+    fullPage: true,
+  },
   // La suspension et sa fin, dans les notifications.
   {
     name: 'notifications-suspension',
