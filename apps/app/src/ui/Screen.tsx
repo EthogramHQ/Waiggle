@@ -7,9 +7,8 @@
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
 import { appName, borders, layout, space } from '@ruche/brand'
 // Head vient d'expo-router, mais ne navigue pas : il remplit seulement l'en-tête du document web
-// (le titre de l'onglet). useIsFocused dit si cet écran est celui qui est affiché (R3 : seul lui
-// remonte en haut quand l'onglet actif est touché de nouveau).
-import { useIsFocused } from 'expo-router'
+// (le titre de l'onglet). C'est, avec useScreenFocused (ui/screenFocus.ts), la seule chose que
+// src/ui prend à expo-router.
 import Head from 'expo-router/head'
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +20,7 @@ import { BrandAmbiance } from './BrandAmbiance'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
+import { useScreenFocused } from './screenFocus'
 import { Text } from './Text'
 import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
 import { AmbientProvider, useAmbient } from './theme/ambient'
@@ -309,23 +309,24 @@ export function Screen({
 }
 
 /**
- * Remonte l'écran en haut quand l'onglet déjà actif est touché de nouveau (le signal `reselect` du
- * cadre de la barre, tabBarSpace.ts). Seulement l'écran affiché (`useIsFocused`) : sur le web, les
- * pages quittées restent montées sous la page ouverte, et toutes recevraient le signal. Un signal
- * reçu pendant qu'un écran est caché est oublié : il ne remonte pas plus tard, à son retour.
+ * Remonte l'écran en haut quand l'onglet déjà actif est touché de nouveau (le signal `topSignal`
+ * du cadre de la barre, tabBarSpace.ts). Seulement l'écran affiché (`useScreenFocused`) : sur le
+ * web, les pages quittées restent montées sous la page ouverte, et toutes recevraient le signal.
+ * Un signal reçu pendant qu'un écran est caché est oublié : il ne remonte pas plus tard, à son
+ * retour.
  */
 function ScrollToTopOnReselect({ scroller }: { scroller: RefObject<ScrollView | null> }) {
-  const { reselect } = useTabBarSpace()
-  const focused = useIsFocused()
+  const { topSignal } = useTabBarSpace()
+  const focused = useScreenFocused()
   const calm = useCalmMotion()
   // Le dernier signal vu : au premier affichage, rien à faire.
-  const seen = useRef(reselect)
+  const seen = useRef(topSignal)
   useEffect(() => {
-    if (reselect === seen.current) return
-    seen.current = reselect
+    if (topSignal === seen.current) return
+    seen.current = topSignal
     // Sans animation avec « Réduire les animations » : un grand déplacement devient un saut.
     if (focused) scroller.current?.scrollTo({ y: 0, animated: !calm })
-  }, [reselect, focused, calm, scroller])
+  }, [topSignal, focused, calm, scroller])
   return null
 }
 

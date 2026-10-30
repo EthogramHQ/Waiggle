@@ -3,8 +3,11 @@
 // qu'il contient, sans la passer de main en main. Chaque écran (ui/Screen.tsx) y lit :
 // - la hauteur à réserver en bas, pour que la fin d'une liste ne reste pas cachée sous la barre ;
 // - le signal de remontée : toucher l'onglet déjà actif fait remonter l'écran affiché en haut.
-// Ce fichier ne connaît ni les onglets ni les pages : src/ui n'importe jamais src/navigation.
+// Ce fichier ne connaît ni les pages ni le routeur : src/ui n'importe jamais src/navigation.
 import { createContext, useContext } from 'react'
+
+/** Les quatre onglets, dans l'ordre de la barre (le « + » se glisse au milieu). */
+export type TabKey = 'feed' | 'explore' | 'hives' | 'me'
 
 export type TabBarSpace = {
   /**
@@ -16,15 +19,15 @@ export type TabBarSpace = {
   height: number
   /**
    * Le nombre de fois où l'onglet déjà actif a été touché. Il ne sert qu'à changer : un écran qui
-   * voit ce nombre bouger remonte en haut (s'il est celui qui est affiché).
+   * voit ce nombre monter remonte en haut (s'il est celui qui est affiché).
    */
-  reselect: number
-  /** À appeler quand l'onglet actif est touché de nouveau (TabBar le fait). */
-  requestReselect: () => void
+  topSignal: number
+  /** À appeler quand l'onglet actif est touché de nouveau (TabBar le fait) : le signal monte. */
+  scrollToTop: () => void
 }
 
 /** La valeur hors de tout cadre (un écran sans barre : la connexion, la page d'un projet). */
-const noTabBar: TabBarSpace = { height: 0, reselect: 0, requestReselect: () => {} }
+const noTabBar: TabBarSpace = { height: 0, topSignal: 0, scrollToTop: () => {} }
 
 /** Le contexte lui-même ; `null` quand aucun TabBarHost n'entoure le composant. */
 export const TabBarSpaceContext = createContext<TabBarSpace | null>(null)
@@ -32,5 +35,5 @@ export const TabBarSpaceContext = createContext<TabBarSpace | null>(null)
 /** Hook : la place de la barre, ou « aucune barre » hors d'un cadre. */
 export const useTabBarSpace = (): TabBarSpace => useContext(TabBarSpaceContext) ?? noTabBar
 
-/** Hook : y a-t-il un cadre de barre autour de ce composant ? */
+/** Hook : y a-t-il un cadre de barre (ou un espace fourni) autour de ce composant ? */
 export const useHasTabBarHost = (): boolean => useContext(TabBarSpaceContext) !== null

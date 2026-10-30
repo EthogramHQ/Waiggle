@@ -20,7 +20,8 @@
 // (au-dessus de la pile des pages, dans app/_layout.tsx), mesure sa hauteur et la donne aux écrans.
 import { borders, durations, layout, radii, space, springs } from '@ruche/brand'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { type LayoutChangeEvent, Platform, Pressable, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { type LayoutChangeEvent, Platform, Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -36,13 +37,12 @@ import type { PressEvent } from './ListGroup'
 import { linkProps } from './SettingsNav'
 import { Surface } from './Surface'
 import { Text } from './Text'
-import { TabBarSpaceContext, useTabBarSpace } from './tabBarSpace'
+import { TabBarSpaceContext, type TabKey, useTabBarSpace } from './tabBarSpace'
 import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Les quatre onglets, dans l'ordre de la barre (le « + » se glisse au milieu). */
-export type TabKey = 'feed' | 'explore' | 'hives' | 'me'
+export type { TabKey }
 
 export type TabBarTab = {
   key: TabKey
@@ -52,25 +52,20 @@ export type TabBarTab = {
 }
 
 export type TabBarProps = {
-  /** Le nom de la région de navigation, lu par les lecteurs d'écran (« Navigation principale »). */
-  label: string
   tabs: readonly TabBarTab[]
-  /** L'onglet actif. */
-  active: TabKey
+  /** L'onglet actif ; `null` quand aucun ne l'est (la page d'un autre membre, sans onglet). */
+  active: TabKey | null
   /**
-   * La photo du membre pour l'onglet « Moi » : son nom (pour les initiales) et, s'il en a une, sa
-   * photo : `source` toute prête (adresse et en-tête de session, voir src/api/media.ts) ou, à
-   * défaut, sa seule adresse `url`.
+   * La photo du membre pour l'onglet « Moi » : son nom (pour les initiales) et sa photo, toute
+   * prête (adresse et en-tête de session, voir src/api/media.ts), ou `null` s'il n'en a pas.
    */
-  avatar: { name: string; url?: string | null; source?: ImageSource | null }
+  avatar: { source: ImageSource | null; name: string }
   /** Le rond miel « + » : son adresse et son nom (« Publier ») ; `null` le cache (membre suspendu). */
   publish: { href: string; label: string } | null
-  /** Un onglet touché, autre que l'actif. */
-  onPress: (tab: TabKey) => void
+  /** Un onglet touché, autre que l'actif, ou le « + » (`'publish'`). */
+  onPress: (target: TabKey | 'publish') => void
   /** L'onglet déjà actif touché de nouveau : revenir à sa première page, ou remonter en haut. */
   onReselect: (tab: TabKey) => void
-  /** Le « + » touché. */
-  onPublish?: () => void
   /**
    * Force le mode « Réduire les animations » (la goutte apparaît en fondu). Sans cette prop, c'est
    * le réglage de l'appareil qui décide (useCalmMotion). Sert au catalogue et aux tests.
@@ -110,20 +105,19 @@ const stretchFactor = 1.25
 const DOUBLE_TAP_MS = 600
 
 export function TabBar({
-  label,
   tabs,
   active,
   avatar,
   publish,
   onPress,
   onReselect,
-  onPublish,
   calm: calmProp,
 }: TabBarProps) {
+  const { t } = useTranslation()
   const { colors, shadows } = useTheme()
   const deviceCalm = useCalmMotion()
   const calm = calmProp ?? deviceCalm
-  const { requestReselect } = useTabBarSpace()
+  const { scrollToTop } = useTabBarSpace()
 
   // Les cinq places, dans l'ordre : deux onglets, le « + » (même caché, sa place reste : les
   // onglets ne se décalent pas quand il disparaît), deux onglets.
@@ -188,7 +182,7 @@ export function TabBar({
     lastTap.current = { key: tab.key, at: now }
     if (tab.key === active) {
       onReselect(tab.key)
-      requestReselect()
+      scrollToTop()
       return
     }
     if (previous && previous.key === tab.key && now - previous.at < DOUBLE_TAP_MS) return
@@ -196,20 +190,24 @@ export function TabBar({
   }
   const pressPublish = (event?: PressEvent) => {
     if (Platform.OS === 'web') event?.preventDefault?.()
-    onPublish?.()
+    onPress('publish')
   }
 
   const onRowLayout = (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width)
 
   return (
     <Surface variant="glass" radius="pill" padding="xs">
-      {/* Pas d'`accessible` sur la région : sur iOS, VoiceOver doit atteindre chaque lien. */}
+      {/* Pas d'`accessible` sur la région : sur iOS, VoiceOver doit atteindre chaque lien. Le nom
+          de la région est le seul texte que la barre lit elle-même. */}
       <View
         role="navigation"
-        aria-label={label}
-        onLayout={onRowLayout}
+        aria-label={t(($) => $.nav.label)}
         style={{ flexDirection: 'row', alignItems: 'stretch' }}
       >
+        {/* La mesure de la largeur, sur une vue vide qui épouse la rangée, et non sur la rangée
+            elle-même : le cadre (TabBarHost) écoute `onLayout` au-dessus de la barre, et une
+            mesure posée sur la région l'intercepterait (le cadre ne saurait plus la hauteur). */}
+        <View pointerEvents="none" onLayout={onRowLayout} style={StyleSheet.absoluteFill} />
         {/* La goutte, derrière les onglets : une place de large, toute la hauteur de la rangée.
             Intouchable et muette : l'état est dit par les liens eux-mêmes. */}
         {slotWidth > 0 ? (
@@ -318,7 +316,6 @@ function MeAvatar({
   active: boolean
 }) {
   const { colors } = useTheme()
-  const source = avatar.source ?? (avatar.url ? { uri: avatar.url } : null)
   return (
     <View
       style={{
@@ -330,7 +327,7 @@ function MeAvatar({
         borderRadius: radii.pill,
       }}
     >
-      <Avatar name={avatar.name} source={source} label={label} size={layout.tabBar.avatar} />
+      <Avatar name={avatar.name} source={avatar.source} label={label} size={layout.tabBar.avatar} />
     </View>
   )
 }
@@ -382,14 +379,14 @@ export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactN
   const insets = useSafeAreaInsets()
   const { padding } = useLayout()
   const [measured, setMeasured] = useState(0)
-  const [reselect, setReselect] = useState(0)
-  const requestReselect = useCallback(() => setReselect((count) => count + 1), [])
+  const [topSignal, setTopSignal] = useState(0)
+  const scrollToTop = useCallback(() => setTopSignal((count) => count + 1), [])
   const shown = bar !== null && bar !== undefined
   // useMemo : la même valeur tant que rien ne change, sinon chaque écran se redessinerait à chaque
   // rendu du cadre.
   const value = useMemo(
-    () => ({ height: shown ? measured : 0, reselect, requestReselect }),
-    [shown, measured, reselect, requestReselect],
+    () => ({ height: shown ? measured : 0, topSignal, scrollToTop }),
+    [shown, measured, topSignal, scrollToTop],
   )
   return (
     <TabBarSpaceContext.Provider value={value}>

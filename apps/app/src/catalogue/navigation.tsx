@@ -24,8 +24,8 @@ const day = palettes.day
 const photo = `data:image/svg+xml;utf8,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" fill="${day.amberText}"/><circle cx="28" cy="22" r="10" fill="${day.honeyLight}"/><ellipse cx="28" cy="46" rx="16" ry="11" fill="${day.honeyLight}"/></svg>`,
 )}`
-const withPhoto = { name: 'Léa Moreau', url: photo }
-const withoutPhoto = { name: 'Léa Moreau', url: null }
+const withPhoto = { name: 'Léa Moreau', source: { uri: photo } }
+const withoutPhoto = { name: 'Léa Moreau', source: null }
 const quiet = { onPress: () => {}, onReselect: () => {} }
 
 /** La largeur d'un téléphone : la barre se regarde à cette largeur, même sur ordinateur. */
@@ -36,12 +36,13 @@ function LiveTabBar({ calm = false }: { calm?: boolean }) {
   const [active, setActive] = useState<TabKey>('feed')
   return (
     <TabBar
-      label={calm ? 'Navigation (mode réduit)' : 'Navigation (essai)'}
       tabs={tabs}
       active={active}
       avatar={withPhoto}
       publish={publish}
-      onPress={setActive}
+      onPress={(target) => {
+        if (target !== 'publish') setActive(target)
+      }}
       onReselect={() => {}}
       calm={calm}
     />
@@ -62,36 +63,15 @@ export function NavigationCatalogue() {
       </View>
       <Text tone="secondary">Moi actif, avec la photo du membre cerclée.</Text>
       <View style={{ width: '100%', maxWidth: phoneWidth }}>
-        <TabBar
-          label="Navigation (Moi, photo)"
-          tabs={tabs}
-          active="me"
-          avatar={withPhoto}
-          publish={publish}
-          {...quiet}
-        />
+        <TabBar tabs={tabs} active="me" avatar={withPhoto} publish={publish} {...quiet} />
       </View>
       <Text tone="secondary">Moi actif, sans photo : les initiales.</Text>
       <View style={{ width: '100%', maxWidth: phoneWidth }}>
-        <TabBar
-          label="Navigation (Moi, initiales)"
-          tabs={tabs}
-          active="me"
-          avatar={withoutPhoto}
-          publish={publish}
-          {...quiet}
-        />
+        <TabBar tabs={tabs} active="me" avatar={withoutPhoto} publish={publish} {...quiet} />
       </View>
       <Text tone="secondary">Membre suspendu : le « + » disparaît, sa place reste.</Text>
       <View style={{ width: '100%', maxWidth: phoneWidth }}>
-        <TabBar
-          label="Navigation (sans publier)"
-          tabs={tabs}
-          active="explore"
-          avatar={withPhoto}
-          publish={null}
-          {...quiet}
-        />
+        <TabBar tabs={tabs} active="explore" avatar={withPhoto} publish={null} {...quiet} />
       </View>
       <Text tone="secondary">
         « Réduire les animations » : la goutte apparaît en fondu à sa nouvelle place.
