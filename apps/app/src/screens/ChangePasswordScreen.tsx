@@ -20,7 +20,7 @@ import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
-import { FieldGroup, TextField } from '../ui/TextField'
+import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useToast } from '../ui/theme/toast'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
@@ -142,7 +142,9 @@ export function ChangePasswordScreen() {
         </>
       }
     >
-      <FieldGroup>
+      {/* Deux champs séparés (pas un FieldGroup) : chacun porte quelque chose sous lui, le lien
+          « Mot de passe oublié ? » ou la jauge. */}
+      <Stack gap="xl">
         <Stack gap="sm">
           <TextField
             label={t(($) => $.settings.changePassword.current)}
@@ -190,7 +192,7 @@ export function ChangePasswordScreen() {
             }
           />
         </Stack>
-      </FieldGroup>
+      </Stack>
       {/* Les conséquences, dites avant le geste (jur-3). */}
       <Surface padding="lg">
         <Row gap="md" align="start">

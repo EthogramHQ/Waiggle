@@ -97,6 +97,17 @@ export function ForgotPasswordScreen() {
     error === 'tooManyAttempts' && (retry.blocked || waitSeconds === null) ? error : null
   const shownError = error === 'tooManyAttempts' ? tooMany : error
 
+  // Après les boutons, comme sur la maquette : la sortie discrète, vers la connexion.
+  const exit = (
+    <Row justify="center">
+      <TextLink
+        label={t(($) => $.auth.forgotPassword.back)}
+        role="button"
+        onPress={() => router.replace('/sign-in')}
+      />
+    </Row>
+  )
+
   return (
     <Screen
       ambiance="brand"
@@ -125,6 +136,7 @@ export function ForgotPasswordScreen() {
               disabled={retry.blocked}
             />
             {retry.until ? <RetryAt until={retry.until} /> : null}
+            {exit}
           </Fragment>
         ) : (
           <Fragment key="form">
@@ -136,6 +148,7 @@ export function ForgotPasswordScreen() {
               disabled={retry.blocked}
             />
             {retry.until ? <RetryAt until={retry.until} /> : null}
+            {exit}
           </Fragment>
         )
       }
@@ -178,13 +191,6 @@ export function ForgotPasswordScreen() {
           </Text>
         </Stack>
       ) : null}
-      <Row justify="center">
-        <TextLink
-          label={t(($) => $.auth.forgotPassword.back)}
-          role="button"
-          onPress={() => router.replace('/sign-in')}
-        />
-      </Row>
     </Screen>
   )
 }
