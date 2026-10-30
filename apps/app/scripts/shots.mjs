@@ -532,6 +532,64 @@ const gardenProject = {
   pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
   followerCount: 8,
 }
+// Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
+// `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
+// utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
+const toolList = [
+  { slug: 'claude', label: 'Claude', projectCount: 41 },
+  { slug: 'chatgpt', label: 'ChatGPT', projectCount: 38 },
+  { slug: 'lovable', label: 'Lovable', projectCount: 34 },
+  { slug: 'python', label: 'Python', projectCount: 22 },
+  { slug: 'mistral', label: 'Mistral', projectCount: 12 },
+  { slug: 'home-assistant', label: 'Home Assistant', projectCount: 9 },
+  { slug: 'notion', label: 'Notion', projectCount: 7 },
+  { slug: 'glide', label: 'Glide', projectCount: 6 },
+]
+// La recherche « carn » (GET /v1/search?q=carn) : deux projets (celui de Léa, testable, trouvé par
+// son titre ; celui de Tante Odile, trouvé dans sa description, avec l'extrait), un membre et un
+// outil. Les planches nomment Léa « Léa Moreau » ; son identifiant reste le sien (pas de pastille
+// « Suivre » sur ses propres projets).
+const odile = { id: 'odile-id', name: 'Tante Odile', avatarUrl: null }
+const coffeeProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000011',
+  author: { ...lea, name: 'Léa Moreau' },
+  title: 'Carnet de cafés',
+  pitch: 'Chaque café goûté, noté et comparé.',
+  status: 'testable',
+  tools: [{ label: 'Notion', slug: 'notion' }],
+  excerpt: null,
+}
+const biscotteProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000012',
+  author: odile,
+  title: 'Biscotte au parc',
+  pitch: 'Où promener le chien selon la météo.',
+  status: 'building',
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  excerpt: '… Le carnet de balades de Biscotte, mis à jour chaque dimanche après la promenade …',
+}
+const camille = {
+  id: 'camille-id',
+  name: 'Camille Carnot',
+  handle: 'camille_carnot',
+  avatarUrl: null,
+  followerCount: 12,
+}
+const searchResultsOf = {
+  carn: {
+    projects: { items: [coffeeProject, biscotteProject], more: false },
+    members: { items: [camille], more: false },
+    tools: { items: [toolList.find((t) => t.slug === 'notion')], more: false },
+  },
+}
+// Aucun résultat (« carnaval ») : les trois groupes, vides.
+const emptySearchResults = {
+  projects: { items: [], more: false },
+  members: { items: [], more: false },
+  tools: { items: [], more: false },
+}
 const gardenComments = [
   comment(41, null, '', 18, 9, {
     state: 'blocked',
@@ -1047,6 +1105,13 @@ const fakeApi = (
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
     // recherche, 5 au plus, comme l'API.
+    // Tranche R3 : la liste des outils d'Explorer, et la recherche par mots. « carn » trouve deux
+    // projets, un membre et un outil ; tout autre texte (« carnaval ») ne trouve rien.
+    if (pathname === '/v1/tools') return json(200, { tools: toolList })
+    if (pathname === '/v1/search') {
+      const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+      return json(200, searchResultsOf[q] ?? emptySearchResults)
+    }
     if (pathname === '/v1/members/mentionable') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase()
       return json(200, { members: mentionable.filter((m) => m.handle.startsWith(q)).slice(0, 5) })
