@@ -210,13 +210,14 @@ describe('UnsubscribeScreen', () => {
     expect(screen.getByRole('button', { name: 'Tout couper' })).toBeBusy()
   })
 
-  it('leads to the e-mail settings in « Mon profil »', async () => {
+  // R2 (jur-B5) : les réglages d'e-mail vivent dans la rubrique Notifications des réglages.
+  it('leads to the e-mail settings in the notification settings', async () => {
     await open({ token: recapToken })
     await confirm()
 
     await fireEvent.press(await screen.findByRole('link', { name: 'Gérer mes e-mails' }))
 
-    expect(visited(mockPush, mockReplace)).toEqual(['/profile'])
+    expect(visited(mockPush, mockReplace)).toEqual(['/settings/notifications'])
   })
 
   it('says the link is invalid at once when its token is damaged, without calling the API', async () => {
