@@ -51,11 +51,16 @@ export const layout = {
   breakpoints: {
     medium: 700, // à partir d'ici : tablette ou petite fenêtre d'ordinateur
     wide: 1100, // à partir d'ici : ordinateur, mise en colonnes
+    // R2 (relecture de design de R1) : les écrans de marque (accueil d'un visiteur, connexion)
+    // passent plus tôt à la scène à gauche et à la carte à droite : à 1 024 points, la colonne
+    // seule laissait de grands vides de miel de chaque côté.
+    card: 1000,
   },
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)
   sideColumn: 320, // largeur de base de la colonne latérale
   mainColumn: 560, // largeur minimale de la colonne principale avant de passer en pile
+  settingsNavWidth: 256, // la colonne des rubriques des réglages, sur ordinateur (R2)
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
   touchTarget: 44, // taille minimale d'une zone à toucher du doigt
   chipHeight: 36, // hauteur dessinée d'une étiquette (sa zone à toucher, autour, fait 44)

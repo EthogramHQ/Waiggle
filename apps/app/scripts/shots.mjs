@@ -166,6 +166,16 @@ const session = {
 //   - adresse-lien-refuse : /email-change/done?error=INVALID_TOKEN, sans session.
 const changeEmailShot = { newEmail: 'lea.moreau@exemple.fr', password: 'mot-de-passe-de-lea' }
 const wrongPasswordShot = 'pas-le-bon-mot-de-passe'
+// Tranche R2 : le lien « nouveau mot de passe » (un jeton accepté, un refusé) et l'adresse qui
+// attend sa vérification. « Vérifie ta boîte mail » ne lit plus l'adresse dans l'URL (jur-9) :
+// `pendingEmail` la pose dans le sessionStorage de l'onglet, comme l'inscription, puis recharge.
+const resetTokenShot = 'tok-7f3c9a-valide' // gitleaks:allow
+const refusedResetToken = 'tok-7f3c9a-refuse' // gitleaks:allow
+const pendingEmail = (email) => async (page) => {
+  await page.evaluate((value) => sessionStorage.setItem('waiggle.pendingEmail', value), email)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByText(email, { exact: false }).first().waitFor()
+}
 const emailOf = { current: leaMe.email, changed: changeEmailShot.newEmail }
 // Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
 // simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
@@ -766,6 +776,31 @@ const fakeApi = (
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname === '/api/auth/get-session') return json(200, signedIn ? sessionNow : null)
     const method = route.request().method()
+    // Tranche R2, le mot de passe et la vérification, sans session comme la vraie API. Mot de passe
+    // oublié et renvoi du lien : toujours la même réponse. Nouveau mot de passe : le jeton refusé
+    // (refusedResetToken) reçoit INVALID_TOKEN, comme Better Auth pour un lien expiré ou servi.
+    if (pathname === '/api/auth/request-password-reset' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/send-verification-email' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/reset-password' && method === 'POST') {
+      const { token } = JSON.parse(route.request().postData() ?? '{}')
+      if (token === refusedResetToken) {
+        return json(400, { code: 'INVALID_TOKEN', message: 'Invalid token' })
+      }
+      return json(200, { status: true })
+    }
+    if (pathname === '/v1/account/unverified-email' && method === 'POST') {
+      const { newEmail } = JSON.parse(route.request().postData() ?? '{}')
+      return json(200, { sentTo: String(newEmail).trim().toLowerCase() })
+    }
+    // Changer son mot de passe (réglages, Sécurité) : avec la session de Léa.
+    if (pathname === '/api/auth/change-password' && method === 'POST') {
+      if (!signedIn) return json(401, { code: 'UNAUTHORIZED', message: '' })
+      return json(200, { status: true })
+    }
     // Se désinscrire depuis un e-mail (tranche 6c) : sans session, comme la vraie API. Le jeton
     // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
     if (pathname === '/v1/email/unsubscribe' && method === 'POST') {
@@ -1034,12 +1069,117 @@ const fakeApi = (
 
 // 4. Ce qu'on photographie.
 const project = `/projects/${recipesProject.id}`
+// La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
+// servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
+// simulée du contexte), puis la page est relue.
+const leaPhoto = `${apiUrl}/media/visuals/e4a1b2c3-d4e5-4f60-8a7b-9c0d1e2f3a4b.webp`
+const withLeaPhoto = async (page) => {
+  await page.route(
+    (url) => url.pathname === '/v1/me',
+    (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { ...leaMe, avatarUrl: leaPhoto } })
+        : route.fallback(),
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+}
 const pages = [
   { name: 'catalogue', path: '/catalogue', signedIn: false, fullPage: true },
   { name: 'accueil', path: '/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
+  // R2 : arrivé du nouveau mot de passe, « Mot de passe changé. Connecte-toi avec le nouveau. »
+  {
+    name: 'connexion-mot-de-passe-change',
+    path: '/sign-in?announce=passwordChanged',
+    signedIn: false,
+  },
   { name: 'inscription', path: '/sign-up', signedIn: false },
-  { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
+  // R2, « Trop d'essais » : l'API refuse la connexion pour 10 minutes (429, Retry-After : 600) ; le
+  // bouton reste bloqué, l'heure du prochain essai est écrite en clair (décision D3).
+  {
+    name: 'trop-essais',
+    path: '/sign-in',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.route('**/api/auth/sign-in/email', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          // L'API est sur une autre origine que l'appli : le navigateur ne laisse lire Retry-After
+          // que si la réponse l'expose, comme le fait la vraie API (CORS, `exposeHeaders` d'app.ts).
+          headers: {
+            'Retry-After': '600',
+            'Access-Control-Expose-Headers': 'Retry-After',
+          },
+          body: JSON.stringify({ code: 'TOO_MANY_REQUESTS', message: '' }),
+        }),
+      )
+      await page.getByLabel('Adresse e-mail').fill('ines.haddad@exemple.fr')
+      await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
+      await page.getByRole('button', { name: 'Me connecter' }).click()
+      // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
+      await page.getByText(/Nouvel essai possible/).waitFor()
+    },
+  },
+  // Tranche R2 : « Vérifie ta boîte mail », l'adresse venue de l'inscription (gmail : « Ouvrir ma
+  // messagerie » ; un service inconnu : pas de bouton sur ordinateur), puis après « Renvoyer ».
+  {
+    name: 'verifier-email',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@gmail.com'),
+  },
+  {
+    name: 'verifier-email-inconnue',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@exemple.fr'),
+  },
+  {
+    name: 'verifier-email-renvoye',
+    path: '/check-email',
+    signedIn: false,
+    prepare: async (page) => {
+      await pendingEmail('ines.haddad@gmail.com')(page)
+      await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
+      await page.getByText(/nouvel e-mail vient de partir/).waitFor()
+    },
+  },
+  // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le
+  // lien, et ce même lien refusé par le serveur.
+  { name: 'mot-de-passe-oublie', path: '/forgot-password', signedIn: false },
+  {
+    name: 'mot-de-passe-oublie-envoye',
+    path: '/forgot-password',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Adresse e-mail').fill('ines.haddad@gmail.com')
+      await page.getByRole('button', { name: 'Envoyer le lien' }).click()
+      await page.getByText(/Si un compte existe pour cette adresse/).waitFor()
+    },
+  },
+  {
+    name: 'nouveau-mot-de-passe',
+    path: `/reset-password?token=${resetTokenShot}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+    },
+  },
+  {
+    name: 'lien-refuse',
+    path: `/reset-password?token=${refusedResetToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+      await page.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+      await page.getByRole('heading', { name: 'Ce lien ne marche plus' }).waitFor()
+    },
+  },
+  // La rubrique Sécurité des réglages : changer son mot de passe (la route est celle des réglages).
+  { name: 'changer-mot-de-passe', path: '/settings/security/password', signedIn: true },
+  // Décision D1 : le second lien d'un changement d'adresse ouvert sans session.
+  { name: 'adresse-connecte-toi', path: '/email-change/sign-in-first', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
   // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
   { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
@@ -1092,14 +1232,35 @@ const pages = [
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()
     },
   },
-  { name: 'compte', path: '/account', signedIn: true, fullPage: true },
-  { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
+  // Tranche R2 : la page « Réglages » (qui remplace « Mon compte ») et chacune de ses rubriques.
+  { name: 'reglages', path: '/settings', signedIn: true, fullPage: true },
+  {
+    name: 'reglages-notifications',
+    path: '/settings/notifications',
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'reglages-langue', path: '/settings/language', signedIn: true, fullPage: true },
+  { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
+  { name: 'reglages-donnees', path: '/settings/data', signedIn: true, fullPage: true },
+  { name: 'reglages-securite', path: '/settings/security', signedIn: true, fullPage: true },
+  // Retour de « Changer ton mot de passe » (relecture R2, B2) : la rubrique dit elle-même
+  // « Mot de passe changé », le toast n'est plus la seule trace.
+  {
+    name: 'reglages-securite-change',
+    path: '/settings/security?announce=passwordChanged',
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'reglages-compte', path: '/settings/account', signedIn: true, fullPage: true },
+  { name: 'reglages-a-propos', path: '/settings/about', signedIn: true, fullPage: true },
+  { name: 'supprimer-compte', path: '/settings/account/delete', signedIn: true, fullPage: true },
   // Tranche « adresse » : la page qui change l'adresse, la demande partie (le premier lien vers
   // l'adresse actuelle), un mot de passe refusé ; puis les pages des deux liens.
-  { name: 'changer-adresse', path: '/account/email', signedIn: true, fullPage: true },
+  { name: 'changer-adresse', path: '/settings/account/email', signedIn: true, fullPage: true },
   {
     name: 'changer-adresse-envoye',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1111,7 +1272,7 @@ const pages = [
   },
   {
     name: 'changer-adresse-erreur',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1129,11 +1290,32 @@ const pages = [
     path: '/email-change/done?error=INVALID_TOKEN',
     signedIn: false,
   },
-  { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
+  { name: 'profil', path: '/settings/profile', signedIn: true, fullPage: true },
+  // R2 : le profil en feuille, Léa avec sa photo (floutée en tête de la feuille), sa bio et ses
+  // outils ; sur ordinateur, l'aperçu de sa page à droite.
+  {
+    name: 'feuille-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Mon profil' }).waitFor()
+    },
+  },
+  // R2 : la suppression en feuille, avec la photo de Léa et les couvertures de ses projets.
+  {
+    name: 'feuille-suppression',
+    path: '/settings/account/delete',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Supprimer ton compte' }).waitFor()
+    },
+  },
   // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
   {
     name: 'profil-pseudo-pris',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1145,7 +1327,7 @@ const pages = [
   // Un nouveau pseudo enregistré : la confirmation rappelle que l'ancien reste réservé.
   {
     name: 'profil-pseudo-change',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1159,7 +1341,7 @@ const pages = [
   // Tranche 6c : un réglage d'e-mail touché, enregistré tout de suite (« Réglage enregistré. »).
   {
     name: 'profil-email',
-    path: '/profile',
+    path: '/settings/notifications',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1235,7 +1417,7 @@ const pages = [
       await page.getByRole('heading', { name: 'Retirer ce contenu ?' }).waitFor()
     },
   },
-  { name: 'compte-admin', path: '/account', signedIn: true, admin: true, fullPage: true },
+  { name: 'reglages-admin', path: '/settings', signedIn: true, admin: true, fullPage: true },
   // Tranche 7b : bloquer. Le menu « … » de la page de Max, ouvert ; puis « Bloquer » choisi, la
   // fenêtre qui dit ce qui change ; la page de Sam vue par Léa qui l'a bloqué (l'en-tête seul,
   // « Tu as bloqué @sam ») ; la liste « Membres bloqués », pleine puis vide ; la confirmation d'un
@@ -1319,7 +1501,13 @@ const pages = [
     fullPage: true,
   },
   { name: 'suspendu-publier', path: '/projects/new', signedIn: true, suspended: true },
-  { name: 'suspendu-profil', path: '/profile', signedIn: true, suspended: true, fullPage: true },
+  {
+    name: 'suspendu-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    suspended: true,
+    fullPage: true,
+  },
   // La suspension et sa fin, dans les notifications.
   {
     name: 'notifications-suspension',

@@ -11,7 +11,7 @@ import { appName, borders, layout, space } from '@ruche/brand'
 import Head from 'expo-router/head'
 import { type ReactNode, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform, ScrollView, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
@@ -77,6 +77,13 @@ type Props = {
    * ou en tête de la carte (ordinateur, sans `hero`). Jamais un bouton ni un texte à lire.
    */
   scene?: ReactNode
+  /**
+   * Les boutons de la page (l'action principale, puis « Annuler »). Sur téléphone, ils restent
+   * collés en bas de l'écran, au-dessus du clavier quand il s'ouvre, sans cacher le champ actif
+   * (le contenu défile dans la place qui reste : WCAG 2.4.11, relecture juridique R2) ; sur
+   * ordinateur, et sur le miel (ambiance « brand »), ils suivent le contenu.
+   */
+  footer?: ReactNode
 }
 
 export function Screen({
@@ -94,10 +101,11 @@ export function Screen({
   thumbhash = null,
   ambiance = 'light',
   scene,
+  footer,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { padding, sizeClass } = useLayout()
+  const { padding, sizeClass, card } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
@@ -105,10 +113,13 @@ export function Screen({
   useEffect(() => markHydrated(), [])
   useBrowserLanguage()
 
-  const withHero = hero !== undefined && sizeClass === 'wide'
   const brand = ambiance === 'brand'
+  // Sur le miel, la carte arrive dès 1 000 points (`card`) ; ailleurs, avec la mise en colonnes.
+  const withHero = hero !== undefined && (brand ? card : sizeClass === 'wide')
   // Sur le miel, pas de barre fixe : elle se poserait sur le dégradé, hors de la feuille.
   const pinned = header !== undefined && stickyHeader && !brand
+  // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
+  const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
   // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
   const body = (
     <>
@@ -128,6 +139,9 @@ export function Screen({
       ) : null}
       {pinned ? null : notice}
       {children}
+      {footer !== undefined && !pinnedFooter ? (
+        <View style={{ gap: space.md }}>{footer}</View>
+      ) : null}
     </>
   )
 
@@ -199,64 +213,111 @@ export function Screen({
               </BrandAmbiance>
             </ScrollView>
           ) : (
-            <ScrollView
-              contentContainerStyle={{
-                flexGrow: 1,
-                alignItems: 'center',
-                // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
-                paddingTop: (pinned ? 0 : insets.top) + space.lg,
-                paddingBottom: insets.bottom + space.huge,
-                paddingHorizontal: padding,
-                gap: space.xl,
-              }}
-              keyboardShouldPersistTaps="handled"
+            // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
+            // il s'ouvre, si bien que le pied collé remonte au-dessus de lui et que le contenu
+            // défile dans la place qui reste (Android le fait de lui-même, le web aussi). Sans
+            // pied collé, rien ne change : la zone qui défile reste seule.
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              enabled={pinnedFooter}
+              {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
             >
-              {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
+              <ScrollView
+                contentContainerStyle={{
+                  flexGrow: 1,
+                  alignItems: 'center',
+                  // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
+                  paddingTop: (pinned ? 0 : insets.top) + space.lg,
+                  // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
+                  paddingBottom: pinnedFooter ? space.xl : insets.bottom + space.huge,
+                  paddingHorizontal: padding,
+                  gap: space.xl,
+                }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
             change pas de taille d'une page à l'autre. */}
-              {header && !pinned ? (
-                <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
-              ) : null}
-              {withHero ? (
-                // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
-                <View
-                  style={{
-                    width: '100%',
-                    maxWidth: layout.maxContentWidth,
-                    flexGrow: 1,
-                    // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                    // mais s'affiche à droite de la scène.
-                    flexDirection: 'row-reverse',
-                    alignItems: 'center',
-                    gap: space.huge,
-                  }}
-                >
-                  <View style={{ width: layout.formWidth - 80 }}>
-                    <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                      {body}
-                    </Surface>
+                {header && !pinned ? (
+                  <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
+                ) : null}
+                {withHero ? (
+                  // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                  <View
+                    style={{
+                      width: '100%',
+                      maxWidth: layout.maxContentWidth,
+                      flexGrow: 1,
+                      // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                      // mais s'affiche à droite de la scène.
+                      flexDirection: 'row-reverse',
+                      alignItems: 'center',
+                      gap: space.huge,
+                    }}
+                  >
+                    <View style={{ width: layout.formWidth - 80 }}>
+                      <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                        {body}
+                      </Surface>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
                   </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
-                </View>
-              ) : (
-                <View
-                  style={{
-                    width: '100%',
-                    maxWidth: maxWidthFor(width, false),
-                    gap: space.xl,
-                    // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                    ...(width === 'form' && !onBack && !header
-                      ? { flexGrow: 1, justifyContent: 'center' }
-                      : null),
-                  }}
-                >
-                  {body}
-                </View>
-              )}
-            </ScrollView>
+                ) : (
+                  <View
+                    style={{
+                      width: '100%',
+                      maxWidth: maxWidthFor(width, false),
+                      gap: space.xl,
+                      // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                      ...(width === 'form' && !onBack && !header
+                        ? { flexGrow: 1, justifyContent: 'center' }
+                        : null),
+                    }}
+                  >
+                    {body}
+                  </View>
+                )}
+              </ScrollView>
+              {pinnedFooter ? (
+                <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
+              ) : null}
+            </KeyboardAvoidingView>
           )}
         </View>
       </AmbientProvider>
     </NoticeScope>
+  )
+}
+
+/**
+ * Le pied collé en bas de l'écran (téléphone) : une bande sur fond « feuille », bordée d'un trait
+ * fin, qui porte les boutons de la page, dégagée de la barre du bas de l'appareil. Exporté pour le
+ * catalogue, qui le montre dans la page ; les écrans passent par la prop `footer` de Screen.
+ */
+export function ScreenFooter({
+  children,
+  width = layout.formWidth,
+}: {
+  children: ReactNode
+  /** La largeur maximale des boutons : celle du contenu de la page. */
+  width?: number
+}) {
+  const { colors } = useTheme()
+  const { padding } = useLayout()
+  const insets = useSafeAreaInsets()
+  return (
+    <View
+      style={{
+        paddingTop: space.md,
+        paddingBottom: insets.bottom + space.md,
+        paddingHorizontal: padding,
+        alignItems: 'center',
+        backgroundColor: colors.sheet,
+        borderTopWidth: borders.hairline,
+        borderTopColor: colors.line,
+      }}
+    >
+      <View style={{ width: '100%', maxWidth: width, gap: space.md }}>{children}</View>
+    </View>
   )
 }
 

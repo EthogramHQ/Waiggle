@@ -1,6 +1,7 @@
 // Limitation de débit pour nos propres routes : « au plus N requêtes par fenêtre de temps ».
 // Les compteurs sont dans la base (table api_rate_limit) : ils survivent à un redémarrage et
 // seraient partagés si l'API tournait un jour sur plusieurs serveurs.
+import { createHmac } from 'node:crypto'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 
@@ -116,12 +117,91 @@ export const memberCounterKeys = (userId: string) => ({
   emailChangeDay: `email-change-day:${userId}`,
   // Les e-mails envoyés à une nouvelle adresse (le second lien) : 3 par heure (S1).
   emailChangeLink: `email-change-link:${userId}`,
+  // Le lien de vérification renvoyé quand un compte non vérifié essaie de se connecter (R2,
+  // relecture de sécurité S3) : 3 par heure, à part du quota par adresse de « Renvoyer l'e-mail ».
+  verificationOnSignIn: `verification-on-sign-in:${userId}`,
+  // Corriger son adresse avant de l'avoir vérifiée (R2, A4, S7) : 3 par heure et 5 par jour, comptés
+  // après un mot de passe juste.
+  unverifiedEmail: `unverified-email:${userId}`,
+  unverifiedEmailDay: `unverified-email-day:${userId}`,
   // Les décisions d'un administrateur (tranche 7c) : 50 par jour, toutes actions confondues, mal
   // formées comprises. Un compte d'administrateur volé ne peut pas tout retirer d'un coup.
   moderationDecision: `moderation-decision:${userId}`,
   // Ses mots de passe faux quand la modération le redemande (S12) : 5 par jour, puis 429.
   moderationPassword: `moderation-password:${userId}`,
+  // Changer son mot de passe depuis les réglages (tranche R2, A2) : 5 essais par quart d'heure et
+  // 10 par jour, comptés avant la vérification du mot de passe actuel (relecture de sécurité S10).
+  // Sans eux, une session volée pourrait deviner ce mot de passe en changeant d'adresse IP.
+  passwordChange: `password-change:${userId}`,
+  passwordChangeDay: `password-change-day:${userId}`,
 })
+
+/**
+ * Une adresse e-mail sous la forme qu'on compare : sans blancs autour, en minuscules. Better Auth
+ * range les adresses en minuscules ; « Lea@Example.com » et « lea@example.com » sont la même boîte.
+ */
+export const normalizeAddress = (email: string) => email.trim().toLowerCase()
+
+/**
+ * L'empreinte d'une adresse e-mail pour la clé d'un compteur « par adresse » (tranche R2,
+ * relectures de sécurité S2 et juridique jur-6). Un HMAC est une empreinte calculée avec une clé
+ * secrète : sans le secret du serveur, on ne peut pas retrouver l'adresse en essayant un
+ * dictionnaire d'adresses, ce que permettrait un simple SHA-256. La clé est dérivée du secret par
+ * une étiquette fixe, une clé par usage, comme pour les jetons de désinscription. Les variantes
+ * d'écriture d'une adresse (capitales, espaces) donnent la même empreinte : un seul compteur.
+ */
+export const addressDigest = (secret: string, email: string) => {
+  const key = createHmac('sha256', secret).update('waiggle:address-counter:v1').digest()
+  return createHmac('sha256', key).update(normalizeAddress(email)).digest('hex')
+}
+
+/**
+ * Les parcours qui comptent « par adresse e-mail » (tranche R2), chacun avec le début de ses clés.
+ * Toutes les listes au même endroit : la suppression d'un compte efface les compteurs de chacun
+ * (deleteAddressCounters, jur-6), et `addressCounterKey` n'accepte que ces noms, si bien qu'un
+ * parcours nouveau ne peut pas oublier de s'inscrire ici.
+ */
+export const ADDRESS_COUNTER_PURPOSES = {
+  // Mot de passe oublié (auth/password.ts).
+  passwordReset: 'password-reset',
+  passwordResetDay: 'password-reset-day',
+  // Renvoyer le lien de vérification (auth/verification-resend.ts).
+  verifyMinute: 'verify-minute',
+  verifyHour: 'verify-hour',
+  verifyDay: 'verify-day',
+  // Corriger une adresse pas encore vérifiée : l'adresse de départ, puis celle d'arrivée
+  // (routes/unverified-email.ts).
+  unverified: 'unverified',
+  unverifiedTo: 'unverified-to',
+} as const
+
+/** L'un des parcours ci-dessus : `(typeof X)[keyof typeof X]` est l'union de ses valeurs. */
+export type AddressCounterPurpose =
+  (typeof ADDRESS_COUNTER_PURPOSES)[keyof typeof ADDRESS_COUNTER_PURPOSES]
+
+/**
+ * La clé d'un compteur « par adresse e-mail » : `purpose` sépare les compteurs de chaque parcours
+ * (mot de passe oublié, renvoi du lien, correction d'adresse…), l'empreinte désigne l'adresse.
+ */
+export const addressCounterKey = (secret: string, purpose: AddressCounterPurpose, email: string) =>
+  `${purpose}:${addressDigest(secret, email)}`
+
+/**
+ * Efface tous les compteurs d'une adresse, à la suppression du compte qui l'a (jur-6) : ce sont des
+ * empreintes, mais elles désignent toujours cette adresse. Une clé par parcours, lues par la clé
+ * primaire de la table (inArray). Les compteurs d'une adresse que le compte n'a plus (corrigée
+ * avant vérification, changée) ne se retrouvent pas : ils partent avec la purge, à la fin de leur
+ * fenêtre.
+ */
+export const deleteAddressCounters = (db: Database, secret: string, email: string) =>
+  db.delete(schema.apiRateLimit).where(
+    inArray(
+      schema.apiRateLimit.key,
+      Object.values(ADDRESS_COUNTER_PURPOSES).map((purpose) =>
+        addressCounterKey(secret, purpose, email),
+      ),
+    ),
+  )
 
 /**
  * Efface les compteurs d'un membre, à la suppression de son compte (leurs clés contiennent son

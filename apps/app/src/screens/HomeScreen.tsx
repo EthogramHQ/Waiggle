@@ -55,8 +55,8 @@ function VisitorHome() {
   const { t } = useTranslation()
   const router = useRouter()
   const openOutside = useOpenOutside()
-  const { sizeClass } = useLayout()
-  const wide = sizeClass === 'wide'
+  // La carte (scène à gauche) des écrans de marque, dès 1 000 points (R2).
+  const wide = useLayout().card
 
   return (
     // Le « miel vif » des moments de marque : sur téléphone, la constellation flotte sur le miel et
@@ -65,6 +65,13 @@ function VisitorHome() {
     <Screen
       ambiance="brand"
       scene={<Constellation height={280} />}
+      // R2 (relecture de design de R1) : le choix de la langue sur le miel, pas en tête de la
+      // feuille ; à 320 × 568, « Créer un compte » remonte ainsi au-dessus du pli.
+      header={
+        <Row justify="end">
+          <LanguageSwitcher compact />
+        </Row>
+      }
       hero={
         <WelcomeHero
           tagline={t(($) => $.home.tagline)}
@@ -76,9 +83,6 @@ function VisitorHome() {
         />
       }
     >
-      <Row justify="end">
-        <LanguageSwitcher compact />
-      </Row>
       {/* Sur ordinateur, la scène de gauche montre déjà la constellation et le logo. */}
       {wide ? (
         <Text variant="title3" heading={1}>
@@ -108,7 +112,11 @@ function VisitorHome() {
           <Text variant="caption" tone="muted">
             {t(($) => $.home.openSource)}
           </Text>
-          <TextLink label={t(($) => $.home.seeCode)} onPress={() => openOutside(sourceUrl)} />
+          <TextLink
+            label={t(($) => $.home.seeCode)}
+            onPress={() => openOutside(sourceUrl)}
+            external
+          />
         </Row>
       )}
     </Screen>
@@ -167,7 +175,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
             <IconButton
               icon="user"
               label={t(($) => $.home.account)}
-              onPress={() => router.push('/account')}
+              onPress={() => router.push('/settings')}
             />
           </>
         ) : (
@@ -184,7 +192,7 @@ function MemberHome({ id, name }: { id: string; name: string }) {
               variant="secondary"
               icon="user"
               size="compact"
-              onPress={() => router.push('/account')}
+              onPress={() => router.push('/settings')}
             />
           </>
         )}

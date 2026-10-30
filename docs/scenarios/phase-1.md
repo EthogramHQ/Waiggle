@@ -965,6 +965,9 @@ Règles détaillées :
 - **Risque accepté** (Louis, 25/10/2026) : si Inès se trompe dans la nouvelle adresse et confirme
   quand même depuis son ancienne boîte, l'inconnu qui suit le second lien reçoit ensuite les
   e-mails du compte (sans pouvoir s'y connecter) ; Inès doit alors nous écrire.
+  **Retiré en R2** (Louis, 29/10/2026) : avec le mot de passe oublié, ce risque devenait une prise
+  de compte ; le lien envoyé à la nouvelle adresse ne marche plus que sur un appareil où le membre
+  est connecté (`refonte.md`, R2).
 
 ## Tranche 7c — Administrer
 

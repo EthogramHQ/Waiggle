@@ -38,6 +38,9 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'confirm' | 'gl
 /** Les tailles du bouton, dans l'ordre : leur hauteur dessinée vient de `layout.controlHeight`. */
 export type ButtonSize = keyof typeof layout.controlHeight
 
+/** Les propriétés du bouton, reprises par ceux qui l'enrobent (RetryButton). */
+export type ButtonProps = Props
+
 type Props = {
   label: string
   onPress: () => void
@@ -114,7 +117,9 @@ export function Button({
     // rouge (jeton shadows.danger) le détache de la fenêtre de confirmation.
     confirm: {
       box: { backgroundColor: colors.danger, boxShadow: `${shadows.highlight}, ${shadows.danger}` },
-      pressed: { opacity: 0.85 },
+      // Appuyé, un rouge plus sombre plutôt qu'un bouton transparent : le blanc y garde 6,6:1 au
+      // lieu de tomber à 4,0:1 sur une feuille claire (relecture de design R2).
+      pressed: { backgroundColor: colors.dangerPressed },
       tone: 'onDanger',
     },
     glass: {

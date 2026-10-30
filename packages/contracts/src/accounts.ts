@@ -59,6 +59,80 @@ export const ChangeEmailRequest = z.object({
 })
 export type ChangeEmailRequest = z.infer<typeof ChangeEmailRequest>
 
+/**
+ * La durée de vie d'un lien de mot de passe oublié, en secondes : une heure. Une seule valeur pour
+ * tous : Better Auth la lit (`resetPasswordTokenExpiresIn`), l'e-mail l'écrit en toutes lettres, et
+ * un test de l'appli vérifie que ses textes (« valable une heure ») disent la même chose (jur-4).
+ */
+export const RESET_LINK_LIFETIME_SECONDS = 60 * 60
+
+/**
+ * Mot de passe oublié (tranche R2, POST /api/auth/request-password-reset). La réponse est la même
+ * qu'un compte existe ou non, et l'e-mail ne part que s'il existe : on ne révèle pas qui a un
+ * compte. Le lien reçu ouvre la page /reset-password de l'appli, valable une heure, une fois.
+ */
+export const ForgotPasswordRequest = z.object({
+  email: z.email(),
+})
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequest>
+
+/**
+ * Choisir un nouveau mot de passe depuis le lien reçu (POST /api/auth/reset-password). Un jeton
+ * expiré, déjà utilisé ou abîmé reçoit le code INVALID_TOKEN, et l'écran dit la même chose dans
+ * tous ces cas. Après le changement, tous les appareils du membre sont déconnectés.
+ */
+export const ResetPasswordRequest = z.object({
+  token: z.string().min(1).max(256),
+  newPassword: Password,
+})
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequest>
+
+/**
+ * Changer son mot de passe depuis les réglages (POST /api/auth/change-password). L'actuel est
+ * exigé ; les autres appareils sont déconnectés et celui-ci reste connecté (l'API l'impose, quoi
+ * que dise la requête). Refus : INVALID_PASSWORD (mot de passe actuel faux), 429 (quota).
+ */
+export const ChangePasswordRequest = z.object({
+  currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+  newPassword: Password,
+})
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequest>
+
+/**
+ * Renvoyer le lien de vérification (POST /api/auth/send-verification-email), depuis « Vérifie ta
+ * boîte mail ». Même réponse que l'adresse ait un compte ou non ; au-delà du quota de l'adresse,
+ * 429 avec l'en-tête Retry-After (l'appli dit alors à quelle heure réessayer).
+ */
+export const ResendVerificationRequest = z.object({
+  email: z.email(),
+})
+export type ResendVerificationRequest = z.infer<typeof ResendVerificationRequest>
+
+/**
+ * Corriger son adresse avant de l'avoir vérifiée (POST /v1/account/unverified-email), sans
+ * session : l'adresse actuelle et le mot de passe prouvent qu'on est bien le nouveau membre.
+ * Refus : 401 `unauthorized` (adresse ou mot de passe incorrect, même réponse pour les deux),
+ * 409 `already_verified` (le compte est déjà vérifié : il suffit de se connecter), 429 (quota).
+ * Une nouvelle adresse déjà utilisée reçoit la même réponse qu'une adresse libre : l'écran dit
+ * « Si cette adresse n'est pas déjà utilisée, un lien vient d'y partir. »
+ */
+export const ChangeUnverifiedEmailRequest = z
+  .object({
+    email: z.email(),
+    password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+    newEmail: z.email(),
+  })
+  .meta({ id: 'ChangeUnverifiedEmailRequest' })
+export type ChangeUnverifiedEmailRequest = z.infer<typeof ChangeUnverifiedEmailRequest>
+
+/** La réponse : la nouvelle adresse, à laquelle le lien est parti si elle était libre. */
+export const ChangeUnverifiedEmailResponse = z
+  .object({
+    sentTo: z.email(),
+  })
+  .meta({ id: 'ChangeUnverifiedEmailResponse' })
+export type ChangeUnverifiedEmailResponse = z.infer<typeof ChangeUnverifiedEmailResponse>
+
 /** Le profil du membre connecté, tel que renvoyé par GET /v1/me. */
 export const Me = z
   .object({

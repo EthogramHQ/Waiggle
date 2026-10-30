@@ -3,7 +3,7 @@
 // frappe compte déjà dans la liste : rien n'est perdu si on enregistre sans valider.
 // Sert aux outils favoris du profil et aux outils d'un projet.
 import { borders, layout, radii, space, textStyles } from '@ruche/brand'
-import { useState } from 'react'
+import { type Ref, useState } from 'react'
 import { Pressable, TextInput, View } from 'react-native'
 import { Icon } from './Icon'
 import { Text } from './Text'
@@ -22,6 +22,11 @@ type Props = {
   /** Une précision à droite du libellé (« 10 au plus »). */
   limit?: string
   error?: string | undefined
+  /**
+   * Une poignée vers le champ « Ajouter… », pour y poser le focus quand la liste est refusée : tout
+   * en bas d'une feuille, son erreur restait sous le pied collé (relecture de design R2).
+   */
+  inputRef?: Ref<TextInput>
 }
 
 /** Découpe un texte tapé aux virgules : les morceaux complets, puis ce qui reste après la dernière. */
@@ -39,6 +44,7 @@ export function TagInput({
   removeLabel,
   limit,
   error,
+  inputRef,
 }: Props) {
   const { colors, shadows } = useTheme()
   const [draft, setDraft] = useState('')
@@ -156,6 +162,7 @@ export function TagInput({
         >
           <Icon name="plus-circle" size={20} tone="amber" />
           <TextInput
+            {...(inputRef ? { ref: inputRef } : null)}
             accessibilityLabel={label}
             value={draft}
             onChangeText={type}

@@ -144,6 +144,8 @@ export type TextProps = {
   | 'onPress'
   | 'testID'
   | 'nativeID'
+  // Un texte qui est à lui seul un état (« Nouvel essai possible à 21:47 », RetryAt) : role status.
+  | 'role'
 >
 
 /** Les niveaux de titre de l'appli : la page (1), ses sections (2), puis dessous (3, 4). */

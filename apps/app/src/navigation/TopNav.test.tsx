@@ -145,3 +145,23 @@ describe('the top bar of a suspended member', () => {
     expect(screen.queryByText(containing(t(($) => $.suspension.title)))).toBeNull()
   })
 })
+
+// Dans les réglages (R2), la photo du membre ne mène plus aux réglages, où l'on est déjà : elle
+// reste là, sans être un bouton (relecture de l'interface, C7).
+describe('the top bar inside the settings', () => {
+  it('offers « Mon compte » outside the settings', async () => {
+    await renderWithProviders(<TopNav />)
+
+    await fireEvent.press(screen.getByRole('button', { name: t(($) => $.home.account) }))
+    expect(mockPush).toHaveBeenCalledWith('/settings')
+  })
+
+  it('shows the photo without a link back to the settings', async () => {
+    await renderWithProviders(<TopNav inSettings />)
+
+    // Témoin : la barre est là.
+    expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: t(($) => $.home.account) })).toBeNull()
+    expect(screen.queryByRole('link', { name: t(($) => $.home.account) })).toBeNull()
+  })
+})

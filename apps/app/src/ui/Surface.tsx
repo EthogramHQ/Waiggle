@@ -41,6 +41,13 @@ type Props = {
   centered?: boolean
   /** L'ombre portée ; sans elle, celle de la matière (aucune pour `plain` et `panel`). */
   shadow?: SurfaceShadow
+  /**
+   * Dans une colonne de hauteur limitée (une feuille, tranche R2) : `shrink`, la surface rétrécit
+   * jusqu'à la hauteur permise (son contenu défile alors dedans) ; `fill`, elle prend toute la
+   * hauteur. Sans cela, sur le web, une vue ne rétrécit jamais (react-native-web lui donne
+   * `flexShrink: 0`) et une longue feuille dépassait de la fenêtre.
+   */
+  fit?: 'shrink' | 'fill'
 }
 
 // Rayon, intensité du flou (de 1 à 100 pour expo-blur) et ombre par défaut de chaque matière.
@@ -78,6 +85,7 @@ export function Surface({
   fill = true,
   centered = false,
   shadow,
+  fit,
 }: Props) {
   const { colors, shadows, scheme } = useTheme()
   const { blur, radius: defaultRadius, shadow: defaultShadow } = defaults[variant]
@@ -116,6 +124,13 @@ export function Surface({
     },
   }
 
+  // minHeight: 0 : sans lui, une boîte flexible ne descend pas sous la hauteur de son contenu.
+  const fitStyle: ViewStyle | null =
+    fit === 'fill'
+      ? { flex: 1, minHeight: 0 }
+      : fit === 'shrink'
+        ? { flexShrink: 1, minHeight: 0 }
+        : null
   const style: ViewStyle = {
     ...look[variant],
     ...(boxShadow ? { boxShadow } : null),
@@ -127,6 +142,7 @@ export function Surface({
     ...(padding ? { padding: space[padding] } : null),
     ...(gap ? { gap: space[gap] } : null),
     ...(fill ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }),
+    ...fitStyle,
   }
 
   if (blur > 0 && realBlur) {
@@ -152,7 +168,7 @@ export function Surface({
       borderBottomRightRadius: inset(corners.borderBottomRightRadius),
     }
     return (
-      <View style={{ ...corners, ...(boxShadow ? { boxShadow } : null), alignSelf }}>
+      <View style={{ ...corners, ...(boxShadow ? { boxShadow } : null), alignSelf, ...fitStyle }}>
         <View style={{ ...inner, overflow: 'hidden' }}>
           {/* Les couches reprennent les coins arrondis : sur le web, une couche floutée n'est pas
               rognée par l'arrondi de son parent, et ses coins carrés dépasseraient. */}

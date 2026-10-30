@@ -8,3 +8,12 @@
 # Un faux jeton de désinscription des tests de l'appli (tranche 6c), abîmé exprès : ni secret, ni
 # signature valide. Les versions suivantes du fichier portent « gitleaks:allow » sur la ligne.
 f97b266a2935c0dc81c340f967a4d3813d1086ed:apps/app/src/testing/email.ts:generic-api-key:28
+
+# Faux jetons de mot de passe oublié de la tranche R2 (30/10/2026) : le jeton d'un test d'écran, les
+# deux des données des captures (un accepté, un refusé par la fausse API), et celui de l'aperçu de
+# l'e-mail. Aucun n'est un secret ni un jeton que le serveur accepterait. Les versions suivantes des
+# fichiers portent « gitleaks:allow » sur la ligne.
+1156f68bad7e39b358ca8cf61febc4cfb7a71dee:apps/app/src/screens/ResetPasswordScreen.test.tsx:generic-api-key:34
+30728a059ba90e664dd8854582cbb829e53c6488:apps/app/scripts/shots.mjs:generic-api-key:172
+30728a059ba90e664dd8854582cbb829e53c6488:apps/app/scripts/shots.mjs:generic-api-key:173
+e7c44434b3a6d135cad7b7c4287611b1dc1c9669:apps/api/src/email/preview.ts:generic-api-key:164

@@ -176,7 +176,7 @@ export function ModerationScreen() {
 function AdminModeration() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  const back = useGoBack('/account')
+  const back = useGoBack('/settings')
   // L'adresse peut ouvrir l'historique, filtré sur un membre (`?tab=history&member=<id>`, depuis la
   // page du membre). Elle n'est connue que dans le navigateur : la page pré-rendue l'ignore, et
   // l'onglet s'ouvre une fois hydratée (ui/theme/hydration.ts).

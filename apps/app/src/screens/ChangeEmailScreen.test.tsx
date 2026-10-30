@@ -301,13 +301,16 @@ describe('ChangeEmailScreen', () => {
     expect(screen.queryByLabelText(passwordLabel)).toBeNull()
   })
 
-  it('leads back to my account once the link is sent', async () => {
+  // R2 : « Mon compte » devient la rubrique Compte des réglages (/settings/account).
+  it('leads back to the account settings once the link is sent', async () => {
     await renderWithProviders(<ChangeEmailScreen />)
     await send(typed)
 
     await fireEvent.press(await screen.findByRole('button', { name: text('back') }))
 
-    expect(visited(mockPush, mockReplace, mockNavigate, mockDismissTo)).toContain('/account')
+    expect(visited(mockPush, mockReplace, mockNavigate, mockDismissTo)).toContain(
+      '/settings/account',
+    )
   })
 
   it('asks a visitor to sign in, without the form', async () => {

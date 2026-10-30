@@ -75,9 +75,13 @@ import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
 import { LoadingCatalogue } from './chargement'
+import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
+import { EntryCatalogue } from './entrer'
+import { SheetsCatalogue } from './feuilles'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
+import { SafeguardsCatalogue } from './garde-fous'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
 import { LightCatalogue } from './lumiere'
@@ -85,6 +89,7 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
+import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 
@@ -1012,6 +1017,15 @@ export function CatalogueScreen() {
       <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
+      {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
+      <AccountCatalogue />
+      <SheetsCatalogue />
+      {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
+      <EntryCatalogue />
+      {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
+      <SettingsCatalogue />
+      {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
+      <SafeguardsCatalogue />
 
       <Section title={l.icons}>
         <Icons />

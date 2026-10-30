@@ -15,9 +15,11 @@ import {
   isValidElement,
   type ReactNode,
   useContext,
+  useId,
   useRef,
 } from 'react'
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
+import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { RadioMark } from './Radio'
 import { Text } from './Text'
@@ -54,6 +56,8 @@ type RadioSlot = {
 const RadioSlotContext = createContext<RadioSlot | null>(null)
 
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
+/** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
+export type PressEvent = { preventDefault?: () => void }
 
 export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
   const { colors, shadows } = useTheme()
@@ -182,7 +186,11 @@ type RowBase = {
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
   tone?: 'default' | 'danger'
-  onPress?: () => void
+  /**
+   * Le geste. Une ligne-lien (`href`) reçoit l'événement du clic : l'écran qui navigue par son
+   * routeur empêche le navigateur de recharger la page (`preventDefault`).
+   */
+  onPress?: (event?: PressEvent) => void
   /** Pour un choix : coché ou non (la ligne devient un bouton radio). */
   selected?: boolean
   /** Le contenu de droite qui n'est pas une icône (un contrôle segmenté, par exemple). */
@@ -199,6 +207,21 @@ type RowBase = {
    * contact@… ») : le nom d'un bouton cache le texte qu'il contient, la précision comprise.
    */
   spokenLabel?: string
+  /**
+   * L'adresse de la page où mène la ligne (les rubriques des réglages, R2) : la ligne devient un
+   * lien, et sur le web un vrai `<a>` (ouvrir dans un nouvel onglet, Entrée). Le geste ordinaire
+   * reste `onPress`, que l'écran branche sur son routeur.
+   */
+  href?: string
+  /** Avec `href` : la ligne mène à la page ouverte (`aria-current="page"`). */
+  current?: boolean
+  /**
+   * Ce que les lecteurs d'écran lisent après le nom d'une ligne qu'on touche (R2) : ce que contient
+   * une rubrique des réglages, « ouvre un site externe ». Le nom d'un lien cache le texte qu'il
+   * contient : sur téléphone, c'est l'indice (`accessibilityHint`) ; sur le web, une description
+   * (`aria-describedby`) vers un texte caché, que le navigateur lit quand même.
+   */
+  hint?: string
 }
 
 export function ListRow({
@@ -215,8 +238,14 @@ export function ListRow({
   disabled = false,
   busy = false,
   spokenLabel,
+  href,
+  current = false,
+  hint,
 }: RowProps) {
   const { colors } = useTheme()
+  // L'identifiant du texte caché qui décrit la ligne (web) : useId en donne un, unique dans la page.
+  const hintId = useId()
+  const webHint = Platform.OS === 'web' && hint !== undefined && onPress !== undefined
   // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
   const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
@@ -295,6 +324,12 @@ export function ListRow({
       {accessory}
       {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
       {right}
+      {/* La description de la ligne, cachée à l'œil (display: none) mais lue par aria-describedby. */}
+      {webHint ? (
+        <View nativeID={hintId} style={{ display: 'none' }}>
+          <Text>{hint}</Text>
+        </View>
+      ) : null}
     </View>
   )
 
@@ -332,9 +367,14 @@ export function ListRow({
 
   return (
     <Pressable
-      accessibilityRole={isChoice ? 'radio' : 'button'}
+      accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
+      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
+      {...describedBy(webHint ? hintId : undefined)}
       aria-disabled={disabled}
+      // Un lien avec adresse : `href` et `aria-current` manquent aux types de React Native (sur
+      // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).
+      {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
       ref={isChoice ? slot?.setNode : undefined}

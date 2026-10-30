@@ -5,6 +5,9 @@
 // - `done` (/email-change/done) : la nouvelle adresse est vérifiée, le changement est fait. Ce lien
 //   ne connecte personne : la page parle à un membre connecté (son adresse, lue dans la session,
 //   jamais dans l'URL) comme à un visiteur (« connecte-toi avec ta nouvelle adresse »).
+// - `signInFirst` (/email-change/sign-in-first, tranche R2, décision D1) : le second lien ouvert
+//   sans être connecté ; il n'aboutit que depuis le compte du membre, la page demande de se
+//   connecter puis de rouvrir le lien.
 // Un lien refusé (expiré, déjà servi, remplacé…) arrive sur l'une ou l'autre avec `?error=…`.
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
@@ -19,7 +22,7 @@ import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
 import { LoadingScreen } from './states'
 
-type Props = { step: 'confirmed' | 'done' }
+type Props = { step: 'confirmed' | 'done' | 'signInFirst' }
 
 export function EmailChangeResultScreen({ step }: Props) {
   const { t } = useTranslation()
@@ -49,60 +52,79 @@ export function EmailChangeResultScreen({ step }: Props) {
           </>
         ),
       }
-    : step === 'confirmed'
+    : step === 'signInFirst'
       ? {
-          title: t(($) => $.account.emailChange.confirmedTitle),
-          icon: 'envelope-simple',
+          // Décision D1 : le second lien a été ouvert sans session. Rien n'a changé, et le lien
+          // n'a pas servi : une fois connecté, le membre le rouvre depuis son e-mail.
+          title: t(($) => $.account.emailChange.signInFirstTitle),
+          icon: 'sign-in',
           body: (
             <>
               <Text tone="secondary" align="center">
-                {t(($) => $.account.emailChange.confirmedBody)}
+                {t(($) => $.account.emailChange.signInFirstBody)}
               </Text>
-              <Text variant="callout" tone="muted" align="center">
-                {t(($) => $.account.emailChange.confirmedNone)}
-              </Text>
-              {/* Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
-                  sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
-                  moindre élément). En blanc : l'action attendue est d'ouvrir le second lien. */}
               <Button
-                label={t(($) => $.account.emailChange.toAccount)}
-                variant="secondary"
-                onPress={toAccount}
+                label={t(($) => $.account.emailChange.signIn)}
+                // push : le retour depuis la connexion ramène ici.
+                onPress={() => router.push('/sign-in')}
               />
             </>
           ),
         }
-      : {
-          title: t(($) => $.account.emailChange.doneTitle),
-          icon: 'check',
-          body: (
-            <>
-              {/* La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
-                  parle. */}
-              {data ? (
+      : step === 'confirmed'
+        ? {
+            title: t(($) => $.account.emailChange.confirmedTitle),
+            icon: 'envelope-simple',
+            body: (
+              <>
                 <Text tone="secondary" align="center">
-                  {t(($) => $.account.emailChange.doneBody, { email: data.user.email })}
+                  {t(($) => $.account.emailChange.confirmedBody)}
                 </Text>
-              ) : (
-                <Text tone="secondary" align="center">
-                  {t(($) => $.account.emailChange.doneSignedOut)}
+                <Text variant="callout" tone="muted" align="center">
+                  {t(($) => $.account.emailChange.confirmedNone)}
                 </Text>
-              )}
-              <Text variant="callout" tone="muted" align="center">
-                {t(($) => $.account.emailChange.doneDevices)}
-              </Text>
-              {data ? (
-                <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
-              ) : (
+                {/* Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
+                  sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
+                  moindre élément). En blanc : l'action attendue est d'ouvrir le second lien. */}
                 <Button
-                  label={t(($) => $.account.emailChange.signIn)}
-                  // push : le retour depuis la connexion ramène ici.
-                  onPress={() => router.push('/sign-in')}
+                  label={t(($) => $.account.emailChange.toAccount)}
+                  variant="secondary"
+                  onPress={toAccount}
                 />
-              )}
-            </>
-          ),
-        }
+              </>
+            ),
+          }
+        : {
+            title: t(($) => $.account.emailChange.doneTitle),
+            icon: 'check',
+            body: (
+              <>
+                {/* La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
+                  parle. */}
+                {data ? (
+                  <Text tone="secondary" align="center">
+                    {t(($) => $.account.emailChange.doneBody, { email: data.user.email })}
+                  </Text>
+                ) : (
+                  <Text tone="secondary" align="center">
+                    {t(($) => $.account.emailChange.doneSignedOut)}
+                  </Text>
+                )}
+                <Text variant="callout" tone="muted" align="center">
+                  {t(($) => $.account.emailChange.doneDevices)}
+                </Text>
+                {data ? (
+                  <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
+                ) : (
+                  <Button
+                    label={t(($) => $.account.emailChange.signIn)}
+                    // push : le retour depuis la connexion ramène ici.
+                    onPress={() => router.push('/sign-in')}
+                  />
+                )}
+              </>
+            ),
+          }
 
   // Avant l'hydratation, ni contenu ni titre d'onglet (`pageTitle={null}`) : la page ne sait pas
   // encore si le lien a été refusé. Le titre calculé ici serait celui de la réussite (« Adresse
