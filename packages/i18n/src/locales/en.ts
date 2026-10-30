@@ -92,6 +92,7 @@ export const en: Translation = {
       sentTitle: 'Sent',
       sent: 'If an account exists for this address, an email has just been sent.',
       sentExpires: 'The link is valid for one hour.',
+      sentLimit: 'Three links per hour at most: the last one received stays valid.',
       noneReceived:
         'Nothing after a few minutes? Check your spam folder, or check the address you typed.',
       resend: 'Send the link again',
@@ -103,19 +104,22 @@ export const en: Translation = {
       consequences: 'Once the password is changed, all your devices will be signed out.',
       submit: 'Save the password',
       invalidTitle: 'This link no longer works',
-      invalidBody: 'It has expired (one hour), it has already been used, or it is incomplete.',
+      invalidBody:
+        'It has expired (one hour), it has already been used, your password or address has changed since, or it is incomplete.',
       requestNew: 'Request a new link',
     },
     checkEmail: {
       title: 'Check your inbox',
       body: 'An email is on its way to {{email}}. Open the link it contains to activate your account: you will be signed in directly.',
       bodyNoEmail: 'We sent you a link by email. Click it to activate your account.',
+      bodyChanged:
+        'If {{email}} is not already in use, an activation link has just been sent to it. Open it to activate your account: you will be signed in directly.',
       locked: 'Until you open this link, you cannot sign in.',
       expires: 'Without verification within {{days}} days of signing up, the sign-up is deleted.',
       back: 'Back to sign in',
       openMailbox: 'Open my mailbox',
       resend: 'Send the email again',
-      resent: 'A new email has just been sent.',
+      resent: 'If this address is waiting for verification, a new email has just been sent.',
       noneReceived: 'Nothing yet? Check your spam folder, or send the email again.',
       change: {
         title: 'Change address',
@@ -211,7 +215,7 @@ export const en: Translation = {
     emailChange: {
       confirmedTitle: 'One more step',
       confirmedBody:
-        'If your new address can be used, a second link has just been sent to it. Open it to finish: it is valid for one hour.',
+        'If your new address can be used, a second link has just been sent to it. Open it to finish, on a device where you are signed in: it is valid for one hour.',
       confirmedNone:
         'Nothing? Check your spam folder. No link is sent if the address already belongs to another account, or after three links within the hour.',
       doneTitle: 'Email address changed',
@@ -286,7 +290,7 @@ export const en: Translation = {
       data: 'Download your data',
       security: 'Password, blocked members',
       account: 'Email address, sign out, deletion',
-      about: 'Source code, write to us',
+      about: 'The source code and its licence',
       moderation: 'Reports awaiting a decision',
     },
     changePassword: {
@@ -987,7 +991,7 @@ export const en: Translation = {
     newEmail: {
       subject: 'Confirm your new email address on {{appName}}',
       greeting: 'Hello,',
-      body: 'Click the button below to make this address the one of your {{appName}} account.',
+      body: 'Click the button below, on a device where you are signed in to {{appName}}, to make this address the one of your account.',
       button: 'Confirm this address',
       expires: 'This link is valid for one hour.',
       ignore:

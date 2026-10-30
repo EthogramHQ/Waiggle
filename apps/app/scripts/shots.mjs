@@ -1142,7 +1142,7 @@ const pages = [
     prepare: async (page) => {
       await pendingEmail('ines.haddad@gmail.com')(page)
       await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
-      await page.getByText(/Un nouvel e-mail vient de partir/).waitFor()
+      await page.getByText(/nouvel e-mail vient de partir/).waitFor()
     },
   },
   // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le

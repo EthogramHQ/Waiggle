@@ -113,6 +113,8 @@ export const fr = {
       sentTitle: 'C’est envoyé',
       sent: 'Si un compte existe pour cette adresse, un e-mail vient de partir.',
       sentExpires: 'Le lien est valable une heure.',
+      // R2 (relecture juridique, C2) : le quota se dit, sans dire si un compte existe.
+      sentLimit: 'Trois liens par heure au plus : le dernier reçu reste valable.',
       noneReceived:
         'Rien reçu après quelques minutes ? Regarde dans les indésirables, ou vérifie l’adresse tapée.',
       resend: 'Renvoyer le lien',
@@ -127,13 +129,17 @@ export const fr = {
       submit: 'Enregistrer le mot de passe',
       // Un seul texte, vrai pour toutes les causes : expiré, déjà servi, abîmé (jur-16).
       invalidTitle: 'Ce lien ne marche plus',
-      invalidBody: 'Il a expiré (une heure), il a déjà servi, ou il est incomplet.',
+      invalidBody:
+        'Il a expiré (une heure), il a déjà servi, ton mot de passe ou ton adresse a changé depuis, ou il est incomplet.',
       requestNew: 'Demander un nouveau lien',
     },
     checkEmail: {
       title: 'Vérifie ta boîte mail',
       body: 'Un e-mail part vers {{email}}. Ouvre le lien qu’il contient pour activer ton compte : la connexion se fait directement.',
       bodyNoEmail: 'Nous t’avons envoyé un lien par e-mail. Clique dessus pour activer ton compte.',
+      // R2 (D4, relecture juridique B1) : après une correction d'adresse, rien n'affirme l'envoi.
+      bodyChanged:
+        'Si {{email}} n’est pas déjà utilisée, un lien d’activation vient d’y partir. Ouvre-le pour activer ton compte : la connexion se fait directement.',
       locked: 'Tant que tu n’as pas ouvert ce lien, tu ne peux pas te connecter.',
       expires:
         'Sans vérification dans les {{days}} jours qui suivent l’inscription, elle est effacée.',
@@ -142,7 +148,7 @@ export const fr = {
       openMailbox: 'Ouvrir ma messagerie',
       resend: 'Renvoyer l’e-mail',
       // La même phrase que l'adresse ait un compte ou non.
-      resent: 'Un nouvel e-mail vient de partir.',
+      resent: 'Si cette adresse attend sa vérification, un nouvel e-mail vient de partir.',
       noneReceived: 'Rien reçu ? Regarde dans les indésirables, ou renvoie l’e-mail.',
       change: {
         title: 'Changer d’adresse',
@@ -254,7 +260,7 @@ export const fr = {
     emailChange: {
       confirmedTitle: 'Plus qu’une étape',
       confirmedBody:
-        'Si ta nouvelle adresse peut être utilisée, un second lien vient d’y partir. Ouvre-le pour terminer : il est valable une heure.',
+        'Si ta nouvelle adresse peut être utilisée, un second lien vient d’y partir. Ouvre-le pour terminer, sur un appareil où ta session est ouverte : il est valable une heure.',
       confirmedNone:
         'Rien reçu ? Regarde dans les indésirables. Aucun lien ne part si l’adresse est déjà celle d’un autre compte, ni après trois liens dans l’heure.',
       doneTitle: 'Adresse changée',
@@ -338,7 +344,7 @@ export const fr = {
       data: 'Télécharger tes données',
       security: 'Mot de passe, membres bloqués',
       account: 'Adresse e-mail, déconnexion, suppression',
-      about: 'Le code source, nous écrire',
+      about: 'Le code source et sa licence',
       moderation: 'Les signalements à traiter',
     },
     // Rubrique « Sécurité » : changer son mot de passe.
@@ -1140,7 +1146,7 @@ export const fr = {
       subject: 'Confirme ta nouvelle adresse sur {{appName}}',
       // Ni nom ni ancienne adresse : avec une faute de frappe, cet e-mail part chez un inconnu (S6).
       greeting: 'Bonjour,',
-      body: 'Clique sur le bouton ci-dessous pour que cette adresse devienne celle de ton compte {{appName}}.',
+      body: 'Clique sur le bouton ci-dessous, sur un appareil où ta session {{appName}} est ouverte, pour que cette adresse devienne celle de ton compte.',
       button: 'Confirmer cette adresse',
       expires: 'Ce lien est valable une heure.',
       ignore:
