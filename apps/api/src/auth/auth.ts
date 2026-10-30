@@ -21,7 +21,7 @@ import { eq } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
-import { existingAccountEmail, verificationEmail } from '../email/templates'
+import { existingAccountEmail } from '../email/templates' // R2 BE-2 : verificationEmail est envoyé par verification-resend.ts
 import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
@@ -32,6 +32,7 @@ import { voidReportsOfDepartedAuthors } from '../reports/queue'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { createEmailChange } from './change-email'
 import { authSchemaOptions } from './schema-options'
+import { createVerificationResend } from './verification-resend' // R2 BE-2
 
 /**
  * Une façon de hacher et de vérifier les mots de passe. Hacher, c'est transformer le mot de passe
@@ -92,6 +93,9 @@ export const AUTH_RATE_RULES = {
   // e-mail. Un plafond par membre s'y ajoute (auth/change-email.ts) : celui-ci suit l'adresse IP.
   '/change-email': { window: 15 * 60, max: 5 },
   '/verify-email': { window: 15 * 60, max: 30 },
+  // R2 BE-2 : « Renvoyer l'e-mail » (A3, S4) ; s'y ajoutent les quotas par adresse
+  // (auth/verification-resend.ts).
+  '/send-verification-email': { window: 15 * 60, max: 5 },
 } satisfies Record<string, { window: number; max: number }>
 
 /**
@@ -126,6 +130,13 @@ export const createAuth = ({
   // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
   // à chiffrer le jeton du second lien.
   const emailChange = createEmailChange({
+    mailer,
+    rateLimiter: createRateLimiter(db),
+    appUrl,
+    secret,
+  })
+  // R2 BE-2 : le renvoi du lien de vérification, ses quotas et ses envois (auth/verification-resend.ts).
+  const verificationResend = createVerificationResend({
     mailer,
     rateLimiter: createRateLimiter(db),
     appUrl,
@@ -177,12 +188,10 @@ export const createAuth = ({
       expiresIn: 60 * 60, // le lien est valable une heure
       // Le même réglage envoie le second lien d'un changement d'adresse, vers la nouvelle adresse :
       // emailChange le reconnaît à son jeton et envoie son propre e-mail (auth/change-email.ts).
-      sendVerificationEmail: async ({ user, url, token }) => {
+      sendVerificationEmail: async ({ user, url, token }, request) => {
         if (await emailChange.sendNewEmailLink({ user, url, token })) return
-        await mailer.send({
-          to: user.email,
-          ...verificationEmail(languageOf(user), { name: user.name, url }),
-        })
+        // R2 BE-2 : page imposée, envoi en arrière-plan, quota du renvoi par la connexion.
+        await verificationResend.sendSignUpLink({ user, url }, request)
       },
       // Juste après la vérification de l'adresse (le lien ouvert), le membre reçoit son pseudo
       // (tranche 6a) : pas avant, pour qu'un compte jamais vérifié n'en bloque aucun. Une panne ici
@@ -332,7 +341,6 @@ export const createAuth = ({
       '/sign-in/social',
       '/link-social',
       '/verify-password',
-      '/send-verification-email',
       '/list-accounts',
       '/unlink-account',
       '/account-info',
@@ -383,6 +391,7 @@ export const createAuth = ({
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/change-email') return emailChange.beforeRequest(ctx)
         if (ctx.path === '/verify-email') return emailChange.beforeLink(ctx)
+        if (ctx.path === '/send-verification-email') return verificationResend.beforeResend(ctx) // R2 BE-2
         const body: object = typeof ctx.body === 'object' && ctx.body !== null ? ctx.body : {}
         if (ctx.path === '/delete-user') {
           const password = 'password' in body ? body.password : undefined
