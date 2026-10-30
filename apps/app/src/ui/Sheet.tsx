@@ -78,6 +78,7 @@ type WebElement = {
   tabIndex: number
   hasAttribute: (name: string) => boolean
   getClientRects: () => { length: number }
+  focus: () => void
 }
 type WebRoot = { querySelectorAll?: (selector: string) => ArrayLike<WebElement> }
 const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]'
@@ -149,7 +150,11 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
       : index === -1 || index === last
         ? 0
         : index + 1
-    focusWithoutScroll(nodes[next])
+    // Un focus ordinaire, cette fois : le navigateur fait défiler le contenu de la feuille jusqu'à
+    // l'élément atteint. Avec `preventScroll`, Tab posait le focus sur un bouton resté sous le
+    // pied (« Télécharger mes données », dans la feuille de suppression : HORS ÉCRAN, batterie de
+    // R2). Seul le contenu de la feuille défile : la page dessous est cachée par le voile.
+    nodes[next]?.focus()
   }
 
   // Les touches de la feuille (web) : Échap ferme, Tab reste dedans. Les touches montent depuis
@@ -183,14 +188,25 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
             son premier élément atteignable, qui doit être dans la feuille. zIndex garde la feuille
             au-dessus du voile, dessiné après elle. */}
         <View
-          style={{
-            zIndex: 1,
-            flex: phone ? 1 : 0,
-            justifyContent: 'flex-end',
-            // Sur ordinateur, la couche rétrécit à la fenêtre : sinon, plus haute qu'elle, elle
-            // poussait le panneau (calé en bas) au-dessus du haut de l'écran.
-            ...(phone ? null : { flexShrink: 1, minHeight: 0 }),
-          }}
+          style={
+            phone
+              ? { zIndex: 1, flex: 1, justifyContent: 'flex-end' }
+              : {
+                  // Sur ordinateur, la couche a la hauteur du panneau (base « auto »), sans
+                  // dépasser la fenêtre. Pas de `flex: 0` : sur le web, il devient `flex: 0 1 0%`,
+                  // une base nulle, et la couche tombait à 0 point de haut ; le panneau, calé en bas
+                  // d'une couche vide posée au milieu, sortait alors par le haut de l'écran (la
+                  // moitié de la feuille du profil au-dessus du bord, à 1440×900 : mesuré par
+                  // `boundingBox` du dialogue, y = -386).
+                  zIndex: 1,
+                  flexGrow: 0,
+                  flexShrink: 1,
+                  flexBasis: 'auto',
+                  minHeight: 0,
+                  maxHeight: '100%',
+                  justifyContent: 'center',
+                }
+          }
         >
           <SheetPanel
             {...panel}

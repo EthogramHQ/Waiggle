@@ -19,6 +19,7 @@ import { queryClient } from '../api/query-client'
 import { webAppUrl } from '../config'
 import { authClient } from './auth-client'
 import { type AuthErrorKey, authErrorKey } from './errors'
+import { setPendingEmail } from './pendingVerification'
 
 /** Résultat d'une action : réussie, ou ratée avec la clé du message à afficher. */
 export type Result<E extends string = AuthErrorKey> = { ok: true } | { ok: false; error: E }
@@ -240,8 +241,13 @@ export const signIn = async (input: SignInRequest): Promise<LimitedResult> => {
       ...input,
       fetchOptions: witness.fetchOptions,
     })
-    // Nouveau membre connecté : on repart d'un cache vide (voir signOut).
-    if (!error) queryClient.clear()
+    // Nouveau membre connecté : on repart d'un cache vide (voir signOut), et l'adresse qui attendait
+    // sa vérification dans l'onglet s'oublie (relecture de sécurité C1 : sur un PC partagé, la
+    // personne suivante la lisait sur « Vérifie ta boîte mail »).
+    if (!error) {
+      queryClient.clear()
+      setPendingEmail(null)
+    }
     return witness.result(error)
   } catch {
     return { ok: false, error: 'generic' }
@@ -253,8 +259,10 @@ export const signOut = async (): Promise<void> => {
     await authClient.signOut()
   } finally {
     // On vide le cache des données (profil…), même si le serveur n'a pas répondu : sur un appareil
-    // partagé, la personne suivante ne doit rien voir de ce qui appartenait au membre précédent.
+    // partagé, la personne suivante ne doit rien voir de ce qui appartenait au membre précédent,
+    // pas même l'adresse qui attendait sa vérification.
     queryClient.clear()
+    setPendingEmail(null)
   }
 }
 
@@ -264,7 +272,9 @@ export const deleteAccount = async (
 ): Promise<Result<'wrongPassword' | AuthErrorKey>> => {
   const { error } = await authClient.deleteUser({ password })
   if (!error) {
-    queryClient.clear() // même raison qu'à la déconnexion
+    // Même raison qu'à la déconnexion.
+    queryClient.clear()
+    setPendingEmail(null)
     return { ok: true }
   }
   if (error.code === 'INVALID_PASSWORD') return { ok: false, error: 'wrongPassword' }

@@ -1,7 +1,7 @@
 // Page « Mon profil » : photo, nom, pseudo, bio et outils favoris du membre connecté.
-// Puis la section « E-mails » (tranche 6c) : deux interrupteurs, enregistrés chacun dès qu'on le
-// touche, sans passer par « Enregistrer » (qui ne concerne que le formulaire au-dessus).
-// Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier, et garde ses e-mails.
+// Les réglages d'e-mail (tranche 6c), qui étaient au bas de cette page, vivent depuis R2 dans la
+// rubrique « Notifications » des réglages (screens/settings/EmailSettings.tsx).
+// Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier.
 // Depuis la tranche R2, tout se passe dans une feuille posée sur la page (ui/Sheet.tsx) : la photo
 // floutée en tête, « Changer la photo » qui la chevauche, « Enregistrer » collé en bas ; sur
 // ordinateur, l'aperçu de sa page à droite, qui suit ce qu'on tape. « Fermer » revient aux
@@ -43,7 +43,6 @@ import { Surface } from '../ui/Surface'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
-import { EmailSettings } from './settings/EmailSettings'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
 export function ProfileScreen() {
@@ -59,7 +58,7 @@ export function ProfileScreen() {
   }
   if (!me.data) return <LoadingScreen />
   // Un compte suspendu (tranche 7c) ne modifie plus son profil : il le lit tel que les autres le
-  // voient, et garde ses réglages d'e-mail.
+  // voient. Ses réglages d'e-mail restent permis, dans la rubrique « Notifications ».
   if (me.data.suspension) return <LockedProfile me={me.data} />
   // Le formulaire n'est affiché qu'une fois le profil chargé : il part ainsi des bonnes valeurs.
   return <ProfileForm me={me.data} />
@@ -68,8 +67,8 @@ export function ProfileScreen() {
 /**
  * « Mon profil » pendant une suspension : ni champ, ni photo à changer, ni « Enregistrer » (l'API
  * refuserait tout changement autre que la langue). Une phrase dit pourquoi, puis le profil tel
- * que les autres membres le lisent (le même en-tête que sa page), puis les réglages d'e-mail, qui
- * restent permis. La barre du haut, sur toutes les largeurs, porte le bandeau de la suspension.
+ * que les autres membres le lisent (le même en-tête que sa page). La barre du haut, sur toutes
+ * les largeurs, porte le bandeau de la suspension.
  */
 function LockedProfile({ me }: { me: Me }) {
   const { t } = useTranslation()
@@ -93,7 +92,6 @@ function LockedProfile({ me }: { me: Me }) {
           tools={me.favoriteTools.map((tool) => ({ label: tool }))}
           heading={2}
         />
-        <EmailSettings />
       </Sheet>
     </Screen>
   )
@@ -297,18 +295,25 @@ function ProfileForm({ me }: { me: Me }) {
         }
         // Sur ordinateur, l'aperçu de sa page, à droite : il suit ce qui est tapé, avant même
         // « Enregistrer » (rien n'est envoyé pour autant).
+        // Sa légende, « Aperçu de ta page », dit ce qu'est ce second nom en grand : un titre de
+        // niveau 2 sous celui de la feuille, et le nom du membre en niveau 3, dans l'aperçu.
         aside={
-          <Surface variant="plain" padding="xl">
-            <MemberHeader
-              name={name.trim() || me.name}
-              handle={t(($) => $.member.handle, { handle: handle.trim() || me.handle })}
-              avatar={avatar}
-              bio={bio.trim()}
-              toolsTitle={t(($) => $.member.favoriteTools)}
-              tools={parseTools(tools).map((tool) => ({ label: tool }))}
-              heading={2}
-            />
-          </Surface>
+          <Stack gap="sm">
+            <Text variant="caption" tone="muted" heading={2}>
+              {t(($) => $.profile.previewTitle)}
+            </Text>
+            <Surface variant="plain" padding="xl">
+              <MemberHeader
+                name={name.trim() || me.name}
+                handle={t(($) => $.member.handle, { handle: handle.trim() || me.handle })}
+                avatar={avatar}
+                bio={bio.trim()}
+                toolsTitle={t(($) => $.member.favoriteTools)}
+                tools={parseTools(tools).map((tool) => ({ label: tool }))}
+                heading={3}
+              />
+            </Surface>
+          </Stack>
         }
       >
         <AvatarCover
@@ -383,7 +388,6 @@ function ProfileForm({ me }: { me: Me }) {
           limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
           error={toolsError || undefined}
         />
-        <EmailSettings />
       </Sheet>
     </Screen>
   )
