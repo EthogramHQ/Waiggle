@@ -31,6 +31,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
+import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
 import { useTapsAllowed } from './tapGuard'
@@ -44,6 +45,15 @@ type PanelProps = {
   children: ReactNode
   /** Les boutons collés en bas de la feuille (l'action principale, puis « Annuler »). */
   footer?: ReactNode
+  /**
+   * Le message d'un envoi (« Mot de passe incorrect. », « Profil enregistré. »), posé en tête du
+   * pied collé, juste au-dessus du bouton touché : toujours en vue, quel que soit l'endroit où la
+   * feuille a défilé. Écrit sous un champ du bas, il restait caché par le pied, et le membre ne
+   * savait pas pourquoi rien ne se passait (relecture de design R2, B2). Une alerte (`role="alert"`)
+   * pour une erreur, lue dès qu'elle paraît ; `polite` pour une confirmation. Le pied grandit vers
+   * le haut : sur téléphone et dans un panneau à sa hauteur maximale, le bouton ne bouge pas.
+   */
+  notice?: SheetNotice | null | undefined
   /**
    * Le niveau du titre : 2 (par défaut) pour une feuille ouverte par-dessus une page qui a déjà son
    * titre ; 1 pour une feuille qui est toute la page (son adresse à elle : /settings/profile).
@@ -89,6 +99,13 @@ type PanelProps = {
    * react-native-web est la boîte de dialogue). La feuille ne se déclare pas alors une seconde fois.
    */
   titleId?: string
+}
+
+/** Le message du pied d'une feuille : son texte, son ton, et s'il coupe la parole (alerte) ou non. */
+export type SheetNotice = {
+  message: string
+  tone?: 'error' | 'info' | 'success'
+  polite?: boolean
 }
 
 type Props = Omit<
@@ -327,6 +344,7 @@ export function SheetPanel({
   subtitle,
   children,
   footer,
+  notice,
   heading = 2,
   decoration,
   aside,
@@ -354,6 +372,8 @@ export function SheetPanel({
       ? { role: 'dialog' as const, 'aria-modal': true, 'aria-labelledby': titleId }
       : null
   const close = closeLabel ?? t(($) => $.common.close)
+  // Le pied collé existe dès qu'il a des boutons ou un message à montrer.
+  const pinned = Boolean(footer) || Boolean(notice)
 
   const header = (
     <View style={{ gap: space.md }}>
@@ -449,14 +469,14 @@ export function SheetPanel({
           contentContainerStyle={{
             paddingHorizontal: space.xl,
             paddingTop: space.xl,
-            paddingBottom: footer ? space.xl : insets.bottom + space.xxl,
+            paddingBottom: pinned ? space.xl : insets.bottom + space.xxl,
             gap: space.xl,
           }}
           keyboardShouldPersistTaps="handled"
         >
           {children}
         </ScrollView>
-        {footer ? (
+        {pinned ? (
           <View
             style={{
               gap: space.md,
@@ -467,6 +487,13 @@ export function SheetPanel({
               borderTopColor: colors.line,
             }}
           >
+            {notice ? (
+              <Notice
+                message={notice.message}
+                tone={notice.tone ?? 'error'}
+                polite={notice.polite ?? false}
+              />
+            ) : null}
             {footer}
           </View>
         ) : null}

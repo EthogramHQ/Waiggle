@@ -34,6 +34,14 @@ type Props = {
   hint?: string | undefined
   error?: string | undefined
   /**
+   * Le champ est en erreur, mais le message est écrit ailleurs, dans un endroit toujours en vue : le
+   * pied collé d'une feuille, près du bouton touché (`Sheet` prop `notice`). Le champ prend la
+   * couleur et l'état « saisie invalide » d'une erreur, sans répéter la phrase dessous (elle serait
+   * lue deux fois, et cachée par le pied quand le champ est tout en bas : relecture de design R2,
+   * B2). Une `error` passe avant.
+   */
+  invalid?: boolean
+  /**
    * L'aide reste affichée sous l'erreur, au lieu de lui laisser la place : pour une aide qu'il faut
    * encore lire pour corriger (la phrase de bonne foi de « Signaler », tranche 7b).
    */
@@ -150,6 +158,7 @@ export function TextField({
   onChangeText,
   hint,
   error,
+  invalid: invalidElsewhere = false,
   keepHint = false,
   showCount = false,
   limit,
@@ -178,6 +187,8 @@ export function TextField({
   // Ce qu'on lit sous le champ : l'erreur d'abord, sinon la confirmation, sinon l'aide (et l'aide
   // après l'erreur ou la confirmation, avec `keepHint` : la même règle que l'affichage, Message).
   const status = error || success
+  // En erreur, que la phrase soit sous le champ (`error`) ou dans le pied de la feuille (`invalid`).
+  const wrong = Boolean(error) || invalidElsewhere
   const message = keepHint && status && hint ? `${status} ${hint}` : status || hint
   const body = textStyles.body
   const max = limit ?? inputProps.maxLength
@@ -219,7 +230,7 @@ export function TextField({
       }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.sm }}>
-        <Text variant="caption" weight={600} tone={error ? 'danger' : focused ? 'accent' : 'muted'}>
+        <Text variant="caption" weight={600} tone={wrong ? 'danger' : focused ? 'accent' : 'muted'}>
           {label}
         </Text>
         {counter ? (
@@ -254,7 +265,7 @@ export function TextField({
             accessibilityHint={Platform.OS === 'web' ? undefined : message}
             {...describedBy(message ? messageId : undefined)}
             // « Saisie invalide » : le lecteur d'écran le dit en arrivant sur le champ (web).
-            {...invalid(Boolean(error))}
+            {...invalid(wrong)}
             // Un champ à suggestions : le lecteur d'écran annonce « liste déroulante, réduite ou
             // développée », et lit le choix en surbrillance sans quitter le champ (aria-activedescendant).
             {...(combobox
@@ -339,7 +350,7 @@ export function TextField({
   if (inGroup) return row
   return (
     <View>
-      <GroupFrame state={error ? 'error' : focused ? 'focus' : 'idle'}>{row}</GroupFrame>
+      <GroupFrame state={wrong ? 'error' : focused ? 'focus' : 'idle'}>{row}</GroupFrame>
       <Message
         id={messageId}
         error={error}

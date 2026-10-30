@@ -299,6 +299,40 @@ const modalLayer = (): { props: { onRequestClose: () => void } } => {
   return found as never
 }
 
+// Relecture de design R2 (B2, C2) : le refus se lit dans le pied, près du bouton, et le bouton
+// reste actif sans mot de passe : une tape dit quoi faire et amène le champ, sans rien envoyer.
+describe('the answer of « Supprimer définitivement », in the pinned footer', () => {
+  it('announces a wrong password in the footer, and marks the field', async () => {
+    jest.mocked(deleteAccount).mockResolvedValue({ ok: false, error: 'wrongPassword' })
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    await fireEvent.changeText(screen.getByLabelText('Confirme avec ton mot de passe'), 'nope')
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Mot de passe incorrect.')
+    // Écrit une seule fois : le champ passe en erreur sans répéter la phrase (lue deux fois sinon).
+    expect(screen.getAllByText('Mot de passe incorrect.')).toHaveLength(1)
+  })
+
+  it('says to type the password when it is empty, without sending anything', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(fr.t(($) => $.errors.passwordRequired))
+    expect(deleteAccount).not.toHaveBeenCalled()
+  })
+
+  it('clears the message as soon as the member types again', async () => {
+    await renderWithI18n(<DeleteAccountScreen />)
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
+
+    await fireEvent.changeText(screen.getByLabelText('Confirme avec ton mot de passe'), 'c')
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
 describe('while the account is being deleted', () => {
   it('disables « Annuler », « Fermer » and « Mot de passe oublié ? »', async () => {
     await startSlowDeletion()

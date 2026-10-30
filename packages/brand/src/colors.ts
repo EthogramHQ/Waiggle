@@ -60,6 +60,9 @@ const day = {
 
   // Messages
   danger: '#D92D20', // fond du bouton de suppression définitive
+  // Le même bouton pendant l'appui : un rouge plus sombre, où le blanc garde son contraste. (Un
+  // bouton rendu transparent mêlait le blanc au fond : 4,0:1 de jour, relecture de design R2.)
+  dangerPressed: '#B42318',
   onDanger: '#FFFFFF',
   dangerText: '#B42318', // texte d'erreur
   dangerSoft: '#FEE4E2', // fond d'un message d'erreur, bouton « Supprimer »
@@ -134,6 +137,7 @@ const night = {
   skeleton: '#3F3930',
 
   danger: '#D92D20',
+  dangerPressed: '#B42318',
   onDanger: '#FFFFFF',
   dangerText: '#FDA29B',
   dangerSoft: '#3A1A17',
@@ -248,6 +252,7 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'dangerText', on: 'background', min: 4.5 },
   { text: 'dangerText', on: 'dangerSoft', min: 4.5 },
   { text: 'onDanger', on: 'danger', min: 4.5 },
+  { text: 'onDanger', on: 'dangerPressed', min: 4.5 },
   // Le chiffre de la pastille des nouveautés (CountBadge).
   { text: 'onBadge', on: 'badge', min: 4.5 },
   { text: 'success', on: 'background', min: 4.5 },

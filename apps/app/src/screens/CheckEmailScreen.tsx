@@ -96,6 +96,23 @@ export function CheckEmailScreen() {
   const shownError =
     error === 'tooManyAttempts' && waitSeconds !== null && !retry.blocked ? null : error
 
+  // Le refus ou la confirmation du dernier geste (renvoi, correction d'adresse), posé sous
+  // « Renvoyer l'e-mail » (voir le pied, plus bas).
+  const message = shownError ? (
+    <Notice ref={messageRef} message={t(($) => $.auth.errors[shownError], lengths)} />
+  ) : confirmation ? (
+    <Notice
+      ref={messageRef}
+      tone="success"
+      polite
+      message={
+        confirmation === 'resent'
+          ? t(($) => $.auth.checkEmail.resent)
+          : t(($) => $.auth.checkEmail.change.sent)
+      }
+    />
+  ) : null
+
   // L'image de la page : l'abeille en vol, qui part porter le message. Seule sur son décor, elle
   // garde son nom pour les lecteurs d'écran (J10).
   const picture = (
@@ -134,6 +151,11 @@ export function CheckEmailScreen() {
                   loading={resending}
                   retry={retry}
                 />
+                {/* Le résultat du renvoi, juste sous le bouton touché : posé au-dessus des boutons,
+                    il les faisait descendre de 86 points, et la seconde tape d'une double tape sur
+                    « Renvoyer » ouvrait la messagerie (relecture de design R2, B1). Ici, seul ce
+                    qui suit le bouton descend : rien ne bouge sous le doigt. */}
+                {message}
                 <Text variant="callout" tone="muted">
                   {t(($) => $.auth.checkEmail.noneReceived)}
                 </Text>
@@ -171,21 +193,6 @@ export function CheckEmailScreen() {
                 : t(($) => $.auth.checkEmail.body, { email })
               : t(($) => $.auth.checkEmail.bodyNoEmail)}
           </Text>
-          {shownError ? (
-            <Notice ref={messageRef} message={t(($) => $.auth.errors[shownError], lengths)} />
-          ) : null}
-          {confirmation && !shownError ? (
-            <Notice
-              ref={messageRef}
-              tone="success"
-              polite
-              message={
-                confirmation === 'resent'
-                  ? t(($) => $.auth.checkEmail.resent)
-                  : t(($) => $.auth.checkEmail.change.sent)
-              }
-            />
-          ) : null}
           <Notice tone="info" message={t(($) => $.auth.checkEmail.locked)} />
           {/* La purge de nuit efface une inscription jamais vérifiée (tranche 6c) : on le dit. */}
           <Text variant="callout" tone="muted">
@@ -289,6 +296,18 @@ function ChangeAddressSheet({ open, email, onClose, onForgot, onChanged }: Sheet
       onClose={onClose}
       title={t(($) => $.auth.checkEmail.change.title)}
       subtitle={t(($) => $.auth.checkEmail.change.intro)}
+      // Le refus, dans le pied collé, au-dessus du bouton touché : sous les champs, le pied le
+      // cachait sur un petit écran (relecture de design R2, B2).
+      notice={
+        shownError
+          ? {
+              message:
+                shownError === 'alreadyVerified'
+                  ? t(($) => $.auth.checkEmail.change.alreadyVerified)
+                  : t(($) => $.auth.errors[shownError], lengths),
+            }
+          : null
+      }
       footer={
         // Bloqué, le bouton dit pourquoi (RetryButton, jur-13).
         <RetryButton
@@ -334,15 +353,6 @@ function ChangeAddressSheet({ open, email, onClose, onForgot, onChanged }: Sheet
           </Row>
         </Stack>
       </FieldGroup>
-      {shownError ? (
-        <Notice
-          message={
-            shownError === 'alreadyVerified'
-              ? t(($) => $.auth.checkEmail.change.alreadyVerified)
-              : t(($) => $.auth.errors[shownError], lengths)
-          }
-        />
-      ) : null}
     </Sheet>
   )
 }
