@@ -54,6 +54,9 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /v1/me/email-preferences': ['own', 'allowed'],
   'PATCH /v1/me/email-preferences': ['own', 'allowed'],
   'GET /v1/me/blocks': ['own', 'allowed'],
+  // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4) : sans session, l'adresse
+  // actuelle et le mot de passe suffisent ; la route ne lit jamais la session (sec-S9).
+  'POST /v1/account/unverified-email': ['public', 'allowed'],
   // Le lien de désinscription d'un e-mail : signé, sans session.
   'GET /v1/email/unsubscribe': ['public', 'allowed'],
   'POST /v1/email/unsubscribe': ['public', 'allowed'],

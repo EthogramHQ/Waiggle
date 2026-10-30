@@ -10,8 +10,10 @@ import {
   moderationAlertEmail,
   type NotificationLinks,
   newEmailVerificationEmail,
+  passwordChangedEmail,
   type RecapData,
   recapEmail,
+  resetPasswordEmail,
   suspensionEmail,
   verificationEmail,
 } from './templates'
@@ -44,12 +46,18 @@ describe('verificationEmail', () => {
 })
 
 describe('existingAccountEmail', () => {
-  it('tells the owner someone tried to sign up, and points to sign-in', () => {
+  // R2 (jur-B2) : le même e-mail part quand quelqu'un s'inscrit avec l'adresse, et quand un nouveau
+  // membre corrige son adresse vers elle (A4) : le texte est vrai pour les deux voies, il ne parle
+  // plus d'« inscription ».
+  it('tells the owner someone used her address, and points to sign-in', () => {
     const signInUrl = 'https://waiggle.com/sign-in'
     const email = existingAccountEmail('fr', { name: 'Léa', signInUrl })
 
-    expect(email.subject).toBe(`Tentative d’inscription sur ${appName}`)
+    expect(email.subject).toBe(fill(fr.existingAccount.subject))
+    expect(email.subject).toContain(appName)
+    expect(email.text).toContain(fill(fr.existingAccount.body))
     expect(email.text).toContain(signInUrl)
+    for (const part of [email.subject, email.text]) expect(part).not.toMatch(/inscri/i)
   })
 })
 
@@ -667,6 +675,156 @@ describe('the rules shared by the e-mails of an address change', () => {
     for (const email of emails()) {
       expect(email.subject).not.toContain('@')
       expect(email.subject).not.toContain('exemple.fr')
+    }
+  })
+})
+
+// ─── Tranche R2 : les deux e-mails de sécurité du mot de passe ──────────────────────────────────
+// Des e-mails de service (jur-1) : ils disent pourquoi ils arrivent, sans publicité ni lien de
+// désinscription. Le premier porte le lien pour choisir un nouveau mot de passe ; le second prévient
+// qu'il a changé, sans jamais le mot de passe.
+
+describe('resetPasswordEmail', () => {
+  // Le lien mène à la page de l'appli et ne porte que le jeton (sec-S6, jur-2).
+  const url = 'https://waiggle.com/reset-password?token=abc123'
+
+  it('is written in French, with the link in the text and in the button, and says why it arrives', () => {
+    const email = resetPasswordEmail('fr', { url, hours: 1 })
+    const t = fr.resetPassword
+
+    expect(email.subject).toBe(fill(t.subject))
+    for (const sentence of [t.body, t.ignore, t.reason]) {
+      expect(email.text).toContain(fill(sentence))
+    }
+    expect(email.text).toContain(fill(t.expires, { hours: '1' }))
+    expect(email.text).toContain(url)
+    expect(email.html).toContain(`href="${url}"`)
+    expect(email.html).toContain(`>${fill(t.button)}</a>`)
+    expect(email.html).toContain('<html lang="fr"')
+    // La version texte n'a pas de bouton : le libellé, puis l'adresse du lien en dessous.
+    const lines = email.text.split('\n')
+    expect(lines[lines.indexOf(url) - 1]).toBe(fill(t.textLink))
+  })
+
+  it('is written in English for an English-speaking member', () => {
+    const email = resetPasswordEmail('en', { url, hours: 1 })
+
+    expect(email.subject).toBe(fill(en.resetPassword.subject))
+    expect(email.text).toContain(fill(en.resetPassword.expires, { hours: '1' }))
+    expect(email.text).not.toContain(fill(fr.resetPassword.body))
+    expect(email.html).toContain('<html lang="en"')
+  })
+
+  // jur-2 : l'adresse n'a peut-être rien prouvé ; la salutation ne porte aucun nom.
+  it('greets nobody by name: the first line is the bare greeting', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = resetPasswordEmail(language, { url, hours: 1 })
+      const t = resources[language].translation.email
+
+      expect(email.text.split('\n')[0]).toBe(fill(t.resetPassword.greeting))
+    }
+  })
+
+  // jur-4 : la durée écrite vient du réglage du serveur, pas d'un texte figé.
+  it('writes the validity it is given, in hours', () => {
+    const one = resetPasswordEmail('fr', { url, hours: 1 })
+    const two = resetPasswordEmail('fr', { url, hours: 2 })
+
+    expect(one.text).toContain(fill(fr.resetPassword.expires, { hours: '1' }))
+    expect(two.text).toContain(fill(fr.resetPassword.expires, { hours: '2' }))
+    expect(two.text).not.toContain(fill(fr.resetPassword.expires, { hours: '1' }))
+  })
+
+  // jur-3 : la conséquence (tous les appareils déconnectés) est dite avant le geste (le lien).
+  it('tells the consequence before the link', () => {
+    const email = resetPasswordEmail('fr', { url, hours: 1 })
+
+    const consequence = email.text.indexOf(fill(fr.resetPassword.expires, { hours: '1' }))
+    expect(consequence).toBeGreaterThan(0)
+    expect(consequence).toBeLessThan(email.text.indexOf(url))
+  })
+
+  it('links to the reset page only, with no image, no unsubscribe link and no extra header', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = resetPasswordEmail(language, { url, hours: 1 })
+
+      const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+      expect(hrefs).toEqual([url])
+      expect(email.html).not.toMatch(/<img|unsubscribe|mailto:/i)
+      expect(email.headers).toBeUndefined()
+      expect(email.text).toContain(contactEmail)
+      expect(email.subject).not.toContain('@')
+      // Le jeton n'apparaît que dans le lien, jamais ailleurs dans le texte.
+      expect(email.text.split('abc123')).toHaveLength(2)
+    }
+  })
+})
+
+describe('passwordChangedEmail', () => {
+  const settingsUrl = 'https://waiggle.com/settings/security'
+  const data = { name: 'Inès', settingsUrl }
+
+  it('tells the member the password changed and the other devices were signed out, without the password', () => {
+    const email = passwordChangedEmail('fr', data)
+    const t = fr.passwordChanged
+
+    expect(email.subject).toBe(fill(t.subject))
+    expect(email.text).toContain(fill(fr.greeting, { name: 'Inès' }))
+    for (const sentence of [t.body, t.notYou, t.reason]) {
+      expect(email.text).toContain(fill(sentence))
+    }
+    expect(email.html).toContain(`href="${settingsUrl}"`)
+    expect(email.html).toContain(`>${fill(t.button)}</a>`)
+    expect(email.html).toContain('<html lang="fr"')
+  })
+
+  it('is written in English for an English-speaking member', () => {
+    const email = passwordChangedEmail('en', { ...data, name: 'Sam' })
+
+    expect(email.subject).toBe(fill(en.passwordChanged.subject))
+    expect(email.text).toContain(fill(en.greeting, { name: 'Sam' }))
+    expect(email.text).toContain(fill(en.passwordChanged.notYou))
+    expect(email.html).toContain('<html lang="en"')
+  })
+
+  // jur-5 : « Ce n'est pas toi ? » : d'abord reprendre la main (Réglages, Sécurité), puis nous
+  // écrire ; l'adresse de contact en texte, jamais en lien.
+  it('tells first how to take the account back, then to write to us, as text', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = passwordChangedEmail(language, data)
+      const notYou = fill(resources[language].translation.email.passwordChanged.notYou)
+
+      expect(notYou.indexOf(contactEmail)).toBeGreaterThan(notYou.search(/Réglages|Settings/))
+      expect(email.text).toContain(notYou)
+      expect(email.html).toContain(contactEmail)
+      expect(email.html).not.toContain('mailto:')
+    }
+  })
+
+  it('links to the settings only, with no image, no unsubscribe link and no extra header', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = passwordChangedEmail(language, data)
+
+      const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+      expect(hrefs).toEqual([settingsUrl])
+      expect(email.html).not.toMatch(/<img|unsubscribe/i)
+      expect(email.headers).toBeUndefined()
+      expect(email.subject).not.toContain('@')
+    }
+  })
+
+  it('turns the address of a name into « [lien] », in the language of the e-mail', () => {
+    const trap = 'Ton compte est bloqué, va sur waiggle-login.com'
+    const french = passwordChangedEmail('fr', { ...data, name: trap })
+    const english = passwordChangedEmail('en', { ...data, name: trap })
+
+    for (const part of [french.text, french.html]) {
+      expect(part).not.toContain('waiggle-login.com')
+      expect(part).toContain('[lien]')
+    }
+    for (const part of [english.text, english.html]) {
+      expect(part).not.toContain('waiggle-login.com')
+      expect(part).toContain('[link]')
     }
   })
 })

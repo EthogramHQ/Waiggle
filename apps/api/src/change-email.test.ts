@@ -590,6 +590,71 @@ describe('the second link', () => {
   })
 })
 
+// ─── D1 (R2, décision de Louis du 29/10/2026) : le second lien n'aboutit que dans la session du
+// membre. Avec une faute de frappe dans la nouvelle adresse, le second lien part chez un inconnu ;
+// combiné au mot de passe oublié (R2), il lui donnait le compte. Sans session, l'appli demande de se
+// connecter, puis le lien aboutit ; dans la session d'un autre membre, refus.
+
+describe('the second link, which only works in the session of the member (D1)', () => {
+  it('changes nothing when opened without a session, and still works afterwards for the member', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const link = await askAndConfirm(cookie)
+    const sessions = await sessionCount()
+
+    const anonymous = await open(link)
+
+    // Rien n'a changé : ni l'adresse, ni les sessions ; aucun cookie de session posé.
+    expect((await accountOf('Inès')).email).toBe(ines.email)
+    expect(await sessionCount()).toBe(sessions)
+    expect(anonymous.headers.getSetCookie().join(';')).not.toContain('session_token=')
+    if (anonymous.status === 302) {
+      // Une redirection : vers une page de l'appli, jamais la page « Adresse changée ».
+      expect(landing(anonymous).page.startsWith(TEST_APP_URL)).toBe(true)
+      expect(landing(anonymous).page).not.toBe(DONE_PAGE)
+    } else {
+      expect(anonymous.status).toBeGreaterThanOrEqual(400)
+    }
+    // Le lien n'est pas consommé : Inès, connectée, l'ouvre et le changement aboutit.
+    const mine = await open(link, cookie)
+    expect(landing(mine)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+    expect((await me(cookie)).body?.email).toBe(NEW_EMAIL)
+  })
+
+  it('changes the address when opened in the session of the member, on any of her devices', async () => {
+    const laptop = await ctx.verifiedMember(ines)
+    const phone = ctx.cookiesFrom(await ctx.signIn(ines))
+    const link = await askAndConfirm(laptop)
+
+    const res = await open(link, phone)
+
+    expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+    expect((await accountOf('Inès')).emailVerified).toBe(true)
+    // Les deux appareils restent connectés, avec la nouvelle adresse.
+    expect((await me(phone)).body?.email).toBe(NEW_EMAIL)
+    expect((await me(laptop)).body?.email).toBe(NEW_EMAIL)
+    // L'ancienne adresse est prévenue.
+    expect(mailsOf('emailChanged', ines.email)).toHaveLength(1)
+  })
+
+  it('is refused in the session of another member, and changes neither account', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const other = await ctx.verifiedMember(malik)
+    const link = await askAndConfirm(cookie)
+
+    const res = await open(link, other)
+
+    // Better Auth refuse déjà ce lien (test « a link opened by another member ») : la page d'arrivée
+    // porte un code d'erreur, et rien ne change.
+    expect(landing(res).error).not.toBeNull()
+    expect((await accountOf('Inès')).email).toBe(ines.email)
+    expect((await accountOf('Malik')).email).toBe(malik.email)
+    expect((await me(other)).body?.email).toBe(malik.email)
+    expect(mailsOf('emailChanged', ines.email)).toEqual([])
+  })
+})
+
 // ─── Les liens périmés ou remplacés (plan, S9) ────────────────────────────────────────────────
 
 describe('a link that is no longer valid', () => {
