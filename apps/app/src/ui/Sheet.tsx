@@ -78,6 +78,7 @@ type WebElement = {
   tabIndex: number
   hasAttribute: (name: string) => boolean
   getClientRects: () => { length: number }
+  focus: () => void
 }
 type WebRoot = { querySelectorAll?: (selector: string) => ArrayLike<WebElement> }
 const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]'
@@ -149,7 +150,11 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
       : index === -1 || index === last
         ? 0
         : index + 1
-    focusWithoutScroll(nodes[next])
+    // Un focus ordinaire, cette fois : le navigateur fait défiler le contenu de la feuille jusqu'à
+    // l'élément atteint. Avec `preventScroll`, Tab posait le focus sur un bouton resté sous le
+    // pied (« Télécharger mes données », dans la feuille de suppression : HORS ÉCRAN, batterie de
+    // R2). Seul le contenu de la feuille défile : la page dessous est cachée par le voile.
+    nodes[next]?.focus()
   }
 
   // Les touches de la feuille (web) : Échap ferme, Tab reste dedans. Les touches montent depuis
