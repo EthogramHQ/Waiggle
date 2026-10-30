@@ -214,7 +214,16 @@ export function SheetPanel({
 
   const header = (
     <View style={{ gap: space.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      {/* La rangée du haut a la hauteur du bouton « Fermer » (44) : il y tient entier, au lieu de
+          déborder du coin arrondi de la feuille, et la poignée est centrée dans la même rangée. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: layout.touchTarget,
+        }}
+      >
         {phone ? (
           // La poignée, au centre ; décorative (le bouton « Fermer » fait le même geste).
           <View

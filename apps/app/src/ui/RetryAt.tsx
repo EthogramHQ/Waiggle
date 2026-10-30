@@ -55,11 +55,12 @@ type Props = {
 }
 
 /**
- * L'heure écrite dans la langue (« 21:47 » en français, « 9:47 PM » en anglais) : Intl.DateTimeFormat
- * est la mise en forme des dates propre à chaque langue, fournie par l'appareil.
+ * L'heure écrite dans la langue (« 21:47 » ou « 01:38 » en français, « 09:47 PM » en anglais) :
+ * Intl.DateTimeFormat est la mise en forme des dates propre à chaque langue, fournie par
+ * l'appareil. L'heure sur deux chiffres : « à 1:38 » se lisait mal en français.
  */
 export const formatRetryTime = (until: Date, language: string): string =>
-  new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(until)
+  new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(until)
 
 /**
  * La phrase « Nouvel essai possible à 21:47 », annoncée comme un état (`status` : les lecteurs

@@ -7,7 +7,7 @@
 // ligne : plusieurs agents y travaillent en même temps. Ses exemples (un outil de développement,
 // absent de l'appli publiée) sont écrits ici, en français et en anglais, et passés en props : les
 // textes de la tranche arrivent par un autre commit.
-import { radii, space } from '@ruche/brand'
+import { layout, radii, space } from '@ruche/brand'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -112,8 +112,17 @@ const en: typeof fr = {
 
 /** Le délai du refus simulé, en secondes : assez court pour voir la libération. */
 const SIMULATED_RETRY_AFTER = 6
-/** L'heure fixe de l'état bloqué : dans un quart d'heure. */
-const BLOCKED_FOR_MS = 15 * 60 * 1000
+/**
+ * L'heure fixe de l'état bloqué : 21 h 47, l'exemple de la décision D3. Une heure fixe, et non
+ * « dans un quart d'heure » : la page web est pré-rendue à la construction, et une heure calculée
+ * à partir de maintenant différait entre le serveur et le navigateur (erreur d'hydratation 418
+ * vue sur les captures du catalogue).
+ */
+const blockedAt = () => {
+  const at = new Date()
+  at.setHours(21, 47, 0, 0)
+  return at
+}
 /** La hauteur donnée à la feuille « téléphone » posée dans la page. */
 const PHONE_SHEET_HEIGHT = 560
 
@@ -138,7 +147,7 @@ export function AccountCatalogue() {
   // Le refus simulé : null tant qu'on n'a pas appuyé ; le hook libère tout seul au bout du délai.
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
-  const [blockedUntil] = useState(() => new Date(Date.now() + BLOCKED_FOR_MS))
+  const [blockedUntil] = useState(blockedAt)
 
   const tabs = [
     { key: 'sign-in' as const, label: l.signIn, content: <Text>{l.signInBody}</Text> },
@@ -185,7 +194,11 @@ export function AccountCatalogue() {
       />
 
       <Text tone="secondary">{l.nav}</Text>
-      <SettingsNav label={l.navLabel} items={sections} current="security" />
+      {/* Sur ordinateur, la colonne a la largeur de la colonne latérale d'une page ; sur
+          téléphone, la liste prend toute la largeur. */}
+      <View style={{ maxWidth: layout.sideColumn }}>
+        <SettingsNav label={l.navLabel} items={sections} current="security" />
+      </View>
 
       <Text tone="secondary">{l.sheetPhone}</Text>
       <View
