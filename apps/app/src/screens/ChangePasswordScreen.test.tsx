@@ -11,6 +11,7 @@ import { leaMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import * as motion from '../ui/theme/motion'
 import { ToastProvider } from '../ui/theme/toast'
 import { ChangePasswordScreen } from './ChangePasswordScreen'
 
@@ -70,6 +71,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers()
+  jest.restoreAllMocks()
 })
 
 describe('ChangePasswordScreen', () => {
@@ -137,6 +139,13 @@ describe('ChangePasswordScreen', () => {
   })
 
   it('tells at what fixed time to try again when the quota is reached', async () => {
+    // « Réduire les animations », le temps de ce test : la lumière d'ambiance de la page respire
+    // sans fin, et le faux requestAnimationFrame de Reanimated en test est un setTimeout d'une
+    // milliseconde. Sous les fausses horloges, avancer de 901 s rejouait donc 901 000 images
+    // (11 s seul, plus de 15 s quand la suite tourne en parallèle). Immobile, la lumière ne pose
+    // plus aucun minuteur ; ce que le test vérifie (l'heure dite, le bouton bloqué puis rendu)
+    // ne dépend pas d'elle.
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(true)
     jest.useFakeTimers()
     jest.setSystemTime(now)
     jest

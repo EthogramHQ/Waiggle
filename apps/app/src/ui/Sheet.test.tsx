@@ -7,7 +7,7 @@
 // Ce que Jest ne mesure pas : la feuille pleine hauteur sur téléphone, le panneau centré sur un fond
 // voilé sur ordinateur, et le pied qui reste au-dessus du clavier (jur-15, WCAG 2.4.11). C'est
 // l'affaire des captures et d'un essai --explore.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -16,8 +16,19 @@ import { Button } from './Button'
 import { focusWithoutScroll } from './focus'
 import { Sheet } from './Sheet'
 import { Text } from './Text'
+import { TAP_GUARD_MS } from './tapGuard'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// La couche qui s'écarte du clavier (iOS) : une vue ordinaire, repérable, qui garde ses réglages
+// (`behavior`, `enabled`) dans ses props pour que le test les lise.
+jest.mock('react-native/Libraries/Components/Keyboard/KeyboardAvoidingView', () => {
+  const { View } = jest.requireActual('react-native')
+  const { createElement } = jest.requireActual('react')
+  return {
+    __esModule: true,
+    default: (props: object) => createElement(View, { ...props, testID: 'keyboard-avoiding' }),
+  }
+})
 // Où la feuille pose le focus du clavier (web) : le test lit l'élément reçu.
 jest.mock('./focus', () => ({
   ...jest.requireActual('./focus'),
@@ -214,5 +225,188 @@ describe('Sheet', () => {
         expect(screen.getByText('Nouvelle adresse')).toBeTruthy()
       })
     }
+
+    // Relecture de l'interface (R2, « Plus tard ») : Échap a deux voies, la touche enfoncée (la
+    // feuille) et la touche relâchée (le Modal, par onRequestClose). Une feuille à adresse se ferme
+    // par un retour arrière : deux appels quittaient aussi la page d'avant.
+    it('closes only once on Escape, though the key reaches the sheet and the layer', async () => {
+      const onClose = jest.fn()
+      // La feuille reste ouverte après l'appel, comme une feuille à adresse pendant son retour
+      // arrière : la touche relâchée arrive encore au Modal.
+      await renderWithProviders(<StillSheet onClose={onClose} />)
+
+      await fireEvent(
+        screen.getByRole('button', { name: 'Envoyer le lien' }),
+        'keyDown',
+        key('Escape'),
+      )
+      await act(() => layer().props.onRequestClose())
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('still closes on Escape released while the focus is outside the sheet', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} />)
+
+      await act(() => layer().props.onRequestClose())
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('ignores Escape while busy', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} busy />)
+
+      await fireEvent(
+        screen.getByRole('button', { name: 'Envoyer le lien' }),
+        'keyDown',
+        key('Escape'),
+      )
+      await act(() => layer().props.onRequestClose())
+
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    // Relecture C4 : le Modal de react-native-web est déjà `role="dialog"` et `aria-modal`. La
+    // couche reçoit le nom, et la feuille ne se déclare pas une seconde boîte de dialogue.
+    it('names the layer of the Modal by the title, without a second dialog inside', async () => {
+      await renderWithProviders(<StillSheet onClose={jest.fn()} />)
+
+      const title = screen.getByRole('header', { name: 'Changer d’adresse' })
+      expect(layer().props['aria-labelledby']).toBe(title.props.nativeID)
+      expect(
+        hostsOf(root()).filter(
+          (node) => node.props.role === 'dialog' || node.props.accessibilityRole === 'dialog',
+        ),
+      ).toHaveLength(0)
+    })
+  })
+
+  // Relecture B1 : pendant une action qui ne s'arrête plus (la suppression du compte), la feuille
+  // ne se ferme par aucune voie, et « Fermer » le dit (inactif).
+  describe('while busy', () => {
+    it('disables « Fermer » and ignores it', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} busy />)
+
+      const button = screen.getByRole('button', { name: close })
+      expect(button).toBeDisabled()
+      await fireEvent.press(button)
+
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('ignores the Android back button and the scrim', async () => {
+      jest.useFakeTimers()
+      try {
+        const onClose = jest.fn()
+        await renderWithProviders(<StillSheet onClose={onClose} busy />)
+        // Après la garde de double tape : seule `busy` retient le voile.
+        await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+
+        await act(() => layer().props.onRequestClose())
+        await fireEvent.press(scrim())
+
+        expect(onClose).not.toHaveBeenCalled()
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('closes again once the action is over (témoin)', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} />)
+
+      await fireEvent.press(screen.getByRole('button', { name: close }))
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // Relecture C3 : la feuille s'ouvre sous le doigt qui vient de toucher « Modifier » ; la seconde
+  // tape d'une double tape tombait sur le voile et la refermait (un retour arrière). La garde de
+  // Dialog : le voile ignore les tapes pendant TAP_GUARD_MS après l'ouverture.
+  describe('the scrim, against a double tap', () => {
+    beforeEach(() => jest.useFakeTimers())
+    afterEach(() => jest.useRealTimers())
+
+    it('ignores a tap right after the opening', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} />)
+
+      await act(() => jest.advanceTimersByTime(TAP_GUARD_MS - 50))
+      await fireEvent.press(scrim())
+
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('closes on a tap once the guard is over', async () => {
+      const onClose = jest.fn()
+      await renderWithProviders(<StillSheet onClose={onClose} />)
+
+      await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+      await fireEvent.press(scrim())
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // Relecture C5 (jur-15, WCAG 2.4.11) : sur iOS, le clavier cachait le pied collé et les champs du
+  // bas. La couche s'écarte du clavier, comme Screen (iOS est la plateforme par défaut de Jest).
+  it('keeps its pinned footer above the keyboard on iOS', async () => {
+    await renderWithProviders(
+      <Sheet
+        open
+        title="Changer d’adresse"
+        onClose={() => {}}
+        footer={<Button label="Envoyer le lien" onPress={() => {}} />}
+      >
+        <Text>Nouvelle adresse</Text>
+      </Sheet>,
+    )
+
+    const avoiding = screen.getByTestId('keyboard-avoiding')
+    expect(avoiding.props.enabled).toBe(true)
+    expect(avoiding.props.behavior).toBe('padding')
+    expect(within(avoiding).getByRole('button', { name: 'Envoyer le lien' })).toBeTruthy()
   })
 })
+
+/** Une feuille qui reste ouverte après onClose (comme une feuille à adresse pendant son retour). */
+function StillSheet({ onClose, busy = false }: { onClose: jest.Mock; busy?: boolean }) {
+  return (
+    <Sheet open busy={busy} title="Changer d’adresse" onClose={onClose}>
+      <Text>Nouvelle adresse</Text>
+      <Button label="Envoyer le lien" onPress={() => {}} />
+    </Sheet>
+  )
+}
+
+type Host = { props: Record<string, unknown>; children: ReadonlyArray<Host | string> }
+
+/** La racine de l'arbre rendu, vue par ce qu'on en lit (ses props et ses enfants). */
+const root = () => screen.root as unknown as Host
+
+/** Tous les éléments de l'arbre rendu, en profondeur (RNTL 14 n'a plus `findAll`). */
+const hostsOf = (node: Host): Host[] => [
+  node,
+  ...node.children.flatMap((child) => (typeof child === 'string' ? [] : hostsOf(child))),
+]
+
+/** La couche du Modal : l'élément qui reçoit onRequestClose (retour Android, Échap relâchée). */
+const layer = () => {
+  const found = hostsOf(root()).find((node) => typeof node.props.onRequestClose === 'function')
+  if (!found) throw new Error('no Modal layer')
+  return found as Host & { props: { onRequestClose: () => void } }
+}
+
+/** Le voile : caché aux lecteurs d'écran, il se trouve par ce qui le cache. */
+const scrim = () => {
+  const found = hostsOf(root()).find(
+    (node) =>
+      node.props.importantForAccessibility === 'no' && node.props.accessibilityElementsHidden,
+  )
+  if (!found) throw new Error('no scrim')
+  return found as never
+}

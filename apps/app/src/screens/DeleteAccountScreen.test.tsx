@@ -1,6 +1,6 @@
 // Tests de la page de suppression du compte : on ne supprime qu'avec le bon mot de passe, et on
 // peut d'abord télécharger ses données.
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { deleteAccount, downloadMyData } from '../accounts/api'
 import { getMe } from '../profile/api'
 import { leaMe } from '../testing/fixtures'
@@ -264,5 +264,70 @@ describe('DeleteAccountScreen in a sheet (R2)', () => {
     }
     // Témoin : la feuille est bien là.
     expect(screen.getByText(fr.t(($) => $.account.delete.warning))).toBeTruthy()
+  })
+})
+
+// --- Relecture de l'interface (R2, B1) : pendant la suppression, rien ne quitte la feuille ---
+// La suppression continue côté serveur : fermer la feuille ferait mentir « Annuler » sur une action
+// définitive, puis l'appli renverrait quand même à l'accueil.
+
+/** Tape le mot de passe et lance une suppression qui ne répond pas encore. */
+const startSlowDeletion = async () => {
+  let answer: (value: { ok: false; error: 'wrongPassword' }) => void = () => {}
+  jest.mocked(deleteAccount).mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve
+    }),
+  )
+  await renderWithI18n(<DeleteAccountScreen />)
+  await fireEvent.changeText(screen.getByLabelText('Confirme avec ton mot de passe'), 'secret')
+  await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
+  return () => act(async () => answer({ ok: false, error: 'wrongPassword' }))
+}
+
+/** La couche du Modal : l'élément qui reçoit onRequestClose (retour Android, Échap relâchée). */
+const modalLayer = (): { props: { onRequestClose: () => void } } => {
+  type Host = { props: Record<string, unknown>; children: ReadonlyArray<Host | string> }
+  const all = (node: Host): Host[] => [
+    node,
+    ...node.children.flatMap((child) => (typeof child === 'string' ? [] : all(child))),
+  ]
+  const found = all(screen.root as unknown as Host).find(
+    (node) => typeof node.props.onRequestClose === 'function',
+  )
+  if (!found) throw new Error('no Modal layer')
+  return found as never
+}
+
+describe('while the account is being deleted', () => {
+  it('disables « Annuler », « Fermer » and « Mot de passe oublié ? »', async () => {
+    await startSlowDeletion()
+
+    expect(screen.getByRole('button', { name: fr.t(($) => $.common.cancel) })).toBeDisabled()
+    expect(screen.getByRole('button', { name: fr.t(($) => $.common.close) })).toBeDisabled()
+    expect(
+      screen.getByRole('link', { name: fr.t(($) => $.auth.signIn.forgotPassword) }),
+    ).toBeDisabled()
+  })
+
+  it('does not leave the sheet through « Annuler », « Fermer » or the back button', async () => {
+    await startSlowDeletion()
+
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.cancel) }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.close) }))
+    await act(() => modalLayer().props.onRequestClose())
+
+    expect(mockBack).not.toHaveBeenCalled()
+    expect(visited(mockReplace, mockPush)).toEqual([])
+  })
+
+  it('lets the member leave again once the deletion has failed (témoin)', async () => {
+    const answer = await startSlowDeletion()
+    await answer()
+
+    expect(await screen.findByText('Mot de passe incorrect.')).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.cancel) }))
+
+    expect(mockBack).toHaveBeenCalledTimes(1)
   })
 })

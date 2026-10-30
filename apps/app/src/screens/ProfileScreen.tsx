@@ -143,7 +143,9 @@ function ProfileForm({ me }: { me: Me }) {
 
   const onSave = async () => {
     if (saving.current) return
-    setMessage(null)
+    // Le dernier message reste en place pendant l'envoi, juste au-dessus d'« Enregistrer » : effacé
+    // au départ, il faisait bouger le bouton sous le doigt (le panneau d'ordinateur, centré,
+    // rétrécissait). La réponse le remplace (relecture de l'interface, C9 ; charte, 6c).
     // Le formulaire tel qu'envoyé, pour savoir au retour ce qui a changé entre-temps.
     const sent = typed.current
     // On vérifie avant d'envoyer : le membre voit tout de suite ce qui ne va pas.
@@ -152,6 +154,9 @@ function ProfileForm({ me }: { me: Me }) {
     const former = me.handle
     const checked = toProfileUpdate(sent, former)
     if (!checked.ok) {
+      // Rien n'est envoyé : les champs disent ce qui ne va pas, et un ancien « Enregistré » ne
+      // reste pas à côté d'eux.
+      setMessage(null)
       setErrors(checked.errors)
       return
     }
@@ -171,6 +176,7 @@ function ProfileForm({ me }: { me: Me }) {
       // le retoucher (« ines » → « ines_m »). Si le pseudo a déjà été retouché, le message parle
       // d'un texte qui n'est plus là : il va dans le message général.
       if ((result.error === 'handleTaken' || result.error === 'handleChangeLimit') && handleKept) {
+        setMessage(null)
         setErrors({ handle: result.error })
         return
       }
@@ -201,7 +207,7 @@ function ProfileForm({ me }: { me: Me }) {
   }
 
   const onChangeAvatar = async () => {
-    setMessage(null)
+    // Le dernier message reste jusqu'au résultat (ou jusqu'au bout, si le membre annule le choix).
     try {
       const picked = await pickAvatar()
       if (!picked) return // le membre a annulé : rien à faire

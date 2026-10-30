@@ -84,6 +84,9 @@ export function DeleteAccountScreen() {
   }
 
   const title = t(($) => $.account.delete.sheetTitle)
+  // Pendant la suppression, rien ne quitte la feuille : la suppression continuerait derrière elle,
+  // et « Annuler » mentirait sur une action définitive (relecture de l'interface, B1).
+  const deleting = busy === 'delete'
   const covers = (member.data?.projects ?? []).map((project) => ({
     key: project.id,
     source: toSource(project.cover?.url),
@@ -95,6 +98,7 @@ export function DeleteAccountScreen() {
       <Sheet
         open={sheet.open}
         onClose={back}
+        busy={deleting}
         title={title}
         subtitle={t(($) => $.account.delete.intro)}
         // La feuille est toute la page : son titre est celui de la page (niveau 1).
@@ -116,12 +120,17 @@ export function DeleteAccountScreen() {
               variant="confirm"
               icon="trash"
               onPress={() => void onDelete()}
-              loading={busy === 'delete'}
+              loading={deleting}
               // impossible de supprimer sans avoir tapé son mot de passe
               disabled={password.length === 0}
             />
             <Row justify="center">
-              <TextLink label={t(($) => $.common.cancel)} onPress={back} role="button" />
+              <TextLink
+                label={t(($) => $.common.cancel)}
+                onPress={back}
+                role="button"
+                disabled={deleting}
+              />
             </Row>
           </>
         }
@@ -218,6 +227,7 @@ export function DeleteAccountScreen() {
                 <TextLink
                   label={t(($) => $.auth.signIn.forgotPassword)}
                   onPress={() => router.push('/forgot-password')}
+                  disabled={deleting}
                 />
               </Row>
             </Stack>
