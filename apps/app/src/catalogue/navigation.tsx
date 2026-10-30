@@ -4,6 +4,7 @@
 // animations » (la goutte apparaît en fondu). Fichier à part de CatalogueScreen.tsx, qui l'importe
 // en une ligne. Les textes d'exemple sont écrits ici en clair : le catalogue est un outil de
 // développement, absent de l'appli publiée.
+import { palettes } from '@ruche/brand'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { Stack } from '../ui/Stack'
@@ -17,12 +18,12 @@ const tabs: TabBarProps['tabs'] = [
   { key: 'me', label: 'Moi', href: '/me' },
 ]
 const publish = { href: '/publish', label: 'Publier' }
-// Une photo de profil d'exemple : un petit dessin en SVG, sans réseau.
-const photo =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56"><rect width="56" height="56" fill="#8A5A00"/><circle cx="28" cy="22" r="10" fill="#FFE58A"/><ellipse cx="28" cy="46" rx="16" ry="11" fill="#FFE58A"/></svg>',
-  )
+// Une photo de profil d'exemple : un petit dessin en SVG, sans réseau. Ses couleurs viennent de la
+// palette de jour (une image ne change pas avec le thème), jamais écrites à la main.
+const day = palettes.day
+const photo = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" fill="${day.amberText}"/><circle cx="28" cy="22" r="10" fill="${day.honeyLight}"/><ellipse cx="28" cy="46" rx="16" ry="11" fill="${day.honeyLight}"/></svg>`,
+)}`
 const withPhoto = { name: 'Léa Moreau', url: photo }
 const withoutPhoto = { name: 'Léa Moreau', url: null }
 const quiet = { onPress: () => {}, onReselect: () => {} }

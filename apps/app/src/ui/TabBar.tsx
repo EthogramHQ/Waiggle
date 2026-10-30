@@ -96,6 +96,9 @@ const labelMaxScale = 1.2
 // lui et la photo (le même air, transparent, quand l'onglet est inactif : rien ne bouge).
 const ringWidth = 2
 const ringGap = 2
+// La hauteur de la photo cerclée : les icônes des autres onglets prennent la même, pour que les
+// quatre libellés soient sur la même ligne.
+const pictureHeight = layout.tabBar.avatar + 2 * (ringGap + ringWidth)
 
 // La goutte en mouvement s'étire de ce facteur avant de se poser (puis le ressort `drop` la ramène).
 const stretchFactor = 1.25
@@ -274,7 +277,13 @@ export function TabBar({
               {slot.key === 'me' ? (
                 <MeAvatar avatar={avatar} label={slot.label} active={isActive} />
               ) : (
-                <Icon name={icons[slot.key]} size={24} tone={isActive ? 'onHoney' : 'secondary'} />
+                <View style={{ height: pictureHeight, justifyContent: 'center' }}>
+                  <Icon
+                    name={icons[slot.key]}
+                    size={24}
+                    tone={isActive ? 'onHoney' : 'secondary'}
+                  />
+                </View>
               )}
               {/* Sur la goutte, l'encre (ton onHoney, lisible jour et nuit, comme Segmented) ;
                   ailleurs, le ton secondaire sur le verre. Une ligne : à 320 points, un libellé
