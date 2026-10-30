@@ -886,6 +886,8 @@ export const en: Translation = {
     previous: 'Previous projects',
     next: 'Next projects',
     popularTools: 'Popular tools',
+    previousTools: 'Previous tools',
+    nextTools: 'Next tools',
     allTools: 'All tools',
     recent: 'Recent',
   },

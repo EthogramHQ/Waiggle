@@ -1030,6 +1030,9 @@ export const fr = {
     previous: 'Projets précédents',
     next: 'Projets suivants',
     popularTools: 'Outils populaires',
+    /** Les flèches du carrousel « Outils populaires », sur ordinateur. */
+    previousTools: 'Outils précédents',
+    nextTools: 'Outils suivants',
     allTools: 'Tous les outils',
     recent: 'Récents',
   },
