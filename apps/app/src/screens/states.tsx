@@ -140,13 +140,16 @@ export function LoadErrorScreen({
  * est connecté. Ce n'est pas un visiteur, on ne lui dit donc pas « Réservé aux membres » : la page
  * dit que le compte ne se charge pas et propose de réessayer (`onRetry`, le `refetch` de
  * `useSession`). Une seule demande par toucher : rien ne relit la session tout seul en boucle.
+ * `withBack={false}` sur l'accueil : « Retour » y ramènerait à la même page.
  */
 export function SessionErrorScreen({
   onRetry,
   width = 'form',
+  withBack = true,
 }: {
   onRetry: () => void
   width?: Width
+  withBack?: boolean
 }) {
   const { t } = useTranslation()
   const back = useGoBack('/')
@@ -162,7 +165,7 @@ export function SessionErrorScreen({
         message={t(($) => $.account.loadError)}
         actions={[
           { label: t(($) => $.common.retry), onPress: onRetry },
-          { label: t(($) => $.states.back), onPress: back },
+          ...(withBack ? [{ label: t(($) => $.states.back), onPress: back }] : []),
         ]}
       />
     </Screen>

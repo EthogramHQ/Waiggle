@@ -13,7 +13,7 @@ import { FEED_PAGE_SIZE, type FeedItem } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { type FeedKind, useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { feedItemId } from '../feed/items'
@@ -42,10 +42,15 @@ import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { WelcomeHero } from '../ui/WelcomeHero'
 import { Wordmark } from '../ui/Wordmark'
+import { SessionErrorScreen } from './states'
 
 export function HomeScreen() {
-  // useSession : le membre connecté, ou null. L'écran se redessine à la connexion / déconnexion.
-  const { data: session } = useSession()
+  // Le membre connecté, ou personne ; l'écran se redessine à la connexion / déconnexion. Pendant
+  // la lecture de la session, l'accueil des visiteurs (c'est aussi la page pré-rendue du web).
+  const { state, session, retry } = useMemberSession()
+  // La lecture a échoué (trop de demandes, panne) : peut-être un membre, on ne lui propose pas de
+  // créer un compte (voir accounts/session.ts). Pas de « Retour » : il ramènerait ici.
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" withBack={false} />
   return session ? <MemberHome id={session.user.id} name={session.user.name} /> : <VisitorHome />
 }
 
