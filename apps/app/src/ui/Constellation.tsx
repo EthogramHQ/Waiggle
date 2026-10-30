@@ -66,9 +66,10 @@ const FLOAT_HEIGHT = 8 // en points
 
 // En dessous de cette hauteur de fenêtre, la bande décorative (téléphone) rétrécit…
 const SHORT_WINDOW = 700
-// … sans descendre sous cette hauteur : la plus grande tuile (88 points, posée à mi-hauteur) y
-// tient encore entière.
-const MIN_BAND_HEIGHT = 190
+// … sans descendre sous cette hauteur : à 320 × 568, les deux portes d'entrée de l'accueil tiennent
+// alors au-dessus du pli (mesuré dans le navigateur). La plus grande tuile (88 points, posée à
+// mi-hauteur) n'en dépasse que de quelques points, sous l'arrondi de la feuille qui la couvre.
+const MIN_BAND_HEIGHT = 170
 
 type Props = {
   height: number
