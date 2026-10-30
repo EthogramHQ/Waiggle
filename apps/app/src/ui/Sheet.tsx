@@ -30,6 +30,22 @@ type PanelProps = {
   children: ReactNode
   /** Les boutons collés en bas de la feuille (l'action principale, puis « Annuler »). */
   footer?: ReactNode
+  /**
+   * Le niveau du titre : 2 (par défaut) pour une feuille ouverte par-dessus une page qui a déjà son
+   * titre ; 1 pour une feuille qui est toute la page (son adresse à elle : /settings/profile).
+   */
+  heading?: 1 | 2
+  /**
+   * Un décor à droite du titre (les photos du membre et de ses projets, sur la feuille de
+   * suppression) : caché aux lecteurs d'écran, il ne porte jamais un bouton ni un texte à lire.
+   */
+  decoration?: ReactNode
+  /**
+   * Sur ordinateur, une colonne à droite de la feuille, dans la même boîte de dialogue (l'aperçu de
+   * sa page pendant qu'on modifie son profil). Absente sur téléphone, et quand la fenêtre n'a pas
+   * la place de la poser à côté.
+   */
+  aside?: ReactNode
   onClose: () => void
   /**
    * Le nom du bouton « Fermer », pour le catalogue seulement (un outil de développement, absent de
@@ -76,8 +92,13 @@ const HANDLE = { width: 36, height: 5 }
 const SHEET_TOP_GAP = space.huge
 /** Les marges autour du panneau sur ordinateur. */
 const PANEL_MARGIN = space.xxxl
+/** La colonne posée à droite du panneau (`aside`), et l'écart entre les deux. */
+const ASIDE_WIDTH = layout.sideColumn + space.xxl
+const ASIDE_GAP = space.xxl
+/** La largeur de fenêtre qu'il faut pour poser la colonne à côté du panneau. */
+const ASIDE_ROOM = layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
 
-export function Sheet({ open, onClose, ...panel }: Props) {
+export function Sheet({ open, onClose, aside, ...panel }: Props) {
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
@@ -161,9 +182,20 @@ export function Sheet({ open, onClose, ...panel }: Props) {
         {/* La feuille d'abord, le voile ensuite : en s'ouvrant, la couche (web) pose le focus sur
             son premier élément atteignable, qui doit être dans la feuille. zIndex garde la feuille
             au-dessus du voile, dessiné après elle. */}
-        <View style={{ zIndex: 1, flex: phone ? 1 : 0, justifyContent: 'flex-end' }}>
+        <View
+          style={{
+            zIndex: 1,
+            flex: phone ? 1 : 0,
+            justifyContent: 'flex-end',
+            // Sur ordinateur, la couche rétrécit à la fenêtre : sinon, plus haute qu'elle, elle
+            // poussait le panneau (calé en bas) au-dessus du haut de l'écran.
+            ...(phone ? null : { flexShrink: 1, minHeight: 0 }),
+          }}
+        >
           <SheetPanel
             {...panel}
+            // La colonne d'à côté, seulement si la fenêtre a la place de la poser.
+            {...(aside !== undefined && !phone && window.width >= ASIDE_ROOM ? { aside } : null)}
             onClose={onClose}
             layout={phone ? 'phone' : 'desktop'}
             maxHeight={window.height - 2 * PANEL_MARGIN}
@@ -195,6 +227,9 @@ export function SheetPanel({
   subtitle,
   children,
   footer,
+  heading = 2,
+  decoration,
+  aside,
   onClose,
   closeLabel,
   layout: disposition,
@@ -248,14 +283,85 @@ export function SheetPanel({
           />
         </View>
       </View>
-      <View style={{ gap: space.xs, paddingRight: layout.touchTarget + space.md }}>
-        {/* Niveau 2 : la feuille s'ouvre par-dessus une page qui a déjà son titre. */}
-        <Text variant="title2" heading={2} nativeID={titleId}>
-          {title}
-        </Text>
-        {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
+      {/* Le titre et, à sa droite, le décor (s'il y en a un). Sans décor, la rangée garde à droite
+          la place du bouton « Fermer », pour que les deux bords du titre restent alignés. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.md,
+          ...(decoration ? null : { paddingRight: layout.touchTarget + space.md }),
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
+          {/* Niveau 2 : la feuille s'ouvre par-dessus une page qui a déjà son titre ; niveau 1
+              quand la feuille est toute la page. */}
+          <Text variant="title2" heading={heading} nativeID={titleId}>
+            {title}
+          </Text>
+          {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
+        </View>
+        {decoration ? (
+          <View
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {decoration}
+          </View>
+        ) : null}
       </View>
     </View>
+  )
+
+  // Sur ordinateur, avec une colonne à côté : la feuille et la colonne forment une rangée, dans la
+  // même boîte de dialogue ; la feuille garde sa largeur de formulaire et sa hauteur maximale.
+  const beside = aside !== undefined && !phone
+  // La feuille elle-même : son en-tête, son contenu qui défile, son pied collé.
+  const surface = (
+    <Surface
+      variant="sheet"
+      radius="sheet"
+      centered={!phone}
+      padding="none"
+      // Téléphone : toute la hauteur sous l'écart du haut ; ordinateur : jusqu'à la hauteur permise.
+      // Le contenu défile alors dans la feuille, et le pied reste en vue.
+      fit={phone ? 'fill' : 'shrink'}
+      {...(phone ? { shadow: 'card' as const } : null)}
+    >
+      <View style={{ flexShrink: 1, ...(phone ? { flex: 1 } : null) }}>
+        <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>{header}</View>
+        {/* Le contenu défile dans la feuille, le titre et le pied restant en place.
+              keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du
+              premier coup. */}
+        <ScrollView
+          style={{ flexShrink: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: space.xl,
+            paddingTop: space.xl,
+            paddingBottom: footer ? space.xl : insets.bottom + space.xxl,
+            gap: space.xl,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+        {footer ? (
+          <View
+            style={{
+              gap: space.md,
+              paddingHorizontal: space.xl,
+              paddingTop: space.md,
+              paddingBottom: (phone ? insets.bottom : 0) + space.xl,
+              borderTopWidth: borders.hairline,
+              borderTopColor: colors.line,
+            }}
+          >
+            {footer}
+          </View>
+        ) : null}
+      </View>
+    </Surface>
   )
 
   return (
@@ -274,52 +380,34 @@ export function SheetPanel({
           : {
               alignSelf: 'center',
               width: '100%',
-              maxWidth: layout.formWidth,
+              maxWidth: beside
+                ? layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
+                : layout.formWidth,
               paddingHorizontal: PANEL_MARGIN,
               ...(maxHeight === undefined ? null : { maxHeight }),
+              ...(beside
+                ? { flexDirection: 'row' as const, alignItems: 'center' as const, gap: ASIDE_GAP }
+                : null),
             }
       }
     >
-      <Surface
-        variant="sheet"
-        radius="sheet"
-        centered={!phone}
-        padding="none"
-        {...(phone ? { shadow: 'card' as const } : null)}
-      >
-        <View style={{ flexShrink: 1, ...(phone ? { flex: 1 } : null) }}>
-          <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>{header}</View>
-          {/* Le contenu défile dans la feuille, le titre et le pied restant en place.
-              keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du
-              premier coup. */}
-          <ScrollView
-            style={{ flexShrink: 1 }}
-            contentContainerStyle={{
-              paddingHorizontal: space.xl,
-              paddingTop: space.xl,
-              paddingBottom: footer ? space.xl : insets.bottom + space.xxl,
-              gap: space.xl,
-            }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {children}
-          </ScrollView>
-          {footer ? (
-            <View
-              style={{
-                gap: space.md,
-                paddingHorizontal: space.xl,
-                paddingTop: space.md,
-                paddingBottom: (phone ? insets.bottom : 0) + space.xl,
-                borderTopWidth: borders.hairline,
-                borderTopColor: colors.line,
-              }}
-            >
-              {footer}
-            </View>
-          ) : null}
+      {beside ? (
+        // La feuille, à gauche : elle prend la place qui reste à côté de la colonne, sans dépasser
+        // la hauteur de la fenêtre (une hauteur en nombre : un pourcentage ne se calculerait pas
+        // dans une rangée sans hauteur fixe).
+        <View
+          style={{
+            flex: 1,
+            minWidth: 0,
+            ...(maxHeight === undefined ? null : { maxHeight }),
+          }}
+        >
+          {surface}
         </View>
-      </Surface>
+      ) : (
+        surface
+      )}
+      {beside ? <View style={{ width: ASIDE_WIDTH }}>{aside}</View> : null}
     </View>
   )
 }

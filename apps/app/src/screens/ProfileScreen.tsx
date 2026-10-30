@@ -2,6 +2,10 @@
 // Puis la section « E-mails » (tranche 6c) : deux interrupteurs, enregistrés chacun dès qu'on le
 // touche, sans passer par « Enregistrer » (qui ne concerne que le formulaire au-dessus).
 // Un compte suspendu (tranche 7c) lit son profil sans pouvoir le modifier, et garde ses e-mails.
+// Depuis la tranche R2, tout se passe dans une feuille posée sur la page (ui/Sheet.tsx) : la photo
+// floutée en tête, « Changer la photo » qui la chevauche, « Enregistrer » collé en bas ; sur
+// ordinateur, l'aperçu de sa page à droite, qui suit ce qu'on tape. « Fermer » revient aux
+// réglages. Les règles du profil, elles, ne changent pas.
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX_LENGTH,
@@ -18,8 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
 import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { TopNav } from '../navigation/TopNav'
-import { useGoBack } from '../navigation/useGoBack'
+import { useRouteSheet } from '../navigation/useRouteSheet'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import {
   type ProfileForm as FormValues,
@@ -28,18 +31,18 @@ import {
   toProfileUpdate,
 } from '../profile/form'
 import { useMe, useSetMe } from '../profile/hooks'
-import { Avatar } from '../ui/Avatar'
+import { AvatarCover } from '../ui/AvatarCover'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { SheetHeader } from '../ui/SheetHeader'
+import { Sheet } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
+import { Surface } from '../ui/Surface'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
-import { useLayout } from '../ui/theme/layout'
 import { EmailSettings } from './settings/EmailSettings'
 import { LoadErrorScreen, LoadingScreen, SignedOutScreen } from './states'
 
@@ -71,23 +74,27 @@ export function ProfileScreen() {
 function LockedProfile({ me }: { me: Me }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
-  const back = useGoBack('/account')
+  const sheet = useRouteSheet('/settings')
+  const title = t(($) => $.profile.title)
   return (
-    // Le nom du membre est le titre de la page (niveau 1), comme sur sa page : « Mon profil » ne
-    // vient que dans l'onglet.
-    <Screen pageTitle={t(($) => $.profile.title)} header={<TopNav />} onBack={back}>
-      {/* Lue à son tour (role « status ») : elle est là dès l'ouverture, ce n'est pas une alerte. */}
-      <Notice tone="info" message={t(($) => $.suspension.profileLocked)} polite />
-      <MemberHeader
-        name={me.name}
-        handle={t(($) => $.member.handle, { handle: me.handle })}
-        avatar={toSource(me.avatarUrl)}
-        bio={me.bio}
-        toolsTitle={t(($) => $.member.favoriteTools)}
-        // De simples pastilles : le profil ne connaît que le nom des outils, pas leur étiquette.
-        tools={me.favoriteTools.map((tool) => ({ label: tool }))}
-      />
-      <EmailSettings />
+    // La même feuille, sans champ : le titre « Mon profil » (niveau 1, la feuille est toute la
+    // page), puis le profil tel que les autres le lisent (son nom en niveau 2).
+    <Screen pageTitle={title}>
+      <Sheet open={sheet.open} onClose={sheet.close} title={title} heading={1}>
+        {/* Lue à son tour (role « status ») : elle est là dès l'ouverture, ce n'est pas une alerte. */}
+        <Notice tone="info" message={t(($) => $.suspension.profileLocked)} polite />
+        <MemberHeader
+          name={me.name}
+          handle={t(($) => $.member.handle, { handle: me.handle })}
+          avatar={toSource(me.avatarUrl)}
+          bio={me.bio}
+          toolsTitle={t(($) => $.member.favoriteTools)}
+          // De simples pastilles : le profil ne connaît que le nom des outils, pas leur étiquette.
+          tools={me.favoriteTools.map((tool) => ({ label: tool }))}
+          heading={2}
+        />
+        <EmailSettings />
+      </Sheet>
     </Screen>
   )
 }
@@ -96,7 +103,6 @@ type Message = { text: string; ok: boolean } | null
 
 function ProfileForm({ me }: { me: Me }) {
   const { t } = useTranslation()
-  const wide = useLayout().sizeClass === 'wide'
   const { refetch: refetchSession } = useSession()
   const setMe = useSetMe()
   const toSource = useMediaSources()
@@ -257,7 +263,9 @@ function ProfileForm({ me }: { me: Me }) {
           max: toolsKey === 'tooManyTools' ? FAVORITE_TOOLS_MAX : TOOL_MAX_LENGTH,
         })
 
-  const back = useGoBack('/account')
+  // « Fermer » revient aux réglages (la page d'avant, ou /settings par un lien direct).
+  const sheet = useRouteSheet('/settings')
+  const title = t(($) => $.profile.title)
   const save = {
     label: t(($) => $.profile.save),
     onPress: () => void onSave(),
@@ -269,41 +277,49 @@ function ProfileForm({ me }: { me: Me }) {
   const notice = message ? (
     <Notice tone={message.ok ? 'success' : 'error'} message={message.text} />
   ) : null
+  const avatar = toSource(me.avatarUrl)
 
   return (
-    <Screen
-      pageTitle={t(($) => $.profile.title)}
-      // Sur téléphone, « Annuler » et « Enregistrer » restent en haut, à portée de pouce ; sur
-      // ordinateur, la barre de navigation en haut et les deux boutons sous le formulaire.
-      header={
-        wide ? (
-          <TopNav />
-        ) : (
-          <SheetHeader
-            title={t(($) => $.profile.title)}
-            cancel={{ label: t(($) => $.common.cancel), onPress: back }}
-            action={save}
-          />
-        )
-      }
-      stickyHeader={!wide}
-      {...(wide ? null : { notice })}
-      {...(wide ? { title: t(($) => $.profile.title) } : null)}
-    >
-      <Stack gap="md" align="center">
-        <Avatar
+    <Screen pageTitle={title}>
+      <Sheet
+        open={sheet.open}
+        onClose={sheet.close}
+        title={title}
+        // La feuille est toute la page : son titre est celui de la page (niveau 1).
+        heading={1}
+        // « Enregistrer » collé en bas, toujours à portée de pouce ; le message juste au-dessus,
+        // en vue du bouton, même après un appui depuis le haut d'un long formulaire.
+        footer={
+          <>
+            {notice}
+            <Button {...save} />
+          </>
+        }
+        // Sur ordinateur, l'aperçu de sa page, à droite : il suit ce qui est tapé, avant même
+        // « Enregistrer » (rien n'est envoyé pour autant).
+        aside={
+          <Surface variant="plain" padding="xl">
+            <MemberHeader
+              name={name.trim() || me.name}
+              handle={t(($) => $.member.handle, { handle: handle.trim() || me.handle })}
+              avatar={avatar}
+              bio={bio.trim()}
+              toolsTitle={t(($) => $.member.favoriteTools)}
+              tools={parseTools(tools).map((tool) => ({ label: tool }))}
+              heading={2}
+            />
+          </Surface>
+        }
+      >
+        <AvatarCover
           name={name}
-          source={toSource(me.avatarUrl)}
+          source={avatar}
           label={t(($) => $.profile.avatar.label)}
-          size={132}
-        />
-        <Button
-          label={t(($) => $.profile.avatar.change)}
-          variant="glass"
-          size="compact"
-          icon="camera"
-          onPress={onChangeAvatar}
-          loading={busy === 'avatar'}
+          action={{
+            label: t(($) => $.profile.avatar.change),
+            onPress: () => void onChangeAvatar(),
+            loading: busy === 'avatar',
+          }}
         />
         <Row gap="sm" align="start">
           <Icon name="shield-check" size={18} tone="amber" />
@@ -313,71 +329,62 @@ function ProfileForm({ me }: { me: Me }) {
             </Text>
           </Stack>
         </Row>
-      </Stack>
 
-      <FieldGroup>
-        <TextField
-          label={t(($) => $.profile.fields.name)}
-          value={name}
-          onChangeText={edit('name', setName)}
-          autoCapitalize="words"
-          maxLength={NAME_MAX_LENGTH}
-          showCount
-          error={nameError}
-          {...submitOnEnter}
-        />
-        {/* Le « @ » est affiché devant, pas dans la valeur : on tape « ines », on lit « @ines ».
+        <FieldGroup>
+          <TextField
+            label={t(($) => $.profile.fields.name)}
+            value={name}
+            onChangeText={edit('name', setName)}
+            autoCapitalize="words"
+            maxLength={NAME_MAX_LENGTH}
+            showCount
+            error={nameError}
+            {...submitOnEnter}
+          />
+          {/* Le « @ » est affiché devant, pas dans la valeur : on tape « ines », on lit « @ines ».
             Taper le « @ » quand même ne gêne pas : il est retiré avant l'envoi. Le compteur
             montre la limite sans couper (pas de maxLength) : un « @ » collé ne prend pas la
             place d'une lettre. autoComplete « off » : le navigateur ne propose pas d'adresse. */}
-        <TextField
-          label={t(($) => $.profile.fields.handle)}
-          value={handle}
-          onChangeText={edit('handle', setHandle)}
-          prefix="@"
-          autoCorrect={false}
-          spellCheck={false}
-          autoComplete="off"
-          limit={HANDLE_MAX_LENGTH}
-          showCount
-          hint={t(($) => $.profile.fields.handleHint, {
-            min: HANDLE_MIN_LENGTH,
-            max: HANDLE_MAX_LENGTH,
-          })}
-          error={handleError}
-          {...submitOnEnter}
+          <TextField
+            label={t(($) => $.profile.fields.handle)}
+            value={handle}
+            onChangeText={edit('handle', setHandle)}
+            prefix="@"
+            autoCorrect={false}
+            spellCheck={false}
+            autoComplete="off"
+            limit={HANDLE_MAX_LENGTH}
+            showCount
+            hint={t(($) => $.profile.fields.handleHint, {
+              min: HANDLE_MIN_LENGTH,
+              max: HANDLE_MAX_LENGTH,
+            })}
+            error={handleError}
+            {...submitOnEnter}
+          />
+          <TextField
+            label={t(($) => $.profile.fields.bio)}
+            value={bio}
+            onChangeText={edit('bio', setBio)}
+            autoCapitalize="sentences"
+            multiline
+            // Pas de maxLength ici : le compteur montre la limite sans couper le texte en plein milieu.
+            limit={BIO_MAX_LENGTH}
+            showCount
+            error={bioError}
+          />
+        </FieldGroup>
+        <TagInput
+          label={t(($) => $.profile.fields.tools)}
+          values={parseTools(tools)}
+          onChange={(list) => edit('tools', setTools)(list.join(', '))}
+          placeholder={t(($) => $.profile.fields.toolsPlaceholder)}
+          removeLabel={(item) => t(($) => $.common.remove, { item })}
+          limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
+          error={toolsError || undefined}
         />
-        <TextField
-          label={t(($) => $.profile.fields.bio)}
-          value={bio}
-          onChangeText={edit('bio', setBio)}
-          autoCapitalize="sentences"
-          multiline
-          // Pas de maxLength ici : le compteur montre la limite sans couper le texte en plein milieu.
-          limit={BIO_MAX_LENGTH}
-          showCount
-          error={bioError}
-        />
-      </FieldGroup>
-      <TagInput
-        label={t(($) => $.profile.fields.tools)}
-        values={parseTools(tools)}
-        onChange={(list) => edit('tools', setTools)(list.join(', '))}
-        placeholder={t(($) => $.profile.fields.toolsPlaceholder)}
-        removeLabel={(item) => t(($) => $.common.remove, { item })}
-        limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
-        error={toolsError || undefined}
-      />
-
-      {/* Sur téléphone, le message est dans la barre fixe, en vue du bouton « Enregistrer ». */}
-      {wide && notice}
-      {wide ? (
-        <Row gap="md" justify="end">
-          <Button label={t(($) => $.common.cancel)} variant="secondary" onPress={back} />
-          <Button {...save} />
-        </Row>
-      ) : null}
-      <EmailSettings />
+        <EmailSettings />
+      </Sheet>
     </Screen>
   )
 }

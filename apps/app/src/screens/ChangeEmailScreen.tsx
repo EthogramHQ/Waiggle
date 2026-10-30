@@ -1,4 +1,5 @@
-// Page « Changer d'adresse e-mail » (tranche « adresse », /account/email). Le membre tape sa
+// Page « Changer d'adresse e-mail » (tranche « adresse », /settings/account/email depuis la tranche
+// R2 ; l'ancienne adresse /account/email y mène toujours). Le membre tape sa
 // nouvelle adresse et son mot de passe ; rien ne change tout de suite. Un premier lien part vers son
 // adresse ACTUELLE (qui doit donner son accord), puis un second vers la nouvelle, pour la vérifier.
 // Une fois la demande partie, la page le dit et le formulaire disparaît : on ne renvoie pas une
@@ -18,9 +19,10 @@ import { Hint } from '../ui/Hint'
 import { Emblem } from '../ui/Illustrations'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Stack } from '../ui/Stack'
+import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
+import { TextLink } from '../ui/TextLink'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe (le message générique d'une
@@ -44,7 +46,8 @@ export function ChangeEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
   const { data, isPending, error: sessionError, refetch } = useSession()
-  const back = useGoBack('/account')
+  // Arrivé par un lien direct : le retour mène à la rubrique « Compte » des réglages (R2).
+  const back = useGoBack('/settings/account')
   const [newEmail, setNewEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -124,9 +127,9 @@ export function ChangeEmailScreen() {
   // (charte de design, « une action qui remplace un bouton »). Retourner à son compte n'a rien de
   // grave : pas de garde dans le temps.
   const onBackToAccount = () => {
-    // dismissTo : revient à « Mon compte » s'il est dans l'historique (on en vient presque
-    // toujours), sinon le met à la place de cette page.
-    router.dismissTo('/account')
+    // dismissTo : revient à la rubrique « Compte » des réglages si elle est dans l'historique (on
+    // en vient presque toujours), sinon la met à la place de cette page.
+    router.dismissTo('/settings/account')
   }
 
   const message = (key: AuthErrorKey | undefined) =>
@@ -210,6 +213,13 @@ export function ChangeEmailScreen() {
           error={message(fieldErrors.password)}
         />
       </FieldGroup>
+      {/* Mot de passe oublié : on en choisit un nouveau d'abord (relecture juridique, jur-12). */}
+      <Row justify="end">
+        <TextLink
+          label={t(($) => $.auth.signIn.forgotPassword)}
+          onPress={() => router.push('/forgot-password')}
+        />
+      </Row>
       {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
       <Button
         label={

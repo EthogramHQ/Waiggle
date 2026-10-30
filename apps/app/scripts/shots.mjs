@@ -1069,10 +1069,30 @@ const fakeApi = (
 
 // 4. Ce qu'on photographie.
 const project = `/projects/${recipesProject.id}`
+// La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
+// servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
+// simulée du contexte), puis la page est relue.
+const leaPhoto = `${apiUrl}/media/visuals/e4a1b2c3-d4e5-4f60-8a7b-9c0d1e2f3a4b.webp`
+const withLeaPhoto = async (page) => {
+  await page.route(
+    (url) => url.pathname === '/v1/me',
+    (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { ...leaMe, avatarUrl: leaPhoto } })
+        : route.fallback(),
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+}
 const pages = [
   { name: 'catalogue', path: '/catalogue', signedIn: false, fullPage: true },
   { name: 'accueil', path: '/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
+  // R2 : arrivé du nouveau mot de passe, « Mot de passe changé. Connecte-toi avec le nouveau. »
+  {
+    name: 'connexion-mot-de-passe-change',
+    path: '/sign-in?announce=passwordChanged',
+    signedIn: false,
+  },
   { name: 'inscription', path: '/sign-up', signedIn: false },
   // R2, « Trop d'essais » : l'API refuse la connexion pour 10 minutes (429, Retry-After : 600) ; le
   // bouton reste bloqué, l'heure du prochain essai est écrite en clair (décision D3).
@@ -1263,6 +1283,27 @@ const pages = [
     signedIn: false,
   },
   { name: 'profil', path: '/settings/profile', signedIn: true, fullPage: true },
+  // R2 : le profil en feuille, Léa avec sa photo (floutée en tête de la feuille), sa bio et ses
+  // outils ; sur ordinateur, l'aperçu de sa page à droite.
+  {
+    name: 'feuille-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Mon profil' }).waitFor()
+    },
+  },
+  // R2 : la suppression en feuille, avec la photo de Léa et les couvertures de ses projets.
+  {
+    name: 'feuille-suppression',
+    path: '/settings/account/delete',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Supprimer ton compte' }).waitFor()
+    },
+  },
   // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
   {
     name: 'profil-pseudo-pris',
