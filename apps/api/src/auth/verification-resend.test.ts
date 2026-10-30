@@ -319,4 +319,31 @@ describe('the link resent by a sign-in before verification', () => {
     expect(res.status).toBe(200)
     expect(verificationMailsTo(lea.email)).toHaveLength(before + 1)
   })
+
+  // sec-S6, relecture de sécurité de R2 (C3) : la connexion accepte un `callbackURL`, que Better
+  // Auth recopierait dans le lien. La page reste imposée : le lien mène à /verified, rien d'autre.
+  it('leads to our page even when the sign-in asks for another one', async () => {
+    await ctx.signUp(lea)
+    const before = verificationMailsTo(lea.email).length
+
+    const signIn = await ctx.request('/api/auth/sign-in/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...ip(1) },
+      body: JSON.stringify({
+        email: lea.email,
+        password: lea.password,
+        callbackURL: `${TEST_APP_URL}/evil-page`,
+      }),
+    })
+
+    expect(signIn.status).toBe(403)
+    expect(verificationMailsTo(lea.email)).toHaveLength(before + 1)
+    const mail = verificationMailsTo(lea.email).at(-1)
+    expect(mail?.text).not.toContain('evil')
+    expect(mail?.html).not.toContain('evil')
+    const link = linkOf(lea.email)
+    expect(link.searchParams.get('callbackURL')).toBe(VERIFIED_PAGE)
+    const opened = await open(link)
+    expect(opened.headers.get('location')).toBe(VERIFIED_PAGE)
+  })
 })

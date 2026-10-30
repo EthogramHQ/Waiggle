@@ -26,6 +26,7 @@ import { type Email, existingAccountEmail, verificationEmail } from '../email/te
 import { errorBody, languageOf } from '../errors'
 import { describeError } from '../log'
 import {
+  ADDRESS_COUNTER_PURPOSES,
   addressCounterKey,
   memberCounterKeys,
   type RateLimiter,
@@ -172,7 +173,7 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
     const newEmail = input.newEmail.trim().toLowerCase()
 
     const byAddress = await limiter.hit(
-      addressCounterKey(secret, 'unverified', email),
+      addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.unverified, email),
       ADDRESS_RULE,
     )
     if (!byAddress.allowed) return tooMany(c, byAddress.retryAfterSeconds)
@@ -210,7 +211,10 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
     const quota = await hitInOrder(limiter, [
       { key: memberCounterKeys(account.id).unverifiedEmail, rule: ACCOUNT_RULE },
       { key: memberCounterKeys(account.id).unverifiedEmailDay, rule: ACCOUNT_DAY_RULE },
-      { key: addressCounterKey(secret, 'unverified-to', newEmail), rule: DESTINATION_RULE },
+      {
+        key: addressCounterKey(secret, ADDRESS_COUNTER_PURPOSES.unverifiedTo, newEmail),
+        rule: DESTINATION_RULE,
+      },
     ])
     if (!quota.allowed) return tooMany(c, quota.retryAfterSeconds)
 

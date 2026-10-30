@@ -17,11 +17,13 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryMailer } from '../email/mailer'
 import { createMemoryStorage } from '../media/storage'
+import { addressDigest } from '../rate-limit'
 import { activity } from '../testing/activity'
 import {
   createTestContext,
   fastPasswordHashing,
   TEST_APP_URL,
+  TEST_AUTH_SECRET,
   type TestContext,
 } from '../testing/context'
 import { AUTH_RATE_RULES, createAuth } from './auth'
@@ -998,5 +1000,97 @@ describe('the account deletion after a reset request', () => {
         row.key.startsWith('password-reset'),
       ),
     ).toEqual([])
+  })
+
+  // jur-6, relecture de sécurité de R2 (C2) : tous les compteurs de l'adresse partent, pas seulement
+  // ceux du mot de passe oublié : le renvoi du lien (verify-*) et la correction de l'adresse non
+  // vérifiée (unverified, unverified-to). Leur clé finit par l'empreinte de l'adresse.
+  it('erases every counter derived from the address of the account', async () => {
+    await ctx.signUp(lea)
+    // La correction vers la même adresse compte « unverified » et « unverified-to » sur elle.
+    const corrected = await post('/v1/account/unverified-email', {
+      email: lea.email,
+      password: lea.password,
+      newEmail: lea.email,
+    })
+    expect(corrected.status).toBe(200)
+    expect((await post('/api/auth/send-verification-email', { email: lea.email })).status).toBe(200)
+    const verification = ctx.mailer.sent
+      .filter((mail) => mail.to === lea.email && mail.text.includes('/api/auth/verify-email?'))
+      .at(-1)
+    if (!verification) throw new Error('no verification e-mail')
+    const link = linkIn(verification.text)
+    const opened = await ctx.request(link.pathname + link.search)
+    const cookie = ctx.cookiesFrom(opened)
+    await forgot(lea.email)
+    const digest = addressDigest(TEST_AUTH_SECRET, lea.email)
+    const ofAddress = async () =>
+      (await ctx.db.select().from(schema.apiRateLimit))
+        .map((row) => row.key)
+        .filter((key) => key.endsWith(`:${digest}`))
+        .sort()
+    expect(await ofAddress()).toEqual(
+      [
+        'password-reset',
+        'password-reset-day',
+        'unverified',
+        'unverified-to',
+        'verify-day',
+        'verify-hour',
+        'verify-minute',
+      ]
+        .map((purpose) => `${purpose}:${digest}`)
+        .sort(),
+    )
+
+    const deleted = await post('/api/auth/delete-user', { password: lea.password }, { cookie })
+
+    expect(deleted.status).toBe(200)
+    expect(await ofAddress()).toEqual([])
+  })
+})
+
+// Relecture de sécurité de R2, B1 : Better Auth lit le jeton dans le corps, ou dans l'adresse si le
+// corps n'en a pas (`body.token || query.token` : un texte vide n'est pas un jeton). Envoyé des
+// deux côtés, vide dans le corps, le jeton de l'adresse change le mot de passe : la suite du reset
+// (e-mail de sécurité, autres liens effacés, adresse vérifiée) doit suivre exactement le même jeton.
+describe('a reset whose token is in the address of the request', () => {
+  const resetWith = (query: string, body: object) =>
+    post(`/api/auth/reset-password${query}`, { newPassword: NEW_PASSWORD, ...body })
+
+  it.each([
+    [
+      'in the address, with an empty token in the body',
+      (t: string) => resetWith(`?token=${t}`, { token: '' }),
+    ],
+    ['in the address, without token in the body', (t: string) => resetWith(`?token=${t}`, {})],
+    ['in the body, with nothing in the address', (t: string) => resetWith('', { token: t })],
+  ] as const)('sends the security e-mail and drops the other links, token %s', async (_, send) => {
+    await ctx.verifiedMember(lea)
+    await forgot(lea.email)
+    const first = lastToken(lea.email)
+    await forgot(lea.email, {}, ip(2))
+    const second = lastToken(lea.email)
+    const before = ctx.mailer.sent.length
+
+    expect((await send(first)).status).toBe(200)
+
+    const sent = ctx.mailer.sent.slice(before)
+    expect(sent.map((mail) => mail.to)).toEqual([lea.email])
+    expect(sent[0]?.text).toContain(`${TEST_APP_URL}/settings/security`)
+    const res = await reset(second, OTHER_PASSWORD)
+    expect(res.status).toBe(400)
+    expect(await codeOf(res)).toBe('INVALID_TOKEN')
+    expect((await ctx.signIn({ email: lea.email, password: NEW_PASSWORD })).status).toBe(200)
+  })
+
+  it('verifies the address the link was sent to, the token being in the address', async () => {
+    await ctx.signUp(lea)
+    await forgot(lea.email)
+
+    const res = await resetWith(`?token=${lastToken(lea.email)}`, { token: '' })
+
+    expect(res.status).toBe(200)
+    expect((await accountOf(lea.email)).emailVerified).toBe(true)
   })
 })

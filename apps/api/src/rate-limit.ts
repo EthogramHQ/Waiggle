@@ -156,11 +156,52 @@ export const addressDigest = (secret: string, email: string) => {
 }
 
 /**
+ * Les parcours qui comptent « par adresse e-mail » (tranche R2), chacun avec le début de ses clés.
+ * Toutes les listes au même endroit : la suppression d'un compte efface les compteurs de chacun
+ * (deleteAddressCounters, jur-6), et `addressCounterKey` n'accepte que ces noms, si bien qu'un
+ * parcours nouveau ne peut pas oublier de s'inscrire ici.
+ */
+export const ADDRESS_COUNTER_PURPOSES = {
+  // Mot de passe oublié (auth/password.ts).
+  passwordReset: 'password-reset',
+  passwordResetDay: 'password-reset-day',
+  // Renvoyer le lien de vérification (auth/verification-resend.ts).
+  verifyMinute: 'verify-minute',
+  verifyHour: 'verify-hour',
+  verifyDay: 'verify-day',
+  // Corriger une adresse pas encore vérifiée : l'adresse de départ, puis celle d'arrivée
+  // (routes/unverified-email.ts).
+  unverified: 'unverified',
+  unverifiedTo: 'unverified-to',
+} as const
+
+/** L'un des parcours ci-dessus : `(typeof X)[keyof typeof X]` est l'union de ses valeurs. */
+export type AddressCounterPurpose =
+  (typeof ADDRESS_COUNTER_PURPOSES)[keyof typeof ADDRESS_COUNTER_PURPOSES]
+
+/**
  * La clé d'un compteur « par adresse e-mail » : `purpose` sépare les compteurs de chaque parcours
  * (mot de passe oublié, renvoi du lien, correction d'adresse…), l'empreinte désigne l'adresse.
  */
-export const addressCounterKey = (secret: string, purpose: string, email: string) =>
+export const addressCounterKey = (secret: string, purpose: AddressCounterPurpose, email: string) =>
   `${purpose}:${addressDigest(secret, email)}`
+
+/**
+ * Efface tous les compteurs d'une adresse, à la suppression du compte qui l'a (jur-6) : ce sont des
+ * empreintes, mais elles désignent toujours cette adresse. Une clé par parcours, lues par la clé
+ * primaire de la table (inArray). Les compteurs d'une adresse que le compte n'a plus (corrigée
+ * avant vérification, changée) ne se retrouvent pas : ils partent avec la purge, à la fin de leur
+ * fenêtre.
+ */
+export const deleteAddressCounters = (db: Database, secret: string, email: string) =>
+  db.delete(schema.apiRateLimit).where(
+    inArray(
+      schema.apiRateLimit.key,
+      Object.values(ADDRESS_COUNTER_PURPOSES).map((purpose) =>
+        addressCounterKey(secret, purpose, email),
+      ),
+    ),
+  )
 
 /**
  * Efface les compteurs d'un membre, à la suppression de son compte (leurs clés contiennent son

@@ -17,7 +17,7 @@ import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { eq, inArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
@@ -28,16 +28,11 @@ import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
 import { suspensionEmailKey } from '../moderation/suspend'
 import { mediaKeysOf } from '../projects/load'
-import { createRateLimiter, deleteMemberCounters } from '../rate-limit'
+import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { createEmailChange } from './change-email'
-import {
-  createPasswordFlows,
-  forgetResetLinks,
-  RESET_LINK_LIFETIME_SECONDS,
-  resetAddressCounterKeys,
-} from './password'
+import { createPasswordFlows, forgetResetLinks, RESET_LINK_LIFETIME_SECONDS } from './password'
 import { authSchemaOptions } from './schema-options'
 import { createVerificationResend } from './verification-resend'
 
@@ -202,10 +197,12 @@ export const createAuth = ({
       },
       // Mot de passe oublié (tranche R2, A1) : le lien vaut une heure et ne sert qu'une fois ; une
       // fois le mot de passe changé, toutes les sessions du membre sont coupées (un voleur connecté
-      // perd l'accès). Le lien mène à la page de l'appli (auth/password.ts) ; la suite du reset
-      // (adresse vérifiée, autres liens effacés, e-mail « mot de passe changé ») est dans le hook
-      // `after` de /reset-password, plus bas.
+      // perd l'accès). Le lien mène à la page de l'appli (auth/password.ts). La suite du reset :
+      // autres liens effacés et e-mail « mot de passe changé » dans onPasswordReset, que Better
+      // Auth appelle avec le membre (relecture de sécurité de R2, B1) ; l'adresse vérifiée dans le
+      // hook `after` de /reset-password, plus bas.
       sendResetPassword: passwordFlows.sendResetPassword,
+      onPasswordReset: passwordFlows.onPasswordReset,
       resetPasswordTokenExpiresIn: RESET_LINK_LIFETIME_SECONDS,
       revokeSessionsOnPasswordReset: true,
     },
@@ -303,17 +300,11 @@ export const createAuth = ({
           filesToDelete.delete(user.id)
           for (const key of keys) await storage.delete(key)
           await deleteMemberCounters(db, user.id)
-          // Le mot de passe oublié (tranche R2, jur-6) : ses liens encore valides, et les compteurs
-          // de son adresse (une empreinte, mais qui désigne toujours cette adresse).
+          // Tranche R2, jur-6 : ses liens de mot de passe oublié encore valides, et tous les
+          // compteurs de son adresse (mot de passe oublié, renvoi du lien, correction de l'adresse :
+          // des empreintes, mais qui désignent toujours cette adresse).
           await forgetResetLinks(db, user.id)
-          await db
-            .delete(schema.apiRateLimit)
-            .where(
-              inArray(
-                schema.apiRateLimit.key,
-                Object.values(resetAddressCounterKeys(secret, user.email)),
-              ),
-            )
+          await deleteAddressCounters(db, secret, user.email)
           await sweepOrphanComments(db)
           // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
           // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
