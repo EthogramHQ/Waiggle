@@ -285,9 +285,10 @@ export const verificationEmail = (
       // filtre, « Ton compte est bloqué, va sur waiggle-login.com » partirait de notre domaine
       // vers n'importe qui (relecture de sécurité A2).
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
-      paragraphs: [t.verify.body, t.verify.expires],
-      button: { label: t.verify.button, url },
-      notes: [t.verify.ignore],
+      // fill, même sans paramètre : un {{appName}} ajouté un jour à ces textes sera rempli.
+      paragraphs: [fill(t.verify.body), fill(t.verify.expires)],
+      button: { label: fill(t.verify.button), url },
+      notes: [fill(t.verify.ignore)],
       footer: fill(t.footer),
     }),
   }
@@ -309,9 +310,77 @@ export const existingAccountEmail = (
       language,
       // Le nom du compte existant : filtré comme dans verificationEmail (relecture de sécurité A2).
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
-      paragraphs: [t.existingAccount.body],
-      button: { label: t.existingAccount.button, url: signInUrl },
-      notes: [t.existingAccount.ignore],
+      // Chaque texte passe par fill : render() écrit les paragraphes tels quels, et le texte de R2
+      // contient {{appName}}, qui s'affichait brut (relecture de TW-1, R2).
+      paragraphs: [fill(t.existingAccount.body)],
+      button: { label: fill(t.existingAccount.button), url: signInUrl },
+      notes: [fill(t.existingAccount.ignore)],
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+// ─── Le mot de passe (tranche R2) ───────────────────────────────────────────────────────────────
+// Deux e-mails de sécurité (relecture juridique jur-1) : ils partent toujours, sans publicité ni
+// lien de désinscription, et disent pourquoi ils arrivent (`reason`, dans le pied).
+
+/**
+ * Le lien pour choisir un nouveau mot de passe (« Mot de passe oublié ? »). Il peut partir vers une
+ * adresse jamais vérifiée, peut-être celle d'un inconnu après une faute de frappe à l'inscription :
+ * la salutation ne porte aucun nom (jur-2). La durée de validité est celle du réglage du serveur
+ * (`hours`, jur-4), et la conséquence (tous les appareils déconnectés) est dite avant le bouton
+ * (jur-3). Le lien mène à la page de l'appli et ne porte que le jeton (auth/password.ts).
+ */
+export const resetPasswordEmail = (
+  language: Language,
+  { url, hours }: { url: string; hours: number },
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.resetPassword.subject),
+    ...render({
+      language,
+      heading: fill(t.resetPassword.heading),
+      greeting: fill(t.resetPassword.greeting),
+      paragraphs: [
+        fill(t.resetPassword.body),
+        fill(t.resetPassword.expires, { hours: String(hours) }),
+      ],
+      button: {
+        label: fill(t.resetPassword.button),
+        textLabel: fill(t.resetPassword.textLink),
+        url,
+      },
+      notes: [fill(t.resetPassword.ignore)],
+      reason: fill(t.resetPassword.reason),
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+/**
+ * « Ton mot de passe a changé », après un mot de passe oublié ou un changement depuis les
+ * réglages. Jamais le mot de passe lui-même. « Ce n'est pas toi ? » dit d'abord comment reprendre
+ * la main (Réglages, Sécurité, ou « Mot de passe oublié ? »), puis d'écrire au contact, en gras et
+ * en texte (jur-5). Le bouton ouvre les réglages.
+ */
+export const passwordChangedEmail = (
+  language: Language,
+  { name, settingsUrl }: { name: string; settingsUrl: string },
+): EmailContent => {
+  const t = resources[language].translation.email
+  return {
+    subject: fill(t.passwordChanged.subject),
+    ...render({
+      language,
+      heading: fill(t.passwordChanged.heading),
+      // Le nom saisi par le membre : filtré comme dans les autres e-mails de compte.
+      greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
+      paragraphs: [fill(t.passwordChanged.body)],
+      button: { label: fill(t.passwordChanged.button), url: settingsUrl },
+      closing: [withBold(t.passwordChanged.notYou, 'contactEmail', contactEmail)],
+      notes: [],
+      reason: fill(t.passwordChanged.reason),
       footer: fill(t.footer),
     }),
   }

@@ -34,6 +34,7 @@ import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { tagRoutes } from './routes/tags'
+import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
 import { suspensionGuard } from './suspension/guard'
@@ -86,6 +87,60 @@ const codeByStatus: Partial<Record<number, ErrorCode>> = {
   429: 'rate_limited',
 }
 const codeForStatus = (status: number): ErrorCode => codeByStatus[status] ?? 'validation'
+
+/** La seule route du mot de passe oublié que l'appli appelle (POST, le jeton dans le corps). */
+const RESET_PASSWORD_PATH = '/api/auth/reset-password'
+
+/**
+ * Vrai pour toute écriture de /api/auth/reset-password/<quelque chose> (la route GET
+ * /reset-password/:token de Better Auth, relecture de sécurité S11) : décodée jusqu'à ce qu'elle
+ * ne change plus (« %252F » donne « %2F », puis « / »), « / » répétés réduits à un seul, sans
+ * tenir compte des capitales. Seul le chemin exact de la vraie route est faux.
+ */
+const isResetCallbackPath = (pathname: string) => {
+  let path = pathname
+  for (let round = 0; round < 3; round++) {
+    let decoded: string
+    try {
+      decoded = decodeURIComponent(path)
+    } catch {
+      // Un « % » qui n'annonce aucun caractère : on garde l'écriture telle quelle.
+      break
+    }
+    if (decoded === path) break
+    path = decoded
+  }
+  const normalized = path.replace(/\/+/g, '/').toLowerCase()
+  return normalized.startsWith(RESET_PASSWORD_PATH) && normalized !== RESET_PASSWORD_PATH
+}
+
+/**
+ * Les routes de Better Auth dont le quota par membre se compte dans un hook, avant la validation
+ * du corps, et doit compter aussi les requêtes mal formées (tranche R2, relecture de sécurité
+ * S10 : changer son mot de passe, auth/password.ts).
+ */
+const COUNTED_EVEN_MALFORMED = new Set(['/api/auth/change-password'])
+
+/**
+ * Un corps annoncé en JSON qui n'en est pas (« x ») est refusé par le routeur de Better Auth avant
+ * tout hook : son quota ne le verrait pas. Pour ces routes, on le remplace par un objet vide :
+ * le hook compte la demande, puis Better Auth la refuse quand même (400, champs manquants).
+ * `clone()` lit une copie du corps : la requête d'origine reste lisible par Better Auth.
+ */
+const countableRequest = async (request: Request) => {
+  if (request.method !== 'POST' || !COUNTED_EVEN_MALFORMED.has(new URL(request.url).pathname)) {
+    return request
+  }
+  if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+    return request
+  }
+  try {
+    JSON.parse(await request.clone().text())
+    return request
+  } catch {
+    return new Request(request, { body: '{}' })
+  }
+}
 
 export const createApp = ({
   version,
@@ -182,9 +237,33 @@ export const createApp = ({
     return small(c, next)
   })
 
+  // La garde de GET /api/auth/reset-password/:token (tranche R2, relecture de sécurité S11). Cette
+  // route de Better Auth redirige vers la page de retour choisie par le visiteur, le jeton dans
+  // l'adresse ; nos liens n'en ont pas besoin (ils mènent à la page de l'appli, auth/password.ts).
+  // Un chemin variable ne se ferme pas par `disabledPaths` (auth.ts) : on la ferme ici, avant
+  // Better Auth, comme une adresse inconnue (404). Le chemin est d'abord décodé (« %2F » devient
+  // « / ») et ses « / » répétés réduits à un seul, pour qu'aucune écriture ne passe à côté ; seul
+  // POST /api/auth/reset-password, la vraie route, reste ouvert.
+  app.use('/api/auth/*', async (c, next) => {
+    if (isResetCallbackPath(new URL(c.req.url).pathname)) return c.notFound()
+    await next()
+  })
+
   // Toutes les routes de Better Auth (inscription, connexion, vérification…) sous /api/auth/.
   // c.req.raw est la requête HTTP standard, que Better Auth sait traiter seul.
-  app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw))
+  // Better Auth dit dans combien de secondes réessayer après son propre refus (429) dans l'en-tête
+  // X-Retry-After, que l'appli web n'a pas le droit de lire (CORS n'expose que Retry-After, plus
+  // haut). On le recopie dans Retry-After, comme nos propres routes (tranche R2, A5) : l'écran peut
+  // dire « Nouvel essai possible à 21 h 47 ».
+  app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
+    const res = await auth.handler(await countableRequest(c.req.raw))
+    const retryAfter = res.headers.get('x-retry-after')
+    if (res.status !== 429 || retryAfter === null || res.headers.has('retry-after')) return res
+    // Une copie de la réponse : les en-têtes d'une réponse reçue peuvent être en lecture seule.
+    const copy = new Response(res.body, res)
+    copy.headers.set('Retry-After', retryAfter)
+    return copy
+  })
 
   // Sur nos propres routes /v1/… : d'abord refuser les modifications venues d'un autre site
   // (voir security/same-origin.ts ; Better Auth fait la même vérification sur /api/auth/…),
@@ -198,7 +277,15 @@ export const createApp = ({
     (c, next) =>
       c.req.path === UNSUBSCRIBE_PATH ? next() : middleware(c, next)
   app.use('/v1/*', outsideSession(sameOriginWrites([appUrl, publicApiUrl])))
-  app.use('/v1/*', outsideSession(sessionMiddleware(auth)))
+  // Tranche R2 : corriger son adresse avant de l'avoir vérifiée (routes/unverified-email.ts) se fait
+  // sans session (S9) : la session n'y est jamais lue, mais le contrôle d'origine s'applique.
+  const readSession = sessionMiddleware(auth)
+  app.use(
+    '/v1/*',
+    outsideSession((c, next) =>
+      c.req.path === UNVERIFIED_EMAIL_PATH ? next() : readSession(c, next),
+    ),
+  )
   // Les images aussi demandent de savoir qui regarde : elles sont réservées aux membres.
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
@@ -231,6 +318,8 @@ export const createApp = ({
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
+  // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
+  app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
   app.route('/', moderationRoutes({ db, limiter, auth, mailer }))
