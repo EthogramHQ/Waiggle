@@ -6,6 +6,8 @@ import { useLocalSearchParams } from 'expo-router'
 import { firstParam } from '../../src/navigation/params'
 import { NotFoundScreen } from '../../src/screens/NotFoundScreen'
 import { SettingsScreen, type SettingsSectionKey } from '../../src/screens/SettingsScreen'
+import { LoadingScreen } from '../../src/screens/states'
+import { useHydrated } from '../../src/ui/theme/hydration'
 
 const sections: readonly SettingsSectionKey[] = [
   'profile',
@@ -26,7 +28,12 @@ const asSection = (value: string | undefined): SettingsSectionKey | null =>
 export default function SettingsSectionPage() {
   const { section } = useLocalSearchParams<{ section: string }>()
   const known = asSection(firstParam(section))
-  return known ? <SettingsScreen section={known} /> : <NotFoundScreen />
+  // Sur le web, la page est pré-rendue sans connaître l'adresse : la rubrique y est inconnue. On ne
+  // conclut « introuvable » qu'une fois dans le navigateur (useHydrated), sinon le pré-rendu
+  // (« introuvable ») et le premier dessin (« Chargement… ») diffèrent, et React redessine tout.
+  const hydrated = useHydrated()
+  if (known) return <SettingsScreen section={known} />
+  return hydrated ? <NotFoundScreen /> : <LoadingScreen />
 }
 
 // Si la page plante, un écran de secours s'affiche à sa place.
