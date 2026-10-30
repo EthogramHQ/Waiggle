@@ -60,6 +60,13 @@ export const ChangeEmailRequest = z.object({
 export type ChangeEmailRequest = z.infer<typeof ChangeEmailRequest>
 
 /**
+ * La durée de vie d'un lien de mot de passe oublié, en secondes : une heure. Une seule valeur pour
+ * tous : Better Auth la lit (`resetPasswordTokenExpiresIn`), l'e-mail l'écrit en toutes lettres, et
+ * un test de l'appli vérifie que ses textes (« valable une heure ») disent la même chose (jur-4).
+ */
+export const RESET_LINK_LIFETIME_SECONDS = 60 * 60
+
+/**
  * Mot de passe oublié (tranche R2, POST /api/auth/request-password-reset). La réponse est la même
  * qu'un compte existe ou non, et l'e-mail ne part que s'il existe : on ne révèle pas qui a un
  * compte. Le lien reçu ouvre la page /reset-password de l'appli, valable une heure, une fois.

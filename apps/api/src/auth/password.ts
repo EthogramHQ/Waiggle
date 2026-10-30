@@ -16,7 +16,7 @@
 // Ne jamais journaliser une adresse ni un jeton.
 
 import { createHmac, randomUUID } from 'node:crypto'
-import { ForgotPasswordRequest } from '@ruche/contracts'
+import { ForgotPasswordRequest, RESET_LINK_LIFETIME_SECONDS } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { APIError, getSessionFromCtx, isAPIError } from 'better-auth/api'
 import type { expireCookie } from 'better-auth/cookies'
@@ -48,12 +48,9 @@ const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
-/**
- * La durée de vie d'un lien de mot de passe oublié, en secondes : une heure. Better Auth la lit
- * (`resetPasswordTokenExpiresIn`, auth.ts), et l'e-mail l'écrit (`{{hours}}`, jur-4) : une seule
- * valeur pour les deux.
- */
-export const RESET_LINK_LIFETIME_SECONDS = 60 * 60
+// La durée de vie d'un lien de mot de passe oublié vit dans le contrat (une heure), pour que
+// l'appli puisse vérifier que ses textes disent la même chose (jur-4). auth.ts l'importe d'ici.
+export { RESET_LINK_LIFETIME_SECONDS }
 
 // Les quotas de la tranche. Ils s'ajoutent à ceux de Better Auth, comptés par adresse IP
 // (AUTH_RATE_RULES, dans auth.ts) : ceux-ci suivent l'adresse e-mail ou le membre partout.
