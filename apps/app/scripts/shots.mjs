@@ -169,8 +169,8 @@ const wrongPasswordShot = 'pas-le-bon-mot-de-passe'
 // Tranche R2 : le lien « nouveau mot de passe » (un jeton accepté, un refusé) et l'adresse qui
 // attend sa vérification. « Vérifie ta boîte mail » ne lit plus l'adresse dans l'URL (jur-9) :
 // `pendingEmail` la pose dans le sessionStorage de l'onglet, comme l'inscription, puis recharge.
-const resetTokenShot = 'tok-7f3c9a-valide'
-const refusedResetToken = 'tok-7f3c9a-refuse'
+const resetTokenShot = 'tok-7f3c9a-valide' // gitleaks:allow
+const refusedResetToken = 'tok-7f3c9a-refuse' // gitleaks:allow
 const pendingEmail = (email) => async (page) => {
   await page.evaluate((value) => sessionStorage.setItem('waiggle.pendingEmail', value), email)
   await page.reload({ waitUntil: 'networkidle' })

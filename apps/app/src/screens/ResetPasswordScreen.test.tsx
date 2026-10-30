@@ -31,7 +31,7 @@ jest.mock('expo-router', () => ({
 
 const text = (key: keyof Translation['auth']['resetPassword']) =>
   fr.t(($) => $.auth.resetPassword[key])
-const token = 'tok-7f3c9a-valide'
+const token = 'tok-7f3c9a-valide' // gitleaks:allow
 const newPassword = 'nouveau-mot-de-passe-long'
 
 /** Tape le nouveau mot de passe, puis appuie sur « Enregistrer le mot de passe ». */

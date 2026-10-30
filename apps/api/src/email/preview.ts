@@ -161,7 +161,7 @@ const variants: [string, (language: Language) => EmailContent][] = [
     'reset-password',
     (language) =>
       resetPasswordEmail(language, {
-        url: `${APP_URL}/reset-password?token=Xk3vQ9pLm2RtY7wZ4aBcD8eF`,
+        url: `${APP_URL}/reset-password?token=Xk3vQ9pLm2RtY7wZ4aBcD8eF`, // gitleaks:allow
         hours: 1,
       }),
   ],
