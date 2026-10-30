@@ -1,6 +1,7 @@
 // Limitation de débit pour nos propres routes : « au plus N requêtes par fenêtre de temps ».
 // Les compteurs sont dans la base (table api_rate_limit) : ils survivent à un redémarrage et
 // seraient partagés si l'API tournait un jour sur plusieurs serveurs.
+import { createHmac } from 'node:crypto'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 
@@ -121,7 +122,31 @@ export const memberCounterKeys = (userId: string) => ({
   moderationDecision: `moderation-decision:${userId}`,
   // Ses mots de passe faux quand la modération le redemande (S12) : 5 par jour, puis 429.
   moderationPassword: `moderation-password:${userId}`,
+  // Changer son mot de passe depuis les réglages (tranche R2, A2) : 5 essais par quart d'heure et
+  // 10 par jour, comptés avant la vérification du mot de passe actuel (relecture de sécurité S10).
+  // Sans eux, une session volée pourrait deviner ce mot de passe en changeant d'adresse IP.
+  passwordChange: `password-change:${userId}`,
+  passwordChangeDay: `password-change-day:${userId}`,
 })
+
+/**
+ * Une adresse e-mail sous la forme qu'on compare : sans blancs autour, en minuscules. Better Auth
+ * range les adresses en minuscules ; « Lea@Example.com » et « lea@example.com » sont la même boîte.
+ */
+export const normalizeAddress = (email: string) => email.trim().toLowerCase()
+
+/**
+ * L'empreinte d'une adresse e-mail pour la clé d'un compteur « par adresse » (tranche R2,
+ * relectures de sécurité S2 et juridique jur-6). Un HMAC est une empreinte calculée avec une clé
+ * secrète : sans le secret du serveur, on ne peut pas retrouver l'adresse en essayant un
+ * dictionnaire d'adresses, ce que permettrait un simple SHA-256. La clé est dérivée du secret par
+ * une étiquette fixe, une clé par usage, comme pour les jetons de désinscription. Les variantes
+ * d'écriture d'une adresse (capitales, espaces) donnent la même empreinte : un seul compteur.
+ */
+export const addressDigest = (secret: string, email: string) => {
+  const key = createHmac('sha256', secret).update('waiggle:address-counter:v1').digest()
+  return createHmac('sha256', key).update(normalizeAddress(email)).digest('hex')
+}
 
 /**
  * Efface les compteurs d'un membre, à la suppression de son compte (leurs clés contiennent son

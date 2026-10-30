@@ -17,7 +17,7 @@ import { parseAcceptLanguage, resolveLanguage, resources } from '@ruche/i18n'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
@@ -31,6 +31,12 @@ import { createRateLimiter, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
 import { createEmailChange } from './change-email'
+import {
+  createPasswordFlows,
+  forgetResetLinks,
+  RESET_LINK_LIFETIME_SECONDS,
+  resetAddressCounterKeys,
+} from './password'
 import { authSchemaOptions } from './schema-options'
 
 /**
@@ -92,6 +98,15 @@ export const AUTH_RATE_RULES = {
   // e-mail. Un plafond par membre s'y ajoute (auth/change-email.ts) : celui-ci suit l'adresse IP.
   '/change-email': { window: 15 * 60, max: 5 },
   '/verify-email': { window: 15 * 60, max: 30 },
+  // Le mot de passe (tranche R2) : demander un lien, choisir le nouveau mot de passe depuis le lien,
+  // le changer depuis les réglages. Des plafonds par adresse e-mail et par membre s'y ajoutent
+  // (auth/password.ts).
+  '/request-password-reset': { window: 15 * 60, max: 5 },
+  '/reset-password': { window: 15 * 60, max: 10 },
+  '/change-password': { window: 15 * 60, max: 5 },
+  // Renvoyer le lien de vérification (tranche R2, A3, relecture de sécurité S4) : un plafond par
+  // adresse s'y ajoute (auth/verification-resend.ts).
+  '/send-verification-email': { window: 15 * 60, max: 5 },
 } satisfies Record<string, { window: number; max: number }>
 
 /**
@@ -126,6 +141,15 @@ export const createAuth = ({
   // propres quotas, comptés dans la table api_rate_limit comme ceux de nos routes. Le secret sert
   // à chiffrer le jeton du second lien.
   const emailChange = createEmailChange({
+    mailer,
+    rateLimiter: createRateLimiter(db),
+    appUrl,
+    secret,
+  })
+  // Le mot de passe oublié et le changement de mot de passe (tranche R2) : hooks, envois et quotas
+  // par adresse et par membre (auth/password.ts).
+  const passwordFlows = createPasswordFlows({
+    db,
     mailer,
     rateLimiter: createRateLimiter(db),
     appUrl,
@@ -166,7 +190,21 @@ export const createAuth = ({
           }),
         })
       },
+      // Mot de passe oublié (tranche R2, A1) : le lien vaut une heure et ne sert qu'une fois ; une
+      // fois le mot de passe changé, toutes les sessions du membre sont coupées (un voleur connecté
+      // perd l'accès). Le lien mène à la page de l'appli (auth/password.ts) ; la suite du reset
+      // (adresse vérifiée, autres liens effacés, e-mail « mot de passe changé ») est dans le hook
+      // `after` de /reset-password, plus bas.
+      sendResetPassword: passwordFlows.sendResetPassword,
+      resetPasswordTokenExpiresIn: RESET_LINK_LIFETIME_SECONDS,
+      revokeSessionsOnPasswordReset: true,
     },
+
+    // Les jetons rangés dans la table `verification` (ceux du mot de passe oublié) n'y sont gardés
+    // que sous leur empreinte (relecture de sécurité S12) : quelqu'un qui lirait la base, ou une
+    // sauvegarde, ne pourrait pas s'en servir. Better Auth calcule la même empreinte pour retrouver
+    // un jeton reçu.
+    verification: { storeIdentifier: 'hashed' },
 
     emailVerification: {
       sendOnSignUp: true,
@@ -190,8 +228,13 @@ export const createAuth = ({
       // le pseudo sera donné en filet à la première lecture de « Mon profil ».
       // Après le second lien d'un changement d'adresse, le membre a déjà son pseudo : emailChange
       // écrit le journal et prévient l'ancienne adresse (auth/change-email.ts).
+      // Un changement d'adresse abouti efface aussi les liens de mot de passe oublié envoyés à
+      // l'ancienne adresse (tranche R2, relecture de sécurité B2).
       afterEmailVerification: async (user, request) => {
-        if (await emailChange.afterEmailChanged(user, request)) return
+        if (await emailChange.afterEmailChanged(user, request)) {
+          if (user) await forgetResetLinks(db, user.id)
+          return
+        }
         try {
           await ensureHandle(db, user.id)
         } catch (error) {
@@ -252,6 +295,17 @@ export const createAuth = ({
           filesToDelete.delete(user.id)
           for (const key of keys) await storage.delete(key)
           await deleteMemberCounters(db, user.id)
+          // Le mot de passe oublié (tranche R2, jur-6) : ses liens encore valides, et les compteurs
+          // de son adresse (une empreinte, mais qui désigne toujours cette adresse).
+          await forgetResetLinks(db, user.id)
+          await db
+            .delete(schema.apiRateLimit)
+            .where(
+              inArray(
+                schema.apiRateLimit.key,
+                Object.values(resetAddressCounterKeys(secret, user.email)),
+              ),
+            )
           await sweepOrphanComments(db)
           // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
           // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
@@ -295,36 +349,30 @@ export const createAuth = ({
     // - expo-authorization-proxy (plugin Expo) ne sert qu'à la connexion par Google, Apple… sur
     //   téléphone, que l'appli ne propose pas. Elle renvoie vers n'importe quelle adresse donnée
     //   dans le lien : un lien sur notre domaine pourrait mener vers un faux site (hameçonnage) ;
-    // - change-password : l'appli ne propose pas (encore) de changer son mot de passe. Ouverte, elle
-    //   laisserait quelqu'un qui a volé une session essayer 100 mots de passe par minute ;
     // - list-sessions et revoke-* : lister ou couper ses sessions, que l'appli ne montre pas ;
     // - sign-in/social et link-social : la connexion par Google, Apple… que l'appli ne propose pas.
     //   Ouvertes, elles écrivent dans les logs le nom de fournisseur envoyé par n'importe qui ;
     // - verify-password (audit du 25/10/2026, C4) : elle dit seulement si un mot de passe est le
     //   bon. Avec une session volée, elle servait à deviner le mot de passe du membre, 100 essais
     //   par minute, sans laisser de trace. La suppression du compte vérifie le sien elle-même ;
-    // - send-verification-email (C5) : renvoyer le lien de vérification, sans session, à
-    //   n'importe quelle adresse non vérifiée (5 e-mails par heure et par adresse IP, vers une
-    //   boîte qui n'a rien demandé). L'appli ne l'appelle pas : se connecter avant d'avoir vérifié
-    //   renvoie le lien (sendOnSignIn, plus haut), sous le quota de la connexion. Better Auth
-    //   envoie alors l'e-mail lui-même, sans passer par la route fermée ;
     // - les autres (C6), qu'aucun écran n'appelle : list-accounts, unlink-account, account-info,
     //   get-access-token et refresh-token (les comptes liés et les jetons d'un fournisseur comme
     //   Google, que nous n'avons pas) ; update-session (écrire dans sa session) ;
-    //   request-password-reset et reset-password (le mot de passe oublié, pas encore proposé) ;
     //   delete-user/callback (suppression confirmée par e-mail : la nôtre l'est par le mot de
     //   passe) ; ok (une sonde : /health suffit).
-    //   change-email n'y est plus : la tranche « adresse » l'a rouverte, protégée par ses hooks
-    //   (mot de passe, quotas par membre, liens à usage unique : auth/change-email.ts).
+    //   N'y sont plus, rouvertes avec leurs hooks et leurs quotas : change-email (tranche
+    //   « adresse », auth/change-email.ts) ; request-password-reset, reset-password et
+    //   change-password (tranche R2, auth/password.ts) ; send-verification-email (tranche R2,
+    //   auth/verification-resend.ts).
     //   Un chemin variable (/callback/:id, /reset-password/:token) ne se ferme pas par cette
-    //   liste, qui compare des chemins exacts : sans fournisseur ni mot de passe oublié réglés, ils
-    //   ne mènent à rien (à surveiller le jour où l'on en règle un).
+    //   liste, qui compare des chemins exacts. /callback/:id ne mène à rien sans fournisseur réglé ;
+    //   /reset-password/:token, qui redirigerait avec le jeton vers la page choisie par le
+    //   visiteur, est fermé par une garde avant Better Auth (app.ts).
     // Une route fermée répond 404, comme une adresse inconnue (test dans accounts.test.ts). Le jour
     // où l'appli s'en sert, on la retire de cette liste, avec ses tests.
     disabledPaths: [
       '/update-user',
       '/expo-authorization-proxy',
-      '/change-password',
       '/list-sessions',
       '/revoke-session',
       '/revoke-sessions',
@@ -332,15 +380,12 @@ export const createAuth = ({
       '/sign-in/social',
       '/link-social',
       '/verify-password',
-      '/send-verification-email',
       '/list-accounts',
       '/unlink-account',
       '/account-info',
       '/get-access-token',
       '/refresh-token',
       '/update-session',
-      '/request-password-reset',
-      '/reset-password',
       '/delete-user/callback',
       '/ok',
     ],
@@ -378,11 +423,23 @@ export const createAuth = ({
     // e-mail, que nous n'utilisons pas) est refusé pour la même raison.
     //
     // Pour changer d'adresse : la demande et les deux liens passent par emailChange
-    // (auth/change-email.ts), qui dit dans l'ordre ce qu'il vérifie.
+    // (auth/change-email.ts), qui dit dans l'ordre ce qu'il vérifie. Pour le mot de passe
+    // (tranche R2) : passwordFlows (auth/password.ts).
+    //
+    // Un aiguillage par chemin : chaque route a sa ligne, et la fonction qui la garde est rangée
+    // dans le fichier de son parcours.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === '/change-email') return emailChange.beforeRequest(ctx)
-        if (ctx.path === '/verify-email') return emailChange.beforeLink(ctx)
+        switch (ctx.path) {
+          case '/change-email':
+            return emailChange.beforeRequest(ctx)
+          case '/verify-email':
+            return emailChange.beforeLink(ctx)
+          case '/request-password-reset':
+            return passwordFlows.beforeResetRequest(ctx)
+          case '/change-password':
+            return passwordFlows.beforeChange(ctx)
+        }
         const body: object = typeof ctx.body === 'object' && ctx.body !== null ? ctx.body : {}
         if (ctx.path === '/delete-user') {
           const password = 'password' in body ? body.password : undefined
@@ -412,8 +469,17 @@ export const createAuth = ({
       }),
       // Un hook `after` s'exécute après la route, même quand elle a répondu par une redirection.
       // Le second lien d'un changement d'adresse ne doit connecter personne (auth/change-email.ts).
+      // Après un mot de passe changé, par le lien ou depuis les réglages : la suite du parcours
+      // (auth/password.ts). Chaque fonction regarde d'abord si la route a réussi.
       after: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === '/verify-email') await emailChange.afterLink(ctx)
+        switch (ctx.path) {
+          case '/verify-email':
+            return emailChange.afterLink(ctx)
+          case '/reset-password':
+            return passwordFlows.afterReset(ctx)
+          case '/change-password':
+            return passwordFlows.afterChange(ctx)
+        }
       }),
     },
 

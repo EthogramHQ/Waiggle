@@ -954,3 +954,49 @@ describe('the quotas of the password change', () => {
     expect(left).toEqual([])
   })
 })
+
+// ─── Ajoutés par le backend (R2) ────────────────────────────────────────────────────────────────
+
+describe('the answer of a reset request over the quota of its address', () => {
+  // Au-delà du quota, notre hook répond à la place de Better Auth (auth/password.ts) : la réponse
+  // doit rester mot pour mot la sienne, sinon elle dirait que le quota de l'adresse est atteint.
+  // Ce test rougit si une mise à jour de Better Auth change son texte.
+  it('is word for word the answer of Better Auth', async () => {
+    await ctx.verifiedMember(lea)
+    const answers = []
+    for (let i = 1; i <= 4; i++) answers.push(await (await forgot(lea.email, {}, ip(i))).json())
+
+    expect(resetMailsTo(lea.email)).toHaveLength(3)
+    expect(answers[3]).toEqual(answers[0])
+    expect(await (await forgot('nobody@example.com', {}, ip(5))).json()).toEqual(answers[0])
+  })
+
+  // Une adresse mal formée reçoit toujours le refus de Better Auth, quota atteint ou non.
+  it('still refuses a malformed address the same way once its quota is reached', async () => {
+    const statuses = []
+    for (let i = 1; i <= 5; i++) statuses.push((await forgot('not-an-address', {}, ip(i))).status)
+
+    expect(statuses).toEqual([400, 400, 400, 400, 400])
+  })
+})
+
+describe('the account deletion after a reset request', () => {
+  // jur-6 : les compteurs de l'adresse (des empreintes, mais qui la désignent) partent aussi.
+  it('erases the counters of the address of the account', async () => {
+    const cookie = await ctx.verifiedMember(lea)
+    await forgot(lea.email)
+    const counters = async () => (await ctx.db.select().from(schema.apiRateLimit)).length
+    const withAddress = await counters()
+
+    expect(
+      (await post('/api/auth/delete-user', { password: lea.password }, { cookie })).status,
+    ).toBe(200)
+
+    expect(await counters()).toBeLessThan(withAddress)
+    expect(
+      (await ctx.db.select().from(schema.apiRateLimit)).filter((row) =>
+        row.key.startsWith('password-reset'),
+      ),
+    ).toEqual([])
+  })
+})
