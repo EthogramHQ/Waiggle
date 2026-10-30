@@ -15,6 +15,8 @@ jest.mock('./auth-client', () => ({
     signIn: { email: jest.fn() },
     signOut: jest.fn(),
     deleteUser: jest.fn(),
+    // Le magasin de session, que la déconnexion remet à « personne » (accounts/signOut.test.ts).
+    $store: { atoms: { session: { get: () => ({}), set: jest.fn() } } },
   },
 }))
 

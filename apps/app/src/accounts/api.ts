@@ -254,9 +254,24 @@ export const signIn = async (input: SignInRequest): Promise<LimitedResult> => {
   }
 }
 
+/**
+ * Oublie la session dans l'appli, une fois que le serveur l'a fermée (déconnexion, compte
+ * supprimé). Better Auth relit alors la session sans la vider d'abord : si cette relecture échoue
+ * (réseau, panne), il garde l'ancienne, et la personne suivante sur un appareil partagé verrait le
+ * nom et l'adresse du membre précédent (relecture de sécurité de la PR #62). On remet donc nous-mêmes
+ * son magasin (un « atome » : une valeur partagée que `useSession` suit) à « personne ».
+ */
+const forgetSession = () => {
+  const session = authClient.$store.atoms.session
+  if (!session) return
+  session.set({ ...session.get(), data: null, error: null, isPending: false, isRefetching: false })
+}
+
 export const signOut = async (): Promise<void> => {
   try {
-    await authClient.signOut()
+    const { error } = await authClient.signOut()
+    // Un refus du serveur : le membre est encore connecté, sa session reste.
+    if (!error) forgetSession()
   } finally {
     // On vide le cache des données (profil…), même si le serveur n'a pas répondu : sur un appareil
     // partagé, la personne suivante ne doit rien voir de ce qui appartenait au membre précédent,
@@ -273,6 +288,7 @@ export const deleteAccount = async (
   const { error } = await authClient.deleteUser({ password })
   if (!error) {
     // Même raison qu'à la déconnexion.
+    forgetSession()
     queryClient.clear()
     setPendingEmail(null)
     return { ok: true }
