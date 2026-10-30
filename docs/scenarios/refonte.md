@@ -390,6 +390,7 @@ Hors de R3, et où ça va :
 - Et « Tester » est annoncé comme un site externe
 - Sur ordinateur, des flèches font défiler le carrousel ; au clavier, chaque carte se rejoint par
   Tab
+- Quand il touche le titre d'une carte du carrousel, la page du projet s'ouvre (Louis, 31/10/2026)
 
 **Suivre l'auteur depuis une carte** (F-Fil8, Explorer seulement)
 - Étant donné une carte de « Récents » dont il ne suit pas l'auteur
