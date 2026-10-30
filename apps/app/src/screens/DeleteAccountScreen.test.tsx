@@ -88,10 +88,14 @@ describe('DeleteAccountScreen', () => {
     expect(deleteAccount).not.toHaveBeenCalled()
   })
 
+  // R2 (relecture de design, C2) : le bouton n'est plus grisé, pour qu'une tape dise ce qui manque ;
+  // la règle reste la même : rien n'est envoyé sans mot de passe.
   it('cannot delete without typing the password first', async () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
-    expect(screen.getByRole('button', { name: 'Supprimer définitivement' })).toBeDisabled()
+    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer définitivement' }))
+
+    expect(deleteAccount).not.toHaveBeenCalled()
   })
 
   it('keeps the account and says so when the password is wrong', async () => {
