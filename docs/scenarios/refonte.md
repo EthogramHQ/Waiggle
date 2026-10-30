@@ -373,7 +373,7 @@ Hors de R3, et où ça va :
 - Étant donné un membre sur l'onglet Explorer
 - Alors il voit, de haut en bas :
   - le titre « Explorer » et, sur ordinateur, « Les projets de tous les membres : à tester, à
-    suivre, à refaire. » ;
+    suivre, pour t'inspirer. » (Louis, 31/10/2026) ;
   - le champ « Un projet, une personne, un outil » (sur téléphone ; sur ordinateur, c'est celui de
     la barre du haut) ;
   - « Ils cherchent des testeurs » : un carrousel des projets testables qui ont un lien de démo,
@@ -424,7 +424,11 @@ Hors de R3, et où ça va :
   abonnés »
 - Les outils : leur nom ; le résultat dit « 7 projets publics »
 - Les accents et les majuscules ne comptent pas : « eleve » trouve « Élève »
-- La recherche commence à 2 caractères
+- La recherche commence à 2 caractères ; les mots d'une seule lettre sont ignorés
+- Les membres : à 2 caractères, seuls ceux que l'on suit ; tous à partir de 3 caractères, comme
+  les mentions (Louis, 31/10/2026, après les relectures de sécurité et juridique : sinon
+  l'annuaire du cercle se relève en moins d'un jour) ; ils sont rangés par nom, jamais par
+  nombre d'abonnés
 
 **Ce qui n'est jamais trouvé**
 - Un projet privé d'un autre membre, un projet retiré par la modération
@@ -442,7 +446,8 @@ Hors de R3, et où ça va :
 - Un quota par membre (à fixer au plan) ; au-delà, « Trop de recherches, réessaie dans un
   instant »
 - Les recherches ne sont gardées nulle part : ni en base, ni dans les journaux (le mot cherché
-  n'apparaît pas dans les logs de l'API)
+  n'apparaît pas dans les logs de l'API), ni sur l'appareil (pas de « recherches récentes »)
+- Taper ne crée pas une page de plus dans l'historique du navigateur à chaque lettre
 - Chaque groupe montre 20 résultats au plus
 
 ### Moi (F-Nav8, F-Nav9, planches `R3-Moi`, `R3-Membre-Desktop`)
