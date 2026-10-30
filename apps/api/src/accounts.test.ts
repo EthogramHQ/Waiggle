@@ -5,6 +5,7 @@
 import { appName } from '@ruche/brand'
 import { AccountExport, ErrorResponse, Me } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { fill, resources } from '@ruche/i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
@@ -166,7 +167,9 @@ describe('signing up with an address that already has an account', () => {
 
     const last = ctx.mailer.sent.at(-1)
     expect(last?.to).toBe('lea@example.com')
-    expect(last?.subject).toBe(`Tentative d’inscription sur ${appName}`)
+    // R2 (jur-B2) : le même e-mail sert aussi à la correction d'adresse (A4) ; son texte ne parle
+    // plus d'inscription.
+    expect(last?.subject).toBe(fill(resources.fr.translation.email.existingAccount.subject))
     expect(await ctx.db.select().from(schema.user)).toHaveLength(1)
   })
 })
@@ -201,6 +204,25 @@ describe('signing in', () => {
     const blocked = await ctx.signIn(lea)
 
     expect(blocked.status).toBe(429)
+  })
+
+  // Tranche R2, A5 : « Trop d'essais » lisible. Better Auth écrit le délai dans son propre en-tête
+  // `X-Retry-After`, que l'appli web n'a pas le droit de lire (CORS n'expose que `Retry-After`,
+  // app.ts). L'API le recopie dans `Retry-After`, comme ses propres routes : l'écran peut alors
+  // dire « Nouvel essai possible à 21 h 47 » au lieu d'un refus muet.
+  it('tells in Retry-After when the 6th sign-in within 15 minutes may be tried again', async () => {
+    await signUpAndVerify()
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      await ctx.signIn({ ...lea, password: `wrong-password-${attempt}` })
+    }
+
+    const blocked = await ctx.signIn(lea)
+
+    expect(blocked.status).toBe(429)
+    const retryAfter = Number(blocked.headers.get('retry-after'))
+    expect(retryAfter).toBeGreaterThan(0)
+    // Au plus la fenêtre du quota de la connexion (15 minutes), en secondes.
+    expect(retryAfter).toBeLessThanOrEqual(15 * 60)
   })
 
   // Le cookie de session, tel que la production le pose (API en https) :
@@ -355,12 +377,13 @@ describe('exporting my data', () => {
 })
 
 // Better Auth ouvre d'office des routes que l'appli n'appelle jamais. Chacune est une porte de
-// plus : changer de mot de passe avec une session volée (100 essais par minute), lister ou couper
-// les sessions, se connecter par un fournisseur (Google…) que nous n'avons pas, dont le nom finirait
-// dans les logs. Fermées, elles répondent comme une adresse inconnue, même avec une session.
+// plus : lister ou couper les sessions, se connecter par un fournisseur (Google…) que nous n'avons
+// pas, dont le nom finirait dans les logs. Fermées, elles répondent comme une adresse inconnue,
+// même avec une session. La tranche R2 a rouvert, avec leurs quotas et leurs tests
+// (auth/password.test.ts, auth/verification-resend.test.ts) : change-password,
+// request-password-reset, reset-password et send-verification-email.
 describe('authentication routes the app does not use', () => {
   it.each([
-    ['POST', '/change-password', { currentPassword: lea.password, newPassword: 'new-password-1' }],
     ['GET', '/list-sessions', undefined],
     ['POST', '/revoke-session', { token: 'any-token' }],
     ['POST', '/revoke-sessions', {}],
@@ -370,23 +393,16 @@ describe('authentication routes the app does not use', () => {
     // Audit de sécurité du 25/10/2026, C4 : vérifier un mot de passe avec une session volée, au
     // rythme du quota général (100 essais par minute), sans rien changer au compte.
     ['POST', '/verify-password', { password: lea.password }],
-    // C5 : renvoyer le lien de vérification à n'importe quelle adresse, sans session (5 e-mails
-    // par heure et par adresse IP vers une boîte qui n'a rien demandé). L'appli ne l'appelle pas :
-    // se connecter avant d'avoir vérifié renvoie le lien (test plus haut).
-    ['POST', '/send-verification-email', { email: lea.email }],
     // C6 : les autres routes ouvertes d'office, que l'appli n'appelle pas. Comptes liés et jetons
-    // de fournisseurs (nous n'en avons aucun), session, mot de passe oublié (pas encore proposé),
-    // suppression confirmée par e-mail (la nôtre l'est par le mot de passe) et la sonde « ok ».
-    // Le changement d'adresse, fermé ici d'abord, est rouvert et protégé par sa tranche
-    // (change-email.test.ts).
+    // de fournisseurs (nous n'en avons aucun), session, suppression confirmée par e-mail (la nôtre
+    // l'est par le mot de passe) et la sonde « ok ». Le changement d'adresse, fermé ici d'abord,
+    // est rouvert et protégé par sa tranche (change-email.test.ts).
     ['GET', '/list-accounts', undefined],
     ['POST', '/unlink-account', { providerId: 'credential' }],
     ['GET', '/account-info?accountId=any-account', undefined],
     ['POST', '/get-access-token', { providerId: 'credential' }],
     ['POST', '/refresh-token', { providerId: 'credential' }],
     ['POST', '/update-session', {}],
-    ['POST', '/request-password-reset', { email: lea.email }],
-    ['POST', '/reset-password', { newPassword: 'new-password-1', token: 'any-token' }],
     // Sans jeton : ouverte, elle répond 400 (jeton manquant) ; un faux jeton y répondait déjà 404.
     ['GET', '/delete-user/callback', undefined],
     ['GET', '/ok', undefined],
