@@ -182,7 +182,16 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
         {/* La feuille d'abord, le voile ensuite : en s'ouvrant, la couche (web) pose le focus sur
             son premier élément atteignable, qui doit être dans la feuille. zIndex garde la feuille
             au-dessus du voile, dessiné après elle. */}
-        <View style={{ zIndex: 1, flex: phone ? 1 : 0, justifyContent: 'flex-end' }}>
+        <View
+          style={{
+            zIndex: 1,
+            flex: phone ? 1 : 0,
+            justifyContent: 'flex-end',
+            // Sur ordinateur, la couche rétrécit à la fenêtre : sinon, plus haute qu'elle, elle
+            // poussait le panneau (calé en bas) au-dessus du haut de l'écran.
+            ...(phone ? null : { flexShrink: 1, minHeight: 0 }),
+          }}
+        >
           <SheetPanel
             {...panel}
             // La colonne d'à côté, seulement si la fenêtre a la place de la poser.
