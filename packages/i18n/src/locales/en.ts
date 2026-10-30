@@ -349,6 +349,7 @@ export const en: Translation = {
       avatarType: 'Choose a JPEG, PNG or WebP image.',
       invalidCharacters: 'Some characters are not allowed (invisible or control characters).',
     },
+    previewTitle: 'Preview of your page',
   },
   project: {
     new: {

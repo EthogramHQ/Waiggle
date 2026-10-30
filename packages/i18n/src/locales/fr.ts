@@ -410,6 +410,8 @@ export const fr = {
       invalidCharacters:
         'Certains caractères ne sont pas autorisés (caractères invisibles ou de contrôle).',
     },
+    /** R2 : la légende de l'aperçu en direct, à droite de la feuille sur ordinateur. */
+    previewTitle: 'Aperçu de ta page',
   },
   project: {
     new: {
