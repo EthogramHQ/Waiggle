@@ -90,7 +90,8 @@ function MemberNotifications() {
             suspended
               ? {
                   label: t(($) => $.notifications.emptyActionSuspended),
-                  onPress: () => router.push('/'),
+                  // R3 : « Découvrir » est devenu l'onglet Explorer.
+                  onPress: () => router.push('/explore'),
                 }
               : {
                   label: t(($) => $.notifications.emptyAction),
