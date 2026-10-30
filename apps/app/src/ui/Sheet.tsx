@@ -10,16 +10,30 @@
 // Native, qui sur le web enferme la touche Tab dans la feuille (focus trap), donne le focus à son
 // premier élément à l'ouverture (ici « Fermer », dessiné en premier) et le rend à l'élément qui
 // l'avait avant à la fermeture (le bouton d'origine) ; Échap ferme, comme le bouton retour sur
-// Android. Toucher le voile ferme aussi. (Relecture juridique du plan, jur-15.)
+// Android. Toucher le voile ferme aussi. (Relecture juridique du plan, jur-15.) Sur le web, c'est la
+// couche du Modal qui porte le rôle et le nom, pour n'avoir qu'une boîte de dialogue.
+//
+// Relecture de l'interface (R2) : le voile a la garde de double tape de Dialog ; `busy` refuse
+// toute fermeture pendant une action qui ne s'arrête plus ; Échap ne ferme qu'une fois ; sur iOS,
+// le clavier ne cache plus le pied collé.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { type ReactNode, type Ref, useEffect, useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Modal, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -64,13 +78,32 @@ type PanelProps = {
   panelRef?: Ref<View>
   /** Pour Sheet : les touches de la feuille sur le web (Échap, Tab). */
   keys?: object
+  /**
+   * Pendant une action qui ne s'arrête plus (la suppression du compte), la feuille refuse de se
+   * fermer : « Fermer » est inactif, et Échap, le voile et le retour Android ne font rien. Sinon
+   * « Annuler » mentirait : l'action continuerait derrière la feuille fermée (relecture B1).
+   */
+  busy?: boolean
+  /**
+   * Pour Sheet, sur le web : l'identifiant du titre, déjà donné au nom de la couche (le Modal de
+   * react-native-web est la boîte de dialogue). La feuille ne se déclare pas alors une seconde fois.
+   */
+  titleId?: string
 }
 
-type Props = Omit<PanelProps, 'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys'> & {
+type Props = Omit<
+  PanelProps,
+  'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys' | 'titleId'
+> & {
   open: boolean
 }
 
-type KeyEvent = { key: string; shiftKey?: boolean; preventDefault: () => void }
+type KeyEvent = {
+  key: string
+  shiftKey?: boolean
+  repeat?: boolean
+  preventDefault: () => void
+}
 
 // Le peu du navigateur dont Tab a besoin : les éléments de la feuille qu'on peut atteindre, dans
 // l'ordre du document. (Les types de React Native ne décrivent pas la page web.)
@@ -99,7 +132,7 @@ const ASIDE_GAP = space.xxl
 /** La largeur de fenêtre qu'il faut pour poser la colonne à côté du panneau. */
 const ASIDE_ROOM = layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
 
-export function Sheet({ open, onClose, aside, ...panel }: Props) {
+export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
@@ -109,11 +142,30 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
   // L'élément qui avait le focus avant l'ouverture (le bouton d'origine) : il le retrouve à la
   // fermeture, sans faire défiler la page.
   const opener = useRef<unknown>(null)
+  // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
+  // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
+  const titleId = `${useId()}-title`
+  // La garde contre la double tape (celle de Dialog) : la feuille s'ouvre souvent sous le doigt qui
+  // vient de toucher « Modifier » ou « Supprimer mon compte », et la seconde tape tombait sur le
+  // voile, qui la refermait aussitôt (un retour arrière, pour une feuille qui a son adresse).
+  const tapsAllowed = useTapsAllowed(open, true)
+  // Échap a deux voies sur le web : l'onKeyDown de la feuille (touche enfoncée) et l'écoute du
+  // Modal de react-native-web (touche relâchée), qui appelle onRequestClose. Sans ce drapeau,
+  // onClose partait deux fois : deux retours arrière, qui quittaient aussi la page d'avant.
+  const escapeHandled = useRef(false)
+
+  // Toute demande de fermeture passe ici : pendant une action qui ne s'arrête plus (`busy`), elle
+  // est refusée, quelle que soit la voie (« Fermer », Échap, voile, retour Android).
+  const requestClose = () => {
+    if (busy) return
+    onClose()
+  }
 
   // useEffect : à l'ouverture (web), on retient qui avait le focus et on le pose sur « Fermer »,
   // le premier élément de la feuille ; à la fermeture, on le rend. Le Modal de react-native-web
   // fait de même de son côté : les deux gestes se recouvrent, sans se gêner.
   useEffect(() => {
+    escapeHandled.current = false
     if (Platform.OS !== 'web') return
     if (open) {
       opener.current = activeElement()
@@ -165,7 +217,10 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
           onKeyDown: (event: KeyEvent) => {
             if (event.key === 'Escape') {
               event.preventDefault()
-              onClose()
+              // La touche relâchée arrivera aussi au Modal : elle est déjà prise en compte.
+              escapeHandled.current = true
+              // Une touche tenue enfoncée se répète : un seul geste, une seule fermeture.
+              if (!event.repeat) requestClose()
             } else if (event.key === 'Tab') {
               event.preventDefault()
               trapTab(event.shiftKey === true)
@@ -174,6 +229,22 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
         }
       : {}
 
+  // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
+  // Une Échap déjà prise par la feuille (touche enfoncée) n'y compte pas une seconde fois.
+  const onRequestClose = () => {
+    if (escapeHandled.current) {
+      escapeHandled.current = false
+      return
+    }
+    requestClose()
+  }
+
+  // Sur le web, le Modal de react-native-web est déjà une boîte de dialogue modale (`role="dialog"`,
+  // `aria-modal`), sans nom : on le nomme par le titre, et la feuille ne s'en déclare pas une
+  // seconde à l'intérieur (deux dialogues imbriqués, dont l'extérieur sans nom : relecture C4). Les
+  // types de React Native ne connaissent pas cet attribut du web, d'où l'objet à part.
+  const named = Platform.OS === 'web' ? ({ 'aria-labelledby': titleId } as object) : null
+
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap. Sur
     // téléphone, la feuille glisse du bas ; sur ordinateur, le panneau paraît par un fondu.
@@ -181,9 +252,19 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
       visible={open}
       transparent
       animationType={phone ? 'slide' : 'fade'}
-      onRequestClose={onClose}
+      onRequestClose={onRequestClose}
+      {...named}
     >
-      <View style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center' }}>
+      {/* KeyboardAvoidingView : sur iOS, la couche se raccourcit de la hauteur du clavier quand il
+          s'ouvre, comme dans Screen ; le pied collé (« Enregistrer », « Envoyer ») remonte
+          au-dessus de lui, et le contenu défile dans la place qui reste, jusqu'aux champs du bas
+          (relecture juridique jur-15, WCAG 2.4.11). Android redimensionne la fenêtre de lui-même,
+          le web aussi. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center' }}
+        enabled={Platform.OS === 'ios'}
+        {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
+      >
         {/* La feuille d'abord, le voile ensuite : en s'ouvrant, la couche (web) pose le focus sur
             son premier élément atteignable, qui doit être dans la feuille. zIndex garde la feuille
             au-dessus du voile, dessiné après elle. */}
@@ -212,24 +293,27 @@ export function Sheet({ open, onClose, aside, ...panel }: Props) {
             {...panel}
             // La colonne d'à côté, seulement si la fenêtre a la place de la poser.
             {...(aside !== undefined && !phone && window.width >= ASIDE_ROOM ? { aside } : null)}
-            onClose={onClose}
+            onClose={requestClose}
+            busy={busy}
             layout={phone ? 'phone' : 'desktop'}
             maxHeight={window.height - 2 * PANEL_MARGIN}
             closeRef={closeRef}
             panelRef={panelRef}
             keys={keys}
+            {...(Platform.OS === 'web' ? { titleId } : null)}
           />
         </View>
         {/* Toucher le voile ferme la feuille, comme « Fermer ». Caché aux lecteurs d'écran (ils
-            ont le bouton) et hors de la touche Tab. */}
+            ont le bouton) et hors de la touche Tab. Pendant la garde, la seconde tape d'une
+            double tape n'y fait rien ; pendant une action `busy`, aucune tape. */}
         <Pressable
           accessibilityElementsHidden
           importantForAccessibility="no"
-          onPress={onClose}
+          onPress={tapsAllowed && !busy ? requestClose : undefined}
           {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
           style={{ position: 'absolute', inset: 0 }}
         />
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -253,14 +337,22 @@ export function SheetPanel({
   closeRef,
   panelRef,
   keys,
+  busy = false,
+  titleId: givenTitleId,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const phone = disposition === 'phone'
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par
-  // son titre.
-  const titleId = `${useId()}-title`
+  // son titre (celui de Sheet, quand la couche du Modal porte déjà le nom).
+  const ownTitleId = `${useId()}-title`
+  const titleId = givenTitleId ?? ownTitleId
+  // La couche du Modal (web) est déjà la boîte de dialogue : la feuille n'en redéclare pas une.
+  const dialog =
+    givenTitleId === undefined
+      ? { role: 'dialog' as const, 'aria-modal': true, 'aria-labelledby': titleId }
+      : null
   const close = closeLabel ?? t(($) => $.common.close)
 
   const header = (
@@ -295,6 +387,8 @@ export function SheetPanel({
             label={close}
             variant="plain"
             onPress={onClose}
+            // Pendant une action qui ne s'arrête plus, « Fermer » est inactif : il ne mentirait pas.
+            disabled={busy}
             {...(closeRef ? { ref: closeRef } : null)}
           />
         </View>
@@ -382,11 +476,10 @@ export function SheetPanel({
 
   return (
     <View
-      // Une boîte de dialogue modale, nommée par son titre. accessibilityViewIsModal : sur iOS,
-      // VoiceOver reste dans la feuille. Pas d'`accessible` : il doit en atteindre chaque élément.
-      role="dialog"
-      aria-modal
-      aria-labelledby={titleId}
+      // Une boîte de dialogue modale, nommée par son titre (sauf dans le Modal du web, qui l'est
+      // déjà). accessibilityViewIsModal : sur iOS, VoiceOver reste dans la feuille. Pas
+      // d'`accessible` : il doit en atteindre chaque élément.
+      {...dialog}
       accessibilityViewIsModal
       {...(panelRef ? { ref: panelRef } : null)}
       {...keys}

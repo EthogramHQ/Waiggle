@@ -1,5 +1,5 @@
 // Tests de l'écran « Mon profil ». L'API (profile/api) est remplacée par de faux appels.
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { request } from '../api/client'
 import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { leaMe, suspendedMe } from '../testing/fixtures'
@@ -478,5 +478,33 @@ describe('ProfileScreen in a sheet (R2)', () => {
     } finally {
       restore()
     }
+  })
+})
+
+// Relecture de l'interface (R2, C9) : le message posé au-dessus d'« Enregistrer » ne disparaît pas
+// pendant l'envoi suivant ; sinon le bouton bouge sous le doigt (charte, 6c). La réponse le remplace.
+describe('ProfileScreen, the message above « Enregistrer »', () => {
+  it('keeps the last message while the next save is on its way, then replaces it', async () => {
+    jest.mocked(updateProfile).mockResolvedValueOnce({ ok: true, data: leaMe })
+    let answer: (value: { ok: false; error: 'internal' }) => void = () => {}
+    jest.mocked(updateProfile).mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText('Bio'), 'Une autre bio')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    // Pendant l'envoi : le message d'avant reste à sa place.
+    expect(screen.getByText('Profil enregistré.')).toBeTruthy()
+
+    await act(async () => answer({ ok: false, error: 'internal' }))
+    expect(await screen.findByText(fr.t(($) => $.errors.internal))).toBeTruthy()
+    expect(screen.queryByText('Profil enregistré.')).toBeNull()
   })
 })
