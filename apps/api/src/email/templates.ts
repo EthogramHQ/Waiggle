@@ -344,7 +344,14 @@ export const resetPasswordEmail = (
       greeting: fill(t.resetPassword.greeting),
       paragraphs: [
         fill(t.resetPassword.body),
-        fill(t.resetPassword.expires, { hours: String(hours) }),
+        // La durée s'écrit en toutes lettres : « une heure », puis « 2 heures » (décision du
+        // 30/10/2026). Le nombre vient toujours du réglage du serveur (jur-4).
+        fill(t.resetPassword.expires, {
+          duration:
+            hours === 1
+              ? fill(t.resetPassword.oneHour)
+              : fill(t.resetPassword.hours, { hours: String(hours) }),
+        }),
       ],
       button: {
         label: fill(t.resetPassword.button),

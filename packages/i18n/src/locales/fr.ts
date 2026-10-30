@@ -1092,8 +1092,12 @@ export const fr = {
       body: 'Une demande vient d’arriver pour changer le mot de passe de ton compte {{appName}}. Pour en choisir un nouveau, utilise le bouton ci-dessous.',
       button: 'Choisir un nouveau mot de passe',
       // La durée vient du réglage du serveur (jur-4) ; la conséquence est dite avant le geste (jur-3).
+      // {{duration}} est `oneHour` pour une heure, `hours` au-delà : la durée s'écrit en toutes
+      // lettres (décision du 30/10/2026).
       expires:
-        'Ce lien est valable {{hours}} h et ne sert qu’une fois. Une fois le mot de passe changé, tous tes appareils seront déconnectés.',
+        'Ce lien est valable {{duration}} et ne sert qu’une fois. Une fois le mot de passe changé, tous tes appareils seront déconnectés.',
+      oneHour: 'une heure',
+      hours: '{{hours}} heures',
       ignore: 'Si tu n’as rien demandé, ignore cet e-mail : ton mot de passe ne change pas.',
       // Un e-mail de sécurité : il dit pourquoi il arrive, et qu'il arrive toujours (jur-1).
       reason:
