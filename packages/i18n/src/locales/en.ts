@@ -161,6 +161,8 @@ export const en: Translation = {
     about: { title: 'About' },
     title: 'My account',
     signOut: 'Sign out',
+    signOutError:
+      'Signing out didn’t go through: you may still be signed in. Check your connection and try again.',
     editProfile: 'Edit my profile',
     language: {
       title: 'Language',

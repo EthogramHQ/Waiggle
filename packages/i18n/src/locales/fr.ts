@@ -199,6 +199,9 @@ export const fr = {
     title: 'Mon compte',
     about: { title: 'À propos' },
     signOut: 'Me déconnecter',
+    // La déconnexion n'a pas abouti (serveur, réseau) : le membre est peut-être encore connecté.
+    signOutError:
+      'La déconnexion n’a pas abouti : tu es peut-être encore connecté. Vérifie ta connexion et réessaie.',
     editProfile: 'Modifier mon profil',
     language: {
       title: 'Langue',

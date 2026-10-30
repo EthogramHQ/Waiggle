@@ -267,12 +267,19 @@ const forgetSession = () => {
   session.set({ ...session.get(), data: null, error: null, isPending: false, isRefetching: false })
 }
 
-export const signOut = async (): Promise<void> => {
+/**
+ * Déconnecte le membre. Le résultat dit si le serveur a fermé la session : un refus (panne, trop de
+ * demandes) se dit à l'écran, au lieu de laisser croire à une déconnexion (relecture de sécurité de
+ * la PR #64). Sans réponse du serveur (réseau coupé), l'erreur remonte telle quelle à l'écran.
+ */
+export const signOut = async (): Promise<Result<'generic'>> => {
   try {
     const { error } = await authClient.signOut()
     // Un refus du serveur : sur le web, le cookie vaut encore, la session reste (la relecture
     // suivante la redonnerait). Sur téléphone, le plugin Expo a déjà effacé la session locale.
-    if (!error) forgetSession()
+    if (error) return { ok: false, error: 'generic' }
+    forgetSession()
+    return { ok: true }
   } finally {
     // On vide le cache des données (profil…), même si le serveur n'a pas répondu : sur un appareil
     // partagé, la personne suivante ne doit rien voir de ce qui appartenait au membre précédent,
@@ -292,6 +299,17 @@ export const deleteAccount = async (
     forgetSession()
     queryClient.clear()
     setPendingEmail(null)
+    // Sur téléphone, le plugin Expo garde une copie de la session dans le coffre-fort et ne la vide
+    // qu'à une déconnexion (avant même d'envoyer la demande) : sans elle, une appli relancée hors
+    // ligne remontrerait le compte supprimé. Le serveur répondra « pas de session » : peu importe,
+    // le compte est supprimé, l'échec de cette déconnexion ne change pas le résultat.
+    if (Platform.OS !== 'web') {
+      try {
+        await authClient.signOut()
+      } catch {
+        // Sans réponse : la copie locale est déjà vidée, avant l'envoi.
+      }
+    }
     return { ok: true }
   }
   if (error.code === 'INVALID_PASSWORD') return { ok: false, error: 'wrongPassword' }
