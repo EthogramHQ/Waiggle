@@ -315,6 +315,9 @@ export function SheetPanel({
       radius="sheet"
       centered={!phone}
       padding="none"
+      // Téléphone : toute la hauteur sous l'écart du haut ; ordinateur : jusqu'à la hauteur permise.
+      // Le contenu défile alors dans la feuille, et le pied reste en vue.
+      fit={phone ? 'fill' : 'shrink'}
       {...(phone ? { shadow: 'card' as const } : null)}
     >
       <View style={{ flexShrink: 1, ...(phone ? { flex: 1 } : null) }}>
