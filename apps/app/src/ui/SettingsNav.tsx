@@ -50,9 +50,9 @@ export function SettingsNav<K extends string>({ label, items, current, onNavigat
 
   // Le geste sur un lien : l'écran navigue, et le navigateur ne recharge pas la page
   // (preventDefault sur le clic du `<a>`). Sans `onNavigate`, on laisse le lien faire.
-  const press = (item: SettingsNavItem<K>) => (event: { preventDefault?: () => void }) => {
+  const press = (item: SettingsNavItem<K>) => (event?: { preventDefault?: () => void }) => {
     if (!onNavigate) return
-    event.preventDefault?.()
+    event?.preventDefault?.()
     onNavigate(item)
   }
 
