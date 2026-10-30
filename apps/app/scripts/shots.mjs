@@ -166,6 +166,16 @@ const session = {
 //   - adresse-lien-refuse : /email-change/done?error=INVALID_TOKEN, sans session.
 const changeEmailShot = { newEmail: 'lea.moreau@exemple.fr', password: 'mot-de-passe-de-lea' }
 const wrongPasswordShot = 'pas-le-bon-mot-de-passe'
+// Tranche R2 : le lien « nouveau mot de passe » (un jeton accepté, un refusé) et l'adresse qui
+// attend sa vérification. « Vérifie ta boîte mail » ne lit plus l'adresse dans l'URL (jur-9) :
+// `pendingEmail` la pose dans le sessionStorage de l'onglet, comme l'inscription, puis recharge.
+const resetTokenShot = 'tok-7f3c9a-valide'
+const refusedResetToken = 'tok-7f3c9a-refuse'
+const pendingEmail = (email) => async (page) => {
+  await page.evaluate((value) => sessionStorage.setItem('waiggle.pendingEmail', value), email)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByText(email, { exact: false }).first().waitFor()
+}
 const emailOf = { current: leaMe.email, changed: changeEmailShot.newEmail }
 // Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
 // simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
@@ -766,6 +776,31 @@ const fakeApi = (
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname === '/api/auth/get-session') return json(200, signedIn ? sessionNow : null)
     const method = route.request().method()
+    // Tranche R2, le mot de passe et la vérification, sans session comme la vraie API. Mot de passe
+    // oublié et renvoi du lien : toujours la même réponse. Nouveau mot de passe : le jeton refusé
+    // (refusedResetToken) reçoit INVALID_TOKEN, comme Better Auth pour un lien expiré ou servi.
+    if (pathname === '/api/auth/request-password-reset' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/send-verification-email' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/reset-password' && method === 'POST') {
+      const { token } = JSON.parse(route.request().postData() ?? '{}')
+      if (token === refusedResetToken) {
+        return json(400, { code: 'INVALID_TOKEN', message: 'Invalid token' })
+      }
+      return json(200, { status: true })
+    }
+    if (pathname === '/v1/account/unverified-email' && method === 'POST') {
+      const { newEmail } = JSON.parse(route.request().postData() ?? '{}')
+      return json(200, { sentTo: String(newEmail).trim().toLowerCase() })
+    }
+    // Changer son mot de passe (réglages, Sécurité) : avec la session de Léa.
+    if (pathname === '/api/auth/change-password' && method === 'POST') {
+      if (!signedIn) return json(401, { code: 'UNAUTHORIZED', message: '' })
+      return json(200, { status: true })
+    }
     // Se désinscrire depuis un e-mail (tranche 6c) : sans session, comme la vraie API. Le jeton
     // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
     if (pathname === '/v1/email/unsubscribe' && method === 'POST') {
@@ -1039,7 +1074,65 @@ const pages = [
   { name: 'accueil', path: '/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
   { name: 'inscription', path: '/sign-up', signedIn: false },
-  { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
+  // Tranche R2 : « Vérifie ta boîte mail », l'adresse venue de l'inscription (gmail : « Ouvrir ma
+  // messagerie » ; un service inconnu : pas de bouton sur ordinateur), puis après « Renvoyer ».
+  {
+    name: 'verifier-email',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@gmail.com'),
+  },
+  {
+    name: 'verifier-email-inconnue',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@exemple.fr'),
+  },
+  {
+    name: 'verifier-email-renvoye',
+    path: '/check-email',
+    signedIn: false,
+    prepare: async (page) => {
+      await pendingEmail('ines.haddad@gmail.com')(page)
+      await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
+      await page.getByText(/Un nouvel e-mail vient de partir/).waitFor()
+    },
+  },
+  // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le
+  // lien, et ce même lien refusé par le serveur.
+  { name: 'mot-de-passe-oublie', path: '/forgot-password', signedIn: false },
+  {
+    name: 'mot-de-passe-oublie-envoye',
+    path: '/forgot-password',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Adresse e-mail').fill('ines.haddad@gmail.com')
+      await page.getByRole('button', { name: 'Envoyer le lien' }).click()
+      await page.getByText(/Si un compte existe pour cette adresse/).waitFor()
+    },
+  },
+  {
+    name: 'nouveau-mot-de-passe',
+    path: `/reset-password?token=${resetTokenShot}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+    },
+  },
+  {
+    name: 'lien-refuse',
+    path: `/reset-password?token=${refusedResetToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+      await page.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+      await page.getByRole('heading', { name: 'Ce lien ne marche plus' }).waitFor()
+    },
+  },
+  // La rubrique Sécurité des réglages : changer son mot de passe (la route est celle des réglages).
+  { name: 'changer-mot-de-passe', path: '/settings/security/password', signedIn: true },
+  // Décision D1 : le second lien d'un changement d'adresse ouvert sans session.
+  { name: 'adresse-connecte-toi', path: '/email-change/sign-in-first', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
   // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
   { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },

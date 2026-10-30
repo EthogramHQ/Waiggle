@@ -1,5 +1,5 @@
 // « Trop d'essais » (tranche R2) : quand le serveur refuse une connexion ou un envoi pour un temps
-// (en-tête `Retry-After`), l'écran dit à quelle heure réessayer, « Nouvel essai possible à 21:47 »,
+// (en-tête `Retry-After`), l'écran dit à quelle heure réessayer, « Nouvel essai possible à 21 h 47 »,
 // et son bouton reste inactif jusque-là, puis se libère tout seul (décision D3 du 29/10/2026).
 // Une heure fixe plutôt qu'un compte à rebours : un texte qui change chaque seconde est relu sans
 // fin par les lecteurs d'écran et attire l'œil pour rien (WCAG 2.2.2) ; l'heure, elle, reste la
@@ -55,12 +55,24 @@ type Props = {
 }
 
 /**
- * L'heure écrite dans la langue (« 21:47 » ou « 01:38 » en français, « 09:47 PM » en anglais) :
- * Intl.DateTimeFormat est la mise en forme des dates propre à chaque langue, fournie par
- * l'appareil. L'heure sur deux chiffres : « à 1:38 » se lisait mal en français.
+ * L'heure écrite dans la langue (« 21 h 47 » ou « 01 h 38 » en français, « 09:47 PM » en
+ * anglais) : Intl.DateTimeFormat est la mise en forme des dates propre à chaque langue, fournie
+ * par l'appareil. L'heure sur deux chiffres : « à 1:38 » se lisait mal en français.
+ *
+ * En français, « 21 h 47 » (décision D3, et l'usage typographique français), avec des espaces
+ * insécables : l'heure ne se coupe jamais en fin de ligne. Pourquoi pas « 21:47 », que donne Intl :
+ * deux nombres séparés par « : » se lisent comme un compte à rebours (« encore 21 min 47 s »), ce
+ * que D3 écarte, et les tests d'écran le refusent.
  */
-export const formatRetryTime = (until: Date, language: string): string =>
-  new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(until)
+export const formatRetryTime = (until: Date, language: string): string => {
+  const format = new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' })
+  if (!language.toLowerCase().startsWith('fr')) return format.format(until)
+  // formatToParts découpe l'heure en morceaux (heure, séparateur, minutes) : on garde les nombres.
+  const parts = format.formatToParts(until)
+  const hour = parts.find((part) => part.type === 'hour')?.value ?? ''
+  const minute = parts.find((part) => part.type === 'minute')?.value ?? ''
+  return `${hour} h ${minute}`
+}
 
 /**
  * La phrase « Nouvel essai possible à 21:47 », annoncée comme un état (`status` : les lecteurs
