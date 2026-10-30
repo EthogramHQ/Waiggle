@@ -117,6 +117,13 @@ export const memberCounterKeys = (userId: string) => ({
   emailChangeDay: `email-change-day:${userId}`,
   // Les e-mails envoyés à une nouvelle adresse (le second lien) : 3 par heure (S1).
   emailChangeLink: `email-change-link:${userId}`,
+  // Le lien de vérification renvoyé quand un compte non vérifié essaie de se connecter (R2,
+  // relecture de sécurité S3) : 3 par heure, à part du quota par adresse de « Renvoyer l'e-mail ».
+  verificationOnSignIn: `verification-on-sign-in:${userId}`,
+  // Corriger son adresse avant de l'avoir vérifiée (R2, A4, S7) : 3 par heure et 5 par jour, comptés
+  // après un mot de passe juste.
+  unverifiedEmail: `unverified-email:${userId}`,
+  unverifiedEmailDay: `unverified-email-day:${userId}`,
   // Les décisions d'un administrateur (tranche 7c) : 50 par jour, toutes actions confondues, mal
   // formées comprises. Un compte d'administrateur volé ne peut pas tout retirer d'un coup.
   moderationDecision: `moderation-decision:${userId}`,
@@ -147,6 +154,13 @@ export const addressDigest = (secret: string, email: string) => {
   const key = createHmac('sha256', secret).update('waiggle:address-counter:v1').digest()
   return createHmac('sha256', key).update(normalizeAddress(email)).digest('hex')
 }
+
+/**
+ * La clé d'un compteur « par adresse e-mail » : `purpose` sépare les compteurs de chaque parcours
+ * (mot de passe oublié, renvoi du lien, correction d'adresse…), l'empreinte désigne l'adresse.
+ */
+export const addressCounterKey = (secret: string, purpose: string, email: string) =>
+  `${purpose}:${addressDigest(secret, email)}`
 
 /**
  * Efface les compteurs d'un membre, à la suppression de son compte (leurs clés contiennent son

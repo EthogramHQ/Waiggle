@@ -34,6 +34,7 @@ import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { tagRoutes } from './routes/tags'
+import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
 import { suspensionGuard } from './suspension/guard'
@@ -276,7 +277,15 @@ export const createApp = ({
     (c, next) =>
       c.req.path === UNSUBSCRIBE_PATH ? next() : middleware(c, next)
   app.use('/v1/*', outsideSession(sameOriginWrites([appUrl, publicApiUrl])))
-  app.use('/v1/*', outsideSession(sessionMiddleware(auth)))
+  // Tranche R2 : corriger son adresse avant de l'avoir vérifiée (routes/unverified-email.ts) se fait
+  // sans session (S9) : la session n'y est jamais lue, mais le contrôle d'origine s'applique.
+  const readSession = sessionMiddleware(auth)
+  app.use(
+    '/v1/*',
+    outsideSession((c, next) =>
+      c.req.path === UNVERIFIED_EMAIL_PATH ? next() : readSession(c, next),
+    ),
+  )
   // Les images aussi demandent de savoir qui regarde : elles sont réservées aux membres.
   app.use('/media/*', sessionMiddleware(auth))
   // Les réponses de /v1/… sont personnelles (profil, export…) : aucun cache intermédiaire
@@ -309,6 +318,8 @@ export const createApp = ({
   app.route('/', feedRoutes({ db, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
+  // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).
+  app.route('/', unverifiedEmailRoutes({ db, limiter, auth, mailer, appUrl, secret }))
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
   app.route('/', moderationRoutes({ db, limiter, auth, mailer }))

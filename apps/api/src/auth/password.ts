@@ -28,6 +28,7 @@ import { type Email, passwordChangedEmail, resetPasswordEmail } from '../email/t
 import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import {
+  addressCounterKey,
   addressDigest,
   memberCounterKeys,
   normalizeAddress,
@@ -80,10 +81,10 @@ const RESET = { method: 'POST', path: '/api/auth/reset-password' }
 const CHANGE = { method: 'POST', path: '/api/auth/change-password' }
 
 /** Les clés des compteurs d'une adresse pour le mot de passe oublié (empreinte HMAC, sec-S2). */
-export const resetAddressCounterKeys = (secret: string, email: string) => {
-  const digest = addressDigest(secret, email)
-  return { hour: `password-reset:${digest}`, day: `password-reset-day:${digest}` }
-}
+export const resetAddressCounterKeys = (secret: string, email: string) => ({
+  hour: addressCounterKey(secret, 'password-reset', email),
+  day: addressCounterKey(secret, 'password-reset-day', email),
+})
 
 /**
  * Dans un hook `after` : la route a-t-elle échoué ? Better Auth range sa réponse dans
@@ -113,7 +114,7 @@ const objectBody = (ctx: AuthContext): Record<string, unknown> =>
  * entier, ce qui reste court, puisque chaque ligne y vit une heure et que la purge de nuit efface
  * les lignes périmées (jobs/nightly-purge.ts).
  */
-export const forgetResetLinks = (db: Database, userId: string) =>
+export const forgetResetLinks = (db: Pick<Database, 'delete'>, userId: string) =>
   db
     .delete(schema.verification)
     .where(

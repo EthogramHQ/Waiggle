@@ -21,7 +21,8 @@ import { eq, inArray } from 'drizzle-orm'
 import { eraseCommentsOf, sweepOrphanComments } from '../comments/erase'
 import { isLanguage, languageOfMember } from '../email/language'
 import type { Mailer } from '../email/mailer'
-import { existingAccountEmail, verificationEmail } from '../email/templates'
+// L'e-mail de vérification part de auth/verification-resend.ts (tranche R2).
+import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
 import { describeError } from '../log'
 import type { FileStorage } from '../media/storage'
@@ -38,6 +39,7 @@ import {
   resetAddressCounterKeys,
 } from './password'
 import { authSchemaOptions } from './schema-options'
+import { createVerificationResend } from './verification-resend'
 
 /**
  * Une façon de hacher et de vérifier les mots de passe. Hacher, c'est transformer le mot de passe
@@ -104,8 +106,8 @@ export const AUTH_RATE_RULES = {
   '/request-password-reset': { window: 15 * 60, max: 5 },
   '/reset-password': { window: 15 * 60, max: 10 },
   '/change-password': { window: 15 * 60, max: 5 },
-  // Renvoyer le lien de vérification (tranche R2, A3, relecture de sécurité S4) : un plafond par
-  // adresse s'y ajoute (auth/verification-resend.ts).
+  // Renvoyer le lien de vérification (tranche R2, A3, relecture de sécurité S4) : des plafonds par
+  // adresse s'y ajoutent (auth/verification-resend.ts).
   '/send-verification-email': { window: 15 * 60, max: 5 },
 } satisfies Record<string, { window: number; max: number }>
 
@@ -150,6 +152,14 @@ export const createAuth = ({
   // par adresse et par membre (auth/password.ts).
   const passwordFlows = createPasswordFlows({
     db,
+    mailer,
+    rateLimiter: createRateLimiter(db),
+    appUrl,
+    secret,
+  })
+  // Renvoyer le lien de vérification (tranche R2, A3) : ses quotas et ses envois
+  // (auth/verification-resend.ts).
+  const verificationResend = createVerificationResend({
     mailer,
     rateLimiter: createRateLimiter(db),
     appUrl,
@@ -215,12 +225,10 @@ export const createAuth = ({
       expiresIn: 60 * 60, // le lien est valable une heure
       // Le même réglage envoie le second lien d'un changement d'adresse, vers la nouvelle adresse :
       // emailChange le reconnaît à son jeton et envoie son propre e-mail (auth/change-email.ts).
-      sendVerificationEmail: async ({ user, url, token }) => {
+      sendVerificationEmail: async ({ user, url, token }, request) => {
         if (await emailChange.sendNewEmailLink({ user, url, token })) return
-        await mailer.send({
-          to: user.email,
-          ...verificationEmail(languageOf(user), { name: user.name, url }),
-        })
+        // Tranche R2 : page imposée, envoi en arrière-plan, quota du renvoi par la connexion.
+        await verificationResend.sendSignUpLink({ user, url }, request)
       },
       // Juste après la vérification de l'adresse (le lien ouvert), le membre reçoit son pseudo
       // (tranche 6a) : pas avant, pour qu'un compte jamais vérifié n'en bloque aucun. Une panne ici
@@ -439,6 +447,8 @@ export const createAuth = ({
             return passwordFlows.beforeResetRequest(ctx)
           case '/change-password':
             return passwordFlows.beforeChange(ctx)
+          case '/send-verification-email':
+            return verificationResend.beforeResend(ctx)
         }
         const body: object = typeof ctx.body === 'object' && ctx.body !== null ? ctx.body : {}
         if (ctx.path === '/delete-user') {
