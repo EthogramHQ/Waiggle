@@ -33,9 +33,18 @@ type Props = {
    * 27/10/2026) ; ailleurs, il est replié dès la deuxième page (SuspensionBanner).
    */
   openSuspension?: boolean
+  /**
+   * La page des réglages est ouverte (R2) : l'avatar n'y est plus un lien vers elle-même. Il reste
+   * dessiné, sans geste ; la colonne des rubriques porte seule le nom « Réglages ».
+   */
+  inSettings?: boolean
 }
 
-export function TopNav({ hideNewProject = false, openSuspension = false }: Props) {
+export function TopNav({
+  hideNewProject = false,
+  openSuspension = false,
+  inSettings = false,
+}: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const { sizeClass } = useLayout()
@@ -78,9 +87,13 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
           )}
           {/* La cloche des notifications, avec le nombre de nouveautés (tranche 6b). */}
           <NotificationBell />
-          <Pressed label={t(($) => $.home.account)} onPress={() => router.push('/account')}>
+          {inSettings ? (
             <Avatar name={name} source={toSource(me.data?.avatarUrl)} label={name} size={44} />
-          </Pressed>
+          ) : (
+            <Pressed label={t(($) => $.home.account)} onPress={() => router.push('/settings')}>
+              <Avatar name={name} source={toSource(me.data?.avatarUrl)} label={name} size={44} />
+            </Pressed>
+          )}
         </Row>
       </Row>
     </Surface>

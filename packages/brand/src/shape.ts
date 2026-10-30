@@ -60,6 +60,7 @@ export const layout = {
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)
   sideColumn: 320, // largeur de base de la colonne latérale
   mainColumn: 560, // largeur minimale de la colonne principale avant de passer en pile
+  settingsNavWidth: 256, // la colonne des rubriques des réglages, sur ordinateur (R2)
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
   touchTarget: 44, // taille minimale d'une zone à toucher du doigt
   chipHeight: 36, // hauteur dessinée d'une étiquette (sa zone à toucher, autour, fait 44)

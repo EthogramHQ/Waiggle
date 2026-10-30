@@ -1,4 +1,7 @@
-// Page : changer d'adresse e-mail (« /account/email »). L'écran lui-même est dans src/screens.
-import { ChangeEmailScreen } from '../../src/screens/ChangeEmailScreen'
+// Ancienne adresse : changer d'adresse e-mail (« /account/email ») vit sous la rubrique « Compte »
+// des réglages depuis la tranche R2.
+import { Redirect } from 'expo-router'
 
-export default ChangeEmailScreen
+export default function ChangeEmailRedirect() {
+  return <Redirect href="/settings/account/email" />
+}

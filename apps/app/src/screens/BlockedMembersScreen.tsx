@@ -35,7 +35,8 @@ export function BlockedMembersScreen() {
 
 function BlockedMembers() {
   const { t, i18n } = useTranslation()
-  const back = useGoBack('/account')
+  // R2 : la page s'ouvre depuis la rubrique « Sécurité » des réglages ; sans historique, on y revient.
+  const back = useGoBack('/settings/security')
   const list = useBlockedMembers()
   const { unblock } = useUnblock()
 

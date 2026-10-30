@@ -24,6 +24,11 @@ export type SettingsNavItem<K extends string> = {
   label: string
   href: string
   icon?: IconName
+  /**
+   * Ce que contient la rubrique (« Photo, nom, pseudo et présentation »), sous son nom dans la liste
+   * du téléphone, et lu après le nom. La colonne d'ordinateur, voisine de la rubrique, s'en passe.
+   */
+  hint?: string
 }
 
 type Props<K extends string> = {
@@ -64,6 +69,7 @@ export function SettingsNav<K extends string>({ label, items, current }: Props<K
               key={item.key}
               label={item.label}
               {...(item.icon ? { icon: item.icon } : null)}
+              {...(item.hint ? { detail: item.hint, hint: item.hint } : null)}
               trailing="chevron"
               href={item.href}
               current={item.key === current}

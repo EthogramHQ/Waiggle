@@ -87,6 +87,7 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
+import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 
@@ -1018,6 +1019,8 @@ export function CatalogueScreen() {
       <AccountCatalogue />
       {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
       <EntryCatalogue />
+      {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
+      <SettingsCatalogue />
 
       <Section title={l.icons}>
         <Icons />
