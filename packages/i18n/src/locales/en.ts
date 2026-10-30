@@ -64,6 +64,7 @@ export const en: Translation = {
       done: 'Good, your password is long enough.',
     },
     tabs: {
+      label: 'Sign in or sign up',
       signIn: 'Sign in',
       signUp: 'Create an account',
     },

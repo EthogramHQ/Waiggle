@@ -99,9 +99,8 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
       }
     >
       <AuthPanel
-        // Le nom de la rangée : ses deux onglets (une clé « Connexion ou inscription » est demandée
-        // à la session ; en attendant, les deux libellés).
-        label={`${t(($) => $.auth.tabs.signIn)}, ${t(($) => $.auth.tabs.signUp)}`}
+        // Le nom de la rangée d'onglets, lu par les lecteurs d'écran : « Connexion ou inscription ».
+        label={t(($) => $.auth.tabs.label)}
         tabs={[
           {
             key: 'signIn',

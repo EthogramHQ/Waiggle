@@ -80,6 +80,8 @@ export const fr = {
     },
     // R2 : sur ordinateur, connexion et inscription sont deux onglets d'un même panneau.
     tabs: {
+      /** Le nom de la rangée d'onglets, lu par les lecteurs d'écran. */
+      label: 'Connexion ou inscription',
       signIn: 'Se connecter',
       signUp: 'Créer un compte',
     },
