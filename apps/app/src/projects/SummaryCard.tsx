@@ -3,6 +3,7 @@
 // Sur téléphone, la carte est haute : la couverture verticale y va mieux, si l'auteur en a donné une.
 import type { ProjectSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -13,9 +14,14 @@ type Props = {
   project: ProjectSummary
   /** La date à afficher, si ce n'est pas la création : dans le fil, le jour de la publication. */
   at?: string
+  /**
+   * Un contrôle posé sur la photo, à côté du lien de la carte (Explorer y pose la pastille
+   * « Suivre Nora », R3) : transmis tel quel à ProjectCard, qui le place.
+   */
+  overlay?: ReactNode
 }
 
-export function SummaryCard({ project, at = project.createdAt }: Props) {
+export function SummaryCard({ project, at = project.createdAt, overlay }: Props) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
@@ -38,6 +44,7 @@ export function SummaryCard({ project, at = project.createdAt }: Props) {
       }}
       badge={project.visibility === 'private' ? t(($) => $.member.private) : undefined}
       onPress={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
+      overlay={overlay}
     />
   )
 }

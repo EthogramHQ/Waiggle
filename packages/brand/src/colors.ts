@@ -233,6 +233,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   // (qui y tomberait sous 4,5). Sur une photo sombre, de jour, il ferait 3,1:1 : là, le panneau.
   { text: 'text', on: 'glass', min: 4.5, base: onAnyBackdrop },
   { text: 'textOnGlass', on: 'glass', min: 4.5, base: onPageOrHoney },
+  // La pastille de verre « Suivre Nora » posée sur la photo d'une carte (R3, relecture ui-9) : une
+  // photo peut être toute noire ou toute blanche, et le verre sombre de nuit pâlit sur du blanc.
+  // Son texte et ses icônes (coche, « ajouter ») sont en `text`, mesurés aux deux extrêmes.
+  { text: 'text', on: 'glass', min: 4.5, base: ['#000000', '#FFFFFF'] },
   // Le bandeau d'erreur d'un formulaire et la tuile de miel (icône ou initiale brune).
   { text: 'dangerText', on: 'errorBand', min: 4.5 },
   { text: 'onHoneyTile', on: 'honey', min: 4.5 },

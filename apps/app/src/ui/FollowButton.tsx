@@ -4,11 +4,23 @@
 // blanc avec une coche : l'action est faite, plus discrète ; toujours en blanc quand la page a déjà
 // son action principale, voir `prominent`), et le nom lu le reprend toujours (« Suivi : Léa ») :
 // c'est l'écran qui le donne, selon l'état.
-import { space } from '@ruche/brand'
-import { View } from 'react-native'
+// Variante `chip` (refonte, tranche R3) : une pastille de verre posée sur la photo d'une carte
+// d'Explorer, « Suivre Nora » puis « Tu suis Nora ✓ ». Voir FollowChip, plus bas.
+import { borders, layout, pressScale, radii, space } from '@ruche/brand'
+import { useEffect, useRef } from 'react'
+import { Pressable, View } from 'react-native'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import { Avatar } from './Avatar'
 import { Button } from './Button'
 import { FollowerCount } from './FollowerCount'
+import { Icon } from './Icon'
+import type { ImageSource } from './image'
+import { spaceToggles } from './keyboard'
 import { Notice, type NoticeAction } from './Notice'
+import { Text } from './Text'
+import { TAP_GUARD_MS } from './tapGuard'
+import { spring } from './theme/motion'
+import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   followed: boolean
@@ -41,6 +53,14 @@ type Props = {
    * disparaître sous le doigt. Il est alors toujours blanc, même quand il serait l'action principale.
    */
   disabled?: boolean
+  /**
+   * button : le bouton des pages de membre et de projet (par défaut). chip : la pastille de verre
+   * posée sur la photo d'une carte (Explorer, R3) ; elle n'a ni nombre, ni message (pas de place sur
+   * une photo : l'écran dit l'échec ailleurs), et `prominent` et `layout` n'y servent pas.
+   */
+  variant?: 'button' | 'chip'
+  /** La photo de l'auteur, au début de la pastille (variante chip seulement) ; décorative. */
+  avatar?: { name: string; source: ImageSource | null }
 }
 
 export function FollowButton({
@@ -54,7 +74,21 @@ export function FollowButton({
   prominent = true,
   layout = 'row',
   disabled = false,
+  variant = 'button',
+  avatar,
 }: Props) {
+  if (variant === 'chip') {
+    return (
+      <FollowChip
+        followed={followed}
+        onPress={onPress}
+        label={label}
+        text={text}
+        disabled={disabled}
+        avatar={avatar}
+      />
+    )
+  }
   const stacked = layout === 'stacked'
   const button = (
     <Button
@@ -89,5 +123,131 @@ export function FollowButton({
       {/* Notice est lue dès qu'elle apparaît (role « alert »), comme les autres erreurs. */}
       {error ? <Notice message={error} action={errorAction} /> : null}
     </View>
+  )
+}
+
+type ChipProps = Pick<Props, 'followed' | 'onPress' | 'label' | 'text' | 'avatar'> & {
+  disabled: boolean
+}
+
+/**
+ * La pastille « Suivre Nora » posée sur la photo d'une carte (Explorer, tranche R3). Un interrupteur,
+ * comme le bouton : toucher suit, retoucher arrête de suivre (relecture juridique jur-J8 : le geste
+ * se défait du même doigt, sans aller sur la page du membre).
+ * - Le nom lu est le texte affiché, sans la coche : « Tu suis Nora », état « activé ». La coche et
+ *   l'icône « ajouter » sont dessinées (Icon est caché aux lecteurs d'écran).
+ * - Dessinée sur 36 points, dans un cadre de 44 que le doigt touche : `hitSlop` n'existe pas sur le
+ *   web (même cadre que Tag et le petit Button).
+ * - Une garde contre la double tape : la pastille est posée là où l'on touche la carte, et la
+ *   seconde tape d'une double tape défaisait aussitôt l'abonnement. Pendant TAP_GUARD_MS après un
+ *   appui, les appuis suivants sont ignorés ; une tape plus tard est un vrai geste, qui passe.
+ * - Le verre de la pastille (`glass`) laisse voir la photo : son couple de contraste est mesuré sur
+ *   une photo noire et sur une photo blanche (`contrastPairs`, packages/brand).
+ * - Rayon `small` (18, la moitié de sa hauteur) plutôt que `pill` : sur une ligne, c'est une
+ *   pilule ; si un nom long passe à la ligne (texte agrandi), le verre ne coupe pas les lettres.
+ */
+function FollowChip({ followed, onPress, label, text, disabled, avatar }: ChipProps) {
+  const { colors, shadows } = useTheme()
+  // Le même enfoncement que les boutons, animé par Reanimated (voir Button.tsx).
+  const scale = useSharedValue(1)
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+
+  // useRef : une valeur gardée d'un rendu à l'autre sans redessiner le composant. La garde n'a rien
+  // à afficher : un état (useState) ferait redessiner la carte à chaque tape pour rien.
+  const guarded = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // À la sortie de l'écran, le minuteur en cours est retiré.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+  const press = () => {
+    if (disabled || guarded.current) return
+    guarded.current = true
+    timer.current = setTimeout(() => {
+      guarded.current = false
+      timer.current = null
+    }, TAP_GUARD_MS)
+    onPress()
+  }
+
+  return (
+    // maxWidth et flexShrink : jamais plus large que la photo ; un nom long passe à la ligne.
+    <Animated.View style={[{ maxWidth: '100%', flexShrink: 1, alignSelf: 'flex-start' }, animated]}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel={label}
+        // Les états passent par aria-… : react-native-web ignore accessibilityState.
+        aria-checked={followed}
+        aria-disabled={disabled}
+        disabled={disabled}
+        onPress={press}
+        // La barre d'espace active un interrupteur sur le web (voir keyboard.ts).
+        {...spaceToggles(press, disabled)}
+        onPressIn={() => {
+          scale.value = spring(pressScale, 'firm')
+        }}
+        onPressOut={() => {
+          scale.value = spring(1)
+        }}
+        // Le cadre de 44 points ; arrondi comme la pastille, pour que l'anneau du focus clavier
+        // (règle :focus-visible de app/+html.tsx) en suive la forme.
+        style={{
+          minHeight: layout.touchTarget,
+          justifyContent: 'center',
+          borderRadius: radii.small,
+        }}
+      >
+        {({ pressed }) => (
+          <View
+            style={{
+              minHeight: layout.chipHeight,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.sm,
+              paddingLeft: avatar ? space.xs : space.md,
+              paddingRight: space.md,
+              paddingVertical: space.xs,
+              borderRadius: radii.small,
+              borderWidth: borders.hairline,
+              borderColor: colors.glassBorder,
+              // Appuyée, un verre plus couvrant (panel), comme le bouton de verre.
+              backgroundColor: pressed ? colors.panel : colors.glass,
+              boxShadow: `${shadows.highlight}, ${shadows.float}`,
+              opacity: disabled ? 0.55 : 1,
+            }}
+          >
+            {/* La photo est décorative : le nom lu dit déjà qui l'on suit. Cachée aux lecteurs
+                d'écran (iOS, Android, web). Sa taille remplit la pastille, moins retrait et bord. */}
+            {avatar ? (
+              <View
+                style={{ flexShrink: 0 }}
+                aria-hidden
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Avatar
+                  name={avatar.name}
+                  source={avatar.source}
+                  label=""
+                  size={layout.chipHeight - 2 * (space.xs + borders.hairline)}
+                />
+              </View>
+            ) : null}
+            {/* minWidth: 0 : sans lui, la rangée ne descend pas sous la largeur du texte. */}
+            <View style={{ flexShrink: 1, minWidth: 0 }}>
+              <Text variant="callout" weight={700} selectable={false}>
+                {text}
+              </Text>
+            </View>
+            <View style={{ flexShrink: 0 }}>
+              <Icon name={followed ? 'check' : 'user-plus'} size={16} />
+            </View>
+          </View>
+        )}
+      </Pressable>
+    </Animated.View>
   )
 }
