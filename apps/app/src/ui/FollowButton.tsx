@@ -238,7 +238,10 @@ function FollowChip({ followed, onPress, label, text, disabled, avatar }: ChipPr
             ) : null}
             {/* minWidth: 0 : sans lui, la rangée ne descend pas sous la largeur du texte. */}
             <View style={{ flexShrink: 1, minWidth: 0 }}>
-              <Text variant="callout" weight={700} selectable={false}>
+              {/* Deux lignes au plus : un nom très long, à texte agrandi, couvrirait la photo et
+                  le panneau du bas (six lignes à 320 points). Le nom entier reste lu, et écrit
+                  dans le panneau de la carte. */}
+              <Text variant="callout" weight={700} selectable={false} numberOfLines={2}>
                 {text}
               </Text>
             </View>

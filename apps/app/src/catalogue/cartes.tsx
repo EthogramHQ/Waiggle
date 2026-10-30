@@ -79,7 +79,9 @@ const cafe = 'GIoKDYSlqIdPUXd3eEeHh9J/YIkI' // gitleaks:allow
 const papillon = 'GdkFJYTHYFSbVnaPWUZndpajf7QG' // gitleaks:allow
 
 const noop = () => {}
-const height = 360
+// La hauteur de SummaryCard (celle de ProjectCard par défaut) : à texte agrandi, le panneau du bas
+// y laisse la place de la pastille ; sur une carte de 360 points, il montait dessous.
+const height = 476
 
 export function CardsCatalogue() {
   const { i18n } = useTranslation()
