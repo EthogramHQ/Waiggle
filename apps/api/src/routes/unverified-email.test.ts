@@ -293,7 +293,13 @@ describe('a new address that already has an account', () => {
       expect(part).not.toContain('Léa')
       expect(part).not.toContain('exampel')
     }
-    expect(verificationMailsTo(ines.email)).toEqual([])
+    // Aucun lien de vérification depuis la demande : `verifiedMember` a déjà envoyé à Inès son
+    // lien d'inscription, avant `before`, et il ne compte pas ici.
+    expect(
+      sent.filter(
+        (mail) => mail.to === ines.email && mail.text.includes('/api/auth/verify-email?token='),
+      ),
+    ).toEqual([])
     expect((await accountNamed('Inès')).email).toBe(ines.email)
   })
 })

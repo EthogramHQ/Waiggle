@@ -154,7 +154,7 @@ describe('changing my address, from the request to the second link', () => {
     expect((await accountOf('Inès')).email).toBe(ines.email)
 
     // Le second lien : l'adresse change, vérifiée ; la page le confirme.
-    const done = await open(linkOf('newEmail', NEW_EMAIL))
+    const done = await open(linkOf('newEmail', NEW_EMAIL), cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect(await accountOf('Inès')).toMatchObject({ email: NEW_EMAIL, emailVerified: true })
@@ -166,7 +166,7 @@ describe('changing my address, from the request to the second link', () => {
 
   it('lets me sign in with the new address and the same password, and no longer with the old one', async () => {
     const cookie = await ctx.verifiedMember(ines)
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect((await ctx.signIn({ email: NEW_EMAIL, password: ines.password })).status).toBe(200)
     expect((await ctx.signIn({ email: ines.email, password: ines.password })).status).toBe(401)
@@ -176,7 +176,7 @@ describe('changing my address, from the request to the second link', () => {
     const phone = await ctx.verifiedMember(ines)
     const laptop = ctx.cookiesFrom(await ctx.signIn(ines))
 
-    await open(await askAndConfirm(phone))
+    await open(await askAndConfirm(phone), phone)
 
     for (const cookie of [phone, laptop]) {
       const { status, body } = await me(cookie)
@@ -189,7 +189,7 @@ describe('changing my address, from the request to the second link', () => {
     const cookie = await ctx.verifiedMember(ines)
     const before = (await me(cookie)).body
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     const after = (await me(cookie)).body
     expect({ ...after, email: null }).toEqual({ ...before, email: null })
@@ -202,7 +202,7 @@ describe('changing my address, from the request to the second link', () => {
   it('writes the three e-mails in the language of the member', async () => {
     const cookie = await ctx.verifiedMember({ ...ines, language: 'en' })
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect(ctx.mailer.sent.map((mail) => mail.subject)).toEqual(
       expect.arrayContaining([
@@ -238,7 +238,7 @@ describe('changing my address, from the request to the second link', () => {
 
     expect((await withinASecond(ask(cookie))).status).toBe(200)
     expect((await withinASecond(open(sentLink(ines.email)))).status).toBe(302)
-    expect((await withinASecond(open(sentLink(NEW_EMAIL)))).status).toBe(302)
+    expect((await withinASecond(open(sentLink(NEW_EMAIL), cookie))).status).toBe(302)
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
 })
@@ -269,12 +269,24 @@ describe('the pages the links lead to', () => {
     expect(confirm.status).toBe(302)
     expect(landing(confirm)).toEqual({ page: CONFIRMED_PAGE, error: null })
 
-    const done = await open(replaced(linkOf('newEmail', NEW_EMAIL), callbackURL))
+    // D1 (R2) : le second lien s'ouvre dans la session d'Inès. Better Auth y repose le cookie de
+    // cette session, rafraîchi (même jeton) : ce n'est pas un cookie nouveau. Aucun autre cookie
+    // n'est posé, sauf pour en expirer un, et aucune session ne s'ouvre.
+    const presented = cookie.split('; ')
+    const sessions = await sessionCount()
+    const done = await open(replaced(linkOf('newEmail', NEW_EMAIL), callbackURL), cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect(done.headers.getSetCookie()).toEqual(
-      done.headers.getSetCookie().filter((set) => /max-age=0|expires=thu, 01 jan 1970/i.test(set)),
+      done.headers
+        .getSetCookie()
+        .filter(
+          (set) =>
+            /max-age=0|expires=thu, 01 jan 1970/i.test(set) ||
+            presented.includes(set.split(';')[0] ?? ''),
+        ),
     )
+    expect(await sessionCount()).toBe(sessions)
     expect(await done.text()).not.toContain('"user"')
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
@@ -286,7 +298,7 @@ describe('the pages the links lead to', () => {
     const second = await askAndConfirm(cookie)
 
     expect(second.searchParams.has('callbackURL')).toBe(false)
-    const done = await open(second)
+    const done = await open(second, cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
@@ -313,8 +325,8 @@ describe('a link used twice', () => {
     const cookie = await ctx.verifiedMember(ines)
     const link = await askAndConfirm(cookie)
 
-    expect(landing(await open(link))).toEqual({ page: DONE_PAGE, error: null })
-    const again = await open(link)
+    expect(landing(await open(link, cookie))).toEqual({ page: DONE_PAGE, error: null })
+    const again = await open(link, cookie)
 
     expect(again.status).toBe(302)
     expect(landing(again).error).not.toBeNull()
@@ -531,7 +543,7 @@ describe('a link opened by another member', () => {
     const link = await askAndConfirm(cookie)
 
     expect(landing(await open(link, malikCookie)).error).not.toBeNull()
-    const res = await open(link)
+    const res = await open(link, cookie)
 
     expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
@@ -686,7 +698,7 @@ describe('a link that is no longer valid', () => {
     const earlierFirst = linkOf('changeEmail', ines.email)
     const earlierSecond = await askAndConfirm(cookie, 'ines.c@exemple.fr')
     // La troisième va jusqu'au bout : l'adresse devient ines.b@exemple.fr.
-    expect(landing(await open(await askAndConfirm(cookie)))).toEqual({
+    expect(landing(await open(await askAndConfirm(cookie), cookie))).toEqual({
       page: DONE_PAGE,
       error: null,
     })
@@ -807,7 +819,7 @@ describe('the trace of an address change', () => {
     const { id } = await accountOf('Inès')
     const spies = spyConsole()
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
     const lines = linesOf(spies)
@@ -887,7 +899,7 @@ describe('the link of the second e-mail (jur-R1)', () => {
 
     for (const secret of [ines.email, ines.name]) expect(readings.join('\n')).not.toContain(secret)
     // Témoin : le lien marche toujours.
-    expect(landing(await open(link))).toEqual({ page: DONE_PAGE, error: null })
+    expect(landing(await open(link, cookie))).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
 
