@@ -27,9 +27,11 @@ const features = [
   {
     id: 'comptes',
     name: 'Comptes',
-    tranche: 'Tranche 1 · Mise en ligne',
+    tranche: 'Tranche 1 · Mise en ligne, R2 · Le compte',
+    // R2 : mot de passe oublié, et les réglages du compte (/settings, ses rubriques, le mot de
+    // passe, l'adresse, la suppression) ; « Mon profil » dans les réglages reste au profil.
     pages:
-      /^\/(sign-up|sign-in|check-email|verified|account\/delete|account\/email|email-change\/(confirmed|done))$/,
+      /^\/(sign-up|sign-in|check-email|verified|forgot-password|reset-password|account\/delete|account\/email|email-change\/(confirmed|done|sign-in-first)|settings(\/\[section\]|\/account\/(delete|email)|\/security\/password)?)$/,
     routes: /^(ALL \/api\/auth)/,
     tables: /^(user|session|account|verification|rate_limit)$/,
   },
@@ -56,7 +58,7 @@ const features = [
     id: 'profil',
     name: 'Profil et langue',
     tranche: 'Tranche 2',
-    pages: /^\/(profile|account)$/,
+    pages: /^\/(profile|account|settings\/profile)$/,
     routes: /^\w+ \/v1\/me(\/|$)/,
     tables: /^(profile|member_handle|api_rate_limit)$/,
   },
