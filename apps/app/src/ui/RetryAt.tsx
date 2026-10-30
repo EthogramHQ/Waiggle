@@ -1,5 +1,5 @@
 // « Trop d'essais » (tranche R2) : quand le serveur refuse une connexion ou un envoi pour un temps
-// (en-tête `Retry-After`), l'écran dit à quelle heure réessayer, « Nouvel essai possible à 21:47 »,
+// (en-tête `Retry-After`), l'écran dit à quelle heure réessayer, « Nouvel essai possible à 21 h 47 »,
 // et son bouton reste inactif jusque-là, puis se libère tout seul (décision D3 du 29/10/2026).
 // Une heure fixe plutôt qu'un compte à rebours : un texte qui change chaque seconde est relu sans
 // fin par les lecteurs d'écran et attire l'œil pour rien (WCAG 2.2.2) ; l'heure, elle, reste la
@@ -55,15 +55,28 @@ type Props = {
 }
 
 /**
- * L'heure écrite dans la langue (« 21:47 » ou « 01:38 » en français, « 09:47 PM » en anglais) :
- * Intl.DateTimeFormat est la mise en forme des dates propre à chaque langue, fournie par
- * l'appareil. L'heure sur deux chiffres : « à 1:38 » se lisait mal en français.
+ * L'heure écrite dans la langue : « 21 h 47 » en français (typographie française, décision de
+ * Louis du 30/10/2026, D3), « 9:47 PM » en anglais. Intl.DateTimeFormat est la mise en forme des
+ * dates propre à chaque langue, fournie par l'appareil ; `formatToParts` la rend en morceaux
+ * (heure, minutes…), ce qui permet de poser nous-mêmes le « h » français, entouré d'espaces
+ * insécables pour que « 21 h 47 » ne se coupe jamais en fin de ligne.
  */
-export const formatRetryTime = (until: Date, language: string): string =>
-  new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(until)
+export const formatRetryTime = (until: Date, language: string): string => {
+  if (language.startsWith('fr')) {
+    const parts = new Intl.DateTimeFormat('fr', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(until)
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? ''
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? ''
+    return `${hour} h ${minute}`
+  }
+  return new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(until)
+}
 
 /**
- * La phrase « Nouvel essai possible à 21:47 », annoncée comme un état (`status` : les lecteurs
+ * La phrase « Nouvel essai possible à 21 h 47 », annoncée comme un état (`status` : les lecteurs
  * d'écran la lisent quand elle paraît, sans interrompre). Son nom ne change pas tant qu'on attend.
  */
 export function RetryAt({ until, format }: Props) {
