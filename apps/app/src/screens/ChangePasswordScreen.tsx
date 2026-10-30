@@ -1,6 +1,6 @@
 // Page « Changer ton mot de passe » (tranche R2, rubrique Sécurité des réglages ; la route est posée
 // par les réglages). Le membre tape son mot de passe actuel, puis le nouveau. L'actuel faux : son
-// champ le dit, rien ne change. Réussi : un toast « Mot de passe changé », et retour à la rubrique.
+// champ le dit, rien ne change. Réussi : retour à la rubrique, qui dit « Mot de passe changé ».
 // Le serveur déconnecte les autres appareils et garde celui-ci : la page le dit avant le geste
 // (relecture juridique, jur-3).
 import { ChangePasswordRequest, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
@@ -9,9 +9,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { changePassword, useSession } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
+import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Callout } from '../ui/Callout'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { HeldSpace } from '../ui/HeldSpace'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
@@ -20,7 +22,6 @@ import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
-import { useToast } from '../ui/theme/toast'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe.
@@ -35,7 +36,6 @@ type FieldErrors = {
 export function ChangePasswordScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const toast = useToast()
   const { data, isPending, error: sessionError, refetch } = useSession()
   const back = useGoBack('/settings')
   const [current, setCurrent] = useState('')
@@ -92,15 +92,12 @@ export function ChangePasswordScreen() {
     setSending(false)
     if (result.ok) {
       setError(null)
-      // Le toast survit au changement de page ; mais un toast ne porte aucune information absente
-      // de l'écran (décision R1) : la rubrique où l'on revient le dit aussi, dans un message poli
-      // (?announce=passwordChanged, relecture de l'interface R2, B2). dismissTo revient à la
-      // rubrique déjà ouverte dans l'historique au lieu d'en empiler une seconde ; arrivé ici par
-      // un lien direct, elle prend la place de cette page.
-      toast.show(
-        t(($) => $.settings.changePassword.done),
-        { icon: 'check-circle' },
-      )
+      // Pas de toast : la rubrique où l'on revient le dit elle-même, dans un message qui reçoit le
+      // focus (?announce=passwordChanged, relecture de l'interface R2, B2). Un toast en plus le
+      // faisait annoncer deux fois (relecture de design R2, C3), et un toast ne porte rien qui
+      // manque à l'écran (décision R1). dismissTo revient à la rubrique déjà ouverte dans
+      // l'historique au lieu d'en empiler une seconde ; arrivé ici par un lien direct, elle prend
+      // la place de cette page.
       router.dismissTo('/settings/security?announce=passwordChanged')
       return
     }
@@ -118,19 +115,23 @@ export function ChangePasswordScreen() {
   const missing = Math.max(0, PASSWORD_MIN_LENGTH - Array.from(fresh).length)
   // Recopiée dans une constante : le sélecteur de t() perd le rétrécissement de `fieldErrors.next`.
   const nextError = fieldErrors.next
-  // « Trop d'essais » ne reste qu'en attendant l'heure dite (ou jusqu'au prochain envoi, sans heure).
-  const shownError =
-    error === 'tooManyAttempts' && waitSeconds !== null && !retry.blocked ? null : error
+  // « Trop d'essais » ne reste qu'en attendant l'heure dite (ou jusqu'au prochain envoi, sans heure) :
+  // à l'heure dite, il s'efface en gardant sa place jusqu'au prochain envoi (C6).
+  const vacated = Boolean(retry.ended) && error === 'tooManyAttempts'
 
   return (
     <Screen
+      // Sur ordinateur, la barre du haut, comme les autres pages des réglages (relecture de design C4).
+      header={<TopNav inSettings />}
       onBack={back}
       title={t(($) => $.settings.changePassword.screenTitle)}
       subtitle={t(($) => $.settings.changePassword.intro)}
       footer={
         <>
-          {shownError ? (
-            <Notice ref={messageRef} message={t(($) => $.auth.errors[shownError], lengths)} />
+          {error ? (
+            <HeldSpace vacated={vacated}>
+              <Notice ref={messageRef} message={t(($) => $.auth.errors[error], lengths)} />
+            </HeldSpace>
           ) : null}
           {/* Bloqué par « trop d'essais », le bouton dit pourquoi (RetryButton, jur-13). */}
           <RetryButton

@@ -19,6 +19,7 @@ import { setPendingEmail } from '../accounts/pendingVerification'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { firstParam } from '../navigation/params'
 import { focusWithoutScroll } from '../ui/focus'
+import { HeldSpace } from '../ui/HeldSpace'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
@@ -76,8 +77,12 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
     router.setParams({ code: undefined })
   }, [hydrated, codeFromLink, router, onDraft])
 
+  // Un envoi à la fois : Entrée tapée deux fois, ou Entrée puis le bouton, n'envoient qu'une demande
+  // (l'état `loading` n'est relu qu'au dessin suivant, trop tard pour la seconde).
+  const busy = useRef(false)
+
   const submit = async () => {
-    if (retry.blocked) return
+    if (busy.current || retry.blocked) return
     // 1. Vérification locale avec le même schéma que l'API (packages/contracts).
     const parsed = SignUpRequest.safeParse({
       name: draft.name,
@@ -100,9 +105,11 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
     setFieldErrors({})
     setError(null)
     setRetryAfter(null)
+    busy.current = true
     setLoading(true)
     // 2. Envoi à l'API, puis 3. écran suivant ou message d'erreur.
     const result = await signUp(parsed.data)
+    busy.current = false
     setLoading(false)
     if (result.ok) {
       // L'adresse passe par l'état partagé, pas par l'adresse de la page (jur-9).
@@ -128,7 +135,12 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
         </Text>
         <Text tone="secondary">{t(($) => $.auth.signUp.subtitle)}</Text>
       </Stack>
-      {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
+      {error ? (
+        // À la fin de l'attente, « Trop d'essais » s'efface en gardant sa place (C6).
+        <HeldSpace vacated={Boolean(retry.ended) && error === 'tooManyAttempts'}>
+          <Notice message={t(($) => $.auth.errors[error], lengths)} />
+        </HeldSpace>
+      ) : null}
       <TextField
         inputRef={inputs.inviteCode}
         label={t(($) => $.auth.fields.inviteCode)}
@@ -168,6 +180,9 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
           onChangeText={setPassword}
           secureTextEntry // masque les caractères tapés (un bouton permet de les afficher)
           autoComplete="new-password" // les gestionnaires de mots de passe proposent d'en générer un
+          // Entrée dans le dernier champ envoie, comme le bouton (relecture de design C1).
+          returnKeyType="go"
+          onSubmitEditing={() => void submit()}
           error={fieldMessage(fieldErrors.password)}
         />
         {/* Une alvéole par caractère exigé : on voit d'un coup d'œil ce qu'il reste à taper. */}

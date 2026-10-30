@@ -12,6 +12,7 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { safeNext } from '../navigation/next'
 import { firstParam } from '../navigation/params'
+import { HeldSpace } from '../ui/HeldSpace'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
 import { RetryButton } from '../ui/RetryButton'
@@ -62,9 +63,12 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
   // Le délai donné par le serveur après « trop d'essais » ; le hook en tire l'heure et le blocage.
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const retry = useRetryAt(retryAfter)
+  // Un envoi à la fois : Entrée tapée deux fois dans le mot de passe, ou Entrée puis le bouton,
+  // n'envoient qu'une demande (l'état `loading` n'est relu qu'au dessin suivant, trop tard).
+  const busy = useRef(false)
 
   const submit = async () => {
-    if (retry.blocked) return
+    if (busy.current || retry.blocked) return
     const parsed = SignInRequest.safeParse({ email: draft.email, password })
     if (!parsed.success) {
       setFieldErrors(fieldErrorsFrom(parsed.error))
@@ -74,8 +78,10 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
     setError(null)
     // Un nouveau refus avec le même délai doit relancer l'attente : on repart de rien.
     setRetryAfter(null)
+    busy.current = true
     setLoading(true)
     const result = await signIn(parsed.data)
+    busy.current = false
     setLoading(false)
     // replace (et non push) : le bouton « retour » ne ramènera pas sur l'écran de connexion.
     if (result.ok) {
@@ -99,18 +105,22 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
         <Notice tone="success" polite message={t(($) => $.auth.signIn.passwordChanged)} />
       ) : null}
       {error ? (
-        <Notice
-          message={t(($) => $.auth.errors[error], lengths)}
-          // Trop d'essais : plutôt que d'attendre, on peut choisir un nouveau mot de passe.
-          action={
-            error === 'tooManyAttempts'
-              ? {
-                  label: t(($) => $.auth.chooseNewPassword),
-                  onPress: () => router.push('/forgot-password'),
-                }
-              : undefined
-          }
-        />
+        // À la fin de l'attente, « Trop d'essais » n'est plus vrai : le message s'efface, mais sa
+        // place reste vide jusqu'au prochain envoi (rien ne remonte sous le doigt, C6).
+        <HeldSpace vacated={Boolean(retry.ended) && error === 'tooManyAttempts'}>
+          <Notice
+            message={t(($) => $.auth.errors[error], lengths)}
+            // Trop d'essais : plutôt que d'attendre, on peut choisir un nouveau mot de passe.
+            action={
+              error === 'tooManyAttempts'
+                ? {
+                    label: t(($) => $.auth.chooseNewPassword),
+                    onPress: () => router.push('/forgot-password'),
+                  }
+                : undefined
+            }
+          />
+        </HeldSpace>
       ) : null}
       <Stack gap="xs">
         <FieldGroup>
@@ -128,6 +138,9 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
             onChangeText={setPassword}
             secureTextEntry
             autoComplete="current-password"
+            // Entrée dans le dernier champ envoie, comme le bouton (relecture de design C1).
+            returnKeyType="go"
+            onSubmitEditing={() => void submit()}
           />
         </FieldGroup>
         <Row justify="end">

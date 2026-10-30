@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
 import { changeEmail, useSession } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
+import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
@@ -236,7 +237,12 @@ export function ChangeEmailScreen() {
   )
 
   return (
-    <Screen onBack={back} title={t(($) => $.account.changeEmail.title)}>
+    // Sur ordinateur, la barre du haut, comme les autres pages des réglages (relecture de design C4).
+    <Screen
+      header={<TopNav inSettings />}
+      onBack={back}
+      title={t(($) => $.account.changeEmail.title)}
+    >
       {content}
     </Screen>
   )

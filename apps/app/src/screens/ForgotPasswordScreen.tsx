@@ -12,6 +12,7 @@ import { canOpenMailbox, openMailbox } from '../accounts/mailbox'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { HeldSpace } from '../ui/HeldSpace'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
 import { RetryButton } from '../ui/RetryButton'
@@ -92,11 +93,10 @@ export function ForgotPasswordScreen() {
     if (result.error === 'tooManyAttempts') setWaitSeconds(result.retryAfterSeconds)
   }
 
-  // « Trop d'essais » ne reste affiché que tant qu'on attend : à l'heure dite, il s'efface et le
-  // bouton se libère. Sans heure donnée par le serveur, il reste jusqu'au prochain envoi.
-  const tooMany =
-    error === 'tooManyAttempts' && (retry.blocked || waitSeconds === null) ? error : null
-  const shownError = error === 'tooManyAttempts' ? tooMany : error
+  // « Trop d'essais » ne reste affiché que tant qu'on attend : à l'heure dite, il s'efface (sa place
+  // reste vide jusqu'au prochain envoi, rien ne remonte sous le doigt : C6) et le bouton se libère.
+  // Sans heure donnée par le serveur, il reste jusqu'au prochain envoi.
+  const vacated = Boolean(retry.ended) && error === 'tooManyAttempts'
 
   // Après les boutons, comme sur la maquette : la sortie discrète, vers la connexion.
   const exit = (
@@ -167,11 +167,13 @@ export function ForgotPasswordScreen() {
       />
       {/* Un refus d'abord (trop d'essais, serveur injoignable) : il prend le focus à la place de la
           confirmation, qui reste dessous telle quelle (rien ne saute sous le doigt). */}
-      {shownError ? (
-        <Notice
-          ref={focusTo.current === 'error' ? messageRef : undefined}
-          message={t(($) => $.auth.errors[shownError], lengths)}
-        />
+      {error ? (
+        <HeldSpace vacated={vacated}>
+          <Notice
+            ref={focusTo.current === 'error' ? messageRef : undefined}
+            message={t(($) => $.auth.errors[error], lengths)}
+          />
+        </HeldSpace>
       ) : null}
       {sentTo ? (
         // La même confirmation dans tous les cas, lue sans couper le lecteur d'écran (status).
