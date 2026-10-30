@@ -229,7 +229,12 @@ const signUp = async (someone, name, { resend = false } = {}) => {
     // Le premier e-mail est arrivé : on compte les e-mails reçus, puis on demande le suivant.
     const received = mailsTo(email).length
     await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
-    await page.getByText('Un nouvel e-mail vient de partir.', { exact: true }).waitFor()
+    // La phrase reste vraie dans les cas que l'API cache (relecture juridique de R2, B1).
+    await page
+      .getByText('Si cette adresse attend sa vérification, un nouvel e-mail vient de partir.', {
+        exact: true,
+      })
+      .waitFor()
     link = await linkAfter(email, received, /https?:\/\/\S+verify-email\S+/, 'lien renvoyé')
     console.log(`  ok : ${name} a reçu un second lien de vérification`)
   }
