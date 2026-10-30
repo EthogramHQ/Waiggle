@@ -90,6 +90,10 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /v1/tags/:slug': ['hidesBlocked', 'allowed'],
   'GET /v1/feed/following': ['hidesBlocked', 'allowed'],
   'GET /v1/feed/discover': ['hidesBlocked', 'allowed'],
+  // La recherche par mots et la liste des outils (tranche R3) : des lectures qui montrent les
+  // contenus des autres, cachées à un membre bloqué dans un sens ou dans l'autre.
+  'GET /v1/search': ['hidesBlocked', 'allowed'],
+  'GET /v1/tools': ['hidesBlocked', 'allowed'],
   // Les notifications.
   'GET /v1/notifications': ['hidesBlocked', 'allowed'],
   'GET /v1/notifications/unread': ['hidesBlocked', 'allowed'],
@@ -175,6 +179,14 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'GET /v1/feed/discover': {
     file: 'blocks-visibility.test.ts',
     test: 'hides the projects of the other one from the discovery feed and the tag pages',
+  },
+  'GET /v1/search': {
+    file: 'search.test.ts',
+    test: 'hides a blocked member, its projects and their tools, in both directions',
+  },
+  'GET /v1/tools': {
+    file: 'tools.test.ts',
+    test: 'leaves the tools of a blocked member out of the list, in both directions',
   },
   'GET /v1/notifications': {
     file: 'blocks-visibility.test.ts',
