@@ -25,6 +25,9 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     replace: mockReplace,
     back: jest.fn(),
+    // R2 : après le succès, l'écran revient à la rubrique Sécurité par `dismissTo` (relecture de
+    // l'interface, B2) ; le faux routeur doit l'avoir.
+    dismissTo: jest.fn(),
     canGoBack: () => true,
     setParams: jest.fn(),
   }),
