@@ -1,22 +1,19 @@
 // La section « E-mails » des réglages (tranche 6c), déplacée de « Mon profil » en R2 : elle sert à
-// la rubrique « Notifications » des réglages, et reste au bas de « Mon profil » tant que celui-ci
-// n'est pas devenu une feuille (ui-dev S2). Deux interrupteurs, enregistrés chacun dès qu'on le touche.
-import { useLocalSearchParams } from 'expo-router'
+// la rubrique « Notifications » des réglages, et seulement à elle (l'ancien lien
+// /profile?section=emails y mène, app/profile.tsx). Deux interrupteurs, enregistrés chacun dès
+// qu'on le touche.
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type ApiErrorKey, errorKey } from '../../api/errors'
 import { useEmailPreferences, useUpdateEmailPreferences } from '../../email/api'
-import { firstParam } from '../../navigation/params'
 import { useSignInAgain } from '../../navigation/signInAgain'
 import { Button } from '../../ui/Button'
-import { type Focusable, focusWithoutScroll, revealWithoutJump } from '../../ui/focus'
+import { type Focusable, focusWithoutScroll } from '../../ui/focus'
 import { ListGroup, ListRow } from '../../ui/ListGroup'
 import { Notice } from '../../ui/Notice'
 import { Stack } from '../../ui/Stack'
 import { Switch } from '../../ui/Switch'
 import { Text } from '../../ui/Text'
-import { useHydrated } from '../../ui/theme/hydration'
-import { useCalmMotion } from '../../ui/theme/motion'
 
 /**
  * La section « E-mails » : le récap de la semaine (activé par défaut) et l'e-mail de mentions et de
@@ -32,13 +29,6 @@ export function EmailSettings({ titled = true }: { titled?: boolean }) {
   const save = useUpdateEmailPreferences()
   const signInAgain = useSignInAgain()
   const data = preferences.data
-  // Arrivé depuis « Mon compte » (/profile?section=emails) : la section vient dans l'écran.
-  // L'adresse n'est connue que dans le navigateur : on attend d'y être (ui/theme/hydration.ts).
-  const section = firstParam(useLocalSearchParams<{ section?: string | string[] }>().section)
-  const hydrated = useHydrated()
-  const calm = useCalmMotion()
-  const sectionRef = useRef<Focusable>(null)
-  const revealed = useRef(false)
 
   // « Réessayer » a marché : la ligne qui portait le bouton disparaît, et le focus du clavier, qui
   // était dessus, irait tout en haut de la page. On le pose sur le premier interrupteur, dès qu'il
@@ -80,19 +70,6 @@ export function EmailSettings({ titled = true }: { titled?: boolean }) {
   const [failedRead, setFailedRead] = useState(readFailure)
   if (readFailure !== null && readFailure !== failedRead) setFailedRead(readFailure)
   const loadFailure = data ? null : (readFailure ?? (retrying ? failedRead : null))
-
-  // La section a sa hauteur finale (les réglages, ou la ligne qui dit qu'ils manquent) : on la fait
-  // venir dans l'écran, une seule fois, au dessin suivant (requestAnimationFrame), quand sa place
-  // est connue. Sur téléphone, revealWithoutJump ne fait rien : la page s'ouvre en haut.
-  const settled = data !== undefined || loadFailure !== null
-  useEffect(() => {
-    if (!hydrated || section !== 'emails' || !settled || revealed.current) return
-    const frame = requestAnimationFrame(() => {
-      revealed.current = true
-      revealWithoutJump(sectionRef.current, calm)
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [hydrated, section, settled, calm])
 
   // Ce qu'a donné le dernier changement : enregistré, ou la raison de l'échec. Pendant l'envoi du
   // suivant, le hook ne dit plus rien (ni « enregistré » ni échec) : on garde le message d'avant
@@ -172,7 +149,7 @@ export function EmailSettings({ titled = true }: { titled?: boolean }) {
   // paddingY : un peu plus d'air au-dessus du titre, pour que la section se détache du formulaire.
   // Sans titre (`titled` faux) : la rubrique « Notifications » des réglages porte déjà le sien.
   return (
-    <Stack gap="md" {...(titled ? { paddingY: 'lg' as const } : null)} ref={sectionRef}>
+    <Stack gap="md" {...(titled ? { paddingY: 'lg' as const } : null)}>
       {titled ? (
         <Text variant="heading" heading={2}>
           {t(($) => $.profile.emails.title)}

@@ -26,9 +26,10 @@ type Props = {
   action?: ReactNode
   /**
    * Le niveau du nom : 1 (par défaut), le titre de la page du membre ; 2 quand l'en-tête est un
-   * aperçu posé dans une page qui a déjà son titre (la feuille « Mon profil », tranche R2).
+   * aperçu posé dans une page qui a déjà son titre ; 3 quand cet aperçu a lui-même sa légende en
+   * niveau 2 (« Aperçu de ta page », dans la feuille « Mon profil », tranche R2).
    */
-  heading?: 1 | 2
+  heading?: 1 | 2 | 3
 }
 
 export function MemberHeader({
