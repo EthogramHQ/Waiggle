@@ -1057,7 +1057,8 @@ const pages = [
       await page.getByLabel('Adresse e-mail').fill('ines.haddad@exemple.fr')
       await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
       await page.getByRole('button', { name: 'Me connecter' }).click()
-      await page.getByRole('status').waitFor()
+      // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
+      await page.getByText(/Nouvel essai possible/).waitFor()
     },
   },
   { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
