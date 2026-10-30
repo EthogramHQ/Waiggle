@@ -139,11 +139,16 @@ describe('HomeScreen', () => {
     // Le logo sert de titre à la page : les lecteurs d'écran l'annoncent avec la phrase d'accueil.
     expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
     expect(screen.getByText('Montre à tes proches ce que tu construis avec l’IA.')).toBeTruthy()
+    // R2, décision D2 (jur-B4) : la phrase de confidentialité dit ce qui est vrai aujourd'hui,
+    // moteurs de recherche compris ; R12 la remplacera quand le public existera.
     expect(
-      screen.getByText(
+      screen.getByText('Rien n’est visible sans compte, ni trouvé par un moteur de recherche.'),
+    ).toBeTruthy()
+    expect(
+      screen.queryByText(
         'Les projets et les profils ne sont visibles que par les membres connectés.',
       ),
-    ).toBeTruthy()
+    ).toBeNull()
   })
 
   it('welcomes the visitor in English when that is their language', async () => {
@@ -179,14 +184,15 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(2, '/sign-in')
   })
 
-  it('greets a signed-in member by name and leads to the account page', async () => {
+  // R2 : « Mon compte » devient la page « Réglages » (/settings) ; /account y redirige.
+  it('greets a signed-in member by name and leads to the settings page', async () => {
     mockSession({ user: { name: 'Léa' } })
     await renderWithI18n(<HomeScreen />)
 
     expect(screen.getByText('Bonjour Léa\u202f!')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Créer un compte' })).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: 'Mon compte' }))
-    expect(mockPush).toHaveBeenCalledWith('/account')
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.home.account) }))
+    expect(mockPush).toHaveBeenCalledWith('/settings')
   })
 
   it('invites a signed-in member to publish a project', async () => {
@@ -593,5 +599,55 @@ describe('the home screen of a suspended member', () => {
     await act(async () => {})
     expect(screen.getByRole('button', { name: fr.t(($) => $.home.publish) })).toBeTruthy()
     expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
+  })
+})
+
+// --- Tranche R2 : l'accueil d'un visiteur, redessiné ---
+// Ce que Jest ne mesure pas : la feuille claire (430 de large sur ordinateur) et le second bouton
+// en verre sont des styles, l'affaire des captures et de la relecture de design.
+
+describe('the visitor home after the redesign (R2)', () => {
+  it('offers « Créer un compte » first, then « J’ai déjà un compte », in that order', async () => {
+    await renderWithI18n(<HomeScreen />)
+
+    const buttons = screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)
+    const create = buttons.indexOf(fr.t(($) => $.home.signUp))
+    const signIn = buttons.indexOf(fr.t(($) => $.home.haveAccount))
+    expect(create).toBeGreaterThanOrEqual(0)
+    expect(signIn).toBe(create + 1)
+  })
+
+  it('says the privacy sentence of decision D2, in English too', async () => {
+    await renderWithI18n(<HomeScreen />, 'en')
+
+    expect(screen.getByText(createI18n('en').t(($) => $.home.membersOnly))).toBeTruthy()
+  })
+
+  it('announces « Voir le code » as a link to an external site', async () => {
+    await renderWithI18n(<HomeScreen />)
+
+    const link = screen.getByRole('link', { name: containing(fr.t(($) => $.home.seeCode)) })
+    const external = fr.t(($) => $.common.externalSite)
+    const props = link.props as Record<string, unknown>
+    expect(
+      [props.accessibilityHint, props['aria-description'], props.accessibilityLabel].some(
+        (value) => typeof value === 'string' && value.includes(external),
+      ),
+    ).toBe(true)
+  })
+
+  it('shows the same welcome, both buttons and the language choice on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithI18n(<HomeScreen />)
+
+      expect(screen.getByRole('header', { name: `Bienvenue sur ${appName}` })).toBeTruthy()
+      expect(screen.getByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeTruthy()
+      expect(screen.getByRole('button', { name: fr.t(($) => $.home.haveAccount) })).toBeTruthy()
+      expect(screen.getByRole('radio', { name: 'English' })).toBeTruthy()
+      expect(screen.getByText(fr.t(($) => $.home.membersOnly))).toBeTruthy()
+    } finally {
+      restore()
+    }
   })
 })
