@@ -232,9 +232,12 @@ const render = ({
         `<p style="margin:0;text-align:center;font-size:14px;line-height:1.4"><a href="${escapeHtml(link.url)}" style="display:inline-block;padding:10px 4px;color:${c.textMuted}">${escapeHtml(link.label)}</a></p>`,
     )
     .join('\n    ')
+  // Le bouton est un lien en `inline-block` : quand son libellé passe sur deux lignes (320 px), le
+  // fond et le jeu intérieur entourent les deux lignes, au lieu que chaque ligne garde son propre
+  // fond et que les deux se chevauchent (relecture de design de R2, B3).
   const htmlButton = button
     ? `<p style="margin:28px 0">
-      <a href="${escapeHtml(button.url)}" style="background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(button.label)}</a>
+      <a href="${escapeHtml(button.url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(button.label)}</a>
     </p>`
     : ''
   const html = `<!doctype html>
