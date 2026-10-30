@@ -185,45 +185,21 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(2, '/sign-in')
   })
 
-  // R2 : « Mon compte » devient la page « Réglages » (/settings) ; /account y redirige.
-  it('greets a signed-in member by name and leads to the settings page', async () => {
-    mockSession({ user: { name: 'Léa' } })
-    await renderWithI18n(<HomeScreen />)
-
-    expect(screen.getByText('Bonjour Léa\u202f!')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Créer un compte' })).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.home.account) }))
-    expect(mockPush).toHaveBeenCalledWith('/settings')
-  })
-
-  it('invites a signed-in member to publish a project', async () => {
-    mockSession({ user: { name: 'Léa' } })
-    await renderWithI18n(<HomeScreen />)
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier un projet' }))
-
-    expect(mockPush).toHaveBeenCalledWith('/projects/new')
-  })
-
-  it('leads a signed-in member to her own projects', async () => {
-    mockSession({ user: { id: 'u1', name: 'Léa' } })
-    await renderWithI18n(<HomeScreen />)
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Mes projets' }))
-
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u1' } })
-  })
+  // R3 (F-Nav6, F-Nav8, F-Nav10) : le salut, la rangée de raccourcis (« Publier », « Mes projets »,
+  // « Réglages ») et le choix « Abonnements / Découvrir » ont quitté l'accueil : la barre d'onglets
+  // et la barre du haut les remplacent (TabBar.test.tsx, TopNav.test.tsx), Découvrir devient
+  // l'onglet Explorer (ExploreScreen.test.tsx). Les anciens tests de ces raccourcis sont retirés.
 })
 
 describe('the « following » feed on the home screen', () => {
-  it('opens on « following », with the new projects of the people followed', async () => {
+  it('shows the new projects of the people followed, without a feed choice (R3)', async () => {
     await renderMemberHome()
 
-    expect(screen.getByRole('radio', { name: 'Abonnements', checked: true })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'Découvrir', checked: false })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
-    // Le filtre des testeurs n'appartient qu'à « Découvrir ».
+    // R3 : le Fil ne garde que les abonnements ; « Découvrir » et son filtre sont dans Explorer.
+    expect(screen.queryByRole('radio', { name: 'Abonnements' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Découvrir' })).toBeNull()
     expect(screen.queryByRole('radio', { name: 'Cherchent des testeurs' })).toBeNull()
   })
 
@@ -238,18 +214,18 @@ describe('the « following » feed on the home screen', () => {
     })
   })
 
-  it('invites a member who follows nobody to discover projects', async () => {
+  // R3 : le fil vide mène à l'onglet Explorer (/explore), qui a repris « Découvrir ».
+  it('invites a member who follows nobody to explore projects', async () => {
     mockFollowing({ items: [], followsAnyone: false })
     await renderMemberHome()
 
     expect(screen.getByText('Tu ne suis personne pour l’instant')).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Découvrir des projets' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Explorer les projets' }))
 
-    expect(screen.getByRole('radio', { name: 'Découvrir', checked: true })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Le carnet de jardin' })).toBeTruthy()
+    expect(mockPush).toHaveBeenCalledWith('/explore')
   })
 
-  it('says when the people followed have published nothing yet, and leads to « discover »', async () => {
+  it('says when the people followed have published nothing yet, and leads to « explore »', async () => {
     mockFollowing({ items: [], followsAnyone: true })
     await renderMemberHome()
 
@@ -257,8 +233,8 @@ describe('the « following » feed on the home screen', () => {
       screen.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.'),
     ).toBeTruthy()
     expect(screen.queryByText('Tu ne suis personne pour l’instant')).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: 'Découvrir des projets' }))
-    expect(screen.getByRole('radio', { name: 'Découvrir', checked: true })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Explorer les projets' }))
+    expect(mockPush).toHaveBeenCalledWith('/explore')
   })
 
   it('keeps the cards already read when the next page fails, and offers to retry', async () => {
@@ -325,13 +301,6 @@ describe('the « following » feed on the home screen', () => {
     expect(screen.getByText('Tu es à jour')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
   })
-
-  it('still offers to publish and to reach one’s own projects', async () => {
-    await renderMemberHome()
-
-    expect(screen.getByRole('button', { name: 'Publier un projet' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Mes projets' })).toBeTruthy()
-  })
 })
 
 describe('the news banner', () => {
@@ -372,68 +341,14 @@ describe('the news banner', () => {
   })
 })
 
-describe('the « discover » feed on the home screen', () => {
-  it('shows the public projects of every member', async () => {
-    await renderMemberHome()
-
-    await fireEvent.press(screen.getByRole('radio', { name: 'Découvrir' }))
-
-    expect(screen.getByRole('radio', { name: 'Découvrir', checked: true })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Le carnet de jardin' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'Tous', checked: true })).toBeTruthy()
-    expect(useDiscoverFeed).toHaveBeenLastCalledWith(expect.objectContaining({ testers: false }))
-  })
-
-  it('keeps only the projects looking for testers once that filter is chosen', async () => {
-    await renderMemberHome()
-    await fireEvent.press(screen.getByRole('radio', { name: 'Découvrir' }))
-
-    await fireEvent.press(screen.getByRole('radio', { name: 'Cherchent des testeurs' }))
-
-    expect(
-      screen.getByRole('radio', { name: 'Cherchent des testeurs', checked: true }),
-    ).toBeTruthy()
-    expect(useDiscoverFeed).toHaveBeenLastCalledWith(expect.objectContaining({ testers: true }))
-  })
-
-  it('says when no project is public yet', async () => {
-    mockDiscover({ items: [] })
-    await renderMemberHome()
-
-    await fireEvent.press(screen.getByRole('radio', { name: 'Découvrir' }))
-
-    expect(screen.getByText('Aucun projet public pour l’instant.')).toBeTruthy()
-  })
-
-  it('says when no project is looking for testers', async () => {
-    mockDiscover({ items: [] })
-    await renderMemberHome()
-    await fireEvent.press(screen.getByRole('radio', { name: 'Découvrir' }))
-
-    await fireEvent.press(screen.getByRole('radio', { name: 'Cherchent des testeurs' }))
-
-    expect(screen.getByText('Aucun projet ne cherche de testeurs pour l’instant.')).toBeTruthy()
-  })
-
-  it('also loads the next page on request', async () => {
-    const discover = mockDiscover({ nextCursor: 'abc' }, { hasNextPage: true })
-    await renderMemberHome()
-    await fireEvent.press(screen.getByRole('radio', { name: 'Découvrir' }))
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Afficher la suite' }))
-
-    expect(discover.fetchNextPage).toHaveBeenCalledTimes(1)
-  })
-})
-
+// R3 : le fil « Découvrir » (tous, testeurs, vide, page suivante) se teste dans
+// ExploreScreen.test.tsx ; l'accueil ne le lit plus.
 describe('the home screen of a member on a computer', () => {
-  it('shows the feed and its choices, and still offers to publish', async () => {
+  it('shows the feed, and still offers to publish', async () => {
     const restore = setDesktopWindow()
     try {
       await renderMemberHome()
 
-      expect(screen.getByRole('radio', { name: 'Abonnements', checked: true })).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
       expect(screen.getByText('Tu es à jour')).toBeTruthy()
       // Sur ordinateur, la barre du haut peut aussi proposer de publier : au moins un bouton.
@@ -503,16 +418,15 @@ describe('notes in the « following » feed on the home screen', () => {
   })
 })
 
-// --- Tranche 6b : la cloche des notifications, à côté de « Mes projets » sur téléphone ---
+// --- Tranche 6b : la cloche des notifications sur téléphone (R3 : à droite du logo, en haut du Fil) ---
 
 describe('the notification bell on the home screen of a phone', () => {
   const { t } = createI18n('fr')
 
-  it('says how many groups are new, next to « my projects »', async () => {
+  it('says how many groups are new', async () => {
     jest.mocked(useUnreadCount).mockReturnValue(1)
     await renderMemberHome()
 
-    expect(screen.getByRole('button', { name: 'Mes projets' })).toBeTruthy()
     expect(
       screen.getByRole('button', { name: t(($) => $.notifications.bellNew, { count: 1 }) }),
     ).toBeTruthy()
@@ -574,8 +488,8 @@ describe('the home screen of a suspended member', () => {
 
     await banner()
     expect(screen.queryByRole('button', { name: fr.t(($) => $.home.publish) })).toBeNull()
-    // Témoins : il lit tout ce qu'il lisait avant.
-    expect(screen.getByRole('button', { name: fr.t(($) => $.home.myProjects) })).toBeTruthy()
+    // Témoin : il lit tout ce qu'il lisait avant (R3 : « Publier » est le « + » de la barre
+    // d'onglets, masqué pour lui ; TabBar.test.tsx).
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
   })
 
@@ -587,7 +501,7 @@ describe('the home screen of a suspended member', () => {
 
       await banner()
       expect(screen.queryAllByRole('button', { name: fr.t(($) => $.home.publish) })).toHaveLength(0)
-      expect(screen.getByRole('radio', { name: 'Abonnements', checked: true })).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
     } finally {
       restore()
     }

@@ -146,22 +146,25 @@ describe('the top bar of a suspended member', () => {
   })
 })
 
-// Dans les réglages (R2), la photo du membre ne mène plus aux réglages, où l'on est déjà : elle
-// reste là, sans être un bouton (relecture de l'interface, C7).
-describe('the top bar inside the settings', () => {
-  it('offers « Mon compte » outside the settings', async () => {
+// R3 (F-Nav8, F-Nav9) : la photo de la barre s'appelle « Moi » et mène à sa propre page (/me), d'où
+// la roue ouvre les réglages. Dans les réglages aussi : on n'y est plus « déjà » (R2 l'y laissait
+// sans lien, relecture de l'interface C7), puisque « Moi » est une autre page.
+describe('the photo of the top bar', () => {
+  it('is named « Moi » and leads to one’s own page', async () => {
     await renderWithProviders(<TopNav />)
 
-    await fireEvent.press(screen.getByRole('button', { name: t(($) => $.home.account) }))
-    expect(mockPush).toHaveBeenCalledWith('/settings')
+    await fireEvent.press(screen.getByRole('link', { name: t(($) => $.nav.me) }))
+    expect(mockPush).toHaveBeenCalledWith('/me')
+    // L'ancien nom a disparu avec l'ancienne destination.
+    expect(screen.queryByRole('button', { name: t(($) => $.home.account) })).toBeNull()
   })
 
-  it('shows the photo without a link back to the settings', async () => {
+  it('leads to « Moi » from the settings too', async () => {
     await renderWithProviders(<TopNav inSettings />)
 
     // Témoin : la barre est là.
     expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: t(($) => $.home.account) })).toBeNull()
-    expect(screen.queryByRole('link', { name: t(($) => $.home.account) })).toBeNull()
+    await fireEvent.press(screen.getByRole('link', { name: t(($) => $.nav.me) }))
+    expect(mockPush).toHaveBeenCalledWith('/me')
   })
 })

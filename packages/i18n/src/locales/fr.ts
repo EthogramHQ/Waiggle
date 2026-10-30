@@ -421,6 +421,9 @@ export const fr = {
     },
     /** R2 : la légende de l'aperçu en direct, à droite de la feuille sur ordinateur. */
     previewTitle: 'Aperçu de ta page',
+    /** R3 : sous le nom, la rubrique dit que la recherche trouve le membre (relecture juridique, jur-J3). */
+    searchable:
+      'Les membres connectés peuvent te trouver par ton nom ou ton pseudo dans la recherche.',
   },
   project: {
     new: {
@@ -972,6 +975,9 @@ export const fr = {
     handle: '@{{handle}}',
     favoriteTools: 'Outils favoris',
     projects: 'Projets',
+    /** R3 : le nombre à côté de « Projets » ou « Mes projets », dans le nom lu. */
+    projectCount_one: '{{count}} projet',
+    projectCount_other: '{{count}} projets',
     empty: 'Pas encore de projet public.',
     emptyMine: 'Tu n’as encore rien publié. Ton premier projet apparaîtra ici.',
     private: 'Privé',
@@ -990,6 +996,106 @@ export const fr = {
     emptyTitle: 'Encore aucun projet ici',
     empty:
       'Aucun projet public fait avec cet outil pour l’instant. Le tien sera peut-être le premier.',
+  },
+  // R3 : la navigation. La barre d'onglets du téléphone (Fil · Explorer · + · Ruches · Moi) et la
+  // barre du haut de l'ordinateur partagent ces noms.
+  nav: {
+    /** Le nom de la région de navigation, lu par les lecteurs d'écran. */
+    label: 'Navigation principale',
+    feed: 'Fil',
+    explore: 'Explorer',
+    /** Le rond miel « + » de la barre du bas, et le bouton de la barre du haut. */
+    publish: 'Publier',
+    hives: 'Ruches',
+    me: 'Moi',
+    moderation: 'Modération',
+    /** La roue dentée de la page « Moi ». */
+    settings: 'Réglages',
+    /** Le bouton loupe de la barre du haut en largeur moyenne, qui ouvre la recherche. */
+    search: 'Rechercher',
+  },
+  // R3 : l'onglet Explorer (planches R3-Explorer*), qui reprend « Découvrir ».
+  explore: {
+    title: 'Explorer',
+    /** Le sous-titre, sur ordinateur (Louis, 30/10/2026). */
+    subtitle: 'Les projets de tous les membres : à tester, à suivre, pour t’inspirer.',
+    testers: 'Ils cherchent des testeurs',
+    /** « Tester », posé sur la photo d'une carte ; la flèche « ↗ » est dessinée, pas lue. */
+    test: 'Tester',
+    /** Le nom lu du lien « Tester » : le projet, puis « ouvre un site externe » (common.externalSite). */
+    testProject: 'Tester {{title}}',
+    /** Le nom lu du carrousel. */
+    carousel: 'Projets qui cherchent des testeurs',
+    /** Les flèches du carrousel, sur ordinateur. */
+    previous: 'Projets précédents',
+    next: 'Projets suivants',
+    popularTools: 'Outils populaires',
+    allTools: 'Tous les outils',
+    recent: 'Récents',
+  },
+  // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
+  // hors du nom lu, qui passe par les pluriels ci-dessous.
+  search: {
+    title: 'Recherche',
+    /** Le nom du champ, lu par les lecteurs d'écran, et son texte d'attente. */
+    label: 'Rechercher',
+    placeholder: 'Un projet, une personne, un outil',
+    clear: 'Effacer la recherche',
+    tabs: { all: 'Tout', projects: 'Projets', members: 'Membres', tools: 'Outils' },
+    /** Le nom lu d'un onglet avec son nombre : « Projets, 2 résultats ». */
+    tabWithCount: '{{tab}}, {{results}}',
+    results_one: '{{count}} résultat',
+    results_other: '{{count}} résultats',
+    resultsMore: '{{max}} résultats ou plus',
+    /** Ce que la région d'état annonce quand les résultats arrivent : « 3 projets, 1 membre, 0 outil ». */
+    summary: '{{projects}}, {{members}}, {{tools}}',
+    projects_one: '{{count}} projet',
+    projects_other: '{{count}} projets',
+    projectsMore: '{{max}} projets ou plus',
+    members_one: '{{count}} membre',
+    members_other: '{{count}} membres',
+    membersMore: '{{max}} membres ou plus',
+    tools_one: '{{count}} outil',
+    tools_other: '{{count}} outils',
+    toolsMore: '{{max}} outils ou plus',
+    /** L'extrait d'une description, entre guillemets. */
+    excerpt: '« {{excerpt}} »',
+    /** Sous le nom d'un membre : son pseudo et ses abonnés (« @camille_ot · 12 abonnés »). */
+    memberMeta: '@{{handle}} · {{followers}}',
+    searching: 'Recherche en cours…',
+    /** Sous 2 caractères, rien n'est cherché : le champ le dit. */
+    typeMore: 'Tape au moins deux caractères.',
+    emptyTitle: 'Aucun résultat pour « {{q}} »',
+    empty: 'Essaie un mot plus court, ou le nom d’un outil comme « Claude ».',
+    tooMany: 'Trop de recherches, réessaie dans un instant.',
+    errorTitle: 'La recherche n’a pas pu aboutir',
+    error: 'Réessaie dans un instant.',
+  },
+  // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
+  tools: {
+    title: 'Tous les outils',
+    subtitle: 'Les outils des projets publics, par ordre alphabétique.',
+    projects_one: '{{count}} projet public',
+    projects_other: '{{count}} projets publics',
+    /** Le nom lu d'un outil avec son nombre : « Claude, 41 projets publics ». */
+    withCount: '{{label}}, {{projects}}',
+    emptyTitle: 'Encore aucun outil',
+    empty: 'Les outils apparaîtront ici dès qu’un projet public en citera un.',
+    errorTitle: 'Les outils n’ont pas pu se charger',
+  },
+  // R3 : l'onglet Ruches existe avant les ruches (R10 ; Louis, 30/10/2026). Ni date, ni promesse,
+  // ni « Préviens-moi » (relecture juridique, jur-J9).
+  hives: {
+    title: 'Ruches',
+    soonTitle: 'Les ruches arrivent bientôt',
+    soonBody1: 'Une ruche, c’est un groupe de proches, comme « Ma ruche Famille ».',
+    soonBody2: 'On y suit les projets des siens, on les teste et on s’encourage.',
+  },
+  // R3 : l'onglet Moi, sa propre page de membre (planche R3-Moi).
+  me: {
+    title: 'Moi',
+    editProfile: 'Modifier mon profil',
+    myProjects: 'Mes projets',
   },
   states: {
     errorTitle: 'Cette page n’a pas pu se charger',
@@ -1197,7 +1303,8 @@ export const fr = {
     filter: { label: 'Quels projets', all: 'Tous', testers: 'Cherchent des testeurs' },
     nobodyTitle: 'Tu ne suis personne pour l’instant',
     nobodyBody: 'Suis des membres depuis leur page : leurs nouveaux projets arriveront ici.',
-    nobodyAction: 'Découvrir des projets',
+    // R3 : « Découvrir » est devenu l'onglet Explorer ; le fil vide y mène.
+    nobodyAction: 'Explorer les projets',
     quiet: 'Rien de neuf pour l’instant chez les personnes que tu suis.',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
@@ -1219,7 +1326,8 @@ export const fr = {
     follow: 'Suivre',
     following: 'Suivi',
     member: 'Suivre {{name}}',
-    memberFollowing: 'Suivi : {{name}}',
+    // R3 (planches) : « Tu suis Nora », dans la pastille d'Explorer comme sur sa page.
+    memberFollowing: 'Tu suis {{name}}',
     project: 'Suivre ce projet',
     projectFollowing: 'Projet suivi',
     followers_one: '{{count}} abonné',
@@ -1238,7 +1346,7 @@ export const fr = {
     empty:
       'Quand un membre réagira à tes projets, les commentera, les suivra ou parlera de toi, tu le liras ici.',
     // Un compte suspendu ne publie pas : l'état vide propose de lire (7c).
-    emptyActionSuspended: 'Découvrir des projets',
+    emptyActionSuspended: 'Explorer les projets',
     emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
     end: 'C’est tout',

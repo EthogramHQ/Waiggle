@@ -34,7 +34,12 @@
   },
   "overrides": [
     {
-      "includes": ["apps/app/src/screens/**", "apps/app/app/**", "!**/*.test.tsx"],
+      "includes": [
+        "apps/app/src/screens/**",
+        "apps/app/src/navigation/**",
+        "apps/app/app/**",
+        "!**/*.test.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {
