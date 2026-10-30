@@ -52,6 +52,10 @@ type Props = {
    * l'appli publiée) ; les écrans laissent le composant le traduire.
    */
   format?: (time: string) => string
+  /**
+   * L'identifiant de la phrase, pour que le bouton bloqué dise pourquoi (aria-describedby, web).
+   */
+  nativeID?: string
 }
 
 /**
@@ -79,22 +83,19 @@ export const formatRetryTime = (until: Date, language: string): string => {
  * La phrase « Nouvel essai possible à 21 h 47 », annoncée comme un état (`status` : les lecteurs
  * d'écran la lisent quand elle paraît, sans interrompre). Son nom ne change pas tant qu'on attend.
  */
-export function RetryAt({ until, format }: Props) {
+export function RetryAt({ until, format, nativeID }: Props) {
   const { t, i18n } = useTranslation()
   const time = formatRetryTime(until, i18n.language)
   const text = format ? format(time) : t(($) => $.auth.retryAt, { time })
   return (
-    // accessible : la phrase est lue d'un seul tenant (l'horloge est décorative).
-    <View
-      accessible
-      role="status"
-      accessibilityLabel={text}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}
-    >
-      <Icon name="clock" size={18} tone="secondary" />
+    // Le statut est la phrase elle-même (son texte est son nom) ; l'horloge, à côté, est décorative.
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+      <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Icon name="clock" size={18} tone="secondary" />
+      </View>
       <View style={{ flexShrink: 1 }}>
         {/* tabular : les chiffres ont tous la même largeur, l'heure ne tremble pas. */}
-        <Text variant="callout" tone="secondary" tabular>
+        <Text variant="callout" tone="secondary" tabular role="status" nativeID={nativeID}>
           {text}
         </Text>
       </View>

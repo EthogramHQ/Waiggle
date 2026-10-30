@@ -65,6 +65,9 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   const insets = useSafeAreaInsets()
   const sizeClass = size ?? window.sizeClass
   const padding = layout.screenPadding[sizeClass]
+  // La carte (scène à gauche, feuille en carte à droite) : dès 1 000 points (R2), avant la mise en
+  // colonnes des autres écrans (1 100) ; le catalogue la choisit par `size`.
+  const card = size ? size === 'wide' : window.card
   // La hauteur réelle de la bande (elle grandit avec le décor), pour que la feuille descende
   // jusqu'en bas de l'écran même quand son contenu est court : sinon la page s'arrêterait sous le
   // contenu, avec un bas de feuille arrondi au milieu de l'écran.
@@ -72,7 +75,7 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   const onBandLayout = (event: LayoutChangeEvent) => setBand(event.nativeEvent.layout.height)
   const decor = scene ? <Decor>{scene}</Decor> : null
 
-  if (sizeClass === 'wide') {
+  if (card) {
     return (
       <View
         style={{

@@ -51,6 +51,10 @@ export const layout = {
   breakpoints: {
     medium: 700, // à partir d'ici : tablette ou petite fenêtre d'ordinateur
     wide: 1100, // à partir d'ici : ordinateur, mise en colonnes
+    // R2 (relecture de design de R1) : les écrans de marque (accueil d'un visiteur, connexion)
+    // passent plus tôt à la scène à gauche et à la carte à droite : à 1 024 points, la colonne
+    // seule laissait de grands vides de miel de chaque côté.
+    card: 1000,
   },
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)

@@ -6,7 +6,8 @@ import type { AuthErrorKey } from './errors'
 export type FieldErrors = Partial<
   Record<
     'name' | 'email' | 'password' | 'inviteCode',
-    AuthErrorKey | 'nameRequired' | 'inviteRequired'
+    // R2 : un champ laissé vide dit ce qu'il attend (« Indique ton adresse e-mail. »).
+    AuthErrorKey | 'nameRequired' | 'inviteRequired' | 'emailRequired' | 'passwordRequired'
   >
 >
 

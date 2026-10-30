@@ -1039,6 +1039,28 @@ const pages = [
   { name: 'accueil', path: '/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
   { name: 'inscription', path: '/sign-up', signedIn: false },
+  // R2, « Trop d'essais » : l'API refuse la connexion pour 10 minutes (429, Retry-After : 600) ; le
+  // bouton reste bloqué, l'heure du prochain essai est écrite en clair (décision D3).
+  {
+    name: 'trop-essais',
+    path: '/sign-in',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.route('**/api/auth/sign-in/email', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          headers: { 'Retry-After': '600' },
+          body: JSON.stringify({ code: 'TOO_MANY_REQUESTS', message: '' }),
+        }),
+      )
+      await page.getByLabel('Adresse e-mail').fill('ines.haddad@exemple.fr')
+      await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
+      await page.getByRole('button', { name: 'Me connecter' }).click()
+      // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
+      await page.getByText(/Nouvel essai possible/).waitFor()
+    },
+  },
   { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
   // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
