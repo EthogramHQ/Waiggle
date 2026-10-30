@@ -1,5 +1,5 @@
 // L'aperçu de chaque e-mail de templates.ts (notifications de la tranche 6c, changement d'adresse,
-// inscription, alerte de modération), pour les relectures de design et juridique : les e-mails
+// inscription, mot de passe, alerte de modération), pour les relectures de design et juridique : les e-mails
 // rendus, en français et en anglais, avec les données des tests (Inès reçoit, Malik, Zoé et Sam
 // commentent, répondent et la mentionnent ; Inès change d'adresse). preview.test.ts refuse un
 // modèle sans aperçu ni exception écrite. Rien ici n'est envoyé ni lu par l'API :
@@ -16,9 +16,11 @@ import {
   moderationAlertEmail,
   type NotificationLinks,
   newEmailVerificationEmail,
+  passwordChangedEmail,
   type RecapData,
   type RecapLine,
   recapEmail,
+  resetPasswordEmail,
   suspensionEmail,
   verificationEmail,
 } from './templates'
@@ -152,6 +154,24 @@ const variants: [string, (language: Language) => EmailContent][] = [
     'existing-account',
     (language) =>
       existingAccountEmail(language, { name: 'Inès Morel', signInUrl: `${APP_URL}/sign-in` }),
+  ],
+  // Les deux e-mails de sécurité du mot de passe (tranche R2). Le lien du mot de passe oublié a la
+  // longueur réelle : la page de l'appli et un jeton de 24 caractères (Better Auth), seul paramètre.
+  [
+    'reset-password',
+    (language) =>
+      resetPasswordEmail(language, {
+        url: `${APP_URL}/reset-password?token=Xk3vQ9pLm2RtY7wZ4aBcD8eF`,
+        hours: 1,
+      }),
+  ],
+  [
+    'password-changed',
+    (language) =>
+      passwordChangedEmail(language, {
+        name: 'Inès Morel',
+        settingsUrl: `${APP_URL}/settings/security`,
+      }),
   ],
   // L'alerte de modération (tranche 7a), à un administrateur : le nombre et le lien, rien d'autre.
   [
