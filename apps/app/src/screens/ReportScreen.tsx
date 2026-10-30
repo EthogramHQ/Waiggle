@@ -22,7 +22,7 @@ import {
 import type { Href } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
 import { useBlock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
@@ -40,7 +40,13 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 /** Les motifs, dans l'ordre du contrat, et la clé de leur libellé (report.reasons.*). */
 const REASONS = [
@@ -74,7 +80,7 @@ const fallbackOf = (kind: ReportTargetKind, id: string, projectId: string | null
 
 export function ReportScreen({ kind, id }: { kind: string; id: string }) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // L'adresse n'est connue que dans le navigateur : la page pré-rendue en reste au chargement
   // (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
@@ -83,7 +89,9 @@ export function ReportScreen({ kind, id }: { kind: string; id: string }) {
   // Pas de session, ou une adresse qui ne décrit rien : aucune requête.
   const preview = useReportTarget(session && target ? target : null)
 
-  if (isPending || !hydrated) return <LoadingScreen />
+  if (state === 'pending' || !hydrated) return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
   if (!target) return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   // Une cible déjà lue garde son formulaire, même si une relecture échoue ensuite : après « Bloquer

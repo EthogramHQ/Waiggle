@@ -9,7 +9,7 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useSuspension } from '../moderation/suspension'
 import { TopNav } from '../navigation/TopNav'
@@ -22,12 +22,14 @@ import { NotificationCard } from '../ui/NotificationCard'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { LoadingScreen, SignedOutScreen } from './states'
+import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 export function NotificationsScreen() {
-  const { data: session, isPending } = useSession()
-  if (isPending) return <LoadingScreen />
-  if (!session) return <SignedOutScreen />
+  const { state, retry } = useMemberSession()
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
+  if (state === 'signedOut') return <SignedOutScreen />
   return <MemberNotifications />
 }
 

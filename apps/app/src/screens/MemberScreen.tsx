@@ -16,7 +16,7 @@ import type { Member } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useBlock, useUnblock } from '../blocks/api'
@@ -40,15 +40,23 @@ import { parisDateTime } from '../ui/parisTime'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 export function MemberScreen({ id }: { id: string }) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // Pas de session : aucune requête (la page d'un membre est réservée aux membres).
   const member = useMember(id, Boolean(session))
 
-  if (isPending) return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="page" />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
   if (member.error) {
     // Introuvable : un membre inconnu, ou qui m'a bloqué. La même page, le même texte : rien ne

@@ -12,7 +12,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { Button } from '../ui/Button'
 import type { IconName } from '../ui/Icon'
 import { Emblem } from '../ui/Illustrations'
@@ -27,7 +27,7 @@ type Props = { step: 'confirmed' | 'done' | 'signInFirst' }
 export function EmailChangeResultScreen({ step }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending } = useSession()
+  const { state, session: data, retry } = useMemberSession()
   // `error` vient de l'adresse : le serveur qui pré-rend la page web ne la connaît pas. On ne la
   // lit qu'une fois dans le navigateur (voir ui/theme/hydration.ts) ; avant, la page attend sans
   // rien affirmer, ni réussite ni refus. Son contenu n'est jamais montré : n'importe quel code (ou
@@ -100,21 +100,22 @@ export function EmailChangeResultScreen({ step }: Props) {
             body: (
               <>
                 {/* La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
-                  parle. */}
-                {data ? (
-                  <Text tone="secondary" align="center">
-                    {t(($) => $.account.emailChange.doneBody, { email: data.user.email })}
-                  </Text>
-                ) : (
-                  <Text tone="secondary" align="center">
-                    {t(($) => $.account.emailChange.doneSignedOut)}
-                  </Text>
-                )}
+                  parle. Si sa lecture a échoué, on ne le sait pas : le changement reste annoncé,
+                  mais on propose de réessayer plutôt que de se connecter (voir accounts/session.ts). */}
+                <Text tone="secondary" align="center">
+                  {data
+                    ? t(($) => $.account.emailChange.doneBody, { email: data.user.email })
+                    : state === 'error'
+                      ? t(($) => $.account.loadError)
+                      : t(($) => $.account.emailChange.doneSignedOut)}
+                </Text>
                 <Text variant="callout" tone="muted" align="center">
                   {t(($) => $.account.emailChange.doneDevices)}
                 </Text>
                 {data ? (
                   <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
+                ) : state === 'error' ? (
+                  <Button label={t(($) => $.common.retry)} onPress={retry} />
                 ) : (
                   <Button
                     label={t(($) => $.account.emailChange.signIn)}
@@ -133,7 +134,7 @@ export function EmailChangeResultScreen({ step }: Props) {
   // « Adresse changée », membre connecté ou non : le temps de lire la session, l'état de
   // chargement plutôt qu'une page à moitié dessinée. L'adresse et le bouton arriveraient ensuite
   // au-dessus et au-dessous des autres textes, et tout bougerait sous le doigt (70 pt mesurés).
-  if (step === 'done' && !refused && isPending) return <LoadingScreen />
+  if (step === 'done' && !refused && state === 'pending') return <LoadingScreen />
 
   return (
     <Screen pageTitle={page.title}>
