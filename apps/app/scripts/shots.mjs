@@ -1247,8 +1247,9 @@ const pages = [
   // Décision D1 : le second lien d'un changement d'adresse ouvert sans session.
   { name: 'adresse-connecte-toi', path: '/email-change/sign-in-first', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
-  // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
-  { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
+  // Le Fil (R3) : l'accueil d'un membre, ses abonnements seuls (le logo et la cloche en haut sur
+  // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
+  { name: 'fil', path: '/', signedIn: true, fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
   { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
