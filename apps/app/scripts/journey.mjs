@@ -713,13 +713,19 @@ try {
   step('Malik cherche « carnaval », puis « eleve », qui trouve le projet de Sam')
   await malik.page.getByRole('link', { name: 'Rechercher', exact: true }).first().click()
   await malik.page.waitForURL((url) => url.pathname === '/search')
-  const field = malik.page.getByLabel('Rechercher', { exact: true }).first()
+  // Les pages précédentes restent montées (cachées) sous la page affichée, avec leur barre du haut :
+  // sur /search, chacune dessine aussi le champ. On vise celui qu'on voit.
+  const field = malik.page
+    .getByLabel('Rechercher', { exact: true })
+    .filter({ visible: true })
+    .first()
   await field.waitFor()
   const historyBefore = await malik.page.evaluate(() => history.length)
   await field.pressSequentially('carnaval', { delay: 40 })
   // Les guillemets français portent des espaces insécables : on cherche par une expression.
   await malik.page
-    .getByText(/^Aucun résultat pour .carnaval.$/)
+    .getByText(/^Aucun résultat pour .{1,3}carnaval.{1,3}$/)
+    .filter({ visible: true })
     .first()
     .waitFor()
   expectEqual(
