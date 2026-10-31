@@ -62,7 +62,16 @@ export function NavLinks<K extends string>({ label, links, active, onPress }: Pr
     <View
       role="navigation"
       aria-label={label}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}
+      // À texte agrandi, les liens passent à la ligne plutôt que de sortir de la barre : sur le
+      // web, une vue ne rétrécit (et donc ne replie ses enfants) qu'avec flexShrink et maxWidth.
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: space.xxs,
+        flexShrink: 1,
+        maxWidth: '100%',
+      }}
     >
       {links.map((entry) => {
         const isActive = entry.key === active
@@ -92,9 +101,11 @@ export function NavLinks<K extends string>({ label, links, active, onPress }: Pr
               ...(isActive ? { boxShadow: shadows.soft } : null),
             })}
           >
+            {/* Sur la goutte, l'encre (ton onHoney) : la goutte reste claire de nuit, comme le choix
+                actif de Segmented et de TabBar (couple onHoney / surfaceRaised de contrastPairs). */}
             <Text
               weight={isActive ? 700 : 500}
-              tone={isActive ? 'default' : 'secondary'}
+              tone={isActive ? 'onHoney' : 'secondary'}
               selectable={false}
             >
               {entry.label}

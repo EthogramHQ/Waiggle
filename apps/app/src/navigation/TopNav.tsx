@@ -151,6 +151,7 @@ function BarSearchField() {
       onSubmit={() => {}}
       // On vient ici pour chercher : le curseur est déjà dans le champ.
       autoFocus
+      grow
     />
   )
 }
@@ -201,18 +202,17 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   // la page de recherche, qui montre alors son propre champ).
   const search =
     sizeClass === 'wide' ? (
-      <Stack grow>
-        {onSearchPage ? (
-          <BarSearchField />
-        ) : (
-          <SearchLink
-            label={t(($) => $.search.label)}
-            placeholder={t(($) => $.search.placeholder)}
-            href={SEARCH_PATH}
-            onPress={() => router.push(SEARCH_PATH)}
-          />
-        )}
-      </Stack>
+      onSearchPage ? (
+        <BarSearchField />
+      ) : (
+        <SearchLink
+          label={t(($) => $.search.label)}
+          placeholder={t(($) => $.search.placeholder)}
+          href={SEARCH_PATH}
+          onPress={() => router.push(SEARCH_PATH)}
+          grow
+        />
+      )
     ) : onSearchPage ? null : (
       <SearchButton
         label={t(($) => $.nav.search)}
@@ -222,18 +222,22 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
     )
 
   const capsule = (
-    <Surface variant="glass" radius="pill" padding="sm">
-      <Row gap="md" paddingX="sm" justify="between">
-        <Row gap="md" grow>
-          <Wordmark logo onPress={() => router.push('/')} />
-          <NavLinks
-            label={t(($) => $.nav.label)}
-            links={links}
-            active={activeFor(pathname)}
-            onPress={(key) => router.push(hrefOf(key))}
-          />
-          {sizeClass === 'wide' ? search : null}
-        </Row>
+    // Le rayon `sheet` (34) arrondit complètement une barre d'une ligne (62 points de haut), comme
+    // une pilule ; à texte agrandi, quand la barre passe sur deux lignes, il ne rogne pas les coins
+    // de ce qu'elle contient (un rayon de pilule le ferait).
+    <Surface variant="glass" radius="sheet" padding="sm">
+      {/* Les groupes passent à la ligne quand la place manque (texte agrandi, petite fenêtre),
+          au lieu de se chevaucher. Le champ, entre les deux, prend la place qui reste. */}
+      <Row gap="md" paddingX="sm" wrap>
+        <Wordmark logo onPress={() => router.push('/')} />
+        <NavLinks
+          label={t(($) => $.nav.label)}
+          links={links}
+          active={activeFor(pathname)}
+          onPress={(key) => router.push(hrefOf(key))}
+        />
+        {/* Sans champ (largeur moyenne), une place vide qui pousse le reste à droite. */}
+        {sizeClass === 'wide' ? search : <Stack grow>{null}</Stack>}
         <Row gap="sm">
           {sizeClass === 'wide' ? null : search}
           {/* La cloche des notifications, avec le nombre de nouveautés (tranche 6b). */}

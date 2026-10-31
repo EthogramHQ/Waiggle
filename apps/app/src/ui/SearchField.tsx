@@ -42,10 +42,19 @@ type Props = {
   placeholder: string
   /** Le nom lu par les lecteurs d'écran (« Rechercher »). */
   label: string
+  /** Prend la place qui reste dans une rangée (la barre du haut) ; voir `GROW_BASIS`. */
+  grow?: boolean
 }
 
+/**
+ * La largeur en dessous de laquelle un champ qui prend la place qui reste (`grow`) passe plutôt à
+ * la ligne, dans une rangée qui le permet : à texte agrandi, la barre du haut garde un champ où
+ * l'on voit ce qu'on tape, au lieu d'un champ écrasé à quelques points.
+ */
+const GROW_BASIS = 220
+
 /** La pilule commune au champ et au lien : fond blanc, bord fin, bord de focus quand il le faut. */
-const usePill = (focused: boolean) => {
+const usePill = (focused: boolean, grow: boolean) => {
   const { colors } = useTheme()
   return {
     flexDirection: 'row' as const,
@@ -55,6 +64,7 @@ const usePill = (focused: boolean) => {
     // Rétrécit dans une rangée au lieu de la pousser hors de l'écran (texte agrandi).
     flexShrink: 1,
     minWidth: 0,
+    ...(grow ? { flexGrow: 1, flexBasis: GROW_BASIS } : null),
     paddingLeft: space.md,
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
@@ -71,6 +81,7 @@ export function SearchField({
   autoFocus = false,
   placeholder,
   label,
+  grow = false,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -80,7 +91,7 @@ export function SearchField({
   // Le dernier envoi (Entrée) : la seconde Entrée d'une double frappe, dans la même fenêtre que la
   // garde des fenêtres (TAP_GUARD_MS), ne relance pas la recherche.
   const lastSubmit = useRef<number | null>(null)
-  const pill = usePill(focused)
+  const pill = usePill(focused, grow)
   const body = textStyles.body
 
   const clear = () => {
@@ -179,7 +190,7 @@ export function SearchField({
  * cherchent le champ par son étiquette) qu'un champ « Rechercher » est là. Un texte rendu invisible
  * par l'opacité reste dans l'arbre d'accessibilité, sur le web comme sur téléphone.
  */
-export function SearchButton({ label, href, onPress }: Omit<LinkProps, 'placeholder'>) {
+export function SearchButton({ label, href, onPress }: Omit<LinkProps, 'placeholder' | 'grow'>) {
   const { colors, shadows } = useTheme()
   return (
     <Pressable
@@ -216,14 +227,16 @@ type LinkProps = {
   placeholder: string
   href: string
   onPress: () => void
+  /** Prend la place qui reste dans une rangée, comme le champ (`SearchField grow`). */
+  grow?: boolean
 }
 
 /**
  * La pilule de recherche, mais un lien : hors de la page de recherche, elle y mène (la barre du
  * haut). Elle a l'air d'un champ vide, pour qu'on sache où chercher.
  */
-export function SearchLink({ label, placeholder, href, onPress }: LinkProps) {
-  const pill = usePill(false)
+export function SearchLink({ label, placeholder, href, onPress, grow = false }: LinkProps) {
+  const pill = usePill(false, grow)
   const { colors } = useTheme()
   return (
     <Pressable
