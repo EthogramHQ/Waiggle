@@ -138,7 +138,6 @@ export function SearchScreen() {
       onSubmit={() => {}}
       // On vient ici pour chercher : le curseur est déjà dans le champ.
       autoFocus
-      grow
     />
   )
 
@@ -220,8 +219,10 @@ export function SearchScreen() {
       <Stack gap="lg" align="stretch">
         {field ? (
           sizeClass === 'compact' ? (
+            // Le champ prend la place que « Annuler » laisse : à 320 points, c'est le champ qui
+            // rétrécit, jamais le bouton (qui passerait sur deux lignes).
             <Row gap="sm" align="center">
-              {field}
+              <Stack grow>{field}</Stack>
               <Button
                 label={t(($) => $.common.cancel)}
                 variant="glass"
