@@ -77,3 +77,39 @@ export function loadingProblem(
   if (shown === undefined) return null
   return `${name} : la capture montre « ${shown} » (la page ne s'est pas chargée ; ses données simulées sont-elles valides ?)`
 }
+
+/**
+ * Attend qu'une page ait fini de se charger, avant que le garde la lise.
+ *
+ * Pourquoi : le script attend la fin du réseau, puis un court délai. Sur une machine chargée (la
+ * CI de main, deux fois le 31/10/2026), une page de modération montrait encore son squelette à ce
+ * moment-là, et le garde faisait échouer une capture qui se serait chargée un instant plus tard.
+ *
+ * - read : lit la page et rend son problème (loadingProblem), ou null si elle est chargée ;
+ * - patience : le temps d'attente maximal ; au-delà, la page est vraiment en panne (des données
+ *   simulées invalides) et son dernier problème est rendu, pour que le garde échoue ;
+ * - step : le temps entre deux lectures ;
+ * - now, sleep : l'horloge, remplaçable dans les tests (une fausse horloge n'attend pas).
+ */
+export async function waitUntilLoaded(
+  read: () => Promise<string | null>,
+  {
+    patience,
+    step,
+    now = Date.now,
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: {
+    patience: number
+    step: number
+    now?: () => number
+    sleep?: (ms: number) => Promise<void>
+  },
+): Promise<string | null> {
+  const deadline = now() + patience
+  let problem = await read()
+  while (problem !== null && now() < deadline) {
+    await sleep(step)
+    problem = await read()
+  }
+  return problem
+}
