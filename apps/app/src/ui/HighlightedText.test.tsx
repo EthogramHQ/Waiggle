@@ -13,7 +13,7 @@ import { HighlightedText } from './HighlightedText'
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
 /** Un nœud de l'arbre rendu, le peu qu'on en lit (RNTL 14 n'exporte pas ce type). */
-type Node = { props: Record<string, unknown>; children: (Node | string)[] }
+type Node = { props: Record<string, unknown>; children: (Node | string)[]; parent?: Node | null }
 
 /** Tout le texte d'un nœud rendu, ses enfants compris. */
 const textOf = (node: Node | string): string =>
@@ -75,7 +75,11 @@ describe('HighlightedText', () => {
   it('marks a whole text that is the word', async () => {
     await renderWithProviders(<HighlightedText text="Café" words={['cafe']} />)
 
-    expect(marks(whole('Café'))).toEqual(['Café'])
+    // Le texte entier est surligné : `getAllByText` (RNTL 14) rend le nœud le plus profond qui dit
+    // « Café », c'est-à-dire la partie surlignée elle-même ; le texte qui la porte est son parent.
+    // (Correction de la session, R3 : l'aide `whole` seule ne pouvait pas trouver ce parent.)
+    const highlighted = whole('Café')
+    expect(marks(highlighted.parent as Node)).toEqual(['Café'])
   })
 
   it('passes the other props of Text on (numberOfLines)', async () => {
