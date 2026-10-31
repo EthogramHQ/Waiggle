@@ -64,15 +64,30 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
 
   return (
     // Jamais plus large qu'un formulaire, même dans une page large : des boutons de 1 280 points
-    // n'auraient pas de sens. align="stretch" : les textes prennent cette largeur et se replient.
-    <View style={{ width: '100%', maxWidth: layout.formWidth, alignSelf: 'center' }}>
-      <Stack gap="xl" align="stretch">
+    // n'auraient pas de sens.
+    // Tout se range à gauche (refonte R3, choix de Louis du 30/10/2026), dans tous les états,
+    // chargement et erreur compris : l'image, le titre, le message et les issues commencent au même
+    // bord que le titre des autres pages, au lieu de flotter au milieu. La règle s'écrit une fois,
+    // ici (alignItems), et le bloc lui-même se pose au bord gauche de la page (alignSelf).
+    <View
+      style={{
+        width: '100%',
+        maxWidth: layout.formWidth,
+        alignSelf: 'flex-start',
+        alignItems: 'flex-start',
+      }}
+    >
+      <Stack gap="xl" align="start">
         {kind === 'loading' || !cramped ? (
-          <View style={{ alignItems: 'center', paddingVertical: space.lg }}>{picture}</View>
+          // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
+          // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
+          // revient à « collée au bord gauche ».
+          <View style={{ alignItems: 'flex-start', paddingVertical: space.lg }}>{picture}</View>
         ) : null}
+        {/* align="stretch" : le titre et le message prennent la largeur du bloc et s'y replient. */}
         <Stack gap="sm" align="stretch">
           {title ? (
-            <Text variant="title2" align="center" heading={level}>
+            <Text variant="title2" heading={level}>
               {title}
             </Text>
           ) : null}
@@ -81,15 +96,15 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
           {message ? (
             <Text
               tone={title ? 'secondary' : 'default'}
-              align="center"
               {...(kind === 'error' ? { accessibilityRole: 'alert' as const } : null)}
             >
               {message}
             </Text>
           ) : null}
         </Stack>
+        {/* Les issues gardent leur largeur naturelle, l'une sous l'autre, au bord gauche. */}
         {actions.length > 0 ? (
-          <Stack gap="md" align="stretch">
+          <Stack gap="md" align="start">
             {actions.map((action, index) => (
               <Button
                 key={action.label}
