@@ -240,8 +240,8 @@ describe('following a member from her page', () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: true, followerCount: 13 })
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    // Une fois suivie, le nom lu reprend le texte affiché (« Suivi »), pour la commande vocale.
-    const button = await screen.findByRole('switch', { name: 'Suivi : Léa' })
+    // Une fois suivie, le nom lu dit « Tu suis Léa » (R3, planches), pour la commande vocale.
+    const button = await screen.findByRole('switch', { name: 'Tu suis Léa' })
     expect(button).toBeChecked()
     expect(screen.getByText('Suivi')).toBeTruthy()
     expect(screen.getByText('13 abonnés')).toBeTruthy()
@@ -764,7 +764,7 @@ describe('the page of a member a suspended member already follows', () => {
     // Le profil arrivé (la suspension est connue), le bouton est toujours là.
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     await act(async () => {})
-    const button = await screen.findByRole('switch', { name: 'Suivi : Léa' })
+    const button = await screen.findByRole('switch', { name: 'Tu suis Léa' })
     await fireEvent.press(button)
 
     expect(mockToggle).toHaveBeenCalledTimes(1)
@@ -775,7 +775,7 @@ describe('the page of a member a suspended member already follows', () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, isFollowed: true, followerCount: 13 })
     const { queryClient } = await renderWithProviders(<MemberScreen id="u1" />)
     await waitFor(() => expect(getMe).toHaveBeenCalled())
-    await screen.findByRole('switch', { name: 'Suivi : Léa' })
+    await screen.findByRole('switch', { name: 'Tu suis Léa' })
 
     // Le suivi retiré (ce que fait la mise à jour optimiste de useFollow) : la page le dit aussitôt.
     await act(async () => {
