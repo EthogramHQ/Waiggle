@@ -12,6 +12,7 @@ const summary = {
   visibility: 'public',
   tools: [{ label: 'Claude Code', slug: 'claude-code' }],
   cover: null,
+  demoUrl: null,
   portraitCover: null,
   createdAt: '2026-10-18T08:30:00.000Z',
   updatedAt: '2026-10-18T08:30:00.000Z',

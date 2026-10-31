@@ -507,13 +507,20 @@ describe('the home screen of a suspended member', () => {
     }
   })
 
-  it('still offers to publish to a member who is not suspended, once her profile is read', async () => {
-    jest.mocked(getMe).mockResolvedValue(leaMe)
-    await renderMemberHome()
+  // R3 : sur téléphone, « Publier » est le « + » de la barre d'onglets (TabBar.test.tsx) ; sur
+  // ordinateur, la barre du haut le propose encore.
+  it('still offers to publish to a member who is not suspended, on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      jest.mocked(getMe).mockResolvedValue(leaMe)
+      await renderMemberHome()
 
-    await act(async () => {})
-    expect(screen.getByRole('button', { name: fr.t(($) => $.home.publish) })).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
+      await act(async () => {})
+      expect(screen.getByRole('button', { name: fr.t(($) => $.home.publish) })).toBeTruthy()
+      expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
+    } finally {
+      restore()
+    }
   })
 })
 

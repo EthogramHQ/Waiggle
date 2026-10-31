@@ -129,7 +129,8 @@ describe('MemberScreen', () => {
     expect(await screen.findByRole('link', { name: 'Mon brouillon' })).toBeTruthy()
     expect(screen.getByText('Privé')).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Modifier mon profil' }))
-    expect(mockPush).toHaveBeenCalledWith('/profile')
+    // R3 (F-Nav8) : la rubrique « Mon profil » des réglages.
+    expect(mockPush).toHaveBeenCalledWith('/settings/profile')
   })
 
   it('says when there is no project yet', async () => {
@@ -243,7 +244,7 @@ describe('following a member from her page', () => {
     // Une fois suivie, le nom lu dit « Tu suis Léa » (R3, planches), pour la commande vocale.
     const button = await screen.findByRole('switch', { name: 'Tu suis Léa' })
     expect(button).toBeChecked()
-    expect(screen.getByText('Suivi')).toBeTruthy()
+    expect(screen.getByText('Tu suis Léa')).toBeTruthy()
     expect(screen.getByText('13 abonnés')).toBeTruthy()
 
     await fireEvent.press(button)

@@ -1028,7 +1028,8 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
-    if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
+    if (pathname === '/v1/feed/discover')
+      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [] })
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
       const fresh = notificationList.flat().filter((n) => n.isNew).length

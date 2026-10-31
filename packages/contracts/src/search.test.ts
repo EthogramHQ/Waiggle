@@ -209,6 +209,7 @@ describe('SearchResults', () => {
     visibility: 'public',
     tools: [{ label: 'Claude Code', slug: 'claude-code' }],
     cover: null,
+    demoUrl: null,
     portraitCover: null,
     createdAt: '2026-10-12T09:00:00.000Z',
     updatedAt: '2026-10-12T09:00:00.000Z',
