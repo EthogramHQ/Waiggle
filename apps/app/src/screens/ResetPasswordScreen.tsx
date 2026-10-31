@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { resetPassword } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
 import { firstParam } from '../navigation/params'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HeldSpace } from '../ui/HeldSpace'
@@ -31,6 +32,10 @@ const lengths = { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }
 export function ResetPasswordScreen() {
   const { t } = useTranslation()
   const router = useRouter()
+  // Le « Retour » du cadre de page, en tête de la feuille comme sur les autres pages du compte
+  // (R3). Ouverte depuis l'e-mail, la page n'a souvent pas de page d'avant : il mène alors à la
+  // connexion, comme « Annuler ».
+  const back = useGoBack('/sign-in')
   // Le jeton n'est connu que dans le navigateur, pas pendant la préparation de la page web : on
   // attend d'y être (voir ui/theme/hydration.ts) avant de dire si le lien est bon ou abîmé.
   const hydrated = useHydrated()
@@ -99,14 +104,19 @@ export function ResetPasswordScreen() {
   // un jeton (le titre de la réussite s'afficherait un instant avant « Ce lien ne marche plus »).
   if (!hydrated)
     return (
-      <Screen ambiance="brand" pageTitle={null}>
+      // Le « Retour » est déjà là : il ne dépend pas du jeton, et ne bouge pas à l'hydratation.
+      <Screen ambiance="brand" pageTitle={null} onBack={back}>
         {null}
       </Screen>
     )
 
   if (refused || !token) {
     return (
-      <Screen ambiance="brand" pageTitle={t(($) => $.auth.resetPassword.invalidTitle)}>
+      <Screen
+        ambiance="brand"
+        pageTitle={t(($) => $.auth.resetPassword.invalidTitle)}
+        onBack={back}
+      >
         <Fragment key="refused">
           <Stack align="center">
             <Emblem icon="warning-circle" />
@@ -135,6 +145,7 @@ export function ResetPasswordScreen() {
     <Screen
       ambiance="brand"
       title={t(($) => $.auth.resetPassword.title)}
+      onBack={back}
       footer={
         <>
           {/* Bloqué, le bouton dit pourquoi (RetryButton, jur-13). */}

@@ -23,6 +23,7 @@ import {
 import type { AuthErrorKey } from '../accounts/errors'
 import { canOpenMailbox, openMailbox } from '../accounts/mailbox'
 import { setPendingEmail, usePendingEmail } from '../accounts/pendingVerification'
+import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Mascot } from '../ui/Mascot'
@@ -46,6 +47,9 @@ const RESEND_WAIT_SECONDS = 60
 export function CheckEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
+  // Revenir d'où l'on vient (l'inscription) ; arrivé sans page d'avant (page rechargée, lien
+  // ouvert ailleurs), la connexion, comme le lien du bas de la page.
+  const back = useGoBack('/sign-in')
   const email = usePendingEmail()
   // La page web est préparée sans connaître le visiteur : on n'affiche le texte qu'une fois dans
   // le navigateur (voir ui/theme/hydration.ts).
@@ -129,6 +133,9 @@ export function CheckEmailScreen() {
       ambiance="brand"
       scene={picture}
       pageTitle={t(($) => $.auth.checkEmail.title)}
+      // Le « Retour » du cadre de page, en tête de la feuille comme sur les autres pages du compte
+      // (R3) : il ne dépend pas du navigateur, il est donc là dès le premier dessin.
+      onBack={back}
       footer={
         hydrated ? (
           <>
