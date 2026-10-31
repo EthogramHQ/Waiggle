@@ -306,10 +306,13 @@ const claudeCode = {
   label: 'Claude Code',
   projects: [summaryOf(fromOthers[0]), summaryOf(recipesProject)],
 }
+// R4 : le total des réactions de chaque carte (« ✦ 49 »), varié : un grand, aucun (la carte ne
+// montre alors rien), un petit, un moyen.
+const feedTotals = [49, 0, 3, 12]
 const feedItems = fromOthers.map((p, i) => ({
   kind: 'project',
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
-  project: summaryOf(p),
+  project: { ...summaryOf(p), reactionTotal: feedTotals[i] ?? 0 },
 }))
 // Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
 // (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
@@ -337,6 +340,8 @@ const testerItems = [
       status: 'testable',
     }),
     demoUrl,
+    // R4 : des totaux variés, dont 0.
+    reactionTotal: [7, 0, 23, 2, 0, 5][i] ?? 0,
   },
 }))
 // La page de Max, vue par Léa qui ne le suit pas encore.
@@ -398,7 +403,7 @@ const noteItem = (project, n, body, day) => ({
   kind: 'note',
   at: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
   note: { ...note(n, body, day), createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString() },
-  project: summaryOf(project),
+  project: { ...summaryOf(project), reactionTotal: feedTotals[fromOthers.indexOf(project)] ?? 0 },
 })
 const followingItems = [
   noteItem(fromOthers[0], 6, 'v2 : il reconnaît maintenant les visages de profil.', 19),
@@ -406,7 +411,21 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
-// feed: 'end' : le fil tient en une page, son bas dit « Tu es à jour » (R1, le miel vif local).
+// R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
+// affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).
+// L'appli pose la sphère avant le premier élément daté de cette date ou d'avant. Selon la page :
+// - feed: 'read-midway' (page « fil ») : lu jusqu'au 18/10 ; la note et le projet du 19 sont
+//   nouveaux, la sphère tombe au milieu, puis les éléments déjà vus ;
+// - feed: 'read-all' (page « fil-a-jour ») : lu jusqu'au plus récent ; rien de nouveau, la sphère
+//   est en tête du fil ;
+// - sans choix : le premier passage (jamais lu, `lastReadAt` null) ; le fil a une suite, la
+//   sphère n'apparaît pas ;
+// - feed: 'end' : premier passage sur un fil qui tient en une page ; la sphère est à la fin
+//   (« Tu as tout vu. », jur-J1).
+const lastReadOf = {
+  'read-midway': feedItems[1]?.at ?? null,
+  'read-all': followingItems[0]?.at ?? null,
+}
 const followingFeed = (feed) =>
   feed === 'nobody'
     ? { items: [], nextCursor: null, followsAnyone: false, lastReadAt: null }
@@ -414,7 +433,7 @@ const followingFeed = (feed) =>
         items: followingItems,
         nextCursor: feed === 'end' ? null : 'suite',
         followsAnyone: true,
-        lastReadAt: null,
+        lastReadAt: lastReadOf[feed] ?? null,
       }
 
 // Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son

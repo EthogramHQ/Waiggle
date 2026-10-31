@@ -10,18 +10,27 @@
 // - les dates de publication sont distinctes et dans un ordre connu (ou, au contraire, toutes
 //   égales, pour vérifier qu'un « ex aequo » ne fait rien perdre d'une page à l'autre).
 // Seule Date est remplacée (toFake) : les vraies minuteries continuent de tourner, la base aussi.
+import { randomUUID } from 'node:crypto'
 import {
+  AccountExport,
   type DiscoverQuery,
   ErrorResponse,
   FEED_PAGE_SIZE,
   FeedPage,
   FollowingFeedPage,
   Me,
+  Member,
   Project,
   ProjectNote,
+  SearchResults,
+  TagPage,
 } from '@ruche/contracts'
+import { schema } from '@ruche/db'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { explainQueries } from './testing/explain'
 
 let ctx: TestContext
 let lea: string // cookies de session
@@ -690,5 +699,229 @@ describe('reading a feed of notes and projects page by page', () => {
     const seen = pages.flatMap(keys)
     expect(new Set(seen).size).toBe(seen.length) // aucun doublon
     expect([...seen].sort()).toEqual([...published].sort()) // aucun oubli
+  })
+})
+
+// --- Tranche R4 : « Récents » et « testeurs » sans les auteurs jamais vérifiés (W4) ---
+// Explorer (« Récents », « Ils cherchent des testeurs ») lit le fil « Découvrir » : il prend la
+// même règle que la recherche, les étiquettes et les outils (R3, sec-A3) : le projet d'un compte
+// qui n'a jamais vérifié son adresse n'existe pour personne.
+
+describe('the « discover » feed and unverified authors (R4, W4)', () => {
+  it('leaves out of « recent » and « testers » the projects of an author who never verified his address', async () => {
+    const demo = 'https://demo.example.com'
+    const shown = await publish(lea, { title: 'De Léa', status: 'testable', demoUrl: demo })
+    // Tom s'inscrit sans ouvrir son lien : son compte existe, jamais vérifié. Son projet est rangé
+    // directement en base (un compte non vérifié ne peut pas se connecter pour publier) : c'est
+    // l'état qu'aurait laissé un compte vérifié plus tard « dé-vérifié », ou une donnée ancienne.
+    await ctx.signUp({ name: 'Tom', email: 'tom@example.com', password: 'tom-long-password' })
+    const [tom] = await ctx.db
+      .select({ id: schema.user.id, emailVerified: schema.user.emailVerified })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'tom@example.com'))
+    expect(tom?.emailVerified).toBe(false)
+    later()
+    const at = new Date()
+    const hidden = randomUUID()
+    await ctx.db.insert(schema.project).values({
+      id: hidden,
+      authorId: tom?.id ?? '',
+      title: 'De Tom, jamais vérifié',
+      pitch: 'Un pitch.',
+      description: '',
+      status: 'testable',
+      visibility: 'public',
+      demoUrl: demo,
+      tools: [],
+      toolSlugs: [],
+      createdAt: at,
+      updatedAt: at,
+      publishedAt: at,
+    })
+
+    for (const cookie of [max, lea]) {
+      expect(ids(await readDiscover(cookie))).toEqual([shown.id])
+      expect(ids(await readDiscover(cookie, { testers: 'true' }))).toEqual([shown.id])
+    }
+  })
+})
+
+// --- Tranche R4 : le total des réactions sur chaque carte ---
+// Le résumé d'un projet (ProjectSummary) porte `reactionTotal`, la somme des cinq compteurs, mêmes
+// règles que la page du projet : les réactions d'un membre bloqué comptent (les nombres sont les
+// mêmes pour tous) ; 0 sur un projet privé ou retiré, même pour son auteur (sec-A4). Le total égale
+// la somme de la page du projet pour le même lecteur (jur-J10). Il est lu partout où une carte
+// s'affiche : le fil « Abonnements », « Découvrir » (et « testeurs »), la recherche, la page d'une
+// étiquette, la page d'un membre.
+
+describe('the reaction total of each project (R4)', () => {
+  const react = async (projectId: string, kind: string, cookie: string) =>
+    expect((await send('PUT', `/v1/projects/${projectId}/reactions/${kind}`, cookie)).status).toBe(
+      204,
+    )
+
+  /** La somme des compteurs de la page du projet, telle que ce lecteur la lit. */
+  const pageTotal = async (projectId: string, cookie: string) => {
+    const res = await send('GET', `/v1/projects/${projectId}`, cookie)
+    expect(res.status).toBe(200)
+    const { counts } = Project.parse(await res.json()).reactions
+    return Object.values(counts).reduce((sum, n) => sum + n, 0)
+  }
+
+  /** Les résumés de projets de chaque liste où ce lecteur peut voir une carte, par liste. */
+  const listsOf = async (cookie: string, memberId: string, tag: string, words: string) => {
+    const get = async (path: string) => {
+      const res = await send('GET', path, cookie)
+      expect(res.status, path).toBe(200)
+      return res.json()
+    }
+    return {
+      following: (await readFollowing(cookie)).items.map((item) => item.project),
+      discover: (await readDiscover(cookie)).items.map((item) => item.project),
+      testers: (await readDiscover(cookie, { testers: 'true' })).items.map((item) => item.project),
+      search: SearchResults.parse(await get(`/v1/search?${new URLSearchParams({ q: words })}`))
+        .projects.items,
+      tag: TagPage.parse(await get(`/v1/tags/${tag}`)).projects,
+      member: Member.parse(await get(`/v1/members/${memberId}`)).projects,
+    }
+  }
+
+  /** Pour chaque liste, le total de chaque projet, par identifiant. */
+  const totalsIn = (lists: Record<string, { id: string; reactionTotal: number }[]>) =>
+    Object.fromEntries(
+      Object.entries(lists).map(([name, projects]) => [
+        name,
+        Object.fromEntries(projects.map((p) => [p.id, p.reactionTotal])),
+      ]),
+    )
+
+  it('gives the total of the reactions in every list, the same as the project page', async () => {
+    const demo = 'https://cafes.example.com'
+    const quiet = await publish(lea, {
+      title: 'Carnet de thés',
+      tools: ['Mistral'],
+      status: 'testable',
+      demoUrl: demo,
+    })
+    const liked = await publish(lea, {
+      title: 'Carnet de cafés',
+      tools: ['Mistral'],
+      status: 'testable',
+      demoUrl: demo,
+    })
+    await followMember(leaId, max)
+    // Trois réactions de deux membres : Max en pose deux, Zoé une ; « quiet » n'en a aucune.
+    await react(liked.id, 'bravo', max)
+    await react(liked.id, 'useful', max)
+    await react(liked.id, 'bravo', zoe)
+
+    const expected = { [liked.id]: 3, [quiet.id]: 0 }
+    const lists = await listsOf(max, leaId, 'mistral', 'carnet')
+    for (const [name, totals] of Object.entries(totalsIn(lists))) {
+      expect(totals, name).toEqual(expected)
+    }
+    // Le même nombre que la page du projet, pour le même lecteur (jur-J10).
+    expect(await pageTotal(liked.id, max)).toBe(3)
+    expect(await pageTotal(quiet.id, max)).toBe(0)
+    // Et le même pour tous : Léa, l'autrice, lit les mêmes totaux sur sa propre page.
+    const own = Member.parse(await (await send('GET', `/v1/members/${leaId}`, lea)).json())
+    expect(totalsIn({ own: own.projects }).own).toEqual(expected)
+  })
+
+  it('counts the reactions of a blocked member in the total, as the project page does', async () => {
+    const liked = await publish(lea, { title: 'Carnet de cafés', tools: ['Mistral'] })
+    await followMember(leaId, max)
+    const zoeId = (await me(zoe)).id
+    await react(liked.id, 'bravo', zoe)
+    await react(liked.id, 'amazing', zoe)
+    await react(liked.id, 'useful', max)
+
+    // Max bloque Zoé : il ne voit plus rien de ce qu'elle écrit, mais les nombres ne changent pas.
+    expect((await send('PUT', `/v1/members/${zoeId}/block`, max)).status).toBe(204)
+
+    const lists = await listsOf(max, leaId, 'mistral', 'carnet')
+    for (const [name, totals] of Object.entries(totalsIn(lists))) {
+      // « testers » est vide : le projet n'est pas testable.
+      if (name === 'testers') continue
+      expect(totals, name).toEqual({ [liked.id]: 3 })
+    }
+    expect(await pageTotal(liked.id, max)).toBe(3)
+  })
+
+  it('shows no total on a private or removed project summary, even to its author and in the export', async () => {
+    const kept = await publish(lea, { title: 'Carnet gardé public' })
+    const hidden = await publish(lea, { title: 'Carnet devenu privé' })
+    const removed = await publish(lea, { title: 'Carnet retiré' })
+    for (const project of [kept, hidden, removed]) {
+      await react(project.id, 'bravo', max)
+      await react(project.id, 'funny', zoe)
+    }
+    await setVisibility(lea, hidden.id, 'private')
+    // Zoé est administratrice (rôle posé en base, comme infra/grant-admin.sh) ; un retrait répond
+    // à un signalement ouvert : Max signale, puis Zoé retire.
+    const act = activity(ctx)
+    await act.makeAdmin((await me(zoe)).id)
+    later()
+    await act.report(max, { kind: 'project', id: removed.id })
+    later()
+    await act.decide(zoe, {
+      action: 'remove',
+      target: { kind: 'project', id: removed.id },
+      ground: 'rules',
+      explanation: 'Ce projet ne respecte pas les règles.',
+    })
+
+    // Léa lit sa propre page, où figurent aussi ses projets privés et retirés.
+    const own = Member.parse(await (await send('GET', `/v1/members/${leaId}`, lea)).json())
+    expect(totalsIn({ own: own.projects }).own).toEqual({
+      [kept.id]: 2, // témoin : un projet public garde son total
+      [hidden.id]: 0,
+      [removed.id]: 0,
+    })
+    // Sa page de projet dit la même chose.
+    expect(await pageTotal(kept.id, lea)).toBe(2)
+    expect(await pageTotal(hidden.id, lea)).toBe(0)
+    expect(await pageTotal(removed.id, lea)).toBe(0)
+
+    // L'export de Léa : ses projets avec leurs compteurs, aucun sur le privé ni sur le retiré.
+    const res = await send('GET', '/v1/me/export', lea)
+    expect(res.status).toBe(200)
+    const exported = AccountExport.parse(await res.json())
+    const counted = Object.fromEntries(
+      exported.projects.map((p) => [
+        p.id,
+        Object.values(p.reactions.counts).reduce((sum, n) => sum + n, 0),
+      ]),
+    )
+    expect(counted).toEqual({ [kept.id]: 2, [hidden.id]: 0, [removed.id]: 0 })
+  })
+
+  it('reads the totals of a whole page in a constant number of queries', async () => {
+    await followMember(leaId, max)
+    /** Toutes les requêtes de chaque liste, et celles qui lisent les réactions. */
+    const measure = async () => {
+      const queries = await explainQueries(ctx.db, async () => {
+        await listsOf(max, leaId, 'mistral', 'carnet')
+      })
+      return {
+        all: queries.length,
+        reactions: queries.filter((q) => q.sql.includes('project_reaction')).length,
+      }
+    }
+
+    const first = await publish(lea, { title: 'Carnet 1', tools: ['Mistral'] })
+    await react(first.id, 'bravo', max)
+    const one = await measure()
+
+    for (const n of [2, 3, 4]) {
+      const project = await publish(lea, { title: `Carnet ${n}`, tools: ['Mistral'] })
+      await react(project.id, 'bravo', max)
+      await react(project.id, 'useful', zoe)
+    }
+    const four = await measure()
+
+    expect(four).toEqual(one)
+    // Une requête groupée des totaux par liste lue (six listes), quel que soit le nombre de cartes.
+    expect(one.reactions).toBe(6)
   })
 })
