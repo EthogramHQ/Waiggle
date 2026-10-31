@@ -1011,8 +1011,11 @@ export const fr = {
     moderation: 'Modération',
     /** La roue dentée de la page « Moi ». */
     settings: 'Réglages',
-    /** Le bouton loupe de la barre du haut en largeur moyenne, qui ouvre la recherche. */
-    search: 'Rechercher',
+    /**
+     * Le bouton loupe de la barre du haut en largeur moyenne, qui ouvre la recherche. Un autre nom
+     * que celui du champ (`search.label`, « Rechercher ») : la loupe ouvre la page, le champ cherche.
+     */
+    search: 'Ouvrir la recherche',
   },
   // R3 : l'onglet Explorer (planches R3-Explorer*), qui reprend « Découvrir ».
   explore: {

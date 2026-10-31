@@ -874,7 +874,7 @@ export const en: Translation = {
     me: 'Me',
     moderation: 'Moderation',
     settings: 'Settings',
-    search: 'Search',
+    search: 'Open the search',
   },
   explore: {
     title: 'Explore',

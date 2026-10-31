@@ -74,6 +74,7 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
+import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
 import { LoadingCatalogue } from './chargement'
 import { AccountCatalogue } from './compte'
@@ -1033,6 +1034,7 @@ export function CatalogueScreen() {
       {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
           (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
       <NavigationCatalogue />
+      <TopBarCatalogue />
       <CardsCatalogue />
       <ExploreCatalogue />
       <SearchCatalogue />
