@@ -17,7 +17,6 @@ import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
-import { insetFocus } from './theme/document'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -143,8 +142,8 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
           accessibilityHint={web ? undefined : outside}
           // Entrée ouvre la démo sur le web, comme un vrai lien (voir keyboard.ts).
           {...enterActivates(test)}
-          // La carte rogne ses bords : l'anneau du clavier se dessine à l'intérieur de la zone.
-          {...insetFocus}
+          // L'anneau du clavier se dessine autour de la zone, comme partout : le calque n'est pas
+          // rogné par la photo, et un anneau intérieur se perdait sur le miel de la pastille.
           onPress={test}
           style={{
             position: 'absolute',
