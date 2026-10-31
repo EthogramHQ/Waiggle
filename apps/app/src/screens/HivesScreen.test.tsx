@@ -3,6 +3,7 @@
 // juridique (jur-J9) ne veut ni date, ni promesse, ni « Préviens-moi » : la page ne demande rien et
 // n'envoie rien.
 import { screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { getMe } from '../profile/api'
 import { leaMe } from '../testing/fixtures'
 import { mockSession, renderWithProviders } from '../testing/render'
@@ -59,6 +60,24 @@ describe('HivesScreen', () => {
         { includeHiddenElements: true },
       ),
     ).toBeTruthy()
+  })
+
+  // Relecture R3 : l'état « bientôt » était centré à la main ; il passe par StateMessage, rangé à
+  // gauche comme tous les états (choix de Louis du 30/10/2026). Un titre de section sous « Ruches ».
+  it('lines up the coming-soon state on the left, its title a section of the page', async () => {
+    await renderWithProviders(<HivesScreen />)
+
+    const title = screen.getByRole('header', { name: fr.t(($) => $.hives.soonTitle) })
+    for (const text of [
+      title,
+      screen.getByText(fr.t(($) => $.hives.soonBody1)),
+      screen.getByText(fr.t(($) => $.hives.soonBody2)),
+    ]) {
+      const align = (StyleSheet.flatten(text.props.style) as { textAlign?: string }).textAlign
+      expect(align ?? 'auto').not.toBe('center')
+    }
+    // Le titre de la page est « Ruches » ; l'état en est une section.
+    expect(screen.getByRole('header', { name: fr.t(($) => $.hives.title) })).toBeTruthy()
   })
 
   it('asks nothing and sends nothing', async () => {
