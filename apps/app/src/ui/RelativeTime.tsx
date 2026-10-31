@@ -86,18 +86,13 @@ const useRelative = (iso: string, now?: Date): RelativeDate => {
 }
 
 /**
- * Hook : la date relative en simple texte (« il y a 5 min »), pour une place qui n'attend que du
- * texte, comme le `detail` d'une ligne de liste (`ListRow`). Une date posée dans une phrase prend
- * `afterVerb` (« publié le 12 oct. ») ; le texte se remet à jour chaque minute, comme
- * `RelativeTime`.
+ * Hook : la date relative en simple texte, pour une place qui n'attend qu'une chaîne, comme le
+ * `detail` d'une ligne de liste (`ListRow`). Il rend les trois formes : `label` seule
+ * (« il y a 5 min »), `afterVerb` dans une phrase (« Bloqué hier », « publié le 12 oct. »), et
+ * `full` pour un nom lu. Le texte se remet à jour chaque minute, comme `RelativeTime` ; `now` fige
+ * l'heure (tests, catalogue).
  */
-export const useRelativeDate = (
-  iso: string,
-  options: { now?: Date; afterVerb?: boolean } = {},
-): string => {
-  const date = useRelative(iso, options.now)
-  return options.afterVerb ? date.afterVerb : date.label
-}
+export const useRelativeDate = (iso: string, now?: Date): RelativeDate => useRelative(iso, now)
 
 // --- Le composant -------------------------------------------------------------------------------
 
@@ -117,7 +112,7 @@ const hiddenFrame = {
 
 type Props = {
   /** La date, au format ISO du contrat (« 2026-10-12T08:00:00.000Z »). */
-  iso: string
+  date: string
   /** L'heure qu'il est, pour figer le texte (tests, catalogue) ; l'horloge de l'appareil sinon. */
   now?: Date
   /** Le rôle du texte (une légende par défaut, comme les dates des cartes). */
@@ -127,15 +122,16 @@ type Props = {
 }
 
 export function RelativeTime({
-  iso,
+  date,
   now,
   variant = 'caption',
   tone = 'muted',
   numberOfLines,
 }: Props) {
-  const { label, full } = useRelative(iso, now)
-  // Sur le web, la date complète se montre au survol : l'attribut `title`, que react-native-web ne
-  // transmet pas (il ne garde que les propriétés qu'il connaît), est donc posé sur la balise.
+  const { label, full } = useRelative(date, now)
+  // Sur le web, la date complète se montre au survol : l'attribut `title`. React-native-web ne
+  // transmet pas cette propriété (il ne garde que celles qu'il connaît) : on la donne quand même à
+  // la vue (elle dit l'intention, et les tests la lisent), puis on la pose sur la balise elle-même.
   const hover = useRef<View>(null)
   useEffect(() => {
     if (Platform.OS !== 'web') return
@@ -157,7 +153,7 @@ export function RelativeTime({
   // est écrite à côté, cachée à l'œil seulement (relecture ui-B3).
   return (
     <View>
-      <View ref={hover} aria-hidden>
+      <View ref={hover} aria-hidden {...({ title: full } as object)}>
         <Text variant={variant} tone={tone} numberOfLines={numberOfLines}>
           {label}
         </Text>
