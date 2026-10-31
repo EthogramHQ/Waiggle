@@ -67,11 +67,16 @@ const measured = (): Node[] => {
   return found
 }
 
-/** L'appareil mesure tout ce qui écoute sa mesure, à cette hauteur. */
+/**
+ * L'appareil mesure tout ce qui écoute sa mesure : à cette hauteur ce qui a un contenu, 0 une vue
+ * vide (une barre qui ne rend rien ne laisse qu'une vue vide).
+ */
 const layoutAll = async (height: number) => {
   for (const node of measured()) {
     await fireEvent(node as never, 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 390, height } },
+      nativeEvent: {
+        layout: { x: 0, y: 0, width: 390, height: node.children.length ? height : 0 },
+      },
     })
   }
 }

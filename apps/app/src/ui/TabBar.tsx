@@ -21,16 +21,7 @@
 // (au-dessus de la pile des pages, dans app/_layout.tsx) et donne aux écrans la hauteur qu'elle
 // occupe : celle que la barre mesure elle-même une fois rendue, 0 quand rien n'est rendu.
 import { borders, durations, layout, radii, space, springs } from '@ruche/brand'
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -99,12 +90,8 @@ const PUBLISH_SLOT = 'publish'
 // Sur téléphone, `maxScale` borne l'agrandissement ; le web l'ignore (voir TabLabel, plus bas).
 const labelMaxScale = 1.2
 
-/**
- * Le contexte privé entre le cadre (TabBarHost) et la barre : la barre, une fois rendue, y écrit la
- * hauteur qu'elle mesure, et 0 quand elle disparaît. Le cadre ne mesure pas l'élément qu'il reçoit :
- * cet élément (AppTabBar) rend souvent `null`, et le cadre vide n'aurait mesuré que sa marge.
- */
-const RenderedBarContext = createContext<(height: number) => void>(() => {})
+/** La taille naturelle d'un libellé d'onglet, mesurée sur le web (voir TabLabel). */
+type LabelSize = { width: number; height: number }
 
 // Le cercle autour de la photo de « Moi » quand l'onglet est actif : son épaisseur et l'air entre
 // lui et la photo (le même air, transparent, quand l'onglet est inactif : rien ne bouge).
@@ -136,11 +123,6 @@ export function TabBar({
   const { colors, shadows } = useTheme()
   const deviceCalm = useCalmMotion()
   const calm = calmProp ?? deviceCalm
-
-  // La hauteur de la barre rendue, donnée au cadre ; quand la barre disparaît (une page poussée,
-  // la déconnexion), le nettoyage de l'effet rend la place : les écrans ne réservent plus rien.
-  const reportHeight = useContext(RenderedBarContext)
-  useEffect(() => () => reportHeight(0), [reportHeight])
 
   // Les cinq places, dans l'ordre : deux onglets, le « + » (même caché, sa place reste : les
   // onglets ne se décalent pas quand il disparaît), deux onglets.
@@ -217,112 +199,122 @@ export function TabBar({
 
   const onRowLayout = (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width)
 
+  // Web : la taille naturelle de chaque libellé, et la réduction commune qui fait tenir le plus
+  // large dans sa place (moins l'air de chaque côté). Voir TabLabel.
+  const [labelSizes, setLabelSizes] = useState<Partial<Record<TabKey, LabelSize>>>({})
+  const measureLabel = (key: TabKey) => (size: LabelSize) =>
+    setLabelSizes((old) => {
+      const known = old[key]
+      // Le même objet quand rien ne change : pas de rendu de plus.
+      return known && known.width === size.width && known.height === size.height
+        ? old
+        : { ...old, [key]: size }
+    })
+  const room = Math.max(slotWidth - 2 * space.xxs, 0)
+  const widest = Math.max(0, ...Object.values(labelSizes).map((size) => size.width))
+  const labelScale = room > 0 && widest > room ? room / widest : 1
+
   return (
-    // La mesure de la barre rendue (sa hauteur, pour le cadre), sur la vue qui l'enveloppe.
-    <View onLayout={(event) => reportHeight(event.nativeEvent.layout.height)}>
-      <Surface variant="glass" radius="pill" padding="xs">
-        {/* Pas d'`accessible` sur la région : sur iOS, VoiceOver doit atteindre chaque lien. Le nom
+    <Surface variant="glass" radius="pill" padding="xs">
+      {/* Pas d'`accessible` sur la région : sur iOS, VoiceOver doit atteindre chaque lien. Le nom
           de la région est le seul texte que la barre lit elle-même. */}
-        <View
-          role="navigation"
-          aria-label={t(($) => $.nav.label)}
-          style={{ flexDirection: 'row', alignItems: 'stretch' }}
-        >
-          {/* La mesure de la largeur, sur une vue vide qui épouse la rangée, et non sur la rangée
-            elle-même : la barre écoute sa hauteur par `onLayout` sur la vue qui l'enveloppe, et une
+      <View
+        role="navigation"
+        aria-label={t(($) => $.nav.label)}
+        style={{ flexDirection: 'row', alignItems: 'stretch' }}
+      >
+        {/* La mesure de la largeur, sur une vue vide qui épouse la rangée, et non sur la rangée
+            elle-même : le cadre (TabBarHost) écoute `onLayout` au-dessus de la barre, et une
             mesure posée sur la région l'intercepterait (le cadre ne saurait plus la hauteur). */}
-          <View pointerEvents="none" onLayout={onRowLayout} style={StyleSheet.absoluteFill} />
-          {/* La goutte, derrière les onglets : une place de large, toute la hauteur de la rangée.
+        <View pointerEvents="none" onLayout={onRowLayout} style={StyleSheet.absoluteFill} />
+        {/* La goutte, derrière les onglets : une place de large, toute la hauteur de la rangée.
             Intouchable et muette : l'état est dit par les liens eux-mêmes. */}
-          {slotWidth > 0 ? (
-            <Animated.View
-              pointerEvents="none"
-              aria-hidden
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={[
-                {
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  width: slotWidth,
-                  borderRadius: radii.pill,
-                  backgroundColor: colors.surfaceRaised,
-                  boxShadow: shadows.soft,
-                },
-                dropStyle,
-              ]}
-            />
-          ) : null}
-          {slots.map((slot) => {
-            if (slot === PUBLISH_SLOT) {
-              return (
-                <View
-                  key={PUBLISH_SLOT}
-                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  {publish ? (
-                    <PublishButton
-                      label={publish.label}
-                      href={publish.href}
-                      onPress={pressPublish}
-                    />
-                  ) : (
-                    // La place reste, vide : les onglets ne bougent pas quand le « + » disparaît.
-                    <View style={{ height: layout.tabBar.publish }} />
-                  )}
-                </View>
-              )
-            }
-            const isActive = slot.key === active
+        {slotWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              {
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: slotWidth,
+                borderRadius: radii.pill,
+                backgroundColor: colors.surfaceRaised,
+                boxShadow: shadows.soft,
+              },
+              dropStyle,
+            ]}
+          />
+        ) : null}
+        {slots.map((slot) => {
+          if (slot === PUBLISH_SLOT) {
             return (
-              <Pressable
-                key={slot.key}
-                accessibilityRole="link"
-                accessibilityLabel={slot.label}
-                // Les deux façons de dire « actif » : aria-current sur le web (linkProps), et
-                // accessibilityState pour VoiceOver et TalkBack, qui ignorent aria-current.
-                {...linkProps(slot.href, isActive)}
-                accessibilityState={{ selected: isActive }}
-                onPress={press(slot)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: space.xxs,
-                  // Au moins la hauteur du « + » : la rangée a partout la même hauteur, et chaque
-                  // place dépasse les 44 points à toucher.
-                  minHeight: Math.max(layout.tabBar.publish, layout.touchTarget),
-                  minWidth: layout.touchTarget,
-                  paddingVertical: space.xs,
-                  paddingHorizontal: space.xxs,
-                  borderRadius: radii.pill,
-                }}
+              <View
+                key={PUBLISH_SLOT}
+                style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
               >
-                {slot.key === 'me' ? (
-                  <MeAvatar avatar={avatar} label={slot.label} active={isActive} />
+                {publish ? (
+                  <PublishButton label={publish.label} href={publish.href} onPress={pressPublish} />
                 ) : (
-                  <View style={{ height: pictureHeight, justifyContent: 'center' }}>
-                    <Icon
-                      name={icons[slot.key]}
-                      size={24}
-                      // Inactive, l'icône prend l'encre, comme son libellé (voir TabLabel).
-                      tone={isActive ? 'onHoney' : 'default'}
-                    />
-                  </View>
+                  // La place reste, vide : les onglets ne bougent pas quand le « + » disparaît.
+                  <View style={{ height: layout.tabBar.publish }} />
                 )}
-                <TabLabel
-                  label={slot.label}
-                  active={isActive}
-                  room={Math.max(slotWidth - 2 * space.xxs, 0)}
-                />
-              </Pressable>
+              </View>
             )
-          })}
-        </View>
-      </Surface>
-    </View>
+          }
+          const isActive = slot.key === active
+          return (
+            <Pressable
+              key={slot.key}
+              accessibilityRole="link"
+              accessibilityLabel={slot.label}
+              // Les deux façons de dire « actif » : aria-current sur le web (linkProps), et
+              // accessibilityState pour VoiceOver et TalkBack, qui ignorent aria-current.
+              {...linkProps(slot.href, isActive)}
+              accessibilityState={{ selected: isActive }}
+              onPress={press(slot)}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: space.xxs,
+                // Au moins la hauteur du « + » : la rangée a partout la même hauteur, et chaque
+                // place dépasse les 44 points à toucher.
+                minHeight: Math.max(layout.tabBar.publish, layout.touchTarget),
+                minWidth: layout.touchTarget,
+                paddingVertical: space.xs,
+                paddingHorizontal: space.xxs,
+                borderRadius: radii.pill,
+              }}
+            >
+              {slot.key === 'me' ? (
+                <MeAvatar avatar={avatar} label={slot.label} active={isActive} />
+              ) : (
+                <View style={{ height: pictureHeight, justifyContent: 'center' }}>
+                  <Icon
+                    name={icons[slot.key]}
+                    size={24}
+                    // Inactive, l'icône prend l'encre, comme son libellé (voir TabLabel).
+                    tone={isActive ? 'onHoney' : 'default'}
+                  />
+                </View>
+              )}
+              <TabLabel
+                label={slot.label}
+                active={isActive}
+                scale={labelScale}
+                size={labelSizes[slot.key]}
+                onMeasure={measureLabel(slot.key)}
+              />
+            </Pressable>
+          )
+        })}
+      </View>
+    </Surface>
   )
 }
 
@@ -332,15 +324,28 @@ export function TabBar({
  *   recours.
  * - Sur le web, ces réglages n'existent pas (`fontScale` y vaut toujours 1) : un navigateur réglé
  *   en grand texte grossit le libellé sans que l'appli le sache, et à 320 de large « Explorer »
- *   devenait « E… ». On mesure donc le libellé à sa largeur naturelle, et s'il dépasse sa place, on
- *   le réduit à l'œil (`transform: scale`) juste assez pour qu'il y tienne, comme le fait
- *   `adjustsFontSizeToFit` sur téléphone. Pour qu'il garde sa largeur naturelle, il est posé dans
- *   une boîte de largeur nulle centrée (un mot ne se coupe pas : sa largeur minimale est la sienne),
+ *   devenait « E… ». On mesure donc chaque libellé à sa largeur naturelle (`onMeasure`), et la barre
+ *   réduit à l'œil (`transform: scale`) tous les libellés du même facteur, juste assez pour que le
+ *   plus large tienne dans sa place, comme `adjustsFontSizeToFit` sur téléphone : les quatre
+ *   gardent la même taille. Pour qu'un libellé garde sa largeur naturelle, il est posé dans une
+ *   boîte de largeur nulle centrée (un mot ne se coupe pas : sa largeur minimale est la sienne),
  *   d'où il déborde également des deux côtés ; la mesure (`onLayout`) ignore la réduction.
- * `room` : la largeur disponible dans la place de l'onglet (0 avant la mesure de la rangée).
  */
-function TabLabel({ label, active, room }: { label: string; active: boolean; room: number }) {
-  const [natural, setNatural] = useState({ width: 0, height: 0 })
+function TabLabel({
+  label,
+  active,
+  scale,
+  size,
+  onMeasure,
+}: {
+  label: string
+  active: boolean
+  /** La réduction commune aux libellés (1 : aucune). Web seulement. */
+  scale: number
+  /** La taille naturelle de ce libellé, une fois mesurée. Web seulement. */
+  size: LabelSize | undefined
+  onMeasure: (size: LabelSize) => void
+}) {
   const web = Platform.OS === 'web'
   const text = (
     <Text
@@ -354,9 +359,7 @@ function TabLabel({ label, active, room }: { label: string; active: boolean; roo
         ? {
             onLayout: (event: LayoutChangeEvent) => {
               const { width, height } = event.nativeEvent.layout
-              setNatural((old) =>
-                old.width === width && old.height === height ? old : { width, height },
-              )
+              onMeasure({ width, height })
             },
           }
         : { numberOfLines: 1 })}
@@ -367,13 +370,12 @@ function TabLabel({ label, active, room }: { label: string; active: boolean; roo
     </Text>
   )
   if (!web) return text
-  const scale = room > 0 && natural.width > room ? room / natural.width : 1
   return (
     <View
       style={{
         width: 0,
         // La hauteur réduite elle aussi : pas de bande vide sous le libellé réduit.
-        ...(natural.height > 0 ? { height: natural.height * scale } : null),
+        ...(size && size.height > 0 ? { height: size.height * scale } : null),
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
@@ -452,15 +454,16 @@ function PublishButton({
  * de la zone du geste de l'appareil (`insets.bottom`), et donne aux écrans, par le contexte
  * (tabBarSpace.ts), la hauteur qu'elle occupe, avec le signal de remontée.
  * `bar` : la barre (un élément qui rend TabBar, ou rien), ou `null`.
- * La hauteur est celle de la barre **rendue** (elle se mesure elle-même, RenderedBarContext), plus
- * la marge du bas : l'élément reçu (AppTabBar) rend souvent `null` (visiteur, page poussée,
- * ordinateur), et les écrans ne réservent alors rien de plus que leur marge habituelle.
+ * La hauteur est celle de la barre **rendue**, mesurée sur la vue qui l'enveloppe au plus près (sans
+ * marge), plus la marge du bas : l'élément reçu (AppTabBar) rend souvent `null` (visiteur, page
+ * poussée, ordinateur) ; la vue mesure alors 0, et les écrans ne réservent rien de plus que leur
+ * marge habituelle. Mesurer le cadre entier, c'était mesurer sa seule marge (8 points sur le web).
  * Dans l'ordre de lecture et du clavier, la barre vient avant les pages.
  */
 export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactNode }) {
   const insets = useSafeAreaInsets()
   const { padding } = useLayout()
-  // La hauteur de la barre rendue, écrite par TabBar ; 0 tant qu'aucune barre n'est rendue.
+  // La hauteur de la barre rendue ; 0 tant qu'aucune barre n'est rendue.
   const [barHeight, setBarHeight] = useState(0)
   const [topSignal, setTopSignal] = useState(0)
   const scrollToTop = useCallback(() => setTopSignal((count) => count + 1), [])
@@ -492,8 +495,12 @@ export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactN
               alignItems: 'center',
             }}
           >
-            <View pointerEvents="box-none" style={{ width: '100%', maxWidth: layout.formWidth }}>
-              <RenderedBarContext.Provider value={setBarHeight}>{bar}</RenderedBarContext.Provider>
+            <View
+              pointerEvents="box-none"
+              onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+              style={{ width: '100%', maxWidth: layout.formWidth }}
+            >
+              {bar}
             </View>
           </View>
         ) : null}
