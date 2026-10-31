@@ -56,7 +56,7 @@ const searchRoute = createRoute({
     400: errorResponse('Invalid query (too short, too long, no word left, or a repeated `q`).'),
     401: errorResponse('Not signed in.'),
     429: errorResponse(
-      'Too many searches, or one already running for this member, or too many at once (see Retry-After).',
+      'Too many searches, or no search place freed within a second (one per member, three at once; see Retry-After).',
     ),
     503: errorResponse('The search took too long and was stopped.'),
   },
@@ -100,9 +100,11 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     }
     const words = searchWords(c.req.valid('query').q)
     // Une place de recherche (relecture C1, search/slots.ts) : une recherche déjà en cours pour
-    // ce membre, ou trois pour toute l'API, et la demande est refusée comme un quota dépassé
+    // ce membre, ou trois pour toute l'API, et la demande attend dans une courte file, jusqu'à
+    // une seconde (SEARCH_WAIT_MS). Faute de place à temps, file pleine ou demande abandonnée par
+    // l'appli (`signal`, qui quitte alors la file), elle est refusée comme un quota dépassé
     // (l'appli dit déjà « réessaie dans un instant »), à reprendre une seconde plus tard.
-    const release = slots.take(user.id)
+    const release = await slots.take(user.id, c.req.raw.signal)
     if (!release) {
       c.header('Retry-After', '1')
       return c.json(errorBody(languageOf(c), 'rate_limited'), 429)

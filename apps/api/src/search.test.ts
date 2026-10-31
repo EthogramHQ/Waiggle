@@ -14,6 +14,7 @@ import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memberCounterKeys } from './rate-limit'
+import { SEARCH_WAIT_MS, SEARCHES_WAITING } from './search/slots'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { explainQueries } from './testing/explain'
@@ -841,8 +842,52 @@ const barrier = () => {
   return { opened, open }
 }
 
+/**
+ * Vrai si la promesse est réglée dans les `ms` millisecondes. L'horloge des minuteurs est la
+ * vraie (seule `Date` est fausse dans ce fichier) : une demande encore en attente après ce délai
+ * attend bien sa place.
+ */
+const settlesWithin = (pending: unknown, ms: number) =>
+  Promise.race([
+    // `ctx.request` rend une réponse ou sa promesse : Promise.resolve les traite pareil.
+    Promise.resolve(pending).then(
+      () => true,
+      () => true,
+    ),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms)),
+  ])
+
+/** Un court instant, bien plus bref que l'attente d'une place (SEARCH_WAIT_MS). */
+const A_MOMENT_MS = 200
+
 describe('searches running at the same time', () => {
-  it('runs one search at a time per member, and gives the place back after a time limit', async () => {
+  it('lets a second search of the same member wait, then run when the first ends', async () => {
+    await publish(ines, 'Carnet de cafés')
+    const slow = barrier()
+    // La première recherche de Malik attend la barrière, puis cherche pour de bon.
+    const run = ctx.db.transaction.bind(ctx.db)
+    const transaction = vi
+      .spyOn(ctx.db, 'transaction')
+      .mockImplementationOnce(async (...args: Parameters<typeof run>) => {
+        await slow.opened
+        return run(...args)
+      })
+    const first = searchRaw(malik, { q: 'carnet' })
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(1))
+
+    // Une deuxième, tapée pendant ce temps : elle attend sa place, sans toucher la base.
+    const second = searchRaw(malik, { q: 'carnet' })
+    expect(await settlesWithin(second, A_MOMENT_MS)).toBe(false)
+    expect(transaction).toHaveBeenCalledTimes(1)
+
+    slow.open()
+    expect((await first).status).toBe(200)
+    const res = await second
+    expect(res.status).toBe(200)
+    expect(titles(SearchResults.parse(await res.json()))).toEqual(['Carnet de cafés'])
+  })
+
+  it('refuses the second search of a member after the wait, and gives the place back after a time limit', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await publish(ines, 'Carnet de cafés')
     const slow = barrier()
@@ -857,8 +902,11 @@ describe('searches running at the same time', () => {
     const first = searchRaw(malik, { q: 'carnet' })
     await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(1))
 
-    // Une deuxième, en même temps : refusée comme un quota, à reprendre une seconde plus tard.
+    // Une deuxième, en même temps : elle attend une seconde, puis est refusée comme un quota, à
+    // reprendre une seconde plus tard. `performance.now` suit la vraie horloge.
+    const started = performance.now()
     const second = await searchRaw(malik, { q: 'carnet' })
+    expect(performance.now() - started).toBeGreaterThanOrEqual(SEARCH_WAIT_MS - 5)
     expect(second.headers.get('retry-after')).toBe('1')
     await expectError(second, 429, 'rate_limited')
     // Zoé, elle, cherche pendant ce temps.
@@ -870,7 +918,73 @@ describe('searches running at the same time', () => {
     expect(titles(await search(malik, 'carnet'))).toEqual(['Carnet de cafés'])
   })
 
-  it('runs three searches at most for the whole API, and gives the places back after an error', async () => {
+  it('takes an abandoned search out of the waiting line', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await publish(ines, 'Carnet de cafés')
+    const slow = barrier()
+    const transaction = vi.spyOn(ctx.db, 'transaction').mockImplementationOnce(async () => {
+      await slow.opened
+      throw Object.assign(new Error('canceling statement due to statement timeout'), {
+        code: '57014',
+      })
+    })
+    const first = searchRaw(malik, { q: 'carnet' })
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(1))
+
+    // La deuxième attend, puis l'appli l'annule (Malik a tapé une lettre de plus) : elle quitte
+    // la file tout de suite, sans attendre la fin de la seconde.
+    const controller = new AbortController()
+    const started = performance.now()
+    const abandoned = ctx.request('/v1/search?q=carnet', {
+      headers: { cookie: malik },
+      signal: controller.signal,
+    })
+    expect(await settlesWithin(abandoned, A_MOMENT_MS)).toBe(false)
+    controller.abort()
+    expect(await settlesWithin(abandoned, A_MOMENT_MS)).toBe(true)
+    expect(performance.now() - started).toBeLessThan(SEARCH_WAIT_MS)
+    expect(transaction).toHaveBeenCalledTimes(1)
+
+    slow.open()
+    expect((await first).status).toBe(503)
+    expect(titles(await search(malik, 'carnet'))).toEqual(['Carnet de cafés'])
+  })
+
+  it('refuses at once when the waiting line is full', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await publish(ines, 'Carnet de cafés')
+    const slow = barrier()
+    const transaction = vi.spyOn(ctx.db, 'transaction')
+    for (let i = 0; i < 3; i++) {
+      transaction.mockImplementationOnce(async () => {
+        await slow.opened
+        throw new Error('connection lost')
+      })
+    }
+    const running = [ines, malik, zoe].map((cookie) => searchRaw(cookie, { q: 'carnet' }))
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(3))
+
+    // Vingt demandes de Louis remplissent la file (le quota en permet 600 par heure).
+    const waiting = Array.from({ length: SEARCHES_WAITING }, () =>
+      searchRaw(louis, { q: 'carnet' }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, A_MOMENT_MS))
+
+    // La vingt et unième est refusée sans attendre ; les vingt autres attendent encore.
+    const started = performance.now()
+    const extra = await searchRaw(louis, { q: 'carnet' })
+    expect(performance.now() - started).toBeLessThan(SEARCH_WAIT_MS / 2)
+    expect(extra.headers.get('retry-after')).toBe('1')
+    await expectError(extra, 429, 'rate_limited')
+    expect(await settlesWithin(Promise.race(waiting), 0)).toBe(false)
+
+    slow.open()
+    expect((await Promise.all(running)).map((res) => res.status)).toEqual([500, 500, 500])
+    // Une à une, chacune passe ou, faute de temps, est refusée comme la vingt et unième.
+    for (const res of await Promise.all(waiting)) expect([200, 429]).toContain(res.status)
+  })
+
+  it('lets a fourth search wait for one of the three places, given back after an error', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await publish(ines, 'Carnet de cafés')
     const slow = barrier()
@@ -885,14 +999,17 @@ describe('searches running at the same time', () => {
     const running = [ines, malik, zoe].map((cookie) => searchRaw(cookie, { q: 'carnet' }))
     await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(3))
 
-    // Louis, quatrième en même temps : refusé, sans que sa recherche touche la base.
-    const fourth = await searchRaw(louis, { q: 'carnet' })
-    expect(fourth.headers.get('retry-after')).toBe('1')
-    await expectError(fourth, 429, 'rate_limited')
+    // Louis, quatrième en même temps : il attend une place, sans que sa recherche touche la base.
+    const fourth = searchRaw(louis, { q: 'carnet' })
+    expect(await settlesWithin(fourth, A_MOMENT_MS)).toBe(false)
     expect(transaction).toHaveBeenCalledTimes(3)
 
     slow.open()
     expect((await Promise.all(running)).map((res) => res.status)).toEqual([500, 500, 500])
+    // Une place rendue après l'erreur lui revient : sa recherche aboutit.
+    const res = await fourth
+    expect(res.status).toBe(200)
+    expect(titles(SearchResults.parse(await res.json()))).toEqual(['Carnet de cafés'])
     // Les trois places sont rendues : quatre recherches l'une après l'autre passent.
     for (const cookie of [louis, ines, malik, zoe]) {
       expect(titles(await search(cookie, 'carnet'))).toEqual(['Carnet de cafés'])
