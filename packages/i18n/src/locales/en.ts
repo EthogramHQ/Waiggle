@@ -889,6 +889,7 @@ export const en: Translation = {
     recent: 'Recent',
     testersError: 'Projects looking for testers could not load.',
     recentError: 'Recent projects could not load.',
+    toolsError: 'Popular tools could not load.',
   },
   search: {
     title: 'Search',

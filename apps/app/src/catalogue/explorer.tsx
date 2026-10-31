@@ -160,7 +160,7 @@ export function ExploreCatalogue() {
                 {(
                   [
                     [t(($) => $.explore.testers), t(($) => $.explore.testersError)],
-                    [t(($) => $.explore.popularTools), t(($) => $.tools.errorTitle)],
+                    [t(($) => $.explore.popularTools), t(($) => $.explore.toolsError)],
                     [t(($) => $.explore.recent), t(($) => $.explore.recentError)],
                   ] as const
                 ).map(([title, message]) => (

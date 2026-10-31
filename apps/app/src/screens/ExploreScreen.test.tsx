@@ -533,7 +533,7 @@ describe('ExploreScreen, when the sections cannot load', () => {
     await renderExplore()
 
     expect(screen.getByText(fr.t(($) => $.explore.testersError))).toBeTruthy()
-    expect(screen.getByText(fr.t(($) => $.tools.errorTitle))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.explore.toolsError))).toBeTruthy()
     expect(screen.getByText(fr.t(($) => $.explore.recentError))).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.feed.errorTitle))).toBeNull()
     // Les titres des sections restent : on sait où l'on est.

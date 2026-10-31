@@ -1039,6 +1039,7 @@ export const fr = {
     /** L'échec d'une section d'Explorer se dit dans la section, avec son propre texte. */
     testersError: 'Les projets qui cherchent des testeurs n’ont pas pu se charger.',
     recentError: 'Les projets récents n’ont pas pu se charger.',
+    toolsError: 'Les outils populaires n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
   // hors du nom lu, qui passe par les pluriels ci-dessous.

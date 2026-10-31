@@ -228,7 +228,7 @@ function PopularTools() {
       <Stack gap="md">
         {header}
         <Notice
-          message={t(($) => $.tools.errorTitle)}
+          message={t(($) => $.explore.toolsError)}
           action={{ label: t(($) => $.common.retry), onPress: () => void tools.refetch() }}
         />
       </Stack>
