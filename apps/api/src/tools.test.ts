@@ -127,6 +127,10 @@ describe('the list of tools', () => {
       { slug: 'lovable', label: 'Lovable', projectCount: 1 },
     ])
 
+    // Un retrait répond à un signalement ouvert (reports/decide.ts) : Malik signale, Louis retire.
+    // (Correction de la session, R3 : sans signalement, le retrait était refusé en 409.)
+    later()
+    await act.report(malik, { kind: 'project', id: removed.id })
     later()
     await act.decide(louis, {
       action: 'remove',

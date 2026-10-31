@@ -152,7 +152,12 @@ const insertMembers = async (members: { name: string; handle: string }[]) => {
 }
 
 /** Louis retire un projet (POST /v1/moderation/decisions). */
-const remove = (projectId: string) => {
+// Un retrait de la modération répond à un signalement ouvert (reports/decide.ts) : Zoé signale
+// d'abord, puis Louis retire. (Correction de la session, R3 : sans signalement, le retrait était
+// refusé en 409, une raison étrangère à la règle testée.)
+const remove = async (projectId: string) => {
+  later()
+  await act.report(zoe, { kind: 'project', id: projectId })
   later()
   return act.decide(louis, {
     action: 'remove',
