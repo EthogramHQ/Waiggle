@@ -16,25 +16,34 @@
 //
 // Le texte cherché n'est jamais interprété : il s'affiche tel quel, en texte simple, et jamais dans
 // le titre de la page ou de l'onglet du navigateur (relecture de sécurité, sec-A8).
-import { SEARCH_QUERY_MAX, SearchQuery, type SearchResults, searchWords } from '@ruche/contracts'
+import {
+  SEARCH_OTHERS_FROM,
+  SEARCH_QUERY_MAX,
+  SearchQuery,
+  type SearchResults,
+  searchWords,
+} from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useSearch } from '../search/api'
+import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { HighlightedText } from '../ui/HighlightedText'
+import { InitialTile, tileVariantOf } from '../ui/InitialTile'
 import { ListGroup, ListRow, type PressEvent } from '../ui/ListGroup'
+import { LiveStatus } from '../ui/LiveStatus'
 import { Screen } from '../ui/Screen'
 import { SearchField } from '../ui/SearchField'
 import { Segmented } from '../ui/Segmented'
 import { Row, Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
-import { Text } from '../ui/Text'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
@@ -51,6 +60,8 @@ export function SearchScreen() {
   const router = useRouter()
   const { state, session, retry } = useMemberSession()
   const { sizeClass } = useLayout()
+  // Les photos des membres trouvés (servies par l'API, avec la session sur téléphone).
+  const toSource = useMediaSources()
   // L'adresse n'est lue qu'une fois la page hydratée : la page web est pré-rendue sans connaître
   // l'adresse complète, et lire `q` plus tôt ferait un écart entre le pré-rendu et le navigateur.
   const hydrated = useHydrated()
@@ -170,25 +181,38 @@ export function SearchScreen() {
   const groups = data ? results(data) : null
   const found = groups ? GROUPS.some((group) => groups[group].count > 0) : false
 
+  // Rien trouvé (ou rien qui puisse l'être) : l'abeille à la loupe dit « Aucun résultat ».
+  const nothingFound = (groups !== null && !found) || unsearchable
+  // Aucun mot de 3 lettres : l'API ne cherche alors que parmi les membres suivis (décision de Louis
+  // du 30/10/2026, sec-B1 et jur-J1, la même règle que l'API, search/load.ts). « Aucun résultat »
+  // le dit, sinon on croirait que la personne cherchée n'est pas membre (relecture juridique, C1).
+  const onlyFollowed = words.length > 0 && words.every((word) => word.length < SEARCH_OTHERS_FROM)
+
+  // « 3 projets, 1 membre, 0 outil » : les nombres d'une réponse (0 partout quand le texte ne peut
+  // rien trouver).
+  const counts = groups ?? results({ projects: none, members: none, tools: none })
+  const summary = t(($) => $.search.summary, {
+    projects: counts.projects.more
+      ? t(($) => $.search.projectsMore, { max: counts.projects.count })
+      : t(($) => $.search.projects, { count: counts.projects.count }),
+    members: counts.members.more
+      ? t(($) => $.search.membersMore, { max: counts.members.count })
+      : t(($) => $.search.members, { count: counts.members.count }),
+    tools: counts.tools.more
+      ? t(($) => $.search.toolsMore, { max: counts.tools.count })
+      : t(($) => $.search.tools, { count: counts.tools.count }),
+  })
+
   // La ligne d'état, lue poliment par les lecteurs d'écran à chaque changement (relecture de
-  // l'interface du plan, ui-7) : « Tape au moins deux caractères », « Recherche en cours… », puis
-  // « 3 projets, 1 membre, 0 outil ».
+  // l'interface du plan, ui-7 ; LiveStatus, toujours montée) : « Tape au moins deux caractères »,
+  // « Recherche en cours… », puis « 3 projets, 1 membre, 0 outil ». Une panne n'y ajoute rien : son
+  // message est déjà une alerte.
   const status = tooShort
     ? t(($) => $.search.typeMore)
-    : groups
-      ? t(($) => $.search.summary, {
-          projects: groups.projects.more
-            ? t(($) => $.search.projectsMore, { max: groups.projects.count })
-            : t(($) => $.search.projects, { count: groups.projects.count }),
-          members: groups.members.more
-            ? t(($) => $.search.membersMore, { max: groups.members.count })
-            : t(($) => $.search.members, { count: groups.members.count }),
-          tools: groups.tools.more
-            ? t(($) => $.search.toolsMore, { max: groups.tools.count })
-            : t(($) => $.search.tools, { count: groups.tools.count }),
-        })
-      : failed || unsearchable
-        ? null
+    : failed
+      ? ''
+      : groups || unsearchable
+        ? summary
         : t(($) => $.search.searching)
 
   const tabLabel = (group: keyof SearchResults) => {
@@ -248,11 +272,9 @@ export function SearchScreen() {
           />
         ) : null}
 
-        {status ? (
-          <Text variant="callout" tone="muted" role="status" accessibilityLiveRegion="polite">
-            {status}
-          </Text>
-        ) : null}
+        {/* Rien trouvé : « 0 projet, 0 membre, 0 outil » reste lu, mais ne se montre pas au-dessus
+            de « Aucun résultat », qui le dit déjà à l'œil (relecture de design, 13). */}
+        <LiveStatus message={status} visible={!nothingFound} />
 
         {failed ? (
           errorKey(shownError) === 'rateLimited' ? (
@@ -272,13 +294,15 @@ export function SearchScreen() {
           )
         ) : null}
 
-        {(groups && !found) || unsearchable ? (
+        {nothingFound ? (
           // Rien trouvé : l'abeille à la loupe, et le texte cherché tel quel (les traductions ne
-          // l'interprètent pas : i18n.ts neutralise les « {{ » des valeurs).
+          // l'interprètent pas : i18n.ts neutralise les « {{ » des valeurs). Sous 3 lettres, le
+          // conseil « Essaie un mot plus court » serait faux : la phrase dit plutôt qu'avec un mot
+          // plus long, on trouve aussi les membres qu'on ne suit pas.
           <StateMessage
             kind="notFound"
             title={t(($) => $.search.emptyTitle, { q: query.trim() })}
-            message={t(($) => $.search.empty)}
+            message={onlyFollowed ? t(($) => $.search.shortQuery) : t(($) => $.search.empty)}
           />
         ) : null}
 
@@ -336,6 +360,16 @@ export function SearchScreen() {
                 <ListRow
                   key={member.id}
                   label={member.name}
+                  // La photo (ou les initiales) : un repère pour l'œil, comme sur la planche. Sans
+                  // nom à elle : le nom de la ligne dit déjà qui c'est.
+                  leading={
+                    <Avatar
+                      name={member.name}
+                      source={toSource(member.avatarUrl)}
+                      label=""
+                      size={40}
+                    />
+                  }
                   title={<HighlightedText text={member.name} words={words} weight={600} />}
                   detail={
                     <HighlightedText variant="callout" tone="muted" text={meta} words={words} />
@@ -360,6 +394,9 @@ export function SearchScreen() {
                   key={tool.slug}
                   label={tool.label}
                   title={<HighlightedText text={tool.label} words={words} weight={600} />}
+                  // La tuile à l'initiale, comme dans « Tous les outils » (ToolsScreen) : même outil,
+                  // même teinte d'une page à l'autre.
+                  leading={<InitialTile name={tool.label} variant={tileVariantOf(tool.slug)} />}
                   detail={projects}
                   spokenLabel={t(($) => $.tools.withCount, { label: tool.label, projects })}
                   trailing="chevron"
@@ -374,6 +411,9 @@ export function SearchScreen() {
     </Screen>
   )
 }
+
+/** Un groupe vide, pour dire « 0 projet, 0 membre, 0 outil » sans réponse de l'API. */
+const none = { items: [], more: false }
 
 /** Le nombre de résultats de chaque groupe, et s'il y en avait plus de 20. */
 const results = (data: SearchResults) => ({
