@@ -2,7 +2,7 @@
 // GET /v1/feed/discover (« Découvrir »). Réservés aux membres connectés ; ce qu'ils montrent est
 // décidé dans feed/load.ts.
 import { createRoute } from '@hono/zod-openapi'
-import { DiscoverQuery, FeedPage, FeedQuery, FollowingFeedPage } from '@ruche/contracts'
+import { DiscoverFeedPage, DiscoverQuery, FeedQuery, FollowingFeedPage } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
 import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
@@ -37,8 +37,10 @@ const discoverRoute = createRoute({
   request: { query: DiscoverQuery },
   responses: {
     200: {
-      description: 'The public projects of every member, newest first.',
-      content: { 'application/json': { schema: FeedPage } },
+      description:
+        'The public projects of every member, newest first, and which of their authors the ' +
+        'viewer already follows.',
+      content: { 'application/json': { schema: DiscoverFeedPage } },
     },
     400: errorResponse('Invalid cursor or filter.'),
     401: errorResponse('Not signed in.'),
@@ -77,7 +79,7 @@ export const feedRoutes = ({ db, publicApiUrl }: Deps) => {
       query.testers === 'true',
       publicApiUrl,
     )
-    return c.json(FeedPage.parse(page), 200)
+    return c.json(DiscoverFeedPage.parse(page), 200)
   })
 
   return app

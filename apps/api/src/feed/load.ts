@@ -3,6 +3,7 @@
 // un curseur (cursor.ts : pourquoi un curseur plutôt qu'un numéro de page). « Abonnements » y mêle
 // les notes des projets suivis (tranche 4b).
 import {
+  type DiscoverFeedPage,
   FEED_PAGE_SIZE,
   type FeedItem,
   type FeedPage,
@@ -13,7 +14,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
-import { followsAnyone } from '../follows/load'
+import { followedAmong, followsAnyone } from '../follows/load'
 import { toNote } from '../notes/load'
 import { rowToSummary, selectMedia, selectProjects } from '../projects/load'
 import { listedProjectFor } from '../projects/visibility'
@@ -270,17 +271,26 @@ export const loadFollowingFeed = async (
  * `testers` : seulement ceux qui cherchent des testeurs (au statut « testable », avec un lien de
  * démo). L'index partiel project_public_published_idx est déjà rangé dans l'ordre du fil.
  */
-export const loadDiscoverFeed = (
+export const loadDiscoverFeed = async (
   db: Database,
   viewerId: string,
   cursor: CursorContent | null,
   testers: boolean,
   publicApiUrl: string,
-): Promise<FeedPage> =>
-  loadPage(
+): Promise<DiscoverFeedPage> => {
+  const page = await loadPage(
     db,
     testers ? and(eq(t.status, 'testable'), isNotNull(t.demoUrl)) : undefined,
     cursor,
     viewerId,
     publicApiUrl,
   )
+  // R3 : les auteurs de la page que le visiteur suit déjà, en une requête de plus (followedAmong),
+  // quel que soit le nombre de cartes. Lui-même n'y est jamais (on ne se suit pas) ; un membre
+  // bloqué non plus : ses projets ne sont pas dans la page. `new Set` retire les doublons (un
+  // auteur de plusieurs cartes).
+  const authorIds = [
+    ...new Set(page.items.map((item) => item.project.author.id).filter((id) => id !== viewerId)),
+  ]
+  return { ...page, followedAuthorIds: await followedAmong(db, viewerId, authorIds) }
+}
