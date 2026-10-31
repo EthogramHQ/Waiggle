@@ -47,6 +47,10 @@ type Props = {
 // La vignette : un peu plus grande que la pastille d'icône d'une ligne (40), pour qu'on reconnaisse
 // la photo, comme sur la planche ; ses coins, ceux d'un petit bloc.
 const THUMB = 48
+// La place que le lien de la ligne demande avant de laisser « Tester » passer dessous : ses marges
+// (2 × 16), la vignette (48), l'écart (12) et une centaine de points pour le titre. Dans la colonne
+// de droite (320 points), « Tester » tient sur la ligne du titre à la taille de texte ordinaire.
+const LINK_BASIS = 180
 
 export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
   const { t } = useTranslation()
@@ -77,8 +81,20 @@ export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
   )
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: space.lg }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
+    // Une rangée qui passe à la ligne : quand le texte est agrandi et que la place manque (200 %,
+    // une colonne étroite), « Tester » passe sous le titre au lieu de l'écraser en une lettre par
+    // ligne (essai du 31/10 à 320 points et 200 %).
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        paddingRight: space.lg,
+      }}
+    >
+      {/* Pas `flex: 1` (base nulle, qui ne passe jamais à la ligne) : une base réelle, puis
+          toute la place qui reste. */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: LINK_BASIS, minWidth: 0 }}>
         {open ? (
           // Le lien de la ligne, nommé par le titre du projet. Comme une ligne touchable d'un
           // `ListRow` : le fond s'assombrit sous le doigt, et l'anneau du clavier se dessine à
@@ -111,9 +127,13 @@ export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
           // autour de la zone : un anneau intérieur se perdrait sur le miel.
           minHeight: layout.touchTarget,
           minWidth: layout.touchTarget,
-          // Jamais plus large que la moitié de la ligne, même à 200 % de texte : le titre garde
-          // sa place.
-          maxWidth: '50%',
+          // Rangé à droite, sur la ligne du titre comme sous elle (marge automatique) ; jamais
+          // plus large que la ligne, même à 200 % de texte (react-native-web ne laisse rien
+          // rétrécir sans `maxWidth`). La marge verticale ne change rien sur une seule ligne (la
+          // ligne est plus haute) ; passé dessous, « Tester » ne colle pas au trait suivant.
+          marginLeft: 'auto',
+          marginVertical: space.sm,
+          maxWidth: '100%',
           flexShrink: 1,
           justifyContent: 'center',
           borderRadius: radii.pill,
