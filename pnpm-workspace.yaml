@@ -109,6 +109,16 @@ auditConfig:
     # certificats du serveur de développement, signature des mises à jour Expo, que Waiggle n'utilise
     # pas). Absent de l'appli et de l'API ; aucune version corrigée publiée.
     - GHSA-86w9-cpqp-85rv
+    # node-forge <= 1.4.0, cinq avis publiés fin octobre 2026 (déni de service par expression
+    # régulière dans pem.decode, MAC PKCS#12 contrefait, deux dénis de service TLS, contrôle
+    # basicConstraints contourné) : même chemin, même raison (outil de développement d'Expo, absent de
+    # l'appli et de l'API). Le correctif, node-forge 1.4.1 (27/10), passe le délai de 7 jours de pnpm
+    # le 3/11/2026 : ce jour-là, monter node-forge et retirer ces cinq lignes.
+    - GHSA-7wch-p9px-956x
+    - GHSA-jc66-7q78-782g
+    - GHSA-8hrf-8g6f-7xwp
+    - GHSA-hqq3-7jhf-c5jx
+    - GHSA-5x38-2vff-x55p
     # (Les exceptions de braces, GHSA-vfj7-8cjw-p6xm, et de sprintf-js, GHSA-hp3w-g68c-fv3c, sont
     # retirées le 25/10/2026 : GitHub a retiré ces deux avis les 22 et 23/10. Celles de zod,
     # GHSA-mrhx-c7xc-m3w5, et de decode-uri-component, GHSA-vcc3-ghjq-m6fr, le 26/10/2026 : corrigées
