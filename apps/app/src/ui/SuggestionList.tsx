@@ -92,6 +92,9 @@ export function SuggestionList({
   const guard = useTapGuard()
 
   const shown = members.filter((member) => !hidden.has(member.id)).slice(0, max)
+  // La première ligne montrée, lue par le minuteur (posé lors d'un rendu plus ancien).
+  const firstShown = useRef<string | undefined>(undefined)
+  firstShown.current = shown[0]?.id
 
   /** Envoie l'écart en attente, s'il y en a un (fin du délai, nouvel écart, départ de la page). */
   const flush = () => {
@@ -100,7 +103,14 @@ export function SuggestionList({
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     pendingRef.current = null
-    if (mounted.current) setPending(null)
+    if (mounted.current) {
+      // « Annuler » va disparaître : s'il avait le focus du clavier (on l'a atteint par Tab sans
+      // le toucher), le focus passe à la première ligne au lieu de retomber en haut de la page.
+      if (hasFocus(undoNode.current) && firstShown.current) {
+        setFocusTarget({ to: firstShown.current })
+      }
+      setPending(null)
+    }
     void send.current(id).then(
       (result) => {
         if (!result.ok) restore(id)
@@ -240,6 +250,13 @@ export function SuggestionList({
     </View>
   )
 }
+
+/**
+ * Vrai si `node` a le focus du clavier. Sur le web, la ref d'une vue est l'élément de la page ;
+ * ailleurs (téléphone, tests), il n'y a pas de page, donc pas de focus du clavier à suivre.
+ */
+const hasFocus = (node: unknown): boolean =>
+  node !== null && typeof document !== 'undefined' && document.activeElement === node
 
 /** Une copie de l'ensemble, sans `id`. */
 const without = (set: ReadonlySet<string>, id: string): ReadonlySet<string> => {

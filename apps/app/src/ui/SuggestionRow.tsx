@@ -5,7 +5,8 @@
 //   cachée aux lecteurs d'écran et hors du parcours de Tab, pour qu'on n'entende pas deux fois le
 //   même lien ;
 // - la vignette et le titre ouvrent le projet (un lien nommé par le titre) ;
-// - « Suivre » est l'interrupteur de FollowButton (« Suivre Léa », puis « Tu suis Léa ») ;
+// - « Suivre » est un interrupteur, comme celui de FollowButton (« Suivre Léa », puis « Tu suis
+//   Léa ») ;
 // - « × » ne suggère plus ce membre (le nom lu le dit : « Ne plus suggérer Léa »).
 // Aucune preuve sociale (ni « suivi par », ni nombre d'abonnés : relecture juridique jur-J5).
 //
@@ -16,13 +17,13 @@
 // pose dans un `ListGroup` (voir SuggestionList), mais dessine sa propre rangée, qui se replie.
 //
 // La ligne ne garde pas l'état « suivi » : l'écran le donne (`followed`) et le change dans
-// `onFollow`, comme pour FollowButton.
+// `onFollow`, comme pour FollowButton. Elle ne dit pas l'échec d'un abonnement : l'écran le dit.
 import { layout, radii, space } from '@ruche/brand'
 import type { Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, View } from 'react-native'
 import { Avatar } from './Avatar'
-import { FollowButton } from './FollowButton'
+import { Button } from './Button'
 import { IconButton } from './IconButton'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
@@ -34,7 +35,7 @@ import { useTheme } from './theme/ThemeProvider'
 /** La taille de la photo du membre, celle des pastilles de `ListRow`. */
 const AVATAR_SIZE = 40
 /** La vignette du projet, devant son titre : à la hauteur d'une ligne de texte. */
-const THUMBNAIL_SIZE = 20
+const THUMBNAIL_SIZE = 16
 /**
  * La place gardée au nom et au titre avant que « Suivre » passe dessous : un nom de deux mots y
  * tient sur un téléphone de 390 points, et à texte agrandi, « Suivre » descend plutôt que de
@@ -194,14 +195,21 @@ export function SuggestionRow({
             </View>
           </Pressable>
         </View>
-        <FollowButton
-          followed={followed}
+        {/* L'interrupteur de FollowButton (même Button, même `checked`, mêmes noms lus), mais petit
+            (36 points dessinés, 44 à toucher) et sans l'icône « ajouter » tant qu'on ne suit pas,
+            comme sur la planche : avec le bouton de FollowButton (compact, icône), il ne restait
+            qu'une centaine de points au nom et au titre sur un téléphone de 390, et « Décollage ! »
+            se coupait au milieu du mot. En blanc : au premier lancement, l'action miel de l'écran
+            est « Publier ». */}
+        <Button
+          label={t(($) => (followed ? $.suggestions.following : $.follow.follow))}
+          spokenLabel={t(($) => (followed ? $.follow.memberFollowing : $.follow.member), { name })}
+          checked={followed}
           onPress={guard(onFollow)}
-          label={t(($) => (followed ? $.follow.memberFollowing : $.follow.member), { name })}
-          text={t(($) => (followed ? $.suggestions.following : $.follow.follow))}
-          // En blanc : sur le premier lancement, l'action miel de l'écran est « Publier ».
-          prominent={false}
           disabled={followDisabled}
+          variant="secondary"
+          size="small"
+          {...(followed ? { icon: 'check' as const } : null)}
         />
       </View>
 
