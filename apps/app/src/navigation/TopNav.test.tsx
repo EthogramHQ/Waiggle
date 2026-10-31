@@ -4,8 +4,9 @@
 //
 // Tranche 7c : la barre porte aussi le bandeau d'un compte suspendu, une fois pour toutes les
 // pages qui la montent, sur téléphone comme sur ordinateur, et n'y propose plus « Publier ».
+import { palettes } from '@ruche/brand'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { Dimensions } from 'react-native'
+import { Dimensions, StyleSheet } from 'react-native'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
 import { getMe } from '../profile/api'
@@ -24,9 +25,13 @@ jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
 // L'adresse de la page, que les tests de R3 font varier (les liens de la barre marquent l'actif).
 let mockPathname = '/'
 const mockPush = jest.fn()
+// La page qui porte la barre est-elle affichée ? Sur le web, Expo Router garde les pages quittées
+// montées dessous, avec la même adresse (R3, relecture de l'interface C9).
+let mockFocused = true
 jest.mock('expo-router', () => ({
   usePathname: () => mockPathname,
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useIsFocused: () => mockFocused,
 }))
 
 const { t } = createI18n('fr')
@@ -36,6 +41,7 @@ let restoreWindow: () => void
 beforeEach(() => {
   restoreWindow = setDesktopWindow()
   mockPathname = '/'
+  mockFocused = true
   mockPush.mockReset()
   mockSession({ user: { id: 'u5', name: 'Inès' } })
   jest.mocked(useUnreadCount).mockReset().mockReturnValue(0)
@@ -148,6 +154,14 @@ describe('the top bar of a suspended member', () => {
     expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
     expect(screen.queryByText(containing(t(($) => $.suspension.title)))).toBeNull()
   })
+
+  // Décision de Louis du 31/10/2026 : « Publier » est en miel, comme le « + » du téléphone.
+  it('offers « Publier » in honey, like the « + » of the phone', async () => {
+    await renderWithProviders(<TopNav />)
+
+    const publish = screen.getByRole('button', { name: t(($) => $.home.publish) })
+    expect(StyleSheet.flatten(publish.props.style)?.backgroundColor).toBe(palettes.day.honey)
+  })
 })
 
 // R3 (F-Nav8, F-Nav9) : la photo de la barre s'appelle « Moi » et mène à sa propre page (/me), d'où
@@ -244,10 +258,16 @@ describe('the search of the top bar', () => {
     Dimensions.set({ window: medium, screen: medium })
   }
 
+  /**
+   * Le nom du lien qui a l'air d'un champ : le nom du champ, puis le texte affiché (charte : le nom
+   * lu contient le texte affiché ; un seul SearchLink, R3, relecture de l'interface C4).
+   */
+  const searchLinkName = `${t(($) => $.search.label)}, ${t(($) => $.search.placeholder)}`
+
   it('is a link to the search page when not on it', async () => {
     await renderWithProviders(<TopNav />)
 
-    const field = screen.getByRole('link', { name: t(($) => $.search.label) })
+    const field = screen.getByRole('link', { name: searchLinkName })
     expect(field.props.href).toBe('/search')
     await fireEvent.press(field)
     expect(mockPush).toHaveBeenCalledWith('/search')
@@ -257,10 +277,22 @@ describe('the search of the top bar', () => {
     mockPathname = '/search'
     await renderWithProviders(<TopNav />)
 
-    expect(screen.queryByRole('link', { name: t(($) => $.search.label) })).toBeNull()
+    expect(screen.queryByRole('link', { name: searchLinkName })).toBeNull()
     // Le champ, nommé pour les lecteurs d'écran, reçoit ce qu'on tape.
     const field = screen.getByLabelText(t(($) => $.search.label))
     expect(typeof field.props.onChangeText).toBe('function')
+  })
+
+  it('leaves the real field to the page shown, not to a page kept mounted below it', async () => {
+    mockPathname = '/search'
+    mockFocused = false
+    await renderWithProviders(<TopNav />)
+
+    // Témoin : la barre est là (sa cloche).
+    expect(screen.getByRole('button', { name: t(($) => $.notifications.bell) })).toBeTruthy()
+    // Aucun champ qui pourrait prendre le clavier : la page cachée garde son lien.
+    expect(screen.queryByLabelText(t(($) => $.search.label))).toBeNull()
+    expect(screen.getByRole('link', { name: searchLinkName })).toBeTruthy()
   })
 
   it('becomes a magnifier button on a medium window, which opens the search page', async () => {
@@ -281,7 +313,7 @@ describe('the search of the top bar', () => {
     await renderWithProviders(<TopNav />)
 
     expect(screen.queryByRole('button', { name: t(($) => $.nav.search) })).toBeNull()
-    expect(screen.getByRole('link', { name: t(($) => $.search.label) })).toBeTruthy()
+    expect(screen.getByRole('link', { name: searchLinkName })).toBeTruthy()
   })
 })
 

@@ -8,7 +8,8 @@
 // (relecture juridique, jur-J5).
 //
 // Où est le champ ?
-// - Sur téléphone, dans la page, avec « Annuler » à côté (revenir à Explorer) ;
+// - Sur téléphone, dans la page, avec « Annuler » à côté (revenir à Explorer), ou dessous quand le
+//   texte est grand ;
 // - en largeur moyenne (700 à 1 100 points), dans la page aussi : la barre du haut n'y a qu'une
 //   loupe (relecture de l'interface du plan, ui-6) ;
 // - sur ordinateur, dans la barre du haut (navigation/TopNav.tsx) : la page lit alors ce que la
@@ -41,7 +42,7 @@ import { LiveStatus } from '../ui/LiveStatus'
 import { Screen } from '../ui/Screen'
 import { SearchField } from '../ui/SearchField'
 import { Segmented } from '../ui/Segmented'
-import { Row, Stack } from '../ui/Stack'
+import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
 import { useHydrated } from '../ui/theme/hydration'
@@ -149,6 +150,18 @@ export function SearchScreen() {
       onSubmit={() => {}}
       // On vient ici pour chercher : le curseur est déjà dans le champ.
       autoFocus
+      // Sur téléphone, « Annuler » à côté du champ ; le champ le fait passer dessous quand le
+      // texte est grand (SearchField, `action`).
+      action={
+        sizeClass === 'compact' ? (
+          <Button
+            label={t(($) => $.common.cancel)}
+            variant="glass"
+            size="compact"
+            onPress={cancel}
+          />
+        ) : undefined
+      }
     />
   )
 
@@ -241,23 +254,7 @@ export function SearchScreen() {
       header={<TopNav />}
     >
       <Stack gap="lg" align="stretch">
-        {field ? (
-          sizeClass === 'compact' ? (
-            // Le champ prend la place que « Annuler » laisse : à 320 points, c'est le champ qui
-            // rétrécit, jamais le bouton (qui passerait sur deux lignes).
-            <Row gap="sm" align="center">
-              <Stack grow>{field}</Stack>
-              <Button
-                label={t(($) => $.common.cancel)}
-                variant="glass"
-                size="compact"
-                onPress={cancel}
-              />
-            </Row>
-          ) : (
-            field
-          )
-        ) : null}
+        {field}
 
         {groups && found ? (
           <Segmented

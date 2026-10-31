@@ -9,8 +9,10 @@
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '../ui/Button'
 import { NavLinks, NavPhotoLink } from '../ui/NavLinks'
-import { SearchButton, SearchField, SearchLink } from '../ui/SearchField'
+import { SearchButton, SearchField } from '../ui/SearchField'
+import { SearchLink } from '../ui/SearchLink'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -28,6 +30,8 @@ const fr = {
   filled: 'Champ rempli, avec sa croix',
   link: 'Hors de la page de recherche : un lien qui a l’air d’un champ',
   button: 'Largeur moyenne : la loupe seule',
+  action:
+    'Page de recherche sur téléphone : le champ et « Annuler », qui passe dessous quand le texte est grand',
   day: 'jour',
   night: 'nuit',
 }
@@ -44,6 +48,7 @@ const en: typeof fr = {
   filled: 'Filled field, with its cross',
   link: 'Away from the search page: a link that looks like a field',
   button: 'Medium width: the magnifier alone',
+  action: 'Search page on a phone: the field and “Cancel”, which goes below it when text is large',
   day: 'day',
   night: 'night',
 }
@@ -146,8 +151,13 @@ export function TopBarCatalogue() {
                   placeholder={t(($) => $.search.placeholder)}
                   href="/search"
                   onPress={noop}
+                  grow
                 />
               </Bar>
+            </Example>
+
+            <Example caption={`${l.action} — ${l[scheme]}`}>
+              <LiveSearch initial="" withCancel />
             </Example>
 
             <Example caption={`${l.button} — ${l[scheme]}`}>
@@ -163,7 +173,7 @@ export function TopBarCatalogue() {
 }
 
 /** Un champ de recherche qu'on peut essayer : il garde ce qu'on tape, la croix et Échap le vident. */
-function LiveSearch({ initial }: { initial: string }) {
+function LiveSearch({ initial, withCancel = false }: { initial: string; withCancel?: boolean }) {
   const { t } = useTranslation()
   const [value, setValue] = useState(initial)
   return (
@@ -173,6 +183,17 @@ function LiveSearch({ initial }: { initial: string }) {
       value={value}
       onChangeText={setValue}
       onSubmit={noop}
+      // « Annuler » de la page de recherche : ici, il vide seulement le champ.
+      action={
+        withCancel ? (
+          <Button
+            label={t(($) => $.common.cancel)}
+            variant="glass"
+            size="compact"
+            onPress={() => setValue('')}
+          />
+        ) : undefined
+      }
     />
   )
 }
