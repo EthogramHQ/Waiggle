@@ -29,6 +29,7 @@ export const radii = {
   group: 22, // groupe de champs, liste de réglages
   small: 18, // petites tuiles
   code: 14, // bloc de prompt
+  mark: 4, // surlignage d'un mot trouvé, posé sur les lettres (web seulement : voir HighlightedText)
   pill: 999, // boutons, pastilles, champs de recherche : complètement arrondis
 } as const
 export type Radius = keyof typeof radii
