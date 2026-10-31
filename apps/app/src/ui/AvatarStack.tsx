@@ -18,8 +18,11 @@ import { useTheme } from './theme/ThemeProvider'
  * bouton de 44 points (avec son liseré, la pile y fait 28 de haut et laisse l'air de la pilule).
  */
 const SIZES = { regular: 28, small: 24 } as const
-/** De combien chaque rond passe sous le précédent, en points. */
-const OVERLAP = space.sm
+/**
+ * De combien chaque rond passe sous le précédent, en points. Moins dans la petite pile : à 24
+ * points, 8 de chevauchement mangeaient la seconde initiale (« NB » se lisait « NE »).
+ */
+const OVERLAPS = { regular: space.sm, small: space.xs } as const
 
 /** Un membre de la pile : son nom (pour ses initiales) et sa photo, s'il en a une. */
 export type StackMember = { name: string; source: ImageSource | null }
@@ -75,6 +78,7 @@ function Initials({ name, size }: { name: string; size: number }) {
 export function AvatarStack({ members, label, max = 3, size = 'regular' }: Props) {
   const { colors } = useTheme()
   const diameter = SIZES[size]
+  const overlap = OVERLAPS[size]
   const shown = members.slice(0, max)
   const others = members.length - shown.length
   // Chaque rond est cerné de la couleur de la surface : il se détache de celui qu'il chevauche.
@@ -105,7 +109,7 @@ export function AvatarStack({ members, label, max = 3, size = 'regular' }: Props
           // biome-ignore lint/suspicious/noArrayIndexKey: la pile n'est jamais réordonnée sur place.
           key={index}
           {...hiddenFromReaders}
-          style={[ring, index > 0 ? { marginLeft: -OVERLAP } : null]}
+          style={[ring, index > 0 ? { marginLeft: -overlap } : null]}
         >
           {member.source ? (
             <Avatar name={member.name} source={member.source} label={member.name} size={diameter} />
@@ -120,7 +124,7 @@ export function AvatarStack({ members, label, max = 3, size = 'regular' }: Props
           style={[
             ring,
             {
-              marginLeft: -OVERLAP,
+              marginLeft: -overlap,
               minWidth: diameter + 2 * borders.badge,
               height: diameter + 2 * borders.badge,
               paddingHorizontal: space.xs,
