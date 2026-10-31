@@ -309,7 +309,8 @@ describe('FollowerCount', () => {
 })
 
 describe('FeedEnd', () => {
-  const labels = { moreLabel: 'Afficher la suite', endLabel: 'Tu es à jour' }
+  // R4 : « Tu es à jour » a quitté FeedEnd (ui/UpToDate.tsx) ; la fin d'ici est la fin discrète.
+  const labels = { moreLabel: 'Afficher la suite', endLabel: 'C’est tout' }
 
   it('offers to load what comes next', async () => {
     const onMore = jest.fn()
@@ -318,7 +319,7 @@ describe('FeedEnd', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Afficher la suite' }))
 
     expect(onMore).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Tu es à jour')).toBeNull()
+    expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
   it('stays in place and busy while the next page loads, without asking for it twice', async () => {
@@ -349,10 +350,10 @@ describe('FeedEnd', () => {
     expect(onMore).toHaveBeenCalledTimes(1)
   })
 
-  it('says the member is up to date at the end, with nothing left to press', async () => {
+  it('says the list is over at the end, with nothing left to press', async () => {
     await renderWithProviders(<FeedEnd state="end" {...labels} onMore={jest.fn()} />)
 
-    expect(screen.getByText('Tu es à jour')).toBeTruthy()
+    expect(screen.getByText('C’est tout')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
