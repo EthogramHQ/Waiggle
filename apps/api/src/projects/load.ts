@@ -234,6 +234,8 @@ const toSummary = ({ visuals, ...project }: ProjectBase): ProjectSummary => ({
   visibility: project.visibility,
   tools: project.tools,
   cover: visuals[0] ?? null,
+  // R3 : le lien de la démo sur la carte (« Tester » sans ouvrir la page du projet).
+  demoUrl: project.demoUrl,
   portraitCover: project.portraitCover,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,

@@ -115,3 +115,48 @@ export const followsAnyone = async (db: Reader, viewerId: string): Promise<boole
   ])
   return member.length > 0 || project.length > 0
 }
+
+/**
+ * Parmi ces membres, ceux que le visiteur suit déjà (R3 : la pastille « Suivre Nora » de
+ * « Récents » ne se pose que sur les autres). Une seule requête, quel que soit leur nombre :
+ *   select member_id from member_follow where follower_id = $moi and member_id in (…)
+ * La clé primaire (follower_id, member_id) la sert entière : PostgreSQL ne lit que les entrées du
+ * visiteur, et parmi elles celles de la liste. Seuls ses propres abonnements sortent d'ici.
+ */
+export const followedAmong = async (
+  db: Reader,
+  viewerId: string,
+  memberIds: string[],
+): Promise<string[]> => {
+  if (memberIds.length === 0) return []
+  const rows = await db
+    .select({ memberId: schema.memberFollow.memberId })
+    .from(schema.memberFollow)
+    .where(
+      and(
+        eq(schema.memberFollow.followerId, viewerId),
+        inArray(schema.memberFollow.memberId, memberIds),
+      ),
+    )
+  return rows.map((row) => row.memberId)
+}
+
+/**
+ * Le nombre d'abonnés de chacun de ces membres (R3 : « @pseudo · 12 abonnés » dans la recherche),
+ * en une requête quel que soit leur nombre :
+ *   select member_id, count(*)::int from member_follow where member_id in (…) group by member_id
+ * L'index member_follow_member_idx trouve les abonnés de chaque membre de la liste. Un membre sans
+ * abonné n'a aucune ligne : il est absent de la Map, et vaut 0.
+ */
+export const memberFollowerCounts = async (
+  db: Reader,
+  memberIds: string[],
+): Promise<Map<string, number>> => {
+  if (memberIds.length === 0) return new Map()
+  const rows = await db
+    .select({ memberId: schema.memberFollow.memberId, followerCount })
+    .from(schema.memberFollow)
+    .where(inArray(schema.memberFollow.memberId, memberIds))
+    .groupBy(schema.memberFollow.memberId)
+  return new Map(rows.map((row) => [row.memberId, row.followerCount]))
+}
