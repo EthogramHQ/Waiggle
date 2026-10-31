@@ -34,7 +34,14 @@ export type CardOverlay = (
  * carrousel en tête d'Explorer. La suite ne se charge que sur demande, par « Afficher la suite »
  * (relecture juridique de R3, jur-J7 : pas de fil sans fin qui se charge tout seul).
  */
-export function DiscoverFeed({ overlay }: { overlay?: CardOverlay }) {
+export function DiscoverFeed({
+  overlay,
+  errorMessage,
+}: {
+  overlay?: CardOverlay
+  /** Le message d'une section en panne (voir FeedError, `section`) : ce fil n'est qu'une section. */
+  errorMessage?: string
+}) {
   const { t } = useTranslation()
   const feed = useDiscoverFeed({ testers: false })
   const pages = feed.data?.pages ?? []
@@ -46,7 +53,7 @@ export function DiscoverFeed({ overlay }: { overlay?: CardOverlay }) {
 
   return !feed.data ? (
     feed.isError ? (
-      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+      <FeedError error={feed.error} onRetry={() => void feed.refetch()} section={errorMessage} />
     ) : (
       <SkeletonList count={3} />
     )
@@ -150,9 +157,29 @@ export function FeedList({ feed, items, news, empty, caption, overlay }: FeedLis
   )
 }
 
+type FeedErrorProps = {
+  error: unknown
+  onRetry: () => void
+  /**
+   * Le fil n'est qu'une section de la page (« Récents » d'Explorer) : une notice compacte qui dit
+   * ce qui manque (« Les projets récents n'ont pas pu se charger. »), avec « Réessayer » sous la
+   * même forme que les autres sections. Sans elle, le fil est toute la page (le Fil) : l'état
+   * d'erreur complet, avec son titre et la raison.
+   */
+  section?: string | undefined
+}
+
 /** Un fil qui n'a pas pu se charger : on dit pourquoi, et on propose de réessayer. */
-export function FeedError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+export function FeedError({ error, onRetry, section }: FeedErrorProps) {
   const { t } = useTranslation()
+  // Relecture de design de R3 (#3) : Explorer en panne disait deux fois « Le fil n'a pas pu se
+  // charger » (le carrousel et « Récents »), avec deux formes de « Réessayer ». Dans une page à
+  // plusieurs sections, chacune dit la sienne, dans le même cadre que ses voisines.
+  if (section) {
+    return (
+      <Notice message={section} action={{ label: t(($) => $.common.retry), onPress: onRetry }} />
+    )
+  }
   return (
     <StateMessage
       kind="error"

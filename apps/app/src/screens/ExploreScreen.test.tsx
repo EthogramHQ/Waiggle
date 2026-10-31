@@ -11,11 +11,11 @@ import type {
   ToolCount,
   ToolList,
 } from '@ruche/contracts'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { useDiscoverFeed, useFeedNews } from '../feed/api'
 import { useFollow } from '../follows/api'
 import { getMe } from '../profile/api'
-import { leaMe } from '../testing/fixtures'
+import { leaMe, suspendedMe } from '../testing/fixtures'
 import { hrefOf, pathOf } from '../testing/navigation'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -472,5 +472,87 @@ describe('ExploreScreen, following an author from a card of « Récents »', () 
     expect(screen.getByText(containing(following('Nora')))).toBeTruthy()
     // Max n'est pas concerné.
     expect(screen.getByRole('switch', { name: follow('Max') })).not.toBeChecked()
+  })
+
+  // Relecture de l'interface de R3 (C2) : un compte suspendu ne suit plus personne de nouveau
+  // (tranche 7c) ; la pastille lui proposait un geste que l'API refuse, suivi d'un toast. Comme sur
+  // la page d'un membre et celle d'un projet, elle n'est pas proposée.
+  it('offers no « Suivre » chip to a suspended member', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderExplore()
+
+    // Témoin : les cartes de Nora et de Max sont là.
+    expect(screen.getByRole('link', { name: 'Le carnet de jardin' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
+    // Le profil (et sa suspension) arrive après le premier dessin.
+    await waitFor(() => expect(screen.queryByRole('switch', { name: follow('Nora') })).toBeNull())
+    expect(screen.queryByRole('switch', { name: follow('Max') })).toBeNull()
+    expect(screen.queryByRole('switch', { name: following('Nora') })).toBeNull()
+  })
+})
+
+// Relecture de design de R3 (#3) : Explorer en panne disait deux fois « Le fil n'a pas pu se
+// charger », sous deux formes de « Réessayer ». Chaque section dit ce qui lui manque, dans une
+// notice compacte, et propose « Réessayer » sous la même forme ; le reste de la page reste.
+describe('ExploreScreen, when the sections cannot load', () => {
+  const retry = fr.t(($) => $.common.retry)
+  /** Un fil qui n'a pas pu se charger (useInfiniteQuery en erreur, sans page lue). */
+  const failedFeed = () =>
+    ({
+      data: undefined,
+      status: 'error',
+      isPending: false,
+      isLoading: false,
+      isSuccess: false,
+      isError: true,
+      error: new Error('500'),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isRefetching: false,
+      fetchNextPage: jest.fn().mockResolvedValue(undefined),
+      refetch: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as Feed
+
+  const failAll = () => {
+    const feeds = mockFeeds({ testers: failedFeed(), recent: failedFeed() })
+    const toolsRefetch = jest.fn().mockResolvedValue(undefined)
+    jest.mocked(useTools).mockReturnValue({
+      data: undefined,
+      status: 'error',
+      isPending: false,
+      isSuccess: false,
+      isError: true,
+      error: new Error('500'),
+      refetch: toolsRefetch,
+    } as unknown as ReturnType<typeof useTools>)
+    return { ...feeds, toolsRefetch }
+  }
+
+  it('says in each section what could not load, never « Le fil n’a pas pu se charger »', async () => {
+    failAll()
+    await renderExplore()
+
+    expect(screen.getByText(fr.t(($) => $.explore.testersError))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.tools.errorTitle))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.explore.recentError))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.feed.errorTitle))).toBeNull()
+    // Les titres des sections restent : on sait où l'on est.
+    expect(screen.getByRole('header', { name: fr.t(($) => $.explore.recent) })).toBeTruthy()
+  })
+
+  it('offers « Réessayer » in one form only, each retrying its own section', async () => {
+    const { testers, recent, toolsRefetch } = failAll()
+    await renderExplore()
+
+    expect(screen.queryAllByRole('button', { name: retry })).toHaveLength(0)
+    const links = screen.getAllByRole('link', { name: retry })
+    expect(links).toHaveLength(3)
+    // Dans l'ordre de la page : les testeurs, les outils, « Récents ».
+    await fireEvent.press(links[0] as never)
+    expect(testers.refetch).toHaveBeenCalledTimes(1)
+    await fireEvent.press(links[1] as never)
+    expect(toolsRefetch).toHaveBeenCalledTimes(1)
+    await fireEvent.press(links[2] as never)
+    expect(recent.refetch).toHaveBeenCalledTimes(1)
   })
 })

@@ -16,6 +16,7 @@ import { useMediaSources } from '../api/media'
 import { useDiscoverFeed } from '../feed/api'
 import { DiscoverFeed } from '../feed/FeedList'
 import { useFollow } from '../follows/api'
+import { useSuspension } from '../moderation/suspension'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { useTools } from '../tools/api'
@@ -58,18 +59,28 @@ function MemberExplore({ userId }: { userId: string }) {
   const setFollowed = (authorId: string, followed: boolean) =>
     setTouched((current) => ({ ...current, [authorId]: followed }))
 
+  // Un compte suspendu (tranche 7c) ne suit plus personne de nouveau : l'API refuserait, et la
+  // pastille finirait en toast d'erreur (relecture de l'interface de R3, C2). Même garde que sur la
+  // page d'un membre et celle d'un projet.
+  const { suspended } = useSuspension()
+
   // La pastille d'une carte de « Récents » : jamais sur ses propres projets, ni sur ceux d'un
   // auteur déjà suivi à l'ouverture (rien à proposer) ; toujours sur celui qu'on vient de toucher.
+  // Suspendu : aucune pastille à proposer. Une pastille déjà touchée (la suspension est arrivée
+  // pendant la visite) reste à sa place, sous le doigt et avec le focus : « Tu suis Nora » peut
+  // encore arrêter de suivre ; « Suivre Nora » y devient inactive, comme sur la page d'un membre.
   const chipOf = (project: ProjectSummary, followedAuthorIds: ReadonlySet<string>) => {
     const { author } = project
     if (author.id === userId) return null
     const local = touched[author.id]
-    if (local === undefined && followedAuthorIds.has(author.id)) return null
+    if (local === undefined && (suspended || followedAuthorIds.has(author.id))) return null
+    const followed = local ?? false
     return (
       <AuthorChip
         author={author}
-        followed={local ?? false}
-        onChange={(followed) => setFollowed(author.id, followed)}
+        followed={followed}
+        disabled={suspended && !followed}
+        onChange={(next) => setFollowed(author.id, next)}
       />
     )
   }
@@ -101,7 +112,7 @@ function MemberExplore({ userId }: { userId: string }) {
         <Text variant="heading" heading={2}>
           {t(($) => $.explore.recent)}
         </Text>
-        <DiscoverFeed overlay={chipOf} />
+        <DiscoverFeed overlay={chipOf} errorMessage={t(($) => $.explore.recentError)} />
       </Stack>
     </Screen>
   )
@@ -135,8 +146,10 @@ function Testers() {
         {title}
         {feed.isError ? (
           // L'échec se dit dans la section ; le reste de la page (outils, « Récents ») reste.
+          // Son propre texte : « Le fil n'a pas pu se charger », dit aussi par « Récents », ne
+          // disait pas lequel (relecture de design de R3, #3).
           <Notice
-            message={t(($) => $.feed.errorTitle)}
+            message={t(($) => $.explore.testersError)}
             action={{ label: t(($) => $.common.retry), onPress: () => void feed.refetch() }}
           />
         ) : (
@@ -248,6 +261,8 @@ type ChipProps = {
   author: ProjectSummary['author']
   /** Suivi d'après la page : l'état affiché, que le toucher inverse. */
   followed: boolean
+  /** Inactive, à sa place : un compte suspendu qui vient d'arrêter de suivre (voir chipOf). */
+  disabled: boolean
   /** L'état à afficher désormais (au toucher, puis en arrière si l'API refuse). */
   onChange: (followed: boolean) => void
 }
@@ -257,7 +272,7 @@ type ChipProps = {
  * de suivre (jur-J8). La pastille change au toucher, sans attendre l'API ; si l'API refuse, elle
  * revient en arrière, et un toast dit pourquoi : la pastille n'a pas de place pour un message.
  */
-function AuthorChip({ author, followed, onChange }: ChipProps) {
+function AuthorChip({ author, followed, disabled, onChange }: ChipProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const toSource = useMediaSources()
@@ -290,6 +305,7 @@ function AuthorChip({ author, followed, onChange }: ChipProps) {
     <FollowButton
       variant="chip"
       followed={followed}
+      disabled={disabled}
       label={text}
       text={text}
       avatar={{ name: author.name, source: toSource(author.avatarUrl) }}
