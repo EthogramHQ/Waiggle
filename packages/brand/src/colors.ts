@@ -31,6 +31,9 @@ const day = {
   honeyPressed: '#F2B000', // bouton miel pendant l'appui
   honeyLight: '#FFE58A', // lumière miel (dégradés)
   honeySoft: '#FFF0C2', // fond des pastilles de statut
+  // Le surlignage miel sous les lettres trouvées par la recherche (R3, HighlightedText). Il porte
+  // toujours l'encre (`text`), même dans une ligne grise : la partie trouvée se lit d'un coup d'œil.
+  highlight: '#FFE58A',
   onHoney: '#1C1B19', // texte posé sur du miel (jamais du blanc : illisible)
   honeyDisabled: '#FFE7A3', // bouton miel inactif
   onHoneyDisabled: '#8A7A55',
@@ -113,6 +116,9 @@ const night = {
   honeyPressed: '#F2B820',
   honeyLight: '#FFD666',
   honeySoft: '#3F3417',
+  // Un miel brun, deux fois plus clair que la carte de nuit (2:1) : la crème claire du texte
+  // s'y lit encore à 8:1.
+  highlight: '#5A4712',
   onHoney: '#1C1B19',
   honeyDisabled: '#4A3D1C',
   onHoneyDisabled: '#A39B89',
@@ -252,6 +258,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'honeySoft', min: 4.5 },
+  // Le surlignage d'une recherche (R3, relecture ui-9) : les lettres trouvées passent à l'encre sur
+  // le miel, dans un titre comme dans une ligne grise.
+  { text: 'text', on: 'highlight', min: 4.5 },
   { text: 'amberText', on: 'background', min: 4.5 },
   // La carte d'une note et le journal d'un projet : texte posé sur une surface pleine.
   { text: 'amberText', on: 'surface', min: 4.5 },
