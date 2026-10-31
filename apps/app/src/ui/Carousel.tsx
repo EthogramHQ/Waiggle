@@ -7,7 +7,15 @@
 // l'œil malgré soi) : ni minuteur, ni défilement au montage ; seulement le doigt, une flèche, Tab.
 // Il ressemble à Thumbnails, l'autre ScrollView horizontal de l'appli.
 import { space } from '@ruche/brand'
-import { Children, isValidElement, type ReactNode, useCallback, useRef, useState } from 'react'
+import {
+  Children,
+  isValidElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -17,6 +25,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native'
+import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
@@ -61,6 +70,10 @@ export function Carousel({
   const { sizeClass, padding } = useLayout()
   const calm = useCalmMotion()
   const scroller = useRef<ScrollView>(null)
+  const previousArrow = useRef<View>(null)
+  const nextArrow = useRef<View>(null)
+  // La flèche qui doit recevoir le focus quand la bande s'arrête à son bout (clavier, web).
+  const handoff = useRef<'previous' | 'next' | null>(null)
   // Les flèches : sur ordinateur et petite fenêtre, où l'on n'a souvent qu'une souris. Sur
   // téléphone, le doigt suffit, et la place manque.
   const arrows = sizeClass !== 'compact'
@@ -133,7 +146,27 @@ export function Carousel({
     target = Math.max(0, content.current > 0 ? Math.min(target, max) : target)
     // « Réduire les animations » : la bande saute à sa place, sans glisser.
     scroller.current?.scrollTo({ x: target, animated: !calm })
+    // Au bout de la bande, la flèche touchée devient inactive, et le navigateur retire le focus
+    // d'un bouton inactif (il tomberait sur la page) : au clavier, il passera à l'autre flèche,
+    // dès qu'elle sera active (l'effet plus bas, quand la bande est arrêtée).
+    const reachedEnd = content.current > 0 && (direction === 1 ? target >= max - 1 : target <= 1)
+    const pressed = direction === 1 ? nextArrow.current : previousArrow.current
+    if (reachedEnd && Platform.OS === 'web' && globalThis.document?.activeElement === pressed) {
+      handoff.current = direction === 1 ? 'previous' : 'next'
+    }
   }
+
+  // useEffect : après le rendu où la bande a atteint son bout, l'autre flèche est redevenue active ;
+  // le focus y passe, sans faire défiler la page.
+  useEffect(() => {
+    if (handoff.current === 'previous' && !ends.start) {
+      focusWithoutScroll(previousArrow.current)
+      handoff.current = null
+    } else if (handoff.current === 'next' && !ends.end) {
+      focusWithoutScroll(nextArrow.current)
+      handoff.current = null
+    }
+  }, [ends])
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     x.current = event.nativeEvent.contentOffset.x
@@ -156,12 +189,14 @@ export function Carousel({
         {showArrows ? (
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <IconButton
+              ref={previousArrow}
               icon="caret-left"
               label={previousLabel}
               disabled={ends.start}
               onPress={() => page(-1)}
             />
             <IconButton
+              ref={nextArrow}
               icon="caret-right"
               label={nextLabel}
               disabled={ends.end}
