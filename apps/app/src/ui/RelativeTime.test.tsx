@@ -158,10 +158,14 @@ describe('RelativeTime, without a given clock', () => {
         ))}
       </>
     )
+    // Chaque rendu de test laisse des minuteurs de délai 0 (le rendu lui-même, pas le composant) :
+    // on les vide avant de compter, sinon le compte grandit à chaque rendu, quel que soit le code.
     const { rerender } = await renderWithProviders(dates(5))
+    await act(() => jest.advanceTimersByTime(0))
     const withFive = jest.getTimerCount()
 
     await rerender(dates(1))
+    await act(() => jest.advanceTimersByTime(0))
 
     expect(screen.getAllByText(/./, { includeHiddenElements: true }).length).toBeGreaterThan(0)
     expect(jest.getTimerCount()).toBe(withFive)
