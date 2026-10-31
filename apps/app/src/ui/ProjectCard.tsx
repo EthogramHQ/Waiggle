@@ -2,7 +2,10 @@
 // de verre avec l'auteur, le titre, le pitch, le bouton « Tester » et le statut.
 // Elle ne connaît pas l'API : on lui donne des textes déjà prêts, ce qui permet de l'utiliser aussi
 // comme aperçu pendant qu'on écrit un projet. Dans une liste, toute la carte est un lien (`onPress`).
+// Un emplacement `overlay` pose un contrôle sur la photo, en haut (la pastille « Suivre Nora »
+// d'Explorer, R3) : à côté du lien de la carte, jamais dedans (relecture de l'interface, ui-4).
 import { space } from '@ruche/brand'
+import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import { Button } from './Button'
@@ -30,6 +33,12 @@ type Props = {
   /** Toute la carte devient un lien vers le projet ; son nom est le titre du projet. */
   onPress?: () => void
   height?: number
+  /**
+   * Un contrôle posé sur la photo, en haut à gauche (`FollowButton variant="chip"`). Il est rendu à
+   * côté du lien de la carte, pas dedans : un bouton dans un lien serait ambigu pour les lecteurs
+   * d'écran, et le toucher n'ouvre pas le projet.
+   */
+  overlay?: ReactNode
 }
 
 export function ProjectCard({
@@ -43,6 +52,7 @@ export function ProjectCard({
   badge,
   onPress,
   height = 476,
+  overlay,
 }: Props) {
   // L'ombre est sous la carte (la couverture), jamais sous le panneau de verre posé dedans.
   const card = (
@@ -84,11 +94,33 @@ export function ProjectCard({
       </View>
     </ProjectCover>
   )
-  if (!onPress) return card
-  return (
+  const linked = onPress ? (
     // radius : l'anneau de focus suit le rayon de la couverture (« sheet », son rayon par défaut).
     <Pressed label={title} onPress={onPress} role="link" radius="sheet">
       {card}
     </Pressed>
+  ) : (
+    card
+  )
+  if (!overlay) return linked
+  return (
+    // La carte et, par-dessus, l'emplacement : deux voisins dans un même cadre. Le contrôle vient
+    // après le lien dans l'ordre du clavier (Tab : la carte, puis « Suivre Nora »).
+    <View>
+      {linked}
+      {/* box-none : la vue de l'emplacement laisse passer le doigt hors du contrôle, vers la carte
+          qui est dessous. Ses bords suivent ceux du panneau de verre du bas. */}
+      <View
+        style={{
+          position: 'absolute',
+          top: space.sm,
+          left: space.sm,
+          right: space.sm,
+          pointerEvents: 'box-none',
+        }}
+      >
+        {overlay}
+      </View>
+    </View>
   )
 }
