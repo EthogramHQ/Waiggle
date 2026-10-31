@@ -1076,6 +1076,10 @@ export const fr = {
     tooMany: 'Trop de recherches, réessaie dans un instant.',
     errorTitle: 'La recherche n’a pas pu aboutir',
     error: 'Réessaie dans un instant.',
+    /** Le nom lu du groupe d'onglets « Tout · Projets · Membres · Outils ». */
+    tabsLabel: 'Résultats à montrer',
+    /** Le nom lu d'un projet trouvé : son titre et sa pastille (« Carnet de cafés, Testable »). */
+    projectWithStatus: '{{title}}, {{status}}',
   },
   // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
   tools: {

@@ -920,6 +920,8 @@ export const en: Translation = {
     tooMany: 'Too many searches, try again in a moment.',
     errorTitle: 'The search could not complete',
     error: 'Try again in a moment.',
+    tabsLabel: 'Results to show',
+    projectWithStatus: '{{title}}, {{status}}',
   },
   tools: {
     title: 'All tools',

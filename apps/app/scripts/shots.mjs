@@ -1145,6 +1145,8 @@ const fakeApi = (
     if (pathname === '/v1/tools') return json(200, { tools: toolList })
     if (pathname === '/v1/search') {
       const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+      // « quota » : le quota de recherches est dépassé (page `recherche-429`).
+      if (q === 'quota') return json(429, { error: { code: 'rate_limited', message: '' } })
       return json(200, searchResultsOf[q] ?? emptySearchResults)
     }
     if (pathname === '/v1/members/mentionable') {
@@ -1723,6 +1725,12 @@ const pages = [
     path: '/projects/00000000-0000-4000-8000-000000000000',
     signedIn: true,
   },
+  // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
+  // quota dépassé ; et l'onglet Ruches, avant les ruches.
+  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
+  { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
+  { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
+  { name: 'ruches', path: '/hives', signedIn: true },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
