@@ -58,7 +58,7 @@ const wavePath = (size: number, height: number, shift: number) => {
 }
 
 export function HoneySphere({ size = 128 }: Props) {
-  const { colors, scheme } = useTheme()
+  const { colors, scheme, shadows } = useTheme()
   const calm = useCalmMotion()
   // Une valeur partagée de Reanimated : elle vit sur le fil des animations, qui la fait avancer de
   // 0 à 1 à chaque vague sans repasser par React. La page pré-rendue du web montre la position 0.
@@ -112,8 +112,11 @@ export function HoneySphere({ size = 128 }: Props) {
           borderRadius: size / 2,
           overflow: 'hidden',
           backgroundColor: colors.glass,
+          // Un liseré neutre et une ombre douce : de jour, le verre blanc se pose sur le cœur
+          // blanc de la lumière miel, et sans eux le haut de la sphère disparaissait.
           borderWidth: borders.hairline,
-          borderColor: colors.panelBorder,
+          borderColor: colors.surfaceBorder,
+          boxShadow: shadows.soft,
         }}
       >
         {/* La nappe de derrière, plus pâle (la lumière miel), décalée d'une demi-vague. */}

@@ -79,14 +79,24 @@ export function UpToDate({ firstVisit = false, onExplore }: Props) {
         overflow: 'hidden',
         gap: space.xl,
         paddingVertical: space.xxxl,
-        paddingHorizontal: space.xl,
+        // 16 points de côté (pas 20) : la nuit, le verre ajoute les siens, et « Explorer d'autres
+        // projets » passait sur deux lignes à 390 points.
+        paddingHorizontal: space.lg,
       }}
     >
       <HoneyGlow scheme={scheme} />
       {/* La sphère et l'abeille endormie posée sur son épaule droite, rangées à gauche comme le
           texte (états rangés à gauche). L'abeille garde son nom, comme dans l'ancienne fin de
           fil (J10) : c'est le moment de marque du bout du fil. */}
-      <View style={{ alignSelf: 'flex-start', paddingTop: space.xxxl, paddingRight: space.huge }}>
+      {/* La place autour de la sphère : l'abeille (96 points avec son disque) se pose en haut à
+          droite et ne mord que sur le coin vide de la sphère, pas sur le miel. */}
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          paddingTop: space.huge,
+          paddingRight: space.huge + space.xl,
+        }}
+      >
         <HoneySphere size={SPHERE} />
         <View style={{ position: 'absolute', top: 0, right: 0 }}>
           <Mascot pose="sleep" size="sm" />
