@@ -6,7 +6,8 @@
 // à toucher fait 44 points, une double tape ne compte qu'une fois, et la retoucher plus tard arrête
 // de suivre (relecture juridique du plan, jur-J8 : on se désabonne du même geste qu'on s'abonne).
 //
-// Les tests du bouton ordinaire (pages de membre et de projet) restent dans components.test.tsx.
+// Les tests du bouton ordinaire (pages de membre et de projet) restent dans components.test.tsx,
+// sauf celui de son icône (relecture de design de R3), en fin de fichier.
 import { layout, palettes } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
@@ -14,6 +15,7 @@ import { StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { FollowButton } from './FollowButton'
+import { iconPaths } from './icons.generated'
 import { TAP_GUARD_MS } from './tapGuard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -174,5 +176,39 @@ describe('FollowButton, as a chip on a photo', () => {
 
     expect(onPress).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('switch', { name: follow })).not.toBeChecked()
+  })
+})
+
+/** Les tracés SVG dessinés dans l'élément et tout ce qu'il contient (les `d` des `Path`). */
+const pathsIn = (node: Node | string): string[] => {
+  if (typeof node === 'string') return []
+  const own = typeof node.props.d === 'string' ? [node.props.d] : []
+  return [...own, ...node.children.flatMap(pathsIn)]
+}
+
+// Relecture de design de R3 (#8) : sur la page d'un autre membre, au téléphone, « + Suivre » et le
+// « + » de Publier, dans la barre d'onglets, étaient deux ronds miel au même signe, pour deux gestes
+// différents. Le bouton dessine une personne avec un « + », comme la pastille et la planche
+// R3-Membre ; son nom lu ne change pas.
+describe('FollowButton, as the button of a page', () => {
+  it('draws a person with a plus, not the plain plus of « Publier »', async () => {
+    await renderWithProviders(
+      <FollowButton followed={false} onPress={jest.fn()} label={follow} text="Suivre" />,
+    )
+
+    const button = screen.getByRole('switch', { name: follow })
+    const drawn = pathsIn(button as unknown as Node)
+    expect(drawn).toEqual(iconPaths['user-plus'])
+    expect(drawn).not.toEqual(iconPaths.plus)
+  })
+
+  it('draws the tick once followed, with the same name read', async () => {
+    await renderWithProviders(
+      <FollowButton followed onPress={jest.fn()} label={following} text={following} />,
+    )
+
+    const button = screen.getByRole('switch', { name: following })
+    expect(button).toBeChecked()
+    expect(pathsIn(button as unknown as Node)).toEqual(iconPaths.check)
   })
 })
