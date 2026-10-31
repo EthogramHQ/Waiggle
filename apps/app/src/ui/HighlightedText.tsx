@@ -8,11 +8,12 @@
 // « Carn », « et de cafés ») ; les parties surlignées sont des textes imbriqués dedans. Le
 // surlignage est un indice pour l'œil seulement : il ne change pas ce qui est lu.
 
-import { radii } from '@ruche/brand'
+import { type FontWeight, radii, textStyles } from '@ruche/brand'
 import { foldForSearch, foldWithMap } from '@ruche/contracts'
 import type { ReactElement } from 'react'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
 import { Text, type TextProps } from './Text'
+import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un morceau du texte d'origine, `[début, fin)`, en unités UTF-16 (celles de `slice`). */
@@ -75,13 +76,32 @@ const markShape = (
   Platform.OS === 'web' ? { borderRadius: radii.mark, boxDecorationBreak: 'clone' } : {}
 ) as TextStyle
 
+/**
+ * La graisse de la partie surlignée : un cran de plus que le texte autour (semi-gras dans un texte
+ * courant, extra-gras dans un titre déjà semi-gras). Le miel pâle ne se distingue presque pas de la
+ * carte blanche (1,25:1 de jour, relecture de design de R3) : la couleur ne peut pas porter seule
+ * l'information (WCAG 1.4.1), la graisse la double. Seule Funnel Sans (`text`) a toutes les
+ * graisses ; un texte d'une autre famille garde la sienne.
+ */
+const markWeight = (around: FontWeight): FontWeight => (around < 600 ? 600 : 800)
+
 export function HighlightedText({ text, words, ...props }: HighlightedTextProps) {
   const { colors } = useTheme()
   const ranges = words.length === 0 ? [] : highlightRanges(text, words)
+  const style = textStyles[props.variant ?? 'body']
+  const weight =
+    style.family === 'text'
+      ? { fontFamily: fontName('text', markWeight(props.weight ?? style.weight)) }
+      : null
   // Le surlignage passe l'encre (`text`) sur le miel, même dans une ligne grise : couple mesuré
-  // dans `contrastPairs` (packages/brand). Il hérite du reste (police, taille, graisse) du texte
-  // qui l'entoure : seuls le fond et la couleur changent.
-  const mark: TextStyle = { backgroundColor: colors.highlight, color: colors.text, ...markShape }
+  // dans `contrastPairs` (packages/brand), et une graisse de plus (voir markWeight). Il hérite du
+  // reste (taille, hauteur de ligne) du texte qui l'entoure.
+  const mark: TextStyle = {
+    backgroundColor: colors.highlight,
+    color: colors.text,
+    ...weight,
+    ...markShape,
+  }
   const parts: (string | ReactElement)[] = []
   let from = 0
   for (const [start, end] of ranges) {
