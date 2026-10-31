@@ -130,12 +130,29 @@ export function Screen({
   const pinned = header !== undefined && stickyHeader && !brand
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
   const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
-  // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
+  const backButton = onBack ? (
+    <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
+  ) : null
+  // R3 (« le Retour au même endroit », point des listes) : sur le miel, le retour se pose en tête de
+  // la barre de BrandAmbiance, à gauche, et l'en-tête de l'écran (la langue) à droite. Dans la
+  // feuille, sa place dépendait du décor (téléphone) et de la hauteur du contenu (la carte centrée
+  // sur ordinateur) : il changeait de place d'une page du compte à l'autre. Mesuré par l'ui-dev R :
+  // (16, 16) à 390 px et (32, 48) à 1280 px sur les quatre pages, premier arrêt de Tab partout.
+  const brandHeader =
+    brand && backButton ? (
+      <View
+        style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+      >
+        {backButton}
+        {header}
+      </View>
+    ) : (
+      header
+    )
+  // Le contenu propre à l'écran, précédé du retour (hors du miel), du titre et du sous-titre.
   const body = (
     <>
-      {onBack ? (
-        <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
-      ) : null}
+      {brand ? null : backButton}
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (
@@ -218,7 +235,7 @@ export function Screen({
             // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
             // miel), le décor et la feuille qui porte le contenu.
             <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              <BrandAmbiance header={header} scene={scene} hero={withHero ? hero : undefined}>
+              <BrandAmbiance header={brandHeader} scene={scene} hero={withHero ? hero : undefined}>
                 {body}
               </BrandAmbiance>
             </ScrollView>
