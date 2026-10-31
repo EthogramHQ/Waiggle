@@ -7,8 +7,9 @@
 // Sans nom (`label` absent), la pile est un simple décor, cachée tout entière : c'est le cas dans
 // le bouton des nouveautés du fil (R4), dont le nom dit déjà tout (« 3 nouveaux projets »).
 import { borders, initialsWeight, space } from '@ruche/brand'
-import { Platform, View } from 'react-native'
-import { Avatar, initialsOf } from './Avatar'
+import { useState } from 'react'
+import { type LayoutChangeEvent, Platform, View } from 'react-native'
+import { Avatar, initialsOf, initialsScale } from './Avatar'
 import type { ImageSource } from './image'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -54,9 +55,23 @@ const hiddenFromReaders = {
  * Les initiales d'un membre sans photo, à la taille de la pile. L'Avatar commun les écrit en 13
  * points à cette taille : « MD » touchait alors le bord du rond, et le rond suivant, qui le
  * chevauche, en mangeait la fin. Ici, un cran plus petit (micro), toujours en graisse très forte.
+ *
+ * Sur le web, `maxScale` n'existe pas : avec le texte du navigateur à 200 %, « LM » sortait de son
+ * rond de 24 points et chevauchait le libellé du bouton des nouveautés (R4). Même garde que
+ * l'Avatar commun : mesurer les initiales à leur taille naturelle, puis les réduire à l'œil
+ * (`transform: scale`, `initialsScale`) juste assez pour tenir dans le rond, depuis une boîte de
+ * largeur nulle centrée (la mesure garde la largeur naturelle : pas de boucle).
  */
 function Initials({ name, size }: { name: string; size: number }) {
   const { colors } = useTheme()
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null)
+  const measure = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout
+    // Le même objet quand rien ne change : pas de rendu de plus.
+    setNatural((old) =>
+      old && old.width === width && old.height === height ? old : { width, height },
+    )
+  }
   return (
     <View
       style={{
@@ -66,11 +81,24 @@ function Initials({ name, size }: { name: string; size: number }) {
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.honey,
+        // Filet de sécurité : rien ne dépasse du rond, même avant la première mesure (web).
+        overflow: 'hidden',
       }}
     >
-      <Text variant="micro" weight={initialsWeight} tone="onHoney" maxScale={1}>
-        {initialsOf(name)}
-      </Text>
+      <View
+        style={{
+          ...(Platform.OS === 'web' ? { width: 0 } : null),
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ scale: initialsScale(natural, size) }],
+        }}
+      >
+        <View onLayout={measure}>
+          <Text variant="micro" weight={initialsWeight} tone="onHoney" maxScale={1}>
+            {initialsOf(name)}
+          </Text>
+        </View>
+      </View>
     </View>
   )
 }

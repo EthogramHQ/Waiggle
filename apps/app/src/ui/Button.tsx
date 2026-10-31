@@ -185,6 +185,10 @@ export function Button({
           flexShrink: 1,
           minWidth: 0,
           opacity: loading ? 0 : 1,
+          // Avec un décor (les visages des nouveautés), la rangée passe à la ligne quand le libellé
+          // ne tient plus à côté (320 points, texte à 200 %) : le décor reste au-dessus, et le
+          // libellé garde toute la largeur au lieu d'être coupé au milieu d'un mot.
+          ...(leading ? { flexWrap: 'wrap' as const, rowGap: space.xs } : null),
         }}
       >
         {/* flexShrink: 0 : l'icône ou le décor gardent leur taille quand le libellé passe sur deux
