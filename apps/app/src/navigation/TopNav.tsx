@@ -14,9 +14,14 @@
 // - en largeur moyenne (700 à 1 100 points), la place manque : une loupe mène à la page, qui montre
 //   alors son propre champ.
 //
-// « Publier » est un bouton de verre, pas de miel : l'action principale (en miel) reste celle de la
-// page (« Tester la démo », « Publier un projet »), une seule par écran. Le formulaire de projet le
-// masque (`hideNewProject`), et un compte suspendu ne le voit plus (l'API refuserait).
+// « Publier » est en miel, comme le « + » de la barre d'onglets du téléphone et comme la planche de
+// R3 (décision de Louis du 31/10/2026, relecture de design de R3 : avant, un bouton de verre, et le
+// Fil d'ordinateur n'avait plus aucune action miel). Le formulaire de projet le masque
+// (`hideNewProject`), et un compte suspendu ne le voit plus (l'API refuserait).
+//
+// Sur la page de recherche, le vrai champ n'est posé que par la page affichée : sur le web, Expo
+// Router garde les pages quittées montées dessous (cachées) ; sur une tablette, leur barre aurait
+// aussi un champ en `autoFocus`, qui pourrait prendre le clavier (relecture de l'interface, C9).
 //
 // Tranche 7c : la barre porte aussi le bandeau d'un compte suspendu (`SuspensionBanner`), sous la
 // capsule. Toutes les pages la posent : le bandeau est ainsi monté une seule fois, jamais écran par
@@ -34,10 +39,12 @@ import { NotificationBell } from '../notifications/NotificationBell'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { type NavLinkEntry, NavLinks, NavPhotoLink } from '../ui/NavLinks'
-import { SearchButton, SearchField, SearchLink } from '../ui/SearchField'
+import { SearchButton, SearchField } from '../ui/SearchField'
+import { SearchLink } from '../ui/SearchLink'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { SuspensionBanner } from '../ui/SuspensionBanner'
+import { useScreenFocused } from '../ui/screenFocus'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { Wordmark } from '../ui/Wordmark'
@@ -174,6 +181,8 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   const me = useMe(Boolean(session), { retryOnMount: false })
   const { suspension } = useSuspension()
   const toSource = useMediaSources(shown)
+  // Cette page est-elle celle qui est affichée ? (hors d'un navigateur, oui : ui/screenFocus.ts).
+  const focusedScreen = useScreenFocused()
 
   if (!session) return null
   const banner = suspension ? (
@@ -184,7 +193,9 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
   if (!shown) return banner
 
   const name = me.data?.name ?? session.user.name
-  const onSearchPage = pathname === SEARCH_PATH
+  // Seule la page affichée pose le vrai champ (voir en tête du fichier) : `usePathname` donne
+  // l'adresse ouverte à toutes les pages montées, même à celles cachées dessous.
+  const onSearchPage = pathname === SEARCH_PATH && focusedScreen
   const onOwnPage = pathname === '/me' || pathname === `/members/${session.user.id}`
   const links: NavLinkEntry<NavKey>[] = [
     { key: 'feed', label: t(($) => $.nav.feed), href: '/' },
@@ -209,7 +220,11 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
           label={t(($) => $.search.label)}
           placeholder={t(($) => $.search.placeholder)}
           href={SEARCH_PATH}
-          onPress={() => router.push(SEARCH_PATH)}
+          onPress={(event) => {
+            // Sur le web, le routeur ouvre la page sans que le navigateur la recharge.
+            event?.preventDefault?.()
+            router.push(SEARCH_PATH)
+          }}
           grow
         />
       )
@@ -259,7 +274,8 @@ export function TopNav({ hideNewProject = false, openSuspension = false }: Props
               spokenLabel={t(($) => $.home.publish)}
               icon="plus"
               size="compact"
-              variant="glass"
+              // Miel, comme le « + » du téléphone (décision de Louis du 31/10/2026).
+              variant="primary"
               onPress={() => router.push('/projects/new')}
             />
           )}

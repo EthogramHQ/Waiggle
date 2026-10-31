@@ -3,11 +3,12 @@
 // l'écran, une croix « Effacer la recherche » dans un cadre de 44 points, Échap qui vide le champ,
 // le focus qui reste après Entrée sur le web, et un double envoi qui ne cherche qu'une fois.
 // Il ressemble à TextField (nom, effacement, focus) ; ses gardes sont reprises ici.
-import { layout } from '@ruche/brand'
+import { layout, textStyles } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { Platform, StyleSheet, type ViewStyle } from 'react-native'
+import { Platform, StyleSheet, TextInput, type ViewStyle } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { Button } from './Button'
 import { SearchField } from './SearchField'
 import { TAP_GUARD_MS } from './tapGuard'
 
@@ -19,6 +20,11 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 const label = fr.t(($) => $.search.label)
 const placeholder = fr.t(($) => $.search.placeholder)
 const clearLabel = fr.t(($) => $.search.clear)
+const cancelLabel = fr.t(($) => $.common.cancel)
+
+/** Le style aplati d'un élément (ou d'un parent absent : rien). */
+const styleOf = (element: { props: { style?: unknown } } | null | undefined) =>
+  (StyleSheet.flatten(element?.props.style as ViewStyle) ?? {}) as ViewStyle
 
 /** Le champ, retrouvé par son nom. */
 const field = () => screen.getByLabelText(label)
@@ -249,5 +255,90 @@ describe('SearchField', () => {
 
       expect(onSubmit).toHaveBeenCalledTimes(2)
     })
+  })
+})
+
+// R3, relectures de `136453b` (interface C5, design 5) : la saisie fait 44 points de haut ; toucher
+// la loupe ou le bord de la pilule donne le focus à la saisie ; « Annuler » de la page de recherche
+// est posé par le champ, qui le fait passer dessous quand le texte est grand.
+describe('SearchField, its frame and its action', () => {
+  it('keeps the input itself 44 points high', async () => {
+    await renderWithProviders(
+      <SearchField value="" onChangeText={() => {}} label={label} placeholder={placeholder} />,
+    )
+
+    expect(frameOf(field()).height).toBeGreaterThanOrEqual(layout.touchTarget)
+  })
+
+  it('gives the focus to the input when the magnifier or the edge of the pill is touched', async () => {
+    // La saisie simulée de React Native a déjà une `focus` espionnée, qui garde les appels des tests
+    // d'avant (la croix rend le focus) : on repart de zéro.
+    const focus = jest.spyOn(TextInput.prototype, 'focus')
+    focus.mockClear()
+    try {
+      await renderWithProviders(
+        <SearchField value="" onChangeText={() => {}} label={label} placeholder={placeholder} />,
+      )
+
+      // La pilule, autour de la saisie : la loupe et le bord en font partie.
+      const pill = field().parent
+      expect(pill).toBeTruthy()
+      await fireEvent.press(pill as NonNullable<typeof pill>)
+
+      expect(focus).toHaveBeenCalledTimes(1)
+    } finally {
+      focus.mockRestore()
+    }
+  })
+
+  it('shows its action (« Annuler ») next to it, and adds no control of its own', async () => {
+    const onCancel = jest.fn()
+    await renderWithProviders(
+      <SearchField
+        value=""
+        onChangeText={() => {}}
+        label={label}
+        placeholder={placeholder}
+        action={<Button label={cancelLabel} variant="glass" size="compact" onPress={onCancel} />}
+      />,
+    )
+
+    await fireEvent.press(screen.getByRole('button', { name: cancelLabel }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    // La pilule ni la mesure du texte ne sont des contrôles : un seul bouton, et le champ.
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(field()).toBeTruthy()
+  })
+
+  it('lets its action go below it once the text is large (the field asks for more room)', async () => {
+    await renderWithProviders(
+      <SearchField
+        value=""
+        onChangeText={() => {}}
+        label={label}
+        placeholder={placeholder}
+        action={<Button label={cancelLabel} variant="glass" size="compact" onPress={() => {}} />}
+      />,
+    )
+
+    /** La place que le champ demande dans sa rangée (sa `flexBasis`), et la rangée elle-même. */
+    const cell = () => {
+      let node = field().parent
+      while (node && typeof styleOf(node).flexBasis !== 'number') node = node.parent
+      return node
+    }
+    const row = cell()?.parent
+    expect(styleOf(row).flexWrap).toBe('wrap')
+    const normal = styleOf(cell()).flexBasis as number
+
+    // Le texte doublé : la ligne de mesure, cachée, fait deux fois la hauteur d'une ligne.
+    const probe = screen.getByText(placeholder, { includeHiddenElements: true })
+    let measured = probe.parent
+    while (measured && !measured.props.onLayout) measured = measured.parent
+    await fireEvent(measured as NonNullable<typeof measured>, 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 2 * textStyles.body.lineHeight } },
+    })
+
+    expect(styleOf(cell()).flexBasis).toBe(2 * normal)
   })
 })

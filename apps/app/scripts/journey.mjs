@@ -711,7 +711,11 @@ try {
   // R3 (F-Nav7) : chercher par mots. Taper ne crée pas une page d'historique par lettre (jur-J5) ;
   // les accents ne comptent pas.
   step('Malik cherche « carnaval », puis « eleve », qui trouve le projet de Sam')
-  await malik.page.getByRole('link', { name: 'Rechercher', exact: true }).first().click()
+  // Le lien qui a l'air d'un champ lit le nom du champ, puis le texte affiché (R3, relecture C4).
+  await malik.page
+    .getByRole('link', { name: 'Rechercher, Un projet, une personne, un outil', exact: true })
+    .first()
+    .click()
   await malik.page.waitForURL((url) => url.pathname === '/search')
   // Les pages précédentes restent montées (cachées) sous la page affichée, avec leur barre du haut :
   // sur /search, chacune dessine aussi le champ. On vise celui qu'on voit.
