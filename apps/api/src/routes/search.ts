@@ -10,6 +10,7 @@ import { errorBody, languageOf } from '../errors'
 import { describeError } from '../log'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { search } from '../search/load'
+import { createSearchSlots } from '../search/slots'
 import { createRouter, errorResponse } from './router'
 
 // Anti-abus (plan de R3) : 600 recherches par heure et 2 000 par jour, comme les suggestions de
@@ -54,7 +55,9 @@ const searchRoute = createRoute({
     },
     400: errorResponse('Invalid query (too short, too long, no word left, or a repeated `q`).'),
     401: errorResponse('Not signed in.'),
-    429: errorResponse('Too many searches (see Retry-After).'),
+    429: errorResponse(
+      'Too many searches, or one already running for this member, or too many at once (see Retry-After).',
+    ),
     503: errorResponse('The search took too long and was stopped.'),
   },
 })
@@ -63,6 +66,8 @@ type Deps = { db: Database; limiter: RateLimiter; publicApiUrl: string }
 
 export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
   const app = createRouter()
+  // Les places de cette API : une seule réserve par application créée (chaque test a la sienne).
+  const slots = createSearchSlots()
   app.use('/v1/search', requireUser)
 
   // Le quota passe avant la validation (comme les mentions) : une demande mal formée compte aussi,
@@ -94,6 +99,14 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       return c.json(errorBody(languageOf(c), 'validation'), 400)
     }
     const words = searchWords(c.req.valid('query').q)
+    // Une place de recherche (relecture C1, search/slots.ts) : une recherche déjà en cours pour
+    // ce membre, ou trois pour toute l'API, et la demande est refusée comme un quota dépassé
+    // (l'appli dit déjà « réessaie dans un instant »), à reprendre une seconde plus tard.
+    const release = slots.take(user.id)
+    if (!release) {
+      c.header('Retry-After', '1')
+      return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    }
     try {
       const results = await search(db, user.id, words, publicApiUrl)
       // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
@@ -104,6 +117,9 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       // cite le texte cherché, ni l'adresse complète (le chemin seul, sans « ?q= »).
       console.error('Search stopped', describeError(error, { method: 'GET', path: c.req.path }))
       return c.json(errorBody(languageOf(c), 'unavailable'), 503)
+    } finally {
+      // Toujours rendue, après une réponse, un délai dépassé ou une erreur inattendue.
+      release()
     }
   })
 

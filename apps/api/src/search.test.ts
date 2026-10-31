@@ -826,3 +826,76 @@ describe('the safeguards', () => {
     expect(lines.filter((line) => line.includes('zanzibar'))).toEqual([])
   })
 })
+
+// ─── Les recherches en même temps (relecture C1) ──────────────────────────────────────────────────
+
+/**
+ * Une barrière : une promesse que le test ouvre lui-même (`open`). La recherche simulée l'attend,
+ * pour rester « en cours » le temps d'envoyer d'autres demandes.
+ */
+const barrier = () => {
+  let open = () => {}
+  const opened = new Promise<void>((resolve) => {
+    open = resolve
+  })
+  return { opened, open }
+}
+
+describe('searches running at the same time', () => {
+  it('runs one search at a time per member, and gives the place back after a time limit', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await publish(ines, 'Carnet de cafés')
+    const slow = barrier()
+    // La première recherche de Malik tient sa transaction jusqu'à l'ouverture de la barrière,
+    // puis tombe sur le délai de PostgreSQL (57014).
+    const transaction = vi.spyOn(ctx.db, 'transaction').mockImplementationOnce(async () => {
+      await slow.opened
+      throw Object.assign(new Error('canceling statement due to statement timeout'), {
+        code: '57014',
+      })
+    })
+    const first = searchRaw(malik, { q: 'carnet' })
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(1))
+
+    // Une deuxième, en même temps : refusée comme un quota, à reprendre une seconde plus tard.
+    const second = await searchRaw(malik, { q: 'carnet' })
+    expect(second.headers.get('retry-after')).toBe('1')
+    await expectError(second, 429, 'rate_limited')
+    // Zoé, elle, cherche pendant ce temps.
+    expect(titles(await search(zoe, 'carnet'))).toEqual(['Carnet de cafés'])
+
+    slow.open()
+    expect((await first).status).toBe(503)
+    // La place est rendue : Malik cherche de nouveau.
+    expect(titles(await search(malik, 'carnet'))).toEqual(['Carnet de cafés'])
+  })
+
+  it('runs three searches at most for the whole API, and gives the places back after an error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await publish(ines, 'Carnet de cafés')
+    const slow = barrier()
+    // Les recherches d'Inès, Malik et Zoé tiennent leur transaction, puis la base tombe en panne.
+    const transaction = vi.spyOn(ctx.db, 'transaction')
+    for (let i = 0; i < 3; i++) {
+      transaction.mockImplementationOnce(async () => {
+        await slow.opened
+        throw new Error('connection lost')
+      })
+    }
+    const running = [ines, malik, zoe].map((cookie) => searchRaw(cookie, { q: 'carnet' }))
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(3))
+
+    // Louis, quatrième en même temps : refusé, sans que sa recherche touche la base.
+    const fourth = await searchRaw(louis, { q: 'carnet' })
+    expect(fourth.headers.get('retry-after')).toBe('1')
+    await expectError(fourth, 429, 'rate_limited')
+    expect(transaction).toHaveBeenCalledTimes(3)
+
+    slow.open()
+    expect((await Promise.all(running)).map((res) => res.status)).toEqual([500, 500, 500])
+    // Les trois places sont rendues : quatre recherches l'une après l'autre passent.
+    for (const cookie of [louis, ines, malik, zoe]) {
+      expect(titles(await search(cookie, 'carnet'))).toEqual(['Carnet de cafés'])
+    }
+  })
+})
