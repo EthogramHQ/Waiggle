@@ -411,6 +411,68 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
+// R4, « Proches à suivre » (GET /v1/suggestions/members) : cinq membres qui ont publié
+// récemment, du plus récent au plus ancien, chacun avec son dernier projet public (résumé complet,
+// total compris). Jamais Léa, ni Max et Inès qu'elle suit dans le fil : la même liste sert au
+// premier lancement (feed: 'nobody') et à la colonne de droite sur ordinateur. Des noms de
+// longueurs variées (le plus long éprouve la ligne), une photo de couverture sur deux projets,
+// des statuts et des totaux variés (dont 0).
+const suggestedOf = (author, id, title, pitch, extra) => ({
+  ...author,
+  latestProject: {
+    ...summaryOf(recipesProject),
+    id,
+    author,
+    title,
+    pitch,
+    createdAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    ...extra.fields,
+  },
+})
+const suggestedMembers = [
+  suggestedOf(
+    { id: 'camille-id', name: 'Camille Roux', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000001',
+    'Le carnet de jardin',
+    'Il note les semis et prévient quand arroser.',
+    {
+      day: 20,
+      fields: { status: 'testable', reactionTotal: 8, cover: summaryOf(photosProject).cover },
+    },
+  ),
+  suggestedOf(
+    { id: 'yanis-id', name: 'Yanis', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000002',
+    'Quiz de géographie',
+    'Des questions sur les capitales, adaptées à ton niveau.',
+    { day: 19, fields: { status: 'building', reactionTotal: 0 } },
+  ),
+  suggestedOf(
+    { id: 'sofia-id', name: 'Sofia Lopes-Carvalho de Almeida', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000003',
+    'Lecteur de factures',
+    'Il range les factures du mois et prépare le tableau des dépenses.',
+    { day: 18, fields: { status: 'idea', reactionTotal: 21 } },
+  ),
+  suggestedOf(
+    { id: 'hugo-id', name: 'Hugo Petit', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000004',
+    'Histoires du soir',
+    'Une histoire courte inventée avec les enfants, chaque soir.',
+    {
+      day: 16,
+      fields: { status: 'testable', reactionTotal: 3, cover: projectWithPhotos.visuals[2] ?? null },
+    },
+  ),
+  suggestedOf(
+    { id: 'amina-id', name: 'Amina Diallo', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000005',
+    'Traducteur de recettes',
+    'Il convertit les mesures et traduit les recettes de famille.',
+    { day: 12, fields: { status: 'building', reactionTotal: 1 } },
+  ),
+]
 // R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
 // affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).
 // L'appli pose la sphère avant le premier élément daté de cette date ou d'avant. Selon la page :
@@ -871,6 +933,8 @@ const fakeApi = (
   })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
+  // Les suggestions que Léa écarte dans ce navigateur (« × », R4) : elles quittent sa liste.
+  const dismissed = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
@@ -1080,6 +1144,15 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
+    // « Proches à suivre » (R4) : la liste, sans ceux que Léa a écartés ; écarter répond 204.
+    if (pathname === '/v1/suggestions/members') {
+      return json(200, { members: suggestedMembers.filter((m) => !dismissed.has(m.id)) })
+    }
+    const dismissal = pathname.match(/^\/v1\/suggestions\/members\/([^/]+)\/dismissed$/)
+    if (dismissal && method === 'PUT') {
+      dismissed.add(decodeURIComponent(dismissal[1]))
+      return route.fulfill({ status: 204, body: '' })
+    }
     // « Découvrir » (Explorer, R3) : le carrousel des testeurs (?testers=true), ou « Récents », où
     // Léa suit déjà Max (comme la planche R3-Explorer-Desktop) : ses cartes n'ont pas de pastille,
     // celles d'Inès portent « Suivre Inès Haddad ».
