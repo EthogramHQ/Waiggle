@@ -89,4 +89,26 @@ describe('HighlightedText', () => {
 
     expect(whole('Carnet de cafés').props.numberOfLines).toBe(1)
   })
+
+  // Relecture de design de R3 (point 9) : le miel pâle fait 1,25:1 contre la carte blanche ; la
+  // couleur ne porte pas seule ce qui est trouvé (WCAG 1.4.1). La partie surlignée est plus grasse
+  // que le texte autour, qu'il soit courant ou déjà semi-gras (un titre de résultat). La graisse
+  // est dans le fichier de police : on compare les polices, pas une valeur précise.
+  it.each([
+    ['in a plain text', {}],
+    ['in a semi-bold title', { weight: 600 as const }],
+  ])('marks the found part in a bolder weight %s, not by colour alone', async (_, props) => {
+    await renderWithProviders(
+      <HighlightedText text="Carnet de cafés" words={['carn']} {...props} />,
+    )
+
+    const text = whole('Carnet de cafés')
+    const mark = text.children.find((child): child is Node => typeof child !== 'string')
+    // La graisse se lit à la fin du nom de la police (« FunnelSans-600 »).
+    const weightOf = (node: Node | undefined) => {
+      const family = (node?.props.style as { fontFamily?: string } | undefined)?.fontFamily
+      return Number(family?.match(/-(\d+)$/)?.[1] ?? Number.NaN)
+    }
+    expect(weightOf(mark)).toBeGreaterThan(weightOf(text))
+  })
 })

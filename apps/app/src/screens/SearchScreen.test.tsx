@@ -497,3 +497,126 @@ describe('SearchScreen, where the field lives', () => {
     }
   })
 })
+
+// --- Corrections après les relectures de R3 ---
+
+/** La ligne d'état de la page (LiveStatus), lue même quand elle ne se montre pas. */
+const statusRegion = () => screen.getByRole('status', { includeHiddenElements: true })
+
+/** « 0 projet, 0 membre, 0 outil ». */
+const zeroSummary = () =>
+  fr.t(($) => $.search.summary, {
+    projects: fr.t(($) => $.search.projects, { count: 0 }),
+    members: fr.t(($) => $.search.members, { count: 0 }),
+    tools: fr.t(($) => $.search.tools, { count: 0 }),
+  })
+
+describe('SearchScreen, the status line (ui-reviewer C3, design-reviewer 13)', () => {
+  it('reads « 0 projet, 0 membre, 0 outil » when nothing is found, without showing it above « Aucun résultat »', async () => {
+    mockParams = { q: 'carnaval' }
+    mockAnswer(answered(nothing))
+    await renderSearch()
+
+    expect(statusRegion()).toHaveTextContent(zeroSummary())
+    expect(screen.getByText(zeroSummary(), { includeHiddenElements: true })).not.toBeVisible()
+    // Témoin : « Aucun résultat » est bien à l'écran.
+    expect(
+      screen.getByText(containing(fr.t(($) => $.search.emptyTitle, { q: 'carnaval' }))),
+    ).toBeVisible()
+  })
+
+  it('shows the summary when something is found', async () => {
+    await renderSearch()
+
+    const summary = fr.t(($) => $.search.summary, {
+      projects: fr.t(($) => $.search.projects, { count: 3 }),
+      members: fr.t(($) => $.search.members, { count: 1 }),
+      tools: fr.t(($) => $.search.tools, { count: 1 }),
+    })
+    expect(screen.getByText(summary)).toBeVisible()
+  })
+
+  it('keeps the status line mounted, empty, when the search fails', async () => {
+    mockAnswer(
+      queryResult({
+        status: 'error',
+        isPending: false,
+        isError: true,
+        error: new ApiError('internal'),
+      }),
+    )
+    await renderSearch()
+
+    // Toujours montée (une région remontée déjà pleine ne serait pas annoncée) ; la panne, elle,
+    // est dite par l'alerte de son message.
+    expect(statusRegion()).toHaveTextContent('')
+    expect(screen.getByText(containing(fr.t(($) => $.search.errorTitle)))).toBeTruthy()
+  })
+})
+
+describe('SearchScreen, under three letters (legal-reviewer C1)', () => {
+  it('says that unfollowed members need three letters', async () => {
+    mockParams = { q: 'ca' }
+    mockAnswer(answered(nothing))
+    await renderSearch()
+
+    expect(screen.getByText(containing(fr.t(($) => $.search.shortQuery)))).toBeTruthy()
+    // « Essaie un mot plus court » serait faux ici.
+    expect(screen.queryByText(containing(fr.t(($) => $.search.empty)))).toBeNull()
+  })
+
+  it('does not say it from three letters on', async () => {
+    mockParams = { q: 'car' }
+    mockAnswer(answered(nothing))
+    await renderSearch()
+
+    expect(screen.getByText(containing(fr.t(($) => $.search.empty)))).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.search.shortQuery)))).toBeNull()
+  })
+
+  it('does not say it when one word has three letters, even next to a short one', async () => {
+    mockParams = { q: 'ca carnaval' }
+    mockAnswer(answered(nothing))
+    await renderSearch()
+
+    expect(screen.queryByText(containing(fr.t(($) => $.search.shortQuery)))).toBeNull()
+  })
+})
+
+describe('SearchScreen, the pictures of the rows (ui-reviewer C6)', () => {
+  /** Les images natives de la page dont l'adresse est `uri`, en parcourant l'arbre rendu. */
+  const imagesOf = (uri: string): Node[] => {
+    const found: Node[] = []
+    const walk = (node: Node | string) => {
+      if (typeof node === 'string') return
+      const source = node.props.source as { uri?: string } | undefined
+      if (source?.uri === uri) found.push(node)
+      for (const child of node.children) walk(child)
+    }
+    walk(screen.root as unknown as Node)
+    return found
+  }
+
+  it('shows the photo of a member found', async () => {
+    const photo = 'https://api.example.test/media/camille.webp'
+    mockAnswer(
+      answered({
+        ...carnResults,
+        members: { items: [{ ...camille, avatarUrl: photo }], more: false },
+      }),
+    )
+    await renderSearch()
+
+    expect(imagesOf(photo).length).toBeGreaterThan(0)
+    // Le nom de la ligne reste celui du membre : la photo ne s'y ajoute pas.
+    expect(screen.getByRole('link', { name: 'Camille Carnot' })).toBeTruthy()
+  })
+
+  it('shows the initials of a member without a photo, and the initial tile of a tool', async () => {
+    await renderSearch()
+
+    // Décoratives : cachées des lecteurs d'écran, on les cherche quand même.
+    expect(screen.getByText('CC', { includeHiddenElements: true })).toBeTruthy()
+    expect(screen.getByText('C', { includeHiddenElements: true })).toBeTruthy()
+  })
+})
