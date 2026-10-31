@@ -6,6 +6,8 @@
 // les captures du catalogue, prises dans les deux thèmes.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { View } from 'react-native'
+import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -40,6 +42,12 @@ const fr = {
   feed: 'Fil de l’accueil',
   following: 'Abonnements',
   discover: 'Découvrir',
+  scrolling:
+    'Trop de choix pour la place (ici 280 points) : une rangée qui défile de côté, le choix actif toujours visible en entier.',
+  results: 'Résultats',
+  tabs: ['Tout', 'Projets 12', 'Membres 3', 'Outils 1'],
+  initials:
+    'Les initiales d’un avatar sans photo suivent la taille du rond, de 96 à 20 points, et n’en sortent jamais, même avec le texte agrandi.',
   radioTitle: 'Pourquoi le signales-tu ?',
   radioFooter: 'Tab entre une fois dans la liste ; les flèches haut et bas changent le choix.',
   reasons: ['Arnaque ou spam', 'Harcèlement ou haine', 'Usurpation d’identité', 'Autre chose'],
@@ -71,6 +79,12 @@ const en: typeof fr = {
   feed: 'Home feed',
   following: 'Following',
   discover: 'Discover',
+  scrolling:
+    'Too many choices for the room (here 280 points): a row that scrolls sideways, the checked choice always fully in view.',
+  results: 'Results',
+  tabs: ['All', 'Projects 12', 'Members 3', 'Tools 1'],
+  initials:
+    'The initials of an avatar without a photo follow the size of the round, from 96 to 20 points, and never leave it, even with larger text.',
   radioTitle: 'Why are you reporting it?',
   radioFooter: 'Tab enters the list once; the up and down arrows change the choice.',
   reasons: ['Scam or spam', 'Harassment or hate', 'Impersonation', 'Something else'],
@@ -79,11 +93,15 @@ const en: typeof fr = {
 
 const noop = () => {}
 
+/** La place étroite de l'exemple qui défile : moins que les quatre onglets de la recherche. */
+const NARROW = 280
+
 export function ControlsCatalogue() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
   const [appearance, setAppearance] = useState<'auto' | 'day' | 'night'>('night')
   const [feed, setFeed] = useState<'following' | 'discover'>('following')
+  const [tab, setTab] = useState('3')
   // Aucun motif coché au départ : Tab arrive sur le premier.
   const [reason, setReason] = useState<number | null>(null)
   return (
@@ -165,6 +183,31 @@ export function ControlsCatalogue() {
         value={feed}
         onChange={setFeed}
       />
+
+      {/* R3 : les onglets de la recherche dans une place étroite ; le dernier est choisi, la bande
+          a donc défilé pour le montrer. */}
+      <Text variant="caption" tone="muted">
+        {l.scrolling}
+      </Text>
+      <View style={{ width: '100%', maxWidth: NARROW }}>
+        <Segmented
+          label={l.results}
+          fill={false}
+          options={l.tabs.map((label, index) => ({ value: String(index), label }))}
+          value={tab}
+          onChange={setTab}
+        />
+      </View>
+
+      {/* R3 : des initiales à toutes les tailles du rond, jusqu'au plus petit (carte d'un testeur). */}
+      <Text variant="caption" tone="muted">
+        {l.initials}
+      </Text>
+      <Stack direction="row" gap="md" wrap align="center">
+        {[96, 56, 28, 20].map((size) => (
+          <Avatar key={size} name="Max Durand" source={null} label="Max Durand" size={size} />
+        ))}
+      </Stack>
 
       {/* Une liste de choix : aucun coché au départ, puis un seul ; et une liste inactive. */}
       <ListGroup title={l.radioTitle} footer={l.radioFooter} radio>
