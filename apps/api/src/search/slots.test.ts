@@ -44,6 +44,43 @@ describe('search slots', () => {
     releaseD?.()
   })
 
+  it('keeps a member to their share of the waiting line, and lets the others in', async () => {
+    const slots = createSearchSlots({
+      perMember: 1,
+      atOnce: 1,
+      waitMs: 5000,
+      maxWaiting: 5,
+      waitingPerMember: 2,
+    })
+    const release = await slots.take('a')
+    const waits = [slots.take('a'), slots.take('a')]
+    // La troisième demande de « a » qui attendrait : refusée tout de suite. Celle de « b » attend.
+    let thirdDone = false
+    const third = slots.take('a').then((result) => {
+      thirdDone = true
+      return result
+    })
+    let otherDone = false
+    const other = slots.take('b').then((result) => {
+      otherDone = true
+      return result
+    })
+    await tick()
+    expect(thirdDone).toBe(true)
+    expect(await third).toBeNull()
+    expect(otherDone).toBe(false)
+
+    // Les places se suivent dans l'ordre d'arrivée : les deux de « a », puis « b ».
+    release?.()
+    const releaseA2 = await waits[0]
+    releaseA2?.()
+    const releaseA3 = await waits[1]
+    releaseA3?.()
+    const releaseB = await other
+    expect([releaseA2, releaseA3, releaseB].every((r) => typeof r === 'function')).toBe(true)
+    releaseB?.()
+  })
+
   it('frees a single place when the same release is called twice', async () => {
     const slots = createSearchSlots({ perMember: 1, atOnce: 1, waitMs: 50, maxWaiting: 5 })
     const release = await slots.take('a')

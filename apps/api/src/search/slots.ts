@@ -34,19 +34,28 @@ export const SEARCH_WAIT_MS = 1000
  */
 export const SEARCHES_WAITING = 20
 
+/**
+ * Combien de demandes un même membre a au plus dans la file. Deux : la recherche lente qu'il
+ * attend, plus celle qu'il vient de taper, au cas où l'appli n'a pas encore fait savoir qu'elle
+ * annulait la précédente. Au-delà, 429 tout de suite pour lui seul : un script ne peut pas remplir
+ * à lui seul les vingt places de la file et faire refuser tous les autres.
+ */
+export const SEARCHES_WAITING_PER_MEMBER = 2
+
 /** Les réglages d'une réserve de places ; les tests en passent de plus petits. */
 export type SearchSlotOptions = {
   perMember: number
   atOnce: number
   waitMs: number
   maxWaiting: number
+  waitingPerMember: number
 }
 
 /**
  * Le compte des places, gardé en mémoire : il vaut pour un processus de l'API (il n'y en a qu'un
  * en production ; plusieurs auraient chacun le leur, ce que la réserve de chacun supporte).
  * `take` rend une promesse : elle donne de quoi libérer la place dès qu'il y en a une, ou null si
- * l'attente dépasse `waitMs`, si la file est pleine, ou si le client abandonne sa demande
+ * l'attente dépasse `waitMs`, si la file est pleine (pour l'API ou pour ce membre), ou si le client abandonne sa demande
  * (`signal`, le signal d'annulation de la requête HTTP). L'appelant libère dans un `finally`
  * (exécuté que la recherche réussisse, échoue ou dépasse son délai), sinon une place perdue le
  * serait pour toujours.
@@ -63,6 +72,7 @@ export const createSearchSlots = ({
   atOnce = SEARCHES_AT_ONCE,
   waitMs = SEARCH_WAIT_MS,
   maxWaiting = SEARCHES_WAITING,
+  waitingPerMember = SEARCHES_WAITING_PER_MEMBER,
 }: Partial<SearchSlotOptions> = {}): SearchSlots => {
   /** Les recherches en cours de chaque membre (seuls les membres qui en ont une y figurent). */
   const running = new Map<string, number>()
@@ -111,7 +121,11 @@ export const createSearchSlots = ({
       // Une place libre : on la prend tout de suite. Aucune demande plus ancienne n'est doublée :
       // `serve` passe à chaque place rendue, donc celles qui attendent encore ne peuvent pas partir.
       if (fits(memberId)) return Promise.resolve(occupy(memberId))
+      // File pleine, ou part de ce membre déjà prise : refus tout de suite. La file est courte
+      // (vingt au plus), la parcourir pour compter coûte moins que tenir un second compte à jour.
       if (queue.length >= maxWaiting) return Promise.resolve(null)
+      const mineWaiting = queue.filter((waiter) => waiter.memberId === memberId).length
+      if (mineWaiting >= waitingPerMember) return Promise.resolve(null)
       return new Promise((resolve) => {
         const leave = () => {
           const index = queue.indexOf(waiter)

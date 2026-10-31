@@ -14,7 +14,7 @@ import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memberCounterKeys } from './rate-limit'
-import { SEARCH_WAIT_MS, SEARCHES_WAITING } from './search/slots'
+import { SEARCH_WAIT_MS, SEARCHES_WAITING, SEARCHES_WAITING_PER_MEMBER } from './search/slots'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { explainQueries } from './testing/explain'
@@ -950,7 +950,7 @@ describe('searches running at the same time', () => {
     expect(titles(await search(malik, 'carnet'))).toEqual(['Carnet de cafés'])
   })
 
-  it('refuses at once when the waiting line is full', async () => {
+  it('refuses a member past their share of the waiting line, without refusing the others', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await publish(ines, 'Carnet de cafés')
     const slow = barrier()
@@ -964,15 +964,79 @@ describe('searches running at the same time', () => {
     const running = [ines, malik, zoe].map((cookie) => searchRaw(cookie, { q: 'carnet' }))
     await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(3))
 
-    // Vingt demandes de Louis remplissent la file (le quota en permet 600 par heure).
-    const waiting = Array.from({ length: SEARCHES_WAITING }, () =>
-      searchRaw(louis, { q: 'carnet' }),
+    // Malik attend déjà deux fois : sa part de la file est prise.
+    const malikWaiting = Array.from({ length: SEARCHES_WAITING_PER_MEMBER }, () =>
+      searchRaw(malik, { q: 'carnet' }),
     )
     await new Promise((resolve) => setTimeout(resolve, A_MOMENT_MS))
-
-    // La vingt et unième est refusée sans attendre ; les vingt autres attendent encore.
+    // Sa demande suivante est refusée sans attendre.
     const started = performance.now()
-    const extra = await searchRaw(louis, { q: 'carnet' })
+    const third = await searchRaw(malik, { q: 'carnet' })
+    expect(performance.now() - started).toBeLessThan(SEARCH_WAIT_MS / 2)
+    expect(third.headers.get('retry-after')).toBe('1')
+    await expectError(third, 429, 'rate_limited')
+    expect(await settlesWithin(Promise.race(malikWaiting), 0)).toBe(false)
+
+    // Louis, lui, entre dans la file et attend sa place.
+    const louisSearch = searchRaw(louis, { q: 'carnet' })
+    expect(await settlesWithin(louisSearch, A_MOMENT_MS)).toBe(false)
+
+    slow.open()
+    expect((await Promise.all(running)).map((res) => res.status)).toEqual([500, 500, 500])
+    const res = await louisSearch
+    expect(res.status).toBe(200)
+    expect(titles(SearchResults.parse(await res.json()))).toEqual(['Carnet de cafés'])
+    for (const waited of await Promise.all(malikWaiting)) {
+      expect([200, 429]).toContain(waited.status)
+    }
+  })
+
+  it('refuses at once when the waiting line is full', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await publish(ines, 'Carnet de cafés')
+    // Onze membres de plus. Le quota d'inscription compte par adresse IP : chacun s'inscrit depuis
+    // la sienne (comme `ctx.verifiedMember`, avec un autre en-tête `x-real-ip`).
+    const memberFrom = async (i: number) => {
+      const email = `membre${i}@example.com`
+      await ctx.signUp(
+        { name: `Membre ${i}`, email, password: 'membre-long-password' },
+        { 'x-real-ip': `198.51.100.${i + 1}` },
+      )
+      const link = ctx.mailer.sent
+        .findLast((sent) => sent.to === email)
+        ?.text.match(/https?:\/\/\S+/)
+      if (!link) throw new Error(`no verification link for ${email}`)
+      const url = new URL(link[0])
+      return ctx.cookiesFrom(await ctx.request(url.pathname + url.search))
+    }
+    // Les dix premiers prendront chacun leur part de la file (deux places) ; le onzième arrive tard.
+    const fillers: string[] = []
+    for (let i = 0; i < SEARCHES_WAITING / SEARCHES_WAITING_PER_MEMBER; i++) {
+      fillers.push(await memberFrom(i))
+    }
+    const latecomer = await memberFrom(fillers.length)
+    const slow = barrier()
+    const transaction = vi.spyOn(ctx.db, 'transaction')
+    for (let i = 0; i < 3; i++) {
+      transaction.mockImplementationOnce(async () => {
+        await slow.opened
+        throw new Error('connection lost')
+      })
+    }
+    const running = [ines, malik, zoe].map((cookie) => searchRaw(cookie, { q: 'carnet' }))
+    await vi.waitFor(() => expect(transaction).toHaveBeenCalledTimes(3))
+
+    // Deux demandes par membre, sans dépasser la part de chacun, remplissent la file.
+    const waiting = fillers.flatMap((cookie) =>
+      Array.from({ length: SEARCHES_WAITING_PER_MEMBER }, () => searchRaw(cookie, { q: 'carnet' })),
+    )
+    expect(waiting).toHaveLength(SEARCHES_WAITING)
+    await new Promise((resolve) => setTimeout(resolve, A_MOMENT_MS))
+
+    // La vingt et unième, d'un membre qui n'attendait pas encore, est refusée sans attendre ; les
+    // vingt autres attendent encore.
+    const started = performance.now()
+    const extra = await searchRaw(latecomer, { q: 'carnet' })
     expect(performance.now() - started).toBeLessThan(SEARCH_WAIT_MS / 2)
     expect(extra.headers.get('retry-after')).toBe('1')
     await expectError(extra, 429, 'rate_limited')
