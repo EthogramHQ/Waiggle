@@ -34,14 +34,10 @@ export const en: Translation = {
   home: {
     title: 'Welcome to {{appName}}',
     tagline: 'Show the people close to you what you build with AI.',
-    greeting: 'Hi {{name}}!',
     signUp: 'Create an account',
     signIn: 'Sign in',
     haveAccount: 'I already have an account',
-    account: 'Settings',
     publish: 'Publish a project',
-    publishShort: 'Publish',
-    myProjects: 'My projects',
     membersOnly: 'Nothing is visible without an account, or found by a search engine.',
     openSource: '{{appName}} is free software.',
     seeCode: 'See the code',
@@ -51,7 +47,8 @@ export const en: Translation = {
       'A question, something to report? Write to us at {{contactEmail}}, in English or French.',
     fields: {
       name: 'Display name',
-      nameHint: 'Your @handle will be made from it; you can change it in My profile.',
+      nameHint:
+        'Signed-in members will be able to find you by this name. Your @handle will be made from it; you can change it in My profile.',
       email: 'Email address',
       password: 'Password',
       passwordHint: 'At least {{min}} characters.',
@@ -163,7 +160,6 @@ export const en: Translation = {
     signOut: 'Sign out',
     signOutError:
       'Signing out didn’t go through: you may still be signed in. Check your connection and try again.',
-    editProfile: 'Edit my profile',
     language: {
       title: 'Language',
       hint: 'Your emails are also sent in this language.',
@@ -850,6 +846,7 @@ export const en: Translation = {
     projects: 'Projects',
     projectCount_one: '{{count}} project',
     projectCount_other: '{{count}} projects',
+    projectCountMore: '{{max}} or more projects',
     empty: 'No public project yet.',
     emptyMine: 'You have not published anything yet. Your first project will show up here.',
     private: 'Private',
@@ -890,6 +887,8 @@ export const en: Translation = {
     nextTools: 'Next tools',
     allTools: 'All tools',
     recent: 'Recent',
+    testersError: 'Projects looking for testers could not load.',
+    recentError: 'Recent projects could not load.',
   },
   search: {
     title: 'Search',
@@ -917,7 +916,9 @@ export const en: Translation = {
     typeMore: 'Type at least two characters.',
     emptyTitle: 'No result for “{{q}}”',
     empty: 'Try a shorter word, or the name of a tool such as “Claude”.',
+    tooManyTitle: 'Too many searches at once',
     tooMany: 'Too many searches, try again in a moment.',
+    shortQuery: 'From 3 letters on, you also find members you don’t follow.',
     errorTitle: 'The search could not complete',
     error: 'Try again in a moment.',
     tabsLabel: 'Results to show',
@@ -940,7 +941,6 @@ export const en: Translation = {
     soonBody2: 'There, you follow their projects, test them and cheer each other on.',
   },
   me: {
-    title: 'Me',
     editProfile: 'Edit my profile',
     myProjects: 'My projects',
   },
@@ -1113,8 +1113,6 @@ export const en: Translation = {
   feed: {
     label: 'The feed',
     errorTitle: 'The feed could not load',
-    tabs: { following: 'Following', discover: 'Discover' },
-    filter: { label: 'Which projects', all: 'All', testers: 'Looking for testers' },
     nobodyTitle: 'You don’t follow anyone yet',
     nobodyBody: 'Follow members from their page: their new projects will show up here.',
     nobodyAction: 'Explore projects',

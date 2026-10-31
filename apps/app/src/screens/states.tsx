@@ -47,7 +47,7 @@ export function LoadingScreen({ width = 'form' }: { width?: Width }) {
       <Stack gap="xl" align="stretch">
         <SkeletonList count={width === 'page' ? 3 : 2} />
         {slow ? (
-          <Stack align="center">
+          <Stack align="start">
             <Button label={t(($) => $.states.back)} onPress={back} variant="secondary" />
           </Stack>
         ) : null}

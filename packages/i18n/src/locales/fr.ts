@@ -46,15 +46,10 @@ export const fr = {
   home: {
     title: 'Bienvenue sur {{appName}}',
     tagline: 'Montre à tes proches ce que tu construis avec l’IA.',
-    greeting: 'Bonjour {{name}} !',
     signUp: 'Créer un compte',
     signIn: 'Me connecter',
     haveAccount: 'J’ai déjà un compte',
-    // R2 : « Mon compte » devient la page « Réglages ».
-    account: 'Réglages',
     publish: 'Publier un projet',
-    publishShort: 'Publier',
-    myProjects: 'Mes projets',
     // R2 (décision D2) : vrai tant que rien n'est public ; R12 dira « Rien n’est public sans ton accord. »
     membersOnly: 'Rien n’est visible sans compte, ni trouvé par un moteur de recherche.',
     openSource: '{{appName}} est un logiciel libre.',
@@ -66,7 +61,9 @@ export const fr = {
       'Une question, un contenu à signaler ? Écris-nous à {{contactEmail}}, en français ou en anglais.',
     fields: {
       name: 'Nom affiché',
-      nameHint: 'Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
+      // R3 (relecture juridique, C2) : on choisit ici son nom, qui sert à être trouvé.
+      nameHint:
+        'Les membres connectés pourront te trouver par ce nom. Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
       email: 'Adresse e-mail',
       password: 'Mot de passe',
       passwordHint: 'Au moins {{min}} caractères.',
@@ -202,7 +199,6 @@ export const fr = {
     // La déconnexion n'a pas abouti (serveur, réseau) : le membre est peut-être encore connecté.
     signOutError:
       'La déconnexion n’a pas abouti : tu es peut-être encore connecté. Vérifie ta connexion et réessaie.',
-    editProfile: 'Modifier mon profil',
     language: {
       title: 'Langue',
       hint: 'Tes e-mails te sont aussi envoyés dans cette langue.',
@@ -978,6 +974,8 @@ export const fr = {
     /** R3 : le nombre à côté de « Projets » ou « Mes projets », dans le nom lu. */
     projectCount_one: '{{count}} projet',
     projectCount_other: '{{count}} projets',
+    /** Au plafond de la liste (PROJECT_LIST_MAX) : « 50 projets ou plus ». */
+    projectCountMore: '{{max}} projets ou plus',
     empty: 'Pas encore de projet public.',
     emptyMine: 'Tu n’as encore rien publié. Ton premier projet apparaîtra ici.',
     private: 'Privé',
@@ -1038,6 +1036,9 @@ export const fr = {
     nextTools: 'Outils suivants',
     allTools: 'Tous les outils',
     recent: 'Récents',
+    /** L'échec d'une section d'Explorer se dit dans la section, avec son propre texte. */
+    testersError: 'Les projets qui cherchent des testeurs n’ont pas pu se charger.',
+    recentError: 'Les projets récents n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
   // hors du nom lu, qui passe par les pluriels ci-dessous.
@@ -1073,7 +1074,10 @@ export const fr = {
     typeMore: 'Tape au moins deux caractères.',
     emptyTitle: 'Aucun résultat pour « {{q}} »',
     empty: 'Essaie un mot plus court, ou le nom d’un outil comme « Claude ».',
+    tooManyTitle: 'Trop de recherches d’un coup',
     tooMany: 'Trop de recherches, réessaie dans un instant.',
+    /** Sous 3 lettres, seuls les membres suivis sortent (relecture juridique de R3, C1). */
+    shortQuery: 'À partir de 3 lettres, tu trouves aussi les membres que tu ne suis pas.',
     errorTitle: 'La recherche n’a pas pu aboutir',
     error: 'Réessaie dans un instant.',
     /** Le nom lu du groupe d'onglets « Tout · Projets · Membres · Outils ». */
@@ -1103,7 +1107,6 @@ export const fr = {
   },
   // R3 : l'onglet Moi, sa propre page de membre (planche R3-Moi).
   me: {
-    title: 'Moi',
     editProfile: 'Modifier mon profil',
     myProjects: 'Mes projets',
   },
@@ -1309,8 +1312,6 @@ export const fr = {
   feed: {
     label: 'Le fil',
     errorTitle: 'Le fil n’a pas pu se charger',
-    tabs: { following: 'Abonnements', discover: 'Découvrir' },
-    filter: { label: 'Quels projets', all: 'Tous', testers: 'Cherchent des testeurs' },
     nobodyTitle: 'Tu ne suis personne pour l’instant',
     nobodyBody: 'Suis des membres depuis leur page : leurs nouveaux projets arriveront ici.',
     // R3 : « Découvrir » est devenu l'onglet Explorer ; le fil vide y mène.

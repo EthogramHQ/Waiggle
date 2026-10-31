@@ -33,7 +33,9 @@ export const getSearch = async (q: string, signal?: AbortSignal): Promise<Search
  *   lettre seule ne compterait pas moins dans le quota.
  * - Pendant qu'une nouvelle recherche part, les résultats précédents restent affichés
  *   (`placeholderData`) : la liste ne clignote pas à chaque mot.
- * - Un refus définitif (le quota, 429) n'est pas réessayé : `shouldRetry` d'api/query-client.ts.
+ * - Une recherche qui échoue n'est jamais réessayée d'elle-même (`retry: false`) : la personne
+ *   retape ou touche « Réessayer ». Sinon, trois essais de 6 s laissaient « Recherche en cours… »
+ *   22 s à l'écran (relecture de design de R3).
  * - Les mêmes lettres retapées dans la minute : la réponse déjà reçue suffit (`staleTime` par
  *   défaut de l'appli). Rien n'est gardé sur l'appareil : le cache vit en mémoire seulement.
  */
@@ -43,4 +45,5 @@ export const useSearch = (q: string) =>
     queryFn: ({ signal }) => getSearch(q, signal),
     enabled: SearchQuery.safeParse({ q }).success,
     placeholderData: keepPreviousData,
+    retry: false,
   })

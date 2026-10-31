@@ -159,8 +159,8 @@ describe('the photo of the top bar', () => {
 
     await fireEvent.press(screen.getByRole('link', { name: t(($) => $.nav.me) }))
     expect(mockPush).toHaveBeenCalledWith('/me')
-    // L'ancien nom a disparu avec l'ancienne destination.
-    expect(screen.queryByRole('button', { name: t(($) => $.home.account) })).toBeNull()
+    // L'ancien nom a disparu avec l'ancienne destination (sa clé aussi : le texte, écrit ici).
+    expect(screen.queryByRole('button', { name: 'Réglages' })).toBeNull()
   })
 
   it('leads to « Moi » from the settings too', async () => {

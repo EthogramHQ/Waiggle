@@ -385,8 +385,9 @@ describe('ExploreScreen, « Récents »', () => {
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
     expect(useDiscoverFeed).toHaveBeenCalledWith(expect.objectContaining({ testers: false }))
-    // Plus de choix « Tous / Cherchent des testeurs » : les catégories viendront en R6.
-    expect(screen.queryByRole('radio', { name: fr.t(($) => $.feed.filter.testers) })).toBeNull()
+    // Plus de choix « Tous / Cherchent des testeurs » : les catégories viendront en R6 (la clé
+    // est retirée, le texte est écrit ici).
+    expect(screen.queryByRole('radio', { name: 'Cherchent des testeurs' })).toBeNull()
   })
 
   it('opens a project of the list', async () => {

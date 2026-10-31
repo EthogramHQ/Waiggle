@@ -258,6 +258,7 @@ export function SearchScreen() {
           errorKey(shownError) === 'rateLimited' ? (
             <StateMessage
               kind="error"
+              title={t(($) => $.search.tooManyTitle)}
               message={t(($) => $.search.tooMany)}
               actions={[{ label: t(($) => $.common.retry), onPress: onRetry, loading: retrying }]}
             />
@@ -352,7 +353,7 @@ export function SearchScreen() {
         {data && shows('tools') ? (
           <ListGroup title={t(($) => $.search.tabs.tools)}>
             {data.tools.items.map((tool) => {
-              const path = `/tags/${tool.slug}`
+              const path = `/tags/${encodeURIComponent(tool.slug)}`
               const projects = t(($) => $.tools.projects, { count: tool.projectCount })
               return (
                 <ListRow

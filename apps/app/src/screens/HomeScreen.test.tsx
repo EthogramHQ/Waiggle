@@ -628,7 +628,8 @@ describe('the top of the feed on a phone (R3)', () => {
     // Témoin : le fil est là.
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
     expect(screen.getByRole('img', { name: fr.t(($) => $.brand.logoAlt) })).toBeTruthy()
-    expect(screen.queryByText(containing(fr.t(($) => $.home.greeting, { name: 'Léa' })))).toBeNull()
+    // La clé de « Bonjour Léa ! » est retirée : le texte est écrit ici.
+    expect(screen.queryByText(containing('Bonjour Léa'))).toBeNull()
     expect(screen.getByRole('button', { name: fr.t(($) => $.notifications.bell) })).toBeTruthy()
   })
 
@@ -641,9 +642,10 @@ describe('the top of the feed on a phone (R3)', () => {
     expect(screen.getByRole('button', { name: fr.t(($) => $.notifications.bell) })).toBeTruthy()
     for (const name of [
       fr.t(($) => $.home.publish),
-      fr.t(($) => $.home.publishShort),
-      fr.t(($) => $.home.myProjects),
-      fr.t(($) => $.home.account),
+      // Les clés de ces trois raccourcis sont retirées : leurs textes sont écrits ici.
+      'Publier',
+      'Mes projets',
+      'Réglages',
     ]) {
       expect(screen.queryByRole('button', { name })).toBeNull()
       expect(screen.queryByRole('link', { name })).toBeNull()
