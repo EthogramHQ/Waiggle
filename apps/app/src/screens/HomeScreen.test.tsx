@@ -267,13 +267,15 @@ describe('the « following » feed on the home screen', () => {
     } as unknown as ReturnType<typeof useFollowingFeed>)
     await renderMemberHome()
 
-    // La règle (une seule action miel par écran), pas la couleur choisie pour « Réessayer » : un
-    // seul bouton au fond miel, et ce n'est pas lui.
+    // La règle (une seule action miel par écran), pas la couleur choisie pour « Réessayer » : au plus
+    // un bouton au fond miel, et ce n'est pas lui. R3 : sur téléphone, l'action miel de l'écran
+    // (« Publier ») est le « + » de la barre d'onglets, posée hors de HomeScreen ; l'écran lui-même
+    // n'en a donc plus aucune (test adapté par la session, F-Nav : la barre d'onglets).
     const honey = (element: ReturnType<typeof screen.getByRole>) =>
       StyleSheet.flatten(element.props.style)?.backgroundColor === palettes.day.honey
     const retry = screen.getByRole('button', { name: 'Réessayer' })
     expect(honey(retry)).toBe(false)
-    expect(screen.getAllByRole('button').filter(honey)).toHaveLength(1)
+    expect(screen.getAllByRole('button').filter(honey)).toHaveLength(0)
     await fireEvent.press(retry)
     expect(following.refetch).toHaveBeenCalledTimes(1)
   })
