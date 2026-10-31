@@ -92,6 +92,7 @@ import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
+import { ToolsCatalogue } from './outils'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -1035,6 +1036,7 @@ export function CatalogueScreen() {
       <NavigationCatalogue />
       <CardsCatalogue />
       <ExploreCatalogue />
+      <ToolsCatalogue />
       <SearchCatalogue />
 
       <Section title={l.icons}>

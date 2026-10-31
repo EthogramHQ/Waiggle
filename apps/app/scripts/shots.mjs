@@ -311,6 +311,34 @@ const feedItems = fromOthers.map((p, i) => ({
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
   project: summaryOf(p),
 }))
+// Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
+// (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
+// depuis R3), de plusieurs membres et aux titres variés, assez pour que le carrousel dépasse.
+const testerItems = [
+  ['Quel papillon ?', max, 'https://papillons.example.org'],
+  ['Décollage !', ines, 'https://decollage.example.com'],
+  [
+    'Carnet de cafés',
+    { id: 'sam-id', name: 'Sam Petit', avatarUrl: null },
+    'https://cafes.example.com',
+  ],
+  ['Le journal de Chelsea', max, 'https://chelsea.example.org'],
+  ['Le quiz des capitales', ines, 'https://quiz.example.org'],
+  ['Mon agent de recettes', ines, 'https://recettes.example.com'],
+].map(([title, author, demoUrl], i) => ({
+  kind: 'project',
+  at: new Date(Date.UTC(2026, 9, 18 - i, 9)).toISOString(),
+  project: {
+    ...summaryOf({
+      ...(i % 2 === 0 ? photosProject : recipesProject),
+      id: `5e6f7a8b-0000-4000-8000-00000000000${i + 1}`,
+      title,
+      author,
+      status: 'testable',
+    }),
+    demoUrl,
+  },
+}))
 // La page de Max, vue par Léa qui ne le suit pas encore.
 const maxMember = {
   ...leaPage,
@@ -1028,8 +1056,14 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
-    if (pathname === '/v1/feed/discover')
-      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [] })
+    // « Découvrir » (Explorer, R3) : le carrousel des testeurs (?testers=true), ou « Récents », où
+    // Léa suit déjà Max (comme la planche R3-Explorer-Desktop) : ses cartes n'ont pas de pastille,
+    // celles d'Inès portent « Suivre Inès Haddad ».
+    if (pathname === '/v1/feed/discover') {
+      if (url.searchParams.get('testers') === 'true')
+        return json(200, { items: testerItems, nextCursor: null, followedAuthorIds: [] })
+      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [max.id] })
+    }
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
       const fresh = notificationList.flat().filter((n) => n.isNew).length
@@ -1251,6 +1285,14 @@ const pages = [
   // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
   { name: 'fil', path: '/', signedIn: true, fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
+  // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
+  // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
+  // R3-Explorer-Nuit).
+  { name: 'explorer', path: '/explore', signedIn: true },
+  { name: 'explorer-nuit', path: '/explore', signedIn: true, fullPage: true },
+  // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
+  { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
   { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
