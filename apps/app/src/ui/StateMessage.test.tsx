@@ -150,6 +150,52 @@ describe('StateMessage, aligned on the left (R3)', () => {
     expect(onTheLeft(screen.getByRole('button', { name: 'Réessayer' }))).toBe(true)
   })
 
+  // Relecture R3 : l'onglet Ruches assemblait à la main un état « bientôt », centré. Il passe par
+  // StateMessage : l'abeille qui fait coucou, le titre et plusieurs paragraphes, à gauche.
+  it('says that something is coming, with the waving bee and several paragraphs, on the left', async () => {
+    await renderWithProviders(
+      <View testID={HOST}>
+        <StateMessage
+          kind="soon"
+          title="Les ruches arrivent bientôt"
+          message={['Une ruche, c’est un groupe de proches.', 'Tu pourras y partager tes projets.']}
+        />
+      </View>,
+    )
+
+    const bee = screen.getByRole('img', {
+      name: fr.t(($) => $.mascot.wave),
+      includeHiddenElements: true,
+    })
+    expect(horizontalPlacement(bee)).toBe('flex-start')
+    const header = screen.getByRole('header', { name: 'Les ruches arrivent bientôt' })
+    const first = screen.getByText('Une ruche, c’est un groupe de proches.')
+    const second = screen.getByText('Tu pourras y partager tes projets.')
+    for (const element of [header, first, second]) {
+      expect(onTheLeft(element)).toBe(true)
+      expect(['auto', 'left']).toContain(textAlignOf(element))
+    }
+    // Deux paragraphes, pas une alerte : rien ne va mal.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('puts the emblem of an error on the left too, before its title', async () => {
+    await renderWithProviders(
+      <View testID={HOST}>
+        <StateMessage kind="error" title="Cette page n’a pas pu se charger" />
+      </View>,
+    )
+
+    // L'emblème est caché aux lecteurs d'écran : on le trouve par son cadre, le premier enfant.
+    const group = rootOf().children.find((child): child is Node => typeof child !== 'string')
+    const frame = group?.children.find((child): child is Node => typeof child !== 'string')
+    if (!frame) throw new Error('pas de cadre pour l’image')
+    expect(horizontalPlacement(frame)).toBe('flex-start')
+    expect(
+      onTheLeft(screen.getByRole('header', { name: 'Cette page n’a pas pu se charger' })),
+    ).toBe(true)
+  })
+
   // Témoin : le rôle et le titre ne changent pas avec l'alignement.
   it('keeps its heading and its way out', async () => {
     const back = jest.fn()

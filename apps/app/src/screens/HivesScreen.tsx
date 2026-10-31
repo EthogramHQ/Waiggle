@@ -7,10 +7,8 @@
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { TopNav } from '../navigation/TopNav'
-import { Mascot } from '../ui/Mascot'
 import { Screen } from '../ui/Screen'
-import { Stack } from '../ui/Stack'
-import { Text } from '../ui/Text'
+import { StateMessage } from '../ui/StateMessage'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 export function HivesScreen() {
@@ -24,21 +22,14 @@ export function HivesScreen() {
 
   return (
     <Screen title={t(($) => $.hives.title)} header={<TopNav />}>
-      <Stack gap="lg" align="center">
-        {/* L'abeille est décorative : le titre dit déjà tout. */}
-        <Mascot pose="wave" size="lg" decorative />
-        <Stack gap="sm" align="stretch">
-          <Text variant="title2" heading={2} align="center">
-            {t(($) => $.hives.soonTitle)}
-          </Text>
-          <Text tone="secondary" align="center">
-            {t(($) => $.hives.soonBody1)}
-          </Text>
-          <Text tone="secondary" align="center">
-            {t(($) => $.hives.soonBody2)}
-          </Text>
-        </Stack>
-      </Stack>
+      {/* L'état « bientôt » de StateMessage : l'abeille qui fait coucou (décorative, le titre dit
+          déjà tout), le titre et les deux phrases, rangés à gauche comme tous les états de l'appli
+          (choix de Louis du 30/10/2026 ; relecture R3 : la page était centrée, à la main). */}
+      <StateMessage
+        kind="soon"
+        title={t(($) => $.hives.soonTitle)}
+        message={[t(($) => $.hives.soonBody1), t(($) => $.hives.soonBody2)]}
+      />
     </Screen>
   )
 }

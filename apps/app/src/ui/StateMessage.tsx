@@ -11,13 +11,16 @@ import { type HeadingLevel, Text } from './Text'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
-export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty'
+// « soon » : une partie de l'appli qui n'existe pas encore (l'onglet Ruches avant les ruches, R3).
+export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty' | 'soon'
 
 /** La pose de la mascotte pour chaque état qui la montre. */
 const mascotPoses: Record<Exclude<StateKind, 'loading' | 'error'>, MascotPose> = {
   notFound: 'search',
   empty: 'sleep',
   signedOut: 'wave',
+  // L'abeille fait coucou : « ça arrive », sur un ton accueillant.
+  soon: 'wave',
 }
 
 /** Une issue : un bouton, éventuellement en chargement (« Réessayer » pendant la nouvelle tentative). */
@@ -27,8 +30,11 @@ type Props = {
   kind: StateKind
   /** Le titre de l'état (absent pendant le chargement, où le message suffit). */
   title?: string
-  /** Ce qui se passe, et ce qu'on peut faire (facultatif quand le titre suffit). */
-  message?: string
+  /**
+   * Ce qui se passe, et ce qu'on peut faire (facultatif quand le titre suffit). Une liste donne
+   * plusieurs paragraphes (« Les ruches arrivent bientôt » et ses deux phrases).
+   */
+  message?: string | readonly string[]
   /** Les issues proposées, de la principale à la secondaire. */
   actions?: Action[]
   /**
@@ -48,6 +54,8 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
   // Quand la place manque (écran bas, texte très agrandi), l'image s'efface : le titre, le message
   // et les issues restent sur le premier écran, sans avoir à faire défiler.
   const cramped = fontScale >= 1.5 || (height > 0 && height < 600)
+  // Le message en paragraphes : aucun, un seul, ou la liste donnée (les textes vides sont ignorés).
+  const paragraphs = (typeof message === 'string' ? [message] : (message ?? [])).filter(Boolean)
   // L'image qui accompagne l'état : une indication de chargement ; la mascotte pour « introuvable »
   // (la loupe), « liste vide » (le sommeil) et « réservé aux membres » (le salut) ; une tuile de
   // miel avec une icône pour l'erreur, où l'abeille n'aurait pas le ton juste.
@@ -57,7 +65,10 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
       // aria-hidden : l'indicateur ne dit rien de plus que le texte « Chargement… » qui le suit.
       <ActivityIndicator size="large" color={colors.amber} aria-hidden />
     ) : kind === 'error' ? (
-      <Emblem icon="warning-circle" />
+      // flush : le bord de la tuile est celui du texte, son halo déborde hors du flux (relecture
+      // R3 : centrée dans son halo de 180 points, la tuile commençait 37 points à droite du texte,
+      // et 119 points de vide la séparaient du message).
+      <Emblem icon="warning-circle" flush />
     ) : (
       <Mascot pose={mascotPoses[kind]} size="sm" decorative />
     )
@@ -78,35 +89,52 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
         gap: space.xl,
       }}
     >
-      {kind === 'loading' || !cramped ? (
-        // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
-        // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
-        // revient à « collée au bord gauche ».
-        <View style={{ alignItems: 'flex-start', paddingVertical: space.lg }}>{picture}</View>
-      ) : null}
-      {/* Le titre et le message prennent toute la largeur du bloc (alignSelf: 'stretch') et s'y
-          replient. Sans lui, rangés à gauche, ils prendraient la largeur de leur plus long mot :
-          à texte agrandi sur 320 points, le message sortait de l'écran (essai du 31/10/2026). */}
-      <View style={{ alignSelf: 'stretch' }}>
-        <Stack gap="sm" align="stretch">
-          {/* breakAnywhere : un mot plus large que l'écran (« introuvable » à 200 % sur 320
-              points) se coupe plutôt que d'être rogné. */}
-          {title ? (
-            <Text variant="title2" heading={level} breakAnywhere>
-              {title}
-            </Text>
-          ) : null}
-          {/* Une erreur est une « alerte » : les lecteurs d'écran la lisent dès qu'elle apparaît,
-            même si la page entière vient d'être remplacée (le chargement devient une erreur). */}
-          {message ? (
-            <Text
-              tone={title ? 'secondary' : 'default'}
-              {...(kind === 'error' ? { accessibilityRole: 'alert' as const } : null)}
-            >
-              {message}
-            </Text>
-          ) : null}
-        </Stack>
+      {/* L'image et les textes forment un groupe plus serré (space.lg) que l'écart des issues :
+          l'image appartient au titre qu'elle illustre. */}
+      <View style={{ alignSelf: 'stretch', alignItems: 'flex-start', gap: space.lg }}>
+        {kind === 'loading' || !cramped ? (
+          // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
+          // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
+          // revient à « collée au bord gauche ». L'emblème d'une erreur n'a pas d'air dessous :
+          // l'écart du groupe suffit entre sa tuile et le titre.
+          <View
+            style={{
+              alignItems: 'flex-start',
+              paddingTop: space.lg,
+              paddingBottom: kind === 'error' ? 0 : space.lg,
+            }}
+          >
+            {picture}
+          </View>
+        ) : null}
+        {/* Le titre et le message prennent toute la largeur du bloc (alignSelf: 'stretch') et s'y
+            replient. Sans lui, rangés à gauche, ils prendraient la largeur de leur plus long mot :
+            à texte agrandi sur 320 points, le message sortait de l'écran (essai du 31/10/2026). */}
+        <View style={{ alignSelf: 'stretch' }}>
+          <Stack gap="sm" align="stretch">
+            {/* breakAnywhere : un mot plus large que l'écran (« introuvable » à 200 % sur 320
+                points) se coupe plutôt que d'être rogné. */}
+            {title ? (
+              <Text variant="title2" heading={level} breakAnywhere>
+                {title}
+              </Text>
+            ) : null}
+            {/* Une erreur est une « alerte » : les lecteurs d'écran la lisent dès qu'elle apparaît,
+              même si la page entière vient d'être remplacée (le chargement devient une erreur).
+              Plusieurs paragraphes : un texte chacun, dans l'ordre (leur rang sert de clé, deux
+              phrases traduites pouvant être identiques). */}
+            {paragraphs.map((paragraph, index) => (
+              <Text
+                // biome-ignore lint/suspicious/noArrayIndexKey: la liste est fixe, donnée par l'écran.
+                key={index}
+                tone={title ? 'secondary' : 'default'}
+                {...(kind === 'error' ? { accessibilityRole: 'alert' as const } : null)}
+              >
+                {paragraph}
+              </Text>
+            ))}
+          </Stack>
+        </View>
       </View>
       {/* Les issues gardent leur largeur naturelle, l'une sous l'autre, au bord gauche. */}
       {actions.length > 0 ? (

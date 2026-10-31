@@ -19,6 +19,7 @@ import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
 import { Button } from '../ui/Button'
 import { Constellation } from '../ui/Constellation'
+import { HiddenHeading } from '../ui/HiddenHeading'
 import { Hint } from '../ui/Hint'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { Logo } from '../ui/Logo'
@@ -149,6 +150,10 @@ function MemberHome() {
       title={compact ? undefined : t(($) => $.nav.feed)}
       pageTitle={t(($) => $.nav.feed)}
     >
+      {/* Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur
+          d'écran parcourt la page par ses titres, et sans titre de niveau 1 il ne sait pas où il
+          est. Posé en tête du contenu, à la place exacte du titre affiché sur ordinateur. */}
+      {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
       {/* Le fil vide mène à l'onglet Explorer, qui a repris « Découvrir ». */}
       <FollowingFeed onExplore={() => router.push('/explore')} />
     </Screen>

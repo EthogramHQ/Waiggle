@@ -4,7 +4,7 @@
 import { appName, palettes } from '@ruche/brand'
 import type { FeedItem, FeedPage, FollowingFeedPage, Project } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { useSession } from '../accounts/api'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed } from '../feed/api'
 import { createI18n } from '../i18n'
@@ -649,6 +649,70 @@ describe('the top of the feed on a phone (R3)', () => {
     ]) {
       expect(screen.queryByRole('button', { name })).toBeNull()
       expect(screen.queryByRole('link', { name })).toBeNull()
+    }
+  })
+})
+
+// Relecture R3 (31/10/2026) : sur téléphone, le logo remplace le titre, et la page n'avait plus
+// aucun titre de niveau 1 ; un lecteur d'écran ne savait pas où il était. Le titre « Fil » reste
+// lu, caché à l'œil. Sur ordinateur, il est affiché : un seul titre de niveau 1 dans les deux cas.
+//
+// Le niveau ne se lit que sur le web (`aria-level`, posé par `Text heading`), où ce fichier ne fixe
+// pas la langue (expo-localization y donne l'anglais au premier écran) : les tests du web comptent
+// les titres de niveau 1, ceux du téléphone lisent le nom, en français.
+describe('the page heading of the feed (R3 review)', () => {
+  /** Les titres de niveau 1 de la page, sur le web. */
+  const levelOneHeadings = () =>
+    screen.queryAllByRole('header').filter((heading) => heading.props['aria-level'] === 1)
+
+  it('keeps a heading named « Fil » on a phone, where the logo stands in for it', async () => {
+    await renderMemberHome()
+
+    // Témoin : le fil et le logo sont là.
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: fr.t(($) => $.brand.logoAlt) })).toBeTruthy()
+    // Le seul titre de la page : « Fil » (le fil lui-même n'en porte pas).
+    const headings = screen.getAllByRole('header')
+    expect(headings).toHaveLength(1)
+    expect(screen.getByRole('header', { name: fr.t(($) => $.nav.feed) })).toBeTruthy()
+  })
+
+  it('makes it the one level-1 heading of the phone page on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderMemberHome()
+
+      // Témoin : le fil est là.
+      expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(levelOneHeadings()).toHaveLength(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('keeps a single level-1 heading « Fil » on a computer, shown there', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderMemberHome()
+
+      expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(screen.getByRole('header', { name: fr.t(($) => $.nav.feed) })).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('makes it the one level-1 heading of the computer page on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    const restore = setDesktopWindow()
+    try {
+      await renderMemberHome()
+
+      expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(levelOneHeadings()).toHaveLength(1)
+    } finally {
+      restore()
+      jest.restoreAllMocks()
     }
   })
 })
