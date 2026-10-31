@@ -202,6 +202,7 @@ function PopularTools() {
     </Text>
   )
   const header = (
+    // Le titre à gauche, « Tous les outils » au bout de la ligne ; à 200 %, le lien passe dessous.
     <Stack direction="row" gap="md" align="center" justify="between" wrap>
       {title}
       <TextLink label={t(($) => $.explore.allTools)} onPress={() => router.push('/tools')} />

@@ -184,8 +184,10 @@ export function Carousel({
           gap: space.md,
         }}
       >
-        {/* Le titre peut passer à la ligne (texte agrandi) sans pousser les flèches hors de l'écran. */}
-        {header ? <View style={{ flexShrink: 1 }}>{header}</View> : null}
+        {/* Le titre peut passer à la ligne (texte agrandi) sans pousser les flèches hors de l'écran.
+            Il prend toute la place laissée par les flèches : un lien posé au bout de l'en-tête
+            (« Tous les outils ») se range ainsi à droite, comme sur la planche R3-Explorer. */}
+        {header ? <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>{header}</View> : null}
         {showArrows ? (
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <IconButton
