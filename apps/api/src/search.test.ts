@@ -377,10 +377,18 @@ describe('the projects found', () => {
 
     const results = await search(malik, 'carnet')
 
-    expect(results.projects.items.map((p) => [p.title, p.visibility])).toEqual([
-      ['Carnet à moi', 'private'],
-      ['Carnet de cafés', 'public'],
-    ])
+    // L'ordre n'est pas la règle de ce test (voir « ranks… » plus bas) : la date de création d'un
+    // projet jamais publié vient de la base (horloge réelle), celle d'une publication de la fausse
+    // horloge du test, et leur ordre variait d'une machine à l'autre (rouge en CI le 31/10 ;
+    // correction de la session, R3). On vérifie donc l'ensemble, sans ordre.
+    const found = results.projects.items.map((p) => [p.title, p.visibility])
+    expect(found).toHaveLength(2)
+    expect(found).toEqual(
+      expect.arrayContaining([
+        ['Carnet à moi', 'private'],
+        ['Carnet de cafés', 'public'],
+      ]),
+    )
     // Son autrice, elle, trouve son projet privé.
     expect(titles(await search(ines, 'secret'))).toEqual(['Carnet secret'])
   })
