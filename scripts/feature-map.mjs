@@ -122,6 +122,16 @@ const features = [
     routes: /^\w+ \/v1\/(members|tags)\//,
     tables: null,
   },
+  // R3 : la barre d'onglets et ce qu'elle ouvre (Explorer, les outils, la recherche par mots,
+  // Ruches avant les ruches, « Moi »). /me dessine la page du membre connecté.
+  {
+    id: 'navigation',
+    name: 'Navigation, Explorer et recherche',
+    tranche: 'R3 · Navigation et Explorer',
+    pages: /^\/(explore|tools|search|hives|me)$/,
+    routes: /^GET \/v1\/(search|tools)$/,
+    tables: null,
+  },
   {
     id: 'accueil',
     name: 'Accueil et liens sortants',
