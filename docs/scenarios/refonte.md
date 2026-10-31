@@ -485,3 +485,176 @@ Pris dans R3 parce qu'ils touchent la navigation (`design-a-reprendre.md`, « Ve
 - Le parcours (`journey`) gagne : passer d'un onglet à l'autre, chercher un projet par un mot sans
   accent, ouvrir le résultat, suivre un auteur depuis Explorer, ouvrir ses réglages par la roue de
   « Moi »
+
+---
+
+## R4 — Le fil et les cartes
+
+Scénario validé par Louis le 31/10/2026 vers 19 h 30, tel que proposé, avec ses trois choix : la
+place de « Tu es à jour », le « × » gardé par le serveur, les deux points des listes (conversation
+1 de R4).
+
+R4 redessine le Fil (planches `R4-Fil`, `R4-Fil-Nuit`, `R4-Fil-Desktop`, `R4-Fil-Desktop-Nuit`,
+`R4-Fil-AJour`, `R4-Fil-Premier`, `R4-Fil-Chargement`, `R4-Fil-Erreur` ; décisions B2 F-Fil1 à
+F-Fil5, F-Fil9 à F-Fil12, F-Fil14, et le mouvement de B11) : la nouvelle carte, les dates
+relatives dans toute l'appli, les nouveautés avec les visages des auteurs, « Tu es à jour », le
+premier lancement avec « Proches à suivre », les colonnes sur ordinateur, et trois mouvements (la
+carte qui devient la page, la lumière qui suit le défilement, l'inclinaison des cartes). Côté
+API : le total des réactions dans le résumé d'un projet, la date de la dernière lecture du fil,
+et les proches à suivre. Relectures : sécurité (les suggestions ne montrent rien de privé ni de
+bloqué), juridique (la date de lecture et les suggestions écartées sont des données personnelles).
+
+Hors de R4, et où ça va :
+- le sélecteur « Tout · Famille · Amis du jeudi », « Tes ruches » dans la colonne de droite, et
+  l'invitation à rejoindre une ruche au premier lancement : R10, qui crée les ruches ;
+- l'étiquette de catégorie posée sur la photo (« Cuisine ») : R6, qui crée les catégories ;
+- le repère « Mis à jour · v1.2 » sur la carte : R7 ;
+- les réactions elles-mêmes (la capsule, « Waggle ! ») : R5a, sur la page projet. La carte ne
+  montre que leur total.
+
+### La carte du fil (F-Fil1, F-Fil2, planches `R4-Fil`, `R4-Fil-Desktop`)
+
+**Ce qu'elle montre**
+- Étant donné un nouveau projet dans le fil d'un membre
+- Alors sa carte montre la photo du projet bord à bord, aux coins arrondis
+- Et, posé en bas de la photo, un panneau de verre porte :
+  - la photo et le nom de l'auteur, et à droite la date relative ;
+  - le titre du projet et son accroche (deux lignes au plus) ;
+  - « Tester ↗ » en miel si le projet a un lien de démo, puis la pastille de son statut ;
+  - à droite, l'étincelle et le total de ses réactions (« ✦ 49 »), un nombre sans noms
+- Et un projet sans photo garde la tuile à l'initiale d'aujourd'hui, à la même taille
+- Et un projet sans réaction ne montre pas de total (pas de « ✦ 0 »)
+- Et le lecteur d'écran lit « 49 réactions », pas le symbole
+
+**Ce qu'on y touche**
+- Quand il touche la carte (la photo, le titre, l'accroche)
+- Alors la page du projet s'ouvre
+- Quand il touche « Tester ↗ »
+- Alors la démo s'ouvre par la page d'avertissement des liens externes, comme dans Explorer, et
+  « Tester » est annoncé comme un site externe
+- Quand il touche le nom ou la photo de l'auteur
+- Alors la page de l'auteur s'ouvre
+
+**Les notes des projets suivis**
+- Une note garde sa carte d'aujourd'hui (« Note de Léa sur Carnet de cafés »), redessinée avec le
+  même verre et la date relative
+
+### Les dates relatives (F-Fil3), partout dans l'appli
+
+- Étant donné une date affichée dans l'appli (fil, Explorer, page projet, notes, commentaires,
+  Activité, modération)
+- Alors elle se lit « à l'instant », « il y a 5 min », « il y a 2 h », « hier », puis le jour
+  (« mardi ») jusqu'à 7 jours
+- Et au-delà, la date courte (« 12 oct. »), avec l'année si ce n'est pas l'année en cours
+  (« 12 oct. 2025 »)
+- Et l'heure est celle de Paris, comme aujourd'hui, et la langue celle de l'appli (« 2 h ago »,
+  « Tuesday », « Oct 12 »)
+- Et sur le web, la page pré-rendue n'affiche la date relative qu'une fois le navigateur connu
+  (pas d'écart signalé par React)
+- Et la date complète reste lisible au survol sur ordinateur et par le lecteur d'écran
+
+### Les nouveautés (F-Fil4, F-Fil14)
+
+- Étant donné un membre qui lit son fil depuis un moment
+- Quand de nouveaux éléments arrivent chez ceux qu'il suit
+- Alors un bouton de verre apparaît en haut du fil, avec les photos de leurs auteurs (trois au
+  plus) et un texte qui s'adapte : « 2 nouveaux projets », « 1 nouvelle note », ou
+  « 3 nouveautés » quand il y a des deux
+- Et sur ordinateur, ce bouton est à côté du titre « Fil »
+- Quand il le touche
+- Alors le fil remonte en haut et les nouvelles cartes tombent en place
+- Et avec « Réduire les animations », elles apparaissent en fondu
+- Et le lecteur d'écran annonce l'arrivée des nouveautés une fois, sans voler le focus
+
+### « Tu es à jour » (F-Fil5, planche `R4-Fil-AJour`)
+
+- Étant donné un membre qui a déjà ouvert son fil
+- Quand il fait défiler les éléments arrivés depuis sa dernière visite et arrive au premier qu'il
+  a déjà vu
+- Alors la sphère de miel s'affiche, avec la mascotte endormie, « Tu es à jour », « Tu as tout vu
+  depuis ta dernière visite », le bouton « Explorer d'autres projets » (vers l'onglet Explorer)
+  et « Les nouveaux projets s'annonceront en haut du fil »
+- Et les éléments plus anciens suivent dessous, comme aujourd'hui, par pages
+- Et si rien n'est arrivé depuis sa dernière visite, la sphère est en haut du fil
+- Et si le fil se termine sans élément déjà vu, la sphère est à la fin
+- Et l'appli retient seulement la date de la dernière lecture du fil, jamais ce qu'il a lu une par
+  une : la date avance quand il ouvre le fil
+- Et le miel de la sphère ondule doucement ; avec « Réduire les animations », il reste immobile
+
+### Le premier lancement et « Proches à suivre » (F-Fil9, F-Fil10, planche `R4-Fil-Premier`)
+
+**Un membre qui ne suit personne**
+- Étant donné un membre qui ne suit encore personne
+- Alors le fil montre la mascotte, « Bonjour Inès ! », « Ton fil t'attend » et « Suis des proches
+  pour voir leurs projets ici. »
+- Et dessous, « Proches à suivre » : jusqu'à cinq membres qui ont publié récemment, chacun avec sa
+  photo, son nom, son dernier projet public (vignette et titre) et « Suivre » sur la ligne
+- Et sous la liste, un encart « Ou publie ton premier projet. Une idée, un essai, ça compte. » avec
+  le bouton « Publier »
+
+**Suivre depuis la liste**
+- Quand il touche « Suivre » sur une ligne
+- Alors il suit ce membre, le bouton dit « Tu suis » avec sa coche, et la ligne reste à sa place
+- Et dès qu'il suit quelqu'un, le fil de cette personne remplace l'accueil au prochain passage
+
+**Écarter une suggestion**
+- Quand il touche « × » sur une ligne (nommé « Ne plus suggérer Léa »)
+- Alors la ligne disparaît et un autre membre prend sa place s'il y en a
+- Et ce membre ne lui est plus suggéré, sur aucun appareil
+
+**Qui est suggéré**
+- Seulement des membres qui ont au moins un projet public, du plus récent au plus ancien
+- Jamais lui-même, ni un membre qu'il suit déjà, ni un membre qu'il a bloqué ou qui l'a bloqué,
+  ni un membre suspendu
+- Le dernier projet montré est toujours public ; jamais un brouillon ni un projet retiré
+
+### Le Fil sur ordinateur (F-Fil11, F-Fil12, F-Fil14, planche `R4-Fil-Desktop`)
+
+- Étant donné un membre sur un écran large
+- Alors le Fil a pour titre « Fil », avec le bouton des nouveautés à côté
+- Et les cartes vont sur deux colonnes, et une colonne à droite porte « Proches à suivre » (trois
+  membres, avec « Suivre ») et « Ils cherchent des testeurs » (vignette, titre, auteur et
+  « Tester »)
+- Et sur un écran moyen, les cartes vont sur une colonne et la colonne de droite reste ; sur
+  téléphone, une seule colonne, sans colonne de droite
+- Et la colonne de droite reste visible quand le fil est vide ou au premier lancement
+
+### Le chargement et l'erreur (planches `R4-Fil-Chargement`, `R4-Fil-Erreur`)
+
+- Pendant le chargement, le fil montre des formes de verre pleines à la place des cartes (l'abeille
+  reste pour le lancement de l'appli)
+- Si le fil ne se charge pas, la mascotte, un message et « Réessayer », aligné à gauche comme les
+  autres états (`StateMessage`)
+
+### Le mouvement (B11)
+
+**La carte qui devient la page**
+- Quand il touche une carte
+- Alors sa photo s'agrandit jusqu'à devenir le haut de la page du projet, et le reste de la page
+  arrive dessous
+- Et au retour, la page se replie dans sa carte
+- Et avec « Réduire les animations », la page apparaît en fondu
+
+**La lumière au défilement** (M6)
+- Pendant qu'il fait défiler le fil, la lumière d'ambiance prend la couleur de la photo de la carte
+  au centre de l'écran, en fondu d'une carte à l'autre
+- Sur téléphone, la version allégée de R1 (la couleur et le fondu, sans reflets)
+- Avec « Réduire les animations », la couleur change toujours, mais sans mouvement de la lumière
+- L'effet s'arrête quand l'appli passe en arrière-plan
+
+**L'inclinaison des cartes** (ordinateur)
+- Quand la souris passe sur une carte, la carte s'incline un peu vers elle et la lumière de son
+  verre suit le pointeur ; elle se remet à plat quand la souris part
+- Rien au toucher ni au clavier ; rien avec « Réduire les animations »
+
+### Venus des listes
+
+Pris dans R4 (choix de Louis, 31/10/2026), parce qu'ils touchent les écrans du fil :
+- les teintes d'`InitialTile`, que « Proches à suivre » montre souvent ;
+- l'écart entre un titre et son sous-titre, que le titre « Fil » reprend.
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) gagne : un nouveau membre voit « Ton fil t'attend », suit un proche
+  depuis « Proches à suivre », retrouve son projet dans le fil avec sa date relative et son total
+  de réactions, touche « Tester », puis revient et voit « Tu es à jour »
