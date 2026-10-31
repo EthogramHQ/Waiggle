@@ -87,7 +87,15 @@ const mockFollowing = (
   options?: { hasNextPage?: boolean; isFetchingNextPage?: boolean },
 ) => {
   const result = infiniteResult<FollowingFeedPage>(
-    [{ items: [fromLea, fromMax], nextCursor: null, followsAnyone: true, ...page }],
+    [
+      {
+        items: [fromLea, fromMax],
+        nextCursor: null,
+        followsAnyone: true,
+        lastReadAt: null,
+        ...page,
+      },
+    ],
     options,
   )
   jest
@@ -214,26 +222,27 @@ describe('the « following » feed on the home screen', () => {
     })
   })
 
-  // R3 : le fil vide mène à l'onglet Explorer (/explore), qui a repris « Découvrir ».
-  it('invites a member who follows nobody to explore projects', async () => {
+  // R4 (F-Fil9, scénario validé le 31/10/2026) : un membre qui ne suit personne voit le premier
+  // lancement et « Proches à suivre », plus le bouton vers Explorer de R3.
+  it('welcomes a member who follows nobody with « Ton fil t’attend » and people to follow', async () => {
     mockFollowing({ items: [], followsAnyone: false })
     await renderMemberHome()
 
-    expect(screen.getByText('Tu ne suis personne pour l’instant')).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Explorer les projets' }))
-
-    expect(mockPush).toHaveBeenCalledWith('/explore')
+    expect(screen.getByText('Ton fil t’attend')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Proches à suivre' })).toBeTruthy()
+    expect(screen.queryByText('Tu ne suis personne pour l’instant')).toBeNull()
   })
 
+  // R4 (F-Fil5) : un fil vide et fini pose « Tu es à jour », dont le bouton secondaire mène à
+  // Explorer (jur-J9) ; au premier passage, « Tu as tout vu. » (jur-J1).
   it('says when the people followed have published nothing yet, and leads to « explore »', async () => {
     mockFollowing({ items: [], followsAnyone: true })
     await renderMemberHome()
 
-    expect(
-      screen.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.'),
-    ).toBeTruthy()
-    expect(screen.queryByText('Tu ne suis personne pour l’instant')).toBeNull()
-    await fireEvent.press(screen.getByRole('button', { name: 'Explorer les projets' }))
+    expect(screen.getByRole('header', { name: 'Tu es à jour' })).toBeTruthy()
+    expect(screen.getByText('Tu as tout vu.')).toBeTruthy()
+    expect(screen.queryByText('Ton fil t’attend')).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Explorer d’autres projets' }))
     expect(mockPush).toHaveBeenCalledWith('/explore')
   })
 

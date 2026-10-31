@@ -147,7 +147,12 @@ describe('the « following » feed', () => {
   it('says that a member follows nobody, and shows nothing', async () => {
     await publish(lea)
 
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
   })
 
   it('shows the public projects of the members followed, newest first, and nobody else’s', async () => {
@@ -174,7 +179,12 @@ describe('the « following » feed', () => {
     expect((await send('POST', `/v1/projects/${project.id}/follow`, max)).status).toBe(204)
 
     // Suivre un projet fera venir ses notes (tranche 4b), pas les nouveaux projets de l'autrice.
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: true })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: true,
+      lastReadAt: null,
+    })
   })
 
   it('never shows a private project, even from a member followed', async () => {
@@ -192,7 +202,12 @@ describe('the « following » feed', () => {
 
     await unfollowMember(leaId, max)
 
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
   })
 
   it('reveals nothing about a followed project gone private: the same page as when it is deleted', async () => {
@@ -207,7 +222,12 @@ describe('the « following » feed', () => {
     const afterDeletion = await readFollowing(max)
 
     expect(whilePrivate).toEqual(afterDeletion)
-    expect(whilePrivate).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(whilePrivate).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
   })
 })
 
@@ -400,7 +420,12 @@ describe('a deleted account in the feeds', () => {
     expect(res.status).toBe(200)
 
     // Max ne suivait que Léa : il ne suit plus personne, et ne voit plus ses projets nulle part.
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
     expect(ids(await readDiscover(max))).toEqual([fromZoe.id])
   })
 })
@@ -508,7 +533,12 @@ describe('the notes of followed projects in the « following » feed', () => {
 
     expect((await send('DELETE', `/v1/projects/${recipes.id}/follow`, max)).status).toBe(204)
 
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
   })
 
   it('removes a deleted note from the feed', async () => {
@@ -532,7 +562,12 @@ describe('the notes of followed projects in the « following » feed', () => {
 
     await setVisibility(lea, recipes.id, 'private')
     // Comme s'il avait été supprimé : rien ne trahit qu'il existe encore (voir les tests 4a).
-    expect(await readFollowing(max)).toEqual({ items: [], nextCursor: null, followsAnyone: false })
+    expect(await readFollowing(max)).toEqual({
+      items: [],
+      nextCursor: null,
+      followsAnyone: false,
+      lastReadAt: null,
+    })
 
     await setVisibility(lea, recipes.id, 'public')
     const after = await readFollowing(max)

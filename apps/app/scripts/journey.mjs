@@ -217,7 +217,7 @@ const signUp = async (someone, name, { resend = false } = {}) => {
   const { page } = someone
   await open(page, `${appUrl}/sign-up`)
   await page.getByLabel('Nom affiché', { exact: true }).fill(name)
-  await page.getByLabel('Adresse e-mail').fill(email)
+  await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)
   // R2 : sur ordinateur, « Créer un compte » est l'onglet ; le bouton dit « Créer mon compte ».
@@ -228,10 +228,10 @@ const signUp = async (someone, name, { resend = false } = {}) => {
   if (resend) {
     // Le premier e-mail est arrivé : on compte les e-mails reçus, puis on demande le suivant.
     const received = mailsTo(email).length
-    await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
+    await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
     // La phrase reste vraie dans les cas que l'API cache (relecture juridique de R2, B1).
     await page
-      .getByText('Si cette adresse attend sa vérification, un nouvel e-mail vient de partir.', {
+      .getByText('Si cette adresse attend sa vérification, un nouvel e‑mail vient de partir.', {
         exact: true,
       })
       .waitFor()
@@ -248,7 +248,7 @@ const signUp = async (someone, name, { resend = false } = {}) => {
 const signIn = async (someone, email, secret) => {
   const { page } = someone
   await open(page, `${appUrl}/sign-in`)
-  await page.getByLabel('Adresse e-mail').fill(email)
+  await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(secret)
   await page.getByRole('button', { name: 'Me connecter' }).click()
   await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
@@ -365,14 +365,14 @@ try {
   // (sa vérification). Léa les ouvre dans son navigateur, où elle est connectée : elle le reste. R2
   // (décision D1) : le second lien n'aboutit d'ailleurs que dans sa session.
   step(
-    'Léa change d’adresse e-mail (rubrique « Compte ») : un lien à l’ancienne, puis à la nouvelle',
+    'Léa change d’adresse e‑mail (rubrique « Compte ») : un lien à l’ancienne, puis à la nouvelle',
   )
   const newEmail = `lea-nouvelle-${randomBytes(4).toString('hex')}@example.com`
   await openSettings(lea, 'Compte', '/settings/account')
   // Une ligne-lien, dont le nom lu dit l'action puis l'adresse actuelle.
-  await lea.page.getByRole('link', { name: /^Changer d.adresse e-mail/ }).click()
+  await lea.page.getByRole('link', { name: /^Changer d.adresse e‑mail/ }).click()
   await lea.page.waitForURL((url) => url.pathname === '/settings/account/email')
-  await lea.page.getByLabel('Nouvelle adresse e-mail').fill(newEmail)
+  await lea.page.getByLabel('Nouvelle adresse e‑mail').fill(newEmail)
   await lea.page.getByLabel('Confirme avec ton mot de passe').fill(password)
   await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
   await lea.page.getByText('Regarde ta boîte mail actuelle').waitFor()
@@ -390,7 +390,7 @@ try {
   await lea.page.getByText(newEmail, { exact: false }).first().waitFor()
   const doneUrl = lea.page.url()
   expectEqual(
-    'adresse e-mail absente de l’URL',
+    'adresse e‑mail absente de l’URL',
     doneUrl.includes(newEmail) || doneUrl.includes(encodeURIComponent(newEmail)),
     false,
   )
@@ -413,10 +413,10 @@ try {
   await lea.page.getByRole('button', { name: 'Me déconnecter' }).click()
   await lea.page.waitForURL((url) => url.pathname === '/')
   await open(lea.page, `${appUrl}/sign-in`)
-  await lea.page.getByLabel('Adresse e-mail').fill(leaSignUp.email)
+  await lea.page.getByLabel('Adresse e‑mail').fill(leaSignUp.email)
   await lea.page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await lea.page.getByRole('button', { name: 'Me connecter' }).click()
-  await lea.page.getByText('Adresse e-mail ou mot de passe incorrect.').waitFor()
+  await lea.page.getByText('Adresse e‑mail ou mot de passe incorrect.').waitFor()
   console.log('  ok : l’ancienne adresse est refusée')
 
   // Tranche R2 : « Mot de passe oublié ? », l'adresse, puis le lien reçu (lu dans le journal de
@@ -426,12 +426,12 @@ try {
   await lea.page.waitForURL((url) => url.pathname === '/forgot-password')
   // Par le rôle : sous Expo Router web, « Se connecter » reste dans la page, cachée, avec son
   // propre champ « Adresse e-mail » (getByLabel trouverait les deux ; getByRole ignore le caché).
-  await lea.page.getByRole('textbox', { name: 'Adresse e-mail' }).fill(newEmail)
+  await lea.page.getByRole('textbox', { name: 'Adresse e‑mail' }).fill(newEmail)
   // On compte les e-mails déjà reçus à cette adresse : le lien attendu est dans le suivant.
   const mailsBeforeReset = mailsTo(newEmail).length
   await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
   await lea.page
-    .getByText('Si un compte existe pour cette adresse, un e-mail vient de partir.')
+    .getByText('Si un compte existe pour cette adresse, un e‑mail vient de partir.')
     .waitFor()
   await open(
     lea.page,
@@ -450,7 +450,7 @@ try {
     async () => (await statusFor(leaPhone, meUrl)) === 401,
   )
   console.log('  ok : la session du téléphone, ouverte avant, est coupée (401)')
-  await lea.page.getByLabel('Adresse e-mail').fill(newEmail)
+  await lea.page.getByLabel('Adresse e‑mail').fill(newEmail)
   await lea.page.getByLabel('Mot de passe', { exact: true }).fill(passwordAfterReset)
   await lea.page.getByRole('button', { name: 'Me connecter' }).click()
   await lea.page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))

@@ -255,6 +255,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'text', on: 'sheet', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
   { text: 'onHoney', on: 'honeyPressed', min: 4.5 },
+  // « Tu es à jour » (R4, ui/UpToDate.tsx) : un texte posé sur la sphère de miel l'est à l'encre,
+  // sur son cœur clair (honeyLight) ou sur le miel, jour et nuit. Au bord de la sphère, presque noir
+  // la nuit, aucun texte : là, il passe par le verre (`panel`, mesuré sur le miel et sur le noir).
+  { text: 'onHoney', on: 'honeyLight', min: 4.5 },
   { text: 'statusText', on: 'honeySoft', min: 4.5 },
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },

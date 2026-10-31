@@ -22,6 +22,7 @@ const summary: ProjectSummary = {
   portraitCover: null,
   createdAt: '2026-10-19T08:00:00.000Z',
   updatedAt: '2026-10-19T08:00:00.000Z',
+  reactionTotal: 0,
 }
 
 /** Un élément du fil, publié à l'heure donnée (« 09 » : 9 h). */
@@ -40,7 +41,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 const headIs = (items: FeedItem[], nextCursor: string | null = null) =>
   jest.mocked(request).mockResolvedValue({
     ok: true,
-    data: { items, nextCursor, followsAnyone: true },
+    data: { items, nextCursor, followsAnyone: true, lastReadAt: null },
   })
 
 /**
@@ -50,7 +51,10 @@ const headIs = (items: FeedItem[], nextCursor: string | null = null) =>
 const shown = (kind: 'following' | 'discover', testers: boolean, items: FeedItem[]) =>
   client.setQueryData(
     ['feed', kind, testers],
-    { pages: [{ items, nextCursor: null, followsAnyone: true }], pageParams: [undefined] },
+    {
+      pages: [{ items, nextCursor: null, followsAnyone: true, lastReadAt: null }],
+      pageParams: [undefined],
+    },
     { updatedAt: Date.now() - 120_000 },
   )
 

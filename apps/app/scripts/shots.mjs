@@ -409,8 +409,13 @@ const followingItems = [
 // feed: 'end' : le fil tient en une page, son bas dit « Tu es à jour » (R1, le miel vif local).
 const followingFeed = (feed) =>
   feed === 'nobody'
-    ? { items: [], nextCursor: null, followsAnyone: false }
-    : { items: followingItems, nextCursor: feed === 'end' ? null : 'suite', followsAnyone: true }
+    ? { items: [], nextCursor: null, followsAnyone: false, lastReadAt: null }
+    : {
+        items: followingItems,
+        nextCursor: feed === 'end' ? null : 'suite',
+        followsAnyone: true,
+        lastReadAt: null,
+      }
 
 // Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son
 // identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
@@ -1216,7 +1221,7 @@ const pages = [
           body: JSON.stringify({ code: 'TOO_MANY_REQUESTS', message: '' }),
         }),
       )
-      await page.getByLabel('Adresse e-mail').fill('ines.haddad@exemple.fr')
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@exemple.fr')
       await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
       await page.getByRole('button', { name: 'Me connecter' }).click()
       // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
@@ -1243,8 +1248,8 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await pendingEmail('ines.haddad@gmail.com')(page)
-      await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
-      await page.getByText(/nouvel e-mail vient de partir/).waitFor()
+      await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
+      await page.getByText(/nouvel e‑mail vient de partir/).waitFor()
     },
   },
   // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le
@@ -1255,7 +1260,7 @@ const pages = [
     path: '/forgot-password',
     signedIn: false,
     prepare: async (page) => {
-      await page.getByLabel('Adresse e-mail').fill('ines.haddad@gmail.com')
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@gmail.com')
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText(/Si un compte existe pour cette adresse/).waitFor()
     },
@@ -1375,7 +1380,7 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(changeEmailShot.password)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Regarde ta boîte mail actuelle').waitFor()
@@ -1387,7 +1392,7 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(wrongPasswordShot)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Mot de passe incorrect.').waitFor()
@@ -1457,7 +1462,7 @@ const pages = [
     fullPage: true,
     prepare: async (page) => {
       await page
-        .getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+        .getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' })
         .click()
       await page.getByText('Réglage enregistré.').waitFor()
     },
@@ -1718,12 +1723,12 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await page.getByRole('button', { name: 'Confirmer' }).click()
-      await page.getByText(/tu ne recevras plus d’e-mail quand on te mentionne/).waitFor()
+      await page.getByText(/tu ne recevras plus d’e‑mail quand on te mentionne/).waitFor()
       // « Tout couper » ignore les appuis des 600 ms qui suivent la confirmation (la seconde tape
       // d'une double tape) : on appuie comme un membre qui a lu le message.
       await page.waitForTimeout(700)
       await page.getByRole('button', { name: 'Tout couper' }).click()
-      await page.getByText(/plus aucun e-mail de notification/).waitFor()
+      await page.getByText(/plus aucun e‑mail de notification/).waitFor()
     },
   },
   {

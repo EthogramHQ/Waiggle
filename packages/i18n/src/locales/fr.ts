@@ -64,7 +64,7 @@ export const fr = {
       // R3 (relecture juridique, C2) : on choisit ici son nom, qui sert à être trouvé.
       nameHint:
         'Les membres connectés pourront te trouver par ce nom. Ton @pseudo en sera tiré ; tu pourras le changer dans Mon profil.',
-      email: 'Adresse e-mail',
+      email: 'Adresse e‑mail',
       password: 'Mot de passe',
       passwordHint: 'Au moins {{min}} caractères.',
       inviteCode: 'Code d’invitation',
@@ -108,7 +108,7 @@ export const fr = {
       intro: 'Indique ton adresse : nous t’envoyons un lien pour choisir un nouveau mot de passe.',
       submit: 'Envoyer le lien',
       sentTitle: 'C’est envoyé',
-      sent: 'Si un compte existe pour cette adresse, un e-mail vient de partir.',
+      sent: 'Si un compte existe pour cette adresse, un e‑mail vient de partir.',
       sentExpires: 'Le lien est valable une heure.',
       // R2 (relecture juridique, C2) : le quota se dit, sans dire si un compte existe.
       sentLimit: 'Trois liens par heure au plus : le dernier reçu reste valable.',
@@ -132,8 +132,8 @@ export const fr = {
     },
     checkEmail: {
       title: 'Vérifie ta boîte mail',
-      body: 'Un e-mail part vers {{email}}. Ouvre le lien qu’il contient pour activer ton compte : la connexion se fait directement.',
-      bodyNoEmail: 'Nous t’avons envoyé un lien par e-mail. Clique dessus pour activer ton compte.',
+      body: 'Un e‑mail part vers {{email}}. Ouvre le lien qu’il contient pour activer ton compte : la connexion se fait directement.',
+      bodyNoEmail: 'Nous t’avons envoyé un lien par e‑mail. Clique dessus pour activer ton compte.',
       // R2 (D4, relecture juridique B1) : après une correction d'adresse, rien n'affirme l'envoi.
       bodyChanged:
         'Si {{email}} n’est pas déjà utilisée, un lien d’activation vient d’y partir. Ouvre-le pour activer ton compte : la connexion se fait directement.',
@@ -143,15 +143,15 @@ export const fr = {
       back: 'Retour à la connexion',
       // R2 : renvoyer le lien, ouvrir sa messagerie, corriger une faute de frappe dans l'adresse.
       openMailbox: 'Ouvrir ma messagerie',
-      resend: 'Renvoyer l’e-mail',
+      resend: 'Renvoyer l’e‑mail',
       // La même phrase que l'adresse ait un compte ou non.
-      resent: 'Si cette adresse attend sa vérification, un nouvel e-mail vient de partir.',
-      noneReceived: 'Rien reçu ? Regarde dans les indésirables, ou renvoie l’e-mail.',
+      resent: 'Si cette adresse attend sa vérification, un nouvel e‑mail vient de partir.',
+      noneReceived: 'Rien reçu ? Regarde dans les indésirables, ou renvoie l’e‑mail.',
       change: {
         title: 'Changer d’adresse',
         intro:
           'Une faute de frappe ? Indique la bonne adresse et ton mot de passe : un nouveau lien y partira, et l’ancien ne marchera plus.',
-        newEmail: 'Nouvelle adresse e-mail',
+        newEmail: 'Nouvelle adresse e‑mail',
         password: 'Ton mot de passe',
         submit: 'Envoyer le lien',
         // Décision D4 : on ne révèle pas qui a un compte.
@@ -166,17 +166,17 @@ export const fr = {
     },
     errors: {
       nameRequired: 'Indique un prénom ou un pseudo.',
-      invalidEmail: 'Cette adresse e-mail n’est pas valide.',
+      invalidEmail: 'Cette adresse e‑mail n’est pas valide.',
       passwordTooShort: 'Le mot de passe doit faire au moins {{min}} caractères.',
       passwordTooLong: 'Le mot de passe doit faire au plus {{max}} caractères.',
-      invalidCredentials: 'Adresse e-mail ou mot de passe incorrect.',
+      invalidCredentials: 'Adresse e‑mail ou mot de passe incorrect.',
       emailNotVerified:
-        'Ton adresse n’est pas encore vérifiée : nous venons de te renvoyer le lien par e-mail.',
+        'Ton adresse n’est pas encore vérifiée : nous venons de te renvoyer le lien par e‑mail.',
       // R2 (jur-14) : sans « tu », l'adresse IP est partagée ; l'heure du prochain essai suit (retryAt).
       tooManyAttempts: 'Trop d’essais pour l’instant.',
       inviteRequired: 'Indique le code d’invitation que tu as reçu.',
       // R2 : à l'envoi, chaque champ vide dit ce qui manque.
-      emailRequired: 'Indique ton adresse e-mail.',
+      emailRequired: 'Indique ton adresse e‑mail.',
       passwordRequired: 'Choisis un mot de passe.',
       // R2 : le lien du mot de passe oublié a expiré, a déjà servi ou est abîmé (INVALID_TOKEN).
       invalidToken: 'Ce lien ne marche plus.',
@@ -201,7 +201,7 @@ export const fr = {
       'La déconnexion n’a pas abouti : tu es peut-être encore connecté. Vérifie ta connexion et réessaie.',
     language: {
       title: 'Langue',
-      hint: 'Tes e-mails te sont aussi envoyés dans cette langue.',
+      hint: 'Tes e‑mails te sont aussi envoyés dans cette langue.',
     },
     appearance: {
       title: 'Apparence',
@@ -211,7 +211,7 @@ export const fr = {
       hint: 'Sur cet appareil seulement. « Automatique » suit le réglage de ton appareil.',
     },
     // Les réglages d'e-mail vivent au profil : « Mon compte » y mène (design, 24/10/2026).
-    emails: { title: 'E-mails', row: 'Choisir les e-mails reçus' },
+    emails: { title: 'E‑mails', row: 'Choisir les e‑mails reçus' },
     data: { title: 'Mes données' },
     safety: { title: 'Sécurité' },
     export: {
@@ -229,9 +229,9 @@ export const fr = {
     // Le profil ne se charge pas (réseau en panne) : la page le dit au lieu de rester muette.
     loadError: 'Impossible de charger ton compte. Vérifie ta connexion et réessaie.',
     email: {
-      label: 'Adresse e-mail',
+      label: 'Adresse e‑mail',
       // Le nom lu de la ligne : l'action, puis l'adresse affichée (sinon le lecteur d'écran la tait).
-      spoken: 'Changer d’adresse e-mail : {{email}}',
+      spoken: 'Changer d’adresse e‑mail : {{email}}',
     },
     // Tranche « adresse » : la page où l'on demande le changement (deux liens à suivre).
     changeEmail: {
@@ -240,10 +240,10 @@ export const fr = {
       title: 'Changer d’adresse e‑mail',
       current: 'Ton adresse actuelle : {{email}}',
       intro:
-        'Ta nouvelle adresse servira à te connecter et à recevoir les e-mails de {{appName}}. Les autres membres ne la voient pas.',
+        'Ta nouvelle adresse servira à te connecter et à recevoir les e‑mails de {{appName}}. Les autres membres ne la voient pas.',
       steps:
         'Elle ne change qu’après deux confirmations : un lien envoyé à ton adresse actuelle, puis un lien envoyé à la nouvelle.',
-      newEmail: 'Nouvelle adresse e-mail',
+      newEmail: 'Nouvelle adresse e‑mail',
       password: 'Confirme avec ton mot de passe',
       submit: 'Envoyer le lien',
       sending: 'Envoi…',
@@ -337,12 +337,12 @@ export const fr = {
     // Ce que contient chaque rubrique, sous son nom dans la liste du téléphone.
     hints: {
       profile: 'Photo, nom, pseudo et présentation',
-      notifications: 'Les e-mails que tu reçois',
-      language: 'Celle de l’appli et de tes e-mails',
+      notifications: 'Les e‑mails que tu reçois',
+      language: 'Celle de l’appli et de tes e‑mails',
       appearance: 'Jour, nuit ou automatique',
       data: 'Télécharger tes données',
       security: 'Mot de passe, membres bloqués',
-      account: 'Adresse e-mail, déconnexion, suppression',
+      account: 'Adresse e‑mail, déconnexion, suppression',
       about: 'Le code source et sa licence',
       moderation: 'Les signalements à traiter',
     },
@@ -387,17 +387,17 @@ export const fr = {
     saved: 'Profil enregistré.',
     // Les réglages d'e-mail (tranche 6c) : chacun s'enregistre dès qu'on le touche.
     emails: {
-      title: 'E-mails',
+      title: 'E‑mails',
       weeklyRecap: 'Le récap de la semaine',
       weeklyRecapHint: 'Le lundi matin, seulement s’il y a du nouveau.',
-      mentionEmails: 'Un e-mail quand on me mentionne ou me répond',
+      mentionEmails: 'Un e‑mail quand on me mentionne ou me répond',
       mentionEmailsHint: 'Un quart d’heure après, si tu ne l’as pas déjà vu. Un par heure au plus.',
       saved: 'Réglage enregistré.',
       accountEmails:
-        'Les e-mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
+        'Les e‑mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
       // Ces réglages ne passent pas par « Enregistrer » : la phrase le dit (relecture de design, 6c).
       instant: 'Chaque réglage s’enregistre dès que tu le touches.',
-      loadError: 'Tes réglages d’e-mail n’ont pas pu se charger.',
+      loadError: 'Tes réglages d’e‑mail n’ont pas pu se charger.',
     },
     savedHandle: 'Profil enregistré. @{{former}} te reste réservé {{days}} jours.',
     errors: {
@@ -612,6 +612,8 @@ export const fr = {
     },
     page: {
       published: 'publié le {{date}}',
+      /** R4 : la date relative après le verbe (« publié hier », « publié le 12 oct. » : jur-J2). */
+      publishedWhen: 'publié {{when}}',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       private: 'Privé : visible par toi seulement',
@@ -739,6 +741,8 @@ export const fr = {
       empty: 'Tu n’as bloqué personne.',
       emptyHint: 'Pour bloquer un membre, ouvre le menu « … » de sa page.',
       blockedOn: 'Bloqué le {{date}}',
+      /** R4 : la date relative après le verbe (« Bloqué hier », « Bloqué le 12 oct. » : jur-J2). */
+      blockedWhen: 'Bloqué {{when}}',
       more: 'Afficher la suite',
       end: 'C’est tout',
       loadError: 'La liste n’a pas pu se charger.',
@@ -877,7 +881,7 @@ export const fr = {
     suspend: {
       title: 'Suspendre le compte de {{name}}',
       intro:
-        'Le compte passe en lecture seule : la personne lit tout, peut supprimer ses contenus, mais ne publie plus et n’interagit plus. Elle est prévenue par e-mail et par notification, avec ton explication.',
+        'Le compte passe en lecture seule : la personne lit tout, peut supprimer ses contenus, mais ne publie plus et n’interagit plus. Elle est prévenue par e‑mail et par notification, avec ton explication.',
       durationLabel: 'Durée',
       // Relecture juridique (J9) : les faits et la règle, jamais un jugement sur la personne.
       explanationHint:
@@ -1126,21 +1130,21 @@ export const fr = {
   // La page ouverte depuis le lien « Ne plus recevoir… » d'un e-mail (tranche 6c), sans connexion.
   // Ouvrir la page ne change rien : seul « Confirmer » coupe les e-mails. Aucune donnée du membre.
   unsubscribe: {
-    title: 'Tes e-mails',
+    title: 'Tes e‑mails',
     askRecap: 'Ne plus recevoir le récap de la semaine ?',
-    askMentions: 'Ne plus recevoir les e-mails de mentions et de réponses ?',
+    askMentions: 'Ne plus recevoir les e‑mails de mentions et de réponses ?',
     confirm: 'Confirmer',
-    keep: 'Garder mes e-mails',
+    keep: 'Garder mes e‑mails',
     doneRecap: 'C’est fait : tu ne recevras plus le récap de la semaine.',
-    doneMentions: 'C’est fait : tu ne recevras plus d’e-mail quand on te mentionne ou te répond.',
+    doneMentions: 'C’est fait : tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.',
     allOff: 'Tout couper',
-    allDone: 'C’est fait : tu ne recevras plus aucun e-mail de notification.',
+    allDone: 'C’est fait : tu ne recevras plus aucun e‑mail de notification.',
     accountEmails:
-      'Les e-mails liés à ton compte, comme la vérification de ton adresse, continuent.',
-    manage: 'Gérer mes e-mails',
+      'Les e‑mails liés à ton compte, comme la vérification de ton adresse, continuent.',
+    manage: 'Gérer mes e‑mails',
     invalidTitle: 'Lien invalide',
     invalid:
-      'Ce lien ne permet pas de te désinscrire. Connecte-toi pour gérer tes e-mails dans Mon profil.',
+      'Ce lien ne permet pas de te désinscrire. Connecte-toi pour gérer tes e‑mails dans Mon profil.',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
@@ -1156,7 +1160,7 @@ export const fr = {
     // Les e-mails de notification (tranche 6c). Un membre y est nommé avec son pseudo ; aucun
     // texte d'un autre membre dans l'objet (visible sur un écran verrouillé). Chaque e-mail dit
     // pourquoi on le reçoit, et son lien de désinscription nomme ce qu'il coupe.
-    manage: 'Gérer mes e-mails',
+    manage: 'Gérer mes e‑mails',
     // Ce qui remplace une adresse écrite par un membre (`defangLinks`), dans la langue de l'e-mail.
     link: '[lien]',
     recap: {
@@ -1187,8 +1191,8 @@ export const fr = {
       mention: '{{name}} (@{{handle}}) parle de toi dans un commentaire sur « {{title}} » :',
       reply: '{{name}} (@{{handle}}) a répondu à ton commentaire sur « {{title}} » :',
       button: 'Voir mes notifications',
-      reason: 'Tu reçois cet e-mail parce que tu as activé les e-mails de mentions et de réponses.',
-      unsubscribe: 'Ne plus recevoir les e-mails de mentions et de réponses',
+      reason: 'Tu reçois cet e‑mail parce que tu as activé les e‑mails de mentions et de réponses.',
+      unsubscribe: 'Ne plus recevoir les e‑mails de mentions et de réponses',
     },
     footer: '{{appName}}, le réseau des projets IA entre proches. Contact : {{contactEmail}}',
     moderationAlert: {
@@ -1199,7 +1203,7 @@ export const fr = {
       body_other: '{{count}} signalements attendent une décision.',
       button: 'Ouvrir la modération',
       reason:
-        'Tu reçois cet e-mail parce que tu es administrateur de {{appName}}. Au plus un par heure.',
+        'Tu reçois cet e‑mail parce que tu es administrateur de {{appName}}. Au plus un par heure.',
     },
     greeting: 'Bonjour {{name}},',
     verify: {
@@ -1231,10 +1235,10 @@ export const fr = {
         'Ce lien est valable {{duration}} et ne sert qu’une fois. Une fois le mot de passe changé, tous tes appareils seront déconnectés.',
       oneHour: 'une heure',
       hours: '{{hours}} heures',
-      ignore: 'Si tu n’as rien demandé, ignore cet e-mail : ton mot de passe ne change pas.',
+      ignore: 'Si tu n’as rien demandé, ignore cet e‑mail : ton mot de passe ne change pas.',
       // Un e-mail de sécurité : il dit pourquoi il arrive, et qu'il arrive toujours (jur-1).
       reason:
-        'Tu reçois cet e-mail parce qu’une demande a été faite sur {{appName}} avec ton adresse. Les e-mails de sécurité du compte arrivent toujours.',
+        'Tu reçois cet e‑mail parce qu’une demande a été faite sur {{appName}} avec ton adresse. Les e‑mails de sécurité du compte arrivent toujours.',
       // La version texte n'a pas de bouton : ce libellé, puis l'adresse du lien en dessous.
       textLink: 'Choisir un nouveau mot de passe :',
     },
@@ -1248,7 +1252,7 @@ export const fr = {
         'Ce n’est pas toi ? Change ton mot de passe tout de suite (Réglages, Sécurité) ou, si tu ne peux plus te connecter, choisis-en un nouveau depuis « Mot de passe oublié ? ». Puis écris-nous à {{contactEmail}}.',
       button: 'Ouvrir mes réglages',
       reason:
-        'Tu reçois cet e-mail parce que le mot de passe de ton compte a changé. Les e-mails de sécurité du compte arrivent toujours.',
+        'Tu reçois cet e‑mail parce que le mot de passe de ton compte a changé. Les e‑mails de sécurité du compte arrivent toujours.',
     },
     // Tranche « adresse » : le premier lien part vers l'ancienne adresse, qui doit donner son accord.
     changeEmail: {
@@ -1333,6 +1337,79 @@ export const fr = {
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',
     newsMany: '{{max}} nouveautés ou plus',
+    // R4 (F-Fil4) : le bouton des nouveautés dit ce qui est arrivé ; « nouveautés » quand il y a
+    // des projets et des notes. Au plafond de la liste, « ou plus » (relecture de l'interface).
+    newProjects_one: '{{count}} nouveau projet',
+    newProjects_other: '{{count}} nouveaux projets',
+    newProjectsMany: '{{max}} nouveaux projets ou plus',
+    newNotes_one: '{{count}} nouvelle note',
+    newNotes_other: '{{count}} nouvelles notes',
+    newNotesMany: '{{max}} nouvelles notes ou plus',
+    newMixed_one: '{{count}} nouveauté',
+    newMixed_other: '{{count}} nouveautés',
+    newMixedMany: '{{max}} nouveautés ou plus',
+    /** Le titre du Fil (R4), posé par `Screen`, avec le bouton des nouveautés à côté sur ordinateur. */
+    title: 'Fil',
+    // R4 (F-Fil5, planche R4-Fil-AJour) : la sphère de miel, avant le premier élément déjà vu.
+    upToDate: {
+      title: 'Tu es à jour',
+      body: 'Tu as tout vu depuis ta dernière visite.',
+      /** Au tout premier passage : il n'y a pas eu de visite avant (relecture juridique jur-J1). */
+      bodyFirst: 'Tu as tout vu.',
+      /** Un bouton secondaire : le message reste « tu peux t'arrêter » (jur-J9). */
+      action: 'Explorer d’autres projets',
+      hint: 'Les nouveautés s’afficheront en haut du fil.',
+    },
+    // R4 (F-Fil9, planche R4-Fil-Premier) : un membre qui ne suit encore personne.
+    firstRun: {
+      hello: 'Bonjour {{name}} !',
+      title: 'Ton fil t’attend',
+      body: 'Suis des proches pour voir leurs projets ici.',
+    },
+    /** Les rubriques de la colonne de droite, sur ordinateur (F-Fil11). */
+    side: {
+      suggestions: 'Proches à suivre',
+      testers: 'Ils cherchent des testeurs',
+    },
+  },
+  // R4 (F-Fil10) : « Proches à suivre ». Aucune preuve sociale sur une ligne (ni « suivi par », ni
+  // nombre d'abonnés : jur-J5). « Suivre » reprend follow.member et follow.memberFollowing.
+  suggestions: {
+    title: 'Proches à suivre',
+    caption: 'Des membres qui ont publié récemment',
+    /** Le nom lu du « × » d'une ligne. */
+    dismiss: 'Ne plus suggérer {{name}}',
+    /** Le texte du bouton une fois le membre suivi, avec sa coche. */
+    following: 'Tu suis',
+    /** Le message après « × », avec « Annuler » pendant 5 secondes (jur-J8, Louis, 31/10/2026). */
+    dismissed: 'Tu ne verras plus {{name}} ici.',
+    undo: 'Annuler',
+    dismissError: 'La suggestion n’a pas pu être retirée. Réessaie.',
+    loadError: 'Les proches à suivre n’ont pas pu se charger.',
+  },
+  // R4 : l'encart en pointillés sous « Proches à suivre », au premier lancement.
+  publishPrompt: {
+    title: 'Ou publie ton premier projet.',
+    body: 'Une idée, un essai, ça compte.',
+    action: 'Publier',
+  },
+  // R4 (F-Fil3) : les dates relatives, à l'heure de Paris. Au-delà de 7 jours, la date courte vient
+  // d'`Intl` (« 12 oct. ») ; le jour de la semaine aussi (« mardi »).
+  dates: {
+    now: 'à l’instant',
+    minutes_one: 'il y a {{count}} min',
+    minutes_other: 'il y a {{count}} min',
+    hours_one: 'il y a {{count}} h',
+    hours_other: 'il y a {{count}} h',
+    yesterday: 'hier',
+    // La forme posée après un verbe (« publié mardi », « publié le 12 oct. » : relecture ui-B2).
+    onDay: '{{day}}',
+    onDate: 'le {{date}}',
+  },
+  // R4 (F-Fil2) : la carte du fil. « ✦ 49 » se lit ainsi ; le symbole n'est pas lu.
+  card: {
+    reactions_one: '{{count}} réaction',
+    reactions_other: '{{count}} réactions',
   },
   follow: {
     follow: 'Suivre',

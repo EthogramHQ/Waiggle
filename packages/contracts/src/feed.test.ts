@@ -24,6 +24,7 @@ const summary = {
   portraitCover: null,
   createdAt: '2026-10-18T08:30:00.000Z',
   updatedAt: '2026-10-18T08:30:00.000Z',
+  reactionTotal: 0,
 }
 const item = { kind: 'project', at: '2026-10-19T09:00:00.000Z', project: summary }
 
@@ -74,7 +75,7 @@ describe('FeedPage', () => {
   })
 
   it('tells a member who follows nobody apart from an empty feed', () => {
-    const page = { items: [], nextCursor: null, followsAnyone: false }
+    const page = { items: [], nextCursor: null, followsAnyone: false, lastReadAt: null }
     expect(FollowingFeedPage.parse(page).followsAnyone).toBe(false)
   })
 })

@@ -73,6 +73,7 @@ export const summaryOf = ({ visuals, ...project }: Project): ProjectSummary => (
   tools: project.tools,
   cover: visuals[0] ?? null,
   demoUrl: project.demoUrl,
+  reactionTotal: 0,
   portraitCover: project.portraitCover,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,

@@ -36,6 +36,9 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   'PUT /v1/members/:id/block',
   'PUT /v1/projects/:id/comments/:commentId/hide',
   'PUT /v1/notifications/seen',
+  // R4 : lire son fil et écarter une suggestion ne touchent que ce qui est à lui, comme « vu ».
+  'PUT /v1/feed/read',
+  'PUT /v1/suggestions/members/:id/dismissed',
   'PATCH /v1/me/email-preferences',
   'PATCH /v1/me',
   'POST /v1/email/unsubscribe',

@@ -263,6 +263,9 @@ export const loadFollowingFeed = async (
         ? encodeCursor({ at: last.at.toISOString(), id: last.id })
         : null,
     followsAnyone: anyone,
+    // R4 : valeur neutre posée au commit du contrat ; la date lue dans feed_state vient avec le
+    // backend de la tranche.
+    lastReadAt: null,
   }
 }
 

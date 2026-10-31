@@ -61,19 +61,19 @@ beforeEach(() => {
 describe('EmailSettings', () => {
   const recap = () => screen.findByRole('switch', { name: 'Le récap de la semaine' })
   const mentions = () =>
-    screen.findByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+    screen.findByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' })
 
   it('shows the two settings, the weekly recap on and the mention e-mails off', async () => {
     await renderWithProviders(<EmailSettings />)
 
-    expect(await screen.findByRole('header', { name: 'E-mails' })).toBeTruthy()
+    expect(await screen.findByRole('header', { name: 'E‑mails' })).toBeTruthy()
     expect(await recap()).toBeChecked()
     expect(await mentions()).not.toBeChecked()
     expect(screen.getByText('Le lundi matin, seulement s’il y a du nouveau.')).toBeTruthy()
     // Les e-mails du compte ne dépendent pas de ces réglages : la section le dit.
     expect(
       screen.getByText(
-        'Les e-mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
+        'Les e‑mails liés à ton compte, comme la vérification de ton adresse, arrivent toujours.',
       ),
     ).toBeTruthy()
   })
@@ -85,7 +85,7 @@ describe('EmailSettings', () => {
     // Le temps que les réglages arrivent de l'API (s'ils s'affichent d'abord avec d'autres valeurs).
     await waitFor(() =>
       expect(
-        screen.getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' }),
+        screen.getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' }),
       ).toBeChecked(),
     )
     expect(await recap()).not.toBeChecked()
@@ -140,7 +140,7 @@ describe('EmailSettings', () => {
 // Tranche 6c, après les relectures de l'interface et du design (commit 9b4172b).
 describe('EmailSettings after the reviews', () => {
   const recapName = 'Le récap de la semaine'
-  const loadError = 'Tes réglages d’e-mail n’ont pas pu se charger.'
+  const loadError = 'Tes réglages d’e‑mail n’ont pas pu se charger.'
 
   /** La première lecture des réglages échoue (`error`), les suivantes passent par le faux serveur. */
   const failFirstRead = (error: 'network' | 'unauthorized') => {
@@ -181,7 +181,7 @@ describe('EmailSettings after the reviews', () => {
 
     const alert = await screen.findByRole('alert')
     const [title, message, toggle] = readingOrder(
-      screen.getByRole('header', { name: 'E-mails' }),
+      screen.getByRole('header', { name: 'E‑mails' }),
       alert,
       screen.getByRole('switch', { name: recapName }),
     )
@@ -215,7 +215,7 @@ describe('EmailSettings after the reviews', () => {
         answer = resolve
       })
     await fireEvent.press(
-      screen.getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' }),
+      screen.getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' }),
     )
 
     expect(screen.getByText('Réglage enregistré.')).toBeTruthy()
@@ -335,7 +335,7 @@ describe('EmailSettings after the reviews', () => {
 
 // Relecture de design globale du 22/10/2026.
 describe('EmailSettings after the global design review', () => {
-  const loadError = 'Tes réglages d’e-mail n’ont pas pu se charger.'
+  const loadError = 'Tes réglages d’e‑mail n’ont pas pu se charger.'
 
   // Une alerte rouge au-dessus du groupe redisait ce que dit la ligne « n'ont pas pu se charger » :
   // la ligne seule dit ce qui manque et pourquoi, une seule fois.

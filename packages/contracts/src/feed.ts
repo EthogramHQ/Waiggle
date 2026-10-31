@@ -79,9 +79,24 @@ export type DiscoverFeedPage = z.infer<typeof DiscoverFeedPage>
 
 /**
  * Une page du fil « Abonnements ». `followsAnyone` permet à l'appli de distinguer un membre qui ne
- * suit personne (« Tu ne suis personne pour l'instant ») d'un fil simplement vide.
+ * suit personne (le premier lancement, « Ton fil t'attend ») d'un fil simplement vide.
+ *
+ * `lastReadAt` (R4) : la date de la dernière lecture du fil retenue par le serveur, **avant** cette
+ * lecture-ci (lire une page ne l'avance jamais : seul PUT /v1/feed/read le fait) ; null si le
+ * membre n'a jamais lu son fil. L'appli pose « Tu es à jour » avant le premier élément arrivé
+ * jusqu'à cette date. C'est la seule trace gardée de ses lectures : aucune liste de ce qu'il a lu.
  */
-export const FollowingFeedPage = FeedPage.extend({ followsAnyone: z.boolean() }).meta({
-  id: 'FollowingFeedPage',
-})
+export const FollowingFeedPage = FeedPage.extend({
+  followsAnyone: z.boolean(),
+  lastReadAt: z.iso.datetime().nullable(),
+}).meta({ id: 'FollowingFeedPage' })
 export type FollowingFeedPage = z.infer<typeof FollowingFeedPage>
+
+/**
+ * Le corps de PUT /v1/feed/read (R4) : le fil est lu jusqu'à `upTo`, le `at` du premier élément
+ * affiché (jamais l'heure de l'appareil). Le serveur ne recule jamais la date, et la borne entre
+ * le 1/1/2026 et son heure à lui : une date hors de ces bornes n'enregistre rien (relecture de
+ * sécurité sec-A2). Réponses : 204 ; 400 (pas une date) ; 401 ; 429.
+ */
+export const FeedReadBody = z.object({ upTo: z.iso.datetime() }).meta({ id: 'FeedReadBody' })
+export type FeedReadBody = z.infer<typeof FeedReadBody>

@@ -7,7 +7,6 @@
 //   externe (comme `TextLink external`), il est posé par-dessus la photo, à côté du lien de la carte
 //   et non dedans.
 import { layout, radii, space } from '@ruche/brand'
-import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View } from 'react-native'
 import { Avatar } from './Avatar'
@@ -16,7 +15,7 @@ import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { Text } from './Text'
-import { TAP_GUARD_MS } from './tapGuard'
+import { useTapGuard } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -44,33 +43,6 @@ const CARD_WIDTH = { compact: layout.sideColumn / 2, medium: layout.sideColumn *
 const COVER_RATIO = { compact: 3 / 4, medium: 3 / 5 }
 // La pastille de l'auteur : deux fois le grand pas d'espacement, sous la taille d'une ligne.
 const AUTHOR_DOT = space.xl
-
-/**
- * Hook : la garde contre la double tape (TAP_GUARD_MS, la même que les fenêtres), commune aux deux
- * liens de la carte. Une page s'ouvre sous le doigt, et la seconde tape l'ouvrirait une deuxième
- * fois (deux pages empilées, deux « Retour ») ; partagée, elle empêche aussi la seconde tape d'un
- * « Tester » de tomber, à côté, sur le lien de la carte. Un `ref` plutôt qu'un état : la seconde
- * tape arrive avant que React ait redessiné, et doit déjà trouver la garde levée.
- */
-function useTapGuard() {
-  const guarded = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Le minuteur s'arrête si la carte quitte l'écran avant la fin de la garde.
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current)
-    },
-    [],
-  )
-  return (action: () => void) => () => {
-    if (guarded.current) return
-    guarded.current = true
-    timer.current = setTimeout(() => {
-      guarded.current = false
-    }, TAP_GUARD_MS)
-    action()
-  }
-}
 
 export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
   const { t } = useTranslation()

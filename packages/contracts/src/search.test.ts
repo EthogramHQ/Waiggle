@@ -213,6 +213,7 @@ describe('SearchResults', () => {
     portraitCover: null,
     createdAt: '2026-10-12T09:00:00.000Z',
     updatedAt: '2026-10-12T09:00:00.000Z',
+    reactionTotal: 0,
     excerpt: null,
   }
   const member = {

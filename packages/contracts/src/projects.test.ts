@@ -170,7 +170,12 @@ describe('Project with its visuals', () => {
   })
 
   it('gives lists the cover and the vertical cover, not the whole gallery', () => {
-    const summary = ProjectSummary.parse({ ...project, cover: visual, portraitCover: null })
+    const summary = ProjectSummary.parse({
+      ...project,
+      cover: visual,
+      portraitCover: null,
+      reactionTotal: 0,
+    })
     expect(summary).toMatchObject({ cover: visual, portraitCover: null })
     expect(summary).not.toHaveProperty('visuals')
   })

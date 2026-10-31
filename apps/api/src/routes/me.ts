@@ -433,6 +433,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         blocks,
         moderation,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
+        // R4 : valeurs neutres posées au commit du contrat ; la lecture du fil et les suggestions
+        // écartées viennent avec le backend de la tranche.
+        feed: { readAt: null },
+        dismissedSuggestions: [],
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({

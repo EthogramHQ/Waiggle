@@ -239,6 +239,9 @@ const toSummary = ({ visuals, ...project }: ProjectBase): ProjectSummary => ({
   portraitCover: project.portraitCover,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
+  // R4 : valeur neutre posée au commit du contrat ; le vrai total (reactionTotalsOf) vient avec
+  // le backend de la tranche.
+  reactionTotal: 0,
 })
 
 /**
