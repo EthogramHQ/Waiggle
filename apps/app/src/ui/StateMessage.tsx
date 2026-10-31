@@ -75,19 +75,24 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
         maxWidth: layout.formWidth,
         alignSelf: 'flex-start',
         alignItems: 'flex-start',
+        gap: space.xl,
       }}
     >
-      <Stack gap="xl" align="start">
-        {kind === 'loading' || !cramped ? (
-          // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
-          // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
-          // revient à « collée au bord gauche ».
-          <View style={{ alignItems: 'flex-start', paddingVertical: space.lg }}>{picture}</View>
-        ) : null}
-        {/* align="stretch" : le titre et le message prennent la largeur du bloc et s'y replient. */}
+      {kind === 'loading' || !cramped ? (
+        // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
+        // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
+        // revient à « collée au bord gauche ».
+        <View style={{ alignItems: 'flex-start', paddingVertical: space.lg }}>{picture}</View>
+      ) : null}
+      {/* Le titre et le message prennent toute la largeur du bloc (alignSelf: 'stretch') et s'y
+          replient. Sans lui, rangés à gauche, ils prendraient la largeur de leur plus long mot :
+          à texte agrandi sur 320 points, le message sortait de l'écran (essai du 31/10/2026). */}
+      <View style={{ alignSelf: 'stretch' }}>
         <Stack gap="sm" align="stretch">
+          {/* breakAnywhere : un mot plus large que l'écran (« introuvable » à 200 % sur 320
+              points) se coupe plutôt que d'être rogné. */}
           {title ? (
-            <Text variant="title2" heading={level}>
+            <Text variant="title2" heading={level} breakAnywhere>
               {title}
             </Text>
           ) : null}
@@ -102,22 +107,22 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
             </Text>
           ) : null}
         </Stack>
-        {/* Les issues gardent leur largeur naturelle, l'une sous l'autre, au bord gauche. */}
-        {actions.length > 0 ? (
-          <Stack gap="md" align="start">
-            {actions.map((action, index) => (
-              <Button
-                key={action.label}
-                label={action.label}
-                // La première issue est la principale ; les suivantes, secondaires.
-                variant={action.variant ?? (index === 0 ? 'primary' : 'secondary')}
-                onPress={action.onPress}
-                loading={action.loading ?? false}
-              />
-            ))}
-          </Stack>
-        ) : null}
-      </Stack>
+      </View>
+      {/* Les issues gardent leur largeur naturelle, l'une sous l'autre, au bord gauche. */}
+      {actions.length > 0 ? (
+        <Stack gap="md" align="start">
+          {actions.map((action, index) => (
+            <Button
+              key={action.label}
+              label={action.label}
+              // La première issue est la principale ; les suivantes, secondaires.
+              variant={action.variant ?? (index === 0 ? 'primary' : 'secondary')}
+              onPress={action.onPress}
+              loading={action.loading ?? false}
+            />
+          ))}
+        </Stack>
+      ) : null}
     </View>
   )
 }
