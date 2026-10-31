@@ -33,7 +33,9 @@ import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
+import { searchRoutes } from './routes/search'
 import { tagRoutes } from './routes/tags'
+import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
@@ -309,6 +311,9 @@ export const createApp = ({
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
   app.route('/', tagRoutes({ db, publicApiUrl }))
+  // La recherche par mots et la liste des outils (tranche R3).
+  app.route('/', searchRoutes({ db, limiter, publicApiUrl }))
+  app.route('/', toolRoutes({ db, limiter }))
   app.route('/', followRoutes({ db, limiter }))
   // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
   app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
