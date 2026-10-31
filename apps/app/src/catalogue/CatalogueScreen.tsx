@@ -74,10 +74,12 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
+import { CardsCatalogue } from './cartes'
 import { LoadingCatalogue } from './chargement'
 import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
+import { ExploreCatalogue } from './explorer'
 import { SheetsCatalogue } from './feuilles'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
@@ -89,6 +91,8 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
+import { NavigationCatalogue } from './navigation'
+import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
@@ -1026,6 +1030,12 @@ export function CatalogueScreen() {
       <SettingsCatalogue />
       {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
       <SafeguardsCatalogue />
+      {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
+          (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
+      <NavigationCatalogue />
+      <CardsCatalogue />
+      <ExploreCatalogue />
+      <SearchCatalogue />
 
       <Section title={l.icons}>
         <Icons />

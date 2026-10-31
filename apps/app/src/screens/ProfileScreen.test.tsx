@@ -67,6 +67,19 @@ describe('ProfileScreen', () => {
     expect(screen.getByRole('button', { name: 'Retirer Cursor' })).toBeTruthy()
   })
 
+  // R3 (relecture juridique, jur-J3) : la recherche trouve les membres par leur nom et leur pseudo ;
+  // la rubrique le dit sous le champ du nom, là où on le choisit.
+  it('says under the name that signed-in members can find you by search', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    expect(
+      screen.getByText(
+        'Les membres connectés peuvent te trouver par ton nom ou ton pseudo dans la recherche.',
+      ),
+    ).toBeTruthy()
+  })
+
   it('saves the edited profile', async () => {
     jest
       .mocked(updateProfile)
