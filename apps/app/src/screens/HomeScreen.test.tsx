@@ -606,3 +606,38 @@ describe('the home screen when the session cannot be read', () => {
     expect(screen.getByRole('button', { name: fr.t(($) => $.home.signUp) })).toBeTruthy()
   })
 })
+
+// --- Tranche R3 : le haut du Fil sur téléphone (docs/scenarios/refonte.md, « Le Fil ») ---
+//
+// Le logo remplace « Bonjour Léa ! », la cloche est à sa droite (F-Nav10) ; les raccourcis
+// (« Publier un projet », « Mes projets », « Réglages ») ont quitté l'accueil : la barre d'onglets
+// les remplace (« + » et « Moi », TabBar.test.tsx).
+describe('the top of the feed on a phone (R3)', () => {
+  it('shows the logo instead of « Bonjour Léa ! », and the bell', async () => {
+    await renderMemberHome()
+
+    // Témoin : le fil est là.
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: fr.t(($) => $.brand.logoAlt) })).toBeTruthy()
+    expect(screen.queryByText(containing(fr.t(($) => $.home.greeting, { name: 'Léa' })))).toBeNull()
+    expect(screen.getByRole('button', { name: fr.t(($) => $.notifications.bell) })).toBeTruthy()
+  })
+
+  it('offers no shortcut any more: neither « Publier un projet », « Mes projets » nor « Réglages »', async () => {
+    await renderMemberHome()
+    await act(async () => {})
+
+    // Témoin : le fil est là, et la cloche aussi.
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: fr.t(($) => $.notifications.bell) })).toBeTruthy()
+    for (const name of [
+      fr.t(($) => $.home.publish),
+      fr.t(($) => $.home.publishShort),
+      fr.t(($) => $.home.myProjects),
+      fr.t(($) => $.home.account),
+    ]) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+      expect(screen.queryByRole('link', { name })).toBeNull()
+    }
+  })
+})

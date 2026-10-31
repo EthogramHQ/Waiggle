@@ -789,3 +789,117 @@ describe('the page of a member a suspended member already follows', () => {
     expect(await screen.findByRole('switch', { name: 'Suivre Léa' })).toBeDisabled()
   })
 })
+
+// --- Tranche R3 : « Moi », sa propre page de membre (docs/scenarios/refonte.md, « Moi ») ---
+//
+// Sur sa page : une roue « Réglages » (en haut à droite) ouvre les réglages, « Modifier mon
+// profil » mène à la rubrique « Mon profil », et ses projets sont titrés « Mes projets · 3 ». Sur la
+// page d'un autre : « Projets · 2 » et « Tu suis Max » une fois suivi. Le nombre et le « · » restent
+// hors du nom lu, qui dit « Mes projets, 3 projets » (relecture de l'interface, « À noter »).
+describe('the « Moi » page (R3)', () => {
+  const third = {
+    ...summaryOf(projectWithPhotos),
+    id: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e',
+    title: 'Le troisième',
+  }
+  const myPage = {
+    ...leaPage,
+    isMe: true,
+    followerCount: 12,
+    projects: [summaryOf(draftProject), summaryOf(projectWithPhotos), third],
+  }
+  const maxPage = {
+    ...leaPage,
+    id: 'u2',
+    name: 'Max',
+    handle: 'max',
+    isFollowed: true,
+    followerCount: 12,
+    projects: [summaryOf(projectWithPhotos), third],
+  }
+  /** Le nom lu d'un titre de liste : « Mes projets » puis « 3 projets », signes et chiffre à part. */
+  const listTitle = (title: string, count: number) =>
+    new RegExp(`^${title}\\b.*${fr.t(($) => $.member.projectCount, { count })}`)
+  const gearName = fr.t(($) => $.nav.settings)
+  const settingsGear = () =>
+    screen.queryByRole('link', { name: gearName }) ?? screen.getByRole('button', { name: gearName })
+  const pushed = () => mockPush.mock.calls.map((call) => pathOf(call[0]))
+
+  beforeEach(() => mockSession({ user: { id: 'u1', name: 'Léa' } }))
+
+  it('opens the settings from the gear of her own page', async () => {
+    jest.mocked(getMember).mockResolvedValue(myPage)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await screen.findByRole('header', { name: 'Léa' })
+    await fireEvent.press(settingsGear())
+
+    expect(pushed()).toContain('/settings')
+  })
+
+  it('leads « Modifier mon profil » to the « Mon profil » section of the settings', async () => {
+    jest.mocked(getMember).mockResolvedValue(myPage)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(
+      await screen.findByRole('button', { name: fr.t(($) => $.me.editProfile) }),
+    )
+
+    expect(pushed()).toContain('/settings/profile')
+  })
+
+  it('titles her projects « Mes projets · 3 », the number read in the plural', async () => {
+    jest.mocked(getMember).mockResolvedValue(myPage)
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(
+      await screen.findByRole('header', {
+        name: listTitle(
+          fr.t(($) => $.me.myProjects),
+          3,
+        ),
+      }),
+    ).toBeTruthy()
+    // Ses projets privés sont toujours là, marqués.
+    expect(screen.getByText(fr.t(($) => $.member.private))).toBeTruthy()
+  })
+
+  it('has no gear on the page of another member', async () => {
+    jest.mocked(getMember).mockResolvedValue(maxPage)
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    // Témoin : la page de Max est là.
+    expect(await screen.findByRole('header', { name: 'Max' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: gearName })).toBeNull()
+    expect(screen.queryByRole('link', { name: gearName })).toBeNull()
+  })
+
+  it('titles the projects of another member « Projets · 2 »', async () => {
+    jest.mocked(getMember).mockResolvedValue(maxPage)
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    expect(
+      await screen.findByRole('header', {
+        name: listTitle(
+          fr.t(($) => $.member.projects),
+          2,
+        ),
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('header', { name: new RegExp(`^${fr.t(($) => $.me.myProjects)}`) }),
+    ).toBeNull()
+  })
+
+  it('says « Tu suis Max » once he is followed', async () => {
+    jest.mocked(getMember).mockResolvedValue(maxPage)
+    await renderWithProviders(<MemberScreen id="u2" />)
+
+    const following = fr.t(($) => $.follow.memberFollowing, { name: 'Max' })
+    const button = await screen.findByRole('switch', { name: following })
+    expect(button).toBeChecked()
+    // Le texte affiché aussi (la coche « ✓ » s'ajoute à l'affichage, hors du nom lu).
+    expect(screen.getByText(containing(following))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.follow.following))).toBeNull()
+  })
+})
