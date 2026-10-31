@@ -17,7 +17,7 @@
 //   annonce directe sur iOS (AccessibilityInfo.announceForAccessibility), qui n'a pas de région
 //   vivante. La région est toujours là, vide entre deux toasts : un lecteur d'écran n'annonce que
 //   ce qui change dans une région qu'il connaît déjà.
-import { durations, layout } from '@ruche/brand'
+import { durations, layout, space } from '@ruche/brand'
 import {
   createContext,
   type ReactNode,
@@ -32,7 +32,8 @@ import { AccessibilityInfo, Platform, View, type ViewStyle } from 'react-native'
 import type { IconName } from '../Icon'
 import { Mascot, type MascotPose } from '../Mascot'
 import { readingTime, Toast } from '../Toast'
-import { useLayout } from './layout'
+import { useTabBarSpace } from '../tabBarSpace'
+import { type SizeClass, useLayout } from './layout'
 import { useCalmMotion } from './motion'
 import { layerPosition, ToastLayer } from './toastLayer'
 
@@ -55,8 +56,20 @@ const ToastContext = createContext<ToastApi>({ show: () => {} })
 /** Hook : la fonction qui affiche un toast. */
 export const useToast = (): ToastApi => useContext(ToastContext)
 
-// Au-dessus de la barre d'onglets à venir sur téléphone ; près du bas sur tablette et ordinateur.
+// La hauteur du toast au-dessus du bas de l'écran : près du bas sur tablette et ordinateur ; plus
+// haut sur téléphone, où un pied collé (les boutons d'un formulaire) occupe souvent le bas.
 const BOTTOM = { compact: 104, wide: 32 } as const
+
+/**
+ * Le décalage du toast : jamais sous la barre d'onglets du téléphone (R3). Quand elle est là, le
+ * toast se pose juste au-dessus d'elle (sa hauteur mesurée, marge du bas de l'appareil comprise,
+ * plus un peu d'air) ; sinon, ou si la barre est plus basse que la place habituelle, à sa place
+ * habituelle. Exporté pour être essayé sans écran.
+ */
+export const toastBottom = (sizeClass: SizeClass, tabBarHeight: number): number => {
+  const usual = sizeClass === 'compact' ? BOTTOM.compact : BOTTOM.wide
+  return tabBarHeight > 0 ? Math.max(usual, tabBarHeight + space.sm) : usual
+}
 
 // Sur le web, la couche reste collée en bas de la fenêtre même si la page défile (position fixe,
 // que react-native-web comprend mais que les types de React Native ignorent ; elle est rendue dans
@@ -69,6 +82,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [leaving, setLeaving] = useState(false)
   const calm = useCalmMotion()
   const { sizeClass } = useLayout()
+  // La barre d'onglets du téléphone (ui/tabBarSpace.ts) : le fournisseur des toasts doit donc être
+  // posé dans son cadre (TabBarHost), sinon il ne la voit pas (hauteur 0) et peut la couvrir.
+  const tabBar = useTabBarSpace()
   // Les minuteurs en cours (le départ, puis l'effacement) : une « ref » garde une valeur d'un
   // rendu à l'autre sans redessiner, ce qu'il faut pour pouvoir les annuler.
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -141,7 +157,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ...pinned,
             left: 0,
             right: 0,
-            bottom: sizeClass === 'compact' ? BOTTOM.compact : BOTTOM.wide,
+            bottom: toastBottom(sizeClass, tabBar.height),
             alignItems: 'center',
             paddingHorizontal: layout.screenPadding.compact,
           }}
