@@ -56,6 +56,12 @@ type Props = {
   /** Affiche un bouton « Retour » en haut à gauche. */
   onBack?: () => void
   /**
+   * Une action en haut à droite, sur la rangée du « Retour » (la roue des réglages de « Moi », R3) :
+   * à la même hauteur que lui, qu'il soit là ou non, au lieu d'une rangée à elle sous le retour.
+   * Hors du miel seulement (sur le miel, la droite de la barre est à `header`).
+   */
+  topAction?: ReactNode
+  /**
    * form : une colonne étroite et centrée (connexion, formulaires) ;
    * page : toute la largeur, jusqu'à 1 280 points (pages en colonnes sur ordinateur).
    */
@@ -99,6 +105,7 @@ export function Screen({
   stickyHeader = false,
   notice,
   onBack,
+  topAction,
   width = 'form',
   hero,
   ambient = true,
@@ -149,10 +156,30 @@ export function Screen({
     ) : (
       header
     )
-  // Le contenu propre à l'écran, précédé du retour (hors du miel), du titre et du sous-titre.
+  // La rangée du haut, hors du miel : le retour à gauche, l'action de la page à droite (R3, la roue
+  // de « Moi » : avant, elle prenait une rangée sous le retour, 64 points plus bas). Sans action, le
+  // retour seul, comme avant ; sans retour, l'action reste à droite.
+  const topRow =
+    !brand && topAction ? (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: backButton ? 'space-between' : 'flex-end',
+          gap: space.sm,
+        }}
+      >
+        {backButton}
+        {topAction}
+      </View>
+    ) : brand ? null : (
+      backButton
+    )
+  // Le contenu propre à l'écran, précédé de la rangée du haut (hors du miel), du titre et du
+  // sous-titre.
   const body = (
     <>
-      {brand ? null : backButton}
+      {topRow}
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (

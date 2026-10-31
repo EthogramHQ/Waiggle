@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from '../ui/Button'
+import { CountedTitle } from '../ui/CountedTitle'
 import { Hint } from '../ui/Hint'
 import { RetryAt, useRetryAt } from '../ui/RetryAt'
 import { ScreenFooter } from '../ui/Screen'
@@ -66,6 +67,13 @@ const fr = {
   footer: 'Pied collé d’un écran (téléphone) : un bouton, puis deux',
   save: 'Enregistrer',
   change: 'Changer le mot de passe',
+  counted:
+    'Titre avec nombre (page d’un membre) : un projet, plusieurs, puis au plafond de la liste (50+)',
+  myProjects: 'Mes projets',
+  projects: 'Projets',
+  oneProject: '1 projet',
+  projectCount: (count: number) => `${count} projets`,
+  projectsMore: '50 projets ou plus',
 }
 
 const en: typeof fr = {
@@ -108,6 +116,13 @@ const en: typeof fr = {
   footer: 'Pinned footer of a screen (phone): one button, then two',
   save: 'Save',
   change: 'Change the password',
+  counted:
+    'Title with a number (member page): one project, several, then at the cap of the list (50+)',
+  myProjects: 'My projects',
+  projects: 'Projects',
+  oneProject: '1 project',
+  projectCount: (count: number) => `${count} projects`,
+  projectsMore: '50 or more projects',
 }
 
 /** Le délai du refus simulé, en secondes : assez court pour voir la libération. */
@@ -278,6 +293,13 @@ export function AccountCatalogue() {
         ) : null}
         <Button label={l.connect} onPress={() => {}} disabled={retry.blocked} />
       </Stack>
+
+      {/* Le titre d'une liste suivi de son nombre (R3, « Mes projets · 3 ») : le nom lu dit le
+          nombre en toutes lettres ; au plafond de l'API (50), « 50+ », lu « 50 projets ou plus ». */}
+      <Text tone="secondary">{l.counted}</Text>
+      <CountedTitle title={l.myProjects} count={1} spokenCount={l.oneProject} level={3} />
+      <CountedTitle title={l.projects} count={12} spokenCount={l.projectCount(12)} level={3} />
+      <CountedTitle title={l.projects} count={50} more spokenCount={l.projectsMore} level={3} />
 
       <Text tone="secondary">{l.footer}</Text>
       <ScreenFooter>

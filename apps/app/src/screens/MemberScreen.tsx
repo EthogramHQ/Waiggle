@@ -14,7 +14,7 @@
 // Tranche 7c : un administrateur trouve dans le menu « Suspendre le compte » (ou « Lever la
 // suspension ») et « Historique de modération », et lit jusqu'à quand le compte est suspendu. Un
 // visiteur suspendu n'a plus « Suivre », sauf pour ne plus suivre un membre qu'il suit déjà.
-import type { Member } from '@ruche/contracts'
+import { type Member, PROJECT_LIST_MAX } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,6 +32,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { SummaryCard } from '../projects/SummaryCard'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Button } from '../ui/Button'
+import { CountedTitle } from '../ui/CountedTitle'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
@@ -42,7 +43,6 @@ import { ProjectGrid } from '../ui/ProjectGrid'
 import { parisDateTime } from '../ui/parisTime'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
-import { Text } from '../ui/Text'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -207,12 +207,15 @@ function MemberView({ member }: { member: Member }) {
     ? t(($) => $.follow.memberFollowing, { name: member.name })
     : t(($) => $.follow.member, { name: member.name })
   // Le titre de la liste des projets : « Mes projets » sur sa page, « Projets » sur celle d'un
-  // autre, suivi du nombre (« Mes projets · 3 »). Le « · » et le chiffre sont dessinés à part, en
-  // discret ; le nom lu dit le nombre en toutes lettres et au bon pluriel (« Mes projets, 3
-  // projets »), sans le signe que les lecteurs d'écran prononceraient « point médian ».
+  // autre, suivi du nombre (« Mes projets · 3 », dessiné par CountedTitle). L'API n'envoie que les
+  // PROJECT_LIST_MAX (50) premiers projets : une liste pleine en cache peut-être d'autres, et le
+  // titre dit alors « 50+ », lu « 50 projets ou plus ».
   const listTitle = member.isMe ? t(($) => $.me.myProjects) : t(($) => $.member.projects)
   const projectCount = member.projects.length
-  const listName = `${listTitle}, ${t(($) => $.member.projectCount, { count: projectCount })}`
+  const capped = projectCount >= PROJECT_LIST_MAX
+  const spokenCount = capped
+    ? t(($) => $.member.projectCountMore, { max: PROJECT_LIST_MAX })
+    : t(($) => $.member.projectCount, { count: projectCount })
 
   const followError = follow.expired
     ? t(($) => $.states.expired)
@@ -221,18 +224,25 @@ function MemberView({ member }: { member: Member }) {
       : undefined
 
   return (
-    <Screen width="page" header={<TopNav />} onBack={onBack} pageTitle={member.name}>
-      {/* Sur sa propre page, la roue des réglages, en haut à droite (R3, F-Nav8) : on entre dans
-          les réglages par « Moi ». Un bouton à icône seule : son nom (« Réglages ») est lu. */}
-      {member.isMe ? (
-        <Row justify="end">
+    <Screen
+      width="page"
+      header={<TopNav />}
+      onBack={onBack}
+      pageTitle={member.name}
+      // Sur sa propre page, la roue des réglages, en haut à droite (R3, F-Nav8) : on entre dans
+      // les réglages par « Moi ». Sur la rangée du « Retour » quand il y en a un (sa page ouverte
+      // par /members/<id>), pas sur une rangée à elle en dessous. Un bouton à icône seule : son
+      // nom (« Réglages ») est lu.
+      topAction={
+        member.isMe ? (
           <IconButton
             icon="gear-six"
             label={t(($) => $.nav.settings)}
             onPress={() => router.push('/settings')}
           />
-        </Row>
-      ) : null}
+        ) : undefined
+      }
+    >
       <MemberHeader
         name={member.name}
         handle={t(($) => $.member.handle, { handle })}
@@ -315,10 +325,12 @@ function MemberView({ member }: { member: Member }) {
       {/* Bloqué : ni projets, ni « Pas encore de projet public » (l'API n'en donne aucun). */}
       {blocked ? null : (
         <>
-          <Text variant="heading" heading={2} accessibilityLabel={listName}>
-            {listTitle}
-            <Text variant="heading" tone="muted">{` · ${projectCount}`}</Text>
-          </Text>
+          <CountedTitle
+            title={listTitle}
+            count={projectCount}
+            more={capped}
+            spokenCount={spokenCount}
+          />
           <ProjectGrid
             empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}
           >

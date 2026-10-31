@@ -1675,6 +1675,21 @@ const pages = [
   // La page d'un membre (la sienne : avec un brouillon privé), et celle d'une étiquette, pleine
   // puis vide.
   { name: 'membre', path: `/members/${leaMe.id}`, signedIn: true, fullPage: true },
+  // « Moi » (R3) : la même page par l'onglet, sans « Retour », la roue des réglages en haut à
+  // droite.
+  { name: 'moi', path: '/me', signedIn: true, fullPage: true },
+  // La barre d'onglets au plus étroit (320 points) avec le texte à 200 % (relecture du plan R3,
+  // ui-8) : les libellés passent sous l'icône, sur une ligne. Téléphone seulement (l'ordinateur
+  // n'a pas de barre d'onglets) ; `textScale` grossit chaque texte, comme le réglage d'un
+  // téléphone (le web n'a pas de `fontScale`).
+  {
+    name: 'barre-320-texte-200',
+    path: '/',
+    signedIn: true,
+    phone: { width: 320, height: 640 },
+    phoneOnly: true,
+    textScale: 2,
+  },
   { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
@@ -1760,6 +1775,29 @@ const unfinishedProblem = async (page, shot, name) =>
     page: shot.name,
     intended: intendedUnfinished,
   })
+
+/**
+ * Grossit chaque texte affiché (et sa hauteur de ligne) de `factor`, comme le réglage « taille du
+ * texte » d'un téléphone poussé à 200 % : la largeur de l'écran ne change pas, seul le texte
+ * grossit. Sur le web, `fontScale` vaut toujours 1 : on écrit donc les tailles dans la page. Les
+ * tailles sont toutes lues avant d'être écrites (un parent grossi changerait celles de ses enfants).
+ * Même règle que `textScale` des essais (`.claude/explore/lib.mjs`).
+ */
+const scaleText = async (page, factor) => {
+  await page.evaluate((factor) => {
+    const all = [...document.querySelectorAll('body *')]
+    const sizes = all.map((element) => {
+      const style = getComputedStyle(element)
+      return [Number.parseFloat(style.fontSize), style.lineHeight]
+    })
+    all.forEach((element, rank) => {
+      const [font, line] = sizes[rank]
+      element.style.fontSize = `${font * factor}px`
+      if (line !== 'normal') element.style.lineHeight = `${Number.parseFloat(line) * factor}px`
+    })
+  }, factor)
+  await page.waitForTimeout(400) // le temps que la barre se mesure de nouveau (onLayout)
+}
 
 const devices = [
   { name: 'telephone', viewport: { width: 390, height: 844 } },
@@ -1958,6 +1996,7 @@ async function layoutReport() {
           await shot.prepare(page)
           await page.waitForTimeout(300)
         }
+        if (shot.textScale) await scaleText(page, shot.textScale)
         await settle(page) // la page entière, pas seulement son haut (voir settle)
         // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
         // échoue à la fin (voir intendedUnfinished).
@@ -2063,8 +2102,16 @@ const scale = read ? 1 : 2
 
 // Les travaux de la file : une capture par page, appareil et thème. Le catalogue, le plus long,
 // est en tête de la liste : il commence tôt au lieu de finir seul, après tous les autres.
+// Une page peut changer la fenêtre du téléphone (`phone`, la barre à 320 points) et se passer de
+// l'ordinateur (`phoneOnly`).
+const devicesFor = (shot) =>
+  devices
+    .filter((device) => !shot.phoneOnly || device.name === 'telephone')
+    .map((device) =>
+      shot.phone && device.name === 'telephone' ? { ...device, viewport: shot.phone } : device,
+    )
 const jobs = selected.flatMap((shot) =>
-  devices.flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
+  devicesFor(shot).flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
 )
 
 const browser = await chromium.launch()
@@ -2105,6 +2152,7 @@ const capture = async ({ shot, device, scheme }) => {
       await shot.prepare(page)
       await page.waitForTimeout(300)
     }
+    if (shot.textScale) await scaleText(page, shot.textScale)
     const height = await settle(page)
     // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
     // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.
