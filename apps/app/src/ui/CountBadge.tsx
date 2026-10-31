@@ -3,8 +3,9 @@
 // garde sa petite taille. À zéro, rien du tout.
 // Elle est cachée aux lecteurs d'écran : c'est le bouton qui la porte qui dit le nombre dans son
 // nom (« Notifications, 3 nouvelles »), sinon il serait lu deux fois.
-import { borders, radii, space } from '@ruche/brand'
-import { View } from 'react-native'
+import { borders, radii, space, textStyles } from '@ruche/brand'
+import { useState } from 'react'
+import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -47,11 +48,65 @@ export function CountBadge({ count, max = 9 }: Props) {
         borderColor: colors.background,
       }}
     >
-      {/* Le chiffre grandit avec le réglage de taille, mais peu (×1,2 au plus) : la pastille reste
-          une pastille, de la même taille partout, et ne cache pas l'icône qu'elle accompagne. */}
-      <Text variant="micro" weight={700} tone="onBadge" tabular maxScale={1.2}>
-        {badgeText(count, max)}
-      </Text>
+      <BadgeText>{badgeText(count, max)}</BadgeText>
+    </View>
+  )
+}
+
+/** L'agrandissement le plus fort du chiffre avec le réglage de taille de l'appareil. */
+const BADGE_MAX_SCALE = 1.2
+/** La plus grande hauteur du chiffre : sa hauteur de ligne, agrandie au plus de BADGE_MAX_SCALE. */
+const BADGE_TEXT_CAP = textStyles.micro.lineHeight * BADGE_MAX_SCALE
+
+type Size = { width: number; height: number }
+
+/**
+ * Le facteur qui ramène un chiffre de cette taille naturelle sous le plafond : 1 en dessous.
+ */
+export const badgeTextScale = (natural: Size | null): number =>
+  natural && natural.height > BADGE_TEXT_CAP ? BADGE_TEXT_CAP / natural.height : 1
+
+/**
+ * Le chiffre grandit avec le réglage de taille, mais peu (×1,2 au plus) : la pastille reste une
+ * pastille, de la même taille partout, et ne cache ni l'icône qu'elle accompagne ni ne sort de la
+ * barre qui la porte.
+ * - Sur téléphone, `maxScale` suffit.
+ * - Sur le web, il n'existe pas (relecture de design de R3, 12 : à 200 %, la pastille de la
+ *   cloche grandissait vers le haut jusqu'à 2 px du bord de l'écran). On mesure donc le chiffre à
+ *   sa taille naturelle (`onLayout`, qui ignore la réduction : pas de boucle), puis on le réduit à
+ *   l'œil (`transform: scale`) jusqu'au plafond ; la boîte qui l'entoure prend la taille réduite,
+ *   si bien que la pastille garde ses proportions. Même façon que les initiales d'Avatar.
+ */
+function BadgeText({ children }: { children: string }) {
+  const [natural, setNatural] = useState<Size | null>(null)
+  const text = (
+    <Text variant="micro" weight={700} tone="onBadge" tabular maxScale={BADGE_MAX_SCALE}>
+      {children}
+    </Text>
+  )
+  if (Platform.OS !== 'web') return text
+  const scale = badgeTextScale(natural)
+  const measure = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout
+    // Le même objet quand rien ne change : pas de rendu de plus.
+    setNatural((old) =>
+      old && old.width === width && old.height === height ? old : { width, height },
+    )
+  }
+  return (
+    <View
+      style={{
+        // La place du chiffre réduit ; avant la première mesure, celle du chiffre tel quel.
+        ...(natural ? { width: natural.width * scale, height: natural.height * scale } : null),
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {/* Plus large que sa boîte quand il est réduit : il en déborde également des deux côtés,
+          puis la réduction (autour de son centre) le ramène dedans. */}
+      <View onLayout={measure} style={{ transform: [{ scale }] }}>
+        {text}
+      </View>
     </View>
   )
 }
