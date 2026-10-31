@@ -22,7 +22,7 @@ import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
 import { useMe } from '../profile/hooks'
 import { TabBar, type TabBarTab, type TabKey } from '../ui/TabBar'
-import { TabBarSpaceContext, useTabBarSpace } from '../ui/tabBarSpace'
+import { useTabBarSpace } from '../ui/tabBarSpace'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 
@@ -153,13 +153,6 @@ export function AppTabBar() {
     [t],
   )
 
-  // La barre prévient d'elle-même les écrans de remonter en haut dès que l'onglet actif est retouché
-  // (le signal du contexte, tabBarSpace.ts). Or, hors de sa première page, l'onglet retouché ramène à
-  // cette première page, et la page qu'on quitte n'a pas à remonter. On donne donc à la barre un
-  // contexte où ce signal est muet, et c'est `onReselect`, ci-dessous, qui le lance quand il le faut.
-  // Les écrans, eux, gardent le contexte du cadre (TabBarHost) : ils ne voient que le vrai signal.
-  const quietSpace = useMemo(() => ({ ...space, scrollToTop: () => {} }), [space])
-
   // Pas de barre : au pré-rendu du web, pour un visiteur (ou tant que la session n'est pas lue, ou si
   // sa lecture a échoué : l'écran dit alors quoi faire), sur ordinateur et tablette, sur une page
   // poussée par-dessus les onglets, et sur Android pendant la frappe.
@@ -169,20 +162,20 @@ export function AppTabBar() {
   const name = me.data?.name ?? session.user.name
 
   return (
-    <TabBarSpaceContext.Provider value={quietSpace}>
-      <TabBar
-        tabs={tabs}
-        active={active}
-        avatar={{ name, source: toSource(me.data?.avatarUrl) }}
-        publish={suspended ? null : { href: PUBLISH_HREF, label: t(($) => $.nav.publish) }}
-        onPress={(target) => open(target === 'publish' ? PUBLISH_HREF : firstPages[target], 'push')}
-        onReselect={(tab) => {
-          // Sur sa première page, l'onglet retouché fait remonter la page en haut ; ailleurs (une
-          // page d'outil, sa propre page de membre, la page d'un autre membre), il y ramène.
-          if (place.kind === 'tab' && place.firstPage) space.scrollToTop()
-          else open(firstPages[tab], 'back')
-        }}
-      />
-    </TabBarSpaceContext.Provider>
+    <TabBar
+      tabs={tabs}
+      active={active}
+      avatar={{ name, source: toSource(me.data?.avatarUrl) }}
+      publish={suspended ? null : { href: PUBLISH_HREF, label: t(($) => $.nav.publish) }}
+      onPress={(target) => open(target === 'publish' ? PUBLISH_HREF : firstPages[target], 'push')}
+      onReselect={(tab) => {
+        // C'est ici que se décide l'onglet retouché (la barre ne fait qu'appeler ce rappel) : sur
+        // sa première page, la page remonte en haut (le signal du contexte, tabBarSpace.ts) ;
+        // ailleurs (une page d'outil, sa propre page de membre, la page d'un autre membre), il
+        // ramène à cette première page, et la page qu'on quitte n'a pas à remonter.
+        if (place.kind === 'tab' && place.firstPage) space.scrollToTop()
+        else open(firstPages[tab], 'back')
+      }}
+    />
   )
 }

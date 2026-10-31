@@ -13,11 +13,13 @@
 // Le composant ne décide de rien : les onglets, l'actif, la photo et la visibilité du « + » lui
 // arrivent en props (navigation/AppTabBar.tsx les tire des pages et de la session), et il ne traduit
 // rien (les libellés sont déjà traduits). Toucher un autre onglet appelle `onPress` ; toucher
-// l'onglet déjà actif appelle `onReselect` et prévient les écrans par le contexte (tabBarSpace.ts),
-// pour que l'écran affiché remonte en haut.
+// l'onglet déjà actif appelle `onReselect`, et c'est l'appelant qui décide : remonter l'écran en
+// haut (le signal du contexte, tabBarSpace.ts) ou revenir à la première page de l'onglet. La barre
+// ne lance pas elle-même la remontée : elle ne sait pas sur quelle page on est.
 //
 // TabBarHost, en bas du fichier, est le cadre qui pose la barre une fois pour toute l'appli
-// (au-dessus de la pile des pages, dans app/_layout.tsx), mesure sa hauteur et la donne aux écrans.
+// (au-dessus de la pile des pages, dans app/_layout.tsx) et donne aux écrans la hauteur qu'elle
+// occupe : celle que la barre mesure elle-même une fois rendue, 0 quand rien n'est rendu.
 import { borders, durations, layout, radii, space, springs } from '@ruche/brand'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -37,7 +39,7 @@ import type { PressEvent } from './ListGroup'
 import { linkProps } from './SettingsNav'
 import { Surface } from './Surface'
 import { Text } from './Text'
-import { TabBarSpaceContext, type TabKey, useTabBarSpace } from './tabBarSpace'
+import { TabBarSpaceContext, type TabKey } from './tabBarSpace'
 import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -85,7 +87,11 @@ const PUBLISH_SLOT = 'publish'
 
 // Un libellé agrandi par le réglage de l'appareil ne double pas : à 320 points de large, cinq places
 // se partagent la largeur, et le libellé doit tenir sur une ligne sous l'icône (comme Wordmark).
+// Sur téléphone, `maxScale` borne l'agrandissement ; le web l'ignore (voir TabLabel, plus bas).
 const labelMaxScale = 1.2
+
+/** La taille naturelle d'un libellé d'onglet, mesurée sur le web (voir TabLabel). */
+type LabelSize = { width: number; height: number }
 
 // Le cercle autour de la photo de « Moi » quand l'onglet est actif : son épaisseur et l'air entre
 // lui et la photo (le même air, transparent, quand l'onglet est inactif : rien ne bouge).
@@ -117,7 +123,6 @@ export function TabBar({
   const { colors, shadows } = useTheme()
   const deviceCalm = useCalmMotion()
   const calm = calmProp ?? deviceCalm
-  const { scrollToTop } = useTabBarSpace()
 
   // Les cinq places, dans l'ordre : deux onglets, le « + » (même caché, sa place reste : les
   // onglets ne se décalent pas quand il disparaît), deux onglets.
@@ -182,7 +187,6 @@ export function TabBar({
     lastTap.current = { key: tab.key, at: now }
     if (tab.key === active) {
       onReselect(tab.key)
-      scrollToTop()
       return
     }
     if (previous && previous.key === tab.key && now - previous.at < DOUBLE_TAP_MS) return
@@ -194,6 +198,21 @@ export function TabBar({
   }
 
   const onRowLayout = (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width)
+
+  // Web : la taille naturelle de chaque libellé, et la réduction commune qui fait tenir le plus
+  // large dans sa place (moins l'air de chaque côté). Voir TabLabel.
+  const [labelSizes, setLabelSizes] = useState<Partial<Record<TabKey, LabelSize>>>({})
+  const measureLabel = (key: TabKey) => (size: LabelSize) =>
+    setLabelSizes((old) => {
+      const known = old[key]
+      // Le même objet quand rien ne change : pas de rendu de plus.
+      return known && known.width === size.width && known.height === size.height
+        ? old
+        : { ...old, [key]: size }
+    })
+  const room = Math.max(slotWidth - 2 * space.xxs, 0)
+  const widest = Math.max(0, ...Object.values(labelSizes).map((size) => size.width))
+  const labelScale = room > 0 && widest > room ? room / widest : 1
 
   return (
     <Surface variant="glass" radius="pill" padding="xs">
@@ -279,29 +298,92 @@ export function TabBar({
                   <Icon
                     name={icons[slot.key]}
                     size={24}
-                    tone={isActive ? 'onHoney' : 'secondary'}
+                    // Inactive, l'icône prend l'encre, comme son libellé (voir TabLabel).
+                    tone={isActive ? 'onHoney' : 'default'}
                   />
                 </View>
               )}
-              {/* Sur la goutte, l'encre (ton onHoney, lisible jour et nuit, comme Segmented) ;
-                  ailleurs, le ton secondaire sur le verre. Une ligne : à 320 points, un libellé
-                  agrandi qui ne tient pas est coupé plutôt que de chevaucher son voisin. */}
-              <Text
-                variant="caption"
-                weight={isActive ? 700 : 500}
-                tone={isActive ? 'onHoney' : 'secondary'}
-                align="center"
-                numberOfLines={1}
-                maxScale={labelMaxScale}
-                selectable={false}
-              >
-                {slot.label}
-              </Text>
+              <TabLabel
+                label={slot.label}
+                active={isActive}
+                scale={labelScale}
+                size={labelSizes[slot.key]}
+                onMeasure={measureLabel(slot.key)}
+              />
             </Pressable>
           )
         })}
       </View>
     </Surface>
+  )
+}
+
+/**
+ * Le libellé d'un onglet, sur une ligne sous l'icône, même avec le texte agrandi.
+ * - Sur téléphone, `maxScale` borne l'agrandissement (1,2) et `numberOfLines` coupe en dernier
+ *   recours.
+ * - Sur le web, ces réglages n'existent pas (`fontScale` y vaut toujours 1) : un navigateur réglé
+ *   en grand texte grossit le libellé sans que l'appli le sache, et à 320 de large « Explorer »
+ *   devenait « E… ». On mesure donc chaque libellé à sa largeur naturelle (`onMeasure`), et la barre
+ *   réduit à l'œil (`transform: scale`) tous les libellés du même facteur, juste assez pour que le
+ *   plus large tienne dans sa place, comme `adjustsFontSizeToFit` sur téléphone : les quatre
+ *   gardent la même taille. Pour qu'un libellé garde sa largeur naturelle, il est posé dans une
+ *   boîte de largeur nulle centrée (un mot ne se coupe pas : sa largeur minimale est la sienne),
+ *   d'où il déborde également des deux côtés ; la mesure (`onLayout`) ignore la réduction.
+ */
+function TabLabel({
+  label,
+  active,
+  scale,
+  size,
+  onMeasure,
+}: {
+  label: string
+  active: boolean
+  /** La réduction commune aux libellés (1 : aucune). Web seulement. */
+  scale: number
+  /** La taille naturelle de ce libellé, une fois mesurée. Web seulement. */
+  size: LabelSize | undefined
+  onMeasure: (size: LabelSize) => void
+}) {
+  const web = Platform.OS === 'web'
+  const text = (
+    <Text
+      variant="caption"
+      weight={active ? 700 : 500}
+      // Sur la goutte, l'encre (onHoney, comme Segmented) ; ailleurs l'encre du verre (text) : le
+      // gris secondaire tombait à 4,2:1 sur le verre de nuit posé sur une photo blanche.
+      tone={active ? 'onHoney' : 'default'}
+      align="center"
+      {...(web
+        ? {
+            onLayout: (event: LayoutChangeEvent) => {
+              const { width, height } = event.nativeEvent.layout
+              onMeasure({ width, height })
+            },
+          }
+        : { numberOfLines: 1 })}
+      maxScale={labelMaxScale}
+      selectable={false}
+    >
+      {label}
+    </Text>
+  )
+  if (!web) return text
+  return (
+    <View
+      style={{
+        width: 0,
+        // La hauteur réduite elle aussi : pas de bande vide sous le libellé réduit.
+        ...(size && size.height > 0 ? { height: size.height * scale } : null),
+        alignSelf: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transform: [{ scale }],
+      }}
+    >
+      {text}
+    </View>
   )
 }
 
@@ -369,24 +451,30 @@ function PublishButton({
 
 /**
  * Le cadre de la barre : il la pose en bas, par-dessus les pages (`position: absolute`), dégagée
- * de la zone du geste de l'appareil (`insets.bottom`), mesure la hauteur qu'elle occupe et la donne
- * aux écrans par le contexte (tabBarSpace.ts), avec le signal de remontée.
- * `bar` : la barre toute prête (un élément TabBar), ou `null` quand elle ne doit pas s'afficher
- * (visiteur, page poussée par-dessus) : les écrans ne réservent alors rien.
+ * de la zone du geste de l'appareil (`insets.bottom`), et donne aux écrans, par le contexte
+ * (tabBarSpace.ts), la hauteur qu'elle occupe, avec le signal de remontée.
+ * `bar` : la barre (un élément qui rend TabBar, ou rien), ou `null`.
+ * La hauteur est celle de la barre **rendue**, mesurée sur la vue qui l'enveloppe au plus près (sans
+ * marge), plus la marge du bas : l'élément reçu (AppTabBar) rend souvent `null` (visiteur, page
+ * poussée, ordinateur) ; la vue mesure alors 0, et les écrans ne réservent rien de plus que leur
+ * marge habituelle. Mesurer le cadre entier, c'était mesurer sa seule marge (8 points sur le web).
  * Dans l'ordre de lecture et du clavier, la barre vient avant les pages.
  */
 export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactNode }) {
   const insets = useSafeAreaInsets()
   const { padding } = useLayout()
-  const [measured, setMeasured] = useState(0)
+  // La hauteur de la barre rendue ; 0 tant qu'aucune barre n'est rendue.
+  const [barHeight, setBarHeight] = useState(0)
   const [topSignal, setTopSignal] = useState(0)
   const scrollToTop = useCallback(() => setTopSignal((count) => count + 1), [])
   const shown = bar !== null && bar !== undefined
+  // La marge sous la barre : la zone du geste de l'appareil, plus un peu d'air.
+  const bottomGap = insets.bottom + space.sm
   // useMemo : la même valeur tant que rien ne change, sinon chaque écran se redessinerait à chaque
   // rendu du cadre.
   const value = useMemo(
-    () => ({ height: shown ? measured : 0, topSignal, scrollToTop }),
-    [shown, measured, topSignal, scrollToTop],
+    () => ({ height: shown && barHeight > 0 ? barHeight + bottomGap : 0, topSignal, scrollToTop }),
+    [shown, barHeight, bottomGap, topSignal, scrollToTop],
   )
   return (
     <TabBarSpaceContext.Provider value={value}>
@@ -396,7 +484,6 @@ export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactN
           // page ; seule la barre les prend.
           <View
             pointerEvents="box-none"
-            onLayout={(event) => setMeasured(event.nativeEvent.layout.height)}
             style={{
               position: 'absolute',
               left: 0,
@@ -404,11 +491,15 @@ export function TabBarHost({ bar, children }: { bar: ReactNode; children: ReactN
               bottom: 0,
               zIndex: 1,
               paddingHorizontal: padding,
-              paddingBottom: insets.bottom + space.sm,
+              paddingBottom: bottomGap,
               alignItems: 'center',
             }}
           >
-            <View pointerEvents="box-none" style={{ width: '100%', maxWidth: layout.formWidth }}>
+            <View
+              pointerEvents="box-none"
+              onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+              style={{ width: '100%', maxWidth: layout.formWidth }}
+            >
               {bar}
             </View>
           </View>
