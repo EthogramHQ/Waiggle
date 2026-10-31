@@ -64,15 +64,35 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
 
   return (
     // Jamais plus large qu'un formulaire, même dans une page large : des boutons de 1 280 points
-    // n'auraient pas de sens. align="stretch" : les textes prennent cette largeur et se replient.
-    <View style={{ width: '100%', maxWidth: layout.formWidth, alignSelf: 'center' }}>
-      <Stack gap="xl" align="stretch">
-        {kind === 'loading' || !cramped ? (
-          <View style={{ alignItems: 'center', paddingVertical: space.lg }}>{picture}</View>
-        ) : null}
+    // n'auraient pas de sens.
+    // Tout se range à gauche (refonte R3, choix de Louis du 30/10/2026), dans tous les états,
+    // chargement et erreur compris : l'image, le titre, le message et les issues commencent au même
+    // bord que le titre des autres pages, au lieu de flotter au milieu. La règle s'écrit une fois,
+    // ici (alignItems), et le bloc lui-même se pose au bord gauche de la page (alignSelf).
+    <View
+      style={{
+        width: '100%',
+        maxWidth: layout.formWidth,
+        alignSelf: 'flex-start',
+        alignItems: 'flex-start',
+        gap: space.xl,
+      }}
+    >
+      {kind === 'loading' || !cramped ? (
+        // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
+        // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
+        // revient à « collée au bord gauche ».
+        <View style={{ alignItems: 'flex-start', paddingVertical: space.lg }}>{picture}</View>
+      ) : null}
+      {/* Le titre et le message prennent toute la largeur du bloc (alignSelf: 'stretch') et s'y
+          replient. Sans lui, rangés à gauche, ils prendraient la largeur de leur plus long mot :
+          à texte agrandi sur 320 points, le message sortait de l'écran (essai du 31/10/2026). */}
+      <View style={{ alignSelf: 'stretch' }}>
         <Stack gap="sm" align="stretch">
+          {/* breakAnywhere : un mot plus large que l'écran (« introuvable » à 200 % sur 320
+              points) se coupe plutôt que d'être rogné. */}
           {title ? (
-            <Text variant="title2" align="center" heading={level}>
+            <Text variant="title2" heading={level} breakAnywhere>
               {title}
             </Text>
           ) : null}
@@ -81,28 +101,28 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
           {message ? (
             <Text
               tone={title ? 'secondary' : 'default'}
-              align="center"
               {...(kind === 'error' ? { accessibilityRole: 'alert' as const } : null)}
             >
               {message}
             </Text>
           ) : null}
         </Stack>
-        {actions.length > 0 ? (
-          <Stack gap="md" align="stretch">
-            {actions.map((action, index) => (
-              <Button
-                key={action.label}
-                label={action.label}
-                // La première issue est la principale ; les suivantes, secondaires.
-                variant={action.variant ?? (index === 0 ? 'primary' : 'secondary')}
-                onPress={action.onPress}
-                loading={action.loading ?? false}
-              />
-            ))}
-          </Stack>
-        ) : null}
-      </Stack>
+      </View>
+      {/* Les issues gardent leur largeur naturelle, l'une sous l'autre, au bord gauche. */}
+      {actions.length > 0 ? (
+        <Stack gap="md" align="start">
+          {actions.map((action, index) => (
+            <Button
+              key={action.label}
+              label={action.label}
+              // La première issue est la principale ; les suivantes, secondaires.
+              variant={action.variant ?? (index === 0 ? 'primary' : 'secondary')}
+              onPress={action.onPress}
+              loading={action.loading ?? false}
+            />
+          ))}
+        </Stack>
+      ) : null}
     </View>
   )
 }

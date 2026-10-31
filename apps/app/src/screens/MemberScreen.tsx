@@ -1,6 +1,8 @@
 // Page d'un membre : son avatar, son nom, sa bio, ses outils favoris (chacun mène à sa page
-// d'étiquette), puis ses projets, du plus récent au plus ancien. Sur sa propre page, un membre voit
-// aussi ses projets privés, marqués « Privé », et un bouton pour modifier son profil. Sur la page
+// d'étiquette), puis ses projets, du plus récent au plus ancien, sous « Projets · 3 ». Sur sa
+// propre page (« Moi », refonte R3), un membre voit aussi ses projets privés, marqués « Privé »,
+// sous « Mes projets · 3 », la roue des réglages en haut à droite, et « Modifier mon profil », qui
+// mène à la rubrique « Mon profil » des réglages. Sur la page
 // d'un autre membre, le nombre d'abonnés (jamais leurs noms), puis le bouton « Suivre » et le menu
 // « … » (tranche 7b) côte à côte : « Signaler ce profil » et « Bloquer ».
 //
@@ -13,7 +15,7 @@
 // suspension ») et « Historique de modération », et lit jusqu'à quand le compte est suspendu. Un
 // visiteur suspendu n'a plus « Suivre », sauf pour ne plus suivre un membre qu'il suit déjà.
 import type { Member } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
@@ -33,6 +35,7 @@ import { Button } from '../ui/Button'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { IconButton } from '../ui/IconButton'
 import { MemberHeader } from '../ui/MemberHeader'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -84,6 +87,10 @@ function MemberView({ member }: { member: Member }) {
   const toSource = useMediaSources()
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
   const back = useGoBack('/')
+  // « Moi » (/me, R3) est la première page d'un onglet, comme le Fil ou Explorer : pas de
+  // « Retour » (on change de page par la barre d'onglets). Sa page ouverte par /members/<id> en a un.
+  const pathname = usePathname()
+  const onBack = pathname === '/me' ? undefined : back
   const follow = useFollow({ kind: 'member', id: member.id })
   const { block } = useBlock()
   const { unblock } = useUnblock()
@@ -91,10 +98,10 @@ function MemberView({ member }: { member: Member }) {
   const followers = t(($) => $.follow.followers, { count: member.followerCount })
   const handle = member.handle
   // Tranche 7c : un compte suspendu ne suit plus personne de nouveau, mais peut retirer ce qu'il a
-  // déjà donné (décision de Louis, 26/10/2026). S'il suit ce membre, « Suivi » reste, pour ne plus
+  // déjà donné (décision de Louis, 26/10/2026). S'il suit ce membre, « Tu suis Léa » reste, pour ne plus
   // le suivre ; s'il ne le suit pas, « Suivre » est absent.
   const { suspended } = useSuspension()
-  // Vu « Suivi » pendant la suspension : le bouton reste toute la visite, inactif une fois le suivi
+  // Vu « Tu suis Léa » pendant la suspension : le bouton reste toute la visite, inactif une fois le suivi
   // retiré. Sans cela, il disparaîtrait sous le doigt (et le focus avec lui) dès le geste fait.
   const [keepFollow, setKeepFollow] = useState(false)
   if (suspended && member.isFollowed && !keepFollow) setKeepFollow(true)
@@ -195,6 +202,18 @@ function MemberView({ member }: { member: Member }) {
       : t(($) => $.moderation.memberSuspendedIndefinite)
     : null
 
+  // Le nom lu du bouton « Suivre » : « Suivre Léa », puis « Tu suis Léa » (aussi le texte affiché).
+  const followName = member.isFollowed
+    ? t(($) => $.follow.memberFollowing, { name: member.name })
+    : t(($) => $.follow.member, { name: member.name })
+  // Le titre de la liste des projets : « Mes projets » sur sa page, « Projets » sur celle d'un
+  // autre, suivi du nombre (« Mes projets · 3 »). Le « · » et le chiffre sont dessinés à part, en
+  // discret ; le nom lu dit le nombre en toutes lettres et au bon pluriel (« Mes projets, 3
+  // projets »), sans le signe que les lecteurs d'écran prononceraient « point médian ».
+  const listTitle = member.isMe ? t(($) => $.me.myProjects) : t(($) => $.member.projects)
+  const projectCount = member.projects.length
+  const listName = `${listTitle}, ${t(($) => $.member.projectCount, { count: projectCount })}`
+
   const followError = follow.expired
     ? t(($) => $.states.expired)
     : follow.error
@@ -202,7 +221,18 @@ function MemberView({ member }: { member: Member }) {
       : undefined
 
   return (
-    <Screen width="page" header={<TopNav />} onBack={back} pageTitle={member.name}>
+    <Screen width="page" header={<TopNav />} onBack={onBack} pageTitle={member.name}>
+      {/* Sur sa propre page, la roue des réglages, en haut à droite (R3, F-Nav8) : on entre dans
+          les réglages par « Moi ». Un bouton à icône seule : son nom (« Réglages ») est lu. */}
+      {member.isMe ? (
+        <Row justify="end">
+          <IconButton
+            icon="gear-six"
+            label={t(($) => $.nav.settings)}
+            onPress={() => router.push('/settings')}
+          />
+        </Row>
+      ) : null}
       <MemberHeader
         name={member.name}
         handle={t(($) => $.member.handle, { handle })}
@@ -217,11 +247,12 @@ function MemberView({ member }: { member: Member }) {
           member.isMe ? (
             <Stack gap="sm" align="center">
               <FollowerCount text={followers} />
+              {/* R3 (F-Nav8) : la rubrique « Mon profil » des réglages. */}
               <Button
-                label={t(($) => $.account.editProfile)}
+                label={t(($) => $.me.editProfile)}
                 variant="secondary"
                 icon="pencil-simple"
-                onPress={() => router.push('/profile')}
+                onPress={() => router.push('/settings/profile')}
               />
             </Stack>
           ) : (
@@ -241,7 +272,7 @@ function MemberView({ member }: { member: Member }) {
                   polite
                 />
               ) : null}
-              {/* Le nombre d'abonnés au-dessus : il ne bouge pas quand « Suivre » devient « Suivi ». */}
+              {/* Le nombre d'abonnés au-dessus : il ne bouge pas quand « Suivre » devient « Tu suis Léa ». */}
               {blocked ? null : <FollowerCount text={followers} />}
               {/* « Suivre » (ou « Débloquer ») et le menu « … » sur une rangée centrée. Le menu
                   garde sa place dans l'arbre, bloqué ou non : après « Bloquer », le focus revient
@@ -262,16 +293,12 @@ function MemberView({ member }: { member: Member }) {
                     onPress={follow.toggle}
                     // Suspendu, le suivi retiré : plus de nouveau suivi (l'API le refuserait).
                     disabled={suspended && !member.isFollowed}
-                    // Le nom lu contient toujours le texte affiché (« Suivi : Léa » quand on la
-                    // suit) : dire « touche Suivi » à la commande vocale trouve bien ce bouton.
-                    label={
-                      member.isFollowed
-                        ? t(($) => $.follow.memberFollowing, { name: member.name })
-                        : t(($) => $.follow.member, { name: member.name })
-                    }
-                    text={
-                      member.isFollowed ? t(($) => $.follow.following) : t(($) => $.follow.follow)
-                    }
+                    // Le nom lu contient toujours le texte affiché : « Suivre », puis « Tu suis
+                    // Léa » une fois suivie (R3, planches ; la coche est dessinée par le bouton,
+                    // hors du nom lu). Dire « touche Tu suis Léa » à la commande vocale trouve
+                    // bien ce bouton.
+                    label={followName}
+                    text={member.isFollowed ? followName : t(($) => $.follow.follow)}
                   />
                 ) : null}
                 <ActionMenu items={menuItems} />
@@ -288,8 +315,9 @@ function MemberView({ member }: { member: Member }) {
       {/* Bloqué : ni projets, ni « Pas encore de projet public » (l'API n'en donne aucun). */}
       {blocked ? null : (
         <>
-          <Text variant="heading" heading={2}>
-            {t(($) => $.member.projects)}
+          <Text variant="heading" heading={2} accessibilityLabel={listName}>
+            {listTitle}
+            <Text variant="heading" tone="muted">{` · ${projectCount}`}</Text>
           </Text>
           <ProjectGrid
             empty={member.isMe ? t(($) => $.member.emptyMine) : t(($) => $.member.empty)}

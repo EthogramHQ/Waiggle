@@ -2,8 +2,9 @@
 // C'est un interrupteur : le lecteur d'écran annonce « Suivre Léa, interrupteur, désactivé », puis
 // « activé » une fois qu'on la suit. Le texte affiché change (« Suivre » en miel, puis « Suivi » en
 // blanc avec une coche : l'action est faite, plus discrète ; toujours en blanc quand la page a déjà
-// son action principale, voir `prominent`), et le nom lu le reprend toujours (« Suivi : Léa ») :
-// c'est l'écran qui le donne, selon l'état.
+// son action principale, voir `prominent`), et le nom lu contient toujours le texte affiché (« Tu
+// suis Léa » sur sa page, R3 ; la coche est dessinée, hors du nom lu) : c'est l'écran qui le
+// donne, selon l'état.
 // Variante `chip` (refonte, tranche R3) : une pastille de verre posée sur la photo d'une carte
 // d'Explorer, « Suivre Nora » puis « Tu suis Nora ✓ ». Voir FollowChip, plus bas.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
