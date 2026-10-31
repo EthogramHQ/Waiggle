@@ -101,7 +101,10 @@ export function FollowButton({
       // Inactif, il passe en blanc : le miel pâle d'un bouton principal inactif attirerait encore
       // l'œil vers un geste impossible (relecture de design 7c).
       variant={followed || !prominent || disabled ? 'secondary' : 'primary'}
-      icon={followed ? 'check' : 'plus'}
+      // Une personne avec un « + », jamais le « + » seul : au téléphone, le « + » miel de la barre
+      // d'onglets veut dire « Publier » ; deux ronds miel au même signe sur la page d'un membre
+      // proposaient deux gestes différents (relecture de design de R3, #8 ; planche R3-Membre).
+      icon={followed ? 'check' : 'user-plus'}
       size="compact"
     />
   )

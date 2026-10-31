@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Carousel } from '../ui/Carousel'
+import { Notice } from '../ui/Notice'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
@@ -31,6 +32,8 @@ const fr = {
   testers: 'Carrousel de cartes de testeurs (avec photo, sans photo, titre long)',
   tools: 'Carrousel serré d’étiquettes avec leur nombre (« Outils populaires »)',
   tags: 'Étiquettes : avec nombre, sans nombre, touchables ou non',
+  failed:
+    'Sections en panne (500) : chacune dit ce qui lui manque, « Réessayer » sous une seule forme',
   day: 'jour',
   night: 'nuit',
   photo: 'Photo du projet',
@@ -44,6 +47,7 @@ const en: typeof fr = {
   testers: 'Carousel of tester cards (with a photo, without, long title)',
   tools: 'Tight carousel of tags with their count (“Popular tools”)',
   tags: 'Tags: with a count, without, tappable or not',
+  failed: 'Sections that could not load (500): each says what is missing, one form of “Retry”',
   day: 'day',
   night: 'night',
   photo: 'Photo of the project',
@@ -146,6 +150,30 @@ export function ExploreCatalogue() {
                 <Tag label="Claude" onPress={noop} />
                 <Tag label="Home Assistant" count={9} />
                 <Tag label="Python" />
+              </Stack>
+            </Example>
+
+            {/* Explorer en panne (relecture de design de R3, #3) : chaque section garde son titre et
+                dit ce qui lui manque, dans la même notice compacte, avec le même « Réessayer ». */}
+            <Example caption={`${l.failed} — ${l[scheme]}`}>
+              <Stack gap="lg">
+                {(
+                  [
+                    [t(($) => $.explore.testers), t(($) => $.explore.testersError)],
+                    [t(($) => $.explore.popularTools), t(($) => $.tools.errorTitle)],
+                    [t(($) => $.explore.recent), t(($) => $.explore.recentError)],
+                  ] as const
+                ).map(([title, message]) => (
+                  <Stack key={title} gap="md">
+                    <Text variant="heading" heading={3}>
+                      {title}
+                    </Text>
+                    <Notice
+                      message={message}
+                      action={{ label: t(($) => $.common.retry), onPress: noop }}
+                    />
+                  </Stack>
+                ))}
               </Stack>
             </Example>
           </Stack>
