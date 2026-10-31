@@ -73,7 +73,7 @@ import {
   summaryOf,
 } from '../src/testing/projects.ts'
 import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
-import { loadingProblem, unfinishedTexts } from './loading-guard.ts'
+import { loadingProblem, unfinishedTexts, waitUntilLoaded } from './loading-guard.ts'
 
 const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
@@ -1775,6 +1775,11 @@ const unfinishedProblem = async (page, shot, name) =>
     page: shot.name,
     intended: intendedUnfinished,
   })
+// Avant le garde, on laisse à la page le temps de finir de charger : 10 s au plus, en la relisant
+// tous les quarts de seconde (voir waitUntilLoaded). Une page chargée passe tout de suite ; une
+// page en panne échoue toujours, seulement 10 s plus tard.
+const settleLoading = (page, shot) =>
+  waitUntilLoaded(() => unfinishedProblem(page, shot, shot.name), { patience: 10_000, step: 250 })
 
 /**
  * Grossit chaque texte affiché (et sa hauteur de ligne) de `factor`, comme le réglage « taille du
@@ -1997,6 +2002,7 @@ async function layoutReport() {
           await page.waitForTimeout(300)
         }
         if (shot.textScale) await scaleText(page, shot.textScale)
+        await settleLoading(page, shot)
         await settle(page) // la page entière, pas seulement son haut (voir settle)
         // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
         // échoue à la fin (voir intendedUnfinished).
@@ -2153,6 +2159,7 @@ const capture = async ({ shot, device, scheme }) => {
       await page.waitForTimeout(300)
     }
     if (shot.textScale) await scaleText(page, shot.textScale)
+    await settleLoading(page, shot)
     const height = await settle(page)
     // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
     // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.
