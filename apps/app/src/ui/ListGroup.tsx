@@ -190,6 +190,11 @@ type RowBase = {
   /** Une icône dans une pastille, à gauche du libellé. */
   icon?: IconName
   /**
+   * Ce qui se pose à gauche du libellé quand une icône ne suffit pas (R3, « Tous les outils ») : la
+   * tuile à l'initiale d'un outil (`<InitialTile …>`). Décoratif : le libellé reste le nom lu.
+   */
+  leading?: ReactNode
+  /**
    * Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. Un texte, ou
    * un nœud qui porte son propre style, comme `title` : la précision surlignée d'un résultat de
    * recherche (`<HighlightedText variant="callout" tone="muted" …>`, « @camille_carnot »).
@@ -241,6 +246,7 @@ export function ListRow({
   label,
   title,
   icon,
+  leading,
   detail,
   detailRight = false,
   detailAlert,
@@ -322,6 +328,7 @@ export function ListRow({
           <Icon name={icon} size={20} tone="secondary" />
         </View>
       ) : null}
+      {leading}
       <View style={{ flex: 1, gap: space.xxs }}>
         {title ?? (
           <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>

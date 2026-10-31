@@ -2,8 +2,8 @@
 // liste des cartes avec son bandeau des nouveautés et sa fin, l'erreur d'un fil qui n'a pas pu se
 // charger, et le fil « Découvrir » (tous les projets publics, ou ceux qui cherchent des testeurs).
 // Ils ont quitté `HomeScreen.tsx` tels quels en R3, quand « Découvrir » est parti dans Explorer.
-import { FEED_PAGE_SIZE, type FeedItem } from '@ruche/contracts'
-import { useState } from 'react'
+import { FEED_PAGE_SIZE, type FeedItem, type ProjectSummary } from '@ruche/contracts'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
@@ -12,49 +12,53 @@ import { FeedEnd } from '../ui/FeedEnd'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
-import { Segmented } from '../ui/Segmented'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { useDiscoverFeed, useFeedNews } from './api'
 import { feedItemId } from './items'
 
-/** Le fil « Découvrir » : tous les projets publics, ou seulement ceux qui cherchent des testeurs. */
-export function DiscoverFeed() {
-  const { t } = useTranslation()
-  const [testers, setTesters] = useState(false)
-  const feed = useDiscoverFeed({ testers })
-  const items = feed.data?.pages.flatMap((page) => page.items) ?? []
-  const news = useFeedNews('discover', items[0], testers)
+/**
+ * Ce qu'un écran pose sur la photo d'une carte de projet (`overlay` de SummaryCard) : Explorer y met
+ * la pastille « Suivre Nora » (R3). `followedAuthorIds` : les auteurs que le membre suit déjà,
+ * d'après les pages lues du fil.
+ */
+export type CardOverlay = (
+  project: ProjectSummary,
+  followedAuthorIds: ReadonlySet<string>,
+) => ReactNode
 
-  return (
-    <Stack gap="lg">
-      <Segmented
-        label={t(($) => $.feed.filter.label)}
-        options={[
-          { value: 'all', label: t(($) => $.feed.filter.all) },
-          { value: 'testers', label: t(($) => $.feed.filter.testers) },
-        ]}
-        value={testers ? 'testers' : 'all'}
-        onChange={(value) => setTesters(value === 'testers')}
-        fill={false}
-      />
-      {!feed.data ? (
-        feed.isError ? (
-          <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
-        ) : (
-          <SkeletonList count={3} />
-        )
-      ) : (
-        <FeedList
-          feed={feed}
-          items={items}
-          news={news}
-          empty={testers ? t(($) => $.feed.testersEmpty) : t(($) => $.feed.discoverEmpty)}
-          caption={testers ? t(($) => $.feed.testersCaption) : t(($) => $.feed.discoverCaption)}
-        />
-      )}
-    </Stack>
+/**
+ * Le fil « Découvrir » : tous les projets publics, du plus récent au plus ancien (R3 : « Récents »
+ * d'Explorer). Le choix « Cherchent des testeurs » a quitté ce fil en R3 : ces projets ont leur
+ * carrousel en tête d'Explorer. La suite ne se charge que sur demande, par « Afficher la suite »
+ * (relecture juridique de R3, jur-J7 : pas de fil sans fin qui se charge tout seul).
+ */
+export function DiscoverFeed({ overlay }: { overlay?: CardOverlay }) {
+  const { t } = useTranslation()
+  const feed = useDiscoverFeed({ testers: false })
+  const pages = feed.data?.pages ?? []
+  const items = pages.flatMap((page) => page.items)
+  const news = useFeedNews('discover', items[0], false)
+  // Les auteurs suivis, d'après chaque page lue (l'API le dit page par page, pour ses auteurs).
+  // `?? []` : une page sans ce champ (un faux fil de test, une ancienne réponse) n'en suit aucun.
+  const followed = new Set(pages.flatMap((page) => page.followedAuthorIds ?? []))
+
+  return !feed.data ? (
+    feed.isError ? (
+      <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
+    ) : (
+      <SkeletonList count={3} />
+    )
+  ) : (
+    <FeedList
+      feed={feed}
+      items={items}
+      news={news}
+      empty={t(($) => $.feed.discoverEmpty)}
+      caption={t(($) => $.feed.discoverCaption)}
+      overlay={overlay ? (project) => overlay(project, followed) : undefined}
+    />
   )
 }
 
@@ -79,10 +83,12 @@ type FeedListProps = {
   empty: string
   /** La phrase en haut du fil, qui dit ce qu'il montre (remplacée par le bandeau des nouveautés). */
   caption: string
+  /** Ce qui se pose sur la photo de la carte d'un projet (pas sur celle d'une note). */
+  overlay?: ((project: ProjectSummary) => ReactNode) | undefined
 }
 
 /** Les cartes d'un fil, le bandeau des nouveautés au-dessus, et la fin du fil en dessous. */
-export function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
+export function FeedList({ feed, items, news, empty, caption, overlay }: FeedListProps) {
   const { t } = useTranslation()
   return (
     <Stack gap="lg">
@@ -108,7 +114,12 @@ export function FeedList({ feed, items, news, empty, caption }: FeedListProps) {
           item.kind === 'note' ? (
             <FeedNoteCard key={feedItemId(item)} note={item.note} project={item.project} />
           ) : (
-            <SummaryCard key={feedItemId(item)} project={item.project} at={item.at} />
+            <SummaryCard
+              key={feedItemId(item)}
+              project={item.project}
+              at={item.at}
+              overlay={overlay?.(item.project)}
+            />
           ),
         )}
       </ProjectGrid>
