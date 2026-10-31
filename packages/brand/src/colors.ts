@@ -233,6 +233,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   // (qui y tomberait sous 4,5). Sur une photo sombre, de jour, il ferait 3,1:1 : là, le panneau.
   { text: 'text', on: 'glass', min: 4.5, base: onAnyBackdrop },
   { text: 'textOnGlass', on: 'glass', min: 4.5, base: onPageOrHoney },
+  // Les onglets inactifs de la barre d'onglets du téléphone (R3, ui/TabBar.tsx) : libellé et icône
+  // en textSecondary sur le verre. La page défile sous la barre : mesurés sur la page, une photo
+  // toute noire et la lumière miel, comme le texte des barres flottantes.
+  { text: 'textSecondary', on: 'glass', min: 4.5, base: onAnyBackdrop },
   // La pastille de verre « Suivre Nora » posée sur la photo d'une carte (R3, relecture ui-9) : une
   // photo peut être toute noire ou toute blanche, et le verre sombre de nuit pâlit sur du blanc.
   // Son texte et ses icônes (coche, « ajouter ») sont en `text`, mesurés aux deux extrêmes.
