@@ -7,9 +7,10 @@
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
 import { appName, borders, layout, space } from '@ruche/brand'
 // Head vient d'expo-router, mais ne navigue pas : il remplit seulement l'en-tête du document web
-// (le titre de l'onglet). C'est la seule chose que src/ui prend à expo-router.
+// (le titre de l'onglet). C'est, avec useScreenFocused (ui/screenFocus.ts), la seule chose que
+// src/ui prend à expo-router.
 import Head from 'expo-router/head'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,10 +20,13 @@ import { BrandAmbiance } from './BrandAmbiance'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
+import { useScreenFocused } from './screenFocus'
 import { Text } from './Text'
+import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
 import { AmbientProvider, useAmbient } from './theme/ambient'
 import { markHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -108,6 +112,12 @@ export function Screen({
   const { padding, sizeClass, card } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
+  // La barre d'onglets du téléphone (R3), quand elle est là : la place qu'elle prend en bas, à
+  // réserver sous le contenu, et son cadre, qui porte le signal de remontée (tabBarSpace.ts).
+  const tabBar = useTabBarSpace()
+  const hosted = useHasTabBarHost()
+  // La zone qui défile, pour la faire remonter en haut quand l'onglet actif est touché de nouveau.
+  const scroller = useRef<ScrollView | null>(null)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -223,13 +233,20 @@ export function Screen({
               {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
             >
               <ScrollView
+                ref={scroller}
                 contentContainerStyle={{
                   flexGrow: 1,
                   alignItems: 'center',
                   // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
                   paddingTop: (pinned ? 0 : insets.top) + space.lg,
                   // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
-                  paddingBottom: pinnedFooter ? space.xl : insets.bottom + space.huge,
+                  // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
+                  // bas de l'appareil comprise) plus un peu d'air.
+                  paddingBottom: pinnedFooter
+                    ? space.xl
+                    : tabBar.height > 0
+                      ? tabBar.height + space.xl
+                      : insets.bottom + space.huge,
                   paddingHorizontal: padding,
                   gap: space.xl,
                 }}
@@ -280,12 +297,37 @@ export function Screen({
               {pinnedFooter ? (
                 <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
               ) : null}
+              {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
+                  écran seul), rien n'écoute, et le composant n'a pas besoin de la navigation. */}
+              {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
             </KeyboardAvoidingView>
           )}
         </View>
       </AmbientProvider>
     </NoticeScope>
   )
+}
+
+/**
+ * Remonte l'écran en haut quand l'onglet déjà actif est touché de nouveau (le signal `topSignal`
+ * du cadre de la barre, tabBarSpace.ts). Seulement l'écran affiché (`useScreenFocused`) : sur le
+ * web, les pages quittées restent montées sous la page ouverte, et toutes recevraient le signal.
+ * Un signal reçu pendant qu'un écran est caché est oublié : il ne remonte pas plus tard, à son
+ * retour.
+ */
+function ScrollToTopOnReselect({ scroller }: { scroller: RefObject<ScrollView | null> }) {
+  const { topSignal } = useTabBarSpace()
+  const focused = useScreenFocused()
+  const calm = useCalmMotion()
+  // Le dernier signal vu : au premier affichage, rien à faire.
+  const seen = useRef(topSignal)
+  useEffect(() => {
+    if (topSignal === seen.current) return
+    seen.current = topSignal
+    // Sans animation avec « Réduire les animations » : un grand déplacement devient un saut.
+    if (focused) scroller.current?.scrollTo({ y: 0, animated: !calm })
+  }, [topSignal, focused, calm, scroller])
+  return null
 }
 
 /**
