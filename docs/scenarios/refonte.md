@@ -573,7 +573,8 @@ Hors de R4, et où ça va :
   a déjà vu
 - Alors la sphère de miel s'affiche, avec la mascotte endormie, « Tu es à jour », « Tu as tout vu
   depuis ta dernière visite », le bouton « Explorer d'autres projets » (vers l'onglet Explorer)
-  et « Les nouveaux projets s'annonceront en haut du fil »
+  (bouton secondaire) et « Les nouveautés s'afficheront en haut du fil. »
+- Et s'il n'a jamais ouvert son fil, le texte dit seulement « Tu as tout vu. »
 - Et les éléments plus anciens suivent dessous, comme aujourd'hui, par pages
 - Et si rien n'est arrivé depuis sa dernière visite, la sphère est en haut du fil
 - Et si le fil se termine sans élément déjà vu, la sphère est à la fin
@@ -589,6 +590,9 @@ Hors de R4, et où ça va :
   pour voir leurs projets ici. »
 - Et dessous, « Proches à suivre » : jusqu'à cinq membres qui ont publié récemment, chacun avec sa
   photo, son nom, son dernier projet public (vignette et titre) et « Suivre » sur la ligne
+- Et la légende dit « Des membres qui ont publié récemment » ; aucune ligne ne dit qui le suit
+  ni combien d'abonnés il a
+- Et le nom ou la photo ouvre la page du membre, la vignette ouvre le projet
 - Et sous la liste, un encart « Ou publie ton premier projet. Une idée, un essai, ça compte. » avec
   le bouton « Publier »
 
@@ -599,13 +603,18 @@ Hors de R4, et où ça va :
 
 **Écarter une suggestion**
 - Quand il touche « × » sur une ligne (nommé « Ne plus suggérer Léa »)
-- Alors la ligne disparaît et un autre membre prend sa place s'il y en a
-- Et ce membre ne lui est plus suggéré, sur aucun appareil
+- Alors la ligne disparaît, le focus passe à la ligne suivante, et un autre membre prend sa place
+  s'il y en a
+- Et un message « Tu ne verras plus Léa ici. » propose « Annuler » pendant 5 secondes, qui remet
+  la ligne (choix de Louis, 31/10/2026)
+- Et passé ce délai, ce membre ne lui est plus suggéré, sur aucun appareil ; Léa n'en sait rien
+- Et deux tapes rapides n'écartent jamais la ligne qui monte sous le doigt
 
 **Qui est suggéré**
 - Seulement des membres qui ont au moins un projet public, du plus récent au plus ancien
-- Jamais lui-même, ni un membre qu'il suit déjà, ni un membre qu'il a bloqué ou qui l'a bloqué,
-  ni un membre suspendu
+- Jamais lui-même, ni un membre qu'il suit déjà, ni un membre qu'il a bloqué ou qui l'a bloqué
+- Un membre suspendu reste suggéré, comme il reste dans Explorer : la suspension ne se devine
+  nulle part (choix de Louis, 31/10/2026)
 - Le dernier projet montré est toujours public ; jamais un brouillon ni un projet retiré
 
 ### Le Fil sur ordinateur (F-Fil11, F-Fil12, F-Fil14, planche `R4-Fil-Desktop`)
