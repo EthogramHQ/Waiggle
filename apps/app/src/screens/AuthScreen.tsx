@@ -20,7 +20,6 @@ import { firstParam } from '../navigation/params'
 import { useGoBack } from '../navigation/useGoBack'
 import { AuthPanel } from '../ui/AuthPanel'
 import { Hint } from '../ui/Hint'
-import { IconButton } from '../ui/IconButton'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
@@ -81,9 +80,13 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
       ambiance="brand"
       // Le titre de l'onglet du navigateur suit l'onglet choisi (jur-15, WCAG 2.4.2).
       pageTitle={titles[tab]}
+      // Le « Retour » est celui du cadre de page, en tête de la feuille, comme sur les autres
+      // pages du compte (mot de passe oublié, « Vérifie ta boîte mail », nouveau mot de passe) :
+      // au même endroit d'une page à l'autre (R3, « Venus des listes »).
+      onBack={back}
+      // Sur le miel, en haut à droite, il ne reste que le choix de la langue.
       header={
-        <Row justify="between" align="center">
-          <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={back} />
+        <Row justify="end" align="center">
           <LanguageSwitcher compact visitor />
         </Row>
       }

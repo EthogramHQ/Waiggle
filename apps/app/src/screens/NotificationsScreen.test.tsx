@@ -674,8 +674,8 @@ describe('my account suspended by the moderation', () => {
 })
 
 // Relecture de design 7c : un compte suspendu ne publie plus. L'état vide lui proposait pourtant
-// « Publier un projet », vers un formulaire fermé ; il propose de découvrir des projets, à
-// l'accueil, comme le fil vide (« Découvrir des projets »).
+// « Publier un projet », vers un formulaire fermé ; il propose d'explorer les projets, comme le
+// fil vide (R3 : « Explorer les projets », vers l'onglet Explorer).
 describe('the empty list of a suspended member', () => {
   beforeEach(() => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
@@ -684,16 +684,16 @@ describe('the empty list of a suspended member', () => {
     jest.mocked(getMe).mockReset()
   })
 
-  it('offers to discover projects instead of publishing one', async () => {
+  it('offers to explore projects instead of publishing one', async () => {
     mockPages([notificationPageOf([])])
     await renderWithProviders(<NotificationsScreen />)
 
-    const discover = await screen.findByRole('button', {
+    const explore = await screen.findByRole('button', {
       name: t(($) => $.notifications.emptyActionSuspended),
     })
     expect(screen.queryByRole('button', { name: 'Publier un projet' })).toBeNull()
-    await fireEvent.press(discover)
+    await fireEvent.press(explore)
 
-    expect(mockPush).toHaveBeenCalledWith('/')
+    expect(mockPush).toHaveBeenCalledWith('/explore')
   })
 })

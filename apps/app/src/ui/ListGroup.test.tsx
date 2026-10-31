@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { ListGroup, ListRow } from './ListGroup'
+import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
@@ -252,5 +253,46 @@ describe('a row that leads to a page', () => {
     } finally {
       jest.restoreAllMocks()
     }
+  })
+})
+
+// R3 (relecture de l'interface, ui-10) : un résultat de recherche surligne la partie du titre qui
+// correspond (HighlightedText). La ligne accepte donc un nœud à la place du texte du titre
+// (`title`) ; le nom lu reste le texte (`label`), et ce texte n'est pas dessiné une seconde fois.
+describe('a row whose title is a node', () => {
+  // Un titre dont une partie est marquée, comme le ferait HighlightedText : un texte imbriqué.
+  const marked = (
+    <Text>
+      Carn<Text>et de cafés</Text>
+    </Text>
+  )
+
+  it('shows the node in place of its label, and is still named by the label', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Carnet de cafés" title={marked} href="/projects/p1" onPress={onPress} />
+      </ListGroup>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Carnet de cafés' })
+    // Le nœud est là (sa partie marquée se trouve), et il est le seul à porter ce texte : le
+    // libellé n'est pas répété dessous.
+    expect(screen.getByText('et de cafés')).toBeTruthy()
+    expect(screen.getAllByText('Carnet de cafés')).toHaveLength(1)
+    await fireEvent.press(link)
+    expect(onPress).toHaveBeenCalled()
+  })
+
+  it('keeps its detail under the node', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Carnet de cafés" title={marked} detail="Sam Petit · En cours" />
+      </ListGroup>,
+    )
+
+    expect(screen.getByText('et de cafés')).toBeTruthy()
+    expect(screen.getAllByText('Carnet de cafés')).toHaveLength(1)
+    expect(screen.getByText('Sam Petit · En cours')).toBeTruthy()
   })
 })

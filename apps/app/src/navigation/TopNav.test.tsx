@@ -4,11 +4,13 @@
 //
 // Tranche 7c : la barre porte aussi le bandeau d'un compte suspendu, une fois pour toutes les
 // pages qui la montent, sur téléphone comme sur ordinateur, et n'y propose plus « Publier ».
+import { palettes } from '@ruche/brand'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { Dimensions, StyleSheet } from 'react-native'
 import { createI18n } from '../i18n'
 import { useUnreadCount } from '../notifications/api'
 import { getMe } from '../profile/api'
-import { leaMe, suspendedMe } from '../testing/fixtures'
+import { adminMe, leaMe, suspendedMe } from '../testing/fixtures'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { containing } from '../testing/text'
 import { TopNav } from './TopNav'
@@ -20,10 +22,16 @@ jest.mock('../api/media', () => ({
 // La barre lit le profil pour l'avatar : on remplace l'appel.
 jest.mock('../profile/api', () => ({ getMe: jest.fn().mockReturnValue(new Promise(() => {})) }))
 jest.mock('../notifications/api', () => ({ useUnreadCount: jest.fn() }))
+// L'adresse de la page, que les tests de R3 font varier (les liens de la barre marquent l'actif).
+let mockPathname = '/'
 const mockPush = jest.fn()
+// La page qui porte la barre est-elle affichée ? Sur le web, Expo Router garde les pages quittées
+// montées dessous, avec la même adresse (R3, relecture de l'interface C9).
+let mockFocused = true
 jest.mock('expo-router', () => ({
-  usePathname: () => '/',
+  usePathname: () => mockPathname,
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useIsFocused: () => mockFocused,
 }))
 
 const { t } = createI18n('fr')
@@ -32,6 +40,8 @@ let restoreWindow: () => void
 
 beforeEach(() => {
   restoreWindow = setDesktopWindow()
+  mockPathname = '/'
+  mockFocused = true
   mockPush.mockReset()
   mockSession({ user: { id: 'u5', name: 'Inès' } })
   jest.mocked(useUnreadCount).mockReset().mockReturnValue(0)
@@ -144,24 +154,190 @@ describe('the top bar of a suspended member', () => {
     expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
     expect(screen.queryByText(containing(t(($) => $.suspension.title)))).toBeNull()
   })
-})
 
-// Dans les réglages (R2), la photo du membre ne mène plus aux réglages, où l'on est déjà : elle
-// reste là, sans être un bouton (relecture de l'interface, C7).
-describe('the top bar inside the settings', () => {
-  it('offers « Mon compte » outside the settings', async () => {
+  // Décision de Louis du 31/10/2026 : « Publier » est en miel, comme le « + » du téléphone.
+  it('offers « Publier » in honey, like the « + » of the phone', async () => {
     await renderWithProviders(<TopNav />)
 
-    await fireEvent.press(screen.getByRole('button', { name: t(($) => $.home.account) }))
-    expect(mockPush).toHaveBeenCalledWith('/settings')
+    const publish = screen.getByRole('button', { name: t(($) => $.home.publish) })
+    expect(StyleSheet.flatten(publish.props.style)?.backgroundColor).toBe(palettes.day.honey)
+  })
+})
+
+// R3 (F-Nav8, F-Nav9) : la photo de la barre s'appelle « Moi » et mène à sa propre page (/me), d'où
+// la roue ouvre les réglages. Dans les réglages aussi : on n'y est plus « déjà » (R2 l'y laissait
+// sans lien, relecture de l'interface C7), puisque « Moi » est une autre page.
+describe('the photo of the top bar', () => {
+  it('is named « Moi » and leads to one’s own page', async () => {
+    await renderWithProviders(<TopNav />)
+
+    await fireEvent.press(screen.getByRole('link', { name: t(($) => $.nav.me) }))
+    expect(mockPush).toHaveBeenCalledWith('/me')
+    // L'ancien nom a disparu avec l'ancienne destination (sa clé aussi : le texte, écrit ici).
+    expect(screen.queryByRole('button', { name: 'Réglages' })).toBeNull()
   })
 
-  it('shows the photo without a link back to the settings', async () => {
+  it('leads to « Moi » from the settings too', async () => {
     await renderWithProviders(<TopNav inSettings />)
 
     // Témoin : la barre est là.
     expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: t(($) => $.home.account) })).toBeNull()
-    expect(screen.queryByRole('link', { name: t(($) => $.home.account) })).toBeNull()
+    await fireEvent.press(screen.getByRole('link', { name: t(($) => $.nav.me) }))
+    expect(mockPush).toHaveBeenCalledWith('/me')
+  })
+})
+
+// R3 (« La barre du haut ») : la barre porte les liens Fil, Explorer et Ruches, l'actif dans sa
+// goutte et dit « page actuelle » aux lecteurs d'écran, avec la même table des chemins que la barre
+// d'onglets du téléphone (navigation/AppTabBar.tsx).
+describe('the links of the top bar', () => {
+  const navLink = (label: string) => screen.getByRole('link', { name: label })
+
+  it('offers Fil, Explorer and Ruches, each with its address', async () => {
+    await renderWithProviders(<TopNav />)
+
+    expect(navLink(t(($) => $.nav.feed)).props.href).toBe('/')
+    expect(navLink(t(($) => $.nav.explore)).props.href).toBe('/explore')
+    expect(navLink(t(($) => $.nav.hives)).props.href).toBe('/hives')
+  })
+
+  it.each([
+    ['/', 'feed'],
+    ['/explore', 'explore'],
+    ['/search', 'explore'],
+    ['/tools', 'explore'],
+    ['/tags/claude', 'explore'],
+    ['/hives', 'hives'],
+  ] as const)('on %s, marks « %s » as the current page, and only it', async (pathname, key) => {
+    mockPathname = pathname
+    await renderWithProviders(<TopNav />)
+
+    const labels = {
+      feed: t(($) => $.nav.feed),
+      explore: t(($) => $.nav.explore),
+      hives: t(($) => $.nav.hives),
+    }
+    expect(navLink(labels[key]).props['aria-current']).toBe('page')
+    for (const other of (Object.keys(labels) as (keyof typeof labels)[]).filter((k) => k !== key)) {
+      expect(navLink(labels[other]).props['aria-current']).not.toBe('page')
+    }
+  })
+
+  it('marks no link on a page pushed over the tabs', async () => {
+    mockPathname = '/projects/p1'
+    await renderWithProviders(<TopNav />)
+
+    for (const label of [t(($) => $.nav.feed), t(($) => $.nav.explore), t(($) => $.nav.hives)]) {
+      expect(navLink(label).props['aria-current']).not.toBe('page')
+    }
+  })
+
+  it('opens the page of the link touched', async () => {
+    await renderWithProviders(<TopNav />)
+
+    await fireEvent.press(navLink(t(($) => $.nav.explore)))
+
+    expect(mockPush).toHaveBeenCalledWith('/explore')
+  })
+
+  it('is not there for a visitor', async () => {
+    mockSession(null)
+    await renderWithProviders(<TopNav />)
+
+    expect(screen.queryByRole('link', { name: t(($) => $.nav.explore) })).toBeNull()
+  })
+})
+
+// R3 (relecture de l'interface, ui-5 et ui-6) : hors de /search, le champ de la barre est un lien
+// qui ouvre la recherche avec le focus (aucune lettre perdue au changement de page) ; sur /search,
+// c'est le vrai champ. En largeur moyenne (700 à 1 100), le champ cède la place à un bouton loupe.
+describe('the search of the top bar', () => {
+  /** Une fenêtre de largeur moyenne (une tablette, une petite fenêtre). */
+  const setMediumWindow = () => {
+    const medium = { width: 900, height: 900, scale: 2, fontScale: 1 }
+    Dimensions.set({ window: medium, screen: medium })
+  }
+
+  /**
+   * Le nom du lien qui a l'air d'un champ : le nom du champ, puis le texte affiché (charte : le nom
+   * lu contient le texte affiché ; un seul SearchLink, R3, relecture de l'interface C4).
+   */
+  const searchLinkName = `${t(($) => $.search.label)}, ${t(($) => $.search.placeholder)}`
+
+  it('is a link to the search page when not on it', async () => {
+    await renderWithProviders(<TopNav />)
+
+    const field = screen.getByRole('link', { name: searchLinkName })
+    expect(field.props.href).toBe('/search')
+    await fireEvent.press(field)
+    expect(mockPush).toHaveBeenCalledWith('/search')
+  })
+
+  it('is the real field on the search page', async () => {
+    mockPathname = '/search'
+    await renderWithProviders(<TopNav />)
+
+    expect(screen.queryByRole('link', { name: searchLinkName })).toBeNull()
+    // Le champ, nommé pour les lecteurs d'écran, reçoit ce qu'on tape.
+    const field = screen.getByLabelText(t(($) => $.search.label))
+    expect(typeof field.props.onChangeText).toBe('function')
+  })
+
+  it('leaves the real field to the page shown, not to a page kept mounted below it', async () => {
+    mockPathname = '/search'
+    mockFocused = false
+    await renderWithProviders(<TopNav />)
+
+    // Témoin : la barre est là (sa cloche).
+    expect(screen.getByRole('button', { name: t(($) => $.notifications.bell) })).toBeTruthy()
+    // Aucun champ qui pourrait prendre le clavier : la page cachée garde son lien.
+    expect(screen.queryByLabelText(t(($) => $.search.label))).toBeNull()
+    expect(screen.getByRole('link', { name: searchLinkName })).toBeTruthy()
+  })
+
+  it('becomes a magnifier button on a medium window, which opens the search page', async () => {
+    setMediumWindow()
+    await renderWithProviders(<TopNav />)
+
+    // Témoin : la barre est là (sa cloche).
+    expect(screen.getByRole('button', { name: t(($) => $.notifications.bell) })).toBeTruthy()
+    expect(screen.queryByLabelText(t(($) => $.search.label))).toBeNull()
+    await fireEvent.press(
+      screen.queryByRole('link', { name: t(($) => $.nav.search) }) ??
+        screen.getByRole('button', { name: t(($) => $.nav.search) }),
+    )
+    expect(mockPush).toHaveBeenCalledWith('/search')
+  })
+
+  it('shows the field, not the magnifier, on a wide window', async () => {
+    await renderWithProviders(<TopNav />)
+
+    expect(screen.queryByRole('button', { name: t(($) => $.nav.search) })).toBeNull()
+    expect(screen.getByRole('link', { name: searchLinkName })).toBeTruthy()
+  })
+})
+
+// R3 : « Modération » dans la barre d'un administrateur seulement (sur téléphone, la ligne reste
+// dans les réglages).
+describe('« Modération » in the top bar', () => {
+  it('is offered to an administrator, and leads to the moderation page', async () => {
+    jest.mocked(getMe).mockResolvedValue(adminMe)
+    await renderWithProviders(<TopNav />)
+
+    const link = await screen.findByRole('link', { name: t(($) => $.nav.moderation) })
+    expect(link.props.href).toBe('/moderation')
+    await fireEvent.press(link)
+    expect(mockPush).toHaveBeenCalledWith('/moderation')
+  })
+
+  it('is not offered to an ordinary member', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    await renderWithProviders(<TopNav />)
+
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+    // Témoin : le profil est lu, la barre complète est là.
+    expect(screen.getByRole('button', { name: t(($) => $.home.publish) })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: t(($) => $.nav.moderation) })).toBeNull()
   })
 })

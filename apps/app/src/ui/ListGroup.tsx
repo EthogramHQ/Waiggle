@@ -13,6 +13,7 @@ import {
   createContext,
   Fragment,
   isValidElement,
+  type ReactElement,
   type ReactNode,
   useContext,
   useId,
@@ -177,11 +178,28 @@ type RowProps = RowBase &
   )
 
 type RowBase = {
+  /** Le libellé : le texte affiché, et le nom lu de la ligne. */
   label: string
+  /**
+   * Ce qui se dessine à la place du libellé, quand le texte seul ne suffit pas (R3, ui-10) : le
+   * titre d'un résultat de recherche, surligné (`<HighlightedText weight={600} …>`). Le nœud porte
+   * son propre style ; il dit le même texte que `label`, qui reste le nom lu de la ligne et ne se
+   * dessine pas une seconde fois.
+   */
+  title?: ReactNode
   /** Une icône dans une pastille, à gauche du libellé. */
   icon?: IconName
-  /** Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. */
-  detail?: string
+  /**
+   * Ce qui se pose à gauche du libellé quand une icône ne suffit pas (R3, « Tous les outils ») : la
+   * tuile à l'initiale d'un outil (`<InitialTile …>`). Décoratif : le libellé reste le nom lu.
+   */
+  leading?: ReactNode
+  /**
+   * Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. Un texte, ou
+   * un nœud qui porte son propre style, comme `title` : la précision surlignée d'un résultat de
+   * recherche (`<HighlightedText variant="callout" tone="muted" …>`, « @camille_carnot »).
+   */
+  detail?: string | ReactElement
   detailRight?: boolean
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
@@ -226,7 +244,9 @@ type RowBase = {
 
 export function ListRow({
   label,
+  title,
   icon,
+  leading,
   detail,
   detailRight = false,
   detailAlert,
@@ -258,6 +278,15 @@ export function ListRow({
       <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
     ) : (
       (trailing ?? null)
+    )
+  // La précision : un texte prend le style des précisions ; un nœud (surligné) porte le sien.
+  const detailText =
+    typeof detail === 'string' ? (
+      <Text variant="callout" tone="muted">
+        {detail}
+      </Text>
+    ) : (
+      detail
     )
 
   const content = (
@@ -299,28 +328,23 @@ export function ListRow({
           <Icon name={icon} size={20} tone="secondary" />
         </View>
       ) : null}
+      {leading}
       <View style={{ flex: 1, gap: space.xxs }}>
-        <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
-          {label}
-        </Text>
+        {title ?? (
+          <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
+            {label}
+          </Text>
+        )}
         {detail && !detailRight && detailAlert !== undefined ? (
           // Une clé neuve à chaque échec : React remplace l'alerte au lieu de changer son texte.
           <View key={`alert-${detailAlert}`} accessible accessibilityRole="alert">
-            <Text variant="callout" tone="muted">
-              {detail}
-            </Text>
+            {detailText}
           </View>
         ) : detail && !detailRight ? (
-          <Text variant="callout" tone="muted">
-            {detail}
-          </Text>
+          detailText
         ) : null}
       </View>
-      {detail && detailRight ? (
-        <Text variant="callout" tone="muted">
-          {detail}
-        </Text>
-      ) : null}
+      {detail && detailRight ? detailText : null}
       {accessory}
       {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
       {right}

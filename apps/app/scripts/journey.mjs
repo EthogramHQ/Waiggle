@@ -255,15 +255,21 @@ const signIn = async (someone, email, secret) => {
 }
 
 /**
- * Tranche R2 : les réglages, ouverts comme un membre, depuis « Réglages » dans la barre du haut,
- * puis la rubrique (`name`) dans la colonne des rubriques ; on attend son adresse (`path`).
+ * Les réglages, ouverts comme un membre (R3) : la photo « Moi » de la barre du haut mène à sa page,
+ * dont la roue « Réglages » ouvre les réglages ; puis la rubrique (`name`) dans la colonne des
+ * rubriques, et on attend son adresse (`path`).
  */
 const openSettings = async (someone, name, path) => {
   const { page } = someone
   await open(page, `${appUrl}/`)
-  // Deux « Réglages » sur l'accueil : l'avatar de la barre du haut (le premier) et le raccourci
-  // sous le bonjour ; les deux mènent au même endroit.
-  await page.getByRole('button', { name: 'Réglages', exact: true }).first().click()
+  await page.getByRole('link', { name: 'Moi', exact: true }).first().click()
+  await page.waitForURL((url) => url.pathname === '/me')
+  // La roue est un bouton ou un lien selon la plateforme : on accepte les deux.
+  await page
+    .getByRole('button', { name: 'Réglages', exact: true })
+    .or(page.getByRole('link', { name: 'Réglages', exact: true }))
+    .first()
+    .click()
   await page.waitForURL((url) => url.pathname === '/settings')
   if (!name) return
   await page
@@ -485,8 +491,8 @@ try {
   await open(sam.page, `${appUrl}/members/${me.id}`)
   await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
   await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
-  // Une fois suivie, le nom lu reprend le texte affiché : « Suivi : Lea », activé.
-  await sam.page.getByRole('switch', { name: /^Suivi.*Lea$/, checked: true }).waitFor()
+  // Une fois suivie, le nom lu reprend le texte affiché : « Tu suis Lea » (R3), activé.
+  await sam.page.getByRole('switch', { name: /^Tu suis Lea/, checked: true }).waitFor()
   // L'interrupteur passe à « Suivi » avant la réponse de l'API (affichage optimiste) : on attend
   // que l'API ait enregistré l'abonnement, comme pour les réactions plus bas (course vue en CI, 6c).
   const readLeaForSam = async () => (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
@@ -645,27 +651,100 @@ try {
   )
 
   // Tranche 7b : Sam publie à son tour un projet, pour qu'on voie plus bas le blocage le cacher.
-  // Un nouveau membre, Malik, le trouve d'abord dans « Découvrir » (le témoin d'avant le blocage).
-  step('Sam publie un projet ; Malik, nouveau membre, le trouve dans « Découvrir »')
-  const samProject = 'Le carnet de Sam'
+  // Un nouveau membre, Malik, le trouve d'abord dans Explorer (le témoin d'avant le blocage). R3 :
+  // son titre porte un accent, que la recherche retrouve sans lui (« eleve » → « Élève »).
+  step('Sam publie un projet ; Malik, nouveau membre, le trouve dans Explorer')
+  const samProject = 'Le carnet de l’Élève'
   await open(sam.page, `${appUrl}/projects/new`)
   await sam.page.getByLabel('Titre').fill(samProject)
   await sam.page.getByLabel('Le pitch, en une phrase').fill('Il range mes essais de prompts.')
   await sam.page.getByRole('button', { name: 'Publier' }).last().click()
   await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   await signUp(malik, 'Malik')
-  /** « Découvrir » sur l'accueil de Malik, une fois le projet de Léa affiché (la liste est chargée). */
+  /**
+   * R3 : « Découvrir » est devenu « Récents », dans l'onglet Explorer. On attend le projet de Léa
+   * (la liste est chargée) ; un projet peut aussi être dans le carrousel des testeurs, d'où `first`.
+   */
   const openDiscover = async () => {
-    await open(malik.page, `${appUrl}/`)
-    await malik.page.getByRole('radio', { name: 'Découvrir' }).click()
-    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+    await open(malik.page, `${appUrl}/explore`)
+    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).first().waitFor()
   }
   await openDiscover()
-  await malik.page.getByRole('link', { name: samProject }).waitFor()
-  console.log('  ok : Malik voit le projet de Sam dans « Découvrir »')
+  await malik.page.getByRole('link', { name: samProject }).first().waitFor()
+  console.log('  ok : Malik voit le projet de Sam dans Explorer')
   const samMe = await (await sam.request.get(`${apiUrl}/v1/me`)).json()
   const malikMe = await (await malik.request.get(`${apiUrl}/v1/me`)).json()
   const samHandle = samMe.handle
+
+  // R3 : passer d'un onglet à l'autre par la barre du haut (l'ordinateur), l'actif marqué.
+  step('Malik passe d’un onglet à l’autre : Fil, Explorer, Ruches')
+  const mainNav = malik.page.getByRole('navigation', { name: 'Navigation principale' }).first()
+  for (const [tab, path] of [
+    ['Fil', '/'],
+    ['Ruches', '/hives'],
+    ['Explorer', '/explore'],
+  ]) {
+    await mainNav.getByRole('link', { name: tab, exact: true }).click()
+    await malik.page.waitForURL((url) => url.pathname === path)
+    await mainNav.locator(`[aria-current="page"]`).filter({ hasText: tab }).first().waitFor()
+    if (tab === 'Ruches')
+      await malik.page.getByText('Les ruches arrivent bientôt').first().waitFor()
+  }
+  console.log('  ok : chaque onglet ouvre sa page et devient l’onglet actif')
+
+  // R3 (F-Fil8) : suivre l'auteur d'une carte de « Récents » par sa pastille, sans ouvrir le projet.
+  step('Malik suit Sam depuis la pastille de sa carte, dans Explorer')
+  await malik.page.getByRole('switch', { name: 'Suivre Sam', exact: true }).first().click()
+  await malik.page
+    .getByRole('switch', { name: /^Tu suis Sam/, checked: true })
+    .first()
+    .waitFor()
+  expectEqual('Malik toujours sur Explorer', new URL(malik.page.url()).pathname, '/explore')
+  await waitFor(
+    'abonnement de Malik à Sam, dans l’API',
+    async () =>
+      (await (await malik.request.get(`${apiUrl}/v1/members/${samMe.id}`)).json()).isFollowed ===
+      true,
+  )
+  console.log('  ok : Malik suit Sam, depuis Explorer')
+
+  // R3 (F-Nav7) : chercher par mots. Taper ne crée pas une page d'historique par lettre (jur-J5) ;
+  // les accents ne comptent pas.
+  step('Malik cherche « carnaval », puis « eleve », qui trouve le projet de Sam')
+  // Le lien qui a l'air d'un champ lit le nom du champ, puis le texte affiché (R3, relecture C4).
+  await malik.page
+    .getByRole('link', { name: 'Rechercher, Un projet, une personne, un outil', exact: true })
+    .first()
+    .click()
+  await malik.page.waitForURL((url) => url.pathname === '/search')
+  // Les pages précédentes restent montées (cachées) sous la page affichée, avec leur barre du haut :
+  // sur /search, chacune dessine aussi le champ. On vise celui qu'on voit.
+  const field = malik.page
+    .getByLabel('Rechercher', { exact: true })
+    .filter({ visible: true })
+    .first()
+  await field.waitFor()
+  const historyBefore = await malik.page.evaluate(() => history.length)
+  await field.pressSequentially('carnaval', { delay: 40 })
+  // Les guillemets français portent des espaces insécables : on cherche par une expression.
+  await malik.page
+    .getByText(/^Aucun résultat pour .{1,3}carnaval.{1,3}$/)
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  expectEqual(
+    'pages d’historique ajoutées en tapant « carnaval »',
+    (await malik.page.evaluate(() => history.length)) - historyBefore,
+    0,
+  )
+  await field.fill('')
+  await field.pressSequentially('eleve', { delay: 40 })
+  await malik.page
+    .getByRole('link', { name: new RegExp(`^${samProject}`) })
+    .first()
+    .click()
+  await malik.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  console.log('  ok : « eleve » trouve « Le carnet de l’Élève », qui s’ouvre')
 
   // Tranche 7a : signaler, puis traiter le signalement. Sam publie un second commentaire, que
   // Malik signale ; l'administrateur le retire.

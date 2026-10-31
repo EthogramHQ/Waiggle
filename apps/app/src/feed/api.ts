@@ -1,6 +1,12 @@
 // Lire les deux fils de l'accueil, « Abonnements » et « Découvrir », page par page, et guetter les
 // nouveautés. Les écrans n'appellent que ces hooks ; les tests les remplacent par de faux résultats.
-import { FEED_PAGE_SIZE, type FeedItem, FeedPage, FollowingFeedPage } from '@ruche/contracts'
+import {
+  DiscoverFeedPage,
+  FEED_PAGE_SIZE,
+  type FeedItem,
+  type FeedPage,
+  FollowingFeedPage,
+} from '@ruche/contracts'
 import {
   type InfiniteData,
   useInfiniteQuery,
@@ -38,8 +44,11 @@ export const getFollowingPage = async (cursor?: string): Promise<FollowingFeedPa
 }
 
 /** Une page du fil « Découvrir » (testers : seulement les projets qui cherchent des testeurs). */
-export const getDiscoverPage = async (testers: boolean, cursor?: string): Promise<FeedPage> => {
-  const result = await request(pathOf('discover', testers, cursor), {}, FeedPage)
+export const getDiscoverPage = async (
+  testers: boolean,
+  cursor?: string,
+): Promise<DiscoverFeedPage> => {
+  const result = await request(pathOf('discover', testers, cursor), {}, DiscoverFeedPage)
   if (!result.ok) throw new ApiError(result.error)
   return result.data
 }

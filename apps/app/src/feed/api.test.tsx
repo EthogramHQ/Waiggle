@@ -18,6 +18,7 @@ const summary: ProjectSummary = {
   visibility: 'public',
   tools: [],
   cover: null,
+  demoUrl: null,
   portraitCover: null,
   createdAt: '2026-10-19T08:00:00.000Z',
   updatedAt: '2026-10-19T08:00:00.000Z',

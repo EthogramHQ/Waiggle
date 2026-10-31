@@ -283,3 +283,205 @@ tailles de texte
 - Le mot de passe sur le miel vif, comme la connexion ; les réglages sur le fond clair
 - Le second lien d'un changement d'adresse ne marche que dans la session du membre
 - « Trop d'essais » : une heure fixe, pas de décompte
+
+---
+
+## R3 — La navigation et Explorer
+
+Scénario validé par Louis le 30/10/2026 vers 23 h, tel que proposé (conversation 1 de R3).
+
+R3 donne à l'appli sa forme définitive (10 planches R3, décisions B1 F-Nav1 à F-Nav10 et B2
+F-Fil5 à F-Fil8) : la barre d'onglets en bas sur téléphone, la barre du haut sur ordinateur,
+Explorer (qui reprend Découvrir), la recherche par mots, et la page « Moi » avec sa roue des
+réglages. Les réglages à rubriques existent depuis R2 : R3 change seulement la façon d'y entrer.
+Une nouvelle route d'API (la recherche) ; aucune table nouvelle. Relectures : sécurité (la
+recherche respecte la visibilité et les blocages), juridique (ce que la recherche garde ou non).
+
+Hors de R3, et où ça va :
+- les catégories (filtres de « Récents », « Toutes les catégories ») : R6, qui les crée ;
+- le catalogue normé des outils, leurs logos, leurs familles : R6. En R3, « Outils » veut dire les
+  étiquettes d'aujourd'hui, avec une tuile à l'initiale ;
+- la feuille de publication qui monte du bas : R6. En R3, « + » ouvre la page de publication
+  d'aujourd'hui ;
+- les ruches elles-mêmes : R10 ;
+- le nouveau fil (cartes, « Tu es à jour », premier lancement) : R4 ;
+- la page « Activité » redessinée : R8. En R3, la cloche mène à la page d'aujourd'hui ;
+- partager sa page et le projet épinglé de la planche « Moi » : plus tard (R5 pour le partage).
+
+### La barre d'onglets (téléphone)
+
+**Les cinq places**
+- Étant donné un membre connecté, sur téléphone
+- Alors une barre de verre flotte en bas : **Fil · Explorer · ( + ) · Ruches · Moi**
+- Et « Moi » montre sa photo (ses initiales s'il n'en a pas), cerclée quand l'onglet est actif
+- Et le « + » est un rond miel de 56 au milieu, qui ouvre la publication
+- Et chaque onglet a un nom lu par les lecteurs d'écran, et dit lequel est actif
+- Et la barre reste au-dessus de la zone du geste de l'appareil (iPhone, Android)
+
+**La goutte**
+- Quand le membre touche un autre onglet
+- Alors la goutte claire de l'onglet actif glisse jusqu'à lui en s'étirant, puis se pose
+- Et avec « Réduire les animations », elle apparaît en fondu à sa nouvelle place
+
+**Où la barre se montre**
+- Elle se montre sur Fil, Explorer, la recherche, la page d'un outil, la page d'un membre, Ruches
+  et Moi
+- Elle disparaît sur les pages poussées par-dessus : un projet, l'Activité, les réglages et leurs
+  rubriques, publier et modifier, signaler, la modération ; ces pages gardent leur « Retour »
+- Toucher l'onglet déjà actif ramène à sa première page, ou en haut de sa liste
+- Un visiteur sans compte ne la voit jamais
+
+**Ruches avant R10** (choix de Louis, 30/10/2026)
+- L'onglet est là dès R3 et ouvre une page « Les ruches arrivent bientôt », avec la mascotte et
+  deux phrases sur ce qu'elles seront (des groupes de proches : « Ma ruche Famille »)
+
+**Un membre suspendu**
+- Étant donné un membre suspendu
+- Alors le « + » disparaît de la barre (et « Publier » de la barre du haut), comme aujourd'hui
+
+### La barre du haut (ordinateur)
+
+**Une barre pour toutes les pages d'un membre**
+- Étant donné un membre connecté, sur un écran large
+- Alors une barre de verre en haut porte : le logo et le mot « waiggle », les liens Fil, Explorer,
+  Ruches (le lien actif dans sa goutte), le champ de recherche, la cloche avec sa pastille, sa
+  photo, et le bouton miel « Publier »
+- Et un administrateur y voit aussi « Modération »
+- Et sa photo mène à « Moi »
+- Et la barre est la même sur toutes les pages, « Publier » compris (F-Nav4)
+
+**Passer du téléphone à l'ordinateur**
+- Quand la fenêtre s'élargit ou se rétrécit
+- Alors la barre du bas laisse la place à celle du haut, sans recharger la page
+- Et la page pré-rendue sur le web ne montre ni l'une ni l'autre avant de connaître la largeur
+  (pas d'écart signalé par React)
+
+### Le Fil
+
+**Le Fil ne garde que les abonnements** (F-Nav6, F-Nav10)
+- Étant donné un membre sur l'onglet Fil
+- Alors il voit le fil de ceux qu'il suit, sans le choix « Abonnements / Découvrir »
+- Et le haut du fil montre le logo à la place de « Bonjour Léa ! », avec la cloche « Activité » et
+  sa pastille à droite
+- Et la cloche ouvre l'Activité, une page poussée, sans barre d'onglets
+- Et le fil vide propose « Explorer les projets », qui ouvre l'onglet Explorer
+- Le reste du Fil (cartes, nouveautés, « Tu es à jour ») change en R4
+
+### Explorer
+
+**La page** (F-Fil6, planches `R3-Explorer`, `R3-Explorer-Nuit`, `R3-Explorer-Desktop`)
+- Étant donné un membre sur l'onglet Explorer
+- Alors il voit, de haut en bas :
+  - le titre « Explorer » et, sur ordinateur, « Les projets de tous les membres : à tester, à
+    suivre, pour t'inspirer. » (Louis, 30/10/2026) ;
+  - le champ « Un projet, une personne, un outil » (sur téléphone ; sur ordinateur, c'est celui de
+    la barre du haut) ;
+  - « Ils cherchent des testeurs » : un carrousel des projets testables qui ont un lien de démo,
+    chacun avec sa photo, « Tester ↗ » posé sur l'image, son titre et son auteur ;
+  - « Outils populaires » : les outils les plus utilisés dans les projets publics, avec leur
+    nombre sur ordinateur, et « Tous les outils » ;
+  - « Récents » : les projets publics de tous les membres, du plus récent au plus ancien, par
+    pages, comme Découvrir aujourd'hui
+- Et la nuit suit les jetons, comme le reste de l'appli
+
+**Tester depuis le carrousel**
+- Quand il touche « Tester ↗ »
+- Alors la démo s'ouvre par la page d'avertissement des liens externes, comme aujourd'hui
+- Et « Tester » est annoncé comme un site externe
+- Sur ordinateur, des flèches font défiler le carrousel ; au clavier, chaque carte se rejoint par
+  Tab
+- Quand il touche le titre d'une carte du carrousel, la page du projet s'ouvre (Louis, 31/10/2026)
+
+**Suivre l'auteur depuis une carte** (F-Fil8, Explorer seulement)
+- Étant donné une carte de « Récents » dont il ne suit pas l'auteur
+- Alors une pastille de verre « Suivre Nora » est posée sur la photo
+- Quand il la touche
+- Alors il suit Nora, et la pastille dit « Tu suis Nora ✓ »
+- Et ses propres projets n'ont pas de pastille
+
+**Les outils**
+- Quand il touche un outil, populaire ou dans « Tous les outils »
+- Alors il voit la page de cet outil (la page d'étiquette d'aujourd'hui), barre d'onglets
+  visible, Explorer actif
+- « Tous les outils » liste les outils des projets publics par ordre alphabétique, chacun avec son
+  nombre de projets publics
+
+### La recherche par mots (F-Nav7, planche `R3-Recherche`)
+
+**Chercher**
+- Étant donné un membre qui touche le champ de recherche
+- Quand il tape « carn »
+- Alors les résultats arrivent pendant qu'il tape, rangés en trois groupes : Projets, Membres,
+  Outils
+- Et des onglets « Tout · Projets 2 · Membres 1 · Outils 1 » filtrent les groupes
+- Et la partie du texte qui correspond est surlignée de miel
+- Et « Annuler » (téléphone) vide la recherche et revient à Explorer
+- Et l'adresse de la page garde la recherche (`/search?q=carn`), qu'on peut partager entre membres
+
+**Ce qui est cherché**
+- Les projets : le titre, le pitch et la description ; le résultat montre la photo, le titre,
+  l'auteur et le statut, ou l'extrait du texte qui correspond
+- Les membres : le nom et le pseudo ; le résultat montre l'avatar, le nom, « @pseudo · 12
+  abonnés »
+- Les outils : leur nom ; le résultat dit « 7 projets publics »
+- Les accents et les majuscules ne comptent pas : « eleve » trouve « Élève »
+- La recherche commence à 2 caractères ; les mots d'une seule lettre sont ignorés
+- Les membres : à 2 caractères, seuls ceux que l'on suit ; tous à partir de 3 caractères, comme
+  les mentions (Louis, 30/10/2026, après les relectures de sécurité et juridique : sinon
+  l'annuaire du cercle se relève en moins d'un jour) ; ils sont rangés par nom, jamais par
+  nombre d'abonnés
+
+**Ce qui n'est jamais trouvé**
+- Un projet privé d'un autre membre, un projet retiré par la modération
+- Un membre qui a bloqué celui qui cherche, ou qu'il a bloqué, ni ses projets
+- Un compte supprimé ou jamais vérifié
+- Les projets privés de celui qui cherche sont trouvés, marqués « Privé »
+
+**Rien trouvé**
+- Quand rien ne correspond, par exemple « carnaval »
+- Alors la mascotte à la loupe dit « Aucun résultat pour « carnaval » » et propose « Essaie un mot
+  plus court, ou le nom d'un outil comme « Claude ». »
+
+**Les garde-fous**
+- La recherche est réservée aux membres connectés
+- Un quota par membre (à fixer au plan) ; au-delà, « Trop de recherches, réessaie dans un
+  instant »
+- Les recherches ne sont gardées nulle part : ni en base, ni dans les journaux (le mot cherché
+  n'apparaît pas dans les logs de l'API), ni sur l'appareil (pas de « recherches récentes »)
+- Taper ne crée pas une page de plus dans l'historique du navigateur à chaque lettre
+- Chaque groupe montre 20 résultats au plus
+
+### Moi (F-Nav8, F-Nav9, planches `R3-Moi`, `R3-Membre-Desktop`)
+
+**Ma page**
+- Étant donné un membre sur l'onglet Moi (ou qui touche sa photo sur ordinateur)
+- Alors il voit sa propre page de membre : sa photo, son nom, « @pseudo », sa bio, son nombre
+  d'abonnés, ses outils favoris
+- Et « Modifier mon profil » mène à la rubrique « Mon profil » des réglages
+- Et une roue dentée, en haut à droite, ouvre les Réglages
+- Et « Mes projets · 3 » liste ses projets, les privés marqués « Privé »
+
+**La page d'un autre membre**
+- Elle prend la même mise en page, avec « Projets · 3 » et le bouton « Suivre », qui devient « Tu
+  suis Max ✓ »
+
+**Les réglages**
+- Les rubriques de R2 ne changent pas ; on y entre par la roue de « Moi » (et sur ordinateur par
+  « Moi » aussi)
+- La ligne « Modération » reste dans les réglages d'un administrateur sur téléphone
+- « Se déconnecter » reste dans la rubrique « Compte »
+
+### Venus des listes (choix de Louis, 30/10/2026)
+
+Pris dans R3 parce qu'ils touchent la navigation (`design-a-reprendre.md`, « Venu de R2 ») :
+- le « Retour » au même endroit sur toutes les pages poussées ;
+- la colonne des rubriques sur ordinateur bornée à la largeur d'un formulaire (interrupteur et
+  radio près de leur libellé) ;
+- les états (lien refusé, « Connecte-toi d'abord ») alignés à gauche, dans `StateMessage` ;
+- le mot « waiggle » sur l'accueil d'ordinateur, à côté du logo.
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) gagne : passer d'un onglet à l'autre, chercher un projet par un mot sans
+  accent, ouvrir le résultat, suivre un auteur depuis Explorer, ouvrir ses réglages par la roue de
+  « Moi »

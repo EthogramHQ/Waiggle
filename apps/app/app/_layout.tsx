@@ -12,8 +12,10 @@ import { I18nextProvider } from 'react-i18next'
 import { Platform } from 'react-native'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
+import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
+import { TabBarHost } from '../src/ui/TabBar'
 import { fontFiles } from '../src/ui/theme/fonts'
 import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
 import { ToastProvider } from '../src/ui/theme/toast'
@@ -58,8 +60,14 @@ export default function RootLayout() {
         <ThemeProvider>
           {/* Applique la langue enregistrée sur le compte du membre connecté */}
           <LanguageSync />
-          {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
-          <ToastProvider>{launching ? <LaunchScreen /> : <ThemedChrome />}</ToastProvider>
+          {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
+              pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
+              TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et
+              aux toasts, qui vivent donc à l'intérieur pour ne jamais la couvrir. */}
+          <TabBarHost bar={launching ? null : <AppTabBar />}>
+            {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
+            <ToastProvider>{launching ? <LaunchScreen /> : <ThemedChrome />}</ToastProvider>
+          </TabBarHost>
         </ThemeProvider>
       </I18nextProvider>
     </QueryClientProvider>

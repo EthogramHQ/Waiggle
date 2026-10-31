@@ -311,6 +311,34 @@ const feedItems = fromOthers.map((p, i) => ({
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
   project: summaryOf(p),
 }))
+// Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
+// (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
+// depuis R3), de plusieurs membres et aux titres variés, assez pour que le carrousel dépasse.
+const testerItems = [
+  ['Quel papillon ?', max, 'https://papillons.example.org'],
+  ['Décollage !', ines, 'https://decollage.example.com'],
+  [
+    'Carnet de cafés',
+    { id: 'sam-id', name: 'Sam Petit', avatarUrl: null },
+    'https://cafes.example.com',
+  ],
+  ['Le journal de Chelsea', max, 'https://chelsea.example.org'],
+  ['Le quiz des capitales', ines, 'https://quiz.example.org'],
+  ['Mon agent de recettes', ines, 'https://recettes.example.com'],
+].map(([title, author, demoUrl], i) => ({
+  kind: 'project',
+  at: new Date(Date.UTC(2026, 9, 18 - i, 9)).toISOString(),
+  project: {
+    ...summaryOf({
+      ...(i % 2 === 0 ? photosProject : recipesProject),
+      id: `5e6f7a8b-0000-4000-8000-00000000000${i + 1}`,
+      title,
+      author,
+      status: 'testable',
+    }),
+    demoUrl,
+  },
+}))
 // La page de Max, vue par Léa qui ne le suit pas encore.
 const maxMember = {
   ...leaPage,
@@ -531,6 +559,64 @@ const gardenProject = {
   title: 'Le carnet du potager',
   pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
   followerCount: 8,
+}
+// Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
+// `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
+// utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
+const toolList = [
+  { slug: 'claude', label: 'Claude', projectCount: 41 },
+  { slug: 'chatgpt', label: 'ChatGPT', projectCount: 38 },
+  { slug: 'lovable', label: 'Lovable', projectCount: 34 },
+  { slug: 'python', label: 'Python', projectCount: 22 },
+  { slug: 'mistral', label: 'Mistral', projectCount: 12 },
+  { slug: 'home-assistant', label: 'Home Assistant', projectCount: 9 },
+  { slug: 'notion', label: 'Notion', projectCount: 7 },
+  { slug: 'glide', label: 'Glide', projectCount: 6 },
+]
+// La recherche « carn » (GET /v1/search?q=carn) : deux projets (celui de Léa, testable, trouvé par
+// son titre ; celui de Tante Odile, trouvé dans sa description, avec l'extrait), un membre et un
+// outil. Les planches nomment Léa « Léa Moreau » ; son identifiant reste le sien (pas de pastille
+// « Suivre » sur ses propres projets).
+const odile = { id: 'odile-id', name: 'Tante Odile', avatarUrl: null }
+const coffeeProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000011',
+  author: { ...lea, name: 'Léa Moreau' },
+  title: 'Carnet de cafés',
+  pitch: 'Chaque café goûté, noté et comparé.',
+  status: 'testable',
+  tools: [{ label: 'Notion', slug: 'notion' }],
+  excerpt: null,
+}
+const biscotteProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000012',
+  author: odile,
+  title: 'Biscotte au parc',
+  pitch: 'Où promener le chien selon la météo.',
+  status: 'building',
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  excerpt: '… Le carnet de balades de Biscotte, mis à jour chaque dimanche après la promenade …',
+}
+const camille = {
+  id: 'camille-id',
+  name: 'Camille Carnot',
+  handle: 'camille_carnot',
+  avatarUrl: null,
+  followerCount: 12,
+}
+const searchResultsOf = {
+  carn: {
+    projects: { items: [coffeeProject, biscotteProject], more: false },
+    members: { items: [camille], more: false },
+    tools: { items: [toolList.find((t) => t.slug === 'notion')], more: false },
+  },
+}
+// Aucun résultat (« carnaval ») : les trois groupes, vides.
+const emptySearchResults = {
+  projects: { items: [], more: false },
+  members: { items: [], more: false },
+  tools: { items: [], more: false },
 }
 const gardenComments = [
   comment(41, null, '', 18, 9, {
@@ -970,7 +1056,14 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
-    if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
+    // « Découvrir » (Explorer, R3) : le carrousel des testeurs (?testers=true), ou « Récents », où
+    // Léa suit déjà Max (comme la planche R3-Explorer-Desktop) : ses cartes n'ont pas de pastille,
+    // celles d'Inès portent « Suivre Inès Haddad ».
+    if (pathname === '/v1/feed/discover') {
+      if (url.searchParams.get('testers') === 'true')
+        return json(200, { items: testerItems, nextCursor: null, followedAuthorIds: [] })
+      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [max.id] })
+    }
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
       const fresh = notificationList.flat().filter((n) => n.isNew).length
@@ -1047,6 +1140,15 @@ const fakeApi = (
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
     // recherche, 5 au plus, comme l'API.
+    // Tranche R3 : la liste des outils d'Explorer, et la recherche par mots. « carn » trouve deux
+    // projets, un membre et un outil ; tout autre texte (« carnaval ») ne trouve rien.
+    if (pathname === '/v1/tools') return json(200, { tools: toolList })
+    if (pathname === '/v1/search') {
+      const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+      // « quota » : le quota de recherches est dépassé (page `recherche-429`).
+      if (q === 'quota') return json(429, { error: { code: 'rate_limited', message: '' } })
+      return json(200, searchResultsOf[q] ?? emptySearchResults)
+    }
     if (pathname === '/v1/members/mentionable') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase()
       return json(200, { members: mentionable.filter((m) => m.handle.startsWith(q)).slice(0, 5) })
@@ -1181,9 +1283,18 @@ const pages = [
   // Décision D1 : le second lien d'un changement d'adresse ouvert sans session.
   { name: 'adresse-connecte-toi', path: '/email-change/sign-in-first', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
-  // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
-  { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
+  // Le Fil (R3) : l'accueil d'un membre, ses abonnements seuls (le logo et la cloche en haut sur
+  // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
+  { name: 'fil', path: '/', signedIn: true, fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
+  // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
+  // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
+  // R3-Explorer-Nuit).
+  { name: 'explorer', path: '/explore', signedIn: true },
+  { name: 'explorer-nuit', path: '/explore', signedIn: true, fullPage: true },
+  // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
+  { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
   { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
   // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
@@ -1564,6 +1675,21 @@ const pages = [
   // La page d'un membre (la sienne : avec un brouillon privé), et celle d'une étiquette, pleine
   // puis vide.
   { name: 'membre', path: `/members/${leaMe.id}`, signedIn: true, fullPage: true },
+  // « Moi » (R3) : la même page par l'onglet, sans « Retour », la roue des réglages en haut à
+  // droite.
+  { name: 'moi', path: '/me', signedIn: true, fullPage: true },
+  // La barre d'onglets au plus étroit (320 points) avec le texte à 200 % (relecture du plan R3,
+  // ui-8) : les libellés passent sous l'icône, sur une ligne. Téléphone seulement (l'ordinateur
+  // n'a pas de barre d'onglets) ; `textScale` grossit chaque texte, comme le réglage d'un
+  // téléphone (le web n'a pas de `fontScale`).
+  {
+    name: 'barre-320-texte-200',
+    path: '/',
+    signedIn: true,
+    phone: { width: 320, height: 640 },
+    phoneOnly: true,
+    textScale: 2,
+  },
   { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
@@ -1614,6 +1740,12 @@ const pages = [
     path: '/projects/00000000-0000-4000-8000-000000000000',
     signedIn: true,
   },
+  // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
+  // quota dépassé ; et l'onglet Ruches, avant les ruches.
+  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
+  { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
+  { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
+  { name: 'ruches', path: '/hives', signedIn: true },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
@@ -1643,6 +1775,29 @@ const unfinishedProblem = async (page, shot, name) =>
     page: shot.name,
     intended: intendedUnfinished,
   })
+
+/**
+ * Grossit chaque texte affiché (et sa hauteur de ligne) de `factor`, comme le réglage « taille du
+ * texte » d'un téléphone poussé à 200 % : la largeur de l'écran ne change pas, seul le texte
+ * grossit. Sur le web, `fontScale` vaut toujours 1 : on écrit donc les tailles dans la page. Les
+ * tailles sont toutes lues avant d'être écrites (un parent grossi changerait celles de ses enfants).
+ * Même règle que `textScale` des essais (`.claude/explore/lib.mjs`).
+ */
+const scaleText = async (page, factor) => {
+  await page.evaluate((factor) => {
+    const all = [...document.querySelectorAll('body *')]
+    const sizes = all.map((element) => {
+      const style = getComputedStyle(element)
+      return [Number.parseFloat(style.fontSize), style.lineHeight]
+    })
+    all.forEach((element, rank) => {
+      const [font, line] = sizes[rank]
+      element.style.fontSize = `${font * factor}px`
+      if (line !== 'normal') element.style.lineHeight = `${Number.parseFloat(line) * factor}px`
+    })
+  }, factor)
+  await page.waitForTimeout(400) // le temps que la barre se mesure de nouveau (onLayout)
+}
 
 const devices = [
   { name: 'telephone', viewport: { width: 390, height: 844 } },
@@ -1841,6 +1996,7 @@ async function layoutReport() {
           await shot.prepare(page)
           await page.waitForTimeout(300)
         }
+        if (shot.textScale) await scaleText(page, shot.textScale)
         await settle(page) // la page entière, pas seulement son haut (voir settle)
         // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
         // échoue à la fin (voir intendedUnfinished).
@@ -1946,8 +2102,16 @@ const scale = read ? 1 : 2
 
 // Les travaux de la file : une capture par page, appareil et thème. Le catalogue, le plus long,
 // est en tête de la liste : il commence tôt au lieu de finir seul, après tous les autres.
+// Une page peut changer la fenêtre du téléphone (`phone`, la barre à 320 points) et se passer de
+// l'ordinateur (`phoneOnly`).
+const devicesFor = (shot) =>
+  devices
+    .filter((device) => !shot.phoneOnly || device.name === 'telephone')
+    .map((device) =>
+      shot.phone && device.name === 'telephone' ? { ...device, viewport: shot.phone } : device,
+    )
 const jobs = selected.flatMap((shot) =>
-  devices.flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
+  devicesFor(shot).flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
 )
 
 const browser = await chromium.launch()
@@ -1988,6 +2152,7 @@ const capture = async ({ shot, device, scheme }) => {
       await shot.prepare(page)
       await page.waitForTimeout(300)
     }
+    if (shot.textScale) await scaleText(page, shot.textScale)
     const height = await settle(page)
     // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
     // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.

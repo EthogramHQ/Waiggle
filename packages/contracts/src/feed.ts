@@ -68,6 +68,16 @@ export const FeedPage = z
 export type FeedPage = z.infer<typeof FeedPage>
 
 /**
+ * Une page du fil « Découvrir » (R3 : la partie « Récents » d'Explorer). `followedAuthorIds` dit,
+ * parmi les auteurs des projets de la page, ceux que le membre suit déjà : la pastille « Suivre
+ * Nora » ne se pose que sur les autres. Ce sont ses propres abonnements, rendus à lui seul.
+ */
+export const DiscoverFeedPage = FeedPage.extend({
+  followedAuthorIds: z.array(z.string()).max(FEED_PAGE_SIZE),
+}).meta({ id: 'DiscoverFeedPage' })
+export type DiscoverFeedPage = z.infer<typeof DiscoverFeedPage>
+
+/**
  * Une page du fil « Abonnements ». `followsAnyone` permet à l'appli de distinguer un membre qui ne
  * suit personne (« Tu ne suis personne pour l'instant ») d'un fil simplement vide.
  */

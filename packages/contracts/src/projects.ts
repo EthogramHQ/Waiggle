@@ -241,7 +241,9 @@ export type Project = z.infer<typeof Project>
 
 /**
  * Un projet en version courte, pour les listes : sa couverture (la première photo) et sa
- * couverture verticale, sans toute la galerie.
+ * couverture verticale, sans toute la galerie. R3 : avec l'adresse de sa démo, pour que
+ * « Tester ↗ » du carrousel d'Explorer l'ouvre sans relire le projet (le même membre la voit
+ * déjà sur la page du projet).
  */
 export const ProjectSummary = Project.pick({
   id: true,
@@ -251,6 +253,7 @@ export const ProjectSummary = Project.pick({
   status: true,
   visibility: true,
   tools: true,
+  demoUrl: true,
   portraitCover: true,
   createdAt: true,
   updatedAt: true,

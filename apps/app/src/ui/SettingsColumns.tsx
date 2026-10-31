@@ -1,5 +1,6 @@
 // La mise en page des réglages sur ordinateur (tranche R2) : la colonne des rubriques (SettingsNav)
-// à gauche, étroite et fixe, et la rubrique ouverte à droite, qui prend le reste. Le titre de la
+// à gauche, étroite et fixe, et la rubrique ouverte à droite, qui prend le reste sans dépasser la
+// largeur d'un formulaire (R3). Le titre de la
 // rubrique est un titre de section (h2) : celui de la page (« Réglages », h1) est au-dessus.
 // Sur téléphone et tablette, l'écran n'en a pas besoin : la liste et la rubrique y sont deux pages.
 //
@@ -53,8 +54,12 @@ export function SettingsColumns({ nav, title, current, children }: Props) {
           {nav}
         </Surface>
       </View>
-      {/* minWidth 0 : sur le web, sans lui, un long texte élargirait la colonne hors de la page. */}
-      <View style={{ flex: 1, minWidth: 0, gap: space.lg }}>
+      {/* minWidth 0 : sur le web, sans lui, un long texte élargirait la colonne hors de la page.
+          maxWidth (refonte R3, choix de Louis du 30/10/2026) : jamais plus large qu'un formulaire.
+          Sur un grand écran, la rubrique prenait toute la largeur restante, et un interrupteur ou
+          une radio, posés au bout de la ligne, s'éloignaient de leur libellé. Le jeton, pas un
+          nombre : changer `layout.formWidth` change aussi cette colonne. */}
+      <View style={{ flex: 1, minWidth: 0, maxWidth: layout.formWidth, gap: space.lg }}>
         {/* Le titre peut recevoir le focus (tabIndex -1, web) sans devenir une étape de Tab. */}
         <View ref={titleRef} {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}>
           <Text variant="heading" heading={2}>

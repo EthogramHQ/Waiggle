@@ -29,6 +29,7 @@ export const radii = {
   group: 22, // groupe de champs, liste de réglages
   small: 18, // petites tuiles
   code: 14, // bloc de prompt
+  mark: 4, // surlignage d'un mot trouvé, posé sur les lettres (web seulement : voir HighlightedText)
   pill: 999, // boutons, pastilles, champs de recherche : complètement arrondis
 } as const
 export type Radius = keyof typeof radii
@@ -63,6 +64,9 @@ export const layout = {
   settingsNavWidth: 256, // la colonne des rubriques des réglages, sur ordinateur (R2)
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
   touchTarget: 44, // taille minimale d'une zone à toucher du doigt
+  // R3 : la barre d'onglets du téléphone. Le rond miel « + » (Publier) au milieu, et la taille de
+  // la photo de l'onglet « Moi » (ses initiales sans photo).
+  tabBar: { publish: 56, avatar: 28 },
   chipHeight: 36, // hauteur dessinée d'une étiquette (sa zone à toucher, autour, fait 44)
   chipControl: 28, // rond du bouton « retirer » posé dans une étiquette
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur

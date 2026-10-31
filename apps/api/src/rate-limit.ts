@@ -134,6 +134,12 @@ export const memberCounterKeys = (userId: string) => ({
   // Sans eux, une session volée pourrait deviner ce mot de passe en changeant d'adresse IP.
   passwordChange: `password-change:${userId}`,
   passwordChangeDay: `password-change-day:${userId}`,
+  // La recherche par mots (tranche R3) : 600 par heure et 2 000 par jour, comme les mentions. La
+  // clé porte le membre, jamais le mot cherché (jur-J6).
+  searchHour: `search-hour:${userId}`,
+  searchDay: `search-day:${userId}`,
+  // La liste des outils (tranche R3) : 600 lectures par heure, calculée à chaque appel.
+  toolsHour: `tools-hour:${userId}`,
 })
 
 /**

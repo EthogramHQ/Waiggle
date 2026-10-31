@@ -4,7 +4,7 @@
 // réécrit la règle. Tranche 7b : un projet d'un membre bloqué (dans un sens ou l'autre) disparaît
 // aussi, pour le visiteur seulement.
 import { schema } from '@ruche/db'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import { notBlockedWith } from '../blocks/visibility'
 
 /**
@@ -21,6 +21,25 @@ export const listedProject = () =>
  */
 export const listedProjectFor = (viewerId: string) =>
   and(listedProject(), notBlockedWith(viewerId, schema.project.authorId))
+
+/**
+ * L'auteur du projet a vérifié son adresse (R3, relecture de sécurité sec-A3) : un compte jamais
+ * vérifié n'existe pour personne (ni sa page, ni ses mentions), ses projets non plus. Une seule
+ * condition, reprise par la recherche, la liste des outils et la page d'une étiquette.
+ *
+ * En SQL : (select verified_author.email_verified from "user" verified_author
+ *           where verified_author.id = project.author_id) is true
+ * Une lecture de la clé primaire de "user" par projet. Les noms de table sont écrits en toutes
+ * lettres (sql.raw, du texte fixe, jamais une entrée du client) : Drizzle écrit parfois une colonne
+ * sans le nom de sa table, et dans cette sous-requête « id » serait alors celui de "user" (charte
+ * de l'API, 6b). `is true` : faux aussi quand la sous-requête ne rend rien.
+ */
+export const verifiedAuthor = () =>
+  sql`(select verified_author.email_verified from ${schema.user} verified_author where verified_author.id = ${sql.raw('"project"."author_id"')}) is true`
+
+/** Un projet listé pour ce visiteur, dont l'auteur est vérifié (outils, étiquettes, recherche). */
+export const listedVerifiedProjectFor = (viewerId: string) =>
+  and(listedProjectFor(viewerId), verifiedAuthor())
 
 /**
  * Un projet que ce membre voit : un projet listé pour lui, ou l'un des siens (même privé ou

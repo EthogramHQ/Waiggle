@@ -31,6 +31,9 @@ const day = {
   honeyPressed: '#F2B000', // bouton miel pendant l'appui
   honeyLight: '#FFE58A', // lumière miel (dégradés)
   honeySoft: '#FFF0C2', // fond des pastilles de statut
+  // Le surlignage miel sous les lettres trouvées par la recherche (R3, HighlightedText). Il porte
+  // toujours l'encre (`text`), même dans une ligne grise : la partie trouvée se lit d'un coup d'œil.
+  highlight: '#FFE58A',
   onHoney: '#1C1B19', // texte posé sur du miel (jamais du blanc : illisible)
   honeyDisabled: '#FFE7A3', // bouton miel inactif
   onHoneyDisabled: '#8A7A55',
@@ -113,6 +116,9 @@ const night = {
   honeyPressed: '#F2B820',
   honeyLight: '#FFD666',
   honeySoft: '#3F3417',
+  // Un miel brun, deux fois plus clair que la carte de nuit (2:1) : la crème claire du texte
+  // s'y lit encore à 8:1.
+  highlight: '#5A4712',
   onHoney: '#1C1B19',
   honeyDisabled: '#4A3D1C',
   onHoneyDisabled: '#A39B89',
@@ -233,6 +239,15 @@ export const contrastPairs: readonly ContrastPair[] = [
   // (qui y tomberait sous 4,5). Sur une photo sombre, de jour, il ferait 3,1:1 : là, le panneau.
   { text: 'text', on: 'glass', min: 4.5, base: onAnyBackdrop },
   { text: 'textOnGlass', on: 'glass', min: 4.5, base: onPageOrHoney },
+  // Les onglets inactifs de la barre d'onglets du téléphone (R3, ui/TabBar.tsx) : libellé et icône
+  // à l'encre (`text`) sur le verre. La page défile sous la barre : mesurés sur la page, la lumière
+  // miel et une photo toute noire ou toute blanche. Le gris `textSecondary` y tombait à 4,24:1 de
+  // nuit, le verre sombre posé sur une photo blanche (correcteur N1c).
+  { text: 'text', on: 'glass', min: 4.5, base: [...onAnyBackdrop, '#FFFFFF'] },
+  // La pastille de verre « Suivre Nora » posée sur la photo d'une carte (R3, relecture ui-9) : une
+  // photo peut être toute noire ou toute blanche, et le verre sombre de nuit pâlit sur du blanc.
+  // Son texte et ses icônes (coche, « ajouter ») sont en `text`, mesurés aux deux extrêmes.
+  { text: 'text', on: 'glass', min: 4.5, base: ['#000000', '#FFFFFF'] },
   // Le bandeau d'erreur d'un formulaire et la tuile de miel (icône ou initiale brune).
   { text: 'dangerText', on: 'errorBand', min: 4.5 },
   { text: 'onHoneyTile', on: 'honey', min: 4.5 },
@@ -244,6 +259,9 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },
   { text: 'amberText', on: 'honeySoft', min: 4.5 },
+  // Le surlignage d'une recherche (R3, relecture ui-9) : les lettres trouvées passent à l'encre sur
+  // le miel, dans un titre comme dans une ligne grise.
+  { text: 'text', on: 'highlight', min: 4.5 },
   { text: 'amberText', on: 'background', min: 4.5 },
   // La carte d'une note et le journal d'un projet : texte posé sur une surface pleine.
   { text: 'amberText', on: 'surface', min: 4.5 },

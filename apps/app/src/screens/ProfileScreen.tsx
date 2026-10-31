@@ -367,6 +367,9 @@ function ProfileForm({ me }: { me: Me }) {
         <FieldGroup>
           <TextField
             label={t(($) => $.profile.fields.name)}
+            // R3 (relecture juridique, jur-J3) : dire, là où l'on choisit son nom, que la
+            // recherche trouve les membres par leur nom et leur pseudo.
+            hint={t(($) => $.profile.searchable)}
             value={name}
             onChangeText={edit('name', setName)}
             inputRef={inputs.name}

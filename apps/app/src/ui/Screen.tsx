@@ -7,9 +7,10 @@
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
 import { appName, borders, layout, space } from '@ruche/brand'
 // Head vient d'expo-router, mais ne navigue pas : il remplit seulement l'en-tête du document web
-// (le titre de l'onglet). C'est la seule chose que src/ui prend à expo-router.
+// (le titre de l'onglet). C'est, avec useScreenFocused (ui/screenFocus.ts), la seule chose que
+// src/ui prend à expo-router.
 import Head from 'expo-router/head'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,10 +20,13 @@ import { BrandAmbiance } from './BrandAmbiance'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
+import { useScreenFocused } from './screenFocus'
 import { Text } from './Text'
+import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
 import { AmbientProvider, useAmbient } from './theme/ambient'
 import { markHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
+import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
@@ -51,6 +55,12 @@ type Props = {
   notice?: ReactNode
   /** Affiche un bouton « Retour » en haut à gauche. */
   onBack?: () => void
+  /**
+   * Une action en haut à droite, sur la rangée du « Retour » (la roue des réglages de « Moi », R3) :
+   * à la même hauteur que lui, qu'il soit là ou non, au lieu d'une rangée à elle sous le retour.
+   * Hors du miel seulement (sur le miel, la droite de la barre est à `header`).
+   */
+  topAction?: ReactNode
   /**
    * form : une colonne étroite et centrée (connexion, formulaires) ;
    * page : toute la largeur, jusqu'à 1 280 points (pages en colonnes sur ordinateur).
@@ -95,6 +105,7 @@ export function Screen({
   stickyHeader = false,
   notice,
   onBack,
+  topAction,
   width = 'form',
   hero,
   ambient = true,
@@ -108,6 +119,12 @@ export function Screen({
   const { padding, sizeClass, card } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
+  // La barre d'onglets du téléphone (R3), quand elle est là : la place qu'elle prend en bas, à
+  // réserver sous le contenu, et son cadre, qui porte le signal de remontée (tabBarSpace.ts).
+  const tabBar = useTabBarSpace()
+  const hosted = useHasTabBarHost()
+  // La zone qui défile, pour la faire remonter en haut quand l'onglet actif est touché de nouveau.
+  const scroller = useRef<ScrollView | null>(null)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -120,12 +137,49 @@ export function Screen({
   const pinned = header !== undefined && stickyHeader && !brand
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
   const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
-  // Le contenu propre à l'écran, précédé du retour, du titre et du sous-titre.
+  const backButton = onBack ? (
+    <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
+  ) : null
+  // R3 (« le Retour au même endroit », point des listes) : sur le miel, le retour se pose en tête de
+  // la barre de BrandAmbiance, à gauche, et l'en-tête de l'écran (la langue) à droite. Dans la
+  // feuille, sa place dépendait du décor (téléphone) et de la hauteur du contenu (la carte centrée
+  // sur ordinateur) : il changeait de place d'une page du compte à l'autre. Mesuré par l'ui-dev R :
+  // (16, 16) à 390 px et (32, 48) à 1280 px sur les quatre pages, premier arrêt de Tab partout.
+  const brandHeader =
+    brand && backButton ? (
+      <View
+        style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
+      >
+        {backButton}
+        {header}
+      </View>
+    ) : (
+      header
+    )
+  // La rangée du haut, hors du miel : le retour à gauche, l'action de la page à droite (R3, la roue
+  // de « Moi » : avant, elle prenait une rangée sous le retour, 64 points plus bas). Sans action, le
+  // retour seul, comme avant ; sans retour, l'action reste à droite.
+  const topRow =
+    !brand && topAction ? (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: backButton ? 'space-between' : 'flex-end',
+          gap: space.sm,
+        }}
+      >
+        {backButton}
+        {topAction}
+      </View>
+    ) : brand ? null : (
+      backButton
+    )
+  // Le contenu propre à l'écran, précédé de la rangée du haut (hors du miel), du titre et du
+  // sous-titre.
   const body = (
     <>
-      {onBack ? (
-        <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
-      ) : null}
+      {topRow}
       {title || subtitle ? (
         <View style={{ gap: space.sm }}>
           {title ? (
@@ -208,7 +262,7 @@ export function Screen({
             // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
             // miel), le décor et la feuille qui porte le contenu.
             <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              <BrandAmbiance header={header} scene={scene} hero={withHero ? hero : undefined}>
+              <BrandAmbiance header={brandHeader} scene={scene} hero={withHero ? hero : undefined}>
                 {body}
               </BrandAmbiance>
             </ScrollView>
@@ -223,13 +277,20 @@ export function Screen({
               {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
             >
               <ScrollView
+                ref={scroller}
                 contentContainerStyle={{
                   flexGrow: 1,
                   alignItems: 'center',
                   // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
                   paddingTop: (pinned ? 0 : insets.top) + space.lg,
                   // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
-                  paddingBottom: pinnedFooter ? space.xl : insets.bottom + space.huge,
+                  // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
+                  // bas de l'appareil comprise) plus un peu d'air.
+                  paddingBottom: pinnedFooter
+                    ? space.xl
+                    : tabBar.height > 0
+                      ? tabBar.height + space.xl
+                      : insets.bottom + space.huge,
                   paddingHorizontal: padding,
                   gap: space.xl,
                 }}
@@ -280,12 +341,37 @@ export function Screen({
               {pinnedFooter ? (
                 <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
               ) : null}
+              {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
+                  écran seul), rien n'écoute, et le composant n'a pas besoin de la navigation. */}
+              {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
             </KeyboardAvoidingView>
           )}
         </View>
       </AmbientProvider>
     </NoticeScope>
   )
+}
+
+/**
+ * Remonte l'écran en haut quand l'onglet déjà actif est touché de nouveau (le signal `topSignal`
+ * du cadre de la barre, tabBarSpace.ts). Seulement l'écran affiché (`useScreenFocused`) : sur le
+ * web, les pages quittées restent montées sous la page ouverte, et toutes recevraient le signal.
+ * Un signal reçu pendant qu'un écran est caché est oublié : il ne remonte pas plus tard, à son
+ * retour.
+ */
+function ScrollToTopOnReselect({ scroller }: { scroller: RefObject<ScrollView | null> }) {
+  const { topSignal } = useTabBarSpace()
+  const focused = useScreenFocused()
+  const calm = useCalmMotion()
+  // Le dernier signal vu : au premier affichage, rien à faire.
+  const seen = useRef(topSignal)
+  useEffect(() => {
+    if (topSignal === seen.current) return
+    seen.current = topSignal
+    // Sans animation avec « Réduire les animations » : un grand déplacement devient un saut.
+    if (focused) scroller.current?.scrollTo({ y: 0, animated: !calm })
+  }, [topSignal, focused, calm, scroller])
+  return null
 }
 
 /**
