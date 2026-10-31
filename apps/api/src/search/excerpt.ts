@@ -14,13 +14,25 @@ const BEFORE_WORD = 40
  * Les expressions régulières ne lisent pas tout le Markdown (un tableau garde ses « | ») : c'est
  * assez pour une ligne d'aperçu, que l'appli affiche en texte simple, jamais en Markdown.
  * Le « _ » seul est gardé : il est courant dans un nom (« a_c »), rare comme mise en forme.
+ *
+ * Le coût (relecture S1) : la description est écrite par un membre, et ce calcul bloque toute
+ * l'API pendant qu'il tourne (le délai de PostgreSQL ne couvre pas le JavaScript). Une expression
+ * comme `\[[^\]]*\]`, sur un texte de 10 000 « [ » jamais fermés, relit tout le reste du texte à
+ * partir de chaque « [ » avant d'échouer : le carré de la longueur, une seconde pour 20 extraits.
+ * D'où deux précautions dans chaque expression qui cherche une fermeture :
+ * - la partie lue après l'ouverture exclut le signe qui ouvre (« [ », « < ») : une tentative
+ *   s'arrête au plus tard à l'ouverture suivante, et le texte entier n'est lu qu'un nombre fixe
+ *   de fois ;
+ * - les répétitions sont bornées (`{0,300}` : de 0 à 300 caractères), par prudence en plus : au-delà,
+ *   ce n'est plus un lien qu'on montrerait dans un aperçu, et il reste tel quel.
  */
 export const plainText = (markdown: string): string =>
   markdown
-    // ![texte](adresse) et [texte](adresse) : le texte seul.
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // <https://…> : l'adresse, sans les chevrons.
-    .replace(/<((?:https?|mailto):[^>\s]*)>/g, '$1')
+    // ![texte](adresse) et [texte](adresse) : le texte seul. Ni le texte ni l'adresse ne
+    // contiennent de crochet (`[^[\]…]`) : un lien entre crochets reste tel quel, c'est rare.
+    .replace(/!?\[([^[\]\n]{0,300})\]\([^)[\]]{0,2048}\)/g, '$1')
+    // <https://…> : l'adresse, sans les chevrons (sans « < » dedans, même raison).
+    .replace(/<((?:https?|mailto):[^<>\s]{0,2048})>/g, '$1')
     // En début de ligne : « # », « > », « - », « * », « + », « 1. ».
     .replace(/^[ \t]*(?:#{1,6}|>+|[-*+]|\d+[.)])[ \t]+/gm, '')
     // Gras, italique, barré, code : les signes seuls.
