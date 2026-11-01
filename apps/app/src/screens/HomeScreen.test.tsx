@@ -1014,8 +1014,9 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
     const list = listAround(card('Carnet de cafés'))
     expect(list).toBeTruthy()
     expect(listAround(card('Le quiz des capitales'))).toBe(list)
-    // La grille d'avant, vide, ne dit pas « rien de neuf » (ui-B6).
-    expect(screen.queryByText(shown(fr.t(($) => $.feed.quiet)))).toBeNull()
+    // La grille d'avant, vide, ne dit pas « rien de neuf » (ui-B6). Le texte écrit en toutes lettres :
+    // sa clé (feed.quiet) est retirée depuis que le fil vide finit sur « Tu es à jour ».
+    expect(screen.queryByText(/Rien de neuf pour l’instant/)).toBeNull()
   })
 
   it('stands at the very end when the feed ends with nothing already seen, said once', async () => {

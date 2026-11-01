@@ -57,7 +57,7 @@ const fr = {
   hello: 'Bonjour Inès !',
   greetingTitle: 'Ton fil t’attend',
   greetingBody: 'Suis quelques proches : leurs projets arriveront ici.',
-  row: 'Une ligne des proches à suivre (SuggestionRow) : à suivre, suivie, inactive',
+  row: 'Une ligne des proches à suivre (SuggestionRow) : à suivre, suivie, inactive, empilée',
   list: 'La liste (SuggestionList) : « × » écarte la ligne, « Annuler » la remet',
   publish: 'L’encart « Publier » (PublishPrompt)',
   sphere: 'La sphère de miel (HoneySphere), 128 et 64 points',
@@ -108,7 +108,7 @@ const en: typeof fr = {
   hello: 'Hello Inès!',
   greetingTitle: 'Your feed is waiting',
   greetingBody: 'Follow a few close ones: their projects will show up here.',
-  row: 'A row of people to follow (SuggestionRow): to follow, followed, disabled',
+  row: 'A row of people to follow (SuggestionRow): to follow, followed, disabled, stacked',
   list: 'The list (SuggestionList): “×” dismisses the row, “Undo” brings it back',
   publish: 'The “Publish” prompt (PublishPrompt)',
   sphere: 'The honey sphere (HoneySphere), 128 and 64 points',
@@ -343,6 +343,15 @@ function Rows({ l }: { l: typeof fr }) {
         followed={false}
         followDisabled
         onFollow={noop}
+      />
+      {/* Empilée, comme dans la colonne de droite du fil sur ordinateur (relecture design A1). */}
+      <SuggestionRow
+        {...row}
+        name={nora}
+        project={{ title: cafes, image: { source: null, thumbhash: cafe, label: l.photo } }}
+        followed={false}
+        onFollow={noop}
+        stacked
       />
     </Stack>
   )
