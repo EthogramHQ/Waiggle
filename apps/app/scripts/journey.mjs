@@ -52,6 +52,17 @@ const step = (text) => console.log(`\n▶ ${text}`)
 const fail = (text) => {
   throw new Error(text)
 }
+/**
+ * Cherche un élément par son rôle et son nom lu, en nom EXACT par défaut. Playwright, lui, cherche
+ * par défaut « un nom qui contient » le texte, sans tenir compte de la casse : « Mon agent de
+ * recettes » trouvait aussi le lien « Tester Mon agent de recettes, ouvre un site externe », et le
+ * parcours échouait loin de la cause (R4). Ici, `exact: true` (nom entier, majuscules comprises) est
+ * la règle ; une recherche partielle voulue le dit, `{ exact: false }`, avec la raison en commentaire.
+ * `scope` est une page ou un morceau de page (un Locator). Sans `name`, on cherche le rôle seul.
+ * Une expression régulière comme nom reste telle quelle (`exact` n'y change rien).
+ */
+const byRole = (scope, role, name, options = {}) =>
+  scope.getByRole(role, name === undefined ? options : { exact: true, ...options, name })
 const expectEqual = (what, actual, expected) => {
   if (actual !== expected) fail(`${what} : attendu ${expected}, obtenu ${actual}`)
   console.log(`  ok : ${what} (${actual})`)
@@ -221,14 +232,14 @@ const signUp = async (someone, name, { resend = false } = {}) => {
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)
   // R2 : sur ordinateur, « Créer un compte » est l'onglet ; le bouton dit « Créer mon compte ».
-  await page.getByRole('button', { name: 'Créer mon compte' }).click()
+  await byRole(page, 'button', 'Créer mon compte').click()
   await page.waitForURL(/\/check-email/)
   // Le lien connecte au compte, puis mène à la page « Adresse vérifiée ».
   let link = await verificationLink(email)
   if (resend) {
     // Le premier e-mail est arrivé : on compte les e-mails reçus, puis on demande le suivant.
     const received = mailsTo(email).length
-    await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
+    await byRole(page, 'button', /^Renvoyer l.e‑mail$/).click()
     // La phrase reste vraie dans les cas que l'API cache (relecture juridique de R2, B1).
     await page
       .getByText('Si cette adresse attend sa vérification, un nouvel e‑mail vient de partir.', {
@@ -250,7 +261,7 @@ const signIn = async (someone, email, secret) => {
   await open(page, `${appUrl}/sign-in`)
   await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(secret)
-  await page.getByRole('button', { name: 'Me connecter' }).click()
+  await byRole(page, 'button', 'Me connecter').click()
   await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
 }
 
@@ -262,20 +273,16 @@ const signIn = async (someone, email, secret) => {
 const openSettings = async (someone, name, path) => {
   const { page } = someone
   await open(page, `${appUrl}/`)
-  await page.getByRole('link', { name: 'Moi', exact: true }).first().click()
+  await byRole(page, 'link', 'Moi').first().click()
   await page.waitForURL((url) => url.pathname === '/me')
   // La roue est un bouton ou un lien selon la plateforme : on accepte les deux.
-  await page
-    .getByRole('button', { name: 'Réglages', exact: true })
-    .or(page.getByRole('link', { name: 'Réglages', exact: true }))
+  await byRole(page, 'button', 'Réglages')
+    .or(byRole(page, 'link', 'Réglages'))
     .first()
     .click()
   await page.waitForURL((url) => url.pathname === '/settings')
   if (!name) return
-  await page
-    .getByRole('navigation', { name: 'Réglages' })
-    .getByRole('link', { name, exact: true })
-    .click()
+  await byRole(byRole(page, 'navigation', 'Réglages'), 'link', name).click()
   await page.waitForURL((url) => url.pathname === path)
 }
 
@@ -303,8 +310,7 @@ try {
    */
   const changeAvatar = async () => {
     const chooser = lea.page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null)
-    const refused = await lea.page
-      .getByRole('button', { name: 'Changer la photo' })
+    const refused = await byRole(lea.page, 'button', 'Changer la photo')
       .click({ timeout: 10_000 })
       .then(
         () => null,
@@ -345,7 +351,7 @@ try {
   step('Léa change de pseudo')
   const handle = `lea_${randomBytes(3).toString('hex')}`
   await lea.page.getByLabel('Pseudo', { exact: true }).fill(`@${handle}`)
-  await lea.page.getByRole('button', { name: 'Enregistrer' }).last().click()
+  await byRole(lea.page, 'button', 'Enregistrer').last().click()
   await lea.page.getByText('Profil enregistré.').waitFor()
   const renamed = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
   expectEqual('pseudo de Léa', renamed.handle, handle)
@@ -354,10 +360,10 @@ try {
   // R2 : les réglages d'e-mail sont la rubrique « Notifications ».
   step('Léa coupe le récap de la semaine ; la page rechargée le montre coupé')
   await openSettings(lea, 'Notifications', '/settings/notifications')
-  await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: true }).click()
+  await byRole(lea.page, 'switch', 'Le récap de la semaine', { checked: true }).click()
   await lea.page.getByText('Réglage enregistré.').waitFor()
   await open(lea.page, `${appUrl}/settings/notifications`)
-  await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: false }).waitFor()
+  await byRole(lea.page, 'switch', 'Le récap de la semaine', { checked: false }).waitFor()
   const emails = await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()
   expectEqual('récap de Léa', emails.weeklyRecap, false)
 
@@ -370,22 +376,22 @@ try {
   const newEmail = `lea-nouvelle-${randomBytes(4).toString('hex')}@example.com`
   await openSettings(lea, 'Compte', '/settings/account')
   // Une ligne-lien, dont le nom lu dit l'action puis l'adresse actuelle.
-  await lea.page.getByRole('link', { name: /^Changer d.adresse e‑mail/ }).click()
+  await byRole(lea.page, 'link', /^Changer d.adresse e‑mail/).click()
   await lea.page.waitForURL((url) => url.pathname === '/settings/account/email')
   await lea.page.getByLabel('Nouvelle adresse e‑mail').fill(newEmail)
   await lea.page.getByLabel('Confirme avec ton mot de passe').fill(password)
-  await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
+  await byRole(lea.page, 'button', 'Envoyer le lien').click()
   await lea.page.getByText('Regarde ta boîte mail actuelle').waitFor()
   // Le premier lien part vers l'adresse ACTUELLE, qui a déjà reçu celui de l'inscription.
   await open(lea.page, await verificationLink(leaSignUp.email, leaSignUp.link))
   await lea.page.waitForURL((url) => url.pathname === '/email-change/confirmed')
-  await lea.page.getByRole('heading', { name: 'Plus qu’une étape' }).waitFor()
+  await byRole(lea.page, 'heading', 'Plus qu’une étape').waitFor()
   // Rien n'a encore changé : il faut aussi le second lien.
   const halfway = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
   expectEqual('adresse de Léa après le premier lien', halfway.email, leaSignUp.email)
   await open(lea.page, await verificationLink(newEmail))
   await lea.page.waitForURL((url) => url.pathname === '/email-change/done')
-  await lea.page.getByRole('heading', { name: 'Adresse changée' }).waitFor()
+  await byRole(lea.page, 'heading', 'Adresse changée').waitFor()
   // La page lit la nouvelle adresse dans la session, jamais dans l'adresse de la page (scénario).
   await lea.page.getByText(newEmail, { exact: false }).first().waitFor()
   const doneUrl = lea.page.url()
@@ -410,26 +416,26 @@ try {
 
   step('Léa se déconnecte (rubrique « Compte ») : l’ancienne adresse ne la connecte plus')
   await openSettings(lea, 'Compte', '/settings/account')
-  await lea.page.getByRole('button', { name: 'Me déconnecter' }).click()
+  await byRole(lea.page, 'button', 'Me déconnecter').click()
   await lea.page.waitForURL((url) => url.pathname === '/')
   await open(lea.page, `${appUrl}/sign-in`)
   await lea.page.getByLabel('Adresse e‑mail').fill(leaSignUp.email)
   await lea.page.getByLabel('Mot de passe', { exact: true }).fill(password)
-  await lea.page.getByRole('button', { name: 'Me connecter' }).click()
+  await byRole(lea.page, 'button', 'Me connecter').click()
   await lea.page.getByText('Adresse e‑mail ou mot de passe incorrect.').waitFor()
   console.log('  ok : l’ancienne adresse est refusée')
 
   // Tranche R2 : « Mot de passe oublié ? », l'adresse, puis le lien reçu (lu dans le journal de
   // l'API, comme les liens de vérification) ; le nouveau mot de passe déconnecte tous ses appareils.
   step('Léa a oublié son mot de passe : elle en choisit un nouveau par le lien reçu')
-  await lea.page.getByRole('link', { name: /^Mot de passe oublié/ }).click()
+  await byRole(lea.page, 'link', /^Mot de passe oublié/).click()
   await lea.page.waitForURL((url) => url.pathname === '/forgot-password')
   // Par le rôle : sous Expo Router web, « Se connecter » reste dans la page, cachée, avec son
   // propre champ « Adresse e-mail » (getByLabel trouverait les deux ; getByRole ignore le caché).
-  await lea.page.getByRole('textbox', { name: 'Adresse e‑mail' }).fill(newEmail)
+  await byRole(lea.page, 'textbox', 'Adresse e‑mail').fill(newEmail)
   // On compte les e-mails déjà reçus à cette adresse : le lien attendu est dans le suivant.
   const mailsBeforeReset = mailsTo(newEmail).length
-  await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
+  await byRole(lea.page, 'button', 'Envoyer le lien').click()
   await lea.page
     .getByText('Si un compte existe pour cette adresse, un e‑mail vient de partir.')
     .waitFor()
@@ -441,7 +447,7 @@ try {
   await lea.page.waitForURL((url) => url.pathname === '/reset-password')
   const passwordAfterReset = `oubli-${randomBytes(8).toString('hex')}`
   await lea.page.getByLabel('Nouveau mot de passe', { exact: true }).fill(passwordAfterReset)
-  await lea.page.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+  await byRole(lea.page, 'button', 'Enregistrer le mot de passe').click()
   await lea.page.waitForURL((url) => url.pathname === '/sign-in')
   await lea.page.getByText('Mot de passe changé. Connecte-toi avec le nouveau.').waitFor()
   console.log('  ok : « Se connecter » dit « Mot de passe changé »')
@@ -452,7 +458,7 @@ try {
   console.log('  ok : la session du téléphone, ouverte avant, est coupée (401)')
   await lea.page.getByLabel('Adresse e‑mail').fill(newEmail)
   await lea.page.getByLabel('Mot de passe', { exact: true }).fill(passwordAfterReset)
-  await lea.page.getByRole('button', { name: 'Me connecter' }).click()
+  await byRole(lea.page, 'button', 'Me connecter').click()
   await lea.page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
   const again = await (await lea.request.get(meUrl)).json()
   expectEqual('Léa reconnectée, nouvelle adresse et nouveau mot de passe', again.email, newEmail)
@@ -463,12 +469,12 @@ try {
   await signIn(leaPhone, newEmail, passwordAfterReset)
   expectEqual('téléphone de Léa reconnecté', await statusFor(leaPhone, meUrl), 200)
   await openSettings(lea, 'Sécurité', '/settings/security')
-  await lea.page.getByRole('link', { name: 'Changer mon mot de passe', exact: true }).click()
+  await byRole(lea.page, 'link', 'Changer mon mot de passe').click()
   await lea.page.waitForURL((url) => url.pathname === '/settings/security/password')
   const passwordAfterChange = `change-${randomBytes(8).toString('hex')}`
   await lea.page.getByLabel('Mot de passe actuel', { exact: true }).fill(passwordAfterReset)
   await lea.page.getByLabel('Nouveau mot de passe', { exact: true }).fill(passwordAfterChange)
-  await lea.page.getByRole('button', { name: 'Changer le mot de passe', exact: true }).click()
+  await byRole(lea.page, 'button', 'Changer le mot de passe').click()
   // Le toast se lit sur la rubrique où l'on revient.
   await lea.page.waitForURL((url) => url.pathname === '/settings/security')
   // La couche des toasts peut aussi porter le texte, cachée, pour les lecteurs d'écran : le visible.
@@ -493,9 +499,9 @@ try {
   await sam.page.getByText('Ton fil t’attend').waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
   await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
-  await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
+  await byRole(sam.page, 'switch', 'Suivre Lea').click()
   // Une fois suivie, le nom lu reprend le texte affiché : « Tu suis Lea » (R3), activé.
-  await sam.page.getByRole('switch', { name: /^Tu suis Lea/, checked: true }).waitFor()
+  await byRole(sam.page, 'switch', /^Tu suis Lea/, { checked: true }).waitFor()
   // L'interrupteur passe à « Suivi » avant la réponse de l'API (affichage optimiste) : on attend
   // que l'API ait enregistré l'abonnement, comme pour les réactions plus bas (course vue en CI, 6c).
   const readLeaForSam = async () => (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
@@ -514,19 +520,19 @@ try {
   await lea.page.getByLabel('Lien de démo (facultatif)').fill('https://example.com/recettes')
   // Chaque photo est d'abord réduite sur l'appareil : comme une personne, on attend de voir sa
   // vignette (et son bouton « Retirer ») avant de passer à la suivante, puis de publier.
-  const add = lea.page.getByRole('button', { name: 'Ajouter une photo' })
+  const add = byRole(lea.page, 'button', 'Ajouter une photo')
   const colors = { rouge: [200, 40, 40], vert: [40, 160, 60], bleu: [40, 80, 200] }
   for (const [n, [name, color]] of Object.entries(colors).entries()) {
     await pick(lea.page, add, image(name, 1200, 800, color))
-    await lea.page.getByRole('button', { name: `Retirer la photo ${n + 1}` }).waitFor()
+    await byRole(lea.page, 'button', `Retirer la photo ${n + 1}`).waitFor()
   }
   await pick(
     lea.page,
-    lea.page.getByRole('button', { name: 'Choisir une couverture verticale' }),
+    byRole(lea.page, 'button', 'Choisir une couverture verticale'),
     image('portrait', 600, 1000, [120, 60, 160]),
   )
-  await lea.page.getByRole('button', { name: 'Retirer la couverture verticale' }).waitFor()
-  await lea.page.getByRole('button', { name: 'Publier' }).last().click() // le premier est celui de la barre du haut
+  await byRole(lea.page, 'button', 'Retirer la couverture verticale').waitFor()
+  await byRole(lea.page, 'button', 'Publier').last().click() // le premier est celui de la barre du haut
   await lea.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   const projectId = lea.page.url().split('/').at(-1)
   let project = await readProject(lea, projectId)
@@ -536,9 +542,9 @@ try {
   const [red, green, blue] = project.visuals.map((visual) => visual.id)
 
   step('Léa met la troisième photo en couverture, puis retire la deuxième')
-  await lea.page.getByRole('button', { name: 'Modifier' }).click()
+  await byRole(lea.page, 'button', 'Modifier').click()
   await lea.page.waitForURL(/\/edit$/)
-  await lea.page.getByRole('button', { name: 'Mettre la photo 3 en couverture' }).click()
+  await byRole(lea.page, 'button', 'Mettre la photo 3 en couverture').click()
   await waitFor('nouvelle couverture', async () => {
     project = await readProject(lea, projectId)
     return project.visuals[0].id === blue
@@ -547,7 +553,7 @@ try {
   // l'écran peut encore montrer l'ancien ordre, boutons désactivés, le temps que la réponse arrive.
   // Cliquer tout de suite viserait la vignette qui portait « photo 2 » avant (la verte, que React
   // déplace ensuite) : on attend que l'écran soit redessiné, ses boutons de nouveau actifs.
-  const removeSecond = lea.page.getByRole('button', { name: 'Retirer la photo 2' })
+  const removeSecond = byRole(lea.page, 'button', 'Retirer la photo 2')
   await waitFor('galerie redessinée', async () => removeSecond.isEnabled())
   await removeSecond.click()
   await waitFor('photo retirée', async () => {
@@ -569,17 +575,15 @@ try {
 
   step('Le projet de Léa arrive dans le fil de Sam ; il le teste, revient, et il est à jour')
   await open(sam.page, `${appUrl}/`)
-  // exact : « Tester Mon agent de recettes, … » est aussi un lien de la carte (R4).
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
+  // Nom exact (défaut de byRole) : « Tester Mon agent de recettes, … » est aussi un lien de la carte (R4).
+  await byRole(sam.page, 'link', 'Mon agent de recettes').waitFor()
   // La date relative de la carte (R4, F-Fil2) : « publié à l'instant », sans heure ni jour.
   await sam.page.getByText('à l’instant').first().waitFor()
   // « Tester » sort de l'appli : son nom lu le dit, et il passe par la page d'avertissement.
-  await sam.page
-    .getByRole('link', { name: 'Tester Mon agent de recettes, ouvre un site externe' })
-    .click()
+  await byRole(sam.page, 'link', 'Tester Mon agent de recettes, ouvre un site externe').click()
   await sam.page.waitForURL((url) => url.pathname === '/out')
-  await sam.page.getByRole('button', { name: 'Continuer vers example.com' }).waitFor()
-  await sam.page.getByRole('button', { name: 'Revenir' }).click()
+  await byRole(sam.page, 'button', 'Continuer vers example.com').waitFor()
+  await byRole(sam.page, 'button', 'Revenir').click()
   await sam.page.waitForURL((url) => url.pathname === '/')
   await sam.page.getByText('Tu es à jour').waitFor()
   console.log('  ok : le projet est dans le fil de Sam, « Tester » mène à l’avertissement')
@@ -588,9 +592,9 @@ try {
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Mon agent de recettes').first().waitFor()
   // L'auteur mène à sa page de membre, où le projet figure.
-  await sam.page.getByRole('link', { name: 'Voir la page de Lea' }).click()
+  await byRole(sam.page, 'link', 'Voir la page de Lea').click()
   await sam.page.waitForURL(/\/members\//)
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
+  await byRole(sam.page, 'link', 'Mon agent de recettes').waitFor()
   console.log('  ok : Sam trouve le projet sur la page de Léa')
   expectEqual('photo, pour Sam', await statusFor(sam, photoUrl), 200)
   expectEqual('photo, sans compte', await statusFor(visitor, photoUrl), 404)
@@ -599,22 +603,22 @@ try {
 
   step('Sam suit le projet ; Léa publie une note, qui arrive dans le fil de Sam')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await sam.page.getByRole('switch', { name: 'Suivre ce projet' }).click()
-  await sam.page.getByRole('switch', { name: 'Projet suivi', checked: true }).waitFor()
+  await byRole(sam.page, 'switch', 'Suivre ce projet').click()
+  await byRole(sam.page, 'switch', 'Projet suivi', { checked: true }).waitFor()
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await lea.page.getByRole('button', { name: 'Publier une note' }).click()
+  await byRole(lea.page, 'button', 'Publier une note').click()
   await lea.page.getByLabel('Ta note').fill('Nouvelle version : il propose aussi un dessert.')
-  await lea.page.getByRole('button', { name: 'Publier la note' }).click()
+  await byRole(lea.page, 'button', 'Publier la note').click()
   await lea.page.getByText('Note publiée.').waitFor()
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByRole('link', { name: 'Note de Lea sur Mon agent de recettes' }).waitFor()
+  await byRole(sam.page, 'link', 'Note de Lea sur Mon agent de recettes').waitFor()
   console.log('  ok : la note de Léa est dans le fil de Sam')
 
   step('Sam réagit « Bravo » et commente ; Léa répond, puis masque le commentaire de Sam')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   // Le nom lu de chaque réaction dit son nombre, et « réagi » une fois posée.
-  await sam.page.getByRole('button', { name: 'Bravo, 0' }).click()
-  await sam.page.getByRole('button', { name: 'Bravo, réagi, 1' }).waitFor()
+  await byRole(sam.page, 'button', 'Bravo, 0').click()
+  await byRole(sam.page, 'button', 'Bravo, réagi, 1').waitFor()
   await waitFor(
     'réaction enregistrée',
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
@@ -629,33 +633,32 @@ try {
   // Tranche 6b : Sam mentionne Léa. Il tape « @ » et le début de son pseudo, choisit Léa dans la
   // liste proposée (l'appli écrit « @pseudo » et une espace), puis finit sa phrase.
   const samSays = `Testé ce soir, @${handle} une soupe parfaite.`
-  await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+  await byRole(sam.page, 'button', 'Écrire un commentaire').click()
   const samField = sam.page.getByLabel('Ton commentaire')
   await samField.fill(`Testé ce soir, @${handle.slice(0, 4)}`)
-  await sam.page.getByRole('option', { name: `Lea, @${handle}` }).click()
+  await byRole(sam.page, 'option', `Lea, @${handle}`).click()
   await samField.pressSequentially('une soupe parfaite.')
-  await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
+  await byRole(sam.page, 'button', 'Publier le commentaire').click()
   await sam.page.getByText('Commentaire publié.').waitFor()
 
   step('Léa voit la cloche, puis la notification de la mention, qui mène au projet')
   // Le nombre n'est relu que chaque minute : on recharge l'accueil pour le lire tout de suite.
   await open(lea.page, `${appUrl}/`)
-  await lea.page
-    .getByRole('button', { name: /^Notifications, \d+ nouvelles?$/ })
+  await byRole(lea.page, 'button', /^Notifications, \d+ nouvelles?$/)
     .first()
     .click()
-  await lea.page.getByRole('link', { name: /Sam parle de toi dans un commentaire/ }).click()
+  await byRole(lea.page, 'link', /Sam parle de toi dans un commentaire/).click()
   await lea.page.waitForURL(`**/projects/${projectId}`)
   // Dans le texte publié, la mention est un lien vers la page de Léa.
-  await lea.page.getByRole('link', { name: `@${handle}`, exact: true }).waitFor()
+  await byRole(lea.page, 'link', `@${handle}`).waitFor()
   const unread = await (await lea.request.get(`${apiUrl}/v1/notifications/unread`)).json()
   expectEqual('nouveautés après la visite', unread.count, 0)
-  await lea.page.getByRole('button', { name: 'Répondre', exact: true }).click()
+  await byRole(lea.page, 'button', 'Répondre').click()
   await lea.page.getByLabel('Ta réponse').fill('Merci Sam, la version dessert arrive.')
-  await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()
+  await byRole(lea.page, 'button', 'Publier la réponse').click()
   await lea.page.getByText('Réponse publiée.').waitFor()
   // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer.
-  await lea.page.getByRole('button', { name: 'Masquer le commentaire' }).click()
+  await byRole(lea.page, 'button', 'Masquer le commentaire').click()
   // C'est elle qui l'a masqué : son bandeau le dit ainsi ; Sam lit « Masqué par la personne qui a publié le projet ».
   await lea.page.getByText('Masqué par toi').waitFor()
   // Un commentaire masqué ne compte plus : reste la réponse de Léa.
@@ -678,7 +681,7 @@ try {
   await open(sam.page, `${appUrl}/projects/new`)
   await sam.page.getByLabel('Titre').fill(samProject)
   await sam.page.getByLabel('Le pitch, en une phrase').fill('Il range mes essais de prompts.')
-  await sam.page.getByRole('button', { name: 'Publier' }).last().click()
+  await byRole(sam.page, 'button', 'Publier').last().click()
   await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   await signUp(malik, 'Malik')
   /**
@@ -687,10 +690,10 @@ try {
    */
   const openDiscover = async () => {
     await open(malik.page, `${appUrl}/explore`)
-    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).first().waitFor()
+    await byRole(malik.page, 'link', 'Mon agent de recettes').first().waitFor()
   }
   await openDiscover()
-  await malik.page.getByRole('link', { name: samProject }).first().waitFor()
+  await byRole(malik.page, 'link', samProject).first().waitFor()
   console.log('  ok : Malik voit le projet de Sam dans Explorer')
   const samMe = await (await sam.request.get(`${apiUrl}/v1/me`)).json()
   const malikMe = await (await malik.request.get(`${apiUrl}/v1/me`)).json()
@@ -698,13 +701,13 @@ try {
 
   // R3 : passer d'un onglet à l'autre par la barre du haut (l'ordinateur), l'actif marqué.
   step('Malik passe d’un onglet à l’autre : Fil, Explorer, Ruches')
-  const mainNav = malik.page.getByRole('navigation', { name: 'Navigation principale' }).first()
+  const mainNav = byRole(malik.page, 'navigation', 'Navigation principale').first()
   for (const [tab, path] of [
     ['Fil', '/'],
     ['Ruches', '/hives'],
     ['Explorer', '/explore'],
   ]) {
-    await mainNav.getByRole('link', { name: tab, exact: true }).click()
+    await byRole(mainNav, 'link', tab).click()
     await malik.page.waitForURL((url) => url.pathname === path)
     await mainNav.locator(`[aria-current="page"]`).filter({ hasText: tab }).first().waitFor()
     if (tab === 'Ruches')
@@ -714,9 +717,8 @@ try {
 
   // R3 (F-Fil8) : suivre l'auteur d'une carte de « Récents » par sa pastille, sans ouvrir le projet.
   step('Malik suit Sam depuis la pastille de sa carte, dans Explorer')
-  await malik.page.getByRole('switch', { name: 'Suivre Sam', exact: true }).first().click()
-  await malik.page
-    .getByRole('switch', { name: /^Tu suis Sam/, checked: true })
+  await byRole(malik.page, 'switch', 'Suivre Sam').first().click()
+  await byRole(malik.page, 'switch', /^Tu suis Sam/, { checked: true })
     .first()
     .waitFor()
   expectEqual('Malik toujours sur Explorer', new URL(malik.page.url()).pathname, '/explore')
@@ -732,10 +734,7 @@ try {
   // les accents ne comptent pas.
   step('Malik cherche « carnaval », puis « eleve », qui trouve le projet de Sam')
   // Le lien qui a l'air d'un champ lit le nom du champ, puis le texte affiché (R3, relecture C4).
-  await malik.page
-    .getByRole('link', { name: 'Rechercher, Un projet, une personne, un outil', exact: true })
-    .first()
-    .click()
+  await byRole(malik.page, 'link', 'Rechercher, Un projet, une personne, un outil').first().click()
   await malik.page.waitForURL((url) => url.pathname === '/search')
   // Les pages précédentes restent montées (cachées) sous la page affichée, avec leur barre du haut :
   // sur /search, chacune dessine aussi le champ. On vise celui qu'on voit.
@@ -759,8 +758,7 @@ try {
   )
   await field.fill('')
   await field.pressSequentially('eleve', { delay: 40 })
-  await malik.page
-    .getByRole('link', { name: new RegExp(`^${samProject}`) })
+  await byRole(malik.page, 'link', new RegExp(`^${samProject}`))
     .first()
     .click()
   await malik.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
@@ -771,21 +769,23 @@ try {
   step('Sam publie un second commentaire ; Malik le signale')
   const spam = 'Gagne 500 € par jour depuis chez toi, écris-moi en privé.'
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await sam.page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+  await byRole(sam.page, 'button', 'Écrire un commentaire').click()
   await sam.page.getByLabel('Ton commentaire').fill(spam)
-  await sam.page.getByRole('button', { name: 'Publier le commentaire' }).click()
+  await byRole(sam.page, 'button', 'Publier le commentaire').click()
   await sam.page.getByText('Commentaire publié.').waitFor()
   await open(malik.page, `${appUrl}/projects/${projectId}`)
   // La réponse de Léa a aussi son « Signaler » : on prend le bouton de la carte du commentaire de
   // Sam, c'est-à-dire le plus petit bloc qui contient à la fois son texte et un « Signaler » (les
   // blocs sont rangés du plus grand au plus petit dans la page : le dernier est la carte).
-  await malik.page
-    .locator('div')
-    .filter({ has: malik.page.getByText(spam, { exact: true }) })
-    .filter({ has: malik.page.getByRole('button', { name: 'Signaler', exact: true }) })
-    .last()
-    .getByRole('button', { name: 'Signaler', exact: true })
-    .click()
+  await byRole(
+    malik.page
+      .locator('div')
+      .filter({ has: malik.page.getByText(spam, { exact: true }) })
+      .filter({ has: byRole(malik.page, 'button', 'Signaler') })
+      .last(),
+    'button',
+    'Signaler',
+  ).click()
   await malik.page.waitForURL(/\/report\?/)
   // La page vise bien le commentaire de Sam : son identifiant, lu par l'API, est celui de l'adresse.
   // Et elle le montre (le dernier exemplaire du texte : la page du projet, sous celle-ci dans la
@@ -805,11 +805,11 @@ try {
   expectEqual('commentaire visé', new URL(malik.page.url()).searchParams.get('id'), spamId)
   await malik.page.getByText('Le commentaire signalé').waitFor()
   await malik.page.getByText(spam, { exact: true }).last().waitFor()
-  await malik.page.getByRole('radio', { name: 'Arnaque ou spam' }).click()
+  await byRole(malik.page, 'radio', 'Arnaque ou spam').click()
   await malik.page
     .getByLabel('Précision (facultatif)')
     .fill('Une offre d’argent facile, sans rapport avec le projet.')
-  await malik.page.getByRole('button', { name: 'Envoyer' }).click()
+  await byRole(malik.page, 'button', 'Envoyer').click()
   await malik.page
     .getByText('Merci, ton signalement a été envoyé. La modération va le regarder.')
     .waitFor()
@@ -822,13 +822,13 @@ try {
   const dialogOf = (someone, title) =>
     someone.page
       .locator('div')
-      .filter({ has: someone.page.getByRole('heading', { name: title }) })
-      .filter({ has: someone.page.getByRole('button', { name: 'Annuler', exact: true }) })
+      .filter({ has: byRole(someone.page, 'heading', title) })
+      .filter({ has: byRole(someone.page, 'button', 'Annuler') })
       .last()
-  await malik.page.getByRole('button', { name: `Bloquer aussi @${samHandle}` }).click()
+  await byRole(malik.page, 'button', `Bloquer aussi @${samHandle}`).click()
   const blockDialog = dialogOf(malik, new RegExp(`^Bloquer @${samHandle}\\s*\\?$`))
   await blockDialog.getByText(/Bloquer ne prévient pas la modération\./).waitFor()
-  await blockDialog.getByRole('button', { name: 'Bloquer', exact: true }).click()
+  await byRole(blockDialog, 'button', 'Bloquer').click()
   await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
   const readSamForMalik = async () =>
     (await malik.request.get(`${apiUrl}/v1/members/${samMe.id}`)).json()
@@ -839,17 +839,17 @@ try {
   await openDiscover()
   expectEqual(
     'projet de Sam, dans « Découvrir » de Malik',
-    await malik.page.getByRole('link', { name: samProject }).count(),
+    await byRole(malik.page, 'link', samProject).count(),
     0,
   )
   await open(malik.page, `${appUrl}/members/${samMe.id}`)
   // Le même texte qu'après le geste (corrections 7b), et « Débloquer » à la place de « Suivre ».
   await malik.page.getByText(`Tu as bloqué @${samHandle}.`, { exact: true }).waitFor()
-  await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).waitFor()
+  await byRole(malik.page, 'button', `Débloquer @${samHandle}`).waitFor()
   console.log('  ok : Malik lit « Tu as bloqué » sur la page de Sam, sans ses projets')
   expectEqual(
     'projet de Sam, sur sa page vue par Malik',
-    await malik.page.getByRole('link', { name: samProject }).count(),
+    await byRole(malik.page, 'link', samProject).count(),
     0,
   )
   // Dans le fil du projet de Léa, le commentaire de Sam devient un emplacement, pour Malik seul.
@@ -869,18 +869,18 @@ try {
   // R2 : « Membres bloqués » est une ligne-lien de la rubrique « Sécurité ».
   step('Malik ouvre « Membres bloqués » depuis la rubrique « Sécurité », et débloque Sam')
   await openSettings(malik, 'Sécurité', '/settings/security')
-  await malik.page.getByRole('link', { name: 'Membres bloqués', exact: true }).click()
+  await byRole(malik.page, 'link', 'Membres bloqués').click()
   await malik.page.waitForURL(/\/blocks$/)
   // Le nom lu de chaque « Débloquer » dit qui il débloque.
-  await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).click()
+  await byRole(malik.page, 'button', `Débloquer @${samHandle}`).click()
   const unblockDialog = dialogOf(malik, new RegExp(`^Débloquer @${samHandle}\\s*\\?$`))
-  await unblockDialog.getByRole('button', { name: 'Débloquer', exact: true }).click()
+  await byRole(unblockDialog, 'button', 'Débloquer').click()
   await malik.page.getByText(`Tu as débloqué @${samHandle}.`, { exact: true }).waitFor()
   await malik.page.getByText('Tu n’as bloqué personne.').waitFor()
   console.log('  ok : la liste des membres bloqués de Malik est vide')
   await waitFor('déblocage enregistré', async () => (await readSamForMalik()).isBlocked === false)
   await openDiscover()
-  await malik.page.getByRole('link', { name: samProject }).waitFor()
+  await byRole(malik.page, 'link', samProject).waitFor()
   console.log('  ok : le projet de Sam est de retour dans « Découvrir »')
   expectEqual(
     'page de Malik, pour Sam',
@@ -893,15 +893,17 @@ try {
   step('Léa répond au second commentaire de Sam')
   const leaAnswer = 'Ce n’est pas le lieu pour ça, Sam.'
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await lea.page
-    .locator('div')
-    .filter({ has: lea.page.getByText(spam, { exact: true }) })
-    .filter({ has: lea.page.getByRole('button', { name: 'Répondre', exact: true }) })
-    .last()
-    .getByRole('button', { name: 'Répondre', exact: true })
-    .click()
+  await byRole(
+    lea.page
+      .locator('div')
+      .filter({ has: lea.page.getByText(spam, { exact: true }) })
+      .filter({ has: byRole(lea.page, 'button', 'Répondre') })
+      .last(),
+    'button',
+    'Répondre',
+  ).click()
   await lea.page.getByLabel('Ta réponse').fill(leaAnswer)
-  await lea.page.getByRole('button', { name: 'Publier la réponse' }).click()
+  await byRole(lea.page, 'button', 'Publier la réponse').click()
   await lea.page.getByText('Réponse publiée.').waitFor()
   console.log('  ok : Léa a répondu au commentaire signalé')
 
@@ -923,22 +925,22 @@ try {
   const reportCard = admin.page
     .locator('div')
     .filter({ has: admin.page.getByText(spam, { exact: true }) })
-    .filter({ has: admin.page.getByRole('button', { name: 'Retirer', exact: true }) })
+    .filter({ has: byRole(admin.page, 'button', 'Retirer') })
     .last()
   await reportCard.getByText(/Arnaque ou spam\s*:\s*1/).waitFor()
   await reportCard.getByText('Une offre d’argent facile, sans rapport avec le projet.').waitFor()
-  await reportCard.getByRole('button', { name: 'Retirer', exact: true }).click()
+  await byRole(reportCard, 'button', 'Retirer').click()
   // La fenêtre « Retirer ce contenu ? » : le plus petit bloc qui contient son titre et le choix du
   // fondement. Son bouton « Retirer » est le sien, pas celui de la carte, restée dessous.
   const removeDialog = admin.page
     .locator('div')
-    .filter({ has: admin.page.getByRole('heading', { name: /^Retirer ce contenu\s*\?$/ }) })
-    .filter({ has: admin.page.getByRole('radiogroup', { name: 'Fondement' }) })
+    .filter({ has: byRole(admin.page, 'heading', /^Retirer ce contenu\s*\?$/) })
+    .filter({ has: byRole(admin.page, 'radiogroup', 'Fondement') })
     .last()
-  await removeDialog.getByRole('radio', { name: /^Les règles de / }).click()
+  await byRole(removeDialog, 'radio', /^Les règles de /).click()
   const explanation = 'Les messages publicitaires ne sont pas admis dans les commentaires.'
   await removeDialog.getByLabel('Explication', { exact: true }).fill(explanation)
-  await removeDialog.getByRole('button', { name: 'Retirer', exact: true }).click()
+  await byRole(removeDialog, 'button', 'Retirer').click()
   await admin.page.getByText('Contenu retiré.', { exact: true }).waitFor()
   console.log('  ok : l’administrateur a retiré le commentaire')
 
@@ -973,20 +975,20 @@ try {
   const karimId = (await karimMe()).id
   await open(karim.page, `${appUrl}/`)
   // Le témoin de l'absence qui suivra : avant la suspension, le bouton est bien là.
-  await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).first().waitFor()
+  await byRole(karim.page, 'button', 'Publier un projet').first().waitFor()
   console.log('  ok : Karim voit « Publier »')
 
   step('L’administrateur suspend Karim 7 jours, depuis la page de Karim')
   await open(admin.page, `${appUrl}/members/${karimId}`)
-  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
-  await admin.page.getByRole('menuitem', { name: 'Suspendre le compte' }).click()
+  await byRole(admin.page, 'button', 'Plus d’actions').click()
+  await byRole(admin.page, 'menuitem', 'Suspendre le compte').click()
   await admin.page.waitForURL(/\/suspend\?/)
-  await admin.page.getByRole('heading', { name: 'Suspendre le compte de Karim' }).waitFor()
-  await admin.page.getByRole('radio', { name: '7 jours', exact: true }).click()
-  await admin.page.getByRole('radio', { name: /^Les règles de / }).click()
+  await byRole(admin.page, 'heading', 'Suspendre le compte de Karim').waitFor()
+  await byRole(admin.page, 'radio', '7 jours').click()
+  await byRole(admin.page, 'radio', /^Les règles de /).click()
   const suspensionExplanation = 'Des messages publicitaires répétés sous les projets des autres.'
   await admin.page.getByLabel('Explication', { exact: true }).fill(suspensionExplanation)
-  await admin.page.getByRole('button', { name: 'Suspendre le compte', exact: true }).click()
+  await byRole(admin.page, 'button', 'Suspendre le compte').click()
   await admin.page.getByText('Compte suspendu.', { exact: true }).waitFor()
   await waitFor(
     'suspension de Karim, dans l’API',
@@ -1003,12 +1005,12 @@ try {
 
   step('Karim voit le bandeau de la suspension, et n’a plus « Publier »')
   await open(karim.page, `${appUrl}/`)
-  const banner = karim.page.getByRole('status').filter({ hasText: 'Ton compte est suspendu' })
+  const banner = byRole(karim.page, 'status').filter({ hasText: 'Ton compte est suspendu' })
   await banner.first().waitFor()
   await banner.first().getByText(new RegExp(suspensionExplanation)).waitFor()
   expectEqual(
     '« Publier » pour Karim suspendu',
-    await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).count(),
+    await byRole(karim.page, 'button', 'Publier un projet').count(),
     0,
   )
   console.log('  ok : Karim lit le bandeau et son explication ; « Publier » a disparu')
@@ -1017,29 +1019,29 @@ try {
   await open(admin.page, `${appUrl}/members/${karimId}`)
   // La ligne que seul un administrateur lit, avec l'heure de Paris.
   await admin.page.getByText(/^Compte suspendu jusqu’au .+\(heure de Paris\)$/).waitFor()
-  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
-  await admin.page.getByRole('menuitem', { name: 'Lever la suspension' }).click()
+  await byRole(admin.page, 'button', 'Plus d’actions').click()
+  await byRole(admin.page, 'menuitem', 'Lever la suspension').click()
   await admin.page.waitForURL(/\/suspend\?/)
-  await admin.page.getByRole('heading', { name: 'Lever la suspension de Karim' }).waitFor()
-  await admin.page.getByRole('radio', { name: 'Plus tôt que prévu', exact: true }).click()
+  await byRole(admin.page, 'heading', 'Lever la suspension de Karim').waitFor()
+  await byRole(admin.page, 'radio', 'Plus tôt que prévu').click()
   await admin.page
     .getByLabel('Explication', { exact: true })
     .fill('Karim a supprimé ses messages et s’est excusé.')
-  await admin.page.getByRole('button', { name: 'Lever la suspension', exact: true }).click()
+  await byRole(admin.page, 'button', 'Lever la suspension').click()
   await admin.page.getByText('Suspension levée.', { exact: true }).waitFor()
   await waitFor(
     'levée de la suspension, dans l’API',
     async () => (await karimMe()).suspension === null,
   )
   await open(karim.page, `${appUrl}/`)
-  await karim.page.getByRole('button', { name: 'Publier un projet', exact: true }).first().waitFor()
+  await byRole(karim.page, 'button', 'Publier un projet').first().waitFor()
   expectEqual('bandeau pour Karim, après la levée', await banner.count(), 0)
   console.log('  ok : Karim retrouve « Publier », sans bandeau')
 
   step('L’historique de modération de Karim montre la suspension et la levée')
   await open(admin.page, `${appUrl}/members/${karimId}`)
-  await admin.page.getByRole('button', { name: 'Plus d’actions' }).click()
-  await admin.page.getByRole('menuitem', { name: 'Historique de modération' }).click()
+  await byRole(admin.page, 'button', 'Plus d’actions').click()
+  await byRole(admin.page, 'menuitem', 'Historique de modération').click()
   await admin.page.waitForURL(/\/moderation\?.*member=/)
   await admin.page.getByText(/^Décisions qui visent @/).waitFor()
   await admin.page.getByText('Levée de la suspension', { exact: true }).first().waitFor()
@@ -1049,8 +1051,8 @@ try {
 
   step('Léa passe le projet en privé : la photo devient introuvable, même pour qui a l’adresse')
   await open(lea.page, `${appUrl}/projects/${projectId}/edit`)
-  await lea.page.getByRole('switch', { name: 'Public' }).click()
-  await lea.page.getByRole('button', { name: 'Enregistrer' }).last().click()
+  await byRole(lea.page, 'switch', 'Public').click()
+  await byRole(lea.page, 'button', 'Enregistrer').last().click()
   await lea.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   expectEqual('visibilité', (await readProject(lea, projectId)).visibility, 'private')
   expectEqual('photo, pour Léa', await statusFor(lea, photoUrl), 200)
@@ -1064,7 +1066,7 @@ try {
   await sam.page.getByText('Tu es à jour').waitFor()
   expectEqual(
     'carte du projet privé, dans le fil de Sam',
-    await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).count(),
+    await byRole(sam.page, 'link', 'Mon agent de recettes').count(),
     0,
   )
   console.log('  ok : le projet a quitté le fil de Sam')
@@ -1074,14 +1076,14 @@ try {
   await sam.page.getByText('Pas encore de projet public.').waitFor()
   console.log('  ok : la page de Léa ne montre aucun projet à Sam')
   await open(lea.page, `${appUrl}/members/${me.id}`)
-  await lea.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
+  await byRole(lea.page, 'link', 'Mon agent de recettes').waitFor()
   await lea.page.getByText('Privé', { exact: true }).waitFor()
   console.log('  ok : Léa voit son projet privé sur sa page')
 
   step('Léa supprime le projet : ses photos disparaissent du disque')
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await lea.page.getByRole('button', { name: 'Supprimer', exact: true }).click()
-  await lea.page.getByRole('button', { name: 'Supprimer le projet' }).click()
+  await byRole(lea.page, 'button', 'Supprimer').click()
+  await byRole(lea.page, 'button', 'Supprimer le projet').click()
   await lea.page.waitForURL((url) => !url.pathname.startsWith('/projects/'))
   expectEqual('photo, pour Léa', await statusFor(lea, photoUrl), 404)
   await expectMedia('après la suppression du projet', { avatars: 1, visuals: 0 })
@@ -1090,10 +1092,10 @@ try {
   // R2 : depuis la rubrique « Compte », une feuille posée sur les réglages
   // (/settings/account/delete), avec le mot de passe choisi dans la rubrique « Sécurité ».
   await openSettings(lea, 'Compte', '/settings/account')
-  await lea.page.getByRole('link', { name: 'Supprimer mon compte', exact: true }).click()
+  await byRole(lea.page, 'link', 'Supprimer mon compte').click()
   await lea.page.waitForURL((url) => url.pathname === '/settings/account/delete')
   await lea.page.getByLabel('Confirme avec ton mot de passe').fill(passwordAfterChange)
-  await lea.page.getByRole('button', { name: 'Supprimer définitivement' }).click()
+  await byRole(lea.page, 'button', 'Supprimer définitivement').click()
   await lea.page.waitForURL((url) => url.pathname === '/')
   expectEqual('avatar de Léa, pour Sam', await statusFor(sam, avatarUrl), 404)
   await expectMedia('après la suppression du compte', { avatars: 0, visuals: 0 })
