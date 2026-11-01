@@ -10,6 +10,7 @@ import {
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm'
+import { blockedWith } from '../blocks/visibility'
 import { currentHandleOf } from '../handles/load'
 import { describeError } from '../log'
 import { rowsToSummaries, selectProjects } from '../projects/load'
@@ -165,16 +166,32 @@ export const loadSuggestions = async (
  * identifiant et son pseudo actuel (null s'il n'en a pas), et la date du « × ». Jamais le nom
  * affiché, et jamais les écarts qui visent ce membre : la condition porte sur member_id seul, que
  * la clé primaire de member_suggestion_dismissal sert. Même forme que les blocages (blocks/list.ts).
+ *
+ * Sous blocage, le pseudo ne sort plus (relecture de sécurité sec-A1) : si l'écarté a bloqué
+ * l'exportateur depuis son « × » (ou l'inverse), sa page répond 404 à l'exportateur ; l'export ne
+ * doit pas donner par la fenêtre ce que la porte refuse. L'identifiant et la date restent : ils
+ * sont à lui (c'est son propre « × »). Le blocage se lit par `blockedWith`, comme partout : deux
+ * `exists` dans la même requête, l'un par la clé primaire de member_block, l'autre par
+ * member_block_blocked_idx, une fois par ligne écartée. Une ligne sans blocage garde son pseudo.
  */
 export const dismissedSuggestionsOf = async (
   db: Database,
   memberId: string,
 ): Promise<DismissedSuggestionExport[]> => {
   const rows = await db
-    .select({ memberId: d.dismissedId, handle: schema.memberHandle.handle, at: d.at })
+    .select({
+      memberId: d.dismissedId,
+      handle: schema.memberHandle.handle,
+      blocked: sql<boolean>`${blockedWith(memberId, d.dismissedId)}`,
+      at: d.at,
+    })
     .from(d)
     .leftJoin(schema.memberHandle, currentHandleOf(d.dismissedId))
     .where(eq(d.memberId, memberId))
     .orderBy(asc(d.at), asc(d.dismissedId))
-  return rows.map((row) => ({ ...row, at: row.at.toISOString() }))
+  return rows.map(({ blocked, handle, ...row }) => ({
+    ...row,
+    handle: blocked ? null : handle,
+    at: row.at.toISOString(),
+  }))
 }
