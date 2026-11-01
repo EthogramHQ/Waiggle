@@ -751,16 +751,31 @@ const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [long
 // `--layout` et `--explore` : les dates relatives (« hier », « dimanche ») sont les mêmes à chaque
 // passage, quel que soit le jour où l'on photographie. Ce que l'API simulée date « maintenant » (un
 // commentaire envoyé, les notifications) part de la même heure.
-// Deux façons de la poser. Les captures et `--layout` figent seulement la date (`setFixedTime`) :
-// les vrais minuteurs et les images d'animation continuent. `clock.install` les remplace par des
-// faux, et le Chromium sans écran de la CI (Linux) n'arrivait plus à prendre la capture (« Unable
-// to capture screenshot », R4). Les essais (`--explore`) gardent `install`, qui fait avancer
-// l'horloge : ils mesurent des délais (« Annuler » pendant 5 s).
+// La façon de la poser : un décalage de `Date`, écrit dans chaque page avant son code
+// (`addInitScript`). L'heure part du 20/10 à 12 h, puis avance normalement ; les minuteurs, les
+// images d'animation et `performance` restent ceux du navigateur. L'horloge de Playwright
+// (`clock.install`, puis `clock.setFixedTime`) empêchait le Chromium sans écran de la CI (Linux)
+// de prendre les captures du fil (« Unable to capture screenshot », R4), alors qu'elle passait sur
+// le PC. Un essai qui doit sauter un délai peut encore poser `page.clock` lui-même.
 const SHOT_NOW = Date.parse('2026-10-20T12:00:00+02:00')
 const SHOT_TIMEZONE = 'Europe/Paris'
 /** Pose l'horloge des captures sur un contexte neuf, avant toute page. */
-const installShotClock = (context, { frozen = false } = {}) =>
-  frozen ? context.clock.setFixedTime(SHOT_NOW) : context.clock.install({ time: SHOT_NOW })
+const installShotClock = (context) =>
+  context.addInitScript((now) => {
+    const RealDate = Date
+    const offset = now - RealDate.now()
+    // Une sous-classe de Date : sans argument, « maintenant » décalé ; avec, la date demandée.
+    class ShotDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + offset)
+        else super(...args)
+      }
+      static now() {
+        return RealDate.now() + offset
+      }
+    }
+    globalThis.Date = ShotDate
+  }, SHOT_NOW)
 
 // Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
 // nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
@@ -2124,7 +2139,7 @@ if (script) {
       viewport: { width: 390, height: 844 },
       ...options,
     })
-    // L'horloge des captures ; un script peut la reprendre (`context.clock`) pour un autre jour.
+    // L'horloge des captures ; un essai peut poser `page.clock` lui-même pour un autre jour.
     await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
@@ -2175,7 +2190,7 @@ async function layoutReport() {
       viewport: { width: 390, height: 844 },
     })
     try {
-      await installShotClock(context, { frozen: true })
+      await installShotClock(context)
       await context.route(
         `${apiUrl}/**`,
         fakeApi(
@@ -2337,7 +2352,7 @@ const capture = async ({ shot, device, scheme }) => {
     deviceScaleFactor: scale,
   })
   try {
-    await installShotClock(context, { frozen: true })
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(
