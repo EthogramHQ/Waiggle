@@ -12,7 +12,7 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais.
-import { radii, space } from '@ruche/brand'
+import { borders, radii, space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -29,13 +29,13 @@ import { toastBottom } from '../ui/theme/toast'
 const fr = {
   title: 'Cadre de la page projet',
   intro:
-    'Ce que Screen et Columns offrent à la page d’un projet. En bas, une place flottante qui reste en vue pendant que la page défile : sa hauteur est réservée sous le contenu (rien ne passe dessous au focus), et un toast monte au-dessus d’elle. En haut, « Retour » écrit en toutes lettres sur ordinateur. Sur ordinateur, deux rangées de colonnes séparées par un trait, lues dans l’ordre : rangée 1 à gauche, rangée 1 à droite, puis la rangée 2.',
+    'Ce que Screen et Columns offrent à la page d’un projet. En bas, une place flottante qui reste en vue pendant que la page défile : sa hauteur est réservée sous le contenu (rien ne passe dessous au focus), et un toast monte au-dessus d’elle. En haut, « Retour » écrit en toutes lettres sur ordinateur. Sur ordinateur, deux rangées de colonnes séparées par un trait, lues dans l’ordre : rangée 1 à gauche, rangée 1 à droite, puis la rangée 2.',
   floating: 'Place flottante, page sans barre d’onglets',
   floatingTabBar: 'Place flottante au-dessus de la barre d’onglets',
   floatingToast: 'Un toast au-dessus de la place flottante',
   back: 'Bouton du haut',
-  backPhone: 'Téléphone : l’icône seule, nommée « Retour »',
-  backWide: 'Ordinateur et tablette : l’icône et le texte',
+  backPhone: 'Téléphone : l’icône seule, nommée « Retour »',
+  backWide: 'Ordinateur et tablette : l’icône et le texte',
   rows: 'Deux rangées de colonnes, un trait entre elles',
   day: 'jour',
   night: 'nuit',
@@ -43,10 +43,10 @@ const fr = {
   copied: 'Prompt copié',
   tabBar: 'Barre d’onglets',
   paragraph:
-    'Ce quiz grandit avec Yanis : plus il répond juste, plus c’est difficile. Le contenu défile sous la capsule, qui reste en bas de l’écran.',
+    'Ce quiz grandit avec Yanis : plus il répond juste, plus c’est difficile. Le contenu défile sous la capsule, qui reste en bas de l’écran.',
   gallery: 'Galerie et capsule',
-  header: 'Statut, titre, auteur, « Tester la démo », la recette',
-  description: 'Description, prompt de départ, mises à jour, « Signaler ce projet »',
+  header: 'Statut, titre, auteur, « Tester la démo », la recette',
+  description: 'Description, prompt de départ, mises à jour, « Signaler ce projet »',
   comments: 'Commentaires',
 }
 
@@ -186,6 +186,8 @@ function PhoneFrame({
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: colors.sheet,
+            borderTopWidth: borders.hairline,
+            borderTopColor: colors.line,
           }}
         >
           <Text variant="caption" tone="muted">
@@ -216,16 +218,20 @@ function PhoneFrame({
 /** La silhouette de la capsule : une pilule de verre, cinq icônes et leur nombre. */
 function CapsuleSilhouette() {
   return (
-    <Surface variant="glass" padding="md">
-      <Stack direction="row" gap="lg" align="center">
-        {capsuleItems.map((item) => (
-          <Stack key={item.icon} direction="row" gap="xs" align="center">
-            <Icon name={item.icon} size={20} tone={item.count > 20 ? 'honey' : 'default'} />
-            <Text variant="callout">{String(item.count)}</Text>
-          </Stack>
-        ))}
-      </Stack>
-    </Surface>
+    // La pilule garde la largeur de son contenu, centrée par la place flottante (une Surface
+    // s'étire par défaut : `fill={false}` dans un cadre centré).
+    <View style={{ alignSelf: 'center' }}>
+      <Surface variant="glass" padding="md" fill={false}>
+        <Stack direction="row" gap="lg" align="center">
+          {capsuleItems.map((item) => (
+            <Stack key={item.icon} direction="row" gap="xs" align="center">
+              <Icon name={item.icon} size={20} tone={item.count > 20 ? 'honey' : 'default'} />
+              <Text variant="callout">{String(item.count)}</Text>
+            </Stack>
+          ))}
+        </Stack>
+      </Surface>
+    </View>
   )
 }
 
