@@ -318,6 +318,15 @@ export function CatalogueScreen() {
             { label: l.signUp, onPress: () => {} },
           ]}
         />
+        {/* « done » : une démarche partie ou aboutie, avec sa tuile de miel (R4, ménage M7). */}
+        <StateMessage
+          kind="done"
+          icon="envelope-simple"
+          level={3}
+          title={l.stateDoneTitle}
+          message={l.stateDone}
+          actions={[{ label: l.goBack, onPress: () => {}, variant: 'secondary' }]}
+        />
       </Section>
 
       <Section title={l.forms}>
