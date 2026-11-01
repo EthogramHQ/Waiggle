@@ -110,6 +110,9 @@ const hiddenFrame = {
   ...(Platform.OS === 'web' ? { clipPath: 'inset(50%)', whiteSpace: 'nowrap' } : null),
 } as unknown as ViewStyle
 
+/** Une date prise dans une phrase : ce qu'on voit, et ce que lit le lecteur d'écran. */
+export type RelativePhrase = { label: string; spoken: string }
+
 type Props = {
   /** La date, au format ISO du contrat (« 2026-10-12T08:00:00.000Z »). */
   date: string
@@ -119,6 +122,14 @@ type Props = {
   variant?: TextVariant
   tone?: TextTone
   numberOfLines?: number
+  /**
+   * La date dans une phrase écrite par l'écran (R4, « @sam · Bloqué hier ») : on voit `label`, le
+   * lecteur d'écran lit `spoken` (« @sam · Bloqué le 23 octobre à 20:30 »), la bulle du survol
+   * garde la date complète. Une fonction, parce que la phrase se refait à chaque minute avec la
+   * date du moment. Une date relative ne s'insère pas dans un texte (sur le web, ce composant est
+   * une vue) : c'est la phrase entière qui passe par lui.
+   */
+  phrase?: (date: RelativeDate) => RelativePhrase
 }
 
 export function RelativeTime({
@@ -127,8 +138,12 @@ export function RelativeTime({
   variant = 'caption',
   tone = 'muted',
   numberOfLines,
+  phrase,
 }: Props) {
-  const { label, full } = useRelative(date, now)
+  const relative = useRelative(date, now)
+  const { full } = relative
+  // Sans phrase, la date seule : le texte court à voir, la date complète à lire.
+  const { label, spoken } = phrase ? phrase(relative) : { label: relative.label, spoken: full }
   // Sur le web, la date complète se montre au survol : l'attribut `title`. React-native-web ne
   // transmet pas cette propriété (il ne garde que celles qu'il connaît) : on la donne quand même à
   // la vue (elle dit l'intention, et les tests la lisent), puis on la pose sur la balise elle-même.
@@ -143,7 +158,7 @@ export function RelativeTime({
     // Sur téléphone, VoiceOver et TalkBack lisent le nom donné (`accessibilityLabel`) à la place du
     // texte affiché : la date complète.
     return (
-      <Text variant={variant} tone={tone} numberOfLines={numberOfLines} accessibilityLabel={full}>
+      <Text variant={variant} tone={tone} numberOfLines={numberOfLines} accessibilityLabel={spoken}>
         {label}
       </Text>
     )
@@ -159,7 +174,7 @@ export function RelativeTime({
         </Text>
       </View>
       <View style={hiddenFrame} pointerEvents="none">
-        <Text variant={variant}>{full}</Text>
+        <Text variant={variant}>{spoken}</Text>
       </View>
     </View>
   )

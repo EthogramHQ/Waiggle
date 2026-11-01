@@ -14,12 +14,12 @@ import { useBlockedMembers, useUnblock } from '../blocks/api'
 import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
-import { shortDate } from '../projects/format'
 import { Button } from '../ui/Button'
 import { FeedEnd } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
+import { RelativeTime } from '../ui/RelativeTime'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
@@ -36,7 +36,7 @@ export function BlockedMembersScreen() {
 }
 
 function BlockedMembers() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   // R2 : la page s'ouvre depuis la rubrique « Sécurité » des réglages ; sans historique, on y revient.
   const back = useGoBack('/settings/security')
   const list = useBlockedMembers()
@@ -103,12 +103,25 @@ function BlockedMembers() {
                   <ListRow
                     key={member.id}
                     label={member.name}
-                    detail={t(($) => $.block.list.detail, {
-                      handle: member.handle,
-                      blockedOn: t(($) => $.block.list.blockedOn, {
-                        date: shortDate(blockedAt, i18n.language),
-                      }),
-                    })}
+                    // R4 : « @sam · Bloqué hier », lu « @sam · Bloqué le 23 octobre à 20:30 ». La
+                    // date relative est une vue sur le web : c'est toute la précision qui passe par
+                    // elle, au style des précisions d'une ligne (légende « callout », discrète).
+                    detail={
+                      <RelativeTime
+                        date={blockedAt}
+                        variant="callout"
+                        phrase={({ afterVerb, full }) => ({
+                          label: t(($) => $.block.list.detail, {
+                            handle: member.handle,
+                            blockedOn: t(($) => $.block.list.blockedWhen, { when: afterVerb }),
+                          }),
+                          spoken: t(($) => $.block.list.detail, {
+                            handle: member.handle,
+                            blockedOn: t(($) => $.block.list.blockedOn, { date: full }),
+                          }),
+                        })}
+                      />
+                    }
                     accessory={
                       <Button
                         label={t(($) => $.block.unblock)}

@@ -21,7 +21,14 @@
 // le focus du clavier sur elle (handle).
 import { layout, radii, space, textStyles } from '@ruche/brand'
 import type { Mention } from '@ruche/contracts'
-import { type ReactNode, type Ref, useId, useImperativeHandle, useRef } from 'react'
+import {
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  useId,
+  useImperativeHandle,
+  useRef,
+} from 'react'
 import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import {
@@ -52,8 +59,12 @@ type Props = {
   /** Le nom du lien vers sa page (« Voir la page de Max »). */
   authorLabel?: string
   onAuthorPress?: () => void
-  /** Quand (« 15 oct. »). */
-  when: string
+  /**
+   * Quand : un texte (« 15 oct. »), posé en légende ; ou un nœud qui porte son propre style, la
+   * date relative du moment (`<RelativeTime …>`, R4 : « il y a 5 min », lue en entier). Sur le web,
+   * `RelativeTime` est une vue : elle se pose ici à côté des autres textes, jamais dans l'un d'eux.
+   */
+  when: string | ReactElement
   /** Le texte, tel qu'écrit (vide pour un emplacement). */
   body: string
   /** Les membres mentionnés dans le texte, rendus par l'API (tranche 6b) : des liens. */
@@ -128,6 +139,15 @@ export function CommentCard({
   useImperativeHandle(handle, () => ({
     focusAction: (index: number) => focusWithoutScroll(buttons.current[index]),
   }))
+  // La date : un texte prend le style des légendes ; un nœud (la date relative) porte le sien.
+  const whenText =
+    typeof when === 'string' ? (
+      <Text variant="caption" tone="muted">
+        {when}
+      </Text>
+    ) : (
+      when
+    )
 
   if (!author) {
     // Un emplacement : ni photo, ni nom, ni action ; une ligne discrète qui dit ce qu'il était, et
@@ -159,9 +179,7 @@ export function CommentCard({
               {placeholder ?? ''}
             </Text>
           </View>
-          <Text variant="caption" tone="muted">
-            {when}
-          </Text>
+          {whenText}
         </View>
       </View>
     )
@@ -212,9 +230,7 @@ export function CommentCard({
         ) : (
           <View style={{ minHeight: layout.touchTarget, justifyContent: 'center' }}>{name}</View>
         )}
-        <Text variant="caption" tone="muted">
-          {when}
-        </Text>
+        {whenText}
         {edited ? (
           <>
             {/* Le point sépare la date de « modifié » pour l'œil ; les lecteurs d'écran le sautent. */}
