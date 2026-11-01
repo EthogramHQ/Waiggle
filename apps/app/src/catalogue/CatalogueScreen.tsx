@@ -18,7 +18,6 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { AmbientLight } from '../ui/AmbientLight'
-import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { CodeBlock } from '../ui/CodeBlock'
@@ -82,6 +81,7 @@ import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
 import { ExploreCatalogue } from './explorer'
 import { SheetsCatalogue } from './feuilles'
+import { FeedCatalogue } from './fil'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FormSamples } from './formulaire'
 import { SafeguardsCatalogue } from './garde-fous'
@@ -1086,6 +1086,7 @@ export function CatalogueScreen() {
       <NavigationCatalogue />
       <TopBarCatalogue />
       <CardsCatalogue />
+      <FeedCatalogue />
       <ExploreCatalogue />
       <ToolsCatalogue />
       <SearchCatalogue />
