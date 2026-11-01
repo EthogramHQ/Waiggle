@@ -23,7 +23,6 @@ import { ListGroup, ListRow } from './ListGroup'
 import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
-import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
@@ -274,31 +273,7 @@ describe('FollowButton', () => {
   })
 })
 
-describe('NewItemsBanner', () => {
-  it('is a button that shows the new items when touched', async () => {
-    const onPress = jest.fn()
-    await renderWithProviders(<NewItemsBanner label="3 nouveautés" onPress={onPress} />)
-
-    await fireEvent.press(screen.getByRole('button', { name: '3 nouveautés' }))
-
-    expect(onPress).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('NewItemsBanner, with nothing new', () => {
-  it('says what the feed shows, with nothing to press', async () => {
-    await renderWithProviders(
-      <NewItemsBanner
-        label={null}
-        onPress={jest.fn()}
-        caption="Les nouveaux projets des personnes que tu suis."
-      />,
-    )
-
-    expect(screen.getByText('Les nouveaux projets des personnes que tu suis.')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-})
+// Le bouton des nouveautés (NewItemsBanner) se teste dans son propre fichier depuis R4.
 
 describe('FollowerCount', () => {
   it('shows the number of followers, never their names', async () => {
