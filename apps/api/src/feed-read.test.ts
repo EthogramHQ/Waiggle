@@ -427,7 +427,11 @@ describe('who reads the date of the last reading', () => {
     )
 
   it('is read only by feed/state.ts, the feed route and the export', () => {
-    const touchTable = sources.filter((file) => /\bfeedState\b|\bfeed_state\b/.test(code(file)))
+    // Le registre des entrées des membres (moderation/inputs.ts) nomme chaque colonne de chaque
+    // table pour la classer (member-inputs.test.ts l'exige) : il cite la table sans jamais la lire.
+    const touchTable = sources
+      .filter((file) => file !== 'moderation/inputs.ts')
+      .filter((file) => /\bfeedState\b|\bfeed_state\b/.test(code(file)))
     expect(touchTable).toEqual(['feed/state.ts'])
 
     const importers = sources.filter((file) => importsOf(file).includes('feed/state')).sort()

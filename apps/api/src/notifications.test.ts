@@ -845,6 +845,9 @@ describe('marking as seen', () => {
 
   it('never goes beyond the time of the server', async () => {
     const meteo = await publish(ines)
+    // Depuis R4 (sec-A2), une date future ne garde rien du tout : Inès ouvre d'abord l'écran, pour
+    // que la notification déjà là (le pseudo) soit vue et que seul compte ce qui arrive après.
+    await openScreen(ines)
 
     await expectDone(await markSeen(ines, new Date(Date.now() + DAY).toISOString()))
     await react(meteo.id, 'bravo', malik)
