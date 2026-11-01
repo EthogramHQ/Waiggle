@@ -569,7 +569,8 @@ try {
 
   step('Le projet de Léa arrive dans le fil de Sam ; il le teste, revient, et il est à jour')
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  // exact : « Tester Mon agent de recettes, … » est aussi un lien de la carte (R4).
+  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
   // La date relative de la carte (R4, F-Fil2) : « publié à l'instant », sans heure ni jour.
   await sam.page.getByText('à l’instant').first().waitFor()
   // « Tester » sort de l'appli : son nom lu le dit, et il passe par la page d'avertissement.
@@ -589,7 +590,7 @@ try {
   // L'auteur mène à sa page de membre, où le projet figure.
   await sam.page.getByRole('link', { name: 'Voir la page de Lea' }).click()
   await sam.page.waitForURL(/\/members\//)
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
   console.log('  ok : Sam trouve le projet sur la page de Léa')
   expectEqual('photo, pour Sam', await statusFor(sam, photoUrl), 200)
   expectEqual('photo, sans compte', await statusFor(visitor, photoUrl), 404)
@@ -1059,7 +1060,13 @@ try {
   await sam.page.getByText('Ce projet est introuvable').waitFor()
   console.log('  ok : la page du projet est introuvable pour Sam')
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.').waitFor()
+  // R4 (F-Fil5) : un fil vidé par l'auteur finit sur « Tu es à jour », sans la carte du projet.
+  await sam.page.getByText('Tu es à jour').waitFor()
+  expectEqual(
+    'carte du projet privé, dans le fil de Sam',
+    await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).count(),
+    0,
+  )
   console.log('  ok : le projet a quitté le fil de Sam')
 
   step('La page de Léa : Sam n’y voit plus le projet, Léa le voit, marqué « Privé »')
@@ -1067,7 +1074,7 @@ try {
   await sam.page.getByText('Pas encore de projet public.').waitFor()
   console.log('  ok : la page de Léa ne montre aucun projet à Sam')
   await open(lea.page, `${appUrl}/members/${me.id}`)
-  await lea.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  await lea.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
   await lea.page.getByText('Privé', { exact: true }).waitFor()
   console.log('  ok : Léa voit son projet privé sur sa page')
 
