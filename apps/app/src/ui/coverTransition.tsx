@@ -178,7 +178,14 @@ export function useCoverSource(id: string) {
   const capture = useCallback(
     (then: () => void) => {
       const node = entry.current.node
-      if (!store || calm || !node) {
+      if (!store) {
+        then()
+        return
+      }
+      if (calm || !node) {
+        // Rien à faire grandir, mais la page sait qu'elle vient d'une carte : son titre prendra le
+        // focus après le fondu (une adresse ouverte directement, elle, laisse le focus en haut).
+        store.pending = { id, at: Date.now() }
         then()
         return
       }
@@ -187,10 +194,9 @@ export function useCoverSource(id: string) {
       const open = (frame: Frame | null) => {
         if (done) return
         done = true
-        if (frame) {
-          store.frames.set(id, frame)
-          store.pending = { id, at: Date.now() }
-        }
+        if (frame) store.frames.set(id, frame)
+        else store.frames.delete(id)
+        store.pending = { id, at: Date.now() }
         then()
       }
       const late = setTimeout(() => open(null), MEASURE_MAX)
@@ -215,12 +221,16 @@ export function useCoverTarget(id: string) {
   const calm = useCalmMotion()
   // useState avec une fonction : calculée une seule fois, au premier affichage de la page. Seule la
   // carte de ce projet, touchée à l'instant, la fait grandir.
-  const [arrival] = useState<CoverArrivalPlan>(() => {
+  // `fromCard` : la page vient d'une carte touchée à l'instant (le focus ira à son titre).
+  const [{ arrival, fromCard }] = useState<{ arrival: CoverArrivalPlan; fromCard: boolean }>(() => {
     const pending = store?.pending
+    const touched =
+      pending !== null && pending !== undefined && pending.id === id
+        ? Date.now() - pending.at <= PENDING_MAX
+        : false
     const frame = store?.frames.get(id)
-    if (!store || calm || !frame || pending?.id !== id) return FADE
-    if (Date.now() - pending.at > PENDING_MAX) return FADE
-    return { kind: 'grow', from: frame }
+    if (!store || calm || !frame || !touched) return { arrival: FADE, fromCard: touched }
+    return { arrival: { kind: 'grow', from: frame }, fromCard: true }
   })
 
   // La carte touchée a trouvé sa page : une autre ouverture de ce projet (un lien, plus tard) ne
@@ -252,7 +262,7 @@ export function useCoverTarget(id: string) {
     [store, id, departure],
   )
 
-  return { arrival, departure, leave }
+  return { arrival, departure, leave, fromCard }
 }
 
 type ArrivalProps = {
@@ -273,7 +283,7 @@ const still = [{ translateX: 0 }, { translateY: 0 }, { scaleX: 1 }, { scaleY: 1 
  */
 export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalProps) {
   const store = useContext(CoverContext)
-  const { arrival } = useCoverTarget(id)
+  const { arrival, fromCard } = useCoverTarget(id)
   const stage = store ? stageOf(store, id) : null
   // En vol : caché au lecteur d'écran et sans prise au doigt. Hors du fournisseur, jamais.
   const [flying, setFlying] = useState(() => Boolean(stage && !stage.arrived))
@@ -303,8 +313,10 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
     photo.value = 1
     rest.value = 1
     setFlying(false)
-    if (Platform.OS === 'web') focusWithoutScroll(title.current?.current)
-  }, [stage, progress, photo, rest])
+    // Seulement venue d'une carte : une page ouverte par son adresse garde le focus en haut, comme
+    // toute page qui se charge.
+    if (fromCard && Platform.OS === 'web') focusWithoutScroll(title.current?.current)
+  }, [stage, progress, photo, rest, fromCard])
 
   // L'état de la page compte ses photos ; il s'oublie après la dernière (un peu plus tard : une
   // photo qui passe d'une colonne à l'autre est retirée puis remontée dans le même affichage).
