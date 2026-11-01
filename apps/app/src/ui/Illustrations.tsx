@@ -24,6 +24,8 @@ import Svg, {
   FeGaussianBlur,
   Filter,
   G,
+  LinearGradient,
+  Mask,
   Path,
   RadialGradient,
   Rect,
@@ -186,7 +188,9 @@ const lightSide = 560
  */
 const depthScale = (p: number) => {
   'worklet' // tourne aussi sur le fil des animations
-  const depth = 4
+  // 1,2 : une profondeur douce, qui laisse cinq anneaux lisibles entre le bord et le cœur
+  // (planche R5a-Portail) ; plus forte, ils se serraient tous sous la lumière du centre.
+  const depth = 1.2
   const far = 1 / (1 + depth)
   return (1 / (1 + depth * p) - far) / (1 - far)
 }
@@ -506,6 +510,8 @@ export function Honeycomb() {
   const { colors, scheme } = useTheme()
   const breath = useBreath(durations.breath / 4)
   const glowId = useSvgId('honeycomb-glow')
+  const fadeId = useSvgId('honeycomb-fade')
+  const maskId = useSvgId('honeycomb-mask')
   // La lumière derrière l'alvéole du centre respire (immobile en mode calme).
   const glow = useAnimatedStyle(() => ({ opacity: 0.7 + breath.value * 0.3 }))
   // Le verre : de jour, du blanc translucide sur le miel ; de nuit, un voile de miel sur la lanterne.
@@ -538,18 +544,39 @@ export function Honeycomb() {
           viewBox={`-150 ${-half} 300 ${honeycombHeight}`}
           preserveAspectRatio="xMidYMid meet"
         >
-          {cells.map(([x, y]) => (
-            <Path
-              key={`${x},${y}`}
-              d={hexPath(hexRadius)}
-              transform={`translate(${x} ${y})`}
-              fill={pane}
-              fillOpacity={night ? 0.06 : 0.2}
-              stroke={pane}
-              strokeOpacity={night ? 0.4 : 0.75}
-              strokeWidth={1.5}
-            />
-          ))}
+          <Defs>
+            {/* Les rangées du haut et du bas s'effacent vers les bords de la boîte, au lieu d'être
+                coupées net (un masque : blanc, on voit ; transparent, on ne voit pas). */}
+            <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset={0} stopColor="#FFFFFF" stopOpacity={0} />
+              <Stop offset={0.2} stopColor="#FFFFFF" stopOpacity={1} />
+              <Stop offset={0.8} stopColor="#FFFFFF" stopOpacity={1} />
+              <Stop offset={1} stopColor="#FFFFFF" stopOpacity={0} />
+            </LinearGradient>
+            <Mask id={maskId}>
+              <Rect
+                x={-1000}
+                y={-half}
+                width={2000}
+                height={honeycombHeight}
+                fill={`url(#${fadeId})`}
+              />
+            </Mask>
+          </Defs>
+          <G mask={`url(#${maskId})`}>
+            {cells.map(([x, y]) => (
+              <Path
+                key={`${x},${y}`}
+                d={hexPath(hexRadius)}
+                transform={`translate(${x} ${y})`}
+                fill={pane}
+                fillOpacity={night ? 0.06 : 0.2}
+                stroke={pane}
+                strokeOpacity={night ? 0.4 : 0.75}
+                strokeWidth={1.5}
+              />
+            ))}
+          </G>
         </Svg>
       </View>
       <Centered side={hexRadius * 3} style={glow}>
