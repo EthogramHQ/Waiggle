@@ -5,7 +5,9 @@ import {
   FEED_PAGE_SIZE,
   type FeedItem,
   type FeedPage,
+  type FeedReadBody,
   FollowingFeedPage,
+  type ProjectSummary,
 } from '@ruche/contracts'
 import {
   type InfiniteData,
@@ -13,7 +15,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { request } from '../api/client'
+import { useEffect, useMemo, useRef } from 'react'
+import { request, requestWithoutBody } from '../api/client'
 import { ApiError } from '../api/errors'
 import { feedItemId } from './items'
 
@@ -79,9 +82,14 @@ export const useDiscoverFeed = ({ testers }: { testers: boolean }) =>
  * Hook : y a-t-il du nouveau au-dessus de ce que le membre voit ? On relit la première page toutes
  * les minutes (et au retour sur l'appli, si elle a plus d'une minute), dans un cache à part : le
  * fil affiché, lui, ne bouge pas. On compte les éléments plus récents que le premier affiché.
- * `count` null : rien de neuf. `more` vrai : plus d'une page de nouveautés.
+ * `count` null : rien de neuf. `more` vrai : plus d'une page de nouveautés. R4 : `authors` (qui les
+ * a publiées) et `kinds` (projets, notes) pour le bouton des nouveautés.
  */
-export const useFeedNews = (kind: FeedKind, first: FeedItem | undefined, testers = false) => {
+export const useFeedNews = (
+  kind: FeedKind,
+  first: FeedItem | undefined,
+  testers = false,
+): FeedNews => {
   const queryClient = useQueryClient()
   const shown = keyOf(kind, testers)
   const head = useQuery({
@@ -96,19 +104,97 @@ export const useFeedNews = (kind: FeedKind, first: FeedItem | undefined, testers
     refetchInterval: NEWS_INTERVAL_MS,
     refetchOnWindowFocus: true,
   })
-  const items = head.data?.items ?? []
+  const page = head.data
+  const firstAt = first?.at
+  const firstId = first ? feedItemId(first) : undefined
+  // useMemo : le résultat n'est recalculé que si la page relue ou le premier élément affiché
+  // changent. Les listes rendues gardent ainsi la même identité d'un rendu à l'autre, et le bouton
+  // des nouveautés ne croit pas à une nouvelle arrivée à chaque rendu de l'écran.
+  return useMemo(() => newsOf(page, firstAt, firstId), [page, firstAt, firstId])
+}
+
+/** Ce que dit le bouton des nouveautés : combien, s'il y en a plus d'une page, qui, et quoi. */
+export type FeedNews = {
+  count: number | null
+  more: boolean
+  /** Les auteurs des nouveautés, 3 au plus, chacun une fois, le plus récent d'abord. */
+  authors: ProjectSummary['author'][]
+  /** Les sortes de nouveautés (projets, notes), chacune une fois. */
+  kinds: FeedItem['kind'][]
+}
+
+/** Au plus trois visages sur le bouton des nouveautés (planche R4-Fil). */
+const NEWS_AUTHORS_MAX = 3
+
+// Rien de neuf : toujours les mêmes listes vides, pour la même raison que le useMemo plus haut.
+const nothingNew: FeedNews = { count: null, more: false, authors: [], kinds: [] }
+
+const newsOf = (
+  page: FeedPage | undefined,
+  firstAt: string | undefined,
+  firstId: string | undefined,
+): FeedNews => {
+  const items = page?.items ?? []
   // Plus récent : publié après le premier élément affiché (à date égale, l'API range par
   // identifiant décroissant). Comparer les dates plutôt que chercher l'identifiant : si le premier
   // élément a disparu (passé en privé), on ne croit pas pour autant à 20 nouveautés.
-  const newer = first
-    ? items.filter(
-        (item) =>
-          item.at > first.at || (item.at === first.at && feedItemId(item) > feedItemId(first)),
-      )
-    : items
-  if (newer.length === 0) return { count: null, more: false }
+  const newer =
+    firstAt !== undefined && firstId !== undefined
+      ? items.filter(
+          (item) => item.at > firstAt || (item.at === firstAt && feedItemId(item) > firstId),
+        )
+      : items
+  if (newer.length === 0) return nothingNew
+  // La page est rangée du plus récent au plus ancien : le premier auteur rencontré est celui de la
+  // dernière nouveauté. Une note a pour auteur celui de son projet. Une Map garde l'ordre
+  // d'insertion et ne garde qu'une entrée par clé : chaque auteur une fois.
+  const authors = new Map<string, ProjectSummary['author']>()
+  for (const item of newer) {
+    if (authors.size >= NEWS_AUTHORS_MAX) break
+    const { author } = item.project
+    if (!authors.has(author.id)) authors.set(author.id, author)
+  }
   return {
     count: newer.length,
-    more: newer.length >= FEED_PAGE_SIZE && head.data?.nextCursor != null,
+    more: newer.length >= FEED_PAGE_SIZE && page?.nextCursor != null,
+    authors: [...authors.values()],
+    kinds: [...new Set(newer.map((item) => item.kind))],
   }
+}
+
+/** PUT /v1/feed/read : le fil est lu jusqu'à `upTo`, le `at` d'un élément affiché. */
+export const putFeedRead = async (upTo: string): Promise<void> => {
+  const body: FeedReadBody = { upTo }
+  const result = await requestWithoutBody('/v1/feed/read', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!result.ok) throw new ApiError(result.error)
+}
+
+/**
+ * Hook (R4, « Tu es à jour ») : quand la première page du fil s'affiche, dire à l'API jusqu'où le
+ * membre a lu. `first` : le premier élément de la **première** page (rien tant qu'elle se charge).
+ *
+ * La date envoyée est le `at` de cet élément, jamais l'heure de l'appareil : la base garde jusqu'où
+ * il a lu, pas quand il était là (relecture juridique J3). Une seule fois par élément, même si le
+ * fil se redessine ; de nouveau quand des nouveautés arrivent en haut (après « nouveautés »). Une
+ * date plus ancienne que la dernière envoyée ne part pas : le serveur ne recule jamais, inutile de
+ * lui écrire pour rien (le premier élément a pu disparaître, passé en privé).
+ *
+ * Un échec (réseau, quota) ne se dit pas : rien ne change à l'écran, et la prochaine visite
+ * marquera le fil lu.
+ */
+export const useMarkFeedRead = (first: FeedItem | undefined) => {
+  // Un `ref` : une valeur gardée d'un rendu à l'autre, sans redessiner quand elle change. Ici, la
+  // dernière date envoyée.
+  const sent = useRef<string | null>(null)
+  const upTo = first?.at
+  useEffect(() => {
+    if (upTo === undefined) return
+    if (sent.current !== null && upTo <= sent.current) return
+    sent.current = upTo
+    putFeedRead(upTo).catch(() => {})
+  }, [upTo])
 }

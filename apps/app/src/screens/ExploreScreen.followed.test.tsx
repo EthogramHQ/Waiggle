@@ -82,7 +82,7 @@ beforeEach(() => {
   mockSession({ user: { id: 'u1', name: 'Léa' } })
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   mockToggle.mockReset()
-  jest.mocked(useFeedNews).mockReturnValue({ count: null, more: false })
+  jest.mocked(useFeedNews).mockReturnValue({ count: null, more: false, authors: [], kinds: [] })
   jest.mocked(useFollow).mockReturnValue({ toggle: mockToggle, error: false, expired: false })
   jest.mocked(useTools).mockReturnValue({
     data: { tools: [] },
