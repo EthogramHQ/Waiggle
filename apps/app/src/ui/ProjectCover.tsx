@@ -4,7 +4,7 @@
 // plutôt qu'un cadre vide.
 import { borders, honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import type { ReactNode } from 'react'
+import { type ReactNode, useId } from 'react'
 import { View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import type { ImageSource } from './image'
@@ -49,7 +49,12 @@ export function ProjectCover({
 }: Props) {
   const { scheme, colors, shadows } = useTheme()
   const height = typeof size === 'number' ? size : layout.cover[size]
-  const id = `cover-${scheme}`
+  // Le dégradé est nommé, puis cité par `url(#…)` : un nom propre à chaque couverture (useId, le même
+  // au pré-rendu web et dans le navigateur). Avec un nom commun, le navigateur prenait le premier
+  // dégradé de la page, parfois dans une page quittée et cachée (`display: none`) : la couverture du
+  // projet ouvert depuis le fil ne se dessinait pas (relecture design R4, A4).
+  const unique = useId()
+  const id = `cover-${scheme}-${unique.replace(/[^\w-]/g, '')}`
   const card = shadow === 'card'
   const cover = (
     <View

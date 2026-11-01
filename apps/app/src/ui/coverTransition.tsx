@@ -53,9 +53,14 @@ import { fade, useCalmMotion } from './theme/motion'
 /** Un cadre dans la fenêtre, en points : sa position (coin en haut à gauche) et sa taille. */
 export type Frame = { x: number; y: number; width: number; height: number }
 
-/** Ce qu'on peut mesurer dans la fenêtre : une vue de React Native (et la fausse vue des tests). */
+/**
+ * Ce qu'on peut mesurer dans la fenêtre : une vue de React Native (et la fausse vue des tests). Sur
+ * le web, c'est aussi un élément de la page : `closest` remonte de la photo au lien de sa carte,
+ * qui reprend le focus au retour.
+ */
 export type Measurable = {
   measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void
+  closest?: (selector: string) => unknown
 }
 
 /** L'arrivée de la page : grandir depuis le cadre d'une carte, ou apparaître en fondu. */
@@ -79,6 +84,40 @@ const FADE_IN = 320
 const FADE_OUT = 160
 /** Filet de sécurité : la photo n'est jamais mesurée (rendu sans mise en page) ; elle se pose. */
 const LAND_MAX = 1500
+/**
+ * Au retour, le fil caché sous la page (la pile garde les pages quittées en `display: none`)
+ * redevient visible un peu après la navigation : on essaie de focaliser la carte tous les
+ * `REFOCUS_STEP`, pendant `REFOCUS_MAX` au plus.
+ */
+const REFOCUS_STEP = 50
+const REFOCUS_MAX = 1000
+
+/** Sur le web, le lien autour de la photo d'une carte (son `Pressable` en `role="link"`). */
+const linkOf = (node: Measurable | null) => node?.closest?.('[role="link"], a') ?? null
+
+/**
+ * Rend le focus au lien de la carte, sans défilement (`focusWithoutScroll`). Un élément caché ne
+ * prend pas le focus : on réessaie jusqu'à ce qu'il l'ait (le navigateur le dit par
+ * `document.activeElement`), ou que le délai passe. Hors du navigateur, un seul essai.
+ */
+const refocus = (link: unknown) => {
+  if (!link || Platform.OS !== 'web') return
+  const started = Date.now()
+  const web = typeof document !== 'undefined'
+  // Le focus au moment du retour (le bouton « Retour ») : s'il part ailleurs que sur la page entière
+  // pendant l'attente (le membre a déjà tapé Tab), on ne le lui reprend pas.
+  const before = web ? document.activeElement : null
+  const attempt = () => {
+    if (web) {
+      const now = document.activeElement
+      if (now !== before && now !== document.body && now !== null) return
+    }
+    focusWithoutScroll(link)
+    const done = !web || document.activeElement === link
+    if (!done && Date.now() - started < REFOCUS_MAX) setTimeout(attempt, REFOCUS_STEP)
+  }
+  attempt()
+}
 
 /** Une carte affichée : son projet et la vue de sa photo (null quand elle n'est plus là). */
 type Entry = { id: string; node: Measurable | null }
@@ -111,6 +150,8 @@ type Store = {
   frames: Map<string, Frame>
   /** La carte qui vient d'être touchée, en attente de sa page, et quand. */
   pending: { id: string; at: number } | null
+  /** La dernière carte touchée de chaque projet : au retour, son lien reprend le focus. */
+  origins: Map<string, Entry>
   stages: Map<string, Stage>
   leavers: Map<string, Leaver>
 }
@@ -128,6 +169,7 @@ export function CoverTransitionProvider({ children }: { children: ReactNode }) {
     entries: new Set(),
     frames: new Map(),
     pending: null,
+    origins: new Map(),
     stages: new Map(),
     leavers: new Map(),
   }))
@@ -182,6 +224,9 @@ export function useCoverSource(id: string) {
         then()
         return
       }
+      // La carte touchée est retenue (l'objet, pas sa vue du moment) : au retour, si elle est encore
+      // affichée, son lien reprend le focus.
+      store.origins.set(id, entry.current)
       if (calm || !node) {
         // Rien à faire grandir, mais la page sait qu'elle vient d'une carte : son titre prendra le
         // focus après le fondu (une adresse ouverte directement, elle, laisse le focus en haut).
@@ -252,14 +297,22 @@ export function useCoverTarget(id: string) {
 
   const leave = useCallback(
     (then: () => void) => {
+      // Venue d'une carte, la page rend le focus du clavier au lien de cette carte une fois quittée
+      // (sur le web) : la lecture au clavier reprend là où elle s'était arrêtée dans le fil, au lieu
+      // de retomber sur la page entière. Ouverte par son adresse, elle ne focalise aucune carte.
+      const origin = fromCard ? store?.origins.get(id) : undefined
+      const quit = () => {
+        then()
+        if (origin) refocus(linkOf(origin.node))
+      }
       const leaver = store?.leavers.get(id)
       if (!leaver) {
-        then()
+        quit()
         return
       }
-      leaver(departure(), then)
+      leaver(departure(), quit)
     },
-    [store, id, departure],
+    [store, id, departure, fromCard],
   )
 
   return { arrival, departure, leave, fromCard }
