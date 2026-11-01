@@ -297,11 +297,10 @@ export function ReactionFanPanel({
         {reactions.map((reaction, index) => (
           <View
             key={reaction.kind}
-            // L'éventail : chaque ligne un peu décalée de la précédente, comme sur la planche.
-            style={{
-              marginLeft: (reactions.length - 1 - index) * FAN_STEP,
-              marginRight: index * (FAN_STEP / 2),
-            }}
+            // L'éventail : chaque ligne un peu décalée de la précédente, comme sur la planche. Le
+            // décalage se prend à gauche seulement : la dernière ligne, souvent la sienne avec
+            // « Retirer », garde toute la largeur (à 320 points, « Retirer » passait dessous).
+            style={{ marginLeft: (reactions.length - 1 - index) * FAN_STEP }}
           >
             <FanRow
               reaction={reaction}
@@ -511,7 +510,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   removePill: {
-    paddingHorizontal: space.lg,
+    paddingHorizontal: space.md,
     paddingVertical: space.sm,
     borderRadius: radii.small,
   },
