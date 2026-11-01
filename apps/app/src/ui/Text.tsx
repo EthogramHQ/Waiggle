@@ -9,13 +9,14 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import {
   Text as NativeText,
   type TextProps as NativeTextProps,
   Platform,
   type TextStyle,
 } from 'react-native'
+import type { Focusable } from './focus'
 import { fontFiles, fontName, monoFont } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -128,6 +129,11 @@ export type TextProps = {
    */
   heading?: HeadingLevel
   /**
+   * Pour poser le focus sur ce texte depuis le code (le titre d'une page à son arrivée, R4) : sur le
+   * web, le texte devient focalisable par le code seulement (`tabIndex -1`), jamais par Tab.
+   */
+  focusRef?: Ref<Focusable>
+  /**
    * Le rôle lu par les lecteurs d'écran. « header » en est exclu : un titre passe par `heading`,
    * qui porte aussi son niveau ; un titre sans niveau ne compile plus.
    */
@@ -178,6 +184,7 @@ export function Text({
   breakAnywhere = false,
   readable = false,
   heading,
+  focusRef,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
@@ -212,6 +219,9 @@ export function Text({
       }}
       {...rest}
       {...(heading ? headingLevel(heading) : null)}
+      // `Focusable` est le nom commun des vues qu'un écran focalise ; le texte natif en est une.
+      {...(focusRef ? { ref: focusRef as unknown as Ref<NativeText> } : null)}
+      {...(focusRef && Platform.OS === 'web' ? { tabIndex: -1 } : null)}
     >
       {children}
     </NativeText>
