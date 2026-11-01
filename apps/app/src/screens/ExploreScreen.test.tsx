@@ -217,7 +217,10 @@ beforeEach(() => {
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   for (const mock of [mockPush, mockReplace, mockNavigate, mockToggle]) mock.mockReset()
   jest.mocked(useDiscoverFeed).mockReset()
-  jest.mocked(useFeedNews).mockReset().mockReturnValue({ count: null, more: false })
+  jest
+    .mocked(useFeedNews)
+    .mockReset()
+    .mockReturnValue({ count: null, more: false, authors: [], kinds: [] })
   jest
     .mocked(useFollow)
     .mockReset()
