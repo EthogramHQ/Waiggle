@@ -320,7 +320,7 @@ export const createApp = ({
   app.route('/', noteRoutes({ db, limiter }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', feedRoutes({ db, publicApiUrl }))
+  app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).

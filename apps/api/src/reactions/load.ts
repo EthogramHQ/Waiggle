@@ -65,6 +65,40 @@ export const reactionStatesOf = async (
 }
 
 /**
+ * Le total des réactions de plusieurs projets (R4 : « ✦ 49 » sur chaque carte), la somme des cinq
+ * compteurs, en une seule requête quel que soit leur nombre. Mêmes règles que `reactionStatesOf`,
+ * donc le même nombre que la page du projet (relecture juridique jur-J10) : les réactions d'un
+ * membre bloqué comptent (un nombre est le même pour tous, sec-A4), et un projet privé ou retiré
+ * n'en a aucune, même pour son auteur. Un projet absent de la réponse vaut 0.
+ *
+ * En SQL :
+ *   select project_id, count(*)::int
+ *   from project_reaction inner join project on project.id = project_reaction.project_id
+ *   where project_id in (…) and project.visibility = 'public' and project.removed_at is null
+ *   group by project_id
+ *
+ * Index : la clé primaire de project_reaction (project_id, member_id, kind) commence par
+ * project_id ; PostgreSQL y lit les réactions de chaque projet de la liste, sans parcourir les
+ * autres. Le total ne sort jamais le nom de qui a réagi : seulement un nombre.
+ *
+ * Toujours une requête, même pour une liste vide (« in () » devient « false », lu sans toucher la
+ * table) : ainsi une liste coûte le même nombre de requêtes qu'elle ait 0 ou 20 cartes, ce que
+ * vérifie le test « reads the totals of a whole page in a constant number of queries ».
+ */
+export const reactionTotalsOf = async (
+  db: Reader,
+  projectIds: string[],
+): Promise<Map<string, number>> => {
+  const rows = await db
+    .select({ projectId: r.projectId, total: sql<number>`count(*)::int` })
+    .from(r)
+    .innerJoin(schema.project, eq(schema.project.id, r.projectId))
+    .where(and(inArray(r.projectId, projectIds), listedProject()))
+    .groupBy(r.projectId)
+  return new Map(rows.map((row) => [row.projectId, row.total]))
+}
+
+/**
  * Toutes les réactions d'un membre, des plus anciennes aux plus récentes, pour l'export de ses
  * données : le projet (son identifiant seulement), le type et la date. Même sur un projet devenu
  * privé : c'est son geste, et l'identifiant ne dit rien du projet. L'index

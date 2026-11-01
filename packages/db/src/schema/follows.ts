@@ -53,3 +53,32 @@ export const projectFollow = pgTable(
     index('project_follow_project_idx').on(t.projectId),
   ],
 )
+
+/**
+ * « member_id ne veut plus qu'on lui propose dismissed_id » (tranche R4, « Proches à suivre » :
+ * le « × » d'une suggestion). L'écarté n'en sait jamais rien : la ligne n'apparaît que dans
+ * l'export de celui qui écarte.
+ */
+export const suggestionDismissal = pgTable(
+  'member_suggestion_dismissal',
+  {
+    // Les deux en onDelete: 'cascade' : un compte supprimé emporte ses écarts et ceux qui le
+    // visaient (relecture de sécurité sec-A6).
+    memberId: text('member_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    dismissedId: text('dismissed_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    // Le moment du « × », écrit par l'API (horloge que les tests remplacent), pour l'export.
+    at: timestamp('at').notNull(),
+  },
+  (t) => [
+    // Écarter deux fois le même membre est impossible ; la clé sert aussi « qui ai-je écarté ? »
+    // (les suggestions d'un membre, son export), qui commence par member_id.
+    primaryKey({ columns: [t.memberId, t.dismissedId] }),
+    // L'autre sens, « qui m'a écarté ? », sert à la suppression d'un compte : sans lui, la cascade
+    // lirait toute la table pour trouver les lignes qui le visent.
+    index('member_suggestion_dismissal_dismissed_idx').on(t.dismissedId),
+  ],
+)

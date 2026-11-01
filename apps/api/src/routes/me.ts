@@ -22,6 +22,7 @@ import { blocksOfMember } from '../blocks/list'
 import { commentsOfAuthor } from '../comments/load'
 import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
+import { readFeedReadAt } from '../feed/state'
 import { claimHandle, HandleTakenError } from '../handles/claim'
 import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
@@ -373,6 +374,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Jusqu'où il a vu ses notifications. Les notifications elles-mêmes n'y sont pas : elles sont
     // calculées à partir des gestes des autres, qui ne sont pas ses données.
     const seenAt = await readSeenAt(db, user.id)
+    // Jusqu'où il a lu son fil « Abonnements » (R4), par feed/state.ts, seul lecteur de cette date
+    // (jur-J3). Jamais la liste de ce qu'il a lu : elle n'est gardée nulle part.
+    const feedReadAt = await readFeedReadAt(db, user.id)
     // Ses réglages d'e-mail et les dates des derniers envois (tranche 6c), valeurs par défaut
     // comprises. Jamais de jeton de désinscription : il se recalcule, il n'est pas gardé.
     const emailPreferences = await exportEmailPreferences(db, user.id)
@@ -433,9 +437,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         blocks,
         moderation,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
-        // R4 : valeurs neutres posées au commit du contrat ; la lecture du fil et les suggestions
-        // écartées viennent avec le backend de la tranche.
-        feed: { readAt: null },
+        feed: { readAt: feedReadAt?.toISOString() ?? null },
+        // R4 : valeur neutre posée au commit du contrat ; les suggestions écartées viennent avec
+        // le backend de la tranche (BE-B).
         dismissedSuggestions: [],
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
