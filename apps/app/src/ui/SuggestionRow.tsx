@@ -160,9 +160,12 @@ export function SuggestionRow({
       style={({ pressed }) => ({
         minHeight: layout.touchTarget,
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        // Empilé, le titre se centre dans sa zone : il se tient alors à égale distance du nom,
+        // au-dessus, et de « Suivre », en dessous (rangé en haut, il laissait un trou avant
+        // « Suivre »).
+        alignItems: stacked ? 'center' : 'flex-start',
         gap: space.sm,
-        paddingTop: space.xxs,
+        paddingTop: stacked ? 0 : space.xxs,
         borderRadius: radii.code,
         opacity: pressed ? 0.6 : 1,
       })}
@@ -175,7 +178,7 @@ export function SuggestionRow({
         importantForAccessibility="no-hide-descendants"
         style={{
           width: THUMBNAIL_SIZE,
-          marginTop: space.xxs,
+          marginTop: stacked ? 0 : space.xxs,
           flexShrink: 0,
           borderRadius: radii.mark,
           backgroundColor: colors.honeySoft,
