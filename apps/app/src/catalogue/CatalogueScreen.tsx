@@ -94,7 +94,6 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
-import { CapsuleCatalogue } from './projet-capsule'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -138,9 +137,6 @@ export function CatalogueScreen() {
         />
         <LanguageSwitcher />
       </Surface>
-
-      {/* R5a : la capsule des réactions de la page projet (projet-capsule.tsx). */}
-      <CapsuleCatalogue />
 
       <Section title={l.colors}>
         <Swatches />
