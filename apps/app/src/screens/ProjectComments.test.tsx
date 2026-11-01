@@ -30,6 +30,7 @@ import { reportsOpened } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr, missingSentences, removalSentences } from '../testing/text'
+import { parisDateTime } from '../ui/parisTime'
 import { Comments } from './ProjectComments'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -593,5 +594,38 @@ describe('the window to delete a comment', () => {
     await waitFor(() =>
       expect(screen.queryByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeNull(),
     )
+  })
+})
+
+// R4 (F-Fil3) : la date d'un commentaire se dit par rapport à maintenant (« il y a 5 min »), et le
+// lecteur d'écran lit la date complète, à l'heure de Paris. Le commentaire date de cinq minutes
+// avant l'horloge du test : le résultat ne dépend pas du jour où il tourne.
+describe('when a comment was written', () => {
+  /** Les blancs d'Intl et de la typographie française ramenés à des espaces, comme getByText. */
+  const plain = (text: string) => text.replace(/\s+/g, ' ')
+  const fiveMinutesAgo = () => new Date(Date.now() - 5 * 60_000).toISOString()
+
+  it('says it relative to now, and reads the full date', async () => {
+    const createdAt = fiveMinutesAgo()
+    mockComments([{ ...zoeComment, createdAt }])
+    await renderWithProviders(<Comments project={project} />)
+    await screen.findByText(zoeComment.body)
+
+    const thread = threadOf(zoeComment.body)
+    expect(thread.getByText(plain(fr.t(($) => $.dates.minutes, { count: 5 })))).toBeTruthy()
+    expect(thread.getByLabelText(plain(parisDateTime(createdAt, 'fr').dateTime))).toBeTruthy()
+  })
+
+  it('dates the same way a deleted comment kept for its replies', async () => {
+    const createdAt = fiveMinutesAgo()
+    mockComments([
+      { ...maxComment, createdAt, state: 'deleted', author: null, body: '', isMine: false },
+    ])
+    await renderWithProviders(<Comments project={project} />)
+
+    const placeholder = await screen.findByText(fr.t(($) => $.project.comments.deletedPlaceholder))
+    expect(screen.getByText(plain(fr.t(($) => $.dates.minutes, { count: 5 })))).toBeTruthy()
+    expect(screen.getByLabelText(plain(parisDateTime(createdAt, 'fr').dateTime))).toBeTruthy()
+    expect(placeholder).toBeTruthy()
   })
 })

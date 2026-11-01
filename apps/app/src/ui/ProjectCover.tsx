@@ -4,7 +4,7 @@
 // plutôt qu'un cadre vide.
 import { borders, honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import type { ReactNode } from 'react'
+import { type ReactNode, useId } from 'react'
 import { View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import type { ImageSource } from './image'
@@ -37,6 +37,11 @@ type Props = {
    * de page, une vignette dans une note).
    */
   shadow?: 'card' | 'none'
+  /**
+   * La couverture prend la hauteur que son parent lui laisse, `height` devenant sa hauteur minimale
+   * (la couverture d'une carte de note étirée à la hauteur d'une carte de projet voisine, R4).
+   */
+  grow?: boolean
 }
 
 export function ProjectCover({
@@ -46,15 +51,24 @@ export function ProjectCover({
   image,
   children,
   shadow = 'none',
+  grow = false,
 }: Props) {
   const { scheme, colors, shadows } = useTheme()
   const height = typeof size === 'number' ? size : layout.cover[size]
-  const id = `cover-${scheme}`
+  // Le dégradé est nommé, puis cité par `url(#…)` : un nom propre à chaque couverture (useId, le même
+  // au pré-rendu web et dans le navigateur). Avec un nom commun, le navigateur prenait le premier
+  // dégradé de la page, parfois dans une page quittée et cachée (`display: none`) : la couverture du
+  // projet ouvert depuis le fil ne se dessinait pas (relecture design R4, A4).
+  const unique = useId()
+  const id = `cover-${scheme}-${unique.replace(/[^\w-]/g, '')}`
   const card = shadow === 'card'
+  // flexGrow : la couverture grandit dans la place libre de son parent, sans descendre sous sa
+  // hauteur de base.
+  const sizing = grow ? { minHeight: height, flexGrow: 1 } : { height }
   const cover = (
     <View
       style={{
-        height,
+        ...sizing,
         borderRadius: radii[radius],
         overflow: 'hidden',
         alignSelf: 'stretch',
@@ -106,7 +120,14 @@ export function ProjectCover({
   // Deux boîtes : l'extérieure porte l'ombre, l'intérieure rogne la photo aux coins arrondis
   // (overflow: 'hidden'), ce qui rognerait aussi l'ombre si elles étaient ensemble.
   return (
-    <View style={{ borderRadius: radii[radius], boxShadow: shadows.card, alignSelf: 'stretch' }}>
+    <View
+      style={{
+        borderRadius: radii[radius],
+        boxShadow: shadows.card,
+        alignSelf: 'stretch',
+        ...(grow ? { flexGrow: 1 } : null),
+      }}
+    >
       {cover}
     </View>
   )

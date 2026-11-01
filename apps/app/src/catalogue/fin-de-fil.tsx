@@ -11,6 +11,7 @@ import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
+import { UpToDate } from '../ui/UpToDate'
 
 const fr = {
   title: 'Fin du fil',
@@ -66,13 +67,9 @@ export function FeedEndCatalogue() {
         // le thème du catalogue (ce ThemeProvider-là ne touche pas à la page).
         <ThemeProvider key={scheme} appearance={scheme}>
           <Example caption={`${l.brand} — ${l[scheme]}`}>
-            <FeedEnd
-              state="end"
-              ambiance="brand"
-              moreLabel={l.showMore}
-              endLabel={l.upToDate}
-              onMore={noop}
-            />
+            {/* R4 : « Tu es à jour » a quitté FeedEnd pour UpToDate (la sphère de miel). La nuit,
+                le texte du premier passage (« Tu as tout vu. »). */}
+            <UpToDate firstVisit={scheme === 'night'} onExplore={noop} />
           </Example>
         </ThemeProvider>
       ))}

@@ -3,7 +3,7 @@
 // formes ne disent rien : l'ensemble est nommé « Chargement… » (common.loading) et marqué occupé
 // (aria-busy sur le web), une seule fois, même pour une liste de plusieurs cartes.
 import { screen } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { SkeletonCard, SkeletonList } from './Skeleton'
@@ -20,6 +20,9 @@ jest.mock('./theme/motion', () => ({
 }))
 
 const loading = fr.t(($) => $.common.loading)
+
+/** La hauteur par défaut d'une carte du fil (`ProjectCard`, `height = 476`). */
+const FEED_CARD_HEIGHT = 476
 
 type Node = { props: Record<string, unknown> }
 
@@ -69,6 +72,58 @@ describe('SkeletonCard', () => {
     await renderWithProviders(<SkeletonCard />)
 
     expect(busy(screen.getByLabelText(loading))).toBe(true)
+  })
+})
+
+// R4 : la forme d'une carte du fil (`shape="feed"`) : un bloc de la hauteur d'une `ProjectCard`
+// (476 points, sa hauteur par défaut) et, en bas, un panneau plein à la place du verre. Quand les
+// cartes arrivent, rien ne saute.
+describe('SkeletonCard, in the shape of a feed card', () => {
+  /** Les hauteurs posées sur les formes dessinées, en points. */
+  const heights = () => {
+    const found: number[] = []
+    const visit = (node: unknown) => {
+      if (!node || typeof node !== 'object' || !('props' in node)) return
+      const { props, children } = node as { props: { style?: unknown }; children: unknown[] }
+      const { height } = (StyleSheet.flatten(props.style as object) ?? {}) as { height?: unknown }
+      if (typeof height === 'number') found.push(height)
+      for (const child of children) visit(child)
+    }
+    visit(screen.root)
+    return found
+  }
+
+  it('takes the height of a feed card', async () => {
+    await renderWithProviders(<SkeletonCard shape="feed" />)
+
+    expect(heights()).toContain(FEED_CARD_HEIGHT)
+  })
+
+  it('is named « Loading » and marked busy, like the other shapes', async () => {
+    await renderWithProviders(<SkeletonCard shape="feed" />)
+
+    expect(busy(screen.getByLabelText(loading))).toBe(true)
+  })
+
+  it('has no text of its own to read', async () => {
+    await renderWithProviders(<SkeletonCard shape="feed" />)
+
+    expect(screen.getByLabelText(loading)).toBeTruthy() // témoin
+    expect(screen.queryByText(/./, { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('announces the loading once for a list of feed cards', async () => {
+    await renderWithProviders(<SkeletonList shape="feed" count={3} />)
+
+    expect(screen.getAllByLabelText(loading)).toHaveLength(1)
+    expect(heights().filter((height) => height === FEED_CARD_HEIGHT)).toHaveLength(3)
+  })
+
+  it('keeps the plain card shape by default', async () => {
+    await renderWithProviders(<SkeletonCard />)
+
+    expect(screen.getByLabelText(loading)).toBeTruthy() // témoin
+    expect(heights()).not.toContain(FEED_CARD_HEIGHT)
   })
 })
 

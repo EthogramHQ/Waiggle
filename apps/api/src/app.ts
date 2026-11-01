@@ -34,6 +34,7 @@ import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
 import { reportRoutes } from './routes/reports'
 import { searchRoutes } from './routes/search'
+import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
 import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
@@ -320,7 +321,9 @@ export const createApp = ({
   app.route('/', noteRoutes({ db, limiter }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', feedRoutes({ db, publicApiUrl }))
+  app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
+  // « Proches à suivre » : la liste et « × » (tranche R4).
+  app.route('/', suggestionRoutes({ db, limiter, publicApiUrl }))
   app.route('/', notificationRoutes({ db, limiter, publicApiUrl }))
   app.route('/', emailRoutes({ db, limiter, secret, appUrl }))
   // Corriger son adresse avant de l'avoir vérifiée (tranche R2, A4).

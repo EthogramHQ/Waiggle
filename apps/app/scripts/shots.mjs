@@ -306,10 +306,13 @@ const claudeCode = {
   label: 'Claude Code',
   projects: [summaryOf(fromOthers[0]), summaryOf(recipesProject)],
 }
+// R4 : le total des réactions de chaque carte (« ✦ 49 »), varié : un grand, aucun (la carte ne
+// montre alors rien), un petit, un moyen.
+const feedTotals = [49, 0, 3, 12]
 const feedItems = fromOthers.map((p, i) => ({
   kind: 'project',
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
-  project: summaryOf(p),
+  project: { ...summaryOf(p), reactionTotal: feedTotals[i] ?? 0 },
 }))
 // Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
 // (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
@@ -337,6 +340,8 @@ const testerItems = [
       status: 'testable',
     }),
     demoUrl,
+    // R4 : des totaux variés, dont 0.
+    reactionTotal: [7, 0, 23, 2, 0, 5][i] ?? 0,
   },
 }))
 // La page de Max, vue par Léa qui ne le suit pas encore.
@@ -398,7 +403,7 @@ const noteItem = (project, n, body, day) => ({
   kind: 'note',
   at: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
   note: { ...note(n, body, day), createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString() },
-  project: summaryOf(project),
+  project: { ...summaryOf(project), reactionTotal: feedTotals[fromOthers.indexOf(project)] ?? 0 },
 })
 const followingItems = [
   noteItem(fromOthers[0], 6, 'v2 : il reconnaît maintenant les visages de profil.', 19),
@@ -406,11 +411,102 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
-// feed: 'end' : le fil tient en une page, son bas dit « Tu es à jour » (R1, le miel vif local).
+// R4, « Proches à suivre » (GET /v1/suggestions/members) : cinq membres qui ont publié
+// récemment, du plus récent au plus ancien, chacun avec son dernier projet public (résumé complet,
+// total compris). Jamais Léa, ni Max et Inès qu'elle suit dans le fil : la même liste sert au
+// premier lancement (feed: 'nobody') et à la colonne de droite sur ordinateur. Des noms de
+// longueurs variées (le plus long éprouve la ligne), une photo de couverture sur deux projets,
+// des statuts et des totaux variés (dont 0).
+const suggestedOf = (author, id, title, pitch, extra) => ({
+  ...author,
+  latestProject: {
+    ...summaryOf(recipesProject),
+    id,
+    author,
+    title,
+    pitch,
+    createdAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    ...extra.fields,
+  },
+})
+const suggestedMembers = [
+  suggestedOf(
+    { id: 'camille-id', name: 'Camille Roux', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000001',
+    'Le carnet de jardin',
+    'Il note les semis et prévient quand arroser.',
+    {
+      day: 20,
+      fields: { status: 'testable', reactionTotal: 8, cover: summaryOf(photosProject).cover },
+    },
+  ),
+  suggestedOf(
+    { id: 'yanis-id', name: 'Yanis', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000002',
+    'Quiz de géographie',
+    'Des questions sur les capitales, adaptées à ton niveau.',
+    { day: 19, fields: { status: 'building', reactionTotal: 0 } },
+  ),
+  suggestedOf(
+    { id: 'sofia-id', name: 'Sofia Lopes-Carvalho de Almeida', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000003',
+    'Lecteur de factures',
+    'Il range les factures du mois et prépare le tableau des dépenses.',
+    { day: 18, fields: { status: 'idea', reactionTotal: 21 } },
+  ),
+  suggestedOf(
+    { id: 'hugo-id', name: 'Hugo Petit', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000004',
+    'Histoires du soir',
+    'Une histoire courte inventée avec les enfants, chaque soir.',
+    {
+      day: 16,
+      fields: { status: 'testable', reactionTotal: 3, cover: projectWithPhotos.visuals[2] ?? null },
+    },
+  ),
+  suggestedOf(
+    { id: 'amina-id', name: 'Amina Diallo', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000005',
+    'Traducteur de recettes',
+    'Il convertit les mesures et traduit les recettes de famille.',
+    { day: 12, fields: { status: 'building', reactionTotal: 1 } },
+  ),
+]
+// La page complète du projet de chaque carte (fil, proches suggérés), par son identifiant, telle
+// que GET /v1/projects/:id la rend : jamais à Léa (`isMine: false`). Un projet suggéré reprend le
+// projet de recettes, avec le titre, l'auteur, le statut et la photo de sa carte.
+const cardProjects = new Map([
+  ...fromOthers.map((project) => [project.id, { ...project, isMine: false }]),
+  ...suggestedMembers.map(({ latestProject: { cover, reactionTotal, ...summary } }) => [
+    summary.id,
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+  ]),
+])
+// R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
+// affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).
+// L'appli pose la sphère avant le premier élément daté de cette date ou d'avant. Selon la page :
+// - feed: 'read-midway' (page « fil ») : lu jusqu'au 18/10 ; la note et le projet du 19 sont
+//   nouveaux, la sphère tombe au milieu, puis les éléments déjà vus ;
+// - feed: 'read-all' (page « fil-a-jour ») : lu jusqu'au plus récent ; rien de nouveau, la sphère
+//   est en tête du fil ;
+// - sans choix : le premier passage (jamais lu, `lastReadAt` null) ; le fil a une suite, la
+//   sphère n'apparaît pas ;
+// - feed: 'end' : premier passage sur un fil qui tient en une page ; la sphère est à la fin
+//   (« Tu as tout vu. », jur-J1).
+const lastReadOf = {
+  'read-midway': feedItems[1]?.at ?? null,
+  'read-all': followingItems[0]?.at ?? null,
+}
 const followingFeed = (feed) =>
   feed === 'nobody'
-    ? { items: [], nextCursor: null, followsAnyone: false }
-    : { items: followingItems, nextCursor: feed === 'end' ? null : 'suite', followsAnyone: true }
+    ? { items: [], nextCursor: null, followsAnyone: false, lastReadAt: null }
+    : {
+        items: followingItems,
+        nextCursor: feed === 'end' ? null : 'suite',
+        followsAnyone: true,
+        lastReadAt: lastReadOf[feed] ?? null,
+      }
 
 // Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son
 // identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
@@ -650,11 +746,42 @@ const reactionsOf = {
 }
 const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
 
+// L'horloge des captures (relecture design R4, A6) : le mardi 20/10/2026, 12 h à Paris. Chaque
+// contexte du navigateur la pose avant sa première page (`installShotClock`), pour les captures,
+// `--layout` et `--explore` : les dates relatives (« hier », « dimanche ») sont les mêmes à chaque
+// passage, quel que soit le jour où l'on photographie. Ce que l'API simulée date « maintenant » (un
+// commentaire envoyé, les notifications) part de la même heure.
+// La façon de la poser : un décalage de `Date`, écrit dans chaque page avant son code
+// (`addInitScript`). L'heure part du 20/10 à 12 h, puis avance normalement ; les minuteurs, les
+// images d'animation et `performance` restent ceux du navigateur. L'horloge de Playwright
+// (`clock.install`, puis `clock.setFixedTime`) empêchait le Chromium sans écran de la CI (Linux)
+// de prendre les captures du fil (« Unable to capture screenshot », R4), alors qu'elle passait sur
+// le PC. Un essai qui doit sauter un délai peut encore poser `page.clock` lui-même.
+const SHOT_NOW = Date.parse('2026-10-20T12:00:00+02:00')
+const SHOT_TIMEZONE = 'Europe/Paris'
+/** Pose l'horloge des captures sur un contexte neuf, avant toute page. */
+const installShotClock = (context) =>
+  context.addInitScript((now) => {
+    const RealDate = Date
+    const offset = now - RealDate.now()
+    // Une sous-classe de Date : sans argument, « maintenant » décalé ; avec, la date demandée.
+    class ShotDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + offset)
+        else super(...args)
+      }
+      static now() {
+        return RealDate.now() + offset
+      }
+    }
+    globalThis.Date = ShotDate
+  }, SHOT_NOW)
+
 // Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
 // nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
 // réactions et les abonnés. Chaque page choisit (notifications: 'none' : aucune ; 'many' : la
 // cloche à « 9+ »), et ce choix est donné à sa propre API simulée, comme le fil.
-const hoursAgo = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString()
+const hoursAgo = (hours) => new Date(SHOT_NOW - hours * 3_600_000).toISOString()
 const dayOf = (iso) => iso.slice(0, 10)
 const notified = (project) => ({ id: project.id, title: project.title })
 // L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
@@ -847,6 +974,8 @@ const fakeApi = (
   })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
+  // Les suggestions que Léa écarte dans ce navigateur (« × », R4) : elles quittent sa liste.
+  const dismissed = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
@@ -931,7 +1060,11 @@ const fakeApi = (
     // remplacer ces réponses par un refus).
     if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
       const { body } = JSON.parse(route.request().postData() ?? '{}')
-      return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        body,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
       return route.fulfill({ status: 204, body: '' })
@@ -978,7 +1111,7 @@ const fakeApi = (
       return json(201, {
         ...comment(0, lea, body, 19, 9),
         id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(SHOT_NOW).toISOString(),
       })
     }
     const one = pathname.match(/^\/v1\/projects\/([^/]+)\/comments\/([^/]+)$/)
@@ -989,7 +1122,12 @@ const fakeApi = (
         .flatMap((c) => [c, ...c.replies])
       const { replies: _replies, ...original } =
         all.find((c) => c.id === one[2]) ?? comment(0, lea, '', 19, 9)
-      return json(200, { ...original, id: one[2], body, editedAt: new Date().toISOString() })
+      return json(200, {
+        ...original,
+        id: one[2],
+        body,
+        editedAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (one && method === 'DELETE') {
       added[one[1]] = (added[one[1]] ?? 0) - 1
@@ -1016,6 +1154,18 @@ const fakeApi = (
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
     }
+    // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
+    // A7 : « Ce projet est introuvable » au toucher d'une carte).
+    const cardProject = cardProjects.get(pathname.replace(/^\/v1\/projects\//, ''))
+    if (cardProject && method === 'GET') return json(200, withExtras(cardProject))
+    // Suivre et ne plus suivre un membre ou un projet : 204, comme la vraie API (A7 : « Suivre »
+    // d'une suggestion revenait en arrière). Une capture qui veut une panne pose sa propre route.
+    if (
+      /^\/v1\/(members|projects)\/[^/]+\/follow$/.test(pathname) &&
+      (method === 'POST' || method === 'DELETE')
+    ) {
+      return route.fulfill({ status: 204, body: '' })
+    }
     // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
     // liste et la page du membre suivent. Se bloquer soi-même : 422.
     const block = pathname.match(/^\/v1\/members\/([^/]+)\/block$/)
@@ -1027,7 +1177,8 @@ const fakeApi = (
       const member = block[1] === max.id ? maxMember : { id: block[1], name: '', handle: '' }
       blocked.set(block[1], {
         member: { id: member.id, name: member.name, handle: member.handle, avatarUrl: null },
-        blockedAt: new Date().toISOString(),
+        // Une milliseconde de plus par blocage : le plus récent reste en tête de la liste.
+        blockedAt: new Date(SHOT_NOW + blocked.size).toISOString(),
       })
       return route.fulfill({ status: 204, body: '' })
     }
@@ -1056,6 +1207,19 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
+    // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
+    // garde la date lue au début de la visite, donc la capture ne change pas : 204, rien de gardé.
+    if (pathname === '/v1/feed/read' && method === 'PUT')
+      return route.fulfill({ status: 204, body: '' })
+    // « Proches à suivre » (R4) : la liste, sans ceux que Léa a écartés ; écarter répond 204.
+    if (pathname === '/v1/suggestions/members') {
+      return json(200, { members: suggestedMembers.filter((m) => !dismissed.has(m.id)) })
+    }
+    const dismissal = pathname.match(/^\/v1\/suggestions\/members\/([^/]+)\/dismissed$/)
+    if (dismissal && method === 'PUT') {
+      dismissed.add(decodeURIComponent(dismissal[1]))
+      return route.fulfill({ status: 204, body: '' })
+    }
     // « Découvrir » (Explorer, R3) : le carrousel des testeurs (?testers=true), ou « Récents », où
     // Léa suit déjà Max (comme la planche R3-Explorer-Desktop) : ses cartes n'ont pas de pastille,
     // celles d'Inès portent « Suivre Inès Haddad ».
@@ -1078,7 +1242,7 @@ const fakeApi = (
       return json(200, {
         items: notificationList[index] ?? [],
         nextCursor: index + 1 < notificationList.length ? 'suite' : null,
-        asOf: new Date().toISOString(),
+        asOf: new Date(SHOT_NOW).toISOString(),
       })
     }
     // Signaler (tranche 7a) : accepté (la page « signaler-erreur » remplace cette réponse par le
@@ -1124,7 +1288,11 @@ const fakeApi = (
       // Tranche 7c : suspendre et lever visent un membre (`memberId`), pas une cible de la file.
       const { action, target, memberId } = JSON.parse(route.request().postData() ?? '{}')
       decided.add(target?.id ?? memberId)
-      return json(201, { id: crypto.randomUUID(), action, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        action,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     // L'historique des décisions (tranche 7c), de la plus récente à la plus ancienne, en une page ;
     // `?member=` ne garde que celles qui visent ce membre (ses contenus et son compte).
@@ -1216,7 +1384,7 @@ const pages = [
           body: JSON.stringify({ code: 'TOO_MANY_REQUESTS', message: '' }),
         }),
       )
-      await page.getByLabel('Adresse e-mail').fill('ines.haddad@exemple.fr')
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@exemple.fr')
       await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
       await page.getByRole('button', { name: 'Me connecter' }).click()
       // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
@@ -1243,8 +1411,8 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await pendingEmail('ines.haddad@gmail.com')(page)
-      await page.getByRole('button', { name: /^Renvoyer l.e-mail$/ }).click()
-      await page.getByText(/nouvel e-mail vient de partir/).waitFor()
+      await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
+      await page.getByText(/nouvel e‑mail vient de partir/).waitFor()
     },
   },
   // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le
@@ -1255,7 +1423,7 @@ const pages = [
     path: '/forgot-password',
     signedIn: false,
     prepare: async (page) => {
-      await page.getByLabel('Adresse e-mail').fill('ines.haddad@gmail.com')
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@gmail.com')
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText(/Si un compte existe pour cette adresse/).waitFor()
     },
@@ -1285,8 +1453,46 @@ const pages = [
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
   // Le Fil (R3) : l'accueil d'un membre, ses abonnements seuls (le logo et la cloche en haut sur
   // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
-  { name: 'fil', path: '/', signedIn: true, fullPage: true },
+  // R4 : « fil » est lu jusqu'au 18/10, donc « Tu es à jour » coupe le fil en deux ; « fil-a-jour »
+  // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
+  // t'attend » et les proches à suivre).
+  { name: 'fil', path: '/', signedIn: true, feed: 'read-midway', fullPage: true },
+  { name: 'fil-a-jour', path: '/', signedIn: true, feed: 'read-all', fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // R4 : le fil qui charge (la première page ne répond jamais : le squelette des cartes), puis le
+  // fil en panne (500 : le message et « Réessayer »). La route de la page passe avant l'API
+  // simulée ; la page est relue pour que la première requête la prenne.
+  {
+    name: 'fil-chargement',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        () => {},
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.locator('[aria-busy="true"]').first().waitFor()
+    },
+  },
+  {
+    name: 'fil-erreur',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        (route) =>
+          route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'internal', message: '' } }),
+          }),
+      )
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.getByRole('button', { name: 'Réessayer' }).first().waitFor()
+    },
+  },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
@@ -1375,7 +1581,7 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(changeEmailShot.password)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Regarde ta boîte mail actuelle').waitFor()
@@ -1387,7 +1593,7 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(wrongPasswordShot)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Mot de passe incorrect.').waitFor()
@@ -1457,7 +1663,7 @@ const pages = [
     fullPage: true,
     prepare: async (page) => {
       await page
-        .getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+        .getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' })
         .click()
       await page.getByText('Réglage enregistré.').waitFor()
     },
@@ -1718,12 +1924,12 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await page.getByRole('button', { name: 'Confirmer' }).click()
-      await page.getByText(/tu ne recevras plus d’e-mail quand on te mentionne/).waitFor()
+      await page.getByText(/tu ne recevras plus d’e‑mail quand on te mentionne/).waitFor()
       // « Tout couper » ignore les appuis des 600 ms qui suivent la confirmation (la seconde tape
       // d'une double tape) : on appuie comme un membre qui a lu le message.
       await page.waitForTimeout(700)
       await page.getByRole('button', { name: 'Tout couper' }).click()
-      await page.getByText(/plus aucun e-mail de notification/).waitFor()
+      await page.getByText(/plus aucun e‑mail de notification/).waitFor()
     },
   },
   {
@@ -1755,7 +1961,7 @@ const pages = [
 const unfinished = unfinishedTexts(fr)
 // Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
 // « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
-const intendedUnfinished = ['catalogue', 'erreur']
+const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur']
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
 // Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
@@ -1929,9 +2135,12 @@ if (script) {
   ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
       ...options,
     })
+    // L'horloge des captures ; un essai peut poser `page.clock` lui-même pour un autre jour.
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended),
@@ -1977,9 +2186,11 @@ async function layoutReport() {
     const lines = [`## ${shot.name} (${shot.path})`, '']
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
     })
     try {
+      await installShotClock(context)
       await context.route(
         `${apiUrl}/**`,
         fakeApi(
@@ -1995,6 +2206,10 @@ async function layoutReport() {
       const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        // Les routes posées sur la page par `prepare` à la largeur précédente partent : celle de
+        // fil-chargement ne répond jamais, et « networkidle » ne viendrait plus (R4). L'API simulée
+        // est posée sur le contexte, elle reste.
+        await page.unrouteAll({ behavior: 'ignoreErrors' })
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         if (shot.prepare) {
@@ -2133,9 +2348,11 @@ const capture = async ({ shot, device, scheme }) => {
     viewport: device.viewport,
     colorScheme: scheme.colorScheme,
     locale: 'fr-FR',
+    timezoneId: SHOT_TIMEZONE,
     deviceScaleFactor: scale,
   })
   try {
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(

@@ -9,6 +9,7 @@ import { Project, ProjectId } from './projects'
 import { ReactionKind } from './reactions'
 import { Removal } from './removal'
 import { ReportExport } from './reports'
+import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
 
 /**
@@ -78,6 +79,16 @@ export const AccountExport = z
      * (null s'il n'a jamais ouvert l'écran).
      */
     notifications: z.object({ seenAt: z.iso.datetime().nullable() }),
+    /**
+     * Le fil (R4) : jusqu'où il l'a lu, la seule trace gardée de ses lectures (null s'il ne l'a
+     * jamais ouvert). Jamais la liste de ce qu'il a lu.
+     */
+    feed: z.object({ readAt: z.iso.datetime().nullable() }),
+    /**
+     * Les membres qu'il ne veut plus se voir suggérer (R4), des plus anciens aux plus récents ;
+     * jamais qui l'a écarté.
+     */
+    dismissedSuggestions: z.array(DismissedSuggestionExport),
     /**
      * Les signalements qu'il a faits (tranche 7a), des plus anciens aux plus récents, sans le texte
      * visé. Jamais ceux qui visent ses contenus.

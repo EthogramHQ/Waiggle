@@ -48,6 +48,12 @@ type Props = {
   /** xl : 56 points ; regular : 52 ; compact : 44 (carte, barre) ; small : 36 dessinés, 44 à toucher. */
   size?: ButtonSize
   icon?: IconName
+  /**
+   * Un décor posé avant le libellé, à la place d'une icône : les visages des auteurs dans le
+   * bouton des nouveautés du fil (`AvatarStack` sans nom). Toujours décoratif : le nom du bouton
+   * reste son libellé, le décor doit être caché aux lecteurs d'écran par celui qui le fournit.
+   */
+  leading?: ReactNode
   loading?: boolean
   disabled?: boolean
   /** Le nom lu par les lecteurs d'écran, s'il diffère du texte affiché (« Suivi » → « Suivre Léa »). */
@@ -71,6 +77,7 @@ export function Button({
   variant = 'primary',
   size = 'regular',
   icon,
+  leading,
   loading = false,
   disabled = false,
   spokenLabel,
@@ -178,9 +185,15 @@ export function Button({
           flexShrink: 1,
           minWidth: 0,
           opacity: loading ? 0 : 1,
+          // Avec un décor (les visages des nouveautés), la rangée passe à la ligne quand le libellé
+          // ne tient plus à côté (320 points, texte à 200 %) : le décor reste au-dessus, et le
+          // libellé garde toute la largeur au lieu d'être coupé au milieu d'un mot.
+          ...(leading ? { flexWrap: 'wrap' as const, rowGap: space.xs } : null),
         }}
       >
-        {/* flexShrink: 0 : l'icône garde sa taille quand le libellé passe sur deux lignes. */}
+        {/* flexShrink: 0 : l'icône ou le décor gardent leur taille quand le libellé passe sur deux
+            lignes. */}
+        {leading ? <View style={{ flexShrink: 0 }}>{leading}</View> : null}
         {icon ? (
           <View style={{ flexShrink: 0 }}>
             <Icon name={icon} size={small ? 16 : 20} tone={tone} />

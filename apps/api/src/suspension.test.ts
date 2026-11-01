@@ -506,6 +506,38 @@ describe('a suspended account', () => {
     expect((await act.send('GET', '/v1/me/export', karim)).status).toBe(200)
   })
 
+  // R4 (sec-A8) : lire son fil et écarter une suggestion ne publient rien ; ils restent permis,
+  // comme marquer ses notifications vues. Karim suit Inès (beforeEach) ; Malik publie.
+  it('still marks its feed read and dismisses a suggestion', async () => {
+    const feed = await act.send('GET', '/v1/feed/following', karim)
+    expect(feed.status).toBe(200)
+    const upTo = ((await feed.json()) as { items: { at: string }[] }).items[0]?.at
+    expect(upTo).toBeDefined()
+    expect((await act.send('PUT', '/v1/feed/read', karim, { upTo })).status).toBe(204)
+    expect(
+      (
+        (await (await act.send('GET', '/v1/feed/following', karim)).json()) as {
+          lastReadAt: unknown
+        }
+      ).lastReadAt,
+    ).toBe(upTo)
+
+    later()
+    await act.publish(malik, 'Le projet de Malik')
+    const listed = async () =>
+      (
+        (await (await act.send('GET', '/v1/suggestions/members', karim)).json()) as {
+          members: { id: string }[]
+        }
+      ).members.map((member) => member.id)
+    // Témoin : Malik est suggéré à Karim, suspendu ou non.
+    expect(await listed()).toContain(malikId)
+
+    const dismissed = await act.send('PUT', `/v1/suggestions/members/${malikId}/dismissed`, karim)
+    expect(dismissed.status).toBe(204)
+    expect(await listed()).not.toContain(malikId)
+  })
+
   // S9 : PATCH /v1/me entre, mais n'accepte que la langue ; toute autre clé, même inchangée, est
   // refusée avant la lecture du pseudo.
   it('changes its language, and nothing else of its profile', async () => {

@@ -85,6 +85,9 @@ const day = {
   panelBorder: 'rgba(255,255,255,0.8)',
   sheet: 'rgba(255,255,255,0.86)', // feuille qui monte du bas de l'écran
   scrim: 'rgba(28,27,25,0.32)', // voile derrière une feuille ou une fenêtre
+  // Le reflet qui suit la souris sur une carte inclinée (ui/tilt.ts) : une lueur blanche au centre,
+  // qui s'efface vers ses bords. Il ne porte aucun texte.
+  glare: 'rgba(255,255,255,0.22)',
   focusRing: '#C77F00', // contour de l'élément choisi au clavier (sur ordinateur)
 
   // La mascotte (ui/Mascot.tsx). Son dessin est une image, à l'encre presque noire de jour comme de
@@ -160,6 +163,8 @@ const night = {
   panelBorder: 'rgba(255,255,255,0.14)',
   sheet: 'rgba(26,23,18,0.94)',
   scrim: 'rgba(0,0,0,0.5)',
+  // De nuit, plus discret : un reflet vif sur une photo sombre éblouirait.
+  glare: 'rgba(255,255,255,0.12)',
   focusRing: '#FFC933',
 
   // L'encre de l'image ne change pas avec le thème ; le disque devient un miel pâle et chaud.
@@ -235,6 +240,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Le texte discret, seulement sur la page : 3,2:1 sur une photo sombre de jour, 3,7:1 sur la
   // lumière miel de nuit. Sur une image ou la lumière, une légende passe en textSecondary.
   { text: 'textMuted', on: 'panel', min: 4.5 },
+  // La carte d'une note du fil (R4, ui/NoteCard.tsx) est tout entière de ce verre, posé sur la page
+  // et sa lumière miel, jamais sur une photo : son surtitre « Note » y est en texte
+  // d'accent, mesuré sur ces deux fonds.
+  { text: 'amberText', on: 'panel', min: 4.5, base: onPageOrHoney },
   // Le verre plus léger des barres flottantes : même règle, avec un gris plus sombre que textMuted
   // (qui y tomberait sous 4,5). Sur une photo sombre, de jour, il ferait 3,1:1 : là, le panneau.
   { text: 'text', on: 'glass', min: 4.5, base: onAnyBackdrop },
@@ -255,6 +264,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'text', on: 'sheet', min: 4.5 },
   { text: 'onHoney', on: 'honey', min: 4.5 },
   { text: 'onHoney', on: 'honeyPressed', min: 4.5 },
+  // « Tu es à jour » (R4, ui/UpToDate.tsx) : un texte posé sur la sphère de miel l'est à l'encre,
+  // sur son cœur clair (honeyLight) ou sur le miel, jour et nuit. Au bord de la sphère, presque noir
+  // la nuit, aucun texte : là, il passe par le verre (`panel`, mesuré sur le miel et sur le noir).
+  { text: 'onHoney', on: 'honeyLight', min: 4.5 },
   { text: 'statusText', on: 'honeySoft', min: 4.5 },
   // Un champ choisi dans un groupe : sa ligne prend le fond honeySoft (TextField).
   { text: 'text', on: 'honeySoft', min: 4.5 },

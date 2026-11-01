@@ -62,3 +62,10 @@ export const readableWidth = 680
 
 /** Agrandissement maximal des textes quand l'appareil est réglé en grande taille de texte. */
 export const maxTextScale = 2
+
+/**
+ * Agrandissement maximal d'un grand titre (page, section) : 34 points doublés (68) ne tiennent pas
+ * sur 320 points, et « Réglages » se coupait au milieu du mot. À 1,5 il tient, et reste bien plus
+ * grand que le texte courant (R4, M5).
+ */
+export const maxHeadingScale = 1.5

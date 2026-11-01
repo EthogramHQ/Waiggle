@@ -140,6 +140,14 @@ export const memberCounterKeys = (userId: string) => ({
   searchDay: `search-day:${userId}`,
   // La liste des outils (tranche R3) : 600 lectures par heure, calculée à chaque appel.
   toolsHour: `tools-hour:${userId}`,
+  // Marquer son fil lu (R4) : 600 par heure, une fois par ouverture du fil dans l'appli.
+  feedReadHour: `feed-read-hour:${userId}`,
+  // Lire « Proches à suivre » (R4) : 600 par heure.
+  suggestionsHour: `suggestions-hour:${userId}`,
+  // Écarter une suggestion (R4) : 120 par heure et 500 par jour (relecture de sécurité sec-A3),
+  // mal formées comprises.
+  suggestionDismissHour: `suggestion-dismiss-hour:${userId}`,
+  suggestionDismissDay: `suggestion-dismiss-day:${userId}`,
 })
 
 /**

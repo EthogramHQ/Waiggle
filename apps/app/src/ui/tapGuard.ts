@@ -2,7 +2,7 @@
 // tranche 7b, Sheet depuis R2) : la couche paraît souvent là où l'on vient de toucher (« Bloquer »
 // d'un menu, « Modifier » d'une rubrique), et la seconde tape d'une double tape tombait sur sa
 // confirmation, ou sur le voile qui la refermait aussitôt.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Le temps, après l'ouverture, pendant lequel une couche gardée ignore les tapes (décision du
@@ -28,4 +28,32 @@ export function useTapsAllowed(visible: boolean, guarded: boolean) {
     return () => clearTimeout(timer)
   }, [visible, guarded])
   return !guarded || allowed
+}
+
+/**
+ * Hook : la garde contre la double tape (TAP_GUARD_MS, la même que les fenêtres), commune aux liens
+ * d'une carte (R3 dans `TesterCard`, partagée en R4 par la carte du fil, `SuggestionRow` et
+ * `TesterRow`). Une page s'ouvre sous le doigt, et la seconde tape l'ouvrirait une deuxième fois
+ * (deux pages empilées, deux « Retour ») ; partagée, elle empêche aussi la seconde tape d'un
+ * « Tester » de tomber, à côté, sur le lien de la carte. Un `ref` plutôt qu'un état : la seconde
+ * tape arrive avant que React ait redessiné, et doit déjà trouver la garde levée.
+ */
+export function useTapGuard() {
+  const guarded = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Le minuteur s'arrête si la carte quitte l'écran avant la fin de la garde.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+  return (action: () => void) => () => {
+    if (guarded.current) return
+    guarded.current = true
+    timer.current = setTimeout(() => {
+      guarded.current = false
+    }, TAP_GUARD_MS)
+    action()
+  }
 }

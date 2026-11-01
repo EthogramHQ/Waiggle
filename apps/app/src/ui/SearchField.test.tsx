@@ -9,7 +9,7 @@ import { Platform, StyleSheet, TextInput, type ViewStyle } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { Button } from './Button'
-import { SearchField } from './SearchField'
+import { SearchButton, SearchField } from './SearchField'
 import { TAP_GUARD_MS } from './tapGuard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -340,5 +340,78 @@ describe('SearchField, its frame and its action', () => {
     })
 
     expect(styleOf(cell()).flexBasis).toBe(2 * normal)
+  })
+})
+
+// Le texte d'attente entier (R4, M8) : une saisie d'une ligne le coupe à 200 % de texte (« Un projet,
+// une p »). Tant que le champ est vide, l'appli dessine donc elle-même le texte, qui passe à la
+// ligne, caché des lecteurs d'écran (la saisie garde le sien) ; il disparaît dès qu'on tape.
+describe('SearchField, its drawn placeholder', () => {
+  // Le texte dessiné porte un espace sans chasse en fin de texte : seule la saisie répond au texte
+  // d'attente exact.
+  const drawn = `${placeholder}​`
+  const hidden = { includeHiddenElements: true }
+
+  it('is drawn while the field is empty, can wrap, and is hidden from screen readers', async () => {
+    await renderWithProviders(
+      <SearchField value="" onChangeText={() => {}} label={label} placeholder={placeholder} />,
+    )
+
+    const text = screen.getByText(drawn, hidden)
+    expect(text.props.numberOfLines).toBeUndefined()
+    type Node = { props: Record<string, unknown>; parent: Node | null }
+    let node = text as unknown as Node | null
+    while (node && node.props['aria-hidden'] !== true) node = node.parent
+    expect(node?.props['aria-hidden']).toBe(true)
+    // La saisie garde le vrai texte d'attente (son nom pour les outils, la couleur du contraste élevé).
+    expect(screen.getByPlaceholderText(placeholder)).toBe(field())
+  })
+
+  it('goes away once something is typed', async () => {
+    await renderWithProviders(
+      <SearchField value="carn" onChangeText={() => {}} label={label} placeholder={placeholder} />,
+    )
+
+    expect(screen.queryByText(drawn, hidden)).toBeNull()
+    expect(field()).toBeTruthy() // témoin : le champ est bien là
+  })
+})
+
+// La loupe seule de la barre du haut en largeur moyenne (R4, M10) : un lien vers la page de
+// recherche, nommé par un texte caché à l'œil, qui ne se dit jamais « page actuelle » (sur la page de
+// recherche, la barre du haut n'est pas là).
+describe('SearchButton', () => {
+  const href = '/search'
+
+  it('is a link named « Rechercher » that leads to the search page', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<SearchButton label={label} href={href} onPress={() => {}} />)
+
+      const link = screen.getByRole('link', { name: label })
+      expect(link.props.href).toBe(href)
+      // Un lien, pas un champ : aucun champ « Rechercher » ne s'est glissé dans l'arbre.
+      expect(screen.queryByLabelText(label)).toBeNull()
+      // Sur la loupe, jamais « page actuelle ».
+      expect(link.props['aria-current']).not.toBe('page')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('opens the search page once per touch, and stops the browser from reloading the page', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const onPress = jest.fn()
+      await renderWithProviders(<SearchButton label={label} href={href} onPress={onPress} />)
+
+      const preventDefault = jest.fn()
+      await fireEvent.press(screen.getByRole('link', { name: label }), { preventDefault })
+
+      expect(onPress).toHaveBeenCalledTimes(1)
+      expect(preventDefault).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.restoreAllMocks()
+    }
   })
 })

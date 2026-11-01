@@ -151,7 +151,7 @@ function Results() {
         {/* La tuile à l'initiale, en miel et en crème, comme « Tous les outils ». */}
         <ListRow
           label="Carnivore AI"
-          leading={<InitialTile name="Carnivore AI" variant="honey" />}
+          leading={<InitialTile name="Carnivore AI" />}
           title={<HighlightedText weight={600} text="Carnivore AI" words={carn} />}
           detail="7 projets publics"
           trailing="chevron"
@@ -160,7 +160,7 @@ function Results() {
         />
         <ListRow
           label="Notion"
-          leading={<InitialTile name="Notion" variant="cream" />}
+          leading={<InitialTile name="Notion" />}
           detail={
             <HighlightedText
               variant="callout"

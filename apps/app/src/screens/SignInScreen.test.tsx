@@ -43,7 +43,7 @@ jest.mock('expo-router', () => {
 const signInMock = jest.mocked(signIn)
 
 const submit = async () => {
-  await fireEvent.changeText(screen.getByLabelText('Adresse e-mail'), 'lea@example.com')
+  await fireEvent.changeText(screen.getByLabelText('Adresse e‑mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'correct-horse-battery')
   await fireEvent.press(screen.getByRole('button', { name: 'Me connecter' }))
 }
@@ -124,7 +124,7 @@ describe('SignInScreen', () => {
 
     await submit()
 
-    expect(screen.getByText('Adresse e-mail ou mot de passe incorrect.')).toBeTruthy()
+    expect(screen.getByText('Adresse e‑mail ou mot de passe incorrect.')).toBeTruthy()
     expect(mockReplace).not.toHaveBeenCalled()
   })
 

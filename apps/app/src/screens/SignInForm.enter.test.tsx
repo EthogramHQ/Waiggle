@@ -26,7 +26,7 @@ const signInMock = jest.mocked(signIn)
 const tooMany = fr.t(($) => $.auth.errors.tooManyAttempts)
 
 const fill = async () => {
-  await fireEvent.changeText(screen.getByLabelText('Adresse e-mail'), 'lea@example.com')
+  await fireEvent.changeText(screen.getByLabelText('Adresse e‑mail'), 'lea@example.com')
   await fireEvent.changeText(screen.getByLabelText('Mot de passe'), 'correct-horse-battery')
 }
 

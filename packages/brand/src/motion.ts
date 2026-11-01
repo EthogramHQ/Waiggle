@@ -48,3 +48,10 @@ export type DurationName = keyof typeof durations
 export const pressScale = 0.96
 /** Le bouton rond flottant s'enfonce davantage : il est plus petit et plus « physique ». */
 export const pressScaleFab = 0.92
+
+/**
+ * L'inclinaison d'une carte sous la souris (R4, sur ordinateur seulement) : `maxDegrees`, l'angle
+ * le plus grand, sur chaque axe ; `perspective`, la distance (en points) de l'œil à la carte. Plus
+ * elle est courte, plus le bord qui s'éloigne rapetisse.
+ */
+export const tilt = { maxDegrees: 4, perspective: 900 } as const

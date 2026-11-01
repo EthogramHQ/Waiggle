@@ -1,6 +1,7 @@
 // Tests des rôles de texte de Miel 2 (tranche R1) : le nom géant d'un outil tient sur une ligne
 // (il rétrécit au lieu de passer à la ligne au milieu d'un mot), et les rôles à chasse fixe (mono,
 // code) ne demandent jamais une police que l'appli n'a pas chargée.
+import { maxHeadingScale, maxTextScale } from '@ruche/brand'
 import { screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -31,6 +32,71 @@ describe('Text, the giant tool name', () => {
     } finally {
       jest.restoreAllMocks()
     }
+  })
+})
+
+// Les grands titres grossissent moins que le texte courant (R4, M5) : à 320 points et 200 % de texte,
+// « Réglages » en titre de page se coupait au milieu du mot.
+describe('Text, the page and section titles', () => {
+  const multiplier = (text: string) => screen.getByText(text).props.maxFontSizeMultiplier
+
+  it.each([1, 2] as const)(
+    'grow less than body text when they are level %i headings',
+    async (level) => {
+      await renderWithProviders(
+        <Text variant="title2" heading={level}>
+          Réglages
+        </Text>,
+      )
+
+      expect(multiplier('Réglages')).toBe(maxHeadingScale)
+      expect(maxHeadingScale).toBeLessThan(maxTextScale)
+    },
+  )
+
+  it('follow the screen width on the web, never above their size token', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Text variant="title2" heading={1}>
+          Réglages
+        </Text>,
+      )
+
+      expect(String(styleOf('Réglages').fontSize)).toBe('min(34px, 8.50vw)')
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('keep a small section title (a group caption) at the full body size scale', async () => {
+    await renderWithProviders(
+      <Text variant="caption" heading={2}>
+        Langue
+      </Text>,
+    )
+
+    expect(multiplier('Langue')).toBe(maxTextScale)
+  })
+
+  it('leave the markdown headings of members (levels 3 and 4) at the full scale', async () => {
+    await renderWithProviders(
+      <Text variant="heading" heading={3}>
+        La recette
+      </Text>,
+    )
+
+    expect(multiplier('La recette')).toBe(maxTextScale)
+  })
+
+  it('let a caller choose its own limit', async () => {
+    await renderWithProviders(
+      <Text variant="title2" heading={1} maxScale={1.2}>
+        Waiggle
+      </Text>,
+    )
+
+    expect(multiplier('Waiggle')).toBe(1.2)
   })
 })
 

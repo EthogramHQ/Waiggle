@@ -11,7 +11,7 @@
 // décrit de la même façon par son texte. Pour l'auteur, une note retirée par la modération garde sa
 // place, avec le bandeau du retrait au-dessus de son texte (`removed`).
 import { borders, layout, radii, readableWidth, space, textStyles } from '@ruche/brand'
-import { type Ref, useId, useImperativeHandle, useRef } from 'react'
+import { type ReactNode, type Ref, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
@@ -23,7 +23,11 @@ import { useTheme } from './theme/ThemeProvider'
 type Note = {
   id: string
   body: string
-  when: string
+  /**
+   * La date de la note : un texte, ou `<RelativeTime …>` (R4, « il y a 2 h »), une vue sur le web,
+   * posée à la place du texte et jamais dedans.
+   */
+  when: ReactNode
   /** Le bandeau d'une note retirée par la modération, pour l'auteur (tranche 7a). */
   removed?: RemovedBanner | undefined
 }
@@ -141,9 +145,13 @@ export function NoteList({
                 }}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="caption" weight={600} tone="muted">
-                    {note.when}
-                  </Text>
+                  {typeof note.when === 'string' ? (
+                    <Text variant="caption" weight={600} tone="muted">
+                      {note.when}
+                    </Text>
+                  ) : (
+                    note.when
+                  )}
                 </View>
                 {onDelete ? (
                   <IconButton

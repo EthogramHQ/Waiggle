@@ -23,7 +23,6 @@ import { ListGroup, ListRow } from './ListGroup'
 import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
-import { NewItemsBanner } from './NewItemsBanner'
 import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
 import { NoteList } from './NoteList'
@@ -274,31 +273,7 @@ describe('FollowButton', () => {
   })
 })
 
-describe('NewItemsBanner', () => {
-  it('is a button that shows the new items when touched', async () => {
-    const onPress = jest.fn()
-    await renderWithProviders(<NewItemsBanner label="3 nouveautés" onPress={onPress} />)
-
-    await fireEvent.press(screen.getByRole('button', { name: '3 nouveautés' }))
-
-    expect(onPress).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('NewItemsBanner, with nothing new', () => {
-  it('says what the feed shows, with nothing to press', async () => {
-    await renderWithProviders(
-      <NewItemsBanner
-        label={null}
-        onPress={jest.fn()}
-        caption="Les nouveaux projets des personnes que tu suis."
-      />,
-    )
-
-    expect(screen.getByText('Les nouveaux projets des personnes que tu suis.')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-})
+// Le bouton des nouveautés (NewItemsBanner) se teste dans son propre fichier depuis R4.
 
 describe('FollowerCount', () => {
   it('shows the number of followers, never their names', async () => {
@@ -309,7 +284,8 @@ describe('FollowerCount', () => {
 })
 
 describe('FeedEnd', () => {
-  const labels = { moreLabel: 'Afficher la suite', endLabel: 'Tu es à jour' }
+  // R4 : « Tu es à jour » a quitté FeedEnd (ui/UpToDate.tsx) ; la fin d'ici est la fin discrète.
+  const labels = { moreLabel: 'Afficher la suite', endLabel: 'C’est tout' }
 
   it('offers to load what comes next', async () => {
     const onMore = jest.fn()
@@ -318,7 +294,7 @@ describe('FeedEnd', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Afficher la suite' }))
 
     expect(onMore).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Tu es à jour')).toBeNull()
+    expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
   it('stays in place and busy while the next page loads, without asking for it twice', async () => {
@@ -349,10 +325,10 @@ describe('FeedEnd', () => {
     expect(onMore).toHaveBeenCalledTimes(1)
   })
 
-  it('says the member is up to date at the end, with nothing left to press', async () => {
+  it('says the list is over at the end, with nothing left to press', async () => {
     await renderWithProviders(<FeedEnd state="end" {...labels} onMore={jest.fn()} />)
 
-    expect(screen.getByText('Tu es à jour')).toBeTruthy()
+    expect(screen.getByText('C’est tout')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
