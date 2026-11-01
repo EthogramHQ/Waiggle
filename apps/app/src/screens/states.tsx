@@ -15,6 +15,7 @@ import { nextAfterSignIn } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
+import { Honeycomb } from '../ui/Illustrations'
 import { Screen } from '../ui/Screen'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
@@ -176,23 +177,65 @@ export function SessionErrorScreen({
  * Ce qu'on cherchait n'existe pas (ou n'est pas visible) : retour à l'accueil.
  *
  * `ambiance` : « light » (par défaut) pour un contenu introuvable à l'intérieur de l'appli (un
- * projet, un membre) ; « brand » pour une adresse qui ne mène nulle part (NotFoundScreen), un moment
+ * membre) ; « brand » pour une adresse qui ne mène nulle part (NotFoundScreen), un moment
  * de marque sur le miel vif (R1). Dans les deux cas, la barre de navigation reste (« Mon compte »
  * partout, décision de Louis du 29/10/2026) : sur le miel, elle se pose au-dessus de la feuille.
+ *
+ * `variant="project"` (R5a, planche R5a-Introuvable) : un projet supprimé, retiré, privé d'un autre
+ * ou d'un membre bloqué, ou une adresse fausse, tous sur la même page. Sur le miel vif, des
+ * alvéoles de verre avec la mascotte à la loupe ; « Retour » en haut ramène à la page quittée, et
+ * « Retour au fil » en bas remplace « Retour à l'accueil ».
  */
 export function NotFoundState({
   title,
   message,
   width = 'form',
   ambiance = 'light',
+  variant,
 }: {
   title: string
   message?: string
   width?: Width
   ambiance?: 'brand' | 'light'
+  variant?: 'project'
 }) {
   const { t } = useTranslation()
   const router = useRouter()
+  // Sans page précédente (un lien ouvert dans un nouvel onglet), « Retour » mène au fil.
+  const back = useGoBack('/')
+  if (variant === 'project') {
+    return (
+      <Screen
+        header={<TopNav />}
+        width={width}
+        pageTitle={title}
+        ambiance="brand"
+        // Les alvéoles sont le décor du miel (téléphone) ou du haut de la carte (ordinateur) : le
+        // bloc de l'état n'a donc pas d'image à lui (`picture={null}`), sinon la mascotte serait
+        // dessinée deux fois.
+        scene={<Honeycomb />}
+        onBack={back}
+        // Le même « Retour » que la page d'un projet : écrit en toutes lettres sur ordinateur.
+        backLabel={t(($) => $.project.page.back)}
+      >
+        <StateMessage
+          kind="notFound"
+          level={1}
+          title={title}
+          picture={null}
+          {...(message ? { message } : null)}
+          actions={[
+            {
+              label: t(($) => $.project.page.notFoundAction),
+              // replace : la page introuvable ne reste pas dans l'historique, un retour depuis le
+              // fil n'y ramène pas.
+              onPress: () => router.replace('/'),
+            },
+          ]}
+        />
+      </Screen>
+    )
+  }
   return (
     <Screen header={<TopNav />} width={width} pageTitle={title} ambiance={ambiance}>
       <StateMessage

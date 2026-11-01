@@ -56,6 +56,13 @@ type Props = {
    * remplace toute la page (page introuvable, erreur de chargement : voir screens/states.tsx).
    */
   level?: HeadingLevel
+  /**
+   * L'image de l'état, à la place de celle que donne son genre (la mascotte, la tuile) : les
+   * alvéoles d'un projet introuvable (R5a), par exemple. `null` : aucune image dans le bloc, quand
+   * l'écran la montre déjà ailleurs (en décor sur le miel, `Screen scene`), pour ne pas la
+   * dessiner deux fois. Sans elle, l'image du genre, comme avant.
+   */
+  picture?: ReactNode
 }
 
 export function StateMessage({
@@ -67,6 +74,7 @@ export function StateMessage({
   children,
   actions = [],
   level = 2,
+  picture: givenPicture,
 }: Props) {
   const { colors } = useTheme()
   const { height } = useLayout()
@@ -82,8 +90,11 @@ export function StateMessage({
   // (la loupe), « liste vide » (le sommeil) et « réservé aux membres » (le salut) ; une tuile de
   // miel avec une icône pour l'erreur, où l'abeille n'aurait pas le ton juste.
   // La mascotte est décorative (J10) : le titre dit déjà l'état, comme l'indicateur de chargement.
+  // Une image donnée par l'écran passe avant celle du genre (`undefined` : rien de donné).
   const picture =
-    kind === 'loading' ? (
+    givenPicture !== undefined ? (
+      givenPicture
+    ) : kind === 'loading' ? (
       // aria-hidden : l'indicateur ne dit rien de plus que le texte « Chargement… » qui le suit.
       <ActivityIndicator size="large" color={colors.amber} aria-hidden />
     ) : kind === 'done' ? (
@@ -116,7 +127,7 @@ export function StateMessage({
       {/* L'image et les textes forment un groupe plus serré (space.lg) que l'écart des issues :
           l'image appartient au titre qu'elle illustre. */}
       <View style={{ alignSelf: 'stretch', alignItems: 'flex-start', gap: space.lg }}>
-        {kind === 'loading' || !cramped ? (
+        {picture !== null && (kind === 'loading' || !cramped) ? (
           // Un cadre rangé à gauche autour de l'image : la mascotte se centre elle-même
           // (alignSelf: 'center' dans Mascot.tsx) ; dans ce cadre, juste à sa taille, « centrée »
           // revient à « collée au bord gauche ». L'emblème d'une erreur n'a pas d'air dessous :
