@@ -1386,8 +1386,46 @@ const pages = [
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
   // Le Fil (R3) : l'accueil d'un membre, ses abonnements seuls (le logo et la cloche en haut sur
   // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
-  { name: 'fil', path: '/', signedIn: true, fullPage: true },
+  // R4 : « fil » est lu jusqu'au 18/10, donc « Tu es à jour » coupe le fil en deux ; « fil-a-jour »
+  // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
+  // t'attend » et les proches à suivre).
+  { name: 'fil', path: '/', signedIn: true, feed: 'read-midway', fullPage: true },
+  { name: 'fil-a-jour', path: '/', signedIn: true, feed: 'read-all', fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // R4 : le fil qui charge (la première page ne répond jamais : le squelette des cartes), puis le
+  // fil en panne (500 : le message et « Réessayer »). La route de la page passe avant l'API
+  // simulée ; la page est relue pour que la première requête la prenne.
+  {
+    name: 'fil-chargement',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        () => {},
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.locator('[aria-busy="true"]').first().waitFor()
+    },
+  },
+  {
+    name: 'fil-erreur',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        (route) =>
+          route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'internal', message: '' } }),
+          }),
+      )
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.getByRole('button', { name: 'Réessayer' }).first().waitFor()
+    },
+  },
   // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
   // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
   // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
@@ -1856,7 +1894,7 @@ const pages = [
 const unfinished = unfinishedTexts(fr)
 // Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
 // « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
-const intendedUnfinished = ['catalogue', 'erreur']
+const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur']
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
 // Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
