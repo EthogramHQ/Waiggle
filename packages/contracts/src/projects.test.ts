@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from './errors'
 import {
+  cleanPrompt,
   DemoUrl,
   Project,
   ProjectInput,
@@ -84,6 +85,65 @@ describe('ProjectUpdate', () => {
     expect(ProjectUpdate.safeParse({ visualOrder: ids }).success).toBe(false)
     expect(ProjectUpdate.safeParse({ visualOrder: [ids[0], ids[0]] }).success).toBe(false)
     expect(ProjectUpdate.safeParse({ visualOrder: ['../secrets'] }).success).toBe(false)
+  })
+})
+
+// Les caractères invisibles d'un prompt collé (décision F-Mod4, tranche R5a). Ils s'écrivent par
+// leur numéro (String.fromCodePoint) : écrits tels quels, on ne les verrait pas dans ce fichier, et
+// un éditeur pourrait les perdre sans prévenir.
+const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b)
+const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e)
+const TAG_LATIN_A = String.fromCodePoint(0xe0041) // un caractère « tag », invisible
+const LINE_SEPARATOR = String.fromCodePoint(0x2028)
+const PARAGRAPH_SEPARATOR = String.fromCodePoint(0x2029)
+const ZERO_WIDTH_JOINER = String.fromCodePoint(0x200d) // liant : 👩 + liant + 💻 = la femme au clavier
+const VARIATION_SELECTOR_16 = String.fromCodePoint(0xfe0f) // ❤ + sélecteur = ❤️ en couleur
+
+describe('Prompts pasted with invisible characters', () => {
+  const promptsOf = (prompt: string) => ProjectInput.parse({ ...valid, prompts: [prompt] }).prompts
+
+  it('saves a prompt without its zero-width spaces, direction overrides and tag characters', () => {
+    expect(
+      promptsOf(`Ré${ZERO_WIDTH_SPACE}sume ${RIGHT_TO_LEFT_OVERRIDE}ce texte${TAG_LATIN_A}.`),
+    ).toEqual(['Résume ce texte.'])
+  })
+
+  it('also cleans the prompts of a change', () => {
+    expect(ProjectUpdate.parse({ prompts: [`Fais${ZERO_WIDTH_SPACE} un plan`] })).toEqual({
+      prompts: ['Fais un plan'],
+    })
+  })
+
+  it('turns Unicode line and paragraph separators into line breaks', () => {
+    expect(promptsOf(`Un${LINE_SEPARATOR}deux${PARAGRAPH_SEPARATOR}trois`)).toEqual([
+      'Un\ndeux\ntrois',
+    ])
+  })
+
+  it('counts the length after removing the invisible characters', () => {
+    // 4 000 caractères visibles et dix invisibles : accepté, et rendu sans eux (sec-B9).
+    const long = 'a'.repeat(4_000)
+    expect(promptsOf(`${long}${ZERO_WIDTH_SPACE.repeat(10)}`)).toEqual([long])
+    // Le témoin : un caractère visible de plus, et le prompt est refusé.
+    expect(ProjectInput.safeParse({ ...valid, prompts: [`${long}b`] }).success).toBe(false)
+  })
+
+  it('drops a prompt made only of invisible characters, like an empty one', () => {
+    expect(promptsOf(`${ZERO_WIDTH_SPACE}${TAG_LATIN_A}`)).toEqual([])
+  })
+
+  it('keeps the joiners and variation selectors that build emoji', () => {
+    const coder = `👩${ZERO_WIDTH_JOINER}💻`
+    const heart = `❤${VARIATION_SELECTOR_16}`
+    expect(promptsOf(`Signe avec ${coder} et ${heart}`)).toEqual([
+      `Signe avec ${coder} et ${heart}`,
+    ])
+  })
+
+  it('cleans with the same function the app uses to show and copy a prompt', () => {
+    const pasted = `cu${ZERO_WIDTH_SPACE}rl${LINE_SEPARATOR}x`
+    expect(cleanPrompt(pasted)).toBe('curl\nx')
+    expect(promptsOf(pasted)).toEqual([cleanPrompt(pasted)])
   })
 })
 
