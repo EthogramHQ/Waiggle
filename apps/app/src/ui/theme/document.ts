@@ -96,7 +96,7 @@ html :focus-visible:not(input, textarea, [data-focus="inset"]) {
   z-index: 1;
 }
 :focus:not(:focus-visible), input:focus-visible, textarea:focus-visible { outline: none; }
-@media (forced-colors: active) { [data-wordmark="copy"] { display: none; } }
+@media (forced-colors: active) { [data-wordmark="copy"], [data-placeholder="copy"] { display: none; } }
 `
 
 /**
@@ -107,6 +107,15 @@ html :focus-visible:not(input, textarea, [data-focus="inset"]) {
  * la couleur du système. À étaler sur la copie (`{...wordmarkCopy}`).
  */
 export const wordmarkCopy: object = Platform.OS === 'web' ? { dataSet: { wordmark: 'copy' } } : {}
+
+/**
+ * Le texte d'attente d'un champ (`SearchField`) dessiné par l'appli, qui passe à la ligne là où celui
+ * du navigateur est coupé : en contraste élevé de Windows, le navigateur impose la couleur de son
+ * propre texte d'attente (qui n'est plus transparent) ; la copie est alors cachée, pour ne pas le
+ * lire deux fois l'un sur l'autre. À étaler sur la copie (`{...placeholderCopy}`).
+ */
+export const placeholderCopy: object =
+  Platform.OS === 'web' ? { dataSet: { placeholder: 'copy' } } : {}
 
 /**
  * À étaler sur un élément touchable rangé dans un cadre qui rogne (`{...insetFocus}`) : sur le web,

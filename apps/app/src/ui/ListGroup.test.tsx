@@ -4,12 +4,15 @@
 // R1 : en mode radio, le groupe entier se parcourt au clavier (flèches, un seul arrêt de Tab).
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet, type ViewStyle } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { ListGroup, ListRow } from './ListGroup'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+
+/** Un nœud de l'arbre rendu, le peu qu'on en lit (RNTL 14 n'exporte pas ce type). */
+type Node = { props: { style?: unknown }; parent: Node | null }
 
 /** Une touche du clavier, telle que react-native-web la passe à onKeyDown. */
 const press = (key: string) => ({ key, repeat: false, preventDefault: () => {} })
@@ -294,5 +297,37 @@ describe('a row whose title is a node', () => {
     expect(screen.getByText('et de cafés')).toBeTruthy()
     expect(screen.getAllByText('Carnet de cafés')).toHaveLength(1)
     expect(screen.getByText('Sam Petit · En cours')).toBeTruthy()
+  })
+})
+
+// À 320 points et 200 % de texte, la colonne du nom d'une ligne tombait à 38 points quand un bouton ou
+// une pastille occupait la droite (R4, M6) : le côté droit passe dessous, d'un seul bloc, et le nom
+// garde au moins de quoi lire quelques mots. Jest ne mesure aucune largeur : on lit les règles.
+describe('a row with something on its right', () => {
+  type Style = { flexWrap?: string; flexBasis?: number; flexGrow?: number; marginLeft?: string }
+  const styleOf = (node: { props: { style?: unknown } } | null): Style =>
+    (StyleSheet.flatten(node?.props.style as ViewStyle) ?? {}) as Style
+
+  it('wraps, keeps a minimum width for its name, and moves its right side below as one block', async () => {
+    await renderWithProviders(
+      <ListGroup>
+        <ListRow label="Sam Petit" detail="@sam" accessory={<Text>Débloquer</Text>} />
+      </ListGroup>,
+    )
+
+    // La ligne : le premier parent du nom qui passe à la ligne.
+    const name = screen.getByText('Sam Petit') as unknown as { parent: Node | null }
+    let column = name.parent
+    while (column && styleOf(column).flexBasis === undefined) column = column.parent
+    const row = column?.parent ?? null
+    expect(styleOf(row).flexWrap).toBe('wrap')
+    expect(styleOf(column).flexBasis).toBeGreaterThanOrEqual(120)
+    expect(styleOf(column).flexGrow).toBe(1)
+
+    // Le bouton et son bloc : rangés à droite, ensemble.
+    const accessory = screen.getByText('Débloquer') as unknown as { parent: Node | null }
+    let block = accessory.parent
+    while (block && styleOf(block).marginLeft === undefined) block = block.parent
+    expect(styleOf(block).marginLeft).toBe('auto')
   })
 })

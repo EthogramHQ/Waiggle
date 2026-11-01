@@ -56,6 +56,13 @@ type RadioSlot = {
 
 const RadioSlotContext = createContext<RadioSlot | null>(null)
 
+/**
+ * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
+ * lire quelques mots. Mesuré à 320 points et 200 % : « Membres bloqués » laissait 38 points à
+ * « Sam Petit » (R4, M6).
+ */
+const MIN_NAME = 120
+
 type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
 /** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
 export type PressEvent = { preventDefault?: () => void }
@@ -289,6 +296,8 @@ export function ListRow({
       detail
     )
 
+  const hasTrailing = Boolean((detail && detailRight) || accessory || busy || right)
+
   const content = (
     <View
       // Une attente : la ligne entière est lue d'un tenant, comme une barre de progression sans
@@ -304,6 +313,9 @@ export function ListRow({
         : null)}
       style={{
         flexDirection: 'row',
+        // Quand la place manque (320 points, texte à 200 %), le côté droit (pastille, bouton,
+        // chevron) passe sous le nom au lieu de l'écraser (R4, M6).
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: space.md,
         minHeight: layout.controlHeight.regular,
@@ -329,7 +341,12 @@ export function ListRow({
         </View>
       ) : null}
       {leading}
-      <View style={{ flex: 1, gap: space.xxs }}>
+      {/* La colonne du nom : `flexGrow` et une vraie `flexBasis` (jamais `flex: 1`, dont la base
+          nulle ne fait jamais passer le reste à la ligne). Elle demande au moins MIN_NAME points ;
+          si le côté droit ne les lui laisse pas, il passe dessous. */}
+      <View
+        style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, minWidth: 0, gap: space.xxs }}
+      >
         {title ?? (
           <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
             {label}
@@ -344,10 +361,26 @@ export function ListRow({
           detailText
         ) : null}
       </View>
-      {detail && detailRight ? detailText : null}
-      {accessory}
-      {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
-      {right}
+      {/* Le côté droit, d'un seul bloc : il passe à la ligne tout entier, rangé à droite
+          (`marginLeft: 'auto'`), au lieu que la pastille et le chevron se séparent. */}
+      {hasTrailing ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.md,
+            marginLeft: 'auto',
+            // Plus large que la ligne, il se replie lui-même (un bouton à texte long).
+            maxWidth: '100%',
+            flexShrink: 1,
+          }}
+        >
+          {detail && detailRight ? detailText : null}
+          {accessory}
+          {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
+          {right}
+        </View>
+      ) : null}
       {/* La description de la ligne, cachée à l'œil (display: none) mais lue par aria-describedby. */}
       {webHint ? (
         <View nativeID={hintId} style={{ display: 'none' }}>

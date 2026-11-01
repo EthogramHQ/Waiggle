@@ -94,6 +94,21 @@ describe('TesterCard, the link of the card', () => {
   })
 })
 
+// Le calque de « Tester » couvre la photo : il laisse passer les touchers vers le lien de la carte
+// (R4, K2). `pointerEvents` doit être une propriété : écrit dans `style`, react-native-web ne crée
+// pas la règle qui rend ses enfants touchables, et le calque prenait les clics de la photo.
+describe('TesterCard, the layer over the photo', () => {
+  it('lets touches through as a property (box-none), not as a style', async () => {
+    await renderWithProviders(card({ onOpen: () => {} }))
+
+    let layer = testLink().parent as Node | null
+    while (layer && layer.props.pointerEvents === undefined) layer = layer.parent
+    expect(layer?.props.pointerEvents).toBe('box-none')
+    const style = (layer?.props.style ?? {}) as Record<string, unknown>
+    expect(style.pointerEvents).toBeUndefined()
+  })
+})
+
 describe('TesterCard without onOpen', () => {
   it('has no link but « Tester »', async () => {
     await renderWithProviders(
