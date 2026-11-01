@@ -469,6 +469,8 @@ export const en: Translation = {
       label: '{{name}}, {{count}}',
       labelMine: '{{name}}, {{count}}, your reaction',
       own: 'Reactions to your project',
+      ownCaption: 'Numbers only: the app never shows anyone who reacted.',
+      ownNone: 'No reactions yet',
       readOnly: 'Reactions to this project',
       group: 'React to this project',
       error: 'Your reaction could not be saved. Try again.',
@@ -638,13 +640,6 @@ export const en: Translation = {
     submit: 'Send',
     sent: 'Thank you, your report has been sent. Moderation will look at it.',
     back: 'Go back',
-    to: 'You are leaving {{appName}} for',
-    from: 'The demo of {{title}}, added by {{name}}',
-    warningTitle: 'This website is not on {{appName}}',
-    warningBody:
-      '{{appName}} checks neither its content nor who runs it. Never type your {{appName}} password there, and only enter personal information if you know who you are giving it to.',
-    open: 'Open the website',
-    stay: 'Stay on {{appName}}',
     illegalRequired: 'Tell us why this content seems illegal to you.',
     limited:
       'You’ve reached the limit of {{max}} reports in 24 hours. For something urgent, write to us: {{contactEmail}}',
@@ -1046,6 +1041,13 @@ export const en: Translation = {
     safety: 'This website is not on {{appName}}. Never type your {{appName}} password there.',
     continue: 'Continue to {{host}}',
     back: 'Go back',
+    to: 'You are leaving {{appName}} for',
+    from: 'The demo of {{title}}, added by {{name}}',
+    warningTitle: 'This website is not on {{appName}}',
+    warningBody:
+      '{{appName}} checks neither its content nor who runs it. Never type your {{appName}} password there, and only enter personal information if you know who you are giving it to.',
+    open: 'Open the website',
+    stay: 'Stay on {{appName}}',
     invalid: 'This link cannot be opened: only https addresses of public websites are allowed.',
   },
   email: {
