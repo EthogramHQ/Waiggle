@@ -589,9 +589,49 @@ export function CatalogueScreen() {
         />
         {/* Le nombre d'abonnés seul, sur sa propre page. */}
         <FollowerCount text={l.followers} />
-        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
-        <NewItemsBanner label={null} caption={l.feedCaption} onPress={() => {}} />
-        <NewItemsBanner label={l.news} caption={l.feedCaption} onPress={() => {}} />
+        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bouton sinon (même place).
+            Le bouton écrit son texte selon ce qui est arrivé : projets, une note, les deux au-delà
+            d'une page (« ou plus »), et l'étincelle à la place des visages sans auteur connu. */}
+        <NewItemsBanner
+          count={null}
+          more={false}
+          kinds={[]}
+          authors={[]}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={3}
+          more={false}
+          kinds={['project']}
+          authors={newsAuthors.slice(0, 2)}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={1}
+          more={false}
+          kinds={['note']}
+          authors={newsAuthors.slice(0, 1)}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={20}
+          more
+          kinds={['project', 'note']}
+          authors={newsAuthors}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={2}
+          more={false}
+          kinds={['project']}
+          authors={[]}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
         {/* Le bas du fil dans ses trois états. */}
         <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
@@ -1269,6 +1309,13 @@ function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }
 }
 
 /** Deux membres proposés après « @in ». */
+/** Les auteurs des nouveautés du fil, sans photo : leurs initiales s'affichent dans le bouton. */
+const newsAuthors = [
+  { name: 'Léa Moreau', source: null },
+  { name: 'Noé Blanc', source: null },
+  { name: 'Inès Haddad', source: null },
+]
+
 const TWO_MEMBERS: MentionSuggestion[] = [
   { id: 'u5', name: 'Inès Haddad', handle: 'ines_haddad', avatar: null },
   { id: 'u6', name: 'Iniko Diallo', handle: 'iniko', avatar: null },

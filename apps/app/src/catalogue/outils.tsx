@@ -1,6 +1,6 @@
 // La section « Explorer : recherche et outils » du catalogue (refonte, tranche R3) : le lien dessiné
 // comme un champ de recherche (SearchLink, le haut d'Explorer sur téléphone), la tuile à l'initiale
-// d'un outil (InitialTile, en miel et en crème) et les lignes de « Tous les outils » (ListRow avec
+// d'un outil (InitialTile, une seule teinte, miel pâle, depuis R4) et les lignes de « Tous les outils » (ListRow avec
 // `leading`), dont un nom long. Chaque exemple de jour et de nuit.
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
@@ -71,9 +71,9 @@ export function ToolsCatalogue() {
             </Example>
             <Example caption={`${l.tiles} — ${l[scheme]}`}>
               <Stack direction="row" gap="md">
-                <InitialTile name="Claude" variant="honey" />
-                <InitialTile name="cursor" variant="cream" />
-                <InitialTile name="Écrivain" variant="honey" />
+                <InitialTile name="Claude" />
+                <InitialTile name="cursor" />
+                <InitialTile name="Écrivain" />
               </Stack>
             </Example>
             <Example caption={`${l.rows} — ${l[scheme]}`}>
