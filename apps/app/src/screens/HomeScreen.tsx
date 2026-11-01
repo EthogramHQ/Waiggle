@@ -172,7 +172,10 @@ function MemberHome({ session }: { session: SessionData }) {
       firstRun={firstRun}
       name={name}
       news={compact ? newsButton : null}
-      columns={sizeClass === 'wide' ? 2 : 1}
+      // Deux colonnes de cartes dès la tablette (768 points) tant que la colonne de droite n'est
+      // pas là, comme Explorer (relecture de design de R4, A5) ; une seule quand elle prend la
+      // place, jusqu'à l'ordinateur (`wide`), où les deux tiennent à côté d'elle.
+      columns={compact || (columns && sizeClass !== 'wide') ? 1 : 2}
       onExplore={onExplore}
     />
   )
@@ -270,7 +273,6 @@ function FollowingFeed({
   columns,
   onExplore,
 }: FollowingFeedProps) {
-  const { t } = useTranslation()
   // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
   // les cartes déjà lues (voir FeedList).
   if (!feed.data) {
@@ -286,7 +288,7 @@ function FollowingFeed({
       feed={feed}
       items={items}
       news={news}
-      empty={t(($) => $.feed.quiet)}
+      // Pas de message de fil vide : un fil vide finit sur « Tu es à jour ».
       upToDate={{ readBefore: readBefore ?? null, onExplore }}
       columns={columns}
     />
