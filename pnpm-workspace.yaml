@@ -24,28 +24,11 @@ allowBuilds:
 # Âge minimum d'une version avant que pnpm accepte de l'installer, en minutes : 7 jours
 # (7 × 24 × 60). Une version piégée a presque toujours été retirée avant.
 minimumReleaseAge: 10080
-# Exceptions à cet âge minimum (accord de Louis du 29/10/2026), chacune datée et retirée à sa date :
-# - les 33 versions entrées par la PR Renovate #39 (25/10/2026), fusionnée 23 minutes avant
-#   l'arrivée de cette règle (Biome 2.6.3, Better Auth 1.7.13, Hono, i18next, Babel…). Tant que l'une
-#   a moins de 7 jours, pnpm refuse toute installation. Elles sont déjà installées, et en ligne
-#   depuis le 28/10 : l'exception ne fait entrer rien de neuf. À retirer le 1/11/2026 après 18 h 30
-#   (la plus jeune date du 25/10 à 17 h 29 UTC).
-minimumReleaseAgeExclude:
-  - '@babel/helper-string-parser'
-  - '@babel/parser'
-  - '@babel/plugin-transform-block-scoping'
-  - '@babel/plugin-transform-classes'
-  - '@babel/types'
-  - '@better-auth/*'
-  - '@better-fetch/fetch'
-  - '@biomejs/*'
-  - auth
-  - baseline-browser-mapping
-  - better-auth
-  - electron-to-chromium
-  - hono
-  - i18next
-  - react-i18next
+# Aucune exception aujourd'hui. Les 15 posées le 29/10/2026 (les versions de la PR Renovate #39,
+# fusionnée 23 minutes avant cette règle) sont retirées le 1/11/2026 : elles ont toutes passé leurs
+# 7 jours. Si une faille ne se corrige que par une version plus jeune, on ajoute
+# `minimumReleaseAgeExclude` pour ce seul paquet, avec sa raison et sa date de retrait ; jamais la
+# règle coupée pour tous.
 # Une dépendance indirecte ne peut pas venir d'ailleurs que du registre (dépôt Git, archive à une
 # adresse quelconque) : une telle source échappe aux vérifications du registre et peut changer sans
 # changer de numéro de version.
