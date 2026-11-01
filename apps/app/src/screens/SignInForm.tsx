@@ -12,13 +12,14 @@ import type { AuthErrorKey } from '../accounts/errors'
 import { type FieldErrors, fieldErrorsFrom } from '../accounts/validation'
 import { safeNext } from '../navigation/next'
 import { firstParam } from '../navigation/params'
+import { focusWithoutScroll } from '../ui/focus'
 import { HeldSpace } from '../ui/HeldSpace'
 import { Notice } from '../ui/Notice'
 import { useRetryAt } from '../ui/RetryAt'
 import { RetryButton } from '../ui/RetryButton'
 import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
-import { FieldGroup, TextField } from '../ui/TextField'
+import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 
@@ -66,12 +67,20 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
   // Un envoi à la fois : Entrée tapée deux fois dans le mot de passe, ou Entrée puis le bouton,
   // n'envoient qu'une demande (l'état `loading` n'est relu qu'au dessin suivant, trop tard).
   const busy = useRef(false)
+  // Une poignée vers le champ de l'adresse, pour y poser le focus quand elle manque.
+  const emailInput = useRef<TextFieldInput>(null)
 
   const submit = async () => {
     if (busy.current || retry.blocked) return
     const parsed = SignInRequest.safeParse({ email: draft.email, password })
     if (!parsed.success) {
-      setFieldErrors(fieldErrorsFrom(parsed.error))
+      const errors = fieldErrorsFrom(parsed.error)
+      // Une adresse vide dit ce qu'elle attend, plutôt que « pas valide » (comme l'inscription).
+      if (!draft.email.trim()) errors.email = 'emailRequired'
+      setFieldErrors(errors)
+      // Le focus va au champ de l'adresse (web), sans faire sauter la page : le bouton touché ne
+      // le garde pas.
+      if (errors.email) focusWithoutScroll(emailInput.current)
       return
     }
     setFieldErrors({})
@@ -91,6 +100,9 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
     setError(result.error)
     if (result.error === 'tooManyAttempts') setRetryAfter(result.retryAfterSeconds)
   }
+
+  // Recopiée dans une constante : le sélecteur de texte perd le rétrécissement d'une propriété.
+  const emailError = fieldErrors.email
 
   return (
     <>
@@ -125,12 +137,13 @@ export function SignInForm({ draft, onDraft, onSignUp }: Props) {
       <Stack gap="xs">
         <FieldGroup>
           <TextField
+            inputRef={emailInput}
             label={t(($) => $.auth.fields.email)}
             value={draft.email}
             onChangeText={(email) => onDraft({ email })}
             autoComplete="email"
             keyboardType="email-address"
-            error={fieldErrors.email ? t(($) => $.auth.errors.invalidEmail) : undefined}
+            error={emailError ? t(($) => $.auth.errors[emailError]) : undefined}
           />
           <TextField
             label={t(($) => $.auth.fields.password)}

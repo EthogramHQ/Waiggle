@@ -141,16 +141,20 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
           <Notice message={t(($) => $.auth.errors[error], lengths)} />
         </HeldSpace>
       ) : null}
-      <TextField
-        inputRef={inputs.inviteCode}
-        label={t(($) => $.auth.fields.inviteCode)}
-        value={draft.inviteCode}
-        onChangeText={(inviteCode) => onDraft({ inviteCode })}
-        hint={t(($) => $.auth.fields.inviteCodeHint)}
-        autoCapitalize="none"
-        autoComplete="off"
-        error={fieldMessage(fieldErrors.inviteCode)}
-      />
+      {/* Le code est dans un groupe à lui, comme le nom : son aide commence alors au même bord
+          que celle du nom (hors du groupe, elle était à 50 pt, l'autre à 34 : relecture R4, M2). */}
+      <FieldGroup>
+        <TextField
+          inputRef={inputs.inviteCode}
+          label={t(($) => $.auth.fields.inviteCode)}
+          value={draft.inviteCode}
+          onChangeText={(inviteCode) => onDraft({ inviteCode })}
+          hint={t(($) => $.auth.fields.inviteCodeHint)}
+          autoCapitalize="none"
+          autoComplete="off"
+          error={fieldMessage(fieldErrors.inviteCode)}
+        />
+      </FieldGroup>
       <FieldGroup>
         <TextField
           inputRef={inputs.name}

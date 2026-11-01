@@ -42,7 +42,13 @@ export function ForgotPasswordScreen() {
   // Le délai avant le prochain essai (secondes) : celui du serveur après un refus, ou la minute
   // d'attente après un envoi. useRetryAt en tire l'heure, et libère le bouton à l'heure dite.
   const [waitSeconds, setWaitSeconds] = useState<number | null>(null)
-  const retry = useRetryAt(waitSeconds)
+  // L'adresse a changé depuis l'envoi (une faute corrigée) : « C'est envoyé » parlait de l'ancienne.
+  // On le déduit des deux adresses plutôt que de l'effacer à la frappe : si le membre retape la
+  // même, « C'est envoyé » revient tel quel, avec son attente. Le blocage d'une minute protège
+  // d'un double toucher sur la même adresse ; il ne vaut pas pour une autre. Seul le refus du
+  // serveur (« Trop d'essais ») reste, car il vaut pour tout le monde derrière l'adresse IP.
+  const stale = sentTo !== null && email.trim() !== sentTo
+  const retry = useRetryAt(stale && error !== 'tooManyAttempts' ? null : waitSeconds)
   // Un envoi à la fois : deux touchers rapides n'envoient qu'une demande (l'état `sending`, lui,
   // n'est à jour qu'au dessin suivant).
   const busy = useRef(false)
@@ -118,7 +124,7 @@ export function ForgotPasswordScreen() {
       footer={
         // Chaque état a sa clé : React dessine des boutons neufs au lieu de renommer ceux qui sont
         // à la même place (charte de design, « une action qui remplace un bouton »).
-        sentTo ? (
+        sentTo && !stale ? (
           <Fragment key="sent">
             {/* L'action attendue après l'envoi : aller lire l'e-mail. En miel, la seule de la page ;
                 sur ordinateur, seulement pour un service connu. */}
@@ -175,7 +181,7 @@ export function ForgotPasswordScreen() {
           />
         </HeldSpace>
       ) : null}
-      {sentTo ? (
+      {sentTo && !stale ? (
         // La même confirmation dans tous les cas, lue sans couper le lecteur d'écran (status).
         <Stack gap="sm">
           <Text variant="headline" heading={2}>
