@@ -18,10 +18,10 @@ import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Hint } from '../ui/Hint'
-import { Emblem } from '../ui/Illustrations'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
+import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
@@ -152,38 +152,36 @@ export function ChangeEmailScreen() {
   // Chaque état a sa clé (`key`) : React dessine des éléments neufs au changement, au lieu de
   // réutiliser ceux qui sont à la même place (le bouton « Envoyer » ne devient pas « Retour »).
   const content = sentTo ? (
-    <Fragment key="sent">
-      <Stack align="center">
-        <Emblem icon="envelope-simple" />
-      </Stack>
-      <Text variant="title3" align="center" heading={2}>
-        {t(($) => $.account.changeEmail.sentTitle)}
-      </Text>
-      {/* Une confirmation, lue sans couper le lecteur d'écran (role « status »), et qui reçoit le
-          focus du clavier sur le web. L'adresse citée est l'actuelle, pas la nouvelle. */}
-      <Notice
-        ref={messageRef}
-        tone="success"
-        polite
-        message={t(($) => $.account.changeEmail.sentBody, { email: sentTo })}
-      />
-      {/* Centrés, comme le titre au-dessus et comme la page « Vérifie ta boîte mail » de
-          l'inscription (CheckEmailScreen) : un état de confirmation se lit au milieu. */}
-      <Text tone="secondary" align="center">
-        {t(($) => $.account.changeEmail.sentNext)}
-      </Text>
-      <Text variant="callout" tone="muted" align="center">
-        {t(($) => $.account.changeEmail.sentNone)}
-      </Text>
+    // L'état commun StateMessage (R4, ménage M7) : tout est rangé à gauche, comme les autres états.
+    <StateMessage
+      key="sent"
+      kind="done"
+      icon="envelope-simple"
+      title={t(($) => $.account.changeEmail.sentTitle)}
+      // Une confirmation, lue sans couper le lecteur d'écran (role « status »), et qui reçoit le
+      // focus du clavier sur le web. L'adresse citée est l'actuelle, pas la nouvelle.
+      notice={
+        <Notice
+          ref={messageRef}
+          tone="success"
+          polite
+          message={t(($) => $.account.changeEmail.sentBody, { email: sentTo })}
+        />
+      }
+      message={[t(($) => $.account.changeEmail.sentNext), t(($) => $.account.changeEmail.sentNone)]}
+      // « Retour » est la seule issue, en blanc : l'action attendue est d'ouvrir le lien reçu.
+      actions={[
+        {
+          label: t(($) => $.account.changeEmail.back),
+          variant: 'secondary',
+          onPress: onBackToAccount,
+        },
+      ]}
+    >
       {/* L'aide passe avant « Retour » : elle l'éloigne encore de la place du bouton touché (27 pt
           d'écart seulement sur ordinateur sans elle, mesuré dans le navigateur). */}
       {noAccess}
-      <Button
-        label={t(($) => $.account.changeEmail.back)}
-        variant="secondary"
-        onPress={onBackToAccount}
-      />
-    </Fragment>
+    </StateMessage>
   ) : (
     <Fragment key="form">
       <Stack gap="sm">

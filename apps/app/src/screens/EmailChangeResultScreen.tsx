@@ -9,20 +9,27 @@
 //   sans être connecté ; il n'aboutit que depuis le compte du membre, la page demande de se
 //   connecter puis de rouvrir le lien.
 // Un lien refusé (expiré, déjà servi, remplacé…) arrive sur l'une ou l'autre avec `?error=…`.
+// Chaque page est un état commun (StateMessage, R4 ménage M7) : image, titre, texte et issues sont
+// rangés à gauche, comme les autres états de l'appli.
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
-import { Button } from '../ui/Button'
 import type { IconName } from '../ui/Icon'
-import { Emblem } from '../ui/Illustrations'
 import { Screen } from '../ui/Screen'
-import { Stack } from '../ui/Stack'
-import { Text } from '../ui/Text'
+import { type StateKind, StateMessage } from '../ui/StateMessage'
 import { useHydrated } from '../ui/theme/hydration'
 import { LoadingScreen } from './states'
 
 type Props = { step: 'confirmed' | 'done' | 'signInFirst' }
+
+/** Ce que dit une page : l'état, son titre, ses paragraphes et ses issues (la première est la principale). */
+type Page = {
+  kind: StateKind
+  icon?: IconName
+  title: string
+  message: string[]
+  actions: { label: string; onPress: () => void; variant?: 'secondary' }[]
+}
 
 export function EmailChangeResultScreen({ step }: Props) {
   const { t } = useTranslation()
@@ -38,102 +45,74 @@ export function EmailChangeResultScreen({ step }: Props) {
 
   // Recommencer, ou aller voir son compte : « Mon compte » demande de se connecter à qui ne l'est pas.
   const toAccount = () => router.replace('/account')
+  // push : le retour depuis la connexion ramène ici.
+  const toSignIn = () => router.push('/sign-in')
 
-  const page: { title: string; icon: IconName; body: ReactNode } = refused
+  const page: Page = refused
     ? {
+        kind: 'error',
         title: t(($) => $.account.emailChange.errorTitle),
-        icon: 'warning-circle',
-        body: (
-          <>
-            <Text tone="secondary" align="center">
-              {t(($) => $.account.emailChange.errorBody)}
-            </Text>
-            <Button label={t(($) => $.account.emailChange.restart)} onPress={toAccount} />
-          </>
-        ),
+        message: [t(($) => $.account.emailChange.errorBody)],
+        actions: [{ label: t(($) => $.account.emailChange.restart), onPress: toAccount }],
       }
     : step === 'signInFirst'
       ? {
           // Décision D1 : le second lien a été ouvert sans session. Rien n'a changé, et le lien
           // n'a pas servi : une fois connecté, le membre le rouvre depuis son e-mail.
+          kind: 'signedOut',
           title: t(($) => $.account.emailChange.signInFirstTitle),
-          icon: 'sign-in',
-          body: (
-            <>
-              <Text tone="secondary" align="center">
-                {t(($) => $.account.emailChange.signInFirstBody)}
-              </Text>
-              <Button
-                label={t(($) => $.account.emailChange.signIn)}
-                // push : le retour depuis la connexion ramène ici.
-                onPress={() => router.push('/sign-in')}
-              />
-            </>
-          ),
+          message: [t(($) => $.account.emailChange.signInFirstBody)],
+          actions: [{ label: t(($) => $.account.emailChange.signIn), onPress: toSignIn }],
         }
       : step === 'confirmed'
         ? {
-            title: t(($) => $.account.emailChange.confirmedTitle),
+            kind: 'done',
             icon: 'envelope-simple',
-            body: (
-              <>
-                <Text tone="secondary" align="center">
-                  {t(($) => $.account.emailChange.confirmedBody)}
-                </Text>
-                <Text variant="callout" tone="muted" align="center">
-                  {t(($) => $.account.emailChange.confirmedNone)}
-                </Text>
-                {/* Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
-                  sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
-                  moindre élément). En blanc : l'action attendue est d'ouvrir le second lien. */}
-                <Button
-                  label={t(($) => $.account.emailChange.toAccount)}
-                  variant="secondary"
-                  onPress={toAccount}
-                />
-              </>
-            ),
+            title: t(($) => $.account.emailChange.confirmedTitle),
+            message: [
+              t(($) => $.account.emailChange.confirmedBody),
+              t(($) => $.account.emailChange.confirmedNone),
+            ],
+            // Toujours une issue : la suite se passe dans la boîte mail, mais la page ne reste pas
+            // sans rien à toucher (la batterie y trouvait un focus du clavier perdu, faute du
+            // moindre élément). En blanc : l'action attendue est d'ouvrir le second lien.
+            actions: [
+              {
+                label: t(($) => $.account.emailChange.toAccount),
+                variant: 'secondary',
+                onPress: toAccount,
+              },
+            ],
           }
         : {
-            title: t(($) => $.account.emailChange.doneTitle),
+            kind: 'done',
             icon: 'check',
-            body: (
-              <>
-                {/* La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
-                  parle. Si sa lecture a échoué, on ne le sait pas : le changement reste annoncé,
-                  mais on propose de réessayer plutôt que de se connecter (voir accounts/session.ts). */}
-                <Text tone="secondary" align="center">
-                  {data
-                    ? t(($) => $.account.emailChange.doneBody, { email: data.user.email })
-                    : state === 'error'
-                      ? t(($) => $.account.loadError)
-                      : t(($) => $.account.emailChange.doneSignedOut)}
-                </Text>
-                <Text variant="callout" tone="muted" align="center">
-                  {t(($) => $.account.emailChange.doneDevices)}
-                </Text>
-                {data ? (
-                  <Button label={t(($) => $.account.emailChange.toAccount)} onPress={toAccount} />
-                ) : state === 'error' ? (
-                  // Deux issues : relire la session, ou aller à « Mon compte », qui sait lui-même
+            title: t(($) => $.account.emailChange.doneTitle),
+            message: [
+              // La session est lue (sinon, l'état de chargement plus bas) : on sait à qui l'on
+              // parle. Si sa lecture a échoué, on ne le sait pas : le changement reste annoncé,
+              // mais on propose de réessayer plutôt que de se connecter (voir accounts/session.ts).
+              data
+                ? t(($) => $.account.emailChange.doneBody, { email: data.user.email })
+                : state === 'error'
+                  ? t(($) => $.account.loadError)
+                  : t(($) => $.account.emailChange.doneSignedOut),
+              t(($) => $.account.emailChange.doneDevices),
+            ],
+            actions: data
+              ? [{ label: t(($) => $.account.emailChange.toAccount), onPress: toAccount }]
+              : state === 'error'
+                ? // Deux issues : relire la session, ou aller à « Mon compte », qui sait lui-même
                   // proposer de réessayer ou de revenir si la panne dure.
-                  <>
-                    <Button label={t(($) => $.common.retry)} onPress={retry} />
-                    <Button
-                      label={t(($) => $.account.emailChange.toAccount)}
-                      variant="secondary"
-                      onPress={toAccount}
-                    />
-                  </>
-                ) : (
-                  <Button
-                    label={t(($) => $.account.emailChange.signIn)}
-                    // push : le retour depuis la connexion ramène ici.
-                    onPress={() => router.push('/sign-in')}
-                  />
-                )}
-              </>
-            ),
+                  [
+                    { label: t(($) => $.common.retry), onPress: retry },
+                    {
+                      label: t(($) => $.account.emailChange.toAccount),
+                      variant: 'secondary',
+                      onPress: toAccount,
+                    },
+                  ]
+                : [{ label: t(($) => $.account.emailChange.signIn), onPress: toSignIn }],
           }
 
   // Avant l'hydratation, ni contenu ni titre d'onglet (`pageTitle={null}`) : la page ne sait pas
@@ -147,13 +126,15 @@ export function EmailChangeResultScreen({ step }: Props) {
 
   return (
     <Screen pageTitle={page.title}>
-      <Stack align="center">
-        <Emblem icon={page.icon} />
-      </Stack>
-      <Text variant="title2" align="center" heading={1}>
-        {page.title}
-      </Text>
-      {page.body}
+      {/* level 1 : la page n'a pas d'autre titre (le cadre n'en reçoit que pour l'onglet). */}
+      <StateMessage
+        kind={page.kind}
+        {...(page.icon ? { icon: page.icon } : null)}
+        title={page.title}
+        message={page.message}
+        actions={page.actions}
+        level={1}
+      />
     </Screen>
   )
 }

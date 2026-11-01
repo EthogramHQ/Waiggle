@@ -2,8 +2,10 @@
 // réservée aux membres, ou liste vide (qui invite à agir). Toujours la même allure, et toujours une issue : un état dit ce qui se
 // passe et propose quoi faire ensuite (« Réessayer », « Revenir », « Me connecter »).
 import { layout, space } from '@ruche/brand'
+import type { ReactNode } from 'react'
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native'
 import { Button, type ButtonVariant } from './Button'
+import type { IconName } from './Icon'
 import { Emblem } from './Illustrations'
 import { Mascot, type MascotPose } from './Mascot'
 import { Stack } from './Stack'
@@ -12,10 +14,12 @@ import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 // « soon » : une partie de l'appli qui n'existe pas encore (l'onglet Ruches avant les ruches, R3).
-export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty' | 'soon'
+// « done » : une démarche qui a abouti ou qui est en route (« Un lien vient de partir », « Adresse
+// changée »), avec une tuile de miel et son icône (prop `icon`), sans l'abeille (R4, ménage M7).
+export type StateKind = 'loading' | 'error' | 'notFound' | 'signedOut' | 'empty' | 'soon' | 'done'
 
 /** La pose de la mascotte pour chaque état qui la montre. */
-const mascotPoses: Record<Exclude<StateKind, 'loading' | 'error'>, MascotPose> = {
+const mascotPoses: Record<Exclude<StateKind, 'loading' | 'error' | 'done'>, MascotPose> = {
   notFound: 'search',
   empty: 'sleep',
   signedOut: 'wave',
@@ -35,6 +39,15 @@ type Props = {
    * plusieurs paragraphes (« Les ruches arrivent bientôt » et ses deux phrases).
    */
   message?: string | readonly string[]
+  /** L'icône de la tuile d'un état « done » (une coche par défaut ; une enveloppe pour un e-mail). */
+  icon?: IconName
+  /**
+   * Un message à lire, juste sous le titre, avant les paragraphes : la confirmation d'un envoi
+   * (un `Notice` qui reçoit le focus du clavier, par exemple).
+   */
+  notice?: ReactNode
+  /** Ce qui suit les paragraphes, avant les issues : une aide discrète (`Hint`). */
+  children?: ReactNode
   /** Les issues proposées, de la principale à la secondaire. */
   actions?: Action[]
   /**
@@ -45,7 +58,16 @@ type Props = {
   level?: HeadingLevel
 }
 
-export function StateMessage({ kind, title, message, actions = [], level = 2 }: Props) {
+export function StateMessage({
+  kind,
+  title,
+  message,
+  icon,
+  notice,
+  children,
+  actions = [],
+  level = 2,
+}: Props) {
   const { colors } = useTheme()
   const { height } = useLayout()
   // fontScale : le réglage de taille de texte de l'appareil (2 = deux fois plus grand). Sur le web,
@@ -64,6 +86,8 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
     kind === 'loading' ? (
       // aria-hidden : l'indicateur ne dit rien de plus que le texte « Chargement… » qui le suit.
       <ActivityIndicator size="large" color={colors.amber} aria-hidden />
+    ) : kind === 'done' ? (
+      <Emblem icon={icon ?? 'check'} flush />
     ) : kind === 'error' ? (
       // flush : le bord de la tuile est celui du texte, son halo déborde hors du flux (relecture
       // R3 : centrée dans son halo de 180 points, la tuile commençait 37 points à droite du texte,
@@ -101,7 +125,7 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
             style={{
               alignItems: 'flex-start',
               paddingTop: space.lg,
-              paddingBottom: kind === 'error' ? 0 : space.lg,
+              paddingBottom: kind === 'error' || kind === 'done' ? 0 : space.lg,
             }}
           >
             {picture}
@@ -119,6 +143,7 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
                 {title}
               </Text>
             ) : null}
+            {notice}
             {/* Une erreur est une « alerte » : les lecteurs d'écran la lisent dès qu'elle apparaît,
               même si la page entière vient d'être remplacée (le chargement devient une erreur).
               Plusieurs paragraphes : un texte chacun, dans l'ordre (leur rang sert de clé, deux
@@ -133,6 +158,7 @@ export function StateMessage({ kind, title, message, actions = [], level = 2 }: 
                 {paragraph}
               </Text>
             ))}
+            {children}
           </Stack>
         </View>
       </View>
