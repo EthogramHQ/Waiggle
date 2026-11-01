@@ -8,7 +8,9 @@
 //   sur le « × » de la ligne qui vient de monter sous le doigt, et ne l'écarte pas (ui-B7) ;
 // - le focus du clavier passe au « × » de la ligne suivante, au lieu de retomber en haut de page ;
 // - « Tu ne verras plus Léa ici. » et « Annuler » pendant 5 secondes ; l'écart n'est envoyé qu'à la
-//   fin de ce délai, ou plus tôt si le membre quitte la page (jur-J8, décision du 31/10/2026) ;
+//   fin de ce délai, ou plus tôt si le membre quitte la page (jur-J8, décision du 31/10/2026) ; le
+//   délai s'arrête tant que « Annuler » a le focus ou la souris (relecture design C2, WCAG 2.2.1) ;
+// - au clavier, « Annuler » est à un Tab du « × » qui a reçu le focus (useTabAfter) ;
 // - si l'envoi échoue, la ligne revient, avec un message.
 //
 // Le message et « Annuler » sont posés sous le groupe, pas dans un toast : un toast ne porte jamais
@@ -28,6 +30,7 @@ import type { CoverImage } from './ProjectCover'
 import { SuggestionRow } from './SuggestionRow'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
+import { useTabAfter } from './tabOrder'
 import { useTapGuard } from './tapGuard'
 
 /** Le temps pendant lequel « Annuler » est proposé après « × » (jur-J8). */
@@ -53,6 +56,13 @@ type Props = {
   onDismiss: (id: string) => Promise<{ ok: boolean }>
   /** « Suivre » inactif, à sa place, sur chaque ligne (un compte suspendu). */
   followDisabled?: boolean
+  /** Les lignes empilées, pour une colonne étroite (la colonne de droite du Fil : SuggestionRow). */
+  stacked?: boolean
+  /**
+   * Un message à la place des lignes (la lecture a échoué, avec « Réessayer ») : le titre de la
+   * section reste au-dessus, pour qu'on sache de quoi parle le message (relecture design A8).
+   */
+  notice?: ReactNode
 }
 
 /** Ce que dit la ligne sous le groupe : rien, l'écart d'un membre, ou l'échec d'un envoi. */
@@ -66,6 +76,8 @@ export function SuggestionList({
   onOpenProject,
   onDismiss,
   followDisabled = false,
+  stacked = false,
+  notice,
 }: Props) {
   const { t } = useTranslation()
   // Les membres retirés de la liste : celui dont l'écart attend la fin des 5 secondes, et ceux dont
@@ -90,11 +102,42 @@ export function SuggestionList({
   // La garde commune à toutes les lignes (et à « Annuler », qui peut monter sous le doigt quand la
   // dernière ligne part).
   const guard = useTapGuard()
+  // Le délai s'arrête tant que « Annuler » a le focus du clavier ou la souris dessus (relecture
+  // design C2, WCAG 2.2.1 : on ne retire pas une action à quelqu'un qui s'apprête à la toucher). On
+  // garde l'heure prévue de l'envoi, pour reprendre, ensuite, avec le temps qui restait.
+  const deadline = useRef(0)
+  const remaining = useRef(UNDO_MS)
+  const held = useRef({ focus: false, hover: false })
+  // La ligne dont le « × » a reçu le focus après un écart : pour le clavier, « Annuler » la suit
+  // (useTabAfter), au lieu d'attendre au bout de la liste, à treize Tab de là.
+  const anchorId = useRef<string | null>(null)
 
   const shown = members.filter((member) => !hidden.has(member.id)).slice(0, max)
   // La première ligne montrée, lue par le minuteur (posé lors d'un rendu plus ancien).
   const firstShown = useRef<string | undefined>(undefined)
   firstShown.current = shown[0]?.id
+
+  /** Lance (ou relance) le compte à rebours de l'écart en attente. */
+  const countDown = (ms: number) => {
+    if (timer.current) clearTimeout(timer.current)
+    deadline.current = Date.now() + ms
+    timer.current = setTimeout(flush, ms)
+  }
+
+  /** « Annuler » prend ou perd le focus, ou la souris : le délai s'arrête, ou repart. */
+  const hold = (kind: 'focus' | 'hover', on: boolean) => {
+    const before = held.current.focus || held.current.hover
+    held.current = { ...held.current, [kind]: on }
+    const after = held.current.focus || held.current.hover
+    if (pendingRef.current === null || before === after) return
+    if (after) {
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = null
+      remaining.current = Math.max(0, deadline.current - Date.now())
+    } else {
+      countDown(remaining.current)
+    }
+  }
 
   /** Envoie l'écart en attente, s'il y en a un (fin du délai, nouvel écart, départ de la page). */
   const flush = () => {
@@ -103,6 +146,9 @@ export function SuggestionList({
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     pendingRef.current = null
+    anchorId.current = null
+    // « Annuler » va disparaître sans toujours dire qu'il perd le focus ou la souris.
+    held.current = { focus: false, hover: false }
     if (mounted.current) {
       // « Annuler » va disparaître : s'il avait le focus du clavier (on l'a atteint par Tab sans
       // le toucher), le focus passe à la première ligne au lieu de retomber en haut de la page.
@@ -139,7 +185,8 @@ export function SuggestionList({
     setPending(member.id)
     setSaid({ kind: 'dismissed', name: member.name })
     setFocusTarget({ to: next?.id ?? 'undo' })
-    timer.current = setTimeout(flush, UNDO_MS)
+    anchorId.current = next?.id ?? null
+    countDown(UNDO_MS)
   }
 
   const undo = () => {
@@ -148,6 +195,8 @@ export function SuggestionList({
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     pendingRef.current = null
+    anchorId.current = null
+    held.current = { focus: false, hover: false }
     setPending(null)
     setHidden((current) => without(current, id))
     setSaid(null)
@@ -163,6 +212,14 @@ export function SuggestionList({
       focusTarget.to === 'undo' ? undoNode.current : dismissNodes.current.get(focusTarget.to)
     focusWithoutScroll(node)
   }, [focusTarget])
+
+  // Au clavier, pendant que l'écart attend : « × » de la ligne montée, Tab, « Annuler », Tab, la
+  // suite de la liste (web seulement ; rien ne bouge à l'écran, voir tabOrder.ts).
+  useTabAfter(
+    () => (anchorId.current ? dismissNodes.current.get(anchorId.current) : null),
+    () => undoNode.current,
+    pending !== null,
+  )
 
   // Le départ de la page : l'écart en attente part tout de suite (jur-J8). À la sortie du composant
   // (une autre page remplace celle-ci), et quand l'appli passe en arrière-plan ou que l'onglet est
@@ -204,7 +261,9 @@ export function SuggestionList({
           {t(($) => $.suggestions.caption)}
         </Text>
       </View>
-      {shown.length > 0 ? (
+      {notice ? (
+        notice
+      ) : shown.length > 0 ? (
         <ListGroup>
           {shown.map((member) => (
             // La clé est l'identifiant : la ligne de Sam qui monte reste la même ligne (son focus,
@@ -216,6 +275,7 @@ export function SuggestionList({
               project={member.project}
               followed={member.followed}
               followDisabled={followDisabled}
+              stacked={stacked}
               onFollow={() => onFollow(member.id)}
               onOpenMember={() => onOpenMember(member.id)}
               onOpenProject={() => onOpenProject(member.id)}
@@ -244,6 +304,10 @@ export function SuggestionList({
             role="button"
             onPress={guard(undo)}
             ref={undoNode}
+            onFocus={() => hold('focus', true)}
+            onBlur={() => hold('focus', false)}
+            onHoverIn={() => hold('hover', true)}
+            onHoverOut={() => hold('hover', false)}
           />
         ) : null}
       </SaidLine>

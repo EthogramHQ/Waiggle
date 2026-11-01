@@ -38,7 +38,10 @@ type Props = {
 export function FeedSide({ withSuggestions, shownProjectIds }: Props) {
   return (
     <Stack gap="xxl" align="stretch">
-      {withSuggestions ? <PeopleToFollow max={SIDE_SUGGESTIONS} /> : null}
+      {/* stacked : la colonne n'a que 320 points ; en rangée, le nom n'y avait qu'une centaine de
+          points, et un nom long prenait trois lignes (relecture design A1). Empilée, la ligne pose
+          la photo et le nom, puis le projet, puis « Suivre » et « × ». */}
+      {withSuggestions ? <PeopleToFollow max={SIDE_SUGGESTIONS} stacked /> : null}
       <Testers exclude={shownProjectIds} />
     </Stack>
   )

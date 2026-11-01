@@ -45,6 +45,14 @@ type Props = {
    * n'existe pas, et en indice lu après le nom sur téléphone.
    */
   external?: boolean
+  /**
+   * Le lien prend ou perd le focus du clavier, la souris arrive dessus ou le quitte : pour arrêter un
+   * délai tant qu'on s'apprête à le toucher (« Annuler » de SuggestionList, WCAG 2.2.1).
+   */
+  onFocus?: () => void
+  onBlur?: () => void
+  onHoverIn?: () => void
+  onHoverOut?: () => void
 }
 
 export function TextLink({
@@ -59,6 +67,10 @@ export function TextLink({
   expanded,
   breakAnywhere = false,
   external = false,
+  onFocus,
+  onBlur,
+  onHoverIn,
+  onHoverOut,
 }: Props) {
   const { t } = useTranslation()
   const web = Platform.OS === 'web'
@@ -80,6 +92,10 @@ export function TextLink({
       // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
       {...(role === 'link' ? enterActivates(onPress, disabled) : null)}
       onPress={onPress}
+      {...(onFocus ? { onFocus } : null)}
+      {...(onBlur ? { onBlur } : null)}
+      {...(onHoverIn ? { onHoverIn } : null)}
+      {...(onHoverOut ? { onHoverOut } : null)}
       // La zone à toucher fait au moins 44 points de côté, même autour d'un mot court. (hitSlop, qui
       // agrandit la zone sans changer l'allure, est ignoré sur le web : on donne donc une vraie taille.)
       style={({ pressed }) => ({

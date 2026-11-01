@@ -9,8 +9,10 @@
 // - « × » est nommé « Ne plus suggérer Léa Martin » ;
 // - aucune preuve sociale : ni « suivi par », ni nombre d'abonnés (relecture juridique jur-J5).
 // La ligne ne garde pas l'état « suivi » : l'écran le donne (ici un useState), comme FollowButton.
+import { layout } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
+import { StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { SuggestionRow } from './SuggestionRow'
@@ -76,6 +78,15 @@ const insideControl = (element: unknown): boolean => {
 }
 
 const memberLink = () => screen.getByRole('link', { name })
+
+/** La hauteur à toucher d'un lien : celle que son style lui donne (minHeight ou height). */
+const touchHeight = (node: ReturnType<typeof screen.getByRole>): number => {
+  const style = StyleSheet.flatten(node.props.style) as { minHeight?: unknown; height?: unknown }
+  return Math.max(
+    typeof style?.minHeight === 'number' ? style.minHeight : 0,
+    typeof style?.height === 'number' ? style.height : 0,
+  )
+}
 
 describe('SuggestionRow', () => {
   beforeEach(() => jest.useFakeTimers())
@@ -214,6 +225,60 @@ describe('SuggestionRow', () => {
     expect(insideControl(screen.getByRole('switch', { name: follow }))).toBe(false)
     expect(insideControl(screen.getByRole('button', { name: dismiss }))).toBe(false)
     expect(insideControl(memberLink())).toBe(false)
+  })
+
+  // Relectures ui B1 et design C3 (décision de Louis du 1/11/2026) : le lien du nom et celui du
+  // projet, empilés, ont chacun 44 points à toucher, dans les deux dessins de la ligne.
+  it.each([false, true])(
+    'gives the name and the project links 44 points to touch each (stacked: %s)',
+    async (stacked) => {
+      await renderWithProviders(
+        <SuggestionRow
+          name={name}
+          avatar={null}
+          project={{ title: projectTitle, image: thumbnail }}
+          followed={false}
+          stacked={stacked}
+          onFollow={() => {}}
+          onOpenMember={() => {}}
+          onOpenProject={() => {}}
+          onDismiss={() => {}}
+        />,
+      )
+
+      for (const link of [memberLink(), screen.getByRole('link', { name: projectTitle })]) {
+        expect(touchHeight(link)).toBeGreaterThanOrEqual(layout.touchTarget)
+      }
+    },
+  )
+
+  // Relecture design A1 : dans la colonne de droite, la ligne s'empile (photo et nom, le projet,
+  // puis « Suivre » et « × ») ; les quatre gestes restent là, séparés, aucun dans un lien.
+  it('keeps the four gestures apart when stacked', async () => {
+    const onOpenMember = jest.fn()
+    const onDismiss = jest.fn()
+    await renderWithProviders(
+      <SuggestionRow
+        name={name}
+        avatar={null}
+        project={{ title: projectTitle, image: thumbnail }}
+        followed={false}
+        stacked
+        onFollow={() => {}}
+        onOpenMember={onOpenMember}
+        onOpenProject={() => {}}
+        onDismiss={onDismiss}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: projectTitle })).toBeTruthy()
+    expect(insideControl(screen.getByRole('switch', { name: follow }))).toBe(false)
+    expect(insideControl(screen.getByRole('button', { name: dismiss }))).toBe(false)
+    await fireEvent.press(memberLink())
+    expect(onOpenMember).toHaveBeenCalledTimes(1)
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+    await fireEvent.press(screen.getByRole('button', { name: dismiss }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
   // jur-J5 : la ligne ne dit jamais qui suit ce membre, ni combien ils sont.
