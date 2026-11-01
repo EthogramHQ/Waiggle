@@ -10,6 +10,7 @@ import {
   useHideComment,
   usePostComment,
 } from '../comments/api'
+import { webAppUrl } from '../config'
 import { useFollow } from '../follows/api'
 import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getMe } from '../profile/api'
@@ -31,6 +32,8 @@ import { reportsOpened, visited } from '../testing/navigation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { containing, fr, missingSentences, removalSentences } from '../testing/text'
+import { copyText } from '../ui/clipboard'
+import { ToastProvider } from '../ui/theme/toast'
 import { ProjectScreen } from './ProjectScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -57,6 +60,9 @@ jest.mock('../comments/api', () => ({
 // Les suggestions après « @ » (tranche 6b) : personne à proposer ; elles sont testées dans
 // ProjectComments.test.tsx.
 jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
+// Le presse-papiers (R5a) : « Copier le lien » du menu « … » et de la feuille Partager, « Copier »
+// d'un prompt. Le test lit ce qui est copié ; l'appareil, lui, n'est jamais touché.
+jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
@@ -90,6 +96,7 @@ beforeEach(() => {
   jest.mocked(deleteProject).mockReset()
   // Tranche 7c : le profil, lu pour savoir si le compte est suspendu ; Léa ne l'est pas.
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
+  jest.mocked(copyText).mockReset().mockResolvedValue(true)
   mockPush.mockReset()
   mockReplace.mockReset()
 })
@@ -108,15 +115,27 @@ describe('ProjectScreen', () => {
     expect(screen.getByText('Propose trois recettes avec : {ingrédients}')).toBeTruthy()
   })
 
-  it('opens the demo through the warning page', async () => {
+  it('opens the demo through the warning page, which learns from which project it comes', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Tester la démo' }))
 
+    // R5a (plan, U6a) : la page de sortie reçoit aussi l'identifiant du projet, pour dire « La démo
+    // de … » ; elle relit le projet par l'API, jamais l'adresse seule.
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/out',
-      params: { url: 'https://recettes.example.com' },
+      params: { url: 'https://recettes.example.com', project: id },
     })
+  })
+
+  it('says under « Tester la démo » that the demo is on a site outside the app', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(
+      await screen.findByText(
+        fr.t(($) => $.project.page.external, { host: 'recettes.example.com' }),
+      ),
+    ).toBeTruthy()
   })
 
   it('says when there is no demo yet', async () => {
@@ -131,7 +150,8 @@ describe('ProjectScreen', () => {
     jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(await screen.findByText('Privé : visible par toi seulement')).toBeTruthy()
+    // R5a (jur-1) : le bandeau dit aussi ce que deviennent les commentaires et les réactions reçus.
+    expect(await screen.findByText(fr.t(($) => $.project.page.privateBanner))).toBeTruthy()
   })
 
   it('leads to the page of the author, and to the page of each tool', async () => {
@@ -195,41 +215,90 @@ describe('ProjectScreen', () => {
     expect(await screen.findByRole('header', { name: 'Ce projet est introuvable' })).toBeTruthy()
   })
 
-  it('shows the vertical cover on a phone, and the other photos as thumbnails', async () => {
+  // R5a (F-404) : la page introuvable d'un projet ramène au fil, en bas, et garde un Retour en haut.
+  it('leads back to the feed from a project that cannot be found', async () => {
+    jest.mocked(getProject).mockRejectedValue(new ApiError('notFound'))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Ce projet est introuvable' })
+    expect(screen.getByText(fr.t(($) => $.project.page.notFound))).toBeTruthy()
+    const toFeed =
+      screen.queryByRole('link', { name: 'Retour au fil' }) ??
+      screen.getByRole('button', { name: 'Retour au fil' })
+    // L'action d'aujourd'hui (« Retour à l'accueil ») est remplacée, pas doublée.
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.states.home) })).toBeNull()
+    await fireEvent.press(toFeed)
+
+    expect(visited(mockPush, mockReplace)).toContain('/')
+  })
+})
+
+// R5a (F-Pr7) : la galerie qui glisse remplace la couverture et ses miniatures. Les anciens tests
+// des miniatures (« Photo 2 sur 3 » en onglet, la couverture verticale en grand) sont réécrits ici.
+describe('the gallery of a project', () => {
+  /** L'élément réglable de la galerie, nommé « Photos du projet ». */
+  const gallery = () => screen.findByLabelText(fr.t(($) => $.gallery.label))
+
+  it('shows the photos in a gallery with « 1 sur 3 », instead of thumbnails', async () => {
     jest.mocked(getProject).mockResolvedValue(projectWithPhotos)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    // Les tests affichent un téléphone (390 points de large) : la couverture verticale est en grand.
-    expect(await screen.findByLabelText('Couverture verticale')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Photo 1 sur 3' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Photo 3 sur 3' })).toBeTruthy()
+    const photos = await gallery()
+    expect(photos.props.accessibilityValue).toEqual(
+      expect.objectContaining({ text: 'Photo 1 sur 3' }),
+    )
+    expect(screen.getByText('1 sur 3')).toBeTruthy()
+    // Les miniatures ont disparu : plus d'onglet « Photo 1 sur 3 ».
+    expect(screen.queryByRole('tab', { name: /^Photo / })).toBeNull()
   })
 
-  it('shows a photo in large when its thumbnail is touched', async () => {
+  it('lets a screen reader move to the next photo without swiping', async () => {
     jest.mocked(getProject).mockResolvedValue(projectWithPhotos)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    const second = await screen.findByRole('tab', { name: 'Photo 2 sur 3' })
-    await fireEvent.press(second)
+    const photos = await gallery()
+    await fireEvent(photos, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } })
 
-    expect(screen.getByRole('tab', { name: 'Photo 2 sur 3' })).toBeSelected()
-    expect(screen.queryByLabelText('Couverture verticale')).toBeNull()
+    expect(await screen.findByText('2 sur 3')).toBeTruthy()
   })
 
-  it('uses the first photo as the cover when there is no vertical cover', async () => {
-    jest.mocked(getProject).mockResolvedValue({ ...projectWithPhotos, portraitCover: null })
+  it('shows neither dots nor « 1 sur 1 » for a single photo', async () => {
+    jest.mocked(getProject).mockResolvedValue({
+      ...projectWithPhotos,
+      visuals: projectWithPhotos.visuals.slice(0, 1),
+      portraitCover: null,
+    })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(await screen.findByRole('tab', { name: 'Photo 1 sur 3' })).toBeSelected()
+    // Témoin : la galerie est là, avec sa photo unique.
+    expect(await gallery()).toBeTruthy()
+    expect(screen.queryByText('1 sur 1')).toBeNull()
   })
 
-  it('shows no thumbnails for a project without photos', async () => {
+  it('shows no gallery counter for a project without photos', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    expect(screen.queryByRole('button', { name: /^Photo / })).toBeNull()
+    expect(screen.queryByText(/^\d+ sur \d+$/)).toBeNull()
+    expect(screen.queryByRole('tab', { name: /^Photo / })).toBeNull()
   })
 
+  it('offers arrows on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      jest.mocked(getProject).mockResolvedValue(projectWithPhotos)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      await gallery()
+      expect(screen.getByRole('button', { name: fr.t(($) => $.gallery.next) })).toBeTruthy()
+      expect(screen.getByRole('button', { name: fr.t(($) => $.gallery.previous) })).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+})
+
+describe('ProjectScreen, for a visitor and on a computer', () => {
   it('asks a visitor to sign in', async () => {
     mockSession(null)
     await renderWithProviders(<ProjectScreen id={id} />)
@@ -238,7 +307,8 @@ describe('ProjectScreen', () => {
     expect(getProject).not.toHaveBeenCalled()
   })
 
-  it('on a computer, puts the title above the columns and offers to publish a project', async () => {
+  // R5a (F-Pr13) : le titre passe dans la colonne de droite ; il reste le seul titre de ce nom.
+  it('on a computer, shows the title once and offers to publish a project', async () => {
     const restore = setDesktopWindow()
     try {
       await renderWithProviders(<ProjectScreen id={id} />)
@@ -1579,14 +1649,17 @@ describe('the comments, after the reviews', () => {
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy()
   })
 
-  it('puts « Modifier » and « Supprimer » after the comments on a phone', async () => {
+  // R5a (scénario, « L'auteur ») : « Modifier » monte à la place de « Suivre ce projet », sous
+  // « Tester la démo » ; « Supprimer » garde sa place d'aujourd'hui, après les commentaires, jusqu'à
+  // R6. (Avant R5a : les deux après les commentaires.)
+  it('puts « Modifier » before the comments and « Supprimer » after them on a phone', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('button', { name: 'Écrire un commentaire' })
     const order = screen
       .getAllByRole('button', { name: /^(Écrire un commentaire|Modifier|Supprimer)$/ })
       .map((button) => button.props.accessibilityLabel)
-    expect(order).toEqual(['Écrire un commentaire', 'Modifier', 'Supprimer'])
+    expect(order).toEqual(['Modifier', 'Écrire un commentaire', 'Supprimer'])
   })
 })
 
@@ -1608,44 +1681,38 @@ describe('reporting a project from its page', () => {
     expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
   })
 
-  it('no longer shows « Signaler ce projet » as a link of its own on the page', async () => {
+  // R5a (F-Pr12) : le lien gris « Signaler ce projet » revient en bas de la page, en plus du menu
+  // (le test de 7b « plus de lien à part » est retourné). Le test de 7b qui voulait le menu juste
+  // après « Suivre ce projet » est retiré : le menu « … » monte sur la photo, à côté de Partager.
+  it('offers « Signaler ce projet » at the bottom of the page, after the comments on a phone', async () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    // Témoin : le menu est là ; l'ancien lien texte de 7a, lui, a disparu.
-    expect(
-      await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }),
-    ).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
-  })
-
-  it('puts the « … » menu right after « Suivre ce projet », before the reactions', async () => {
-    // Corrections de 7b (relecture de design, point 11) : seul sur sa ligne sous les réactions, le
-    // menu s'ouvrait par-dessus le Journal à 1440 points. Sa place à l'écran, Jest ne la mesure
-    // pas (essai --explore) ; l'ordre de lecture, si.
-    seenByOther(recipesProject)
-    await renderWithProviders(<ProjectScreen id={id} />)
-
-    await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) })
-    // « Suivre ce projet » est un interrupteur (switch), « … » un bouton : l'ordre des deux rôles.
+    await screen.findByRole('button', { name: 'Écrire un commentaire' })
+    const report =
+      screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+      screen.getByRole('button', { name: 'Signaler ce projet' })
     const names = screen
-      .getAllByRole(/^(button|switch)$/)
+      .getAllByRole(/^(button|link)$/)
       .map((control) => String(control.props.accessibilityLabel ?? ''))
-    const follow = names.findIndex((name) => name.startsWith(fr.t(($) => $.follow.project)))
-    const menu = names.indexOf(fr.t(($) => $.actionMenu.label))
-    expect(follow).toBeGreaterThan(-1)
-    expect(menu).toBe(follow + 1)
+    expect(names.indexOf('Signaler ce projet')).toBeGreaterThan(
+      names.indexOf('Écrire un commentaire'),
+    )
+    await fireEvent.press(report)
+
+    expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
   })
 
-  it('never offers the author to report the project, and shows no empty menu', async () => {
+  it('never offers the author to report the project, neither at the bottom nor in the menu', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     // Témoin : la page de l'auteur est affichée, avec ses actions.
     expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Signaler ce projet' })).toBeNull()
-    // Le menu n'aurait rien à offrir à l'auteur : il n'est pas montré.
-    expect(screen.queryByRole('button', { name: fr.t(($) => $.actionMenu.label) })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Signaler ce projet' })).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
+    expect(screen.queryByRole('menuitem', { name: 'Signaler ce projet' })).toBeNull()
   })
 })
 
@@ -1863,9 +1930,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     // Témoin du profil lu : aucune réaction à poser.
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
-    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull())
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
     expect(mockToggle).toHaveBeenCalledTimes(1)
@@ -1901,9 +1966,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     )
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
-    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull())
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
     const follow = await screen.findByRole('switch', { name: 'Suivre ce projet' })
@@ -1944,9 +2007,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
-    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull())
     expect(screen.getByLabelText(fr.t(($) => $.project.reactions.readOnly))).toBeTruthy()
   })
 })
@@ -1994,5 +2055,395 @@ describe('the windows of the project page, right after opening', () => {
 
     expect(mockRemoveComment).not.toHaveBeenCalled()
     expect(screen.getByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeTruthy()
+  })
+})
+
+// --- Tranche R5a : la page projet redessinée (docs/scenarios/refonte.md, « R5a ») ---
+
+/** Un élément de l'écran, tel que Testing Library le rend : on ne lit que son arbre. */
+type Element = ReturnType<typeof screen.getByText>
+type TreeNode = { children: (TreeNode | string)[]; type: unknown }
+
+/**
+ * La place de chaque élément dans l'ordre de lecture (l'ordre de l'arbre, celui que suivent le
+ * clavier et le lecteur d'écran) : on parcourt l'arbre depuis la racine, en profondeur d'abord.
+ */
+const readingOrder = (...elements: Element[]) => {
+  const order: unknown[] = []
+  const walk = (node: TreeNode) => {
+    order.push(node)
+    for (const child of node.children) if (typeof child !== 'string') walk(child)
+  }
+  walk(screen.root as unknown as TreeNode)
+  return elements.map((element) => order.indexOf(element))
+}
+
+/** Vrai si l'élément est dans la page qui défile (le ScrollView de `Screen`). */
+const insideScroll = (element: Element) => {
+  let node = element.parent
+  while (node) {
+    if (node.type === 'RCTScrollView') return true
+    node = node.parent
+  }
+  return false
+}
+
+/** Le nom lu de chaque contrôle (bouton, lien, interrupteur), dans l'ordre de l'arbre. */
+const controlNames = () =>
+  screen
+    .getAllByRole(/^(button|link|switch)$/)
+    .map((control) => String(control.props.accessibilityLabel ?? ''))
+
+/** Le petit « Suivre » de l'auteur, à côté de son nom : « Suivre » ou « Suivre Léa ». */
+const followAuthor = /^Suivre( Léa)?$/
+
+/** L'adresse publique du projet, sans rien d'autre (aucun paramètre, rien sur qui partage). */
+const projectUrl = new URL(`/projects/${id}`, webAppUrl).href
+
+describe('the dates under the title', () => {
+  it('says when the project was published, and nothing about a change within the minute', async () => {
+    jest
+      .mocked(getProject)
+      .mockResolvedValue({ ...recipesProject, updatedAt: '2026-10-12T08:00:30.000Z' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getAllByText(/Publié /).length).toBeGreaterThan(0)
+    expect(screen.queryAllByText(/Mis à jour/)).toHaveLength(0)
+  })
+
+  it('adds « Mis à jour » once the project changed after its publication', async () => {
+    jest
+      .mocked(getProject)
+      .mockResolvedValue({ ...recipesProject, updatedAt: '2026-10-14T09:00:00.000Z' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getAllByText(/Publié /).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Mis à jour /).length).toBeGreaterThan(0)
+  })
+
+  it('says « Créé » instead of « Publié » for a private project', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getAllByText(/Créé /).length).toBeGreaterThan(0)
+    expect(screen.queryAllByText(/Publié /)).toHaveLength(0)
+  })
+})
+
+describe('following the author from the project page', () => {
+  it('offers to follow the author, then says « Tu suis Léa »', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const chip = await screen.findByRole('switch', { name: followAuthor })
+    expect(chip).not.toBeChecked()
+    expect(useFollow).toHaveBeenCalledWith({ kind: 'member', id: 'u1' })
+    await fireEvent.press(chip)
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+    // Comme sur la page d'un membre : le nom lu reprend le texte affiché.
+    expect(await screen.findByRole('switch', { name: 'Tu suis Léa' })).toBeChecked()
+  })
+
+  it('offers no « Suivre » next to one’s own name', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page de l'auteur est là, avec « Modifier ».
+    expect(await screen.findByRole('button', { name: 'Modifier' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: followAuthor })).toBeNull()
+    expect(screen.queryByText(/^Tu suis/)).toBeNull()
+  })
+})
+
+describe('the reactions of the project page (R5a)', () => {
+  it('on a phone, floats the capsule outside the scrolling page, read after all the content', async () => {
+    // Décision de Louis du 2/11/2026 (ui-13) : la place flottante de `Screen` est hors du
+    // défilement ; le lecteur d'écran lit la capsule après tout le contenu, comme une barre.
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const capsule = await screen.findByRole('button', { name: 'Waggle !, 0' })
+    expect(insideScroll(capsule)).toBe(false)
+    const names = controlNames()
+    expect(names.indexOf('Waggle !, 0')).toBeGreaterThan(names.indexOf('Signaler ce projet'))
+    expect(names.indexOf('Waggle !, 0')).toBeGreaterThan(names.indexOf('Écrire un commentaire'))
+  })
+
+  it('opens the fan of reactions on a long press on the capsule, without reacting', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent(await screen.findByRole('button', { name: 'Utile, 0' }), 'longPress')
+
+    expect(
+      await screen.findByRole('dialog', { name: fr.t(($) => $.reactions.fan.title) }),
+    ).toBeTruthy()
+    expect(mockReact).not.toHaveBeenCalled()
+  })
+
+  it('reacts to the line touched in the fan', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent(await screen.findByRole('button', { name: 'Utile, 0' }), 'longPress')
+    const fan = within(
+      await screen.findByRole('dialog', { name: fr.t(($) => $.reactions.fan.title) }),
+    )
+    // Les lignes sont gardées un instant après l'ouverture (le doigt de l'appui long se lève).
+    await passTapGuard()
+    const funny = fan.getByRole('button', { name: 'Drôle, 0' })
+    await fireEvent(funny, 'pressIn')
+    await fireEvent.press(funny)
+
+    expect(mockReact).toHaveBeenCalledWith('funny')
+  })
+
+  it('tells the author « Pas encore de réaction » instead of five zeros', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText(fr.t(($) => $.project.reactions.ownNone))).toBeTruthy()
+    expect(screen.queryAllByRole('listitem', { name: /^(Bluffant|Waggle\s!),/ })).toHaveLength(0)
+    // Ni capsule ni éventail pour l'auteur.
+    expect(screen.queryByRole('button', { name: /^(Bluffant|Waggle\s!),/ })).toBeNull()
+  })
+
+  it('tells the author that only numbers are shown, never who reacted', async () => {
+    jest
+      .mocked(getProject)
+      .mockResolvedValue(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 2 }, mine: [] }))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByText(fr.t(($) => $.project.reactions.ownCaption))).toBeTruthy()
+  })
+})
+
+describe('the « … » menu of the project page', () => {
+  const openMenu = async () =>
+    fireEvent.press(await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
+
+  it('offers another member « Copier le lien » and « Signaler ce projet »', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Copier le lien' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).toBeNull()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Signaler ce projet' }))
+
+    expect(reportsOpened(mockPush)).toEqual([expect.objectContaining({ kind: 'project', id })])
+  })
+
+  it('offers the author « Copier le lien » and « Modifier »', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Copier le lien' })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Modifier' }))
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/projects/[id]/edit', params: { id } })
+  })
+
+  it('copies the address of the project and nothing else, then says who can open it', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(
+      <ToastProvider>
+        <ProjectScreen id={id} />
+      </ToastProvider>,
+    )
+
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Copier le lien' }))
+
+    expect(copyText).toHaveBeenCalledWith(projectUrl)
+    expect((await screen.findAllByText(fr.t(($) => $.share.copiedMembers))).length).toBeGreaterThan(
+      0,
+    )
+  })
+
+  it('tells the author of a private project that the copied link opens only for her', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(
+      <ToastProvider>
+        <ProjectScreen id={id} />
+      </ToastProvider>,
+    )
+
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Copier le lien' }))
+
+    expect((await screen.findAllByText(fr.t(($) => $.share.copiedPrivate))).length).toBeGreaterThan(
+      0,
+    )
+  })
+})
+
+describe('sharing a project', () => {
+  it('opens the share sheet, with the title, who can open the link, and « Copier le lien »', async () => {
+    seenByOther(recipesProject)
+    await renderWithProviders(
+      <ToastProvider>
+        <ProjectScreen id={id} />
+      </ToastProvider>,
+    )
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+
+    expect(
+      await screen.findByText(fr.t(($) => $.share.title, { title: 'Mon agent de recettes' })),
+    ).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.share.membersOnly))).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Copier le lien' }))
+    expect(copyText).toHaveBeenCalledWith(projectUrl)
+  })
+
+  it('tells the author of a private project that the link opens only for her', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+
+    expect(await screen.findByText(fr.t(($) => $.share.privateOnly))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.share.membersOnly))).toBeNull()
+  })
+})
+
+describe('the starting prompt', () => {
+  it('shows « Le prompt de départ » after the description, with its own « Copier »', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const heading = await screen.findByRole('header', { name: 'Le prompt de départ' })
+    expect(
+      screen.getByRole('button', { name: fr.t(($) => $.project.prompts.copyStarting) }),
+    ).toBeTruthy()
+    const description = screen.getByRole('header', { name: 'Comment ça marche' })
+    const [descriptionAt, promptAt] = readingOrder(description, heading)
+    expect(promptAt).toBeGreaterThan(descriptionAt ?? Number.POSITIVE_INFINITY)
+    // L'ancienne liste « Prompts clés » de la recette est remplacée, pas doublée.
+    expect(screen.queryByRole('header', { name: 'Prompts clés' })).toBeNull()
+  })
+
+  it('folds the other prompts under « Les autres prompts · 2 »', async () => {
+    jest.mocked(getProject).mockResolvedValue({
+      ...recipesProject,
+      prompts: ['Propose trois recettes avec : {ingrédients}', 'Fais la liste', 'Classe par prix'],
+    })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(
+      await screen.findByRole('button', {
+        name: containing(fr.t(($) => $.project.prompts.others, { count: 2 })),
+      }),
+    ).toBeTruthy()
+  })
+
+  it('shows no such section for a project without prompts', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, prompts: [] })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page est là.
+    expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: 'Le prompt de départ' })).toBeNull()
+  })
+})
+
+describe('the button at the top of the project page', () => {
+  it('says « Retour » on a phone, never « Retour au fil »', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getByRole('button', { name: fr.t(($) => $.project.page.back) })).toBeTruthy()
+    expect(screen.queryByText('Retour au fil')).toBeNull()
+  })
+
+  it('shows « Retour » in words on a computer, once', async () => {
+    const restore = setDesktopWindow()
+    try {
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      await screen.findByRole('header', { name: 'Mon agent de recettes' })
+      const backs = screen.getAllByRole('button', { name: 'Retour' })
+      expect(backs).toHaveLength(1)
+      const [back] = backs
+      if (!back) throw new Error('a back button is expected')
+      expect(within(back).getByText('Retour')).toBeTruthy()
+      expect(screen.queryByText('Retour au fil')).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+})
+
+// F-Pr13 et le point des listes de début de tranche (choix de Louis du 1/11) : au clavier, « Suivre »
+// et les réactions venaient après tout le contenu de la colonne principale.
+describe('the reading order of the project page on a computer', () => {
+  it('reads the gallery, the header, « Suivre » and the reactions before the description', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const gallery = await screen.findByLabelText(fr.t(($) => $.gallery.label))
+      const [galleryAt, titleAt, authorAt, followAt, capsuleAt, descriptionAt] = readingOrder(
+        gallery,
+        screen.getByRole('header', { name: 'Mon agent de recettes' }),
+        screen.getByRole('switch', { name: followAuthor }),
+        screen.getByRole('switch', { name: 'Suivre ce projet' }),
+        screen.getByRole('button', { name: 'Waggle !, 0' }),
+        screen.getByRole('header', { name: 'Comment ça marche' }),
+      )
+      expect([galleryAt, titleAt, authorAt, followAt, capsuleAt, descriptionAt]).not.toContain(-1)
+      const at = (value: number | undefined) => value ?? -1
+      expect(at(titleAt)).toBeGreaterThan(at(galleryAt))
+      expect(at(authorAt)).toBeGreaterThan(at(titleAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(authorAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(followAt))
+      expect(at(capsuleAt)).toBeGreaterThan(at(galleryAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(capsuleAt))
+    } finally {
+      restore()
+    }
+  })
+
+  it('puts the capsule on the gallery, inside the page, on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther(projectWithPhotos)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const capsule = await screen.findByRole('button', { name: 'Waggle !, 0' })
+      expect(insideScroll(capsule)).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('reads the description, the prompt, the journal and « Signaler » before the comments', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const prompt = await screen.findByRole('header', { name: 'Le prompt de départ' })
+      const report =
+        screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+        screen.getByRole('button', { name: 'Signaler ce projet' })
+      const [descriptionAt, promptAt, journalAt, reportAt, commentAt] = readingOrder(
+        screen.getByRole('header', { name: 'Comment ça marche' }),
+        prompt,
+        screen.getByRole('header', { name: 'Journal' }),
+        report,
+        screen.getByRole('button', { name: 'Écrire un commentaire' }),
+      )
+      const at = (value: number | undefined) => value ?? -1
+      expect(at(promptAt)).toBeGreaterThan(at(descriptionAt))
+      expect(at(journalAt)).toBeGreaterThan(at(promptAt))
+      expect(at(reportAt)).toBeGreaterThan(at(journalAt))
+      expect(at(commentAt)).toBeGreaterThan(at(reportAt))
+    } finally {
+      restore()
+    }
   })
 })
