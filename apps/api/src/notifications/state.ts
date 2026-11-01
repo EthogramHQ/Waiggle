@@ -35,22 +35,42 @@ export const markHandleChosen = async (db: Database, userId: string, now: Date) 
 }
 
 /**
- * Marque vu tout ce qui est arrivé jusqu'à `upTo`, borné à `now` (l'heure du serveur : l'appli ne
- * peut pas marquer vu l'avenir). La date ne recule jamais : « greatest(ancienne, nouvelle) » garde
- * la plus récente des deux (et greatest ignore un null : jamais ouvert, la nouvelle date l'emporte).
+ * Les bornes d'une date « vu » (relecture de sécurité sec-A2, R4), les mêmes que pour la lecture du
+ * fil (feed/state.ts) : jamais avant l'ouverture du site, le 1/1/2026 à minuit UTC ; jamais après
+ * `now`, l'heure du serveur, passée à chaque appel.
+ */
+export const SEEN_FLOOR = new Date('2026-01-01T00:00:00.000Z')
+
+/**
+ * Marque vu tout ce qui est arrivé jusqu'à `upTo`. La date ne recule jamais :
+ * « greatest(ancienne, nouvelle) » garde la plus récente des deux (et greatest ignore un null :
+ * jamais ouvert, la nouvelle date l'emporte).
+ *
+ * Une date hors des bornes (avant le 1/1/2026, ou après `now`) n'est pas gardée du tout : rien
+ * n'est écrit, et la route répond quand même 204 (sec-A2). Le contrat accepte toute date ISO bien
+ * formée, l'an 0000 compris, que PostgreSQL refuserait (une erreur 500) ; et une date future,
+ * ramenée autrefois à `now`, marquait tout vu d'un coup (l'an 9999 par exemple) : l'appli envoie
+ * la date d'une notification qu'elle a montrée, jamais l'avenir. La vérification se fait en
+ * JavaScript, avant toute requête. Rend true si la date était dans les bornes.
  *
  * « insert … on conflict do update » (un « upsert ») : la ligne existe presque toujours ; sinon
  * (un membre dont le pseudo précède la tranche, avant le rattrapage du démarrage), elle est créée,
  * datée de maintenant comme le ferait ce rattrapage. « excluded » désigne la ligne qu'on voulait
  * insérer : la date arrive ainsi par la colonne, en paramètre lié, jamais écrite dans le SQL.
  */
-export const markSeen = async (db: Database, userId: string, upTo: Date, now: Date) => {
-  const seenAt = upTo > now ? now : upTo
+export const markSeen = async (
+  db: Database,
+  userId: string,
+  upTo: Date,
+  now: Date,
+): Promise<boolean> => {
+  if (Number.isNaN(upTo.getTime()) || upTo < SEEN_FLOOR || upTo > now) return false
   await db
     .insert(t)
-    .values({ userId, seenAt, createdAt: now })
+    .values({ userId, seenAt: upTo, createdAt: now })
     .onConflictDoUpdate({
       target: t.userId,
       set: { seenAt: sql`greatest(${t.seenAt}, excluded.seen_at)` },
     })
+  return true
 }

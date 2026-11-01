@@ -35,6 +35,7 @@ import { loadProjectsOf } from '../projects/load'
 import { listedProject } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
+import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -413,6 +414,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // actuel et la date. Jamais ceux qui l'ont bloqué : ce n'est pas son geste, et le lui dire
     // trahirait leur blocage (blocks/list.ts).
     const blocks = await blocksOfMember(db, user.id)
+    // Les suggestions qu'il a écartées (R4, jur-J4), même forme que les blocages : l'écarté par son
+    // pseudo actuel, jamais par son nom. Jamais celles qui le visent : l'écarté n'en sait rien.
+    const dismissedSuggestions = await dismissedSuggestionsOf(db, user.id)
     // Les suspensions de son compte (tranche 7c, J8), avec leur fin réelle et la raison d'une
     // levée ; jamais l'administrateur qui a décidé, jamais qui a signalé (suspension/load.ts).
     const moderation = await suspensionsOfMember(db, user.id, new Date())
@@ -438,9 +442,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         moderation,
         notifications: { seenAt: seenAt?.toISOString() ?? null },
         feed: { readAt: feedReadAt?.toISOString() ?? null },
-        // R4 : valeur neutre posée au commit du contrat ; les suggestions écartées viennent avec
-        // le backend de la tranche (BE-B).
-        dismissedSuggestions: [],
+        dismissedSuggestions,
         emailPreferences,
         loginMethods: loginMethods.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
         sessions: sessions.map((s) => ({
