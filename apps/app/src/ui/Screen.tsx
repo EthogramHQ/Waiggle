@@ -12,7 +12,14 @@ import { appName, borders, layout, space } from '@ruche/brand'
 import Head from 'expo-router/head'
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Platform,
+  ScrollView,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
@@ -21,6 +28,7 @@ import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
 import { useScreenFocused } from './screenFocus'
+import { ScreenScrollContext, useScreenScrollChannel } from './scrollLight'
 import { Text } from './Text'
 import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
 import { AmbientProvider, useAmbient } from './theme/ambient'
@@ -39,6 +47,17 @@ type Props = {
   pageTitle?: string | null
   /** Une phrase sous le titre. */
   subtitle?: string
+  /**
+   * Un élément à côté du titre, sur sa rangée (le bouton des nouveautés du Fil, R4) : après lui dans
+   * l'ordre de lecture, et sans rien changer à l'écart entre le titre et le sous-titre, le même sur
+   * toutes les pages. Sans titre, il n'est pas affiché.
+   */
+  titleAside?: ReactNode
+  /**
+   * Chaque défilement de la zone qui défile de l'écran. Un composant posé dans l'écran (le fil)
+   * écoute plutôt par le canal de Screen (ui/scrollLight.ts).
+   */
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void
   children: ReactNode
   /** Une barre tout en haut (la navigation sur ordinateur, l'en-tête d'un formulaire). */
   header?: ReactNode
@@ -100,6 +119,8 @@ export function Screen({
   title,
   pageTitle,
   subtitle,
+  titleAside,
+  onScroll,
   children,
   header,
   stickyHeader = false,
@@ -125,6 +146,9 @@ export function Screen({
   const hosted = useHasTabBarHost()
   // La zone qui défile, pour la faire remonter en haut quand l'onglet actif est touché de nouveau.
   const scroller = useRef<ScrollView | null>(null)
+  // Le canal du défilement : `onScroll` de l'écran, et les composants posés dedans qui l'écoutent
+  // (la lumière au défilement du fil, ui/scrollLight.ts).
+  const scroll = useScreenScrollChannel(onScroll)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -181,8 +205,35 @@ export function Screen({
     <>
       {topRow}
       {title || subtitle ? (
+        // L'en-tête de la page, le même partout (Fil, Explorer, Outils) : l'écart entre le titre et
+        // le sous-titre est le seul `gap` de cette colonne (point des listes R4 : 32 points sur le
+        // Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).
         <View style={{ gap: space.sm }}>
-          {title ? (
+          {title && titleAside ? (
+            // Le titre et l'élément posé à côté, sur une rangée : centrés l'un sur l'autre (le bouton
+            // de 44 points dépasse de 3 points le titre de chaque côté), et sans marge ni remplissage
+            // en haut ou en bas, pour ne rien ajouter à l'écart du sous-titre. `flexWrap` : à 320
+            // points ou en grand texte, le bouton passe sous le titre au lieu de sortir de l'écran.
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: space.md,
+              }}
+            >
+              {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
+                  d'elle-même : flexShrink 0 par défaut). */}
+              <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+                <Text variant="title2" heading={1}>
+                  {title}
+                </Text>
+              </View>
+              {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
+                  ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
+              <View style={{ flexShrink: 1, maxWidth: '100%' }}>{titleAside}</View>
+            </View>
+          ) : title ? (
             // Le titre de la page : niveau 1 (ses sections sont de niveau 2).
             <Text variant="title2" heading={1}>
               {title}
@@ -213,140 +264,155 @@ export function Screen({
           de l'écran choisit par useAmbient()) et ses impulsions. Un fournisseur par écran : sur le
           web, la page précédente reste montée sous la nouvelle et garde sa propre lumière. */}
       <AmbientProvider initialSource={thumbhash ? { thumbhash } : null}>
-        <AmbientSourceSync thumbhash={thumbhash} />
-        {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
+        <ScreenScrollContext.Provider value={scroll.channel}>
+          <AmbientSourceSync thumbhash={thumbhash} held={scroll.channel.lightHeld} />
+          {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
           horizontal). */}
-        <View
-          style={{
-            flex: 1,
-            // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
-            // dans le bas de l'écran.
-            backgroundColor: brand ? colors.surface : colors.background,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
+          <View
+            style={{
+              flex: 1,
+              // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
+              // dans le bas de l'écran.
+              backgroundColor: brand ? colors.surface : colors.background,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Head place son contenu dans l'en-tête de la page web (la balise <title> de l'onglet). Sur
           téléphone, il n'y a pas d'onglet : rien à faire. */}
-          {Platform.OS === 'web' ? (
-            <Head>
-              <title>{tabTitle}</title>
-            </Head>
-          ) : null}
-          {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. */}
-          {ambient && !brand ? <AmbientLight /> : null}
-          {pinned ? (
-            // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
-            // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
-            // s'arrête plus net sous la barre.
-            <View
-              style={{
-                paddingTop: insets.top + space.sm,
-                paddingBottom: space.sm,
-                paddingHorizontal: padding,
-                alignItems: 'center',
-                backgroundColor: colors.sheet,
-                borderBottomWidth: borders.hairline,
-                borderBottomColor: colors.line,
-              }}
-            >
+            {Platform.OS === 'web' ? (
+              <Head>
+                <title>{tabTitle}</title>
+              </Head>
+            ) : null}
+            {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. */}
+            {ambient && !brand ? <AmbientLight /> : null}
+            {pinned ? (
+              // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
+              // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
+              // s'arrête plus net sous la barre.
               <View
-                style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}
-              >
-                {header}
-                {notice}
-              </View>
-            </View>
-          ) : null}
-          {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
-          {brand ? (
-            // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
-            // miel), le décor et la feuille qui porte le contenu.
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              <BrandAmbiance header={brandHeader} scene={scene} hero={withHero ? hero : undefined}>
-                {body}
-              </BrandAmbiance>
-            </ScrollView>
-          ) : (
-            // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
-            // il s'ouvre, si bien que le pied collé remonte au-dessus de lui et que le contenu
-            // défile dans la place qui reste (Android le fait de lui-même, le web aussi). Sans
-            // pied collé, rien ne change : la zone qui défile reste seule.
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              enabled={pinnedFooter}
-              {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
-            >
-              <ScrollView
-                ref={scroller}
-                contentContainerStyle={{
-                  flexGrow: 1,
-                  alignItems: 'center',
-                  // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
-                  paddingTop: (pinned ? 0 : insets.top) + space.lg,
-                  // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
-                  // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
-                  // bas de l'appareil comprise) plus un peu d'air.
-                  paddingBottom: pinnedFooter
-                    ? space.xl
-                    : tabBar.height > 0
-                      ? tabBar.height + space.xl
-                      : insets.bottom + space.huge,
+                style={{
+                  paddingTop: insets.top + space.sm,
+                  paddingBottom: space.sm,
                   paddingHorizontal: padding,
-                  gap: space.xl,
+                  alignItems: 'center',
+                  backgroundColor: colors.sheet,
+                  borderBottomWidth: borders.hairline,
+                  borderBottomColor: colors.line,
                 }}
-                keyboardShouldPersistTaps="handled"
               >
-                {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
-            change pas de taille d'une page à l'autre. */}
-                {header && !pinned ? (
-                  <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>{header}</View>
-                ) : null}
-                {withHero ? (
-                  // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
-                  <View
-                    style={{
-                      width: '100%',
-                      maxWidth: layout.maxContentWidth,
-                      flexGrow: 1,
-                      // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                      // mais s'affiche à droite de la scène.
-                      flexDirection: 'row-reverse',
-                      alignItems: 'center',
-                      gap: space.huge,
-                    }}
-                  >
-                    <View style={{ width: layout.formWidth - 80 }}>
-                      <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                        {body}
-                      </Surface>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
-                  </View>
-                ) : (
-                  <View
-                    style={{
-                      width: '100%',
-                      maxWidth: maxWidthFor(width, false),
-                      gap: space.xl,
-                      // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                      ...(width === 'form' && !onBack && !header
-                        ? { flexGrow: 1, justifyContent: 'center' }
-                        : null),
-                    }}
-                  >
-                    {body}
-                  </View>
-                )}
+                <View
+                  style={{ width: '100%', maxWidth: maxWidthFor(width, withHero), gap: space.sm }}
+                >
+                  {header}
+                  {notice}
+                </View>
+              </View>
+            ) : null}
+            {/* ScrollView : l'écran défile si le contenu dépasse (petit téléphone, clavier ouvert). */}
+            {brand ? (
+              // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
+              // miel), le décor et la feuille qui porte le contenu.
+              <ScrollView
+                contentContainerStyle={{ flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+                onScroll={scroll.handleScroll}
+                scrollEventThrottle={SCROLL_EVENT_MS}
+              >
+                <BrandAmbiance
+                  header={brandHeader}
+                  scene={scene}
+                  hero={withHero ? hero : undefined}
+                >
+                  {body}
+                </BrandAmbiance>
               </ScrollView>
-              {pinnedFooter ? (
-                <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
-              ) : null}
-              {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
+            ) : (
+              // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
+              // il s'ouvre, si bien que le pied collé remonte au-dessus de lui et que le contenu
+              // défile dans la place qui reste (Android le fait de lui-même, le web aussi). Sans
+              // pied collé, rien ne change : la zone qui défile reste seule.
+              <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                enabled={pinnedFooter}
+                {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
+              >
+                <ScrollView
+                  ref={scroller}
+                  contentContainerStyle={{
+                    flexGrow: 1,
+                    alignItems: 'center',
+                    // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
+                    paddingTop: (pinned ? 0 : insets.top) + space.lg,
+                    // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
+                    // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
+                    // bas de l'appareil comprise) plus un peu d'air.
+                    paddingBottom: pinnedFooter
+                      ? space.xl
+                      : tabBar.height > 0
+                        ? tabBar.height + space.xl
+                        : insets.bottom + space.huge,
+                    paddingHorizontal: padding,
+                    gap: space.xl,
+                  }}
+                  keyboardShouldPersistTaps="handled"
+                  onScroll={scroll.handleScroll}
+                  scrollEventThrottle={SCROLL_EVENT_MS}
+                >
+                  {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
+            change pas de taille d'une page à l'autre. */}
+                  {header && !pinned ? (
+                    <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+                      {header}
+                    </View>
+                  ) : null}
+                  {withHero ? (
+                    // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                    <View
+                      style={{
+                        width: '100%',
+                        maxWidth: layout.maxContentWidth,
+                        flexGrow: 1,
+                        // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                        // mais s'affiche à droite de la scène.
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        gap: space.huge,
+                      }}
+                    >
+                      <View style={{ width: layout.formWidth - 80 }}>
+                        <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                          {body}
+                        </Surface>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
+                    </View>
+                  ) : (
+                    <View
+                      style={{
+                        width: '100%',
+                        maxWidth: maxWidthFor(width, false),
+                        gap: space.xl,
+                        // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                        ...(width === 'form' && !onBack && !header
+                          ? { flexGrow: 1, justifyContent: 'center' }
+                          : null),
+                      }}
+                    >
+                      {body}
+                    </View>
+                  )}
+                </ScrollView>
+                {pinnedFooter ? (
+                  <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
+                ) : null}
+                {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
                   écran seul), rien n'écoute, et le composant n'a pas besoin de la navigation. */}
-              {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
-            </KeyboardAvoidingView>
-          )}
-        </View>
+                {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
+              </KeyboardAvoidingView>
+            )}
+          </View>
+        </ScreenScrollContext.Provider>
       </AmbientProvider>
     </NoticeScope>
   )
@@ -410,15 +476,27 @@ export function ScreenFooter({
 /**
  * Passe le visuel de l'écran (`thumbhash`) à la lumière quand il change : un projet chargé après
  * l'ouverture de sa page fait glisser la lumière du miel vers ses couleurs. Au premier affichage,
- * le fournisseur l'a déjà (initialSource) : rien ne glisse.
+ * le fournisseur l'a déjà (initialSource) : rien ne glisse. Quand le fil tient la lumière (la
+ * carte au milieu de l'écran, `held`), la source de l'écran ne la lui reprend pas (ui-B5).
  */
-function AmbientSourceSync({ thumbhash }: { thumbhash: string | null }) {
+function AmbientSourceSync({
+  thumbhash,
+  held,
+}: {
+  thumbhash: string | null
+  held: RefObject<boolean>
+}) {
   const { setSource } = useAmbient()
   useEffect(() => {
+    if (held.current) return
     setSource(thumbhash ? { thumbhash } : null)
-  }, [setSource, thumbhash])
+  }, [setSource, thumbhash, held])
   return null
 }
+
+// Un défilement est signalé au plus toutes les 16 ms (une image) : sur iOS, sans ce réglage,
+// `onScroll` ne serait appelé qu'une fois au début du geste.
+const SCROLL_EVENT_MS = 16
 
 // Un onglet n'affiche qu'une trentaine de caractères : au-delà de 60, le titre est abrégé (« … »),
 // pour qu'un titre de projet ou d'étiquette très long n'encombre pas l'historique du navigateur.
