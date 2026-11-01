@@ -34,7 +34,6 @@ import {
 import { useMentionable } from '../mentions/api'
 import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
-import { shortDate } from '../projects/format'
 import { removalBanner } from '../reports/removal'
 import { Button } from '../ui/Button'
 import { excerpt } from '../ui/CommentAction'
@@ -44,6 +43,7 @@ import { CommentThread, type CommentThreadHandle } from '../ui/CommentThread'
 import { Dialog } from '../ui/Dialog'
 import { NoteComposer } from '../ui/NoteComposer'
 import { Notice } from '../ui/Notice'
+import { RelativeTime } from '../ui/RelativeTime'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
@@ -85,7 +85,7 @@ const placeholderKey = {
 } as const satisfies Record<CommentState, string>
 
 export function Comments({ project }: { project: Project }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const nameOf = useNameOf()
   const router = useRouter()
   const toSource = useMediaSources()
@@ -536,7 +536,9 @@ export function Comments({ project }: { project: Project }) {
                 router.push({ pathname: '/members/[id]', params: { id: author.id } }),
             }
           : null)}
-        when={shortDate(comment.createdAt, i18n.language)}
+        // R4 : « il y a 5 min », lu en entier (« 15 octobre à 11:00 ») ; une vue sur le web, que la
+        // carte pose à côté du nom, jamais dans un texte.
+        when={<RelativeTime date={comment.createdAt} />}
         body={comment.body}
         mentions={comment.mentions}
         onMemberPress={openMember}

@@ -14,6 +14,7 @@ import { blockedInes, blockedPageOf, blockedSam } from '../testing/blocks'
 import { passTapGuard } from '../testing/dialog'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import { parisDateTime } from '../ui/parisTime'
 import { BlockedMembersScreen } from './BlockedMembersScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -254,5 +255,38 @@ describe('unblocking a member', () => {
     expect(
       screen.queryByText(containing(fr.t(($) => $.block.unblocked, { handle: 'ines_morel' }))),
     ).toBeNull()
+  })
+})
+
+// R4 (F-Fil3) : la date d'un blocage se dit par rapport à maintenant (« Bloqué il y a 5 min »), et
+// le lecteur d'écran lit la date complète, à l'heure de Paris (« Bloqué le 1 novembre à 10:25 »).
+// Le blocage date de cinq minutes avant l'horloge du test : le résultat ne dépend pas du jour où il
+// tourne.
+describe('when each member was blocked', () => {
+  /** Les blancs d'Intl et de la typographie française ramenés à des espaces, comme getByText. */
+  const plain = (text: string) => text.replace(/\s+/g, ' ')
+
+  it('says it relative to now, and reads the full date', async () => {
+    const blockedAt = new Date(Date.now() - 5 * 60_000).toISOString()
+    mockList([blockedPageOf([{ ...blockedInes, blockedAt }])])
+    await renderWithProviders(<BlockedMembersScreen />)
+    await screen.findByText(blockedInes.member.name)
+
+    const handle = blockedInes.member.handle
+    const shown = fr.t(($) => $.block.list.detail, {
+      handle,
+      blockedOn: fr.t(($) => $.block.list.blockedWhen, {
+        when: fr.t(($) => $.dates.minutes, { count: 5 }),
+      }),
+    })
+    const spoken = fr.t(($) => $.block.list.detail, {
+      handle,
+      blockedOn: fr.t(($) => $.block.list.blockedOn, {
+        date: parisDateTime(blockedAt, 'fr').dateTime,
+      }),
+    })
+    const row = rowOf(blockedInes.member.name)
+    expect(row.getByText(plain(shown))).toBeTruthy()
+    expect(row.getByLabelText(plain(spoken))).toBeTruthy()
   })
 })
