@@ -1,11 +1,17 @@
 // Les morceaux d'un fil de projets, partagés par le Fil (l'accueil d'un membre) et Explorer : la
-// liste des cartes avec son bandeau des nouveautés et sa fin, l'erreur d'un fil qui n'a pas pu se
+// liste des cartes avec son bouton des nouveautés et sa fin, l'erreur d'un fil qui n'a pas pu se
 // charger, et le fil « Découvrir » (tous les projets publics, ou ceux qui cherchent des testeurs).
 // Ils ont quitté `HomeScreen.tsx` tels quels en R3, quand « Découvrir » est parti dans Explorer.
-import { FEED_PAGE_SIZE, type FeedItem, type ProjectSummary } from '@ruche/contracts'
+//
+// R4 : le Fil y gagne « Tu es à jour » (la sphère de miel posée avant le premier élément déjà vu,
+// qui coupe le fil en deux listes), la lumière qui suit la carte du milieu de l'écran, et un bouton
+// des nouveautés qui montre les visages des auteurs (posé ici sur téléphone, à côté du titre de la
+// page sur ordinateur : `FeedNews`).
+import type { FeedItem, ProjectSummary } from '@ruche/contracts'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
+import { useMediaSources } from '../api/media'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
 import { SummaryCard } from '../projects/SummaryCard'
 import { FeedEnd } from '../ui/FeedEnd'
@@ -15,8 +21,10 @@ import { ProjectGrid } from '../ui/ProjectGrid'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
-import { useDiscoverFeed, useFeedNews } from './api'
-import { feedItemId } from './items'
+import { useScrollLight } from '../ui/scrollLight'
+import { UpToDate } from '../ui/UpToDate'
+import { type FeedNews as News, useDiscoverFeed, useFeedNews } from './api'
+import { feedItemId, upToDateIndex } from './items'
 
 /**
  * Ce qu'un écran pose sur la photo d'une carte de projet (`overlay` de SummaryCard) : Explorer y met
@@ -61,10 +69,48 @@ export function DiscoverFeed({
     <FeedList
       feed={feed}
       items={items}
-      news={news}
+      news={
+        <FeedNews
+          news={news}
+          onPress={() => feed.refetch()}
+          caption={t(($) => $.feed.discoverCaption)}
+        />
+      }
       empty={t(($) => $.feed.discoverEmpty)}
-      caption={t(($) => $.feed.discoverCaption)}
       overlay={overlay ? (project) => overlay(project, followed) : undefined}
+    />
+  )
+}
+
+type FeedNewsProps = {
+  /** Ce que dit `useFeedNews` : combien, s'il y en a plus d'une page, qui, et quoi. */
+  news: News
+  /** Relire le fil depuis le début : les nouveautés arrivent en haut. */
+  onPress: () => unknown
+  /** La phrase qui dit ce que montre le fil, à la place du bouton quand rien n'est neuf. */
+  caption?: string | undefined
+}
+
+/**
+ * Le bouton des nouveautés d'un fil, branché : les photos des auteurs passent de l'adresse de l'API
+ * à une image qu'on peut dessiner (`useMediaSources`). Le Fil le pose à côté de son titre sur
+ * ordinateur (`titleAside` de Screen), et en tête de la liste sur téléphone, où le logo remplace le
+ * titre.
+ */
+export function FeedNews({ news, onPress, caption }: FeedNewsProps) {
+  const toSource = useMediaSources()
+  const authors = news.authors.map((author) => ({
+    name: author.name,
+    source: toSource(author.avatarUrl),
+  }))
+  return (
+    <NewItemsBanner
+      count={news.count}
+      more={news.more}
+      kinds={news.kinds}
+      authors={authors}
+      onPress={onPress}
+      {...(caption ? { caption } : null)}
     />
   )
 }
@@ -85,62 +131,93 @@ type LoadedFeed = {
 type FeedListProps = {
   feed: LoadedFeed
   items: FeedItem[]
-  news: { count: number | null; more: boolean }
-  /** Le message d'un fil vide. */
+  /**
+   * Le haut du fil : le bouton des nouveautés (`FeedNews`), toujours à la même place. Absent quand
+   * l'écran le pose ailleurs (le Fil sur ordinateur, à côté de son titre).
+   */
+  news?: ReactNode
+  /** Le message d'un fil vide (sans « Tu es à jour » : Explorer). */
   empty: string
-  /** La phrase en haut du fil, qui dit ce qu'il montre (remplacée par le bandeau des nouveautés). */
-  caption: string
   /** Ce qui se pose sur la photo de la carte d'un projet (pas sur celle d'une note). */
   overlay?: ((project: ProjectSummary) => ReactNode) | undefined
+  /**
+   * « Tu es à jour » (le Fil, R4) : la date de la dernière lecture, lue sur la première page et
+   * figée pour la visite (`useReadBefore`), et ce que fait « Explorer d'autres projets ». Sans elle
+   * (Explorer), une seule liste, et la fin ordinaire.
+   */
+  upToDate?: { readBefore: string | null; onExplore: () => void } | undefined
+  /** Le nombre de colonnes de la grille, imposé par l'écran (voir ProjectGrid). */
+  columns?: number | undefined
 }
 
-/** Les cartes d'un fil, le bandeau des nouveautés au-dessus, et la fin du fil en dessous. */
-export function FeedList({ feed, items, news, empty, caption, overlay }: FeedListProps) {
+/**
+ * Les cartes d'un fil, le bouton des nouveautés au-dessus, « Tu es à jour » à sa place, et la fin du
+ * fil en dessous.
+ */
+export function FeedList({ feed, items, news, empty, overlay, upToDate, columns }: FeedListProps) {
   const { t } = useTranslation()
-  return (
-    <Stack gap="lg">
-      {/* Toujours là, à la même hauteur : le bandeau y remplace la phrase, sans rien décaler. */}
-      <NewItemsBanner
-        label={
-          news.count === null
-            ? null
-            : news.more
-              ? t(($) => $.feed.newsMany, { max: FEED_PAGE_SIZE })
-              : t(($) => $.feed.news, { count: news.count })
-        }
-        // Relire le fil depuis le début : les nouveautés arrivent en haut, à la place du bandeau.
-        onPress={() => feed.refetch()}
-        caption={caption}
-      />
-      {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
-      {feed.isRefetchError ? <Notice message={t(($) => $.errors[errorKey(feed.error)])} /> : null}
-      <ProjectGrid empty={empty}>
+  // La lumière suit la carte du milieu de l'écran (R4). Ce hook s'appelle ici, dans un enfant de
+  // Screen, jamais dans le corps de l'écran : la lumière d'ambiance est fournie par Screen
+  // (relecture de l'interface, ui-B5). Le résumé flou d'une note est celui de son projet.
+  const { cardRef } = useScrollLight(
+    items.map((item) => ({ id: feedItemId(item), thumbhash: item.project.cover?.thumbhash })),
+  )
+
+  const cardOf = (item: FeedItem) => {
+    const id = feedItemId(item)
+    return (
+      // La vue que la lumière mesure : la carte entière, à sa place dans la fenêtre.
+      // (une pile sans écart autour d'un seul élément : la vue la plus simple qu'un dossier de
+      // domaine a le droit de poser).
+      <Stack key={id} ref={cardRef(id)} gap="none">
         {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
             discrète, qui mène elle aussi au projet. */}
-        {items.map((item) =>
-          item.kind === 'note' ? (
-            <FeedNoteCard key={feedItemId(item)} note={item.note} project={item.project} />
-          ) : (
-            <SummaryCard
-              key={feedItemId(item)}
-              project={item.project}
-              at={item.at}
-              overlay={overlay?.(item.project)}
-            />
-          ),
+        {item.kind === 'note' ? (
+          <FeedNoteCard note={item.note} project={item.project} />
+        ) : (
+          <SummaryCard project={item.project} at={item.at} overlay={overlay?.(item.project)} />
         )}
-      </ProjectGrid>
-      {items.length > 0 ? (
+      </Stack>
+    )
+  }
+
+  // Où se pose la sphère : avant le premier élément déjà vu, au bout, ou nulle part (voir
+  // upToDateIndex). Sans `upToDate` (Explorer), nulle part.
+  const sphereAt = upToDate ? upToDateIndex(items, upToDate.readBefore, feed.hasNextPage) : null
+  const state = feed.isFetchingNextPage
+    ? 'loading'
+    : feed.isFetchNextPageError
+      ? 'error'
+      : feed.hasNextPage
+        ? 'more'
+        : 'end'
+  // La fin ordinaire (« Tu es à jour » en petit) ne redit pas ce que la sphère dit déjà.
+  const showEnd = items.length > 0 && !(sphereAt !== null && state === 'end')
+
+  return (
+    <Stack gap="lg">
+      {/* Toujours là, à la même hauteur : le bouton y remplace la phrase, sans rien décaler. */}
+      {news}
+      {/* La relecture du fil a échoué : on le dit, les cartes déjà là restent. */}
+      {feed.isRefetchError ? <Notice message={t(($) => $.errors[errorKey(feed.error)])} /> : null}
+      {upToDate ? (
+        // Le Fil : deux grilles autour de la sphère, chacune une liste complète (ui-B6). Une grille
+        // vide n'est pas dessinée (elle dirait « rien de neuf » au-dessus de « Tu es à jour »).
+        <>
+          {segment(items.slice(0, sphereAt ?? items.length), cardOf, empty, columns)}
+          {sphereAt !== null ? (
+            <UpToDate firstVisit={upToDate.readBefore === null} onExplore={upToDate.onExplore} />
+          ) : null}
+          {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, empty, columns) : null}
+        </>
+      ) : (
+        <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
+          {items.map(cardOf)}
+        </ProjectGrid>
+      )}
+      {showEnd ? (
         <FeedEnd
-          state={
-            feed.isFetchingNextPage
-              ? 'loading'
-              : feed.isFetchNextPageError
-                ? 'error'
-                : feed.hasNextPage
-                  ? 'more'
-                  : 'end'
-          }
+          state={state}
           moreLabel={t(($) => $.feed.more)}
           endLabel={t(($) => $.feed.end)}
           errorLabel={t(($) => $.feed.moreError)}
@@ -152,6 +229,21 @@ export function FeedList({ feed, items, news, empty, caption, overlay }: FeedLis
         />
       ) : null}
     </Stack>
+  )
+}
+
+/** Une des deux grilles autour de « Tu es à jour » ; rien quand elle n'a aucun élément. */
+function segment(
+  items: FeedItem[],
+  cardOf: (item: FeedItem) => ReactNode,
+  empty: string,
+  columns: number | undefined,
+) {
+  if (items.length === 0) return null
+  return (
+    <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
+      {items.map(cardOf)}
+    </ProjectGrid>
   )
 }
 

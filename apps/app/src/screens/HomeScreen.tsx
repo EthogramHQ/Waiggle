@@ -6,18 +6,31 @@
 // pour un membre connecté, le Fil : les nouveaux projets des personnes suivies et les notes des
 // projets suivis (R3 : « Découvrir » est devenu l'onglet Explorer, et les raccourcis « Publier »,
 // « Mes projets », « Réglages » sont passés dans la barre d'onglets et la barre du haut). Le fil se
-// lit 20 par 20, jusqu'à « Tu es à jour », et un bandeau annonce les nouveautés sans jamais faire
-// bouger ce qu'on lit.
+// lit 20 par 20, et un bouton annonce les nouveautés sans jamais faire bouger ce qu'on lit.
+//
+// R4 (« le fil et les cartes ») : « Tu es à jour » se pose avant le premier élément déjà vu ; un
+// membre qui ne suit personne voit le premier lancement (« Ton fil t'attend », proches à suivre) ;
+// sur ordinateur, le titre « Fil » porte le bouton des nouveautés à côté de lui, et une colonne de
+// droite propose des proches à suivre et des projets qui cherchent des testeurs.
+
 import { sourceUrl } from '@ruche/brand'
+import type { FollowingFeedPage } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { SessionData } from '../accounts/session'
 import { useMemberSession } from '../accounts/session'
-import { useFeedNews, useFollowingFeed } from '../feed/api'
-import { FeedError, FeedList } from '../feed/FeedList'
+import { useFeedNews, useFollowingFeed, useMarkFeedRead } from '../feed/api'
+import { FeedError, FeedList, FeedNews } from '../feed/FeedList'
+import { FeedSide } from '../feed/FeedSide'
+import { FirstRun } from '../feed/FirstRun'
+import { useReadBefore } from '../feed/readBefore'
 import { useOpenOutside } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { NotificationBell } from '../notifications/NotificationBell'
+import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
+import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
 import { HiddenHeading } from '../ui/HiddenHeading'
 import { Hint } from '../ui/Hint'
@@ -26,7 +39,6 @@ import { Logo } from '../ui/Logo'
 import { Screen } from '../ui/Screen'
 import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
-import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
@@ -41,7 +53,7 @@ export function HomeScreen() {
   // La lecture a échoué (trop de demandes, panne) : peut-être un membre, on ne lui propose pas de
   // créer un compte (voir accounts/session.ts). Pas de « Retour » : il ramènerait ici.
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" withBack={false} />
-  return session ? <MemberHome /> : <VisitorHome />
+  return session ? <MemberHome session={session} /> : <VisitorHome />
 }
 
 function VisitorHome() {
@@ -118,14 +130,57 @@ function VisitorHome() {
   )
 }
 
-function MemberHome() {
+function MemberHome({ session }: { session: SessionData }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const compact = useLayout().sizeClass === 'compact'
+  const { sizeClass, columns } = useLayout()
+  const compact = sizeClass === 'compact'
+  // Le nom du salut du premier lancement : celui du profil, comme la barre du haut, ou celui de la
+  // session tant que le profil n'est pas lu.
+  const me = useMe(true, { retryOnMount: false })
+  const name = me.data?.name ?? session.user.name
+
+  // Le fil, lu ici (et pas plus bas) : sur ordinateur, son bouton des nouveautés se pose à côté du
+  // titre de la page, que seul cet écran donne à Screen.
+  const feed = useFollowingFeed()
+  const firstPage = feed.data?.pages[0]
+  const items = feed.data?.pages.flatMap((page) => page.items) ?? []
+  const news = useFeedNews('following', items[0])
+  // Le fil est marqué lu jusqu'au premier élément de la première page, dès qu'il s'affiche (R4).
+  useMarkFeedRead(firstPage?.items[0])
+  // La date de la dernière lecture, lue sur la première page et figée pour la visite : la sphère
+  // « Tu es à jour » ne saute pas quand le fil est relu (voir feed/readBefore.ts).
+  const readBefore = useReadBefore(firstPage)
+  const firstRun = useFirstRun(firstPage)
+
   // openSuspension : sur l'accueil, le bandeau d'un compte suspendu s'ouvre déplié. Sur téléphone,
   // la barre du haut ne montre que ce bandeau ; sur ordinateur, elle porte aussi « Publier un
   // projet » (masqué pour un compte suspendu), la cloche et la photo.
   const topNav = <TopNav openSuspension />
+  const onExplore = () => router.push('/explore')
+  const showNews = () => feed.refetch()
+  // Le bouton des nouveautés, avec la phrase qui dit ce que montre le fil quand rien n'est neuf.
+  // Sur ordinateur, à côté du titre (la phrase passe en sous-titre) ; sur téléphone, en tête du fil.
+  const caption = t(($) => $.feed.followingCaption)
+  const newsButton = <FeedNews news={news} onPress={showNews} {...(compact ? { caption } : null)} />
+
+  const main = (
+    <FollowingFeed
+      feed={feed}
+      items={items}
+      readBefore={readBefore}
+      firstRun={firstRun}
+      name={name}
+      news={compact ? newsButton : null}
+      columns={sizeClass === 'wide' ? 2 : 1}
+      onExplore={onExplore}
+    />
+  )
+  // Les projets déjà en carte dans le fil : la colonne de droite ne les propose pas une seconde fois.
+  const shownProjectIds = new Set(
+    items.flatMap((item) => (item.kind === 'project' ? [item.project.id] : [])),
+  )
+
   return (
     <Screen
       width="page"
@@ -145,28 +200,75 @@ function MemberHome() {
           topNav
         )
       }
-      // Sur ordinateur, le titre « Fil » (la barre du haut porte déjà le logo et le mot). Sur
+      // Sur ordinateur, le titre « Fil » (la barre du haut porte déjà le logo et le mot), le bouton
+      // des nouveautés à côté de lui (R4, même écart titre → sous-titre qu'Explorer et Outils). Sur
       // téléphone, le logo tient lieu de titre, et l'onglet « Fil » de la barre du bas dit où l'on est.
-      title={compact ? undefined : t(($) => $.nav.feed)}
+      title={compact ? undefined : t(($) => $.feed.title)}
+      titleAside={compact ? undefined : newsButton}
+      subtitle={compact ? undefined : caption}
       pageTitle={t(($) => $.nav.feed)}
     >
       {/* Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur
           d'écran parcourt la page par ses titres, et sans titre de niveau 1 il ne sait pas où il
           est. Posé en tête du contenu, à la place exacte du titre affiché sur ordinateur. */}
       {compact ? <HiddenHeading text={t(($) => $.nav.feed)} /> : null}
-      {/* Le fil vide mène à l'onglet Explorer, qui a repris « Découvrir ». */}
-      <FollowingFeed onExplore={() => router.push('/explore')} />
+      {/* Sur ordinateur (quand les deux colonnes tiennent), la colonne de droite. Sans proches à
+          suivre au premier lancement : la colonne principale les montre déjà. */}
+      {columns ? (
+        <Columns
+          main={main}
+          side={<FeedSide withSuggestions={firstRun === false} shownProjectIds={shownProjectIds} />}
+        />
+      ) : (
+        main
+      )}
     </Screen>
   )
 }
 
-/** Le fil « Abonnements » : les nouveaux projets des personnes suivies, les notes des projets suivis. */
-function FollowingFeed({ onExplore }: { onExplore: () => void }) {
-  const { t } = useTranslation()
-  const feed = useFollowingFeed()
-  const items = feed.data?.pages.flatMap((page) => page.items) ?? []
-  const news = useFeedNews('following', items[0])
+/**
+ * Hook : le premier lancement (le membre ne suit personne), décidé sur la première page et gardé
+ * pour la visite ; `undefined` tant que cette page n'est pas là.
+ *
+ * Pourquoi gardé : suivre un proche depuis la liste relit le fil (follows/api.ts). Sans cette
+ * mémoire, le premier « Suivre » remplacerait toute la page par le fil, sous le doigt, et l'on ne
+ * pourrait plus suivre le deuxième proche de la liste. Le fil arrive alors sous la liste.
+ */
+const useFirstRun = (firstPage: Pick<FollowingFeedPage, 'followsAnyone'> | undefined) => {
+  const [kept, setKept] = useState<boolean | undefined>(undefined)
+  if (kept === undefined && firstPage) {
+    // Rempli pendant le rendu, comme useReadBefore : aucun rendu intermédiaire sans la décision.
+    const next = firstPage.followsAnyone === false
+    setKept(next)
+    return next
+  }
+  return kept
+}
 
+type FollowingFeedProps = {
+  feed: ReturnType<typeof useFollowingFeed>
+  items: FollowingFeedPage['items']
+  readBefore: string | null | undefined
+  firstRun: boolean | undefined
+  name: string
+  /** Le bouton des nouveautés, en tête du fil (téléphone) ; null quand il est à côté du titre. */
+  news: ReactNode
+  columns: number
+  onExplore: () => void
+}
+
+/** Le fil « Abonnements » : les nouveaux projets des personnes suivies, les notes des projets suivis. */
+function FollowingFeed({
+  feed,
+  items,
+  readBefore,
+  firstRun,
+  name,
+  news,
+  columns,
+  onExplore,
+}: FollowingFeedProps) {
+  const { t } = useTranslation()
   // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
   // les cartes déjà lues (voir FeedList).
   if (!feed.data) {
@@ -174,32 +276,26 @@ function FollowingFeed({ onExplore }: { onExplore: () => void }) {
       <FeedError error={feed.error} onRetry={() => void feed.refetch()} />
     ) : (
       // Le squelette du fil : trois cartes, un seul « Chargement… » pour un lecteur d'écran.
-      <SkeletonList count={3} />
+      <SkeletonList count={3} shape="feed" />
     )
   }
-  if (items.length === 0) {
-    // Ne suivre personne n'est pas une erreur, ni un fil calme : dans les deux cas, on montre où
-    // trouver des projets. En blanc : « Publier » (le « + » de la barre d'onglets, ou le bouton de
-    // la barre du haut) reste la seule action miel.
-    const followsAnyone = feed.data.pages[0]?.followsAnyone
-    return (
-      <StateMessage
-        kind="empty"
-        title={followsAnyone ? undefined : t(($) => $.feed.nobodyTitle)}
-        message={followsAnyone ? t(($) => $.feed.quiet) : t(($) => $.feed.nobodyBody)}
-        actions={[
-          { label: t(($) => $.feed.nobodyAction), onPress: onExplore, variant: 'secondary' },
-        ]}
-      />
-    )
-  }
-  return (
+  const list = (
     <FeedList
       feed={feed}
       items={items}
       news={news}
       empty={t(($) => $.feed.quiet)}
-      caption={t(($) => $.feed.followingCaption)}
+      upToDate={{ readBefore: readBefore ?? null, onExplore }}
+      columns={columns}
     />
+  )
+  if (!firstRun) return list
+  // Le premier lancement : le salut, les proches à suivre et l'invitation à publier. Le fil, relu
+  // après un « Suivre », arrive dessous, sans rien déplacer de ce qu'on touche.
+  return (
+    <Stack gap="xxl" align="stretch">
+      <FirstRun name={name} />
+      {items.length > 0 ? list : null}
+    </Stack>
   )
 }
