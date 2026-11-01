@@ -449,7 +449,7 @@ const suggestedMembers = [
     { day: 19, fields: { status: 'building', reactionTotal: 0 } },
   ),
   suggestedOf(
-    { id: 'sofia-id', name: 'Sofia Lopes-Carvalho de Almeida', avatarUrl: null },
+    { id: 'sofia-id', name: 'Sofia Lopes-Carvalho Almeida', avatarUrl: null },
     '5a6b7c8d-0000-4000-8000-000000000003',
     'Lecteur de factures',
     'Il range les factures du mois et prépare le tableau des dépenses.',
