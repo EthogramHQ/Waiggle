@@ -232,14 +232,17 @@ export function ProjectCard({
   const authorRow = (
     <View
       onLayout={measure('author')}
+      // box-none : la rangée laisse passer le doigt hors de ses liens, vers la carte dessous. En
+      // propriété, pas en style : sur le web, react-native-web n'en fait du CSS que sous cette forme
+      // (en style, `pointer-events: box-none` n'existe pas en CSS, et la vue prenait les clics :
+      // essai du 01/11, le statut touché n'ouvrait pas le projet).
+      pointerEvents="box-none"
       style={{
         flexDirection: 'row',
         flexWrap: 'wrap',
         alignItems: 'center',
         columnGap: space.sm,
         minHeight: layout.touchTarget,
-        // box-none : la rangée laisse passer le doigt hors de ses liens, vers la carte dessous.
-        pointerEvents: 'box-none',
       }}
     >
       {/* Le nom ne prend que sa place ; trop long, il rétrécit (une ligne, coupée). */}
@@ -278,7 +281,7 @@ export function ProjectCard({
   const total =
     reactionTotal > 0 ? (
       // À droite de la rangée (marge automatique). Le doigt passe au travers, vers la carte.
-      <View style={{ marginLeft: 'auto', pointerEvents: 'none' }}>
+      <View pointerEvents="none" style={{ marginLeft: 'auto' }}>
         {web ? (
           // Sur le web, le nom d'un texte sans rôle n'est pas lu : le « 49 » dessiné est caché au
           // lecteur d'écran, et « 49 réactions » est écrit à côté, caché à l'œil (relecture ui-B3).
@@ -356,18 +359,18 @@ export function ProjectCard({
   const bottomRow = (
     <View
       onLayout={measure('bottom')}
+      pointerEvents="box-none"
       style={{
         flexDirection: 'row',
         flexWrap: 'wrap',
         alignItems: 'center',
         gap: space.sm,
         minHeight: layout.touchTarget,
-        pointerEvents: 'box-none',
       }}
     >
       {tester}
       {/* Les pastilles ne se touchent pas : le doigt passe au travers, vers la carte. */}
-      <View style={{ flexDirection: 'row', gap: space.sm, pointerEvents: 'none' }}>
+      <View pointerEvents="none" style={{ flexDirection: 'row', gap: space.sm }}>
         <StatusPill label={status.label} strong={status.strong} />
         {badge ? <StatusPill label={badge} /> : null}
       </View>
@@ -383,6 +386,7 @@ export function ProjectCard({
       {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de lui
           (zIndex). box-none : le calque laisse passer le doigt hors de la rangée. */}
       <View
+        pointerEvents="box-none"
         style={{
           position: 'absolute',
           left: edge,
@@ -390,21 +394,14 @@ export function ProjectCard({
           bottom: authorBottom,
           zIndex: 1,
           opacity: measures.title === null ? 0 : 1,
-          pointerEvents: 'box-none',
         }}
       >
         {authorRow}
       </View>
       {cardLayer}
       <View
-        style={{
-          position: 'absolute',
-          left: edge,
-          right: edge,
-          bottom: edge,
-          zIndex: 1,
-          pointerEvents: 'box-none',
-        }}
+        pointerEvents="box-none"
+        style={{ position: 'absolute', left: edge, right: edge, bottom: edge, zIndex: 1 }}
       >
         {bottomRow}
       </View>
@@ -412,14 +409,8 @@ export function ProjectCard({
         // box-none : la vue de l'emplacement laisse passer le doigt hors du contrôle, vers la carte
         // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
         <View
-          style={{
-            position: 'absolute',
-            top: INSET,
-            left: INSET,
-            right: INSET,
-            zIndex: 1,
-            pointerEvents: 'box-none',
-          }}
+          pointerEvents="box-none"
+          style={{ position: 'absolute', top: INSET, left: INSET, right: INSET, zIndex: 1 }}
         >
           {overlay}
         </View>
