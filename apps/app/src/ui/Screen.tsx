@@ -198,22 +198,12 @@ export function Screen({
   useFloatingClaim(focused ? floatingTop : 0)
   // R5a (ui-11) : « Retour » écrit en toutes lettres sur ordinateur et tablette, quand l'écran le
   // demande (`backLabel`) ; sinon, et sur téléphone, l'icône seule, nommée.
-  const backName = backLabel ?? t(($) => $.common.back)
   const backButton = onBack ? (
-    backLabel !== undefined && sizeClass !== 'compact' ? (
-      // La pilule garde la largeur de son texte, à gauche (sans ce cadre, la colonne l'étirerait).
-      <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
-        <Button
-          variant="glass"
-          size="compact"
-          icon="arrow-left"
-          label={backLabel}
-          onPress={onBack}
-        />
-      </View>
-    ) : (
-      <IconButton icon="arrow-left" label={backName} onPress={onBack} />
-    )
+    <BackButton
+      label={backLabel ?? t(($) => $.common.back)}
+      withText={backLabel !== undefined && sizeClass !== 'compact'}
+      onPress={onBack}
+    />
   ) : null
   // R3 (« le Retour au même endroit », point des listes) : sur le miel, le retour se pose en tête de
   // la barre de BrandAmbiance, à gauche, et l'en-tête de l'écran (la langue) à droite. Dans la
@@ -562,6 +552,30 @@ export function ScreenFooter({
       }}
     >
       <View style={{ width: '100%', maxWidth: width, gap: space.md }}>{children}</View>
+    </View>
+  )
+}
+
+/**
+ * Le bouton du haut : l'icône seule, nommée par `label` ; ou, avec `withText` (R5a, ordinateur et
+ * tablette), l'icône et le texte dans une pilule de verre, que toute la pilule se touche et que le
+ * nom ne soit pas lu deux fois. Exporté pour le catalogue ; les écrans passent par les props
+ * `onBack` et `backLabel` de Screen.
+ */
+export function BackButton({
+  label,
+  withText = false,
+  onPress,
+}: {
+  label: string
+  withText?: boolean
+  onPress: () => void
+}) {
+  if (!withText) return <IconButton icon="arrow-left" label={label} onPress={onPress} />
+  return (
+    // La pilule garde la largeur de son texte, à gauche (sans ce cadre, la colonne l'étirerait).
+    <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+      <Button variant="glass" size="compact" icon="arrow-left" label={label} onPress={onPress} />
     </View>
   )
 }
