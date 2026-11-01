@@ -359,8 +359,9 @@ describe('SearchField, its drawn placeholder', () => {
 
     const text = screen.getByText(drawn, hidden)
     expect(text.props.numberOfLines).toBeUndefined()
-    let node: { props: Record<string, unknown>; parent: unknown } | null = text as never
-    while (node && node.props['aria-hidden'] !== true) node = node.parent as typeof node
+    type Node = { props: Record<string, unknown>; parent: Node | null }
+    let node = text as unknown as Node | null
+    while (node && node.props['aria-hidden'] !== true) node = node.parent
     expect(node?.props['aria-hidden']).toBe(true)
     // La saisie garde le vrai texte d'attente (son nom pour les outils, la couleur du contraste élevé).
     expect(screen.getByPlaceholderText(placeholder)).toBe(field())
