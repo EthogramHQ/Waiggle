@@ -88,6 +88,9 @@ type WebPointerEvent = {
   nativeEvent: { pointerType?: string; clientX: number; clientY: number }
   currentTarget: {
     getBoundingClientRect: () => { left: number; top: number; width: number; height: number }
+    /** La taille de l'élément sans sa transformation (la carte penchée paraît un peu plus petite). */
+    offsetWidth?: number
+    offsetHeight?: number
     style?: { transform: string }
   }
 }
@@ -161,6 +164,15 @@ export function useTilt(wanted = true) {
           node.current = currentTarget
           const rect = currentTarget.getBoundingClientRect()
           if (rect.width <= 0 || rect.height <= 0) return
+          // La taille de la carte, pour déplacer le reflet en points, est relue ici : `onLayout` ne
+          // la donne pas sur le web, car il n'est posé qu'une fois l'inclinaison active (après
+          // l'hydratation), quand la carte est déjà dessinée et ne change plus de taille. Le
+          // reflet restait alors au centre (relecture design R4, A3).
+          const width = currentTarget.offsetWidth ?? rect.width
+          const height = currentTarget.offsetHeight ?? rect.height
+          if (size.value.width !== width || size.value.height !== height) {
+            size.value = { width, height }
+          }
           instant.value = false
           tilt.value = {
             ...tiltAt(

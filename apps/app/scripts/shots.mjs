@@ -473,6 +473,16 @@ const suggestedMembers = [
     { day: 12, fields: { status: 'building', reactionTotal: 1 } },
   ),
 ]
+// La page complète du projet de chaque carte (fil, proches suggérés), par son identifiant, telle
+// que GET /v1/projects/:id la rend : jamais à Léa (`isMine: false`). Un projet suggéré reprend le
+// projet de recettes, avec le titre, l'auteur, le statut et la photo de sa carte.
+const cardProjects = new Map([
+  ...fromOthers.map((project) => [project.id, { ...project, isMine: false }]),
+  ...suggestedMembers.map(({ latestProject: { cover, reactionTotal, ...summary } }) => [
+    summary.id,
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+  ]),
+])
 // R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
 // affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).
 // L'appli pose la sphère avant le premier élément daté de cette date ou d'avant. Selon la page :
@@ -736,11 +746,22 @@ const reactionsOf = {
 }
 const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
 
+// L'horloge des captures (relecture design R4, A6) : le mardi 20/10/2026, 12 h à Paris. Chaque
+// contexte du navigateur la pose avant sa première page (`installShotClock`), pour les captures,
+// `--layout` et `--explore` : les dates relatives (« hier », « dimanche ») sont les mêmes à chaque
+// passage, quel que soit le jour où l'on photographie. L'horloge part de là et avance normalement
+// (les minuteurs et les animations tournent). Ce que l'API simulée date « maintenant » (un
+// commentaire envoyé, les notifications) part de la même heure.
+const SHOT_NOW = Date.parse('2026-10-20T12:00:00+02:00')
+const SHOT_TIMEZONE = 'Europe/Paris'
+/** Pose l'horloge des captures sur un contexte neuf, avant toute page. */
+const installShotClock = (context) => context.clock.install({ time: SHOT_NOW })
+
 // Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
 // nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
 // réactions et les abonnés. Chaque page choisit (notifications: 'none' : aucune ; 'many' : la
 // cloche à « 9+ »), et ce choix est donné à sa propre API simulée, comme le fil.
-const hoursAgo = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString()
+const hoursAgo = (hours) => new Date(SHOT_NOW - hours * 3_600_000).toISOString()
 const dayOf = (iso) => iso.slice(0, 10)
 const notified = (project) => ({ id: project.id, title: project.title })
 // L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
@@ -1019,7 +1040,11 @@ const fakeApi = (
     // remplacer ces réponses par un refus).
     if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
       const { body } = JSON.parse(route.request().postData() ?? '{}')
-      return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        body,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
       return route.fulfill({ status: 204, body: '' })
@@ -1066,7 +1091,7 @@ const fakeApi = (
       return json(201, {
         ...comment(0, lea, body, 19, 9),
         id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(SHOT_NOW).toISOString(),
       })
     }
     const one = pathname.match(/^\/v1\/projects\/([^/]+)\/comments\/([^/]+)$/)
@@ -1077,7 +1102,12 @@ const fakeApi = (
         .flatMap((c) => [c, ...c.replies])
       const { replies: _replies, ...original } =
         all.find((c) => c.id === one[2]) ?? comment(0, lea, '', 19, 9)
-      return json(200, { ...original, id: one[2], body, editedAt: new Date().toISOString() })
+      return json(200, {
+        ...original,
+        id: one[2],
+        body,
+        editedAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (one && method === 'DELETE') {
       added[one[1]] = (added[one[1]] ?? 0) - 1
@@ -1104,6 +1134,18 @@ const fakeApi = (
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
     }
+    // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
+    // A7 : « Ce projet est introuvable » au toucher d'une carte).
+    const cardProject = cardProjects.get(pathname.replace(/^\/v1\/projects\//, ''))
+    if (cardProject && method === 'GET') return json(200, withExtras(cardProject))
+    // Suivre et ne plus suivre un membre ou un projet : 204, comme la vraie API (A7 : « Suivre »
+    // d'une suggestion revenait en arrière). Une capture qui veut une panne pose sa propre route.
+    if (
+      /^\/v1\/(members|projects)\/[^/]+\/follow$/.test(pathname) &&
+      (method === 'POST' || method === 'DELETE')
+    ) {
+      return route.fulfill({ status: 204, body: '' })
+    }
     // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
     // liste et la page du membre suivent. Se bloquer soi-même : 422.
     const block = pathname.match(/^\/v1\/members\/([^/]+)\/block$/)
@@ -1115,7 +1157,8 @@ const fakeApi = (
       const member = block[1] === max.id ? maxMember : { id: block[1], name: '', handle: '' }
       blocked.set(block[1], {
         member: { id: member.id, name: member.name, handle: member.handle, avatarUrl: null },
-        blockedAt: new Date().toISOString(),
+        // Une milliseconde de plus par blocage : le plus récent reste en tête de la liste.
+        blockedAt: new Date(SHOT_NOW + blocked.size).toISOString(),
       })
       return route.fulfill({ status: 204, body: '' })
     }
@@ -1179,7 +1222,7 @@ const fakeApi = (
       return json(200, {
         items: notificationList[index] ?? [],
         nextCursor: index + 1 < notificationList.length ? 'suite' : null,
-        asOf: new Date().toISOString(),
+        asOf: new Date(SHOT_NOW).toISOString(),
       })
     }
     // Signaler (tranche 7a) : accepté (la page « signaler-erreur » remplace cette réponse par le
@@ -1225,7 +1268,11 @@ const fakeApi = (
       // Tranche 7c : suspendre et lever visent un membre (`memberId`), pas une cible de la file.
       const { action, target, memberId } = JSON.parse(route.request().postData() ?? '{}')
       decided.add(target?.id ?? memberId)
-      return json(201, { id: crypto.randomUUID(), action, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        action,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     // L'historique des décisions (tranche 7c), de la plus récente à la plus ancienne, en une page ;
     // `?member=` ne garde que celles qui visent ce membre (ses contenus et son compte).
@@ -2068,9 +2115,12 @@ if (script) {
   ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
       ...options,
     })
+    // L'horloge des captures ; un script peut la reprendre (`context.clock`) pour un autre jour.
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended),
@@ -2116,9 +2166,11 @@ async function layoutReport() {
     const lines = [`## ${shot.name} (${shot.path})`, '']
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
     })
     try {
+      await installShotClock(context)
       await context.route(
         `${apiUrl}/**`,
         fakeApi(
@@ -2276,9 +2328,11 @@ const capture = async ({ shot, device, scheme }) => {
     viewport: device.viewport,
     colorScheme: scheme.colorScheme,
     locale: 'fr-FR',
+    timezoneId: SHOT_TIMEZONE,
     deviceScaleFactor: scale,
   })
   try {
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(
