@@ -95,6 +95,7 @@ import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
 import { CapsuleCatalogue } from './projet-capsule'
+import { GalleryCatalogue } from './projet-galerie'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -140,6 +141,9 @@ export function CatalogueScreen() {
         <LanguageSwitcher />
       </Surface>
 
+      {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
+          captures de la branche ; à ranger à l'assemblage. */}
+      <GalleryCatalogue />
       {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
           En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       <ProjectGroundworkCatalogue />
