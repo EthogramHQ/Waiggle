@@ -229,7 +229,9 @@ export function Screen({
                   {title}
                 </Text>
               </View>
-              {titleAside}
+              {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
+                  ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
+              <View style={{ flexShrink: 1, maxWidth: '100%' }}>{titleAside}</View>
             </View>
           ) : title ? (
             // Le titre de la page : niveau 1 (ses sections sont de niveau 2).
