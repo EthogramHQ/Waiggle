@@ -10,7 +10,7 @@ import { appName, borders, layout, space } from '@ruche/brand'
 // (le titre de l'onglet). C'est, avec useScreenFocused (ui/screenFocus.ts), la seule chose que
 // src/ui prend à expo-router.
 import Head from 'expo-router/head'
-import { type ReactNode, type RefObject, useEffect, useRef } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   KeyboardAvoidingView,
@@ -18,12 +18,16 @@ import {
   type NativeSyntheticEvent,
   Platform,
   ScrollView,
+  StyleSheet,
   View,
+  type ViewStyle,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrowserLanguage } from '../i18n'
 import { AmbientLight } from './AmbientLight'
 import { BrandAmbiance } from './BrandAmbiance'
+import { Button } from './Button'
+import { useFloatingClaim } from './floatingSpace'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { Surface } from './Surface'
@@ -113,6 +117,22 @@ type Props = {
    * ordinateur, et sur le miel (ambiance « brand »), ils suivent le contenu.
    */
   footer?: ReactNode
+  /**
+   * Ce qui flotte en bas de l'écran pendant que la page défile (la capsule des réactions de la page
+   * d'un projet, R5a). Screen le pose hors de la zone qui défile, centré, au-dessus de la zone sûre
+   * du téléphone (et au-dessus de la barre d'onglets quand il y en a une) ; il mesure sa hauteur et
+   * la réserve sous le contenu, pour que la fin de la page remonte au-dessus de lui et que, sur le
+   * web, un contrôle qui reçoit le focus au clavier ne passe jamais dessous (WCAG 2.4.11). Un toast
+   * monte au-dessus de lui (ui/floatingSpace.ts). Hors du miel seulement (ambiance « light »).
+   */
+  floating?: ReactNode
+  /**
+   * Le nom du bouton du haut (avec `onBack`), quand il diffère de « Retour » ou doit se lire en
+   * entier (la page d'un projet, R5a). Sur ordinateur et tablette, l'icône et ce texte dans une
+   * pilule de verre ; sur téléphone, l'icône seule, nommée par ce texte. Sans lui, l'icône seule
+   * nommée « Retour », partout, comme avant.
+   */
+  backLabel?: string
 }
 
 export function Screen({
@@ -134,6 +154,8 @@ export function Screen({
   ambiance = 'light',
   scene,
   footer,
+  floating,
+  backLabel,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -161,8 +183,27 @@ export function Screen({
   const pinned = header !== undefined && stickyHeader && !brand
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
   const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
+  // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
+  // distance entre elle et le bas de l'écran, et la réserve à laisser sous le contenu.
+  const [measuredFloating, setMeasuredFloating] = useState(0)
+  const hasFloating = floating !== undefined && floating !== null && floating !== false && !brand
+  const floatingHeight = hasFloating ? measuredFloating : 0
+  // Au-dessus de la barre d'onglets quand elle est là (sa hauteur comprend déjà la marge du bas de
+  // l'appareil) ; sinon au-dessus de la zone sûre, avec un peu d'air.
+  const floatingLift = tabBar.height > 0 ? tabBar.height + space.sm : insets.bottom + space.lg
+  // Du bas de l'écran au haut de la place flottante : ce que le contenu et le toast doivent dégager.
+  const floatingTop = floatingHeight > 0 ? floatingLift + floatingHeight : 0
+  // Seul l'écran affiché soulève le toast : sur le web, la page quittée reste montée, cachée.
+  const focused = useScreenFocused()
+  useFloatingClaim(focused ? floatingTop : 0)
+  // R5a (ui-11) : « Retour » écrit en toutes lettres sur ordinateur et tablette, quand l'écran le
+  // demande (`backLabel`) ; sinon, et sur téléphone, l'icône seule, nommée.
   const backButton = onBack ? (
-    <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={onBack} />
+    <BackButton
+      label={backLabel ?? t(($) => $.common.back)}
+      withText={backLabel !== undefined && sizeClass !== 'compact'}
+      onPress={onBack}
+    />
   ) : null
   // R3 (« le Retour au même endroit », point des listes) : sur le miel, le retour se pose en tête de
   // la barre de BrandAmbiance, à gauche, et l'en-tête de l'écran (la langue) à droite. Dans la
@@ -304,6 +345,14 @@ export function Screen({
               >
                 <ScrollView
                   ref={scroller}
+                  // Sur le web, le navigateur fait défiler le contrôle qui reçoit le focus (Tab)
+                  // jusqu'au-dessus de cette marge : il ne finit pas caché sous la place flottante
+                  // (`scroll-padding-bottom`, que les types de React Native ignorent).
+                  style={
+                    Platform.OS === 'web' && floatingTop > 0
+                      ? ({ scrollPaddingBottom: floatingTop + space.sm } as ViewStyle)
+                      : undefined
+                  }
                   contentContainerStyle={{
                     flexGrow: 1,
                     alignItems: 'center',
@@ -312,11 +361,15 @@ export function Screen({
                     // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
                     // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
                     // bas de l'appareil comprise) plus un peu d'air.
+                    // Une place flottante mesurée : la fin du contenu remonte au-dessus d'elle (barre
+                    // d'onglets ou zone sûre comprises, dans `floatingTop`), plus le même air.
                     paddingBottom: pinnedFooter
                       ? space.xl
-                      : tabBar.height > 0
-                        ? tabBar.height + space.xl
-                        : insets.bottom + space.huge,
+                      : floatingTop > 0
+                        ? floatingTop + space.xl
+                        : tabBar.height > 0
+                          ? tabBar.height + space.xl
+                          : insets.bottom + space.huge,
                     paddingHorizontal: padding,
                     gap: space.xl,
                   }}
@@ -376,6 +429,15 @@ export function Screen({
                 {hosted ? <ScrollToTopOnReselect scroller={scroller} /> : null}
               </KeyboardAvoidingView>
             )}
+            {hasFloating ? (
+              <ScreenFloating
+                lift={floatingLift}
+                width={maxWidthFor(width, false)}
+                onHeight={setMeasuredFloating}
+              >
+                {floating}
+              </ScreenFloating>
+            ) : null}
           </View>
         </ScreenScrollContext.Provider>
       </AmbientProvider>
@@ -490,6 +552,82 @@ export function ScreenFooter({
       }}
     >
       <View style={{ width: '100%', maxWidth: width, gap: space.md }}>{children}</View>
+    </View>
+  )
+}
+
+/**
+ * Le bouton du haut : l'icône seule, nommée par `label` ; ou, avec `withText` (R5a, ordinateur et
+ * tablette), l'icône et le texte dans une pilule de verre, que toute la pilule se touche et que le
+ * nom ne soit pas lu deux fois. Exporté pour le catalogue ; les écrans passent par les props
+ * `onBack` et `backLabel` de Screen.
+ */
+export function BackButton({
+  label,
+  withText = false,
+  onPress,
+}: {
+  label: string
+  withText?: boolean
+  onPress: () => void
+}) {
+  if (!withText) return <IconButton icon="arrow-left" label={label} onPress={onPress} />
+  return (
+    // La pilule garde la largeur de son texte, à gauche (sans ce cadre, la colonne l'étirerait).
+    <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+      <Button variant="glass" size="compact" icon="arrow-left" label={label} onPress={onPress} />
+    </View>
+  )
+}
+
+/**
+ * La place flottante en bas de l'écran (R5a) : une couche posée sur le bas de l'écran, à `lift`
+ * points de son bord, qui centre son contenu dans la largeur de la page. Elle laisse passer les
+ * touchers à côté de son contenu vers la page dessous (`box-none`). Sa hauteur est mesurée par une
+ * vue vide qui la couvre (et non par un `onLayout` sur la couche : le contenu, la capsule, peut
+ * mesurer lui aussi, et une mesure remontée s'arrêterait à lui) puis rendue par `onHeight`.
+ * Exporté pour le catalogue, qui la montre dans un cadre ; les écrans passent par la prop `floating`
+ * de Screen.
+ */
+export function ScreenFloating({
+  children,
+  lift,
+  width = layout.maxContentWidth,
+  onHeight,
+}: {
+  children: ReactNode
+  /** La distance entre le bas de l'écran (ou du cadre) et la place, en points. */
+  lift: number
+  /** La largeur maximale du contenu : celle de la page. */
+  width?: number
+  onHeight?: (height: number) => void
+}) {
+  const { padding } = useLayout()
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: lift,
+        alignItems: 'center',
+        paddingHorizontal: padding,
+      }}
+    >
+      <View
+        pointerEvents="box-none"
+        style={{ width: '100%', maxWidth: width, alignItems: 'center' }}
+      >
+        {children}
+      </View>
+      {onHeight ? (
+        <View
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          onLayout={(event) => onHeight(Math.ceil(event.nativeEvent.layout.height))}
+        />
+      ) : null}
     </View>
   )
 }

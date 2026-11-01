@@ -95,6 +95,7 @@ import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
 import { CapsuleCatalogue } from './projet-capsule'
+import { ProjectFrameCatalogue } from './projet-ecran'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -145,6 +146,8 @@ export function CatalogueScreen() {
       <ProjectGroundworkCatalogue />
       {/* R5a : la capsule des réactions de la page projet (projet-capsule.tsx). */}
       <CapsuleCatalogue />
+      {/* R5a : en tête le temps des captures de l'ui-dev ; la session la range à l'assemblage. */}
+      <ProjectFrameCatalogue />
 
       <Section title={l.colors}>
         <Swatches />
