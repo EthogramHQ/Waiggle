@@ -148,13 +148,14 @@ function PromptItem({ text, copyLabel, copy }: { text: string; copyLabel: string
                 </Text>
               </View>
             </View>
-            {reasons.map((reason) => (
-              <View key={reason} style={{ flexShrink: 1, maxWidth: '100%' }}>
-                <Text variant="caption" tone="muted">
-                  {reason}
-                </Text>
-              </View>
-            ))}
+            {/* Les raisons en un seul paragraphe : une raison courte tient à côté de la pastille
+                (la planche) ; plusieurs passent ensemble sous elle, sur toute la largeur, au lieu
+                d'une colonne étroite ou de lignes en escalier. */}
+            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+              <Text variant="caption" tone="muted">
+                {reasons.join(' ')}
+              </Text>
+            </View>
           </View>
         ) : null}
         <CodeBlock>{text}</CodeBlock>
