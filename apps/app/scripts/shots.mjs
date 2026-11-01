@@ -2134,6 +2134,10 @@ async function layoutReport() {
       const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        // Les routes posées sur la page par `prepare` à la largeur précédente partent : celle de
+        // fil-chargement ne répond jamais, et « networkidle » ne viendrait plus (R4). L'API simulée
+        // est posée sur le contexte, elle reste.
+        await page.unrouteAll({ behavior: 'ignoreErrors' })
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         if (shot.prepare) {
