@@ -16,6 +16,9 @@
 //
 // Un emplacement `overlay` pose un contrôle sur la photo, en haut (la pastille « Suivre Nora »
 // d'Explorer, R3) : à côté du lien de la carte, jamais dedans (relecture de l'interface, ui-4).
+//
+// Sur ordinateur, une carte qui est un lien s'incline vers la souris, avec un reflet sur sa photo
+// (`useTilt`, R4) ; elle se remet à plat avant que sa photo soit mesurée au toucher.
 import { layout, pressScale, radii, space } from '@ruche/brand'
 import { type ReactNode, type Ref, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -34,6 +37,7 @@ import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
+import { useTilt } from './tilt'
 
 /** La hauteur d'une carte du fil, en points (le squelette du fil prend la même : `Skeleton`). */
 export const PROJECT_CARD_HEIGHT = 476
@@ -148,7 +152,16 @@ export function ProjectCard({
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
   // carte juste à côté) n'ouvre pas une deuxième page.
   const guard = useTapGuard()
-  const open = onPress ? guard(onPress) : undefined
+  // L'inclinaison sous la souris, seulement pour une carte qui est un lien (un aperçu ne bouge
+  // pas). Au toucher, la carte se remet à plat avant `onPress`, qui mesure sa photo (la carte qui
+  // devient la page) : le cadre mesuré est celui de la carte à plat.
+  const tilt = useTilt(Boolean(onPress))
+  const open = onPress
+    ? guard(() => {
+        tilt.flatten()
+        onPress()
+      })
+    : undefined
   const openAuthor = author.onPress ? guard(author.onPress) : undefined
   const test = tryIt ? guard(tryIt.onPress) : undefined
   // L'accroche décrit le lien de la carte sur le web (lue après son nom) : useId donne le même
@@ -177,6 +190,28 @@ export function ProjectCard({
       <View ref={coverRef} style={{ position: 'absolute', inset: 0 }} {...decorative}>
         <ProjectCover height={measures.card} image={image ?? null} shadow="card" />
       </View>
+      {tilt.active ? (
+        // Le reflet qui suit la souris : une lueur blanche, rognée au rayon de la photo, posée
+        // sous le verre (qui la floute à son tour). Il décore, et le doigt passe au travers
+        // (`pointerEvents` en propriété : sur le web, seule cette forme devient du CSS).
+        <View
+          pointerEvents="none"
+          {...decorative}
+          style={{ position: 'absolute', inset: 0, borderRadius: radii.sheet, overflow: 'hidden' }}
+        >
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                inset: 0,
+                // Un dégradé du centre vers les bords (CSS du web, seul endroit où la lueur existe).
+                backgroundImage: `radial-gradient(closest-side, ${colors.glare}, transparent)`,
+              } as ViewStyle,
+              tilt.glareStyle,
+            ]}
+          />
+        </View>
+      ) : null}
       <Surface variant="panel" padding="lg" gap="sm">
         {/* La place de la rangée de l'auteur, posée par-dessus. */}
         <View style={{ height: measures.author }} />
@@ -382,39 +417,44 @@ export function ProjectCard({
     // La carte et, par-dessus, ses rangées : des voisins dans un même cadre, qui s'enfoncent
     // ensemble sous le doigt. L'ordre de l'arbre est celui de la lecture (et du clavier) :
     // l'auteur, la carte, « Tester », puis l'emplacement (« Suivre Nora »).
-    <Animated.View style={[{ alignSelf: 'stretch' }, pressStyle]}>
-      {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de lui
+    // Autour, la vue qui s'incline sous la souris (sur ordinateur) : une vue à part, car
+    // l'enfoncement et l'inclinaison sont deux transformations animées, et un même style animé
+    // n'en garderait qu'une.
+    <Animated.View {...tilt.handlers} style={[{ alignSelf: 'stretch' }, tilt.cardStyle]}>
+      <Animated.View style={[{ alignSelf: 'stretch' }, pressStyle]}>
+        {/* La rangée de l'auteur vient avant le lien dans l'arbre, mais se dessine au-dessus de lui
           (zIndex). box-none : le calque laisse passer le doigt hors de la rangée. */}
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: 'absolute',
-          left: edge,
-          right: edge,
-          bottom: authorBottom,
-          zIndex: 1,
-          opacity: measures.title === null ? 0 : 1,
-        }}
-      >
-        {authorRow}
-      </View>
-      {cardLayer}
-      <View
-        pointerEvents="box-none"
-        style={{ position: 'absolute', left: edge, right: edge, bottom: edge, zIndex: 1 }}
-      >
-        {bottomRow}
-      </View>
-      {overlay ? (
-        // box-none : la vue de l'emplacement laisse passer le doigt hors du contrôle, vers la carte
-        // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
         <View
           pointerEvents="box-none"
-          style={{ position: 'absolute', top: INSET, left: INSET, right: INSET, zIndex: 1 }}
+          style={{
+            position: 'absolute',
+            left: edge,
+            right: edge,
+            bottom: authorBottom,
+            zIndex: 1,
+            opacity: measures.title === null ? 0 : 1,
+          }}
         >
-          {overlay}
+          {authorRow}
         </View>
-      ) : null}
+        {cardLayer}
+        <View
+          pointerEvents="box-none"
+          style={{ position: 'absolute', left: edge, right: edge, bottom: edge, zIndex: 1 }}
+        >
+          {bottomRow}
+        </View>
+        {overlay ? (
+          // box-none : la vue de l'emplacement laisse passer le doigt hors du contrôle, vers la carte
+          // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
+          <View
+            pointerEvents="box-none"
+            style={{ position: 'absolute', top: INSET, left: INSET, right: INSET, zIndex: 1 }}
+          >
+            {overlay}
+          </View>
+        ) : null}
+      </Animated.View>
     </Animated.View>
   )
 }
