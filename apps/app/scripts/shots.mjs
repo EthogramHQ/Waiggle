@@ -749,13 +749,18 @@ const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [long
 // L'horloge des captures (relecture design R4, A6) : le mardi 20/10/2026, 12 h à Paris. Chaque
 // contexte du navigateur la pose avant sa première page (`installShotClock`), pour les captures,
 // `--layout` et `--explore` : les dates relatives (« hier », « dimanche ») sont les mêmes à chaque
-// passage, quel que soit le jour où l'on photographie. L'horloge part de là et avance normalement
-// (les minuteurs et les animations tournent). Ce que l'API simulée date « maintenant » (un
+// passage, quel que soit le jour où l'on photographie. Ce que l'API simulée date « maintenant » (un
 // commentaire envoyé, les notifications) part de la même heure.
+// Deux façons de la poser. Les captures et `--layout` figent seulement la date (`setFixedTime`) :
+// les vrais minuteurs et les images d'animation continuent. `clock.install` les remplace par des
+// faux, et le Chromium sans écran de la CI (Linux) n'arrivait plus à prendre la capture (« Unable
+// to capture screenshot », R4). Les essais (`--explore`) gardent `install`, qui fait avancer
+// l'horloge : ils mesurent des délais (« Annuler » pendant 5 s).
 const SHOT_NOW = Date.parse('2026-10-20T12:00:00+02:00')
 const SHOT_TIMEZONE = 'Europe/Paris'
 /** Pose l'horloge des captures sur un contexte neuf, avant toute page. */
-const installShotClock = (context) => context.clock.install({ time: SHOT_NOW })
+const installShotClock = (context, { frozen = false } = {}) =>
+  frozen ? context.clock.setFixedTime(SHOT_NOW) : context.clock.install({ time: SHOT_NOW })
 
 // Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
 // nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
@@ -2170,7 +2175,7 @@ async function layoutReport() {
       viewport: { width: 390, height: 844 },
     })
     try {
-      await installShotClock(context)
+      await installShotClock(context, { frozen: true })
       await context.route(
         `${apiUrl}/**`,
         fakeApi(
@@ -2332,7 +2337,7 @@ const capture = async ({ shot, device, scheme }) => {
     deviceScaleFactor: scale,
   })
   try {
-    await installShotClock(context)
+    await installShotClock(context, { frozen: true })
     await context.route(
       `${apiUrl}/**`,
       fakeApi(
