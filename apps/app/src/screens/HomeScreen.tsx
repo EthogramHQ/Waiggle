@@ -205,7 +205,9 @@ function MemberHome({ session }: { session: SessionData }) {
       // téléphone, le logo tient lieu de titre, et l'onglet « Fil » de la barre du bas dit où l'on est.
       title={compact ? undefined : t(($) => $.feed.title)}
       titleAside={compact ? undefined : newsButton}
-      subtitle={compact ? undefined : caption}
+      // La phrase qui dit ce que montre le fil ; pas au premier lancement, où le salut et « Ton fil
+      // t'attend » le disent déjà, juste en dessous.
+      subtitle={compact || firstRun ? undefined : caption}
       pageTitle={t(($) => $.nav.feed)}
     >
       {/* Sur téléphone, le titre « Fil » reste pourtant lu, caché à l'œil (relecture R3) : un lecteur
