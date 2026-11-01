@@ -5,7 +5,7 @@
 // passer, il n'est donc pas annoncé quand la page paraît ; il se lit dans l'ordre de la page.
 //
 // Deux tons (R5a) :
-// - `plain`, celui d'origine : une surface blanche, l'icône et la phrase en gris ;
+// - `default`, celui d'origine : une surface blanche, l'icône et la phrase en gris ;
 // - `caution`, la prudence : un fond ambre doux (`cautionSoft`), le titre et l'icône en ambre foncé
 //   (`amberText`), la phrase à l'encre. Il sert sous un prompt : « Relis-le avant de t'en servir… ».
 //   L'icône prend `amberText` et non l'ambre des icônes (`amber`) : sur ce fond, l'ambre seul ne
@@ -18,7 +18,7 @@ import { Surface } from './Surface'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
-export type CalloutTone = 'plain' | 'caution'
+export type CalloutTone = 'default' | 'caution'
 
 type Props = {
   /** L'icône, décorative (le titre dit tout) : l'appareil, un cadenas… */
@@ -27,11 +27,11 @@ type Props = {
   title: string
   /** L'explication, sous le titre (facultative : un avertissement court tient dans son titre). */
   body?: string | undefined
-  /** `plain` par défaut ; `caution` pour une mise en garde (voir l'en-tête du fichier). */
+  /** `default` par défaut ; `caution` pour une mise en garde (voir l'en-tête du fichier). */
   tone?: CalloutTone
 }
 
-export function Callout({ icon, title, body, tone = 'plain' }: Props) {
+export function Callout({ icon, title, body, tone = 'default' }: Props) {
   const { colors } = useTheme()
   const caution = tone === 'caution'
 

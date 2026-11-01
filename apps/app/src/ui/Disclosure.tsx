@@ -1,9 +1,9 @@
 // Une section repliable : un titre qu'on touche pour déplier ou replier son contenu. Sert aux
 // parties facultatives d'un formulaire (« Ajouter la recette »), pour ne pas l'alourdir, et aux
 // contenus secondaires d'une page (« Les autres prompts · 2 », R5a).
-// Les lecteurs d'écran annoncent « replié » ou « déplié » : sur le web par `aria-expanded`, sur
-// téléphone par `accessibilityState.expanded` (react-native-web ignore le second, VoiceOver et
-// TalkBack ne lisent pas toujours le premier : on donne les deux, comme pour les autres états).
+// Les lecteurs d'écran annoncent « replié » ou « déplié » : `aria-expanded`, que React Native
+// traduit aussi en `accessibilityState.expanded` pour VoiceOver et TalkBack (Disclosure.test.tsx
+// le vérifie : les deux disent toujours la même chose).
 import { radii, space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'
 import { Pressable, View } from 'react-native'
@@ -43,7 +43,6 @@ export function Disclosure({ title, hint, icon = 'plus', initiallyOpen = false, 
         accessibilityRole="button"
         accessibilityLabel={title}
         aria-expanded={open}
-        accessibilityState={{ expanded: open }}
         onPress={() => setOpen((previous) => !previous)}
         // Sans pastille, la ligne garde plus de 44 points à toucher : son titre et ses marges.
         style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg }}
