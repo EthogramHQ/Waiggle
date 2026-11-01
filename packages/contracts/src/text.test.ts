@@ -16,9 +16,12 @@ describe('DisplayName', () => {
     expect(DisplayName.parse('Léa 👩‍💻')).toBe('Léa 👩‍💻')
   })
 
-  it('refuses an empty name or one longer than 80 characters', () => {
+  // 30 caractères au plus (décision du 1/11/2026) : un nom tient sur deux lignes dans la colonne
+  // des proches à suivre, sans être coupé.
+  it('refuses an empty name or one longer than 30 characters', () => {
     expect(DisplayName.safeParse('   ').success).toBe(false)
-    expect(DisplayName.safeParse('a'.repeat(81)).success).toBe(false)
+    expect(DisplayName.parse('a'.repeat(30))).toBe('a'.repeat(30))
+    expect(DisplayName.safeParse('a'.repeat(31)).success).toBe(false)
   })
 
   it('refuses a name made only of characters that look empty', () => {

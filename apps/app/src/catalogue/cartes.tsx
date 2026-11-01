@@ -185,7 +185,7 @@ function Cards({ l }: { l: typeof fr }) {
       <Captioned caption={l.longName}>
         <ProjectCard
           {...recettes}
-          author={{ name: 'Marie-Bénédicte de la Fontaine-Lacroix', avatar: null }}
+          author={{ name: 'Marie-Bénédicte de La Fontaine', avatar: null }}
           when={l.now}
           status={{ label: l.idea, strong: false }}
           image={null}
@@ -196,9 +196,9 @@ function Cards({ l }: { l: typeof fr }) {
               variant="chip"
               followed={false}
               onPress={noop}
-              label={l.follow('Marie-Bénédicte de la Fontaine-Lacroix')}
-              text={l.follow('Marie-Bénédicte de la Fontaine-Lacroix')}
-              avatar={{ name: 'Marie-Bénédicte de la Fontaine-Lacroix', source: null }}
+              label={l.follow('Marie-Bénédicte de La Fontaine')}
+              text={l.follow('Marie-Bénédicte de La Fontaine')}
+              avatar={{ name: 'Marie-Bénédicte de La Fontaine', source: null }}
             />
           }
         />

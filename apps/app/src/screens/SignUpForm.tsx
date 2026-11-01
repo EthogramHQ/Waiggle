@@ -5,6 +5,7 @@
 // et le premier reçoit le focus. Après l'envoi, le membre doit ouvrir le lien reçu par e-mail.
 import {
   InviteCode,
+  NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   SignUpRequest,
@@ -162,6 +163,9 @@ export function SignUpForm({ draft, onDraft, onSignIn }: Props) {
           hint={t(($) => $.auth.fields.nameHint)}
           value={draft.name}
           onChangeText={(name) => onDraft({ name })}
+          // La limite du contrat, comme dans Mon profil : le compteur « 3 / 30 » la montre avant l'envoi.
+          maxLength={NAME_MAX_LENGTH}
+          showCount
           autoComplete="name"
           autoCapitalize="words"
           error={fieldMessage(fieldErrors.name)}

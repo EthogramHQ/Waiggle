@@ -18,7 +18,7 @@
 //
 // Deux dessins : en rangée (la colonne principale, au premier lancement), et empilé (`stacked`), pour
 // une colonne étroite comme celle de droite du Fil sur ordinateur (320 points) : en rangée, le nom
-// n'y avait qu'une centaine de points et « Sofia Lopes-Carvalho de Almeida » prenait trois lignes
+// n'y avait qu'une centaine de points et « Sofia Lopes-Carvalho Almeida » prenait trois lignes
 // (relecture design A1). Empilée, la ligne pose la photo et le nom, puis le projet, puis « Suivre »
 // et « × » : le nom a toute la largeur à côté de la photo.
 //

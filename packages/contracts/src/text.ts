@@ -7,7 +7,9 @@
 // On les refuse dès la vérification des données, avant qu'ils n'atteignent la base.
 import { z } from 'zod'
 
-export const NAME_MAX_LENGTH = 80
+// 30 caractères au plus (décision du 1/11/2026 ; 80 avant) : un nom tient alors en entier sur deux
+// lignes dans les colonnes étroites (proches à suivre, cartes), sans « … ». Le pseudo, lui, reste à 20.
+export const NAME_MAX_LENGTH = 30
 
 // Les caractères refusés, par leur numéro Unicode (« code point »), écrits en hexadécimal.
 // Chaque paire [début, fin] est une plage de numéros.
@@ -116,7 +118,7 @@ export const removeForbiddenCharacters = (text: string) =>
 
 const message = 'contains forbidden characters'
 
-/** Un nom affiché : 1 à 80 caractères, sur une ligne. */
+/** Un nom affiché : 1 à 30 caractères, sur une ligne. */
 export const DisplayName = z
   .string()
   .trim()

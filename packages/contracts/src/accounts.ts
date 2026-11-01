@@ -31,7 +31,7 @@ export const InviteCode = z.string().trim().min(1).max(INVITE_CODE_MAX_LENGTH)
 export const normalizeInviteCode = (code: string) => code.normalize('NFKC').trim().toLowerCase()
 
 export const SignUpRequest = z.object({
-  name: DisplayName, // 1 à 80 caractères, sans caractère invisible (voir text.ts)
+  name: DisplayName, // 1 à 30 caractères, sans caractère invisible (voir text.ts)
   email: z.email(),
   password: Password,
   inviteCode: InviteCode,

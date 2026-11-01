@@ -1336,7 +1336,7 @@ const FIVE_MEMBERS: MentionSuggestion[] = [
   ...TWO_MEMBERS,
   {
     id: 'u7',
-    name: 'Ingrid-Marie de la Fontaine-Beauregard',
+    name: 'Ingrid-Marie de Beauregard-Roy',
     handle: 'ingrid_marie_fontain',
     avatar: null,
   },

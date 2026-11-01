@@ -59,8 +59,8 @@ describe('creating an account', () => {
     expect(ctx.mailer.sent[0]?.subject).toBe(`Activate your ${appName} account`)
   })
 
-  it('applies the same name rules as the profile: 80 characters, nothing invisible', async () => {
-    const tooLong = await ctx.signUp({ ...lea, name: 'a'.repeat(81) })
+  it('applies the same name rules as the profile: 30 characters, nothing invisible', async () => {
+    const tooLong = await ctx.signUp({ ...lea, name: 'a'.repeat(31) })
     const reversed = await ctx.signUp({ ...lea, email: 'max@example.com', name: 'Max\u202Enimda' })
 
     expect(tooLong.status).toBe(400)
@@ -71,8 +71,8 @@ describe('creating an account', () => {
   it('refuses an invalid name the same way whether the address has an account or not', async () => {
     await ctx.signUp(lea)
 
-    const existing = await ctx.signUp({ ...lea, name: 'a'.repeat(81) })
-    const unknown = await ctx.signUp({ ...lea, email: 'new@example.com', name: 'a'.repeat(81) })
+    const existing = await ctx.signUp({ ...lea, name: 'a'.repeat(31) })
+    const unknown = await ctx.signUp({ ...lea, email: 'new@example.com', name: 'a'.repeat(31) })
 
     expect(existing.status).toBe(unknown.status)
     expect(await existing.text()).toBe(await unknown.text())
