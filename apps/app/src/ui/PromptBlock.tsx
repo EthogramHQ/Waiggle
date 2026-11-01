@@ -23,7 +23,6 @@ import { CodeBlock } from './CodeBlock'
 import { copyText } from './clipboard'
 import { Disclosure } from './Disclosure'
 import { Icon } from './Icon'
-import { LiveStatus } from './LiveStatus'
 import { type PromptWarning, promptWarnings } from './promptWarnings'
 import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
@@ -242,9 +241,17 @@ function CopyButton({ text, label, copy, hint, describedById }: CopyButtonProps)
       )
       resetTimer.current = setTimeout(() => setStatus('idle'), COPIED_MS)
     } else {
-      // Jamais un « Copié » mensonger (ui-7) : la phrase d'échec reste sous le bouton jusqu'à la
-      // prochaine copie réussie. Pas dans un toast : il disparaîtrait avant qu'on ait pu la lire.
+      // Jamais un « Copié » mensonger (ui-7). La phrase d'échec va à deux endroits :
+      // - sous le bouton, où elle reste jusqu'à la prochaine copie réussie (un toast seul
+      //   disparaîtrait avant qu'on ait pu la relire, et ne doit rien dire d'absent de l'écran) ;
+      // - dans un toast, qui l'annonce aux lecteurs d'écran (région polie, une seule annonce) et
+      //   la montre même quand le bouton est en bas de l'écran et sa phrase hors de vue
+      //   (l'essai du catalogue : le 4e bloc, touché au bas d'un téléphone).
       setStatus('failed')
+      toast.show(
+        t(($) => $.project.prompts.copyFailed),
+        { icon: 'warning-circle' },
+      )
     }
   }
 
@@ -265,8 +272,13 @@ function CopyButton({ text, label, copy, hint, describedById }: CopyButtonProps)
           void onPress()
         }}
       />
-      {/* Toujours montée, vide plutôt qu'absente : sinon la phrase d'échec ne serait pas annoncée. */}
-      <LiveStatus message={status === 'failed' ? t(($) => $.project.prompts.copyFailed) : ''} />
+      {/* Une phrase simple, pas une région annoncée : le toast l'annonce déjà (lue deux fois
+          sinon). Elle paraît sous le bouton touché : rien ne bouge sous le doigt. */}
+      {status === 'failed' ? (
+        <Text variant="callout" tone="danger">
+          {t(($) => $.project.prompts.copyFailed)}
+        </Text>
+      ) : null}
     </View>
   )
 }
