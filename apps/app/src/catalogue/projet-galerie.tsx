@@ -27,7 +27,7 @@ const fr = {
   title: 'Galerie de photos',
   intro:
     'La galerie de la page projet : les photos glissent l’une après l’autre et s’arrêtent toujours sur une photo entière. Des points et « 1 sur 3 » disent où l’on en est ; rien pour une seule photo. Sur ordinateur, des flèches de verre et les flèches du clavier (le focus dans la galerie) ; le lecteur d’écran entend « Photo 2 sur 3 » et passe d’une photo à l’autre sans glisser.',
-  three: 'Trois photos, avec les boutons de verre (et la capsule à cheval, sur ordinateur)',
+  three: 'Trois photos : les boutons de verre sur téléphone, la capsule à cheval sur ordinateur',
   two: 'Deux photos',
   one: 'Une seule photo : ni points, ni « 1 sur 1 », ni flèches',
   none: 'Sans photo : la lumière miel et le titre',
@@ -46,7 +46,7 @@ const en: typeof fr = {
   title: 'Photo gallery',
   intro:
     'The gallery of the project page: photos glide one after the other and always stop on a whole photo. Dots and “1 of 3” tell where you are; nothing for a single photo. On computers, glass arrows and the arrow keys (with the focus in the gallery); screen readers hear “Photo 2 of 3” and move from photo to photo without swiping.',
-  three: 'Three photos, with the glass buttons (and the straddling capsule, on computers)',
+  three: 'Three photos: the glass buttons on phones, the straddling capsule on computers',
   two: 'Two photos',
   one: 'A single photo: no dots, no “1 of 1”, no arrows',
   none: 'No photo: the honey light and the title',
@@ -168,8 +168,11 @@ function WithOverlay({ l, caption }: { l: typeof fr; caption: string }) {
         onIndexChange={setShown}
         overlay={
           <>
-            <Controls l={l} />
-            {sizeClass === 'compact' ? null : (
+            {/* Comme la page : sur ordinateur, Retour, Partager et « … » sont au-dessus de la
+                galerie, hors de la photo (planche R5a-Projet-Desktop). */}
+            {sizeClass === 'compact' ? (
+              <Controls l={l} />
+            ) : (
               <CoverStraddle>
                 <ReactionCapsule reactions={reactions} onToggle={noop} onOpenFan={noop} />
               </CoverStraddle>
