@@ -94,6 +94,7 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { ProjectFrameCatalogue } from './projet-ecran'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -137,6 +138,9 @@ export function CatalogueScreen() {
         />
         <LanguageSwitcher />
       </Surface>
+
+      {/* R5a : en tête le temps des captures de l'ui-dev ; la session la range à l'assemblage. */}
+      <ProjectFrameCatalogue />
 
       <Section title={l.colors}>
         <Swatches />
