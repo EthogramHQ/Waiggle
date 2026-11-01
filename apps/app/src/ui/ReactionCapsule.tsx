@@ -44,16 +44,12 @@ import { Text } from './Text'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Une réaction telle que la page la prépare : son nom, son nombre, et si c'est la sienne. */
-export type ReactionCapsuleItem = {
+/** Une réaction telle que la page la donne : son nombre, et si c'est la sienne. */
+export type CapsuleReaction = {
   kind: ReactionKind
-  /** Le nom de la réaction (« Waggle ! ») : il n'est pas affiché, le nom lu le reprend. */
-  text: string
   count: number
   /** Le membre qui regarde a posé cette réaction : miel plein. */
   mine: boolean
-  /** Le nom lu par les lecteurs d'écran, complet (« Waggle !, 21, ta réaction »). */
-  label: string
   /**
    * Cette réaction ne se pose pas (compte suspendu, tranche 7c) : son nombre seul, sans bouton.
    * Les autres restent des boutons, pour retirer une réaction déjà donnée.
@@ -66,14 +62,18 @@ export type ReactionCapsuleItem = {
   disabled?: boolean
 }
 
+/**
+ * Une réaction avec ses textes, écrits par la capsule elle-même : son nom (« Waggle ! ») et le nom
+ * lu, complet (« Waggle !, 21, ta réaction »).
+ */
+type Item = CapsuleReaction & { text: string; label: string }
+
 type Props = {
-  items: ReactionCapsuleItem[]
+  reactions: CapsuleReaction[]
   /** Pose ou retire cette réaction. */
   onToggle: (kind: ReactionKind) => void
   /** Ouvre l'éventail (appui long, clic droit, touche Menu, action du lecteur d'écran). */
-  onOpenFan?: (() => void) | undefined
-  /** Le nom du groupe de boutons, pour les lecteurs d'écran (« Réagir à ce projet »). */
-  label?: string | undefined
+  onOpenFan: () => void
   /** Le dernier changement n'a pas pu être enregistré : le message, au-dessus de la capsule. */
   error?: string | undefined
   /** Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré). */
@@ -144,11 +144,26 @@ export function ReactionIcon({
   )
 }
 
-export function ReactionCapsule({ items, onToggle, onOpenFan, label, error, errorAction }: Props) {
+export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAction }: Props) {
   const { t } = useTranslation()
   const calm = useCalmMotion()
   const hintId = useId()
-  const hint = onOpenFan ? t(($) => $.reactions.fan.open) : undefined
+  const hint = t(($) => $.reactions.fan.open)
+  const label = t(($) => $.project.reactions.group)
+  // Le nom affiché de chaque réaction et le nom lu, qui reprend ce qu'on voit (le nombre) et dit
+  // si elle est la sienne.
+  const items: Item[] = reactions.map((reaction) => {
+    const text = t(($) => $.project.reactions[reaction.kind])
+    const { count, mine } = reaction
+    return {
+      ...reaction,
+      text,
+      label: t(($) => (mine ? $.project.reactions.labelMine : $.project.reactions.label), {
+        name: text,
+        count,
+      }),
+    }
+  })
   // Chaque réaction posée reçoit un numéro qui avance : la goutte, l'anneau, le rebond et la danse
   // partent quand il change. Au montage, aucun : rien ne bouge sans geste du membre.
   const [bursts, setBursts] = useState<Partial<Record<ReactionKind, number>>>({})
@@ -156,18 +171,17 @@ export function ReactionCapsule({ items, onToggle, onOpenFan, label, error, erro
   const [centers, setCenters] = useState<Partial<Record<ReactionKind, { x: number; y: number }>>>(
     {},
   )
-  const lastOpen = useRef(-SAME_GESTURE_MS)
+  const lastOpen = useRef<number | null>(null)
 
   const openFan = () => {
-    if (!onOpenFan) return
     // Date.now() dans un geste, jamais pendant le rendu (la page web est pré-rendue).
     const now = Date.now()
-    if (now - lastOpen.current < SAME_GESTURE_MS) return
+    if (lastOpen.current !== null && now - lastOpen.current < SAME_GESTURE_MS) return
     lastOpen.current = now
     onOpenFan()
   }
 
-  const press = (item: ReactionCapsuleItem) => {
+  const press = (item: Item) => {
     // Poser (et non retirer) fait partir le mouvement.
     if (!item.mine) setBursts((all) => ({ ...all, [item.kind]: (all[item.kind] ?? 0) + 1 }))
     onToggle(item.kind)
@@ -210,9 +224,9 @@ export function ReactionCapsule({ items, onToggle, onOpenFan, label, error, erro
                   burst={bursts[item.kind] ?? 0}
                   calm={calm}
                   hint={hint}
-                  hintId={hint ? hintId : undefined}
+                  hintId={hintId}
                   onPress={() => press(item)}
-                  onOpenFan={onOpenFan ? openFan : undefined}
+                  onOpenFan={openFan}
                 />
               )
               return (
@@ -248,7 +262,7 @@ export function ReactionCapsule({ items, onToggle, onOpenFan, label, error, erro
       </View>
       {/* L'indice lu sur chaque bouton, sur le web (aria-describedby) : « Voir les réactions et
           leurs noms ». Caché à l'œil ; sur téléphone, c'est accessibilityHint. */}
-      {hint && Platform.OS === 'web' ? (
+      {Platform.OS === 'web' ? (
         <View style={hiddenFrame} pointerEvents="none">
           <Text nativeID={hintId}>{hint}</Text>
         </View>
@@ -258,13 +272,13 @@ export function ReactionCapsule({ items, onToggle, onOpenFan, label, error, erro
 }
 
 type ButtonProps = {
-  item: ReactionCapsuleItem
+  item: Item
   burst: number
   calm: boolean
-  hint: string | undefined
-  hintId: string | undefined
+  hint: string
+  hintId: string
   onPress: () => void
-  onOpenFan: (() => void) | undefined
+  onOpenFan: () => void
 }
 
 /** Une réaction qu'on peut poser ou retirer : un bouton qui reste enfoncé (miel plein). */
@@ -285,31 +299,30 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
     playBounce()
   }, [burst, playBounce])
   const inactive = item.disabled === true
-  const fanProps = onOpenFan
-    ? {
-        onLongPress: onOpenFan,
-        delayLongPress: FAN_LONG_PRESS_MS,
-        // Le lecteur d'écran : l'action « appui long » ouvre l'éventail (VoiceOver, TalkBack).
-        accessibilityActions: [{ name: 'longpress' as const, ...(hint ? { label: hint } : null) }],
-        onAccessibilityAction: (event: AccessibilityActionEvent) => {
-          if (event.nativeEvent.actionName === 'longpress') onOpenFan()
-        },
-        ...(Platform.OS === 'web'
-          ? {
-              // Clic droit, touche Menu, Maj+F10 : le menu du navigateur laisse la place à
-              // l'éventail. preventDefault d'abord, sans détacher la fonction (sur le web, la
-              // détacher lèverait « Illegal invocation »).
-              onContextMenu: (event: { preventDefault: () => void }) => {
-                event.preventDefault()
-                onOpenFan()
-              },
-              ...describedBy(hintId),
-            }
-          : hint
-            ? { accessibilityHint: hint }
-            : null),
-      }
-    : null
+  const fanProps = {
+    onLongPress: onOpenFan,
+    delayLongPress: FAN_LONG_PRESS_MS,
+    // L'indice : « Voir les réactions et leurs noms ». Sur téléphone, accessibilityHint ; sur le
+    // web, react-native-web ne le transmet pas : aria-describedby vers le texte caché de la capsule.
+    accessibilityHint: hint,
+    // Le lecteur d'écran : l'action « appui long » ouvre l'éventail (VoiceOver, TalkBack).
+    accessibilityActions: [{ name: 'longpress' as const, label: hint }],
+    onAccessibilityAction: (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'longpress') onOpenFan()
+    },
+    ...(Platform.OS === 'web'
+      ? {
+          // Clic droit, touche Menu, Maj+F10 : le menu du navigateur laisse la place à
+          // l'éventail. preventDefault sur l'événement lui-même, sans détacher la fonction (sur
+          // le web, la détacher lèverait « Illegal invocation »).
+          onContextMenu: (event: { preventDefault: () => void }) => {
+            event.preventDefault()
+            onOpenFan()
+          },
+          ...describedBy(hintId),
+        }
+      : null),
+  }
   return (
     <Animated.View style={[styles.grow, sink]}>
       <Animated.View style={[styles.grow, bounce.style]}>
@@ -342,6 +355,12 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
             inactive && styles.inactive,
           ]}
         >
+          {/* Le nom de la réaction (« Waggle ! »), écrit mais caché à l'œil : la planche ne montre
+              que l'icône, et le nom lu du bouton (accessibilityLabel) le dit déjà. Il reste dans
+              le texte de la page (une recherche dans la page le trouve). */}
+          <View style={hiddenFrame} pointerEvents="none">
+            <Text selectable={false}>{item.text}</Text>
+          </View>
           {item.kind === 'bravo' ? (
             <BeeDance play={burst} calm={calm}>
               <ReactionIcon kind="bravo" onHoney={item.mine} />
@@ -375,7 +394,7 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
  * Une réaction verrouillée (compte suspendu) : l'icône et le nombre, pâlis, sans bouton. Un élément
  * de liste nommé (« Bluffant, 9 »), lu d'un seul tenant.
  */
-function Locked({ item }: { item: ReactionCapsuleItem }) {
+function Locked({ item }: { item: Item }) {
   return (
     <View
       // accessible : sur téléphone, l'élément est lu d'un seul tenant ; sur le web, le rôle suffit.

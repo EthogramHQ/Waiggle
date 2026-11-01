@@ -13,7 +13,7 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { AmbientLight } from '../ui/AmbientLight'
-import { ReactionCapsule, type ReactionCapsuleItem } from '../ui/ReactionCapsule'
+import { type CapsuleReaction, ReactionCapsule } from '../ui/ReactionCapsule'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -73,37 +73,22 @@ const counts: Counts = { amazing: 9, inspiring: 14, useful: 4, funny: 6, bravo: 
 const zero: Counts = { amazing: 0, inspiring: 0, useful: 0, funny: 0, bravo: 0 }
 const big: Counts = { amazing: 128, inspiring: 1042, useful: 87, funny: 356, bravo: 2210 }
 
-/** Hook : les cinq réactions, préparées comme la page les prépare (nom lu complet). */
-function useItems() {
-  const { t } = useTranslation()
-  return (
-    values: Counts,
-    mine: ReactionKind[] = [],
-    extra: (kind: ReactionKind) => Partial<ReactionCapsuleItem> = () => ({}),
-  ): ReactionCapsuleItem[] =>
-    REACTION_KINDS.map((kind) => {
-      const text = t(($) => $.project.reactions[kind])
-      const isMine = mine.includes(kind)
-      const count = values[kind]
-      return {
-        kind,
-        text,
-        count,
-        mine: isMine,
-        label: t(($) => (isMine ? $.project.reactions.labelMine : $.project.reactions.label), {
-          name: text,
-          count,
-        }),
-        ...extra(kind),
-      }
-    })
-}
+/** Les cinq réactions, telles que la page les donne : un nombre, et si c'est la sienne. */
+const items = (
+  values: Counts,
+  mine: ReactionKind[] = [],
+  extra: (kind: ReactionKind) => Partial<CapsuleReaction> = () => ({}),
+): CapsuleReaction[] =>
+  REACTION_KINDS.map((kind) => ({
+    kind,
+    count: values[kind],
+    mine: mine.includes(kind),
+    ...extra(kind),
+  }))
 
 export function CapsuleCatalogue() {
-  const { t, i18n } = useTranslation()
+  const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
-  const items = useItems()
-  const group = t(($) => $.project.reactions.group)
   const schemes = ['day', 'night'] as const
   return (
     <Stack gap="lg">
@@ -112,7 +97,7 @@ export function CapsuleCatalogue() {
       </Text>
       <Text tone="secondary">{l.intro}</Text>
 
-      <LiveSample caption={l.live} fanLabel={l.fanOpened} group={group} />
+      <LiveSample caption={l.live} fanLabel={l.fanOpened} />
 
       {schemes.map((scheme) => (
         // Un thème imposé autour des exemples : le jour et la nuit l'un sous l'autre, quel que soit
@@ -120,19 +105,13 @@ export function CapsuleCatalogue() {
         <ThemeProvider key={scheme} appearance={scheme}>
           <Stack gap="md">
             <Example caption={`${l.rest} — ${l[scheme]}`}>
-              <ReactionCapsule
-                items={items(counts)}
-                onToggle={noop}
-                onOpenFan={noop}
-                label={group}
-              />
+              <ReactionCapsule reactions={items(counts)} onToggle={noop} onOpenFan={noop} />
             </Example>
             <Example caption={`${l.mine} — ${l[scheme]}`}>
               <ReactionCapsule
-                items={items({ ...counts }, ['inspiring', 'bravo'])}
+                reactions={items({ ...counts }, ['inspiring', 'bravo'])}
                 onToggle={noop}
                 onOpenFan={noop}
-                label={group}
               />
             </Example>
             <Example caption={`${l.onPhoto} — ${l[scheme]}`}>
@@ -147,10 +126,9 @@ export function CapsuleCatalogue() {
               >
                 <AmbientLight thumbhash={papillon} />
                 <ReactionCapsule
-                  items={items(counts, ['bravo'])}
+                  reactions={items(counts, ['bravo'])}
                   onToggle={noop}
                   onOpenFan={noop}
-                  label={group}
                 />
               </View>
             </Example>
@@ -159,34 +137,28 @@ export function CapsuleCatalogue() {
       ))}
 
       <Example caption={l.zero}>
-        <ReactionCapsule items={items(zero)} onToggle={noop} onOpenFan={noop} label={group} />
+        <ReactionCapsule reactions={items(zero)} onToggle={noop} onOpenFan={noop} />
       </Example>
       <Example caption={l.big}>
-        <ReactionCapsule
-          items={items(big, ['amazing'])}
-          onToggle={noop}
-          onOpenFan={noop}
-          label={group}
-        />
+        <ReactionCapsule reactions={items(big, ['amazing'])} onToggle={noop} onOpenFan={noop} />
       </Example>
       <Example caption={l.suspended}>
         {/* Comme la page : Inspirant est encore donnée (un bouton, pour la retirer) ; Waggle !
             a été retirée pendant la visite (inactive) ; les autres sont verrouillées. */}
         <ReactionCapsule
-          items={items(counts, ['inspiring'], (kind) => ({
+          reactions={items(counts, ['inspiring'], (kind) => ({
             locked: kind !== 'inspiring' && kind !== 'bravo',
             disabled: kind === 'bravo',
           }))}
           onToggle={noop}
-          label={group}
+          onOpenFan={noop}
         />
       </Example>
       <Example caption={l.error}>
         <ReactionCapsule
-          items={items(counts, ['bravo'])}
+          reactions={items(counts, ['bravo'])}
           onToggle={noop}
           onOpenFan={noop}
-          label={group}
           error={l.errorText}
           errorAction={{ label: l.signIn, onPress: noop }}
         />
@@ -194,10 +166,9 @@ export function CapsuleCatalogue() {
       <Example caption={l.narrow}>
         <View style={{ width: 320 - 2 * space.lg, maxWidth: '100%' }}>
           <ReactionCapsule
-            items={items(big, ['useful', 'bravo'])}
+            reactions={items(big, ['useful', 'bravo'])}
             onToggle={noop}
             onOpenFan={noop}
-            label={group}
           />
         </View>
       </Example>
@@ -206,16 +177,7 @@ export function CapsuleCatalogue() {
 }
 
 /** La capsule qui pose et retire pour de vrai, comme sur la page : le mouvement se voit. */
-function LiveSample({
-  caption,
-  fanLabel,
-  group,
-}: {
-  caption: string
-  fanLabel: string
-  group: string
-}) {
-  const items = useItems()
+function LiveSample({ caption, fanLabel }: { caption: string; fanLabel: string }) {
   const [mine, setMine] = useState<ReactionKind[]>(['inspiring'])
   const [opened, setOpened] = useState(0)
   const values = Object.fromEntries(
@@ -226,10 +188,9 @@ function LiveSample({
   return (
     <Example caption={caption}>
       <ReactionCapsule
-        items={items(values, mine)}
+        reactions={items(values, mine)}
         onToggle={toggle}
         onOpenFan={() => setOpened((n) => n + 1)}
-        label={group}
       />
       <Text variant="caption" tone="muted">
         {fanLabel.replace('{{count}}', String(opened))}
