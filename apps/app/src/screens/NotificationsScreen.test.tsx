@@ -35,6 +35,7 @@ import {
 } from '../testing/notifications'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { missingSentences, removalSentences } from '../testing/text'
+import { relativeDate, shortDate } from '../ui/relativeDate'
 import { NotificationsScreen } from './NotificationsScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -696,4 +697,80 @@ describe('the empty list of a suspended member', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/explore')
   })
+})
+
+// --- R4 « le fil et les cartes » : les dates dites par rapport à maintenant (F-Fil3) ---
+//
+// Une notification dit « hier », « il y a 3 h » ; le lecteur d'écran lit la date et l'heure
+// complètes. Une décision de la modération (un retrait, un signalement traité, une suspension) garde
+// sa date absolue, visible sans survol (relecture juridique jur-J2) : c'est un repère qu'on cite.
+
+describe('the dates, said relative to now (R4)', () => {
+  /** Le mercredi 21 octobre 2026 à 14 h, heure de Paris. */
+  const now = new Date('2026-10-21T12:00:00.000Z')
+
+  beforeEach(() => {
+    // Seule l'horloge des dates est figée : les minuteurs restent vrais, pour React et les tests.
+    jest.useFakeTimers({
+      now,
+      doNotFake: [
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'setImmediate',
+        'clearImmediate',
+        'setInterval',
+        'clearInterval',
+        'setTimeout',
+        'clearTimeout',
+      ],
+    })
+  })
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('says « yesterday » on a reaction, and reads its full date in the name of the link', async () => {
+    mockPages([notificationPageOf([reactionsNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const { label, full } = relativeDate(reactionsNotification.at, 'fr', now)
+    expect(screen.getByText(label)).toBeTruthy()
+    // Le nom du lien reprend tout ce que dit la carte, la date complète en dernier (une seule
+    // notification, donc un seul lien).
+    const link = screen.getByRole('link', { name: containing(texts.reactions) })
+    const name = String(link.props.accessibilityLabel).replace(/\s+/g, ' ')
+    expect(name).toMatch(containing(`${full}.`))
+    expect(name).not.toMatch(containing(label))
+    expect(screen.queryByText(shortDate(reactionsNotification.at, 'fr', now))).toBeNull()
+  })
+
+  it('reads the full date of a notification that leads nowhere', async () => {
+    mockPages([notificationPageOf([memberFollowsNotification])])
+    await renderWithProviders(<NotificationsScreen />)
+
+    const { label, full } = relativeDate(memberFollowsNotification.at, 'fr', now)
+    expect(screen.getByText(label)).toBeTruthy()
+    expect(screen.getByLabelText(full)).toBeTruthy()
+  })
+
+  it.each([
+    ['a removal', removedCommentNotification],
+    ['a handled report', reportHandledNotification],
+    ['a suspension', suspendedNotification],
+  ])(
+    'keeps the absolute date of %s, visible without hovering (jur-J2)',
+    async (_, notification) => {
+      mockPages([notificationPageOf([notification])])
+      await renderWithProviders(<NotificationsScreen />)
+
+      expect(screen.getAllByText(shortDate(notification.at, 'fr', now)).length).toBeGreaterThan(0)
+      expect(screen.queryByText(relativeDate(notification.at, 'fr', now).label)).toBeNull()
+    },
+  )
 })

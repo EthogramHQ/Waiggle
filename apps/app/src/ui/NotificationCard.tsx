@@ -7,9 +7,11 @@
 // à son compte, sans nom), elle ne mène nulle part : ce n'est ni un lien ni un bouton, et ses
 // textes se lisent l'un après l'autre.
 import { borders, radii, space } from '@ruche/brand'
+import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Pressed } from './Pressed'
+import { RelativeTime, useRelativeDate } from './RelativeTime'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -22,8 +24,12 @@ type Props = {
   detail?: string | null
   /** L'extrait d'un commentaire, affiché en citation. */
   quote?: string | null
-  /** Quand (« 20 oct. »). */
-  when: string
+  /**
+   * Quand. Une date ISO (`{ date }`) se dit par rapport à maintenant (« il y a 2 h », « hier ») et
+   * se lit en entier (« 20 octobre à 14:00 ») ; `now` fige l'heure (catalogue). Un texte (« 20
+   * oct. ») s'écrit tel quel : une décision de la modération garde sa date absolue (jur-J2).
+   */
+  when: string | { date: string; now?: Date }
   /** Arrivée depuis la dernière ouverture de l'écran. */
   isNew: boolean
   /** Le mot qui le dit (« Nouveau »). */
@@ -45,16 +51,43 @@ export const sentence = (part: string): string => {
 // Le rond de l'icône : assez grand pour se repérer d'un coup d'œil en parcourant la liste.
 const BUBBLE = 40
 
-export function NotificationCard({
-  icon,
-  text,
-  detail,
-  quote,
+export function NotificationCard({ when, ...props }: Props) {
+  if (typeof when === 'string') {
+    return (
+      <Card
+        {...props}
+        date={
+          <Text variant="caption" tone="muted">
+            {when}
+          </Text>
+        }
+        dateName={when}
+      />
+    )
+  }
+  return <RelativeCard {...props} when={when} />
+}
+
+/** Une carte datée par rapport à maintenant : le texte court se montre, la date complète se lit. */
+function RelativeCard({
   when,
-  isNew,
-  newLabel,
-  onPress,
-}: Props) {
+  ...props
+}: Omit<Props, 'when'> & { when: { date: string; now?: Date } }) {
+  // Le nom du lien a besoin de la date complète en texte ; RelativeTime la donne au lecteur d'écran
+  // quand la carte ne mène nulle part (ses textes se lisent alors un à un). Les deux suivent la
+  // même horloge partagée.
+  const { full } = useRelativeDate(when.date, when.now)
+  return <Card {...props} date={<RelativeTime date={when.date} now={when.now} />} dateName={full} />
+}
+
+type CardProps = Omit<Props, 'when'> & {
+  /** La date dessinée : un texte, ou `RelativeTime` (une vue sur le web, posée à côté d'un texte). */
+  date: ReactNode
+  /** La date telle que le nom du lien la dit. */
+  dateName: string
+}
+
+function Card({ icon, text, detail, quote, date, dateName, isNew, newLabel, onPress }: CardProps) {
   const { colors, shadows } = useTheme()
   const content = (
     <View
@@ -120,9 +153,7 @@ export function NotificationCard({
             rowGap: space.xxs,
           }}
         >
-          <Text variant="caption" tone="muted">
-            {when}
-          </Text>
+          {date}
           {isNew ? (
             <View
               style={{
@@ -142,7 +173,7 @@ export function NotificationCard({
   )
   if (!onPress) return content
   // Le nom du lien : tout ce que la carte écrit, « Nouveau » d'abord, en phrases.
-  const label = [isNew ? newLabel : null, text, detail, quote, when]
+  const label = [isNew ? newLabel : null, text, detail, quote, dateName]
     .filter((part): part is string => Boolean(part))
     .map(sentence)
     .join(' ')

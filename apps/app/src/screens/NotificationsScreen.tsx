@@ -6,6 +6,10 @@
 // première page arrive, et jusqu'à l'heure que l'API a donnée avec elle (`asOf`), pas celle du
 // téléphone. Ce qui arrive pendant la lecture reste donc nouveau pour la prochaine fois.
 // La liste se lit 20 par 20 (« Afficher la suite », puis « C'est tout ») et ne bouge jamais seule.
+//
+// Les dates se disent par rapport à maintenant (« il y a 2 h », « hier » : R4, F-Fil3), sauf celle
+// d'une décision de la modération, qui reste absolue et visible sans survol (jur-J2).
+import type { Notification } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +27,19 @@ import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
+
+/**
+ * Les notifications d'une décision de la modération : un retrait, un signalement traité, une
+ * suspension et sa fin. Leur date est un repère qu'on cite (pour contester, par exemple) : elle
+ * reste écrite en entier (« 21 oct. »), jamais « il y a 3 h » (relecture juridique jur-J2). Un
+ * commentaire masqué par l'auteur du projet (`hidden`) n'en est pas une.
+ */
+const MODERATION_KINDS = new Set<Notification['kind']>([
+  'removed',
+  'report_handled',
+  'suspended',
+  'suspension_ended',
+])
 
 export function NotificationsScreen() {
   const { state, retry } = useMemberSession()
@@ -113,7 +130,11 @@ function MemberNotifications() {
                   text={shown.text}
                   detail={shown.detail}
                   quote={shown.quote}
-                  when={shortDate(notification.at, i18n.language)}
+                  when={
+                    MODERATION_KINDS.has(notification.kind)
+                      ? shortDate(notification.at, i18n.language)
+                      : { date: notification.at }
+                  }
                   isNew={notification.isNew}
                   newLabel={t(($) => $.notifications.new)}
                   onPress={target ? () => router.push(target) : null}
