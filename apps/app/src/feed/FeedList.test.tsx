@@ -8,7 +8,7 @@
 // carte, celle que Reanimated jouerait à son arrivée à l'écran.
 import type { FeedItem } from '@ruche/contracts'
 import { screen } from '@testing-library/react-native'
-import { FadeIn, useReducedMotion } from 'react-native-reanimated'
+import { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { renderWithProviders } from '../testing/render'
 import { FeedList } from './FeedList'
@@ -100,10 +100,8 @@ describe('FeedList, the arrival of new cards', () => {
     // « 1 nouveau projet » touché : le fil relu commence par la nouvelle carte.
     await rerender(list([garden, cafes, quiz]))
 
-    const drop = enteringOf('Le carnet de jardin')
-    expect(drop).toBeDefined()
-    // Une chute, pas le fondu réservé au mode calme.
-    expect(drop).not.toBe(FadeIn)
+    // Une chute depuis le haut (FadeInUp : le nom dit d'où elle vient), pas le fondu du mode calme.
+    expect(enteringOf('Le carnet de jardin')).toBeInstanceOf(FadeInUp)
     expect(enteringOf('Carnet de cafés')).toBeUndefined()
     expect(enteringOf('Le quiz des capitales')).toBeUndefined()
   })
@@ -114,7 +112,7 @@ describe('FeedList, the arrival of new cards', () => {
 
     await rerender(list([garden, cafes, quiz]))
 
-    expect(enteringOf('Le carnet de jardin')).toBe(FadeIn)
+    expect(enteringOf('Le carnet de jardin')).toBeInstanceOf(FadeIn)
     expect(enteringOf('Carnet de cafés')).toBeUndefined()
   })
 

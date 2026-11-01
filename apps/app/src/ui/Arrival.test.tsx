@@ -2,7 +2,7 @@
 // chute, ou un fondu avec « Réduire les animations ») ; un élément déjà là est simplement montré.
 // Jest ne joue aucune animation : on lit l'animation d'entrée (`entering`) que Reanimated jouerait.
 import { screen } from '@testing-library/react-native'
-import { FadeIn, useReducedMotion } from 'react-native-reanimated'
+import { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated'
 import { renderWithProviders } from '../testing/render'
 import { Arrival } from './Arrival'
 import { Pressed } from './Pressed'
@@ -59,15 +59,14 @@ describe('Arrival', () => {
   it('drops an arriving element into place', async () => {
     await renderWithProviders(<Arrival arriving>{card}</Arrival>)
 
-    const entering = enteringOf('Carnet de cafés')
-    expect(entering).toBeDefined()
-    expect(entering).not.toBe(FadeIn)
+    // FadeInUp : depuis le haut, vers sa place (le nom dit d'où elle vient).
+    expect(enteringOf('Carnet de cafés')).toBeInstanceOf(FadeInUp)
   })
 
   it('fades an arriving element in when the device asks for calm motion', async () => {
     reducedMotion.mockReturnValue(true)
     await renderWithProviders(<Arrival arriving>{card}</Arrival>)
 
-    expect(enteringOf('Carnet de cafés')).toBe(FadeIn)
+    expect(enteringOf('Carnet de cafés')).toBeInstanceOf(FadeIn)
   })
 })
