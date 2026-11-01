@@ -6,9 +6,8 @@
 // total des réactions s'affiche (« ✦ 49 »).
 import type { ProjectSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import type { ReactNode, Ref } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { View } from 'react-native'
 import { useMediaSources } from '../api/media'
 import { useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -24,8 +23,11 @@ type Props = {
    * « Suivre Nora », R3) : transmis tel quel à ProjectCard, qui le place.
    */
   overlay?: ReactNode
-  /** La vue autour de la photo, pour la mesurer (transmise à ProjectCard). */
-  coverRef?: Ref<View>
+  /**
+   * La vue autour de la photo, pour la mesurer (transmise à ProjectCard). Son type vient de
+   * ProjectCard : src/projects n'importe rien de react-native (règle de Biome, R5a ui-2).
+   */
+  coverRef?: ComponentProps<typeof ProjectCard>['coverRef']
 }
 
 export function SummaryCard({ project, at = project.createdAt, overlay, coverRef }: Props) {
