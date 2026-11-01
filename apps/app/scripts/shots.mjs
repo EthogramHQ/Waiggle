@@ -68,6 +68,7 @@ import {
 import {
   draftProject,
   leaPage,
+  photo,
   projectWithPhotos,
   recipesProject,
   summaryOf,
@@ -656,6 +657,32 @@ const gardenProject = {
   pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
   followerCount: 8,
 }
+// Tranche R5a, la page projet : un projet d'Inès à trois photos (la galerie, « 1 sur 3 ») et trois
+// prompts (« Le prompt de départ », puis « Les autres prompts · 2 »). Le troisième contient un lien :
+// il porte le repère « À lire avant de l'utiliser » quand on déplie les autres. Ses photos ont leurs
+// propres identifiants, donc leurs propres couleurs (sampleImage).
+const launchProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000f1',
+  author: ines,
+  isMine: false,
+  title: 'Décollage !',
+  pitch: 'Un coach qui prépare ton premier 10 km, semaine après semaine.',
+  status: 'testable',
+  demoUrl: 'https://decollage.example.org',
+  followerCount: 12,
+  visuals: [
+    photo('a5e1c2d3-0000-4000-8000-0000000000f1'),
+    photo('5e2b3c4d-0000-4000-8000-0000000000f2', 1200, 1600),
+    photo('c83d4e5f-0000-4000-8000-0000000000f3'),
+  ],
+  prompts: [
+    'Tu es un coach de course à pied. À partir de mes trois dernières sorties (distance, temps, ressenti), propose-moi un plan de 4 semaines pour courir 10 km en moins d’une heure. Pose-moi d’abord deux questions si une information te manque.',
+    'Transforme ce plan en tableau : une ligne par séance, avec le jour, la durée, l’allure visée et un conseil court.',
+    'Lis https://www.example.org/conseils-10-km et résume les cinq conseils les plus utiles pour un débutant, en une phrase chacun.',
+  ],
+  notes: recipesNotes.slice(2),
+}
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
 // `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
 // utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
@@ -1153,6 +1180,10 @@ const fakeApi = (
     }
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
+    }
+    // R5a : la page projet à trois photos et trois prompts (les pages de captures : la session).
+    if (pathname === `/v1/projects/${launchProject.id}`) {
+      return json(200, withExtras(launchProject))
     }
     // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
     // A7 : « Ce projet est introuvable » au toucher d'une carte).
