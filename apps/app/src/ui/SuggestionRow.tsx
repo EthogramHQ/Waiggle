@@ -160,12 +160,12 @@ export function SuggestionRow({
       style={({ pressed }) => ({
         minHeight: layout.touchTarget,
         flexDirection: 'row',
-        // Empilé, le titre se centre dans sa zone : il se tient alors à égale distance du nom,
-        // au-dessus, et de « Suivre », en dessous (rangé en haut, il laissait un trou avant
-        // « Suivre »).
-        alignItems: stacked ? 'center' : 'flex-start',
+        alignItems: 'flex-start',
         gap: space.sm,
-        paddingTop: stacked ? 0 : space.xxs,
+        // Empilé, le titre descend un peu dans sa zone : il se tient alors à égale distance du nom,
+        // au-dessus, et de « Suivre », en dessous (rangé tout en haut, il laissait un trou avant
+        // « Suivre » ; centré, un trou après le nom).
+        paddingTop: stacked ? space.sm : space.xxs,
         borderRadius: radii.code,
         opacity: pressed ? 0.6 : 1,
       })}
@@ -178,7 +178,7 @@ export function SuggestionRow({
         importantForAccessibility="no-hide-descendants"
         style={{
           width: THUMBNAIL_SIZE,
-          marginTop: stacked ? 0 : space.xxs,
+          marginTop: space.xxs,
           flexShrink: 0,
           borderRadius: radii.mark,
           backgroundColor: colors.honeySoft,
@@ -224,7 +224,9 @@ export function SuggestionRow({
 
   if (stacked) {
     return (
-      <View style={{ paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.xs }}>
+      // Un peu plus d'air en haut et en bas qu'en rangée : la photo, en haut de la ligne, ne
+      // touche plus le bord de la carte ni le trait de la ligne d'au-dessus.
+      <View style={{ paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           {photo}
           {/* Le nom prend toute la place qui reste à côté de la photo (minWidth: 0 : à texte
