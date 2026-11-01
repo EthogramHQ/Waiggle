@@ -96,7 +96,8 @@ html :focus-visible:not(input, textarea, [data-focus="inset"]) {
   z-index: 1;
 }
 :focus:not(:focus-visible), input:focus-visible, textarea:focus-visible { outline: none; }
-@media (forced-colors: active) { [data-wordmark="copy"], [data-placeholder="copy"] { display: none; } }
+@media (forced-colors: active) { [data-wordmark="copy"] { display: none; } }
+@media (forced-colors: active) { [data-placeholder="copy"] { display: none; } }
 `
 
 /**
