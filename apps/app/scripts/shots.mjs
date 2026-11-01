@@ -2180,8 +2180,27 @@ async function layoutReport() {
   const sections = new Map()
   // Les captures restées en chargement (ou en panne), signalées à la fin.
   const unloadedPages = []
-  // Un travail par page, dans son propre contexte : sa fenêtre et son API simulée neuve, gardée
-  // d'une largeur à l'autre (le pseudo enregistré à 320 px se retrouve à 360 px).
+  // Les pages qui ont dépassé leur limite de temps, signalées à la fin elles aussi.
+  const stuckPages = []
+  // Chaque largeur a 60 secondes au plus (page et largeur nommées dans l'erreur). `work` est la
+  // promesse de la mesure : si la limite gagne la course, on ne peut pas l'arrêter de force, mais
+  // on lui met un `catch` pour que son échec tardif (le contexte fermé sous ses pieds) ne plante
+  // pas le script ; la fermeture du contexte, juste après, coupe ses appels en attente.
+  const PAGE_DEADLINE = 60_000
+  const withDeadline = (work, ms, what) => {
+    let timer
+    const limit = new Promise((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(Object.assign(new Error(`${what} : plus de ${ms / 1000} s`), { deadline: true })),
+        ms,
+      )
+    })
+    work.catch(() => {})
+    return Promise.race([work, limit]).finally(() => clearTimeout(timer))
+  }
+  // Un travail par page, dans son propre contexte : sa fenêtre, neuve ; l'API simulée est reposée
+  // neuve à chaque largeur (voir measureWidth).
   const measure = async (shot) => {
     const lines = [`## ${shot.name} (${shot.path})`, '']
     const context = await browser.newContext({
@@ -2191,25 +2210,30 @@ async function layoutReport() {
     })
     try {
       await installShotClock(context)
-      await context.route(
-        `${apiUrl}/**`,
-        fakeApi(
-          shot.signedIn,
-          shot.feed,
-          shot.notifications,
-          shot.admin,
-          shot.blocks,
-          shot.email,
-          shot.suspended,
-        ),
-      )
       const page = await context.newPage()
-      for (const width of widths) {
+      // La mesure d'une largeur. Elle est lancée plus bas sous une limite de temps : voir
+      // `withDeadline`.
+      const measureWidth = async (width) => {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
-        // Les routes posées sur la page par `prepare` à la largeur précédente partent : celle de
-        // fil-chargement ne répond jamais, et « networkidle » ne viendrait plus (R4). L'API simulée
-        // est posée sur le contexte, elle reste.
+        // Une largeur ne doit rien hériter de la précédente : on lève toutes les routes (celles de
+        // `prepare`, posées sur la page, comme l'API simulée, posée sur le contexte) et on repose
+        // une API simulée NEUVE, qui a oublié ce que la page y avait changé (le pseudo enregistré à
+        // 320 px, un signalement, une réaction). Sans cela, la route de fil-chargement, qui ne
+        // répond jamais, empêchait « networkidle » à toutes les largeurs suivantes (R4).
         await page.unrouteAll({ behavior: 'ignoreErrors' })
+        await context.unrouteAll({ behavior: 'ignoreErrors' })
+        await context.route(
+          `${apiUrl}/**`,
+          fakeApi(
+            shot.signedIn,
+            shot.feed,
+            shot.notifications,
+            shot.admin,
+            shot.blocks,
+            shot.email,
+            shot.suspended,
+          ),
+        )
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         if (shot.prepare) {
@@ -2272,6 +2296,19 @@ async function layoutReport() {
           `- **${width} px** : ${notes.length > 0 ? notes.join(' — ') : 'rien à signaler'}`,
         )
       }
+      for (const width of widths) {
+        try {
+          await withDeadline(measureWidth(width), PAGE_DEADLINE, `${shot.name} à ${width} px`)
+        } catch (error) {
+          if (!error.deadline) throw error
+          // Une page bloquée coûtait 17 min à tout le rapport (R4) : on la note, on abandonne ses
+          // largeurs restantes (le `finally` ferme le contexte, ce qui coupe ce qui attendait
+          // encore), et les autres pages continuent.
+          stuckPages.push(error.message)
+          lines.push(`- **${width} px** : **page bloquée** (${error.message})`)
+          break
+        }
+      }
       lines.push('')
       sections.set(shot, lines)
     } finally {
@@ -2290,8 +2327,9 @@ async function layoutReport() {
   ]
   writeFileSync(join(dir, 'rapport.md'), `${lines.join('\n')}\n`)
   console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
-  if (unloadedPages.length > 0) {
-    console.error(`Pages non chargées :\n${unloadedPages.join('\n')}`)
+  if (stuckPages.length > 0) console.error(`Pages bloquées :\n${stuckPages.join('\n')}`)
+  if (unloadedPages.length > 0) console.error(`Pages non chargées :\n${unloadedPages.join('\n')}`)
+  if (stuckPages.length > 0 || unloadedPages.length > 0) {
     server.close()
     process.exit(1)
   }
