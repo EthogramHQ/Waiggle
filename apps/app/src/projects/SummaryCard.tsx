@@ -10,6 +10,7 @@ import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { View } from 'react-native'
 import { useMediaSources } from '../api/media'
+import { useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useLayout } from '../ui/theme/layout'
@@ -36,6 +37,8 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
   // La démo, recopiée dans une constante : le rappel de « Tester » la lit plus tard, et TypeScript
   // ne garde pas le « non nul » vérifié ici jusque dans une fonction.
   const { demoUrl } = project
+  // La carte qui devient la page (R4) : la vue autour de la photo, et sa mesure au toucher.
+  const cover = useCoverSource(project.id)
   return (
     <ProjectCard
       title={project.title}
@@ -67,9 +70,12 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
           : undefined
       }
       reactionTotal={project.reactionTotal}
-      onPress={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
+      // La photo est mesurée avant d'ouvrir la page, qui la fait grandir depuis ce cadre (R4).
+      onPress={() =>
+        cover.capture(() => router.push({ pathname: '/projects/[id]', params: { id: project.id } }))
+      }
       overlay={overlay}
-      coverRef={coverRef}
+      coverRef={coverRef ?? cover.ref}
     />
   )
 }
