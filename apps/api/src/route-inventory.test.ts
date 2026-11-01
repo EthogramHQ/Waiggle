@@ -90,6 +90,13 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'GET /v1/tags/:slug': ['hidesBlocked', 'allowed'],
   'GET /v1/feed/following': ['hidesBlocked', 'allowed'],
   'GET /v1/feed/discover': ['hidesBlocked', 'allowed'],
+  // Le fil et « Proches à suivre » (tranche R4, relecture de sécurité sec-A8) : marquer son fil lu
+  // ne touche qu'à soi ; les suggestions montrent d'autres membres, et écarter répond le même 404
+  // que « Suivre » à un membre bloqué dans un sens ou l'autre (sec-B1). Lire son fil et écarter
+  // restent permis pendant une suspension, comme marquer ses notifications vues.
+  'PUT /v1/feed/read': ['own', 'allowed'],
+  'GET /v1/suggestions/members': ['hidesBlocked', 'allowed'],
+  'PUT /v1/suggestions/members/:id/dismissed': ['hidesBlocked', 'allowed'],
   // La recherche par mots et la liste des outils (tranche R3) : des lectures qui montrent les
   // contenus des autres, cachées à un membre bloqué dans un sens ou dans l'autre.
   'GET /v1/search': ['hidesBlocked', 'allowed'],
@@ -179,6 +186,14 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'GET /v1/feed/discover': {
     file: 'blocks-visibility.test.ts',
     test: 'hides the projects of the other one from the discovery feed and the tag pages',
+  },
+  'GET /v1/suggestions/members': {
+    file: 'suggestions.test.ts',
+    test: 'hides a member blocked either way from the suggestions, and his latest project with him',
+  },
+  'PUT /v1/suggestions/members/:id/dismissed': {
+    file: 'suggestions.test.ts',
+    test: 'answers the same 404 for an unknown member, an unverified one, and one blocked either way, as follow does',
   },
   'GET /v1/search': {
     file: 'search.test.ts',
