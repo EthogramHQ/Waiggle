@@ -94,6 +94,7 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -142,6 +143,8 @@ export function CatalogueScreen() {
       {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
           En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       <ProjectGroundworkCatalogue />
+      {/* R5a : la capsule des réactions de la page projet (projet-capsule.tsx). */}
+      <CapsuleCatalogue />
 
       <Section title={l.colors}>
         <Swatches />
