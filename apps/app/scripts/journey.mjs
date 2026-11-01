@@ -485,9 +485,12 @@ try {
   expectEqual('session de cet appareil, gardée', await statusFor(lea, meUrl), 200)
   await leaPhone.context.close()
 
-  step('Sam ne suit personne : son fil le dit ; il lit le pseudo de Léa et la suit depuis sa page')
+  step(
+    'Sam ne suit personne : son fil l’attend ; il lit le pseudo de Léa et la suit depuis sa page',
+  )
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()
+  // R4 (F-Fil9) : le premier lancement accueille au lieu de constater un vide.
+  await sam.page.getByText('Ton fil t’attend').waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
   await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
   await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
@@ -507,6 +510,8 @@ try {
   await lea.page
     .getByLabel('Le pitch, en une phrase')
     .fill('Il propose un dîner avec ce qui reste.')
+  // Un lien de démo : la carte du fil de Sam portera « Tester » (R4).
+  await lea.page.getByLabel('Lien de démo (facultatif)').fill('https://example.com/recettes')
   // Chaque photo est d'abord réduite sur l'appareil : comme une personne, on attend de voir sa
   // vignette (et son bouton « Retirer ») avant de passer à la suivante, puis de publier.
   const add = lea.page.getByRole('button', { name: 'Ajouter une photo' })
@@ -562,11 +567,21 @@ try {
   await expectMedia('après le retrait', { avatars: 1, visuals: 3 })
   const photoUrl = project.visuals[0].url
 
-  step('Le projet de Léa arrive dans le fil de Sam')
+  step('Le projet de Léa arrive dans le fil de Sam ; il le teste, revient, et il est à jour')
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  // La date relative de la carte (R4, F-Fil2) : « publié à l'instant », sans heure ni jour.
+  await sam.page.getByText('à l’instant').first().waitFor()
+  // « Tester » sort de l'appli : son nom lu le dit, et il passe par la page d'avertissement.
+  await sam.page
+    .getByRole('link', { name: 'Tester Mon agent de recettes, ouvre un site externe' })
+    .click()
+  await sam.page.waitForURL((url) => url.pathname === '/out')
+  await sam.page.getByRole('button', { name: 'Continuer vers example.com' }).waitFor()
+  await sam.page.getByRole('button', { name: 'Revenir' }).click()
+  await sam.page.waitForURL((url) => url.pathname === '/')
   await sam.page.getByText('Tu es à jour').waitFor()
-  console.log('  ok : le projet est dans le fil « Abonnements » de Sam')
+  console.log('  ok : le projet est dans le fil de Sam, « Tester » mène à l’avertissement')
 
   step('Sam voit le projet et ses photos ; une personne sans compte ne voit rien')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
@@ -604,6 +619,10 @@ try {
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
   )
   console.log('  ok : Léa voit « Bravo » compté une fois')
+  // Le total de la carte du fil (R4) : le nombre dessiné est caché au lecteur, le nom lu l'écrit.
+  await open(sam.page, `${appUrl}/`)
+  await sam.page.getByText('1 réaction', { exact: true }).waitFor()
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
   // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
   // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
   // Tranche 6b : Sam mentionne Léa. Il tape « @ » et le début de son pseudo, choisit Léa dans la
