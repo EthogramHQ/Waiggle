@@ -4,7 +4,9 @@
 // - grouped : groupe blanc bordé (champs d'un formulaire, liste de réglages) ;
 // - glass   : verre, pour ce qui flotte (barres, boutons ronds sur une image) ;
 // - panel   : verre plus dense, qui porte du texte posé sur une image ;
-// - sheet   : feuille qui monte du bas de l'écran.
+// - sheet   : feuille qui monte du bas de l'écran ;
+// - veil    : voile qui floute toute la page sous une couche (l'éventail des réactions, R5a) : sans
+//             bord ni coin, la couleur du voile des fenêtres (`scrim`) sur le flou.
 // Les surfaces pleines (plain, grouped) ont une fine bordure beige (surfaceBorder) : blanches sur la
 // Cire, un blanc à peine chaud, elles s'en détacheraient mal sans elle.
 // Le verre floute ce qui passe derrière lui. Le flou est calculé par l'appareil, ce qui a un coût :
@@ -17,7 +19,7 @@ import type { ReactNode } from 'react'
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useTheme } from './theme/ThemeProvider'
 
-export type SurfaceVariant = 'plain' | 'grouped' | 'glass' | 'panel' | 'sheet'
+export type SurfaceVariant = 'plain' | 'grouped' | 'glass' | 'panel' | 'sheet' | 'veil'
 
 /**
  * L'ombre portée par la surface. `card` : l'ombre d'une carte posée sur la page ; `none` : aucune.
@@ -57,9 +59,11 @@ const defaults = {
   glass: { radius: 'pill', blur: 40, shadow: 'float' },
   panel: { radius: 'panel', blur: 50, shadow: null },
   sheet: { radius: 'sheet', blur: 60, shadow: 'float' },
+  // Le voile couvre tout l'écran : aucun coin arrondi, aucune ombre.
+  veil: { radius: 'none', blur: 40, shadow: null },
 } as const satisfies Record<
   SurfaceVariant,
-  { radius: Radius; blur: number; shadow: 'soft' | 'float' | null }
+  { radius: Radius | 'none'; blur: number; shadow: 'soft' | 'float' | null }
 >
 
 // Sur Android, le vrai flou demande de désigner à l'avance ce qu'il faut flouter (une « cible »).
@@ -122,7 +126,10 @@ export function Surface({
     sheet: {
       backgroundColor: realBlur ? colors.sheet : colors.surface,
     },
+    // Sans flou (Android), le même voile que derrière une feuille ou une fenêtre.
+    veil: { backgroundColor: colors.scrim },
   }
+  const shownRadius = radius ?? defaultRadius
 
   // minHeight: 0 : sans lui, une boîte flexible ne descend pas sous la hauteur de son contenu.
   const fitStyle: ViewStyle | null =
@@ -134,7 +141,7 @@ export function Surface({
   const style: ViewStyle = {
     ...look[variant],
     ...(boxShadow ? { boxShadow } : null),
-    borderRadius: radii[radius ?? defaultRadius],
+    borderRadius: shownRadius === 'none' ? 0 : radii[shownRadius],
     // Une feuille n'est arrondie qu'en haut : elle sort du bas de l'écran. Posée au centre, non.
     ...(variant === 'sheet' && !centered
       ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
