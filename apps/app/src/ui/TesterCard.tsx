@@ -6,18 +6,15 @@
 // - « Tester » ouvre la démo par la page d'avertissement des liens externes : annoncé comme un site
 //   externe (comme `TextLink external`), il est posé par-dessus la photo, à côté du lien de la carte
 //   et non dedans.
-import { layout, radii, space } from '@ruche/brand'
-import { useTranslation } from 'react-i18next'
-import { Platform, Pressable, View } from 'react-native'
+import { layout, space } from '@ruche/brand'
+import { View } from 'react-native'
 import { Avatar } from './Avatar'
-import { Icon } from './Icon'
-import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { useLayout } from './theme/layout'
-import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
   title: string
@@ -45,21 +42,12 @@ const COVER_RATIO = { compact: 3 / 4, medium: 3 / 5 }
 const AUTHOR_DOT = space.xl
 
 export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
-  const { t } = useTranslation()
-  const { colors, shadows } = useTheme()
   const { sizeClass } = useLayout()
   const shape = sizeClass === 'compact' ? 'compact' : 'medium'
   const width = CARD_WIDTH[shape]
   const coverHeight = Math.round(width * COVER_RATIO[shape])
-  const web = Platform.OS === 'web'
   const guard = useTapGuard()
   const test = guard(onTest)
-
-  // Le nom lu : « Tester Carnet de cafés » (le texte affiché en tête, puis le projet : plusieurs
-  // cartes, plusieurs « Tester »). Il quitte l'appli : sur le web, où l'indice n'existe pas, le nom
-  // le dit (« …, ouvre un site externe ») ; sur téléphone, l'indice lu après le nom.
-  const name = t(($) => $.explore.testProject, { title })
-  const outside = t(($) => $.common.externalSite)
 
   const body = (
     <View style={{ gap: space.sm }}>
@@ -111,55 +99,21 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
           height: coverHeight,
         }}
       >
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={web ? `${name}, ${outside}` : name}
-          accessibilityHint={web ? undefined : outside}
-          // Entrée ouvre la démo sur le web, comme un vrai lien (voir keyboard.ts).
-          {...enterActivates(test)}
-          // L'anneau du clavier se dessine autour de la zone, comme partout : le calque n'est pas
-          // rogné par la photo, et un anneau intérieur se perdait sur le miel de la pastille.
+        {/* La pastille miel commune (`TestLink`) : son nom lu (« Tester Carnet de cafés »), son
+            avertissement de site externe et ses 44 points viennent d'elle. L'anneau du clavier se
+            dessine autour de sa zone : le calque n'est pas rogné par la photo. Ici, elle se pose en
+            bas à gauche, jamais plus large que la photo, même à 200 % de texte. */}
+        <TestLink
+          title={title}
           onPress={test}
+          size="small"
           style={{
             position: 'absolute',
             left: space.xs,
             bottom: space.xs,
-            // 44 points à toucher autour de la pastille dessinée, plus petite (hitSlop est ignoré
-            // sur le web) ; le rayon suit la pastille, pour l'anneau du clavier.
-            minHeight: layout.touchTarget,
-            minWidth: layout.touchTarget,
-            // Jamais plus large que la photo, même à 200 % de texte.
             maxWidth: width - 2 * space.xs,
-            justifyContent: 'center',
-            borderRadius: radii.pill,
           }}
-        >
-          {({ pressed }) => (
-            // La pastille miel : son texte encre (onHoney) se lit sur le miel, et le miel opaque
-            // garde ce contraste sur n'importe quelle photo ; son halo la détache d'une photo claire.
-            <View
-              style={{
-                alignSelf: 'flex-start',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: space.xs,
-                minHeight: layout.controlHeight.small,
-                paddingHorizontal: space.md,
-                borderRadius: radii.pill,
-                backgroundColor: pressed ? colors.honeyPressed : colors.honey,
-                boxShadow: `${shadows.highlight}, ${shadows.honey}`,
-              }}
-            >
-              <Text variant="callout" weight={700} tone="onHoney" numberOfLines={1}>
-                {t(($) => $.explore.test)}
-              </Text>
-              {/* La flèche est décorative : le nom lu dit déjà que le lien sort de l'appli. */}
-              <View aria-hidden>
-                <Icon name="arrow-up-right" size={space.lg} tone="onHoney" />
-              </View>
-            </View>
-          )}
-        </Pressable>
+        />
       </View>
     </View>
   )

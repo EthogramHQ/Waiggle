@@ -5,14 +5,18 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
+import { space } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { View } from 'react-native'
 import { Carousel } from '../ui/Carousel'
 import { Notice } from '../ui/Notice'
+import { ProjectCover } from '../ui/ProjectCover'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { TesterCard } from '../ui/TesterCard'
+import { TestLink } from '../ui/TestLink'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
@@ -32,6 +36,10 @@ const fr = {
   testers: 'Carrousel de cartes de testeurs (avec photo, sans photo, titre long)',
   tools: 'Carrousel serré d’étiquettes avec leur nombre (« Outils populaires »)',
   tags: 'Étiquettes : avec nombre, sans nombre, touchables ou non',
+  testLink:
+    'Pastille « Tester ↗ » (TestLink) : petite (carte d’Explorer, colonne du fil), compacte (carte du fil), titre long, sur photo',
+  small: 'petite',
+  compact: 'compacte',
   failed:
     'Sections en panne (500) : chacune dit ce qui lui manque, « Réessayer » sous une seule forme',
   day: 'jour',
@@ -47,6 +55,10 @@ const en: typeof fr = {
   testers: 'Carousel of tester cards (with a photo, without, long title)',
   tools: 'Tight carousel of tags with their count (“Popular tools”)',
   tags: 'Tags: with a count, without, tappable or not',
+  testLink:
+    '“Try ↗” pill (TestLink): small (Explore card, feed column), compact (feed card), long title, on a photo',
+  small: 'small',
+  compact: 'compact',
   failed: 'Sections that could not load (500): each says what is missing, one form of “Retry”',
   day: 'day',
   night: 'night',
@@ -150,6 +162,40 @@ export function ExploreCatalogue() {
                 <Tag label="Claude" onPress={noop} />
                 <Tag label="Home Assistant" count={9} />
                 <Tag label="Python" />
+              </Stack>
+            </Example>
+
+            {/* La pastille « Tester ↗ » seule, dans ses états : les deux tailles, un titre long
+                (le nom lu est long, la pastille reste d'une ligne) et posée sur une photo. */}
+            <Example caption={`${l.testLink} — ${l[scheme]}`}>
+              <Stack gap="md">
+                <Stack direction="row" gap="md" align="center" wrap>
+                  <Text variant="caption" tone="muted">
+                    {l.small}
+                  </Text>
+                  <TestLink title="Carnet de cafés" onPress={noop} size="small" />
+                  <Text variant="caption" tone="muted">
+                    {l.compact}
+                  </Text>
+                  <TestLink title="Carnet de cafés" onPress={noop} size="compact" />
+                </Stack>
+                <Stack direction="row" gap="md" align="center" wrap>
+                  <TestLink title={l.longTitle} onPress={noop} size="small" />
+                  <TestLink title={l.longTitle} onPress={noop} size="compact" />
+                </Stack>
+                <View style={{ width: 256 }}>
+                  <ProjectCover
+                    height={154}
+                    radius="group"
+                    image={{ source: null, thumbhash: samples.cafe, label: l.photo }}
+                  />
+                  <TestLink
+                    title="Carnet de cafés"
+                    onPress={noop}
+                    size="small"
+                    style={{ position: 'absolute', left: space.xs, bottom: space.xs }}
+                  />
+                </View>
               </Stack>
             </Example>
 
