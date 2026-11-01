@@ -274,6 +274,13 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
   },
   member_follow: { follower_id: 'identifiant', member_id: 'identifiant', created_at: 'date' },
   project_follow: { follower_id: 'identifiant', project_id: 'identifiant', created_at: 'date' },
+  // R4 : la dernière lecture du fil, et les proches qu'un membre a écartés (« × »).
+  feed_state: { member_id: 'identifiant', read_at: 'date' },
+  member_suggestion_dismissal: {
+    member_id: 'identifiant',
+    dismissed_id: 'identifiant',
+    at: 'date',
+  },
   email_preference: {
     user_id: 'identifiant',
     weekly_recap: 'booléen',
