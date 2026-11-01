@@ -950,6 +950,18 @@ const queryUpToDate = () =>
   screen.queryByRole('header', { name: fr.t(($) => $.feed.upToDate.title) })
 /** Le lien d'une carte du fil, nommé par le titre du projet. */
 const card = (title: string) => screen.getByRole('link', { name: title })
+/**
+ * La liste qui contient cette carte, en remontant depuis son lien. `getByRole('list')` ne trouve
+ * qu'un conteneur `accessible`, que la charte interdit (VoiceOver n'atteindrait plus les cartes).
+ */
+type Element = ReturnType<typeof screen.getByRole>
+const listAround = (start: Element): Element | null => {
+  let node: Element | null = start
+  while (node && node.props.accessibilityRole !== 'list' && node.props.role !== 'list') {
+    node = node.parent
+  }
+  return node
+}
 
 // L'ordre de lecture : l'arbre rendu, parcouru de haut en bas (RNTL 14 n'a plus `findAll`).
 type Node = { props: Record<string, unknown>; children: (Node | string)[] }
@@ -982,10 +994,11 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
     expect(comesBefore(card('Le quiz des capitales'), upToDate())).toBe(true)
     expect(comesBefore(upToDate(), card('Le tri des photos'))).toBe(true)
     // Deux grilles, chacune une liste complète (jamais la sphère au milieu d'une liste).
-    const lists = screen.getAllByRole('list')
-    expect(lists).toHaveLength(2)
-    type Element = ReturnType<typeof screen.getByRole>
-    const [newer, seen] = lists as [Element, Element]
+    const newer = listAround(card('Carnet de cafés')) as Element
+    const seen = listAround(card('Le tri des photos')) as Element
+    expect(newer).toBeTruthy()
+    expect(seen).toBeTruthy()
+    expect(newer).not.toBe(seen)
     expect(within(newer).getByRole('link', { name: 'Carnet de cafés' })).toBeTruthy()
     expect(within(newer).queryByRole('link', { name: 'Le tri des photos' })).toBeNull()
     expect(within(seen).getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
@@ -998,7 +1011,9 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
     await renderMemberHome()
 
     expect(comesBefore(upToDate(), card('Carnet de cafés'))).toBe(true)
-    expect(screen.getAllByRole('list')).toHaveLength(1)
+    const list = listAround(card('Carnet de cafés'))
+    expect(list).toBeTruthy()
+    expect(listAround(card('Le quiz des capitales'))).toBe(list)
     // La grille d'avant, vide, ne dit pas « rien de neuf » (ui-B6).
     expect(screen.queryByText(shown(fr.t(($) => $.feed.quiet)))).toBeNull()
   })
@@ -1080,11 +1095,9 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
 
       // Sur le web, la langue de l'écran suit le navigateur : le titre est cherché dans les deux.
       const titles = [fr, createI18n('en')].map((i18n) => i18n.t(($) => $.feed.upToDate.title))
-      const sphere = screen
-        .getAllByRole('header')
-        .filter((heading) =>
-          titles.some((title) => within(heading).queryByText(title, { exact: true })),
-        )
+      // `within(heading)` ne regarde que les descendants du titre, pas le titre lui-même : on
+      // cherche donc le titre par son nom.
+      const sphere = titles.flatMap((title) => screen.queryAllByRole('header', { name: title }))
       expect(sphere).toHaveLength(1)
       expect(sphere[0]?.props['aria-level']).toBe(2)
     } finally {
@@ -1217,7 +1230,7 @@ describe('the first run of a member who follows nobody (R4)', () => {
 
     expect(useFollow).toHaveBeenCalledWith({ kind: 'member', id: nora.id })
     expect(mockToggle).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('button', { name: /^Tu suis/ })).toBeTruthy()
+    expect(await screen.findByRole('switch', { name: /^Tu suis/ })).toBeTruthy()
     // La ligne de Nora reste là, et la liste n'est pas relue (elle bougerait sous le doigt).
     expect(screen.getByRole('button', { name: dismissOf('Nora') })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /^Ne plus suggérer/ })).toHaveLength(5)
