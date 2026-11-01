@@ -16,6 +16,7 @@ import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { focusWithoutScroll } from './focus'
+import { Notice } from './Notice'
 import { SuggestionList } from './SuggestionList'
 import { TAP_GUARD_MS } from './tapGuard'
 
@@ -210,5 +211,60 @@ describe('SuggestionList', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1)
     expect(shown('Léa Martin')).toBeTruthy()
     expect(screen.getByText(fr.t(($) => $.suggestions.dismissError))).toBeTruthy()
+  })
+
+  // Relecture design C2 (WCAG 2.2.1) : « Annuler » ne disparaît pas sous le focus du clavier. Le
+  // délai s'arrête tant qu'il a le focus, et repart, pour le temps qui restait, quand il le perd.
+  it('holds « Annuler » while it has the keyboard focus, then counts down again', async () => {
+    const onDismiss = jest.fn(async (_id: string) => ({ ok: true }))
+    await renderWithProviders(<List onDismiss={onDismiss} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: dismissName('Léa Martin') }))
+    await act(() => jest.advanceTimersByTime(1_000))
+    await fireEvent(screen.getByRole('button', { name: undo }), 'focus')
+    await act(() => jest.advanceTimersByTime(UNDO_MS * 3))
+
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: undo })).toBeTruthy()
+
+    await fireEvent(screen.getByRole('button', { name: undo }), 'blur')
+    await act(() => jest.advanceTimersByTime(UNDO_MS - 1_000 - 1))
+    expect(onDismiss).not.toHaveBeenCalled()
+    await act(() => jest.advanceTimersByTime(1))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: undo })).toBeNull()
+  })
+
+  // Même chose à la souris : le pointeur posé sur « Annuler » arrête le délai.
+  it('holds « Annuler » while the pointer rests on it', async () => {
+    const onDismiss = jest.fn(async (_id: string) => ({ ok: true }))
+    await renderWithProviders(<List onDismiss={onDismiss} />)
+
+    await fireEvent.press(screen.getByRole('button', { name: dismissName('Léa Martin') }))
+    await fireEvent(screen.getByRole('button', { name: undo }), 'hoverIn')
+    await act(() => jest.advanceTimersByTime(UNDO_MS * 3))
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    await fireEvent(screen.getByRole('button', { name: undo }), 'hoverOut')
+    await act(() => jest.advanceTimersByTime(UNDO_MS))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  // Relecture design A8 : la lecture des suggestions échoue ; le titre de la section reste, et le
+  // message se pose dessous, au lieu de flotter seul au-dessus de la section suivante.
+  it('keeps its title above a notice that replaces the rows', async () => {
+    await renderWithProviders(
+      <SuggestionList
+        members={[]}
+        notice={<Notice message={fr.t(($) => $.suggestions.loadError)} />}
+        onFollow={() => {}}
+        onOpenMember={() => {}}
+        onOpenProject={() => {}}
+        onDismiss={async () => ({ ok: true })}
+      />,
+    )
+
+    expect(screen.getByRole('header', { name: fr.t(($) => $.suggestions.title) })).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.suggestions.loadError))).toBeTruthy()
   })
 })

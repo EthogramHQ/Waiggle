@@ -18,12 +18,14 @@ import { useDismissSuggestion, useSuggestions } from './api'
 type Props = {
   /** Le nombre de lignes : 5 au premier lancement, 3 dans la colonne de droite. */
   max: number
+  /** Les lignes empilées : la colonne de droite est étroite (relecture design A1). */
+  stacked?: boolean
 }
 
 /** Le « toggle » de useFollow : suit ou ne suit plus, selon l'état affiché qu'on lui passe. */
 type Toggle = (shown?: unknown) => void
 
-export function PeopleToFollow({ max }: Props) {
+export function PeopleToFollow({ max, stacked = false }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
@@ -60,16 +62,27 @@ export function PeopleToFollow({ max }: Props) {
   )
 
   if (suggestions.isError || retrying) {
+    // Le titre « Proches à suivre » reste au-dessus du message (relecture design A8) : sans lui,
+    // l'erreur flottait seule au-dessus de la section suivante.
     return (
-      <Notice
-        message={t(($) => $.suggestions.loadError)}
-        action={{
-          label: t(($) => $.common.retry),
-          onPress: () => {
-            setRetrying(true)
-            void suggestions.refetch().finally(() => setRetrying(false))
-          },
-        }}
+      <SuggestionList
+        members={[]}
+        notice={
+          <Notice
+            message={t(($) => $.suggestions.loadError)}
+            action={{
+              label: t(($) => $.common.retry),
+              onPress: () => {
+                setRetrying(true)
+                void suggestions.refetch().finally(() => setRetrying(false))
+              },
+            }}
+          />
+        }
+        onFollow={() => {}}
+        onOpenMember={() => {}}
+        onOpenProject={() => {}}
+        onDismiss={async () => ({ ok: true })}
       />
     )
   }
@@ -102,6 +115,7 @@ export function PeopleToFollow({ max }: Props) {
       <SuggestionList
         members={members.map(rowOf)}
         max={max}
+        stacked={stacked}
         followDisabled={suspended}
         onFollow={(id) => {
           const followed = touched[id] ?? false
