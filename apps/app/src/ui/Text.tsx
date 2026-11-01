@@ -4,6 +4,7 @@
 import {
   type FontFamily,
   type FontWeight,
+  maxHeadingScale,
   maxTextScale,
   readableWidth,
   type TextVariant,
@@ -102,6 +103,24 @@ const giantWebStyle = (variant: TextVariant, children: ReactNode): TextStyle => 
   } as unknown as TextStyle
 }
 
+/**
+ * Un grand titre sur le web (R4, M5) : `maxScale` n'y existe pas (le navigateur n'agrandit pas les
+ * `px`), alors le titre suit la largeur de l'écran, jamais plus grand que son jeton : `min(34px,
+ * 8.5vw)`. Sur 320 points il tient à 27 points, et même un utilisateur qui agrandit tout le texte
+ * (200 % : 54 points) garde « Réglages » et « Recherche » entiers sur une ligne ; dès 400 points de
+ * large, la taille est celle du jeton. Une formule CSS, sans mesure ni rendu de plus (la page web
+ * est pré-rendue sans connaître l'écran). La hauteur de ligne et l'interlettrage passent en
+ * proportions pour suivre.
+ */
+const bigTitleWebStyle = (variant: TextVariant): TextStyle => {
+  const style = textStyles[variant]
+  return {
+    fontSize: `min(${style.size}px, ${(style.size / 4).toFixed(2)}vw)`,
+    lineHeight: `${(style.lineHeight / style.size).toFixed(3)}`,
+    letterSpacing: `${style.tracking}em`,
+  } as unknown as TextStyle
+}
+
 export type TextProps = {
   children: ReactNode
   variant?: TextVariant
@@ -113,7 +132,10 @@ export type TextProps = {
   tabular?: boolean
   /** Souligné (liens). */
   underline?: boolean
-  /** Agrandissement maximal avec le réglage de taille de l'appareil (2 par défaut). */
+  /**
+   * Agrandissement maximal avec le réglage de taille de l'appareil : 2 par défaut, 1,5 pour un grand
+   * titre (`heading` 1 ou 2, voir plus bas).
+   */
   maxScale?: number
   /**
    * Coupe un mot trop long n'importe où plutôt que de le laisser dépasser de l'écran (une adresse
@@ -174,7 +196,7 @@ export function Text({
   align,
   tabular = false,
   underline = false,
-  maxScale = maxTextScale,
+  maxScale: maxScaleProp,
   breakAnywhere = false,
   readable = false,
   heading,
@@ -183,6 +205,12 @@ export function Text({
   const { colors } = useTheme()
   const style = textStyles[variant]
   const giant = giantVariants.includes(variant)
+  // Un grand titre (niveau 1 ou 2, 22 points ou plus) grossit moins que le texte courant : doublé,
+  // il ne tient plus sur 320 points et se coupe au milieu du mot (R4, M5). Un titre de groupe en
+  // petites capitales (13 points) et les titres écrits par les membres (niveaux 3 et 4) gardent
+  // l'agrandissement complet.
+  const bigTitle = heading !== undefined && heading <= 2 && style.size >= textStyles.heading.size
+  const maxScale = maxScaleProp ?? (bigTitle ? maxHeadingScale : maxTextScale)
   return (
     <NativeText
       // Les textes grandissent avec le réglage de taille de l'appareil, jusqu'à deux fois leur taille.
@@ -209,6 +237,7 @@ export function Text({
         ...(breakAnywhere ? breakAnywhereStyle : null),
         ...(readable ? { maxWidth: readableWidth } : null),
         ...(giant && Platform.OS === 'web' ? giantWebStyle(variant, children) : null),
+        ...(bigTitle && Platform.OS === 'web' ? bigTitleWebStyle(variant) : null),
       }}
       {...rest}
       {...(heading ? headingLevel(heading) : null)}

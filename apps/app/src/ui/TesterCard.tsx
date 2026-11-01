@@ -98,14 +98,17 @@ export function TesterCard({ title, author, image, onTest, onOpen }: Props) {
       )}
       {/* Le calque de « Tester », frère du lien de la carte : posé à la place exacte de la photo,
           il laisse passer les tapes ailleurs que sur la pastille (box-none). */}
+      {/* `pointerEvents` en propriété, jamais dans `style` : sur le web, react-native-web ne crée la
+          règle qui rend ses enfants touchables (`>* { pointer-events: auto }`) qu'à partir de la
+          propriété ; écrit dans le style, le calque entier prenait les clics de la photo. */}
       <View
+        pointerEvents="box-none"
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           height: coverHeight,
-          pointerEvents: 'box-none',
         }}
       >
         <Pressable

@@ -31,6 +31,7 @@ import type { PressEvent } from './ListGroup'
 import { linkProps } from './SettingsNav'
 import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
+import { placeholderCopy } from './theme/document'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -175,49 +176,77 @@ export function SearchField({
     >
       {/* La loupe est décorative : le nom du champ dit déjà ce qu'il fait. */}
       <Icon name="magnifying-glass" size={20} tone="muted" />
-      <TextInput
-        ref={input}
-        aria-label={label}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textPlaceholder}
-        autoFocus={autoFocus}
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="search"
-        // Le champ de recherche du navigateur (type="search") ajoute sa propre croix : on garde
-        // la nôtre, nommée et de 44 points. D'où un champ texte ordinaire.
-        onSubmitEditing={submit}
-        // Entrée cherche sans quitter le champ (web) : on corrige ou complète tout de suite.
-        // react-native-web lit encore `blurOnSubmit` (pas `submitBehavior`).
-        {...(Platform.OS === 'web' && onSubmit ? { blurOnSubmit: false } : null)}
-        // Échap vide le champ (web) ; déjà vide, il laisse la touche au navigateur.
-        onKeyPress={(event) => {
-          if (Platform.OS !== 'web') return
-          const native = event.nativeEvent as { key: string; preventDefault?: () => void }
-          if (native.key !== 'Escape' || value === '') return
-          native.preventDefault?.()
-          clear()
-        }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          fontFamily: fontName(body.family, body.weight),
-          fontSize: body.size,
-          lineHeight: body.lineHeight,
-          color: colors.text,
-          // La saisie elle-même fait 44 points de haut : c'est elle que l'on touche et que les
-          // outils mesurent (relecture de l'interface de R3, C5).
-          minHeight: layout.touchTarget,
-          paddingVertical: space.xs,
-          // Sur le web, le navigateur dessine son propre contour : la bordure de la pilule s'en
-          // charge déjà.
-          outlineWidth: 0,
-        }}
-      />
+      {/* La saisie et son texte d'attente. Une saisie d'une ligne coupe son texte d'attente (à 200 % de
+          texte, « Un projet, une p ») : tant que le champ est vide, l'appli dessine elle-même le
+          texte, en flux, et il passe à la ligne ; la saisie, transparente côté texte d'attente,
+          est posée par-dessus, sur toute la place. Le vrai texte d'attente reste dans la saisie (son
+          nom pour les outils, et la couleur imposée du contraste élevé de Windows, où la copie
+          disparaît : `placeholderCopy`). */}
+      <View
+        style={{ flex: 1, minWidth: 0, minHeight: layout.touchTarget, justifyContent: 'center' }}
+      >
+        {value === '' ? (
+          // Un espace sans chasse en fin de texte : la copie n'a pas le même texte que la saisie,
+          // dont le texte d'attente reste la seule chose que les outils retrouvent par ce texte.
+          <View
+            aria-hidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            {...placeholderCopy}
+            style={{ paddingVertical: space.xs }}
+          >
+            <Text tone="muted" selectable={false}>{`${placeholder}​`}</Text>
+          </View>
+        ) : null}
+        <TextInput
+          ref={input}
+          aria-label={label}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="transparent"
+          autoFocus={autoFocus}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          // Le champ de recherche du navigateur (type="search") ajoute sa propre croix : on garde
+          // la nôtre, nommée et de 44 points. D'où un champ texte ordinaire.
+          onSubmitEditing={submit}
+          // Entrée cherche sans quitter le champ (web) : on corrige ou complète tout de suite.
+          // react-native-web lit encore `blurOnSubmit` (pas `submitBehavior`).
+          {...(Platform.OS === 'web' && onSubmit ? { blurOnSubmit: false } : null)}
+          // Échap vide le champ (web) ; déjà vide, il laisse la touche au navigateur.
+          onKeyPress={(event) => {
+            if (Platform.OS !== 'web') return
+            const native = event.nativeEvent as { key: string; preventDefault?: () => void }
+            if (native.key !== 'Escape' || value === '') return
+            native.preventDefault?.()
+            clear()
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            // Posée par-dessus le texte d'attente dessiné, sur toute la place de la zone.
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            minWidth: 0,
+            fontFamily: fontName(body.family, body.weight),
+            fontSize: body.size,
+            lineHeight: body.lineHeight,
+            color: colors.text,
+            // La saisie elle-même fait 44 points de haut : c'est elle que l'on touche et que les
+            // outils mesurent (relecture de l'interface de R3, C5).
+            minHeight: layout.touchTarget,
+            paddingVertical: space.xs,
+            // Sur le web, le navigateur dessine son propre contour : la bordure de la pilule s'en
+            // charge déjà.
+            outlineWidth: 0,
+          }}
+        />
+      </View>
       {value !== '' ? (
         <Pressable
           accessibilityRole="button"

@@ -32,6 +32,7 @@ export {
   fontFamilies,
   fontWeights,
   initialsWeight,
+  maxHeadingScale,
   maxTextScale,
   readableWidth,
   type TextVariant,

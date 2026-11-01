@@ -12,7 +12,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
-import { NavLinks } from './NavLinks'
+import { NavLinks, NavPhotoLink } from './NavLinks'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -143,5 +143,56 @@ describe('NavLinks', () => {
     // Témoin : les autres liens, eux, naviguent.
     await fireEvent.press(link(fr.t(($) => $.nav.feed)))
     expect(onPress).toHaveBeenCalledWith('feed')
+  })
+})
+
+// La photo « Moi » de la barre du haut (R4, M10) : un lien nommé « Moi » avec sa vraie adresse, qui dit
+// « page actuelle » sur sa page seulement, et n'empile pas une seconde fois cette page.
+describe('NavPhotoLink', () => {
+  const me = fr.t(($) => $.nav.me)
+  const photo = (props: { current?: boolean; onPress?: () => void } = {}) => (
+    <NavPhotoLink
+      label={me}
+      href="/me"
+      current={props.current}
+      onPress={props.onPress ?? (() => {})}
+      name="Léa Moreau"
+      source={null}
+    />
+  )
+
+  it('is a link named « Moi » with its address, and not the current page elsewhere', async () => {
+    await renderWithProviders(photo())
+
+    const photoLink = link(me)
+    expect(photoLink.props.href).toBe('/me')
+    expect(photoLink.props['aria-current']).not.toBe('page')
+    expect(screen.queryByRole('link', { name: me, selected: true })).toBeNull()
+  })
+
+  it('says it is the current page, on the web and on the phone, when its page is open', async () => {
+    await renderWithProviders(photo({ current: true }))
+
+    expect(link(me).props['aria-current']).toBe('page')
+    expect(screen.getByRole('link', { name: me, selected: true })).toBeTruthy()
+  })
+
+  it('opens the page when touched', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(photo({ onPress }))
+
+    await fireEvent.press(link(me))
+
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not open its page a second time when it is already the current page', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(photo({ current: true, onPress }))
+
+    expect(link(me)).toBeTruthy() // témoin : le lien est là
+    await fireEvent.press(link(me))
+
+    expect(onPress).not.toHaveBeenCalled()
   })
 })
