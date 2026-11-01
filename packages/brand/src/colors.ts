@@ -235,6 +235,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Le texte discret, seulement sur la page : 3,2:1 sur une photo sombre de jour, 3,7:1 sur la
   // lumière miel de nuit. Sur une image ou la lumière, une légende passe en textSecondary.
   { text: 'textMuted', on: 'panel', min: 4.5 },
+  // La carte d'une note du fil (R4, ui/NoteCard.tsx) est tout entière de ce verre, posé sur la page
+  // et sa lumière miel, jamais sur une photo : son surtitre « Note » y est en texte
+  // d'accent, mesuré sur ces deux fonds.
+  { text: 'amberText', on: 'panel', min: 4.5, base: onPageOrHoney },
   // Le verre plus léger des barres flottantes : même règle, avec un gris plus sombre que textMuted
   // (qui y tomberait sous 4,5). Sur une photo sombre, de jour, il ferait 3,1:1 : là, le panneau.
   { text: 'text', on: 'glass', min: 4.5, base: onAnyBackdrop },

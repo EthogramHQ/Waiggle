@@ -5,14 +5,14 @@ import type { ProjectNote, ProjectSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
-import { shortDate } from '../projects/format'
 import { NoteCard } from '../ui/NoteCard'
+import { RelativeTime } from '../ui/RelativeTime'
 import { useNameOf } from '../useNameOf'
 
 type Props = { note: ProjectNote; project: ProjectSummary }
 
 export function FeedNoteCard({ note, project }: Props) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
   const nameOf = useNameOf()
@@ -28,7 +28,9 @@ export function FeedNoteCard({ note, project }: Props) {
       project={project.title}
       author={{ name: project.author.name, avatar: toSource(project.author.avatarUrl) }}
       body={note.body}
-      when={shortDate(note.createdAt, i18n.language)}
+      // « il y a 2 h », « hier » : la date se dit par rapport à maintenant (R4, F-Fil3), et se lit
+      // en entier. Sur le verre posé sur la lumière du fil, une légende passe en textSecondary.
+      when={<RelativeTime date={note.createdAt} tone="secondary" />}
       image={
         visual
           ? { source: toSource(visual.url), thumbhash: visual.thumbhash, label: project.title }
