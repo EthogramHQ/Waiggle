@@ -1144,6 +1144,10 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
+    // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
+    // garde la date lue au début de la visite, donc la capture ne change pas : 204, rien de gardé.
+    if (pathname === '/v1/feed/read' && method === 'PUT')
+      return route.fulfill({ status: 204, body: '' })
     // « Proches à suivre » (R4) : la liste, sans ceux que Léa a écartés ; écarter répond 204.
     if (pathname === '/v1/suggestions/members') {
       return json(200, { members: suggestedMembers.filter((m) => !dismissed.has(m.id)) })
