@@ -42,7 +42,8 @@ type Props = {
 }
 
 // La couverture, en bande basse : assez pour reconnaître le projet, pas assez pour se confondre
-// avec une carte de projet. Sa hauteur ne change jamais, même à côté de cartes plus hautes.
+// avec une carte de projet. C'est sa hauteur la plus petite : à côté d'une carte plus haute, elle
+// prend la place qui reste (voir plus bas).
 const COVER_HEIGHT = 120
 // Au-delà, le texte se coupe (avec « … ») : la carte garde une taille raisonnable dans le fil.
 const BODY_LINES = 6
@@ -55,9 +56,11 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
   const bodyId = useId()
   const dateId = useId()
   return (
-    // Pas de `fill` : dans une rangée de la grille, la carte garde sa propre hauteur, en haut de sa
-    // case, au lieu de s'étirer à celle des cartes de projet voisines (à côté d'une grande photo,
-    // ~200 points de vide s'ouvraient entre le texte et l'auteur, relecture du 22/10/2026).
+    // `fill` : dans une rangée de la grille, la carte s'étire à la hauteur de la carte de projet
+    // voisine, et c'est sa couverture qui prend la place en plus (`grow`). Le texte et l'auteur
+    // restent ensemble, sous elle : ni vide sous la carte (relecture de design de R4, A2 : 201
+    // points à 1 280), ni vide entre le texte et l'auteur (relecture du 22/10/2026). Seule dans sa
+    // rangée (téléphone), la carte garde sa hauteur.
     // radius : l'anneau de focus suit le rayon du verre, celui des cartes du fil.
     <Pressed
       label={label}
@@ -65,12 +68,13 @@ export function NoteCard({ label, project, author, body, when, image, onPress }:
       role="link"
       radius="sheet"
       describedBy={`${bodyId} ${dateId}`}
+      fill
     >
       {/* Le verre des cartes de projet, au rayon des cartes du fil, avec l'ombre d'une carte. */}
-      <Surface variant="panel" radius="sheet" padding="sm" gap="sm" shadow="card">
+      <Surface variant="panel" radius="sheet" padding="sm" gap="sm" shadow="card" fit="fill">
         {/* Rayon intérieur plus petit que celui du verre, de l'épaisseur de son bord (8 points) :
             34 − 8 = 26, le rayon « panel ». */}
-        <ProjectCover height={COVER_HEIGHT} radius="panel" image={image ?? null} />
+        <ProjectCover height={COVER_HEIGHT} radius="panel" image={image ?? null} grow />
         {/* Le texte, puis l'auteur juste dessous. */}
         <View
           style={{

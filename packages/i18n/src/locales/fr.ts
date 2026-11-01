@@ -1321,7 +1321,6 @@ export const fr = {
     nobodyBody: 'Suis des membres depuis leur page : leurs nouveaux projets arriveront ici.',
     // R3 : « Découvrir » est devenu l'onglet Explorer ; le fil vide y mène.
     nobodyAction: 'Explorer les projets',
-    quiet: 'Rien de neuf pour l’instant chez les personnes que tu suis.',
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
     followingCaption:

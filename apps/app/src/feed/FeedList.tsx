@@ -8,12 +8,13 @@
 // des nouveautés qui montre les visages des auteurs (posé ici sur téléphone, à côté du titre de la
 // page sur ordinateur : `FeedNews`).
 import type { FeedItem, ProjectSummary } from '@ruche/contracts'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
 import { SummaryCard } from '../projects/SummaryCard'
+import { Arrival } from '../ui/Arrival'
 import { FeedEnd } from '../ui/FeedEnd'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
@@ -128,6 +129,10 @@ type LoadedFeed = {
   refetch: () => Promise<unknown>
 }
 
+// Le message d'un fil vide (`empty`) ou « Tu es à jour » (`upToDate`), l'un ou l'autre, jamais les
+// deux (relecture de l'interface de R4) : un fil vide du Fil finit sur « Tu es à jour », jamais sur
+// un message de fil vide, qui ne serait donc jamais affiché. `never` : TypeScript refuse qu'un
+// écran donne les deux.
 type FeedListProps = {
   feed: LoadedFeed
   items: FeedItem[]
@@ -136,18 +141,50 @@ type FeedListProps = {
    * l'écran le pose ailleurs (le Fil sur ordinateur, à côté de son titre).
    */
   news?: ReactNode
-  /** Le message d'un fil vide (sans « Tu es à jour » : Explorer). */
-  empty: string
   /** Ce qui se pose sur la photo de la carte d'un projet (pas sur celle d'une note). */
   overlay?: ((project: ProjectSummary) => ReactNode) | undefined
-  /**
-   * « Tu es à jour » (le Fil, R4) : la date de la dernière lecture, lue sur la première page et
-   * figée pour la visite (`useReadBefore`), et ce que fait « Explorer d'autres projets ». Sans elle
-   * (Explorer), une seule liste, et la fin ordinaire.
-   */
-  upToDate?: { readBefore: string | null; onExplore: () => void } | undefined
   /** Le nombre de colonnes de la grille, imposé par l'écran (voir ProjectGrid). */
   columns?: number | undefined
+} & (
+  | {
+      /** Le message d'un fil vide (Explorer, sans « Tu es à jour »). */
+      empty: string
+      upToDate?: never
+    }
+  | {
+      /**
+       * « Tu es à jour » (le Fil, R4) : la date de la dernière lecture, lue sur la première page et
+       * figée pour la visite (`useReadBefore`), et ce que fait « Explorer d'autres projets ». Sans
+       * elle (Explorer), une seule liste, et la fin ordinaire.
+       */
+      upToDate: { readBefore: string | null; onExplore: () => void }
+      empty?: never
+    }
+)
+
+/**
+ * Hook : les éléments qui viennent d'arriver en haut du fil (après « 3 nouveaux projets »), ceux
+ * dont la carte tombe en place (`Arrival`, R4).
+ *
+ * Il retient les éléments déjà affichés (un `useRef` : une mémoire qui survit aux affichages sans
+ * en provoquer). Au premier affichage, tous sont déjà là : rien ne bouge. Ensuite, un élément est
+ * « arrivé » s'il est nouveau et posé avant le premier élément déjà vu, en haut du fil : la suite
+ * (« Afficher la suite », plus ancienne) s'ajoute en bas sans animation. Après chaque affichage,
+ * les éléments montrés rejoignent les éléments vus : une carte ne tombe qu'une fois, même si elle
+ * est redessinée (une grille qui se recompose à l'arrivée de la suivante).
+ */
+const useArrivals = (items: readonly FeedItem[]): ReadonlySet<string> => {
+  const known = useRef<Set<string> | null>(null)
+  // Rempli pendant le premier affichage : aucun rendu ne passe sans cette mémoire.
+  if (known.current === null) known.current = new Set(items.map(feedItemId))
+  const seen = known.current
+  const firstSeen = items.findIndex((item) => seen.has(feedItemId(item)))
+  const arrived = items.slice(0, firstSeen === -1 ? items.length : firstSeen).map(feedItemId)
+  // Sans liste de dépendances : après chaque affichage, une fois les cartes posées à l'écran.
+  useEffect(() => {
+    for (const item of items) seen.add(feedItemId(item))
+  })
+  return new Set(arrived)
 }
 
 /**
@@ -162,14 +199,14 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
   const { cardRef } = useScrollLight(
     items.map((item) => ({ id: feedItemId(item), thumbhash: item.project.cover?.thumbhash })),
   )
+  const arrivals = useArrivals(items)
 
   const cardOf = (item: FeedItem) => {
     const id = feedItemId(item)
     return (
-      // La vue que la lumière mesure : la carte entière, à sa place dans la fenêtre.
-      // (une pile sans écart autour d'un seul élément : la vue la plus simple qu'un dossier de
-      // domaine a le droit de poser).
-      <Stack key={id} ref={cardRef(id)} gap="none">
+      // La vue que la lumière mesure : la carte entière, à sa place dans la fenêtre. Une carte
+      // arrivée par le bouton des nouveautés y tombe en place.
+      <Arrival key={id} ref={cardRef(id)} arriving={arrivals.has(id)}>
         {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
             discrète, qui mène elle aussi au projet. */}
         {item.kind === 'note' ? (
@@ -177,7 +214,7 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
         ) : (
           <SummaryCard project={item.project} at={item.at} overlay={overlay?.(item.project)} />
         )}
-      </Stack>
+      </Arrival>
     )
   }
 
@@ -202,13 +239,14 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
       {feed.isRefetchError ? <Notice message={t(($) => $.errors[errorKey(feed.error)])} /> : null}
       {upToDate ? (
         // Le Fil : deux grilles autour de la sphère, chacune une liste complète (ui-B6). Une grille
-        // vide n'est pas dessinée (elle dirait « rien de neuf » au-dessus de « Tu es à jour »).
+        // vide n'est pas dessinée (elle dirait « rien de neuf » au-dessus de « Tu es à jour ») ; un
+        // fil vide finit donc sur la sphère seule.
         <>
-          {segment(items.slice(0, sphereAt ?? items.length), cardOf, empty, columns)}
+          {segment(items.slice(0, sphereAt ?? items.length), cardOf, columns)}
           {sphereAt !== null ? (
             <UpToDate firstVisit={upToDate.readBefore === null} onExplore={upToDate.onExplore} />
           ) : null}
-          {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, empty, columns) : null}
+          {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (
         <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
@@ -236,15 +274,10 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
 function segment(
   items: FeedItem[],
   cardOf: (item: FeedItem) => ReactNode,
-  empty: string,
   columns: number | undefined,
 ) {
   if (items.length === 0) return null
-  return (
-    <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
-      {items.map(cardOf)}
-    </ProjectGrid>
-  )
+  return <ProjectGrid {...(columns ? { columns } : null)}>{items.map(cardOf)}</ProjectGrid>
 }
 
 type FeedErrorProps = {

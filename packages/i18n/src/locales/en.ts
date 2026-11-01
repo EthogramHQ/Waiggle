@@ -1119,7 +1119,6 @@ export const en: Translation = {
     nobodyTitle: 'You don’t follow anyone yet',
     nobodyBody: 'Follow members from their page: their new projects will show up here.',
     nobodyAction: 'Explore projects',
-    quiet: 'Nothing new yet from the people you follow.',
     discoverEmpty: 'No public project yet.',
     testersEmpty: 'No project is looking for testers yet.',
     followingCaption: 'New projects from the people you follow, and notes from followed projects.',

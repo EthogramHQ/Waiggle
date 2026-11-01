@@ -205,42 +205,7 @@ export function Screen({
     <>
       {topRow}
       {title || subtitle ? (
-        // L'en-tête de la page, le même partout (Fil, Explorer, Outils) : l'écart entre le titre et
-        // le sous-titre est le seul `gap` de cette colonne (point des listes R4 : 32 points sur le
-        // Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).
-        <View style={{ gap: space.sm }}>
-          {title && titleAside ? (
-            // Le titre et l'élément posé à côté, sur une rangée : centrés l'un sur l'autre (le bouton
-            // de 44 points dépasse de 3 points le titre de chaque côté), et sans marge ni remplissage
-            // en haut ou en bas, pour ne rien ajouter à l'écart du sous-titre. `flexWrap` : à 320
-            // points ou en grand texte, le bouton passe sous le titre au lieu de sortir de l'écran.
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: space.md,
-              }}
-            >
-              {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
-                  d'elle-même : flexShrink 0 par défaut). */}
-              <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-                <Text variant="title2" heading={1}>
-                  {title}
-                </Text>
-              </View>
-              {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
-                  ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
-              <View style={{ flexShrink: 1, maxWidth: '100%' }}>{titleAside}</View>
-            </View>
-          ) : title ? (
-            // Le titre de la page : niveau 1 (ses sections sont de niveau 2).
-            <Text variant="title2" heading={1}>
-              {title}
-            </Text>
-          ) : null}
-          {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
-        </View>
+        <PageHeading title={title} aside={titleAside} subtitle={subtitle} />
       ) : null}
       {pinned ? null : notice}
       {children}
@@ -438,6 +403,62 @@ function ScrollToTopOnReselect({ scroller }: { scroller: RefObject<ScrollView | 
     if (focused) scroller.current?.scrollTo({ y: 0, animated: !calm })
   }, [topSignal, focused, calm, scroller])
   return null
+}
+
+/**
+ * L'en-tête de la page, le même partout (Fil, Explorer, Outils) : le titre (niveau 1, ses sections
+ * sont de niveau 2), ce qui se pose à côté de lui (`aside`, le bouton des nouveautés du Fil, R4) et
+ * le sous-titre. Exporté pour le catalogue, qui le montre dans la page ; les écrans passent par les
+ * props `title`, `titleAside` et `subtitle` de Screen.
+ */
+export function PageHeading({
+  title,
+  aside,
+  subtitle,
+  level = 1,
+}: {
+  title?: string | undefined
+  aside?: ReactNode
+  subtitle?: string | undefined
+  /** Le niveau du titre : 1 dans une page ; 2 au catalogue, sous le titre de la page. */
+  level?: 1 | 2
+}) {
+  return (
+    // L'écart entre le titre et le sous-titre est le seul `gap` de cette colonne (point des listes
+    // R4 : 32 points sur le Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).
+    <View style={{ gap: space.sm }}>
+      {title && aside ? (
+        // Le titre et l'élément posé à côté, sur une rangée : centrés l'un sur l'autre (le bouton
+        // de 44 points dépasse de 3 points le titre de chaque côté), et sans marge ni remplissage
+        // en haut ou en bas, pour ne rien ajouter à l'écart du sous-titre. `flexWrap` : à 320
+        // points ou en grand texte, le bouton passe sous le titre au lieu de sortir de l'écran.
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: space.md,
+          }}
+        >
+          {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
+              d'elle-même : flexShrink 0 par défaut). */}
+          <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+            <Text variant="title2" heading={level}>
+              {title}
+            </Text>
+          </View>
+          {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
+              ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
+          <View style={{ flexShrink: 1, maxWidth: '100%' }}>{aside}</View>
+        </View>
+      ) : title ? (
+        <Text variant="title2" heading={level}>
+          {title}
+        </Text>
+      ) : null}
+      {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
+    </View>
+  )
 }
 
 /**
