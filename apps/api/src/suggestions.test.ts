@@ -263,6 +263,12 @@ describe('who may read and dismiss suggestions', () => {
       await dismiss('pas un identifiant !', max),
       await follow(UNKNOWN_MEMBER, max),
     )
+    // Soi-même : le même refus 400 que « Suivre » sur soi (sec-A2), et rien n'est écrit.
+    const ownDismissal = await dismiss(maxId, max)
+    await expectError(ownDismissal, 400, 'cannot_follow_own')
+    expect(await (await follow(maxId, max)).json()).toEqual(
+      await (await dismiss(maxId, max)).json(),
+    )
     // Rien n'est écrit pour eux.
     expect(await storedDismissals()).toEqual([])
     // Témoin : Zoé, vérifiée et sans blocage, s'écarte.
@@ -628,6 +634,41 @@ describe('the dismissals in the export and with the accounts', () => {
       await (await send('GET', '/v1/notifications/unread', lea)).json(),
     ).count
     expect(unreadAfter).toBe(unreadBefore)
+  })
+
+  it('exports a dismissed member without his handle once he has blocked the dismisser', async () => {
+    const leaHandle = (await act.me(lea)).handle
+    const zoeHandle = (await act.me(zoe)).handle
+    await expectDone(await dismiss(leaId, max))
+    later()
+    await expectDone(await dismiss(zoeId, max))
+
+    // Léa bloque Max après coup : la page de Léa répond 404 à Max, son pseudo ne sort plus non plus.
+    await act.block(maxId, lea)
+    const exported = (await exportOf(max)).dismissedSuggestions
+    // L'identifiant et la date restent ; seul le pseudo de Léa disparaît. Zoé, sans blocage, le garde.
+    expect(exported.map((row) => [row.memberId, row.handle])).toEqual([
+      [leaId, null],
+      [zoeId, zoeHandle],
+    ])
+    expect(JSON.stringify(exported)).not.toContain(leaHandle ?? 'no handle')
+  })
+
+  it('exports a dismissed member without his handle once the dismisser has blocked him', async () => {
+    const leaHandle = (await act.me(lea)).handle
+    await expectDone(await dismiss(leaId, max))
+
+    // Max bloque Léa après l'avoir écartée : le blocage joue dans les deux sens.
+    await act.block(leaId, max)
+    const exported = (await exportOf(max)).dismissedSuggestions
+    expect(exported).toHaveLength(1)
+    expect(exported[0]?.memberId).toBe(leaId)
+    expect(exported[0]?.handle).toBeNull()
+    expect(JSON.stringify(exported)).not.toContain(leaHandle ?? 'no handle')
+
+    // Débloquée, Léa retrouve son pseudo dans l'export (le blocage seul le cachait).
+    await act.unblock(leaId, max)
+    expect((await exportOf(max)).dismissedSuggestions[0]?.handle).toBe(leaHandle)
   })
 
   it('drops the dismissal when the dismissed member deletes her account, and all of them with the dismisser', async () => {
