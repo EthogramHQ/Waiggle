@@ -85,6 +85,9 @@ const day = {
   panelBorder: 'rgba(255,255,255,0.8)',
   sheet: 'rgba(255,255,255,0.86)', // feuille qui monte du bas de l'écran
   scrim: 'rgba(28,27,25,0.32)', // voile derrière une feuille ou une fenêtre
+  // Le reflet qui suit la souris sur une carte inclinée (ui/tilt.ts) : une lueur blanche au centre,
+  // qui s'efface vers ses bords. Il ne porte aucun texte.
+  glare: 'rgba(255,255,255,0.22)',
   focusRing: '#C77F00', // contour de l'élément choisi au clavier (sur ordinateur)
 
   // La mascotte (ui/Mascot.tsx). Son dessin est une image, à l'encre presque noire de jour comme de
@@ -160,6 +163,8 @@ const night = {
   panelBorder: 'rgba(255,255,255,0.14)',
   sheet: 'rgba(26,23,18,0.94)',
   scrim: 'rgba(0,0,0,0.5)',
+  // De nuit, plus discret : un reflet vif sur une photo sombre éblouirait.
+  glare: 'rgba(255,255,255,0.12)',
   focusRing: '#FFC933',
 
   // L'encre de l'image ne change pas avec le thème ; le disque devient un miel pâle et chaud.

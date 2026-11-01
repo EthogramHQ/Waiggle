@@ -22,6 +22,7 @@ export {
   pressScaleFab,
   type SpringName,
   springs,
+  tilt,
 } from './motion'
 export { appName, contactEmail, sourceUrl } from './name'
 export { type ShadowName, shadows } from './shadows'
