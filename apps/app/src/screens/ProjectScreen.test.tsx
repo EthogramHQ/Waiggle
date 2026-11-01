@@ -825,7 +825,7 @@ describe('reacting to a project from its page', () => {
     expect(await screen.findByText('Les réactions à ton projet')).toBeTruthy()
     expect(screen.getByLabelText('Waggle\u202f!, 2')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/ }),
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\s!),/ }),
     ).toBeNull()
   })
 
@@ -1350,7 +1350,7 @@ describe('reactions, after the reviews', () => {
 
     await screen.findByText('Les réactions à ton projet')
     const items = screen.getAllByRole('listitem', {
-      name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/,
+      name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\s!),/,
     })
     expect(items).toHaveLength(5)
     expect(screen.getByRole('listitem', { name: 'Waggle\u202f!, 9' })).toBeTruthy()
@@ -1803,7 +1803,7 @@ describe('a project page seen by a suspended member', () => {
       expect(screen.queryByRole('switch', { name: 'Suivre ce projet' })).toBeNull(),
     )
     expect(
-      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/ }),
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\s!),/ }),
     ).toBeNull()
     // Il lit tout ce qu'il lisait avant : les nombres restent, comme pour l'auteur.
     expect(screen.getByLabelText('Waggle\u202f!, 3')).toBeTruthy()
@@ -1864,7 +1864,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     // Témoin du profil lu : aucune réaction à poser.
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
     )
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
@@ -1902,7 +1902,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
     )
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
@@ -1945,7 +1945,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+      expect(screen.queryByRole('button', { name: /^Waggle\s!,/ })).toBeNull(),
     )
     expect(screen.getByLabelText(fr.t(($) => $.project.reactions.readOnly))).toBeTruthy()
   })
