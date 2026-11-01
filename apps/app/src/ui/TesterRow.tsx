@@ -17,14 +17,12 @@
 // un `ListRow` touchable range tout ce qui est à droite (`trailing`, `accessory`) dans son propre
 // bouton, où « Tester » serait un lien dans un lien ; et il ne devient un lien qu'avec une adresse
 // (`href`), que la ligne n'a pas.
-import { layout, radii, space } from '@ruche/brand'
-import { useTranslation } from 'react-i18next'
-import { Platform, Pressable, View } from 'react-native'
-import { Icon } from './Icon'
+import { space } from '@ruche/brand'
+import { Pressable, View } from 'react-native'
 import { enterActivates } from './keyboard'
 import { ListRow } from './ListGroup'
 import { type CoverImage, ProjectCover } from './ProjectCover'
-import { Text } from './Text'
+import { TestLink } from './TestLink'
 import { useTapGuard } from './tapGuard'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -53,19 +51,11 @@ const THUMB = 48
 const LINK_BASIS = 180
 
 export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
-  const { t } = useTranslation()
-  const { colors, shadows } = useTheme()
-  const web = Platform.OS === 'web'
+  const { colors } = useTheme()
   // Une seule garde pour les deux liens de la ligne (voir tapGuard.ts).
   const guard = useTapGuard()
   const test = guard(onTest)
   const open = onOpen ? guard(onOpen) : undefined
-
-  // Le nom lu : « Tester Carnet de cafés » (le texte affiché en tête, puis le projet). Il quitte
-  // l'appli : sur le web, où l'indice n'existe pas, le nom le dit (« …, ouvre un site externe ») ;
-  // sur téléphone, l'indice lu après le nom.
-  const name = t(($) => $.explore.testProject, { title })
-  const outside = t(($) => $.common.externalSite)
 
   const body = (
     <ListRow
@@ -115,56 +105,15 @@ export function TesterRow({ title, author, image, onTest, onOpen }: Props) {
         )}
       </View>
       {/* « Tester », frère du lien de la ligne. */}
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={web ? `${name}, ${outside}` : name}
-        accessibilityHint={web ? undefined : outside}
-        {...enterActivates(test)}
+      <TestLink
+        title={title}
         onPress={test}
-        style={{
-          // 44 points à toucher autour de la pastille dessinée, plus petite (hitSlop est ignoré
-          // sur le web) ; le rayon suit la pastille, pour l'anneau du clavier, qui se dessine
-          // autour de la zone : un anneau intérieur se perdrait sur le miel.
-          minHeight: layout.touchTarget,
-          minWidth: layout.touchTarget,
-          // Rangé à droite, sur la ligne du titre comme sous elle (marge automatique) ; jamais
-          // plus large que la ligne, même à 200 % de texte (react-native-web ne laisse rien
-          // rétrécir sans `maxWidth`). La marge verticale ne change rien sur une seule ligne (la
-          // ligne est plus haute) ; passé dessous, « Tester » ne colle pas au trait suivant.
-          marginLeft: 'auto',
-          marginVertical: space.sm,
-          maxWidth: '100%',
-          flexShrink: 1,
-          justifyContent: 'center',
-          borderRadius: radii.pill,
-        }}
-      >
-        {({ pressed }) => (
-          // La pastille miel, comme celle de `TesterCard` : son texte encre (onHoney) se lit sur le
-          // miel.
-          <View
-            style={{
-              alignSelf: 'flex-end',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: space.xs,
-              minHeight: layout.controlHeight.small,
-              paddingHorizontal: space.md,
-              borderRadius: radii.pill,
-              backgroundColor: pressed ? colors.honeyPressed : colors.honey,
-              boxShadow: `${shadows.highlight}, ${shadows.honey}`,
-            }}
-          >
-            <Text variant="callout" weight={700} tone="onHoney" numberOfLines={1}>
-              {t(($) => $.explore.test)}
-            </Text>
-            {/* La flèche est décorative : le nom lu dit déjà que le lien sort de l'appli. */}
-            <View aria-hidden>
-              <Icon name="arrow-up-right" size={space.lg} tone="onHoney" />
-            </View>
-          </View>
-        )}
-      </Pressable>
+        size="small"
+        // Rangé à droite, sur la ligne du titre comme sous elle (marge automatique). La marge
+        // verticale ne change rien sur une seule ligne (la ligne est plus haute) ; passé dessous,
+        // « Tester » ne colle pas au trait suivant.
+        style={{ marginLeft: 'auto', marginVertical: space.sm }}
+      />
     </View>
   )
 }

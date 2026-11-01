@@ -33,6 +33,7 @@ import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
+import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
 import { spring } from './theme/motion'
@@ -146,7 +147,7 @@ export function ProjectCard({
   coverRef,
 }: Props) {
   const { t } = useTranslation()
-  const { colors, shadows } = useTheme()
+  const { colors } = useTheme()
   const web = Platform.OS === 'web'
   const [measures, measure] = useMeasures(height)
   // Une garde commune aux trois liens : la seconde tape d'une double tape (« Tester », puis la
@@ -336,58 +337,12 @@ export function ProjectCard({
     ) : null
 
   // --- « Tester ↗ » ---------------------------------------------------------------------------
-  // Le nom lu : « Tester Carnet de cafés » (le texte affiché en tête, puis le projet : plusieurs
-  // cartes, plusieurs « Tester »). Il quitte l'appli : sur le web, où l'indice n'existe pas, le nom
-  // le dit (« …, ouvre un site externe ») ; sur téléphone, l'indice lu après le nom.
-  const testName = t(($) => $.explore.testProject, { title })
-  const outside = t(($) => $.common.externalSite)
-  // La pastille miel, recopiée de `TesterCard` et `TesterRow` (un composant commun est à décider) ;
-  // ici à la hauteur d'une zone à toucher, comme sur la planche du fil.
+  // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
+  // la planche du fil. Son nom lu, « Tester Carnet de cafés » (plusieurs cartes, plusieurs
+  // « Tester »), et son avertissement de site externe viennent d'elle.
   const tester =
     tryIt && test ? (
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={web ? `${testName}, ${outside}` : testName}
-        accessibilityHint={web ? undefined : outside}
-        // Entrée ouvre la démo sur le web, comme un vrai lien (voir keyboard.ts).
-        {...enterActivates(test)}
-        onPress={test}
-        style={{
-          // 44 points à toucher ; le rayon suit la pastille, pour l'anneau du clavier, qui se
-          // dessine autour (un anneau intérieur se perdrait sur le miel). Jamais plus large que la
-          // rangée, même à 200 % de texte.
-          minHeight: layout.touchTarget,
-          minWidth: layout.touchTarget,
-          maxWidth: '100%',
-          flexShrink: 1,
-          justifyContent: 'center',
-          borderRadius: radii.pill,
-        }}
-      >
-        {({ pressed }) => (
-          // Son texte encre (onHoney) se lit sur le miel, opaque sur n'importe quelle photo.
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: space.xs,
-              minHeight: layout.controlHeight.compact,
-              paddingHorizontal: space.lg,
-              borderRadius: radii.pill,
-              backgroundColor: pressed ? colors.honeyPressed : colors.honey,
-              boxShadow: `${shadows.highlight}, ${shadows.honey}`,
-            }}
-          >
-            <Text variant="callout" weight={700} tone="onHoney" numberOfLines={1}>
-              {tryIt.label}
-            </Text>
-            {/* La flèche est décorative : le nom lu dit déjà que le lien sort de l'appli. */}
-            <View aria-hidden>
-              <Icon name="arrow-up-right" size={space.lg} tone="onHoney" />
-            </View>
-          </View>
-        )}
-      </Pressable>
+      <TestLink title={title} label={tryIt.label} onPress={test} size="compact" />
     ) : null
 
   // --- La rangée du bas : « Tester », le statut, la pastille, le total -------------------------
