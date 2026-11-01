@@ -137,10 +137,10 @@ export function useTilt(wanted = true) {
     frozen.current = true
     instant.value = true
     tilt.value = FLAT
-    // Sur le web, Reanimated n'écrit le nouveau style qu'à la prochaine image, alors que la mesure
-    // de la photo (`measureInWindow` de react-native-web) part dans un minuteur de 0 ms, souvent
-    // avant : la transformation est retirée ici, sur l'élément même. Reanimated y écrit ensuite
-    // « à plat », qui revient au même.
+    // Sur le web, la mesure de la photo (`measureInWindow` de react-native-web) part dans un
+    // minuteur de 0 ms. Reanimated a écrit « à plat » avant elle dans nos essais (01/11), mais rien
+    // ne garantit cet ordre d'une version à l'autre : la transformation est aussi retirée ici, sur
+    // l'élément même. Reanimated y écrit ensuite « à plat », qui revient au même.
     if (node.current?.style) node.current.style.transform = 'none'
   }, [tilt, instant])
 
