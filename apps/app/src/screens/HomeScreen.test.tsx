@@ -1205,7 +1205,7 @@ describe('the first run of a member who follows nobody (R4)', () => {
     await renderFirstRun()
 
     expect(screen.getAllByRole('button', { name: /^Ne plus suggérer/ })).toHaveLength(5)
-    expect(screen.getAllByRole('button', { name: /^Suivre/ })).toHaveLength(5)
+    expect(screen.getAllByRole('switch', { name: /^Suivre/ })).toHaveLength(5)
     expect(screen.getByRole('button', { name: dismissOf('Malo') })).toBeTruthy()
   })
 
@@ -1213,7 +1213,7 @@ describe('the first run of a member who follows nobody (R4)', () => {
     const suggestions = mockSuggestions(fiveSuggested)
     await renderFirstRun()
 
-    await fireEvent.press(screen.getAllByRole('button', { name: /^Suivre/ })[0] as never)
+    await fireEvent.press(screen.getAllByRole('switch', { name: /^Suivre/ })[0] as never)
 
     expect(useFollow).toHaveBeenCalledWith({ kind: 'member', id: nora.id })
     expect(mockToggle).toHaveBeenCalledTimes(1)
@@ -1240,17 +1240,25 @@ describe('the first run of a member who follows nobody (R4)', () => {
   })
 
   // Décision de Louis du 31/10/2026 : le nom ou la photo ouvre la page du membre, la vignette ouvre
-  // le projet.
-  it('opens the page of a suggested member, and her latest project', async () => {
+  // le projet. Deux rendus : la garde de double tape de la liste (600 ms, ui-B7) bloquerait une
+  // seconde tape faite aussitôt après la première.
+  it('opens the page of a suggested member', async () => {
     await renderFirstRun()
 
     const nameOf =
       screen.queryByRole('link', { name: 'Nora' }) ?? screen.getByRole('button', { name: 'Nora' })
     await fireEvent.press(nameOf)
-    await fireEvent.press(screen.getByRole('link', { name: 'Carnet de cafés' }))
 
     const paths = mockPush.mock.calls.map(([href]) => pathOf(href))
     expect(paths).toContain(`/members/${nora.id}`)
+  })
+
+  it('opens the latest project of a suggested member', async () => {
+    await renderFirstRun()
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Carnet de cafés' }))
+
+    const paths = mockPush.mock.calls.map(([href]) => pathOf(href))
     expect(paths).toContain(`/projects/${fiveSuggested[0]?.latestProject.id}`)
   })
 
@@ -1277,7 +1285,7 @@ describe('the first run of a member who follows nobody (R4)', () => {
     await renderFirstRun(suspendedInes)
 
     await suspensionBanner()
-    const follows = screen.getAllByRole('button', { name: /^Suivre/ })
+    const follows = screen.getAllByRole('switch', { name: /^Suivre/ })
     expect(follows).toHaveLength(5)
     for (const button of follows) expect(button).toBeDisabled()
   })
