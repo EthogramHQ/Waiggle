@@ -168,6 +168,12 @@ script=$(web "https://$APP_HOST/" | grep -o '/_expo/static/js/web/[^"]*\.js' | h
 grep -qx 'cache-control: public, max-age=31536000, immutable' <<<"$(headers_of "https://$APP_HOST$script")" ||
   die "$script : devrait être gardé un an par le navigateur"
 echo "ok : $script gardé un an"
+# L'adresse de repli de l'appli (config.ts) ne doit jamais finir dans le bundle publié : un lien
+# partagé ou copié pointerait vers le PC du développeur (relecture de sécurité de R5a, sec-B7).
+if web "https://$APP_HOST$script" | grep -q 'localhost:8081'; then
+  die "$script : contient localhost:8081 (EXPO_PUBLIC_APP_URL absente à la construction ?)"
+fi
+echo "ok : $script sans adresse de développement"
 
 step "Redirections"
 expect "HTTP → HTTPS" "$(web -o /dev/null -w '%{http_code} %{redirect_url}' "http://$APP_HOST/sign-in")" \

@@ -439,7 +439,7 @@ export const fr = {
       status: 'Où en est-il ?',
       public: 'Public',
       publicHint:
-        'Visible par les membres connectés. En privé, il te sert de brouillon : les commentaires et les réactions reçus sont gardés, mais personne ne les voit.',
+        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
@@ -532,14 +532,39 @@ export const fr = {
       inspiring: 'Inspirant',
       useful: 'Utile',
       funny: 'Drôle',
-      bravo: 'Bravo',
+      // R5a : « Waggle ! » remplace « Bravo » à l'écran ; la clé reste `bravo` (base, API).
+      bravo: 'Waggle !',
       label: '{{name}}, {{count}}',
-      labelMine: '{{name}}, réagi, {{count}}',
+      labelMine: '{{name}}, {{count}}, ta réaction',
       own: 'Les réactions à ton projet',
+      // Sous le bloc de l'auteur (R5a, jur-2) ; « Pas encore de réaction » tant que tout est à 0 (jur-14).
+      ownCaption: 'Des nombres seulement : l’appli ne montre à personne qui a réagi.',
+      ownNone: 'Pas encore de réaction',
       // La légende des réactions qu’un compte suspendu lit sans pouvoir réagir.
       readOnly: 'Les réactions à ce projet',
       group: 'Réagir à ce projet',
       error: 'Ta réaction n’a pas pu être enregistrée. Réessaie.',
+    },
+    // « Le prompt de départ » et ses repères (R5a : F-Pr2, F-Pr10, jur-6, jur-7). Un repère dit ce
+    // qu'il a trouvé, jamais une intention ; rien ne dit qu'un prompt est « sûr ».
+    prompts: {
+      starting: 'Le prompt de départ',
+      others: 'Les autres prompts · {{count}}',
+      copy: 'Copier',
+      copyStarting: 'Copier le prompt de départ',
+      copyNamed: 'Copier le prompt {{index}}',
+      copied: 'Copié',
+      bubble: 'Prompt copié',
+      copyFailed: 'Impossible de copier le prompt. Réessaie.',
+      caution:
+        'Relis-le avant de t’en servir. Ne donne jamais à une IA ton mot de passe, une clé ou un code reçu.',
+      warning: 'À lire avant de l’utiliser',
+      reasons: {
+        command: 'Il contient une commande.',
+        link: 'Il contient un lien.',
+        encoded: 'Il contient un long bloc codé, illisible tel quel.',
+        secret: 'Il parle de mot de passe, de clé ou de code.',
+      },
     },
     comments: {
       title: 'Commentaires ({{count}})',
@@ -614,6 +639,17 @@ export const fr = {
       published: 'publié le {{date}}',
       /** R4 : la date relative après le verbe (« publié hier », « publié le 12 oct. » : jur-J2). */
       publishedWhen: 'publié {{when}}',
+      // R5a : la ligne de dates sous le titre, avec la phrase de RelativeTime (ui-16).
+      publishedOn: 'Publié {{when}}',
+      createdOn: 'Créé {{when}}',
+      updatedWhen: 'Mis à jour {{when}}',
+      report: 'Signaler ce projet',
+      more: 'Plus d’actions',
+      // Le bouton du haut, d'où qu'on arrive (ui-11 : « Retour au fil » mentirait en venant d'ailleurs).
+      back: 'Retour',
+      notFoundAction: 'Retour au fil',
+      privateBanner:
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       private: 'Privé : visible par toi seulement',
@@ -1146,6 +1182,40 @@ export const fr = {
     invalid:
       'Ce lien ne permet pas de te désinscrire. Connecte-toi pour gérer tes e‑mails dans Mon profil.',
   },
+  // L'éventail des réactions (R5a, F-Re1) : appui long sur la capsule, clic droit ou touche Menu.
+  reactions: {
+    fan: {
+      title: 'Les réactions',
+      mine: 'Ta réaction',
+      remove: 'Retirer',
+      removeNamed: 'Retirer {{name}}',
+      hint: 'Tu peux en poser plusieurs, une de chaque.',
+      help: 'Touche une réaction pour la poser. Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune.',
+      helpOk: 'J’ai compris',
+      // L'indice lu sur la capsule (ui-4) : dit qu'il existe une autre façon de l'ouvrir.
+      open: 'Voir les réactions et leurs noms',
+    },
+  },
+  // La galerie de photos d'un projet (R5a, F-Pr7).
+  gallery: {
+    label: 'Photos du projet',
+    photoOf: 'Photo {{index}} sur {{count}}',
+    count: '{{index}} sur {{count}}',
+    previous: 'Photo précédente',
+    next: 'Photo suivante',
+  },
+  // Partager un projet ou une page de membre (R5a, F-Pr1, F-Mb1). Le lien ne contient que l'adresse.
+  share: {
+    action: 'Partager',
+    title: '{{title}} sur {{appName}}',
+    membersOnly: 'Seuls les membres de {{appName}} pourront l’ouvrir.',
+    privateOnly: 'Ce projet est privé : le lien ne s’ouvrira que pour toi.',
+    system: 'Partager…',
+    copy: 'Copier le lien',
+    copiedMembers: 'Lien copié : seuls les membres de {{appName}} pourront l’ouvrir.',
+    copiedPrivate: 'Lien copié : il ne s’ouvrira que pour toi.',
+    copyFailed: 'Impossible de copier le lien. Réessaie.',
+  },
   leaving: {
     title: 'Tu quittes {{appName}}',
     body: 'Ce lien mène vers un autre site. {{appName}} ne vérifie pas son contenu : n’y entre pas d’informations personnelles si tu as un doute.',
@@ -1153,6 +1223,14 @@ export const fr = {
     safety: 'Ce site n’est pas sur {{appName}}. N’y saisis jamais ton mot de passe {{appName}}.',
     continue: 'Continuer vers {{host}}',
     back: 'Revenir',
+    // R5a, le portail (F-Out1, F-Out2, jur-8, sec-B5) : le nom du site en gras suit `to`.
+    to: 'Tu quittes {{appName}} pour',
+    from: 'La démo de {{title}}, ajoutée par {{name}}',
+    warningTitle: 'Ce site n’est pas sur {{appName}}',
+    warningBody:
+      '{{appName}} ne vérifie ni son contenu ni qui le gère. N’y saisis jamais ton mot de passe {{appName}}, et n’y entre des informations personnelles que si tu sais à qui tu les confies.',
+    open: 'Ouvrir le site',
+    stay: 'Rester sur {{appName}}',
     invalid:
       'Ce lien ne peut pas être ouvert : seules les adresses https vers un site public sont acceptées.',
   },

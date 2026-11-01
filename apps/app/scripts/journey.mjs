@@ -582,8 +582,8 @@ try {
   // « Tester » sort de l'appli : son nom lu le dit, et il passe par la page d'avertissement.
   await byRole(sam.page, 'link', 'Tester Mon agent de recettes, ouvre un site externe').click()
   await sam.page.waitForURL((url) => url.pathname === '/out')
-  await byRole(sam.page, 'button', 'Continuer vers example.com').waitFor()
-  await byRole(sam.page, 'button', 'Revenir').click()
+  await byRole(sam.page, 'button', 'Ouvrir le site').waitFor()
+  await byRole(sam.page, 'button', 'Rester sur Waiggle').click()
   await sam.page.waitForURL((url) => url.pathname === '/')
   await sam.page.getByText('Tu es à jour').waitFor()
   console.log('  ok : le projet est dans le fil de Sam, « Tester » mène à l’avertissement')
@@ -614,16 +614,16 @@ try {
   await byRole(sam.page, 'link', 'Note de Lea sur Mon agent de recettes').waitFor()
   console.log('  ok : la note de Léa est dans le fil de Sam')
 
-  step('Sam réagit « Bravo » et commente ; Léa répond, puis masque le commentaire de Sam')
+  step('Sam réagit « Waggle ! » et commente ; Léa répond, puis masque le commentaire de Sam')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   // Le nom lu de chaque réaction dit son nombre, et « réagi » une fois posée.
-  await byRole(sam.page, 'button', 'Bravo, 0').click()
-  await byRole(sam.page, 'button', 'Bravo, réagi, 1').waitFor()
+  await byRole(sam.page, 'button', 'Waggle\u202f!, 0').click()
+  await byRole(sam.page, 'button', 'Waggle\u202f!, 1, ta réaction').waitFor()
   await waitFor(
     'réaction enregistrée',
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
   )
-  console.log('  ok : Léa voit « Bravo » compté une fois')
+  console.log('  ok : Léa voit « Waggle ! » compté une fois')
   // Le total de la carte du fil (R4) : le nombre dessiné est caché au lecteur, le nom lu l'écrit.
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByText('1 réaction', { exact: true }).waitFor()

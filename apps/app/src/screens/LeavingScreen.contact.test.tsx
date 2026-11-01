@@ -30,15 +30,15 @@ describe('LeavingScreen and e-mail addresses', () => {
   it('refuses an e-mail link, even to our contact address', async () => {
     await renderWithProviders(<LeavingScreen url={`mailto:${contactEmail}`} />)
 
-    expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy() // témoin
-    expect(screen.queryByRole('button', { name: /^Continuer vers/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Rester sur Waiggle' })).toBeTruthy() // témoin
+    expect(screen.queryByRole('button', { name: /^Ouvrir le site/ })).toBeNull()
     expect(openURL).not.toHaveBeenCalled()
   })
 
   it('refuses an e-mail link with something added', async () => {
     await renderWithProviders(<LeavingScreen url={`mailto:${contactEmail}?bcc=x@example.com`} />)
 
-    expect(screen.getByRole('button', { name: 'Revenir' })).toBeTruthy() // témoin
-    expect(screen.queryByRole('button', { name: /^Continuer vers/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Rester sur Waiggle' })).toBeTruthy() // témoin
+    expect(screen.queryByRole('button', { name: /^Ouvrir le site/ })).toBeNull()
   })
 })

@@ -800,7 +800,7 @@ describe('reacting to a project from its page', () => {
     for (const name of ['Bluffant, 0', 'Inspirant, 0', 'Utile, 0', 'Drôle, 0']) {
       expect(await screen.findByRole('button', { name })).toBeTruthy()
     }
-    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, 3' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Waggle\u202f!, 3' }))
 
     expect(useReaction).toHaveBeenCalledWith(id)
     expect(mockReact).toHaveBeenCalledWith('bravo')
@@ -810,7 +810,9 @@ describe('reacting to a project from its page', () => {
     seenByOther(withReactions({ counts: { ...NO_REACTIONS.counts, bravo: 4 }, mine: ['bravo'] }))
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(await screen.findByRole('button', { name: 'Bravo, réagi, 4' })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: 'Waggle\u202f!, 4, ta réaction' }),
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Utile, 0' })).toBeTruthy()
   })
 
@@ -821,9 +823,9 @@ describe('reacting to a project from its page', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByText('Les réactions à ton projet')).toBeTruthy()
-    expect(screen.getByLabelText('Bravo, 2')).toBeTruthy()
+    expect(screen.getByLabelText('Waggle\u202f!, 2')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Bravo),/ }),
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/ }),
     ).toBeNull()
   })
 
@@ -1336,7 +1338,7 @@ describe('reactions, after the reviews', () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    const bravo = await screen.findByRole('button', { name: 'Bravo, 0' })
+    const bravo = await screen.findByRole('button', { name: 'Waggle\u202f!, 0' })
     expect(ancestorWithRole(bravo, 'group')?.props.accessibilityLabel).toBe('Réagir à ce projet')
   })
 
@@ -1348,12 +1350,12 @@ describe('reactions, after the reviews', () => {
 
     await screen.findByText('Les réactions à ton projet')
     const items = screen.getAllByRole('listitem', {
-      name: /^(Bluffant|Inspirant|Utile|Drôle|Bravo),/,
+      name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/,
     })
     expect(items).toHaveLength(5)
-    expect(screen.getByRole('listitem', { name: 'Bravo, 9' })).toBeTruthy()
+    expect(screen.getByRole('listitem', { name: 'Waggle\u202f!, 9' })).toBeTruthy()
     expect(screen.getAllByText('0')).toHaveLength(4)
-    const bravo = screen.getByRole('listitem', { name: 'Bravo, 9' })
+    const bravo = screen.getByRole('listitem', { name: 'Waggle\u202f!, 9' })
     expect(ancestorWithRole(bravo, 'list')?.props.accessibilityLabel).toBe(
       'Les réactions à ton projet',
     )
@@ -1801,10 +1803,10 @@ describe('a project page seen by a suspended member', () => {
       expect(screen.queryByRole('switch', { name: 'Suivre ce projet' })).toBeNull(),
     )
     expect(
-      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Bravo),/ }),
+      screen.queryByRole('button', { name: /^(Bluffant|Inspirant|Utile|Drôle|Waggle\u202f!),/ }),
     ).toBeNull()
     // Il lit tout ce qu'il lisait avant : les nombres restent, comme pour l'auteur.
-    expect(screen.getByLabelText('Bravo, 3')).toBeTruthy()
+    expect(screen.getByLabelText('Waggle\u202f!, 3')).toBeTruthy()
   })
 
   it('offers no comment to write, but keeps the comments readable', async () => {
@@ -1842,7 +1844,7 @@ describe('a project page seen by a suspended member', () => {
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     await act(async () => {})
     expect(screen.getByRole('switch', { name: 'Suivre ce projet' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Bravo, 3' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Waggle\u202f!, 3' })).toBeTruthy()
   })
 })
 
@@ -1861,7 +1863,9 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     // Témoin du profil lu : aucune réaction à poser.
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+    )
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
     expect(mockToggle).toHaveBeenCalledTimes(1)
@@ -1879,7 +1883,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     )
     // Les autres réactions restent lisibles, sans bouton.
     expect(screen.getByLabelText('Utile, 0')).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 3' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Waggle\u202f!, 3, ta réaction' }))
 
     expect(mockReact).toHaveBeenCalledWith('bravo')
   })
@@ -1897,7 +1901,9 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     )
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+    )
     await fireEvent.press(screen.getByRole('switch', { name: 'Projet suivi' }))
 
     const follow = await screen.findByRole('switch', { name: 'Suivre ce projet' })
@@ -1921,9 +1927,11 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
       ),
     )
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Bravo, réagi, 3' }))
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'Waggle\u202f!, 3, ta réaction' }),
+    )
 
-    const chip = await screen.findByRole('button', { name: 'Bravo, 2' })
+    const chip = await screen.findByRole('button', { name: 'Waggle\u202f!, 2' })
     expect(chip).toBeDisabled()
     await fireEvent.press(chip)
     expect(mockReact).toHaveBeenCalledTimes(1)
@@ -1936,7 +1944,9 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^Bravo,/ })).toBeNull())
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^Waggle\u202f!,/ })).toBeNull(),
+    )
     expect(screen.getByLabelText(fr.t(($) => $.project.reactions.readOnly))).toBeTruthy()
   })
 })

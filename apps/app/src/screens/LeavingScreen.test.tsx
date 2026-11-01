@@ -32,9 +32,7 @@ describe('LeavingScreen', () => {
     await renderWithProviders(<LeavingScreen url="https://recettes.example.com/demo?x=1" />)
 
     expect(screen.getByText('https://recettes.example.com/demo?x=1')).toBeTruthy()
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Continuer vers recettes.example.com' }),
-    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Ouvrir le site' }))
 
     expect(openURL).toHaveBeenCalledWith('https://recettes.example.com/demo?x=1')
   })
@@ -47,13 +45,13 @@ describe('LeavingScreen', () => {
         'Ce lien ne peut pas être ouvert : seules les adresses https vers un site public sont acceptées.',
       ),
     ).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Continuer/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Ouvrir le site/ })).toBeNull()
   })
 
   it('goes back without opening anything', async () => {
     await renderWithProviders(<LeavingScreen url="https://recettes.example.com" />)
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Revenir' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Rester sur Waiggle' }))
 
     expect(mockBack).toHaveBeenCalled()
     expect(openURL).not.toHaveBeenCalled()
@@ -63,7 +61,7 @@ describe('LeavingScreen', () => {
     mockCanGoBack = false
     await renderWithProviders(<LeavingScreen url="https://recettes.example.com" />)
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Revenir' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Rester sur Waiggle' }))
 
     expect(mockBack).not.toHaveBeenCalled()
     expect(mockReplace).toHaveBeenCalledWith('/')
@@ -72,7 +70,7 @@ describe('LeavingScreen', () => {
   it('refuses local machines and disguised addresses', async () => {
     for (const url of ['https://192.168.1.1/admin', 'https://waiggle.com@pirate.example.com']) {
       await renderWithProviders(<LeavingScreen url={url} />)
-      expect(screen.queryByRole('button', { name: /Continuer/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /Ouvrir le site/ })).toBeNull()
     }
   })
 
@@ -91,7 +89,7 @@ describe('LeavingScreen', () => {
     globalThis.URL = PhoneURL
     try {
       await renderWithProviders(<LeavingScreen url={'https://\u0430pple.com/login'} />)
-      expect(screen.queryByRole('button', { name: /Continuer/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /Ouvrir le site/ })).toBeNull()
     } finally {
       globalThis.URL = realURL
     }

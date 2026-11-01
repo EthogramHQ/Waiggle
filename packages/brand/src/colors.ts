@@ -40,6 +40,10 @@ const day = {
   statusText: '#6A4300', // texte des pastilles de statut
   amber: '#C77F00', // icônes d'accent, jamais du texte courant
   amberText: '#8A5A00', // texte d'accent (liens)
+  // Le fond doux d'un encadré de prudence (Callout, ton `caution` : « Relis-le avant de t'en
+  // servir », sur un prompt). Il porte amberText ou l'encre ; l'icône prend amberText, car l'ambre
+  // seul n'y fait que 3:1 tout juste.
+  cautionSoft: '#FFF4DB',
 
   // Traits
   line: '#ECE8DE', // séparateurs
@@ -128,6 +132,7 @@ const night = {
   statusText: '#FFD666',
   amber: '#E0A030',
   amberText: '#F5B942',
+  cautionSoft: '#3A2C10',
 
   line: 'rgba(255,255,255,0.10)',
   lineStrong: 'rgba(255,255,255,0.18)',
@@ -280,6 +285,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'amberText', on: 'surface', min: 4.5 },
   { text: 'textSecondary', on: 'surface', min: 4.5 },
   { text: 'amber', on: 'background', min: 3 },
+  // L'encadré de prudence (Callout, ton `caution`) : titre et icône en amberText, phrase à l'encre.
+  { text: 'amberText', on: 'cautionSoft', min: 4.5 },
+  { text: 'text', on: 'cautionSoft', min: 4.5 },
+  { text: 'textSecondary', on: 'cautionSoft', min: 4.5 },
   { text: 'dangerText', on: 'background', min: 4.5 },
   { text: 'dangerText', on: 'dangerSoft', min: 4.5 },
   { text: 'onDanger', on: 'danger', min: 4.5 },
