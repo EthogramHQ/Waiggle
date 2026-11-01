@@ -27,6 +27,11 @@ type Props = {
    * « E-mails » du profil, quand on y arrive depuis « Mon compte ».
    */
   ref?: Ref<View>
+  /**
+   * L'identifiant de la pile, pour qu'un lien voisin la cite en description (`describedBy`) : la
+   * date relative d'un auteur, lue avec le lien vers sa page (R4).
+   */
+  nativeID?: string
 }
 
 const alignments = {
@@ -52,6 +57,7 @@ export function Stack({
   accessibilityRole,
   accessibilityLabel,
   ref,
+  nativeID,
 }: Props) {
   const style: ViewStyle = {
     flexDirection: direction,
@@ -84,6 +90,7 @@ export function Stack({
       style={style}
       {...(accessibilityRole ? { accessibilityRole } : null)}
       {...(accessibilityLabel ? { accessibilityLabel } : null)}
+      {...(nativeID ? { nativeID } : null)}
     >
       {items}
     </View>

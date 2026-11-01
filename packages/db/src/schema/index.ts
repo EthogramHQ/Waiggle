@@ -1,8 +1,9 @@
-// Toutes les tables de Ruche. Chaque domaine a son fichier, ré-exporté ici.
+// Toutes les tables de Waiggle. Chaque domaine a son fichier, ré-exporté ici.
 export * from './auth'
 export * from './blocks'
 export * from './comments'
 export * from './email'
+export * from './feed'
 export * from './follows'
 export * from './handles'
 export * from './moderation'

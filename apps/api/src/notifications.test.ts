@@ -845,11 +845,48 @@ describe('marking as seen', () => {
 
   it('never goes beyond the time of the server', async () => {
     const meteo = await publish(ines)
+    // Depuis R4 (sec-A2), une date future ne garde rien du tout : Inès ouvre d'abord l'écran, pour
+    // que la notification déjà là (le pseudo) soit vue et que seul compte ce qui arrive après.
+    await openScreen(ines)
 
     await expectDone(await markSeen(ines, new Date(Date.now() + DAY).toISOString()))
     await react(meteo.id, 'bravo', malik)
 
     expect(await unread(ines)).toBe(1)
+  })
+
+  // R4, relecture de sécurité sec-A2 : `z.iso.datetime()` accepte l'an 0000 (que PostgreSQL
+  // refuse : 500) et l'an 9999 (qui, ramené à l'heure du serveur, marquerait tout vu). Comme pour
+  // PUT /v1/feed/read, une date bien formée hors des bornes (avant le 1/1/2026, après l'heure du
+  // serveur) répond 204 et n'enregistre rien.
+  it('answers 204, never 500, to a well-formed date of year 0000 or 9999, and stores nothing before the launch', async () => {
+    const meteo = await publish(ines)
+    await react(meteo.id, 'bravo', malik)
+    const seenAt = async () => {
+      const [row] = await ctx.db
+        .select({ seenAt: schema.notificationState.seenAt })
+        .from(schema.notificationState)
+        .where(eq(schema.notificationState.userId, inesId))
+      return row?.seenAt ?? null
+    }
+    const before = await unread(ines)
+    expect(before).toBeGreaterThan(0)
+    expect(await seenAt()).toBeNull()
+
+    for (const upTo of [
+      '0000-01-01T00:00:00Z',
+      '9999-12-31T23:59:59Z',
+      '2025-12-31T12:00:00.000Z', // avant le 1/1/2026, l'ouverture du site
+    ]) {
+      await expectDone(await markSeen(ines, upTo))
+    }
+
+    // Rien n'est retenu : la cloche compte autant qu'avant.
+    expect(await seenAt()).toBeNull()
+    expect(await unread(ines)).toBe(before)
+    // Témoin : une vraie date, l'heure du serveur, marque tout vu.
+    await expectDone(await markSeen(ines, new Date().toISOString()))
+    expect(await unread(ines)).toBe(0)
   })
 
   it('counts for one member only', async () => {

@@ -4,6 +4,11 @@ La direction visuelle de Waiggle, choisie par Louis le 12/10/2026 : **blanc, ver
 miel**. Les visuels des projets s'affichent en grand. Derrière chaque écran, une lumière douce prend
 la couleur du visuel affiché. L'interface bouge « comme du miel ».
 
+**Miel 2** (refonte, tranche R1, octobre 2026) garde cette direction et l'affine : un fond « Cire »
+à peine chaud d'où les surfaces blanches se détachent, une police à chasse fixe pour les noms
+d'outils, deux ambiances (la lumière vivante et le « miel vif » des moments de marque), un logo
+vectoriel, une mascotte et un chargement animé.
+
 Ce document dit **où vit chaque décision de design dans le code** et **comment la changer**. Les
 valeurs exactes (codes couleur, tailles) ne sont pas recopiées ici : elles vivent dans le code, à
 un seul endroit, et ce document n'a donc jamais à être mis à jour quand une valeur change.
@@ -46,9 +51,11 @@ autre teinte au même rôle, et on peut changer une teinte sans toucher aux comp
   dessus est l'encre (`onHoney`).
 - **Contraste** : la liste `contrastPairs` déclare chaque couple « texte sur fond » utilisé. Un test
   vérifie qu'ils restent lisibles (au moins 4,5:1, ou 3:1 pour les icônes), de jour comme de nuit.
-- **Lettres** (`typography.ts`) : Funnel Display pour les titres, Funnel Sans pour le reste, sous
+- **Lettres** (`typography.ts`) : Funnel Display pour les titres, Funnel Sans pour le reste, Geist
+  Mono (chasse fixe) pour les étiquettes d'outils, les versions et les prompts ; toutes sous
   licence libre OFL et livrées avec l'appli. Aucune requête ne part vers Google. Une échelle de
-  rôles, de `display` (grand titre d'ordinateur) à `micro` (libellé d'onglet).
+  rôles, de `toolNameWide` (le nom géant d'un outil) et `poster` (l'affiche d'un écran de marque)
+  à `micro` (libellé d'onglet), plus `mono` et `code`.
 - **Formes** (`shape.ts`) : espacements multiples de 4 (`xs` à `huge`), rayons du plus rond
   (`sheet`) au plus serré (`code`), largeurs d'écran (téléphone, tablette, ordinateur), 44 points
   minimum pour toucher.
@@ -86,11 +93,46 @@ bouton qu'on vient de toucher. Exemples : captures `publier-telephone-*` et `pro
 
 `AmbientLight`, la signature de Miel. Derrière l'écran, une grande lueur prend la couleur du visuel
 affiché (un projet, un avatar). Sans visuel, c'est la « lumière miel ». Elle respire lentement
-(20 secondes) et, sur téléphone, suit l'inclinaison de l'appareil.
+(`durations.breath`) et, sur téléphone, suit l'inclinaison de l'appareil.
+
+Depuis Miel 2, elle est **vivante** :
+
+- **Sa source** : un écran la règle par `useAmbient().setSource(…)` (`ui/theme/ambient.tsx`),
+  avec le ThumbHash d'un visuel ou trois couleurs. Elle passe d'une source à l'autre en fondu
+  (`durations.lightFade`), et `pulse()` la fait briller un instant (une réaction, par exemple).
+  Chaque écran a sa propre lumière : `Screen` monte son fournisseur.
+- **Sur ordinateur** (`AmbientLight.web.tsx`), elle est dessinée par la carte graphique (WebGL) :
+  une matière qui coule, des reflets de miel, une lueur qui suit la souris. Sans WebGL, sur
+  téléphone, ou avec « Réduire les animations », c'est la version allégée
+  (`AmbientLightSoft.tsx`). Les captures de la CI, sans carte graphique, montrent cette version.
+- **Vie privée** : la position de la souris et le capteur d'inclinaison ne servent qu'au dessin.
+  Rien n'est gardé ni envoyé, et le dessin n'est jamais relu.
 
 Son flou ne coûte rien : on ne calcule aucun filtre, on agrandit une image minuscule, floue par
 nature. Pour un visuel de projet, cette image est son **ThumbHash** : un résumé de l'image en
-quelques dizaines d'octets, que le serveur calculera à l'envoi (tranche 3b).
+quelques dizaines d'octets, que le serveur calcule à l'envoi.
+
+## Les deux ambiances
+
+`Screen` prend une prop `ambiance` :
+
+- `light` (par défaut) : la lumière d'ambiance derrière le contenu.
+- `brand` : le **miel vif** des moments de marque (accueil d'un visiteur, connexion, inscription,
+  adresse vérifiée, page introuvable…). Un dégradé de miel en haut de l'écran
+  (`ui/BrandAmbiance.tsx`), et une feuille claire qui remonte dessus et porte le contenu et les
+  boutons. La lumière d'ambiance est alors coupée. Aucun bouton encre n'est posé sur le miel.
+
+## La marque : logo, mascotte, chargement
+
+- **Le logo** (`ui/Logo.tsx`) : l'abeille et son « w », en tracés vectoriels générés par
+  `apps/app/scripts/logo.mts` dans `ui/logo.generated.ts`. Le mot « waiggle » (`ui/Wordmark.tsx`)
+  porte un point de miel sur le i. Ces signes de la marque ne sont pas sous AGPL (voir le README).
+- **Le chargement** : au lancement de l'appli, l'abeille dessine son « w » en volant
+  (`ui/LoadingLogo.tsx`). Une page qui charge montre des **squelettes** (`ui/Skeleton.tsx`), la
+  forme grise de ce qui arrive ; « Chargement… » reste lu par les lecteurs d'écran.
+- **La mascotte** (`ui/Mascot.tsx`) : l'abeille en quatre poses (vol, salut, sommeil, loupe), dans
+  les états vides, la page introuvable et la fin du fil. Ses images sont découpées et ré-encodées
+  sans métadonnées par `apps/app/scripts/images.mts`.
 
 ## Le mouvement
 
@@ -100,8 +142,11 @@ part : elles restent fluides même quand l'appli travaille.
 
 Par défaut, tout le monde a toutes les animations et la lumière d'ambiance vivante. Seule exception,
 validée dans le scénario : si la personne a elle-même activé « Réduire les animations » sur son
-appareil, les grands déplacements deviennent des fondus. Le hook `useCalmMotion()` le signale. Le
-reste ne change pas, lumière d'ambiance comprise.
+appareil, les grands déplacements deviennent des fondus. Le hook `useCalmMotion()` le signale.
+La lumière d'ambiance devient alors immobile : elle garde sa couleur et ses fondus d'une source à
+l'autre, mais ne respire plus et ne suit plus la souris ni l'inclinaison (décision du 29/10/2026 ;
+une animation qui tourne sans fin doit pouvoir s'arrêter, WCAG 2.2.2). Seule l'abeille du
+lancement continue de voler : elle est seule à l'écran, le temps du chargement.
 
 ## L'ordinateur
 

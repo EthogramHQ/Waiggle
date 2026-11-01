@@ -15,6 +15,11 @@ export type AuthErrorKey =
   | 'sameEmail'
   // Un refus 401 sans code connu : la session a expiré en cours de route.
   | 'sessionExpired'
+  // Tranche R2 : le lien « nouveau mot de passe » est refusé (expiré, déjà servi ou abîmé : un seul
+  // message pour toutes les causes, jur-16) ; le compte est déjà vérifié (corriger son adresse
+  // avant vérification n'a plus de sens : il suffit de se connecter).
+  | 'invalidToken'
+  | 'alreadyVerified'
   | 'generic'
 
 // Correspondance code Better Auth → clé de message. Record<string, …> : un dictionnaire.
@@ -29,6 +34,9 @@ const byCode: Record<string, AuthErrorKey> = {
   // Changer d'adresse (POST /api/auth/change-email, contrat ChangeEmailRequest).
   INVALID_PASSWORD: 'wrongPassword',
   SAME_EMAIL: 'sameEmail',
+  // Nouveau mot de passe depuis le lien reçu (POST /api/auth/reset-password, contrat
+  // ResetPasswordRequest) : Better Auth dit INVALID_TOKEN quelle que soit la cause.
+  INVALID_TOKEN: 'invalidToken',
 }
 
 export const authErrorKey = ({

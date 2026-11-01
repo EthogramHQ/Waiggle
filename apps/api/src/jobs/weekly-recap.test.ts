@@ -391,7 +391,8 @@ describe('the links of the recap', () => {
     // Le pied de l'e-mail porte le même lien signé, et le lien vers les réglages.
     expect(recap.text).toContain(token)
     expect(recap.text).toContain(fr.recap.unsubscribe)
-    expect(recap.text).toContain(`${TEST_APP_URL}/profile`)
+    // R2 (jur-B5) : « Gérer mes e-mails » mène à la rubrique Notifications des réglages.
+    expect(recap.text).toContain(`${TEST_APP_URL}/settings/notifications`)
 
     // Le bouton « Se désabonner » de la messagerie : un POST sans cookie ni Origin.
     const res = await ctx.app.request(`${url.pathname}${url.search}`, {

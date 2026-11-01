@@ -3,6 +3,7 @@
 // un curseur (cursor.ts : pourquoi un curseur plutôt qu'un numéro de page). « Abonnements » y mêle
 // les notes des projets suivis (tranche 4b).
 import {
+  type DiscoverFeedPage,
   FEED_PAGE_SIZE,
   type FeedItem,
   type FeedPage,
@@ -13,18 +14,19 @@ import { type Database, schema } from '@ruche/db'
 import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
-import { followsAnyone } from '../follows/load'
+import { followedAmong, followsAnyone } from '../follows/load'
 import { toNote } from '../notes/load'
-import { rowToSummary, selectMedia, selectProjects } from '../projects/load'
-import { listedProjectFor } from '../projects/visibility'
+import { rowsToSummaries, selectProjects } from '../projects/load'
+import { listedProjectFor, listedVerifiedProjectFor } from '../projects/visibility'
 
 const t = schema.project
 const n = schema.projectNote
 
 /**
  * Une page du fil « Découvrir » : les projets publics qui remplissent `where`, après le curseur
- * s'il y en a un. Toujours deux requêtes, quel que soit le nombre de cartes : les projets (avec
- * leur auteur), puis les médias de tous ces projets à la fois (pour les couvertures).
+ * s'il y en a un. Toujours trois requêtes, quel que soit le nombre de cartes : les projets (avec
+ * leur auteur), puis, en même temps, les médias de tous ces projets (pour les couvertures) et le
+ * total de leurs réactions (rowsToSummaries).
  */
 const loadPage = async (
   db: Database,
@@ -41,7 +43,10 @@ const loadPage = async (
         // is null » écarte au passage les quelques projets retirés qu'il contient. Tranche 7b :
         // ni celui d'un membre bloqué avec le visiteur (listedProjectFor), écarté par deux
         // « exists » sur member_block, chacun servi par un index (blocks/visibility.ts).
-        listedProjectFor(viewerId),
+        // R4 (W4) : ni celui d'un auteur qui n'a jamais vérifié son adresse, absent pour tous
+        // comme dans la recherche (verifiedAuthor : une lecture de la clé primaire de "user" par
+        // projet lu, au plus 21 ici).
+        listedVerifiedProjectFor(viewerId),
         isNotNull(t.publishedAt),
         where,
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
@@ -52,23 +57,16 @@ const loadPage = async (
     .limit(FEED_PAGE_SIZE + 1)
 
   const page = rows.slice(0, FEED_PAGE_SIZE)
-  const media = await selectMedia(
-    db,
-    page.map((row) => row.project.id),
-  )
+  const summaries = await rowsToSummaries(db, page, viewerId, publicApiUrl)
   // flatMap : publishedAt n'est jamais null ici (la requête l'exige), mais TypeScript ne le sait
-  // pas ; une ligne sans date est simplement laissée de côté.
-  const items: FeedItem[] = page.flatMap((row) =>
-    row.project.publishedAt
-      ? [
-          {
-            kind: 'project' as const,
-            at: row.project.publishedAt.toISOString(),
-            project: rowToSummary(row, media, viewerId, publicApiUrl),
-          },
-        ]
-      : [],
-  )
+  // pas ; une ligne sans date est simplement laissée de côté. Les résumés sont dans l'ordre des
+  // lignes : summaries[i] est celui de page[i].
+  const items: FeedItem[] = page.flatMap((row, i) => {
+    const project = summaries[i]
+    return row.project.publishedAt && project
+      ? [{ kind: 'project' as const, at: row.project.publishedAt.toISOString(), project }]
+      : []
+  })
   const last = items.at(-1)
   return {
     items,
@@ -209,15 +207,18 @@ const selectFollowingEntries = (
  * notes de ses projets ; suivre un projet fait venir ses notes.
  *
  * Toujours le même nombre de requêtes, quelle que soit la page : les lignes (une requête), les
- * projets de ces lignes avec leur auteur (une), leurs médias pour les couvertures (une), et deux
- * petites requêtes pour followsAnyone.
+ * projets de ces lignes avec leur auteur (une), leurs médias pour les couvertures et le total de
+ * leurs réactions (deux, rowsToSummaries), et deux petites requêtes pour followsAnyone.
+ *
+ * Sans `lastReadAt` (R4) : la date de la dernière lecture est une trace d'activité, que seul
+ * feed/state.ts lit (relecture juridique jur-J3) ; la route du fil l'ajoute à la page.
  */
 export const loadFollowingFeed = async (
   db: Database,
   viewerId: string,
   cursor: CursorContent | null,
   publicApiUrl: string,
-): Promise<FollowingFeedPage> => {
+): Promise<Omit<FollowingFeedPage, 'lastReadAt'>> => {
   const [entries, anyone] = await Promise.all([
     selectFollowingEntries(db, viewerId, cursor),
     followsAnyone(db, viewerId),
@@ -232,12 +233,11 @@ export const loadFollowingFeed = async (
     projectIds.length === 0
       ? []
       : await selectProjects(db).where(and(inArray(t.id, projectIds), listedProjectFor(viewerId)))
-  const media = await selectMedia(
-    db,
-    rows.map((row) => row.project.id),
-  )
   const summaries = new Map(
-    rows.map((row) => [row.project.id, rowToSummary(row, media, viewerId, publicApiUrl)]),
+    (await rowsToSummaries(db, rows, viewerId, publicApiUrl)).map((summary) => [
+      summary.id,
+      summary,
+    ]),
   )
 
   const items = page.flatMap((entry): FeedItem[] => {
@@ -270,17 +270,26 @@ export const loadFollowingFeed = async (
  * `testers` : seulement ceux qui cherchent des testeurs (au statut « testable », avec un lien de
  * démo). L'index partiel project_public_published_idx est déjà rangé dans l'ordre du fil.
  */
-export const loadDiscoverFeed = (
+export const loadDiscoverFeed = async (
   db: Database,
   viewerId: string,
   cursor: CursorContent | null,
   testers: boolean,
   publicApiUrl: string,
-): Promise<FeedPage> =>
-  loadPage(
+): Promise<DiscoverFeedPage> => {
+  const page = await loadPage(
     db,
     testers ? and(eq(t.status, 'testable'), isNotNull(t.demoUrl)) : undefined,
     cursor,
     viewerId,
     publicApiUrl,
   )
+  // R3 : les auteurs de la page que le visiteur suit déjà, en une requête de plus (followedAmong),
+  // quel que soit le nombre de cartes. Lui-même n'y est jamais (on ne se suit pas) ; un membre
+  // bloqué non plus : ses projets ne sont pas dans la page. `new Set` retire les doublons (un
+  // auteur de plusieurs cartes).
+  const authorIds = [
+    ...new Set(page.items.map((item) => item.project.author.id).filter((id) => id !== viewerId)),
+  ]
+  return { ...page, followedAuthorIds: await followedAmong(db, viewerId, authorIds) }
+}

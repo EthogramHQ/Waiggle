@@ -25,6 +25,22 @@ describe('safeNext', () => {
     expect(safeNext('/notificationsx')).toBeNull()
   })
 
+  // R2 : les réglages ont leurs rubriques et leurs feuilles à adresse ; une session qui expire là
+  // ramène à la rubrique, pas à l'accueil.
+  it('keeps the settings and their sections', () => {
+    for (const value of [
+      '/settings',
+      '/settings/security',
+      '/settings/security/password',
+      '/settings/account/delete',
+      '/settings/profile',
+      '/settings?section=x',
+    ]) {
+      expect(safeNext(value)).toBe(value)
+    }
+    expect(safeNext('/settingsx')).toBeNull()
+  })
+
   it('refuses another site, however it is written', () => {
     for (const value of [
       'https://faux.example',

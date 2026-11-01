@@ -7,7 +7,8 @@ import { useReducedMotion, withSpring, withTiming } from 'react-native-reanimate
 /**
  * Hook : faut-il remplacer les grands déplacements par des fondus ? Vrai seulement si la personne a
  * activé « Réduire les animations » dans les réglages de son appareil. Les petits mouvements
- * (appui sur un bouton) et la lumière d'ambiance restent, comme prévu dans le scénario.
+ * (appui sur un bouton) restent ; la lumière d'ambiance garde sa couleur mais devient immobile
+ * (décision du 29/10/2026, WCAG 2.2.2 : un mouvement qui dure et démarre seul doit pouvoir s'arrêter).
  */
 export const useCalmMotion = (): boolean => useReducedMotion()
 

@@ -15,7 +15,30 @@ export type Focusable = View
 // l'écran. (Les types de React Native ne décrivent pas la page web.)
 type WebNode = {
   focus?: (options?: { preventScroll?: boolean }) => void
-  scrollIntoView?: (options?: { block?: 'nearest'; behavior?: 'smooth' | 'auto' }) => void
+  scrollIntoView?: (options?: {
+    block?: 'nearest' | 'center'
+    behavior?: 'smooth' | 'auto'
+  }) => void
+}
+
+/**
+ * Amène un champ dans l'écran et lui donne le focus : pour un champ qu'il faut remplir avant
+ * d'envoyer, resté loin sous le pied collé d'une feuille (« Confirme avec ton mot de passe », tout
+ * en bas de la feuille de suppression : relecture de design R2, C2). Sur le web, le champ vient au
+ * milieu de la zone qui défile (« center ») : son libellé et ce qui est écrit dessous se lisent
+ * aussi, au lieu de rester collés au bord du pied ; en douceur, sauf avec « Réduire les animations »
+ * (`calm`). Le focus est posé d'abord, sans défilement, pour que seul ce geste-là fasse défiler. Sur
+ * téléphone, le focus ouvre le clavier, qui fait venir le champ.
+ */
+export const focusAndReveal = (node: unknown, calm: boolean) => {
+  if (!node) return
+  const element = node as WebNode
+  if (Platform.OS !== 'web') {
+    element.focus?.()
+    return
+  }
+  element.focus?.({ preventScroll: true })
+  element.scrollIntoView?.({ block: 'center', behavior: calm ? 'auto' : 'smooth' })
 }
 
 /**

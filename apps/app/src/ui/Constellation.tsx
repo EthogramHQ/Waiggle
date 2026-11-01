@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { Icon, type IconName } from './Icon'
+import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -63,6 +64,13 @@ const sceneTiles: Tile[] = tiles.map((tile) =>
 const FLOAT_PERIOD = 8000
 const FLOAT_HEIGHT = 8 // en points
 
+// En dessous de cette hauteur de fenêtre, la bande décorative (téléphone) rétrécit…
+const SHORT_WINDOW = 700
+// … sans descendre sous cette hauteur : à 320 × 568, les deux portes d'entrée de l'accueil tiennent
+// alors au-dessus du pli (mesuré dans le navigateur). La plus grande tuile (88 points, posée à
+// mi-hauteur) n'en dépasse que de quelques points, sous l'arrondi de la feuille qui la couvre.
+const MIN_BAND_HEIGHT = 170
+
 type Props = {
   height: number
   children?: ReactNode
@@ -72,13 +80,22 @@ type Props = {
 
 export function Constellation({ height, children, layout = 'band' }: Props) {
   const calm = useCalmMotion()
+  // Sur un téléphone court (320 × 568), la bande rétrécit d'autant qu'il manque de hauteur : les
+  // portes d'entrée de l'accueil restent au-dessus du pli (relecture de design R1, puis R2 C5). Au-
+  // delà de SHORT_WINDOW, rien ne change. La hauteur de la fenêtre vaut 0 avant l'hydratation
+  // (useLayout) : le pré-rendu garde la hauteur pleine.
+  const windowHeight = useLayout().height
+  const shown =
+    layout === 'band' && windowHeight > 0 && windowHeight < SHORT_WINDOW
+      ? Math.max(Math.min(height, MIN_BAND_HEIGHT), height - (SHORT_WINDOW - windowHeight))
+      : height
   const t = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: FLOAT_PERIOD, easing: Easing.linear }), -1)
   }, [t])
 
   return (
-    <View style={{ height, alignSelf: 'stretch' }}>
+    <View style={{ height: shown, alignSelf: 'stretch' }}>
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"

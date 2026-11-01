@@ -365,7 +365,7 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
     // role « menu » : le lecteur d'écran annonce une liste d'actions, nommée comme son bouton. Pas
     // d'`accessible` : sur iOS, VoiceOver doit atteindre chaque action.
     <View accessibilityRole="menu" aria-label={label}>
-      <Surface variant="panel" radius="group" padding="xs">
+      <Surface variant="panel" radius="group" padding="xs" shadow="card">
         {/* Plus haut que l'écran (texte très agrandi) : la liste défile dans le menu. */}
         <ScrollView
           bounces={false}

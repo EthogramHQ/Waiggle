@@ -73,7 +73,7 @@ import {
   summaryOf,
 } from '../src/testing/projects.ts'
 import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
-import { loadingProblem, unfinishedTexts } from './loading-guard.ts'
+import { loadingProblem, unfinishedTexts, waitUntilLoaded } from './loading-guard.ts'
 
 const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
@@ -166,6 +166,16 @@ const session = {
 //   - adresse-lien-refuse : /email-change/done?error=INVALID_TOKEN, sans session.
 const changeEmailShot = { newEmail: 'lea.moreau@exemple.fr', password: 'mot-de-passe-de-lea' }
 const wrongPasswordShot = 'pas-le-bon-mot-de-passe'
+// Tranche R2 : le lien « nouveau mot de passe » (un jeton accepté, un refusé) et l'adresse qui
+// attend sa vérification. « Vérifie ta boîte mail » ne lit plus l'adresse dans l'URL (jur-9) :
+// `pendingEmail` la pose dans le sessionStorage de l'onglet, comme l'inscription, puis recharge.
+const resetTokenShot = 'tok-7f3c9a-valide' // gitleaks:allow
+const refusedResetToken = 'tok-7f3c9a-refuse' // gitleaks:allow
+const pendingEmail = (email) => async (page) => {
+  await page.evaluate((value) => sessionStorage.setItem('waiggle.pendingEmail', value), email)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByText(email, { exact: false }).first().waitFor()
+}
 const emailOf = { current: leaMe.email, changed: changeEmailShot.newEmail }
 // Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
 // simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
@@ -296,10 +306,43 @@ const claudeCode = {
   label: 'Claude Code',
   projects: [summaryOf(fromOthers[0]), summaryOf(recipesProject)],
 }
+// R4 : le total des réactions de chaque carte (« ✦ 49 »), varié : un grand, aucun (la carte ne
+// montre alors rien), un petit, un moyen.
+const feedTotals = [49, 0, 3, 12]
 const feedItems = fromOthers.map((p, i) => ({
   kind: 'project',
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
-  project: summaryOf(p),
+  project: { ...summaryOf(p), reactionTotal: feedTotals[i] ?? 0 },
+}))
+// Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
+// (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
+// depuis R3), de plusieurs membres et aux titres variés, assez pour que le carrousel dépasse.
+const testerItems = [
+  ['Quel papillon ?', max, 'https://papillons.example.org'],
+  ['Décollage !', ines, 'https://decollage.example.com'],
+  [
+    'Carnet de cafés',
+    { id: 'sam-id', name: 'Sam Petit', avatarUrl: null },
+    'https://cafes.example.com',
+  ],
+  ['Le journal de Chelsea', max, 'https://chelsea.example.org'],
+  ['Le quiz des capitales', ines, 'https://quiz.example.org'],
+  ['Mon agent de recettes', ines, 'https://recettes.example.com'],
+].map(([title, author, demoUrl], i) => ({
+  kind: 'project',
+  at: new Date(Date.UTC(2026, 9, 18 - i, 9)).toISOString(),
+  project: {
+    ...summaryOf({
+      ...(i % 2 === 0 ? photosProject : recipesProject),
+      id: `5e6f7a8b-0000-4000-8000-00000000000${i + 1}`,
+      title,
+      author,
+      status: 'testable',
+    }),
+    demoUrl,
+    // R4 : des totaux variés, dont 0.
+    reactionTotal: [7, 0, 23, 2, 0, 5][i] ?? 0,
+  },
 }))
 // La page de Max, vue par Léa qui ne le suit pas encore.
 const maxMember = {
@@ -360,7 +403,7 @@ const noteItem = (project, n, body, day) => ({
   kind: 'note',
   at: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
   note: { ...note(n, body, day), createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString() },
-  project: summaryOf(project),
+  project: { ...summaryOf(project), reactionTotal: feedTotals[fromOthers.indexOf(project)] ?? 0 },
 })
 const followingItems = [
   noteItem(fromOthers[0], 6, 'v2 : il reconnaît maintenant les visages de profil.', 19),
@@ -368,10 +411,102 @@ const followingItems = [
   noteItem(fromOthers[1], 7, longNote, 17),
   ...feedItems.slice(2),
 ]
+// R4, « Proches à suivre » (GET /v1/suggestions/members) : cinq membres qui ont publié
+// récemment, du plus récent au plus ancien, chacun avec son dernier projet public (résumé complet,
+// total compris). Jamais Léa, ni Max et Inès qu'elle suit dans le fil : la même liste sert au
+// premier lancement (feed: 'nobody') et à la colonne de droite sur ordinateur. Des noms de
+// longueurs variées (le plus long éprouve la ligne), une photo de couverture sur deux projets,
+// des statuts et des totaux variés (dont 0).
+const suggestedOf = (author, id, title, pitch, extra) => ({
+  ...author,
+  latestProject: {
+    ...summaryOf(recipesProject),
+    id,
+    author,
+    title,
+    pitch,
+    createdAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    updatedAt: new Date(Date.UTC(2026, 9, extra.day, 10)).toISOString(),
+    ...extra.fields,
+  },
+})
+const suggestedMembers = [
+  suggestedOf(
+    { id: 'camille-id', name: 'Camille Roux', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000001',
+    'Le carnet de jardin',
+    'Il note les semis et prévient quand arroser.',
+    {
+      day: 20,
+      fields: { status: 'testable', reactionTotal: 8, cover: summaryOf(photosProject).cover },
+    },
+  ),
+  suggestedOf(
+    { id: 'yanis-id', name: 'Yanis', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000002',
+    'Quiz de géographie',
+    'Des questions sur les capitales, adaptées à ton niveau.',
+    { day: 19, fields: { status: 'building', reactionTotal: 0 } },
+  ),
+  suggestedOf(
+    { id: 'sofia-id', name: 'Sofia Lopes-Carvalho de Almeida', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000003',
+    'Lecteur de factures',
+    'Il range les factures du mois et prépare le tableau des dépenses.',
+    { day: 18, fields: { status: 'idea', reactionTotal: 21 } },
+  ),
+  suggestedOf(
+    { id: 'hugo-id', name: 'Hugo Petit', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000004',
+    'Histoires du soir',
+    'Une histoire courte inventée avec les enfants, chaque soir.',
+    {
+      day: 16,
+      fields: { status: 'testable', reactionTotal: 3, cover: projectWithPhotos.visuals[2] ?? null },
+    },
+  ),
+  suggestedOf(
+    { id: 'amina-id', name: 'Amina Diallo', avatarUrl: null },
+    '5a6b7c8d-0000-4000-8000-000000000005',
+    'Traducteur de recettes',
+    'Il convertit les mesures et traduit les recettes de famille.',
+    { day: 12, fields: { status: 'building', reactionTotal: 1 } },
+  ),
+]
+// La page complète du projet de chaque carte (fil, proches suggérés), par son identifiant, telle
+// que GET /v1/projects/:id la rend : jamais à Léa (`isMine: false`). Un projet suggéré reprend le
+// projet de recettes, avec le titre, l'auteur, le statut et la photo de sa carte.
+const cardProjects = new Map([
+  ...fromOthers.map((project) => [project.id, { ...project, isMine: false }]),
+  ...suggestedMembers.map(({ latestProject: { cover, reactionTotal, ...summary } }) => [
+    summary.id,
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+  ]),
+])
+// R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
+// affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).
+// L'appli pose la sphère avant le premier élément daté de cette date ou d'avant. Selon la page :
+// - feed: 'read-midway' (page « fil ») : lu jusqu'au 18/10 ; la note et le projet du 19 sont
+//   nouveaux, la sphère tombe au milieu, puis les éléments déjà vus ;
+// - feed: 'read-all' (page « fil-a-jour ») : lu jusqu'au plus récent ; rien de nouveau, la sphère
+//   est en tête du fil ;
+// - sans choix : le premier passage (jamais lu, `lastReadAt` null) ; le fil a une suite, la
+//   sphère n'apparaît pas ;
+// - feed: 'end' : premier passage sur un fil qui tient en une page ; la sphère est à la fin
+//   (« Tu as tout vu. », jur-J1).
+const lastReadOf = {
+  'read-midway': feedItems[1]?.at ?? null,
+  'read-all': followingItems[0]?.at ?? null,
+}
 const followingFeed = (feed) =>
   feed === 'nobody'
-    ? { items: [], nextCursor: null, followsAnyone: false }
-    : { items: followingItems, nextCursor: 'suite', followsAnyone: true }
+    ? { items: [], nextCursor: null, followsAnyone: false, lastReadAt: null }
+    : {
+        items: followingItems,
+        nextCursor: feed === 'end' ? null : 'suite',
+        followsAnyone: true,
+        lastReadAt: lastReadOf[feed] ?? null,
+      }
 
 // Les réactions et les commentaires (tranche 5). Un commentaire, pour l'API simulée : son
 // identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
@@ -521,6 +656,64 @@ const gardenProject = {
   pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
   followerCount: 8,
 }
+// Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
+// `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
+// utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
+const toolList = [
+  { slug: 'claude', label: 'Claude', projectCount: 41 },
+  { slug: 'chatgpt', label: 'ChatGPT', projectCount: 38 },
+  { slug: 'lovable', label: 'Lovable', projectCount: 34 },
+  { slug: 'python', label: 'Python', projectCount: 22 },
+  { slug: 'mistral', label: 'Mistral', projectCount: 12 },
+  { slug: 'home-assistant', label: 'Home Assistant', projectCount: 9 },
+  { slug: 'notion', label: 'Notion', projectCount: 7 },
+  { slug: 'glide', label: 'Glide', projectCount: 6 },
+]
+// La recherche « carn » (GET /v1/search?q=carn) : deux projets (celui de Léa, testable, trouvé par
+// son titre ; celui de Tante Odile, trouvé dans sa description, avec l'extrait), un membre et un
+// outil. Les planches nomment Léa « Léa Moreau » ; son identifiant reste le sien (pas de pastille
+// « Suivre » sur ses propres projets).
+const odile = { id: 'odile-id', name: 'Tante Odile', avatarUrl: null }
+const coffeeProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000011',
+  author: { ...lea, name: 'Léa Moreau' },
+  title: 'Carnet de cafés',
+  pitch: 'Chaque café goûté, noté et comparé.',
+  status: 'testable',
+  tools: [{ label: 'Notion', slug: 'notion' }],
+  excerpt: null,
+}
+const biscotteProject = {
+  ...summaryOf(recipesProject),
+  id: '1a2b3c4d-0000-4000-8000-000000000012',
+  author: odile,
+  title: 'Biscotte au parc',
+  pitch: 'Où promener le chien selon la météo.',
+  status: 'building',
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  excerpt: '… Le carnet de balades de Biscotte, mis à jour chaque dimanche après la promenade …',
+}
+const camille = {
+  id: 'camille-id',
+  name: 'Camille Carnot',
+  handle: 'camille_carnot',
+  avatarUrl: null,
+  followerCount: 12,
+}
+const searchResultsOf = {
+  carn: {
+    projects: { items: [coffeeProject, biscotteProject], more: false },
+    members: { items: [camille], more: false },
+    tools: { items: [toolList.find((t) => t.slug === 'notion')], more: false },
+  },
+}
+// Aucun résultat (« carnaval ») : les trois groupes, vides.
+const emptySearchResults = {
+  projects: { items: [], more: false },
+  members: { items: [], more: false },
+  tools: { items: [], more: false },
+}
 const gardenComments = [
   comment(41, null, '', 18, 9, {
     state: 'blocked',
@@ -553,11 +746,42 @@ const reactionsOf = {
 }
 const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
 
+// L'horloge des captures (relecture design R4, A6) : le mardi 20/10/2026, 12 h à Paris. Chaque
+// contexte du navigateur la pose avant sa première page (`installShotClock`), pour les captures,
+// `--layout` et `--explore` : les dates relatives (« hier », « dimanche ») sont les mêmes à chaque
+// passage, quel que soit le jour où l'on photographie. Ce que l'API simulée date « maintenant » (un
+// commentaire envoyé, les notifications) part de la même heure.
+// La façon de la poser : un décalage de `Date`, écrit dans chaque page avant son code
+// (`addInitScript`). L'heure part du 20/10 à 12 h, puis avance normalement ; les minuteurs, les
+// images d'animation et `performance` restent ceux du navigateur. L'horloge de Playwright
+// (`clock.install`, puis `clock.setFixedTime`) empêchait le Chromium sans écran de la CI (Linux)
+// de prendre les captures du fil (« Unable to capture screenshot », R4), alors qu'elle passait sur
+// le PC. Un essai qui doit sauter un délai peut encore poser `page.clock` lui-même.
+const SHOT_NOW = Date.parse('2026-10-20T12:00:00+02:00')
+const SHOT_TIMEZONE = 'Europe/Paris'
+/** Pose l'horloge des captures sur un contexte neuf, avant toute page. */
+const installShotClock = (context) =>
+  context.addInitScript((now) => {
+    const RealDate = Date
+    const offset = now - RealDate.now()
+    // Une sous-classe de Date : sans argument, « maintenant » décalé ; avec, la date demandée.
+    class ShotDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + offset)
+        else super(...args)
+      }
+      static now() {
+        return RealDate.now() + offset
+      }
+    }
+    globalThis.Date = ShotDate
+  }, SHOT_NOW)
+
 // Les notifications de Léa (tranche 6b) : une de chaque sorte, sur ses projets, les deux premières
 // nouvelles, puis une suite plus ancienne (« Afficher la suite »). Personne n'est nommé pour les
 // réactions et les abonnés. Chaque page choisit (notifications: 'none' : aucune ; 'many' : la
 // cloche à « 9+ »), et ce choix est donné à sa propre API simulée, comme le fil.
-const hoursAgo = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString()
+const hoursAgo = (hours) => new Date(SHOT_NOW - hours * 3_600_000).toISOString()
 const dayOf = (iso) => iso.slice(0, 10)
 const notified = (project) => ({ id: project.id, title: project.title })
 // L'identifiant d'un commentaire cité (un UUID, comme l'exige le contrat).
@@ -750,6 +974,8 @@ const fakeApi = (
   })
   // Les décisions de modération prises dans ce navigateur (tranche 7a) : la cible quitte sa liste.
   const decided = new Set()
+  // Les suggestions que Léa écarte dans ce navigateur (« × », R4) : elles quittent sa liste.
+  const dismissed = new Set()
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
@@ -765,6 +991,31 @@ const fakeApi = (
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname === '/api/auth/get-session') return json(200, signedIn ? sessionNow : null)
     const method = route.request().method()
+    // Tranche R2, le mot de passe et la vérification, sans session comme la vraie API. Mot de passe
+    // oublié et renvoi du lien : toujours la même réponse. Nouveau mot de passe : le jeton refusé
+    // (refusedResetToken) reçoit INVALID_TOKEN, comme Better Auth pour un lien expiré ou servi.
+    if (pathname === '/api/auth/request-password-reset' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/send-verification-email' && method === 'POST') {
+      return json(200, { status: true })
+    }
+    if (pathname === '/api/auth/reset-password' && method === 'POST') {
+      const { token } = JSON.parse(route.request().postData() ?? '{}')
+      if (token === refusedResetToken) {
+        return json(400, { code: 'INVALID_TOKEN', message: 'Invalid token' })
+      }
+      return json(200, { status: true })
+    }
+    if (pathname === '/v1/account/unverified-email' && method === 'POST') {
+      const { newEmail } = JSON.parse(route.request().postData() ?? '{}')
+      return json(200, { sentTo: String(newEmail).trim().toLowerCase() })
+    }
+    // Changer son mot de passe (réglages, Sécurité) : avec la session de Léa.
+    if (pathname === '/api/auth/change-password' && method === 'POST') {
+      if (!signedIn) return json(401, { code: 'UNAUTHORIZED', message: '' })
+      return json(200, { status: true })
+    }
     // Se désinscrire depuis un e-mail (tranche 6c) : sans session, comme la vraie API. Le jeton
     // vient de l'adresse ; un jeton de bonne forme mais refusé (refusedToken) reçoit 400.
     if (pathname === '/v1/email/unsubscribe' && method === 'POST') {
@@ -809,7 +1060,11 @@ const fakeApi = (
     // remplacer ces réponses par un refus).
     if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
       const { body } = JSON.parse(route.request().postData() ?? '{}')
-      return json(201, { id: crypto.randomUUID(), body, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        body,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
       return route.fulfill({ status: 204, body: '' })
@@ -856,7 +1111,7 @@ const fakeApi = (
       return json(201, {
         ...comment(0, lea, body, 19, 9),
         id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(SHOT_NOW).toISOString(),
       })
     }
     const one = pathname.match(/^\/v1\/projects\/([^/]+)\/comments\/([^/]+)$/)
@@ -867,7 +1122,12 @@ const fakeApi = (
         .flatMap((c) => [c, ...c.replies])
       const { replies: _replies, ...original } =
         all.find((c) => c.id === one[2]) ?? comment(0, lea, '', 19, 9)
-      return json(200, { ...original, id: one[2], body, editedAt: new Date().toISOString() })
+      return json(200, {
+        ...original,
+        id: one[2],
+        body,
+        editedAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     if (one && method === 'DELETE') {
       added[one[1]] = (added[one[1]] ?? 0) - 1
@@ -894,6 +1154,18 @@ const fakeApi = (
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
     }
+    // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
+    // A7 : « Ce projet est introuvable » au toucher d'une carte).
+    const cardProject = cardProjects.get(pathname.replace(/^\/v1\/projects\//, ''))
+    if (cardProject && method === 'GET') return json(200, withExtras(cardProject))
+    // Suivre et ne plus suivre un membre ou un projet : 204, comme la vraie API (A7 : « Suivre »
+    // d'une suggestion revenait en arrière). Une capture qui veut une panne pose sa propre route.
+    if (
+      /^\/v1\/(members|projects)\/[^/]+\/follow$/.test(pathname) &&
+      (method === 'POST' || method === 'DELETE')
+    ) {
+      return route.fulfill({ status: 204, body: '' })
+    }
     // Bloquer (PUT) et débloquer (DELETE) un membre (tranche 7b) : 204, comme la vraie API ; la
     // liste et la page du membre suivent. Se bloquer soi-même : 422.
     const block = pathname.match(/^\/v1\/members\/([^/]+)\/block$/)
@@ -905,7 +1177,8 @@ const fakeApi = (
       const member = block[1] === max.id ? maxMember : { id: block[1], name: '', handle: '' }
       blocked.set(block[1], {
         member: { id: member.id, name: member.name, handle: member.handle, avatarUrl: null },
-        blockedAt: new Date().toISOString(),
+        // Une milliseconde de plus par blocage : le plus récent reste en tête de la liste.
+        blockedAt: new Date(SHOT_NOW + blocked.size).toISOString(),
       })
       return route.fulfill({ status: 204, body: '' })
     }
@@ -934,7 +1207,27 @@ const fakeApi = (
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
     if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
-    if (pathname === '/v1/feed/discover') return json(200, { items: feedItems, nextCursor: null })
+    // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
+    // garde la date lue au début de la visite, donc la capture ne change pas : 204, rien de gardé.
+    if (pathname === '/v1/feed/read' && method === 'PUT')
+      return route.fulfill({ status: 204, body: '' })
+    // « Proches à suivre » (R4) : la liste, sans ceux que Léa a écartés ; écarter répond 204.
+    if (pathname === '/v1/suggestions/members') {
+      return json(200, { members: suggestedMembers.filter((m) => !dismissed.has(m.id)) })
+    }
+    const dismissal = pathname.match(/^\/v1\/suggestions\/members\/([^/]+)\/dismissed$/)
+    if (dismissal && method === 'PUT') {
+      dismissed.add(decodeURIComponent(dismissal[1]))
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // « Découvrir » (Explorer, R3) : le carrousel des testeurs (?testers=true), ou « Récents », où
+    // Léa suit déjà Max (comme la planche R3-Explorer-Desktop) : ses cartes n'ont pas de pastille,
+    // celles d'Inès portent « Suivre Inès Haddad ».
+    if (pathname === '/v1/feed/discover') {
+      if (url.searchParams.get('testers') === 'true')
+        return json(200, { items: testerItems, nextCursor: null, followedAuthorIds: [] })
+      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [max.id] })
+    }
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
       const fresh = notificationList.flat().filter((n) => n.isNew).length
@@ -949,7 +1242,7 @@ const fakeApi = (
       return json(200, {
         items: notificationList[index] ?? [],
         nextCursor: index + 1 < notificationList.length ? 'suite' : null,
-        asOf: new Date().toISOString(),
+        asOf: new Date(SHOT_NOW).toISOString(),
       })
     }
     // Signaler (tranche 7a) : accepté (la page « signaler-erreur » remplace cette réponse par le
@@ -995,7 +1288,11 @@ const fakeApi = (
       // Tranche 7c : suspendre et lever visent un membre (`memberId`), pas une cible de la file.
       const { action, target, memberId } = JSON.parse(route.request().postData() ?? '{}')
       decided.add(target?.id ?? memberId)
-      return json(201, { id: crypto.randomUUID(), action, createdAt: new Date().toISOString() })
+      return json(201, {
+        id: crypto.randomUUID(),
+        action,
+        createdAt: new Date(SHOT_NOW).toISOString(),
+      })
     }
     // L'historique des décisions (tranche 7c), de la plus récente à la plus ancienne, en une page ;
     // `?member=` ne garde que celles qui visent ce membre (ses contenus et son compte).
@@ -1011,6 +1308,15 @@ const fakeApi = (
     // Une page dont le chargement échoue, pour photographier l'état « erreur ».
     // Les membres proposés après « @ » (tranche 6b) : ceux dont le pseudo commence par la
     // recherche, 5 au plus, comme l'API.
+    // Tranche R3 : la liste des outils d'Explorer, et la recherche par mots. « carn » trouve deux
+    // projets, un membre et un outil ; tout autre texte (« carnaval ») ne trouve rien.
+    if (pathname === '/v1/tools') return json(200, { tools: toolList })
+    if (pathname === '/v1/search') {
+      const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+      // « quota » : le quota de recherches est dépassé (page `recherche-429`).
+      if (q === 'quota') return json(429, { error: { code: 'rate_limited', message: '' } })
+      return json(200, searchResultsOf[q] ?? emptySearchResults)
+    }
     if (pathname === '/v1/members/mentionable') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase()
       return json(200, { members: mentionable.filter((m) => m.handle.startsWith(q)).slice(0, 5) })
@@ -1033,16 +1339,172 @@ const fakeApi = (
 
 // 4. Ce qu'on photographie.
 const project = `/projects/${recipesProject.id}`
+// La photo de Léa (R2, feuilles du profil et de la suppression) : son profil répond avec une photo,
+// servie comme les autres images d'exemple, pour cette page seule (page.route passe avant l'API
+// simulée du contexte), puis la page est relue.
+const leaPhoto = `${apiUrl}/media/visuals/e4a1b2c3-d4e5-4f60-8a7b-9c0d1e2f3a4b.webp`
+const withLeaPhoto = async (page) => {
+  await page.route(
+    (url) => url.pathname === '/v1/me',
+    (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { ...leaMe, avatarUrl: leaPhoto } })
+        : route.fallback(),
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+}
 const pages = [
   { name: 'catalogue', path: '/catalogue', signedIn: false, fullPage: true },
   { name: 'accueil', path: '/', signedIn: false },
   { name: 'connexion', path: '/sign-in', signedIn: false },
+  // R2 : arrivé du nouveau mot de passe, « Mot de passe changé. Connecte-toi avec le nouveau. »
+  {
+    name: 'connexion-mot-de-passe-change',
+    path: '/sign-in?announce=passwordChanged',
+    signedIn: false,
+  },
   { name: 'inscription', path: '/sign-up', signedIn: false },
-  { name: 'verifier-email', path: '/check-email?email=lea%40example.com', signedIn: false },
+  // R2, « Trop d'essais » : l'API refuse la connexion pour 10 minutes (429, Retry-After : 600) ; le
+  // bouton reste bloqué, l'heure du prochain essai est écrite en clair (décision D3).
+  {
+    name: 'trop-essais',
+    path: '/sign-in',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.route('**/api/auth/sign-in/email', (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          // L'API est sur une autre origine que l'appli : le navigateur ne laisse lire Retry-After
+          // que si la réponse l'expose, comme le fait la vraie API (CORS, `exposeHeaders` d'app.ts).
+          headers: {
+            'Retry-After': '600',
+            'Access-Control-Expose-Headers': 'Retry-After',
+          },
+          body: JSON.stringify({ code: 'TOO_MANY_REQUESTS', message: '' }),
+        }),
+      )
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@exemple.fr')
+      await page.getByLabel('Mot de passe', { exact: true }).fill('un-mot-de-passe-faux')
+      await page.getByRole('button', { name: 'Me connecter' }).click()
+      // Pas `getByRole('status')` : la couche des toasts en a un autre, caché.
+      await page.getByText(/Nouvel essai possible/).waitFor()
+    },
+  },
+  // Tranche R2 : « Vérifie ta boîte mail », l'adresse venue de l'inscription (gmail : « Ouvrir ma
+  // messagerie » ; un service inconnu : pas de bouton sur ordinateur), puis après « Renvoyer ».
+  {
+    name: 'verifier-email',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@gmail.com'),
+  },
+  {
+    name: 'verifier-email-inconnue',
+    path: '/check-email',
+    signedIn: false,
+    prepare: pendingEmail('ines.haddad@exemple.fr'),
+  },
+  {
+    name: 'verifier-email-renvoye',
+    path: '/check-email',
+    signedIn: false,
+    prepare: async (page) => {
+      await pendingEmail('ines.haddad@gmail.com')(page)
+      await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
+      await page.getByText(/nouvel e‑mail vient de partir/).waitFor()
+    },
+  },
+  // Tranche R2 : le mot de passe oublié (vide, puis envoyé), le nouveau mot de passe ouvert par le
+  // lien, et ce même lien refusé par le serveur.
+  { name: 'mot-de-passe-oublie', path: '/forgot-password', signedIn: false },
+  {
+    name: 'mot-de-passe-oublie-envoye',
+    path: '/forgot-password',
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Adresse e‑mail').fill('ines.haddad@gmail.com')
+      await page.getByRole('button', { name: 'Envoyer le lien' }).click()
+      await page.getByText(/Si un compte existe pour cette adresse/).waitFor()
+    },
+  },
+  {
+    name: 'nouveau-mot-de-passe',
+    path: `/reset-password?token=${resetTokenShot}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+    },
+  },
+  {
+    name: 'lien-refuse',
+    path: `/reset-password?token=${refusedResetToken}`,
+    signedIn: false,
+    prepare: async (page) => {
+      await page.getByLabel('Nouveau mot de passe').fill('une-phrase-assez-longue')
+      await page.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+      await page.getByRole('heading', { name: 'Ce lien ne marche plus' }).waitFor()
+    },
+  },
+  // La rubrique Sécurité des réglages : changer son mot de passe (la route est celle des réglages).
+  { name: 'changer-mot-de-passe', path: '/settings/security/password', signedIn: true },
+  // Décision D1 : le second lien d'un changement d'adresse ouvert sans session.
+  { name: 'adresse-connecte-toi', path: '/email-change/sign-in-first', signedIn: false },
   { name: 'quitter', path: '/out?url=https%3A%2F%2Frecettes.example.com', signedIn: false },
-  // L'accueil d'un membre : le fil « Abonnements », puis le même pour qui ne suit personne.
-  { name: 'accueil-connecte', path: '/', signedIn: true, fullPage: true },
+  // Le Fil (R3) : l'accueil d'un membre, ses abonnements seuls (le logo et la cloche en haut sur
+  // téléphone, la barre d'onglets en bas), puis le même pour qui ne suit personne.
+  // R4 : « fil » est lu jusqu'au 18/10, donc « Tu es à jour » coupe le fil en deux ; « fil-a-jour »
+  // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
+  // t'attend » et les proches à suivre).
+  { name: 'fil', path: '/', signedIn: true, feed: 'read-midway', fullPage: true },
+  { name: 'fil-a-jour', path: '/', signedIn: true, feed: 'read-all', fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
+  // R4 : le fil qui charge (la première page ne répond jamais : le squelette des cartes), puis le
+  // fil en panne (500 : le message et « Réessayer »). La route de la page passe avant l'API
+  // simulée ; la page est relue pour que la première requête la prenne.
+  {
+    name: 'fil-chargement',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        () => {},
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.locator('[aria-busy="true"]').first().waitFor()
+    },
+  },
+  {
+    name: 'fil-erreur',
+    path: '/',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/feed/following',
+        (route) =>
+          route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'internal', message: '' } }),
+          }),
+      )
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.getByRole('button', { name: 'Réessayer' }).first().waitFor()
+    },
+  },
+  // Explorer (R3) : le haut de la page (le champ sur téléphone, le carrousel des testeurs, les
+  // outils populaires), puis la page entière jusqu'à « Récents » et ses pastilles « Suivre ».
+  // Chaque capture est prise de jour et de nuit ; « explorer-nuit » est la page entière (planche
+  // R3-Explorer-Nuit).
+  { name: 'explorer', path: '/explore', signedIn: true },
+  { name: 'explorer-nuit', path: '/explore', signedIn: true, fullPage: true },
+  // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
+  { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
+  // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
+  { name: 'fil-fini', path: '/', signedIn: true, feed: 'end', fullPage: true },
+  // Une adresse qui ne mène nulle part (R1) : la page introuvable, sur le miel vif.
+  { name: 'introuvable', path: '/nulle-part', signedIn: false },
   // Les notifications (tranche 6b) : la liste (avec sa suite), l'écran vide, et la cloche à « 9+ ».
   { name: 'notifications', path: '/notifications', signedIn: true, fullPage: true },
   { name: 'notifications-vide', path: '/notifications', signedIn: true, notifications: 'none' },
@@ -1087,18 +1549,39 @@ const pages = [
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()
     },
   },
-  { name: 'compte', path: '/account', signedIn: true, fullPage: true },
-  { name: 'supprimer-compte', path: '/account/delete', signedIn: true, fullPage: true },
+  // Tranche R2 : la page « Réglages » (qui remplace « Mon compte ») et chacune de ses rubriques.
+  { name: 'reglages', path: '/settings', signedIn: true, fullPage: true },
+  {
+    name: 'reglages-notifications',
+    path: '/settings/notifications',
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'reglages-langue', path: '/settings/language', signedIn: true, fullPage: true },
+  { name: 'reglages-apparence', path: '/settings/appearance', signedIn: true, fullPage: true },
+  { name: 'reglages-donnees', path: '/settings/data', signedIn: true, fullPage: true },
+  { name: 'reglages-securite', path: '/settings/security', signedIn: true, fullPage: true },
+  // Retour de « Changer ton mot de passe » (relecture R2, B2) : la rubrique dit elle-même
+  // « Mot de passe changé », le toast n'est plus la seule trace.
+  {
+    name: 'reglages-securite-change',
+    path: '/settings/security?announce=passwordChanged',
+    signedIn: true,
+    fullPage: true,
+  },
+  { name: 'reglages-compte', path: '/settings/account', signedIn: true, fullPage: true },
+  { name: 'reglages-a-propos', path: '/settings/about', signedIn: true, fullPage: true },
+  { name: 'supprimer-compte', path: '/settings/account/delete', signedIn: true, fullPage: true },
   // Tranche « adresse » : la page qui change l'adresse, la demande partie (le premier lien vers
   // l'adresse actuelle), un mot de passe refusé ; puis les pages des deux liens.
-  { name: 'changer-adresse', path: '/account/email', signedIn: true, fullPage: true },
+  { name: 'changer-adresse', path: '/settings/account/email', signedIn: true, fullPage: true },
   {
     name: 'changer-adresse-envoye',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(changeEmailShot.password)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Regarde ta boîte mail actuelle').waitFor()
@@ -1106,11 +1589,11 @@ const pages = [
   },
   {
     name: 'changer-adresse-erreur',
-    path: '/account/email',
+    path: '/settings/account/email',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByLabel('Nouvelle adresse e-mail').fill(changeEmailShot.newEmail)
+      await page.getByLabel('Nouvelle adresse e‑mail').fill(changeEmailShot.newEmail)
       await page.getByLabel('Confirme avec ton mot de passe').fill(wrongPasswordShot)
       await page.getByRole('button', { name: 'Envoyer le lien' }).click()
       await page.getByText('Mot de passe incorrect.').waitFor()
@@ -1124,11 +1607,32 @@ const pages = [
     path: '/email-change/done?error=INVALID_TOKEN',
     signedIn: false,
   },
-  { name: 'profil', path: '/profile', signedIn: true, fullPage: true },
+  { name: 'profil', path: '/settings/profile', signedIn: true, fullPage: true },
+  // R2 : le profil en feuille, Léa avec sa photo (floutée en tête de la feuille), sa bio et ses
+  // outils ; sur ordinateur, l'aperçu de sa page à droite.
+  {
+    name: 'feuille-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Mon profil' }).waitFor()
+    },
+  },
+  // R2 : la suppression en feuille, avec la photo de Léa et les couvertures de ses projets.
+  {
+    name: 'feuille-suppression',
+    path: '/settings/account/delete',
+    signedIn: true,
+    prepare: async (page) => {
+      await withLeaPhoto(page)
+      await page.getByRole('dialog', { name: 'Supprimer ton compte' }).waitFor()
+    },
+  },
   // Tranche 6a : un pseudo déjà pris (celui de Max), refusé sous son champ ; ce qui a été tapé reste.
   {
     name: 'profil-pseudo-pris',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1140,7 +1644,7 @@ const pages = [
   // Un nouveau pseudo enregistré : la confirmation rappelle que l'ancien reste réservé.
   {
     name: 'profil-pseudo-change',
-    path: '/profile',
+    path: '/settings/profile',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
@@ -1154,12 +1658,12 @@ const pages = [
   // Tranche 6c : un réglage d'e-mail touché, enregistré tout de suite (« Réglage enregistré. »).
   {
     name: 'profil-email',
-    path: '/profile',
+    path: '/settings/notifications',
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
       await page
-        .getByRole('switch', { name: 'Un e-mail quand on me mentionne ou me répond' })
+        .getByRole('switch', { name: 'Un e‑mail quand on me mentionne ou me répond' })
         .click()
       await page.getByText('Réglage enregistré.').waitFor()
     },
@@ -1230,7 +1734,7 @@ const pages = [
       await page.getByRole('heading', { name: 'Retirer ce contenu ?' }).waitFor()
     },
   },
-  { name: 'compte-admin', path: '/account', signedIn: true, admin: true, fullPage: true },
+  { name: 'reglages-admin', path: '/settings', signedIn: true, admin: true, fullPage: true },
   // Tranche 7b : bloquer. Le menu « … » de la page de Max, ouvert ; puis « Bloquer » choisi, la
   // fenêtre qui dit ce qui change ; la page de Sam vue par Léa qui l'a bloqué (l'en-tête seul,
   // « Tu as bloqué @sam ») ; la liste « Membres bloqués », pleine puis vide ; la confirmation d'un
@@ -1314,7 +1818,13 @@ const pages = [
     fullPage: true,
   },
   { name: 'suspendu-publier', path: '/projects/new', signedIn: true, suspended: true },
-  { name: 'suspendu-profil', path: '/profile', signedIn: true, suspended: true, fullPage: true },
+  {
+    name: 'suspendu-profil',
+    path: '/settings/profile',
+    signedIn: true,
+    suspended: true,
+    fullPage: true,
+  },
   // La suspension et sa fin, dans les notifications.
   {
     name: 'notifications-suspension',
@@ -1371,6 +1881,21 @@ const pages = [
   // La page d'un membre (la sienne : avec un brouillon privé), et celle d'une étiquette, pleine
   // puis vide.
   { name: 'membre', path: `/members/${leaMe.id}`, signedIn: true, fullPage: true },
+  // « Moi » (R3) : la même page par l'onglet, sans « Retour », la roue des réglages en haut à
+  // droite.
+  { name: 'moi', path: '/me', signedIn: true, fullPage: true },
+  // La barre d'onglets au plus étroit (320 points) avec le texte à 200 % (relecture du plan R3,
+  // ui-8) : les libellés passent sous l'icône, sur une ligne. Téléphone seulement (l'ordinateur
+  // n'a pas de barre d'onglets) ; `textScale` grossit chaque texte, comme le réglage d'un
+  // téléphone (le web n'a pas de `fontScale`).
+  {
+    name: 'barre-320-texte-200',
+    path: '/',
+    signedIn: true,
+    phone: { width: 320, height: 640 },
+    phoneOnly: true,
+    textScale: 2,
+  },
   { name: 'etiquette', path: '/tags/claude-code', signedIn: true, fullPage: true },
   { name: 'etiquette-vide', path: '/tags/inconnu', signedIn: true },
   // Les états d'une page : réservée aux membres (vue par un visiteur), chargement en échec,
@@ -1399,12 +1924,12 @@ const pages = [
     signedIn: false,
     prepare: async (page) => {
       await page.getByRole('button', { name: 'Confirmer' }).click()
-      await page.getByText(/tu ne recevras plus d’e-mail quand on te mentionne/).waitFor()
+      await page.getByText(/tu ne recevras plus d’e‑mail quand on te mentionne/).waitFor()
       // « Tout couper » ignore les appuis des 600 ms qui suivent la confirmation (la seconde tape
       // d'une double tape) : on appuie comme un membre qui a lu le message.
       await page.waitForTimeout(700)
       await page.getByRole('button', { name: 'Tout couper' }).click()
-      await page.getByText(/plus aucun e-mail de notification/).waitFor()
+      await page.getByText(/plus aucun e‑mail de notification/).waitFor()
     },
   },
   {
@@ -1421,6 +1946,12 @@ const pages = [
     path: '/projects/00000000-0000-4000-8000-000000000000',
     signedIn: true,
   },
+  // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
+  // quota dépassé ; et l'onglet Ruches, avant les ruches.
+  { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
+  { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
+  { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
+  { name: 'ruches', path: '/hives', signedIn: true },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
 // habituelles, la page ne doit plus montrer « Chargement… » ni « Cette page n’a pas pu se
@@ -1430,18 +1961,54 @@ const pages = [
 const unfinished = unfinishedTexts(fr)
 // Les pages qui montrent l'un de ces textes exprès : le catalogue (les états « chargement » et
 // « erreur » de StateMessage) et « erreur » (une lecture qui échoue, LoadErrorScreen).
-const intendedUnfinished = ['catalogue', 'erreur']
+const intendedUnfinished = ['catalogue', 'erreur', 'fil-chargement', 'fil-erreur']
 // Le texte visible de la page : innerText donne une ligne par bloc, sans ce qui est caché
 // (display: none) ; textContent collerait tous les textes et lirait aussi les cachés.
+// Depuis Miel 2 (R1), un squelette ou le logo du lancement n'affichent plus « Chargement… » :
+// c'est leur nom pour les lecteurs d'écran (aria-label). On ajoute donc au texte le nom de chaque
+// élément occupé (aria-busy), une ligne chacun, pour que le garde les voie encore.
 const visibleText = (page) =>
-  // biome-ignore lint/performance/useDomNodeTextContent: on veut le texte rendu (voir ci-dessus).
-  page.evaluate(() => document.body.innerText)
+  page.evaluate(() => {
+    const busy = [...document.querySelectorAll('[aria-busy="true"]')]
+      .map((element) => element.getAttribute('aria-label'))
+      .filter(Boolean)
+    // biome-ignore lint/performance/useDomNodeTextContent: on veut le texte rendu (voir ci-dessus).
+    return [document.body.innerText, ...busy].join('\n')
+  })
 const unfinishedProblem = async (page, shot, name) =>
   loadingProblem(name, await visibleText(page), {
     texts: unfinished,
     page: shot.name,
     intended: intendedUnfinished,
   })
+// Avant le garde, on laisse à la page le temps de finir de charger : 10 s au plus, en la relisant
+// tous les quarts de seconde (voir waitUntilLoaded). Une page chargée passe tout de suite ; une
+// page en panne échoue toujours, seulement 10 s plus tard.
+const settleLoading = (page, shot) =>
+  waitUntilLoaded(() => unfinishedProblem(page, shot, shot.name), { patience: 10_000, step: 250 })
+
+/**
+ * Grossit chaque texte affiché (et sa hauteur de ligne) de `factor`, comme le réglage « taille du
+ * texte » d'un téléphone poussé à 200 % : la largeur de l'écran ne change pas, seul le texte
+ * grossit. Sur le web, `fontScale` vaut toujours 1 : on écrit donc les tailles dans la page. Les
+ * tailles sont toutes lues avant d'être écrites (un parent grossi changerait celles de ses enfants).
+ * Même règle que `textScale` des essais (`.claude/explore/lib.mjs`).
+ */
+const scaleText = async (page, factor) => {
+  await page.evaluate((factor) => {
+    const all = [...document.querySelectorAll('body *')]
+    const sizes = all.map((element) => {
+      const style = getComputedStyle(element)
+      return [Number.parseFloat(style.fontSize), style.lineHeight]
+    })
+    all.forEach((element, rank) => {
+      const [font, line] = sizes[rank]
+      element.style.fontSize = `${font * factor}px`
+      if (line !== 'normal') element.style.lineHeight = `${Number.parseFloat(line) * factor}px`
+    })
+  }, factor)
+  await page.waitForTimeout(400) // le temps que la barre se mesure de nouveau (onLayout)
+}
 
 const devices = [
   { name: 'telephone', viewport: { width: 390, height: 844 } },
@@ -1568,9 +2135,12 @@ if (script) {
   ) => {
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
       ...options,
     })
+    // L'horloge des captures ; un essai peut poser `page.clock` lui-même pour un autre jour.
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(signedIn, feed, notifications, admin, blocks, email, suspended),
@@ -1616,9 +2186,11 @@ async function layoutReport() {
     const lines = [`## ${shot.name} (${shot.path})`, '']
     const context = await browser.newContext({
       locale: 'fr-FR',
+      timezoneId: SHOT_TIMEZONE,
       viewport: { width: 390, height: 844 },
     })
     try {
+      await installShotClock(context)
       await context.route(
         `${apiUrl}/**`,
         fakeApi(
@@ -1634,12 +2206,18 @@ async function layoutReport() {
       const page = await context.newPage()
       for (const width of widths) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+        // Les routes posées sur la page par `prepare` à la largeur précédente partent : celle de
+        // fil-chargement ne répond jamais, et « networkidle » ne viendrait plus (R4). L'API simulée
+        // est posée sur le contexte, elle reste.
+        await page.unrouteAll({ behavior: 'ignoreErrors' })
         await page.goto(base + shot.path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(shot.wait ?? 600)
         if (shot.prepare) {
           await shot.prepare(page)
           await page.waitForTimeout(300)
         }
+        if (shot.textScale) await scaleText(page, shot.textScale)
+        await settleLoading(page, shot)
         await settle(page) // la page entière, pas seulement son haut (voir settle)
         // Une page restée en chargement ne se mesure pas : noté dans le rapport, et le script
         // échoue à la fin (voir intendedUnfinished).
@@ -1733,17 +2311,28 @@ for (const name of readdirSync(out)) {
 }
 
 // Une page longue est photographiée en plusieurs tranches, en faisant défiler sa zone de
-// défilement. Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; près de cette
-// limite, il laisse même des zones non peintes, sans erreur. On coupe donc au-delà de 12 000
-// points (le catalogue : catalogue, catalogue-2…). Avec --read, les tranches font environ 1 600
-// pixels, la hauteur qu'un agent lit confortablement, et sont numérotées dès la première (nom-1).
-const PART = read ? 1600 : 12000
+// défilement. Au-delà de 16 000 points, Chromium refuse une fenêtre plus haute ; bien avant, il
+// laisse des zones non peintes, sans erreur, quand l'image est grande en pixels. Les captures
+// sont prises à l'échelle 2 : des tranches de 12 000 points faisaient 23 000 pixels de haut, et
+// sur ordinateur (2 880 pixels de large) les champs et les choix du catalogue sortaient en
+// blanc. On coupe donc au-delà de 6 000 points, soit 12 000 pixels (le catalogue : catalogue,
+// catalogue-2…). Avec --read, les tranches font environ 1 600 pixels, la hauteur qu'un agent lit
+// confortablement, et sont numérotées dès la première (nom-1).
+const PART = read ? 1600 : 6000
 const scale = read ? 1 : 2
 
 // Les travaux de la file : une capture par page, appareil et thème. Le catalogue, le plus long,
 // est en tête de la liste : il commence tôt au lieu de finir seul, après tous les autres.
+// Une page peut changer la fenêtre du téléphone (`phone`, la barre à 320 points) et se passer de
+// l'ordinateur (`phoneOnly`).
+const devicesFor = (shot) =>
+  devices
+    .filter((device) => !shot.phoneOnly || device.name === 'telephone')
+    .map((device) =>
+      shot.phone && device.name === 'telephone' ? { ...device, viewport: shot.phone } : device,
+    )
 const jobs = selected.flatMap((shot) =>
-  devices.flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
+  devicesFor(shot).flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
 )
 
 const browser = await chromium.launch()
@@ -1759,9 +2348,11 @@ const capture = async ({ shot, device, scheme }) => {
     viewport: device.viewport,
     colorScheme: scheme.colorScheme,
     locale: 'fr-FR',
+    timezoneId: SHOT_TIMEZONE,
     deviceScaleFactor: scale,
   })
   try {
+    await installShotClock(context)
     await context.route(
       `${apiUrl}/**`,
       fakeApi(
@@ -1784,6 +2375,8 @@ const capture = async ({ shot, device, scheme }) => {
       await shot.prepare(page)
       await page.waitForTimeout(300)
     }
+    if (shot.textScale) await scaleText(page, shot.textScale)
+    await settleLoading(page, shot)
     const height = await settle(page)
     // La page s'est-elle chargée ? (voir intendedUnfinished) Le problème est signalé à la fin,
     // avec les erreurs des pages ; la capture est prise quand même, pour qu'on la regarde.

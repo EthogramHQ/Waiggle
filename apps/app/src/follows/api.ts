@@ -59,22 +59,29 @@ export const useFollow = (target: Target) => {
   })
   const { mutate } = mutation
   // biome-ignore lint/correctness/useExhaustiveDependencies: la cible ne change qu'avec kind et id.
-  const toggle = useCallback(() => {
-    // La page change ici même, au toucher, avant tout envoi : un second toucher, même très rapide,
-    // lit déjà le nouvel état (« suivi ») et demande donc l'inverse. On garde l'ancienne page pour
-    // pouvoir revenir en arrière.
-    const key = cacheKeyOf(target)
-    const previous = queryClient.getQueryData<FollowState>(key)
-    const follow = !(previous?.isFollowed ?? false)
-    if (previous) {
-      queryClient.setQueryData<FollowState>(key, {
-        ...previous,
-        isFollowed: follow,
-        followerCount: Math.max(0, previous.followerCount + (follow ? 1 : -1)),
-      })
-    }
-    mutate({ follow, previous })
-  }, [queryClient, target.kind, target.id, mutate])
+  const toggle = useCallback(
+    (shown?: unknown) => {
+      // La page change ici même, au toucher, avant tout envoi : un second toucher, même très rapide,
+      // lit déjà le nouvel état (« suivi ») et demande donc l'inverse. On garde l'ancienne page pour
+      // pouvoir revenir en arrière.
+      const key = cacheKeyOf(target)
+      const previous = queryClient.getQueryData<FollowState>(key)
+      // `shown` : l'état que l'écran affiche, quand il ne vient pas de la page en cache (la pastille
+      // « Suivre Nora » d'Explorer, R3, sans page de Nora lue : sans lui, retoucher « Tu suis Nora »
+      // demanderait encore de suivre). Seul un vrai booléen compte : un bouton peut passer son
+      // événement de toucher à `onPress={toggle}`.
+      const follow = !(typeof shown === 'boolean' ? shown : (previous?.isFollowed ?? false))
+      if (previous) {
+        queryClient.setQueryData<FollowState>(key, {
+          ...previous,
+          isFollowed: follow,
+          followerCount: Math.max(0, previous.followerCount + (follow ? 1 : -1)),
+        })
+      }
+      mutate({ follow, previous })
+    },
+    [queryClient, target.kind, target.id, mutate],
+  )
   return {
     toggle,
     error: mutation.isError,

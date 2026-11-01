@@ -1,4 +1,5 @@
-// Page « Changer d'adresse e-mail » (tranche « adresse », /account/email). Le membre tape sa
+// Page « Changer d'adresse e-mail » (tranche « adresse », /settings/account/email depuis la tranche
+// R2 ; l'ancienne adresse /account/email y mène toujours). Le membre tape sa
 // nouvelle adresse et son mot de passe ; rien ne change tout de suite. Un premier lien part vers son
 // adresse ACTUELLE (qui doit donner son accord), puis un second vers la nouvelle, pour la vérifier.
 // Une fois la demande partie, la page le dit et le formulaire disparaît : on ne renvoie pas une
@@ -9,18 +10,21 @@ import { useRouter } from 'expo-router'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
-import { changeEmail, useSession } from '../accounts/api'
+import { changeEmail } from '../accounts/api'
 import type { AuthErrorKey } from '../accounts/errors'
+import { useMemberSession } from '../accounts/session'
+import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Hint } from '../ui/Hint'
-import { Emblem } from '../ui/Illustrations'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
-import { Stack } from '../ui/Stack'
+import { Row, Stack } from '../ui/Stack'
+import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
+import { TextLink } from '../ui/TextLink'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 // Paramètres des messages qui citent les longueurs de mot de passe (le message générique d'une
@@ -43,8 +47,9 @@ const fieldOf = (error: AuthErrorKey): keyof FieldErrors | null => {
 export function ChangeEmailScreen() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { data, isPending, error: sessionError, refetch } = useSession()
-  const back = useGoBack('/account')
+  const { state, session: data, retry: retrySession } = useMemberSession()
+  // Arrivé par un lien direct : le retour mène à la rubrique « Compte » des réglages (R2).
+  const back = useGoBack('/settings/account')
   const [newEmail, setNewEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -67,9 +72,9 @@ export function ChangeEmailScreen() {
     focusWithoutScroll(messageRef.current)
   })
 
-  if (isPending) return <LoadingScreen />
-  // La session ne se lit pas (serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
-  if (sessionError && !data) return <SessionErrorScreen onRetry={() => void refetch()} />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là, on propose de réessayer.
+  if (state === 'error') return <SessionErrorScreen onRetry={retrySession} />
   // Personne de connecté : on propose de se connecter (et de revenir ici ensuite).
   if (!data) return <SignedOutScreen />
   const current = data.user.email
@@ -124,9 +129,9 @@ export function ChangeEmailScreen() {
   // (charte de design, « une action qui remplace un bouton »). Retourner à son compte n'a rien de
   // grave : pas de garde dans le temps.
   const onBackToAccount = () => {
-    // dismissTo : revient à « Mon compte » s'il est dans l'historique (on en vient presque
-    // toujours), sinon le met à la place de cette page.
-    router.dismissTo('/account')
+    // dismissTo : revient à la rubrique « Compte » des réglages si elle est dans l'historique (on
+    // en vient presque toujours), sinon la met à la place de cette page.
+    router.dismissTo('/settings/account')
   }
 
   const message = (key: AuthErrorKey | undefined) =>
@@ -147,38 +152,36 @@ export function ChangeEmailScreen() {
   // Chaque état a sa clé (`key`) : React dessine des éléments neufs au changement, au lieu de
   // réutiliser ceux qui sont à la même place (le bouton « Envoyer » ne devient pas « Retour »).
   const content = sentTo ? (
-    <Fragment key="sent">
-      <Stack align="center">
-        <Emblem icon="envelope-simple" />
-      </Stack>
-      <Text variant="title3" align="center" heading={2}>
-        {t(($) => $.account.changeEmail.sentTitle)}
-      </Text>
-      {/* Une confirmation, lue sans couper le lecteur d'écran (role « status »), et qui reçoit le
-          focus du clavier sur le web. L'adresse citée est l'actuelle, pas la nouvelle. */}
-      <Notice
-        ref={messageRef}
-        tone="success"
-        polite
-        message={t(($) => $.account.changeEmail.sentBody, { email: sentTo })}
-      />
-      {/* Centrés, comme le titre au-dessus et comme la page « Vérifie ta boîte mail » de
-          l'inscription (CheckEmailScreen) : un état de confirmation se lit au milieu. */}
-      <Text tone="secondary" align="center">
-        {t(($) => $.account.changeEmail.sentNext)}
-      </Text>
-      <Text variant="callout" tone="muted" align="center">
-        {t(($) => $.account.changeEmail.sentNone)}
-      </Text>
+    // L'état commun StateMessage (R4, ménage M7) : tout est rangé à gauche, comme les autres états.
+    <StateMessage
+      key="sent"
+      kind="done"
+      icon="envelope-simple"
+      title={t(($) => $.account.changeEmail.sentTitle)}
+      // Une confirmation, lue sans couper le lecteur d'écran (role « status »), et qui reçoit le
+      // focus du clavier sur le web. L'adresse citée est l'actuelle, pas la nouvelle.
+      notice={
+        <Notice
+          ref={messageRef}
+          tone="success"
+          polite
+          message={t(($) => $.account.changeEmail.sentBody, { email: sentTo })}
+        />
+      }
+      message={[t(($) => $.account.changeEmail.sentNext), t(($) => $.account.changeEmail.sentNone)]}
+      // « Retour » est la seule issue, en blanc : l'action attendue est d'ouvrir le lien reçu.
+      actions={[
+        {
+          label: t(($) => $.account.changeEmail.back),
+          variant: 'secondary',
+          onPress: onBackToAccount,
+        },
+      ]}
+    >
       {/* L'aide passe avant « Retour » : elle l'éloigne encore de la place du bouton touché (27 pt
           d'écart seulement sur ordinateur sans elle, mesuré dans le navigateur). */}
       {noAccess}
-      <Button
-        label={t(($) => $.account.changeEmail.back)}
-        variant="secondary"
-        onPress={onBackToAccount}
-      />
-    </Fragment>
+    </StateMessage>
   ) : (
     <Fragment key="form">
       <Stack gap="sm">
@@ -210,6 +213,13 @@ export function ChangeEmailScreen() {
           error={message(fieldErrors.password)}
         />
       </FieldGroup>
+      {/* Mot de passe oublié : on en choisit un nouveau d'abord (relecture juridique, jur-12). */}
+      <Row justify="end">
+        <TextLink
+          label={t(($) => $.auth.signIn.forgotPassword)}
+          onPress={() => router.push('/forgot-password')}
+        />
+      </Row>
       {error ? <Notice message={t(($) => $.auth.errors[error], lengths)} /> : null}
       <Button
         label={
@@ -226,7 +236,12 @@ export function ChangeEmailScreen() {
   )
 
   return (
-    <Screen onBack={back} title={t(($) => $.account.changeEmail.title)}>
+    // Sur ordinateur, la barre du haut, comme les autres pages des réglages (relecture de design C4).
+    <Screen
+      header={<TopNav inSettings />}
+      onBack={back}
+      title={t(($) => $.account.changeEmail.title)}
+    >
       {content}
     </Screen>
   )

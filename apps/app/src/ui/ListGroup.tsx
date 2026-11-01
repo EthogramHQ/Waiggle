@@ -1,11 +1,28 @@
 // Une liste de réglages : un groupe blanc arrondi, des lignes séparées par un trait fin.
 // Une ligne peut mener ailleurs (chevron), lancer une action (icône à droite), être un choix
 // (coche) ou simplement afficher une information. Les réglages du compte en sont faits.
+// En mode `radio` (une liste de choix : la langue, l'apparence, le motif d'un signalement), le
+// groupe se parcourt au clavier comme tout groupe de boutons radio (et comme Segmented, Choices) :
+// Tab ne s'y arrête qu'une fois, sur le choix coché (le premier tant qu'aucun ne l'est), les
+// flèches cochent le choix voisin en faisant le tour, Espace et Entrée cochent le choix qui a le
+// focus. Avant (point de liste de R1), la page « Signaler » demandait sept Tab pour traverser
+// ses motifs.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { Children, Fragment, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, View } from 'react-native'
+import {
+  Children,
+  createContext,
+  Fragment,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+  useContext,
+  useId,
+  useRef,
+} from 'react'
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native'
+import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
-import { spaceToggles } from './keyboard'
+import { RadioMark } from './Radio'
 import { Text } from './Text'
 import { insetFocus } from './theme/document'
 import { useTheme } from './theme/ThemeProvider'
@@ -23,9 +40,71 @@ type GroupProps = {
   radio?: boolean
 }
 
+/**
+ * Ce qu'un groupe de choix donne à chacune de ses lignes : sa place dans le parcours au clavier.
+ * Un « contexte » React : une valeur posée par un composant parent, que ses descendants lisent
+ * (useContext) sans qu'on la passe de main en main. Une ligne hors d'un groupe radio n'en a pas.
+ */
+type RadioSlot = {
+  /** 0 pour le seul choix que Tab atteint, -1 pour les autres (« tabIndex itinérant »). */
+  tabIndex: 0 | -1
+  /** Une flèche : cocher le choix voisin (1 : le suivant, -1 : le précédent) et lui donner le focus. */
+  onArrow: (step: 1 | -1) => void
+  /** Pour que le groupe retrouve l'élément de la ligne, et y pose le focus. */
+  setNode: (node: View | null) => void
+}
+
+const RadioSlotContext = createContext<RadioSlot | null>(null)
+
+/**
+ * La largeur que garde le nom d'une ligne (en points) avant que le côté droit passe dessous : de quoi
+ * lire quelques mots. Mesuré à 320 points et 200 % : « Membres bloqués » laissait 38 points à
+ * « Sam Petit » (R4, M6).
+ */
+const MIN_NAME = 120
+
+type KeyEvent = { key: string; repeat?: boolean; preventDefault: () => void }
+/** Le peu d'un événement de clic dont une ligne-lien a besoin (voir `onPress`). */
+export type PressEvent = { preventDefault?: () => void }
+
 export function ListGroup({ title, footer, children, radio = false }: GroupProps) {
   const { colors, shadows } = useTheme()
   const rows = Children.toArray(children)
+  // Les éléments des choix, par rang de ligne, pour y poser le focus quand une flèche passe au
+  // voisin.
+  const nodes = useRef<(View | null)[]>([])
+  // Les choix du groupe : les lignes qui ont un état (`selected`) et une action. Le groupe lit
+  // leurs propriétés pour savoir laquelle est cochée, et appeler l'action d'une voisine.
+  const choices = radio
+    ? rows.map((row) =>
+        isValidElement<RowBase>(row) && row.props.selected !== undefined && row.props.onPress
+          ? row.props
+          : null,
+      )
+    : []
+  const checked = choices.findIndex((choice) => choice?.selected === true)
+  const tabStop = checked === -1 ? choices.findIndex((choice) => choice !== null) : checked
+  // Une flèche depuis la ligne `from` : le prochain choix actif dans ce sens, en faisant le tour
+  // (après le dernier, le premier). Un choix inactif est sauté.
+  const move = (from: number, step: 1 | -1) => {
+    const count = choices.length
+    for (let k = 1; k <= count; k++) {
+      const index = (((from + step * k) % count) + count) % count
+      const choice = choices[index]
+      if (choice?.onPress && !choice.disabled) {
+        choice.onPress()
+        nodes.current[index]?.focus()
+        return
+      }
+    }
+  }
+  const slot = (index: number): RadioSlot => ({
+    tabIndex: index === tabStop ? 0 : -1,
+    onArrow: (step) => move(index, step),
+    setNode: (node) => {
+      nodes.current[index] = node
+    },
+  })
   const notes = footer === undefined ? [] : typeof footer === 'string' ? [footer] : footer
   return (
     <View style={{ gap: space.sm }}>
@@ -60,7 +139,11 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
                 }}
               />
             ) : null}
-            {row}
+            {choices[i] ? (
+              <RadioSlotContext.Provider value={slot(i)}>{row}</RadioSlotContext.Provider>
+            ) : (
+              row
+            )}
           </Fragment>
         ))}
       </View>
@@ -102,16 +185,37 @@ type RowProps = RowBase &
   )
 
 type RowBase = {
+  /** Le libellé : le texte affiché, et le nom lu de la ligne. */
   label: string
+  /**
+   * Ce qui se dessine à la place du libellé, quand le texte seul ne suffit pas (R3, ui-10) : le
+   * titre d'un résultat de recherche, surligné (`<HighlightedText weight={600} …>`). Le nœud porte
+   * son propre style ; il dit le même texte que `label`, qui reste le nom lu de la ligne et ne se
+   * dessine pas une seconde fois.
+   */
+  title?: ReactNode
   /** Une icône dans une pastille, à gauche du libellé. */
   icon?: IconName
-  /** Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. */
-  detail?: string
+  /**
+   * Ce qui se pose à gauche du libellé quand une icône ne suffit pas (R3, « Tous les outils ») : la
+   * tuile à l'initiale d'un outil (`<InitialTile …>`). Décoratif : le libellé reste le nom lu.
+   */
+  leading?: ReactNode
+  /**
+   * Une précision sous le libellé (l'adresse e-mail…), ou à droite avec `detailRight`. Un texte, ou
+   * un nœud qui porte son propre style, comme `title` : la précision surlignée d'un résultat de
+   * recherche (`<HighlightedText variant="callout" tone="muted" …>`, « @camille_carnot »).
+   */
+  detail?: string | ReactElement
   detailRight?: boolean
   /** Ce qu'il y a à droite : un chevron (mène ailleurs), une icône (action), une coche (choix). */
   trailing?: 'chevron' | 'check' | IconName | ReactNode
   tone?: 'default' | 'danger'
-  onPress?: () => void
+  /**
+   * Le geste. Une ligne-lien (`href`) reçoit l'événement du clic : l'écran qui navigue par son
+   * routeur empêche le navigateur de recharger la page (`preventDefault`).
+   */
+  onPress?: (event?: PressEvent) => void
   /** Pour un choix : coché ou non (la ligne devient un bouton radio). */
   selected?: boolean
   /** Le contenu de droite qui n'est pas une icône (un contrôle segmenté, par exemple). */
@@ -128,11 +232,28 @@ type RowBase = {
    * contact@… ») : le nom d'un bouton cache le texte qu'il contient, la précision comprise.
    */
   spokenLabel?: string
+  /**
+   * L'adresse de la page où mène la ligne (les rubriques des réglages, R2) : la ligne devient un
+   * lien, et sur le web un vrai `<a>` (ouvrir dans un nouvel onglet, Entrée). Le geste ordinaire
+   * reste `onPress`, que l'écran branche sur son routeur.
+   */
+  href?: string
+  /** Avec `href` : la ligne mène à la page ouverte (`aria-current="page"`). */
+  current?: boolean
+  /**
+   * Ce que les lecteurs d'écran lisent après le nom d'une ligne qu'on touche (R2) : ce que contient
+   * une rubrique des réglages, « ouvre un site externe ». Le nom d'un lien cache le texte qu'il
+   * contient : sur téléphone, c'est l'indice (`accessibilityHint`) ; sur le web, une description
+   * (`aria-describedby`) vers un texte caché, que le navigateur lit quand même.
+   */
+  hint?: string
 }
 
 export function ListRow({
   label,
+  title,
   icon,
+  leading,
   detail,
   detailRight = false,
   detailAlert,
@@ -144,19 +265,38 @@ export function ListRow({
   disabled = false,
   busy = false,
   spokenLabel,
+  href,
+  current = false,
+  hint,
 }: RowProps) {
   const { colors } = useTheme()
+  // L'identifiant du texte caché qui décrit la ligne (web) : useId en donne un, unique dans la page.
+  const hintId = useId()
+  const webHint = Platform.OS === 'web' && hint !== undefined && onPress !== undefined
+  // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
+  const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
   const right =
     trailing === 'chevron' ? (
       <Icon name="caret-right" size={18} tone="muted" />
     ) : trailing === 'check' || isChoice ? (
-      <Check selected={selected === true} />
+      <RadioMark selected={selected === true} />
     ) : typeof trailing === 'string' ? (
       <Icon name={trailing as IconName} size={20} tone={tone === 'danger' ? 'danger' : 'muted'} />
     ) : (
       (trailing ?? null)
     )
+  // La précision : un texte prend le style des précisions ; un nœud (surligné) porte le sien.
+  const detailText =
+    typeof detail === 'string' ? (
+      <Text variant="callout" tone="muted">
+        {detail}
+      </Text>
+    ) : (
+      detail
+    )
+
+  const hasTrailing = Boolean((detail && detailRight) || accessory || busy || right)
 
   const content = (
     <View
@@ -173,11 +313,17 @@ export function ListRow({
         : null)}
       style={{
         flexDirection: 'row',
+        // Quand la place manque (320 points, texte à 200 %), le côté droit (pastille, bouton,
+        // chevron) passe sous le nom au lieu de l'écraser (R4, M6).
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: space.md,
         minHeight: layout.controlHeight.regular,
         paddingHorizontal: space.lg,
         paddingVertical: space.md,
+        // Inactive, la ligne pâlit, comme un bouton, une case ou un rond inactifs : on voit
+        // qu'elle ne répondra pas avant de la toucher.
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       {icon ? (
@@ -194,45 +340,102 @@ export function ListRow({
           <Icon name={icon} size={20} tone="secondary" />
         </View>
       ) : null}
-      <View style={{ flex: 1, gap: space.xxs }}>
-        <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
-          {label}
-        </Text>
+      {leading}
+      {/* La colonne du nom : `flexGrow` et une vraie `flexBasis` (jamais `flex: 1`, dont la base
+          nulle ne fait jamais passer le reste à la ligne). Elle demande au moins MIN_NAME points ;
+          si le côté droit ne les lui laisse pas, il passe dessous. */}
+      <View
+        style={{ flexGrow: 1, flexShrink: 1, flexBasis: MIN_NAME, minWidth: 0, gap: space.xxs }}
+      >
+        {title ?? (
+          <Text weight={600} tone={tone === 'danger' ? 'danger' : 'default'}>
+            {label}
+          </Text>
+        )}
         {detail && !detailRight && detailAlert !== undefined ? (
           // Une clé neuve à chaque échec : React remplace l'alerte au lieu de changer son texte.
           <View key={`alert-${detailAlert}`} accessible accessibilityRole="alert">
-            <Text variant="callout" tone="muted">
-              {detail}
-            </Text>
+            {detailText}
           </View>
         ) : detail && !detailRight ? (
-          <Text variant="callout" tone="muted">
-            {detail}
-          </Text>
+          detailText
         ) : null}
       </View>
-      {detail && detailRight ? (
-        <Text variant="callout" tone="muted">
-          {detail}
-        </Text>
+      {/* Le côté droit, d'un seul bloc : il passe à la ligne tout entier, rangé à droite
+          (`marginLeft: 'auto'`), au lieu que la pastille et le chevron se séparent. */}
+      {hasTrailing ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space.md,
+            marginLeft: 'auto',
+            // Plus large que la ligne, il se replie lui-même (un bouton à texte long).
+            maxWidth: '100%',
+            flexShrink: 1,
+          }}
+        >
+          {detail && detailRight ? detailText : null}
+          {accessory}
+          {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
+          {right}
+        </View>
       ) : null}
-      {accessory}
-      {busy ? <ActivityIndicator color={colors.textMuted} aria-hidden /> : null}
-      {right}
+      {/* La description de la ligne, cachée à l'œil (display: none) mais lue par aria-describedby. */}
+      {webHint ? (
+        <View nativeID={hintId} style={{ display: 'none' }}>
+          <Text>{hint}</Text>
+        </View>
+      ) : null}
     </View>
   )
 
   if (!onPress) return content
+
+  // Un choix (bouton radio) au clavier, sur le web : react-native-web ne fait réagir aux touches
+  // que les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a) ne pouvait pas
+  // s'envoyer au clavier : aucun motif ne se cochait. Espace et Entrée cochent ; dans un groupe
+  // radio, les flèches passent au voisin et seul un choix est dans le parcours de Tab.
+  const choiceKeys = (press: () => void) =>
+    Platform.OS === 'web'
+      ? {
+          ...(slot ? { tabIndex: slot.tabIndex } : null),
+          onKeyDown: (event: KeyEvent) => {
+            if (event.key === ' ' || event.key === 'Enter') {
+              // preventDefault : l'espace ne fait pas défiler la page. Une touche gardée enfoncée
+              // (repeat) ne coche pas dix fois.
+              event.preventDefault()
+              if (!event.repeat && !disabled) press()
+              return
+            }
+            const step =
+              event.key === 'ArrowDown' || event.key === 'ArrowRight'
+                ? 1
+                : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+                  ? -1
+                  : 0
+            if (step === 0 || !slot) return
+            // preventDefault : la flèche ne fait pas défiler la page.
+            event.preventDefault()
+            slot.onArrow(step)
+          },
+        }
+      : null
+
   return (
     <Pressable
-      accessibilityRole={isChoice ? 'radio' : 'button'}
+      accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
+      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
+      {...describedBy(webHint ? hintId : undefined)}
       aria-disabled={disabled}
+      // Un lien avec adresse : `href` et `aria-current` manquent aux types de React Native (sur
+      // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).
+      {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
-      // Un choix (bouton radio) se coche avec la barre d'espace, sur le web : react-native-web ne
-      // le fait que pour les boutons (keyboard.ts). Sans cela, la page « Signaler » (tranche 7a)
-      // ne pouvait pas s'envoyer au clavier : aucun motif ne se cochait.
-      {...(isChoice ? spaceToggles(onPress, disabled) : null)}
+      // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
+      ref={isChoice ? slot?.setNode : undefined}
+      {...(isChoice ? choiceKeys(onPress) : null)}
       disabled={disabled}
       onPress={onPress}
       // Le groupe rogne ce qui dépasse : l'anneau de focus se dessine à l'intérieur de la ligne.
@@ -241,26 +444,5 @@ export function ListRow({
     >
       {content}
     </Pressable>
-  )
-}
-
-/** La coche ronde d'un choix : pleine de miel quand il est choisi, vide sinon. */
-function Check({ selected }: { selected: boolean }) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: radii.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: selected ? colors.honey : 'transparent',
-        borderWidth: selected ? 0 : borders.strong,
-        borderColor: colors.lineStrong,
-      }}
-    >
-      {selected ? <Icon name="check" size={16} tone="onHoney" /> : null}
-    </View>
   )
 }

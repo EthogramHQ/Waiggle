@@ -93,7 +93,9 @@ export function Switch({
           borderRadius: radii.pill,
           justifyContent: 'center',
           paddingHorizontal: (TRACK.height - KNOB) / 2,
-          backgroundColor: value ? colors.honey : colors.lineStrong,
+          // Éteint, la piste seule montre qu'il y a un interrupteur (la pastille est blanche comme
+          // la carte) : elle tient 3:1 contre le fond (controlBorder, WCAG 1.4.11).
+          backgroundColor: value ? colors.honey : colors.controlBorder,
           opacity: disabled ? 0.55 : 1,
         }}
       >

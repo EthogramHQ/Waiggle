@@ -40,10 +40,12 @@ describe('translations', () => {
   })
 
   it('never writes the app name by hand, so renaming the app takes one line', () => {
-    // Le nom affiché et le nom de code : ni l'un ni l'autre ne doit apparaître dans un texte.
+    // Le nom affiché et le nom de code (« @ruche/… », « ruche-api ») : ni l'un ni l'autre ne doit
+    // apparaître dans un texte. Le mot « ruche » seul est permis depuis R3 : les ruches sont une
+    // fonction de l'appli (des groupes de proches), nommée ainsi dans le scénario validé.
     for (const [key, text] of [...Object.entries(fr), ...Object.entries(en)]) {
       expect(text, `write {{appName}} instead in ${key}`).not.toMatch(
-        new RegExp(`${appName}|Ruche`, 'i'),
+        new RegExp(`${appName}|@ruche|ruche-(api|web)`, 'i'),
       )
     }
   })

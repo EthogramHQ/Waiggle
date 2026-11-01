@@ -1,4 +1,4 @@
-// Le « facteur » de l'appli : toutes les requêtes vers l'API de Ruche (/v1/…) passent par ici.
+// Le « facteur » de l'appli : toutes les requêtes vers l'API de Waiggle (/v1/…) passent par ici.
 // Il ajoute la session du membre, puis traduit la réponse en résultat simple pour les écrans :
 // { ok: true, data } quand tout va bien, { ok: false, error } avec la clé du message sinon.
 import { Platform } from 'react-native'

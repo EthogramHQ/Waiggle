@@ -12,9 +12,14 @@ import { I18nextProvider } from 'react-i18next'
 import { Platform } from 'react-native'
 import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
+import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
+import { CoverTransitionProvider } from '../src/ui/coverTransition'
+import { LaunchScreen } from '../src/ui/LoadingLogo'
+import { TabBarHost } from '../src/ui/TabBar'
 import { fontFiles } from '../src/ui/theme/fonts'
 import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
+import { ToastProvider } from '../src/ui/theme/toast'
 
 const isWeb = Platform.OS === 'web'
 
@@ -42,7 +47,11 @@ export default function RootLayout() {
     return () => i18n.off('languageChanged', apply)
   }, [i18n])
 
-  if (!fontsLoaded && !isWeb) return null
+  // Sur téléphone, tant que les polices chargent : l'écran du lancement, le logo animé sur le fond
+  // de l'appli (plutôt qu'un écran vide). Il a besoin des traductions (son nom pour les lecteurs
+  // d'écran) et du thème : il se pose donc à la place de la navigation, dans les fournisseurs. Sur
+  // le web, rien de plus : la page est pré-rendue, ses polices déclarées dans la page.
+  const launching = !fontsLoaded && !isWeb
 
   return (
     // Les « Provider » rendent une ressource disponible à tous les écrans placés à l'intérieur,
@@ -52,7 +61,20 @@ export default function RootLayout() {
         <ThemeProvider>
           {/* Applique la langue enregistrée sur le compte du membre connecté */}
           <LanguageSync />
-          <ThemedChrome />
+          {/* R3 : la barre d'onglets du téléphone, posée une seule fois au-dessus de toutes les pages,
+              pour que sa goutte glisse d'un onglet à l'autre. AppTabBar décide où elle se montre ;
+              TabBarHost mesure sa hauteur et la donne aux écrans (la place à réserver en bas) et
+              aux toasts, qui vivent donc à l'intérieur pour ne jamais la couvrir. */}
+          <TabBarHost bar={launching ? null : <AppTabBar />}>
+            {/* Les toasts (« Projet publié ») : un seul à la fois, posé au-dessus de tous les écrans. */}
+            <ToastProvider>
+              {/* R4 : la carte qui devient la page. Le fournisseur garde le cadre de la photo
+                  touchée, que la page du projet lit pour la faire grandir depuis la carte. */}
+              <CoverTransitionProvider>
+                {launching ? <LaunchScreen /> : <ThemedChrome />}
+              </CoverTransitionProvider>
+            </ToastProvider>
+          </TabBarHost>
         </ThemeProvider>
       </I18nextProvider>
     </QueryClientProvider>

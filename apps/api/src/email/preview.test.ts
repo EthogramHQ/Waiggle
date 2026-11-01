@@ -21,6 +21,9 @@ const SERVICE = [
   'existing-account',
   'moderation-alert',
   'new-email',
+  // R2 : le mot de passe oublié et « Ton mot de passe a changé », deux e-mails de sécurité.
+  'password-changed',
+  'reset-password',
   'suspension-7d',
   'suspension-indefinite',
   'verification',
@@ -95,6 +98,28 @@ describe('emailPreviews', () => {
       const second = textOf(`new-email.${language}.html`)?.email
       expect(second?.text).not.toContain('ines.morel@exemple.fr')
       expect(second?.text).not.toContain('Inès')
+    }
+  })
+
+  // R2 : le lien du mot de passe oublié mène à la page de l'appli, avec le jeton pour seul paramètre
+  // (sec-S6) ; l'e-mail « mot de passe changé » mène aux réglages. Deux e-mails de service.
+  it('links the reset e-mail to the app page with the token only, and the changed one to the settings', () => {
+    const previews = emailPreviews()
+    const hrefsOf = (file: string) =>
+      [
+        ...(previews.find((preview) => preview.file === file)?.email.html ?? '').matchAll(
+          /href="([^"]+)"/g,
+        ),
+      ].map((m) => m[1] ?? '')
+
+    for (const language of ['fr', 'en']) {
+      const reset = hrefsOf(`reset-password.${language}.html`)
+      expect(reset).toHaveLength(1)
+      expect(reset[0]).toMatch(/^https:\/\/waiggle\.com\/reset-password\?token=[A-Za-z0-9_-]+$/)
+      const changed = hrefsOf(`password-changed.${language}.html`)
+      expect(changed).toHaveLength(1)
+      expect(changed[0]?.startsWith('https://waiggle.com/')).toBe(true)
+      expect(changed[0]).not.toContain('token')
     }
   })
 })

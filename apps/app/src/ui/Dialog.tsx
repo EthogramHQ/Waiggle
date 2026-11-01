@@ -12,10 +12,11 @@
 // fenêtre s'ouvre souvent sous le doigt qui vient de toucher l'action (« Bloquer » d'un menu), et la
 // seconde tape d'une double tape tombait sur sa confirmation (relecture de design, tranche 7b).
 import { borders, layout, space } from '@ruche/brand'
-import { type ReactNode, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { Surface } from './Surface'
 import { Text } from './Text'
+import { useTapsAllowed } from './tapGuard'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Le contenu que vise l'action, rappelé sous le titre : sa sorte et le début de son texte. */
@@ -61,31 +62,9 @@ type Props = {
 /** Le nombre de lignes du texte rappelé : de quoi le reconnaître, sans pousser les boutons loin. */
 const QUOTE_LINES = 3
 
-/**
- * Le temps, après l'ouverture, pendant lequel une fenêtre `guardTaps` ignore les tapes (décision du
- * 25/10/2026) : la seconde tape d'une double tape arrive vers 150 à 250 ms ; une tape vers 700 ms
- * est un geste à part, qui passe.
- */
-export const TAP_GUARD_MS = 600
-
-/**
- * Hook : vrai quand les boutons peuvent recevoir une tape. Sans garde, toujours ; avec, à partir de
- * TAP_GUARD_MS après chaque ouverture (la garde repart à la réouverture).
- */
-function useTapsAllowed(visible: boolean, guarded: boolean) {
-  const [allowed, setAllowed] = useState(false)
-  // useEffect : un minuteur posé à l'ouverture, et retiré si la fenêtre se ferme avant (ou si le
-  // composant quitte l'écran), pour ne pas changer l'état d'une fenêtre déjà fermée.
-  useEffect(() => {
-    if (!visible || !guarded) {
-      setAllowed(false)
-      return
-    }
-    const timer = setTimeout(() => setAllowed(true), TAP_GUARD_MS)
-    return () => clearTimeout(timer)
-  }, [visible, guarded])
-  return !guarded || allowed
-}
+// La garde elle-même vit dans tapGuard.ts, partagée avec la feuille (Sheet) ; son délai reste
+// lisible ici, où les tests le cherchent.
+export { TAP_GUARD_MS } from './tapGuard'
 
 export function Dialog({
   visible,

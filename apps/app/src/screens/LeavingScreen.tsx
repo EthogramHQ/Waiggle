@@ -37,11 +37,25 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   // Sur le web, la page est préparée sans connaître l'adresse (elle est dans l'URL du visiteur) :
   // on n'affiche la destination qu'une fois dans le navigateur (voir ui/theme/hydration.ts).
   const hydrated = useHydrated()
+  // Miel 2 (R1) : le portail est un moment de marque, sur le « miel vif » (ui/BrandAmbiance.tsx).
+  // La porte vers l'extérieur, des anneaux de lumière autour d'une flèche, est le décor (`scene`) :
+  // l'ambiance la pose sur le miel (téléphone) ou en tête de la carte (ordinateur). Textes et
+  // boutons restent sur la feuille claire. (La refonte du reste de la page : R5a.)
+  // Les trois états de la page ont le même décor : la bande de miel ne change pas de hauteur quand
+  // la page passe de « préparée sans l'adresse » à « adresse lue ».
+  const scene = <PortalRings />
 
-  if (!hydrated) return <Screen title={t(($) => $.leaving.title)}>{null}</Screen>
+  if (!hydrated) {
+    return (
+      <Screen ambiance="brand" scene={scene} title={t(($) => $.leaving.title)}>
+        {/* Avant de lire l'adresse : le titre et le décor seulement. */}
+        {null}
+      </Screen>
+    )
+  }
   if (!target) {
     return (
-      <Screen title={t(($) => $.leaving.title)}>
+      <Screen ambiance="brand" scene={scene} title={t(($) => $.leaving.title)}>
         <Notice message={t(($) => $.leaving.invalid)} />
         <Button label={t(($) => $.leaving.back)} variant="secondary" onPress={back} />
       </Screen>
@@ -49,9 +63,7 @@ export function LeavingScreen({ url }: { url: string | undefined }) {
   }
 
   return (
-    <Screen pageTitle={t(($) => $.leaving.title)}>
-      {/* La porte vers l'extérieur : des anneaux de lumière autour d'une flèche. */}
-      <PortalRings />
+    <Screen ambiance="brand" scene={scene} pageTitle={t(($) => $.leaving.title)}>
       {/* align="stretch" : les textes prennent toute la largeur, et un nom de site très long se
           coupe au lieu de sortir de l'écran. */}
       <Stack gap="xs" align="stretch">

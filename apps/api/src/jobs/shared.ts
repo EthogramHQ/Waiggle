@@ -15,7 +15,7 @@ import { describeError } from '../log'
 export type JobDeps = {
   db: Database
   mailer: Mailer
-  /** L'adresse de l'appli web (le bouton, la page de désinscription, Mon profil). */
+  /** L'adresse de l'appli web (le bouton, la page de désinscription, les réglages des e-mails). */
   appUrl: string
   /** L'adresse publique de l'API (la désinscription en un clic de la messagerie). */
   apiUrl: string
@@ -28,7 +28,7 @@ export const BATCH_SIZE = 100
 
 /** Les liens d'un e-mail de notification : tous chez nous, avec le jeton signé de ce membre. */
 export const linksFor = (
-  { appUrl, apiUrl, secret }: JobDeps,
+  { appUrl, apiUrl, secret }: Pick<JobDeps, 'appUrl' | 'apiUrl' | 'secret'>,
   userId: string,
   kind: UnsubscribeKind,
 ): NotificationLinks => {
@@ -36,7 +36,9 @@ export const linksFor = (
   return {
     button: new URL('/notifications', appUrl).toString(),
     unsubscribe: `${new URL('/unsubscribe', appUrl)}?${query}`,
-    manage: new URL('/profile', appUrl).toString(),
+    // « Gérer mes e-mails » mène aux réglages des notifications (R2, jur-B5), où chaque e-mail se
+    // coupe, et plus à la page du profil.
+    manage: new URL('/settings/notifications', appUrl).toString(),
     oneClick: `${new URL('/v1/email/unsubscribe', apiUrl)}?${query}`,
   }
 }

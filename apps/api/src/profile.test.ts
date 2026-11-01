@@ -1,8 +1,8 @@
 // Tests d'intégration de la tranche 2 : le profil, la langue et l'avatar.
 // Scénarios : docs/scenarios/phase-1.md, tranche 2.
-import { appName } from '@ruche/brand'
 import { ErrorResponse, Me } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { fill, resources } from '@ruche/i18n'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -182,7 +182,10 @@ describe('choosing my language', () => {
     // Une tentative d'inscription avec mon adresse déclenche un e-mail d'avertissement.
     await ctx.signUp({ ...lea, password: 'another-password-1' })
 
-    expect(ctx.mailer.sent.at(-1)?.subject).toBe(`Sign-up attempt on ${appName}`)
+    // Le sujet se lit dans les textes anglais (il a changé avec jur-B2), rempli comme à l'envoi.
+    expect(ctx.mailer.sent.at(-1)?.subject).toBe(
+      fill(resources.en.translation.email.existingAccount.subject),
+    )
   })
 })
 
@@ -329,7 +332,7 @@ describe('serving images', () => {
 })
 
 describe('requests coming from another website', () => {
-  // Attaque « CSRF » : une page piégée pousse le navigateur de Léa, connecté à Ruche, à envoyer
+  // Attaque « CSRF » : une page piégée pousse le navigateur de Léa, connecté à Waiggle, à envoyer
   // une requête à notre API. Le navigateur y joint le cookie de Léa… et l'en-tête Origin, qui
   // trahit la page d'où vient la requête.
   const evil = { origin: 'https://evil.example' }

@@ -90,6 +90,10 @@
 		rewrite @member /members/[id].html
 		@tag path_regexp ^/tags/[^/.]+$
 		rewrite @tag /tags/[slug].html
+		# Tranche R2 : une rubrique des réglages (/settings/security → settings/[section].html).
+		# /settings/profile a sa propre page, déjà trouvée à l'étape 1.
+		@settings_section path_regexp ^/settings/[^/.]+$
+		rewrite @settings_section /settings/[section].html
 		file_server
 	}
 

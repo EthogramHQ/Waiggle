@@ -1,13 +1,12 @@
 // Un bloc de texte affiché tel quel, en police à chasse fixe : les prompts d'un projet.
 // On peut le sélectionner pour le copier.
-import { maxTextScale, radii, space, textStyles } from '@ruche/brand'
-import { Text, View } from 'react-native'
-import { monoFont } from './theme/fonts'
+import { radii, space } from '@ruche/brand'
+import { View } from 'react-native'
+import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
 export function CodeBlock({ children }: { children: string }) {
   const { colors } = useTheme()
-  const { size, lineHeight } = textStyles.callout
   return (
     <View
       style={{
@@ -16,11 +15,9 @@ export function CodeBlock({ children }: { children: string }) {
         padding: space.md,
       }}
     >
-      <Text
-        selectable
-        maxFontSizeMultiplier={maxTextScale}
-        style={{ fontFamily: monoFont, fontSize: size - 1, lineHeight, color: colors.text }}
-      >
+      {/* Le rôle `code` (Miel 2) porte la police, la taille et l'interligne ; Text suit la taille
+          de texte de l'appareil, dans la limite commune. */}
+      <Text variant="code" selectable>
         {children}
       </Text>
     </View>

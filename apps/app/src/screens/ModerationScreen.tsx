@@ -41,7 +41,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import {
   useDecide,
@@ -73,7 +73,13 @@ import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 /**
  * Le temps de lire ce qui vient de changer : pendant ces 600 ms après une décision, la liste vient
@@ -159,10 +165,12 @@ const settledElsewhere: ReadonlySet<string> = new Set(['alreadyDecided', 'notFou
 
 export function ModerationScreen() {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // Le profil dit si le membre est administrateur ; personne de connecté : on ne demande rien.
   const me = useMe(Boolean(session))
-  if (isPending) return <LoadingScreen />
+  if (state === 'pending') return <LoadingScreen />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} />
   if (!session) return <SignedOutScreen />
   if (!me.data) {
     if (me.isError) return <LoadErrorScreen error={me.error} onRetry={() => void me.refetch()} />
@@ -176,7 +184,7 @@ export function ModerationScreen() {
 function AdminModeration() {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  const back = useGoBack('/account')
+  const back = useGoBack('/settings')
   // L'adresse peut ouvrir l'historique, filtré sur un membre (`?tab=history&member=<id>`, depuis la
   // page du membre). Elle n'est connue que dans le navigateur : la page pré-rendue l'ignore, et
   // l'onglet s'ouvre une fois hydratée (ui/theme/hydration.ts).

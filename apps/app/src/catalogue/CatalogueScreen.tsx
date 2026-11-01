@@ -18,7 +18,6 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { AmbientLight } from '../ui/AmbientLight'
-import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { CodeBlock } from '../ui/CodeBlock'
@@ -26,7 +25,6 @@ import { Columns } from '../ui/Columns'
 import { CommentCard } from '../ui/CommentCard'
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
-import { Constellation } from '../ui/Constellation'
 import { CountBadge } from '../ui/CountBadge'
 import { Dialog } from '../ui/Dialog'
 import { Disclosure } from '../ui/Disclosure'
@@ -37,7 +35,6 @@ import { Hint } from '../ui/Hint'
 import { HoneyMeter } from '../ui/HoneyMeter'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
-import { Emblem, Honeycomb, PortalRings } from '../ui/Illustrations'
 import { type IconName, iconPaths } from '../ui/icons.generated'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
 import { ListGroup, ListRow } from '../ui/ListGroup'
@@ -75,8 +72,30 @@ import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
+import { AmbiancesCatalogue } from './ambiances'
+import { TopBarCatalogue } from './barre-haut'
+import { CardsCatalogue } from './cartes'
+import { LoadingCatalogue } from './chargement'
+import { AccountCatalogue } from './compte'
+import { ControlsCatalogue } from './controles'
+import { EntryCatalogue } from './entrer'
+import { ExploreCatalogue } from './explorer'
+import { SheetsCatalogue } from './feuilles'
+import { FeedCatalogue } from './fil'
+import { FeedEndCatalogue } from './fin-de-fil'
+import { FormSamples } from './formulaire'
+import { SafeguardsCatalogue } from './garde-fous'
+import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
+import { LightCatalogue } from './lumiere'
+import { BrandCatalogue } from './marque'
+import { MascotCatalogue } from './mascotte'
+import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
+import { NavigationCatalogue } from './navigation'
+import { ToolsCatalogue } from './outils'
+import { SearchCatalogue } from './recherche'
+import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 
@@ -224,50 +243,6 @@ export function CatalogueScreen() {
         />
       </Section>
 
-      <Section title={l.surfaces}>
-        <Columns
-          main={
-            <OnLight thumbhash={samples.papillon}>
-              <Surface variant="panel" padding="lg" gap="sm">
-                <Stack direction="row" gap="sm" align="center">
-                  <Avatar name="Léa Moreau" source={null} label="Léa Moreau" size={28} />
-                  <Text variant="callout" weight={700}>
-                    Léa Moreau
-                  </Text>
-                </Stack>
-                <Text variant="title3">{l.sampleTitle}</Text>
-                <Text variant="callout" tone="secondary">
-                  {l.samplePitch}
-                </Text>
-              </Surface>
-              <Surface variant="glass" padding="md" fill={false}>
-                <Text variant="callout" weight={600}>
-                  {l.glass}
-                </Text>
-              </Surface>
-            </OnLight>
-          }
-          side={
-            <Stack gap="md">
-              <Surface padding="lg">
-                <Text>{l.plain}</Text>
-              </Surface>
-              <Surface variant="grouped" padding="lg">
-                <Text>{l.grouped}</Text>
-              </Surface>
-            </Stack>
-          }
-        />
-      </Section>
-
-      <Section title={l.avatars}>
-        <Stack direction="row" gap="lg" align="center" wrap>
-          <Avatar name="Léa" source={null} label="Léa" size={96} />
-          <Avatar name="Max" source={null} label="Max" size={44} />
-          <Avatar name="Inès" source={null} label="Inès" size={28} />
-        </Stack>
-      </Section>
-
       <Section title={l.text}>
         <Surface padding="xl">
           <Markdown text={l.markdown} onLinkPress={() => {}} />
@@ -342,6 +317,15 @@ export function CatalogueScreen() {
             { label: l.signIn, onPress: () => {} },
             { label: l.signUp, onPress: () => {} },
           ]}
+        />
+        {/* « done » : une démarche partie ou aboutie, avec sa tuile de miel (R4, ménage M7). */}
+        <StateMessage
+          kind="done"
+          icon="envelope-simple"
+          level={3}
+          title={l.stateDoneTitle}
+          message={l.stateDone}
+          actions={[{ label: l.goBack, onPress: () => {}, variant: 'secondary' }]}
         />
       </Section>
 
@@ -614,9 +598,49 @@ export function CatalogueScreen() {
         />
         {/* Le nombre d'abonnés seul, sur sa propre page. */}
         <FollowerCount text={l.followers} />
-        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bandeau sinon (même place). */}
-        <NewItemsBanner label={null} caption={l.feedCaption} onPress={() => {}} />
-        <NewItemsBanner label={l.news} caption={l.feedCaption} onPress={() => {}} />
+        {/* Le haut du fil : la phrase quand il n'y a rien de neuf, le bouton sinon (même place).
+            Le bouton écrit son texte selon ce qui est arrivé : projets, une note, les deux au-delà
+            d'une page (« ou plus »), et l'étincelle à la place des visages sans auteur connu. */}
+        <NewItemsBanner
+          count={null}
+          more={false}
+          kinds={[]}
+          authors={[]}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={3}
+          more={false}
+          kinds={['project']}
+          authors={newsAuthors.slice(0, 2)}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={1}
+          more={false}
+          kinds={['note']}
+          authors={newsAuthors.slice(0, 1)}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={20}
+          more
+          kinds={['project', 'note']}
+          authors={newsAuthors}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
+        <NewItemsBanner
+          count={2}
+          more={false}
+          kinds={['project']}
+          authors={[]}
+          caption={l.feedCaption}
+          onPress={() => {}}
+        />
         {/* Le bas du fil dans ses trois états. */}
         <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
         <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
@@ -1048,21 +1072,38 @@ export function CatalogueScreen() {
       <SuspensionCatalogue />
       {/* Tranche 7b : le menu « … » des pages d'un membre et d'un projet (actionMenu.tsx). */}
       <ActionMenuSamples />
-
-      <Section title={l.illustrations}>
-        <Stack direction="row" gap="lg" wrap align="center">
-          <Emblem icon="envelope-simple" />
-          <PortalRings />
-          <Honeycomb />
-        </Stack>
-        <Constellation height={260} />
-        {/* La scène d'accueil sur ordinateur : le centre reste libre pour le logo. */}
-        <Constellation height={420} layout="scene" />
-      </Section>
+      {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
+      <AccountCatalogue />
+      <SheetsCatalogue />
+      {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
+      <EntryCatalogue />
+      {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
+      <SettingsCatalogue />
+      {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
+      <SafeguardsCatalogue />
+      {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
+          (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
+      <NavigationCatalogue />
+      <TopBarCatalogue />
+      <CardsCatalogue />
+      <FeedCatalogue />
+      <ExploreCatalogue />
+      <ToolsCatalogue />
+      <SearchCatalogue />
 
       <Section title={l.icons}>
         <Icons />
       </Section>
+      <BrandCatalogue />
+      <ControlsCatalogue />
+      <MaterialsCatalogue />
+      <FormSamples />
+      <TokensCatalogue />
+      <LightCatalogue />
+      <AmbiancesCatalogue />
+      <LoadingCatalogue />
+      <FeedEndCatalogue />
+      <MascotCatalogue />
     </Screen>
   )
 }
@@ -1278,6 +1319,13 @@ function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }
 }
 
 /** Deux membres proposés après « @in ». */
+/** Les auteurs des nouveautés du fil, sans photo : leurs initiales s'affichent dans le bouton. */
+const newsAuthors = [
+  { name: 'Léa Moreau', source: null },
+  { name: 'Noé Blanc', source: null },
+  { name: 'Inès Haddad', source: null },
+]
+
 const TWO_MEMBERS: MentionSuggestion[] = [
   { id: 'u5', name: 'Inès Haddad', handle: 'ines_haddad', avatar: null },
   { id: 'u6', name: 'Iniko Diallo', handle: 'iniko', avatar: null },

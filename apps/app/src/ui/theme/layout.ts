@@ -30,5 +30,8 @@ export const useLayout = () => {
   const columns =
     Math.min(width - 2 * padding, layout.maxContentWidth) >=
     layout.mainColumn + layout.sideColumn + space.xxl
-  return { width, height, sizeClass, padding, columns }
+  // Les écrans de marque (miel vif) : la scène à gauche et la carte à droite, dès 1 000 points
+  // (plus tôt que la mise en colonnes, `wide`).
+  const card = width >= layout.breakpoints.card
+  return { width, height, sizeClass, padding, columns, card }
 }

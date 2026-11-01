@@ -16,17 +16,36 @@ import type { Translation } from '@ruche/i18n'
 
 /**
  * Les textes d'une page qui n'a pas fini de se charger, lus dans les traductions (jamais recopiés :
- * s'ils changent, le garde suit) : son chargement (LoadingScreen et les listes) et son échec
- * (LoadErrorScreen), dans src/screens/states.tsx.
+ * s'ils changent, le garde suit) : son chargement (LoadingScreen et les listes), son échec
+ * (LoadErrorScreen), dans src/screens/states.tsx, et le lancement de l'appli (« Waiggle se
+ * lance… », le logo animé de ui/LoadingLogo.tsx).
+ *
+ * Attention : depuis Miel 2 (R1), le chargement d'une page est un squelette, et le lancement un
+ * logo ; « Chargement… » et « Waiggle se lance… » y sont des noms pour les lecteurs d'écran
+ * (aria-label), absents d'innerText. Pour les voir, le texte passé à loadingProblem doit aussi
+ * contenir le nom des éléments occupés (`[aria-busy="true"]`) de la page.
  */
 export const unfinishedTexts = (translation: Translation): string[] => [
   translation.common.loading,
   translation.states.errorTitle,
+  translation.common.loadingApp,
 ]
 
 // Les blancs ramenés à une espace simple : le navigateur peut rendre une espace insécable (celles
 // de la typographie française) comme une espace ordinaire dans innerText, ou l'inverse.
 const normalize = (text: string) => text.replace(/\s+/g, ' ').trim()
+
+/**
+ * Une ligne entière égale au texte, où un paramètre (`{{appName}}`) vaut n'importe quel mot : les
+ * traductions sont lues brutes, sans le nom de l'appli (que ce script n'importe pas).
+ */
+const lineOf = (text: string) => {
+  const pattern = normalize(text)
+    .split(/\{\{\w+\}\}/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\S+')
+  return new RegExp(`^${pattern}$`)
+}
 
 /**
  * Le problème d'une capture, ou null si elle montre bien sa page.
@@ -50,8 +69,47 @@ export function loadingProblem(
   }: { texts: readonly string[]; page?: string; intended?: readonly string[] },
 ): string | null {
   if (page !== undefined && intended.includes(page)) return null
-  const lines = new Set(visibleText.split('\n').map(normalize))
-  const shown = texts.find((text) => lines.has(normalize(text)))
+  const lines = visibleText.split('\n').map(normalize)
+  const shown = texts.find((text) => {
+    const line = lineOf(text)
+    return lines.some((candidate) => line.test(candidate))
+  })
   if (shown === undefined) return null
   return `${name} : la capture montre « ${shown} » (la page ne s'est pas chargée ; ses données simulées sont-elles valides ?)`
+}
+
+/**
+ * Attend qu'une page ait fini de se charger, avant que le garde la lise.
+ *
+ * Pourquoi : le script attend la fin du réseau, puis un court délai. Sur une machine chargée (la
+ * CI de main, deux fois le 31/10/2026), une page de modération montrait encore son squelette à ce
+ * moment-là, et le garde faisait échouer une capture qui se serait chargée un instant plus tard.
+ *
+ * - read : lit la page et rend son problème (loadingProblem), ou null si elle est chargée ;
+ * - patience : le temps d'attente maximal ; au-delà, la page est vraiment en panne (des données
+ *   simulées invalides) et son dernier problème est rendu, pour que le garde échoue ;
+ * - step : le temps entre deux lectures ;
+ * - now, sleep : l'horloge, remplaçable dans les tests (une fausse horloge n'attend pas).
+ */
+export async function waitUntilLoaded(
+  read: () => Promise<string | null>,
+  {
+    patience,
+    step,
+    now = Date.now,
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: {
+    patience: number
+    step: number
+    now?: () => number
+    sleep?: (ms: number) => Promise<void>
+  },
+): Promise<string | null> {
+  const deadline = now() + patience
+  let problem = await read()
+  while (problem !== null && now() < deadline) {
+    await sleep(step)
+    problem = await read()
+  }
+  return problem
 }

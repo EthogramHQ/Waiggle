@@ -1,6 +1,10 @@
 // Le thème de l'appli : les couleurs et les ombres du jour ou de la nuit, selon l'apparence choisie.
 // Le ThemeProvider est posé une fois autour de toute l'appli (app/_layout.tsx) ; chaque composant
-// lit le thème avec useTheme(). Quand l'apparence change, tous les composants se redessinent d'un coup.
+// lit le thème avec useTheme(). Quand l'apparence change, tous les composants se redessinent d'un
+// coup ; sur le web, les fonds, bordures et ombres passent de l'un à l'autre en fondu (600 ms), le
+// texte non (voir documentCss, theme/document.ts). Sur téléphone, le changement reste immédiat.
+// Un ThemeProvider peut aussi se poser dans un autre, avec une apparence imposée (le catalogue
+// montre une matière de nuit à côté de celle du jour) : celui du dedans ne touche pas à la page.
 import {
   type Palette,
   palettes,
@@ -14,11 +18,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { Platform, useColorScheme } from 'react-native'
 import { type Appearance, loadAppearance, saveAppearance } from './appearance'
+import { focusHalo, SCHEME_FADE_MS, SCHEME_FADING } from './document'
 import { useHydrated } from './hydration'
 
 export type Theme = {
@@ -54,6 +61,10 @@ type Props = {
 export function ThemeProvider({ children, appearance: forced }: Props) {
   // useColorScheme : le réglage clair / sombre de l'appareil, mis à jour s'il change en cours de route.
   const system = useColorScheme()
+  // Seul le ThemeProvider le plus extérieur règle la page web (fond, focus, fondu) : un autre, posé
+  // dedans, ne colore que ce qu'il entoure.
+  const nested = useContext(ThemeContext) !== null
+  const ownsDocument = Platform.OS === 'web' && !nested && typeof document !== 'undefined'
   const [chosen, setChosen] = useState<Appearance>(forced ?? 'auto')
 
   // Au démarrage, on relit le choix mémorisé sur cet appareil.
@@ -91,26 +102,60 @@ export function ThemeProvider({ children, appearance: forced }: Props) {
     [scheme, appearance, setAppearance],
   )
 
+  // Le fondu entre le jour et la nuit (web). On pose data-scheme-fading sur <html> le temps du
+  // fondu, et seulement ce temps : posée en permanence, la règle ferait aussi fondre chaque survol.
+  // useLayoutEffect, et non useEffect : il passe juste après que React a changé les couleurs dans
+  // la page, avant que le navigateur ne la redessine. Le navigateur voit donc en même temps les
+  // nouvelles couleurs et la règle du fondu, et lance les transitions (avec useEffect, il aurait
+  // parfois déjà dessiné les nouvelles couleurs d'un coup).
+  // Pas de fondu au démarrage : la page de nuit, cachée jusqu'à l'hydratation, se montre d'emblée
+  // dans son thème (voir documentCss) ; la faire fondre depuis le jour serait un éclair blanc lent.
+  const shown = useRef({ scheme, hydrated })
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useLayoutEffect(() => {
+    const before = shown.current
+    shown.current = { scheme, hydrated }
+    if (!ownsDocument || !before.hydrated || before.scheme === scheme) return
+    const root = document.documentElement
+    root.setAttribute(SCHEME_FADING, '')
+    // Un second changement pendant le fondu le prolonge : on repart pour une durée entière.
+    if (fadeTimer.current) clearTimeout(fadeTimer.current)
+    fadeTimer.current = setTimeout(() => {
+      root.removeAttribute(SCHEME_FADING)
+      fadeTimer.current = null
+    }, SCHEME_FADE_MS)
+  }, [scheme, hydrated, ownsDocument])
+  // En partant (fin d'un test), on ne laisse ni minuteur ni fondu derrière soi.
+  useEffect(
+    () => () => {
+      if (!fadeTimer.current) return
+      clearTimeout(fadeTimer.current)
+      document.documentElement.removeAttribute(SCHEME_FADING)
+    },
+    [],
+  )
+
   // Sur le web, le fond de la page et les barres de défilement suivent aussi le thème
   // (on les voit quand on « tire » la page au-delà de son bord).
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    if (!ownsDocument) return
     document.documentElement.style.colorScheme = scheme === 'night' ? 'dark' : 'light'
     document.body.style.backgroundColor = theme.colors.background
-    // La couleur de l'anneau de focus (dessiné par une seule règle CSS, dans app/+html.tsx) : une
-    // « variable CSS » que la règle lit, et qui suit le thème choisi dans l'appli.
+    // Les couleurs de l'anneau de focus et de son halo (dessinés par une seule règle CSS, dans
+    // app/+html.tsx) : des « variables CSS » que la règle lit, et qui suivent le thème choisi.
     document.documentElement.style.setProperty('--focus-ring', theme.colors.focusRing)
+    document.documentElement.style.setProperty('--focus-halo', focusHalo(theme.colors))
     // La page est dans son vrai thème : elle peut se montrer (voir documentCss, theme/document.ts).
     if (hydrated) document.documentElement.setAttribute('data-hydrated', '')
-  }, [scheme, theme.colors.background, theme.colors.focusRing, hydrated])
+  }, [scheme, theme.colors, hydrated, ownsDocument])
 
   // Filet de sécurité : si une page ne signalait jamais son hydratation, elle ne doit pas rester
   // cachée de nuit (voir documentCss). Au bout de quelques secondes, on la montre quoi qu'il arrive.
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return
+    if (!ownsDocument) return
     const timer = setTimeout(() => document.documentElement.setAttribute('data-hydrated', ''), 3000)
     return () => clearTimeout(timer)
-  }, [])
+  }, [ownsDocument])
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
 }

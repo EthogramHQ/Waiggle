@@ -38,6 +38,13 @@ describe('French typography', () => {
     }
   })
 
+  it('writes e‑mail with a no-break hyphen', () => {
+    for (const [path, text] of fr) {
+      // \u2011 : le trait d'union insécable ; « e- » ne finit jamais seul une ligne (R4, M1).
+      expect(text, path).not.toMatch(/\b[eE]-mail/)
+    }
+  })
+
   it('catches the usual mistakes', () => {
     // Le test se vérifie lui-même : ces fautes doivent être repérées.
     const question = /(?<!\u202f)[?!;]/

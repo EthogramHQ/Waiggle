@@ -2,7 +2,9 @@
 // selon les règles que vérifie src/typography.test.ts :
 // - une espace fine insécable (U+202F) avant « ? », « ! » et « ; » ;
 // - une espace insécable (U+00A0) avant « : » (sauf dans « https:// ») et à l'intérieur de « » ;
-// - l'apostrophe typographique (’) à la place de l'apostrophe droite (').
+// - l'apostrophe typographique (’) à la place de l'apostrophe droite (') ;
+// - « e‑mail » avec un trait d'union insécable (U+2011), pour que « e- » ne reste jamais seul en
+//   fin de ligne (R4, M1).
 // Seuls les textes sont touchés : jamais le code, les commentaires, les noms de clés, ni les
 // paramètres {{…}} remplis à l'affichage. Le lanceur est scripts/typo-fix.mjs (pnpm typo:fix).
 //
@@ -14,6 +16,7 @@ const SPACES = '[ \\u00a0\\u202f]*'
 // Écrites par leur numéro Unicode : dans le code, ces espaces seraient invisibles.
 const NARROW = String.fromCodePoint(0x202f) // espace fine insécable
 const NBSP = String.fromCodePoint(0x00a0) // espace insécable
+const NB_HYPHEN = String.fromCodePoint(0x2011) // trait d'union insécable
 
 // Chaque règle : ce qu'on cherche, et ce que doit devenir ce qu'on a trouvé. Une expression
 // régulière (« regex ») décrit un motif de texte ; le drapeau g cherche toutes les occurrences.
@@ -26,6 +29,8 @@ const rules: { pattern: RegExp; fix: (found: string, ...groups: string[]) => str
   { pattern: new RegExp(`${SPACES}:(?!//)`, 'g'), fix: () => `${NBSP}:` },
   { pattern: new RegExp(`«${SPACES}`, 'g'), fix: () => `«${NBSP}` },
   { pattern: new RegExp(`${SPACES}»`, 'g'), fix: () => `${NBSP}»` },
+  // « e-mail » et « E-mail » : le trait d'union ordinaire devient insécable (\b : début de mot).
+  { pattern: /\b([eE])-mail/g, fix: (_, letter = '') => `${letter}${NB_HYPHEN}mail` },
 ]
 
 /** Corrige un texte (la valeur d'une chaîne, déjà lue) et compte les corrections. */

@@ -1,9 +1,11 @@
 // Un lien en texte souligné, pour une action secondaire dans une phrase ou sous un formulaire
 // (« Créer un compte », « Changer d'adresse »). Pour l'action principale : un Button.
-import { layout } from '@ruche/brand'
+import { layout, space } from '@ruche/brand'
 import type { Ref } from 'react'
-import { Platform, Pressable, type View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { Platform, Pressable, View } from 'react-native'
 import { describedBy } from './aria'
+import { Icon } from './Icon'
 import { enterActivates } from './keyboard'
 import { Text, type Tone } from './Text'
 
@@ -37,6 +39,20 @@ type Props = {
    * sortirait sinon du cadre sur un petit téléphone, à 200 % de texte (bandeau de suspension, 7c).
    */
   breakAnywhere?: boolean
+  /**
+   * Le lien quitte l'appli (« Voir le code », R2) : une petite flèche le montre, et les lecteurs
+   * d'écran l'annoncent (« ouvre un site externe ») : dans le nom lu sur le web, où un indice
+   * n'existe pas, et en indice lu après le nom sur téléphone.
+   */
+  external?: boolean
+  /**
+   * Le lien prend ou perd le focus du clavier, la souris arrive dessus ou le quitte : pour arrêter un
+   * délai tant qu'on s'apprête à le toucher (« Annuler » de SuggestionList, WCAG 2.2.1).
+   */
+  onFocus?: () => void
+  onBlur?: () => void
+  onHoverIn?: () => void
+  onHoverOut?: () => void
 }
 
 export function TextLink({
@@ -50,21 +66,36 @@ export function TextLink({
   ref,
   expanded,
   breakAnywhere = false,
+  external = false,
+  onFocus,
+  onBlur,
+  onHoverIn,
+  onHoverOut,
 }: Props) {
+  const { t } = useTranslation()
+  const web = Platform.OS === 'web'
+  const outside = external ? t(($) => $.common.externalSite) : undefined
+  // Le nom lu garde le texte affiché en tête (« Voir le code, ouvre un site externe »).
+  const spoken = outside && web ? `${label}, ${outside}` : label
+  const spokenHint = [hint, outside].filter(Boolean).join(' ') || undefined
   return (
     <Pressable
       ref={ref}
       accessibilityRole={role}
-      accessibilityLabel={label}
+      accessibilityLabel={spoken}
       {...(expanded === undefined ? null : { 'aria-expanded': expanded })}
       {...describedBy(describedById)}
       // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle (comme IconButton).
-      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
+      accessibilityHint={web ? undefined : spokenHint}
       aria-disabled={disabled}
       disabled={disabled}
       // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
       {...(role === 'link' ? enterActivates(onPress, disabled) : null)}
       onPress={onPress}
+      {...(onFocus ? { onFocus } : null)}
+      {...(onBlur ? { onBlur } : null)}
+      {...(onHoverIn ? { onHoverIn } : null)}
+      {...(onHoverOut ? { onHoverOut } : null)}
       // La zone à toucher fait au moins 44 points de côté, même autour d'un mot court. (hitSlop, qui
       // agrandit la zone sans changer l'allure, est ignoré sur le web : on donne donc une vraie taille.)
       style={({ pressed }) => ({
@@ -77,9 +108,21 @@ export function TextLink({
         opacity: disabled ? 0.55 : pressed ? 0.6 : 1,
       })}
     >
-      <Text variant="callout" weight={700} tone={tone} underline breakAnywhere={breakAnywhere}>
-        {label}
-      </Text>
+      {external ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
+          <Text variant="callout" weight={700} tone={tone} underline breakAnywhere={breakAnywhere}>
+            {label}
+          </Text>
+          {/* La flèche est décorative : le nom lu dit déjà que le lien sort de l'appli. */}
+          <View aria-hidden>
+            <Icon name="arrow-up-right" size={14} tone={tone} />
+          </View>
+        </View>
+      ) : (
+        <Text variant="callout" weight={700} tone={tone} underline breakAnywhere={breakAnywhere}>
+          {label}
+        </Text>
+      )}
     </Pressable>
   )
 }

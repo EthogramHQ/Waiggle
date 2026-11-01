@@ -8,7 +8,7 @@ import { and, arrayContains } from 'drizzle-orm'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import { loadSummaries } from '../projects/load'
-import { listedProjectFor } from '../projects/visibility'
+import { listedVerifiedProjectFor } from '../projects/visibility'
 import { createRouter, errorResponse } from './router'
 
 const readTagRoute = createRoute({
@@ -44,10 +44,11 @@ export const tagRoutes = ({ db, publicApiUrl }: Deps) => {
     // PostgreSQL, accéléré par l'index GIN de la table). Seulement les projets publics et pas
     // retirés, même pour leur auteur : ses brouillons n'ont rien à faire sur une page partagée, ni
     // un projet que la modération a retiré. Tranche 7b : ni ceux d'un membre bloqué avec le
-    // visiteur, dans un sens ou dans l'autre (listedProjectFor).
+    // visiteur, dans un sens ou dans l'autre (listedProjectFor). R3 (sec-A3) : ni celui d'un
+    // auteur qui n'a jamais vérifié son adresse, la même règle que la recherche et les outils.
     const projects = await loadSummaries(
       db,
-      and(listedProjectFor(viewer.id), arrayContains(schema.project.toolSlugs, [slug])),
+      and(listedVerifiedProjectFor(viewer.id), arrayContains(schema.project.toolSlugs, [slug])),
       viewer.id,
       publicApiUrl,
     )

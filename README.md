@@ -3,8 +3,8 @@
 *[English version](README.en.md)*
 
 Waiggle est un réseau social pour publier ses projets IA, suivre ceux de ses proches, les tester et
-s'encourager mutuellement à en créer de nouveaux. Dans le code, il porte le nom de code « Ruche »
-(les paquets `@ruche/…`).
+s'encourager mutuellement à en créer de nouveaux. Les identifiants techniques gardent le nom de
+code « Ruche » (les paquets `@ruche/…`).
 
 > Phase 1 en cours : un premier cercle restreint, sur invitation.
 
@@ -71,3 +71,8 @@ Pour signaler une faille de sécurité, voir [SECURITY.md](SECURITY.md).
 
 [AGPL-3.0](LICENSE) : toute version modifiée mise à disposition sur un réseau doit publier son
 code source.
+
+Le nom Waiggle, le logo (l'abeille et son vol en w) et la mascotte sont des signes distinctifs du
+projet ; ils ne sont pas couverts par l'AGPL-3.0 : une version modifiée ne les utilise pas comme si
+elle était Waiggle. Les polices (Funnel Display, Funnel Sans, Geist Mono) sont sous licence SIL OFL
+1.1 et les icônes (Phosphor) sous licence MIT : voir `apps/app/public/licences-tierces.txt`.

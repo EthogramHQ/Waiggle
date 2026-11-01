@@ -7,11 +7,19 @@ import { FunnelSans_400Regular } from '@expo-google-fonts/funnel-sans/400Regular
 import { FunnelSans_500Medium } from '@expo-google-fonts/funnel-sans/500Medium'
 import { FunnelSans_600SemiBold } from '@expo-google-fonts/funnel-sans/600SemiBold'
 import { FunnelSans_700Bold } from '@expo-google-fonts/funnel-sans/700Bold'
+import { FunnelSans_800ExtraBold } from '@expo-google-fonts/funnel-sans/800ExtraBold'
+import { GeistMono_400Regular } from '@expo-google-fonts/geist-mono/400Regular'
+import { GeistMono_500Medium } from '@expo-google-fonts/geist-mono/500Medium'
 import type { FontFamily, FontWeight } from '@ruche/brand'
 import { fontWeights } from '@ruche/brand'
-import { Platform } from 'react-native'
 
-const prefixes: Record<FontFamily, string> = { display: 'FunnelDisplay', text: 'FunnelSans' }
+// Chaque famille a son préfixe ; le fichier des licences (public/licences-tierces.txt) nomme
+// chacune d'elles (un test le vérifie).
+export const prefixes: Record<FontFamily, string> = {
+  display: 'FunnelDisplay',
+  text: 'FunnelSans',
+  mono: 'GeistMono',
+}
 
 /** Le nom sous lequel une police est enregistrée : fontName('text', 600) → 'FunnelSans-600'. */
 export const fontName = (family: FontFamily, weight: FontWeight): string => {
@@ -30,11 +38,15 @@ export const fontFiles = {
   'FunnelSans-500': FunnelSans_500Medium,
   'FunnelSans-600': FunnelSans_600SemiBold,
   'FunnelSans-700': FunnelSans_700Bold,
+  'FunnelSans-800': FunnelSans_800ExtraBold,
+  // Geist Mono : seulement les deux graisses de l'échelle (400 pour le code, 500 pour les
+  // étiquettes), pour ne pas alourdir l'appli.
+  'GeistMono-400': GeistMono_400Regular,
+  'GeistMono-500': GeistMono_500Medium,
 }
 
-/** Police à chasse fixe (toutes les lettres ont la même largeur), pour les prompts et le code. */
-export const monoFont = Platform.select({
-  ios: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-})
+/**
+ * Police à chasse fixe (toutes les lettres ont la même largeur), pour les prompts et le code
+ * (le Markdown des membres) : Geist Mono, comme les rôles `mono` et `code` de Text.
+ */
+export const monoFont = fontName('mono', 400)

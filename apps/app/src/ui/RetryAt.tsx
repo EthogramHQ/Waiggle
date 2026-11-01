@@ -1,0 +1,118 @@
+// « Trop d'essais » (tranche R2) : quand le serveur refuse une connexion ou un envoi pour un temps
+// (en-tête `Retry-After`), l'écran dit à quelle heure réessayer, « Nouvel essai possible à 21 h 47 »,
+// et son bouton reste inactif jusque-là, puis se libère tout seul (décision D3 du 29/10/2026).
+// Une heure fixe plutôt qu'un compte à rebours : un texte qui change chaque seconde est relu sans
+// fin par les lecteurs d'écran et attire l'œil pour rien (WCAG 2.2.2) ; l'heure, elle, reste la
+// même tant qu'on attend, et son nom lu aussi.
+//
+// Deux morceaux : le hook `useRetryAt`, qui tient le temps (bloqué ou non, jusqu'à quand), et le
+// composant `RetryAt`, qui écrit l'heure dans la langue de l'appli.
+import { space } from '@ruche/brand'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { View } from 'react-native'
+import { Icon } from './Icon'
+import { Text } from './Text'
+
+/** Ce que le hook rend à l'écran : s'il doit encore attendre, et jusqu'à quand. */
+export type RetryState = {
+  /** Vrai tant que l'heure n'est pas passée : le bouton reste inactif. */
+  blocked: boolean
+  /** L'heure à partir de laquelle réessayer, ou null quand rien ne bloque. */
+  until: Date | null
+  /**
+   * Vrai quand l'attente vient de finir d'elle-même (l'heure est passée), jusqu'au prochain délai
+   * ou jusqu'à ce que l'écran remette le délai à null (son prochain envoi). Pendant ce temps, la
+   * phrase de l'heure et le message « trop d'essais » s'effacent en gardant leur place
+   * (`HeldSpace`) : rien ne remonte sous le doigt sans geste du membre (relecture de design R2, C6).
+   */
+  ended?: boolean
+}
+
+/**
+ * Hook : à partir du délai donné par le serveur (en secondes, null quand il n'y en a pas), l'heure
+ * à laquelle réessayer. Un nouveau délai (un nouveau refus) repart de maintenant ; à l'heure dite,
+ * `blocked` repasse à faux de lui-même, sans geste du membre.
+ */
+export const useRetryAt = (retryAfterSeconds: number | null): RetryState => {
+  const [until, setUntil] = useState<Date | null>(null)
+  // L'attente a-t-elle fini d'elle-même ? Seul le minuteur le met à vrai ; un nouveau délai, ou
+  // aucun délai (l'écran repart de rien à son prochain envoi), le remet à faux.
+  const [ended, setEnded] = useState(false)
+  // useEffect : à chaque nouveau délai, on calcule l'heure et on pose un minuteur qui libère ; le
+  // minuteur est retiré si un autre délai arrive avant, ou si l'écran se ferme.
+  useEffect(() => {
+    setEnded(false)
+    if (retryAfterSeconds === null || retryAfterSeconds <= 0) {
+      setUntil(null)
+      return
+    }
+    const ms = retryAfterSeconds * 1000
+    setUntil(new Date(Date.now() + ms))
+    const timer = setTimeout(() => {
+      setUntil(null)
+      setEnded(true)
+    }, ms)
+    return () => clearTimeout(timer)
+  }, [retryAfterSeconds])
+  return { blocked: until !== null, until, ended }
+}
+
+type Props = {
+  /** L'heure à partir de laquelle réessayer (`until` du hook). */
+  until: Date
+  /**
+   * Le texte autour de l'heure, pour le catalogue seulement (un outil de développement, absent de
+   * l'appli publiée) ; les écrans laissent le composant le traduire.
+   */
+  format?: (time: string) => string
+  /**
+   * L'identifiant de la phrase, pour que le bouton bloqué dise pourquoi (aria-describedby, web).
+   */
+  nativeID?: string
+}
+
+/**
+ * L'heure écrite dans la langue : « 21 h 47 » en français (typographie française, décision de
+ * Louis du 30/10/2026, D3), « 9:47 PM » en anglais. Intl.DateTimeFormat est la mise en forme des
+ * dates propre à chaque langue, fournie par l'appareil ; `formatToParts` la rend en morceaux
+ * (heure, minutes…), ce qui permet de poser nous-mêmes le « h » français, entouré d'espaces
+ * insécables pour que « 21 h 47 » ne se coupe jamais en fin de ligne.
+ */
+export const formatRetryTime = (until: Date, language: string): string => {
+  if (language.startsWith('fr')) {
+    const parts = new Intl.DateTimeFormat('fr', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(until)
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? ''
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? ''
+    return `${hour} h ${minute}`
+  }
+  return new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(until)
+}
+
+/**
+ * La phrase « Nouvel essai possible à 21 h 47 », annoncée comme un état (`status` : les lecteurs
+ * d'écran la lisent quand elle paraît, sans interrompre). Son nom ne change pas tant qu'on attend.
+ */
+export function RetryAt({ until, format, nativeID }: Props) {
+  const { t, i18n } = useTranslation()
+  const time = formatRetryTime(until, i18n.language)
+  const text = format ? format(time) : t(($) => $.auth.retryAt, { time })
+  return (
+    // Le statut est la phrase elle-même (son texte est son nom) ; l'horloge, à côté, est décorative.
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+      <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Icon name="clock" size={18} tone="secondary" />
+      </View>
+      <View style={{ flexShrink: 1 }}>
+        {/* tabular : les chiffres ont tous la même largeur, l'heure ne tremble pas. */}
+        <Text variant="callout" tone="secondary" tabular role="status" nativeID={nativeID}>
+          {text}
+        </Text>
+      </View>
+    </View>
+  )
+}

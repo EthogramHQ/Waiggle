@@ -15,6 +15,9 @@
 // et la lumière d'ambiance prend la couleur de la photo affichée.
 // Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre
 // et retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
+// R4 : ouverte depuis une carte du fil, la page part de la photo de la carte, qui grandit jusqu'à
+// la couverture (`CoverArrival`), le reste apparaissant en fondu (`CoverFade`) ; « Retour » la
+// replie dans sa carte (ui/coverTransition.tsx). Les dates se disent par rapport à maintenant.
 import {
   NoteText,
   PROJECT_NOTE_MAX,
@@ -25,9 +28,9 @@ import {
   type ReactionKind,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useFollow } from '../follows/api'
@@ -39,7 +42,7 @@ import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject } from '../projects/api'
-import { hostOf, shortDate } from '../projects/format'
+import { hostOf } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
@@ -48,9 +51,11 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
+import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { Dialog } from '../ui/Dialog'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
+import type { Focusable } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -61,6 +66,7 @@ import { Notice } from '../ui/Notice'
 import { Pressed } from '../ui/Pressed'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ReactionBar } from '../ui/ReactionBar'
+import { RelativeTime } from '../ui/RelativeTime'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
 import { Row, Stack } from '../ui/Stack'
@@ -73,15 +79,24 @@ import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
 import { Comments } from './ProjectComments'
-import { LoadErrorScreen, LoadingScreen, NotFoundState, SignedOutScreen } from './states'
+import {
+  LoadErrorScreen,
+  LoadingScreen,
+  NotFoundState,
+  SessionErrorScreen,
+  SignedOutScreen,
+} from './states'
 
 export function ProjectScreen({ id }: { id: string }) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
   const project = useProject(id, Boolean(session))
 
-  if (isPending) return <LoadingScreen width="page" />
+  if (state === 'pending') return <LoadingScreen width="page" />
+  // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là,
+  // on propose de réessayer plutôt que de se connecter.
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
   if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
@@ -104,9 +119,17 @@ export function ProjectScreen({ id }: { id: string }) {
 }
 
 function ProjectView({ project }: { project: Project }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const nameOf = useNameOf()
   const router = useRouter()
+  // La carte qui devient la page : le titre reçoit le focus quand la photo est posée, et « Retour »
+  // replie d'abord la page dans sa carte. `faded` enveloppe chacun des autres morceaux, qui
+  // apparaissent en fondu (un par un : la colonne de `Screen` garde ses écarts entre eux).
+  const titleRef = useRef<Focusable>(null)
+  const coverTarget = useCoverTarget(project.id)
+  const faded = (node: ReactNode) => (node ? <CoverFade id={project.id}>{node}</CoverFade> : null)
+  // La date de publication, citée par le lien de l'auteur, qui la contient (son nom la cacherait).
+  const publishedId = useId()
   const openOutside = useOpenOutside()
   const forgetProject = useForgetProject()
   const toSource = useMediaSources()
@@ -122,8 +145,10 @@ function ProjectView({ project }: { project: Project }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil.
-  const back = useGoBack('/')
+  // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil. La
+  // page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
+  const goBack = useGoBack('/')
+  const back = () => coverTarget.leave(goBack)
   const follow = useFollow({ kind: 'project', id: project.id })
   const followers = t(($) => $.follow.followers, { count: project.followerCount })
   const reaction = useReaction(project.id)
@@ -212,26 +237,32 @@ function ProjectView({ project }: { project: Project }) {
   // Les morceaux de la page, assemblés différemment sur téléphone et sur ordinateur.
   // Sur téléphone, une couverture verticale a besoin de hauteur pour ne pas être trop recadrée.
   const cover = (
-    <ProjectCover
-      // Sans photo, la couverture n'est qu'une lumière miel : une bande basse suffit.
-      height={!shown ? 'band' : columns ? 'hero' : shown.visual === portrait ? 'portrait' : 'band'}
-      radius={large ? 'tile' : 'sheet'}
-      image={
-        shown
-          ? {
-              source: toSource(shown.visual.url),
-              thumbhash: shown.visual.thumbhash,
-              label: shown.label,
-            }
-          : null
-      }
-    >
-      {large ? null : (
-        <Row padding="lg">
-          <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={back} />
-        </Row>
-      )}
-    </ProjectCover>
+    // La photo qui grandit depuis la carte touchée : cachée au lecteur d'écran pendant son vol, puis
+    // le focus va au titre.
+    <CoverArrival id={project.id} focusOnArrival={titleRef} radius={large ? 'tile' : 'sheet'}>
+      <ProjectCover
+        // Sans photo, la couverture n'est qu'une lumière miel : une bande basse suffit.
+        height={
+          !shown ? 'band' : columns ? 'hero' : shown.visual === portrait ? 'portrait' : 'band'
+        }
+        radius={large ? 'tile' : 'sheet'}
+        image={
+          shown
+            ? {
+                source: toSource(shown.visual.url),
+                thumbhash: shown.visual.thumbhash,
+                label: shown.label,
+              }
+            : null
+        }
+      >
+        {large ? null : (
+          <Row padding="lg">
+            <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={back} />
+          </Row>
+        )}
+      </ProjectCover>
+    </CoverArrival>
   )
 
   const info = (
@@ -242,7 +273,7 @@ function ProjectView({ project }: { project: Project }) {
       />
       {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
       {columns ? null : (
-        <Text variant="title2" heading={1} breakAnywhere>
+        <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
           {project.title}
         </Text>
       )}
@@ -251,6 +282,7 @@ function ProjectView({ project }: { project: Project }) {
           nameOf: nameOf(project.author.name),
         })}
         role="link"
+        describedBy={publishedId}
         onPress={() =>
           router.push({ pathname: '/members/[id]', params: { id: project.author.id } })
         }
@@ -264,11 +296,17 @@ function ProjectView({ project }: { project: Project }) {
           />
           <Stack gap="xxs" grow>
             <Text weight={700}>{project.author.name}</Text>
-            <Text variant="caption" tone="muted">
-              {t(($) => $.project.page.published, {
-                date: shortDate(project.createdAt, i18n.language),
-              })}
-            </Text>
+            {/* « publié hier », « publié le 12 oct. » : la date dans sa phrase, à côté du nom
+                (une vue sur le web, jamais dans un texte) ; lue « publié le 12 octobre à 10:00 ». */}
+            <Stack nativeID={publishedId}>
+              <RelativeTime
+                date={project.createdAt}
+                phrase={({ afterVerb, full }) => ({
+                  label: t(($) => $.project.page.publishedWhen, { when: afterVerb }),
+                  spoken: t(($) => $.project.page.published, { date: full }),
+                })}
+              />
+            </Stack>
           </Stack>
         </Row>
       </Pressed>
@@ -509,27 +547,29 @@ function ProjectView({ project }: { project: Project }) {
       >
         {/* Le titre au-dessus des colonnes, sur toute la largeur : dans la colonne latérale, un
             titre long passait sur sept lignes. */}
-        <Text variant={wide ? 'display' : 'title1'} heading={1} breakAnywhere>
-          {project.title}
-        </Text>
-        {removal}
+        {faded(
+          <Text variant={wide ? 'display' : 'title1'} heading={1} breakAnywhere focusRef={titleRef}>
+            {project.title}
+          </Text>,
+        )}
+        {faded(removal)}
         <Columns
           main={
             <>
               {cover}
-              {thumbnails}
-              {description}
+              {faded(thumbnails)}
+              {faded(description)}
               {/* Ce qui se lit longtemps va dans la colonne principale ; la latérale garde les
                   informations et les actions. */}
-              {journal}
-              {comments}
+              {faded(journal)}
+              {faded(comments)}
             </>
           }
           side={
             <>
-              {info}
-              {recipe}
-              {ownerActions}
+              {faded(info)}
+              {faded(recipe)}
+              {faded(ownerActions)}
             </>
           }
         />
@@ -548,16 +588,16 @@ function ProjectView({ project }: { project: Project }) {
           plutôt qu'en `header` : vide, elle n'y ajoute aucun écart au-dessus de la couverture. */}
       {large ? null : <TopNav />}
       {cover}
-      {thumbnails}
-      {removal}
-      {info}
-      {recipe}
-      {description}
-      {journal}
+      {faded(thumbnails)}
+      {faded(removal)}
+      {faded(info)}
+      {faded(recipe)}
+      {faded(description)}
+      {faded(journal)}
       {/* La conversation vient après le projet ; « Modifier » et « Supprimer », que l'auteur
           cherche moins souvent, ferment la page. */}
-      {comments}
-      {ownerActions}
+      {faded(comments)}
+      {faded(ownerActions)}
     </Screen>
   )
 }
@@ -568,7 +608,7 @@ function ProjectView({ project }: { project: Project }) {
  * page à chaque lettre tapée.
  */
 function Journal({ project, suspended }: { project: Project; suspended: boolean }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const publishNote = usePublishNote(project.id)
   const deleteNote = useDeleteNote(project.id)
   const signInAgain = useSignInAgain()
@@ -689,7 +729,8 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
       notes={project.notes.map((note) => ({
         id: note.id,
         body: note.body,
-        when: shortDate(note.createdAt, i18n.language),
+        // « il y a 2 h », « hier » : une vue à la place du texte de la date (R4).
+        when: <RelativeTime date={note.createdAt} />,
         // Une note retirée par la modération (tranche 7a) n'arrive qu'à l'auteur du projet : il
         // lit pourquoi, au-dessus de son texte.
         removed: note.removal ? removalBanner(note.removal, t) : undefined,

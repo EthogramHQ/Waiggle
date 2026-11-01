@@ -187,6 +187,33 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
     'change-email-confirmation': `${appUrl}/email-change/confirmed`,
     'change-email-verification': `${appUrl}/email-change/done`,
   }
+  // Le second lien ouvert sans session (D1) : la page « Connecte-toi d'abord ».
+  const signInFirstPage = `${appUrl}/email-change/sign-in-first`
+  // La page où mène un lien d'inscription (auth/verification-resend.ts l'impose à l'envoi).
+  const verifiedPage = `${appUrl}/verified`
+
+  /**
+   * Un lien d'inscription (R2, relecture de sécurité S13) : refusé s'il a été émis avant la
+   * dernière correction de l'adresse du compte (POST /v1/account/unverified-email pose
+   * `updated_at`). Sans cela, après « lea@exampel.com → lea@example.com → lea@exampel.com », le
+   * tout premier lien, parti avant la première correction, vérifierait encore le compte. Seulement
+   * pour un compte pas encore vérifié : Better Auth change aussi `updated_at` pour d'autres raisons,
+   * mais un compte non vérifié n'a ni session ni profil à modifier. Un jeton faux ou périmé est
+   * laissé à Better Auth, qui le refuse lui-même.
+   */
+  const beforeSignUpLink = async (ctx: AuthContext, token: string) => {
+    const payload = z
+      .object({ email: z.string(), iat: z.number() })
+      .safeParse(await verifyJWT(token, ctx.context.secret)).data
+    if (!payload) return
+    const found = await ctx.context.internalAdapter.findUserByEmail(payload.email)
+    if (!found || found.user.emailVerified) return
+    // `iat` est en secondes, `updatedAt` en millisecondes (pôle code-api, « Pièges ») : le lien
+    // émis dans la seconde même de la correction n'est pas pris pour plus ancien.
+    if (payload.iat < Math.floor(new Date(found.user.updatedAt).getTime() / 1000)) {
+      throw ctx.redirect(`${verifiedPage}?error=INVALID_TOKEN`)
+    }
+  }
 
   /**
    * Envoie un e-mail sans attendre qu'il parte (relecture de sécurité S4) : sinon le temps de
@@ -402,8 +429,10 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
 
     /**
      * Hook `before` de GET /api/auth/verify-email, pour les deux liens d'un changement d'adresse.
-     * Un lien d'inscription passe sans changement. Pour les nôtres :
+     * Un lien d'inscription n'y est que comparé à la dernière correction de l'adresse (R2, S13 :
+     * beforeSignUpLink). Pour les nôtres :
      * - la page de retour est imposée (S2), même pour un lien périmé ou faux ;
+     * - le second lien n'aboutit que dans une session du membre (R2, D1) ;
      * - un jeton plus ancien que le compte de son adresse est refusé (S9) : celui d'un compte
      *   supprimé depuis ne peut rien sur un compte neuf inscrit avec la même adresse ;
      * - chaque lien ne sert qu'une fois (S1) ;
@@ -426,7 +455,7 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       const step = stepOf(token)
       if (!step) {
         if (namesNewAddress(token)) throw refused(pageOf['change-email-verification'])
-        return // un lien d'inscription
+        return beforeSignUpLink(ctx, token)
       }
       const page = pageOf[step]
       // Ce qu'un hook `before` retourne dans `context` est fusionné dans la requête : Better Auth
@@ -447,6 +476,18 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
         throw redirect('INVALID_TOKEN')
       }
 
+      // Une nouvelle adresse prise entre-temps : le second lien est refusé (S5), sans être compté.
+      const taken = await ctx.context.internalAdapter.findUserByEmail(payload.updateTo)
+      if (taken && step === 'change-email-verification') throw redirect('INVALID_TOKEN')
+
+      // D1 (décision de Louis du 29/10/2026) : le second lien n'aboutit que dans une session du
+      // membre. Avec une faute de frappe dans la nouvelle adresse, il part chez un inconnu ; s'il
+      // aboutissait sans session, cet inconnu deviendrait l'adresse du compte, puis, par « Mot de
+      // passe oublié », son maître. Sans session : rien ne change, rien n'est compté (le lien reste
+      // utilisable), et la page de l'appli demande de se connecter puis de rouvrir le lien. Un lien
+      // déjà refusé pour une autre raison (plus haut, ou par Better Auth) garde sa page d'erreur.
+      if (!session && step === 'change-email-verification') throw ctx.redirect(signInFirstPage)
+
       // Le compteur ne laisse passer qu'une ouverture (insertion atomique, rate-limit.ts). Sa clé
       // vient de la partie signée du jeton, la même pour toutes ses écritures (B1).
       const firstUse = await rateLimiter.hit(
@@ -455,8 +496,7 @@ export const createEmailChange = ({ mailer, rateLimiter, appUrl, secret }: Email
       )
       if (!firstUse.allowed) throw redirect('LINK_USED')
 
-      if (await ctx.context.internalAdapter.findUserByEmail(payload.updateTo)) {
-        if (step === 'change-email-verification') throw redirect('INVALID_TOKEN')
+      if (taken) {
         // Le premier lien d'une adresse prise compte comme un second lien envoyé : sinon le
         // plafond (3 par heure) dirait, par sa différence, quelles adresses ont un compte.
         await rateLimiter.hit(memberCounterKeys(owner.user.id).emailChangeLink, NEW_EMAIL_LINK_RULE)

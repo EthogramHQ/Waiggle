@@ -2,20 +2,23 @@
 // la couleur à partir des jetons de @ruche/brand. Un écran dit ce qu'est le texte (un titre de
 // projet, une légende) et pas à quoi il ressemble : pour changer tous les titres, on change le jeton.
 import {
+  type FontFamily,
   type FontWeight,
+  maxHeadingScale,
   maxTextScale,
   readableWidth,
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import {
   Text as NativeText,
   type TextProps as NativeTextProps,
   Platform,
   type TextStyle,
 } from 'react-native'
-import { fontName } from './theme/fonts'
+import type { Focusable } from './focus'
+import { fontFiles, fontName, monoFont } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Les couleurs de texte possibles, par rôle. */
@@ -31,6 +34,13 @@ export type Tone =
   | 'disabled'
   | 'status'
   | 'onBadge'
+
+/**
+ * Les couleurs que seul un texte peut prendre, en plus de celles qu'il partage avec les icônes : le
+ * nom de l'auteur sur une tuile de miel (un brun) et le texte posé sur une tuile d'encre (la couleur
+ * du fond de page, qui s'y lit comme l'encre sur la page : le contraste est le même).
+ */
+export type TextTone = Tone | 'onHoneyTile' | 'onInk'
 
 // Sur le web, un mot sans espace plus large que l'écran déborde ; « overflow-wrap: anywhere » le
 // coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
@@ -49,12 +59,73 @@ const toneColor = {
   disabled: 'onHoneyDisabled',
   status: 'statusText',
   onBadge: 'onBadge',
-} as const
+  onHoneyTile: 'onHoneyTile',
+  onInk: 'background',
+} as const satisfies Record<TextTone, string>
+
+/**
+ * La police d'un rôle de texte. Geist Mono (les rôles `mono` et `code`) est livrée en 400 et 500 ;
+ * si une graisse manquait un jour à `fontFiles`, on prendrait `monoFont` plutôt qu'une police que
+ * l'appli n'a pas chargée.
+ */
+const fontFamilyOf = (family: FontFamily, weight: FontWeight): string => {
+  const name = fontName(family, weight)
+  return family === 'mono' && !(name in fontFiles) ? monoFont : name
+}
+
+/**
+ * Le nom géant d'un outil (`toolName`, `toolNameWide`) tient sur une ligne : il rétrécit quand il
+ * est long, plutôt que de passer à la ligne au milieu d'un mot.
+ * - Sur téléphone, React Native le fait seul : `adjustsFontSizeToFit` avec `numberOfLines={1}`.
+ * - Sur le web, ces deux réglages n'existent pas. La taille devient une formule CSS, `clamp(min,
+ *   idéal, max)` : l'idéal partage la largeur de l'écran (moins ses marges) entre les lettres du
+ *   nom, environ 0,58 de la taille chacune pour cette police serrée ; jamais plus grand que le
+ *   jeton, jamais plus petit qu'un titre de carte. L'interlettrage et la hauteur de ligne
+ *   passent en proportions (em, sans unité), pour suivre la taille calculée.
+ */
+const giantVariants: readonly TextVariant[] = ['toolName', 'toolNameWide']
+/** La largeur moyenne d'une lettre de Funnel Display grasse et serrée, en fraction de sa taille. */
+const GIANT_LETTER_WIDTH = 0.58
+/** Les marges de l'écran autour du nom, de part et d'autre, en points (≈ deux fois 24). */
+const GIANT_MARGINS = 48
+const giantWebStyle = (variant: TextVariant, children: ReactNode): TextStyle => {
+  const style = textStyles[variant]
+  const letters = typeof children === 'string' ? Math.max(Array.from(children).length, 1) : 8
+  const ideal = `calc((100vw - ${GIANT_MARGINS}px) / ${(letters * GIANT_LETTER_WIDTH).toFixed(2)})`
+  // Le plancher : la taille d'un titre de carte. Un nom très long qui n'y tient toujours pas passe
+  // à la ligne entre ses mots, plutôt que de sortir de l'écran.
+  const smallest = textStyles.title3.size
+  // Les types de React Native n'attendent que des nombres ici ; react-native-web passe les textes
+  // tels quels au navigateur.
+  return {
+    fontSize: `clamp(${smallest}px, ${ideal}, ${style.size}px)`,
+    lineHeight: `${(style.lineHeight / style.size).toFixed(3)}`,
+    letterSpacing: `${style.tracking}em`,
+  } as unknown as TextStyle
+}
+
+/**
+ * Un grand titre sur le web (R4, M5) : `maxScale` n'y existe pas (le navigateur n'agrandit pas les
+ * `px`), alors le titre suit la largeur de l'écran, jamais plus grand que son jeton : `min(34px,
+ * 8.5vw)`. Sur 320 points il tient à 27 points, et même un utilisateur qui agrandit tout le texte
+ * (200 % : 54 points) garde « Réglages » et « Recherche » entiers sur une ligne ; dès 400 points de
+ * large, la taille est celle du jeton. Une formule CSS, sans mesure ni rendu de plus (la page web
+ * est pré-rendue sans connaître l'écran). La hauteur de ligne et l'interlettrage passent en
+ * proportions pour suivre.
+ */
+const bigTitleWebStyle = (variant: TextVariant): TextStyle => {
+  const style = textStyles[variant]
+  return {
+    fontSize: `min(${style.size}px, ${(style.size / 4).toFixed(2)}vw)`,
+    lineHeight: `${(style.lineHeight / style.size).toFixed(3)}`,
+    letterSpacing: `${style.tracking}em`,
+  } as unknown as TextStyle
+}
 
 export type TextProps = {
   children: ReactNode
   variant?: TextVariant
-  tone?: Tone
+  tone?: TextTone
   /** Remplace la graisse prévue par la variante (par exemple un libellé en gras). */
   weight?: FontWeight
   align?: 'left' | 'center' | 'right'
@@ -62,7 +133,10 @@ export type TextProps = {
   tabular?: boolean
   /** Souligné (liens). */
   underline?: boolean
-  /** Agrandissement maximal avec le réglage de taille de l'appareil (2 par défaut). */
+  /**
+   * Agrandissement maximal avec le réglage de taille de l'appareil : 2 par défaut, 1,5 pour un grand
+   * titre (`heading` 1 ou 2, voir plus bas).
+   */
   maxScale?: number
   /**
    * Coupe un mot trop long n'importe où plutôt que de le laisser dépasser de l'écran (une adresse
@@ -76,6 +150,11 @@ export type TextProps = {
    * page, 2 pour ses sections, 3 et 4 en dessous (les titres écrits par les membres).
    */
   heading?: HeadingLevel
+  /**
+   * Pour poser le focus sur ce texte depuis le code (le titre d'une page à son arrivée, R4) : sur le
+   * web, le texte devient focalisable par le code seulement (`tabIndex -1`), jamais par Tab.
+   */
+  focusRef?: Ref<Focusable>
   /**
    * Le rôle lu par les lecteurs d'écran. « header » en est exclu : un titre passe par `heading`,
    * qui porte aussi son niveau ; un titre sans niveau ne compile plus.
@@ -93,6 +172,8 @@ export type TextProps = {
   | 'onPress'
   | 'testID'
   | 'nativeID'
+  // Un texte qui est à lui seul un état (« Nouvel essai possible à 21:47 », RetryAt) : role status.
+  | 'role'
 >
 
 /** Les niveaux de titre de l'appli : la page (1), ses sections (2), puis dessous (3, 4). */
@@ -121,20 +202,33 @@ export function Text({
   align,
   tabular = false,
   underline = false,
-  maxScale = maxTextScale,
+  maxScale: maxScaleProp,
   breakAnywhere = false,
   readable = false,
   heading,
+  focusRef,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
   const style = textStyles[variant]
+  const giant = giantVariants.includes(variant)
+  // Un grand titre (niveau 1 ou 2, 22 points ou plus) grossit moins que le texte courant : doublé,
+  // il ne tient plus sur 320 points et se coupe au milieu du mot (R4, M5). Un titre de groupe en
+  // petites capitales (13 points) et les titres écrits par les membres (niveaux 3 et 4) gardent
+  // l'agrandissement complet.
+  const bigTitle = heading !== undefined && heading <= 2 && style.size >= textStyles.heading.size
+  const maxScale = maxScaleProp ?? (bigTitle ? maxHeadingScale : maxTextScale)
   return (
     <NativeText
       // Les textes grandissent avec le réglage de taille de l'appareil, jusqu'à deux fois leur taille.
       maxFontSizeMultiplier={maxScale}
+      // Le nom géant d'un outil rétrécit pour tenir sur une ligne (téléphone ; le web le fait par
+      // sa formule de taille, plus bas).
+      {...(giant && Platform.OS !== 'web'
+        ? { numberOfLines: 1, adjustsFontSizeToFit: true }
+        : null)}
       style={{
-        fontFamily: fontName(style.family, weight ?? style.weight),
+        fontFamily: fontFamilyOf(style.family, weight ?? style.weight),
         // La graisse est déjà dans le fichier de police : on n'en redemande pas une au système,
         // qui sinon « grossirait » les lettres une deuxième fois.
         fontWeight: 'normal',
@@ -149,9 +243,14 @@ export function Text({
         ...(underline ? { textDecorationLine: 'underline' as const } : null),
         ...(breakAnywhere ? breakAnywhereStyle : null),
         ...(readable ? { maxWidth: readableWidth } : null),
+        ...(giant && Platform.OS === 'web' ? giantWebStyle(variant, children) : null),
+        ...(bigTitle && Platform.OS === 'web' ? bigTitleWebStyle(variant) : null),
       }}
       {...rest}
       {...(heading ? headingLevel(heading) : null)}
+      // `Focusable` est le nom commun des vues qu'un écran focalise ; le texte natif en est une.
+      {...(focusRef ? { ref: focusRef as unknown as Ref<NativeText> } : null)}
+      {...(focusRef && Platform.OS === 'web' ? { tabIndex: -1 } : null)}
     >
       {children}
     </NativeText>

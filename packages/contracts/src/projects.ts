@@ -241,7 +241,10 @@ export type Project = z.infer<typeof Project>
 
 /**
  * Un projet en version courte, pour les listes : sa couverture (la première photo) et sa
- * couverture verticale, sans toute la galerie.
+ * couverture verticale, sans toute la galerie. R3 : avec l'adresse de sa démo, pour que
+ * « Tester ↗ » du carrousel d'Explorer l'ouvre sans relire le projet (le même membre la voit
+ * déjà sur la page du projet). R4 : avec le total de ses réactions, que la carte du fil affiche
+ * (« ✦ 49 »).
  */
 export const ProjectSummary = Project.pick({
   id: true,
@@ -251,11 +254,20 @@ export const ProjectSummary = Project.pick({
   status: true,
   visibility: true,
   tools: true,
+  demoUrl: true,
   portraitCover: true,
   createdAt: true,
   updatedAt: true,
 })
-  .extend({ cover: ProjectVisual.nullable() })
+  .extend({
+    cover: ProjectVisual.nullable(),
+    /**
+     * La somme des cinq compteurs de réactions (R4), mêmes règles que la page du projet : les
+     * réactions des membres bloqués comptent, comme sur la page. Un nombre, jamais des noms ; 0
+     * pour un projet privé ou retiré, même pour son auteur (relecture de sécurité sec-A4).
+     */
+    reactionTotal: z.number().int().min(0),
+  })
   .meta({ id: 'ProjectSummary' })
 export type ProjectSummary = z.infer<typeof ProjectSummary>
 

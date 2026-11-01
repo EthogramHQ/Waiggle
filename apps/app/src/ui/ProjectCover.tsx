@@ -2,9 +2,9 @@
 // et son résumé flou (ThumbHash) affiché le temps qu'elle arrive. Sans photo : la lumière miel,
 // avec le titre écrit dessus en grand, pour que chaque projet ait une couverture chaleureuse
 // plutôt qu'un cadre vide.
-import { honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
+import { borders, honeyLight, layout, type Radius, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import type { ReactNode } from 'react'
+import { type ReactNode, useId } from 'react'
 import { View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import type { ImageSource } from './image'
@@ -31,14 +31,54 @@ type Props = {
   image?: CoverImage | null
   /** Ce qui se pose sur la couverture (boutons ronds, panneau de verre). */
   children?: ReactNode
+  /**
+   * `card` : la couverture est une carte posée sur la page (celle du fil), avec l'ombre d'une carte
+   * et, la nuit, un fin liseré qui la détache du noir. Sans ombre par défaut (une couverture en tête
+   * de page, une vignette dans une note).
+   */
+  shadow?: 'card' | 'none'
+  /**
+   * La couverture prend la hauteur que son parent lui laisse, `height` devenant sa hauteur minimale
+   * (la couverture d'une carte de note étirée à la hauteur d'une carte de projet voisine, R4).
+   */
+  grow?: boolean
 }
 
-export function ProjectCover({ title, height: size, radius = 'sheet', image, children }: Props) {
-  const { scheme, colors } = useTheme()
+export function ProjectCover({
+  title,
+  height: size,
+  radius = 'sheet',
+  image,
+  children,
+  shadow = 'none',
+  grow = false,
+}: Props) {
+  const { scheme, colors, shadows } = useTheme()
   const height = typeof size === 'number' ? size : layout.cover[size]
-  const id = `cover-${scheme}`
-  return (
-    <View style={{ height, borderRadius: radii[radius], overflow: 'hidden', alignSelf: 'stretch' }}>
+  // Le dégradé est nommé, puis cité par `url(#…)` : un nom propre à chaque couverture (useId, le même
+  // au pré-rendu web et dans le navigateur). Avec un nom commun, le navigateur prenait le premier
+  // dégradé de la page, parfois dans une page quittée et cachée (`display: none`) : la couverture du
+  // projet ouvert depuis le fil ne se dessinait pas (relecture design R4, A4).
+  const unique = useId()
+  const id = `cover-${scheme}-${unique.replace(/[^\w-]/g, '')}`
+  const card = shadow === 'card'
+  // flexGrow : la couverture grandit dans la place libre de son parent, sans descendre sous sa
+  // hauteur de base.
+  const sizing = grow ? { minHeight: height, flexGrow: 1 } : { height }
+  const cover = (
+    <View
+      style={{
+        ...sizing,
+        borderRadius: radii[radius],
+        overflow: 'hidden',
+        alignSelf: 'stretch',
+        // Le liseré de nuit : une ombre noire ne se voit pas sur le fond de nuit, le trait si.
+        // L'image, posée dans le cadre, s'arrête à l'intérieur du trait.
+        ...(card && scheme === 'night'
+          ? { borderWidth: borders.hairline, borderColor: colors.surfaceBorder }
+          : null),
+      }}
+    >
       {image ? (
         <Image
           source={image.source}
@@ -74,6 +114,21 @@ export function ProjectCover({ title, height: size, radius = 'sheet', image, chi
         </View>
       ) : null}
       {children}
+    </View>
+  )
+  if (!card) return cover
+  // Deux boîtes : l'extérieure porte l'ombre, l'intérieure rogne la photo aux coins arrondis
+  // (overflow: 'hidden'), ce qui rognerait aussi l'ombre si elles étaient ensemble.
+  return (
+    <View
+      style={{
+        borderRadius: radii[radius],
+        boxShadow: shadows.card,
+        alignSelf: 'stretch',
+        ...(grow ? { flexGrow: 1 } : null),
+      }}
+    >
+      {cover}
     </View>
   )
 }

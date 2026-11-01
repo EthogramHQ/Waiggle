@@ -21,7 +21,7 @@ import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
 import { recentNotesOf } from '../notes/load'
 import { mediaUrl } from '../profile/me'
-import { reactionStatesOf } from '../reactions/load'
+import { reactionStatesOf, reactionTotalsOf } from '../reactions/load'
 import { removalsOf } from '../removals/load'
 import { projectVisibleTo } from './visibility'
 
@@ -224,8 +224,14 @@ export const loadProjectsOf = async (
   return toProjects(db, rows, media, viewerId, publicApiUrl)
 }
 
-/** Un projet en version courte, pour les listes : sa première photo en couverture, sans la galerie. */
-const toSummary = ({ visuals, ...project }: ProjectBase): ProjectSummary => ({
+/**
+ * Un projet en version courte, pour les listes : sa première photo en couverture, sans la galerie,
+ * et le total de ses réactions (`reactionTotal`, lu pour toute la liste par reactionTotalsOf).
+ */
+const toSummary = (
+  { visuals, ...project }: ProjectBase,
+  reactionTotal: number,
+): ProjectSummary => ({
   id: project.id,
   author: project.author,
   title: project.title,
@@ -234,21 +240,33 @@ const toSummary = ({ visuals, ...project }: ProjectBase): ProjectSummary => ({
   visibility: project.visibility,
   tools: project.tools,
   cover: visuals[0] ?? null,
+  // R3 : le lien de la démo sur la carte (« Tester » sans ouvrir la page du projet).
+  demoUrl: project.demoUrl,
   portraitCover: project.portraitCover,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
+  reactionTotal,
 })
 
 /**
- * Une ligne de la base en carte de liste (contrat `ProjectSummary`), avec la couverture prise dans
- * `media` : les médias de toute la liste, lus en une fois par selectMedia.
+ * Des lignes de la base en cartes de liste (contrat `ProjectSummary`), dans le même ordre. Toujours
+ * deux requêtes de plus, quel que soit le nombre de cartes, lancées en même temps (Promise.all) :
+ * les médias de toute la liste (pour les couvertures), et le total des réactions de toute la liste
+ * (R4). Toute liste de cartes passe par ici : le fil, Découvrir, la recherche, une étiquette, la
+ * page d'un membre ; aucune ne peut donc oublier le total.
  */
-export const rowToSummary = (
-  row: ProjectRow,
-  media: MediaRow[],
+export const rowsToSummaries = async (
+  db: Database,
+  rows: ProjectRow[],
   viewerId: string,
   publicApiUrl: string,
-): ProjectSummary => toSummary(toProjectBase(row, media, viewerId, publicApiUrl))
+): Promise<ProjectSummary[]> => {
+  const ids = rows.map((row) => row.project.id)
+  const [media, totals] = await Promise.all([selectMedia(db, ids), reactionTotalsOf(db, ids)])
+  return rows.map((row) =>
+    toSummary(toProjectBase(row, media, viewerId, publicApiUrl), totals.get(row.project.id) ?? 0),
+  )
+}
 
 /**
  * Une liste de projets (page d'un membre, d'une étiquette) : ceux qui remplissent `where`, du plus
@@ -264,11 +282,7 @@ export const loadSummaries = async (
     .where(where)
     .orderBy(desc(schema.project.createdAt))
     .limit(PROJECT_LIST_MAX)
-  const media = await selectMedia(
-    db,
-    rows.map((row) => row.project.id),
-  )
-  return rows.map((row) => rowToSummary(row, media, viewerId, publicApiUrl))
+  return rowsToSummaries(db, rows, viewerId, publicApiUrl)
 }
 
 /**

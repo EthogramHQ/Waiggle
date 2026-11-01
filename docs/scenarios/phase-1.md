@@ -140,7 +140,7 @@ Règles détaillées :
 - **Lien de démo** : `https://` uniquement. Sont refusés `localhost`, les noms sans point, les noms
   en `.local`, `.internal`, `.home.arpa` ou `.localhost`, et toute adresse IP privée, locale ou
   réservée. Le serveur n'ouvre jamais ce lien. Un clic passe par une page d'avertissement
-  (« Tu quittes Ruche pour… »), comme tous les liens externes.
+  (« Tu quittes Waiggle pour… »), comme tous les liens externes.
 - **Visuels** : de 0 à 6 par projet, en JPEG, PNG ou WebP de 5 Mo au plus. Ils sont ré-encodés en
   WebP de 1 600 px au plus, sans métadonnées. Le premier sert de couverture, et l'ordre est
   modifiable.
@@ -266,6 +266,8 @@ miel). Ces scénarios valent pour tous les écrans, présents et à venir.
   (une option d'accessibilité pour qui a le mal des transports), les grands déplacements (une carte
   qui s'envole, la lumière qui suit l'inclinaison) deviennent des fondus. Le reste ne change pas,
   lumière d'ambiance comprise
+- Précision du 29/10/2026 (refonte, R1) : avec « Réduire les animations », la lumière d'ambiance
+  devient immobile (couleur gardée, fondus gardés, plus de respiration) ; voir `refonte.md`
 
 **Texte agrandi**
 - Étant donné un appareil réglé avec une grande taille de texte
@@ -363,7 +365,7 @@ Ajouts après la relecture de sécurité :
 - Il montre les projets publics récents de tous les membres, et ceux qui cherchent des testeurs
 
 **Ouvrir une démo**
-- Quand un membre ouvre un lien de démo, une page lui indique qu'il quitte Ruche et vers quel domaine
+- Quand un membre ouvre un lien de démo, une page lui indique qu'il quitte Waiggle et vers quel domaine
 
 ### Précisions (tranche 4) — validées le 19/10/2026
 
@@ -963,6 +965,9 @@ Règles détaillées :
 - **Risque accepté** (Louis, 25/10/2026) : si Inès se trompe dans la nouvelle adresse et confirme
   quand même depuis son ancienne boîte, l'inconnu qui suit le second lien reçoit ensuite les
   e-mails du compte (sans pouvoir s'y connecter) ; Inès doit alors nous écrire.
+  **Retiré en R2** (Louis, 29/10/2026) : avec le mot de passe oublié, ce risque devenait une prise
+  de compte ; le lien envoyé à la nouvelle adresse ne marche plus que sur un appareil où le membre
+  est connecté (`refonte.md`, R2).
 
 ## Tranche 7c — Administrer
 

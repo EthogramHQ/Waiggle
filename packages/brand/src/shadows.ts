@@ -9,6 +9,7 @@ const day = {
   float: '0 12px 32px rgba(110,70,0,0.14)', // ce qui flotte : barres, boutons ronds
   card: '0 18px 40px rgba(90,40,10,0.18)', // cartes immersives
   honey: '0 10px 24px rgba(199,127,0,0.28)', // halo du bouton miel
+  danger: '0 10px 24px rgba(217,45,32,0.28)', // halo du bouton rouge (suppression définitive)
   // Reflet : un trait de lumière en haut du verre et des boutons, à l'intérieur (« inset »)
   highlight: 'inset 0 1px 0 rgba(255,255,255,0.9)',
 }
@@ -18,7 +19,8 @@ const night = {
   float: '0 12px 32px rgba(0,0,0,0.45)',
   card: '0 18px 40px rgba(0,0,0,0.5)',
   honey: '0 10px 24px rgba(255,201,51,0.18)',
-  highlight: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+  danger: '0 10px 24px rgba(217,45,32,0.18)',
+  highlight: 'inset 0 1px 0 rgba(255,255,255,0.14)',
 } satisfies Record<keyof typeof day, string>
 
 export type ShadowName = keyof typeof day

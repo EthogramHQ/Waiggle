@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../accounts/api'
+import { useMemberSession } from '../accounts/session'
 import { type ApiResult, errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
@@ -63,6 +64,7 @@ import {
   LoadingScreen,
   NotFoundState,
   NotMineState,
+  SessionErrorScreen,
   SignedOutScreen,
   SuspendedState,
 } from './states'
@@ -75,7 +77,7 @@ type ScreenProps = {
 
 export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   const { t } = useTranslation()
-  const { data: session, isPending } = useSession()
+  const { state, session, retry } = useMemberSession()
   // En modification, on part du projet existant ; en création, il n'y a rien à charger.
   const project = useProject(id ?? '', Boolean(session && id))
   // Sur ordinateur, le formulaire occupe toute la largeur : ses états aussi, pour que la barre du
@@ -86,7 +88,9 @@ export function ProjectFormScreen({ id, uploadFailed = false }: ScreenProps) {
   // toujours déjà en cache) ; s'il dit « suspendu », la page change.
   const suspended = useSuspension().suspended
 
-  if (isPending) return <LoadingScreen width={width} />
+  if (state === 'pending') return <LoadingScreen width={width} />
+  // La session ne se lit pas : réessayer, pas se connecter (voir accounts/session.ts).
+  if (state === 'error') return <SessionErrorScreen onRetry={retry} width={width} />
   if (!session) return <SignedOutScreen width={width} />
   if (suspended) return <SuspendedState projectId={id} width={width} />
   if (!id) return <ProjectFormView initial={emptyProjectForm} />

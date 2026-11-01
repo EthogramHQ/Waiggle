@@ -1,9 +1,17 @@
-# Ruche — règles du projet
+# Waiggle — règles du projet
 
-Ruche est un réseau social open source (AGPL-3.0) où des proches publient leurs projets IA, les
+Waiggle est un réseau social open source (AGPL-3.0) où des proches publient leurs projets IA, les
 suivent, les testent et s'encouragent. On n'héberge rien d'exécutable : chaque projet pointe vers
-une démo externe. Le produit est bilingue français / anglais. « Ruche » est un nom de code : les membres voient
-« Waiggle », défini dans `packages/brand/src/name.ts` et nulle part ailleurs.
+une démo externe. Le produit est bilingue français / anglais.
+
+**Deux « ruches » à ne pas confondre.**
+
+- **« Ruche », le nom de code technique.** Il reste dans les identifiants : les paquets
+  `@ruche/*`, le dossier `/srv/ruche` du serveur, les images `ruche-api` et `ruche-web`. La
+  documentation appelle le projet « Waiggle ». Dans l'appli, le nom affiché vient de
+  `packages/brand/src/name.ts` et de nulle part ailleurs.
+- **Les ruches, une fonction de l'appli** (refonte) : des groupes de proches, comme « Ma ruche
+  Famille ». Dans le code, cette fonction s'appelle `hive` (tables, routes, composants).
 
 L'équipe : Louis, qui décide, relit et valide tout, aidé d'un assistant de code qui écrit l'essentiel
 du code. Ces règles valent pour toute personne, ou tout outil, qui contribue.
@@ -54,7 +62,10 @@ Chaque fonctionnalité est une tranche verticale, dans cet ordre :
    (sécurité ; juridique si la tranche touche aux données, aux e-mails, à l'IA ou à la modération) :
    ce que la relecture trouve entre au plan et devient des tests.
 3. **Les tests, qui doivent échouer** : unitaires pour les règles, intégration pour l'API
-   (`app.request(...)`), test de composant pour l'écran. Lance-les et constate l'échec.
+   (`app.request(...)`), test de composant pour l'écran, écrits à partir du contrat, sans voir le
+   code. Lance-les et constate l'échec. L'interface peut commencer en même temps par ce qui ne
+   dépend pas des tests (catalogue, composants visuels, captures) ; avant tout code d'écran, elle
+   reprend ces tests et constate leur échec à son tour.
 4. **Le backend**, jusqu'au vert.
 5. **L'interface**, puis son test.
 6. **`pnpm check`** vert et le parcours d'un membre (`pnpm --filter @ruche/app journey`) vert, puis
@@ -107,7 +118,8 @@ L'interface doit rester facile à modifier : chaque décision de design vit à u
   - zones à toucher de 44 points au moins ;
   - les textes suivent la taille de texte de l'appareil.
 - **Animations** : complètes par défaut. Seuls les grands déplacements deviennent des fondus si la
-  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance reste.
+  personne a activé « Réduire les animations » (`useCalmMotion`). La lumière d'ambiance garde sa
+  couleur mais devient immobile (WCAG 2.2.2).
 - **Web** : la page est pré-rendue sans connaître le visiteur. Ce qui dépend du navigateur (thème,
   largeur, langue, paramètres d'URL) attend `useHydrated()` (`ui/theme/hydration.ts`). Sinon React
   signale un écart et redessine tout. La CI des captures échoue sur ces erreurs.

@@ -1,4 +1,7 @@
-// Page : supprimer son compte (« /account/delete »). L'écran lui-même est dans src/screens.
-import { DeleteAccountScreen } from '../../src/screens/DeleteAccountScreen'
+// Ancienne adresse : supprimer son compte (« /account/delete ») vit sous la rubrique « Compte » des
+// réglages depuis la tranche R2.
+import { Redirect } from 'expo-router'
 
-export default DeleteAccountScreen
+export default function DeleteAccountRedirect() {
+  return <Redirect href="/settings/account/delete" />
+}

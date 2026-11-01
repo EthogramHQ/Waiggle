@@ -170,9 +170,42 @@ describe('Project with its visuals', () => {
   })
 
   it('gives lists the cover and the vertical cover, not the whole gallery', () => {
-    const summary = ProjectSummary.parse({ ...project, cover: visual, portraitCover: null })
+    const summary = ProjectSummary.parse({
+      ...project,
+      cover: visual,
+      portraitCover: null,
+      reactionTotal: 0,
+    })
     expect(summary).toMatchObject({ cover: visual, portraitCover: null })
     expect(summary).not.toHaveProperty('visuals')
+  })
+
+  // R4 : la carte du fil montre le total des réactions (« ✦ 49 »). Un nombre entier, jamais
+  // négatif, et jamais des noms : le résumé ne garde ni la liste de qui a réagi, ni le détail par
+  // type (celui-là reste sur la page du projet).
+  it('carries the total of its reactions, a whole number, never who reacted', () => {
+    const base = { ...project, cover: null, portraitCover: null }
+    const summary = ProjectSummary.parse({
+      ...base,
+      reactionTotal: 49,
+      reactors: ['max-id'],
+    })
+    expect(summary.reactionTotal).toBe(49)
+    expect(summary).not.toHaveProperty('reactors')
+    // Le détail par type (Project.reactions) n'entre pas dans le résumé.
+    expect(summary).not.toHaveProperty('reactions')
+    expect(ProjectSummary.parse({ ...base, reactionTotal: 0 }).reactionTotal).toBe(0)
+  })
+
+  it('refuses a summary without a total, or with a negative or fractional one', () => {
+    const base = { ...project, cover: null, portraitCover: null }
+    expect(ProjectSummary.safeParse(base).success).toBe(false)
+    for (const reactionTotal of [-1, 1.5, '3', null]) {
+      expect(
+        ProjectSummary.safeParse({ ...base, reactionTotal }).success,
+        String(reactionTotal),
+      ).toBe(false)
+    }
   })
 })
 

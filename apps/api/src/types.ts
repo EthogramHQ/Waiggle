@@ -3,7 +3,7 @@ import type { Language } from '@ruche/i18n'
 import type { Auth } from './auth/auth'
 
 // Better Auth sait déduire (« infer ») le type exact d'un membre et d'une session,
-// champs ajoutés par Ruche compris (comme `language`).
+// champs ajoutés par Waiggle compris (comme `language`).
 export type AuthUser = Auth['$Infer']['Session']['user']
 export type AuthSession = Auth['$Infer']['Session']['session']
 

@@ -1,7 +1,12 @@
-// Le bas d'un fil : « Afficher la suite » tant qu'il en reste, puis « Tu es à jour ». Pas de
-// défilement sans fin : on sait où le fil s'arrête, et un bouton se prend aussi au clavier. Si la
-// page suivante n'arrive pas, le message d'erreur et « Réessayer » se mettent ici, sous les cartes
-// déjà lues, qui restent en place.
+// Le bas d'un fil : « Afficher la suite » tant qu'il en reste, puis une fin discrète (« C'est
+// tout »). Pas de défilement sans fin : on sait où le fil s'arrête, et un bouton se prend aussi au
+// clavier. Si la page suivante n'arrive pas, le message d'erreur et « Réessayer » se mettent ici,
+// sous les cartes déjà lues, qui restent en place.
+//
+// R4 : le « Tu es à jour » sur le miel vif de l'accueil a quitté ce composant. Il vit dans
+// `UpToDate` (la sphère de miel), que le fil pose avant le premier élément déjà vu, pas forcément
+// au bout. Ici reste le bas commun à toutes les listes (fil, commentaires, notifications, membres
+// bloqués, modération).
 import { space } from '@ruche/brand'
 import { useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
@@ -16,6 +21,7 @@ type Props = {
   /** more : il reste des pages ; loading : la suivante arrive ; end : tout est lu ; error : raté. */
   state: State
   moreLabel: string
+  /** La fin discrète : une coche et ce texte (« C'est tout »). */
   endLabel: string
   onMore: () => void
   /** Le message quand la page suivante n'a pas pu se charger, et le bouton pour réessayer. */
@@ -30,10 +36,10 @@ const activeElement = () =>
   (globalThis as { document?: { activeElement: unknown } }).document?.activeElement
 
 export function FeedEnd({ state, moreLabel, endLabel, onMore, errorLabel, retryLabel }: Props) {
-  // Quand la dernière page arrive, le bouton « Afficher la suite » laisse la place à « Tu es à
-  // jour ». Si le focus du clavier était sur ce bouton, il passe sur ce message (tabIndex -1 :
-  // focusable sans être une étape de la touche Tab) au lieu de se perdre. preventScroll : la page
-  // ne saute pas jusqu'à lui, on reste sur les cartes qui viennent d'arriver.
+  // Quand la dernière page arrive, le bouton « Afficher la suite » laisse la place à la fin. Si le
+  // focus du clavier était sur ce bouton, il passe sur ce message (tabIndex -1 : focusable sans
+  // être une étape de la touche Tab) au lieu de se perdre. preventScroll : la page ne saute pas
+  // jusqu'à lui, on reste sur les cartes qui viennent d'arriver.
   const button = useRef<View>(null)
   const end = useRef<View>(null)
   const hadFocus = useRef(false)

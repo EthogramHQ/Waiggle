@@ -154,7 +154,7 @@ describe('changing my address, from the request to the second link', () => {
     expect((await accountOf('Inès')).email).toBe(ines.email)
 
     // Le second lien : l'adresse change, vérifiée ; la page le confirme.
-    const done = await open(linkOf('newEmail', NEW_EMAIL))
+    const done = await open(linkOf('newEmail', NEW_EMAIL), cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect(await accountOf('Inès')).toMatchObject({ email: NEW_EMAIL, emailVerified: true })
@@ -166,7 +166,7 @@ describe('changing my address, from the request to the second link', () => {
 
   it('lets me sign in with the new address and the same password, and no longer with the old one', async () => {
     const cookie = await ctx.verifiedMember(ines)
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect((await ctx.signIn({ email: NEW_EMAIL, password: ines.password })).status).toBe(200)
     expect((await ctx.signIn({ email: ines.email, password: ines.password })).status).toBe(401)
@@ -176,7 +176,7 @@ describe('changing my address, from the request to the second link', () => {
     const phone = await ctx.verifiedMember(ines)
     const laptop = ctx.cookiesFrom(await ctx.signIn(ines))
 
-    await open(await askAndConfirm(phone))
+    await open(await askAndConfirm(phone), phone)
 
     for (const cookie of [phone, laptop]) {
       const { status, body } = await me(cookie)
@@ -189,7 +189,7 @@ describe('changing my address, from the request to the second link', () => {
     const cookie = await ctx.verifiedMember(ines)
     const before = (await me(cookie)).body
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     const after = (await me(cookie)).body
     expect({ ...after, email: null }).toEqual({ ...before, email: null })
@@ -202,7 +202,7 @@ describe('changing my address, from the request to the second link', () => {
   it('writes the three e-mails in the language of the member', async () => {
     const cookie = await ctx.verifiedMember({ ...ines, language: 'en' })
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect(ctx.mailer.sent.map((mail) => mail.subject)).toEqual(
       expect.arrayContaining([
@@ -238,7 +238,7 @@ describe('changing my address, from the request to the second link', () => {
 
     expect((await withinASecond(ask(cookie))).status).toBe(200)
     expect((await withinASecond(open(sentLink(ines.email)))).status).toBe(302)
-    expect((await withinASecond(open(sentLink(NEW_EMAIL)))).status).toBe(302)
+    expect((await withinASecond(open(sentLink(NEW_EMAIL), cookie))).status).toBe(302)
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
 })
@@ -269,12 +269,24 @@ describe('the pages the links lead to', () => {
     expect(confirm.status).toBe(302)
     expect(landing(confirm)).toEqual({ page: CONFIRMED_PAGE, error: null })
 
-    const done = await open(replaced(linkOf('newEmail', NEW_EMAIL), callbackURL))
+    // D1 (R2) : le second lien s'ouvre dans la session d'Inès. Better Auth y repose le cookie de
+    // cette session, rafraîchi (même jeton) : ce n'est pas un cookie nouveau. Aucun autre cookie
+    // n'est posé, sauf pour en expirer un, et aucune session ne s'ouvre.
+    const presented = cookie.split('; ')
+    const sessions = await sessionCount()
+    const done = await open(replaced(linkOf('newEmail', NEW_EMAIL), callbackURL), cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect(done.headers.getSetCookie()).toEqual(
-      done.headers.getSetCookie().filter((set) => /max-age=0|expires=thu, 01 jan 1970/i.test(set)),
+      done.headers
+        .getSetCookie()
+        .filter(
+          (set) =>
+            /max-age=0|expires=thu, 01 jan 1970/i.test(set) ||
+            presented.includes(set.split(';')[0] ?? ''),
+        ),
     )
+    expect(await sessionCount()).toBe(sessions)
     expect(await done.text()).not.toContain('"user"')
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
@@ -286,7 +298,7 @@ describe('the pages the links lead to', () => {
     const second = await askAndConfirm(cookie)
 
     expect(second.searchParams.has('callbackURL')).toBe(false)
-    const done = await open(second)
+    const done = await open(second, cookie)
     expect(done.status).toBe(302)
     expect(landing(done)).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
@@ -313,8 +325,8 @@ describe('a link used twice', () => {
     const cookie = await ctx.verifiedMember(ines)
     const link = await askAndConfirm(cookie)
 
-    expect(landing(await open(link))).toEqual({ page: DONE_PAGE, error: null })
-    const again = await open(link)
+    expect(landing(await open(link, cookie))).toEqual({ page: DONE_PAGE, error: null })
+    const again = await open(link, cookie)
 
     expect(again.status).toBe(302)
     expect(landing(again).error).not.toBeNull()
@@ -531,7 +543,7 @@ describe('a link opened by another member', () => {
     const link = await askAndConfirm(cookie)
 
     expect(landing(await open(link, malikCookie)).error).not.toBeNull()
-    const res = await open(link)
+    const res = await open(link, cookie)
 
     expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
@@ -546,21 +558,10 @@ describe('a link opened by another member', () => {
 // pas ; l'API l'efface aussitôt. Le cache de session dans un cookie (`cookieCache`) reste coupé,
 // comme en production : avec lui, un cookie « session_data » laisserait entrer quelques minutes
 // même après l'effacement de la session.
+// R2 (D1, décision de Louis du 29/10/2026) : le test « changes the address without signing in a
+// device that has no session » est retiré. Sans session, le second lien ne change plus rien et ne
+// connecte personne (bloc « D1 » plus bas, qui vérifie aussi qu'aucune session n'est créée).
 describe('the second link', () => {
-  it('changes the address without signing in a device that has no session', async () => {
-    const cookie = await ctx.verifiedMember(ines)
-    const link = await askAndConfirm(cookie)
-    const sessions = await sessionCount()
-
-    const res = await open(link)
-
-    expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
-    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
-    expect(await sessionCount()).toBe(sessions)
-    expect(res.headers.getSetCookie().join('\n')).not.toContain('session_data')
-    expect((await me(ctx.cookiesFrom(res))).status).toBe(401)
-  })
-
   // Une session lue plus d'un jour après sa dernière lecture est rafraîchie : Better Auth la repose
   // alors dans un cookie, comme une nouvelle. Ce n'en est pas une : elle reste ouverte. Le
   // téléphone d'Inès ne sert pas pendant 25 heures ; elle fait la demande depuis son ordinateur,
@@ -587,6 +588,73 @@ describe('the second link', () => {
 
     expect(cookie).toContain('session_token')
     expect((await me(cookie)).status).toBe(200)
+  })
+})
+
+// ─── D1 (R2, décision de Louis du 29/10/2026) : le second lien n'aboutit que dans la session du
+// membre. Avec une faute de frappe dans la nouvelle adresse, le second lien part chez un inconnu ;
+// combiné au mot de passe oublié (R2), il lui donnait le compte. Sans session, l'appli demande de se
+// connecter, puis le lien aboutit ; dans la session d'un autre membre, refus.
+
+describe('the second link, which only works in the session of the member (D1)', () => {
+  it('changes nothing when opened without a session, and still works afterwards for the member', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const link = await askAndConfirm(cookie)
+    const sessions = await sessionCount()
+
+    const anonymous = await open(link)
+
+    // Rien n'a changé : ni l'adresse, ni les sessions ; aucun cookie de session posé.
+    expect((await accountOf('Inès')).email).toBe(ines.email)
+    expect(await sessionCount()).toBe(sessions)
+    expect(anonymous.headers.getSetCookie().join(';')).not.toContain('session_token=')
+    // Repris du test retiré : pas de cookie « session_data » non plus (`cookieCache` coupé).
+    expect(anonymous.headers.getSetCookie().join(';')).not.toContain('session_data')
+    if (anonymous.status === 302) {
+      // Une redirection : vers une page de l'appli, jamais la page « Adresse changée ».
+      expect(landing(anonymous).page.startsWith(TEST_APP_URL)).toBe(true)
+      expect(landing(anonymous).page).not.toBe(DONE_PAGE)
+    } else {
+      expect(anonymous.status).toBeGreaterThanOrEqual(400)
+    }
+    // Le lien n'est pas consommé : Inès, connectée, l'ouvre et le changement aboutit.
+    const mine = await open(link, cookie)
+    expect(landing(mine)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+    expect((await me(cookie)).body?.email).toBe(NEW_EMAIL)
+  })
+
+  it('changes the address when opened in the session of the member, on any of her devices', async () => {
+    const laptop = await ctx.verifiedMember(ines)
+    const phone = ctx.cookiesFrom(await ctx.signIn(ines))
+    const link = await askAndConfirm(laptop)
+
+    const res = await open(link, phone)
+
+    expect(landing(res)).toEqual({ page: DONE_PAGE, error: null })
+    expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
+    expect((await accountOf('Inès')).emailVerified).toBe(true)
+    // Les deux appareils restent connectés, avec la nouvelle adresse.
+    expect((await me(phone)).body?.email).toBe(NEW_EMAIL)
+    expect((await me(laptop)).body?.email).toBe(NEW_EMAIL)
+    // L'ancienne adresse est prévenue.
+    expect(mailsOf('emailChanged', ines.email)).toHaveLength(1)
+  })
+
+  it('is refused in the session of another member, and changes neither account', async () => {
+    const cookie = await ctx.verifiedMember(ines)
+    const other = await ctx.verifiedMember(malik)
+    const link = await askAndConfirm(cookie)
+
+    const res = await open(link, other)
+
+    // Better Auth refuse déjà ce lien (test « a link opened by another member ») : la page d'arrivée
+    // porte un code d'erreur, et rien ne change.
+    expect(landing(res).error).not.toBeNull()
+    expect((await accountOf('Inès')).email).toBe(ines.email)
+    expect((await accountOf('Malik')).email).toBe(malik.email)
+    expect((await me(other)).body?.email).toBe(malik.email)
+    expect(mailsOf('emailChanged', ines.email)).toEqual([])
   })
 })
 
@@ -630,7 +698,7 @@ describe('a link that is no longer valid', () => {
     const earlierFirst = linkOf('changeEmail', ines.email)
     const earlierSecond = await askAndConfirm(cookie, 'ines.c@exemple.fr')
     // La troisième va jusqu'au bout : l'adresse devient ines.b@exemple.fr.
-    expect(landing(await open(await askAndConfirm(cookie)))).toEqual({
+    expect(landing(await open(await askAndConfirm(cookie), cookie))).toEqual({
       page: DONE_PAGE,
       error: null,
     })
@@ -751,7 +819,7 @@ describe('the trace of an address change', () => {
     const { id } = await accountOf('Inès')
     const spies = spyConsole()
 
-    await open(await askAndConfirm(cookie))
+    await open(await askAndConfirm(cookie), cookie)
 
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
     const lines = linesOf(spies)
@@ -831,7 +899,7 @@ describe('the link of the second e-mail (jur-R1)', () => {
 
     for (const secret of [ines.email, ines.name]) expect(readings.join('\n')).not.toContain(secret)
     // Témoin : le lien marche toujours.
-    expect(landing(await open(link))).toEqual({ page: DONE_PAGE, error: null })
+    expect(landing(await open(link, cookie))).toEqual({ page: DONE_PAGE, error: null })
     expect((await accountOf('Inès')).email).toBe(NEW_EMAIL)
   })
 

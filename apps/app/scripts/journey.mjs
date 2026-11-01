@@ -5,9 +5,14 @@
 // administrateur retire (tranche 7a) : celui qui a signalé est prévenu, l'auteur voit pourquoi, les
 // autres ne le voient plus. Depuis la confirmation de son signalement, ce membre bloque aussi
 // l'auteur du commentaire (tranche 7b) : chacun ne voit plus l'autre, puis il le débloque depuis
-// « Mon compte ». Au début, le premier membre change aussi d'adresse e-mail (tranche « adresse »),
-// puis se reconnecte avec la nouvelle. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque étape, on vérifie ce que voit chacun (le
-// membre, l'autre membre, une personne sans compte) et ce qui reste sur le disque du serveur.
+// ses « Réglages ». Au début, le premier membre change aussi d'adresse e-mail (tranche « adresse »),
+// puis se reconnecte avec la nouvelle. Tranche R2 (« Le compte ») : « Mon compte » devient
+// « Réglages », en rubriques (/settings/<rubrique>) ; le second membre renvoie son lien de
+// vérification depuis « Vérifie ta boîte mail » ; le premier oublie son mot de passe, en choisit un
+// nouveau par le lien reçu, puis le change depuis la rubrique « Sécurité » : chaque fois, son autre
+// appareil est déconnecté. Puis le projet devient privé, est supprimé, et le compte aussi. À chaque
+// étape, on vérifie ce que voit chacun (le membre, l'autre membre, une personne sans compte) et ce
+// qui reste sur le disque du serveur.
 //
 // Usage : node apps/app/scripts/journey.mjs <adresse de l'appli> <adresse de l'API>
 // Variables d'environnement :
@@ -136,6 +141,32 @@ const verificationLink = (email, except) =>
     return link === except ? null : link
   })
 
+/**
+ * Tranche R2 : les e-mails reçus à cette adresse, du plus ancien au plus récent, chacun coupé à sa
+ * fin (« --- fin --- ») : la console écrit les e-mails les uns après les autres, à toutes les
+ * adresses mêlées.
+ */
+const mailsTo = (email) => {
+  const logs = execSync(mailCommand, { encoding: 'utf8', shell, maxBuffer: 64 * 1024 * 1024 })
+  return logs
+    .split(`E-mail pour ${email} ---`)
+    .slice(1)
+    .map((block) => block.split('--- fin ---')[0])
+}
+/**
+ * Le lien qui répond à `pattern` dans un e-mail arrivé après les `count` premiers à cette adresse.
+ * Deux liens de vérification fabriqués dans la même seconde peuvent être identiques : on compte les
+ * e-mails au lieu de comparer les liens.
+ */
+const linkAfter = (email, count, pattern, what) =>
+  waitFor(`${what} pour ${email}`, () =>
+    mailsTo(email)
+      .slice(count)
+      .map((mail) => mail.match(pattern)?.[0])
+      .find(Boolean),
+  )
+const resetLink = /https?:\/\/\S+reset-password\?token=\S+/
+
 // --- Le navigateur ---------------------------------------------------------------------------
 
 const problems = []
@@ -176,22 +207,76 @@ const pick = async (page, button, file) => {
 }
 
 const password = `parcours-${randomBytes(8).toString('hex')}`
-const signUp = async (someone, name) => {
+/**
+ * S'inscrire, puis ouvrir le lien de vérification. Avec `resend` (tranche R2), la personne touche
+ * d'abord « Renvoyer l'e-mail » sur « Vérifie ta boîte mail », et c'est le lien renvoyé qui active
+ * son compte.
+ */
+const signUp = async (someone, name, { resend = false } = {}) => {
   const email = `${name.toLowerCase()}-${randomBytes(4).toString('hex')}@example.com`
   const { page } = someone
   await open(page, `${appUrl}/sign-up`)
   await page.getByLabel('Nom affiché', { exact: true }).fill(name)
-  await page.getByLabel('Adresse e-mail').fill(email)
+  await page.getByLabel('Adresse e‑mail').fill(email)
   await page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await page.getByLabel('Code d’invitation').fill(inviteCode)
-  await page.getByRole('button', { name: 'Créer un compte' }).click()
+  // R2 : sur ordinateur, « Créer un compte » est l'onglet ; le bouton dit « Créer mon compte ».
+  await page.getByRole('button', { name: 'Créer mon compte' }).click()
   await page.waitForURL(/\/check-email/)
   // Le lien connecte au compte, puis mène à la page « Adresse vérifiée ».
-  const link = await verificationLink(email)
+  let link = await verificationLink(email)
+  if (resend) {
+    // Le premier e-mail est arrivé : on compte les e-mails reçus, puis on demande le suivant.
+    const received = mailsTo(email).length
+    await page.getByRole('button', { name: /^Renvoyer l.e‑mail$/ }).click()
+    // La phrase reste vraie dans les cas que l'API cache (relecture juridique de R2, B1).
+    await page
+      .getByText('Si cette adresse attend sa vérification, un nouvel e‑mail vient de partir.', {
+        exact: true,
+      })
+      .waitFor()
+    link = await linkAfter(email, received, /https?:\/\/\S+verify-email\S+/, 'lien renvoyé')
+    console.log(`  ok : ${name} a reçu un second lien de vérification`)
+  }
   await open(page, link)
   await page.getByText('Adresse vérifiée').waitFor()
-  console.log(`  ok : ${name} inscrite et vérifiée`)
+  console.log(`  ok : ${name} inscrite et vérifiée${resend ? ' par le lien renvoyé' : ''}`)
   return { email, link }
+}
+
+/** Se connecter depuis la page « Se connecter », comme une personne. */
+const signIn = async (someone, email, secret) => {
+  const { page } = someone
+  await open(page, `${appUrl}/sign-in`)
+  await page.getByLabel('Adresse e‑mail').fill(email)
+  await page.getByLabel('Mot de passe', { exact: true }).fill(secret)
+  await page.getByRole('button', { name: 'Me connecter' }).click()
+  await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
+}
+
+/**
+ * Les réglages, ouverts comme un membre (R3) : la photo « Moi » de la barre du haut mène à sa page,
+ * dont la roue « Réglages » ouvre les réglages ; puis la rubrique (`name`) dans la colonne des
+ * rubriques, et on attend son adresse (`path`).
+ */
+const openSettings = async (someone, name, path) => {
+  const { page } = someone
+  await open(page, `${appUrl}/`)
+  await page.getByRole('link', { name: 'Moi', exact: true }).first().click()
+  await page.waitForURL((url) => url.pathname === '/me')
+  // La roue est un bouton ou un lien selon la plateforme : on accepte les deux.
+  await page
+    .getByRole('button', { name: 'Réglages', exact: true })
+    .or(page.getByRole('link', { name: 'Réglages', exact: true }))
+    .first()
+    .click()
+  await page.waitForURL((url) => url.pathname === '/settings')
+  if (!name) return
+  await page
+    .getByRole('navigation', { name: 'Réglages' })
+    .getByRole('link', { name, exact: true })
+    .click()
+  await page.waitForURL((url) => url.pathname === path)
 }
 
 const lea = await person('Léa')
@@ -206,16 +291,51 @@ const karim = await person('Karim')
 try {
   step('Deux personnes s’inscrivent avec le code d’invitation, et vérifient leur adresse')
   const leaSignUp = await signUp(lea, 'Lea')
-  await signUp(sam, 'Sam')
+  // Tranche R2 : Sam ne trouve pas le premier e-mail ; il en demande un autre, qui active son compte.
+  await signUp(sam, 'Sam', { resend: true })
 
-  step('Léa choisit une photo de profil')
-  await open(lea.page, `${appUrl}/profile`)
-  await pick(
-    lea.page,
-    lea.page.getByRole('button', { name: 'Changer la photo' }),
-    image('avatar', 600, 600, [240, 180, 0]),
-  )
-  await lea.page.getByText('Photo mise à jour.').waitFor()
+  step('Léa choisit une photo de profil, depuis la rubrique « Mon profil » des réglages')
+  await openSettings(lea, 'Mon profil', '/settings/profile')
+  const avatarImage = image('avatar', 600, 600, [240, 180, 0])
+  /**
+   * Toucher « Changer la photo » et attendre le choix du fichier, 10 s au plus. Rend ce qui a
+   * manqué (le clic refusé et pourquoi, ou aucun choix de fichier), ou null si la photo est partie.
+   */
+  const changeAvatar = async () => {
+    const chooser = lea.page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null)
+    const refused = await lea.page
+      .getByRole('button', { name: 'Changer la photo' })
+      .click({ timeout: 10_000 })
+      .then(
+        () => null,
+        (error) => error.message.split('\n').slice(0, 4).join(' '),
+      )
+    const picked = await chooser
+    if (!picked) return refused ?? 'clic reçu, mais aucun choix de fichier ne s’ouvre'
+    await picked.setFiles(avatarImage)
+    await lea.page.getByText('Photo mise à jour.').waitFor()
+    return null
+  }
+  const avatarMissed = await changeAvatar()
+  if (avatarMissed) {
+    // Un défaut de l'appli, pas du parcours : on le note (le parcours finira en échec), on essaie
+    // encore après un rechargement de la page, puis, au besoin, on envoie la photo par l'API pour
+    // que les étapes suivantes gardent leur sens.
+    problems.push(`« Changer la photo », arrivé par les réglages : ${avatarMissed}`)
+    console.error(`  ÉCHEC : « Changer la photo », arrivé par les réglages : ${avatarMissed}`)
+    await open(lea.page, `${appUrl}/settings/profile`)
+    const missedAgain = await changeAvatar()
+    console.error(`  après rechargement : ${missedAgain ?? 'la photo part'}`)
+    if (missedAgain) {
+      problems.push(`« Changer la photo », page rechargée : ${missedAgain}`)
+      const sent = await lea.request.post(`${apiUrl}/v1/me/avatar`, {
+        headers: { Origin: appUrl },
+        multipart: { avatar: avatarImage },
+      })
+      console.error(`  photo envoyée par l’API : HTTP ${sent.status()}`)
+      await open(lea.page, `${appUrl}/settings/profile`)
+    }
+  }
   const me = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
   const avatarUrl = me.avatarUrl ?? fail('pas d’adresse d’avatar')
   await expectMedia('après l’avatar', { avatars: 1, visuals: 0 })
@@ -231,22 +351,28 @@ try {
   expectEqual('pseudo de Léa', renamed.handle, handle)
 
   // Tranche 6c : un réglage d'e-mail s'enregistre dès qu'on le touche, sans « Enregistrer ».
+  // R2 : les réglages d'e-mail sont la rubrique « Notifications ».
   step('Léa coupe le récap de la semaine ; la page rechargée le montre coupé')
+  await openSettings(lea, 'Notifications', '/settings/notifications')
   await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: true }).click()
   await lea.page.getByText('Réglage enregistré.').waitFor()
-  await open(lea.page, `${appUrl}/profile`)
+  await open(lea.page, `${appUrl}/settings/notifications`)
   await lea.page.getByRole('switch', { name: 'Le récap de la semaine', checked: false }).waitFor()
   const emails = await (await lea.request.get(`${apiUrl}/v1/me/email-preferences`)).json()
   expectEqual('récap de Léa', emails.weeklyRecap, false)
 
   // Tranche « adresse » : deux liens, l'un à l'ancienne adresse (son accord), l'autre à la nouvelle
-  // (sa vérification). Léa les ouvre dans son navigateur, où elle est connectée : elle le reste.
-  step('Léa change d’adresse e-mail : un lien à l’ancienne, puis un à la nouvelle')
+  // (sa vérification). Léa les ouvre dans son navigateur, où elle est connectée : elle le reste. R2
+  // (décision D1) : le second lien n'aboutit d'ailleurs que dans sa session.
+  step(
+    'Léa change d’adresse e‑mail (rubrique « Compte ») : un lien à l’ancienne, puis à la nouvelle',
+  )
   const newEmail = `lea-nouvelle-${randomBytes(4).toString('hex')}@example.com`
-  await open(lea.page, `${appUrl}/account`)
-  await lea.page.getByRole('button', { name: /^Changer d.adresse e-mail/ }).click()
-  await lea.page.waitForURL((url) => url.pathname === '/account/email')
-  await lea.page.getByLabel('Nouvelle adresse e-mail').fill(newEmail)
+  await openSettings(lea, 'Compte', '/settings/account')
+  // Une ligne-lien, dont le nom lu dit l'action puis l'adresse actuelle.
+  await lea.page.getByRole('link', { name: /^Changer d.adresse e‑mail/ }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/settings/account/email')
+  await lea.page.getByLabel('Nouvelle adresse e‑mail').fill(newEmail)
   await lea.page.getByLabel('Confirme avec ton mot de passe').fill(password)
   await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
   await lea.page.getByText('Regarde ta boîte mail actuelle').waitFor()
@@ -264,7 +390,7 @@ try {
   await lea.page.getByText(newEmail, { exact: false }).first().waitFor()
   const doneUrl = lea.page.url()
   expectEqual(
-    'adresse e-mail absente de l’URL',
+    'adresse e‑mail absente de l’URL',
     doneUrl.includes(newEmail) || doneUrl.includes(encodeURIComponent(newEmail)),
     false,
   )
@@ -272,30 +398,104 @@ try {
   expectEqual('nouvelle adresse de Léa', changed.email, newEmail)
   expectEqual('nouvelle adresse vérifiée', changed.emailVerified, true)
 
-  step('Léa se déconnecte : l’ancienne adresse ne la connecte plus, la nouvelle oui')
-  await open(lea.page, `${appUrl}/account`)
+  // Tranche R2 : Léa est aussi connectée sur un autre appareil (un second navigateur). Le mot de
+  // passe choisi par le lien « oublié », puis celui changé dans les réglages, l'en déconnectent.
+  // Peu de connexions en tout : sur la pile d'essai, la connexion n'en permet que 5 par quart
+  // d'heure depuis une même adresse IP (AUTH_RATE_RULES de l'API) ; le parcours en fait 4.
+  step('Léa se connecte aussi sur son téléphone, avec sa nouvelle adresse')
+  const leaPhone = await person('Léa (téléphone)')
+  const meUrl = `${apiUrl}/v1/me`
+  await signIn(leaPhone, newEmail, password)
+  expectEqual('session du téléphone de Léa', await statusFor(leaPhone, meUrl), 200)
+
+  step('Léa se déconnecte (rubrique « Compte ») : l’ancienne adresse ne la connecte plus')
+  await openSettings(lea, 'Compte', '/settings/account')
   await lea.page.getByRole('button', { name: 'Me déconnecter' }).click()
   await lea.page.waitForURL((url) => url.pathname === '/')
   await open(lea.page, `${appUrl}/sign-in`)
-  await lea.page.getByLabel('Adresse e-mail').fill(leaSignUp.email)
+  await lea.page.getByLabel('Adresse e‑mail').fill(leaSignUp.email)
   await lea.page.getByLabel('Mot de passe', { exact: true }).fill(password)
   await lea.page.getByRole('button', { name: 'Me connecter' }).click()
-  await lea.page.getByText('Adresse e-mail ou mot de passe incorrect.').waitFor()
+  await lea.page.getByText('Adresse e‑mail ou mot de passe incorrect.').waitFor()
   console.log('  ok : l’ancienne adresse est refusée')
-  await lea.page.getByLabel('Adresse e-mail').fill(newEmail)
+
+  // Tranche R2 : « Mot de passe oublié ? », l'adresse, puis le lien reçu (lu dans le journal de
+  // l'API, comme les liens de vérification) ; le nouveau mot de passe déconnecte tous ses appareils.
+  step('Léa a oublié son mot de passe : elle en choisit un nouveau par le lien reçu')
+  await lea.page.getByRole('link', { name: /^Mot de passe oublié/ }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/forgot-password')
+  // Par le rôle : sous Expo Router web, « Se connecter » reste dans la page, cachée, avec son
+  // propre champ « Adresse e-mail » (getByLabel trouverait les deux ; getByRole ignore le caché).
+  await lea.page.getByRole('textbox', { name: 'Adresse e‑mail' }).fill(newEmail)
+  // On compte les e-mails déjà reçus à cette adresse : le lien attendu est dans le suivant.
+  const mailsBeforeReset = mailsTo(newEmail).length
+  await lea.page.getByRole('button', { name: 'Envoyer le lien' }).click()
+  await lea.page
+    .getByText('Si un compte existe pour cette adresse, un e‑mail vient de partir.')
+    .waitFor()
+  await open(
+    lea.page,
+    await linkAfter(newEmail, mailsBeforeReset, resetLink, 'lien du mot de passe oublié'),
+  )
+  // La page range le jeton et le retire de l'adresse affichée.
+  await lea.page.waitForURL((url) => url.pathname === '/reset-password')
+  const passwordAfterReset = `oubli-${randomBytes(8).toString('hex')}`
+  await lea.page.getByLabel('Nouveau mot de passe', { exact: true }).fill(passwordAfterReset)
+  await lea.page.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/sign-in')
+  await lea.page.getByText('Mot de passe changé. Connecte-toi avec le nouveau.').waitFor()
+  console.log('  ok : « Se connecter » dit « Mot de passe changé »')
+  await waitFor(
+    'téléphone de Léa déconnecté par le nouveau mot de passe',
+    async () => (await statusFor(leaPhone, meUrl)) === 401,
+  )
+  console.log('  ok : la session du téléphone, ouverte avant, est coupée (401)')
+  await lea.page.getByLabel('Adresse e‑mail').fill(newEmail)
+  await lea.page.getByLabel('Mot de passe', { exact: true }).fill(passwordAfterReset)
   await lea.page.getByRole('button', { name: 'Me connecter' }).click()
   await lea.page.waitForURL((url) => !url.pathname.startsWith('/sign-in'))
-  const again = await (await lea.request.get(`${apiUrl}/v1/me`)).json()
-  expectEqual('Léa reconnectée avec sa nouvelle adresse', again.email, newEmail)
+  const again = await (await lea.request.get(meUrl)).json()
+  expectEqual('Léa reconnectée, nouvelle adresse et nouveau mot de passe', again.email, newEmail)
 
-  step('Sam ne suit personne : son fil le dit ; il lit le pseudo de Léa et la suit depuis sa page')
+  // Tranche R2 : changer son mot de passe depuis les réglages coupe les autres appareils, et garde
+  // celui-ci (le serveur l'impose).
+  step('Léa change son mot de passe (rubrique « Sécurité ») : son téléphone est déconnecté')
+  await signIn(leaPhone, newEmail, passwordAfterReset)
+  expectEqual('téléphone de Léa reconnecté', await statusFor(leaPhone, meUrl), 200)
+  await openSettings(lea, 'Sécurité', '/settings/security')
+  await lea.page.getByRole('link', { name: 'Changer mon mot de passe', exact: true }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/settings/security/password')
+  const passwordAfterChange = `change-${randomBytes(8).toString('hex')}`
+  await lea.page.getByLabel('Mot de passe actuel', { exact: true }).fill(passwordAfterReset)
+  await lea.page.getByLabel('Nouveau mot de passe', { exact: true }).fill(passwordAfterChange)
+  await lea.page.getByRole('button', { name: 'Changer le mot de passe', exact: true }).click()
+  // Le toast se lit sur la rubrique où l'on revient.
+  await lea.page.waitForURL((url) => url.pathname === '/settings/security')
+  // La couche des toasts peut aussi porter le texte, cachée, pour les lecteurs d'écran : le visible.
+  await lea.page
+    .getByText('Mot de passe changé', { exact: true })
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  await waitFor(
+    'téléphone de Léa déconnecté par le changement',
+    async () => (await statusFor(leaPhone, meUrl)) === 401,
+  )
+  console.log('  ok : la session du téléphone est coupée (401)')
+  expectEqual('session de cet appareil, gardée', await statusFor(lea, meUrl), 200)
+  await leaPhone.context.close()
+
+  step(
+    'Sam ne suit personne : son fil l’attend ; il lit le pseudo de Léa et la suit depuis sa page',
+  )
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByText('Tu ne suis personne pour l’instant').waitFor()
+  // R4 (F-Fil9) : le premier lancement accueille au lieu de constater un vide.
+  await sam.page.getByText('Ton fil t’attend').waitFor()
   await open(sam.page, `${appUrl}/members/${me.id}`)
   await sam.page.getByText(`@${handle}`, { exact: true }).waitFor()
   await sam.page.getByRole('switch', { name: 'Suivre Lea' }).click()
-  // Une fois suivie, le nom lu reprend le texte affiché : « Suivi : Lea », activé.
-  await sam.page.getByRole('switch', { name: /^Suivi.*Lea$/, checked: true }).waitFor()
+  // Une fois suivie, le nom lu reprend le texte affiché : « Tu suis Lea » (R3), activé.
+  await sam.page.getByRole('switch', { name: /^Tu suis Lea/, checked: true }).waitFor()
   // L'interrupteur passe à « Suivi » avant la réponse de l'API (affichage optimiste) : on attend
   // que l'API ait enregistré l'abonnement, comme pour les réactions plus bas (course vue en CI, 6c).
   const readLeaForSam = async () => (await sam.request.get(`${apiUrl}/v1/members/${me.id}`)).json()
@@ -310,6 +510,8 @@ try {
   await lea.page
     .getByLabel('Le pitch, en une phrase')
     .fill('Il propose un dîner avec ce qui reste.')
+  // Un lien de démo : la carte du fil de Sam portera « Tester » (R4).
+  await lea.page.getByLabel('Lien de démo (facultatif)').fill('https://example.com/recettes')
   // Chaque photo est d'abord réduite sur l'appareil : comme une personne, on attend de voir sa
   // vignette (et son bouton « Retirer ») avant de passer à la suivante, puis de publier.
   const add = lea.page.getByRole('button', { name: 'Ajouter une photo' })
@@ -365,11 +567,22 @@ try {
   await expectMedia('après le retrait', { avatars: 1, visuals: 3 })
   const photoUrl = project.visuals[0].url
 
-  step('Le projet de Léa arrive dans le fil de Sam')
+  step('Le projet de Léa arrive dans le fil de Sam ; il le teste, revient, et il est à jour')
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  // exact : « Tester Mon agent de recettes, … » est aussi un lien de la carte (R4).
+  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
+  // La date relative de la carte (R4, F-Fil2) : « publié à l'instant », sans heure ni jour.
+  await sam.page.getByText('à l’instant').first().waitFor()
+  // « Tester » sort de l'appli : son nom lu le dit, et il passe par la page d'avertissement.
+  await sam.page
+    .getByRole('link', { name: 'Tester Mon agent de recettes, ouvre un site externe' })
+    .click()
+  await sam.page.waitForURL((url) => url.pathname === '/out')
+  await sam.page.getByRole('button', { name: 'Continuer vers example.com' }).waitFor()
+  await sam.page.getByRole('button', { name: 'Revenir' }).click()
+  await sam.page.waitForURL((url) => url.pathname === '/')
   await sam.page.getByText('Tu es à jour').waitFor()
-  console.log('  ok : le projet est dans le fil « Abonnements » de Sam')
+  console.log('  ok : le projet est dans le fil de Sam, « Tester » mène à l’avertissement')
 
   step('Sam voit le projet et ses photos ; une personne sans compte ne voit rien')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
@@ -377,7 +590,7 @@ try {
   // L'auteur mène à sa page de membre, où le projet figure.
   await sam.page.getByRole('link', { name: 'Voir la page de Lea' }).click()
   await sam.page.waitForURL(/\/members\//)
-  await sam.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
   console.log('  ok : Sam trouve le projet sur la page de Léa')
   expectEqual('photo, pour Sam', await statusFor(sam, photoUrl), 200)
   expectEqual('photo, sans compte', await statusFor(visitor, photoUrl), 404)
@@ -407,6 +620,10 @@ try {
     async () => (await readProject(lea, projectId)).reactions.counts.bravo === 1,
   )
   console.log('  ok : Léa voit « Bravo » compté une fois')
+  // Le total de la carte du fil (R4) : le nombre dessiné est caché au lecteur, le nom lu l'écrit.
+  await open(sam.page, `${appUrl}/`)
+  await sam.page.getByText('1 réaction', { exact: true }).waitFor()
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
   // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
   // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
   // Tranche 6b : Sam mentionne Léa. Il tape « @ » et le début de son pseudo, choisit Léa dans la
@@ -454,27 +671,100 @@ try {
   )
 
   // Tranche 7b : Sam publie à son tour un projet, pour qu'on voie plus bas le blocage le cacher.
-  // Un nouveau membre, Malik, le trouve d'abord dans « Découvrir » (le témoin d'avant le blocage).
-  step('Sam publie un projet ; Malik, nouveau membre, le trouve dans « Découvrir »')
-  const samProject = 'Le carnet de Sam'
+  // Un nouveau membre, Malik, le trouve d'abord dans Explorer (le témoin d'avant le blocage). R3 :
+  // son titre porte un accent, que la recherche retrouve sans lui (« eleve » → « Élève »).
+  step('Sam publie un projet ; Malik, nouveau membre, le trouve dans Explorer')
+  const samProject = 'Le carnet de l’Élève'
   await open(sam.page, `${appUrl}/projects/new`)
   await sam.page.getByLabel('Titre').fill(samProject)
   await sam.page.getByLabel('Le pitch, en une phrase').fill('Il range mes essais de prompts.')
   await sam.page.getByRole('button', { name: 'Publier' }).last().click()
   await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   await signUp(malik, 'Malik')
-  /** « Découvrir » sur l'accueil de Malik, une fois le projet de Léa affiché (la liste est chargée). */
+  /**
+   * R3 : « Découvrir » est devenu « Récents », dans l'onglet Explorer. On attend le projet de Léa
+   * (la liste est chargée) ; un projet peut aussi être dans le carrousel des testeurs, d'où `first`.
+   */
   const openDiscover = async () => {
-    await open(malik.page, `${appUrl}/`)
-    await malik.page.getByRole('radio', { name: 'Découvrir' }).click()
-    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+    await open(malik.page, `${appUrl}/explore`)
+    await malik.page.getByRole('link', { name: 'Mon agent de recettes' }).first().waitFor()
   }
   await openDiscover()
-  await malik.page.getByRole('link', { name: samProject }).waitFor()
-  console.log('  ok : Malik voit le projet de Sam dans « Découvrir »')
+  await malik.page.getByRole('link', { name: samProject }).first().waitFor()
+  console.log('  ok : Malik voit le projet de Sam dans Explorer')
   const samMe = await (await sam.request.get(`${apiUrl}/v1/me`)).json()
   const malikMe = await (await malik.request.get(`${apiUrl}/v1/me`)).json()
   const samHandle = samMe.handle
+
+  // R3 : passer d'un onglet à l'autre par la barre du haut (l'ordinateur), l'actif marqué.
+  step('Malik passe d’un onglet à l’autre : Fil, Explorer, Ruches')
+  const mainNav = malik.page.getByRole('navigation', { name: 'Navigation principale' }).first()
+  for (const [tab, path] of [
+    ['Fil', '/'],
+    ['Ruches', '/hives'],
+    ['Explorer', '/explore'],
+  ]) {
+    await mainNav.getByRole('link', { name: tab, exact: true }).click()
+    await malik.page.waitForURL((url) => url.pathname === path)
+    await mainNav.locator(`[aria-current="page"]`).filter({ hasText: tab }).first().waitFor()
+    if (tab === 'Ruches')
+      await malik.page.getByText('Les ruches arrivent bientôt').first().waitFor()
+  }
+  console.log('  ok : chaque onglet ouvre sa page et devient l’onglet actif')
+
+  // R3 (F-Fil8) : suivre l'auteur d'une carte de « Récents » par sa pastille, sans ouvrir le projet.
+  step('Malik suit Sam depuis la pastille de sa carte, dans Explorer')
+  await malik.page.getByRole('switch', { name: 'Suivre Sam', exact: true }).first().click()
+  await malik.page
+    .getByRole('switch', { name: /^Tu suis Sam/, checked: true })
+    .first()
+    .waitFor()
+  expectEqual('Malik toujours sur Explorer', new URL(malik.page.url()).pathname, '/explore')
+  await waitFor(
+    'abonnement de Malik à Sam, dans l’API',
+    async () =>
+      (await (await malik.request.get(`${apiUrl}/v1/members/${samMe.id}`)).json()).isFollowed ===
+      true,
+  )
+  console.log('  ok : Malik suit Sam, depuis Explorer')
+
+  // R3 (F-Nav7) : chercher par mots. Taper ne crée pas une page d'historique par lettre (jur-J5) ;
+  // les accents ne comptent pas.
+  step('Malik cherche « carnaval », puis « eleve », qui trouve le projet de Sam')
+  // Le lien qui a l'air d'un champ lit le nom du champ, puis le texte affiché (R3, relecture C4).
+  await malik.page
+    .getByRole('link', { name: 'Rechercher, Un projet, une personne, un outil', exact: true })
+    .first()
+    .click()
+  await malik.page.waitForURL((url) => url.pathname === '/search')
+  // Les pages précédentes restent montées (cachées) sous la page affichée, avec leur barre du haut :
+  // sur /search, chacune dessine aussi le champ. On vise celui qu'on voit.
+  const field = malik.page
+    .getByLabel('Rechercher', { exact: true })
+    .filter({ visible: true })
+    .first()
+  await field.waitFor()
+  const historyBefore = await malik.page.evaluate(() => history.length)
+  await field.pressSequentially('carnaval', { delay: 40 })
+  // Les guillemets français portent des espaces insécables : on cherche par une expression.
+  await malik.page
+    .getByText(/^Aucun résultat pour .{1,3}carnaval.{1,3}$/)
+    .filter({ visible: true })
+    .first()
+    .waitFor()
+  expectEqual(
+    'pages d’historique ajoutées en tapant « carnaval »',
+    (await malik.page.evaluate(() => history.length)) - historyBefore,
+    0,
+  )
+  await field.fill('')
+  await field.pressSequentially('eleve', { delay: 40 })
+  await malik.page
+    .getByRole('link', { name: new RegExp(`^${samProject}`) })
+    .first()
+    .click()
+  await malik.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  console.log('  ok : « eleve » trouve « Le carnet de l’Élève », qui s’ouvre')
 
   // Tranche 7a : signaler, puis traiter le signalement. Sam publie un second commentaire, que
   // Malik signale ; l'administrateur le retire.
@@ -576,9 +866,10 @@ try {
     404,
   )
 
-  step('Malik ouvre « Membres bloqués » depuis « Mon compte », et débloque Sam')
-  await open(malik.page, `${appUrl}/account`)
-  await malik.page.getByRole('button', { name: 'Membres bloqués' }).click()
+  // R2 : « Membres bloqués » est une ligne-lien de la rubrique « Sécurité ».
+  step('Malik ouvre « Membres bloqués » depuis la rubrique « Sécurité », et débloque Sam')
+  await openSettings(malik, 'Sécurité', '/settings/security')
+  await malik.page.getByRole('link', { name: 'Membres bloqués', exact: true }).click()
   await malik.page.waitForURL(/\/blocks$/)
   // Le nom lu de chaque « Débloquer » dit qui il débloque.
   await malik.page.getByRole('button', { name: `Débloquer @${samHandle}` }).click()
@@ -614,7 +905,7 @@ try {
   await lea.page.getByText('Réponse publiée.').waitFor()
   console.log('  ok : Léa a répondu au commentaire signalé')
 
-  step('Un administrateur ouvre « Modération » depuis « Mon compte », et retire le commentaire')
+  step('Un administrateur ouvre « Modération » depuis ses réglages, et retire le commentaire')
   const { email: adminEmail } = await signUp(admin, 'Admin')
   // Le rôle ne se donne par aucune route de l'API. Sur la pile d'essai, le script de production
   // (infra/grant-admin.sh, JOURNEY_ADMIN_CMD) l'écrit dans la base ; le parcours local, lui, a
@@ -625,9 +916,8 @@ try {
     async () => (await (await admin.request.get(`${apiUrl}/v1/me`)).json()).isAdmin === true,
   )
   console.log('  ok : Admin est administrateur')
-  await open(admin.page, `${appUrl}/account`)
-  await admin.page.getByRole('button', { name: 'Modération' }).click()
-  await admin.page.waitForURL(/\/moderation$/)
+  // R2 : une rubrique de la colonne, pour un administrateur seulement, qui mène à sa propre page.
+  await openSettings(admin, 'Modération', '/moderation')
   // La carte du signalement : le texte copié au moment de l'envoi, le motif et son nombre, et la
   // précision de Malik.
   const reportCard = admin.page
@@ -770,7 +1060,13 @@ try {
   await sam.page.getByText('Ce projet est introuvable').waitFor()
   console.log('  ok : la page du projet est introuvable pour Sam')
   await open(sam.page, `${appUrl}/`)
-  await sam.page.getByText('Rien de neuf pour l’instant chez les personnes que tu suis.').waitFor()
+  // R4 (F-Fil5) : un fil vidé par l'auteur finit sur « Tu es à jour », sans la carte du projet.
+  await sam.page.getByText('Tu es à jour').waitFor()
+  expectEqual(
+    'carte du projet privé, dans le fil de Sam',
+    await sam.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).count(),
+    0,
+  )
   console.log('  ok : le projet a quitté le fil de Sam')
 
   step('La page de Léa : Sam n’y voit plus le projet, Léa le voit, marqué « Privé »')
@@ -778,7 +1074,7 @@ try {
   await sam.page.getByText('Pas encore de projet public.').waitFor()
   console.log('  ok : la page de Léa ne montre aucun projet à Sam')
   await open(lea.page, `${appUrl}/members/${me.id}`)
-  await lea.page.getByRole('link', { name: 'Mon agent de recettes' }).waitFor()
+  await lea.page.getByRole('link', { name: 'Mon agent de recettes', exact: true }).waitFor()
   await lea.page.getByText('Privé', { exact: true }).waitFor()
   console.log('  ok : Léa voit son projet privé sur sa page')
 
@@ -791,8 +1087,12 @@ try {
   await expectMedia('après la suppression du projet', { avatars: 1, visuals: 0 })
 
   step('Léa supprime son compte : son avatar disparaît du disque')
-  await open(lea.page, `${appUrl}/account/delete`)
-  await lea.page.getByLabel('Confirme avec ton mot de passe').fill(password)
+  // R2 : depuis la rubrique « Compte », une feuille posée sur les réglages
+  // (/settings/account/delete), avec le mot de passe choisi dans la rubrique « Sécurité ».
+  await openSettings(lea, 'Compte', '/settings/account')
+  await lea.page.getByRole('link', { name: 'Supprimer mon compte', exact: true }).click()
+  await lea.page.waitForURL((url) => url.pathname === '/settings/account/delete')
+  await lea.page.getByLabel('Confirme avec ton mot de passe').fill(passwordAfterChange)
   await lea.page.getByRole('button', { name: 'Supprimer définitivement' }).click()
   await lea.page.waitForURL((url) => url.pathname === '/')
   expectEqual('avatar de Léa, pour Sam', await statusFor(sam, avatarUrl), 404)

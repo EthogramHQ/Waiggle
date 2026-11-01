@@ -13,7 +13,7 @@ flowchart LR
     n3["catalogue"]
     n4["navigation"]
     n5["client API"]
-    n22["réglages"]
+    n25["réglages"]
   end
   subgraph appliDomaines["apps/app : domaines"]
     n6["accounts"]
@@ -32,47 +32,54 @@ flowchart LR
     n19["projects"]
     n20["reactions"]
     n21["reports"]
+    n22["search"]
+    n23["suggestions"]
+    n24["tools"]
   end
   subgraph api["apps/api (serveur)"]
-    n23["routes"]
-    n44["socle"]
+    n26["routes"]
+    n50["socle"]
   end
   subgraph apiDomaines["apps/api : domaines"]
-    n24["auth"]
-    n25["blocks"]
-    n26["comments"]
-    n27["email"]
-    n28["feed"]
-    n29["follows"]
-    n30["handles"]
-    n31["jobs"]
-    n32["media"]
-    n33["mentions"]
-    n34["moderation"]
-    n35["notes"]
-    n36["notifications"]
-    n37["profile"]
-    n38["projects"]
-    n39["reactions"]
-    n40["removals"]
-    n41["reports"]
-    n42["security"]
-    n43["suspension"]
+    n27["auth"]
+    n28["blocks"]
+    n29["comments"]
+    n30["email"]
+    n31["feed"]
+    n32["follows"]
+    n33["handles"]
+    n34["jobs"]
+    n35["media"]
+    n36["mentions"]
+    n37["moderation"]
+    n38["notes"]
+    n39["notifications"]
+    n40["profile"]
+    n41["projects"]
+    n42["reactions"]
+    n43["removals"]
+    n44["reports"]
+    n45["search"]
+    n46["security"]
+    n47["suggestions"]
+    n48["suspension"]
+    n49["tools"]
   end
   subgraph paquets["packages (partagés)"]
-    n45["contrats"]
-    n46["base de données"]
-    n47["traductions"]
-    n48["marque"]
+    n51["contrats"]
+    n52["base de données"]
+    n53["traductions"]
+    n54["marque"]
   end
   n0 --> n1
   n0 --> n2
   n0 --> n3
   n0 --> n4
   n0 --> n5
+  n0 --> n6
   n0 --> n18
-  n0 --> n22
-  n0 --> n47
+  n0 --> n25
+  n0 --> n53
   n1 --> n2
   n1 --> n4
   n1 --> n5
@@ -92,17 +99,19 @@ flowchart LR
   n1 --> n20
   n1 --> n21
   n1 --> n22
-  n1 --> n45
-  n1 --> n47
-  n1 --> n48
+  n1 --> n24
+  n1 --> n25
+  n1 --> n51
+  n1 --> n53
+  n1 --> n54
   n2 --> n18
-  n2 --> n22
-  n2 --> n45
-  n2 --> n47
-  n2 --> n48
+  n2 --> n25
+  n2 --> n51
+  n2 --> n53
+  n2 --> n54
   n3 --> n2
-  n3 --> n45
-  n3 --> n48
+  n3 --> n51
+  n3 --> n54
   n4 --> n2
   n4 --> n5
   n4 --> n6
@@ -110,199 +119,234 @@ flowchart LR
   n4 --> n17
   n4 --> n18
   n5 --> n6
-  n5 --> n22
+  n5 --> n25
   n6 --> n5
-  n6 --> n22
-  n6 --> n48
+  n6 --> n25
+  n6 --> n51
+  n6 --> n54
   n7 --> n2
   n7 --> n4
   n7 --> n5
   n7 --> n10
   n7 --> n17
-  n7 --> n45
+  n7 --> n51
   n8 --> n5
   n8 --> n19
-  n8 --> n45
+  n8 --> n51
   n9 --> n5
-  n9 --> n22
-  n9 --> n45
+  n9 --> n25
+  n9 --> n51
+  n10 --> n2
   n10 --> n5
-  n10 --> n45
+  n10 --> n15
+  n10 --> n16
+  n10 --> n19
+  n10 --> n23
+  n10 --> n51
   n11 --> n5
   n11 --> n10
   n11 --> n19
   n13 --> n5
-  n13 --> n45
+  n13 --> n51
   n14 --> n5
-  n14 --> n45
+  n14 --> n51
   n15 --> n5
   n15 --> n6
   n15 --> n18
-  n15 --> n45
+  n15 --> n51
   n16 --> n2
   n16 --> n5
   n16 --> n10
   n16 --> n19
-  n16 --> n22
-  n16 --> n45
+  n16 --> n25
+  n16 --> n51
   n17 --> n2
   n17 --> n5
-  n17 --> n45
+  n17 --> n51
   n18 --> n5
   n18 --> n6
   n18 --> n12
-  n18 --> n45
+  n18 --> n51
   n19 --> n2
   n19 --> n5
   n19 --> n12
   n19 --> n18
-  n19 --> n45
+  n19 --> n51
   n20 --> n5
   n20 --> n19
   n21 --> n5
-  n21 --> n45
-  n22 --> n47
-  n23 --> n24
-  n23 --> n25
-  n23 --> n26
-  n23 --> n27
-  n23 --> n28
-  n23 --> n29
-  n23 --> n30
-  n23 --> n32
-  n23 --> n33
-  n23 --> n34
-  n23 --> n35
-  n23 --> n36
-  n23 --> n37
-  n23 --> n38
-  n23 --> n39
-  n23 --> n41
-  n23 --> n43
-  n23 --> n44
-  n23 --> n45
-  n23 --> n46
-  n23 --> n48
-  n24 --> n26
-  n24 --> n27
-  n24 --> n30
-  n24 --> n34
-  n24 --> n38
-  n24 --> n41
-  n24 --> n43
-  n24 --> n44
-  n24 --> n45
-  n24 --> n46
-  n24 --> n47
-  n24 --> n48
-  n25 --> n30
-  n25 --> n37
-  n25 --> n45
-  n25 --> n46
-  n26 --> n25
+  n21 --> n51
+  n22 --> n5
+  n22 --> n51
+  n23 --> n2
+  n23 --> n5
+  n23 --> n11
+  n23 --> n15
+  n23 --> n51
+  n24 --> n5
+  n24 --> n51
+  n25 --> n53
+  n26 --> n27
+  n26 --> n28
+  n26 --> n29
+  n26 --> n30
+  n26 --> n31
+  n26 --> n32
   n26 --> n33
+  n26 --> n35
+  n26 --> n36
   n26 --> n37
   n26 --> n38
+  n26 --> n39
   n26 --> n40
+  n26 --> n41
+  n26 --> n42
   n26 --> n44
   n26 --> n45
-  n26 --> n46
-  n27 --> n36
-  n27 --> n45
-  n27 --> n46
-  n27 --> n47
+  n26 --> n47
+  n26 --> n48
+  n26 --> n49
+  n26 --> n50
+  n26 --> n51
+  n26 --> n52
+  n26 --> n54
+  n27 --> n29
+  n27 --> n30
+  n27 --> n33
+  n27 --> n37
+  n27 --> n41
+  n27 --> n44
   n27 --> n48
-  n28 --> n29
-  n28 --> n35
-  n28 --> n38
-  n28 --> n44
-  n28 --> n45
-  n28 --> n46
-  n29 --> n38
-  n29 --> n46
-  n30 --> n36
-  n30 --> n44
-  n30 --> n45
-  n30 --> n46
-  n30 --> n47
-  n31 --> n24
-  n31 --> n27
-  n31 --> n30
-  n31 --> n36
+  n27 --> n50
+  n27 --> n51
+  n27 --> n52
+  n27 --> n53
+  n27 --> n54
+  n28 --> n33
+  n28 --> n40
+  n28 --> n51
+  n28 --> n52
+  n29 --> n28
+  n29 --> n36
+  n29 --> n40
+  n29 --> n41
+  n29 --> n43
+  n29 --> n50
+  n29 --> n51
+  n29 --> n52
+  n30 --> n39
+  n30 --> n51
+  n30 --> n52
+  n30 --> n53
+  n30 --> n54
+  n31 --> n32
+  n31 --> n38
   n31 --> n41
-  n31 --> n43
-  n31 --> n44
-  n31 --> n45
-  n31 --> n46
-  n33 --> n25
-  n33 --> n26
-  n33 --> n37
-  n33 --> n45
-  n33 --> n46
+  n31 --> n50
+  n31 --> n51
+  n31 --> n52
+  n32 --> n41
+  n32 --> n52
+  n33 --> n39
+  n33 --> n50
+  n33 --> n51
+  n33 --> n52
+  n33 --> n53
   n34 --> n27
-  n34 --> n41
-  n34 --> n43
+  n34 --> n30
+  n34 --> n33
+  n34 --> n39
   n34 --> n44
-  n34 --> n45
-  n34 --> n46
-  n35 --> n40
-  n35 --> n45
-  n35 --> n46
-  n36 --> n25
-  n36 --> n37
-  n36 --> n38
+  n34 --> n48
+  n34 --> n50
+  n34 --> n51
+  n34 --> n52
+  n36 --> n28
+  n36 --> n29
   n36 --> n40
-  n36 --> n43
-  n36 --> n45
-  n36 --> n46
+  n36 --> n51
+  n36 --> n52
   n37 --> n30
-  n37 --> n43
-  n37 --> n46
-  n37 --> n47
-  n38 --> n25
-  n38 --> n26
-  n38 --> n29
-  n38 --> n35
-  n38 --> n37
-  n38 --> n39
-  n38 --> n40
-  n38 --> n45
-  n38 --> n46
-  n39 --> n38
-  n39 --> n45
-  n39 --> n46
-  n40 --> n45
-  n40 --> n46
-  n41 --> n25
-  n41 --> n26
-  n41 --> n30
-  n41 --> n31
-  n41 --> n34
-  n41 --> n36
+  n37 --> n44
+  n37 --> n48
+  n37 --> n50
+  n37 --> n51
+  n37 --> n52
+  n38 --> n43
+  n38 --> n51
+  n38 --> n52
+  n39 --> n28
+  n39 --> n40
+  n39 --> n41
+  n39 --> n43
+  n39 --> n48
+  n39 --> n51
+  n39 --> n52
+  n40 --> n33
+  n40 --> n48
+  n40 --> n52
+  n40 --> n53
+  n41 --> n28
+  n41 --> n29
+  n41 --> n32
   n41 --> n38
+  n41 --> n40
+  n41 --> n42
   n41 --> n43
-  n41 --> n44
-  n41 --> n45
-  n41 --> n46
-  n42 --> n44
-  n43 --> n36
-  n43 --> n44
-  n43 --> n45
-  n43 --> n46
-  n44 --> n23
-  n44 --> n24
-  n44 --> n27
-  n44 --> n30
-  n44 --> n31
-  n44 --> n32
-  n44 --> n42
-  n44 --> n43
-  n44 --> n45
-  n44 --> n46
-  n44 --> n47
+  n41 --> n51
+  n41 --> n52
+  n42 --> n41
+  n42 --> n51
+  n42 --> n52
+  n43 --> n51
+  n43 --> n52
+  n44 --> n28
+  n44 --> n29
+  n44 --> n33
+  n44 --> n34
+  n44 --> n37
+  n44 --> n39
+  n44 --> n41
   n44 --> n48
-  n45 --> n47
-  n47 --> n48
+  n44 --> n50
+  n44 --> n51
+  n44 --> n52
+  n45 --> n28
+  n45 --> n32
+  n45 --> n40
+  n45 --> n41
+  n45 --> n49
+  n45 --> n51
+  n45 --> n52
+  n46 --> n50
+  n47 --> n28
+  n47 --> n33
+  n47 --> n41
+  n47 --> n50
+  n47 --> n51
+  n47 --> n52
+  n48 --> n39
+  n48 --> n50
+  n48 --> n51
+  n48 --> n52
+  n49 --> n41
+  n49 --> n45
+  n49 --> n51
+  n49 --> n52
+  n50 --> n26
+  n50 --> n27
+  n50 --> n30
+  n50 --> n33
+  n50 --> n34
+  n50 --> n35
+  n50 --> n46
+  n50 --> n48
+  n50 --> n51
+  n50 --> n52
+  n50 --> n53
+  n50 --> n54
+  n51 --> n53
+  n53 --> n54
 ```
 
 ## Les règles vérifiées

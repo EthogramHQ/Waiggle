@@ -24,9 +24,24 @@ type Props = {
   tools: { label: string; onPress?: (() => void) | undefined }[]
   /** Un bouton sous l'en-tête (« Modifier mon profil », sur sa propre page). */
   action?: ReactNode
+  /**
+   * Le niveau du nom : 1 (par défaut), le titre de la page du membre ; 2 quand l'en-tête est un
+   * aperçu posé dans une page qui a déjà son titre ; 3 quand cet aperçu a lui-même sa légende en
+   * niveau 2 (« Aperçu de ta page », dans la feuille « Mon profil », tranche R2).
+   */
+  heading?: 1 | 2 | 3
 }
 
-export function MemberHeader({ name, handle, avatar, bio, toolsTitle, tools, action }: Props) {
+export function MemberHeader({
+  name,
+  handle,
+  avatar,
+  bio,
+  toolsTitle,
+  tools,
+  action,
+  heading = 1,
+}: Props) {
   return (
     <Stack gap="lg" align="center">
       <Avatar name={name} source={avatar} label={name} size={96} />
@@ -35,8 +50,8 @@ export function MemberHeader({ name, handle, avatar, bio, toolsTitle, tools, act
       <Stack gap="sm" align="stretch">
         {/* Le pseudo colle au nom (écart minimal) : il le précise, comme un second nom. */}
         <Stack gap="xxs" align="stretch">
-          {/* Le nom du membre est le titre de sa page (niveau 1). */}
-          <Text variant="title1" align="center" heading={1} breakAnywhere>
+          {/* Le nom du membre est le titre de sa page (niveau 1), ou celui de l'aperçu (2). */}
+          <Text variant="title1" align="center" heading={heading} breakAnywhere>
             {name}
           </Text>
           {/* En discret (gris, plus petit) : le nom reste ce qu'on lit d'abord. Un pseudo n'a

@@ -118,7 +118,11 @@ export function UnsubscribeScreen() {
   const heading = hydrated && !invalid && step === 'ask' ? question : pageTitle
   const manage = (
     <Stack align="center">
-      <TextLink label={t(($) => $.unsubscribe.manage)} onPress={() => router.push('/profile')} />
+      {/* R2 (relecture juridique, jur-B5) : les réglages d'e-mail sont la rubrique « Notifications ». */}
+      <TextLink
+        label={t(($) => $.unsubscribe.manage)}
+        onPress={() => router.push('/settings/notifications')}
+      />
     </Stack>
   )
   const accountEmails = (

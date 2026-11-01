@@ -134,7 +134,8 @@ describe('when the e-mail goes out', () => {
     // Il dit pourquoi on le reçoit, et comment l'arrêter (relecture juridique R2).
     expect(email.text).toContain(fill(fr.mentions.reason))
     expect(email.text).toContain(fr.mentions.unsubscribe)
-    expect(email.text).toContain(`${TEST_APP_URL}/profile`)
+    // R2 (jur-B5) : « Gérer mes e-mails » mène à la rubrique Notifications des réglages.
+    expect(email.text).toContain(`${TEST_APP_URL}/settings/notifications`)
     // L'objet s'affiche sur un écran verrouillé : ni titre ni extrait (relecture juridique R5).
     expect(email.subject).not.toContain('Vélo')
     expect(email.subject).not.toContain('pluie')
