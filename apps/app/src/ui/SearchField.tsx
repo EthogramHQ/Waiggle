@@ -72,6 +72,12 @@ const GROW_BASIS = 220
 const ACTION_BASIS = 160
 
 /**
+ * Au-delà de cette hauteur, le texte d'attente tient sur plusieurs lignes : la pilule devient un
+ * panneau (même seuil que `SearchLink` : une ligne et trois quarts de contrôle).
+ */
+const TALL = layout.touchTarget * 1.75
+
+/**
  * La pilule commune au champ et au lien (SearchLink) : fond blanc, bord fin, bord de focus quand il
  * le faut. Le bord de focus est plus épais : une marge compense la différence, pour que la pilule
  * garde la même taille et que rien ne bouge quand le champ prend ou perd le focus.
@@ -140,6 +146,8 @@ export function SearchField({
   const { t } = useTranslation()
   const { colors } = useTheme()
   const [focused, setFocused] = useState(false)
+  // Le texte d'attente tient-il sur plusieurs lignes ? Mesuré à chaque changement de taille.
+  const [tall, setTall] = useState(false)
   // useRef : une poignée vers la saisie, pour lui rendre le focus quand la croix disparaît.
   const input = useRef<TextInput>(null)
   // Le dernier envoi (Entrée) : la seconde Entrée d'une double frappe, dans la même fenêtre que la
@@ -172,7 +180,13 @@ export function SearchField({
       focusable={false}
       {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
       onPress={() => input.current?.focus()}
-      style={pill}
+      // Le texte d'attente passe à la ligne (texte agrandi) : la pilule devient un panneau aux
+      // coins moins ronds, dont la courbe ne passe plus sur les lettres (comme SearchLink).
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout.height > TALL
+        if (next !== tall) setTall(next)
+      }}
+      style={tall ? { ...pill, borderRadius: radii.panel } : pill}
     >
       {/* La loupe est décorative : le nom du champ dit déjà ce qu'il fait. */}
       <Icon name="magnifying-glass" size={20} tone="muted" />
