@@ -98,6 +98,7 @@ import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectFrameCatalogue } from './projet-ecran'
 import { GalleryCatalogue } from './projet-galerie'
 import { FanCatalogue } from './projet-eventail'
+import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -146,6 +147,9 @@ export function CatalogueScreen() {
       {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
           captures de la branche ; à ranger à l'assemblage. */}
       <GalleryCatalogue />
+      {/* R5a : le bloc « Le prompt de départ » (projet-prompts.tsx). En tête le temps des captures
+          de l'ui-dev ; la session le range à l'assemblage. */}
+      <ProjectPromptsCatalogue />
       {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
           En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       {/* R5a : l'éventail des réactions et la vue de l'auteur (projet-eventail.tsx). En tête pour
