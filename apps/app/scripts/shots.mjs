@@ -497,6 +497,13 @@ const cardProjects = new Map([
     summary.id,
     { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
   ]),
+  // Les cartes d'« Ils cherchent des testeurs » (Explorer) : sans leur page, la carte menait à
+  // « Ce projet est introuvable » (relecture design de RF, point 7). Même façon que les suggestions :
+  // le projet de recettes, avec le titre, l'auteur, la démo et la photo de la carte.
+  ...testerItems.map(({ project: { cover, reactionTotal, ...summary } }) => [
+    summary.id,
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+  ]),
 ])
 // R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
 // affiché à la lecture précédente (l'horloge des captures est figée au 20/10/2026, 12 h à Paris).

@@ -22,6 +22,9 @@ const fr = {
   more: 'Il en reste',
   loading: 'La suite arrive',
   error: 'La suite n’a pas pu se charger',
+  endSentence:
+    'La fin avec une phrase (facultative : aucune liste de l’appli n’en met aujourd’hui)',
+  endText: 'Tu as tout lu',
   day: 'jour',
   night: 'nuit',
   showMore: 'Afficher la suite',
@@ -38,6 +41,8 @@ const en: typeof fr = {
   more: 'More to come',
   loading: 'More is on its way',
   error: 'More could not load',
+  endSentence: 'The end with a sentence (optional: no list of the app uses one today)',
+  endText: 'You’ve read it all',
   day: 'day',
   night: 'night',
   showMore: 'Show more',
@@ -84,6 +89,11 @@ export function FeedEndCatalogue() {
           retryLabel={l.retry}
           onMore={noop}
         />
+      </Example>
+      <Example caption={l.endSentence}>
+        {/* `endLabel` reste permis (une fin discrète : coche et phrase), mais aucune liste de
+            l'appli ne l'utilise depuis RF : l'exemple garde la prop visible. */}
+        <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.endText} onMore={noop} />
       </Example>
     </Stack>
   )

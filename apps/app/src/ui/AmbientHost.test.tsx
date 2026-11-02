@@ -17,7 +17,7 @@ import { act, screen } from '@testing-library/react-native'
 import type { ComponentType, ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
-import { AmbientHost, hostedStackStyle } from './AmbientHost'
+import { AmbientHost, hostedNavigationTheme, hostedStackStyle } from './AmbientHost'
 import { Screen } from './Screen'
 import { Text } from './Text'
 import { type AmbientPalette, type AmbientSource, useAmbient } from './theme/ambient'
@@ -322,5 +322,27 @@ describe('Screen outside the host', () => {
     )
 
     expect(screen.getAllByTestId('ambient-light')).toHaveLength(2)
+  })
+})
+
+// RF, U4 : le thème de la navigation. La pile peint ses cadres du `background` de ce thème (un gris
+// clair par défaut) : il couvrait la lumière et le fond de l'hôte. `hostedNavigationTheme` le rend
+// transparent ; que `app/_layout.tsx` le donne bien à la navigation est vérifié par
+// `navigation/RootLayout.test.tsx`.
+describe('hostedNavigationTheme', () => {
+  const base = {
+    dark: false,
+    colors: { background: 'rgb(242, 242, 242)', card: 'rgb(255, 255, 255)' },
+  }
+
+  it('turns the grey background of the navigation theme transparent', () => {
+    expect(hostedNavigationTheme(base).colors.background).toBe('transparent')
+  })
+
+  it('keeps the rest of the theme, and does not change the one it was given', () => {
+    const theme = hostedNavigationTheme(base)
+    expect(theme.colors.card).toBe('rgb(255, 255, 255)')
+    expect(theme.dark).toBe(false)
+    expect(base.colors.background).toBe('rgb(242, 242, 242)')
   })
 })

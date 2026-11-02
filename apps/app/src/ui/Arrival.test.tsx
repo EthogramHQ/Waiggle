@@ -3,8 +3,10 @@
 // Jest ne joue aucune animation : on lit l'animation d'entrée (`entering`) que Reanimated jouerait.
 import { screen } from '@testing-library/react-native'
 import { FadeIn, FadeInUp, useReducedMotion } from 'react-native-reanimated'
+import { arrivedFocusSuite, MORE, type PageState } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
 import { Arrival } from './Arrival'
+import { FeedEnd, useFirstArrived } from './FeedEnd'
 import { Pressed } from './Pressed'
 import { Text } from './Text'
 
@@ -70,3 +72,27 @@ describe('Arrival', () => {
     expect(enteringOf('Carnet de cafés')).toBeInstanceOf(FadeIn)
   })
 })
+
+// RF, jur-RF2 : la liste donne `focusRef` à la carte arrivée en premier avec la page 2, et `FeedEnd`
+// y met le focus quand « Afficher la suite » disparaît (la liste finit sans phrase).
+const ArrivalList = ({ names, state }: { names: string[]; state: PageState }) => {
+  const arrived = useFirstArrived(names.length, state === 'loading')
+  return (
+    <>
+      {names.map((name, index) => (
+        <Arrival
+          key={name}
+          arriving={false}
+          focusRef={index === arrived.index ? arrived.ref : undefined}
+        >
+          <Text>{name}</Text>
+        </Arrival>
+      ))}
+      <FeedEnd state={state} moreLabel={MORE} onMore={() => {}} firstArrived={arrived.ref} />
+    </>
+  )
+}
+
+arrivedFocusSuite('Arrival as the first arrived card', () => (names, state) => (
+  <ArrivalList names={names} state={state} />
+))
