@@ -5,15 +5,33 @@
 //
 // Sur un grand écran, un écran peut montrer une « scène » (`hero`) à gauche et son contenu dans une
 // carte à droite : c'est la mise en page de l'accueil et de la connexion sur ordinateur.
+//
+// La tranche RF (« la fluidité ») assemble ici trois pièces, chacune dans son fichier :
+// - la lumière (theme/ambient.tsx, ScreenAmbient) : sur le web, une seule lumière derrière toutes
+//   les pages (ui/AmbientHost.tsx), à laquelle l'écran s'inscrit ; hors de l'hôte (téléphone,
+//   tests, catalogue), chaque écran pose la sienne, comme avant ;
+// - la barre du haut (ui/ScreenTopBar.tsx) : posée par-dessus la zone qui défile, fixe sur tablette
+//   et ordinateur, et qui suit le contenu sur téléphone ;
+// - le fondu des pages (ui/ScreenFade.tsx), autour du contenu seul : ni la barre, ni la lumière, ni
+//   la place flottante ne s'effacent d'une page à l'autre.
 import { appName, borders, layout, space } from '@ruche/brand'
 // Head vient d'expo-router, mais ne navigue pas : il remplit seulement l'en-tête du document web
-// (le titre de l'onglet). C'est, avec useScreenFocused (ui/screenFocus.ts), la seule chose que
-// src/ui prend à expo-router.
+// (le titre de l'onglet). C'est, avec ui/screenFocus.ts (la page est-elle affichée, combien de fois
+// l'est-elle devenue), la seule chose que src/ui prend à expo-router.
 import Head from 'expo-router/head'
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
@@ -28,14 +46,17 @@ import { AmbientLight } from './AmbientLight'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { useFloatingClaim } from './floatingSpace'
+import type { Focusable } from './focus'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
+import { ScreenFade } from './ScreenFade'
+import { ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
 import { Surface } from './Surface'
-import { useScreenFocused } from './screenFocus'
-import { ScreenScrollContext, useScreenScrollChannel } from './scrollLight'
+import { useScreenFocused, useScreenShownCount } from './screenFocus'
+import { type ScreenScroll, ScreenScrollContext, useScreenScrollChannel } from './scrollLight'
 import { Text } from './Text'
 import { useHasTabBarHost, useTabBarSpace } from './tabBarSpace'
-import { AmbientProvider, useAmbient } from './theme/ambient'
+import { ScreenAmbient, useAmbient, useHasAmbientHost } from './theme/ambient'
 import { markHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
@@ -57,6 +78,29 @@ type Props = {
    * toutes les pages. Sans titre, il n'est pas affiché.
    */
   titleAside?: ReactNode
+  /**
+   * RF (ui-5) : garder `titleAside` en vue. Quand la barre est fixe (tablette, ordinateur) et que la
+   * rangée du titre est passée dessous, l'élément quitte le titre pour la place sous la barre
+   * (`belowBar`) ; il revient à côté du titre quand celui-ci redescend. Il n'existe qu'une fois dans
+   * l'arbre : il est déplacé, pas copié. La rangée du titre garde sa hauteur pendant son absence :
+   * rien ne remonte sous le doigt. Pour une page sans scène (`hero`).
+   */
+  keepAsideInView?: boolean
+  /**
+   * RF (ui-5) : la vue du titre, pour y poser le focus (après le bouton des nouveautés touché sous
+   * la barre, le focus va au titre « Fil »).
+   */
+  titleRef?: Ref<Focusable>
+  /**
+   * RF : ce qui se pose sous la barre fixe, centré, par-dessus le contenu. Montré seulement quand la
+   * barre est fixe ; quand elle suit le contenu (téléphone), rien.
+   */
+  belowBar?: ReactNode
+  /**
+   * RF : le contenu apparaît en fondu quand la page devient affichée, sur le web (vrai par défaut,
+   * ui/ScreenFade.tsx). Faux : la page a son propre passage (un projet ouvert depuis une carte).
+   */
+  fade?: boolean
   /**
    * Chaque défilement de la zone qui défile de l'écran. Un composant posé dans l'écran (le fil)
    * écoute plutôt par le canal de Screen (ui/scrollLight.ts).
@@ -140,6 +184,10 @@ export function Screen({
   pageTitle,
   subtitle,
   titleAside,
+  keepAsideInView = false,
+  titleRef,
+  belowBar,
+  fade = true,
   onScroll,
   children,
   header,
@@ -168,9 +216,12 @@ export function Screen({
   const hosted = useHasTabBarHost()
   // La zone qui défile, pour la faire remonter en haut quand l'onglet actif est touché de nouveau.
   const scroller = useRef<ScrollView | null>(null)
+  // « Réduire les animations » : un grand déplacement (remonter en haut) devient un saut.
+  const calm = useCalmMotion()
+  const toTop = useCallback(() => scroller.current?.scrollTo({ y: 0, animated: !calm }), [calm])
   // Le canal du défilement : `onScroll` de l'écran, et les composants posés dedans qui l'écoutent
-  // (la lumière au défilement du fil, ui/scrollLight.ts).
-  const scroll = useScreenScrollChannel(onScroll)
+  // (la lumière au défilement du fil, ui/scrollLight.ts) ; `toTop()` pour remonter en haut (RF).
+  const scroll = useScreenScrollChannel(onScroll, toTop)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -179,8 +230,36 @@ export function Screen({
   const brand = ambiance === 'brand'
   // Sur le miel, la carte arrive dès 1 000 points (`card`) ; ailleurs, avec la mise en colonnes.
   const withHero = hero !== undefined && (brand ? card : sizeClass === 'wide')
-  // Sur le miel, pas de barre fixe : elle se poserait sur le dégradé, hors de la feuille.
+  // La barre « collée » d'un formulaire (`stickyHeader`) : hors de la zone qui défile, sur son fond
+  // « feuille » opaque (ui-2). Sur le miel, pas de barre fixe : elle se poserait sur le dégradé,
+  // hors de la feuille.
   const pinned = header !== undefined && stickyHeader && !brand
+  // RF : toute autre barre du haut, hors du miel, passe par ScreenTopBar, posée par-dessus la zone
+  // qui défile : fixe sur tablette et ordinateur, elle suit le contenu sur téléphone. Elle rend sa
+  // place (`barSpace`) : sa hauteur, réservée en haut du contenu, et si elle est fixe.
+  const hasHeader = header !== undefined && header !== null && header !== false
+  const topBar = hasHeader && !stickyHeader && !brand
+  const [barSpace, setBarSpace] = useState<TopBarSpace>(NO_BAR_SPACE)
+  const barPinned = topBar && barSpace.pinned
+  // Ce que la barre fixe couvre en haut de la fenêtre : la lumière qui suit le défilement cherche
+  // son « milieu de l'écran » dessous (ui-15).
+  useEffect(() => {
+    scroll.channel.coveredTop.current = barPinned ? barSpace.height : 0
+  }, [scroll.channel, barPinned, barSpace.height])
+  // La place réservée en haut du contenu : sous la barre de ScreenTopBar, sa hauteur mesurée plus
+  // l'écart d'avant entre la barre et le titre. Tant qu'elle n'est pas mesurée (le pré-rendu, la
+  // première image), la place d'une barre vide : la marge du haut, et le même écart.
+  const contentTop = topBar
+    ? (barSpace.height > 0 ? barSpace.height : insets.top + space.lg) + space.xl
+    : (pinned ? 0 : insets.top) + space.lg
+  // ui-5 : `titleAside` passé sous la barre fixe, une fois le titre passé dessous.
+  const aside = useAsideBelowBar({
+    enabled: keepAsideInView && barPinned && Boolean(title) && Boolean(titleAside),
+    scroll: scroll.channel,
+    contentTop,
+    covered: barSpace.height,
+  })
+  const asideAway = aside.below
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
   const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
   // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
@@ -196,6 +275,14 @@ export function Screen({
   // Seul l'écran affiché soulève le toast : sur le web, la page quittée reste montée, cachée.
   const focused = useScreenFocused()
   useFloatingClaim(focused ? floatingTop : 0)
+  // RF : combien de fois la route de l'écran est devenue affichée (ui/screenFocus.ts). Chaque
+  // arrivée date l'écran auprès de l'hôte de la lumière : la lumière dessinée est celle de l'écran
+  // devenu affiché en dernier (ui-11).
+  const shown = useScreenShownCount()
+  // Sur le web, une lumière commune derrière toutes les pages (ui/AmbientHost.tsx) ?
+  const lightHosted = useHasAmbientHost()
+  // Sous la barre fixe : `titleAside` une fois le titre passé dessous (ui-5), sinon `belowBar`.
+  const shownBelowBar = asideAway ? titleAside : belowBar
   // R5a (ui-11) : « Retour » écrit en toutes lettres sur ordinateur et tablette, quand l'écran le
   // demande (`backLabel`) ; sinon, et sur téléphone, l'icône seule, nommée.
   const backButton = onBack ? (
@@ -256,7 +343,19 @@ export function Screen({
     <>
       {topRow}
       {title || subtitle ? (
-        <PageHeading title={title} aside={titleAside} subtitle={subtitle} />
+        <PageHeading
+          title={title}
+          aside={asideAway ? undefined : titleAside}
+          subtitle={subtitle}
+          titleRef={titleRef}
+          {...(keepAsideInView
+            ? {
+                onLayout: aside.onHeadingLayout,
+                onRowLayout: aside.onRowLayout,
+                rowMinHeight: asideAway ? aside.rowHeight : undefined,
+              }
+            : null)}
+        />
       ) : null}
       {pinned ? null : notice}
       {children}
@@ -277,9 +376,16 @@ export function Screen({
     // écran ; la page restée montée sous celle-ci a les siens (ui/Notice.tsx).
     <NoticeScope>
       {/* La lumière de cet écran : sa source (le visuel donné par `thumbhash`, ou ce qu'un composant
-          de l'écran choisit par useAmbient()) et ses impulsions. Un fournisseur par écran : sur le
-          web, la page précédente reste montée sous la nouvelle et garde sa propre lumière. */}
-      <AmbientProvider initialSource={thumbhash ? { thumbhash } : null}>
+          de l'écran choisit par useAmbient()) et ses impulsions. Sur le web, dans l'hôte
+          (ui/AmbientHost.tsx), l'écran s'inscrit à la lumière commune, qui prend la source de
+          l'écran affiché ; un écran caché (la page restée montée sous la nouvelle) ne la change
+          plus. Hors de l'hôte (téléphone, tests, catalogue), un fournisseur par écran, comme avant. */}
+      <ScreenAmbient
+        light={ambient && !brand}
+        initialSource={thumbhash ? { thumbhash } : null}
+        focused={focused}
+        shown={shown}
+      >
         <ScreenScrollContext.Provider value={scroll.channel}>
           <AmbientSourceSync thumbhash={thumbhash} held={scroll.channel.lightHeld} />
           {/* overflow: 'hidden' : rien ne dépasse de l'écran sur les côtés (pas de défilement
@@ -288,8 +394,13 @@ export function Screen({
             style={{
               flex: 1,
               // Sur le miel, le fond est celui de la feuille : ses coins du bas, arrondis, se fondent
-              // dans le bas de l'écran.
-              backgroundColor: brand ? colors.surface : colors.background,
+              // dans le bas de l'écran. Dans l'hôte de la lumière, l'hôte pose le fond de l'appli,
+              // sous la lumière commune : l'écran est transparent, sinon il la cacherait.
+              backgroundColor: brand
+                ? colors.surface
+                : lightHosted
+                  ? 'transparent'
+                  : colors.background,
               overflow: 'hidden',
             }}
           >
@@ -300,8 +411,17 @@ export function Screen({
                 <title>{tabTitle}</title>
               </Head>
             ) : null}
-            {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. */}
-            {ambient && !brand ? <AmbientLight /> : null}
+            {/* Le miel vif remplace la lumière d'ambiance : les deux ensemble se mêleraient. Dans
+                l'hôte, la lumière est la sienne : l'écran n'en pose pas. */}
+            {ambient && !brand && !lightHosted ? <AmbientLight /> : null}
+            {topBar ? (
+              // La barre du haut (RF), avant la zone qui défile dans l'arbre : lue et atteinte par
+              // Tab d'abord (ui-4). Toujours à cette place, fixe ou non : passer de l'un à l'autre
+              // ne la remonte pas (ui-10). `belowBar` seulement quand elle est fixe.
+              <ScreenTopBar belowBar={barPinned ? shownBelowBar : undefined} onSpace={setBarSpace}>
+                {header}
+              </ScreenTopBar>
+            ) : null}
             {pinned ? (
               // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
               // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
@@ -330,18 +450,22 @@ export function Screen({
               // Le miel vif : BrandAmbiance pose le dégradé, ses marges, la barre du haut (sur le
               // miel), le décor et la feuille qui porte le contenu.
               <ScrollView
+                ref={scroller}
                 contentContainerStyle={{ flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
                 onScroll={scroll.handleScroll}
                 scrollEventThrottle={SCROLL_EVENT_MS}
               >
-                <BrandAmbiance
-                  header={brandHeader}
-                  scene={scene}
-                  hero={withHero ? hero : undefined}
-                >
-                  {body}
-                </BrandAmbiance>
+                {/* Le fondu des pages : tout le miel est le contenu de la page. */}
+                <ScreenFade fade={fade} style={styles.grow}>
+                  <BrandAmbiance
+                    header={brandHeader}
+                    scene={scene}
+                    hero={withHero ? hero : undefined}
+                  >
+                    {body}
+                  </BrandAmbiance>
+                </ScreenFade>
               </ScrollView>
             ) : (
               // KeyboardAvoidingView : sur iOS, la zone se raccourcit de la hauteur du clavier quand
@@ -355,19 +479,18 @@ export function Screen({
               >
                 <ScrollView
                   ref={scroller}
-                  // Sur le web, le navigateur fait défiler le contrôle qui reçoit le focus (Tab)
-                  // jusqu'au-dessus de cette marge : il ne finit pas caché sous la place flottante
-                  // (`scroll-padding-bottom`, que les types de React Native ignorent).
-                  style={
-                    Platform.OS === 'web' && floatingTop > 0
-                      ? ({ scrollPaddingBottom: floatingTop + space.sm } as ViewStyle)
-                      : undefined
-                  }
+                  // Sur le web, le navigateur fait défiler le contrôle qui reçoit le focus (Tab,
+                  // Maj+Tab) jusqu'entre ces marges : il ne finit caché ni sous la place flottante
+                  // (`scroll-padding-bottom`), ni sous la barre fixe et ce qui se pose dessous
+                  // (`scroll-padding-top`, jur-RF3). Les types de React Native ignorent ces deux
+                  // propriétés ; react-native-web les transmet.
+                  style={scrollPadding(floatingTop, barPinned ? barSpace.scrollPaddingTop : 0)}
                   contentContainerStyle={{
                     flexGrow: 1,
                     alignItems: 'center',
-                    // Sous une barre fixe, l'encoche du téléphone est déjà dégagée par la barre.
-                    paddingTop: (pinned ? 0 : insets.top) + space.lg,
+                    // Sous la barre de ScreenTopBar, sa hauteur mesurée (voir `contentTop`) ; sous
+                    // une barre collée, l'encoche du téléphone est déjà dégagée par la barre.
+                    paddingTop: contentTop,
                     // Au-dessus d'un pied collé, la marge du bas de l'écran est déjà prise par le pied.
                     // Sous la barre d'onglets, la fin du contenu dépasse d'elle : sa hauteur (marge du
                     // bas de l'appareil comprise) plus un peu d'air.
@@ -387,52 +510,59 @@ export function Screen({
                   onScroll={scroll.handleScroll}
                   scrollEventThrottle={SCROLL_EVENT_MS}
                 >
-                  {/* La barre du haut a toujours la même largeur, quelle que soit celle du contenu : elle ne
-            change pas de taille d'une page à l'autre. */}
-                  {header && !pinned ? (
-                    <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-                      {header}
-                    </View>
-                  ) : null}
-                  {withHero ? (
-                    // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
-                    <View
-                      style={{
-                        width: '100%',
-                        maxWidth: layout.maxContentWidth,
-                        flexGrow: 1,
-                        // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
-                        // mais s'affiche à droite de la scène.
-                        flexDirection: 'row-reverse',
-                        alignItems: 'center',
-                        gap: space.huge,
-                      }}
-                    >
-                      <View style={{ width: layout.formWidth - 80 }}>
-                        <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
-                          {body}
-                        </Surface>
+                  {/* Le fondu des pages (RF) : autour du contenu seul, dans la zone qui défile. Il
+                      prend la largeur du contenu, que la colonne de la zone qui défile centre ; il
+                      s'étire en hauteur pour qu'un formulaire seul reste au milieu de l'écran. */}
+                  <ScreenFade
+                    fade={fade}
+                    style={{
+                      width: '100%',
+                      maxWidth: withHero ? layout.maxContentWidth : maxWidthFor(width, false),
+                      flexGrow: 1,
+                    }}
+                  >
+                    {withHero ? (
+                      // Grand écran avec une scène : la scène prend la place, la carte garde une largeur fixe.
+                      <View
+                        style={{
+                          width: '100%',
+                          flexGrow: 1,
+                          // row-reverse : la carte vient d'abord dans la page (lecteurs d'écran, touche Tab),
+                          // mais s'affiche à droite de la scène.
+                          flexDirection: 'row-reverse',
+                          alignItems: 'center',
+                          gap: space.huge,
+                        }}
+                      >
+                        <View style={{ width: layout.formWidth - 80 }}>
+                          <Surface variant="panel" radius="sheet" padding="xxl" gap="xl">
+                            {body}
+                          </Surface>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
                       </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>{hero}</View>
-                    </View>
-                  ) : (
-                    <View
-                      style={{
-                        width: '100%',
-                        maxWidth: maxWidthFor(width, false),
-                        gap: space.xl,
-                        // Un formulaire seul se place au milieu de la hauteur de l'écran.
-                        ...(width === 'form' && !onBack && !header
-                          ? { flexGrow: 1, justifyContent: 'center' }
-                          : null),
-                      }}
-                    >
-                      {body}
-                    </View>
-                  )}
+                    ) : (
+                      <View
+                        style={{
+                          width: '100%',
+                          gap: space.xl,
+                          // Un formulaire seul se place au milieu de la hauteur de l'écran.
+                          ...(width === 'form' && !onBack && !header
+                            ? { flexGrow: 1, justifyContent: 'center' }
+                            : null),
+                        }}
+                      >
+                        {body}
+                      </View>
+                    )}
+                  </ScreenFade>
                 </ScrollView>
                 {pinnedFooter ? (
-                  <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
+                  // Les boutons de la page font partie de son contenu : ils apparaissent avec lui,
+                  // et ne prennent aucun clic tant qu'il n'est pas plein (S1).
+                  <ScreenFade fade={fade}>
+                    <ScreenFooter width={maxWidthFor(width, false)}>{footer}</ScreenFooter>
+                  </ScreenFade>
                 ) : null}
                 {/* Seulement dans le cadre de la barre : hors de lui (la connexion, les tests d'un
                   écran seul), rien n'écoute, et le composant n'a pas besoin de la navigation. */}
@@ -450,7 +580,7 @@ export function Screen({
             ) : null}
           </View>
         </ScreenScrollContext.Provider>
-      </AmbientProvider>
+      </ScreenAmbient>
     </NoticeScope>
   )
 }
@@ -488,43 +618,62 @@ export function PageHeading({
   aside,
   subtitle,
   level = 1,
+  onLayout,
+  onRowLayout,
+  rowMinHeight,
+  titleRef,
 }: {
   title?: string | undefined
+  /** La vue du titre, pour y poser le focus. */
+  titleRef?: Ref<Focusable> | undefined
   aside?: ReactNode
   subtitle?: string | undefined
   /** Le niveau du titre : 1 dans une page ; 2 au catalogue, sous le titre de la page. */
   level?: 1 | 2
+  /** RF (ui-5) : la place de l'en-tête dans la page, pour Screen (`keepAsideInView`). */
+  onLayout?: ((event: LayoutChangeEvent) => void) | undefined
+  /** RF (ui-5) : la place de la rangée du titre (le titre et ce qui est à côté), en tête de l'en-tête. */
+  onRowLayout?: ((event: LayoutChangeEvent) => void) | undefined
+  /**
+   * RF (ui-5) : la hauteur gardée à la rangée du titre quand l'élément d'à côté est parti sous la
+   * barre fixe : rien de ce qui suit ne remonte.
+   */
+  rowMinHeight?: number | undefined
 }) {
+  // La rangée du titre : avec l'élément d'à côté, ou sans lui mais à sa hauteur gardée.
+  const row = Boolean(title) && (Boolean(aside) || rowMinHeight !== undefined)
   return (
     // L'écart entre le titre et le sous-titre est le seul `gap` de cette colonne (point des listes
     // R4 : 32 points sur le Fil, 8 ailleurs, quand le Fil avait son en-tête à lui).
-    <View style={{ gap: space.sm }}>
-      {title && aside ? (
+    <View style={{ gap: space.sm }} onLayout={onLayout}>
+      {row ? (
         // Le titre et l'élément posé à côté, sur une rangée : centrés l'un sur l'autre (le bouton
         // de 44 points dépasse de 3 points le titre de chaque côté), et sans marge ni remplissage
         // en haut ou en bas, pour ne rien ajouter à l'écart du sous-titre. `flexWrap` : à 320
         // points ou en grand texte, le bouton passe sous le titre au lieu de sortir de l'écran.
         <View
+          onLayout={onRowLayout}
           style={{
             flexDirection: 'row',
             flexWrap: 'wrap',
             alignItems: 'center',
             gap: space.md,
+            ...(rowMinHeight !== undefined ? { minHeight: rowMinHeight } : null),
           }}
         >
           {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
               d'elle-même : flexShrink 0 par défaut). */}
           <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-            <Text variant="title2" heading={level}>
+            <Text variant="title2" heading={level} focusRef={titleRef}>
               {title}
             </Text>
           </View>
           {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
               ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
-          <View style={{ flexShrink: 1, maxWidth: '100%' }}>{aside}</View>
+          {aside ? <View style={{ flexShrink: 1, maxWidth: '100%' }}>{aside}</View> : null}
         </View>
       ) : title ? (
-        <Text variant="title2" heading={level}>
+        <Text variant="title2" heading={level} focusRef={titleRef}>
           {title}
         </Text>
       ) : null}
@@ -662,6 +811,97 @@ function AmbientSourceSync({
   }, [setSource, thumbhash, held])
   return null
 }
+
+/**
+ * Hook (RF, ui-5) : la rangée du titre est-elle passée sous la barre fixe ? Il lit la place de
+ * l'en-tête dans la page et la hauteur de sa rangée (`onLayout`, rendus par PageHeading), puis
+ * compare, à chaque défilement, le bas de la rangée au bas de la barre. Seul un changement redessine
+ * l'écran. `contentTop` : la place réservée en haut du contenu ; `covered` : la hauteur de la barre.
+ */
+function useAsideBelowBar({
+  enabled,
+  scroll,
+  contentTop,
+  covered,
+}: {
+  enabled: boolean
+  scroll: ScreenScroll
+  contentTop: number
+  covered: number
+}) {
+  // Les mesures et le dernier défilement : des refs, lues au défilement sans redessiner.
+  const headingY = useRef(0)
+  const lastScroll = useRef(0)
+  const [rowHeight, setRowHeight] = useState(0)
+  const [below, setBelow] = useState(false)
+  // Le bas de la rangée du titre, compté depuis le haut du contenu : la place réservée, la place de
+  // l'en-tête dans la colonne du contenu, puis la rangée (en tête de l'en-tête).
+  const geometry = useRef({ contentTop, covered, rowHeight })
+  geometry.current = { contentTop, covered, rowHeight }
+
+  const decide = useCallback(() => {
+    const { contentTop: top, covered: bar, rowHeight: height } = geometry.current
+    // La rangée sort de la page par le haut quand son bas passe le bas de la barre. Sans mesure de
+    // la rangée, rien ne bouge.
+    const passed = height > 0 && lastScroll.current + bar >= top + headingY.current + height
+    setBelow(passed)
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) {
+      setBelow(false)
+      return
+    }
+    decide()
+    return scroll.subscribe((event) => {
+      lastScroll.current = Math.max(0, event.nativeEvent.contentOffset.y)
+      decide()
+    })
+  }, [enabled, scroll, decide])
+
+  // La rangée ne garde que sa dernière mesure non nulle : une page cachée mesure 0, et la rangée
+  // sans l'élément d'à côté garde déjà la hauteur qu'elle avait avec lui.
+  const onRowLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = Math.ceil(event.nativeEvent.layout.height)
+    if (height > 0) setRowHeight((current) => (current === height ? current : height))
+  }, [])
+  const onHeadingLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { y, height } = event.nativeEvent.layout
+      if (height <= 0) return
+      headingY.current = y
+      if (enabled) decide()
+    },
+    [enabled, decide],
+  )
+  // Une nouvelle mesure de la rangée ou de la barre peut changer la décision.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: les mesures relancent la décision
+  useEffect(() => {
+    if (enabled) decide()
+  }, [enabled, decide, rowHeight, contentTop, covered])
+
+  return { below: enabled && below, rowHeight, onRowLayout, onHeadingLayout }
+}
+
+/** La place de la barre du haut, avant sa première mesure. */
+const NO_BAR_SPACE: TopBarSpace = { pinned: false, height: 0, scrollPaddingTop: 0 }
+
+/**
+ * Le style web de la zone qui défile : les marges du défilement au clavier, sous la barre fixe et
+ * au-dessus de la place flottante (`scroll-padding-*`, que les types de React Native ignorent).
+ */
+const scrollPadding = (bottom: number, top: number): ViewStyle | undefined => {
+  if (Platform.OS !== 'web' || (bottom <= 0 && top <= 0)) return undefined
+  return {
+    ...(bottom > 0 ? { scrollPaddingBottom: bottom + space.sm } : null),
+    ...(top > 0 ? { scrollPaddingTop: top } : null),
+  } as ViewStyle
+}
+
+const styles = StyleSheet.create({
+  // Le fondu du miel : il prend toute la hauteur, comme le miel lui-même.
+  grow: { flexGrow: 1 },
+})
 
 // Un défilement est signalé au plus toutes les 16 ms (une image) : sur iOS, sans ce réglage,
 // `onScroll` ne serait appelé qu'une fois au début du geste.

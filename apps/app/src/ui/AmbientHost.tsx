@@ -10,7 +10,7 @@
 // Même idée que TabBarHost (ui/TabBar.tsx) : un cadre posé une fois, qui rend un service aux écrans
 // par un contexte, et un hook pour savoir s'il est là (useHasAmbientHost).
 import type { ReactNode } from 'react'
-import { View } from 'react-native'
+import { type ColorValue, View } from 'react-native'
 import { AmbientLight } from './AmbientLight'
 import { AmbientHostProvider, useAmbientSource } from './theme/ambient'
 import { useTheme } from './theme/ThemeProvider'
@@ -21,6 +21,17 @@ import { useTheme } from './theme/ThemeProvider'
  * de l'appli (ui-15 : la mise en page n'écrit aucune couleur).
  */
 export const hostedStackStyle = { backgroundColor: 'transparent' } as const
+
+/**
+ * Le thème de la navigation autour de l'hôte (RF, U4) : celui reçu (`DefaultTheme` d'expo-router),
+ * au fond transparent. La pile peint ses cadres de la couleur `background` de ce thème (un gris
+ * clair par défaut, rgb(242, 242, 242)) : sans cela, ce gris cache la lumière et le fond de l'hôte,
+ * de jour comme de nuit, derrière des pages pourtant transparentes. Une fonction plutôt qu'un objet
+ * tout fait : src/ui ne prend à expo-router que ce qui ne peut venir d'ailleurs.
+ */
+export const hostedNavigationTheme = <Theme extends { colors: { background: ColorValue } }>(
+  base: Theme,
+): Theme => ({ ...base, colors: { ...base.colors, background: 'transparent' } })
 
 /**
  * L'hôte : le fond de l'appli (`colors.background`), la lumière commune par-dessus, puis la pile.

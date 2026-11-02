@@ -5,7 +5,7 @@
 import { defaultLanguage } from '@ruche/i18n'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useFonts } from 'expo-font'
-import { Stack } from 'expo-router'
+import { DefaultTheme, ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { I18nextProvider } from 'react-i18next'
@@ -14,7 +14,7 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
-import { AmbientHost, hostedStackStyle } from '../src/ui/AmbientHost'
+import { AmbientHost, hostedNavigationTheme, hostedStackStyle } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
@@ -23,6 +23,8 @@ import { ThemeProvider, useTheme } from '../src/ui/theme/ThemeProvider'
 import { ToastProvider } from '../src/ui/theme/toast'
 
 const isWeb = Platform.OS === 'web'
+// Sur le web, le thème de la navigation de l'hôte de la lumière (ui/AmbientHost.tsx).
+const webNavigationTheme = hostedNavigationTheme(DefaultTheme)
 
 export default function RootLayout() {
   // Sur le web, les pages sont préparées à l'avance (« pré-rendues ») en français, puis passent à la
@@ -102,7 +104,15 @@ function ThemedChrome() {
       <StatusBar style={scheme === 'night' ? 'light' : 'dark'} />
       {/* RF : sur le web, une seule lumière d'ambiance, posée sous toutes les pages : elle continue
           d'une page à l'autre au lieu de repartir de zéro (ui/AmbientHost.tsx). */}
-      {isWeb ? <AmbientHost>{stack}</AmbientHost> : stack}
+      {isWeb ? (
+        <AmbientHost>
+          {/* Le thème de la navigation, au fond transparent : sinon la pile peint ses cadres de
+              son gris par défaut, par-dessus la lumière et le fond de l'hôte. */}
+          <NavigationThemeProvider value={webNavigationTheme}>{stack}</NavigationThemeProvider>
+        </AmbientHost>
+      ) : (
+        stack
+      )}
     </>
   )
 }
