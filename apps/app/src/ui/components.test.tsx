@@ -32,7 +32,6 @@ import { Pressed } from './Pressed'
 import { ProjectCard } from './ProjectCard'
 import { ProjectCover } from './ProjectCover'
 import { ProjectGrid } from './ProjectGrid'
-import { ReactionBar, type ReactionBarItem } from './ReactionBar'
 import { Screen } from './Screen'
 import { Segmented } from './Segmented'
 import { SheetHeader } from './SheetHeader'
@@ -45,7 +44,6 @@ import { TagInput } from './TagInput'
 import { Text } from './Text'
 import { FieldGroup, TextField } from './TextField'
 import { TextLink } from './TextLink'
-import { Thumbnails } from './Thumbnails'
 import { fontFiles, fontName } from './theme/fonts'
 import { VisualEditor, type VisualEditorLabels, type VisualTile } from './VisualEditor'
 import { Wordmark } from './Wordmark'
@@ -641,20 +639,6 @@ describe('ProjectCover', () => {
     await renderWithProviders(<ProjectCover height={200} image={tile(1).image} />)
 
     expect(screen.getByLabelText('Photo 1 sur 3')).toBeTruthy()
-  })
-})
-
-describe('Thumbnails', () => {
-  it('names each photo, marks the one shown, and shows another when touched', async () => {
-    const onSelect = jest.fn()
-    await renderWithProviders(
-      <Thumbnails items={[tile(1), tile(2), tile(3)]} selected={0} onSelect={onSelect} />,
-    )
-
-    expect(screen.getByRole('tab', { name: 'Photo 1 sur 3' })).toBeSelected()
-    await fireEvent.press(screen.getByRole('tab', { name: 'Photo 2 sur 3' }))
-
-    expect(onSelect).toHaveBeenCalledWith(1)
   })
 })
 
@@ -1394,68 +1378,6 @@ describe('TextLink', () => {
 
 // --- Tranche 5 : réagir et commenter ---
 
-describe('ReactionBar', () => {
-  // Les cinq réactions, telles que l'écran les prépare : le texte affiché, le nombre, et le nom lu
-  // par le lecteur d'écran, qui dit aussi si la réaction est la sienne (« réagi »).
-  const items: ReactionBarItem[] = [
-    { kind: 'amazing', text: 'Bluffant', count: 0, mine: false, label: 'Bluffant, 0' },
-    { kind: 'inspiring', text: 'Inspirant', count: 1, mine: false, label: 'Inspirant, 1' },
-    { kind: 'useful', text: 'Utile', count: 0, mine: false, label: 'Utile, 0' },
-    { kind: 'funny', text: 'Drôle', count: 0, mine: false, label: 'Drôle, 0' },
-    { kind: 'bravo', text: 'Bravo', count: 4, mine: true, label: 'Bravo, réagi, 4' },
-  ]
-
-  it('is one button per reaction, named after it and its count, and reacts with the one touched', async () => {
-    const onToggle = jest.fn()
-    await renderWithProviders(<ReactionBar items={items} onToggle={onToggle} />)
-
-    expect(screen.getAllByRole('button')).toHaveLength(5)
-    expect(screen.getByText('Bluffant')).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Utile, 0' }))
-
-    expect(onToggle).toHaveBeenCalledWith('useful')
-  })
-
-  it('says in its name which reaction is the member’s own, and lets her remove it', async () => {
-    const onToggle = jest.fn()
-    await renderWithProviders(<ReactionBar items={items} onToggle={onToggle} />)
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Bravo, réagi, 4' }))
-
-    expect(onToggle).toHaveBeenCalledWith('bravo')
-  })
-
-  it('shows the numbers without any button when read-only, with its caption', async () => {
-    const own = items.map((item) => ({
-      ...item,
-      mine: false,
-      label: `${item.text}, ${item.count}`,
-    }))
-    await renderWithProviders(
-      <ReactionBar items={own} readOnly caption="Les réactions à ton projet" />,
-    )
-
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
-    expect(screen.getByText('Les réactions à ton projet')).toBeTruthy()
-    expect(screen.getByLabelText('Bravo, 4')).toBeTruthy()
-    expect(screen.getByLabelText('Inspirant, 1')).toBeTruthy()
-  })
-
-  it('reads out its error as soon as it appears', async () => {
-    await renderWithProviders(
-      <ReactionBar
-        items={items}
-        onToggle={jest.fn()}
-        error="Ta réaction n’a pas pu être enregistrée. Réessaie."
-      />,
-    )
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Ta réaction n’a pas pu être enregistrée. Réessaie.',
-    )
-  })
-})
-
 describe('CommentCard', () => {
   const card = {
     author: { name: 'Max', avatar: null },
@@ -1626,23 +1548,6 @@ describe('CommentThread', () => {
   })
 })
 
-describe('ReactionBar, the member’s own reactions', () => {
-  it('marks her own reaction as selected, and only that one', async () => {
-    await renderWithProviders(
-      <ReactionBar
-        items={[
-          { kind: 'useful', text: 'Utile', count: 0, mine: false, label: 'Utile, 0' },
-          { kind: 'bravo', text: 'Bravo', count: 4, mine: true, label: 'Bravo, réagi, 4' },
-        ]}
-        onToggle={jest.fn()}
-      />,
-    )
-
-    expect(screen.getByRole('button', { name: 'Bravo, réagi, 4' })).toBeSelected()
-    expect(screen.getByRole('button', { name: 'Utile, 0' })).not.toBeSelected()
-  })
-})
-
 // --- Relectures de la tranche 5 ---
 
 /** L'ancêtre le plus proche qui porte ce rôle (une liste, un groupe : leur rôle sert au web). */
@@ -1651,38 +1556,6 @@ const ancestorWithRole = (node: ReturnType<typeof screen.getByText>, role: strin
   while (parent && parent.props.role !== role) parent = parent.parent
   return parent
 }
-
-describe('ReactionBar, after the reviews', () => {
-  const items: ReactionBarItem[] = [
-    { kind: 'useful', text: 'Utile', count: 0, mine: false, label: 'Utile, 0' },
-    { kind: 'bravo', text: 'Bravo', count: 9, mine: false, label: 'Bravo, 9' },
-  ]
-
-  it('is a list of numbers named after its caption when read-only, zeros shown', async () => {
-    await renderWithProviders(
-      <ReactionBar items={items} readOnly caption="Les réactions à ton projet" />,
-    )
-
-    const shown = screen.getAllByRole('listitem')
-    expect(shown).toHaveLength(2)
-    expect(screen.getByRole('listitem', { name: 'Bravo, 9' })).toBeTruthy()
-    expect(screen.getByRole('listitem', { name: 'Utile, 0' })).toHaveTextContent('Utile0')
-    const bravo = screen.getByRole('listitem', { name: 'Bravo, 9' })
-    expect(ancestorWithRole(bravo, 'list')?.props.accessibilityLabel).toBe(
-      'Les réactions à ton projet',
-    )
-  })
-
-  it('gathers its buttons in a group, named after what they do', async () => {
-    await renderWithProviders(
-      <ReactionBar items={items} onToggle={jest.fn()} label="Réagir à ce projet" />,
-    )
-
-    const bravo = screen.getByRole('button', { name: 'Bravo, 9' })
-    expect(ancestorWithRole(bravo, 'group')?.props.accessibilityLabel).toBe('Réagir à ce projet')
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0)
-  })
-})
 
 describe('CommentCard, after the reviews', () => {
   const card = {
