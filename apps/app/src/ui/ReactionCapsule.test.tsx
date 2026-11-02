@@ -300,6 +300,35 @@ describe('ReactionCapsule', () => {
       expect(onToggle).not.toHaveBeenCalled()
     })
 
+    // Sur le web, un élément de liste dans un autre (<li> dans <li>) est du HTML invalide : le
+    // navigateur le répare en lisant la page pré-rendue, et React ne s'y retrouve plus (erreur
+    // #418 du catalogue, R5a).
+    it('never puts a list item inside another one', async () => {
+      const takenBack: CapsuleReaction[] = [
+        ...locked.slice(0, 4),
+        { kind: 'bravo', count: 20, mine: false, disabled: true },
+      ]
+      await renderWithProviders(<Capsule reactions={takenBack} />)
+
+      // On parcourt tout l'arbre, même les vues qu'un lecteur d'écran ne lit pas seules
+      // (getAllByRole ne trouve que les éléments lus d'un seul tenant) : chaque vue de rôle
+      // « listitem » compte, et aucune ne doit être sous une autre.
+      type Host = { props: Record<string, unknown>; children: ReadonlyArray<Host | string> }
+      let items = 0
+      let nested = 0
+      const walk = (node: Host, inItem: boolean) => {
+        const isItem = node.props.role === 'listitem'
+        if (isItem) items++
+        if (isItem && inItem) nested++
+        for (const child of node.children) {
+          if (typeof child !== 'string') walk(child, inItem || isItem)
+        }
+      }
+      walk(screen.root as unknown as Host, false)
+      expect(items).toBeGreaterThanOrEqual(5)
+      expect(nested).toBe(0)
+    })
+
     it('keeps the faded reaction reachable by the keyboard on the web', async () => {
       jest.replaceProperty(Platform, 'OS', 'web')
       try {

@@ -233,7 +233,10 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
                 <View
                   key={item.kind}
                   onLayout={measure(item.kind)}
-                  {...(mixed ? { role: 'listitem' as const } : null)}
+                  // Une réaction verrouillée est déjà un élément de liste (Locked) : la case qui
+                  // l'entoure n'en est pas un, car un <li> dans un <li> est du HTML invalide, que
+                  // le navigateur répare en lisant la page pré-rendue (erreur #418 de React).
+                  {...(mixed && !item.locked ? { role: 'listitem' as const } : null)}
                   style={styles.slot}
                 >
                   {content}
