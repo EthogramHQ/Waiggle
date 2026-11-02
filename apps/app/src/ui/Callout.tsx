@@ -23,8 +23,12 @@ export type CalloutTone = 'default' | 'caution'
 type Props = {
   /** L'icône, décorative (le titre dit tout) : l'appareil, un cadenas… */
   icon: IconName
-  /** Ce qu'il faut retenir, en une ligne. */
-  title: string
+  /**
+   * Ce qu'il faut retenir, en une ligne. Facultatif (R5a, le bandeau d'un projet privé) : un texte
+   * de plusieurs phrases, qui commence déjà par ce qu'il faut retenir (« Privé : … »), se lit mieux
+   * à l'encre que tout en gras ; il passe alors seul dans `body`.
+   */
+  title?: string | undefined
   /** L'explication, sous le titre (facultative : un avertissement court tient dans son titre). */
   body?: string | undefined
   /** `default` par défaut ; `caution` pour une mise en garde (voir l'en-tête du fichier). */
@@ -41,9 +45,11 @@ export function Callout({ icon, title, body, tone = 'default' }: Props) {
       {/* flexShrink et minWidth 0 : à 200 % de texte, les lignes passent à la ligne au lieu de
           sortir du cadre (sur le web, une vue ne rétrécit pas d'elle-même). */}
       <View style={{ flex: 1, flexShrink: 1, minWidth: 0, gap: space.xs }}>
-        <Text weight={600} {...(caution ? { tone: 'accent' as const } : null)}>
-          {title}
-        </Text>
+        {title ? (
+          <Text weight={600} {...(caution ? { tone: 'accent' as const } : null)}>
+            {title}
+          </Text>
+        ) : null}
         {body ? (
           <Text variant="callout" tone={caution ? 'default' : 'secondary'}>
             {body}

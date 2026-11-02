@@ -129,7 +129,9 @@ export function ProjectActionsView({
       {/* Privé : seul l'auteur le voit ; le bandeau dit ce que deviennent commentaires et
           réactions déjà reçus (jur-1). Un encadré, pas un message : rien ne vient de se passer. */}
       {project.visibility === 'private' ? (
-        <Callout tone="caution" icon="lock-simple" title={t(($) => $.project.page.privateBanner)} />
+        // Sans titre : le texte, de plusieurs phrases, commence déjà par « Privé : » ; tout en gras,
+        // il se lirait mal (voir Callout).
+        <Callout tone="caution" icon="lock-simple" body={t(($) => $.project.page.privateBanner)} />
       ) : null}
       <ButtonPair>
         {demo}

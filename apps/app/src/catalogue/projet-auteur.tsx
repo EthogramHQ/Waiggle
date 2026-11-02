@@ -115,12 +115,13 @@ export function ProjectPartsCatalogue() {
 }
 
 /** Les textes de la ligne de l'auteur, comme `useAuthorLine` les écrit. */
-const useLine = (l: Labels, handle: string | undefined = l.handle): AuthorLineProps => {
+/** `read` faux : la page du membre n'est pas encore lue, le pseudo pas encore connu. */
+const useLine = (l: Labels, read = true): AuthorLineProps => {
   const { t } = useTranslation()
   const nameOf = useNameOf()
   return {
     name: l.author,
-    handle,
+    handle: read ? l.handle : undefined,
     avatar: null,
     openLabel: t(($) => $.member.open, { nameOf: nameOf(l.author) }),
     onOpen: noop,
@@ -191,7 +192,7 @@ function Parts({
 
 /** La ligne de l'auteur seule : pas encore lue, suivie, en échec, inactive. */
 function LineStates({ l }: { l: Labels }) {
-  const unread = useLine(l, undefined)
+  const unread = useLine(l, false)
   const line = useLine(l)
   const followed = useChip(l, true, noop)
   const notFollowed = useChip(l, false, noop)
