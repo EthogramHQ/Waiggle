@@ -21,7 +21,7 @@ import { ThemeProvider } from '../ui/theme/ThemeProvider'
 const fr = {
   title: 'Barre du haut',
   intro:
-    'Les pièces de la barre des ordinateurs. Le lien de la page ouverte est posé dans sa goutte, qui ne glisse pas : sur ordinateur, la page change d’un coup. Toucher le lien de la page ouverte ne fait rien, et une double tape n’ouvre la page qu’une fois. Le champ de recherche se vide par sa croix ou par Échap ; Tab ou un clic montrent son bord de focus.',
+    'Les pièces de la barre des ordinateurs. Le lien de la page ouverte est posé dans sa goutte, posée ici sans glisser : d’une page à l’autre, elle glisse (section La barre fixe). Toucher le lien de la page ouverte ne fait rien, et une double tape n’ouvre la page qu’une fois. Le champ de recherche se vide par sa croix ou par Échap ; Tab ou un clic montrent son bord de focus.',
   links: 'Liens, actif :',
   none: 'aucun (une page posée par-dessus)',
   admin: 'Liens d’un administrateur, « Modération » actif',
@@ -39,7 +39,7 @@ const fr = {
 const en: typeof fr = {
   title: 'Top bar',
   intro:
-    'The pieces of the computer bar. The link of the open page sits in its drop, which does not slide: on a computer, the page changes at once. Touching the link of the open page does nothing, and a double tap opens the page once. The search field empties with its cross or with Escape; Tab or a click show its focus border.',
+    'The pieces of the computer bar. The link of the open page sits in its drop, placed here without sliding: from one page to the next, it slides (section The pinned bar). Touching the link of the open page does nothing, and a double tap opens the page once. The search field empties with its cross or with Escape; Tab or a click show its focus border.',
   links: 'Links, active:',
   none: 'none (a page pushed on top)',
   admin: 'Links of an administrator, “Moderation” active',
