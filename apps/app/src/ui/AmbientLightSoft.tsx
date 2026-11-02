@@ -17,6 +17,7 @@ import { AppState, Platform, StyleSheet, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  ReduceMotion,
   SensorType,
   useAnimatedSensor,
   useAnimatedStyle,
@@ -35,6 +36,100 @@ import { useTheme } from './theme/ThemeProvider'
 const BLEED = '-15%'
 // Amplitude du déplacement quand on incline le téléphone, en points.
 const TILT = 18
+// L'intensité de la lumière. La nuit, elle est plus forte : c'est une lanterne dans le noir. De
+// jour, elle se voit un peu plus depuis RF (0,6 avant, A5) ; la garde : le texte le plus pâle
+// (textMuted) reste à 4,5:1 au moins sur le point le plus coloré.
+const STRENGTH = { day: 0.7, night: 0.55 } as const
+// Le haut du voile, de jour (0,15 avant RF, A5) : il laisse passer un peu plus de miel en haut de
+// l'écran ; le bas reste plein, pour le texte qui s'y pose.
+const VEIL_TOP = { day: 0.1, night: 0.35 } as const
+
+/** Ce que l'hôte de la lumière peut lui dire en plus de sa source. */
+export type LightSwitch = {
+  /**
+   * Aucun écran affiché ne veut de lumière (le miel vif, `ambient={false}`) : elle s'efface en
+   * fondu (durations.base), puis s'arrête de travailler (respiration en pause, canvas retiré).
+   */
+  off?: boolean
+}
+
+/**
+ * Hook : le fondu d'une lumière qu'on éteint ou rallume (`off`), en durations.base. `dark` devient
+ * vrai une fois le fondu de sortie fini : la lumière, invisible, peut alors cesser de travailler.
+ * Le fondu reste avec « Réduire les animations » : ce n'est pas un déplacement.
+ */
+export function useLightFade(off: boolean) {
+  const opacity = useSharedValue(off ? 0 : 1)
+  const [dark, setDark] = useState(off)
+  const first = useRef(true)
+  useEffect(() => {
+    // Au premier affichage, la lumière est déjà dans son état : rien à fondre (et aucune image
+    // d'animation demandée pour rien).
+    if (first.current) {
+      first.current = false
+      return
+    }
+    opacity.value = withTiming(off ? 0 : 1, {
+      duration: durations.base,
+      easing: Easing.out(Easing.quad),
+      reduceMotion: ReduceMotion.Never,
+    })
+    if (!off) {
+      setDark(false)
+      return
+    }
+    const timer = setTimeout(() => setDark(true), durations.base)
+    return () => clearTimeout(timer)
+  }, [off, opacity])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return { style, dark }
+}
+
+// ---------------------------------------------------------------------------------------------
+// L'horloge de la respiration (ui-8)
+
+/**
+ * La respiration est une seule horloge, gardée dans le module (une variable qui vit tant que la
+ * page est ouverte, au-dessus de tous les composants) : une lumière montée de nouveau (au retour
+ * d'une page du miel, sur la page suivante d'une pile de téléphone) reprend la respiration là où
+ * elle en était, au lieu de repartir de zéro. Elle avance tant qu'au moins une lumière respire,
+ * et s'arrête avec la dernière (appli en arrière-plan, lumière éteinte).
+ */
+const breathClock = { elapsed: 0, startedAt: 0, running: 0 }
+const clockNow = () => (typeof performance === 'undefined' ? Date.now() : performance.now())
+
+/** Une lumière commence à respirer ; renvoie le temps déjà respiré, en millisecondes. */
+function startBreathClock(): number {
+  const now = clockNow()
+  if (breathClock.running === 0) breathClock.startedAt = now - breathClock.elapsed
+  breathClock.running += 1
+  return now - breathClock.startedAt
+}
+
+/** Une lumière s'arrête de respirer ; la dernière arrête l'horloge. */
+function stopBreathClock() {
+  breathClock.running = Math.max(0, breathClock.running - 1)
+  if (breathClock.running === 0) breathClock.elapsed = clockNow() - breathClock.startedAt
+}
+
+// La courbe d'une demi-respiration (Easing.inOut(Easing.sin), écrite en clair) : 0 → 1.
+const breathCurve = (progress: number) => {
+  'worklet'
+  return (1 - Math.cos(Math.PI * progress)) / 2
+}
+
+/**
+ * Où en est la respiration après `elapsed` millisecondes : sa valeur (0 à 1), si elle monte, et la
+ * part déjà faite de la demi-respiration en cours.
+ */
+const breathAt = (elapsed: number) => {
+  const half = durations.breath / 2
+  const at = ((elapsed % durations.breath) + durations.breath) % durations.breath
+  const rising = at < half
+  const progress = (rising ? at : at - half) / half
+  const curve = breathCurve(progress)
+  return { value: rising ? curve : 1 - curve, rising, progress }
+}
 
 /** Les deux places de la lumière : celle qu'on voit, et celle où entre la source suivante. */
 type Slots = { a: AmbientSource; b: AmbientSource; front: 'a' | 'b' }
@@ -42,6 +137,7 @@ type Slots = { a: AmbientSource; b: AmbientSource; front: 'a' | 'b' }
 export function SoftLight({
   source,
   still = false,
+  off = false,
 }: {
   source: AmbientSource
   /**
@@ -49,10 +145,11 @@ export function SoftLight({
    * WebGL (une machine lente, que l'on ne fait pas travailler image après image).
    */
   still?: boolean
-}) {
+} & LightSwitch) {
   const { scheme, colors } = useTheme()
   const calm = useCalmMotion()
   const { onPulse } = useAmbientSource()
+  const fade = useLightFade(off)
   // Les dégradés SVG sont désignés par un identifiant. Il dépend seulement du thème : deux lumières
   // affichées en même temps partagent le même dégradé, identique, sans conflit. (Un identifiant
   // tiré au hasard ou par useId différerait entre la page préparée sur le serveur et le navigateur.)
@@ -91,38 +188,60 @@ export function SoftLight({
   // s'arrête quand l'appli passe en arrière-plan (rien à dessiner pour personne) et reprend au
   // retour. Avec « Réduire les animations », la lumière reste immobile (J5, WCAG 2.2.2 : une
   // animation qui dure plus de 5 secondes à côté du contenu doit pouvoir s'arrêter). Elle ne
-  // respire pas non plus quand on la demande immobile (`still`).
+  // respire pas non plus quand on la demande immobile (`still`). Éteinte (`off`, fondu fini), elle
+  // se met en pause sans revenir à zéro. Elle suit l'horloge du module : montée de nouveau, elle
+  // reprend où elle en était (ui-8).
   const breath = useSharedValue(0)
   const resting = calm || still
+  const paused = fade.dark
   useEffect(() => {
     if (resting) {
       cancelAnimation(breath)
       breath.value = 0
       return
     }
+    if (paused) return
+    let running = false
     const breathe = () => {
-      breath.value = withRepeat(
-        withTiming(1, { duration: durations.breath / 2, easing: Easing.inOut(Easing.sin) }),
-        -1, // sans fin
-        true, // aller-retour
+      running = true
+      const half = durations.breath / 2
+      const { value, rising, progress } = breathAt(startBreathClock())
+      // La fin de la demi-respiration en cours suit la même courbe que si elle n'avait jamais été
+      // interrompue : la part restante, ramenée de 0 à 1 (l'« easing » de withTiming).
+      const from = breathCurve(progress)
+      const rest = (amount: number) => {
+        'worklet'
+        return from >= 1 ? 1 : (breathCurve(progress + amount * (1 - progress)) - from) / (1 - from)
+      }
+      breath.value = value
+      breath.value = withSequence(
+        withTiming(rising ? 1 : 0, {
+          duration: Math.max(1, (1 - progress) * half),
+          easing: rest,
+        }),
+        withRepeat(
+          withTiming(rising ? 0 : 1, { duration: half, easing: Easing.inOut(Easing.sin) }),
+          -1, // sans fin
+          true, // aller-retour
+        ),
       )
     }
+    const pause = () => {
+      if (!running) return
+      running = false
+      cancelAnimation(breath)
+      stopBreathClock()
+    }
     breathe()
-    let paused = false
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background' && !paused) {
-        paused = true
-        cancelAnimation(breath)
-      } else if (state === 'active' && paused) {
-        paused = false
-        breathe()
-      }
+      if (state === 'background') pause()
+      else if (state === 'active' && !running) breathe()
     })
     return () => {
       subscription.remove()
-      cancelAnimation(breath)
+      pause()
     }
-  }, [resting, breath])
+  }, [resting, paused, breath])
 
   // L'impulsion : la lumière s'avive et grossit un instant, puis revient en douceur. Les rafales
   // sont déjà fusionnées par le fournisseur (theme/ambient.tsx). Immobile en mode calme.
@@ -144,13 +263,16 @@ export function SoftLight({
     opacity: Math.min(1, 0.85 + breath.value * 0.15 + kick.value * 0.15),
   }))
 
-  // La nuit, la lumière est plus forte : c'est une lanterne dans le noir.
-  const strength = scheme === 'night' ? 0.55 : 0.6
+  const strength = STRENGTH[scheme]
 
   return (
     // overflow: 'hidden' rogne ce qui déborde : sans lui, la lumière agrandit la page et, sur le
-    // web, fait apparaître une barre de défilement horizontale.
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
+    // web, fait apparaître une barre de défilement horizontale. L'opacité de la couche : le fondu
+    // d'une lumière qu'on éteint (`off`).
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }, fade.style]}
+    >
       <Tilt>
         {/* Deux couches : l'extérieure fixe l'intensité, l'intérieure respire. */}
         <View style={{ position: 'absolute', inset: BLEED, opacity: strength }}>
@@ -165,7 +287,7 @@ export function SoftLight({
         </View>
       </Tilt>
       <Veil id={id} night={scheme === 'night'} background={colors.background} />
-    </View>
+    </Animated.View>
   )
 }
 
@@ -237,7 +359,7 @@ export function Veil({
         <LinearGradient id={`veil${id}`} x1="0" y1="0" x2="0" y2="1">
           {/* La nuit, le voile est plus présent dès le haut : sous une lumière vive, les petits
               textes discrets passaient sous le contraste minimal. */}
-          <Stop offset={0} stopColor={background} stopOpacity={night ? 0.35 : 0.15} />
+          <Stop offset={0} stopColor={background} stopOpacity={VEIL_TOP[night ? 'night' : 'day']} />
           <Stop offset={0.6} stopColor={background} stopOpacity={0.75} />
           <Stop offset={0.9} stopColor={background} stopOpacity={1} />
         </LinearGradient>

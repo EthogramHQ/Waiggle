@@ -21,8 +21,12 @@ import { ToastProvider, useToast } from './toast'
 
 jest.mock('../../accounts/api', () => ({ useSession: jest.fn() }))
 // Si la page de l'écran est celle qui est affichée (useIsFocused d'Expo Router, derrière une aide
-// qui répond « oui » hors d'un navigateur) : remplacée ici.
-jest.mock('../screenFocus', () => ({ useScreenFocused: jest.fn() }))
+// qui répond « oui » hors d'un navigateur) : remplacée ici. Depuis RF, le module dit aussi combien
+// de fois la route est devenue affichée (le fondu des pages) : 1, une page déjà là, sans fondu.
+jest.mock('../screenFocus', () => ({
+  useScreenFocused: jest.fn(),
+  useScreenShownCount: jest.fn(() => 1),
+}))
 
 beforeEach(() => {
   jest.mocked(useScreenFocused).mockReset().mockReturnValue(true)

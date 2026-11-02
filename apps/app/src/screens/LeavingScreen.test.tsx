@@ -7,6 +7,7 @@ import { getProject } from '../projects/api'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { TAP_GUARD_MS } from '../ui/tapGuard'
 import { LeavingScreen } from './LeavingScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -56,13 +57,28 @@ beforeEach(() => {
   mockSession(null)
   jest.mocked(getProject).mockReset()
 })
-afterEach(() => openURL.mockRestore())
+afterEach(() => {
+  openURL.mockRestore()
+  jest.useRealTimers()
+})
+
+/**
+ * Laisse passer la garde de « Ouvrir le site » (RF, S1 b : les tapes sont ignorées pendant
+ * TAP_GUARD_MS après l'arrivée de la page). Sous la fausse horloge de Jest, posée par le test.
+ */
+const afterTheGuard = async () => {
+  await act(async () => {
+    jest.advanceTimersByTime(TAP_GUARD_MS)
+  })
+}
 
 describe('LeavingScreen', () => {
   it('shows where the link really leads, then opens it', async () => {
+    jest.useFakeTimers()
     await renderWithProviders(<LeavingScreen url="https://recettes.example.com/demo?x=1" />)
 
     expect(screen.getByText('https://recettes.example.com/demo?x=1')).toBeTruthy()
+    await afterTheGuard()
     await fireEvent.press(screen.getByRole('button', { name: 'Ouvrir le site' }))
 
     expect(openURL).toHaveBeenCalledWith('https://recettes.example.com/demo?x=1')
@@ -264,12 +280,38 @@ describe('the page that leaves for another site (R5a)', () => {
   })
 
   it('opens the site only once for a double tap', async () => {
+    jest.useFakeTimers()
     await renderWithProviders(<LeavingScreen url="https://recettes.example.com" project={id} />)
+    await afterTheGuard()
 
     const open = screen.getByRole('button', { name: 'Ouvrir le site' })
     await fireEvent.press(open)
     await fireEvent.press(open)
 
+    expect(openURL).toHaveBeenCalledTimes(1)
+  })
+
+  // RF, S1 (b) : la page de sortie paraît souvent sous le doigt (un lien « Tester » touché deux
+  // fois, une page qui arrive en fondu) ; la seconde tape d'une double tape ne doit pas ouvrir le
+  // site sans que le membre ait lu la page. « Ouvrir le site » ignore donc les tapes pendant
+  // TAP_GUARD_MS après l'arrivée de la page, comme la confirmation d'un Dialog.
+  it('ignores taps on « Ouvrir le site » just after the page appears', async () => {
+    jest.useFakeTimers()
+    await renderWithProviders(<LeavingScreen url="https://recettes.example.com" project={id} />)
+    const open = () => screen.getByRole('button', { name: 'Ouvrir le site' })
+
+    await fireEvent.press(open())
+    await act(async () => {
+      jest.advanceTimersByTime(TAP_GUARD_MS - 50)
+    })
+    await fireEvent.press(open())
+    expect(openURL).not.toHaveBeenCalled()
+
+    // Bien après la garde (et après celle de la double tape), une tape ouvre le site.
+    await act(async () => {
+      jest.advanceTimersByTime(2 * TAP_GUARD_MS)
+    })
+    await fireEvent.press(open())
     expect(openURL).toHaveBeenCalledTimes(1)
   })
 
