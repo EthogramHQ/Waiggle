@@ -19,7 +19,15 @@ import { appName, borders, layout, space } from '@ruche/brand'
 // (le titre de l'onglet). C'est, avec ui/screenFocus.ts (la page est-elle affichée, combien de fois
 // l'est-elle devenue), la seule chose que src/ui prend à expo-router.
 import Head from 'expo-router/head'
-import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   KeyboardAvoidingView,
@@ -38,6 +46,7 @@ import { AmbientLight } from './AmbientLight'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { useFloatingClaim } from './floatingSpace'
+import type { Focusable } from './focus'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
@@ -77,6 +86,11 @@ type Props = {
    * rien ne remonte sous le doigt. Pour une page sans scène (`hero`).
    */
   keepAsideInView?: boolean
+  /**
+   * RF (ui-5) : la vue du titre, pour y poser le focus (après le bouton des nouveautés touché sous
+   * la barre, le focus va au titre « Fil »).
+   */
+  titleRef?: Ref<Focusable>
   /**
    * RF : ce qui se pose sous la barre fixe, centré, par-dessus le contenu. Montré seulement quand la
    * barre est fixe ; quand elle suit le contenu (téléphone), rien.
@@ -171,6 +185,7 @@ export function Screen({
   subtitle,
   titleAside,
   keepAsideInView = false,
+  titleRef,
   belowBar,
   fade = true,
   onScroll,
@@ -332,6 +347,7 @@ export function Screen({
           title={title}
           aside={asideAway ? undefined : titleAside}
           subtitle={subtitle}
+          titleRef={titleRef}
           {...(keepAsideInView
             ? {
                 onLayout: aside.onHeadingLayout,
@@ -605,8 +621,11 @@ export function PageHeading({
   onLayout,
   onRowLayout,
   rowMinHeight,
+  titleRef,
 }: {
   title?: string | undefined
+  /** La vue du titre, pour y poser le focus. */
+  titleRef?: Ref<Focusable> | undefined
   aside?: ReactNode
   subtitle?: string | undefined
   /** Le niveau du titre : 1 dans une page ; 2 au catalogue, sous le titre de la page. */
@@ -645,7 +664,7 @@ export function PageHeading({
           {/* Le titre peut rétrécir et passer à la ligne (sur le web, une vue ne rétrécit pas
               d'elle-même : flexShrink 0 par défaut). */}
           <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-            <Text variant="title2" heading={level}>
+            <Text variant="title2" heading={level} focusRef={titleRef}>
               {title}
             </Text>
           </View>
@@ -654,7 +673,7 @@ export function PageHeading({
           {aside ? <View style={{ flexShrink: 1, maxWidth: '100%' }}>{aside}</View> : null}
         </View>
       ) : title ? (
-        <Text variant="title2" heading={level}>
+        <Text variant="title2" heading={level} focusRef={titleRef}>
           {title}
         </Text>
       ) : null}
