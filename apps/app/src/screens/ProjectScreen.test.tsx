@@ -2427,7 +2427,8 @@ describe('the reading order of the project page on a computer', () => {
     }
   })
 
-  it('reads the description, the prompt, the journal and « Signaler » before the comments', async () => {
+  // R5a, décision de Louis du 2/11 : « Signaler ce projet » vient après les commentaires, comme sur téléphone.
+  it('reads the description, the prompt and the journal before the comments, and « Signaler » after them', async () => {
     const restore = setDesktopWindow()
     try {
       seenByOther({ ...projectWithPhotos, notes: [v2] })
@@ -2447,8 +2448,8 @@ describe('the reading order of the project page on a computer', () => {
       const at = (value: number | undefined) => value ?? -1
       expect(at(promptAt)).toBeGreaterThan(at(descriptionAt))
       expect(at(journalAt)).toBeGreaterThan(at(promptAt))
-      expect(at(reportAt)).toBeGreaterThan(at(journalAt))
-      expect(at(commentAt)).toBeGreaterThan(at(reportAt))
+      expect(at(commentAt)).toBeGreaterThan(at(journalAt))
+      expect(at(reportAt)).toBeGreaterThan(at(commentAt))
     } finally {
       restore()
     }
