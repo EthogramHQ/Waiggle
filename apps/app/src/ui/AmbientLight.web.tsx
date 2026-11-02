@@ -226,9 +226,19 @@ const MAX_HEIGHT = 1080
 // (moins de 50 images par seconde), le dessin passe au palier suivant de SCALES. Un écart plus
 // long que SLOW_FRAME_CAP_MS (un onglet repris, un ramasse-miettes) compte pour SLOW_FRAME_CAP_MS :
 // une seule image lente ne fait pas rapetisser le dessin.
+//
+// Sur un écran plus lent que 60 Hz (30 Hz : économie d'énergie, certains moniteurs externes), les
+// images arrivent toutes les 33 ms sans que la machine peine : la limite suit alors la cadence de
+// l'écran, SLOW_RATIO fois son intervalle (20 ms pour 16,7 ms à 60 Hz, 40 ms à 30 Hz). Cet
+// intervalle est le plus court écart vu entre deux images du navigateur : une machine qui rame
+// sur un écran à 60 Hz rate des images (33, 50 ms), mais en tient encore à 16,7 ms de temps en
+// temps ; un écran à 30 Hz n'en donne jamais de plus rapprochées. Un écart sous
+// MIN_SCREEN_FRAME_MS (deux rappels dans la même image) ne compte pas.
 const SLOW_WINDOW = 60
 const SLOW_FRAME_MS = 20
 const SLOW_FRAME_CAP_MS = 100
+const SLOW_RATIO = SLOW_FRAME_MS / (1000 / 60)
+const MIN_SCREEN_FRAME_MS = 4
 // La cadence : au plus 60 images par seconde, même sur un écran à 120 Hz (une image sur deux y
 // est sautée). FRAME_SLACK_MS : la marge accordée à une image qui arrive un peu tôt (les images
 // d'un écran à 60 Hz ne sont pas espacées de 16,7 ms tout rond).
@@ -406,6 +416,10 @@ function startLight(
   // Le repli : la somme des écarts entre images et leur nombre, sur la fenêtre en cours.
   let slowSum = 0
   let slowCount = 0
+  // La cadence de l'écran : le plus court écart vu entre deux images du navigateur (dessinées ou
+  // sautées), et l'heure de la dernière. Infinity tant qu'il n'y en a pas eu deux.
+  let screenFrameMs = Number.POSITIVE_INFINITY
+  let lastTick: number | null = null
 
   const resize = () => {
     const scale = SCALES[lightState.step] ?? SCALES[2]
@@ -422,12 +436,25 @@ function startLight(
     gl.viewport(0, 0, width, height)
   }
 
+  /** Note l'écart entre deux images du navigateur : le plus court donne la cadence de l'écran. */
+  const tick = (now: number) => {
+    if (lastTick !== null) {
+      const interval = now - lastTick
+      if (interval >= MIN_SCREEN_FRAME_MS && interval < screenFrameMs) screenFrameMs = interval
+    }
+    lastTick = now
+  }
+
   /** Compte l'écart avant cette image ; après SLOW_WINDOW images trop lentes, le palier suivant. */
   const measure = (gap: number) => {
     slowSum += Math.min(SLOW_FRAME_CAP_MS, gap)
     slowCount += 1
     if (slowCount < SLOW_WINDOW) return
-    if (slowSum / slowCount > SLOW_FRAME_MS && lightState.step < SCALES.length - 1) {
+    // Trop lent pour cet écran : SLOW_FRAME_MS à 60 Hz et plus, davantage sur un écran plus lent.
+    const limit = Number.isFinite(screenFrameMs)
+      ? Math.max(SLOW_FRAME_MS, screenFrameMs * SLOW_RATIO)
+      : SLOW_FRAME_MS
+    if (slowSum / slowCount > limit && lightState.step < SCALES.length - 1) {
       lightState.step += 1
     }
     slowSum = 0
@@ -436,6 +463,7 @@ function startLight(
 
   const draw = (now: number) => {
     frame = requestAnimationFrame(draw)
+    tick(now)
     // Au plus 60 images par seconde : une image arrivée trop tôt (écran à 120 Hz) est sautée. Le
     // rendez-vous suivant avance d'un pas de FRAME_MS à chaque image dessinée, ce qui tient la
     // moyenne à 60 même quand les images arrivent un peu tôt ; une machine en retard repart de
