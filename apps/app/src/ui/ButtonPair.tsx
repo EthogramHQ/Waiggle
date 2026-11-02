@@ -25,9 +25,15 @@ type Props = {
    * `Stack` : la légende suit alors la largeur de son bouton.
    */
   children: ReactNode
+  /**
+   * Côte à côte, deux places de hauteurs différentes (un bouton et sa légende, à côté d'un bouton
+   * seul) : centrées l'une par rapport à l'autre (par défaut), ou alignées en haut, pour que les
+   * deux boutons restent sur la même ligne (la page d'un projet, planche R5a-Projet-Desktop).
+   */
+  align?: 'center' | 'start'
 }
 
-export function ButtonPair({ children }: Props) {
+export function ButtonPair({ children, align = 'center' }: Props) {
   // Children.toArray retire les enfants vides (`cond && <Button/>` faux) : un bouton absent ne
   // laisse pas de place vide, l'autre reste seul, à la même largeur bornée.
   const items = Children.toArray(children)
@@ -37,8 +43,8 @@ export function ButtonPair({ children }: Props) {
         flexDirection: 'row',
         flexWrap: 'wrap',
         // Les deux boutons d'une rangée ont parfois une hauteur différente (un libellé passé sur
-        // deux lignes) : centrés l'un par rapport à l'autre.
-        alignItems: 'center',
+        // deux lignes) : centrés l'un par rapport à l'autre, sauf demande contraire (`align`).
+        alignItems: align === 'start' ? 'flex-start' : 'center',
         gap: space.md,
       }}
     >

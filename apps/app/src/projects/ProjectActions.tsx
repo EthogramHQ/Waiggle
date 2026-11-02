@@ -30,7 +30,10 @@ import { hostOf } from './format'
 export type ActionsProject = Pick<
   Project,
   'id' | 'isMine' | 'visibility' | 'demoUrl' | 'isFollowed' | 'followerCount'
->
+> & {
+  /** Retiré par la modération (tranche 7a) : il ne se modifie plus (l'API refuserait, 409). */
+  removal?: Project['removal']
+}
 
 type ViewProps = {
   project: ActionsProject
@@ -133,7 +136,9 @@ export function ProjectActionsView({
         // il se lirait mal (voir Callout).
         <Callout tone="caution" icon="lock-simple" body={t(($) => $.project.page.privateBanner)} />
       ) : null}
-      <ButtonPair>
+      {/* Alignés en haut : « Suivre ce projet » reste à la hauteur de « Tester la démo », que
+          suit la ligne de l'hôte (planche R5a-Projet-Desktop). */}
+      <ButtonPair align="start">
         {demo}
         {second}
       </ButtonPair>
@@ -167,7 +172,9 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
             : undefined
       }
       followErrorAction={follow.expired ? signInAgain() : undefined}
-      suspended={suspended}
+      // Un projet retiré par la modération ne se modifie plus : comme un compte suspendu, l'auteur
+      // n'a plus que le nombre d'abonnés (il peut encore le supprimer, plus bas sur la page).
+      suspended={suspended || Boolean(project.removal)}
     />
   )
 }

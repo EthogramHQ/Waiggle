@@ -1,83 +1,86 @@
-// Page d'un projet : sa couverture, son statut, son titre, son auteur, sa démo, sa « recette »
-// (outils, temps passé, prompts clés) et sa description. L'auteur peut le modifier ou le supprimer.
-// L'auteur mène à sa page de membre, et chaque outil à la page de son étiquette. Un autre membre
-// peut suivre le projet ; tous voient combien de membres le suivent.
-// Le journal (tranche 4b) : les notes de l'auteur, de la plus récente à la plus ancienne. L'auteur y
-// publie et y supprime ses notes ; après un changement de statut, le formulaire le ramène ici avec
-// « ?announce=<statut> », et une note toute prête l'attend dans le champ.
-// Sur téléphone, tout se lit de haut en bas ; sur ordinateur, la couverture, la description et le
-// journal à gauche, les informations et les actions à droite.
-// Les réactions et les commentaires (tranche 5) : un autre membre pose ses réactions sous « Suivre »
-// (l'auteur voit seulement les nombres) ; les commentaires viennent après le journal, dans la
-// colonne principale sur ordinateur.
-// La couverture : sur téléphone, la couverture verticale si l'auteur en a donné une, sinon la
-// première photo ; sur ordinateur, la première photo. Des vignettes permettent de voir les autres,
-// et la lumière d'ambiance prend la couleur de la photo affichée.
-// Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre
-// et retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
-// R4 : ouverte depuis une carte du fil, la page part de la photo de la carte, qui grandit jusqu'à
-// la couverture (`CoverArrival`), le reste apparaissant en fondu (`CoverFade`) ; « Retour » la
-// replie dans sa carte (ui/coverTransition.tsx). Les dates se disent par rapport à maintenant.
+// Page d'un projet (R5a, planches « Projet », « Projet-Desktop » et « Projet-Suite ») : sa galerie de
+// photos, son en-tête (statut, titre, dates, auteur, pitch), ses actions (« Tester la démo »,
+// « Suivre ce projet » ou, pour l'auteur, « Modifier »), les réactions, sa « recette » (outils,
+// temps passé), sa description, le prompt de départ, son journal et ses commentaires.
+// Ce fichier assemble des pièces faites ailleurs, sans écrire de style :
+// - la galerie (ui/PhotoGallery.tsx), qui grandit depuis la carte touchée (ui/coverTransition.tsx) ;
+// - l'en-tête et les actions (projects/ProjectHeader.tsx, projects/ProjectActions.tsx) ;
+// - la capsule des réactions et son éventail (ui/ReactionCapsule.tsx, ui/ReactionFan.tsx) ; l'auteur
+//   voit seulement ses nombres (ui/OwnReactions.tsx) ;
+// - le prompt de départ (ui/PromptBlock.tsx) et la feuille « Partager » (ui/ShareSheet.tsx).
+// Trois mises en page :
+// - téléphone : la galerie bord à bord, avec Retour, Partager et « … » posés dessus, puis une
+//   feuille qui remonte sur le bas de la photo et porte toute la page ; la capsule flotte en bas de
+//   l'écran, hors du défilement (lue après tout le contenu, décision de Louis du 2/11/2026) ;
+// - tablette (de 768 points à la largeur des colonnes) : une seule colonne, la galerie aux coins
+//   arrondis, la capsule à cheval sur son bas ; Retour, Partager et « … » en haut de la page ;
+// - ordinateur : deux rangées de colonnes, dans l'ordre de lecture (galerie et capsule | en-tête,
+//   actions et recette ; puis description, prompt, journal et « Signaler » | commentaires). Le
+//   clavier et le lecteur d'écran passent ainsi par « Suivre » et les réactions avant la
+//   description, au lieu de tout le contenu de gauche d'abord.
+// Le journal (tranche 4b) : les notes de l'auteur ; après un changement de statut, le formulaire le
+// ramène ici avec « ?announce=<statut> », et une note toute prête l'attend dans le champ.
+// Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre et
+// retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
 import {
   NoteText,
   PROJECT_NOTE_MAX,
   type Project,
   ProjectStatus,
-  type ProjectVisual,
   REACTION_KINDS,
   type ReactionKind,
 } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
-import { useOpenOutside } from '../navigation/links'
+import { useOpenDemo, useOpenOutside } from '../navigation/links'
 import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
 import { deleteProject } from '../projects/api'
-import { hostOf } from '../projects/format'
 import { useForgetProject, useProject } from '../projects/hooks'
+import { ProjectActions } from '../projects/ProjectActions'
+import { ProjectHeader } from '../projects/ProjectHeader'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
-import { ActionMenu } from '../ui/ActionMenu'
-import { Avatar } from '../ui/Avatar'
+import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
 import { Button } from '../ui/Button'
-import { CodeBlock } from '../ui/CodeBlock'
 import { Columns } from '../ui/Columns'
+import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { Dialog } from '../ui/Dialog'
-import { FollowButton } from '../ui/FollowButton'
-import { FollowerCount } from '../ui/FollowerCount'
 import type { Focusable } from '../ui/focus'
-import { Hint } from '../ui/Hint'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
 import { NoteComposer } from '../ui/NoteComposer'
 import { NoteList, type NoteListHandle } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
-import { Pressed } from '../ui/Pressed'
-import { ProjectCover } from '../ui/ProjectCover'
-import { ReactionBar } from '../ui/ReactionBar'
+import { OwnReactions } from '../ui/OwnReactions'
+import { PhotoGallery } from '../ui/PhotoGallery'
+import { CoverControls, CoverSheet, CoverStraddle } from '../ui/ProjectCover'
+import { PromptBlock } from '../ui/PromptBlock'
+import { ReactionCapsule } from '../ui/ReactionCapsule'
+import { ReactionFan } from '../ui/ReactionFan'
 import { RelativeTime } from '../ui/RelativeTime'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
+import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
-import { StatusPill } from '../ui/StatusPill'
 import { Surface } from '../ui/Surface'
+import { shareUrl } from '../ui/share'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
-import { Thumbnails } from '../ui/Thumbnails'
+import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import { useNameOf } from '../useNameOf'
+import { useToast } from '../ui/theme/toast'
 import { Comments } from './ProjectComments'
 import {
   LoadErrorScreen,
@@ -100,10 +103,12 @@ export function ProjectScreen({ id }: { id: string }) {
   if (!session) return <SignedOutScreen width="page" />
   if (project.error) {
     // « Introuvable » : le même écran, que le projet n'existe pas ou qu'il soit privé. Celui qui
-    // n'a pas le droit de le voir n'apprend même pas qu'il existe.
+    // n'a pas le droit de le voir n'apprend même pas qu'il existe. R5a : les alvéoles sur le miel,
+    // « Retour » en haut et « Retour au fil » en bas (`variant="project"`).
     if (errorKey(project.error) === 'notFound') {
       return (
         <NotFoundState
+          variant="project"
           width="page"
           title={t(($) => $.project.page.notFoundTitle)}
           message={t(($) => $.project.page.notFound)}
@@ -120,27 +125,29 @@ export function ProjectScreen({ id }: { id: string }) {
 
 function ProjectView({ project }: { project: Project }) {
   const { t } = useTranslation()
-  const nameOf = useNameOf()
   const router = useRouter()
+  const toast = useToast()
   // La carte qui devient la page : le titre reçoit le focus quand la photo est posée, et « Retour »
   // replie d'abord la page dans sa carte. `faded` enveloppe chacun des autres morceaux, qui
   // apparaissent en fondu (un par un : la colonne de `Screen` garde ses écarts entre eux).
   const titleRef = useRef<Focusable>(null)
   const coverTarget = useCoverTarget(project.id)
   const faded = (node: ReactNode) => (node ? <CoverFade id={project.id}>{node}</CoverFade> : null)
-  // La date de publication, citée par le lien de l'auteur, qui la contient (son nom la cacherait).
-  const publishedId = useId()
   const openOutside = useOpenOutside()
+  // « Tester la démo » passe par la page de sortie, qui apprend de quel projet vient le lien (R5a).
+  const openDemo = useOpenDemo()
   const forgetProject = useForgetProject()
   const toSource = useMediaSources()
   const { sizeClass, columns } = useLayout()
-  // large : tablette et ordinateur (barre du haut, retour hors de la couverture) ; wide : ordinateur ;
-  // columns : les deux colonnes tiennent côte à côte. Sinon (téléphone, tablette en portrait), la
-  // page garde l'ordre du téléphone, où « Tester la démo » vient juste après la couverture.
+  // large : tablette et ordinateur (barre du haut, Retour hors de la photo) ; columns : les deux
+  // colonnes tiennent côte à côte. Entre les deux (tablette), une seule colonne.
   const large = sizeClass !== 'compact'
-  const wide = sizeClass === 'wide'
-  // La photo de la galerie choisie dans les vignettes ; null : la couverture par défaut.
-  const [selected, setSelected] = useState<number | null>(null)
+  // La photo montrée par la galerie : la lumière d'ambiance prend sa couleur.
+  const [photoIndex, setPhotoIndex] = useState(0)
+  // L'éventail des réactions (appui long sur la capsule), la feuille « Partager », la fenêtre qui
+  // confirme la suppression.
+  const [fanOpen, setFanOpen] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -149,44 +156,36 @@ function ProjectView({ project }: { project: Project }) {
   // page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
   const goBack = useGoBack('/')
   const back = () => coverTarget.leave(goBack)
-  const follow = useFollow({ kind: 'project', id: project.id })
-  const followers = t(($) => $.follow.followers, { count: project.followerCount })
   const reaction = useReaction(project.id)
   const { timeSpent } = project
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
-  // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne suit plus, ne réagit plus et
-  // n'écrit plus de note ; il peut encore supprimer, et retirer ce qu'il a déjà donné (décision de
-  // Louis du 26/10/2026 : ne plus suivre, retirer une réaction).
+  // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne réagit plus et n'écrit plus
+  // de note ; il peut encore supprimer, et retirer ce qu'il a déjà donné (décision de Louis du
+  // 26/10/2026). « Suivre ce projet » suit la même règle, dans ProjectActions.
   const suspended = useSuspension().suspended
-  // Ce qu'il peut encore retirer : ce qu'il avait donné à un moment de la visite. Une fois retiré,
-  // le bouton reste à sa place jusqu'à la fin de la visite : s'il disparaissait, le focus se
-  // perdrait et la rangée bougerait sous le doigt. Un nouvel appui serait refusé par l'API.
-  const given = useRef({ follow: false, reactions: new Set<ReactionKind>() })
-  if (project.isFollowed) given.current.follow = true
-  for (const kind of project.reactions.mine) given.current.reactions.add(kind)
-  const canFollow = !suspended || given.current.follow
-  // Les cinq réactions, telles que la barre les affiche. Le nom lu reprend le texte affiché et dit
-  // si la réaction est la sienne (« Bravo, réagi, 4 »).
+  // Les réactions qu'il peut encore retirer : celles qu'il avait données à un moment de la visite.
+  // Une fois retirée, la réaction reste un bouton, inactif, jusqu'à la fin de la visite : s'il
+  // disparaissait, le focus se perdrait et la capsule bougerait sous le doigt.
+  const given = useRef(new Set<ReactionKind>())
+  for (const kind of project.reactions.mine) given.current.add(kind)
+  // Les cinq réactions, telles que la capsule, l'éventail et la vue de l'auteur les montrent ; les
+  // noms lus (« Waggle !, 21, ta réaction ») sont écrits par ces composants.
   const reactions = REACTION_KINDS.map((kind) => {
-    const text = t(($) => $.project.reactions[kind])
-    const count = project.reactions.counts[kind]
     const mine = !project.isMine && project.reactions.mine.includes(kind)
     return {
       kind,
-      text,
-      count,
+      count: project.reactions.counts[kind],
       mine,
-      locked: suspended && !given.current.reactions.has(kind),
-      // Donnée puis retirée pendant la visite : la pastille reste, inactive (la remettre serait
+      locked: suspended && !given.current.has(kind),
+      // Donnée puis retirée pendant la visite : le bouton reste, inactif (la remettre serait
       // refusé par l'API, 403).
       disabled: suspended && !mine,
-      label: t(($) => (mine ? $.project.reactions.labelMine : $.project.reactions.label), {
-        name: text,
-        count,
-      }),
     }
   })
+  // L'auteur ne réagit pas à son propre projet ; un compte suspendu sans réaction à retirer non
+  // plus : tous deux voient les nombres seuls.
+  const readOnly = project.isMine || reactions.every((item) => item.locked)
 
   const onDelete = async () => {
     setBusy(true)
@@ -201,274 +200,174 @@ function ProjectView({ project }: { project: Project }) {
     router.replace('/')
   }
 
-  const hasRecipe = project.tools.length > 0 || project.timeSpent || project.prompts.length > 0
+  const edit = () => router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })
+  const report = () =>
+    router.push({ pathname: '/report', params: { kind: 'project', id: project.id } })
 
-  // La photo affichée en couverture, et ce qu'en annoncent les lecteurs d'écran.
-  const gallery = project.visuals
-  const photoLabel = (index: number) =>
-    t(($) => $.project.visuals.photo, { number: index + 1, total: gallery.length })
-  const portrait = large ? null : project.portraitCover
-  const shown: { visual: ProjectVisual; label: string } | null =
-    selected !== null && gallery[selected]
-      ? { visual: gallery[selected], label: photoLabel(selected) }
-      : portrait
-        ? { visual: portrait, label: t(($) => $.project.visuals.portraitLabel) }
-        : gallery[0]
-          ? { visual: gallery[0], label: photoLabel(0) }
-          : null
-  // Les vignettes servent dès qu'il y a autre chose à voir que la couverture affichée.
-  const showThumbnails = gallery.length > 1 || (portrait !== null && gallery.length > 0)
-  const thumbnails = showThumbnails ? (
-    <Thumbnails
-      items={gallery.map((visual, index) => ({
-        key: visual.id,
-        image: {
-          source: toSource(visual.url),
-          thumbhash: visual.thumbhash,
-          label: photoLabel(index),
-        },
-      }))}
-      // -1 : aucune vignette n'est sélectionnée (c'est la couverture verticale qui est affichée).
-      selected={selected ?? (portrait ? -1 : 0)}
-      onSelect={setSelected}
+  // « Copier le lien » du menu « … » : l'adresse publique du projet, rien d'autre (ui/share.ts),
+  // puis un toast qui dit qui pourra l'ouvrir (jur-3, jur-5). Le menu s'est déjà refermé.
+  const copyLink = async () => {
+    const url = shareUrl({ kind: 'project', id: project.id })
+    if (!url) return
+    const done = await copyText(url)
+    if (!done) {
+      toast.show(
+        t(($) => $.share.copyFailed),
+        { icon: 'warning-circle' },
+      )
+      return
+    }
+    toast.show(
+      project.visibility === 'private'
+        ? t(($) => $.share.copiedPrivate)
+        : t(($) => $.share.copiedMembers),
+      { icon: 'check-circle' },
+    )
+  }
+  // Le menu « … » : copier le lien, puis signaler (un autre membre) ou modifier (l'auteur, sauf
+  // projet retiré par la modération ou compte suspendu : l'API refuserait).
+  const menuItems: ActionMenuItem[] = [
+    { label: t(($) => $.share.copy), icon: 'link', onPress: () => void copyLink() },
+    ...(project.isMine
+      ? project.removal || suspended
+        ? []
+        : [{ label: t(($) => $.project.page.edit), icon: 'pencil-simple' as const, onPress: edit }]
+      : [{ label: t(($) => $.report.project), icon: 'flag' as const, onPress: report }]),
+  ]
+  // Partager et « … » : posés sur la photo (téléphone) ou en haut de la page (tablette, ordinateur).
+  const pageActions = (
+    <>
+      <IconButton
+        icon="share-network"
+        label={t(($) => $.share.action)}
+        onPress={() => setSharing(true)}
+      />
+      <ActionMenu variant="glass" items={menuItems} />
+    </>
+  )
+
+  // La capsule des réactions (un autre membre). Sur un compte suspendu, l'éventail ne s'ouvre pas :
+  // il ne pourrait y poser aucune réaction nouvelle (rien n'est décidé pour lui, U3).
+  const capsule = readOnly ? null : (
+    <ReactionCapsule
+      reactions={reactions}
+      onToggle={reaction.toggle}
+      onOpenFan={() => {
+        if (!suspended) setFanOpen(true)
+      }}
+      error={
+        reaction.expired
+          ? t(($) => $.states.expired)
+          : reaction.error
+            ? t(($) => $.project.reactions.error)
+            : undefined
+      }
+      errorAction={reaction.expired ? signInAgain() : undefined}
+    />
+  )
+  const ownReactions = readOnly ? (
+    <OwnReactions
+      reactions={reactions.map(({ kind, count }) => ({ kind, count }))}
+      viewer={project.isMine ? 'author' : 'suspended'}
     />
   ) : null
 
-  // Les morceaux de la page, assemblés différemment sur téléphone et sur ordinateur.
-  // Sur téléphone, une couverture verticale a besoin de hauteur pour ne pas être trop recadrée.
-  const cover = (
-    // La photo qui grandit depuis la carte touchée : cachée au lecteur d'écran pendant son vol, puis
-    // le focus va au titre.
-    <CoverArrival id={project.id} focusOnArrival={titleRef} radius={large ? 'tile' : 'sheet'}>
-      <ProjectCover
-        // Sans photo, la couverture n'est qu'une lumière miel : une bande basse suffit.
-        height={
-          !shown ? 'band' : columns ? 'hero' : shown.visual === portrait ? 'portrait' : 'band'
-        }
-        radius={large ? 'tile' : 'sheet'}
-        image={
-          shown
-            ? {
-                source: toSource(shown.visual.url),
-                thumbhash: shown.visual.thumbhash,
-                label: shown.label,
+  // La galerie. Sur téléphone, bord à bord sous la barre d'état, sauf sous le bandeau d'un compte
+  // suspendu (la photo le couvrirait) ; Retour, Partager et « … » posés dessus. Ailleurs, coins
+  // arrondis et la capsule à cheval sur son bas.
+  const bleed = !large && !suspended
+  const gallery = (
+    // La photo qui grandit depuis la carte touchée : cachée au lecteur d'écran pendant son vol,
+    // puis le focus va au titre.
+    <CoverArrival
+      id={project.id}
+      focusOnArrival={titleRef}
+      {...(large ? { radius: 'tile' as const } : null)}
+    >
+      <PhotoGallery
+        photos={project.visuals.map((visual) => ({
+          key: visual.id,
+          source: toSource(visual.url),
+          thumbhash: visual.thumbhash,
+        }))}
+        title={project.title}
+        bleed={bleed}
+        onIndexChange={setPhotoIndex}
+        overlay={
+          large ? (
+            capsule ? (
+              <CoverStraddle>{capsule}</CoverStraddle>
+            ) : null
+          ) : (
+            <CoverControls
+              start={
+                <IconButton
+                  icon="arrow-left"
+                  label={t(($) => $.project.page.back)}
+                  onPress={back}
+                />
               }
-            : null
+              end={pageActions}
+            />
+          )
         }
-      >
-        {large ? null : (
-          <Row padding="lg">
-            <IconButton icon="arrow-left" label={t(($) => $.common.back)} onPress={back} />
-          </Row>
-        )}
-      </ProjectCover>
+      />
     </CoverArrival>
   )
 
-  const info = (
-    <Stack gap="lg">
-      <StatusPill
-        label={t(($) => $.project.status[project.status])}
-        strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
-      />
-      {/* En colonnes, le titre est au-dessus des deux colonnes (voir plus bas). */}
-      {columns ? null : (
-        <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
-          {project.title}
-        </Text>
-      )}
-      <Pressed
-        label={t(($) => $.member.open, {
-          nameOf: nameOf(project.author.name),
-        })}
-        role="link"
-        describedBy={publishedId}
-        onPress={() =>
-          router.push({ pathname: '/members/[id]', params: { id: project.author.id } })
-        }
-      >
-        <Row gap="md">
-          <Avatar
-            name={project.author.name}
-            source={toSource(project.author.avatarUrl)}
-            label={project.author.name}
-            size={44}
-          />
-          <Stack gap="xxs" grow>
-            <Text weight={700}>{project.author.name}</Text>
-            {/* « publié hier », « publié le 12 oct. » : la date dans sa phrase, à côté du nom
-                (une vue sur le web, jamais dans un texte) ; lue « publié le 12 octobre à 10:00 ». */}
-            <Stack nativeID={publishedId}>
-              <RelativeTime
-                date={project.createdAt}
-                phrase={({ afterVerb, full }) => ({
-                  label: t(($) => $.project.page.publishedWhen, { when: afterVerb }),
-                  spoken: t(($) => $.project.page.published, { date: full }),
-                })}
-              />
-            </Stack>
-          </Stack>
-        </Row>
-      </Pressed>
-      {project.visibility === 'private' ? (
-        <Notice tone="info" message={t(($) => $.project.page.private)} />
-      ) : null}
-      <Text variant="headline" tone="secondary" weight={400} readable>
-        {project.pitch}
-      </Text>
-      {project.demoUrl ? (
-        <Stack gap="sm">
-          <Button
-            label={t(($) => $.project.page.tryDemo)}
-            icon="arrow-up-right"
-            onPress={() => openOutside(project.demoUrl ?? '')}
-          />
-          {/* On annonce toujours le site extérieur, avant même la page d'avertissement. */}
-          <Hint
-            icon="globe-simple"
-            text={t(($) => $.project.page.external, { host: hostOf(project.demoUrl) })}
-          />
-        </Stack>
-      ) : (
-        <Text tone="muted">{t(($) => $.project.page.noDemo)}</Text>
-      )}
-      {/* Suivre, après la démo : on lit d'abord le projet, puis on décide de le suivre. Seulement le
-          projet d'un autre ; l'auteur voit seulement le nombre d'abonnés.
-          Le menu « … » (tranche 7b, « Signaler ce projet ») au bout de la même rangée, en haut :
-          dans l'axe de « Suivre ce projet », même quand un message d'erreur s'ajoute dessous. Il
-          s'ouvre vers la gauche (`align="end"`), au-dessus de sa colonne : à 1440 points, ouvert
-          depuis le bord gauche de la colonne latérale, il couvrait le Journal (relecture 7b).
-          Jamais sur son propre projet, où il n'aurait rien à offrir (pas de menu vide). */}
-      {project.isMine ? (
-        <FollowerCount text={followers} />
-      ) : (
-        <Row align="start" gap="md">
-          <Stack grow>
-            {/* Suspendu, sans suivre ce projet (tranche 7c) : le nombre d'abonnés seul, comme pour
-                l'auteur ; le menu « … » reste (signaler est toujours permis). */}
-            {canFollow ? (
-              <FollowButton
-                followed={project.isFollowed}
-                onPress={follow.toggle}
-                // Le nom lu reprend le texte affiché, « Projet suivi » une fois suivi (MemberScreen).
-                label={
-                  project.isFollowed
-                    ? t(($) => $.follow.projectFollowing)
-                    : t(($) => $.follow.project)
-                }
-                text={
-                  project.isFollowed
-                    ? t(($) => $.follow.projectFollowing)
-                    : t(($) => $.follow.project)
-                }
-                caption={followers}
-                error={
-                  follow.expired
-                    ? t(($) => $.states.expired)
-                    : follow.error
-                      ? t(($) => $.follow.error)
-                      : undefined
-                }
-                errorAction={follow.expired ? signInAgain() : undefined}
-                prominent={false}
-                // Suspendu, le suivi retiré : il reste à sa place, inactif (un nouveau suivi serait
-                // refusé par l'API, 403), comme sur la page d'un membre.
-                disabled={suspended && !project.isFollowed}
-              />
-            ) : (
-              <FollowerCount text={followers} />
-            )}
-          </Stack>
-          <ActionMenu
-            align="end"
-            items={[
-              {
-                label: t(($) => $.report.project),
-                icon: 'flag',
-                onPress: () =>
-                  router.push({ pathname: '/report', params: { kind: 'project', id: project.id } }),
-              },
-            ]}
-          />
-        </Row>
-      )}
-      {/* Réagir, après Suivre. L'auteur ne réagit pas à son propre projet : il voit les nombres. */}
-      {project.isMine ? (
-        <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.own)} />
-      ) : reactions.every((item) => item.locked) ? (
-        // Suspendu, sans réaction à retirer : les nombres seuls (il lit tout ce qu'il lisait). La
-        // légende nomme la liste, comme pour l'auteur.
-        <ReactionBar items={reactions} readOnly caption={t(($) => $.project.reactions.readOnly)} />
-      ) : (
-        <ReactionBar
-          items={reactions}
-          onToggle={reaction.toggle}
-          label={t(($) => $.project.reactions.group)}
-          error={
-            reaction.expired
-              ? t(($) => $.states.expired)
-              : reaction.error
-                ? t(($) => $.project.reactions.error)
-                : undefined
-          }
-          errorAction={reaction.expired ? signInAgain() : undefined}
-        />
-      )}
-    </Stack>
+  const header = <ProjectHeader project={project} titleRef={titleRef} />
+  const actions = (
+    <ProjectActions
+      project={project}
+      onOpenDemo={() => {
+        if (project.demoUrl) openDemo(project.demoUrl, project.id)
+      }}
+      onEdit={edit}
+    />
   )
 
   // Retiré par la modération (tranche 7a) : l'auteur, seul à le voir encore, lit en tête pourquoi,
   // et comment contester.
   const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
 
-  const recipe = hasRecipe ? (
-    <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" heading={2}>
-        {t(($) => $.project.page.recipe)}
-      </Text>
-      {project.tools.length > 0 ? (
-        <Stack gap="sm">
-          <Text variant="caption" weight={600} tone="muted">
-            {t(($) => $.project.page.tools)}
-          </Text>
-          <Stack direction="row" gap="sm" wrap>
-            {project.tools.map((tool) => (
-              <Tag
-                key={tool.slug}
-                label={tool.label}
-                onPress={() =>
-                  router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })
-                }
-              />
-            ))}
+  // La recette : les outils et le temps passé (jusqu'à R6). Les prompts ont leur propre bloc.
+  const recipe =
+    project.tools.length > 0 || timeSpent ? (
+      <Surface variant="grouped" padding="xl" gap="lg">
+        <Text variant="heading" heading={2}>
+          {t(($) => $.project.page.recipe)}
+        </Text>
+        {project.tools.length > 0 ? (
+          <Stack gap="sm">
+            <Text variant="caption" weight={600} tone="muted">
+              {t(($) => $.project.page.tools)}
+            </Text>
+            <Stack direction="row" gap="sm" wrap>
+              {project.tools.map((tool) => (
+                <Tag
+                  key={tool.slug}
+                  label={tool.label}
+                  onPress={() =>
+                    router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })
+                  }
+                />
+              ))}
+            </Stack>
           </Stack>
-        </Stack>
-      ) : null}
-      {timeSpent ? (
-        <Stack gap="sm">
-          <Text variant="caption" weight={600} tone="muted">
-            {t(($) => $.project.page.timeSpent)}
-          </Text>
-          <Row gap="sm">
-            <Icon name="clock" size={20} tone="amber" />
-            <Text weight={600}>{t(($) => $.project.timeSpent[timeSpent])}</Text>
-          </Row>
-        </Stack>
-      ) : null}
-      {project.prompts.length > 0 ? (
-        <Stack gap="sm">
-          <Text variant="caption" weight={600} tone="muted">
-            {t(($) => $.project.page.prompts)}
-          </Text>
-          {project.prompts.map((prompt, i) => (
-            // Les prompts sont affichés tels quels, sans mise en forme : on voit le vrai texte.
-            // biome-ignore lint/suspicious/noArrayIndexKey: deux prompts peuvent être identiques
-            <CodeBlock key={i}>{prompt}</CodeBlock>
-          ))}
-        </Stack>
-      ) : null}
-    </Surface>
-  ) : null
+        ) : null}
+        {timeSpent ? (
+          <Stack gap="sm">
+            <Text variant="caption" weight={600} tone="muted">
+              {t(($) => $.project.page.timeSpent)}
+            </Text>
+            <Row gap="sm">
+              <Icon name="clock" size={20} tone="amber" />
+              <Text weight={600}>{t(($) => $.project.timeSpent[timeSpent])}</Text>
+            </Row>
+          </Stack>
+        ) : null}
+      </Surface>
+    ) : null
 
   const description = project.description ? (
     <Stack gap="md">
@@ -479,29 +378,40 @@ function ProjectView({ project }: { project: Project }) {
     </Stack>
   ) : null
 
-  const ownerActions = project.isMine ? (
+  // Le prompt de départ et les autres (repliés). Sans prompt, rien : pas même une place vide.
+  const prompt = project.prompts.length > 0 ? <PromptBlock prompts={project.prompts} /> : null
+
+  // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
+  const journal =
+    project.isMine || project.notes.length > 0 ? (
+      <Journal project={project} suspended={suspended} />
+    ) : null
+  // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
+  const comments = <Comments project={project} />
+
+  // « Signaler ce projet », un lien gris en bas de la page, en plus du menu « … » (F-Pr12). Jamais
+  // sur son propre projet. Dans une rangée : le lien garde la largeur de son texte.
+  const reportLink = project.isMine ? null : (
+    <Row>
+      <TextLink label={t(($) => $.project.page.report)} tone="muted" onPress={report} />
+    </Row>
+  )
+
+  // « Supprimer » garde sa place d'aujourd'hui, après les commentaires, jusqu'à R6 ; « Modifier »
+  // est monté dans les actions, sous le titre.
+  const deletion = project.isMine ? (
     <Stack gap="md">
       {error ? <Notice message={error} /> : null}
-      {/* Un projet retiré ne se modifie plus (l'API refuserait, 409 `removed`) ; il se supprime.
-          Un compte suspendu non plus (tranche 7c) : il peut encore supprimer. */}
-      {project.removal || suspended ? null : (
+      <Row>
         <Button
-          label={t(($) => $.project.page.edit)}
-          variant="secondary"
-          icon="pencil-simple"
-          onPress={() =>
-            router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })
-          }
+          label={t(($) => $.project.page.delete)}
+          variant="danger"
+          icon="trash"
+          onPress={() => setConfirming(true)}
         />
-      )}
-      <Button
-        label={t(($) => $.project.page.delete)}
-        variant="danger"
-        icon="trash"
-        onPress={() => setConfirming(true)}
-      />
-      {/* Supprimer est définitif : une fenêtre demande confirmation, avec le titre du projet. */}
-      {/* guardTaps : la fenêtre s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une
+      </Row>
+      {/* Supprimer est définitif : une fenêtre demande confirmation, avec le titre du projet.
+          guardTaps : la fenêtre s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une
           seconde tape trop rapide n'y décide rien (design 7b). */}
       <Dialog
         visible={confirming}
@@ -525,79 +435,142 @@ function ProjectView({ project }: { project: Project }) {
     </Stack>
   ) : null
 
-  // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
-  const journal =
-    project.isMine || project.notes.length > 0 ? (
-      <Journal project={project} suspended={suspended} />
-    ) : null
-  // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
-  const comments = <Comments project={project} />
+  // Les couches de la page, montées dès l'arrivée, fermées : l'éventail lit au montage s'il doit
+  // montrer son aide (rien ne pousse ses lignes à l'ouverture), la feuille rend le focus à
+  // « Partager » quand elle se ferme.
+  const layers = (
+    <>
+      {capsule && !suspended ? (
+        <ReactionFan
+          open={fanOpen}
+          reactions={reactions.map(({ kind, count, mine }) => ({ kind, count, mine }))}
+          onToggle={reaction.toggle}
+          onClose={() => setFanOpen(false)}
+        />
+      ) : null}
+      <ShareSheet
+        open={sharing}
+        onClose={() => setSharing(false)}
+        title={project.title}
+        target={{ kind: 'project', id: project.id }}
+        visibility={project.visibility}
+        image={project.visuals[0] ? toSource(project.visuals[0].url) : null}
+      />
+    </>
+  )
 
-  // La lumière d'ambiance prend la couleur de la photo affichée (sans photo : la lumière miel).
-  const thumbhash = shown?.visual.thumbhash ?? null
+  // La lumière d'ambiance prend la couleur de la photo montrée (sans photo : la lumière miel).
+  const thumbhash = project.visuals[photoIndex]?.thumbhash ?? null
 
-  if (columns) {
+  if (large) {
     return (
       <Screen
         width="page"
         header={<TopNav />}
         onBack={back}
+        // « Retour » écrit en toutes lettres, d'où qu'on arrive (ui-11).
+        backLabel={t(($) => $.project.page.back)}
+        topAction={
+          <Row gap="sm" align="center">
+            {pageActions}
+          </Row>
+        }
         thumbhash={thumbhash}
         pageTitle={project.title}
       >
-        {/* Le titre au-dessus des colonnes, sur toute la largeur : dans la colonne latérale, un
-            titre long passait sur sept lignes. */}
-        {faded(
-          <Text variant={wide ? 'display' : 'title1'} heading={1} breakAnywhere focusRef={titleRef}>
-            {project.title}
-          </Text>,
-        )}
         {faded(removal)}
-        <Columns
-          main={
-            <>
-              {cover}
-              {faded(thumbnails)}
-              {faded(description)}
-              {/* Ce qui se lit longtemps va dans la colonne principale ; la latérale garde les
-                  informations et les actions. */}
-              {faded(journal)}
-              {faded(comments)}
-            </>
-          }
-          side={
-            <>
-              {faded(info)}
-              {faded(recipe)}
-              {faded(ownerActions)}
-            </>
-          }
-        />
+        {columns ? (
+          // Deux rangées, dans l'ordre de lecture : la galerie (et la capsule) | l'en-tête, les
+          // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation.
+          <Columns
+            divided
+            rows={[
+              {
+                main: (
+                  <>
+                    {gallery}
+                    {faded(ownReactions)}
+                  </>
+                ),
+                side: (
+                  <>
+                    {faded(header)}
+                    {faded(actions)}
+                    {faded(recipe)}
+                  </>
+                ),
+              },
+              {
+                main: (
+                  <>
+                    {faded(description)}
+                    {faded(prompt)}
+                    {faded(journal)}
+                    {faded(reportLink)}
+                  </>
+                ),
+                side: (
+                  <>
+                    {faded(comments)}
+                    {faded(deletion)}
+                  </>
+                ),
+              },
+            ]}
+          />
+        ) : (
+          // Tablette : une seule colonne, dans l'ordre du téléphone.
+          <>
+            {gallery}
+            {faded(header)}
+            {faded(actions)}
+            {faded(ownReactions)}
+            {faded(recipe)}
+            {faded(description)}
+            {faded(prompt)}
+            {faded(journal)}
+            {faded(comments)}
+            {faded(reportLink)}
+            {faded(deletion)}
+          </>
+        )}
+        {layers}
       </Screen>
     )
   }
+
+  const page = (
+    <>
+      {faded(removal)}
+      {faded(header)}
+      {faded(actions)}
+      {faded(ownReactions)}
+      {faded(recipe)}
+      {faded(description)}
+      {faded(prompt)}
+      {faded(journal)}
+      {/* La conversation vient après le projet ; « Signaler » et « Supprimer » ferment la page. */}
+      {faded(comments)}
+      {faded(reportLink)}
+      {faded(deletion)}
+    </>
+  )
   return (
     <Screen
       thumbhash={thumbhash}
       pageTitle={project.title}
-      // Sur tablette : toute la largeur, la barre du haut, et le retour hors de la couverture.
-      {...(large ? { width: 'page' as const, header: <TopNav />, onBack: back } : null)}
+      // La capsule flotte en bas de l'écran, hors du défilement : lue après tout le contenu
+      // (décision de Louis du 2/11/2026). Screen réserve sa hauteur sous la page.
+      floating={capsule}
     >
       {/* Sur téléphone, la barre du haut ne montre que le bandeau d'un compte suspendu (tranche
-          7c), au-dessus de la couverture ; sinon elle ne dessine rien. Posée dans le contenu
-          plutôt qu'en `header` : vide, elle n'y ajoute aucun écart au-dessus de la couverture. */}
-      {large ? null : <TopNav />}
-      {cover}
-      {faded(thumbnails)}
-      {faded(removal)}
-      {faded(info)}
-      {faded(recipe)}
-      {faded(description)}
-      {faded(journal)}
-      {/* La conversation vient après le projet ; « Modifier » et « Supprimer », que l'auteur
-          cherche moins souvent, ferment la page. */}
-      {faded(comments)}
-      {faded(ownerActions)}
+          7c), au-dessus de la galerie ; sinon elle ne dessine rien. */}
+      <TopNav />
+      {gallery}
+      {/* La feuille qui remonte sur le bas de la photo bord à bord ; sous le bandeau d'un compte
+          suspendu, la galerie garde ses marges et la page suit simplement. */}
+      {bleed ? <CoverSheet>{page}</CoverSheet> : page}
+      {layers}
     </Screen>
   )
 }
