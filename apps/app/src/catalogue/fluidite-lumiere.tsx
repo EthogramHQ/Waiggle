@@ -84,10 +84,10 @@ const sourceName = (source: AmbientSource, l: Labels) => {
 
 /** Ce que la lumière commune dessine, lu comme elle le lit (useAmbientSource). */
 function DrawnReadout({ l }: { l: Labels }) {
-  const { source, lit } = useAmbientSource()
+  const { source, wanted } = useAmbientSource()
   return (
     <Text variant="caption" tone="secondary">
-      {`${l.drawn} ${lit ? sourceName(source, l) : l.none}`}
+      {`${l.drawn} ${wanted ? sourceName(source, l) : l.none}`}
     </Text>
   )
 }

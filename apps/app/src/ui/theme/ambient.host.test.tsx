@@ -24,9 +24,9 @@ const pulses: number[] = []
 
 /** Ce que la lumière commune dessine, en texte ; elle note aussi ses impulsions. */
 function Readout() {
-  const { source, lit, onPulse } = useAmbientSource()
+  const { source, wanted, onPulse } = useAmbientSource()
   useEffect(() => onPulse((force) => pulses.push(force)), [onPulse])
-  return <Text>{`drawn:${lit ? JSON.stringify(source) : 'off'}`}</Text>
+  return <Text>{`drawn:${wanted ? JSON.stringify(source) : 'off'}`}</Text>
 }
 
 const drawn = (source: AmbientSource) => `drawn:${JSON.stringify(source)}`

@@ -12,7 +12,7 @@
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { AmbientLight } from './AmbientLight'
-import { AmbientHostProvider } from './theme/ambient'
+import { AmbientHostProvider, useAmbientSource } from './theme/ambient'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -24,20 +24,31 @@ export const ambientStackStyle = { backgroundColor: 'transparent' } as const
 
 /**
  * L'hôte : le fond de l'appli (`colors.background`), la lumière commune par-dessus, puis la pile.
- * La lumière lit la source de l'écran retenu par le registre (useAmbientSource) ; aucun écran
- * affiché ne veut de lumière (le miel) : elle reçoit `null` et `lit` faux, et s'efface.
  */
 export function AmbientHost({ children }: { children: ReactNode }) {
   const { colors } = useTheme()
   return (
     <AmbientHostProvider>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        {/* La lumière se place elle-même sur tout le cadre (StyleSheet.absoluteFill), muette pour
-            les lecteurs d'écran, et laisse passer les touchers. Posée avant la pile, elle est
-            peinte dessous. */}
-        <AmbientLight />
+        <HostLight />
         <View style={{ flex: 1 }}>{children}</View>
       </View>
     </AmbientHostProvider>
   )
+}
+
+/**
+ * La lumière commune : la source de l'écran retenu par le registre (theme/ambient.tsx). Quand
+ * aucun écran affiché ne veut de lumière (le miel, `ambient={false}`, aucun écran inscrit), elle
+ * reçoit `off` : elle s'efface en fondu, puis rend son canvas. Elle se place elle-même sur tout le
+ * cadre (StyleSheet.absoluteFill), muette pour les lecteurs d'écran, et laisse passer les
+ * touchers ; posée avant la pile, elle est peinte dessous.
+ */
+function HostLight() {
+  const { source, wanted } = useAmbientSource()
+  // `off` vient de la lumière de la même tranche (LightSwitch, ui/AmbientLightSoft.tsx), écrite en
+  // même temps ailleurs : passé par un objet étalé tant que son type n'est pas encore là, sans quoi
+  // TypeScript refuserait la prop. À l'assemblage, s'écrit `off={!wanted}`.
+  const lightSwitch = { off: !wanted }
+  return <AmbientLight source={source} {...lightSwitch} />
 }

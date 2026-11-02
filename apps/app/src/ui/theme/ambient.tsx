@@ -188,11 +188,11 @@ type AmbientState = {
   /**
    * Une lumière est-elle voulue ? Toujours vrai hors de l'hôte. Dans l'hôte (le web), faux quand
    * l'écran affiché n'en veut pas (le miel, `ambient={false}`) ou qu'aucun écran inscrit n'est
-   * affiché : la source vaut alors `null`, et la lumière s'efface en fondu puis rend son canvas
-   * (AmbientLight.web.tsx). `null` seul ne suffit pas à le dire : c'est aussi la lumière miel d'un
-   * écran sans visuel (le Fil).
+   * affiché : l'hôte rend alors `<AmbientLight off />`, qui s'efface en fondu puis rend son
+   * canvas. Une source `null` ne le dit jamais : `null`, c'est la lumière miel (un écran sans
+   * visuel, le Fil). Pendant le fondu de sortie, la source reste la dernière dessinée.
    */
-  lit: boolean
+  wanted: boolean
   /** S'abonner aux impulsions (déjà fusionnées) ; renvoie de quoi se désabonner. */
   onPulse: (listener: PulseListener) => () => void
 }
@@ -203,7 +203,7 @@ const AmbientActions = createContext<Ambient | null>(null)
 const AmbientStateContext = createContext<AmbientState | null>(null)
 
 const inert: Ambient = { setSource: () => {}, pulse: () => {} }
-const noSource: AmbientState = { source: null, lit: true, onPulse: () => () => {} }
+const noSource: AmbientState = { source: null, wanted: true, onPulse: () => () => {} }
 
 /**
  * Hook : le canal des impulsions, commun au fournisseur d'un écran et à l'hôte. `pulse` prévient
@@ -254,7 +254,7 @@ export function AmbientProvider({
   }, [])
 
   const actions = useMemo(() => ({ setSource, pulse }), [setSource, pulse])
-  const state = useMemo(() => ({ source, lit: true, onPulse }), [source, onPulse])
+  const state = useMemo(() => ({ source, wanted: true, onPulse }), [source, onPulse])
   return (
     <AmbientActions.Provider value={actions}>
       <AmbientStateContext.Provider value={state}>{children}</AmbientStateContext.Provider>
@@ -299,23 +299,24 @@ type AmbientRegistry = {
 const AmbientRegistryContext = createContext<AmbientRegistry | null>(null)
 
 /** Ce que l'hôte dessine : la source de l'écran retenu, et s'il veut une lumière. */
-type Drawn = { id: string | null; source: AmbientSource; lit: boolean }
+type Drawn = { id: string | null; source: AmbientSource; wanted: boolean }
 
 /**
  * L'écran dont l'hôte dessine la lumière : parmi les écrans affichés, celui qui l'est devenu en
  * dernier. Ce n'est pas « le premier qui se dit affiché » : pendant un changement de page, deux
  * écrans peuvent se dire affichés un court instant, et c'est le passage à « affiché », un
  * événement daté, qui départage (ui-11). Aucun écran affiché, ou l'écran retenu ne veut pas de
- * lumière : aucune lumière (source `null`, `lit` faux).
+ * lumière : `wanted` faux, et la source reste celle d'avant (`previous`), pour que la lumière
+ * s'efface dans ses couleurs au lieu de virer au miel pendant son fondu de sortie.
  */
-const pickDrawn = (entries: Map<string, Registration>): Drawn => {
+const pickDrawn = (entries: Map<string, Registration>, previous: AmbientSource): Drawn => {
   let chosen: [string, Registration] | null = null
   for (const pair of entries) {
     const [, entry] = pair
     if (entry.focused && (chosen === null || entry.shownAt > chosen[1].shownAt)) chosen = pair
   }
-  if (chosen === null || !chosen[1].light) return { id: null, source: null, lit: false }
-  return { id: chosen[0], source: chosen[1].source, lit: true }
+  if (chosen === null || !chosen[1].light) return { id: null, source: previous, wanted: false }
+  return { id: chosen[0], source: chosen[1].source, wanted: true }
 }
 
 /**
@@ -331,16 +332,23 @@ export function AmbientHostProvider({ children }: { children: ReactNode }) {
   const shownCount = useRef(0)
   // Avant toute inscription (la page pré-rendue, le premier affichage), la lumière miel : c'est ce
   // que le serveur dessine, et le premier affichage du navigateur doit lui être identique.
-  const [drawn, setDrawn] = useState<Drawn>({ id: null, source: null, lit: true })
+  const [drawn, setDrawn] = useState<Drawn>({ id: null, source: null, wanted: true })
   // L'écran dessiné, lu par `pulse` sans attendre un nouveau rendu.
   const drawnId = useRef<string | null>(null)
   const { pulse: pulseLight, onPulse } = usePulseChannel()
 
+  // La dernière source choisie, gardée pendant le fondu de sortie (pickDrawn).
+  const lastSource = useRef<AmbientSource>(null)
+
   const refresh = useCallback(() => {
-    const next = pickDrawn(entries.current)
+    const next = pickDrawn(entries.current, lastSource.current)
+    // Lus par les gestes (pulse, le prochain refresh) aussitôt, sans attendre le rendu.
     drawnId.current = next.id
+    lastSource.current = next.source
     setDrawn((current) =>
-      current.id === next.id && current.lit === next.lit && sameSource(current.source, next.source)
+      current.id === next.id &&
+      current.wanted === next.wanted &&
+      sameSource(current.source, next.source)
         ? current
         : next,
     )
@@ -402,8 +410,8 @@ export function AmbientHostProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const state = useMemo(
-    () => ({ source: drawn.source, lit: drawn.lit, onPulse }),
-    [drawn.source, drawn.lit, onPulse],
+    () => ({ source: drawn.source, wanted: drawn.wanted, onPulse }),
+    [drawn.source, drawn.wanted, onPulse],
   )
   return (
     <AmbientRegistryContext.Provider value={registry}>
