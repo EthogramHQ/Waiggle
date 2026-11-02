@@ -451,3 +451,38 @@ describe('ReactionFan', () => {
     })
   })
 })
+
+// Décision de Louis du 2/11 : à partir de 1 000, le nombre s'écrit en court ; le nom lu garde le
+// nombre entier.
+describe('ReactionFan, large counts', () => {
+  const big: FanReaction[] = [
+    { kind: 'amazing', count: 1234, mine: false },
+    { kind: 'inspiring', count: 0, mine: false },
+    { kind: 'useful', count: 5, mine: false },
+    { kind: 'funny', count: 12345, mine: true },
+    { kind: 'bravo', count: 21, mine: false },
+  ]
+
+  it('shows 1 234 reactions as « 1,2 k » and reads the whole number on a row', async () => {
+    await show({ reactions: big })
+
+    expect(screen.getByText('1,2 k')).toBeTruthy()
+    expect(screen.queryByText('1234')).toBeNull()
+    expect(screen.getByRole('button', { name: rowName('amazing', 1234) })).toBeTruthy()
+    // Un petit nombre reste tel quel (témoin).
+    expect(screen.getByText('21')).toBeTruthy()
+  })
+
+  it('shortens the count of her own reaction too', async () => {
+    await show({ reactions: big })
+
+    expect(screen.getByText('12,3 k')).toBeTruthy()
+  })
+
+  it('writes it « 1.2K » in English', async () => {
+    await renderWithProviders(<Fan reactions={big} />, 'en')
+    await act(async () => {})
+
+    expect(screen.getByText('1.2K')).toBeTruthy()
+  })
+})

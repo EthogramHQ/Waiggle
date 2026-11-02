@@ -13,12 +13,14 @@
 //
 // Aucun bouton : rien n'invite à toucher. Pour les lecteurs d'écran, une liste nommée par son titre,
 // dont chaque pastille est lue d'un seul tenant (« Waggle !, 21 »). Les pastilles passent à la ligne
-// quand la place manque (téléphone étroit, texte agrandi).
+// quand la place manque (téléphone étroit, texte agrandi). À partir de 1 000, le nombre s'écrit en
+// court (« 1,2 k », `shortCount`) ; le nom lu garde le nombre entier.
 import { radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { StyleSheet, View } from 'react-native'
 import { ReactionIcon } from './ReactionCapsule'
+import { shortCount } from './shortCount'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -80,7 +82,7 @@ export function OwnReactions({ reactions, viewer = 'author' }: Props) {
 
 /** Une réaction : l'icône, le nom et le nombre sur une pastille grise, lus d'un seul tenant. */
 function Pill({ reaction }: { reaction: OwnReaction }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { colors } = useTheme()
   const name = t(($) => $.project.reactions[reaction.kind])
   const { count } = reaction
@@ -99,7 +101,7 @@ function Pill({ reaction }: { reaction: OwnReaction }) {
       </Text>
       {/* tabular : des chiffres de même largeur, comme dans la capsule. */}
       <Text variant="callout" weight={700} tabular selectable={false}>
-        {count}
+        {shortCount(count, i18n.language)}
       </Text>
     </View>
   )

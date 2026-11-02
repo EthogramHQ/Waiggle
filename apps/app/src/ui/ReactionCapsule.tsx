@@ -19,6 +19,9 @@
 //
 // Étroit (320 points) ou texte agrandi (200 %) : la capsule ne défile jamais de côté ; les nombres
 // passent sous les icônes, dans chaque bouton.
+//
+// À partir de 1 000, le nombre s'écrit en court (« 1,2 k », `shortCount`), y compris celui qui roule ;
+// le nom lu garde le nombre entier (« Utile, 1234 »).
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import type { ReactionKind } from '@ruche/contracts'
 import { useEffect, useId, useRef, useState } from 'react'
@@ -40,6 +43,7 @@ import { bee, beeViewBox } from './logo.generated'
 import { Notice, type NoticeAction } from './Notice'
 import { BeeDance, ReactionBurst, RollingCount, useBounce } from './reactionMotion'
 import { Surface } from './Surface'
+import { shortCount } from './shortCount'
 import { Text } from './Text'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -287,6 +291,8 @@ type ButtonProps = {
 /** Une réaction qu'on peut poser ou retirer : un bouton qui reste enfoncé (miel plein). */
 function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }: ButtonProps) {
   const { colors } = useTheme()
+  // La langue, pour l'écriture courte du nombre (« 1,2 k » / « 1.2K »).
+  const { i18n } = useTranslation()
   // Comme les boutons : il s'enfonce légèrement sous le doigt, avec un ressort.
   const scale = useSharedValue(1)
   const sink = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
@@ -374,6 +380,7 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
           <RollingCount
             value={item.count}
             calm={calm}
+            format={(value) => shortCount(value, i18n.language)}
             render={(value) => (
               // tabular : des chiffres de même largeur, le bouton ne tressaute pas quand il change.
               <Text
@@ -383,7 +390,7 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
                 tabular
                 selectable={false}
               >
-                {value}
+                {shortCount(value, i18n.language)}
               </Text>
             )}
           />
@@ -398,6 +405,7 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
  * de liste nommé (« Bluffant, 9 »), lu d'un seul tenant.
  */
 function Locked({ item }: { item: Item }) {
+  const { i18n } = useTranslation()
   return (
     <View
       // accessible : sur téléphone, l'élément est lu d'un seul tenant ; sur le web, le rôle suffit.
@@ -408,7 +416,7 @@ function Locked({ item }: { item: Item }) {
     >
       <ReactionIcon kind={item.kind} />
       <Text variant="callout" weight={700} tone="secondary" tabular selectable={false}>
-        {item.count}
+        {shortCount(item.count, i18n.language)}
       </Text>
     </View>
   )
