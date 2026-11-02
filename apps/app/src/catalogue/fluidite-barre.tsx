@@ -15,6 +15,7 @@ import { NavLinks } from '../ui/NavLinks'
 import { ScreenTopBar } from '../ui/ScreenTopBar'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
+import { SuspensionBanner } from '../ui/SuspensionBanner'
 import { ScreenScrollContext, useScreenScrollChannel } from '../ui/scrollLight'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
@@ -26,6 +27,10 @@ const fr = {
   pinned: 'Fixe, avec son voile',
   below: 'Fixe, avec ce qui se pose dessous (le bouton des nouveautés du Fil)',
   flow: 'Dans le flux : elle remonte avec la page',
+  suspended:
+    'Fixe, avec le bandeau de suspension replié sous la capsule (tout l’en-tête reste en place)',
+  suspendedOpen: 'Fixe, avec le bandeau de suspension déplié (« Détails »)',
+  suspensionText: 'Trois messages d’arnaque en deux jours, après deux retraits.',
   drop: 'La goutte glisse d’un lien à l’autre (touchez les liens ou les boutons) ; avec « Réduire les animations », elle se pose directement',
   card: 'Une carte du fil',
   news: '3 nouveautés',
@@ -40,6 +45,9 @@ const en: typeof fr = {
   pinned: 'Pinned, with its veil',
   below: 'Pinned, with what sits below it (the new items button of the Feed)',
   flow: 'In the flow: it scrolls away with the page',
+  suspended: 'Pinned, with the suspension banner folded under the capsule (the whole header stays)',
+  suspendedOpen: 'Pinned, with the suspension banner unfolded (“Details”)',
+  suspensionText: 'Three scam messages in two days, after two removals.',
   drop: 'The drop slides from one link to the next (touch the links or the buttons); with “Reduce motion”, it lands at once',
   card: 'A card of the feed',
   news: '3 new items',
@@ -77,6 +85,12 @@ export function FluidTopBarCatalogue() {
             <Example caption={`${l.flow} — ${l[scheme]}`}>
               <PageFrame labels={l} flow />
             </Example>
+            <Example caption={`${l.suspended} — ${l[scheme]}`}>
+              <PageFrame labels={l} suspension="folded" />
+            </Example>
+            <Example caption={`${l.suspendedOpen} — ${l[scheme]}`}>
+              <PageFrame labels={l} suspension="open" />
+            </Example>
             <Example caption={`${l.drop} — ${l[scheme]}`}>
               <DropExample />
             </Example>
@@ -110,10 +124,13 @@ function PageFrame({
   labels,
   belowBar,
   flow = false,
+  suspension,
 }: {
   labels: Labels
   belowBar?: ReactNode
   flow?: boolean
+  /** Le bandeau de suspension sous la capsule, replié ou déplié : il fait partie de l'en-tête fixe. */
+  suspension?: 'folded' | 'open'
 }) {
   const { t } = useTranslation()
   const scroll = useScreenScrollChannel()
@@ -122,21 +139,36 @@ function PageFrame({
   return (
     <Surface variant="grouped" padding="none">
       <ScreenScrollContext.Provider value={scroll.channel}>
-        <View style={{ height: 320, overflow: 'hidden' }}>
+        {/* Le bandeau déplié est haut : son cadre l'est aussi, pour qu'il ne soit pas rogné. */}
+        <View style={{ height: suspension === 'open' ? 520 : 320, overflow: 'hidden' }}>
           <ScreenTopBar belowBar={belowBar} brand={flow} onHeight={setReserve}>
-            <Surface variant="glass" radius="sheet" padding="sm">
-              <Row gap="md" paddingX="sm" wrap>
-                <NavLinks
-                  label={t(($) => $.nav.label)}
-                  links={[
-                    { key: 'feed', label: t(($) => $.nav.feed), href: '/' },
-                    { key: 'explore', label: t(($) => $.nav.explore), href: '/explore' },
-                  ]}
-                  active="feed"
-                  onPress={noop}
+            <Stack gap="sm">
+              <Surface variant="glass" radius="sheet" padding="sm">
+                <Row gap="md" paddingX="sm" wrap>
+                  <NavLinks
+                    label={t(($) => $.nav.label)}
+                    links={[
+                      { key: 'feed', label: t(($) => $.nav.feed), href: '/' },
+                      { key: 'explore', label: t(($) => $.nav.explore), href: '/explore' },
+                    ]}
+                    active="feed"
+                    onPress={noop}
+                  />
+                </Row>
+              </Surface>
+              {suspension ? (
+                <SuspensionBanner
+                  suspension={{
+                    since: '2026-10-26T23:30:00.000Z',
+                    endsAt: '2026-11-02T23:30:00.000Z',
+                    ground: 'rules',
+                    explanation: labels.suspensionText,
+                    afterReport: true,
+                  }}
+                  initiallyOpen={suspension === 'open'}
                 />
-              </Row>
-            </Surface>
+              ) : null}
+            </Stack>
           </ScreenTopBar>
           <ScrollView
             onScroll={scroll.handleScroll}

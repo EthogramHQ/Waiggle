@@ -5,7 +5,9 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform, StyleSheet, type ViewStyle } from 'react-native'
+import { arrivedFocusSuite, MORE, type PageState } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
+import { FeedEnd, useFirstArrived } from './FeedEnd'
 import { ListGroup, ListRow } from './ListGroup'
 import { Text } from './Text'
 
@@ -331,3 +333,41 @@ describe('a row with something on its right', () => {
     expect(styleOf(block).marginLeft).toBe('auto')
   })
 })
+
+// RF, jur-RF2 : une liste de lignes qui se lit par pages et finit sans phrase donne le focus à la
+// première ligne arrivée avec la page 2. `ListRow` branche la ref à deux endroits : sur la ligne
+// touchable (`Pressable`), ou, quand elle ne se touche pas, sur son cadre.
+const RowList = ({
+  names,
+  state,
+  touchable,
+}: {
+  names: string[]
+  state: PageState
+  touchable: boolean
+}) => {
+  const arrived = useFirstArrived(names.length, state === 'loading')
+  return (
+    <>
+      <ListGroup>
+        {names.map((name, index) => (
+          <ListRow
+            key={name}
+            label={name}
+            ref={index === arrived.index ? arrived.ref : undefined}
+            {...(touchable ? { onPress: () => {} } : null)}
+          />
+        ))}
+      </ListGroup>
+      <FeedEnd state={state} moreLabel={MORE} onMore={() => {}} firstArrived={arrived.ref} />
+    </>
+  )
+}
+
+arrivedFocusSuite('ListRow, a touchable row as the first arrived', () => (names, state) => (
+  <RowList names={names} state={state} touchable />
+))
+
+arrivedFocusSuite('ListRow, a plain row as the first arrived', () => (names, state) => (
+  <RowList names={names} state={state} touchable={false} />
+))
