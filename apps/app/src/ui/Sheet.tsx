@@ -34,7 +34,7 @@ import { IconButton } from './IconButton'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
-import { useTapsAllowed } from './tapGuard'
+import { holdPageTaps, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -246,6 +246,23 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
         }
       : {}
 
+  // Une tape sur le voile. Pendant une action `busy`, rien. Pendant la garde d'ouverture, elle ne
+  // ferme rien, mais sur le web elle a déjà pris le focus (le voile est une `div` focalisable,
+  // `tabIndex` -1) : on le rend à « Fermer », pour que Tab reparte de la feuille (relecture R5a,
+  // une double tape sur « Partager »). Hors garde, elle ferme, et la page dessous ignore les tapes
+  // un moment : la seconde tape d'une double tape y tomberait (le « Retour » de la page, qui
+  // fermait la feuille puis quittait la page : mesuré à 390 et 1280 px).
+  const onScrimPress = busy
+    ? undefined
+    : () => {
+        if (!tapsAllowed) {
+          if (Platform.OS === 'web') focusWithoutScroll(closeRef.current)
+          return
+        }
+        requestClose()
+        holdPageTaps()
+      }
+
   // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
   // Une Échap déjà prise par la feuille (touche enfoncée) n'y compte pas une seconde fois.
   const onRequestClose = () => {
@@ -332,7 +349,7 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
         <Pressable
           accessibilityElementsHidden
           importantForAccessibility="no"
-          onPress={tapsAllowed && !busy ? requestClose : undefined}
+          onPress={onScrimPress}
           {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
           style={{ position: 'absolute', inset: 0 }}
         />

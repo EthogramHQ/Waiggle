@@ -89,15 +89,16 @@ function useShareContent({
   // React ait redessiné, d'où des `ref` plutôt qu'un état (comme « Copier » d'un prompt).
   const copying = useRef(false)
   const copyGuardUntil = useRef(0)
-  // La copie refusée par l'appareil : dite dans le pied de la feuille, jusqu'à la fermeture.
-  const [failed, setFailed] = useState(false)
+  // Ce que l'appareil a refusé : la copie (« copy ») ou le menu de partage (« system »), dit dans le
+  // pied de la feuille jusqu'à la fermeture ; `null` tant que rien n'a échoué.
+  const [failed, setFailed] = useState<'copy' | 'system' | null>(null)
   // À chaque réouverture, la feuille repart sans le message d'avant (une erreur se montre après un
   // geste, et disparaît quand on rouvre). Changer l'état pendant le dessin pour suivre une prop est
   // permis par React, et évite d'afficher l'ancien message le temps d'un dessin.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) setFailed(false)
+    if (open) setFailed(null)
   }
 
   if (!url) return null
@@ -114,10 +115,10 @@ function useShareContent({
     const done = await copy(url)
     copying.current = false
     if (!done) {
-      setFailed(true)
+      setFailed('copy')
       return
     }
-    setFailed(false)
+    setFailed(null)
     // La feuille d'abord, le toast ensuite (ui-8). La feuille disparaît sous le doigt : sur le web,
     // la seconde tape d'une double tape tomberait sur la page dessous (« Publier », une carte) ;
     // la page l'ignore le temps de la garde.
@@ -129,11 +130,14 @@ function useShareContent({
   }
 
   const onSystem = async () => {
+    setFailed(null)
     try {
       await shareLink(url)
     } catch {
       // Une panne du menu de l'appareil (autre qu'un menu refermé, déjà avalé par shareLink) : la
-      // feuille reste ouverte, avec « Copier le lien » à portée. Rien à annoncer de plus.
+      // feuille reste ouverte, avec « Copier le lien » à portée, et le dit dans son pied, comme une
+      // copie refusée (relecture de design R5a, C1 : le geste ne devait pas rester muet).
+      setFailed('system')
     }
   }
 
@@ -158,7 +162,10 @@ function useShareContent({
     ) : null
 
   const notice: SheetNotice | null = failed
-    ? { message: t(($) => $.share.copyFailed), tone: 'error' }
+    ? {
+        message: failed === 'copy' ? t(($) => $.share.copyFailed) : t(($) => $.share.systemFailed),
+        tone: 'error',
+      }
     : null
 
   return {

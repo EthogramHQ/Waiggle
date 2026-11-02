@@ -475,3 +475,56 @@ describe('the message of the pinned footer', () => {
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy()
   })
 })
+
+// Relecture de design R5a (C1) : sur le web, le voile qui disparaît sous le doigt laisse la seconde
+// tape d'une double tape tomber sur la page dessous (le « Retour » : on quittait la page), et
+// pendant la garde d'ouverture, cette tape sur le voile emportait le focus (une `div`).
+describe('the scrim on the web, against a double tap', () => {
+  const opener = { focus: jest.fn() }
+  /** Les écouteurs posés sur le document par `holdPageTaps` : les `click` à la capture. */
+  const clickGuards = () =>
+    (document.addEventListener as unknown as jest.Mock).mock.calls.filter(
+      ([type, , capture]) => type === 'click' && capture === true,
+    )
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.replaceProperty(Platform, 'OS', 'web')
+    jest.mocked(focusWithoutScroll).mockClear()
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument(opener),
+      configurable: true,
+    })
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('makes the page ignore taps for a moment when the scrim closes the sheet', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<StillSheet onClose={onClose} />)
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+    expect(clickGuards()).toHaveLength(0) // témoin : rien n'est retenu avant la fermeture
+
+    await fireEvent.press(scrim())
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(clickGuards()).toHaveLength(1)
+  })
+
+  it('gives the focus to « Fermer », not to the scrim, on a tap during the guard', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<StillSheet onClose={onClose} />)
+    jest.mocked(focusWithoutScroll).mockClear()
+
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS - 50))
+    await fireEvent.press(scrim())
+
+    expect(onClose).not.toHaveBeenCalled()
+    const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])
+    expect((focused.at(-1) as unknown as Host).props.accessibilityLabel).toBe(close)
+    expect(clickGuards()).toHaveLength(0) // rien n'a fermé : la page n'a rien à retenir
+  })
+})
