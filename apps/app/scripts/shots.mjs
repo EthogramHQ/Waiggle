@@ -1505,6 +1505,27 @@ const pages = [
   // n'a rien de neuf (la sphère en tête) ; « fil-vide » est le premier lancement (« Ton fil
   // t'attend » et les proches à suivre).
   { name: 'fil', path: '/', signedIn: true, feed: 'read-midway', fullPage: true },
+  // RF : le Fil défilé de 700 points. Sur ordinateur, la barre du haut reste fixée et le contenu
+  // passe dessous ; sur téléphone, rien ne change (pas de barre du haut).
+  {
+    name: 'fil-defile',
+    path: '/',
+    signedIn: true,
+    feed: 'read-midway',
+    prepare: async (page) => {
+      await page.evaluate(() => {
+        // La vraie zone de défilement de l'écran (la plus haute qui défile), comme pour fullPage.
+        const scrollers = [...document.querySelectorAll('div')].filter(
+          (el) =>
+            el.scrollHeight > el.clientHeight &&
+            ['auto', 'scroll'].includes(getComputedStyle(el).overflowY),
+        )
+        const main = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
+        if (main) main.scrollTop = 700
+        else window.scrollTo(0, 700)
+      })
+    },
+  },
   { name: 'fil-a-jour', path: '/', signedIn: true, feed: 'read-all', fullPage: true },
   { name: 'fil-vide', path: '/', signedIn: true, feed: 'nobody' },
   // R4 : le fil qui charge (la première page ne répond jamais : le squelette des cartes), puis le
