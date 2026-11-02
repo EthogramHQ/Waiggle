@@ -868,3 +868,93 @@ Hors de R5a, et où ça va :
 6. **L'aide de l'éventail** : retenue sur l'appareil (une fois par appareil, pas par compte).
 7. **Partager** : une feuille de Waiggle (avec le bandeau), puis le menu de l'appareil ; pas le menu
    de l'appareil directement, qui ne peut pas montrer le bandeau.
+
+---
+
+## RF — La fluidité (entre R5a et R5b)
+
+Statut : **validé par Louis** le 2/11/2026, tel quel (liste T1 à T13 comprise).
+
+Demandée par Louis le 2/11/2026 après R5a, depuis son expérience sur ordinateur : naviguer dans
+Waiggle doit donner une impression de continuité, sans coupure entre deux pages, et les textes ne
+disent plus ce que l'écran montre déjà. Aucun contrat d'API ne change ; aucune règle métier non
+plus.
+
+Ce qui existe aujourd'hui : chaque écran pose sa propre lumière d'ambiance (`ui/Screen.tsx`), qui
+repart de zéro à chaque page ; la barre du haut (`navigation/TopNav.tsx`, tablette et ordinateur
+seulement) défile avec la page ; sur le web, une page remplace l'autre d'un coup. Sur téléphone, il
+n'y a pas de barre du haut : la barre d'onglets du bas est déjà fixe.
+
+**La lumière continue d'une page à l'autre**
+- Étant donné un membre qui passe du Fil à Explorer, puis à la page d'un projet
+- Alors la lumière d'ambiance ne s'éteint pas et ne repart pas de zéro : c'est la même lumière,
+  posée une seule fois derrière toutes les pages, qui continue de couler
+- Et quand la nouvelle page a une autre source (la photo du projet), la lumière glisse vers ses
+  couleurs, en une fraction de seconde, au lieu de changer d'un coup
+- Et au retour, elle glisse vers les couleurs de la page retrouvée
+- Et sur le miel vif (connexion, inscription), le miel remplace toujours la lumière, comme avant
+- Et avec « Réduire les animations », la lumière garde ses couleurs mais reste immobile ; le
+  changement de couleur devient un simple fondu (WCAG 2.2.2)
+- Et sur téléphone, c'est la même règle, avec la lumière allégée
+
+**La barre du haut reste en place (tablette et ordinateur)**
+- Étant donné un membre sur ordinateur qui fait défiler une longue page (le Fil, un projet)
+- Alors la barre du haut (logo, Fil · Explorer · Ruches, recherche, cloche, Moi, Publier) reste
+  fixée en haut de la fenêtre
+- Et le contenu passe dessous, flouté par son verre ; rien n'est caché derrière elle (la page
+  réserve sa hauteur, et un champ qui reçoit le focus ou un lien vers un endroit de la page
+  s'arrête sous elle)
+- Et d'une page à l'autre, la barre ne bouge pas : seule la goutte du lien actif glisse
+- Et le bandeau d'un compte suspendu reste sous la barre, fixé avec elle
+- Sur téléphone, rien ne change : pas de barre du haut, la barre d'onglets du bas est déjà fixe
+  (une barre du haut fixe mangerait la hauteur d'un petit écran)
+
+**Les pages apparaissent en fondu**
+- Étant donné un membre qui touche un lien dans l'appli web (ordinateur, tablette ou téléphone)
+- Alors le contenu de la page quittée s'efface et celui de la nouvelle apparaît en fondu, en 150 à
+  200 ms, au lieu de la coupure d'aujourd'hui
+- Et la barre du haut et la lumière, qui ne changent pas, ne clignotent pas : seul le contenu
+  change
+- Et la page d'un projet ouverte depuis une carte garde son passage d'R4 (la photo de la carte
+  grandit jusqu'à la page) ; le fondu ne s'y ajoute pas
+- Et une page ouverte directement (lien reçu, rechargement) s'affiche tout de suite : le HTML
+  pré-rendu n'est jamais invisible, pour une connexion lente comme pour un moteur de recherche
+- Et avec « Réduire les animations », le fondu reste (un fondu n'est pas un déplacement)
+- Et dans l'appli de téléphone (iOS, Android), la pile garde son glissement natif, attendu sur ces
+  appareils
+- Et le focus du clavier et du lecteur d'écran arrive sur la nouvelle page comme avant
+
+**Les textes ne répètent plus ce qui se voit**
+- Étant donné un état vide, une fin de liste ou une confirmation
+- Alors une phrase qui redit le titre, ou ce que l'écran montre déjà, disparaît ; la phrase qui
+  apprend quelque chose (quoi faire, ce qui va se passer, qui voit quoi) reste
+- Et une phrase exigée par une relecture juridique ou d'accessibilité reste, même si elle semble
+  évidente (par exemple « Si un compte existe pour cette adresse… »)
+- Et les textes retirés le sont en français et en anglais, avec les tests et les captures qui les
+  citent
+
+La liste, phrase par phrase, à valider par Louis (✂ retirer, ✎ raccourcir, ✓ garder) :
+
+| # | Où | Aujourd'hui | Proposé |
+| --- | --- | --- | --- |
+| T1 | Fil, sphère « à jour » | « Tu es à jour » / « Tu as tout vu depuis ta dernière visite. » (« Tu as tout vu. » au premier passage) | ✂ la deuxième phrase, dans les deux cas |
+| T2 | Fil, même sphère | « Les nouveautés s'afficheront en haut du fil. » | ✓ garder (dit où regarder) |
+| T3 | Fil, bas de la liste | « Tu es à jour » | ✂ retirer : la sphère le dit déjà plus haut ; la liste finit, sans phrase |
+| T4 | Bas des commentaires, des notifications, des membres bloqués, de la modération | « C'est tout » | ✂ retirer : la fin de la liste se voit |
+| T5 | Page d'un outil, vide | « Encore aucun projet ici » / « Aucun projet public fait avec cet outil pour l'instant. Le tien sera peut-être le premier. » | ✎ « Le tien sera peut-être le premier. » seul sous le titre |
+| T6 | Page d'un outil, sous-titre | « Les projets publics faits avec cet outil, du plus récent au plus ancien. » | ✎ « Les projets publics faits avec cet outil. » |
+| T7 | Tous les outils, sous-titre | « Les outils des projets publics, par ordre alphabétique. » | ✎ « Les outils des projets publics. » |
+| T8 | Ma page, sans projet | « Tu n'as encore rien publié. Ton premier projet apparaîtra ici. » | ✎ « Tu n'as encore rien publié. » |
+| T9 | Formulaire de projet, aperçu | « Aperçu dans le fil » / « Il suit ce que tu écris. » | ✂ la deuxième phrase |
+| T10 | Supprimer son compte, sous-titre | « Voici ce qui disparaît avec lui. » (suivi de la liste) | ✂ retirer : la liste suit, avec son titre |
+| T11 | Journal vide (auteur) | « Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil. », puis l'aide du champ « … Tes abonnés la verront dans leur fil. » | ✎ l'état vide garde « Pas encore de note. » ; l'aide du champ garde le reste |
+| T12 | Fil « Découvrir », légende | « Les derniers projets publiés par les membres. » | ✓ garder (dit l'ordre et la source, que l'onglet ne dit pas) |
+| T13 | Notifications, vide | « Pas encore de notification » / « Quand un membre réagira à tes projets… tu le liras ici. » | ✓ garder (dit ce qui arrivera) |
+
+La liste complète vient au plan : un passage sur toutes les pages (captures de téléphone et
+d'ordinateur, jour) relève chaque état vide, fin de liste et confirmation ; les phrases trouvées en
+plus suivent la même règle et reviennent à Louis avant le code.
+
+**Repris des listes « À reprendre »**
+- Le bouton des nouveautés du Fil, aujourd'hui hors de vue dès qu'on descend : sur ordinateur, il
+  reste visible sous la barre fixe, et le toucher remonte en haut du fil
