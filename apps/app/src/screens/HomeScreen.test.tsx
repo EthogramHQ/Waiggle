@@ -1540,6 +1540,51 @@ describe('the news button under the pinned top bar (RF, ui-5)', () => {
       )
     }))
 
+  // Correction après relecture (design n° 3) : dans le navigateur, le focus allait bien au titre,
+  // puis le bouton des nouveautés le reprenait pour sa propre place (vidée, puis retirée de sous la
+  // barre en remontant), et il tombait sur toute la page. Le titre doit garder le dernier focus.
+  it('leaves the last focus on « Fil » on the web, the news button does not take it back', () =>
+    onComputer(async () => {
+      mockFollowing()
+      await renderMemberHome()
+      await scrollTitleUnderBar()
+      const button = screen.getByRole('button', { name: NEWS })
+      expect(insideScroll(button)).toBe(false) // témoin : sous la barre
+
+      // Sur le web, chaque `focus` posé sur une vue native est noté (les vues partagent leur classe :
+      // on l'écoute dès que l'aide de focus reçoit le titre, avant tout autre focus).
+      const focused: unknown[] = []
+      let lent: { proto: { focus?: unknown }; own: boolean } | null = null
+      jest.spyOn(focusModule, 'focusWithoutScroll').mockImplementation((node) => {
+        if (!node) return false
+        if (!lent) {
+          const proto = Object.getPrototypeOf(node) as { focus?: unknown }
+          lent = { proto, own: Object.hasOwn(proto, 'focus') }
+          if (typeof proto.focus !== 'function') proto.focus = () => {}
+          jest.spyOn(proto as { focus: () => void }, 'focus').mockImplementation(function (
+            this: unknown,
+          ) {
+            focused.push(this)
+          })
+        }
+        ;(node as { focus: (options: object) => void }).focus({ preventScroll: true })
+        return true
+      })
+      jest.replaceProperty(Platform, 'OS', 'web')
+      ;(globalThis as { document?: unknown }).document = { activeElement: { focused: true } }
+      try {
+        await fireEvent.press(button)
+        await act(async () => {})
+
+        expect(focused.some(isFeedTitle)).toBe(true) // témoin : le titre a reçu le focus
+        expect(isFeedTitle(focused.at(-1))).toBe(true)
+      } finally {
+        delete (globalThis as { document?: unknown }).document
+        const kept = lent as { proto: { focus?: unknown }; own: boolean } | null
+        if (kept && !kept.own) delete kept.proto.focus
+      }
+    }))
+
   it('keeps the button beside the title on a phone, where nothing is pinned', async () => {
     await renderMemberHome()
     await scrollTitleUnderBar()

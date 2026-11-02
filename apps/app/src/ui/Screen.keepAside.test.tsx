@@ -7,7 +7,8 @@
 // Jest ne calcule aucune position : on appelle les `onLayout` et le `onScroll` comme l'appareil le
 // ferait, puis on lit l'arbre.
 import { act, screen } from '@testing-library/react-native'
-import { Dimensions, StyleSheet } from 'react-native'
+import { createRef, type RefObject } from 'react'
+import { Dimensions, Platform, StyleSheet, View } from 'react-native'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { Button } from './Button'
 import { Screen } from './Screen'
@@ -83,7 +84,7 @@ const titleRow = (): Node => {
   throw new Error('No title row')
 }
 
-const page = (keep = true) => (
+const page = (keep = true, probe?: RefObject<View | null>) => (
   <Screen
     width="page"
     title="Fil"
@@ -92,11 +93,64 @@ const page = (keep = true) => (
     keepAsideInView={keep}
   >
     <Text>Le fil</Text>
+    {probe ? <View ref={probe} /> : null}
   </Screen>
 )
 
+// Le focus du clavier (RF, correction après relecture : le bouton changé de place est remonté, et
+// le focus tombait sur toute la page). Jest n'a pas de navigateur : on prête à la page web le peu
+// que Screen en lit (l'élément qui a le focus, et « cette place le contient-elle ? »), et on écoute
+// `focus` sur les vues natives, qui partagent toutes la même classe (comme FeedEnd.test.tsx).
+type Patched = { contains?: unknown; focus?: unknown }
+let lent: { proto: Patched; hadContains: boolean; contains: unknown; hadFocus: boolean } | null =
+  null
+
+/** Une page web prêtée, complète en apparence : tout ce qu'on y lit accepte tout. */
+const loose = (): unknown =>
+  new Proxy(() => {}, {
+    get: (_target, key) =>
+      key === Symbol.toPrimitive ? () => '' : key === 'then' ? undefined : loose(),
+    set: () => true,
+    apply: () => loose(),
+  })
+
+/**
+ * Passe sur le web, prête la page (`holds` : la place du bouton contient-elle le focus ?) et rend
+ * l'espion de `focus`. `probe` : une vue du rendu, pour trouver la classe des vues natives.
+ */
+const lendWebPage = (probe: RefObject<View | null>, holds: boolean) => {
+  const view = probe.current as unknown as Patched | null
+  if (!view) throw new Error('The probe is not mounted')
+  const proto = Object.getPrototypeOf(view) as Patched
+  lent = {
+    proto,
+    hadContains: Object.hasOwn(proto, 'contains'),
+    contains: proto.contains,
+    hadFocus: Object.hasOwn(proto, 'focus'),
+  }
+  proto.contains = () => holds
+  if (typeof proto.focus !== 'function') proto.focus = () => {}
+  jest.replaceProperty(Platform, 'OS', 'web')
+  ;(globalThis as { document?: unknown }).document = new Proxy(
+    { activeElement: { focused: true } } as Record<string | symbol, unknown>,
+    { get: (target, key) => (key in target ? target[key] : loose()), set: () => true },
+  )
+  // `spyOn` rend l'espion déjà posé par un test précédent, avec ses appels : on les efface.
+  const focus = jest.spyOn(proto as { focus: (options?: object) => void }, 'focus')
+  focus.mockClear()
+  return focus
+}
+
 const phoneWindow = { width: 390, height: 844, scale: 3, fontScale: 1 }
 afterEach(async () => {
+  jest.restoreAllMocks()
+  if (lent) {
+    if (lent.hadContains) lent.proto.contains = lent.contains
+    else delete lent.proto.contains
+    if (!lent.hadFocus) delete lent.proto.focus
+    lent = null
+  }
+  delete (globalThis as { document?: unknown }).document
   await act(async () => Dimensions.set({ window: phoneWindow, screen: phoneWindow }))
 })
 
@@ -146,6 +200,48 @@ describe('Screen keepAsideInView (RF, ui-5)', () => {
     await scrollTo(2000)
 
     expect(insideScroll(news()[0])).toBe(true)
+  })
+
+  it('gives the focus back to the aside when it moves under the bar while it had the focus', async () => {
+    setDesktopWindow()
+    const probe = createRef<View>()
+    await renderWithProviders(page(true, probe))
+    await layOutTitle()
+    await scrollTo(0)
+    const focus = lendWebPage(probe, true)
+
+    await scrollTo(2000)
+
+    expect(insideScroll(news()[0])).toBe(false) // témoin : parti sous la barre
+    expect(focus).toHaveBeenCalledWith(expect.objectContaining({ preventScroll: true }))
+  })
+
+  it('gives the focus back to the aside when it comes back beside the title', async () => {
+    setDesktopWindow()
+    const probe = createRef<View>()
+    await renderWithProviders(page(true, probe))
+    await layOutTitle()
+    await scrollTo(2000)
+    const focus = lendWebPage(probe, true)
+
+    await scrollTo(0)
+
+    expect(insideScroll(news()[0])).toBe(true) // témoin : revenu à côté du titre
+    expect(focus).toHaveBeenCalledWith(expect.objectContaining({ preventScroll: true }))
+  })
+
+  it('leaves the focus where it is when the aside did not have it', async () => {
+    setDesktopWindow()
+    const probe = createRef<View>()
+    await renderWithProviders(page(true, probe))
+    await layOutTitle()
+    await scrollTo(0)
+    const focus = lendWebPage(probe, false)
+
+    await scrollTo(2000)
+
+    expect(insideScroll(news()[0])).toBe(false) // témoin : parti sous la barre
+    expect(focus).not.toHaveBeenCalled()
   })
 
   it('leaves the aside beside the title on a phone, where the bar is not pinned', async () => {

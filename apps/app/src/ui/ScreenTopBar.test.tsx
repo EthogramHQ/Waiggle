@@ -22,12 +22,14 @@
 //
 // Jest ne calcule aucune position : on appelle les `onLayout` comme l'appareil le ferait, et on lit
 // l'arbre et les propriétés.
+import { space } from '@ruche/brand'
 import { act, screen } from '@testing-library/react-native'
 import type { ReactNode } from 'react'
-import { StyleSheet, View } from 'react-native'
-import { renderWithProviders } from '../testing/render'
+import { Platform, StyleSheet, View } from 'react-native'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { Button } from './Button'
 import { ScreenTopBar } from './ScreenTopBar'
+import { type ScreenScroll, ScreenScrollContext, type ScrollEvent } from './scrollLight'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -126,6 +128,58 @@ const measureBar = async (height: number) => {
   throw new Error('Nothing measures the top bar')
 }
 
+/**
+ * Le canal de défilement d'un Screen, prêté (RF, correction après relecture, 2.4.11) : la page a
+ * défilé de `y` (`emit`), et `jumpTo` note où la barre demande de la ramener.
+ */
+const fakeScroll = () => {
+  const listeners = new Set<(event: ScrollEvent) => void>()
+  const channel: ScreenScroll & { jumpTo: jest.Mock } = {
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    lightHeld: { current: false },
+    coveredTop: { current: 0 },
+    toTop: jest.fn(),
+    jumpTo: jest.fn(),
+  }
+  const emit = async (y: number) => {
+    const event = { nativeEvent: { contentOffset: { x: 0, y } } } as unknown as ScrollEvent
+    await act(async () => {
+      for (const listener of listeners) listener(event)
+    })
+  }
+  return Object.assign(channel, { emit })
+}
+
+const stageIn = (scroll: ScreenScroll) => (
+  <ScreenScrollContext.Provider value={scroll}>{stage()}</ScreenScrollContext.Provider>
+)
+
+/**
+ * Un bouton de la barre reçoit le focus, sur le web (le focus d'un enfant remonte jusqu'à la bande :
+ * on appelle son `onFocus`, le premier en remontant serait celui du bouton). `top` : le haut du
+ * bouton dans la fenêtre, tel que le navigateur le mesure.
+ */
+const focusInBar = async (top: number) => {
+  const band = [barRoot(), ...ancestorsUpTo(barRoot(), host())]
+    .reverse()
+    .find((node) => typeof node.props.onFocus === 'function')
+  if (!band) throw new Error('The band does not listen to the focus')
+  const onFocus = band.props.onFocus as (event: unknown) => void
+  jest.replaceProperty(Platform, 'OS', 'web')
+  try {
+    await act(async () =>
+      onFocus({ target: { getBoundingClientRect: () => ({ top, bottom: top + 44 }) } }),
+    )
+  } finally {
+    jest.restoreAllMocks()
+  }
+}
+
 describe('ScreenTopBar', () => {
   it('shows the bar, then what sits below it, in reading order', async () => {
     await renderWithProviders(
@@ -206,6 +260,47 @@ describe('ScreenTopBar', () => {
       for (const value of Object.values(styleOf(node))) {
         if (typeof value === 'string') expect(value).not.toMatch(/url\(/)
       }
+    }
+  })
+
+  it('brings the bar back into the window when one of its controls gets the focus after a scroll (2.4.11)', async () => {
+    const scroll = fakeScroll()
+    await renderWithProviders(stageIn(scroll))
+    await measureBar(120)
+    await scroll.emit(600)
+
+    // Maj+Tab arrive sur un bouton de la barre, 150 points au-dessus du haut de la fenêtre.
+    await focusInBar(-150)
+
+    // La page redescend juste assez : le bouton reparaît en haut, avec un peu d'air pour son anneau.
+    expect(scroll.jumpTo).toHaveBeenCalledTimes(1)
+    expect(scroll.jumpTo).toHaveBeenCalledWith(600 - 150 - space.sm)
+  })
+
+  it('leaves the page where it is when the focused control is already in the window', async () => {
+    const scroll = fakeScroll()
+    await renderWithProviders(stageIn(scroll))
+    await measureBar(120)
+    await scroll.emit(40)
+
+    await focusInBar(20)
+
+    expect(scroll.jumpTo).not.toHaveBeenCalled()
+  })
+
+  it('leaves the page where it is when the bar is pinned, which never leaves the window', async () => {
+    const restore = setDesktopWindow()
+    try {
+      const scroll = fakeScroll()
+      await renderWithProviders(stageIn(scroll))
+      await measureBar(80)
+      await scroll.emit(600)
+
+      await focusInBar(-150)
+
+      expect(scroll.jumpTo).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => restore())
     }
   })
 
