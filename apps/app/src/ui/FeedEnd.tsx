@@ -9,7 +9,7 @@
 // au bout. Ici reste le bas commun à toutes les listes (fil, commentaires, notifications, membres
 // bloqués, modération).
 import { space } from '@ruche/brand'
-import { useEffect, useRef } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
 import { Button } from './Button'
 import { Icon } from './Icon'
@@ -28,19 +28,88 @@ type Props = {
   /** Le message quand la page suivante n'a pas pu se charger, et le bouton pour réessayer. */
   errorLabel?: string
   retryLabel?: string
+  /**
+   * La vue de la première carte arrivée avec la dernière page (son lien), posée par la liste. Sans
+   * phrase de fin, c'est là que le focus du clavier va quand « Afficher la suite » disparaît :
+   * la lecture continue à cette carte, au lieu de retomber sur toute la page (jur-RF2).
+   */
+  firstArrived?: RefObject<View | null>
 }
 
 // Le peu du navigateur dont on a besoin ici : l'élément qui a le focus, et savoir si un élément en
 // contient un autre. (Les types de React Native ne décrivent pas la page web.)
-type WebNode = { contains?: (node: unknown) => boolean; focus?: (options?: object) => void }
+type WebNode = {
+  contains?: (node: unknown) => boolean
+  focus?: (options?: object) => void
+  matches?: (selector: string) => boolean
+  querySelector?: (selector: string) => WebNode | null
+  setAttribute?: (name: string, value: string) => void
+}
 const activeElement = () =>
   (globalThis as { document?: { activeElement: unknown } }).document?.activeElement
 
-export function FeedEnd({ state, moreLabel, endLabel, onMore, errorLabel, retryLabel }: Props) {
+/** Ce que la touche Tab atteint dans une page web (les vues à tabIndex -1 n'en sont pas). */
+const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Où poser le focus dans la première carte arrivée : la liste donne la case de l'élément (une carte
+ * de projet, une ligne, une notification), qui ne sait pas où est son lien. La case elle-même si
+ * Tab l'atteint ; sinon le premier élément qu'elle contient que Tab atteint (le lien de la carte,
+ * « Débloquer ») : Tab repart de là, comme si le membre y était arrivé ; sinon (une notification
+ * sans lien) la case, rendue focusable sans devenir une étape de Tab (tabIndex -1), dont le lecteur
+ * d'écran lit le contenu.
+ */
+const focusTarget = (node: WebNode | null): WebNode | null => {
+  if (!node) return null
+  if (node.matches?.(TABBABLE)) return node
+  const inner = node.querySelector?.(TABBABLE)
+  if (inner) return inner
+  node.setAttribute?.('tabindex', '-1')
+  return node
+}
+
+/** La première carte arrivée avec la dernière page : son rang dans la liste, et sa vue. */
+export type FirstArrived = { index: number | null; ref: RefObject<View | null> }
+
+/**
+ * Hook : la première carte arrivée avec la dernière page d'une liste, à donner à `FeedEnd`
+ * (`firstArrived={arrived.ref}`) et à poser sur la case de l'élément de rang `arrived.index`.
+ *
+ * `count` : le nombre d'éléments affichés ; `loading` : la page suivante est demandée. Pendant le
+ * chargement, la liste a encore son ancien nombre d'éléments : il est noté (dans un `useRef`, une
+ * mémoire qui survit aux affichages sans en provoquer), et la page arrivée commence à ce rang. Une
+ * dernière page vide : la dernière carte de la liste, où la lecture s'est arrêtée.
+ */
+export function useFirstArrived(count: number, loading: boolean): FirstArrived {
+  const ref = useRef<View>(null)
+  const before = useRef<number | null>(null)
+  // Sans liste de dépendances : après chaque affichage. Le rendu où la page arrive lit donc le
+  // nombre noté pendant le chargement, juste avant.
+  useEffect(() => {
+    if (loading) before.current = count
+  })
+  const from = before.current
+  return { index: from === null || count === 0 ? null : Math.min(from, count - 1), ref }
+}
+
+export function FeedEnd({
+  state,
+  moreLabel,
+  endLabel,
+  onMore,
+  errorLabel,
+  retryLabel,
+  firstArrived,
+}: Props) {
   // Quand la dernière page arrive, le bouton « Afficher la suite » laisse la place à la fin. Si le
-  // focus du clavier était sur ce bouton, il passe sur ce message (tabIndex -1 : focusable sans
-  // être une étape de la touche Tab) au lieu de se perdre. preventScroll : la page ne saute pas
-  // jusqu'à lui, on reste sur les cartes qui viennent d'arriver.
+  // focus du clavier était sur ce bouton, il passe sur la phrase de fin s'il y en a une (tabIndex
+  // -1 : focusable sans être une étape de la touche Tab), sinon sur la première carte arrivée
+  // (`firstArrived`), au lieu de se perdre sur toute la page. preventScroll : la page ne saute pas,
+  // on reste sur les cartes qui viennent d'arriver.
+  //
+  // Pourquoi l'effet trouve la carte : React attache les `ref` des vues au moment où il pose le
+  // rendu à l'écran, avant de lancer les effets. La carte arrivée avec la dernière page et l'état
+  // « end » viennent du même rendu de la liste : quand cet effet tourne, la ref pointe déjà sur elle.
   const button = useRef<View>(null)
   const end = useRef<View>(null)
   const hadFocus = useRef(false)
@@ -60,8 +129,11 @@ export function FeedEnd({ state, moreLabel, endLabel, onMore, errorLabel, retryL
   useEffect(() => {
     if (state !== 'end' || !hadFocus.current) return
     hadFocus.current = false
-    ;(end.current as unknown as WebNode | null)?.focus?.({ preventScroll: true })
-  }, [state])
+    const target = end.current
+      ? (end.current as unknown as WebNode)
+      : focusTarget((firstArrived?.current ?? null) as unknown as WebNode | null)
+    target?.focus?.({ preventScroll: true })
+  }, [state, firstArrived])
 
   if (state === 'end') {
     if (!endLabel) return null

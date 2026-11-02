@@ -1,12 +1,12 @@
 // La liste des commentaires d'un projet (tranche 5) : les fils, du plus récent au plus ancien,
-// séparés par un trait fin, puis « Afficher la suite » tant qu'il en reste, et « C'est tout » au
-// bout (FeedEnd, le même bas que les fils de l'accueil : pas de défilement sans fin). Sans
-// commentaire, le message donné par l'écran (« Pas encore de commentaire. »), sans « C'est tout ».
+// séparés par un trait fin, puis « Afficher la suite » tant qu'il en reste (FeedEnd, le même bas
+// que les fils de l'accueil : pas de défilement sans fin) ; depuis RF, rien au bout (T4). Sans
+// commentaire, le message donné par l'écran (« Pas encore de commentaire. »).
 // Les fils (CommentThread) sont donnés par l'écran ; la liste ne fait que les ranger.
 import { borders, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode } from 'react'
 import { View } from 'react-native'
-import { FeedEnd } from './FeedEnd'
+import { FeedEnd, useFirstArrived } from './FeedEnd'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -39,6 +39,9 @@ export function CommentList({
   const { colors } = useTheme()
   // Children.toArray retire les « rien » (null, false) et donne une clé à chaque fil.
   const threads = Children.toArray(children)
+  // Le premier fil arrivé avec la dernière page : le focus du clavier y va quand « Afficher la
+  // suite » disparaît, la liste n'ayant plus de phrase de fin (jur-RF2).
+  const arrived = useFirstArrived(threads.length, state === 'loading')
   if (threads.length === 0) return <Text tone="secondary">{empty}</Text>
   return (
     <View style={{ gap: space.xl }}>
@@ -51,6 +54,7 @@ export function CommentList({
             // redessiner tous les autres.
             key={isValidElement(thread) && thread.key !== null ? thread.key : i}
             role="listitem"
+            ref={i === arrived.index ? arrived.ref : undefined}
             style={
               i > 0
                 ? {
@@ -70,6 +74,7 @@ export function CommentList({
         moreLabel={moreLabel}
         endLabel={endLabel}
         onMore={onMore}
+        firstArrived={arrived.ref}
         {...(errorLabel ? { errorLabel } : null)}
         {...(retryLabel ? { retryLabel } : null)}
       />

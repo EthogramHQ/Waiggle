@@ -15,6 +15,7 @@ import {
   isValidElement,
   type ReactElement,
   type ReactNode,
+  type Ref,
   useContext,
   useId,
   useRef,
@@ -247,6 +248,12 @@ type RowBase = {
    * (`aria-describedby`) vers un texte caché, que le navigateur lit quand même.
    */
   hint?: string
+  /**
+   * La vue de la ligne (la ligne touchable, sinon son cadre), pour qu'une liste par pages y pose le
+   * focus quand la dernière page arrive (`useFirstArrived`, jur-RF2). Ignoré sur un choix : le
+   * groupe radio garde déjà sa vue pour les flèches.
+   */
+  ref?: Ref<View> | undefined
 }
 
 export function ListRow({
@@ -268,6 +275,7 @@ export function ListRow({
   href,
   current = false,
   hint,
+  ref,
 }: RowProps) {
   const { colors } = useTheme()
   // L'identifiant du texte caché qui décrit la ligne (web) : useId en donne un, unique dans la page.
@@ -300,6 +308,7 @@ export function ListRow({
 
   const content = (
     <View
+      ref={onPress ? undefined : ref}
       // Une attente : la ligne entière est lue d'un tenant, comme une barre de progression sans
       // fin connue, « occupée ». Un rôle est nécessaire : sur le web, le navigateur ignore le nom
       // d'un bloc qui n'en a pas.
@@ -434,7 +443,7 @@ export function ListRow({
       {...(href ? { href, ...(current ? { 'aria-current': 'page' } : null) } : null)}
       {...(isChoice ? { 'aria-checked': selected === true } : null)}
       // Le groupe retrouve l'élément d'un choix pour y poser le focus (flèches).
-      ref={isChoice ? slot?.setNode : undefined}
+      ref={isChoice ? slot?.setNode : ref}
       {...(isChoice ? choiceKeys(onPress) : null)}
       disabled={disabled}
       onPress={onPress}

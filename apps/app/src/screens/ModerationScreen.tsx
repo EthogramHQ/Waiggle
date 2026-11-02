@@ -61,7 +61,7 @@ import { Choices } from '../ui/Choices'
 import { excerpt } from '../ui/CommentAction'
 import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
-import { FeedEnd } from '../ui/FeedEnd'
+import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
@@ -377,6 +377,22 @@ function AdminModeration() {
   // La lecture de la liste affichée, et ses refus qui changent toute la page.
   const list = tab === 'pending' ? queue : tab === 'removed' ? removed : history
   const fatal = !list.data && list.isError ? errorKey(list.error) : null
+  // Les cartes affichées de chaque onglet (lues avant les refus ci-dessous : le hook qui suit doit
+  // être appelé à chaque affichage, dans le même ordre).
+  const queueItems = queue.data?.pages.flatMap((page) => page.items) ?? []
+  const removedItems = removed.data?.pages.flatMap((page) => page.items) ?? []
+  const shownQueue = keepDecided(queueItems, decidedQueue)
+  const shownRemoved = keepDecided(removedItems, decidedRemoved)
+  const decisions = history.data?.pages.flatMap((page) => page.items) ?? []
+  const count =
+    tab === 'pending'
+      ? shownQueue.length
+      : tab === 'removed'
+        ? shownRemoved.length
+        : decisions.length
+  // La première carte arrivée avec la dernière page de l'onglet : le focus du clavier y va quand
+  // « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
+  const arrived = useFirstArrived(count, list.isFetchingNextPage)
   // Un administrateur révoqué : l'API ne connaît plus la page.
   if (fatal === 'notFound') return <NotFoundState title={t(($) => $.states.notFoundTitle)} />
   if (fatal === 'unauthorized') return <SignedOutScreen expired />
@@ -559,17 +575,6 @@ function AdminModeration() {
     )
   }
 
-  const queueItems = queue.data?.pages.flatMap((page) => page.items) ?? []
-  const removedItems = removed.data?.pages.flatMap((page) => page.items) ?? []
-  const shownQueue = keepDecided(queueItems, decidedQueue)
-  const shownRemoved = keepDecided(removedItems, decidedRemoved)
-  const decisions = history.data?.pages.flatMap((page) => page.items) ?? []
-  const count =
-    tab === 'pending'
-      ? shownQueue.length
-      : tab === 'removed'
-        ? shownRemoved.length
-        : decisions.length
   const showsError = (!list.data && list.isError) || (retrying && !list.data)
 
   // Le membre filtré, nommé par son pseudo tel que les décisions le donnent ; un compte parti
@@ -639,7 +644,7 @@ function AdminModeration() {
       ) : (
         <Stack gap="lg">
           {/* Une liste annoncée : « liste, 4 éléments », et on saute d'une carte à l'autre. */}
-          <Stack gap="md" accessibilityRole="list">
+          <Stack gap="md" accessibilityRole="list" firstArrived={arrived}>
             {tab === 'pending'
               ? shownQueue.map(queueCard)
               : tab === 'removed'
@@ -665,6 +670,7 @@ function AdminModeration() {
             moreLabel={t(($) => $.moderation.more)}
             errorLabel={t(($) => $.moderation.moreError)}
             retryLabel={t(($) => $.common.retry)}
+            firstArrived={arrived.ref}
             // Une seule demande à la fois, même après un double clic.
             onMore={() => {
               if (!list.isFetchingNextPage) void list.fetchNextPage()

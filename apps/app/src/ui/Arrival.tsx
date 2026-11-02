@@ -8,7 +8,7 @@
 // voisine), pour que la carte puisse s'étirer avec elle, et c'est la vue que la liste mesure (`ref`,
 // la lumière qui suit la carte du milieu de l'écran).
 import { durations, springs } from '@ruche/brand'
-import type { ReactNode, Ref } from 'react'
+import { type ReactNode, type Ref, type RefObject, useCallback } from 'react'
 import { View } from 'react-native'
 import Animated, { FadeIn, FadeInUp, ReduceMotion } from 'react-native-reanimated'
 import { useCalmMotion } from './theme/motion'
@@ -19,6 +19,17 @@ type Props = {
   arriving: boolean
   /** La vue de l'élément, pour qui veut la mesurer (`measureInWindow`). */
   ref?: Ref<View>
+  /**
+   * La même vue, pour la première carte arrivée avec la dernière page : `FeedEnd` y pose le focus
+   * quand « Afficher la suite » disparaît (`useFirstArrived`, jur-RF2).
+   */
+  focusRef?: RefObject<View | null> | undefined
+}
+
+/** Donne la vue à un `ref`, qu'il soit une fonction (rappelée) ou un objet (`current`). */
+const assign = (ref: Ref<View> | undefined, node: View | null) => {
+  if (typeof ref === 'function') ref(node)
+  else if (ref) ref.current = node
 }
 
 // `entering` : l'animation que Reanimated joue quand la vue apparaît à l'écran (et seulement à ce
@@ -36,15 +47,24 @@ const drop = FadeInUp.springify()
 // demande moins d'animations, et la carte apparaîtrait d'un coup.
 const calmFade = FadeIn.duration(durations.base).reduceMotion(ReduceMotion.Never)
 
-export function Arrival({ children, arriving, ref }: Props) {
+export function Arrival({ children, arriving, ref, focusRef }: Props) {
   const calm = useCalmMotion()
+  // Une vue, deux `ref` : un seul rappel qui donne la vue aux deux. `useCallback` le garde d'un
+  // affichage à l'autre (React ne le rappelle que si l'un des deux change).
+  const both = useCallback(
+    (node: View | null) => {
+      assign(ref, node)
+      assign(focusRef, node)
+    },
+    [ref, focusRef],
+  )
   // Une carte déjà là reçoit `undefined` : rien ne se joue. Changer `entering` après l'apparition
   // ne rejoue rien non plus : seule compte la valeur au moment où la vue arrive.
   const entering = arriving ? (calm ? calmFade : drop) : undefined
   return (
     // flexGrow : la carte peut s'étirer à la hauteur de la case (voir ProjectGrid).
     <Animated.View entering={entering} style={{ flexGrow: 1 }}>
-      <View ref={ref} style={{ flexGrow: 1 }}>
+      <View ref={focusRef ? both : ref} style={{ flexGrow: 1 }}>
         {children}
       </View>
     </Animated.View>
