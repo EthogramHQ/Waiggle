@@ -94,6 +94,7 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectFrameCatalogue } from './projet-ecran'
 import { FanCatalogue } from './projet-eventail'
@@ -149,6 +150,9 @@ export function CatalogueScreen() {
       {/* R5a : la page de sortie (projet-sortie.tsx). Tout en tête pour les captures de la branche ;
           à ranger à l'assemblage. */}
       <LeavingCatalogue />
+      {/* R5a : l'en-tête et les actions de la page projet (projet-auteur.tsx). En tête pour les
+          captures de la branche ; à ranger à l'assemblage. */}
+      <ProjectPartsCatalogue />
       {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
           captures de la branche ; à ranger à l'assemblage. */}
       <GalleryCatalogue />
