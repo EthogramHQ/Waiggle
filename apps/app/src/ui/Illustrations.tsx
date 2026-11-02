@@ -4,7 +4,7 @@
 //
 // Toutes démarrent seules et durent : avec « Réduire les animations », elles s'immobilisent (WCAG
 // 2.2.2, comme la lumière d'ambiance). Le portail apparaît alors en fondu, sans mouvement.
-import { durations, radii } from '@ruche/brand'
+import { durations, maskVisible, radii } from '@ruche/brand'
 import { type ReactNode, useEffect, useId } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, {
@@ -548,10 +548,10 @@ export function Honeycomb() {
             {/* Les rangées du haut et du bas s'effacent vers les bords de la boîte, au lieu d'être
                 coupées net (un masque : blanc, on voit ; transparent, on ne voit pas). */}
             <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset={0} stopColor="#FFFFFF" stopOpacity={0} />
-              <Stop offset={0.2} stopColor="#FFFFFF" stopOpacity={1} />
-              <Stop offset={0.8} stopColor="#FFFFFF" stopOpacity={1} />
-              <Stop offset={1} stopColor="#FFFFFF" stopOpacity={0} />
+              <Stop offset={0} stopColor={maskVisible} stopOpacity={0} />
+              <Stop offset={0.2} stopColor={maskVisible} stopOpacity={1} />
+              <Stop offset={0.8} stopColor={maskVisible} stopOpacity={1} />
+              <Stop offset={1} stopColor={maskVisible} stopOpacity={0} />
             </LinearGradient>
             <Mask id={maskId}>
               <Rect

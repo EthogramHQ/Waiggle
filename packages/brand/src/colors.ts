@@ -321,6 +321,13 @@ export const contrastPairs: readonly ContrastPair[] = [
 export const focusHaloOpacity = 0.28
 
 /**
+ * Le blanc d'un masque SVG : il ne se voit jamais, il dit seulement « ici, le dessin se voit »
+ * (un masque lit la clarté de ce qu'il contient : blanc, visible ; transparent, caché). Le même de
+ * jour et de nuit. Sert aux alvéoles de l'introuvable, qui s'effacent vers le haut et le bas (R5a).
+ */
+export const maskVisible = '#FFFFFF'
+
+/**
  * La « lumière miel » : le dégradé rond qui sert de lumière d'ambiance quand un écran n'a pas de
  * visuel (et de couverture aux projets sans image). Chaque arrêt = une position de 0 à 1 et une couleur.
  */
