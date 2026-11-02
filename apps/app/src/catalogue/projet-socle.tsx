@@ -16,6 +16,7 @@ import { ButtonPair } from '../ui/ButtonPair'
 import { Callout } from '../ui/Callout'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Disclosure } from '../ui/Disclosure'
+import { FollowButton } from '../ui/FollowButton'
 import { MetaLine } from '../ui/MetaLine'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
@@ -55,6 +56,8 @@ const fr = {
     'Button iconAfter : l’icône après le libellé (un lien qui sort de l’appli, « Ouvrir le site ↗ »), puis avant, comme d’habitude ; en secondaire.',
   metaLine:
     'MetaLine : des renseignements séparés par des points, sous un titre. Une seule ligne, puis une ligne longue qui passe à la ligne sans couper un morceau.',
+  followBell:
+    'FollowButton icon="bell" : la cloche de « Suivre ce projet » (la personne avec un « + » reste pour suivre un membre).',
   metaPublished: 'Publié le 3 oct.',
   metaUpdated: 'Mis à jour hier',
   metaLong: 'Publié le 3 octobre 2026 à 18 h 40',
@@ -101,6 +104,8 @@ const en: typeof fr = {
     'Button iconAfter: the icon after the label (a link that leaves the app, “Open the site ↗”), then before it, as usual; as a secondary.',
   metaLine:
     'MetaLine: small facts separated by dots, under a title. A single line, then a long line that wraps without cutting a piece in two.',
+  followBell:
+    'FollowButton icon="bell": the bell of “Follow this project” (the person with a “+” stays for following a member).',
   metaPublished: 'Published Oct 3',
   metaUpdated: 'Updated yesterday',
   metaLong: 'Published October 3, 2026 at 6:40 pm',
@@ -215,6 +220,18 @@ export function ProjectGroundworkCatalogue() {
       <ButtonPair>
         <Button label={l.open} icon="arrow-up-right" onPress={noop} />
       </ButtonPair>
+
+      <Text tone="secondary">{l.followBell}</Text>
+      <View style={{ alignSelf: 'flex-start' }}>
+        <FollowButton
+          followed={false}
+          onPress={noop}
+          label={l.follow}
+          text={l.follow}
+          icon="bell"
+          prominent={false}
+        />
+      </View>
 
       <Text tone="secondary">{l.metaLine}</Text>
       <MetaLine>

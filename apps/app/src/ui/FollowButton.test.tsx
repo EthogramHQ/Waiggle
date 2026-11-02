@@ -202,6 +202,22 @@ describe('FollowButton, as the button of a page', () => {
     expect(drawn).not.toEqual(iconPaths.plus)
   })
 
+  it('draws the given icon instead, a bell to follow a project, the name read unchanged', async () => {
+    await renderWithProviders(
+      <FollowButton
+        followed={false}
+        onPress={jest.fn()}
+        label={follow}
+        text="Suivre"
+        icon="bell"
+      />,
+    )
+
+    const button = screen.getByRole('switch', { name: follow })
+    expect(pathsIn(button as unknown as Node)).toEqual(iconPaths.bell)
+    expect(pathsIn(button as unknown as Node)).not.toEqual(iconPaths['user-plus'])
+  })
+
   it('draws the tick once followed, with the same name read', async () => {
     await renderWithProviders(
       <FollowButton followed onPress={jest.fn()} label={following} text={following} />,
