@@ -390,6 +390,106 @@ describe('ReactionCapsule', () => {
   })
 })
 
+// Décision de Louis du 2/11 : la capsule d'un membre suspendu n'ouvre pas l'éventail (il n'y pose
+// plus rien). Sans `onOpenFan`, aucun indice « Voir les réactions et leurs noms » (il promettrait
+// une action qui n'existe pas), ni action « appui long » pour le lecteur d'écran, et le clic droit
+// garde le menu du navigateur.
+describe('ReactionCapsule, without a fan', () => {
+  const withoutFan = () => <ReactionCapsule reactions={reactions} onToggle={jest.fn()} />
+  const button = () => screen.getByRole('button', { name: labelOf('useful', 5) })
+
+  it('keeps its buttons, which still put a reaction (témoin)', async () => {
+    const onToggle = jest.fn()
+    await renderWithProviders(<ReactionCapsule reactions={reactions} onToggle={onToggle} />)
+
+    await fireEvent.press(button())
+
+    expect(onToggle).toHaveBeenCalledWith('useful')
+  })
+
+  it('gives no hint about the fan, and no long press action', async () => {
+    await renderWithProviders(withoutFan())
+
+    expect(button().props.accessibilityHint).toBeUndefined()
+    const actions = (button().props.accessibilityActions ?? []) as { name: string }[]
+    expect(actions.map((action) => action.name)).not.toContain('longpress')
+  })
+
+  it('leaves the browser menu alone on a right click, and links no hint on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(withoutFan())
+
+      expect(button().props.onContextMenu).toBeUndefined()
+      expect(button().props['aria-describedby']).toBeUndefined()
+      // Le texte caché de l'indice n'est pas écrit non plus.
+      expect(screen.queryByText(openHint, { includeHiddenElements: true })).toBeNull()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('has no long press handler', async () => {
+    await renderWithProviders(withoutFan())
+
+    expect(button().props.onLongPress).toBeUndefined()
+  })
+})
+
+// Une double tape (deux tapes à 180 ms) posait puis retirait la réaction : deux écritures, et une
+// réaction qui n'existe plus. Chaque réaction a sa garde de 600 ms (`useTapGuard`).
+describe('ReactionCapsule, double tap', () => {
+  it('puts the reaction once on a double tap, 180 ms apart', async () => {
+    jest.useFakeTimers()
+    try {
+      const onToggle = jest.fn()
+      await renderWithProviders(<Capsule onToggle={onToggle} />)
+      const useful = () => screen.getByRole('button', { name: labelOf('useful', 5) })
+
+      await fireEvent.press(useful())
+      await act(() => jest.advanceTimersByTime(180))
+      await fireEvent.press(useful())
+
+      expect(onToggle.mock.calls).toEqual([['useful']])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('takes the next tap into account after 600 ms (a separate gesture)', async () => {
+    jest.useFakeTimers()
+    try {
+      const onToggle = jest.fn()
+      await renderWithProviders(<Capsule onToggle={onToggle} />)
+      const useful = () => screen.getByRole('button', { name: labelOf('useful', 5) })
+
+      await fireEvent.press(useful())
+      await act(() => jest.advanceTimersByTime(700))
+      await fireEvent.press(useful())
+
+      expect(onToggle.mock.calls).toEqual([['useful'], ['useful']])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('guards each reaction on its own: two different reactions in a row both go through', async () => {
+    jest.useFakeTimers()
+    try {
+      const onToggle = jest.fn()
+      await renderWithProviders(<Capsule onToggle={onToggle} />)
+
+      await fireEvent.press(screen.getByRole('button', { name: labelOf('useful', 5) }))
+      await act(() => jest.advanceTimersByTime(180))
+      await fireEvent.press(screen.getByRole('button', { name: labelOf('funny', 1) }))
+
+      expect(onToggle.mock.calls).toEqual([['useful'], ['funny']])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+})
+
 // Décision de Louis du 2/11 : à partir de 1 000, le nombre s'écrit en court (« 1,2 k »), pour que la
 // capsule ne déborde pas à 320 points et 200 % ; le nom lu garde le nombre entier.
 describe('ReactionCapsule, large counts', () => {

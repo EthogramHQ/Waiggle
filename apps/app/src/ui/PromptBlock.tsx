@@ -12,7 +12,7 @@
 // - « Copié » et la bulle « Prompt copié » seulement si la copie a vraiment réussi (ui-7) ; sinon une
 //   phrase d'échec, affichée sous le bouton et lue par les lecteurs d'écran.
 
-import { radii, space } from '@ruche/brand'
+import { radii, readableWidth, space } from '@ruche/brand'
 import { cleanPrompt } from '@ruche/contracts'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -53,7 +53,14 @@ export function PromptBlock({ prompts, copy = copyText }: Props) {
   // Pas de prompt, pas de section : ni titre, ni prudence.
   if (starting === undefined) return null
 
-  const caution = <Callout tone="caution" icon="info" title={t(($) => $.project.prompts.caution)} />
+  // La prudence est une phrase à lire : bornée à `readableWidth` comme le Markdown, elle garde une
+  // longueur de ligne confortable (une centaine de caractères sur un grand écran, sinon). Posée à
+  // gauche, dans la colonne du prompt : le bloc de code, lui, garde toute la largeur.
+  const caution = (
+    <View style={{ maxWidth: readableWidth }}>
+      <Callout tone="caution" icon="info" title={t(($) => $.project.prompts.caution)} />
+    </View>
+  )
 
   return (
     <View style={{ gap: space.md }}>
@@ -64,6 +71,7 @@ export function PromptBlock({ prompts, copy = copyText }: Props) {
       <PromptItem
         text={starting}
         copyLabel={t(($) => $.project.prompts.copyStarting)}
+        copiedLabel={t(($) => $.project.prompts.copiedStarting)}
         copy={copy}
       />
       {caution}
@@ -85,6 +93,7 @@ export function PromptBlock({ prompts, copy = copyText }: Props) {
               text={text}
               // Le 2e prompt de la liste est le premier des « autres » : son numéro est rang + 2.
               copyLabel={t(($) => $.project.prompts.copyNamed, { index: rank + 2 })}
+              copiedLabel={t(($) => $.project.prompts.copiedNamed, { index: rank + 2 })}
               copy={copy}
             />
           ))}
@@ -95,7 +104,17 @@ export function PromptBlock({ prompts, copy = copyText }: Props) {
 }
 
 /** Un prompt : ses repères, son texte en chasse fixe, et son bouton « Copier ». */
-function PromptItem({ text, copyLabel, copy }: { text: string; copyLabel: string; copy: Copy }) {
+function PromptItem({
+  text,
+  copyLabel,
+  copiedLabel,
+  copy,
+}: {
+  text: string
+  copyLabel: string
+  copiedLabel: string
+  copy: Copy
+}) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   const warnings = promptWarnings(text)
@@ -162,6 +181,7 @@ function PromptItem({ text, copyLabel, copy }: { text: string; copyLabel: string
       <CopyButton
         text={text}
         label={copyLabel}
+        copiedLabel={copiedLabel}
         copy={copy}
         // Sur téléphone, où aria-describedby n'existe pas : les repères lus après le nom.
         hint={warnings.length > 0 ? [warningLabel, ...reasons].join(' ') : undefined}
@@ -189,6 +209,8 @@ type CopyButtonProps = {
   text: string
   /** Le nom lu : « Copier le prompt de départ », « Copier le prompt 2 » (ui-10). */
   label: string
+  /** Le nom lu pendant « Copié » : « Prompt de départ copié », « Prompt 2 copié ». */
+  copiedLabel: string
   copy: Copy
   hint: string | undefined
   describedById: string | undefined
@@ -203,7 +225,7 @@ type CopyButtonProps = {
  *   des fenêtres et des cartes) après chaque copie commencée.
  * Ce sont des `ref` et non des états : la 2e tape arrive avant que React ait redessiné.
  */
-function CopyButton({ text, label, copy, hint, describedById }: CopyButtonProps) {
+function CopyButton({ text, label, copiedLabel, copy, hint, describedById }: CopyButtonProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -262,9 +284,9 @@ function CopyButton({ text, label, copy, hint, describedById }: CopyButtonProps)
         variant="secondary"
         size="compact"
         label={copied ? t(($) => $.project.prompts.copied) : t(($) => $.project.prompts.copy)}
-        // Le nom complet reste le même pendant « Copié » : le focus ne change pas de nom sous le
-        // lecteur d'écran, et la bulle annonce la réussite.
-        spokenLabel={label}
+        // Le nom lu suit le texte affiché (WCAG 2.5.3, « le nom contient le texte visible ») :
+        // « Copier le prompt de départ », puis « Prompt de départ copié » pendant « Copié ».
+        spokenLabel={copied ? copiedLabel : label}
         {...(copied ? { icon: 'check' as const } : null)}
         hint={hint}
         describedById={describedById}

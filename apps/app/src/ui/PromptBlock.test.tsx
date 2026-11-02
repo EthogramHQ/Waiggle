@@ -2,9 +2,10 @@
 // le premier prompt en chasse fixe avec « Copier », la phrase de prudence, le repère « À lire avant
 // de l'utiliser » et ses raisons, et les autres prompts repliés. Ce qui est copié est exactement ce
 // qui est affiché : le texte nettoyé par cleanPrompt (relecture de sécurité sec-B1).
+import { readableWidth } from '@ruche/brand'
 import { cleanPrompt } from '@ruche/contracts'
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { createI18n } from '../i18n'
 import { renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
@@ -44,6 +45,8 @@ const t = {
   copyStarting: fr.t(($) => $.project.prompts.copyStarting),
   copyNamed: (index: number) => fr.t(($) => $.project.prompts.copyNamed, { index }),
   copied: fr.t(($) => $.project.prompts.copied),
+  copiedStarting: fr.t(($) => $.project.prompts.copiedStarting),
+  copiedNamed: (index: number) => fr.t(($) => $.project.prompts.copiedNamed, { index }),
   bubble: fr.t(($) => $.project.prompts.bubble),
   copyFailed: fr.t(($) => $.project.prompts.copyFailed),
   caution: fr.t(($) => $.project.prompts.caution),
@@ -138,6 +141,21 @@ describe('PromptBlock', () => {
 
   describe('the caution and the warning', () => {
     // jur-6 et sec-B3 : la phrase de prudence s'affiche toujours, repère ou non.
+    // La prudence est du texte à lire : elle ne s'étire pas sur toute la largeur d'un grand écran
+    // (98 caractères par ligne à 1 280 px). Un de ses parents la borne à `readableWidth`.
+    it('keeps the caution to a readable line length', async () => {
+      await renderWithProviders(<PromptBlock prompts={[STARTING]} />)
+
+      type Up = { props: { style?: unknown }; parent: Up | null }
+      const widths: unknown[] = []
+      for (let node = screen.getByText(t.caution) as unknown as Up | null; node; node = node.parent)
+        widths.push(
+          (StyleSheet.flatten(node.props.style as never) as { maxWidth?: unknown })?.maxWidth,
+        )
+
+      expect(widths).toContain(readableWidth)
+    })
+
     it('always shows the caution, even without any warning', async () => {
       await renderWithProviders(<PromptBlock prompts={[STARTING]} />)
 
@@ -236,6 +254,42 @@ describe('PromptBlock', () => {
 
       expect(await screen.findByText(t.copied)).toBeTruthy()
       expect(mockShow.mock.calls.map((call) => call[0])).toEqual([t.bubble])
+    })
+
+    // WCAG 2.5.3 : le nom lu contient le texte affiché. Pendant « Copié », le nom lu dit donc
+    // « copié » (« Prompt de départ copié »), puis redevient « Copier le prompt de départ ».
+    it('reads « Prompt de départ copié » while it says « Copié », then « Copier le prompt de départ » again', async () => {
+      jest.useFakeTimers()
+      try {
+        copy.mockResolvedValue(true)
+        await renderWithProviders(<PromptBlock prompts={[STARTING]} />)
+        expect(screen.getByRole('button', { name: t.copyStarting })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: t.copiedStarting })).toBeNull()
+
+        await fireEvent.press(screen.getByRole('button', { name: t.copyStarting }))
+        await act(async () => {})
+        expect(screen.getByRole('button', { name: t.copiedStarting })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: t.copyStarting })).toBeNull()
+
+        await act(() => jest.advanceTimersByTime(3_000))
+        expect(screen.getByRole('button', { name: t.copyStarting })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: t.copiedStarting })).toBeNull()
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('reads « Prompt 2 copié » for another prompt once copied', async () => {
+      copy.mockResolvedValue(true)
+      await renderWithProviders(<PromptBlock prompts={[STARTING, SECOND, THIRD]} />)
+      await fireEvent.press(screen.getByRole('button', { name: containing(t.others(2)) }))
+      expect(screen.getByRole('button', { name: t.copyNamed(2) })).toBeTruthy()
+
+      await fireEvent.press(screen.getByRole('button', { name: t.copyNamed(2) }))
+
+      expect(await screen.findByRole('button', { name: t.copiedNamed(2) })).toBeTruthy()
+      // Le prompt de départ, lui, n'a pas bougé.
+      expect(screen.getByRole('button', { name: t.copyStarting })).toBeTruthy()
     })
 
     it('goes back to « Copier » about two seconds later', async () => {

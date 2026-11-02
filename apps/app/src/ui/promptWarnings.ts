@@ -32,15 +32,26 @@ const ORDER: readonly PromptWarning[] = ['command', 'link', 'encoded', 'secret']
 // telles quelles, on ne les distinguerait pas de l'apostrophe droite en relisant le code.
 const CURLY_APOSTROPHES = new RegExp(`[${String.fromCodePoint(0x2018, 0x2019, 0x02bc)}]`, 'g')
 
+// Les caractères sans largeur, que `cleanPrompt` laisse passer (les liants U+200C et U+200D des
+// emoji, les sélecteurs de variante) : glissés au milieu de « curl » ou de « mot de passe », ils
+// cachent le repère sans rien changer à l'œil. `Default_Ignorable_Code_Point` est la liste Unicode
+// de ce qui ne se dessine pas ; les sélecteurs de variante (FE00-FE0F, E0100-E01EF) y figurent déjà,
+// on les nomme quand même pour que le but se lise. Retirés de la copie pliée seulement : ce qu'on
+// affiche et qu'on copie reste le texte nettoyé, emoji compris.
+// Une alternation plutôt qu'une seule classe `[…]` : Biome refuse de mêler dans une classe un
+// caractère et des marques combinantes (noMisleadingCharacterClass).
+const INVISIBLE = /\p{Default_Ignorable_Code_Point}|[\u{FE00}-\u{FE0F}]|[\u{E0100}-\u{E01EF}]/gu
+
 /**
- * Plie le texte pour la recherche : NFKC, minuscules, accents retirés, apostrophes droites, et les
- * espaces d'une même ligne regroupés en une seule (les retours à la ligne restent : une commande
- * se repère aussi au début d'une ligne).
+ * Plie le texte pour la recherche : NFKC, caractères sans largeur retirés, minuscules, accents
+ * retirés, apostrophes droites, et les espaces d'une même ligne regroupés en une seule (les retours
+ * à la ligne restent : une commande se repère aussi au début d'une ligne).
  * NFD sépare une lettre accentuée en lettre + accent ; `\p{M}` (les « marques ») retire l'accent.
  */
 const fold = (text: string) =>
   text
     .normalize('NFKC')
+    .replace(INVISIBLE, '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
@@ -158,7 +169,7 @@ export function promptWarnings(text: string): PromptWarning[] {
   const found: Record<PromptWarning, boolean> = {
     command: COMMAND_WORDS.test(flat) || COMMAND_PIPE.test(flat) || COMMAND_PROMPT.test(lines),
     link: LINK.test(flat),
-    encoded: ENCODED.test(text.normalize('NFKC').replace(ADDRESSES, ' ')),
+    encoded: ENCODED.test(text.normalize('NFKC').replace(INVISIBLE, '').replace(ADDRESSES, ' ')),
     secret: SECRET_WORDS.test(flat),
   }
   return ORDER.filter((warning) => found[warning])

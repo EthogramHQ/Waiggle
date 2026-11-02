@@ -247,14 +247,13 @@ function ProjectView({ project }: { project: Project }) {
   )
 
   // La capsule des réactions (un autre membre). Sur un compte suspendu, l'éventail ne s'ouvre pas :
-  // il ne pourrait y poser aucune réaction nouvelle (rien n'est décidé pour lui, U3).
+  // il ne pourrait y poser aucune réaction nouvelle (rien n'est décidé pour lui, U3). Sans
+  // `onOpenFan`, la capsule ne promet pas non plus l'éventail (ni indice, ni appui long).
   const capsule = readOnly ? null : (
     <ReactionCapsule
       reactions={reactions}
       onToggle={reaction.toggle}
-      onOpenFan={() => {
-        if (!suspended) setFanOpen(true)
-      }}
+      onOpenFan={suspended ? undefined : () => setFanOpen(true)}
       error={
         reaction.expired
           ? t(($) => $.states.expired)
