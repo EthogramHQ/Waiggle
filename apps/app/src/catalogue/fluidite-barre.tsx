@@ -90,12 +90,14 @@ export function FluidTopBarCatalogue() {
 /** Un exemple : sa légende, puis lui. */
 function Example({ caption, children }: { caption: string; children: ReactNode }) {
   return (
-    <Stack gap="sm">
+    // Sur une feuille du thème de l'exemple : la légende reste lisible quel que soit celui du
+    // catalogue (de nuit, une légende de jour posée sur le fond de nuit ne se lisait pas).
+    <Surface variant="panel" padding="md" gap="sm">
       <Text variant="caption" tone="secondary">
         {caption}
       </Text>
       {children}
-    </Stack>
+    </Surface>
   )
 }
 
