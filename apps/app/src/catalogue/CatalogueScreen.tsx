@@ -96,10 +96,10 @@ import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectFrameCatalogue } from './projet-ecran'
-import { GalleryCatalogue } from './projet-galerie'
 import { FanCatalogue } from './projet-eventail'
-import { ProjectPromptsCatalogue } from './projet-prompts'
+import { GalleryCatalogue } from './projet-galerie'
 import { NotFoundPortalCatalogue } from './projet-introuvable'
+import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -154,11 +154,11 @@ export function CatalogueScreen() {
       {/* R5a : le portail et l'introuvable d'un projet (projet-introuvable.tsx). Tout en tête pour
           les captures de la branche ; à ranger à l'assemblage. */}
       <NotFoundPortalCatalogue />
-      {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
-          En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       {/* R5a : l'éventail des réactions et la vue de l'auteur (projet-eventail.tsx). En tête pour
           les captures de la branche ; à ranger à l'assemblage. */}
       <FanCatalogue />
+      {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
+          En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       <ProjectGroundworkCatalogue />
       {/* R5a : la capsule des réactions de la page projet (projet-capsule.tsx). */}
       <CapsuleCatalogue />

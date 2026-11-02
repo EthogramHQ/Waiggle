@@ -30,6 +30,9 @@ describe('oncePerDevice', () => {
   // du membre ou de l'appareil, ni compteur).
   it('stores the same constant, whatever the moment, without any date or number', async () => {
     const setItem = jest.spyOn(AsyncStorage, 'setItem')
+    // Le stockage simulé fait déjà de `setItem` une `jest.fn` : `spyOn` la rend telle quelle, avec
+    // les appels des tests précédents du fichier. On les efface pour ne compter que les nôtres.
+    setItem.mockClear()
     // Deux moments éloignés : une valeur qui contiendrait l'heure changerait de l'un à l'autre.
     jest.useFakeTimers({ now: new Date('2026-11-02T08:00:00Z'), doNotFake: ['nextTick'] })
     try {
