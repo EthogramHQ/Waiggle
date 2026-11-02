@@ -534,8 +534,8 @@ export const fr = {
       funny: 'Drôle',
       // R5a : « Waggle ! » remplace « Bravo » à l'écran ; la clé reste `bravo` (base, API).
       bravo: 'Waggle !',
-      label: '{{name}}, {{count}}',
-      labelMine: '{{name}}, {{count}}, ta réaction',
+      label: '{{name}}, {{count, number}}',
+      labelMine: '{{name}}, {{count, number}}, ta réaction',
       own: 'Les réactions à ton projet',
       // Sous le bloc de l'auteur (R5a, jur-2) ; « Pas encore de réaction » tant que tout est à 0 (jur-14).
       ownCaption: 'Des nombres seulement : l’appli ne montre à personne qui a réagi.',
