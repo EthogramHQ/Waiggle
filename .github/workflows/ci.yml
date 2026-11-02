@@ -75,10 +75,11 @@ jobs:
     name: Screenshots
     if: github.event_name != 'schedule'
     runs-on: ubuntu-26.04
-    # 20 minutes : les captures prennent 6 à 7 min, mais l'installation de Chromium a déjà pris 8 min
-    # sur un runner lent (26/10/2026, main annulé à 15 min). Si le navigateur se bloque, on n'attend
-    # pas des heures.
-    timeout-minutes: 20
+    # 30 minutes : la tâche entière prenait déjà 16 à 18 min sur main fin octobre (plus de pages, et
+    # l'installation de Chromium a pris jusqu'à 8 min sur un runner lent, 26/10/2026) ; avec les
+    # pages de RF, elle passait 20 min (2/11/2026). Si le navigateur se bloque, on n'attend pas des
+    # heures.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
