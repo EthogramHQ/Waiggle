@@ -503,7 +503,9 @@ export function SheetPanel({
           contentContainerStyle={{
             paddingHorizontal: space.xl,
             paddingTop: space.xl,
-            paddingBottom: pinned ? space.xl : insets.bottom + space.xxl,
+            // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
+            // le dernier bloc et le bouton (décision de Louis du 2/11).
+            paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
             gap: space.xl,
           }}
           keyboardShouldPersistTaps="handled"
