@@ -99,6 +99,7 @@ import { ProjectFrameCatalogue } from './projet-ecran'
 import { GalleryCatalogue } from './projet-galerie'
 import { FanCatalogue } from './projet-eventail'
 import { ProjectPromptsCatalogue } from './projet-prompts'
+import { NotFoundPortalCatalogue } from './projet-introuvable'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -150,6 +151,9 @@ export function CatalogueScreen() {
       {/* R5a : le bloc « Le prompt de départ » (projet-prompts.tsx). En tête le temps des captures
           de l'ui-dev ; la session le range à l'assemblage. */}
       <ProjectPromptsCatalogue />
+      {/* R5a : le portail et l'introuvable d'un projet (projet-introuvable.tsx). Tout en tête pour
+          les captures de la branche ; à ranger à l'assemblage. */}
+      <NotFoundPortalCatalogue />
       {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
           En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       {/* R5a : l'éventail des réactions et la vue de l'auteur (projet-eventail.tsx). En tête pour
