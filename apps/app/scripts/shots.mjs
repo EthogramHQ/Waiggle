@@ -360,6 +360,20 @@ const maxMember = {
     .filter((item) => item.project.author.id === max.id)
     .map((item) => item.project),
 }
+// R5a : Inès, l'autrice du projet de la galerie (launchProject). Sans sa page, la lecture de
+// l'auteur échoue et la page projet cache « Suivre » (décision du 2/11) : la capture le perdrait.
+const inesMember = {
+  ...leaPage,
+  id: ines.id,
+  name: ines.name,
+  avatarUrl: ines.avatarUrl,
+  handle: 'ines_haddad',
+  bio: 'Je lance des petits outils pour l’association.',
+  isMe: false,
+  isFollowed: false,
+  followerCount: 7,
+  projects: [],
+}
 // Tranche 7c : deux membres que la modération connaît. Sam (celui de la file, testing/moderation.ts)
 // peut être suspendu ; Karim l'est déjà, 7 jours après un signalement.
 const samPage = {
@@ -1233,6 +1247,7 @@ const fakeApi = (
       return json(200, blockedMemberPage(blocked.get(member[1])))
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
+    if (pathname === `/v1/members/${ines.id}`) return json(200, inesMember)
     // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
     // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
