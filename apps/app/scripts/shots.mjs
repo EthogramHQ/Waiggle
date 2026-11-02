@@ -1172,6 +1172,8 @@ const fakeApi = (
       return json(200, withExtras(commentedProject))
     }
     if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
+    // R5a : le brouillon privé de Léa, vu par elle (le bandeau privé, « Pas encore de réaction »).
+    if (pathname === `/v1/projects/${draftProject.id}`) return json(200, withExtras(draftProject))
     if (pathname === `/v1/projects/${removedProject.id}`) {
       return json(200, withExtras(removedProject))
     }
@@ -1975,6 +1977,37 @@ const pages = [
   {
     name: 'projet-introuvable',
     path: '/projects/00000000-0000-4000-8000-000000000000',
+    signedIn: true,
+  },
+  // Tranche R5a, la page projet (planches R5a-*) : le projet d'Inès à trois photos et trois prompts,
+  // l'éventail des réactions (ouvert d'un clic droit, comme d'un appui long), la feuille Partager,
+  // le brouillon privé vu par Léa, et la page de sortie qui nomme le projet de la démo.
+  { name: 'projet-galerie', path: `/projects/${launchProject.id}`, signedIn: true, fullPage: true },
+  {
+    name: 'projet-eventail',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page
+        .getByRole('button', { name: /^Bluffant/ })
+        .first()
+        .click({ button: 'right' })
+      await page.getByRole('dialog', { name: 'Les réactions' }).waitFor()
+    },
+  },
+  {
+    name: 'projet-partager',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
+    },
+  },
+  { name: 'projet-auteur-prive', path: `/projects/${draftProject.id}`, signedIn: true },
+  {
+    name: 'sortie-demo',
+    path: `/out?url=${encodeURIComponent(launchProject.demoUrl)}&project=${launchProject.id}`,
     signedIn: true,
   },
   // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le
