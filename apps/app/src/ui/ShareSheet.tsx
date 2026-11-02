@@ -32,7 +32,7 @@ import type { ImageSource } from './image'
 import { Sheet, type SheetNotice, SheetPanel } from './Sheet'
 import { canShareNatively, type ShareTarget, shareLink, shareUrl } from './share'
 import { Text } from './Text'
-import { TAP_GUARD_MS, useTapGuard } from './tapGuard'
+import { holdPageTaps, TAP_GUARD_MS, useTapGuard } from './tapGuard'
 import { useHydrated } from './theme/hydration'
 import { useTheme } from './theme/ThemeProvider'
 import { useToast } from './theme/toast'
@@ -118,7 +118,10 @@ function useShareContent({
       return
     }
     setFailed(false)
-    // La feuille d'abord, le toast ensuite (ui-8).
+    // La feuille d'abord, le toast ensuite (ui-8). La feuille disparaît sous le doigt : sur le web,
+    // la seconde tape d'une double tape tomberait sur la page dessous (« Publier », une carte) ;
+    // la page l'ignore le temps de la garde.
+    holdPageTaps()
     onClose()
     toast.show(isPrivate ? t(($) => $.share.copiedPrivate) : t(($) => $.share.copiedMembers), {
       icon: 'check-circle',
@@ -148,7 +151,7 @@ function useShareContent({
         style={{
           width: THUMBNAIL,
           height: THUMBNAIL,
-          borderRadius: radii.tile,
+          borderRadius: radii.small,
           backgroundColor: colors.honeySoft,
         }}
       />
