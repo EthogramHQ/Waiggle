@@ -16,7 +16,7 @@
 import { sourceUrl } from '@ruche/brand'
 import type { FollowingFeedPage } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, type RefObject, useContext, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SessionData } from '../accounts/session'
 import { useMemberSession } from '../accounts/session'
@@ -32,6 +32,7 @@ import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
 import { Constellation } from '../ui/Constellation'
+import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HiddenHeading } from '../ui/HiddenHeading'
 import { Hint } from '../ui/Hint'
 import { LanguageSwitcher } from '../ui/LanguageSwitcher'
@@ -39,6 +40,7 @@ import { Logo } from '../ui/Logo'
 import { Screen } from '../ui/Screen'
 import { SkeletonList } from '../ui/Skeleton'
 import { Row, Stack } from '../ui/Stack'
+import { ScreenScrollContext } from '../ui/scrollLight'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
@@ -163,6 +165,8 @@ function MemberHome({ session }: { session: SessionData }) {
   // Sur ordinateur, à côté du titre (la phrase passe en sous-titre) ; sur téléphone, en tête du fil.
   const caption = t(($) => $.feed.followingCaption)
   const newsButton = <FeedNews news={news} onPress={showNews} {...(compact ? { caption } : null)} />
+  // RF (ui-5) : le titre « Fil », où le focus revient quand le bouton des nouveautés est touché.
+  const feedTitle = useRef<Focusable>(null)
 
   const main = (
     <FollowingFeed
@@ -207,7 +211,13 @@ function MemberHome({ session }: { session: SessionData }) {
       // des nouveautés à côté de lui (R4, même écart titre → sous-titre qu'Explorer et Outils). Sur
       // téléphone, le logo tient lieu de titre, et l'onglet « Fil » de la barre du bas dit où l'on est.
       title={compact ? undefined : t(($) => $.feed.title)}
-      titleAside={compact ? undefined : newsButton}
+      titleRef={feedTitle}
+      // RF (ui-5) : quand le titre passe sous la barre fixe, Screen pose le bouton sous elle ; il
+      // reste ainsi en vue pendant qu'on descend dans le fil.
+      keepAsideInView
+      titleAside={
+        compact ? undefined : <PinnedNews news={news} onShow={showNews} titleRef={feedTitle} />
+      }
       // La phrase qui dit ce que montre le fil ; pas au premier lancement, où le salut et « Ton fil
       // t'attend » le disent déjà, juste en dessous.
       subtitle={compact || firstRun ? undefined : caption}
@@ -239,6 +249,34 @@ function MemberHome({ session }: { session: SessionData }) {
  * mémoire, le premier « Suivre » remplacerait toute la page par le fil, sous le doigt, et l'on ne
  * pourrait plus suivre le deuxième proche de la liste. Le fil arrive alors sous la liste.
  */
+/**
+ * Le bouton des nouveautés sur ordinateur (RF, ui-5), à côté du titre ou sous la barre fixe. Son
+ * toucher relit le fil comme avant, puis remonte en haut (`toTop()` du canal de défilement de
+ * Screen : un composant rendu dans Screen le lit par son contexte) et pose le focus sur le titre
+ * « Fil », sans faire défiler une seconde fois.
+ */
+function PinnedNews({
+  news,
+  onShow,
+  titleRef,
+}: {
+  news: ReturnType<typeof useFeedNews>
+  onShow: () => unknown
+  titleRef: RefObject<Focusable | null>
+}) {
+  const scroll = useContext(ScreenScrollContext)
+  return (
+    <FeedNews
+      news={news}
+      onPress={() => {
+        onShow()
+        scroll?.toTop()
+        focusWithoutScroll(titleRef.current)
+      }}
+    />
+  )
+}
+
 const useFirstRun = (firstPage: Pick<FollowingFeedPage, 'followsAnyone'> | undefined) => {
   const [kept, setKept] = useState<boolean | undefined>(undefined)
   if (kept === undefined && firstPage) {
