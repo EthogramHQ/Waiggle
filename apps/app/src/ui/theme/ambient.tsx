@@ -3,15 +3,21 @@
 // et la lumière glisse vers elles ; une action marquante (publier, réagir) la ravive d'une
 // impulsion. Sans source, c'est la lumière miel.
 //
-// Chaque écran (ui/Screen.tsx) monte son propre fournisseur : sur le web, la page précédente reste
-// montée sous la nouvelle, et chacune garde ainsi sa lumière. Un composant de l'écran y accède par
-// useAmbient() ; la lumière elle-même (AmbientLight) lit la source par useAmbientSource().
+// Sur le web (tranche RF), une seule lumière est posée derrière toutes les pages, par l'hôte
+// (ui/AmbientHost.tsx) : elle ne repart pas de zéro à chaque page. Chaque écran s'y inscrit
+// (ScreenAmbient, plus bas) avec sa source et son envie de lumière ; l'hôte dessine celle de
+// l'écran **devenu affiché en dernier**. Hors de l'hôte (téléphone, tests, catalogue), chaque
+// écran garde son propre fournisseur (AmbientProvider) et sa propre lumière, comme avant.
+// Dans les deux cas, un composant de l'écran parle à la lumière par useAmbient() ; la lumière
+// elle-même (AmbientLight) lit la source par useAmbientSource().
 import { palettes } from '@ruche/brand'
 import {
   createContext,
   type ReactNode,
   useCallback,
   useContext,
+  useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -179,6 +185,14 @@ type PulseListener = (force: number) => void
 
 type AmbientState = {
   source: AmbientSource
+  /**
+   * Une lumière est-elle voulue ? Toujours vrai hors de l'hôte. Dans l'hôte (le web), faux quand
+   * l'écran affiché n'en veut pas (le miel, `ambient={false}`) ou qu'aucun écran inscrit n'est
+   * affiché : l'hôte rend alors `<AmbientLight off />`, qui s'efface en fondu puis rend son
+   * canvas. Une source `null` ne le dit jamais : `null`, c'est la lumière miel (un écran sans
+   * visuel, le Fil). Pendant le fondu de sortie, la source reste la dernière dessinée.
+   */
+  wanted: boolean
   /** S'abonner aux impulsions (déjà fusionnées) ; renvoie de quoi se désabonner. */
   onPulse: (listener: PulseListener) => () => void
 }
@@ -189,25 +203,17 @@ const AmbientActions = createContext<Ambient | null>(null)
 const AmbientStateContext = createContext<AmbientState | null>(null)
 
 const inert: Ambient = { setSource: () => {}, pulse: () => {} }
-const noSource: AmbientState = { source: null, onPulse: () => () => {} }
+const noSource: AmbientState = { source: null, wanted: true, onPulse: () => () => {} }
 
-export function AmbientProvider({
-  initialSource = null,
-  children,
-}: {
-  /** La source du premier affichage, sans fondu (l'image du projet déjà connue). */
-  initialSource?: AmbientSource
-  children: ReactNode
-}) {
-  const [source, setSourceState] = useState<AmbientSource>(initialSource)
+/**
+ * Hook : le canal des impulsions, commun au fournisseur d'un écran et à l'hôte. `pulse` prévient
+ * les abonnés (la lumière), en fusionnant les rafales ; `onPulse` abonne.
+ */
+function usePulseChannel() {
   // Les abonnés aux impulsions, et l'heure de la dernière impulsion jouée. Des « refs » : des
   // valeurs gardées d'un affichage à l'autre, dont le changement ne redessine rien.
   const listeners = useRef(new Set<PulseListener>())
   const lastPulse = useRef(Number.NEGATIVE_INFINITY)
-
-  const setSource = useCallback((next: AmbientSource) => {
-    setSourceState((current) => (sameSource(current, next) ? current : next))
-  }, [])
 
   const pulse = useCallback((force = 1) => {
     const now = Date.now()
@@ -225,8 +231,30 @@ export function AmbientProvider({
     }
   }, [])
 
+  return { pulse, onPulse }
+}
+
+/**
+ * Le fournisseur d'un écran hors de l'hôte (téléphone, tests, catalogue) : sa source à lui et ses
+ * impulsions, que sa propre lumière lit.
+ */
+export function AmbientProvider({
+  initialSource = null,
+  children,
+}: {
+  /** La source du premier affichage, sans fondu (l'image du projet déjà connue). */
+  initialSource?: AmbientSource
+  children: ReactNode
+}) {
+  const [source, setSourceState] = useState<AmbientSource>(initialSource)
+  const { pulse, onPulse } = usePulseChannel()
+
+  const setSource = useCallback((next: AmbientSource) => {
+    setSourceState((current) => (sameSource(current, next) ? current : next))
+  }, [])
+
   const actions = useMemo(() => ({ setSource, pulse }), [setSource, pulse])
-  const state = useMemo(() => ({ source, onPulse }), [source, onPulse])
+  const state = useMemo(() => ({ source, wanted: true, onPulse }), [source, onPulse])
   return (
     <AmbientActions.Provider value={actions}>
       <AmbientStateContext.Provider value={state}>{children}</AmbientStateContext.Provider>
@@ -240,8 +268,260 @@ export function AmbientProvider({
  */
 export const useAmbient = (): Ambient => useContext(AmbientActions) ?? inert
 
-/** Hook de la lumière elle-même : la source à dessiner et ses impulsions. */
+/** Hook de la lumière elle-même : la source à dessiner, si elle est voulue, et ses impulsions. */
 export const useAmbientSource = (): AmbientState => useContext(AmbientStateContext) ?? noSource
+
+// ---------------------------------------------------------------------------------------------
+// L'hôte : une lumière pour toutes les pages (le web)
+
+/** Ce que l'hôte sait d'un écran inscrit. */
+type Registration = {
+  /** La dernière source choisie par l'écran pendant qu'il était affiché. */
+  source: AmbientSource
+  /** L'écran veut-il une lumière ? (pas sur le miel, ni avec `ambient={false}`) */
+  light: boolean
+  /** L'écran est-il affiché, d'après le routeur ? */
+  focused: boolean
+  /** Combien de fois la route est devenue affichée (useScreenShownCount, ui/screenFocus.ts). */
+  shown: number
+  /** Le numéro du dernier passage à « affiché » : le plus grand gagne (ui-11). 0 : jamais. */
+  shownAt: number
+}
+
+/** Le registre de l'hôte, tel que les écrans le voient : chaque geste porte l'identité de l'écran. */
+type AmbientRegistry = {
+  add: (id: string, entry: Omit<Registration, 'shownAt'>) => void
+  remove: (id: string) => void
+  setLight: (id: string, light: boolean) => void
+  setFocused: (id: string, focused: boolean) => void
+  setShown: (id: string, shown: number) => void
+  setSource: (id: string, source: AmbientSource) => void
+  pulse: (id: string, force?: number) => void
+}
+
+const AmbientRegistryContext = createContext<AmbientRegistry | null>(null)
+
+/** Ce que l'hôte dessine : la source de l'écran retenu, et s'il veut une lumière. */
+type Drawn = { id: string | null; source: AmbientSource; wanted: boolean }
+
+/**
+ * L'écran dont l'hôte dessine la lumière : parmi les écrans affichés, celui qui l'est devenu en
+ * dernier. Ce n'est pas « le premier qui se dit affiché » : pendant un changement de page, deux
+ * écrans peuvent se dire affichés un court instant, et c'est le passage à « affiché », un
+ * événement daté, qui départage (ui-11). Aucun écran affiché, ou l'écran retenu ne veut pas de
+ * lumière : `wanted` faux, et la source reste celle d'avant (`previous`), pour que la lumière
+ * s'efface dans ses couleurs au lieu de virer au miel pendant son fondu de sortie.
+ */
+const pickDrawn = (entries: Map<string, Registration>, previous: AmbientSource): Drawn => {
+  let chosen: [string, Registration] | null = null
+  for (const pair of entries) {
+    const [, entry] = pair
+    if (entry.focused && (chosen === null || entry.shownAt > chosen[1].shownAt)) chosen = pair
+  }
+  if (chosen === null || !chosen[1].light) return { id: null, source: previous, wanted: false }
+  return { id: chosen[0], source: chosen[1].source, wanted: true }
+}
+
+/**
+ * Le fournisseur de l'hôte (ui/AmbientHost.tsx le pose, sur le web) : il tient le registre des
+ * écrans et donne à la lumière commune (et aux lumières des cartes) la source de l'écran retenu et
+ * les impulsions de cet écran-là.
+ */
+export function AmbientHostProvider({ children }: { children: ReactNode }) {
+  // Le registre vit dans une ref : s'inscrire ou changer de source ne redessine pas l'hôte ; seul
+  // un changement de ce qui est dessiné (`drawn`) le fait.
+  const entries = useRef(new Map<string, Registration>())
+  // Le compteur des passages à « affiché » : un numéro qui ne fait que monter.
+  const shownCount = useRef(0)
+  // Avant toute inscription (la page pré-rendue, le premier affichage), la lumière miel : c'est ce
+  // que le serveur dessine, et le premier affichage du navigateur doit lui être identique.
+  const [drawn, setDrawn] = useState<Drawn>({ id: null, source: null, wanted: true })
+  // L'écran dessiné, lu par `pulse` sans attendre un nouveau rendu.
+  const drawnId = useRef<string | null>(null)
+  const { pulse: pulseLight, onPulse } = usePulseChannel()
+
+  // La dernière source choisie, gardée pendant le fondu de sortie (pickDrawn).
+  const lastSource = useRef<AmbientSource>(null)
+
+  const refresh = useCallback(() => {
+    const next = pickDrawn(entries.current, lastSource.current)
+    // Lus par les gestes (pulse, le prochain refresh) aussitôt, sans attendre le rendu.
+    drawnId.current = next.id
+    lastSource.current = next.source
+    setDrawn((current) =>
+      current.id === next.id &&
+      current.wanted === next.wanted &&
+      sameSource(current.source, next.source)
+        ? current
+        : next,
+    )
+  }, [])
+
+  const registry = useMemo<AmbientRegistry>(() => {
+    const showIfFocused = (entry: Registration) => {
+      if (entry.focused) {
+        shownCount.current += 1
+        entry.shownAt = shownCount.current
+      }
+    }
+    return {
+      add: (id, entry) => {
+        const registration = { ...entry, shownAt: 0 }
+        showIfFocused(registration)
+        entries.current.set(id, registration)
+        refresh()
+      },
+      // S3 : un écran démonté ne compte plus ; s'il était dessiné, l'écran affiché avant lui reprend
+      // la lumière, ou plus rien.
+      remove: (id) => {
+        entries.current.delete(id)
+        refresh()
+      },
+      setLight: (id, light) => {
+        const entry = entries.current.get(id)
+        if (!entry || entry.light === light) return
+        entry.light = light
+        refresh()
+      },
+      setFocused: (id, focused) => {
+        const entry = entries.current.get(id)
+        if (!entry || entry.focused === focused) return
+        entry.focused = focused
+        // Le passage à « affiché » est l'événement qui date l'écran ; le passage à « caché » ne
+        // date rien.
+        showIfFocused(entry)
+        refresh()
+      },
+      // ui-11 : la route est de nouveau devenue affichée (son compteur a monté), même si l'écran
+      // se disait déjà affiché : c'est l'événement qui la date, pas le booléen.
+      setShown: (id, shown) => {
+        const entry = entries.current.get(id)
+        if (!entry || entry.shown === shown) return
+        entry.shown = shown
+        showIfFocused(entry)
+        refresh()
+      },
+      // S3 : un écran caché ne change pas la lumière ; son geste est ignoré, pas mis de côté.
+      setSource: (id, source) => {
+        const entry = entries.current.get(id)
+        if (!entry?.focused || sameSource(entry.source, source)) return
+        entry.source = source
+        refresh()
+      },
+      // S3 : seul l'écran dont la lumière est dessinée la ravive.
+      pulse: (id, force) => {
+        if (drawnId.current === id) pulseLight(force)
+      },
+    }
+  }, [refresh, pulseLight])
+
+  // Au montage, après les inscriptions des écrans (leurs effets passent avant celui de l'hôte) :
+  // sans aucun écran inscrit, aucune lumière.
+  useLayoutEffect(() => {
+    refresh()
+  }, [refresh])
+
+  const state = useMemo(
+    () => ({ source: drawn.source, wanted: drawn.wanted, onPulse }),
+    [drawn.source, drawn.wanted, onPulse],
+  )
+  return (
+    <AmbientRegistryContext.Provider value={registry}>
+      <AmbientStateContext.Provider value={state}>{children}</AmbientStateContext.Provider>
+    </AmbientRegistryContext.Provider>
+  )
+}
+
+/** Hook : y a-t-il un hôte de la lumière autour de ce composant ? (même idée que useHasTabBarHost) */
+export const useHasAmbientHost = (): boolean => useContext(AmbientRegistryContext) !== null
+
+/** Ce qu'un écran dit de sa lumière en s'inscrivant. */
+export type ScreenAmbientOptions = {
+  /** L'écran veut-il une lumière ? Faux sur le miel (`brand`) et avec `ambient={false}`. */
+  light: boolean
+  /** Sa source au premier affichage (le visuel déjà connu), sinon `null` (la lumière miel). */
+  initialSource?: AmbientSource
+  /** L'écran est-il affiché ? (`useScreenFocused()`, ui/screenFocus.ts) */
+  focused: boolean
+  /**
+   * Combien de fois sa route est devenue affichée (`useScreenShownCount()`, ui/screenFocus.ts).
+   * Chaque montée date l'écran : le dernier daté parmi les affichés donne la lumière (ui-11).
+   * Sans compteur, seul le passage de `focused` à vrai date l'écran.
+   */
+  shown?: number
+}
+
+/**
+ * Hook : inscrit l'écran auprès de l'hôte, le temps de sa vie, et rend ses gestes **liés à son
+ * inscription** : `setSource` change la source de cet écran-là (ignoré tant qu'il est caché),
+ * `pulse` ravive la lumière commune seulement si c'est la sienne qui est dessinée. Hors de l'hôte,
+ * rend `null` et n'inscrit rien.
+ */
+export function useAmbientRegistration({
+  light,
+  initialSource = null,
+  focused,
+  shown = 0,
+}: ScreenAmbientOptions): Ambient | null {
+  const registry = useContext(AmbientRegistryContext)
+  // useId : une identité stable, propre à cet écran, pour le registre.
+  const id = useId()
+  // Ce que l'inscription envoie : une ref, lue par l'effet d'inscription sans en être une
+  // dépendance (sinon chaque changement désinscrirait puis réinscrirait l'écran). Les effets
+  // suivants la tiennent à jour.
+  const latest = useRef({ light, source: initialSource, focused, shown })
+
+  // useLayoutEffect : avant que le navigateur ne peigne, pour que la lumière de la page qui arrive
+  // parte dès sa première image. L'effet renvoie le désabonnement, joué au démontage (S3).
+  useLayoutEffect(() => {
+    if (!registry) return
+    registry.add(id, latest.current)
+    return () => registry.remove(id)
+  }, [registry, id])
+
+  useLayoutEffect(() => {
+    latest.current.light = light
+    registry?.setLight(id, light)
+  }, [registry, id, light])
+
+  useLayoutEffect(() => {
+    latest.current.focused = focused
+    registry?.setFocused(id, focused)
+  }, [registry, id, focused])
+
+  useLayoutEffect(() => {
+    latest.current.shown = shown
+    registry?.setShown(id, shown)
+  }, [registry, id, shown])
+
+  return useMemo(
+    () =>
+      registry
+        ? {
+            setSource: (source: AmbientSource) => registry.setSource(id, source),
+            pulse: (force?: number) => registry.pulse(id, force),
+          }
+        : null,
+    [registry, id],
+  )
+}
+
+/**
+ * La lumière d'un écran, que `ui/Screen.tsx` pose autour de son contenu : dans l'hôte, il s'y
+ * inscrit et donne à ses enfants des gestes liés à son inscription (useAmbient()) ; hors de
+ * l'hôte, il monte son propre fournisseur, comme avant (l'écran pose alors sa propre
+ * `AmbientLight`, voir useHasAmbientHost).
+ */
+export function ScreenAmbient({
+  children,
+  ...options
+}: ScreenAmbientOptions & { children: ReactNode }) {
+  const actions = useAmbientRegistration(options)
+  if (actions === null) {
+    return <AmbientProvider initialSource={options.initialSource}>{children}</AmbientProvider>
+  }
+  return <AmbientActions.Provider value={actions}>{children}</AmbientActions.Provider>
+}
 
 /** Ce qu'on peut donner directement à une lumière, au lieu de la source de l'écran. */
 export type AmbientLightProps = {
