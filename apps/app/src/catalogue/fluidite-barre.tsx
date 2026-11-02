@@ -139,7 +139,8 @@ function PageFrame({
   return (
     <Surface variant="grouped" padding="none">
       <ScreenScrollContext.Provider value={scroll.channel}>
-        <View style={{ height: 320, overflow: 'hidden' }}>
+        {/* Le bandeau déplié est haut : son cadre l'est aussi, pour qu'il ne soit pas rogné. */}
+        <View style={{ height: suspension === 'open' ? 520 : 320, overflow: 'hidden' }}>
           <ScreenTopBar belowBar={belowBar} brand={flow} onHeight={setReserve}>
             <Stack gap="sm">
               <Surface variant="glass" radius="sheet" padding="sm">
