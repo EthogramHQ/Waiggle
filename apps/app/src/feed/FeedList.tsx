@@ -15,7 +15,7 @@ import { useMediaSources } from '../api/media'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Arrival } from '../ui/Arrival'
-import { FeedEnd } from '../ui/FeedEnd'
+import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
 import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
@@ -200,13 +200,23 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
     items.map((item) => ({ id: feedItemId(item), thumbhash: item.project.cover?.thumbhash })),
   )
   const arrivals = useArrivals(items)
+  // La première carte arrivée avec la dernière page : sans phrase de fin, le focus du clavier y va
+  // quand « Afficher la suite » disparaît (jur-RF2).
+  const lastPage = useFirstArrived(items.length, feed.isFetchingNextPage)
+  const firstArrivedItem = lastPage.index === null ? undefined : items[lastPage.index]
+  const firstArrivedId = firstArrivedItem ? feedItemId(firstArrivedItem) : null
 
   const cardOf = (item: FeedItem) => {
     const id = feedItemId(item)
     return (
       // La vue que la lumière mesure : la carte entière, à sa place dans la fenêtre. Une carte
       // arrivée par le bouton des nouveautés y tombe en place.
-      <Arrival key={id} ref={cardRef(id)} arriving={arrivals.has(id)}>
+      <Arrival
+        key={id}
+        ref={cardRef(id)}
+        arriving={arrivals.has(id)}
+        focusRef={id === firstArrivedId ? lastPage.ref : undefined}
+      >
         {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
             discrète, qui mène elle aussi au projet. */}
         {item.kind === 'note' ? (
@@ -228,8 +238,11 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
       : feed.hasNextPage
         ? 'more'
         : 'end'
-  // La fin ordinaire (« Tu es à jour » en petit) ne redit pas ce que la sphère dit déjà.
-  const showEnd = items.length > 0 && !(sphereAt !== null && state === 'end')
+  // Le bas du fil reste monté même quand la sphère clôt le fil : depuis RF, il ne dit plus rien à
+  // la fin (« Tu es à jour » en petit retiré, T3), mais c'est lui qui rend le focus du clavier à la
+  // première carte arrivée quand « Afficher la suite » disparaît (jur-RF2). Démonté, il le
+  // laisserait tomber sur toute la page.
+  const showEnd = items.length > 0
 
   return (
     <Stack gap="lg">
@@ -257,6 +270,7 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
           moreLabel={t(($) => $.feed.more)}
           errorLabel={t(($) => $.feed.moreError)}
           retryLabel={t(($) => $.common.retry)}
+          firstArrived={lastPage.ref}
           // Une seule demande à la fois, même après un double clic.
           onMore={() => {
             if (!feed.isFetchingNextPage) void feed.fetchNextPage()

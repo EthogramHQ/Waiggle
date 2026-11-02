@@ -15,7 +15,7 @@ import { type BlockAsking, BlockDialog } from '../blocks/BlockDialog'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { Button } from '../ui/Button'
-import { FeedEnd } from '../ui/FeedEnd'
+import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -63,6 +63,9 @@ function BlockedMembers() {
   }
 
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
+  // La première ligne arrivée avec la dernière page : le focus du clavier y va (son « Débloquer »)
+  // quand « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
+  const arrived = useFirstArrived(items.length, list.isFetchingNextPage)
   // Une session expirée en arrivant : se reconnecter, pas réessayer.
   if (!list.data && list.isError && errorKey(list.error) === 'unauthorized')
     return <SignedOutScreen expired />
@@ -99,9 +102,10 @@ function BlockedMembers() {
           ) : (
             <>
               <ListGroup footer={t(($) => $.block.list.hint)}>
-                {items.map(({ member, blockedAt }) => (
+                {items.map(({ member, blockedAt }, index) => (
                   <ListRow
                     key={member.id}
+                    ref={index === arrived.index ? arrived.ref : undefined}
                     label={member.name}
                     // R4 : « @sam · Bloqué hier », lu « @sam · Bloqué le 23 octobre à 20:30 ». La
                     // date relative est une vue sur le web : c'est toute la précision qui passe par
@@ -153,6 +157,7 @@ function BlockedMembers() {
                 moreLabel={t(($) => $.block.list.more)}
                 errorLabel={t(($) => $.block.list.moreError)}
                 retryLabel={t(($) => $.common.retry)}
+                firstArrived={arrived.ref}
                 // Une seule demande à la fois, même après un double clic.
                 onMore={() => {
                   if (!list.isFetchingNextPage) void list.fetchNextPage()
