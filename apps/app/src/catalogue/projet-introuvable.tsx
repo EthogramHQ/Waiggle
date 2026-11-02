@@ -29,7 +29,7 @@ const fr = {
   portal: 'Portail',
   portalCalm: 'Portail, « Réduire les animations » : immobile',
   notFound: 'Projet introuvable',
-  desktop: 'Ordinateur : le décor en tête de la carte',
+  desktop: 'Ordinateur : le décor sur le miel, à gauche de la carte (`hero`)',
   day: 'jour',
   night: 'nuit',
   leaving: 'Tu quittes Waiggle pour',
@@ -45,7 +45,7 @@ const en: typeof fr = {
   portal: 'Portal',
   portalCalm: 'Portal, “Reduce motion”: still',
   notFound: 'Project not found',
-  desktop: 'Computer: the decor tops the card',
+  desktop: 'Computer: the decor on the honey, left of the card (`hero`)',
   day: 'day',
   night: 'night',
   leaving: 'You are leaving Waiggle for',
@@ -169,14 +169,14 @@ export function NotFoundPortalCatalogue() {
         <Stack gap="lg">
           <Example caption={`${l.portal} — ${l.desktop}`}>
             <Frame>
-              <BrandAmbiance size="wide" scene={<PortalRings />}>
+              <BrandAmbiance size="wide" hero={<PortalRings />}>
                 <LeavingSheet l={l} />
               </BrandAmbiance>
             </Frame>
           </Example>
           <Example caption={`${l.notFound} — ${l.desktop}`}>
             <Frame>
-              <BrandAmbiance size="wide" scene={<Honeycomb />}>
+              <BrandAmbiance size="wide" hero={<Honeycomb />}>
                 <NotFoundSheet />
               </BrandAmbiance>
             </Frame>

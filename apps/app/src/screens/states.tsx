@@ -210,10 +210,12 @@ export function NotFoundState({
         width={width}
         pageTitle={title}
         ambiance="brand"
-        // Les alvéoles sont le décor du miel (téléphone) ou du haut de la carte (ordinateur) : le
-        // bloc de l'état n'a donc pas d'image à lui (`picture={null}`), sinon la mascotte serait
-        // dessinée deux fois.
+        // Les alvéoles sont le décor du miel : dans la bande, sur téléphone (`scene`) ; à gauche de
+        // la carte, sur ordinateur (`hero`), car ce verre clair disparaîtrait sur la carte blanche.
+        // Le bloc de l'état n'a donc pas d'image à lui (`picture={null}`), sinon la mascotte
+        // serait dessinée deux fois.
         scene={<Honeycomb />}
+        hero={<Honeycomb />}
         onBack={back}
         // Le même « Retour » que la page d'un projet : écrit en toutes lettres sur ordinateur.
         backLabel={t(($) => $.project.page.back)}
