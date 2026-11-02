@@ -87,11 +87,16 @@ describe('following the author from the header', () => {
     expect(await screen.findByRole('switch', { name: 'Tu suis Léa' })).toBeChecked()
   })
 
-  it('offers « Suivre » when the page of the author could not be read', async () => {
+  it('offers no chip when the page of the author could not be read', async () => {
+    // Décision de Louis du 2/11/2026 : sans la page de l'auteur, on ne sait pas si on le suit, et
+    // « Suivre » échouerait sans doute aussi. Avant : « Suivre » était proposé quand même.
     jest.mocked(useMember).mockReturnValue(failed)
     await renderWithProviders(<ProjectHeader project={seenByMax} />)
 
-    expect(await screen.findByRole('switch', { name: 'Suivre Léa' })).not.toBeChecked()
+    // Témoin : la ligne de l'auteur est là, sans la pastille.
+    expect(await screen.findByRole('link', { name: 'Voir la page de Léa' })).toBeTruthy()
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(screen.queryByText('Suivre')).toBeNull()
   })
 
   it('offers no chip next to one’s own name', async () => {

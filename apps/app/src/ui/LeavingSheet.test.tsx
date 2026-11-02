@@ -23,10 +23,35 @@ describe('LeavingSheet', () => {
       />,
     )
 
-    expect(screen.getByRole('header', { name: fr.t(($) => $.leaving.to) })).toBeTruthy()
+    // Le nom lu du titre porte aussi le site (voir le test suivant).
+    expect(
+      screen.getByRole('header', {
+        name: fr.t(($) => $.leaving.toHost, { host: 'carnet-cafes.vercel.app' }),
+      }),
+    ).toBeTruthy()
     expect(screen.getByText('carnet-cafes.vercel.app')).toBeTruthy()
     expect(screen.getByText('https://carnet-cafes.vercel.app/essai')).toBeTruthy()
     expect(screen.getByText(fr.t(($) => $.leaving.warningTitle))).toBeTruthy()
+  })
+
+  it('reads the title in full, with the site, while showing only the sentence', async () => {
+    await renderWithProviders(
+      <LeavingSheet
+        host="carnet-cafes.vercel.app"
+        href="https://carnet-cafes.vercel.app/essai"
+        origin={null}
+        onOpen={noop}
+        onStay={noop}
+      />,
+    )
+
+    // Le nom lu du titre porte le site : un lecteur d'écran qui parcourt les titres l'entend en entier.
+    const title = screen.getByRole('header', {
+      name: fr.t(($) => $.leaving.toHost, { host: 'carnet-cafes.vercel.app' }),
+    })
+    // Ce qui s'affiche ne change pas : la phrase seule, le site est en grand dessous.
+    expect(title).toHaveTextContent(fr.t(($) => $.leaving.to))
+    expect(title).not.toHaveTextContent('carnet-cafes')
   })
 
   it('opens the site or stays, each with its own button', async () => {

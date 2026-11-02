@@ -46,6 +46,15 @@ jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest.fn() }))
 // Suivre : un faux hook, dont le test lit les appels (toggle) et choisit l'erreur.
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
+// La page de l'auteur est lue (« Suivre » n'est proposé qu'une fois qu'on sait si on le suit, et
+// plus quand la lecture échoue : décision du 2/11/2026). Ici, une lecture réussie, auteur non suivi.
+jest.mock('../members/api', () => ({
+  useMember: () => ({
+    data: { id: 'u1', name: 'Léa', handle: 'lea', isFollowed: false },
+    isError: false,
+    isPending: false,
+  }),
+}))
 // Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
 jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
 // Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.

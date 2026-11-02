@@ -16,6 +16,7 @@ import { ButtonPair } from '../ui/ButtonPair'
 import { Callout } from '../ui/Callout'
 import { CodeBlock } from '../ui/CodeBlock'
 import { Disclosure } from '../ui/Disclosure'
+import { MetaLine } from '../ui/MetaLine'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 
@@ -48,6 +49,16 @@ const fr = {
   pairSingle: 'Un seul bouton (l’auteur n’a pas « Suivre ce projet ») : la même largeur bornée.',
   pairCaption: 'Un bouton et sa légende : la légende suit la largeur de son bouton.',
   pairLeaving: 'La page de sortie : ouvrir le site ou rester.',
+  pairStart:
+    'ButtonPair align="start" : les boutons alignés en haut (« Tester la démo » a une ligne sous lui, « Suivre ce projet » non). Par défaut (au-dessus), ils sont centrés l’un par rapport à l’autre.',
+  iconAfter:
+    'Button iconAfter : l’icône après le libellé (un lien qui sort de l’appli, « Ouvrir le site ↗ »), puis avant, comme d’habitude ; en secondaire.',
+  metaLine:
+    'MetaLine : des renseignements séparés par des points, sous un titre. Une seule ligne, puis une ligne longue qui passe à la ligne sans couper un morceau.',
+  metaPublished: 'Publié le 3 oct.',
+  metaUpdated: 'Mis à jour hier',
+  metaLong: 'Publié le 3 octobre 2026 à 18 h 40',
+  metaLongUpdated: 'Mis à jour il y a deux jours, par Léa Moreau',
   tryDemo: 'Tester la démo',
   follow: 'Suivre ce projet',
   following: 'Projet suivi',
@@ -84,6 +95,16 @@ const en: typeof fr = {
   pairSingle: 'A single button (the author has no “Follow this project”): the same bounded width.',
   pairCaption: 'A button and its caption: the caption follows the width of its button.',
   pairLeaving: 'The leaving page: open the site or stay.',
+  pairStart:
+    'ButtonPair align="start": the buttons aligned at the top (“Try the demo” has a line under it, “Follow this project” has none). By default (above), they are centred on each other.',
+  iconAfter:
+    'Button iconAfter: the icon after the label (a link that leaves the app, “Open the site ↗”), then before it, as usual; as a secondary.',
+  metaLine:
+    'MetaLine: small facts separated by dots, under a title. A single line, then a long line that wraps without cutting a piece in two.',
+  metaPublished: 'Published Oct 3',
+  metaUpdated: 'Updated yesterday',
+  metaLong: 'Published October 3, 2026 at 6:40 pm',
+  metaLongUpdated: 'Updated two days ago, by Léa Moreau',
   tryDemo: 'Try the demo',
   follow: 'Follow this project',
   following: 'Following',
@@ -174,6 +195,47 @@ export function ProjectGroundworkCatalogue() {
         <Button label={l.open} icon="arrow-up-right" onPress={noop} />
         <Button label={l.stay} variant="secondary" onPress={noop} />
       </ButtonPair>
+
+      <Text tone="secondary">{l.pairStart}</Text>
+      <ButtonPair align="start">
+        <Stack gap="xs">
+          <Button label={l.tryDemo} icon="arrow-up-right" onPress={noop} />
+          <Text variant="caption" tone="muted">
+            {l.host}
+          </Text>
+        </Stack>
+        <Button label={l.follow} variant="secondary" icon="bell" onPress={noop} />
+      </ButtonPair>
+
+      <Text tone="secondary">{l.iconAfter}</Text>
+      <ButtonPair>
+        <Button label={l.open} icon="arrow-up-right" iconAfter onPress={noop} />
+        <Button label={l.open} variant="secondary" icon="arrow-up-right" iconAfter onPress={noop} />
+      </ButtonPair>
+      <ButtonPair>
+        <Button label={l.open} icon="arrow-up-right" onPress={noop} />
+      </ButtonPair>
+
+      <Text tone="secondary">{l.metaLine}</Text>
+      <MetaLine>
+        <Text variant="caption" tone="muted">
+          {l.metaPublished}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {l.metaUpdated}
+        </Text>
+      </MetaLine>
+      {/* Une colonne étroite, posée par le catalogue seulement : la ligne passe à la ligne. */}
+      <View style={{ alignSelf: 'stretch', maxWidth: 220 }}>
+        <MetaLine>
+          <Text variant="caption" tone="muted">
+            {l.metaLong}
+          </Text>
+          <Text variant="caption" tone="muted">
+            {l.metaLongUpdated}
+          </Text>
+        </MetaLine>
+      </View>
     </Stack>
   )
 }
