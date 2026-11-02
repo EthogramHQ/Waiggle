@@ -57,3 +57,54 @@ export function useTapGuard() {
     action()
   }
 }
+
+/** Le peu du document du navigateur dont `holdPageTaps` a besoin. */
+type WebDocument = {
+  addEventListener: (type: string, listener: (event: WebEvent) => void, capture: boolean) => void
+  removeEventListener: (type: string, listener: (event: WebEvent) => void, capture: boolean) => void
+}
+type WebEvent = {
+  type: string
+  key?: string
+  stopPropagation: () => void
+  preventDefault: () => void
+}
+
+/** Les événements d'une tape (souris, doigt, stylet) et du clavier qui active un bouton. */
+const TAP_EVENTS = [
+  'pointerdown',
+  'pointerup',
+  'mousedown',
+  'mouseup',
+  'touchstart',
+  'touchend',
+  'click',
+  'keydown',
+]
+
+/**
+ * Sur le web, une couche qui se ferme d'elle-même sous le doigt (« Copier le lien » ferme la
+ * feuille Partager, R5a) laisse tomber la seconde tape d'une double tape sur la page dessous :
+ * mesuré dans le navigateur, elle ouvrait « Publier » (390 px) ou une carte de projet (1280 px).
+ * Sur téléphone, la couche qui glisse vers le bas reçoit encore cette tape ; sur le web, elle a
+ * disparu. Cette fonction ignore donc les tapes (et Entrée, Espace) sur toute la page pendant
+ * TAP_GUARD_MS après la fermeture : écoutées à la capture sur le document, elles s'arrêtent avant
+ * d'atteindre quoi que ce soit. Ailleurs que sur le web, elle ne fait rien.
+ */
+export function holdPageTaps() {
+  const doc = (globalThis as { document?: Partial<WebDocument> }).document
+  if (typeof doc?.addEventListener !== 'function' || typeof doc.removeEventListener !== 'function')
+    return
+  const { addEventListener: add, removeEventListener: remove } = doc as WebDocument
+  const until = Date.now() + TAP_GUARD_MS
+  const stop = (event: WebEvent) => {
+    if (Date.now() >= until) return
+    if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return
+    event.stopPropagation()
+    event.preventDefault()
+  }
+  for (const type of TAP_EVENTS) add.call(doc, type, stop, true)
+  setTimeout(() => {
+    for (const type of TAP_EVENTS) remove.call(doc, type, stop, true)
+  }, TAP_GUARD_MS)
+}

@@ -284,8 +284,14 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
       >
         {/* La feuille d'abord, le voile ensuite : en s'ouvrant, la couche (web) pose le focus sur
             son premier élément atteignable, qui doit être dans la feuille. zIndex garde la feuille
-            au-dessus du voile, dessiné après elle. */}
+            au-dessus du voile, dessiné après elle.
+            pointerEvents « box-none » (en propriété : en style, react-native-web ne laisse pas
+            passer les clics) : cette couche couvre l'écran (téléphone) ou toute la largeur
+            (ordinateur), et prenait pour elle les tapes posées à côté de la feuille ; elles
+            n'arrivaient jamais au voile, et le focus partait sur la page (essai de R5a, feuille
+            Partager, 390 et 1280 px). Seule la feuille les reçoit, le reste va au voile. */}
         <View
+          pointerEvents="box-none"
           style={
             phone
               ? { zIndex: 1, flex: 1, justifyContent: 'flex-end' }

@@ -100,6 +100,7 @@ import { ProjectFrameCatalogue } from './projet-ecran'
 import { FanCatalogue } from './projet-eventail'
 import { GalleryCatalogue } from './projet-galerie'
 import { NotFoundPortalCatalogue } from './projet-introuvable'
+import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
@@ -153,6 +154,9 @@ export function CatalogueScreen() {
       {/* R5a : l'en-tête et les actions de la page projet (projet-auteur.tsx). En tête pour les
           captures de la branche ; à ranger à l'assemblage. */}
       <ProjectPartsCatalogue />
+      {/* R5a : la feuille Partager (projet-partager.tsx). En tête pour les captures de la
+          branche ; à ranger à l'assemblage. */}
+      <ShareCatalogue />
       {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
           captures de la branche ; à ranger à l'assemblage. */}
       <GalleryCatalogue />

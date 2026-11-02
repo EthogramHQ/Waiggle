@@ -938,4 +938,39 @@ describe('sharing the page of a member', () => {
 
     expect(copyText).toHaveBeenCalledWith(leaUrl)
   })
+
+  // Décision de la session (R5a, questions de TW-3) : sur sa propre page aussi, à côté de la roue.
+  it('offers « Partager » on one’s own page too, beside the settings', async () => {
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isMe: true })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('button', { name: 'Réglages' })).toBeTruthy() // témoin : la roue
+    await fireEvent.press(screen.getByRole('button', { name: 'Partager' }))
+
+    expect(await screen.findByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeTruthy()
+    expect(screen.getByText(leaUrl)).toBeTruthy()
+  })
+
+  // Un membre qui m'a bloqué n'a pas de page pour moi : rien à partager.
+  it('offers no « Partager » on the page of a member who blocked me', async () => {
+    jest.mocked(getMember).mockRejectedValue(new ApiError('notFound'))
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    // Le témoin : la page « introuvable » est bien là.
+    expect(await screen.findByRole('header', { name: 'Ce membre est introuvable' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Partager' })).toBeNull()
+  })
+
+  it('closes the sheet once the link is copied, the « Partager » button still in place', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Copier le lien' }))
+
+    // La feuille s'est fermée après la copie : son titre n'est plus à l'écran.
+    await waitFor(() =>
+      expect(screen.queryByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeNull(),
+    )
+    expect(screen.getByRole('button', { name: 'Partager' })).toBeTruthy()
+  })
 })

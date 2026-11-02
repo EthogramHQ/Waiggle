@@ -14,6 +14,9 @@
 // Tranche 7c : un administrateur trouve dans le menu « Suspendre le compte » (ou « Lever la
 // suspension ») et « Historique de modération », et lit jusqu'à quand le compte est suspendu. Un
 // visiteur suspendu n'a plus « Suivre », sauf pour ne plus suivre un membre qu'il suit déjà.
+//
+// Tranche R5a (F-Mb1) : « Partager » en haut à droite ouvre la feuille de partage (`ShareSheet`),
+// avec l'adresse de la page ; sur sa propre page, à côté de la roue.
 import { type Member, PROJECT_LIST_MAX } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
@@ -42,6 +45,7 @@ import { Notice } from '../ui/Notice'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { parisDateTime } from '../ui/parisTime'
 import { Screen } from '../ui/Screen'
+import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import {
   LoadErrorScreen,
@@ -217,6 +221,17 @@ function MemberView({ member }: { member: Member }) {
     ? t(($) => $.member.projectCountMore, { max: PROJECT_LIST_MAX })
     : t(($) => $.member.projectCount, { count: projectCount })
 
+  // La feuille « Partager » ouverte ou non, et son bouton (un bouton à icône seule : son nom
+  // « Partager » est lu).
+  const [sharing, setSharing] = useState(false)
+  const shareButton = (
+    <IconButton
+      icon="share-network"
+      label={t(($) => $.share.action)}
+      onPress={() => setSharing(true)}
+    />
+  )
+
   const followError = follow.expired
     ? t(($) => $.states.expired)
     : follow.error
@@ -233,14 +248,23 @@ function MemberView({ member }: { member: Member }) {
       // les réglages par « Moi ». Sur la rangée du « Retour » quand il y en a un (sa page ouverte
       // par /members/<id>), pas sur une rangée à elle en dessous. Un bouton à icône seule : son
       // nom (« Réglages ») est lu.
+      //
+      // R5a (F-Mb1) : « Partager », sur la page d'un autre membre comme sur la sienne (à côté de la
+      // roue). Un membre qui m'a bloqué n'a pas de page pour moi (« introuvable », plus haut) : rien
+      // à partager.
       topAction={
         member.isMe ? (
-          <IconButton
-            icon="gear-six"
-            label={t(($) => $.nav.settings)}
-            onPress={() => router.push('/settings')}
-          />
-        ) : undefined
+          <Row gap="sm" align="center">
+            {shareButton}
+            <IconButton
+              icon="gear-six"
+              label={t(($) => $.nav.settings)}
+              onPress={() => router.push('/settings')}
+            />
+          </Row>
+        ) : (
+          shareButton
+        )
       }
     >
       <MemberHeader
@@ -354,6 +378,15 @@ function MemberView({ member }: { member: Member }) {
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
           requestAnimationFrame(() => focusWithoutScroll(unblockedRef.current))
         }}
+      />
+      {/* La feuille « Partager » (R5a) : l'adresse de la page, par l'identifiant du membre, sans
+          rien d'autre ; à la fermeture, le focus revient au bouton Partager. */}
+      <ShareSheet
+        open={sharing}
+        onClose={() => setSharing(false)}
+        title={member.name}
+        target={{ kind: 'member', id: member.id }}
+        image={toSource(member.avatarUrl)}
       />
     </Screen>
   )
