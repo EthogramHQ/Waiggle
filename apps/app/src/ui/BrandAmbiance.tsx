@@ -76,6 +76,12 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   const decor = scene ? <Decor>{scene}</Decor> : null
 
   if (card) {
+    // RF (relecture design, n° 6) : la barre se pose où la posent les autres pages (ScreenTopBar :
+    // la marge du haut de l'écran plus `space.lg`). Sous la grande marge de la carte, elle descendait
+    // de 32 points en arrivant sur le miel depuis Explorer, puis remontait au retour. La carte, elle,
+    // garde sa place : l'écart rendu à la barre passe sous elle (`barLift`).
+    const withBar = header !== undefined && header !== null && header !== false
+    const barLift = withBar ? space.huge - space.lg : 0
     return (
       <View
         style={{
@@ -83,7 +89,7 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
           // Le miel couvre toute la fenêtre (le catalogue, lui, n'a pas de fenêtre à remplir).
           minHeight: size ? undefined : window.height,
           alignItems: 'center',
-          paddingTop: insets.top + space.huge,
+          paddingTop: insets.top + space.huge - barLift,
           paddingBottom: insets.bottom + space.huge,
           paddingHorizontal: padding,
           gap: space.xl,
@@ -97,6 +103,7 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
           style={{
             // La place qui reste sous la barre : la carte s'y centre en hauteur.
             flexGrow: 1,
+            marginTop: barLift,
             width: '100%',
             maxWidth: layout.maxContentWidth,
             // row-reverse : la feuille vient d'abord dans la page (lecteurs d'écran, touche Tab),

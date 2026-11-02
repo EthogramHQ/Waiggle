@@ -102,6 +102,26 @@ describe('the ambient host registry', () => {
     expect(pulses).toEqual([0.5])
   })
 
+  // Relecture RF (ui N3) : la page d'un projet, restée cachée sous le formulaire, reçoit la nouvelle
+  // photo (`setSource`). Rien ne change à l'écran tant qu'elle est cachée (S3), mais elle la garde :
+  // à son retour, la lumière prend la nouvelle photo, pas l'ancienne.
+  it('keeps the source a hidden screen sets, and draws it once that screen is back', async () => {
+    const view = await renderWithProviders(
+      app([
+        { name: 'project', source: coffee, focused: false },
+        { name: 'form', source: butterfly, focused: true },
+      ]),
+    )
+    await act(async () => gestures.project?.setSource(tea))
+    // S3 : caché, il ne change pas la lumière dessinée.
+    expect(screen.getByText(drawn(butterfly))).toBeTruthy()
+
+    // Retour : le formulaire est démonté, la page du projet redevient affichée.
+    await view.rerender(app([{ name: 'project', source: coffee, focused: true }]))
+
+    expect(screen.getByText(drawn(tea))).toBeTruthy()
+  })
+
   it('draws no light when the shown screen does not want one, then the honey light is gone', async () => {
     await renderWithProviders(
       app([

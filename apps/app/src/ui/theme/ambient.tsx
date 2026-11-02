@@ -401,12 +401,14 @@ export function AmbientHostProvider({ children }: { children: ReactNode }) {
         showIfFocused(entry)
         refresh()
       },
-      // S3 : un écran caché ne change pas la lumière ; son geste est ignoré, pas mis de côté.
+      // S3 : un écran caché ne change pas la lumière dessinée. Sa source est gardée, sans être
+      // dessinée : la page d'un projet restée sous le formulaire qui vient de changer sa photo
+      // retrouve la nouvelle lumière à son retour (relecture RF, ui N3), au lieu de l'ancienne.
       setSource: (id, source) => {
         const entry = entries.current.get(id)
-        if (!entry?.focused || sameSource(entry.source, source)) return
+        if (!entry || sameSource(entry.source, source)) return
         entry.source = source
-        refresh()
+        if (entry.focused) refresh()
       },
       // S3 : seul l'écran dont la lumière est dessinée la ravive.
       pulse: (id, force) => {
@@ -453,7 +455,8 @@ export type ScreenAmbientOptions = {
 
 /**
  * Hook : inscrit l'écran auprès de l'hôte, le temps de sa vie, et rend ses gestes **liés à son
- * inscription** : `setSource` change la source de cet écran-là (ignoré tant qu'il est caché),
+ * inscription** : `setSource` change la source de cet écran-là (gardée sans être dessinée tant
+ * qu'il est caché),
  * `pulse` ravive la lumière commune seulement si c'est la sienne qui est dessinée. Hors de l'hôte,
  * rend `null` et n'inscrit rien.
  */

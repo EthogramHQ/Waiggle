@@ -151,13 +151,33 @@ export function ScreenFade({ children, fade = true, style }: Props) {
     return () => clearTimeout(timer)
   }, [guarded, since, level])
 
-  // Deux couches : l'extérieure porte l'opacité fixe (0 tant que l'animation n'est pas à l'écran)
-  // et coupe les clics (S1) ; l'intérieure porte l'opacité animée. pointerEvents en propriété,
-  // jamais en style : le web ignorerait la règle des enfants.
+  // Deux couches : l'extérieure porte l'opacité fixe (0 tant que l'animation n'est pas à l'écran),
+  // l'intérieure l'opacité animée. pointerEvents en propriété, jamais en style : le web ignorerait
+  // la règle des enfants.
+  //
+  // Les clics (S1) : sur le web, `pointerEvents="none"` ne s'applique qu'à la couche et à ses
+  // enfants directs (react-native-web écrit `>* { pointer-events: none }`) ; plus bas, une vue
+  // `box-none` (le lien « Tester » d'une carte, son auteur) rend les clics à ses enfants. Pendant le
+  // fondu, un bouclier transparent se pose donc par-dessus tout le contenu et prend chaque clic :
+  // muet pour les lecteurs d'écran, hors de la touche Tab, retiré dès que la page est pleine. Le
+  // contenu forme alors sa propre pile (`zIndex: 0`) : les calques des cartes (`zIndex: 1`) restent
+  // dessous. La couche garde aussi `none`, qui suffit dans l'appli de téléphone.
   const hidden = active && (phase === 'waiting' || phase === 'armed')
   return (
     <View pointerEvents={active ? 'none' : 'auto'} style={[style, hidden ? styles.hidden : null]}>
-      <Animated.View style={[styles.fill, web ? animated : null]}>{children}</Animated.View>
+      <Animated.View style={[styles.fill, active ? styles.stack : null, web ? animated : null]}>
+        {children}
+      </Animated.View>
+      {active ? (
+        <View
+          testID="fade-shield"
+          pointerEvents="auto"
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.shield}
+        />
+      ) : null}
     </View>
   )
 }
@@ -167,4 +187,8 @@ const styles = StyleSheet.create({
   // couche : le contenu se range comme sans elles.
   fill: { flexGrow: 1, flexShrink: 1, minHeight: 0 },
   hidden: { opacity: 0 },
+  // Une pile à part pour le contenu, le temps du fondu : rien en lui ne passe sur le bouclier.
+  stack: { zIndex: 0 },
+  // Le bouclier : toute la couche, par-dessus le contenu.
+  shield: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
 })

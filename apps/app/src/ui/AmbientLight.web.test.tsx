@@ -550,6 +550,21 @@ describe('AmbientLight draws finer, within its limits (web, A5)', () => {
     expect(lastSize()).toEqual([1008, 630])
   })
 
+  // Relecture RF (sécurité A3) : un écran à 30 Hz (économie d'énergie, moniteur externe) donne une
+  // image toutes les 33 ms sans que la machine peine. Le repli compare l'écart entre images à la
+  // cadence de l'écran (le plus court écart entre deux images du navigateur), pas à 20 ms fixes :
+  // la lumière y garde 0,7. Le cas « 60 Hz qui rame » est le test suivant (16 ms, puis 25 ms).
+  it('keeps 0.7 on a 30 Hz screen, whose images come every 33 ms', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+
+    await frames(200, 1000 / 30)
+
+    expect(lastSize()).toEqual([1008, 630])
+  })
+
   // Repli : la moyenne de 60 images au-dessus de 20 ms (moins de 50 images par seconde). Chaque
   // palier se mesure sur 60 images neuves ; on en donne 62 pour laisser la mesure se conclure.
   // Le palier vaut pour toute la visite (il vit dans le module, et passe d'un test à l'autre) : ce

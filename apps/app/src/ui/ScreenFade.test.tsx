@@ -235,6 +235,37 @@ describe('ScreenFade, its guards (web)', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Voir le projet' }))
     expect(press).toHaveBeenCalledTimes(1)
   })
+
+  // S1 (a), sur le web pour de vrai (relecture RF, sécurité A1) : `pointerEvents="none"` n'y
+  // atteint que les enfants directs, et les cartes (`box-none`) rouvrent les clics plus bas. Un
+  // bouclier posé par-dessus le contenu prend donc les clics pendant le fondu : il est là, muet et
+  // hors de la touche Tab, puis retiré quand la page est pleine. (Jest applique la règle de React
+  // Native, pas le CSS : le vrai clic se mesure dans le navigateur.)
+  it('lays a shield over the content while it fades in, and removes it once it is full', async () => {
+    const view = await renderWithProviders(page({ focused: true, shown: 0 }))
+    await view.rerender(page({ focused: true, shown: 1 }))
+
+    const shield = screen.getByTestId('fade-shield', { includeHiddenElements: true })
+    expect(shield.props.pointerEvents).toBe('auto')
+    expect(shield.props['aria-hidden']).toBe(true)
+    expect(shield.props.tabIndex).toBeUndefined()
+    expect(shield.props.focusable).toBeFalsy()
+    // Par-dessus le contenu : après lui dans l'arbre, toute la couche, au-dessus de sa pile.
+    const style = StyleSheet.flatten(shield.props.style) as Record<string, unknown>
+    expect(style).toMatchObject({ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 })
+    expect(style.zIndex).toBe(1)
+
+    await wait(400)
+    expect(screen.queryByTestId('fade-shield', { includeHiddenElements: true })).toBeNull()
+    expect(seenOpacity(content())).toBe(1) // témoin : la page est pleine
+  })
+
+  it('lays no shield over a page shown at once (témoin)', async () => {
+    await renderWithProviders(page({ focused: true, shown: 3 }))
+
+    expect(content()).toBeTruthy()
+    expect(screen.queryByTestId('fade-shield', { includeHiddenElements: true })).toBeNull()
+  })
 })
 
 // Dans l'appli de téléphone, la pile garde son glissement natif : ScreenFade ne fait rien.
