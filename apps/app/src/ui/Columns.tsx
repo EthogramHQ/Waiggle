@@ -23,7 +23,15 @@ import { useTheme } from './theme/ThemeProvider'
  */
 export type ColumnsRow = { main: ReactNode; side: ReactNode; continues?: boolean }
 
-type Props = { gap?: Space } & (
+/**
+ * La largeur de la colonne latérale. `regular` : elle garde sa base (`sideColumn`), la principale
+ * prend toute la place gagnée. `wide` (la page d'un projet) : même base, donc même moment de passage
+ * en pile, mais la place gagnée se partage entre les deux colonnes, jusqu'à `sideColumnWide` pour la
+ * latérale ; au-delà, tout revient à la principale.
+ */
+export type SideWidth = 'regular' | 'wide'
+
+type Props = { gap?: Space; sideWidth?: SideWidth } & (
   | { main: ReactNode; side: ReactNode; rows?: never; divided?: never }
   | {
       /** Les rangées, dans l'ordre de lecture. */
@@ -37,7 +45,10 @@ type Props = { gap?: Space } & (
 
 export function Columns(props: Props) {
   const gap = props.gap ?? 'xxl'
-  if (props.rows === undefined) return <ColumnPair main={props.main} side={props.side} gap={gap} />
+  const sideWidth = props.sideWidth ?? 'regular'
+  if (props.rows === undefined) {
+    return <ColumnPair main={props.main} side={props.side} gap={gap} sideWidth={sideWidth} />
+  }
   return (
     // Les rangées l'une sous l'autre, avec le même écart que les colonnes (et autour du trait).
     <View style={{ gap: space[gap] }}>
@@ -46,7 +57,7 @@ export function Columns(props: Props) {
         // biome-ignore lint/suspicious/noArrayIndexKey: l'ordre des rangées est fixe.
         <Fragment key={index}>
           {props.divided && index > 0 && !row.continues ? <RowDivider /> : null}
-          <ColumnPair main={row.main} side={row.side} gap={gap} />
+          <ColumnPair main={row.main} side={row.side} gap={gap} sideWidth={sideWidth} />
         </Fragment>
       ))}
     </View>
@@ -54,15 +65,28 @@ export function Columns(props: Props) {
 }
 
 /** Une paire de colonnes : la principale, puis la latérale, qui passe dessous quand la place manque. */
-function ColumnPair({ main, side, gap }: { main: ReactNode; side: ReactNode; gap: Space }) {
+function ColumnPair({
+  main,
+  side,
+  gap,
+  sideWidth,
+}: {
+  main: ReactNode
+  side: ReactNode
+  gap: Space
+  sideWidth: SideWidth
+}) {
+  const wide = sideWidth === 'wide'
   return (
     <View
       style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[gap], alignItems: 'flex-start' }}
     >
-      {/* flexGrow 999 : la colonne principale prend presque toute la place gagnée. */}
+      {/* flexGrow 999 : la colonne principale prend presque toute la place gagnée. En `wide`, les
+          deux colonnes grandissent autant l'une que l'autre, et la latérale s'arrête à sa largeur
+          maximale (maxWidth) : le reste revient à la principale. */}
       <View
         style={{
-          flexGrow: 999,
+          flexGrow: wide ? 1 : 999,
           flexShrink: 1,
           flexBasis: layout.mainColumn,
           minWidth: 0,
@@ -76,6 +100,7 @@ function ColumnPair({ main, side, gap }: { main: ReactNode; side: ReactNode; gap
           flexGrow: 1,
           flexShrink: 1,
           flexBasis: layout.sideColumn,
+          ...(wide ? { maxWidth: layout.sideColumnWide } : null),
           minWidth: 0,
           gap: space[gap],
         }}

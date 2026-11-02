@@ -499,8 +499,11 @@ function ProjectView({ project }: { project: Project }) {
           // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation. Enfin
           // « Signaler ce projet », en bas à gauche : dans une rangée à lui, il vient après les
           // commentaires, au clavier comme sur téléphone (décision de Louis du 2/11/2026).
+          // `sideWidth="wide"` : la colonne de droite grandit jusqu'à environ 450 points (planche
+          // R5a-Projet-Desktop ; à 320, un titre long prenait six lignes). Décision du 2/11/2026.
           <Columns
             divided
+            sideWidth="wide"
             rows={[
               {
                 main: (

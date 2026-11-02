@@ -60,6 +60,9 @@ export const layout = {
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)
   sideColumn: 320, // largeur de base de la colonne latérale
+  // La colonne latérale large (la page d'un projet, décision de Louis du 2/11/2026) : elle part de
+  // la même base, puis grandit jusqu'ici. À 320, le titre d'un projet long prenait six lignes.
+  sideColumnWide: 450,
   mainColumn: 560, // largeur minimale de la colonne principale avant de passer en pile
   settingsNavWidth: 256, // la colonne des rubriques des réglages, sur ordinateur (R2)
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
