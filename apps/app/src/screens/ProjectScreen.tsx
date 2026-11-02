@@ -74,6 +74,7 @@ import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
+import { useScreenFocused } from '../ui/screenFocus'
 import { shareUrl } from '../ui/share'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
@@ -96,7 +97,11 @@ export function ProjectScreen({ id }: { id: string }) {
   // Pas de session : aucune requête (« public » veut dire « visible par les membres »).
   const project = useProject(id, Boolean(session))
 
-  if (state === 'pending') return <LoadingScreen width="page" />
+  // RF (ui-1) : pendant le chargement, pas de fondu des pages. La page ouverte depuis une carte a
+  // son propre passage (la photo qui grandit, ou son fondu à elle, coverTransition.tsx), chargement
+  // compris ; et on ne peut pas savoir ici si elle vient d'une carte : `useCoverTarget` ne se lit
+  // pas avant l'arrivée de la page, il oublierait la carte touchée (ProjectView le lit).
+  if (state === 'pending') return <LoadingScreen width="page" fade={false} />
   // La session ne se lit pas (trop de demandes, serveur en panne) : on ne sait pas qui est là,
   // on propose de réessayer plutôt que de se connecter.
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
@@ -119,7 +124,7 @@ export function ProjectScreen({ id }: { id: string }) {
       <LoadErrorScreen error={project.error} onRetry={() => void project.refetch()} width="page" />
     )
   }
-  if (!project.data) return <LoadingScreen width="page" />
+  if (!project.data) return <LoadingScreen width="page" fade={false} />
   return <ProjectView project={project.data} />
 }
 
@@ -133,6 +138,15 @@ function ProjectView({ project }: { project: Project }) {
   const titleRef = useRef<Focusable>(null)
   const coverTarget = useCoverTarget(project.id)
   const faded = (node: ReactNode) => (node ? <CoverFade id={project.id}>{node}</CoverFade> : null)
+  // RF (ui-1) : venue d'une carte, la page garde son passage, sans le fondu des pages par-dessus,
+  // tant que dure cette arrivée. Dès que le membre la quitte (sur le web, elle reste montée, cachée
+  // sous la page suivante), l'arrivée est finie : à son retour, elle apparaît en fondu comme les
+  // autres pages.
+  const shownNow = useScreenFocused()
+  const [arriving, setArriving] = useState(coverTarget.fromCard)
+  useEffect(() => {
+    if (!shownNow) setArriving(false)
+  }, [shownNow])
   const openOutside = useOpenOutside()
   // « Tester la démo » passe par la page de sortie, qui apprend de quel projet vient le lien (R5a).
   const openDemo = useOpenDemo()
@@ -479,6 +493,7 @@ function ProjectView({ project }: { project: Project }) {
       <Screen
         width="page"
         header={<TopNav />}
+        fade={!arriving}
         onBack={back}
         // « Retour » écrit en toutes lettres, d'où qu'on arrive (ui-11).
         backLabel={t(($) => $.project.page.back)}
@@ -578,6 +593,7 @@ function ProjectView({ project }: { project: Project }) {
     <Screen
       thumbhash={thumbhash}
       pageTitle={project.title}
+      fade={!arriving}
       // La capsule flotte en bas de l'écran, hors du défilement : lue après tout le contenu
       // (décision de Louis du 2/11/2026). Screen réserve sa hauteur sous la page.
       floating={capsule}
@@ -735,11 +751,9 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
               setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
             },
             deleteLabel: t(($) => $.project.notes.delete),
-            // Sur un projet privé, personne d'autre ne verra ses notes : on le dit.
-            empty:
-              project.visibility === 'private'
-                ? t(($) => $.project.notes.emptyPrivate)
-                : t(($) => $.project.notes.empty),
+            // RF (T11, T16) : le même état vide, public ou privé ; qui lira la note, c'est l'aide
+            // du champ qui le dit (`hintPrivate` sur un projet privé, jur-RF6).
+            empty: t(($) => $.project.notes.empty),
           }
         : {
             // Un autre membre peut signaler chaque note (tranche 7a).

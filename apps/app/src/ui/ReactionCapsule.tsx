@@ -43,9 +43,10 @@ import { bee, beeViewBox } from './logo.generated'
 import { Notice, type NoticeAction } from './Notice'
 import { BeeDance, ReactionBurst, RollingCount, useBounce } from './reactionMotion'
 import { Surface } from './Surface'
+import { useScreenFocused } from './screenFocus'
 import { shortCount } from './shortCount'
 import { Text } from './Text'
-import { useTapGuard } from './tapGuard'
+import { useTapGuard, useTapsAllowed } from './tapGuard'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -182,6 +183,14 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
     {},
   )
   const lastOpen = useRef<number | null>(null)
+  // RF (relecture de sécurité, A2) : sur le web, la capsule flotte hors du fondu du contenu
+  // (ui/ScreenFade.tsx), qui coupe les tapes tant que la page n'est pas pleine. Elle prenait donc
+  // les tapes dès la première image d'un retour sur la page : la seconde tape d'une double tape
+  // posait une réaction. Elle les ignore pendant TAP_GUARD_MS à chaque fois que sa page devient
+  // affichée, comme une fenêtre qui s'ouvre. Dans l'appli de téléphone, la pile glisse et la
+  // capsule arrive avec la page : pas de garde.
+  const focused = useScreenFocused()
+  const tapsAllowed = useTapsAllowed(focused, Platform.OS === 'web')
 
   const openFan = onOpenFan
     ? () => {
@@ -194,6 +203,7 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
     : undefined
 
   const press = (item: Item) => {
+    if (!tapsAllowed) return
     // Poser (et non retirer) fait partir le mouvement.
     if (!item.mine) setBursts((all) => ({ ...all, [item.kind]: (all[item.kind] ?? 0) + 1 }))
     onToggle(item.kind)

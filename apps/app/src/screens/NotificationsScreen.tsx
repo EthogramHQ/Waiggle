@@ -21,7 +21,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { useMarkSeen, useNotifications } from '../notifications/api'
 import { presentNotification } from '../notifications/present'
 import { shortDate } from '../projects/format'
-import { FeedEnd } from '../ui/FeedEnd'
+import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { NotificationCard } from '../ui/NotificationCard'
 import { Screen } from '../ui/Screen'
 import { Stack } from '../ui/Stack'
@@ -69,6 +69,9 @@ function MemberNotifications() {
   }, [asOf, markSeen])
 
   const items = list.data?.pages.flatMap((page) => page.items) ?? []
+  // La première notification arrivée avec la dernière page : le focus du clavier y va quand
+  // « Afficher la suite » disparaît, la liste finissant sans phrase (jur-RF2).
+  const arrived = useFirstArrived(items.length, list.isFetchingNextPage)
   // Une session expirée en cours de route : se reconnecter, pas réessayer.
   if (!list.data && list.isError && errorKey(list.error) === 'unauthorized')
     return <SignedOutScreen expired />
@@ -119,7 +122,7 @@ function MemberNotifications() {
       ) : (
         <Stack gap="lg">
           {/* Une liste annoncée : « liste, 20 éléments », et on saute d'une notification à l'autre. */}
-          <Stack gap="sm" accessibilityRole="list">
+          <Stack gap="sm" accessibilityRole="list" firstArrived={arrived}>
             {items.map((notification) => {
               const shown = presentNotification(notification, t, i18n.language)
               const target = shown.target
@@ -153,9 +156,9 @@ function MemberNotifications() {
                     : 'end'
             }
             moreLabel={t(($) => $.notifications.more)}
-            endLabel={t(($) => $.notifications.end)}
             errorLabel={t(($) => $.notifications.moreError)}
             retryLabel={t(($) => $.common.retry)}
+            firstArrived={arrived.ref}
             // Une seule demande à la fois, même après un double clic.
             onMore={() => {
               if (!list.isFetchingNextPage) void list.fetchNextPage()

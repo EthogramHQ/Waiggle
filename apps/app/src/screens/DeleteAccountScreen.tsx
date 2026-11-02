@@ -117,7 +117,6 @@ export function DeleteAccountScreen() {
         onClose={back}
         busy={deleting}
         title={title}
-        subtitle={t(($) => $.account.delete.intro)}
         // La feuille est toute la page : son titre est celui de la page (niveau 1).
         heading={1}
         // Le refus, en tête du pied, juste au-dessus de « Supprimer définitivement » : en vue, et
@@ -153,7 +152,9 @@ export function DeleteAccountScreen() {
           </>
         }
       >
-        <ListGroup>
+        {/* RF (jur-RF1) : la liste porte son titre, en face de « Ce qui reste », au lieu d'un
+            sous-titre qui l'annonçait. */}
+        <ListGroup title={t(($) => $.account.delete.goesTitle)}>
           <ListRow
             icon="user"
             label={t(($) => $.account.delete.profileItem)}

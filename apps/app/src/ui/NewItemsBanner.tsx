@@ -61,15 +61,28 @@ function useNewsLabel(count: number | null, more: boolean, kinds: readonly NewsK
   return t(($) => $.feed.newMixed, { count })
 }
 
+/**
+ * Sur le web : le focus est-il parti ailleurs que dans `place` ? Oui s'il est sur un élément hors
+ * d'elle ; non s'il y est encore (le bouton touché) ou s'il est retombé sur toute la page (`body`,
+ * le bouton disparu). (Les types de React Native ne décrivent pas la page web.)
+ */
+const focusMovedAway = (place: unknown) => {
+  const page = (globalThis as { document?: { activeElement?: unknown; body?: unknown } }).document
+  const active = page?.activeElement
+  if (!active || active === page?.body) return false
+  return !(place as { contains?: (node: unknown) => boolean } | null)?.contains?.(active)
+}
+
 export function NewItemsBanner({ count, more, kinds, authors, onPress, caption }: Props) {
   const label = useNewsLabel(count, more, kinds)
   // La place du bouton. Après un toucher, le bouton disparaît : sur le web, le focus du clavier
   // revient ici (tabIndex -1 : on peut y poser le focus, mais la touche Tab ne s'y arrête pas), au
-  // lieu de retomber tout en haut de la page.
+  // lieu de retomber tout en haut de la page. Sauf si l'écran l'a posé ailleurs pendant `onPress`
+  // (le Fil sur ordinateur le donne au titre « Fil », RF ui-5) : la place ne le lui reprend pas.
   const slot = useRef<View>(null)
   const show = async () => {
     await onPress()
-    if (Platform.OS === 'web') slot.current?.focus()
+    if (Platform.OS === 'web' && !focusMovedAway(slot.current)) slot.current?.focus()
   }
   return (
     <View

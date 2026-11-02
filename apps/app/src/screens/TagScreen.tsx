@@ -35,8 +35,9 @@ export function TagScreen({ slug }: { slug: string }) {
       onBack={back}
       // Le nom tapé par l'auteur du projet le plus récent ; sans projet, l'étiquette elle-même.
       title={tag.data.label ?? tag.data.slug}
-      // Le sous-titre décrit la liste : sans liste, il n'a rien à décrire.
-      {...(empty ? null : { subtitle: t(($) => $.tag.subtitle) })}
+      // Le sous-titre dit que la liste ne montre que les projets publics. Il reste quand elle est
+      // vide : sans lui, l'auteur d'un projet privé fait avec cet outil lirait « aucun projet ici ».
+      subtitle={t(($) => $.tag.subtitle)}
     >
       {empty ? (
         // Une étiquette sans projet public invite à publier le premier, au lieu d'une page vide.

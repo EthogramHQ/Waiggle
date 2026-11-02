@@ -280,7 +280,8 @@ export const fr = {
     delete: {
       title: 'Supprimer mon compte',
       screenTitle: 'Supprimer ton compte',
-      intro: 'Voici ce qui disparaît avec lui.',
+      /** RF (jur-RF1) : le titre de la première liste, en face de « Ce qui reste ». */
+      goesTitle: 'Ce qui disparaît',
       profileItem: 'Ton profil et ta photo',
       projectsItem: 'Tes projets',
       projectsDetail:
@@ -350,7 +351,6 @@ export const fr = {
     changePassword: {
       title: 'Changer mon mot de passe',
       screenTitle: 'Changer ton mot de passe',
-      intro: 'Pour le confirmer, indique d’abord celui que tu utilises aujourd’hui.',
       current: 'Mot de passe actuel',
       new: 'Nouveau mot de passe',
       // Les conséquences, dites avant le geste (relecture juridique, jur-3).
@@ -424,7 +424,7 @@ export const fr = {
   project: {
     new: {
       title: 'Nouveau projet',
-      subtitle: 'Montre à tes proches ce que tu construis. Tu pourras tout modifier ensuite.',
+      subtitle: 'Tu pourras tout modifier ensuite.',
       submit: 'Publier',
     },
     edit: {
@@ -472,7 +472,6 @@ export const fr = {
     },
     preview: {
       title: 'Aperçu dans le fil',
-      hint: 'Il suit ce que tu écris.',
       now: 'à l’instant',
       untitled: 'Ton projet',
       noPitch: 'Ton pitch apparaîtra ici.',
@@ -503,15 +502,12 @@ export const fr = {
     },
     notes: {
       title: 'Journal',
-      empty:
-        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
+      empty: 'Pas encore de note.',
       add: 'Publier une note',
       field: 'Ta note',
       hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
       hintPrivate:
         'Ce projet est privé : personne d’autre que toi ne voit ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
-      emptyPrivate:
-        'Pas encore de note. Ce projet est privé : personne d’autre que toi ne verra ses notes, jusqu’à ce que tu le rendes public.',
       submit: 'Publier la note',
       required: 'Écris ta note avant de la publier.',
       hintAnnounce:
@@ -634,7 +630,6 @@ export const fr = {
       blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',
       unavailablePlaceholder: 'Commentaire indisponible',
       more: 'Afficher la suite',
-      end: 'C’est tout',
       moreError: 'La suite des commentaires n’a pas pu se charger.',
       loadError: 'Les commentaires n’ont pas pu se charger.',
       loading: 'Chargement des commentaires…',
@@ -784,7 +779,6 @@ export const fr = {
       /** R4 : la date relative après le verbe (« Bloqué hier », « Bloqué le 12 oct. » : jur-J2). */
       blockedWhen: 'Bloqué {{when}}',
       more: 'Afficher la suite',
-      end: 'C’est tout',
       loadError: 'La liste n’a pas pu se charger.',
       // Ajoutés par l'interface : le nom lu de « Débloquer » sur chaque ligne (toutes portent le
       // même mot), et la suite ratée de la liste.
@@ -861,8 +855,7 @@ export const fr = {
     dismissed: 'Signalement classé sans suite.',
     removedDone: 'Contenu retiré.',
     restoredDone: 'Contenu rétabli.',
-    // Le bas de la liste (ajoutés par l'interface, tranche 7a) : tout est lu, ou la suite a raté.
-    end: 'C’est tout',
+    // Le bas de la liste (ajouté par l'interface, tranche 7a) : la suite a raté.
     moreError: 'La suite de la liste n’a pas pu se charger.',
     // Une copie longue se replie après trois champs (ajoutés par l'interface, corrections 7b).
     showAll: 'Afficher tout',
@@ -1021,7 +1014,7 @@ export const fr = {
     /** Au plafond de la liste (PROJECT_LIST_MAX) : « 50 projets ou plus ». */
     projectCountMore: '{{max}} projets ou plus',
     empty: 'Pas encore de projet public.',
-    emptyMine: 'Tu n’as encore rien publié. Ton premier projet apparaîtra ici.',
+    emptyMine: 'Tu n’as encore rien publié.',
     private: 'Privé',
     notFoundTitle: 'Ce membre est introuvable',
     notFound: 'Son compte a peut-être été supprimé, ou le lien est incorrect.',
@@ -1034,10 +1027,9 @@ export const fr = {
     option: '{{name}}, @{{handle}}',
   },
   tag: {
-    subtitle: 'Les projets publics faits avec cet outil, du plus récent au plus ancien.',
+    subtitle: 'Les projets publics faits avec cet outil.',
     emptyTitle: 'Encore aucun projet ici',
-    empty:
-      'Aucun projet public fait avec cet outil pour l’instant. Le tien sera peut-être le premier.',
+    empty: 'Le tien sera peut-être le premier.',
   },
   // R3 : la navigation. La barre d'onglets du téléphone (Fil · Explorer · + · Ruches · Moi) et la
   // barre du haut de l'ordinateur partagent ces noms.
@@ -1120,11 +1112,10 @@ export const fr = {
     emptyTitle: 'Aucun résultat pour « {{q}} »',
     empty: 'Essaie un mot plus court, ou le nom d’un outil comme « Claude ».',
     tooManyTitle: 'Trop de recherches d’un coup',
-    tooMany: 'Trop de recherches, réessaie dans un instant.',
+    tooMany: 'Réessaie dans un instant.',
     /** Sous 3 lettres, seuls les membres suivis sortent (relecture juridique de R3, C1). */
     shortQuery: 'À partir de 3 lettres, tu trouves aussi les membres que tu ne suis pas.',
     errorTitle: 'La recherche n’a pas pu aboutir',
-    error: 'Réessaie dans un instant.',
     /** Le nom lu du groupe d'onglets « Tout · Projets · Membres · Outils ». */
     tabsLabel: 'Résultats à montrer',
     /** Le nom lu d'un projet trouvé : son titre et sa pastille (« Carnet de cafés, Testable »). */
@@ -1133,7 +1124,7 @@ export const fr = {
   // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
   tools: {
     title: 'Tous les outils',
-    subtitle: 'Les outils des projets publics, par ordre alphabétique.',
+    subtitle: 'Les outils des projets publics.',
     projects_one: '{{count}} projet public',
     projects_other: '{{count}} projets publics',
     /** Le nom lu d'un outil avec son nombre : « Claude, 41 projets publics ». */
@@ -1175,10 +1166,10 @@ export const fr = {
     askMentions: 'Ne plus recevoir les e‑mails de mentions et de réponses ?',
     confirm: 'Confirmer',
     keep: 'Garder mes e‑mails',
-    doneRecap: 'C’est fait : tu ne recevras plus le récap de la semaine.',
-    doneMentions: 'C’est fait : tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.',
+    doneRecap: 'Tu ne recevras plus le récap de la semaine.',
+    doneMentions: 'Tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.',
     allOff: 'Tout couper',
-    allDone: 'C’est fait : tu ne recevras plus aucun e‑mail de notification.',
+    allDone: 'Tu ne recevras plus aucun e‑mail de notification.',
     accountEmails:
       'Les e‑mails liés à ton compte, comme la vérification de ton adresse, continuent.',
     manage: 'Gérer mes e‑mails',
@@ -1413,7 +1404,6 @@ export const fr = {
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
-    end: 'Tu es à jour',
     noteLabel: 'Note {{nameOf}} sur {{title}}',
     noteKicker: 'Note',
     news_one: '{{count}} nouveauté',
@@ -1435,9 +1425,6 @@ export const fr = {
     // R4 (F-Fil5, planche R4-Fil-AJour) : la sphère de miel, avant le premier élément déjà vu.
     upToDate: {
       title: 'Tu es à jour',
-      body: 'Tu as tout vu depuis ta dernière visite.',
-      /** Au tout premier passage : il n'y a pas eu de visite avant (relecture juridique jur-J1). */
-      bodyFirst: 'Tu as tout vu.',
       /** Un bouton secondaire : le message reste « tu peux t'arrêter » (jur-J9). */
       action: 'Explorer d’autres projets',
       hint: 'Les nouveautés s’afficheront en haut du fil.',
@@ -1520,7 +1507,6 @@ export const fr = {
     emptyActionSuspended: 'Explorer les projets',
     emptyAction: 'Publier un projet',
     more: 'Afficher la suite',
-    end: 'C’est tout',
     moreError: 'La suite des notifications n’a pas pu se charger.',
     errorTitle: 'Les notifications n’ont pas pu se charger',
     reactions_one: '{{count}} réaction sur « {{title}} »',

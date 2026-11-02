@@ -4,6 +4,7 @@
 import { type Space, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode, type Ref } from 'react'
 import { View, type ViewStyle } from 'react-native'
+import type { FirstArrived } from './FeedEnd'
 
 type Props = {
   children: ReactNode
@@ -32,6 +33,11 @@ type Props = {
    * date relative d'un auteur, lue avec le lien vers sa page (R4).
    */
   nativeID?: string
+  /**
+   * Une liste (`accessibilityRole="list"`) qui se lit par pages : la case de l'élément arrivé en
+   * premier avec la dernière page reçoit la vue que `FeedEnd` focalise (`useFirstArrived`, jur-RF2).
+   */
+  firstArrived?: FirstArrived
 }
 
 const alignments = {
@@ -58,6 +64,7 @@ export function Stack({
   accessibilityLabel,
   ref,
   nativeID,
+  firstArrived,
 }: Props) {
   const style: ViewStyle = {
     flexDirection: direction,
@@ -79,6 +86,7 @@ export function Stack({
           <View
             key={isValidElement(child) && child.key !== null ? child.key : index}
             role="listitem"
+            ref={index === firstArrived?.index ? firstArrived.ref : undefined}
           >
             {child}
           </View>

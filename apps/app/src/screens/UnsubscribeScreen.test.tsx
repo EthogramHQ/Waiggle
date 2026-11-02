@@ -128,9 +128,7 @@ describe('UnsubscribeScreen', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1)
     expect(jest.mocked(unsubscribe).mock.calls[0]?.[0]).toBe(recapToken)
     expect(jest.mocked(unsubscribe).mock.calls[0]?.[1]).toBeUndefined()
-    expect(
-      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
-    ).toBeTruthy()
+    expect(await screen.findByText('Tu ne recevras plus le récap de la semaine.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
     // Ensuite : tout couper, ou aller aux réglages.
     expect(screen.getByRole('button', { name: 'Tout couper' })).toBeTruthy()
@@ -143,9 +141,7 @@ describe('UnsubscribeScreen', () => {
     await confirm()
 
     expect(
-      await screen.findByText(
-        'C’est fait : tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.',
-      ),
+      await screen.findByText('Tu ne recevras plus d’e‑mail quand on te mentionne ou te répond.'),
     ).toBeTruthy()
   })
 
@@ -168,9 +164,7 @@ describe('UnsubscribeScreen', () => {
     expect(screen.getByRole('button', { name: 'Confirmer' })).toBeBusy()
 
     answer({ ok: true, data: null })
-    expect(
-      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
-    ).toBeTruthy()
+    expect(await screen.findByText('Tu ne recevras plus le récap de la semaine.')).toBeTruthy()
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
@@ -184,7 +178,7 @@ describe('UnsubscribeScreen', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(2)
     expect(jest.mocked(unsubscribe).mock.calls[1]).toEqual([recapToken, 'all'])
     expect(
-      await screen.findByText('C’est fait : tu ne recevras plus aucun e‑mail de notification.'),
+      await screen.findByText('Tu ne recevras plus aucun e‑mail de notification.'),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Tout couper' })).toBeNull()
     // R6 : « Tout couper » ne touche pas aux e-mails du compte, et la page le dit.
@@ -264,7 +258,7 @@ describe('UnsubscribeScreen', () => {
 
     expect(await screen.findByText('Lien invalide')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Confirmer' })).toBeNull()
-    expect(screen.queryByText(/C’est fait/)).toBeNull()
+    expect(screen.queryByText(/Tu ne recevras plus/)).toBeNull()
   })
 
   it('says what went wrong and lets the member try again when the network fails', async () => {
@@ -278,9 +272,7 @@ describe('UnsubscribeScreen', () => {
     expect(screen.queryByText('Lien invalide')).toBeNull()
     await confirm()
     expect(unsubscribe).toHaveBeenCalledTimes(2)
-    expect(
-      await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.'),
-    ).toBeTruthy()
+    expect(await screen.findByText('Tu ne recevras plus le récap de la semaine.')).toBeTruthy()
   })
 
   it('shows nothing that depends on the link before the page is hydrated, and sends nothing', async () => {
@@ -310,7 +302,7 @@ describe('UnsubscribeScreen', () => {
     onceTheConfirmationIsRead()
     await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
 
-    await screen.findByText('C’est fait : tu ne recevras plus aucun e‑mail de notification.')
+    await screen.findByText('Tu ne recevras plus aucun e‑mail de notification.')
     expect(screen.queryByText(/Léa|lea@example\.com/)).toBeNull()
   })
 })
@@ -325,7 +317,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
 
     // Le même élément touché deux fois : la réponse (immédiate) arrive entre les deux appuis.
     await fireEvent.press(button)
-    await screen.findByText('C’est fait : tu ne recevras plus le récap de la semaine.')
+    await screen.findByText('Tu ne recevras plus le récap de la semaine.')
     await fireEvent.press(button)
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
@@ -366,7 +358,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(2)
     expect(jest.mocked(unsubscribe).mock.calls[1]).toEqual([recapToken, 'all'])
     expect(
-      await screen.findByText('C’est fait : tu ne recevras plus aucun e‑mail de notification.'),
+      await screen.findByText('Tu ne recevras plus aucun e‑mail de notification.'),
     ).toBeTruthy()
   })
 
@@ -377,7 +369,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     await screen.findByRole('button', { name: 'Tout couper' })
     const page = JSON.stringify(screen.toJSON())
     // Des morceaux sans espace avant « : » (une espace insécable dans le texte affiché).
-    const done = page.indexOf('tu ne recevras plus le récap de la semaine.')
+    const done = page.indexOf('Tu ne recevras plus le récap de la semaine.')
     const manage = page.indexOf('Gérer mes e‑mails')
     const accountEmails = page.indexOf('Les e‑mails liés à ton compte')
     const allOff = page.indexOf('Tout couper')
@@ -395,7 +387,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     await confirm()
 
     const message = await screen.findByRole('status')
-    expect(message).toHaveTextContent('C’est fait : tu ne recevras plus le récap de la semaine.')
+    expect(message).toHaveTextContent('Tu ne recevras plus le récap de la semaine.')
     expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
   })
 
@@ -408,9 +400,7 @@ describe('UnsubscribeScreen, after a double tap on « Confirmer »', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Tout couper' }))
 
     const message = await screen.findByRole('status')
-    expect(message).toHaveTextContent(
-      'C’est fait : tu ne recevras plus aucun e‑mail de notification.',
-    )
+    expect(message).toHaveTextContent('Tu ne recevras plus aucun e‑mail de notification.')
     expect(focused()).toEqual({ role: 'status', tabIndex: -1 })
   })
 

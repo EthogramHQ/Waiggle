@@ -67,4 +67,11 @@ describe('TagScreen', () => {
     expect(screen.getByRole('header', { name: 'Encore aucun projet ici' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Publier un projet' })).toBeTruthy()
   })
+
+  it('still says the list holds public projects only when it is empty', async () => {
+    jest.mocked(getTag).mockResolvedValue({ slug: 'secret', label: null, projects: [] })
+    await renderWithProviders(<TagScreen slug="secret" />)
+
+    expect(await screen.findByText('Les projets publics faits avec cet outil.')).toBeTruthy()
+  })
 })

@@ -24,6 +24,7 @@ import { ButtonPair } from './ButtonPair'
 import { Callout } from './Callout'
 import { Stack } from './Stack'
 import { Text } from './Text'
+import { useTapsAllowed } from './tapGuard'
 
 /** La ligne « La démo de … » : sa phrase toute faite, et l'auteur dont la photo la précède. */
 export type LeavingOrigin = { text: string; author: StackMember }
@@ -56,6 +57,10 @@ const BLANK = String.fromCodePoint(0xa0)
 
 export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, onStay }: Props) {
   const { t } = useTranslation()
+  // RF (S1b) : la tape qui a ouvert cette page (un double clic sur « Tester ») ne doit pas ouvrir le
+  // site dans la foulée. « Ouvrir le site » ignore les tapes pendant TAP_GUARD_MS après le montage,
+  // comme les boutons d'une fenêtre (Dialog) ; « Rester sur Waiggle » n'a rien de définitif.
+  const tapsAllowed = useTapsAllowed(true, true)
   return (
     <>
       {/* align="stretch" : les textes prennent toute la largeur de la feuille, et un nom de site
@@ -90,7 +95,14 @@ export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, o
         body={t(($) => $.leaving.warningBody)}
       />
       <ButtonPair>
-        <Button label={t(($) => $.leaving.open)} icon="arrow-up-right" iconAfter onPress={onOpen} />
+        <Button
+          label={t(($) => $.leaving.open)}
+          icon="arrow-up-right"
+          iconAfter
+          onPress={() => {
+            if (tapsAllowed) onOpen()
+          }}
+        />
         <Button label={t(($) => $.leaving.stay)} variant="secondary" onPress={onStay} />
       </ButtonPair>
     </>

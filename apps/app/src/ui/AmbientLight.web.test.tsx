@@ -7,8 +7,9 @@
 // l'élément de test qui le représente ; on lui prête, le temps d'un test, ce qu'un canvas sait
 // faire (getContext, les écouteurs). Et l'on prête au monde ce qu'un navigateur fournit (document,
 // window.addEventListener), seulement s'il manque.
+import { durations } from '@ruche/brand'
 import { act, isHiddenFromAccessibility, screen } from '@testing-library/react-native'
-import { useState } from 'react'
+import { type ReactElement, useState } from 'react'
 import { Dimensions, Platform } from 'react-native'
 import {
   useReducedMotion,
@@ -95,14 +96,20 @@ const lend = (owner: object, key: string, value: unknown) => {
 /**
  * La lumière n'est montée qu'après un premier dessin : on prête d'abord à l'élément qui tiendra
  * lieu de <canvas> (un élément de test, comme screen.container) ce qu'un canvas sait faire, avec
- * le contexte donné (null : WebGL refusé). Un seul rendu : la lumière paraît par un état.
+ * le contexte donné (null : WebGL refusé) et la taille affichée du canvas (1440 × 900 par défaut).
+ * Un seul rendu : la lumière paraît par un état. `swap` remplace ensuite ce qui est affiché (une
+ * autre prop, null pour la retirer), sans nouveau rendu.
  */
-const showLight = async (webgl: object | null, light = <AmbientLight />) => {
-  let show: () => void = () => {}
+const showLight = async (
+  webgl: object | null,
+  light: ReactElement = <AmbientLight />,
+  size = { width: 1440, height: 900 },
+) => {
+  let setShown: (next: ReactElement | null) => void = () => {}
   function Later() {
-    const [shown, setShown] = useState(false)
-    show = () => setShown(true)
-    return <AmbientProvider>{shown ? light : null}</AmbientProvider>
+    const [shown, set] = useState<ReactElement | null>(null)
+    setShown = set
+    return <AmbientProvider>{shown}</AmbientProvider>
   }
   await renderWithProviders(<Later />)
   const element = Object.getPrototypeOf(screen.container) as object
@@ -111,14 +118,17 @@ const showLight = async (webgl: object | null, light = <AmbientLight />) => {
     getContext,
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1440, height: 900 }),
-    clientWidth: 1440,
-    clientHeight: 900,
+    getBoundingClientRect: () => ({ left: 0, top: 0, ...size }),
+    clientWidth: size.width,
+    clientHeight: size.height,
   })) {
     lend(element, key, value)
   }
-  await act(async () => show())
-  return { getContext }
+  await act(async () => setShown(light))
+  const swap = async (next: ReactElement | null) => {
+    await act(async () => setShown(next))
+  }
+  return { getContext, swap }
 }
 
 /** Les types de tous les éléments dessinés (« canvas », « View »…). */
@@ -262,7 +272,9 @@ const loseLastContext = async () => {
 describe('AmbientLight in a stack of pages (web, review C4)', () => {
   // Expo Router garde montées les pages quittées : sans garde, chacune gardait son contexte WebGL
   // et sa boucle ; au-delà de 16, Chrome retirait les plus anciens, et la lumière d'une page où
-  // l'on revenait restait figée.
+  // l'on revenait restait figée. Depuis RF, une seule lumière est posée derrière la pile
+  // (AmbientHost) ; la garde reste pour une lumière qui sort de l'écran (le catalogue, hors de
+  // l'hôte), et le canvas neuf reprend où l'ancien s'était arrêté (ui-8, plus bas).
   it('removes its canvas and gives back its WebGL context while its page is hidden', async () => {
     setWindow(1440, 900)
     const seeLight = watchVisibility()
@@ -307,6 +319,273 @@ describe('AmbientLight in a stack of pages (web, review C4)', () => {
 
     expect(getContext).toHaveBeenCalledTimes(4) // le premier canvas, puis trois remplaçants
     expect(drawnTypes()).not.toContain('canvas')
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Tranche RF : une seule lumière derrière toutes les pages (AmbientHost), qui ne repart jamais de
+// zéro, et un dessin plus fin (A5).
+
+/**
+ * Un faux contexte WebGL dont on lit le dessin : chaque emplacement d'uniforme est son nom (uTime,
+ * uRes…), si bien que `uniform1f('uTime', t)` dit le temps de chaque image ; `viewport` dit la taille
+ * du dessin ; `drawArrays`, chaque image dessinée ; `loseContext`, le contexte rendu.
+ */
+const readableWebGL = () => {
+  const loseContext = jest.fn()
+  const gl = fakeWebGL() as Record<string, jest.Mock>
+  gl.getUniformLocation?.mockImplementation((_program: unknown, name: string) => name)
+  gl.getExtension?.mockReturnValue({ loseContext })
+  const calls = (name: string) => gl[name]?.mock.calls ?? []
+  return {
+    webgl: gl as object,
+    loseContext,
+    /** Le temps donné au shader, image après image (en secondes). */
+    times: () =>
+      calls('uniform1f')
+        .filter(([at]) => at === 'uTime')
+        .map(([, value]) => value as number),
+    /** La taille du dernier dessin, en points de dessin. */
+    lastSize: () => calls('viewport').at(-1)?.slice(2, 4),
+    /** Le nombre d'images dessinées. */
+    drawn: () => calls('drawArrays').length,
+  }
+}
+
+/**
+ * Les images du navigateur, données une à une par le test : `requestAnimationFrame` garde le
+ * rappel, et `frames(n, every)` avance l'heure de `every` ms (performance.now compris) puis
+ * appelle les rappels en attente, n fois. À poser avant de montrer la lumière.
+ */
+const handFrames = () => {
+  let now = 1000
+  let nextId = 1
+  const pending = new Map<number, FrameRequestCallback>()
+  frame.mockImplementation((callback: FrameRequestCallback) => {
+    const id = nextId++
+    pending.set(id, callback)
+    return id
+  })
+  jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id) => {
+    if (typeof id === 'number') pending.delete(id)
+  })
+  jest.spyOn(performance, 'now').mockImplementation(() => now)
+  return async (count: number, every: number) => {
+    for (let image = 0; image < count; image++) {
+      now += every
+      const callbacks = [...pending.values()]
+      pending.clear()
+      await act(async () => {
+        for (const callback of callbacks) callback(now)
+      })
+    }
+  }
+}
+
+/** Avance la fausse horloge de Jest (minuteurs et images). */
+const wait = async (ms: number) => {
+  await act(async () => {
+    jest.advanceTimersByTime(ms)
+  })
+}
+
+// S2 : plus aucun écran affiché ne veut de lumière (le miel vif, `ambient={false}`) : l'hôte le dit
+// à la lumière par `off`. Elle s'efface en fondu (durations.base), puis retire son canvas et
+// rend son contexte ; un canvas neuf revient avec la lumière. Un seul contexte vivant à la fois.
+describe('AmbientLight when no displayed screen wants light (web, S2)', () => {
+  it('fades out, then removes its canvas and gives back its WebGL context', async () => {
+    jest.useFakeTimers()
+    setWindow(1440, 900)
+    const { webgl, loseContext } = readableWebGL()
+    const { swap } = await showLight(webgl)
+    expect(drawnTypes()).toContain('canvas') // témoin
+
+    await swap(<AmbientLight off />)
+    await wait(durations.base / 2)
+    // Pendant le fondu de sortie, la lumière est encore là.
+    expect(drawnTypes()).toContain('canvas')
+
+    await wait(durations.base)
+    expect(drawnTypes()).not.toContain('canvas')
+    expect(loseContext).toHaveBeenCalledTimes(1)
+  })
+
+  it('comes back on a new canvas, with a single WebGL context alive at a time', async () => {
+    jest.useFakeTimers()
+    setWindow(1440, 900)
+    const { webgl, loseContext } = readableWebGL()
+    const { getContext, swap } = await showLight(webgl)
+    await swap(<AmbientLight off />)
+    await wait(durations.base * 2)
+
+    await swap(<AmbientLight off={false} />)
+
+    expect(drawnTypes()).toContain('canvas')
+    expect(getContext).toHaveBeenCalledTimes(2)
+    // Les contextes ouverts moins les contextes rendus : un seul vivant.
+    expect(getContext.mock.calls.length - loseContext.mock.calls.length).toBe(1)
+  })
+
+  // La première page est sur le miel (la connexion) : rien à dessiner, aucun contexte ouvert.
+  it('opens no WebGL context while no displayed screen wants light', async () => {
+    jest.useFakeTimers()
+    setWindow(1440, 900)
+    const { getContext } = await showLight(readableWebGL().webgl, <AmbientLight off />)
+    await wait(durations.base * 2)
+
+    expect(getContext).not.toHaveBeenCalled()
+    expect(drawnTypes()).not.toContain('canvas')
+  })
+})
+
+// ui-8 : la lumière ne repart jamais de zéro. Un canvas neuf (retour d'une page, après le miel, un
+// contexte remplacé) reprend au temps où l'autre s'était arrêté ; aujourd'hui, chaque canvas
+// repartait de 18 s, et l'on voyait le dessin sauter.
+describe('AmbientLight keeps its clock from one canvas to the next (web, ui-8)', () => {
+  it('starts a new canvas at the time where the last one stopped', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const seeLight = watchVisibility()
+    const { webgl, times } = readableWebGL()
+    await showLight(webgl)
+    await frames(60, 16)
+    const stopped = times().at(-1) ?? 0
+    await seeLight(false)
+    const before = times().length
+
+    await seeLight(true)
+    await frames(1, 16)
+
+    const restarted = times()[before] ?? Number.NaN
+    expect(restarted).toBeCloseTo(stopped, 1)
+  })
+
+  // L'horloge vit pour la visite (dans le module), pas dans le composant : une lumière démontée
+  // puis remontée (une page du catalogue, l'hôte qui redessine) la reprend au lieu de repartir.
+  it('resumes the time when a light is unmounted and mounted again', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, times } = readableWebGL()
+    const { swap } = await showLight(webgl)
+    await frames(60, 16)
+    const stopped = times().at(-1) ?? 0
+    await swap(null)
+    const before = times().length
+
+    await swap(<AmbientLight />)
+    await frames(1, 16)
+
+    expect(times()[before]).toBeCloseTo(stopped, 1)
+  })
+})
+
+// A5 : un dessin plus fin (0,7 de la taille affichée au lieu de 0,45), sous le même plafond
+// (1 920 × 1 080, densité d'écran comptée au plus à 1 : garde S5), au plus 60 images par seconde,
+// et un repli automatique quand la machine peine : 0,55, puis 0,45, sans jamais remonter.
+describe('AmbientLight draws finer, within its limits (web, A5)', () => {
+  it('draws at 0.7 of the size shown', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+
+    await frames(2, 16)
+
+    expect(lastSize()).toEqual([1008, 630])
+  })
+
+  it('never draws more than 1 920 × 1 080', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl, <AmbientLight />, { width: 3000, height: 2000 })
+
+    await frames(2, 16)
+
+    expect(lastSize()).toEqual([1920, 1080])
+  })
+
+  it('ignores a high-density screen', async () => {
+    setWindow(1440, 900)
+    jest.replaceProperty(
+      globalThis as unknown as { devicePixelRatio: number },
+      'devicePixelRatio',
+      2,
+    )
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+
+    await frames(2, 16)
+
+    expect(lastSize()).toEqual([1008, 630])
+  })
+
+  // Une image sur deux sautée à 120 Hz. À 60 Hz, l'écart entre deux images varie d'une fraction de
+  // milliseconde : des images à 16 ms d'intervalle sont toutes dessinées (la garde a une marge).
+  it('draws at most 60 images a second, even on a 120 Hz screen', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, drawn } = readableWebGL()
+    await showLight(webgl)
+    await frames(20, 16)
+    const at60 = drawn()
+    expect(at60).toBeGreaterThanOrEqual(19) // témoin : à 60 Hz, chaque image
+
+    await frames(40, 1000 / 120)
+
+    const at120 = drawn() - at60
+    expect(at120).toBeGreaterThanOrEqual(19)
+    expect(at120).toBeLessThanOrEqual(21)
+  })
+
+  it('keeps 0.7 while images come in under 20 ms', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+
+    await frames(130, 18)
+
+    expect(lastSize()).toEqual([1008, 630])
+  })
+
+  // Relecture RF (sécurité A3) : un écran à 30 Hz (économie d'énergie, moniteur externe) donne une
+  // image toutes les 33 ms sans que la machine peine. Le repli compare l'écart entre images à la
+  // cadence de l'écran (le plus court écart entre deux images du navigateur), pas à 20 ms fixes :
+  // la lumière y garde 0,7. Le cas « 60 Hz qui rame » est le test suivant (16 ms, puis 25 ms).
+  it('keeps 0.7 on a 30 Hz screen, whose images come every 33 ms', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+
+    await frames(200, 1000 / 30)
+
+    expect(lastSize()).toEqual([1008, 630])
+  })
+
+  // Repli : la moyenne de 60 images au-dessus de 20 ms (moins de 50 images par seconde). Chaque
+  // palier se mesure sur 60 images neuves ; on en donne 62 pour laisser la mesure se conclure.
+  // Le palier vaut pour toute la visite (il vit dans le module, et passe d'un test à l'autre) : ce
+  // test vient donc après tous ceux qui mesurent le dessin à 0,7.
+  it('falls back to 0.55, then 0.45, after 60 slow images, and never goes back up', async () => {
+    setWindow(1440, 900)
+    const frames = handFrames()
+    const { webgl, lastSize } = readableWebGL()
+    await showLight(webgl)
+    await frames(2, 16)
+    expect(lastSize()).toEqual([1008, 630]) // témoin
+
+    await frames(62, 25)
+    expect(lastSize()).toEqual([792, 495])
+
+    await frames(62, 25)
+    expect(lastSize()).toEqual([648, 405])
+
+    // Des images redevenues rapides ne le font pas remonter.
+    await frames(200, 16)
+    expect(lastSize()).toEqual([648, 405])
   })
 })
 

@@ -393,10 +393,10 @@ describe('the end of the list', () => {
     expect(screen.getByRole('button', { name: 'Afficher la suite' })).toBeBusy()
   })
 
-  it('says « that’s all » at the very end', async () => {
+  it('ends the list without a word at the very end (RF, T4)', async () => {
     await renderWithProviders(<NotificationsScreen />)
 
-    expect(screen.getByText('C’est tout')).toBeTruthy()
+    expect(screen.queryByText('C’est tout')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
   })
 })

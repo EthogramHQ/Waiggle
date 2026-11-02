@@ -12,11 +12,17 @@
 // Les gardes du canvas (relecture de sécurité S5) :
 // - WebGL est demandé sans accepter une carte graphique lente (failIfMajorPerformanceCaveat), en
 //   basse consommation ; refusé, ou si le shader ne compile pas, c'est la version allégée ;
-// - le dessin est petit (0,45 de la taille affichée, sans tenir compte des écrans haute densité, au
-//   plus 1920 × 1080) : le navigateur l'agrandit, et le flou de la matière ne s'en voit pas ;
+// - le dessin est plus petit que l'écran (0,7 de la taille affichée depuis RF, sans tenir compte
+//   des écrans haute densité, au plus 1920 × 1080) : le navigateur l'agrandit, et le flou de la
+//   matière ne s'en voit pas ;
+// - au plus 60 images par seconde, même sur un écran à 120 Hz ; si la machine peine (60 images à
+//   plus de 20 ms en moyenne), le dessin rapetisse (0,55, puis 0,45) et ne regrandit plus pendant
+//   la visite ;
 // - la boucle d'images s'arrête quand l'onglet est caché ; le canvas lui-même est retiré (et son
 //   contexte WebGL rendu) quand la lumière ne se voit plus : page quittée mais gardée dans la pile
-//   de navigation, ou sortie de l'écran ; un canvas neuf reprend au retour ;
+//   de navigation, sortie de l'écran, ou lumière éteinte (`off` : aucun écran affiché n'en veut,
+//   après son fondu de sortie) ; un canvas neuf reprend au retour, au temps où l'autre s'était
+//   arrêté ;
 // - un contexte perdu (la carte graphique reprise, ou retiré par le navigateur) est remplacé par un
 //   canvas neuf, trois fois au plus, puis par la version allégée ;
 // - la source du shader est une constante, jamais composée à partir d'une donnée : les couleurs
@@ -25,7 +31,8 @@
 import { palettes } from '@ruche/brand'
 import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { SoftLight, Veil } from './AmbientLightSoft'
+import Animated from 'react-native-reanimated'
+import { type LightSwitch, SoftLight, useLightFade, Veil } from './AmbientLightSoft'
 import {
   type AmbientLightProps,
   type AmbientPalette,
@@ -38,7 +45,7 @@ import { useLayout } from './theme/layout'
 import { useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
-export function AmbientLight(props: AmbientLightProps) {
+export function AmbientLight({ off = false, ...props }: AmbientLightProps & LightSwitch) {
   const source = useLightSource(props)
   // Avant l'hydratation, la page doit être identique à celle du serveur, qui n'a pas de canvas.
   const hydrated = useHydrated()
@@ -52,15 +59,15 @@ export function AmbientLight(props: AmbientLightProps) {
 
   // WebGL refusé (failIfMajorPerformanceCaveat : une carte graphique lente ou absente) : la
   // version allégée, immobile, pour ne pas faire travailler la machine à chaque image.
-  if (refused) return <SoftLight source={source} still />
-  if (!hydrated || sizeClass !== 'wide' || calm) return <SoftLight source={source} />
+  if (refused) return <SoftLight source={source} still off={off} />
+  if (!hydrated || sizeClass !== 'wide' || calm) return <SoftLight source={source} off={off} />
   return (
     <>
       {/* Dessous, la version allégée immobile : elle se voit le temps que le canvas dessine sa
           première image (retour sur une page, contexte remplacé), au lieu d'un fond vide. Une fois
           dessiné, le canvas, opaque, la couvre. */}
-      <SoftLight source={source} still />
-      <LiveLight palette={palette} onRefused={() => setRefused(true)} />
+      <SoftLight source={source} still off={off} />
+      <LiveLight palette={palette} off={off} onRefused={() => setRefused(true)} />
     </>
   )
 }
@@ -100,8 +107,19 @@ type Live = {
   kick: number
 }
 
-function LiveLight({ palette, onRefused }: { palette: AmbientPalette; onRefused: () => void }) {
+function LiveLight({
+  palette,
+  off,
+  onRefused,
+}: {
+  palette: AmbientPalette
+  off: boolean
+  onRefused: () => void
+}) {
   const { scheme, colors } = useTheme()
+  // Éteinte (`off`), la lumière s'efface en fondu ; le fondu fini (`dark`), son canvas est retiré
+  // et son contexte rendu (S2) : un seul contexte WebGL vivant, et aucun quand rien ne se voit.
+  const fade = useLightFade(off)
   const { onPulse } = useAmbientSource()
   const canvas = useRef<HTMLCanvasElement | null>(null)
   // Une « ref » : une boîte gardée d'un affichage à l'autre. La boucle d'images y lit les valeurs
@@ -133,13 +151,14 @@ function LiveLight({ palette, onRefused }: { palette: AmbientPalette; onRefused:
   // canvas) en fabrique un nouveau, après un contexte perdu.
   const frame = useRef<View | null>(null)
   const onScreen = useOnScreen(frame)
+  const drawing = onScreen && !fade.dark
   const [generation, setGeneration] = useState(0)
   const losses = useRef(0)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: generation n'est pas lue, mais un nouveau canvas (nouvelle clé) doit relancer la lumière
   useEffect(() => {
     const element = canvas.current
-    if (!onScreen || !element) return
+    if (!drawing || !element) return
     const stop = startLight(element, live.current, () => {
       losses.current += 1
       if (losses.current > MAX_LOSSES) refusedRef.current()
@@ -150,33 +169,37 @@ function LiveLight({ palette, onRefused }: { palette: AmbientPalette; onRefused:
       return
     }
     return stop
-  }, [onScreen, generation])
+  }, [drawing, generation])
 
   return (
-    // overflow: 'hidden' : le canvas ne déborde jamais de son cadre.
-    <View
-      ref={frame}
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
-    >
-      {onScreen ? (
-        <canvas
-          key={generation}
-          ref={canvas}
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            display: 'block',
-            pointerEvents: 'none',
-          }}
-        />
-      ) : null}
-      {/* Le même voile que la version allégée : le texte posé plus bas reste lisible. */}
-      <Veil id={`live${scheme}`} night={scheme === 'night'} background={colors.background} />
-    </View>
+    // Deux couches : l'extérieure porte le fondu (une vue animée), l'intérieure est observée par
+    // useOnScreen (une vue simple, dont la ref est l'élément du DOM).
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, fade.style]}>
+      {/* overflow: 'hidden' : le canvas ne déborde jamais de son cadre. */}
+      <View
+        ref={frame}
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
+      >
+        {drawing ? (
+          <canvas
+            key={generation}
+            ref={canvas}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              pointerEvents: 'none',
+            }}
+          />
+        ) : null}
+        {/* Le même voile que la version allégée : le texte posé plus bas reste lisible. */}
+        <Veil id={`live${scheme}`} night={scheme === 'night'} background={colors.background} />
+      </View>
+    </Animated.View>
   )
 }
 
@@ -193,13 +216,54 @@ const hexToRgb = (hex: string): Rgb => {
 
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0)
 
-// La part de la taille affichée que l'on dessine vraiment, et la taille maximale du dessin.
-const SCALE = 0.45
+// La part de la taille affichée que l'on dessine vraiment, et la taille maximale du dessin. 0,7
+// depuis RF (0,45 avant : les reflets paraissaient pixelisés, A5) ; puis, si la machine peine, les
+// replis, du plus fin au plus grossier.
+const SCALES = [0.7, 0.55, 0.45] as const
 const MAX_WIDTH = 1920
 const MAX_HEIGHT = 1080
+// Le repli : quand la moyenne de SLOW_WINDOW images dépasse SLOW_FRAME_MS entre deux images
+// (moins de 50 images par seconde), le dessin passe au palier suivant de SCALES. Un écart plus
+// long que SLOW_FRAME_CAP_MS (un onglet repris, un ramasse-miettes) compte pour SLOW_FRAME_CAP_MS :
+// une seule image lente ne fait pas rapetisser le dessin.
+//
+// Sur un écran plus lent que 60 Hz (30 Hz : économie d'énergie, certains moniteurs externes), les
+// images arrivent toutes les 33 ms sans que la machine peine : la limite suit alors la cadence de
+// l'écran, SLOW_RATIO fois son intervalle (20 ms pour 16,7 ms à 60 Hz, 40 ms à 30 Hz). Cet
+// intervalle est le plus court écart vu entre deux images du navigateur : une machine qui rame
+// sur un écran à 60 Hz rate des images (33, 50 ms), mais en tient encore à 16,7 ms de temps en
+// temps ; un écran à 30 Hz n'en donne jamais de plus rapprochées. Un écart sous
+// MIN_SCREEN_FRAME_MS (deux rappels dans la même image) ne compte pas.
+const SLOW_WINDOW = 60
+const SLOW_FRAME_MS = 20
+const SLOW_FRAME_CAP_MS = 100
+const SLOW_RATIO = SLOW_FRAME_MS / (1000 / 60)
+const MIN_SCREEN_FRAME_MS = 4
+// La cadence : au plus 60 images par seconde, même sur un écran à 120 Hz (une image sur deux y
+// est sautée). FRAME_SLACK_MS : la marge accordée à une image qui arrive un peu tôt (les images
+// d'un écran à 60 Hz ne sont pas espacées de 16,7 ms tout rond).
+const FRAME_MS = 1000 / 60
+const FRAME_SLACK_MS = 4
+// La part de la couleur de la source dans la lumière de jour (le reste est du blanc). 0,40 avant
+// RF ; 0,48 la rend un peu plus visible (A5). La garde : le texte le plus pâle (textMuted) reste à
+// 4,5:1 au moins sur le point le plus coloré ; sinon, revenir vers 0,44.
+const DAY_COLOR_SHARE = 0.48
 // Le temps du dessin repart de zéro après ce nombre de secondes (environ 2 h 45) : un uniforme
 // borné, et des calculs qui gardent leur précision.
 const TIME_PERIOD = 10_000
+// Le temps du premier dessin de la visite : la matière y est déjà bien formée.
+const START_TIME = 18
+
+/**
+ * Ce que la lumière garde d'un canvas à l'autre, pour toute la visite (des variables du module,
+ * qui vivent tant que la page est ouverte) :
+ * - `time` : l'horloge du dessin (ui-8). Un canvas neuf (retour d'une page du miel, contexte
+ *   remplacé) reprend au temps où le précédent s'était arrêté, au lieu de repartir de START_TIME :
+ *   la matière continue de couler, sans « saut » ;
+ * - `step` : le palier de SCALES atteint. Un dessin qui a dû rapetisser ne regrandit plus pendant
+ *   la visite : la machine qui a peiné peinerait encore.
+ */
+const lightState = { time: START_TIME, step: 0 }
 // Le plafond des caustiques (J11) : leur éclat ne dépasse jamais cette part du miel, quelle que
 // soit l'impulsion. Leur rythme, fixé dans le shader (sin(f*16. + t*5.), t = temps × 0,045),
 // change la luminance d'un point environ une fois toutes les 14 secondes, bien sous la limite de
@@ -228,10 +292,12 @@ const VERTEX_SHADER = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'
 // matière qui ressemble à de la fumée ou à du miel qui coule. Deux fbm déforment la troisième
 // (domain warping), et le temps les fait glisser. uA, uB, uC : les trois couleurs de la source ;
 // uHoney : le miel des reflets ; uDark : le fond de nuit ; uPtr : la souris ; uKick : l'impulsion ;
-// uNight : 0 le jour, 1 la nuit. uPortal et uLite restent à 0 (le passage par le portail et la
-// version allégée du prototype viendront d'autres tranches, ou sont faits autrement ici).
+// uNight : 0 le jour, 1 la nuit ; uDayMix : la part de couleur du jour (DAY_COLOR_SHARE, un
+// uniforme plutôt qu'un nombre écrit dans la source, qui reste une constante). uPortal et uLite
+// restent à 0 (le passage par le portail et la version allégée du prototype viendront d'autres
+// tranches, ou sont faits autrement ici).
 const FRAGMENT_SHADER = `precision highp float;
-uniform vec2 uRes;uniform float uTime;uniform vec3 uA,uB,uC,uHoney,uDark;uniform vec2 uPtr;uniform float uNight,uPortal,uKick,uLite,uCausMax;
+uniform vec2 uRes;uniform float uTime;uniform vec3 uA,uB,uC,uHoney,uDark;uniform vec2 uPtr;uniform float uNight,uPortal,uKick,uLite,uCausMax,uDayMix;
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),u.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),u.x),u.y);}
 float fbm(vec2 p){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<5;i++){v+=a*n(p);p=m*p;a*=.5;}return v;}
@@ -257,7 +323,7 @@ void main(){
  float glow=exp(-d*d*3.5)*full;
  col+=uHoney*glow*.22;
  col+=vec3(1.,.92,.65)*pw*exp(-r*r*9.)*1.3;
- vec3 day=mix(vec3(1.),col,.40+uKick*.18+uPortal*.35);
+ vec3 day=mix(vec3(1.),col,uDayMix+uKick*.18+uPortal*.35);
  day=mix(day,vec3(1.),smoothstep(.15,-.6,p.y)*.4);
  vec3 night=uDark+col*col*.42+uHoney*caus*min(.30,uCausMax)+uHoney*glow*.16+vec3(1.,.8,.4)*pw*exp(-r*r*9.)*.6+uHoney*uPortal*.08;
  vec3 o=mix(day,night,uNight);
@@ -279,6 +345,7 @@ const UNIFORMS = [
   'uKick',
   'uLite',
   'uCausMax',
+  'uDayMix',
 ] as const
 type UniformName = (typeof UNIFORMS)[number]
 
@@ -339,17 +406,28 @@ function startLight(
   let pointer: [number, number] = [0.5, 0.62]
   let pointerTarget: [number, number] = [0.5, 0.62]
   let mouse: { x: number; y: number } | null = null
-  let time = 18
+  // Le temps reprend où le canvas précédent l'avait laissé (lightState, ui-8).
+  let time = lightState.time
   let last = performance.now()
   let frame = 0
   let lost = false
+  // La cadence : l'heure à partir de laquelle la prochaine image peut être dessinée.
+  let nextFrameAt = Number.NEGATIVE_INFINITY
+  // Le repli : la somme des écarts entre images et leur nombre, sur la fenêtre en cours.
+  let slowSum = 0
+  let slowCount = 0
+  // La cadence de l'écran : le plus court écart vu entre deux images du navigateur (dessinées ou
+  // sautées), et l'heure de la dernière. Infinity tant qu'il n'y en a pas eu deux.
+  let screenFrameMs = Number.POSITIVE_INFINITY
+  let lastTick: number | null = null
 
   const resize = () => {
+    const scale = SCALES[lightState.step] ?? SCALES[2]
     const density = Math.min(1, globalThis.devicePixelRatio || 1)
-    const width = Math.min(MAX_WIDTH, Math.max(2, Math.round(canvas.clientWidth * SCALE * density)))
+    const width = Math.min(MAX_WIDTH, Math.max(2, Math.round(canvas.clientWidth * scale * density)))
     const height = Math.min(
       MAX_HEIGHT,
-      Math.max(2, Math.round(canvas.clientHeight * SCALE * density)),
+      Math.max(2, Math.round(canvas.clientHeight * scale * density)),
     )
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width
@@ -358,10 +436,44 @@ function startLight(
     gl.viewport(0, 0, width, height)
   }
 
+  /** Note l'écart entre deux images du navigateur : le plus court donne la cadence de l'écran. */
+  const tick = (now: number) => {
+    if (lastTick !== null) {
+      const interval = now - lastTick
+      if (interval >= MIN_SCREEN_FRAME_MS && interval < screenFrameMs) screenFrameMs = interval
+    }
+    lastTick = now
+  }
+
+  /** Compte l'écart avant cette image ; après SLOW_WINDOW images trop lentes, le palier suivant. */
+  const measure = (gap: number) => {
+    slowSum += Math.min(SLOW_FRAME_CAP_MS, gap)
+    slowCount += 1
+    if (slowCount < SLOW_WINDOW) return
+    // Trop lent pour cet écran : SLOW_FRAME_MS à 60 Hz et plus, davantage sur un écran plus lent.
+    const limit = Number.isFinite(screenFrameMs)
+      ? Math.max(SLOW_FRAME_MS, screenFrameMs * SLOW_RATIO)
+      : SLOW_FRAME_MS
+    if (slowSum / slowCount > limit && lightState.step < SCALES.length - 1) {
+      lightState.step += 1
+    }
+    slowSum = 0
+    slowCount = 0
+  }
+
   const draw = (now: number) => {
     frame = requestAnimationFrame(draw)
-    const dt = Math.min(0.1, Math.max(0, (now - last) / 1000))
+    tick(now)
+    // Au plus 60 images par seconde : une image arrivée trop tôt (écran à 120 Hz) est sautée. Le
+    // rendez-vous suivant avance d'un pas de FRAME_MS à chaque image dessinée, ce qui tient la
+    // moyenne à 60 même quand les images arrivent un peu tôt ; une machine en retard repart de
+    // maintenant, sans rattraper.
+    if (now < nextFrameAt - FRAME_SLACK_MS) return
+    nextFrameAt = now - nextFrameAt > FRAME_MS ? now + FRAME_MS : nextFrameAt + FRAME_MS
+    const gap = Math.max(0, now - last)
+    const dt = Math.min(0.1, gap / 1000)
     last = now
+    measure(gap)
     resize()
     const towardColor = 1 - Math.exp(-dt / 0.25)
     const towardNight = 1 - Math.exp(-dt / 0.15)
@@ -386,6 +498,7 @@ function startLight(
     }
     pointer = [lerp(pointer[0], pointerTarget[0], 0.05), lerp(pointer[1], pointerTarget[1], 0.05)]
     time = (time + dt) % TIME_PERIOD
+    lightState.time = time
 
     gl.uniform2f(uniforms.uRes, canvas.width, canvas.height)
     gl.uniform1f(uniforms.uTime, time)
@@ -400,6 +513,7 @@ function startLight(
     gl.uniform1f(uniforms.uKick, live.kick)
     gl.uniform1f(uniforms.uLite, 0)
     gl.uniform1f(uniforms.uCausMax, CAUSTICS_MAX)
+    gl.uniform1f(uniforms.uDayMix, DAY_COLOR_SHARE)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
 

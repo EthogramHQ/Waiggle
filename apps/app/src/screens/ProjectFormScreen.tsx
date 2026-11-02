@@ -553,12 +553,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
         main={fields}
         side={
           <Stack gap="md">
-            <Row justify="between">
-              <Text variant="heading">{t(($) => $.project.preview.title)}</Text>
-              <Text variant="caption" tone="muted">
-                {t(($) => $.project.preview.hint)}
-              </Text>
-            </Row>
+            <Text variant="heading">{t(($) => $.project.preview.title)}</Text>
             <ProjectCard
               title={form.title.trim() || t(($) => $.project.preview.untitled)}
               pitch={form.pitch.trim() || t(($) => $.project.preview.noPitch)}

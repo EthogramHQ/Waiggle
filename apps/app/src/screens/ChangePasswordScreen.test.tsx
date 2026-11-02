@@ -81,7 +81,6 @@ describe('ChangePasswordScreen', () => {
     await renderScreen()
 
     expect(screen.getByRole('header', { name: text('screenTitle') })).toBeTruthy()
-    expect(screen.getAllByText(containing(text('intro'))).length).toBeGreaterThan(0)
     const oldField = screen.getByLabelText(text('current'))
     expect(oldField).toHaveProp('secureTextEntry', true)
     expect(oldField).toHaveProp('autoComplete', 'current-password')

@@ -233,7 +233,7 @@ export const en: Translation = {
     delete: {
       title: 'Delete my account',
       screenTitle: 'Delete your account',
-      intro: 'Here is what goes with it.',
+      goesTitle: 'What disappears',
       profileItem: 'Your profile and your picture',
       projectsItem: 'Your projects',
       projectsDetail: 'With their description, recipe, prompts, photos, notes and comments',
@@ -294,7 +294,6 @@ export const en: Translation = {
     changePassword: {
       title: 'Change my password',
       screenTitle: 'Change your password',
-      intro: 'To confirm it, first enter the one you use today.',
       current: 'Current password',
       new: 'New password',
       consequencesTitle: 'Your other devices will be signed out',
@@ -357,8 +356,7 @@ export const en: Translation = {
   project: {
     new: {
       title: 'New project',
-      subtitle:
-        'Show the people close to you what you are building. You can change everything later.',
+      subtitle: 'You can change everything later.',
       submit: 'Publish',
     },
     edit: {
@@ -406,7 +404,6 @@ export const en: Translation = {
     },
     preview: {
       title: 'Preview in the feed',
-      hint: 'It follows what you write.',
       now: 'just now',
       untitled: 'Your project',
       noPitch: 'Your pitch will show here.',
@@ -437,15 +434,12 @@ export const en: Translation = {
     },
     notes: {
       title: 'Journal',
-      empty:
-        'No note yet. Tell how your project is going: your followers will see it in their feed.',
+      empty: 'No note yet.',
       add: 'Post a note',
       field: 'Your note',
       hint: 'What changed, what you are preparing, what you are looking for. Your followers will see it in their feed.',
       hintPrivate:
         'This project is private: nobody but you sees its notes. If you make it public, every member will see them.',
-      emptyPrivate:
-        'No note yet. This project is private: nobody but you will see its notes until you make it public.',
       submit: 'Post the note',
       required: 'Write your note before posting it.',
       hintAnnounce: 'Your project is now “{{status}}”: tell your followers, or touch Cancel.',
@@ -556,7 +550,6 @@ export const en: Translation = {
       blockedPlaceholder: 'Comment from a member you blocked',
       unavailablePlaceholder: 'Comment unavailable',
       more: 'Show more',
-      end: 'That’s all',
       moreError: 'The next comments could not load.',
       loadError: 'The comments could not load.',
       loading: 'Loading the comments…',
@@ -685,7 +678,6 @@ export const en: Translation = {
       blockedOn: 'Blocked on {{date}}',
       blockedWhen: 'Blocked {{when}}',
       more: 'Show more',
-      end: 'That’s all',
       loadError: 'The list couldn’t load.',
       unblockLabel: 'Unblock @{{handle}}',
       detail: '@{{handle}} · {{blockedOn}}',
@@ -753,8 +745,7 @@ export const en: Translation = {
     dismissed: 'Report dismissed.',
     removedDone: 'Content removed.',
     restoredDone: 'Content restored.',
-    // The end of the list (added with the interface, slice 7a): all read, or the next page failed.
-    end: 'That’s all',
+    // The end of the list (added with the interface, slice 7a): the next page failed.
     moreError: 'The rest of the list could not load.',
     // A long copy folds after three fields (added with the interface, 7b corrections).
     showAll: 'Show all',
@@ -880,7 +871,7 @@ export const en: Translation = {
     projectCount_other: '{{count}} projects',
     projectCountMore: '{{max}} or more projects',
     empty: 'No public project yet.',
-    emptyMine: 'You have not published anything yet. Your first project will show up here.',
+    emptyMine: 'You have not published anything yet.',
     private: 'Private',
     notFoundTitle: 'This member cannot be found',
     notFound: 'The account may have been deleted, or the link is wrong.',
@@ -890,9 +881,9 @@ export const en: Translation = {
     option: '{{name}}, @{{handle}}',
   },
   tag: {
-    subtitle: 'The public projects made with this tool, newest first.',
+    subtitle: 'The public projects made with this tool.',
     emptyTitle: 'No project here yet',
-    empty: 'No public project made with this tool yet. Yours may be the first.',
+    empty: 'Yours may be the first.',
   },
   nav: {
     label: 'Main navigation',
@@ -950,16 +941,15 @@ export const en: Translation = {
     emptyTitle: 'No result for “{{q}}”',
     empty: 'Try a shorter word, or the name of a tool such as “Claude”.',
     tooManyTitle: 'Too many searches at once',
-    tooMany: 'Too many searches, try again in a moment.',
+    tooMany: 'Try again in a moment.',
     shortQuery: 'From 3 letters on, you also find members you don’t follow.',
     errorTitle: 'The search could not complete',
-    error: 'Try again in a moment.',
     tabsLabel: 'Results to show',
     projectWithStatus: '{{title}}, {{status}}',
   },
   tools: {
     title: 'All tools',
-    subtitle: 'The tools of public projects, in alphabetical order.',
+    subtitle: 'The tools of public projects.',
     projects_one: '{{count}} public project',
     projects_other: '{{count}} public projects',
     withCount: '{{label}}, {{projects}}',
@@ -994,11 +984,10 @@ export const en: Translation = {
     askMentions: 'Stop receiving emails about mentions and replies?',
     confirm: 'Confirm',
     keep: 'Keep my emails',
-    doneRecap: 'Done: you will no longer receive the weekly recap.',
-    doneMentions:
-      'Done: you will no longer receive an email when someone mentions or replies to you.',
+    doneRecap: 'You will no longer receive the weekly recap.',
+    doneMentions: 'You will no longer receive an email when someone mentions or replies to you.',
     allOff: 'Turn them all off',
-    allDone: 'Done: you will no longer receive any notification email.',
+    allDone: 'You will no longer receive any notification email.',
     accountEmails: 'Emails about your account, such as verifying your address, continue.',
     manage: 'Manage my emails',
     invalidTitle: 'Invalid link',
@@ -1191,7 +1180,6 @@ export const en: Translation = {
     testersCaption: 'Projects to try: their makers are waiting for your feedback.',
     more: 'Show more',
     moreError: 'The rest of the feed could not load.',
-    end: 'You’re all caught up',
     noteLabel: '{{nameOf}} note on {{title}}',
     noteKicker: 'Note',
     news_one: '{{count}} new item',
@@ -1209,8 +1197,6 @@ export const en: Translation = {
     title: 'Feed',
     upToDate: {
       title: 'You’re all caught up',
-      body: 'You’ve seen everything since your last visit.',
-      bodyFirst: 'You’ve seen everything.',
       action: 'Explore more projects',
       hint: 'New posts will show up at the top of the feed.',
     },
@@ -1277,7 +1263,6 @@ export const en: Translation = {
     emptyActionSuspended: 'Explore projects',
     emptyAction: 'Publish a project',
     more: 'Show more',
-    end: 'That’s all',
     moreError: 'The next notifications could not be loaded.',
     errorTitle: 'The notifications could not be loaded',
     reactions_one: '{{count}} reaction on “{{title}}”',

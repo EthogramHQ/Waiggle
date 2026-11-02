@@ -20,8 +20,13 @@ import { type TabBarSpace, TabBarSpaceContext } from './tabBarSpace'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 // Si la page de l'écran est celle qui est affichée (useIsFocused d'Expo Router, derrière une
-// aide qui répond « oui » hors d'un navigateur) : remplacée ici.
-jest.mock('./screenFocus', () => ({ useScreenFocused: jest.fn() }))
+// aide qui répond « oui » hors d'un navigateur) : remplacée ici. Depuis RF, le module dit aussi
+// combien de fois la route est devenue affichée (le fondu des pages, ScreenFade) : 1, une page déjà
+// là, sans fondu.
+jest.mock('./screenFocus', () => ({
+  useScreenFocused: jest.fn(),
+  useScreenShownCount: jest.fn(() => 1),
+}))
 
 /** Un espace de barre fixe, sans signal de remontée. */
 const space = (height: number, topSignal = 0): TabBarSpace => ({

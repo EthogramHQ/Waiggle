@@ -33,6 +33,7 @@ import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { containing, fr, missingSentences, removalSentences } from '../testing/text'
 import { copyText } from '../ui/clipboard'
+import { CoverTransitionProvider, useCoverSource } from '../ui/coverTransition'
 import { ToastProvider } from '../ui/theme/toast'
 import { ProjectScreen } from './ProjectScreen'
 
@@ -76,11 +77,36 @@ const mockPush = jest.fn()
 const mockReplace = jest.fn()
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
 let mockParams: Record<string, string | undefined> = {}
-jest.mock('expo-router', () => ({
-  usePathname: () => '/page/actuelle',
-  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
-  useLocalSearchParams: () => mockParams,
-}))
+// RF (ui-1) : la page est-elle affichée ? Sur le web, la page quittée reste montée, cachée ; le
+// retour la rend affichée de nouveau. `useIsFocused` et `useFocusEffect` suivent ce drapeau, relu
+// à chaque rendu (le test redessine après l'avoir changé).
+let mockFocused = true
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react')
+  return {
+    usePathname: () => '/page/actuelle',
+    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+    useLocalSearchParams: () => mockParams,
+    useIsFocused: () => mockFocused,
+    useFocusEffect: (effect: () => undefined | (() => void)) => {
+      const focused = mockFocused
+      useEffect(() => (focused ? effect() : undefined), [focused, effect])
+    },
+  }
+})
+// Le cadre de page, tel quel, mais dont le test lit les propriétés (RF : `fade`).
+const mockScreenProps: Record<string, unknown>[] = []
+jest.mock('../ui/Screen', () => {
+  const actual = jest.requireActual('../ui/Screen')
+  const { createElement } = require('react')
+  return {
+    ...actual,
+    Screen: (props: Record<string, unknown>) => {
+      mockScreenProps.push(props)
+      return createElement(actual.Screen, props)
+    },
+  }
+})
 
 const { id } = recipesProject
 const mockToggle = jest.fn()
@@ -108,6 +134,8 @@ beforeEach(() => {
   jest.mocked(copyText).mockReset().mockResolvedValue(true)
   mockPush.mockReset()
   mockReplace.mockReset()
+  mockFocused = true
+  mockScreenProps.length = 0
 })
 
 describe('ProjectScreen', () => {
@@ -496,11 +524,8 @@ describe('the journal of a project', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByRole('header', { name: 'Journal' })).toBeTruthy()
-    expect(
-      screen.getByText(
-        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
-      ),
-    ).toBeTruthy()
+    // RF (T11) : l'état vide dit seulement « Pas encore de note. » ; l'aide du champ dit le reste.
+    expect(screen.getByText('Pas encore de note.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
   })
 })
@@ -570,15 +595,28 @@ describe('publishing a note from the project page', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('tells the author of a private project that nobody else sees its notes', async () => {
+  // RF (T16, jur-RF6) : sous le bandeau « Privé », le même état vide qu'un projet public, sans
+  // parler d'abonnés ; qui lira les notes, c'est l'aide du champ qui le dit (`hintPrivate`).
+  it('gives a private project the same empty journal, without speaking of followers', async () => {
     jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(
-      await screen.findByText(
-        'Pas encore de note. Ce projet est privé : personne d’autre que toi ne verra ses notes, jusqu’à ce que tu le rendes public.',
-      ),
-    ).toBeTruthy()
+    expect(await screen.findByText('Pas encore de note.')).toBeTruthy()
+    expect(screen.queryByText(/abonnés/)).toBeNull()
+  })
+
+  // jur-RF6 : l'état vide ne dit plus qui lira ; c'est l'aide du champ ouvert, propre au projet
+  // privé (`hintPrivate`), qui le dit, et elle ne parle pas d'abonnés non plus.
+  it('says in the opened field of a private project who will read the note, without followers', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
+
+    expect(screen.getByLabelText('Ta note')).toBeTruthy() // témoin : le champ est ouvert
+    expect(screen.getByText(fr.t(($) => $.project.notes.hintPrivate))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.project.notes.hint))).toBeNull()
+    expect(screen.queryByText(/abonnés/)).toBeNull()
   })
 })
 
@@ -1003,7 +1041,7 @@ describe('the comments of a project', () => {
     expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
-  it('offers the next comments, then says when there are no more', async () => {
+  it('offers the next comments, then ends the list without a word (RF, T4)', async () => {
     seenByOther()
     mockComments([zoeComment], { hasNextPage: true })
     const view = await renderWithProviders(<ProjectScreen id={id} />)
@@ -1013,8 +1051,10 @@ describe('the comments of a project', () => {
 
     mockComments([zoeComment])
     await view.rerender(<ProjectScreen id={id} />)
-    expect(await screen.findByText('C’est tout')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull(),
+    )
+    expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
   it('shows « Commentaire supprimé » in place of a deleted comment, above its replies', async () => {
@@ -2414,6 +2454,22 @@ describe('the reading order of the project page on a computer', () => {
     }
   })
 
+  // RF (ui-14) : la barre du haut devient fixe sur ordinateur ; la capsule, elle, reste dans la page,
+  // sur la galerie (le test suivant), et sur téléphone elle flotte toujours hors de la page.
+  it('keeps the top bar out of the page and the capsule in it, on a computer (RF)', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther(projectWithPhotos)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const capsule = await screen.findByRole('button', { name: 'Waggle !, 0' })
+      expect(insideScroll(capsule)).toBe(true)
+      expect(insideScroll(screen.getByRole('link', { name: fr.t(($) => $.nav.feed) }))).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
   it('puts the capsule on the gallery, inside the page, on a computer', async () => {
     const restore = setDesktopWindow()
     try {
@@ -2531,5 +2587,64 @@ describe('sharing a project removed by the moderation', () => {
     expect(screen.getByRole('button', { name: share })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: menu }))
     expect(screen.getByRole('menuitem', { name: copy })).toBeTruthy()
+  })
+})
+
+// RF (« Les pages apparaissent en fondu », relecture du plan ui-1) : la page d'un projet ouverte
+// depuis une carte garde son passage de R4 (la photo de la carte grandit, ou son propre fondu) ; le
+// fondu des pages ne s'y ajoute pas : ProjectScreen passe `fade={false}` à Screen pendant cette
+// arrivée, chargement compris. Au retour sur la page, restée montée (le membre revient d'une autre
+// page), elle apparaît en fondu comme les autres.
+describe('the page fade of the project page (RF, ui-1)', () => {
+  // La carte du fil, touchée : elle prévient la page qu'elle arrive d'elle (coverTransition.tsx).
+  let card: ReturnType<typeof useCoverSource> | undefined
+  function Card() {
+    card = useCoverSource(id)
+    return null
+  }
+  const stage = (page: boolean) => (
+    <CoverTransitionProvider>
+      <Card />
+      {page ? <ProjectScreen id={id} /> : null}
+    </CoverTransitionProvider>
+  )
+  const fades = () => mockScreenProps.map((props) => props.fade)
+
+  /** Ouvre la page depuis la carte touchée, et attend son titre. */
+  const openFromCard = async () => {
+    const view = await renderWithProviders(stage(false))
+    await act(async () => card?.capture(() => {}))
+    mockScreenProps.length = 0
+    await view.rerender(stage(true))
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    return view
+  }
+
+  it('does not fade in the page that arrives from a card, loading included', async () => {
+    await openFromCard()
+
+    expect(fades().length).toBeGreaterThan(0) // témoin : la page est passée par Screen
+    expect(fades().every((fade) => fade === false)).toBe(true)
+  })
+
+  it('fades in a page opened by its address, without a card (witness)', async () => {
+    await renderWithProviders(stage(true))
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+
+    expect(fades().at(-1)).not.toBe(false)
+  })
+
+  it('fades in the page when the member comes back to it', async () => {
+    const view = await openFromCard()
+    // Témoin : à l'arrivée depuis la carte, pas de fondu (sinon ce test passerait sans la règle).
+    expect(fades().at(-1)).toBe(false)
+
+    // Le membre part vers une autre page (celle-ci, restée montée, est cachée), puis revient.
+    mockFocused = false
+    await view.rerender(stage(true))
+    mockFocused = true
+    await view.rerender(stage(true))
+
+    expect(fades().at(-1)).not.toBe(false)
   })
 })

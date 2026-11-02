@@ -761,7 +761,6 @@ export function Comments({ project }: { project: Project }) {
           if (!comments.isFetchingNextPage) void comments.fetchNextPage()
         }}
         moreLabel={t(($) => $.project.comments.more)}
-        endLabel={t(($) => $.project.comments.end)}
         errorLabel={t(($) => $.project.comments.moreError)}
         retryLabel={t(($) => $.common.retry)}
         empty={t(($) => $.project.comments.empty)}

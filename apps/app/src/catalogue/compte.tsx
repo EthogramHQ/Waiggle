@@ -48,7 +48,6 @@ const fr = {
   sheetDesktop: 'Feuille, disposition ordinateur : panneau centré',
   sheetOpen: 'Ouvrir la feuille',
   sheetTitle: 'Supprimer ton compte',
-  sheetSubtitle: 'Voici ce qui disparaît avec lui.',
   sheetBody: 'Tes projets, tes notes et tes commentaires. Ton pseudo redevient libre.',
   sheetField: 'Confirme avec ton mot de passe',
   sheetConfirm: 'Supprimer définitivement',
@@ -98,7 +97,6 @@ const en: typeof fr = {
   sheetDesktop: 'Sheet, desktop layout: centred panel',
   sheetOpen: 'Open the sheet',
   sheetTitle: 'Delete your account',
-  sheetSubtitle: 'Here is what goes with it.',
   sheetBody: 'Your projects, your notes and your comments. Your handle becomes free again.',
   sheetField: 'Confirm with your password',
   sheetConfirm: 'Delete for good',
@@ -227,7 +225,6 @@ export function AccountCatalogue() {
         <SheetPanel
           layout="phone"
           title={l.sheetTitle}
-          subtitle={l.sheetSubtitle}
           closeLabel={l.close}
           onClose={() => {}}
           footer={deleteFooter}
@@ -267,7 +264,6 @@ export function AccountCatalogue() {
       <Sheet
         open={sheetOpen}
         title={l.sheetTitle}
-        subtitle={l.sheetSubtitle}
         closeLabel={l.close}
         onClose={() => setSheetOpen(false)}
         footer={deleteFooter}

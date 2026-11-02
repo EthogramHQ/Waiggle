@@ -31,6 +31,24 @@ export type ScreenScroll = {
    * par Screen lui-même (`thumbhash`, la lumière miel) ne reprend alors plus la main (ui-B5).
    */
   lightHeld: RefObject<boolean>
+  /**
+   * Remonte la zone qui défile tout en haut (RF, ui-5 : le bouton des nouveautés posé sous la barre
+   * fixe). Un défilement animé, ou un saut avec « Réduire les animations ».
+   */
+  toTop: () => void
+  /**
+   * Fait défiler la zone qui défile jusqu'à `y`, d'un saut (sans animation). Pour la barre du haut
+   * qui suit le contenu (RF, correction après relecture) : quand un de ses éléments reçoit le focus
+   * alors que la page a défilé, elle n'est plus dans l'écran, et le navigateur ne sait pas l'y
+   * ramener (elle n'est pas dans la zone qui défile) ; elle redescend la page juste assez.
+   */
+  jumpTo: (y: number) => void
+  /**
+   * La hauteur du haut de la fenêtre couverte par la barre fixe (0 quand la barre suit le contenu,
+   * ou qu'il n'y en a pas). Tenue à jour par Screen ; la lumière qui suit le défilement compte son
+   * « milieu de l'écran » dans la place qui reste dessous (ui-15).
+   */
+  coveredTop: RefObject<number>
 }
 
 // Hors d'un Screen (catalogue, test d'un composant seul) : rien ne défile, personne n'écoute.
@@ -39,14 +57,24 @@ export const ScreenScrollContext = createContext<ScreenScroll | null>(null)
 /**
  * Hook de Screen : fabrique son canal de défilement. Rend la valeur à donner au contexte et la
  * fonction à brancher sur le `onScroll` de sa zone qui défile (qui prévient aussi `onScroll`, la
- * prop de l'écran).
+ * prop de l'écran). `toTop` : ce que fait `ScreenScroll.toTop()` (remonter la zone qui défile) ;
+ * `jumpTo` : ce que fait `ScreenScroll.jumpTo(y)` ; sans eux (le catalogue), rien.
  */
-export function useScreenScrollChannel(onScroll?: (event: ScrollEvent) => void) {
+export function useScreenScrollChannel(
+  onScroll?: (event: ScrollEvent) => void,
+  toTop?: () => void,
+  jumpTo?: (y: number) => void,
+) {
   // Des « refs » : gardées d'un affichage à l'autre, sans rien redessiner quand elles changent.
   const listeners = useRef(new Set<ScrollListener>())
   const lightHeld = useRef(false)
+  const coveredTop = useRef(0)
   const latestOnScroll = useRef(onScroll)
   latestOnScroll.current = onScroll
+  const latestToTop = useRef(toTop)
+  latestToTop.current = toTop
+  const latestJumpTo = useRef(jumpTo)
+  latestJumpTo.current = jumpTo
 
   const subscribe = useCallback((listener: ScrollListener) => {
     listeners.current.add(listener)
@@ -55,7 +83,15 @@ export function useScreenScrollChannel(onScroll?: (event: ScrollEvent) => void) 
     }
   }, [])
   // Le même objet tant que l'écran est monté : les abonnés ne se réabonnent pas à chaque affichage.
-  const channel = useRef<ScreenScroll>({ subscribe, lightHeld }).current
+  // `toTop` et `jumpTo` passent par des refs : les fonctions du dernier affichage, sans changer
+  // l'objet.
+  const channel = useRef<ScreenScroll>({
+    subscribe,
+    lightHeld,
+    coveredTop,
+    toTop: () => latestToTop.current?.(),
+    jumpTo: (y) => latestJumpTo.current?.(y),
+  }).current
 
   const handleScroll = useCallback((event: ScrollEvent) => {
     latestOnScroll.current?.(event)
@@ -112,7 +148,10 @@ export function useScrollLight(items: readonly LitItem[]): {
   const readMiddle = useCallback(() => {
     const measured = [...cards.current]
     if (measured.length === 0) return
-    const middle = Dimensions.get('window').height / 2
+    // Le milieu de ce qu'on voit : sous la barre fixe (RF, ui-15), la carte « au milieu » est celle
+    // du milieu de la place qui reste, pas celle du milieu de la fenêtre, à demi sous la barre.
+    const covered = scroll?.coveredTop.current ?? 0
+    const middle = covered + (Dimensions.get('window').height - covered) / 2
     const distances = new Map<string, number>()
     for (const [id, card] of measured) {
       card.measureInWindow((_x, y, _width, height) => {

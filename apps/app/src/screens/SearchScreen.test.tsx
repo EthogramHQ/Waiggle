@@ -428,7 +428,7 @@ describe('SearchScreen, nothing found', () => {
 })
 
 describe('SearchScreen, errors', () => {
-  it('says « Trop de recherches, réessaie dans un instant. » on a 429', async () => {
+  it('says « Réessaie dans un instant. » under its title on a 429', async () => {
     mockAnswer(
       queryResult({
         status: 'error',

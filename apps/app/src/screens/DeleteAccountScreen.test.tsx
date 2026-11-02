@@ -138,6 +138,25 @@ describe('DeleteAccountScreen', () => {
 // --- Tranche 7a : ce qui reste après la suppression (règle 24 de la relecture du plan) ---
 
 describe('what remains after deleting the account', () => {
+  // RF (jur-RF1) : plus de sous-titre ; la première liste porte son titre, en face de « Ce qui
+  // reste », chacun au-dessus de sa liste.
+  it('titles the two lists « Ce qui disparaît » then « Ce qui reste », each above its items', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    await renderWithI18n(<DeleteAccountScreen />)
+    await screen.findByText(containing('@lea'))
+
+    const goes = fr.t(($) => $.account.delete.goesTitle)
+    const remains = fr.t(($) => $.account.delete.remains.title)
+    expect(screen.getByRole('header', { name: goes })).toBeTruthy()
+    expect(screen.getByRole('header', { name: remains })).toBeTruthy()
+    const page = JSON.stringify(screen.toJSON())
+    const at = (sentence: string) => page.indexOf(JSON.stringify(sentence).slice(1, -1))
+    expect(at(goes)).toBeLessThan(at(fr.t(($) => $.account.delete.profileItem)))
+    expect(at(fr.t(($) => $.account.delete.profileItem))).toBeLessThan(at(remains))
+    expect(at(remains)).toBeLessThan(at(fr.t(($) => $.account.delete.remains.reports)))
+    expect(screen.queryByText(/Voici ce qui disparaît/)).toBeNull()
+  })
+
   it('says that the reports of the member and a trace of the removals stay one year', async () => {
     await renderWithI18n(<DeleteAccountScreen />)
 
@@ -207,7 +226,7 @@ describe('DeleteAccountScreen in a sheet (R2)', () => {
 
     const inside = within(sheet())
     for (const sentence of [
-      fr.t(($) => $.account.delete.intro),
+      fr.t(($) => $.account.delete.goesTitle),
       fr.t(($) => $.account.delete.profileItem),
       fr.t(($) => $.account.delete.projectsItem),
       fr.t(($) => $.account.delete.handleItem),

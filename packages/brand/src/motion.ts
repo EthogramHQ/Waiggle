@@ -31,6 +31,7 @@ export const durations = {
   quick: 160, // appui, survol
   base: 320, // apparition, changement d'état
   medium: 420, // un élément qui se déplace sur l'écran
+  page: 180, // le fondu d'une page qui devient affichée sur le web (RF)
   slow: 560, // transition entre deux écrans
   scheme: 600, // fondu entre le jour et la nuit
   long: 720, // une grande entrée (l'affiche d'un écran de marque)

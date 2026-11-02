@@ -10,9 +10,12 @@
 // qui respire, s'avive d'une impulsion, se met en pause en arrière-plan et suit l'inclinaison.
 // Sur le web, Metro prend à sa place AmbientLight.web.tsx (un « fichier de plateforme » : même nom,
 // suffixe .web), qui dessine sur ordinateur la lumière vivante du prototype.
-import { SoftLight } from './AmbientLightSoft'
+import { type LightSwitch, SoftLight } from './AmbientLightSoft'
 import { type AmbientLightProps, useLightSource } from './theme/ambient'
 
-export function AmbientLight(props: AmbientLightProps) {
-  return <SoftLight source={useLightSource(props)} />
+// `off` : la lumière s'efface en fondu (aucun écran affiché n'en veut). Il est surtout lu sur le
+// web, où une seule lumière sert toutes les pages (ui/AmbientHost.tsx) ; ce fichier le reçoit
+// aussi, puisque TypeScript lit ici le type des deux versions.
+export function AmbientLight({ off = false, ...props }: AmbientLightProps & LightSwitch) {
+  return <SoftLight source={useLightSource(props)} off={off} />
 }

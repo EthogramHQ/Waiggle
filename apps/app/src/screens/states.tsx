@@ -32,7 +32,14 @@ type Width = 'form' | 'page'
  * Pas de titre d'onglet propre : la page web pré-rendue (celle que montrent les aperçus d'un lien
  * partagé) en reste à ce stade, et y lirait « Chargement… ».
  */
-export function LoadingScreen({ width = 'form' }: { width?: Width }) {
+export function LoadingScreen({
+  width = 'form',
+  fade = true,
+}: {
+  width?: Width
+  /** RF : faux pour une page qui a son propre passage (un projet ouvert depuis une carte). */
+  fade?: boolean
+}) {
   const { t } = useTranslation()
   const back = useGoBack('/')
   // Un chargement qui dure (réseau lent, nouvelles tentatives) : au bout de quelques secondes,
@@ -44,7 +51,7 @@ export function LoadingScreen({ width = 'form' }: { width?: Width }) {
     return () => clearTimeout(timer)
   }, [])
   return (
-    <Screen header={<TopNav />} width={width}>
+    <Screen header={<TopNav />} width={width} fade={fade}>
       <Stack gap="xl" align="stretch">
         <SkeletonList count={width === 'page' ? 3 : 2} />
         {slow ? (
