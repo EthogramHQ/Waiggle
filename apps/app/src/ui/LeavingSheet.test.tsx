@@ -1,9 +1,10 @@
 // Tests de la feuille de la page de sortie (R5a) : ce qu'elle dit, ses deux boutons, la ligne « La
 // démo de … » et la place gardée pour elle.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { LeavingSheet } from './LeavingSheet'
+import { TAP_GUARD_MS } from './tapGuard'
 
 const origin = {
   text: 'La démo de Carnet de cafés, ajoutée par Léa',
@@ -55,6 +56,7 @@ describe('LeavingSheet', () => {
   })
 
   it('opens the site or stays, each with its own button', async () => {
+    jest.useFakeTimers()
     const onOpen = jest.fn()
     const onStay = jest.fn()
     await renderWithProviders(
@@ -66,10 +68,15 @@ describe('LeavingSheet', () => {
       />,
     )
 
+    // RF (S1b) : « Ouvrir le site » attend la garde des tapes après l'ouverture de la page.
+    await act(async () => {
+      jest.advanceTimersByTime(TAP_GUARD_MS)
+    })
     await fireEvent.press(screen.getByRole('button', { name: 'Ouvrir le site' }))
     expect(onOpen).toHaveBeenCalledTimes(1)
     await fireEvent.press(screen.getByRole('button', { name: 'Rester sur Waiggle' }))
     expect(onStay).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
   })
 
   it('shows whose demo it is, the photo hidden from screen readers', async () => {
