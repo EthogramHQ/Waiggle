@@ -4,6 +4,8 @@
 // une ligne pose sa réaction ; sur une réaction déjà posée, la ligne dit « Ta réaction » et un
 // bouton « Retirer » à part la retire (relecture ui-6 : une ligne, un seul contrôle). L'éventail
 // reste ouvert après un choix : on peut en poser plusieurs, ce que rappelle la phrase du bas.
+// À partir de 1 000, le nombre s'écrit en court (« 1,2 k », `shortCount`) ; le nom lu garde le
+// nombre entier.
 //
 // La première fois sur l'appareil, une aide en haut (« Touche une réaction pour la poser… ») avec
 // « J'ai compris ». Elle est lue dans le stockage dès le montage, l'éventail encore fermé (ui-9) :
@@ -29,6 +31,7 @@ import { Icon } from './Icon'
 import { hasSeen, noteSeen } from './oncePerDevice'
 import { ReactionIcon } from './ReactionCapsule'
 import { Surface } from './Surface'
+import { shortCount } from './shortCount'
 import { Text } from './Text'
 import { TAP_GUARD_MS, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
@@ -379,7 +382,7 @@ function FanRow({
   gestures: Gestures
   controlRef?: Ref<View>
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { colors } = useTheme()
   const name = t(($) => $.project.reactions[reaction.kind])
   const { count } = reaction
@@ -397,7 +400,7 @@ function FanRow({
   const number = (
     // tabular : des chiffres de même largeur, comme dans la capsule.
     <Text variant="body" weight={700} tabular tone={reaction.mine ? 'onHoney' : 'default'}>
-      {count}
+      {shortCount(count, i18n.language)}
     </Text>
   )
 

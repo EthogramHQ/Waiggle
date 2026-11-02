@@ -220,6 +220,11 @@ type RollProps = {
   calm: boolean
   /** Dessine un nombre (la capsule choisit sa police et sa couleur). */
   render: (value: number) => ReactNode
+  /**
+   * Comment le nombre s'écrit à l'écran (l'écriture courte, « 1,2 k »). Le nombre ne roule que si
+   * ce qu'on lit change : de 1 234 à 1 235, « 1,2 k » reste « 1,2 k », et rien ne bouge.
+   */
+  format?: (value: number) => string
 }
 
 /**
@@ -228,7 +233,7 @@ type RollProps = {
  * (il donne sa taille au bouton) ; l'ancien est posé par-dessus le temps de partir. Pas de
  * rognage : à 200 % de texte, un cadre rogné couperait les chiffres.
  */
-export function RollingCount({ value, calm, render }: RollProps) {
+export function RollingCount({ value, calm, render, format = String }: RollProps) {
   const [shown, setShown] = useState({ value, previous: value, direction: 0 })
   const progress = useSharedValue(1)
   const height = useRef(16)
@@ -237,7 +242,13 @@ export function RollingCount({ value, calm, render }: RollProps) {
   if (shown.value !== value) {
     // Un changement : on le note pendant le rendu (et non dans un effet), pour que l'ancien et le
     // nouveau nombre soient dessinés ensemble dès la première image.
-    setShown({ value, previous: shown.value, direction: value > shown.value ? 1 : -1 })
+    // Direction 0 : le texte lu est le même (écriture courte), le nombre change sans rouler.
+    const same = format(value) === format(shown.value)
+    setShown({
+      value,
+      previous: shown.value,
+      direction: same ? 0 : value > shown.value ? 1 : -1,
+    })
   }
 
   useEffect(() => {

@@ -360,3 +360,47 @@ describe('ReactionCapsule', () => {
     })
   })
 })
+
+// Décision de Louis du 2/11 : à partir de 1 000, le nombre s'écrit en court (« 1,2 k »), pour que la
+// capsule ne déborde pas à 320 points et 200 % ; le nom lu garde le nombre entier.
+describe('ReactionCapsule, large counts', () => {
+  const big: CapsuleReaction[] = [
+    { kind: 'amazing', count: 3, mine: false },
+    { kind: 'inspiring', count: 0, mine: false },
+    { kind: 'useful', count: 1234, mine: false },
+    { kind: 'funny', count: 12345, mine: false },
+    { kind: 'bravo', count: 21, mine: true },
+  ]
+
+  it('shows 1 234 reactions as « 1,2 k », and reads the whole number', async () => {
+    await renderWithProviders(<Capsule reactions={big} />)
+
+    expect(screen.getByText('1,2 k')).toBeTruthy()
+    expect(screen.getByText('12,3 k')).toBeTruthy()
+    expect(screen.queryByText('1234')).toBeNull()
+    expect(screen.getByRole('button', { name: labelOf('useful', 1234) })).toBeTruthy()
+    expect(screen.getByRole('button', { name: labelOf('funny', 12345) })).toBeTruthy()
+  })
+
+  it('writes it « 1.2K » in English', async () => {
+    await renderWithProviders(<Capsule reactions={big} />, 'en')
+
+    expect(screen.getByText('1.2K')).toBeTruthy()
+    expect(screen.getByText('12.3K')).toBeTruthy()
+  })
+
+  it('keeps a small count as it is (témoin)', async () => {
+    await renderWithProviders(<Capsule reactions={big} />)
+
+    expect(screen.getByText('21')).toBeTruthy()
+    expect(screen.getByText('3')).toBeTruthy()
+  })
+
+  it('shortens the count of a locked reaction too', async () => {
+    const locked = big.map((reaction) => ({ ...reaction, locked: true }))
+    await renderWithProviders(<Capsule reactions={locked} />)
+
+    expect(screen.getByText('1,2 k')).toBeTruthy()
+    expect(screen.getByLabelText(labelOf('useful', 1234))).toBeTruthy()
+  })
+})
