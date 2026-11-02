@@ -19,9 +19,10 @@
 // - ui-9 : « Partager… » attend l'hydratation de la page web (le pré-rendu ne connaît pas le
 //   navigateur).
 import { radii } from '@ruche/brand'
+import { Image } from 'expo-image'
 import { type ReactNode, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Image, View } from 'react-native'
+import { View } from 'react-native'
 import { Avatar } from './Avatar'
 import { Button } from './Button'
 import { ButtonPair } from './ButtonPair'
@@ -138,14 +139,17 @@ function useShareContent({
     target.kind === 'member' ? (
       <Avatar name={title} source={image} label="" size={THUMBNAIL} />
     ) : image ? (
+      // expo-image, comme les vignettes d'un projet (`Thumbnails`) : il recadre la photo au carré
+      // et dessine aussi une image SVG sur le web, où l'Image de React Native ne le fait pas.
       <Image
         source={image}
-        accessibilityIgnoresInvertColors
+        contentFit="cover"
+        accessible={false}
         style={{
           width: THUMBNAIL,
           height: THUMBNAIL,
           borderRadius: radii.tile,
-          backgroundColor: colors.line,
+          backgroundColor: colors.honeySoft,
         }}
       />
     ) : null
