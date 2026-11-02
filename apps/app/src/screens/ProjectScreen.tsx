@@ -290,7 +290,8 @@ function ProjectView({ project }: { project: Project }) {
           source: toSource(visual.url),
           thumbhash: visual.thumbhash,
         }))}
-        title={project.title}
+        // Sans photo, la lumière miel seule (sans `title`) : le titre est déjà juste à côté ou
+        // dessous, dans l'en-tête ; écrit aussi sur la lumière, il se lisait deux fois à l'œil.
         bleed={bleed}
         onIndexChange={setPhotoIndex}
         overlay={
