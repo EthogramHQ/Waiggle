@@ -101,6 +101,7 @@ import { GalleryCatalogue } from './projet-galerie'
 import { NotFoundPortalCatalogue } from './projet-introuvable'
 import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
+import { LeavingCatalogue } from './projet-sortie'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -145,6 +146,9 @@ export function CatalogueScreen() {
         <LanguageSwitcher />
       </Surface>
 
+      {/* R5a : la page de sortie (projet-sortie.tsx). Tout en tête pour les captures de la branche ;
+          à ranger à l'assemblage. */}
+      <LeavingCatalogue />
       {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
           captures de la branche ; à ranger à l'assemblage. */}
       <GalleryCatalogue />
