@@ -1,6 +1,7 @@
 // La section « Fin du fil » du catalogue (tranche R1) : le bas d'un fil (FeedEnd) dans tous ses
 // états, et surtout « Tu es à jour », le bout du fil de l'accueil, posé sur une ambiance locale de
-// miel vif, de jour et de nuit. À côté, la fin discrète des autres listes (« C'est tout »).
+// miel vif, de jour et de nuit. Les autres listes finissent sans rien dire depuis RF (T3, T4) :
+// la fin discrète n'est plus montrée.
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais.
@@ -16,9 +17,8 @@ import { UpToDate } from '../ui/UpToDate'
 const fr = {
   title: 'Fin du fil',
   intro:
-    'Le bas d’un fil : « Afficher la suite » tant qu’il en reste, puis la fin. Au bout du fil de l’accueil, « Tu es à jour » est un petit moment de marque, sur le miel vif ; le texte y est posé sur un verre, lisible de jour comme de nuit. Les autres listes finissent par une ligne discrète.',
+    'Le bas d’un fil : « Afficher la suite » tant qu’il en reste, puis la fin. Au bout du fil de l’accueil, « Tu es à jour » est un petit moment de marque, sur le miel vif ; le texte y est posé sur un verre, lisible de jour comme de nuit. Les autres listes finissent sans rien dire.',
   brand: 'Tu es à jour (le fil de l’accueil)',
-  light: 'Fin discrète (commentaires, notifications, modération)',
   more: 'Il en reste',
   loading: 'La suite arrive',
   error: 'La suite n’a pas pu se charger',
@@ -26,7 +26,6 @@ const fr = {
   night: 'nuit',
   showMore: 'Afficher la suite',
   upToDate: 'Tu es à jour',
-  thatsAll: 'C’est tout',
   moreError: 'La suite n’a pas pu se charger.',
   retry: 'Réessayer',
 }
@@ -34,9 +33,8 @@ const fr = {
 const en: typeof fr = {
   title: 'End of the feed',
   intro:
-    'The bottom of a feed: “Show more” while there is more, then the end. At the bottom of the home feed, “You’re all caught up” is a small brand moment, on bright honey; its text sits on glass, readable by day and by night. The other lists end with a quiet line.',
+    'The bottom of a feed: “Show more” while there is more, then the end. At the bottom of the home feed, “You’re all caught up” is a small brand moment, on bright honey; its text sits on glass, readable by day and by night. The other lists end without a word.',
   brand: 'You’re all caught up (the home feed)',
-  light: 'Quiet end (comments, notifications, moderation)',
   more: 'More to come',
   loading: 'More is on its way',
   error: 'More could not load',
@@ -44,7 +42,6 @@ const en: typeof fr = {
   night: 'night',
   showMore: 'Show more',
   upToDate: 'You’re all caught up',
-  thatsAll: 'That’s all',
   moreError: 'More could not load.',
   retry: 'Try again',
 }
@@ -67,27 +64,22 @@ export function FeedEndCatalogue() {
         // le thème du catalogue (ce ThemeProvider-là ne touche pas à la page).
         <ThemeProvider key={scheme} appearance={scheme}>
           <Example caption={`${l.brand} — ${l[scheme]}`}>
-            {/* R4 : « Tu es à jour » a quitté FeedEnd pour UpToDate (la sphère de miel). La nuit,
-                le texte du premier passage (« Tu as tout vu. »). */}
-            <UpToDate firstVisit={scheme === 'night'} onExplore={noop} />
+            {/* R4 : « Tu es à jour » a quitté FeedEnd pour UpToDate (la sphère de miel). */}
+            <UpToDate onExplore={noop} />
           </Example>
         </ThemeProvider>
       ))}
 
-      <Example caption={l.light}>
-        <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.thatsAll} onMore={noop} />
-      </Example>
       <Example caption={l.more}>
-        <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={noop} />
+        <FeedEnd state="more" moreLabel={l.showMore} onMore={noop} />
       </Example>
       <Example caption={l.loading}>
-        <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={noop} />
+        <FeedEnd state="loading" moreLabel={l.showMore} onMore={noop} />
       </Example>
       <Example caption={l.error}>
         <FeedEnd
           state="error"
           moreLabel={l.showMore}
-          endLabel={l.upToDate}
           errorLabel={l.moreError}
           retryLabel={l.retry}
           onMore={noop}

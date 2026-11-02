@@ -153,7 +153,6 @@ function MemberNotifications() {
                     : 'end'
             }
             moreLabel={t(($) => $.notifications.more)}
-            endLabel={t(($) => $.notifications.end)}
             errorLabel={t(($) => $.notifications.moreError)}
             retryLabel={t(($) => $.common.retry)}
             // Une seule demande à la fois, même après un double clic.

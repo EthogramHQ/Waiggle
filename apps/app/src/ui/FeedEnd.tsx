@@ -1,5 +1,6 @@
-// Le bas d'un fil : « Afficher la suite » tant qu'il en reste, puis une fin discrète (« C'est
-// tout »). Pas de défilement sans fin : on sait où le fil s'arrête, et un bouton se prend aussi au
+// Le bas d'un fil : « Afficher la suite » tant qu'il en reste, puis, si l'écran le demande, une fin
+// discrète. Depuis RF, aucune liste de l'appli n'en dit plus rien : la fin de la liste se voit
+// (« C'est tout » et « Tu es à jour » retirés, T3 et T4). Pas de défilement sans fin : on sait où le fil s'arrête, et un bouton se prend aussi au
 // clavier. Si la page suivante n'arrive pas, le message d'erreur et « Réessayer » se mettent ici,
 // sous les cartes déjà lues, qui restent en place.
 //
@@ -21,8 +22,8 @@ type Props = {
   /** more : il reste des pages ; loading : la suivante arrive ; end : tout est lu ; error : raté. */
   state: State
   moreLabel: string
-  /** La fin discrète : une coche et ce texte (« C'est tout »). */
-  endLabel: string
+  /** La fin discrète : une coche et ce texte. Sans lui, la liste finit sans rien dire (RF). */
+  endLabel?: string
   onMore: () => void
   /** Le message quand la page suivante n'a pas pu se charger, et le bouton pour réessayer. */
   errorLabel?: string
@@ -63,6 +64,7 @@ export function FeedEnd({ state, moreLabel, endLabel, onMore, errorLabel, retryL
   }, [state])
 
   if (state === 'end') {
+    if (!endLabel) return null
     return (
       <View
         ref={end}

@@ -285,7 +285,6 @@ export function SearchScreen() {
             <StateMessage
               kind="error"
               title={t(($) => $.search.errorTitle)}
-              message={t(($) => $.search.error)}
               actions={[{ label: t(($) => $.common.retry), onPress: onRetry, loading: retrying }]}
             />
           )

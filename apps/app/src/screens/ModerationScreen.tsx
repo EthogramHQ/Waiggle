@@ -663,7 +663,6 @@ function AdminModeration() {
                     : 'end'
             }
             moreLabel={t(($) => $.moderation.more)}
-            endLabel={t(($) => $.moderation.end)}
             errorLabel={t(($) => $.moderation.moreError)}
             retryLabel={t(($) => $.common.retry)}
             // Une seule demande à la fois, même après un double clic.

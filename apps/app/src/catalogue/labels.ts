@@ -44,7 +44,7 @@ const fr = {
   hintLink: 'Tu n’as plus accès à ton adresse ? Écris-nous à contact@example.org.',
   hintLinkLabel: 'contact@example.org',
   stateEmptyTitle: 'Encore aucun projet ici',
-  stateEmpty: 'Aucun projet public fait avec cet outil pour l’instant.',
+  stateEmpty: 'Le tien sera peut-être le premier.',
   recipe: 'Ajouter la recette',
   recipeHint: 'Outils, temps passé, prompts clés : facultatif',
   step: 'Une étape d’une suite à faire dans l’ordre.',
@@ -150,8 +150,7 @@ const fr = {
   noteOlder: 'Première version en ligne : on photographie la tasse, il devine le café.',
   noteOlderWhen: '12 oct.',
   noteUrl: 'Le code : https://github.com/lea-moreau/carnet-de-cafes-avec-un-nom-tres-long',
-  journalEmpty:
-    'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
+  journalEmpty: 'Pas encore de note.',
   deleteNote: 'Supprimer la note',
   addNote: 'Publier une note',
   noteField: 'Ta note',
@@ -208,7 +207,6 @@ const fr = {
   mentionBody: 'Demande à @ines_haddad, elle a testé la version anglaise. Et @zoe_martin ?',
   mentionLongBody:
     '@Ines_Haddad @max_durand_cuisine_b : vous l’avez essayé sur un vrai frigo ? Écris à contact@ines_haddad.fr',
-  commentsEnd: 'C’est tout',
   commentsMoreError: 'La suite des commentaires n’a pas pu se charger.',
   titleField: 'Titre',
   pitchField: 'Pitch',
@@ -296,7 +294,7 @@ const en: typeof fr = {
   hintLink: 'No longer have access to your address? Write to us at contact@example.org.',
   hintLinkLabel: 'contact@example.org',
   stateEmptyTitle: 'No project here yet',
-  stateEmpty: 'No public project made with this tool yet.',
+  stateEmpty: 'Yours may be the first.',
   recipe: 'Add the recipe',
   recipeHint: 'Tools, time spent, key prompts: optional',
   step: 'One step of a sequence to follow in order.',
@@ -401,8 +399,7 @@ const en: typeof fr = {
   noteOlder: 'First version online: snap the cup, it guesses the coffee.',
   noteOlderWhen: 'Oct 12',
   noteUrl: 'The code: https://github.com/lea-moreau/coffee-notebook-with-a-very-long-name',
-  journalEmpty:
-    'No note yet. Tell how your project is going: your followers will see it in their feed.',
+  journalEmpty: 'No note yet.',
   deleteNote: 'Delete the note',
   addNote: 'Post a note',
   noteField: 'Your note',
@@ -456,7 +453,6 @@ const en: typeof fr = {
   mentionBody: 'Ask @ines_haddad, she tried the English version. And @zoe_martin?',
   mentionLongBody:
     '@Ines_Haddad @max_durand_cuisine_b: did you try it on a real fridge? Write to contact@ines_haddad.fr',
-  commentsEnd: 'That’s all',
   commentsMoreError: 'The next comments could not load.',
   titleField: 'Title',
   pitchField: 'Pitch',

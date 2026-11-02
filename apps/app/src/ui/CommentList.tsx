@@ -17,7 +17,8 @@ type Props = {
   state: 'more' | 'loading' | 'end' | 'error'
   onMore: () => void
   moreLabel: string
-  endLabel: string
+  /** La fin discrète ; sans elle, la liste finit sans rien dire (RF, T4). */
+  endLabel?: string
   /** Le message d'une liste vide. */
   empty: string
   /** Le message quand la suite n'a pas pu se charger, et le bouton pour réessayer. */

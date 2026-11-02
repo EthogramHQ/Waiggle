@@ -243,9 +243,7 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
         // fil vide finit donc sur la sphère seule.
         <>
           {segment(items.slice(0, sphereAt ?? items.length), cardOf, columns)}
-          {sphereAt !== null ? (
-            <UpToDate firstVisit={upToDate.readBefore === null} onExplore={upToDate.onExplore} />
-          ) : null}
+          {sphereAt !== null ? <UpToDate onExplore={upToDate.onExplore} /> : null}
           {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (
@@ -257,7 +255,6 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
         <FeedEnd
           state={state}
           moreLabel={t(($) => $.feed.more)}
-          endLabel={t(($) => $.feed.end)}
           errorLabel={t(($) => $.feed.moreError)}
           retryLabel={t(($) => $.common.retry)}
           // Une seule demande à la fois, même après un double clic.

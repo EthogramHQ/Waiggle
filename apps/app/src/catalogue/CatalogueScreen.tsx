@@ -648,14 +648,12 @@ export function CatalogueScreen() {
           caption={l.feedCaption}
           onPress={() => {}}
         />
-        {/* Le bas du fil dans ses trois états. */}
-        <FeedEnd state="more" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
-        <FeedEnd state="loading" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
-        <FeedEnd state="end" moreLabel={l.showMore} endLabel={l.upToDate} onMore={() => {}} />
+        {/* Le bas du fil : il en reste, la suite arrive, la suite a raté (la fin ne dit rien, RF). */}
+        <FeedEnd state="more" moreLabel={l.showMore} onMore={() => {}} />
+        <FeedEnd state="loading" moreLabel={l.showMore} onMore={() => {}} />
         <FeedEnd
           state="error"
           moreLabel={l.showMore}
-          endLabel={l.upToDate}
           errorLabel={l.moreError}
           retryLabel={l.retry}
           onMore={() => {}}
@@ -910,13 +908,12 @@ export function CatalogueScreen() {
         {/* La liste : un fil avec ses réponses et le champ d'une réponse ouvert au bout, un fil
             avec « Répondre » au bout, un fil sous « Commentaire supprimé » (sans « Répondre »),
             puis « Afficher la suite ». Ensuite : la suite qui arrive, la suite en échec,
-            « C'est tout », et la liste vide. */}
+            la fin (sans phrase depuis RF), et la liste vide. */}
         <Surface variant="grouped" padding="xl" gap="lg">
           <CommentList
             state="more"
             onMore={() => {}}
             moreLabel={l.showMore}
-            endLabel={l.commentsEnd}
             empty={l.commentsEmpty}
           >
             <CommentThread
@@ -1002,7 +999,6 @@ export function CatalogueScreen() {
               state={state}
               onMore={() => {}}
               moreLabel={l.showMore}
-              endLabel={l.commentsEnd}
               empty={l.commentsEmpty}
               errorLabel={l.commentsMoreError}
               retryLabel={l.retry}
@@ -1022,7 +1018,6 @@ export function CatalogueScreen() {
             state="end"
             onMore={() => {}}
             moreLabel={l.showMore}
-            endLabel={l.commentsEnd}
             empty={l.commentsEmpty}
           />
         </Surface>

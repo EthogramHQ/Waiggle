@@ -2,8 +2,8 @@
 // fil avant le premier élément déjà vu. Ce qu'un membre et un lecteur d'écran en perçoivent :
 // - un titre de section (niveau 2), car il coupe le fil en deux listes (relecture de l'interface,
 //   ui-B6) ;
-// - le texte « depuis ta dernière visite », sauf au tout premier passage, où il n'y a pas eu de
-//   visite avant (« Tu as tout vu. », relecture juridique jur-J1) ;
+// - pas de phrase qui redise le titre (« Tu as tout vu… », retirée en RF, T1), donc jamais de
+//   « dernière visite » au tout premier passage (relecture juridique jur-J1) ;
 // - « Explorer d'autres projets » en bouton secondaire, jamais le miel principal : le message reste
 //   « tu peux t'arrêter » (jur-J9), et l'indication « Les nouveautés s'afficheront en haut du fil. » ;
 // - rien d'annoncé, et le focus jamais pris : la sphère se rencontre en faisant défiler, elle
@@ -28,8 +28,6 @@ jest.mock('./focus', () => ({
 }))
 
 const title = fr.t(($) => $.feed.upToDate.title)
-const body = fr.t(($) => $.feed.upToDate.body)
-const bodyFirst = fr.t(($) => $.feed.upToDate.bodyFirst)
 const action = fr.t(($) => $.feed.upToDate.action)
 const hint = fr.t(($) => $.feed.upToDate.hint)
 
@@ -65,19 +63,13 @@ describe('UpToDate', () => {
     expect(screen.getByRole('header', { name: title }).props['aria-level']).toBe(2)
   })
 
-  it('says everything since the last visit was seen, with the hint about news', async () => {
+  // RF (T1) : le titre, puis l'indication des nouveautés ; aucune phrase qui le redise, et donc
+  // jamais de « dernière visite » (jur-J1).
+  it('says only its title and the hint about news, never « Tu as tout vu »', async () => {
     await renderWithProviders(<UpToDate onExplore={jest.fn()} />)
 
-    expect(screen.getByText(body)).toBeTruthy()
     expect(screen.getByText(hint)).toBeTruthy()
-    expect(screen.queryByText(bodyFirst)).toBeNull()
-  })
-
-  // jur-J1 : au tout premier passage, il n'y a pas eu de « dernière visite ».
-  it('never speaks of a last visit on the very first one (jur-J1)', async () => {
-    await renderWithProviders(<UpToDate firstVisit onExplore={jest.fn()} />)
-
-    expect(screen.getByText(bodyFirst)).toBeTruthy()
+    expect(screen.queryByText(/Tu as tout vu/, { includeHiddenElements: true })).toBeNull()
     expect(screen.queryByText(/dernière visite/, { includeHiddenElements: true })).toBeNull()
   })
 

@@ -496,11 +496,8 @@ describe('the journal of a project', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     expect(await screen.findByRole('header', { name: 'Journal' })).toBeTruthy()
-    expect(
-      screen.getByText(
-        'Pas encore de note. Raconte où en est ton projet : tes abonnés la verront dans leur fil.',
-      ),
-    ).toBeTruthy()
+    // RF (T11) : l'état vide dit seulement « Pas encore de note. » ; l'aide du champ dit le reste.
+    expect(screen.getByText('Pas encore de note.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
   })
 })
@@ -570,15 +567,14 @@ describe('publishing a note from the project page', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('tells the author of a private project that nobody else sees its notes', async () => {
+  // RF (T16, jur-RF6) : sous le bandeau « Privé », le même état vide qu'un projet public, sans
+  // parler d'abonnés ; qui lira les notes, c'est l'aide du champ qui le dit (`hintPrivate`).
+  it('gives a private project the same empty journal, without speaking of followers', async () => {
     jest.mocked(getProject).mockResolvedValue({ ...recipesProject, visibility: 'private' })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(
-      await screen.findByText(
-        'Pas encore de note. Ce projet est privé : personne d’autre que toi ne verra ses notes, jusqu’à ce que tu le rendes public.',
-      ),
-    ).toBeTruthy()
+    expect(await screen.findByText('Pas encore de note.')).toBeTruthy()
+    expect(screen.queryByText(/abonnés/)).toBeNull()
   })
 })
 
@@ -1003,7 +999,7 @@ describe('the comments of a project', () => {
     expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
-  it('offers the next comments, then says when there are no more', async () => {
+  it('offers the next comments, then ends the list without a word (RF, T4)', async () => {
     seenByOther()
     mockComments([zoeComment], { hasNextPage: true })
     const view = await renderWithProviders(<ProjectScreen id={id} />)
@@ -1013,8 +1009,10 @@ describe('the comments of a project', () => {
 
     mockComments([zoeComment])
     await view.rerender(<ProjectScreen id={id} />)
-    expect(await screen.findByText('C’est tout')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull()
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull(),
+    )
+    expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
   it('shows « Commentaire supprimé » in place of a deleted comment, above its replies', async () => {

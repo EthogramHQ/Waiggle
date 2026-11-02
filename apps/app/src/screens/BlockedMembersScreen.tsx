@@ -151,7 +151,6 @@ function BlockedMembers() {
                         : 'end'
                 }
                 moreLabel={t(($) => $.block.list.more)}
-                endLabel={t(($) => $.block.list.end)}
                 errorLabel={t(($) => $.block.list.moreError)}
                 retryLabel={t(($) => $.common.retry)}
                 // Une seule demande à la fois, même après un double clic.

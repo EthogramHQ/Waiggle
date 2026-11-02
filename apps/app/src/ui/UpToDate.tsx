@@ -1,6 +1,7 @@
 // « Tu es à jour » (R4, F-Fil5, planche R4-Fil-AJour) : le bloc de miel posé dans le fil de
 // l'accueil, juste avant le premier élément déjà vu (ou à la fin d'un fil tout neuf). Il dit au
-// membre qu'il peut s'arrêter : la sphère de miel et l'abeille endormie, le titre, le texte, puis
+// membre qu'il peut s'arrêter : la sphère de miel et l'abeille endormie, le titre (sans phrase qui
+// le redise : « Tu as tout vu » est retiré en RF, T1), puis
 // « Explorer d'autres projets » en bouton secondaire (une possibilité, pas un appel : relecture
 // juridique jur-J9) et l'indication que les nouveautés arriveront en haut du fil.
 //
@@ -25,11 +26,6 @@ import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
 
 type Props = {
-  /**
-   * Le tout premier passage du membre sur son fil (son `lastReadAt` était vide) : il n'y a pas eu
-   * de « dernière visite », le texte dit seulement « Tu as tout vu. » (jur-J1).
-   */
-  firstVisit?: boolean
   /** « Explorer d'autres projets » : l'écran qui l'utilise mène à Explorer. */
   onExplore: () => void
 }
@@ -37,7 +33,7 @@ type Props = {
 /** Le diamètre de la sphère, en points. */
 const SPHERE = 128
 
-export function UpToDate({ firstVisit = false, onExplore }: Props) {
+export function UpToDate({ onExplore }: Props) {
   const { t } = useTranslation()
   const { scheme } = useTheme()
   const night = scheme === 'night'
@@ -51,9 +47,6 @@ export function UpToDate({ firstVisit = false, onExplore }: Props) {
       <View style={{ alignSelf: 'stretch', gap: space.xs }}>
         <Text variant="title3" heading={2} tone={tone}>
           {t(($) => $.feed.upToDate.title)}
-        </Text>
-        <Text tone={tone} readable>
-          {firstVisit ? t(($) => $.feed.upToDate.bodyFirst) : t(($) => $.feed.upToDate.body)}
         </Text>
       </View>
       <Button

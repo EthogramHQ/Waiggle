@@ -126,7 +126,6 @@ export function ChangePasswordScreen() {
       header={<TopNav inSettings />}
       onBack={back}
       title={t(($) => $.settings.changePassword.screenTitle)}
-      subtitle={t(($) => $.settings.changePassword.intro)}
       footer={
         <>
           {error ? (

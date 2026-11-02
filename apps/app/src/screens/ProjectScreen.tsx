@@ -735,11 +735,9 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
               setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
             },
             deleteLabel: t(($) => $.project.notes.delete),
-            // Sur un projet privé, personne d'autre ne verra ses notes : on le dit.
-            empty:
-              project.visibility === 'private'
-                ? t(($) => $.project.notes.emptyPrivate)
-                : t(($) => $.project.notes.empty),
+            // RF (T11, T16) : le même état vide, public ou privé ; qui lira la note, c'est l'aide
+            // du champ qui le dit (`hintPrivate` sur un projet privé, jur-RF6).
+            empty: t(($) => $.project.notes.empty),
           }
         : {
             // Un autre membre peut signaler chaque note (tranche 7a).

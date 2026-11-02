@@ -344,13 +344,13 @@ describe('the « following » feed on the home screen', () => {
   })
 
   // R4 (F-Fil5) : un fil vide et fini pose « Tu es à jour », dont le bouton secondaire mène à
-  // Explorer (jur-J9) ; au premier passage, « Tu as tout vu. » (jur-J1).
+  // Explorer (jur-J9) ; depuis RF (T1), le titre seul, sans « Tu as tout vu. ».
   it('says when the people followed have published nothing yet, and leads to « explore »', async () => {
     mockFollowing({ items: [], followsAnyone: true })
     await renderMemberHome()
 
     expect(screen.getByRole('header', { name: 'Tu es à jour' })).toBeTruthy()
-    expect(screen.getByText('Tu as tout vu.')).toBeTruthy()
+    expect(screen.queryByText(/Tu as tout vu/)).toBeNull()
     expect(screen.queryByText('Ton fil t’attend')).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Explorer d’autres projets' }))
     expect(mockPush).toHaveBeenCalledWith('/explore')
@@ -1003,7 +1003,7 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
     expect(within(newer).queryByRole('link', { name: 'Le tri des photos' })).toBeNull()
     expect(within(seen).getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
     expect(within(seen).getByRole('link', { name: 'Le carnet de jardin' })).toBeTruthy()
-    expect(screen.getByText(shown(fr.t(($) => $.feed.upToDate.body)))).toBeTruthy()
+    expect(screen.queryByText(containing('Tu as tout vu'))).toBeNull()
   })
 
   it('stands at the top when nothing arrived since the last visit, with no empty list before it', async () => {
@@ -1025,15 +1025,16 @@ describe('« Tu es à jour » in the feed (R4, F-Fil5)', () => {
 
     expect(comesBefore(card('Le quiz des capitales'), upToDate())).toBe(true)
     expect(screen.getAllByText(fr.t(($) => $.feed.upToDate.title))).toHaveLength(1)
-    expect(screen.getByText(shown(fr.t(($) => $.feed.upToDate.body)))).toBeTruthy()
+    expect(screen.queryByText(containing('Tu as tout vu'))).toBeNull()
   })
 
-  it('says only « Tu as tout vu. » at the end of a first visit (jur-J1)', async () => {
+  it('says only its title at the end of a first visit, no « dernière visite » (jur-J1, RF T1)', async () => {
     // Le fil de départ : Léa et Max, jamais lu (lastReadAt null), sans suite.
     await renderMemberHome()
 
     expect(comesBefore(card('Le tri des photos'), upToDate())).toBe(true)
-    expect(screen.getByText(shown(fr.t(($) => $.feed.upToDate.bodyFirst)))).toBeTruthy()
+    expect(screen.getAllByText(fr.t(($) => $.feed.upToDate.title))).toHaveLength(1)
+    expect(screen.queryByText(containing('Tu as tout vu'))).toBeNull()
     expect(screen.queryByText(containing('dernière visite'))).toBeNull()
   })
 
