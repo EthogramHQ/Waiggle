@@ -148,35 +148,6 @@ export function CatalogueScreen() {
         <LanguageSwitcher />
       </Surface>
 
-      {/* R5a : la page de sortie (projet-sortie.tsx). Tout en tête pour les captures de la branche ;
-          à ranger à l'assemblage. */}
-      <LeavingCatalogue />
-      {/* R5a : l'en-tête et les actions de la page projet (projet-auteur.tsx). En tête pour les
-          captures de la branche ; à ranger à l'assemblage. */}
-      <ProjectPartsCatalogue />
-      {/* R5a : la feuille Partager (projet-partager.tsx). En tête pour les captures de la
-          branche ; à ranger à l'assemblage. */}
-      <ShareCatalogue />
-      {/* R5a : la galerie de photos de la page projet (projet-galerie.tsx). En tête pour les
-          captures de la branche ; à ranger à l'assemblage. */}
-      <GalleryCatalogue />
-      {/* R5a : le bloc « Le prompt de départ » (projet-prompts.tsx). En tête le temps des captures
-          de l'ui-dev ; la session le range à l'assemblage. */}
-      <ProjectPromptsCatalogue />
-      {/* R5a : le portail et l'introuvable d'un projet (projet-introuvable.tsx). Tout en tête pour
-          les captures de la branche ; à ranger à l'assemblage. */}
-      <NotFoundPortalCatalogue />
-      {/* R5a : l'éventail des réactions et la vue de l'auteur (projet-eventail.tsx). En tête pour
-          les captures de la branche ; à ranger à l'assemblage. */}
-      <FanCatalogue />
-      {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
-          En tête pour les captures de la branche ; à ranger à l'assemblage. */}
-      <ProjectGroundworkCatalogue />
-      {/* R5a : la capsule des réactions de la page projet (projet-capsule.tsx). */}
-      <CapsuleCatalogue />
-      {/* R5a : en tête le temps des captures de l'ui-dev ; la session la range à l'assemblage. */}
-      <ProjectFrameCatalogue />
-
       <Section title={l.colors}>
         <Swatches />
       </Section>
@@ -1129,6 +1100,20 @@ export function CatalogueScreen() {
       <ExploreCatalogue />
       <ToolsCatalogue />
       <SearchCatalogue />
+      {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
+          l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
+          actions, capsule, éventail et vue de l'auteur, prompts, Partager, la page de sortie et son
+          portail, l'introuvable (projet-*.tsx). */}
+      <ProjectGroundworkCatalogue />
+      <ProjectFrameCatalogue />
+      <GalleryCatalogue />
+      <ProjectPartsCatalogue />
+      <CapsuleCatalogue />
+      <FanCatalogue />
+      <ProjectPromptsCatalogue />
+      <ShareCatalogue />
+      <LeavingCatalogue />
+      <NotFoundPortalCatalogue />
 
       <Section title={l.icons}>
         <Icons />
