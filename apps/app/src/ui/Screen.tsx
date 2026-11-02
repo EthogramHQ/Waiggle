@@ -25,6 +25,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -268,7 +269,9 @@ export function Screen({
   })
   const asideAway = aside.below
   const { refocus } = aside
-  useEffect(() => {
+  // Avant que la page soit redessinée (`useLayoutEffect`) : le focus ne reste pas, même une image, sur
+  // toute la page.
+  useLayoutEffect(() => {
     if (!refocus.current) return
     refocus.current = false
     // Sur la nouvelle place, le premier élément que Tab atteint (le bouton), sans faire défiler.
