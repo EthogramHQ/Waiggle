@@ -16,8 +16,12 @@ import { Fragment, type ReactNode } from 'react'
 import { View } from 'react-native'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Une rangée : sa colonne principale (à gauche) et sa colonne latérale (à droite). */
-export type ColumnsRow = { main: ReactNode; side: ReactNode }
+/**
+ * Une rangée : sa colonne principale (à gauche) et sa colonne latérale (à droite). `continues` :
+ * la rangée prolonge la précédente, sans trait au-dessus d'elle, même avec `divided` (le pied de
+ * la page d'un projet : « Signaler ce projet », en bas à gauche, lu après les commentaires).
+ */
+export type ColumnsRow = { main: ReactNode; side: ReactNode; continues?: boolean }
 
 type Props = { gap?: Space } & (
   | { main: ReactNode; side: ReactNode; rows?: never; divided?: never }
@@ -41,7 +45,7 @@ export function Columns(props: Props) {
         // Le rang suffit comme clé : les rangées d'une page ne changent pas d'ordre.
         // biome-ignore lint/suspicious/noArrayIndexKey: l'ordre des rangées est fixe.
         <Fragment key={index}>
-          {props.divided && index > 0 ? <RowDivider /> : null}
+          {props.divided && index > 0 && !row.continues ? <RowDivider /> : null}
           <ColumnPair main={row.main} side={row.side} gap={gap} />
         </Fragment>
       ))}

@@ -71,8 +71,8 @@ type Props = {
   /** Sans photo : le titre écrit sur la lumière miel (la couverture d'aujourd'hui). */
   title?: string
   /**
-   * La hauteur des photos (jetons `layout.cover`, ou en points). Par défaut : `hero` sur ordinateur
-   * et tablette, `band` sur téléphone.
+   * La hauteur des photos (jetons `layout.cover`, ou en points). Par défaut : `hero` sur ordinateur,
+   * `medium` sur tablette, `band` sur téléphone.
    */
   height?: number | CoverShape
   /**
@@ -133,7 +133,9 @@ export function PhotoGallery({
   // La moitié de ce qui dépasse sous la galerie (`CoverStraddle`) : la place réservée sous elle.
   const [straddle, setStraddle] = useState(0)
 
-  const base = shape ?? (desktop ? 'hero' : 'band')
+  // La hauteur par défaut suit la taille de l'écran : grande sur ordinateur, moyenne sur tablette
+  // (le titre et « Tester la démo » restent dans le premier écran), bande sur téléphone.
+  const base = shape ?? (sizeClass === 'wide' ? 'hero' : sizeClass === 'medium' ? 'medium' : 'band')
   const photoHeight = typeof base === 'number' ? base : layout.cover[base]
   // Bord à bord : la photo monte sous la barre d'état, et la feuille en recouvre le bas ; la part
   // visible garde la hauteur demandée.

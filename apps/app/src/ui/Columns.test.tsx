@@ -81,6 +81,27 @@ describe('Columns', () => {
     expect(divider.props['aria-hidden']).toBe(true)
   })
 
+  // Correction C3 de R5a : le pied de la page d'un projet (« Signaler ce projet ») est une rangée
+  // qui prolonge la précédente, lue après elle, sans trait entre les deux.
+  it('draws no line before a row that continues the previous one', async () => {
+    await renderWithProviders(
+      <Columns
+        divided
+        rows={[
+          { main: <Text>Galerie</Text>, side: <Text>En-tête</Text> },
+          { main: <Text>Description</Text>, side: <Text>Commentaires</Text> },
+          { main: <Text>Signaler</Text>, side: null, continues: true },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Signaler')).toBeTruthy()
+    // Un seul trait : sous la première rangée.
+    expect(screen.getAllByTestId('columns-divider', { includeHiddenElements: true })).toHaveLength(
+      1,
+    )
+  })
+
   it('draws no line without `divided`, nor before the first row', async () => {
     await renderWithProviders(
       <Columns

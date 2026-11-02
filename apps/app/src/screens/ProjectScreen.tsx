@@ -224,10 +224,16 @@ function ProjectView({ project }: { project: Project }) {
       { icon: 'check-circle' },
     )
   }
+  // Un projet retiré par la modération ne s'ouvre plus que pour son auteur : l'API répond 404 à
+  // tous les autres. Ni « Partager » ni « Copier le lien », qui promettraient le contraire
+  // (« seuls les membres pourront l'ouvrir » ; décision de Louis du 2/11/2026).
+  const shareable = !project.removal
   // Le menu « … » : copier le lien, puis signaler (un autre membre) ou modifier (l'auteur, sauf
   // projet retiré par la modération ou compte suspendu : l'API refuserait).
   const menuItems: ActionMenuItem[] = [
-    { label: t(($) => $.share.copy), icon: 'link', onPress: () => void copyLink() },
+    ...(shareable
+      ? [{ label: t(($) => $.share.copy), icon: 'link' as const, onPress: () => void copyLink() }]
+      : []),
     ...(project.isMine
       ? project.removal || suspended
         ? []
@@ -235,16 +241,20 @@ function ProjectView({ project }: { project: Project }) {
       : [{ label: t(($) => $.report.project), icon: 'flag' as const, onPress: report }]),
   ]
   // Partager et « … » : posés sur la photo (téléphone) ou en haut de la page (tablette, ordinateur).
-  const pageActions = (
-    <>
-      <IconButton
-        icon="share-network"
-        label={t(($) => $.share.action)}
-        onPress={() => setSharing(true)}
-      />
-      <ActionMenu variant="glass" items={menuItems} />
-    </>
-  )
+  // Un menu sans action (l'auteur d'un projet retiré) ne se dessine pas : il s'ouvrirait sur rien.
+  const pageActions =
+    shareable || menuItems.length > 0 ? (
+      <>
+        {shareable ? (
+          <IconButton
+            icon="share-network"
+            label={t(($) => $.share.action)}
+            onPress={() => setSharing(true)}
+          />
+        ) : null}
+        {menuItems.length > 0 ? <ActionMenu variant="glass" items={menuItems} /> : null}
+      </>
+    ) : null
 
   // La capsule des réactions (un autre membre). Sur un compte suspendu, l'éventail ne s'ouvre pas :
   // il ne pourrait y poser aucune réaction nouvelle (rien n'est décidé pour lui, U3).
@@ -449,14 +459,16 @@ function ProjectView({ project }: { project: Project }) {
           onClose={() => setFanOpen(false)}
         />
       ) : null}
-      <ShareSheet
-        open={sharing}
-        onClose={() => setSharing(false)}
-        title={project.title}
-        target={{ kind: 'project', id: project.id }}
-        visibility={project.visibility}
-        image={project.visuals[0] ? toSource(project.visuals[0].url) : null}
-      />
+      {shareable ? (
+        <ShareSheet
+          open={sharing}
+          onClose={() => setSharing(false)}
+          title={project.title}
+          target={{ kind: 'project', id: project.id }}
+          visibility={project.visibility}
+          image={project.visuals[0] ? toSource(project.visuals[0].url) : null}
+        />
+      ) : null}
     </>
   )
 
@@ -472,9 +484,11 @@ function ProjectView({ project }: { project: Project }) {
         // « Retour » écrit en toutes lettres, d'où qu'on arrive (ui-11).
         backLabel={t(($) => $.project.page.back)}
         topAction={
-          <Row gap="sm" align="center">
-            {pageActions}
-          </Row>
+          pageActions ? (
+            <Row gap="sm" align="center">
+              {pageActions}
+            </Row>
+          ) : undefined
         }
         thumbhash={thumbhash}
         pageTitle={project.title}
@@ -482,7 +496,9 @@ function ProjectView({ project }: { project: Project }) {
         {faded(removal)}
         {columns ? (
           // Deux rangées, dans l'ordre de lecture : la galerie (et la capsule) | l'en-tête, les
-          // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation.
+          // actions, la recette ; un trait ; puis ce qui se lit longtemps | la conversation. Enfin
+          // « Signaler ce projet », en bas à gauche : dans une rangée à lui, il vient après les
+          // commentaires, au clavier comme sur téléphone (décision de Louis du 2/11/2026).
           <Columns
             divided
             rows={[
@@ -507,7 +523,6 @@ function ProjectView({ project }: { project: Project }) {
                     {faded(description)}
                     {faded(prompt)}
                     {faded(journal)}
-                    {faded(reportLink)}
                   </>
                 ),
                 side: (
@@ -517,6 +532,7 @@ function ProjectView({ project }: { project: Project }) {
                   </>
                 ),
               },
+              ...(reportLink ? [{ main: faded(reportLink), side: null, continues: true }] : []),
             ]}
           />
         ) : (

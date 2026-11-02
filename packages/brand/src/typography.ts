@@ -57,8 +57,13 @@ export const textStyles = {
 
 export type TextVariant = keyof typeof textStyles
 
-/** Longueur de ligne confortable pour un texte long sur ordinateur, en points (≈ 70 caractères). */
-export const readableWidth = 680
+/**
+ * Longueur de ligne confortable pour un texte long sur ordinateur, en points : environ 75
+ * caractères du texte courant (`body`, Funnel Sans de 17 points, ≈ 7,4 points par caractère).
+ * Au-delà de 80, l'œil peine à retrouver le début de la ligne suivante. Relecture de design de
+ * R5a : à 680, une note du journal faisait 88 caractères par ligne.
+ */
+export const readableWidth = 560
 
 /** Agrandissement maximal des textes quand l'appareil est réglé en grande taille de texte. */
 export const maxTextScale = 2
