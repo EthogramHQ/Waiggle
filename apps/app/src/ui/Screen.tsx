@@ -315,6 +315,8 @@ export function Screen({
   // feuille, sa place dépendait du décor (téléphone) et de la hauteur du contenu (la carte centrée
   // sur ordinateur) : il changeait de place d'une page du compte à l'autre. Mesuré par l'ui-dev R :
   // (16, 16) à 390 px et (32, 48) à 1280 px sur les quatre pages, premier arrêt de Tab partout.
+  // Depuis RF, sur ordinateur, la barre du miel prend la marge du haut de `ScreenTopBar` (la
+  // capsule ne saute plus d'une page à l'autre) : le retour est à (32, 16) à 1280 px.
   //
   // Exception, R5a (`backLabel`, la page introuvable d'un projet, barre « Mon compte » connectée) :
   // le retour écrit en toutes lettres ne tient pas sur la rangée de la barre (à 768 points, « Publier »

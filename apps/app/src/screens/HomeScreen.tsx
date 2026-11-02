@@ -242,14 +242,6 @@ function MemberHome({ session }: { session: SessionData }) {
 }
 
 /**
- * Hook : le premier lancement (le membre ne suit personne), décidé sur la première page et gardé
- * pour la visite ; `undefined` tant que cette page n'est pas là.
- *
- * Pourquoi gardé : suivre un proche depuis la liste relit le fil (follows/api.ts). Sans cette
- * mémoire, le premier « Suivre » remplacerait toute la page par le fil, sous le doigt, et l'on ne
- * pourrait plus suivre le deuxième proche de la liste. Le fil arrive alors sous la liste.
- */
-/**
  * Le bouton des nouveautés sur ordinateur (RF, ui-5), à côté du titre ou sous la barre fixe. Son
  * toucher relit le fil comme avant, puis remonte en haut (`toTop()` du canal de défilement de
  * Screen : un composant rendu dans Screen le lit par son contexte) et pose le focus sur le titre
@@ -277,6 +269,14 @@ function PinnedNews({
   )
 }
 
+/**
+ * Hook : le premier lancement (le membre ne suit personne), décidé sur la première page et gardé
+ * pour la visite ; `undefined` tant que cette page n'est pas là.
+ *
+ * Pourquoi gardé : suivre un proche depuis la liste relit le fil (follows/api.ts). Sans cette
+ * mémoire, le premier « Suivre » remplacerait toute la page par le fil, sous le doigt, et l'on ne
+ * pourrait plus suivre le deuxième proche de la liste. Le fil arrive alors sous la liste.
+ */
 const useFirstRun = (firstPage: Pick<FollowingFeedPage, 'followsAnyone'> | undefined) => {
   const [kept, setKept] = useState<boolean | undefined>(undefined)
   if (kept === undefined && firstPage) {
