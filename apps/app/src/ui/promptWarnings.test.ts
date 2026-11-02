@@ -191,6 +191,32 @@ describe('promptWarnings', () => {
     ).toEqual(['command', 'link', 'encoded', 'secret'])
   })
 
+  // `cleanPrompt` laisse passer les liants U+200C et U+200D (emoji) et les sélecteurs de variante :
+  // glissés dans un mot, ils cachaient le repère. La copie pliée les retire (le texte affiché et
+  // copié, lui, ne change pas).
+  describe('a mark hidden by a zero-width joiner', () => {
+    const ZERO_WIDTH_JOINER = String.fromCodePoint(0x200d)
+    const NON_JOINER = String.fromCodePoint(0x200c)
+    const VARIATION_SELECTOR = String.fromCodePoint(0xfe0f)
+    const half = 'aB3dE6gH9j'.repeat(2)
+
+    it.each([
+      ['a secret', `mot de p${ZERO_WIDTH_JOINER}asse`, 'secret'],
+      ['a command', `cu${ZERO_WIDTH_JOINER}rl x`, 'command'],
+      ['a link', `evil.c${ZERO_WIDTH_JOINER}om/x`, 'link'],
+      ['a long encoded block', `${half}${ZERO_WIDTH_JOINER}${half}`, 'encoded'],
+      ['a command, with a non-joiner', `cu${NON_JOINER}rl x`, 'command'],
+      ['a secret, with a variation selector', `to${VARIATION_SELECTOR}ken`, 'secret'],
+    ] as const)('still flags %s', (_, text, warning) => {
+      expect(flags(text, warning)).toBe(true)
+    })
+
+    it('does not make up a mark from emoji joiners (témoin)', () => {
+      const family = ['👨', '👩', '👧'].join(ZERO_WIDTH_JOINER)
+      expect(promptWarnings(`Dessine ${family} devant la maison`)).toEqual([])
+    })
+  })
+
   // sec-B2 : la recherche reste rapide sur un texte écrit pour la ralentir (les expressions qui
   // reviennent en arrière sans fin), à la longueur maximale d'un prompt.
   it('stays fast on 4 000 characters written to slow it down', () => {

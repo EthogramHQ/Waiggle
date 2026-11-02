@@ -45,6 +45,7 @@ import { BeeDance, ReactionBurst, RollingCount, useBounce } from './reactionMoti
 import { Surface } from './Surface'
 import { shortCount } from './shortCount'
 import { Text } from './Text'
+import { useTapGuard } from './tapGuard'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -76,8 +77,12 @@ type Props = {
   reactions: CapsuleReaction[]
   /** Pose ou retire cette réaction. */
   onToggle: (kind: ReactionKind) => void
-  /** Ouvre l'éventail (appui long, clic droit, touche Menu, action du lecteur d'écran). */
-  onOpenFan: () => void
+  /**
+   * Ouvre l'éventail (appui long, clic droit, touche Menu, action du lecteur d'écran). Facultatif :
+   * sans lui (compte suspendu, qui ne pose plus rien), aucun de ces gestes n'existe, et les boutons
+   * ne promettent ni indice ni action « appui long » ; le clic droit garde le menu du navigateur.
+   */
+  onOpenFan?: (() => void) | undefined
   /** Le dernier changement n'a pas pu être enregistré : le message, au-dessus de la capsule. */
   error?: string | undefined
   /** Un lien sous le message d'erreur (« Me reconnecter » quand la session a expiré). */
@@ -152,7 +157,8 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
   const { t } = useTranslation()
   const calm = useCalmMotion()
   const hintId = useId()
-  const hint = t(($) => $.reactions.fan.open)
+  // L'indice « Voir les réactions et leurs noms » n'existe que si l'éventail peut s'ouvrir.
+  const hint = onOpenFan ? t(($) => $.reactions.fan.open) : undefined
   const label = t(($) => $.project.reactions.group)
   // Le nom affiché de chaque réaction et le nom lu, qui reprend ce qu'on voit (le nombre) et dit
   // si elle est la sienne.
@@ -177,13 +183,15 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
   )
   const lastOpen = useRef<number | null>(null)
 
-  const openFan = () => {
-    // Date.now() dans un geste, jamais pendant le rendu (la page web est pré-rendue).
-    const now = Date.now()
-    if (lastOpen.current !== null && now - lastOpen.current < SAME_GESTURE_MS) return
-    lastOpen.current = now
-    onOpenFan()
-  }
+  const openFan = onOpenFan
+    ? () => {
+        // Date.now() dans un geste, jamais pendant le rendu (la page web est pré-rendue).
+        const now = Date.now()
+        if (lastOpen.current !== null && now - lastOpen.current < SAME_GESTURE_MS) return
+        lastOpen.current = now
+        onOpenFan()
+      }
+    : undefined
 
   const press = (item: Item) => {
     // Poser (et non retirer) fait partir le mouvement.
@@ -269,7 +277,7 @@ export function ReactionCapsule({ reactions, onToggle, onOpenFan, error, errorAc
       </View>
       {/* L'indice lu sur chaque bouton, sur le web (aria-describedby) : « Voir les réactions et
           leurs noms ». Caché à l'œil ; sur téléphone, c'est accessibilityHint. */}
-      {Platform.OS === 'web' ? (
+      {Platform.OS === 'web' && hint ? (
         <View style={hiddenFrame} pointerEvents="none">
           <Text nativeID={hintId}>{hint}</Text>
         </View>
@@ -282,15 +290,20 @@ type ButtonProps = {
   item: Item
   burst: number
   calm: boolean
-  hint: string
+  /** L'indice de l'éventail ; absent quand la capsule n'a pas d'éventail. */
+  hint: string | undefined
   hintId: string
   onPress: () => void
-  onOpenFan: () => void
+  onOpenFan: (() => void) | undefined
 }
 
 /** Une réaction qu'on peut poser ou retirer : un bouton qui reste enfoncé (miel plein). */
 function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }: ButtonProps) {
   const { colors } = useTheme()
+  // La garde contre la double tape, propre à cette réaction (un bouton, une garde) : deux tapes à
+  // 180 ms posaient puis retiraient la réaction, soit deux écritures et une réaction perdue. Une
+  // tape sur une autre réaction passe ; le même bouton se rouvre après TAP_GUARD_MS.
+  const guard = useTapGuard()
   // La langue, pour l'écriture courte du nombre (« 1,2 k » / « 1.2K »).
   const { i18n } = useTranslation()
   // Comme les boutons : il s'enfonce légèrement sous le doigt, avec un ressort.
@@ -308,30 +321,36 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
     playBounce()
   }, [burst, playBounce])
   const inactive = item.disabled === true
-  const fanProps = {
-    onLongPress: onOpenFan,
-    delayLongPress: FAN_LONG_PRESS_MS,
-    // L'indice : « Voir les réactions et leurs noms ». Sur téléphone, accessibilityHint ; sur le
-    // web, react-native-web ne le transmet pas : aria-describedby vers le texte caché de la capsule.
-    accessibilityHint: hint,
-    // Le lecteur d'écran : l'action « appui long » ouvre l'éventail (VoiceOver, TalkBack).
-    accessibilityActions: [{ name: 'longpress' as const, label: hint }],
-    onAccessibilityAction: (event: AccessibilityActionEvent) => {
-      if (event.nativeEvent.actionName === 'longpress') onOpenFan()
-    },
-    ...(Platform.OS === 'web'
+  // Les gestes de l'éventail, seulement si la capsule en a un : sans lui, rien n'est promis (ni
+  // indice, ni action « appui long »), et le clic droit garde le menu du navigateur.
+  const fanProps =
+    onOpenFan && hint
       ? {
-          // Clic droit, touche Menu, Maj+F10 : le menu du navigateur laisse la place à
-          // l'éventail. preventDefault sur l'événement lui-même, sans détacher la fonction (sur
-          // le web, la détacher lèverait « Illegal invocation »).
-          onContextMenu: (event: { preventDefault: () => void }) => {
-            event.preventDefault()
-            onOpenFan()
+          onLongPress: onOpenFan,
+          delayLongPress: FAN_LONG_PRESS_MS,
+          // L'indice : « Voir les réactions et leurs noms ». Sur téléphone, accessibilityHint ; sur
+          // le web, react-native-web ne le transmet pas : aria-describedby vers le texte caché de
+          // la capsule.
+          accessibilityHint: hint,
+          // Le lecteur d'écran : l'action « appui long » ouvre l'éventail (VoiceOver, TalkBack).
+          accessibilityActions: [{ name: 'longpress' as const, label: hint }],
+          onAccessibilityAction: (event: AccessibilityActionEvent) => {
+            if (event.nativeEvent.actionName === 'longpress') onOpenFan()
           },
-          ...describedBy(hintId),
+          ...(Platform.OS === 'web'
+            ? {
+                // Clic droit, touche Menu, Maj+F10 : le menu du navigateur laisse la place à
+                // l'éventail. preventDefault sur l'événement lui-même, sans détacher la fonction
+                // (sur le web, la détacher lèverait « Illegal invocation »).
+                onContextMenu: (event: { preventDefault: () => void }) => {
+                  event.preventDefault()
+                  onOpenFan()
+                },
+                ...describedBy(hintId),
+              }
+            : null),
         }
-      : null),
-  }
+      : null
   return (
     <Animated.View style={[styles.grow, sink]}>
       <Animated.View style={[styles.grow, bounce.style]}>
@@ -347,9 +366,9 @@ function ReactionButton({ item, burst, calm, hint, hintId, onPress, onOpenFan }:
           // toucher : le focus se perdrait. Il y reste (comme ReactionBar).
           {...(Platform.OS === 'web' && inactive ? { tabIndex: 0 as const } : null)}
           {...fanProps}
-          onPress={() => {
+          onPress={guard(() => {
             if (!inactive) onPress()
-          }}
+          })}
           onPressIn={() => {
             if (!inactive) scale.value = spring(pressScale, 'firm')
           }}
@@ -447,6 +466,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
+    // Avec flexWrap, les lignes se rangent selon alignContent (« stretch » par défaut), pas
+    // alignItems : sur un bouton plus haut que son contenu, la ligne se collait en haut (icône et
+    // nombre 9 px trop haut). Centrée, elle tient le milieu du bouton.
+    alignContent: 'center',
     justifyContent: 'center',
     columnGap: space.xs,
     minHeight: layout.touchTarget,
