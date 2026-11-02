@@ -18,17 +18,20 @@ import { Surface } from '../ui/Surface'
 import { ScreenRouteScope, useScreenShownCount } from '../ui/screenFocus'
 import { Text } from '../ui/Text'
 
+// L'espace insécable avant le deux-points (typographie française), écrite par son numéro : un
+// caractère invisible tapé tel quel se perdrait à la relecture.
+const nbsp = String.fromCodePoint(0xa0)
+
 const fr = {
   title: 'Les pages apparaissent en fondu',
-  intro:
-    'Sur le web, le contenu d’une page ouverte dans l’appli apparaît en fondu (180 ms), à l’aller comme au retour. Jamais la première page de la visite, ni un écran remonté pendant la visite (la fin d’un chargement). Le fondu suit la route : chaque page compte ses arrivées. Sur téléphone, rien : la pile glisse.',
+  intro: `Sur le web, le contenu d’une page ouverte dans l’appli apparaît en fondu (180${nbsp}ms), à l’aller comme au retour. Jamais la première page de la visite, ni un écran remonté pendant la visite (la fin d’un chargement). Le fondu suit la route${nbsp}: chaque page compte ses arrivées. Sur téléphone, rien${nbsp}: la pile glisse.`,
   shown: 'Page affichée',
   pageA: 'Page A',
   pageB: 'Page B',
   pageC: 'Sans fondu',
   openNew: 'Ouvrir une page neuve',
-  arrivals: (count: number) => `Arrivées de cette route${String.fromCodePoint(0xa0)}: ${count}`,
-  noFade: 'fade={false} : la page d’un projet ouverte depuis une carte, qui a son propre passage.',
+  arrivals: (count: number) => `Arrivées de cette route${nbsp}: ${count}`,
+  noFade: `fade={false}${nbsp}: la page d’un projet ouverte depuis une carte, qui a son propre passage.`,
   tap: 'Toucher pendant le fondu',
   tapped: (count: number) => `Touché ${count} fois`,
 }

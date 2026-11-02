@@ -78,8 +78,8 @@ const outside = newRecord(1)
 type Scope = { focused: boolean; record: RouteRecord }
 const ScopeContext = createContext<Scope | null>(null)
 
-/** Hook : la réponse du routeur seul, vrai hors d'un navigateur. */
-const useRouteFocused = (): boolean => {
+/** Hook : la réponse du routeur seul, `null` hors d'un navigateur. */
+const useRouteFocused = (): boolean | null => {
   try {
     // Un hook appelé dans un try, ce que la règle des hooks refuse d'ordinaire : permis ici, car
     // l'issue ne change pas d'un rendu à l'autre (un composant est toujours dans un navigateur, ou
@@ -89,7 +89,7 @@ const useRouteFocused = (): boolean => {
     // biome-ignore lint/correctness/useHookAtTopLevel: l'issue du try est la même à chaque rendu (voir ci-dessus)
     return useIsFocused()
   } catch {
-    return true
+    return null
   }
 }
 
@@ -107,14 +107,16 @@ const useRouteKey = (): string | null => {
 export const useScreenFocused = (): boolean => {
   const scope = useContext(ScopeContext)
   const focused = useRouteFocused()
-  return focused && (scope?.focused ?? true)
+  return (focused ?? true) && (scope?.focused ?? true)
 }
 
 /**
  * Hook : le nombre de fois où la route de l'écran est devenue affichée. 0 au premier rendu d'une
  * route neuve, puis 1 dès son arrivée, 2 au retour sur elle, et ainsi de suite. Le nombre est
  * celui de la route, pas du composant : un écran monté plus tard dans la même visite (la fin d'un
- * chargement) lit le même nombre, sans le faire monter. Hors d'un navigateur : 1.
+ * chargement) lit le même nombre, sans le faire monter. Hors d'un navigateur : 1. Un routeur qui
+ * dit si la page est affichée sans donner sa clé (un faux `useIsFocused` de test) : le nombre des
+ * arrivées vues par ce composant.
  *
  * Le passage à 1 se fait dans un `useLayoutEffect` (un effet que React lance après avoir posé
  * l'écran, mais avant que le navigateur le dessine) : le nouveau nombre redessine aussitôt ceux qui
@@ -123,9 +125,20 @@ export const useScreenFocused = (): boolean => {
  */
 export const useScreenShownCount = (): number => {
   const scope = useContext(ScopeContext)
+  const routeFocused = useRouteFocused()
   const focused = useScreenFocused()
   const key = useRouteKey()
-  const record = scope ? scope.record : key === null ? outside : recordOf(key)
+  // Le nombre propre au composant, quand un routeur dit si la page est affichée sans donner sa clé
+  // (un test qui remplace `useIsFocused` d'expo-router, sans `useRoute`) : il compte alors les
+  // arrivées que ce composant voit lui-même.
+  const [own] = useState(newRecord)
+  const record = scope
+    ? scope.record
+    : key !== null
+      ? recordOf(key)
+      : routeFocused === null
+        ? outside
+        : own
   // useSyncExternalStore branche le composant sur une valeur gardée hors de React (le nombre de la
   // route) : quand le nombre change, tous ceux qui le lisent sont redessinés ensemble. Le troisième
   // argument est la valeur du pré-rendu et de l'hydratation (web) : 0, rien n'a encore été affiché.
