@@ -2454,3 +2454,81 @@ describe('the reading order of the project page on a computer', () => {
     }
   })
 })
+
+// --- Corrections après les relectures de R5a (C3) ---
+
+// Décision de Louis du 2/11/2026 : sur ordinateur aussi, « Signaler ce projet » vient en dernier,
+// après les commentaires, comme sur téléphone (au clavier, il passait avant la conversation).
+describe('« Signaler ce projet » on a computer', () => {
+  it('comes after the comments, as on a phone', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const comment = await screen.findByRole('button', { name: 'Écrire un commentaire' })
+      const report =
+        screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+        screen.getByRole('button', { name: 'Signaler ce projet' })
+      const [journalAt, commentAt, reportAt] = readingOrder(
+        screen.getByRole('header', { name: 'Journal' }),
+        comment,
+        report,
+      )
+      const at = (value: number | undefined) => value ?? -1
+      expect([journalAt, commentAt, reportAt]).not.toContain(-1)
+      expect(at(commentAt)).toBeGreaterThan(at(journalAt))
+      expect(at(reportAt)).toBeGreaterThan(at(commentAt))
+    } finally {
+      restore()
+    }
+  })
+})
+
+// Décision de Louis du 2/11/2026 : un projet retiré par la modération ne s'ouvre plus que pour son
+// auteur (l'API répond 404 à tous les autres). La feuille « Partager » disait pourtant « seuls les
+// membres pourront l'ouvrir » : ni « Partager » ni « Copier le lien » sur un projet retiré.
+describe('sharing a project removed by the moderation', () => {
+  const removed = { ...recipesProject, removal: removalByLaw }
+  const share = fr.t(($) => $.share.action)
+  const copy = fr.t(($) => $.share.copy)
+  const menu = fr.t(($) => $.actionMenu.label)
+
+  it('offers its author neither « Partager » nor « Copier le lien » on a phone', async () => {
+    jest.mocked(getProject).mockResolvedValue(removed)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page de l'auteur est là, avec son bandeau de retrait.
+    expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: share })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
+    // Plus rien dans le menu « … » (« Modifier » est déjà refusé sur un projet retiré) : pas de
+    // menu vide.
+    expect(screen.queryByRole('button', { name: menu })).toBeNull()
+  })
+
+  it('offers its author neither « Partager » nor « Copier le lien » on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      jest.mocked(getProject).mockResolvedValue(removed)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: share })).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
+      expect(screen.queryByRole('button', { name: menu })).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+
+  it('still offers « Partager » and « Copier le lien » on a project that was not removed', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getByRole('button', { name: share })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: menu }))
+    expect(screen.getByRole('menuitem', { name: copy })).toBeTruthy()
+  })
+})

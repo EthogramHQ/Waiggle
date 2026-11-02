@@ -130,9 +130,10 @@ export function NoteList({
                 flex: 1,
                 minWidth: 0,
                 gap: space.xxs,
-                // Sur un grand écran, la note garde une longueur de ligne confortable, et son bouton
-                // « Supprimer » reste près d'elle au lieu de partir au bout de la colonne.
-                maxWidth: readableWidth,
+                // La note prend toute la largeur de la carte : sa date à gauche, son bouton calé au
+                // bord droit (relecture de design de R5a : borné avec le texte, il flottait au
+                // milieu de la carte). Seuls le texte et le bandeau de retrait gardent une longueur
+                // de ligne confortable (`readable`, `readableWidth`).
                 paddingBottom: last ? 0 : space.xl,
               }}
             >
@@ -181,7 +182,9 @@ export function NoteList({
                 ) : null}
               </View>
               {note.removed ? (
-                <RemovalNotice title={note.removed.title} lines={note.removed.lines} compact />
+                <View style={{ maxWidth: readableWidth }}>
+                  <RemovalNotice title={note.removed.title} lines={note.removed.lines} compact />
+                </View>
               ) : null}
               {/* Texte brut, affiché tel quel ; selectable : on peut le copier. Un mot très long
                   (une adresse) se coupe au lieu de sortir de l'écran ; readable : sur un grand

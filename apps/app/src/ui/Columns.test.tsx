@@ -2,7 +2,9 @@
 // d'écran, touche Tab) suit l'ordre de lecture, rangée par rangée, et un trait sépare les rangées.
 // Jest ne calcule aucune position : on vérifie l'ordre des éléments dans l'arbre, celui que suivent
 // le lecteur d'écran et la touche Tab. Les places à l'écran se regardent dans les captures.
+import { layout } from '@ruche/brand'
 import { screen } from '@testing-library/react-native'
+import { type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Button } from './Button'
 import { Columns } from './Columns'
@@ -79,6 +81,70 @@ describe('Columns', () => {
     ])
     // Le trait est un décor : caché aux lecteurs d'écran.
     expect(divider.props['aria-hidden']).toBe(true)
+  })
+
+  // Correction C3 de R5a : le pied de la page d'un projet (« Signaler ce projet ») est une rangée
+  // qui prolonge la précédente, lue après elle, sans trait entre les deux.
+  it('draws no line before a row that continues the previous one', async () => {
+    await renderWithProviders(
+      <Columns
+        divided
+        rows={[
+          { main: <Text>Galerie</Text>, side: <Text>En-tête</Text> },
+          { main: <Text>Description</Text>, side: <Text>Commentaires</Text> },
+          { main: <Text>Signaler</Text>, side: null, continues: true },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Signaler')).toBeTruthy()
+    // Un seul trait : sous la première rangée.
+    expect(screen.getAllByTestId('columns-divider', { includeHiddenElements: true })).toHaveLength(
+      1,
+    )
+  })
+
+  // Correction C3 de R5a (décision de Louis du 2/11/2026) : la page d'un projet élargit sa colonne
+  // de droite (titre, actions, commentaires) jusqu'à `sideColumnWide`, sans passer en pile plus tôt.
+  describe('with a wide side column', () => {
+    type Node = { props: Record<string, unknown>; parent: Node | null }
+    /** Le style de la colonne qui contient ce texte : le premier ancêtre qui a une base. */
+    const columnOf = (text: string) => {
+      let node: Node | null = screen.getByText(text) as unknown as Node
+      while (node) {
+        const style = StyleSheet.flatten(node.props.style as StyleProp<ViewStyle>)
+        if (style?.flexBasis !== undefined) return style
+        node = node.parent
+      }
+      throw new Error(`no column around ${text}`)
+    }
+
+    it('lets the side column grow up to sideColumnWide, from the same base', async () => {
+      await renderWithProviders(
+        <Columns
+          sideWidth="wide"
+          rows={[{ main: <Text>Galerie</Text>, side: <Text>En-tête</Text> }]}
+        />,
+      )
+
+      const side = columnOf('En-tête')
+      const main = columnOf('Galerie')
+      // La même base qu'avant : les colonnes ne passent pas en pile plus tôt.
+      expect(side.flexBasis).toBe(layout.sideColumn)
+      expect(side.maxWidth).toBe(layout.sideColumnWide)
+      expect(layout.sideColumnWide).toBeGreaterThan(layout.sideColumn)
+      // La place gagnée se partage : la colonne de droite grandit autant que la principale.
+      expect(side.flexGrow).toBe(main.flexGrow)
+    })
+
+    it('keeps the narrow side column by default', async () => {
+      await renderWithProviders(
+        <Columns rows={[{ main: <Text>Galerie</Text>, side: <Text>En-tête</Text> }]} />,
+      )
+
+      expect(columnOf('En-tête').maxWidth).toBeUndefined()
+      expect(columnOf('Galerie').flexGrow).toBeGreaterThan(columnOf('En-tête').flexGrow ?? 0)
+    })
   })
 
   it('draws no line without `divided`, nor before the first row', async () => {
