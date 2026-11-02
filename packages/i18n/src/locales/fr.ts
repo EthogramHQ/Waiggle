@@ -1218,11 +1218,6 @@ export const fr = {
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
-    body: 'Ce lien mène vers un autre site. {{appName}} ne vérifie pas son contenu : n’y entre pas d’informations personnelles si tu as un doute.',
-    destination: 'Destination',
-    safety: 'Ce site n’est pas sur {{appName}}. N’y saisis jamais ton mot de passe {{appName}}.',
-    continue: 'Continuer vers {{host}}',
-    back: 'Revenir',
     // R5a, le portail (F-Out1, F-Out2, jur-8, sec-B5) : le nom du site en gras suit `to`.
     to: 'Tu quittes {{appName}} pour',
     from: 'La démo de {{title}}, ajoutée par {{name}}',

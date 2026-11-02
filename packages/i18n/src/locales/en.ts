@@ -1036,11 +1036,6 @@ export const en: Translation = {
   },
   leaving: {
     title: 'You are leaving {{appName}}',
-    body: 'This link leads to another website. {{appName}} does not check its content: do not enter personal information there if in doubt.',
-    destination: 'Destination',
-    safety: 'This website is not on {{appName}}. Never type your {{appName}} password there.',
-    continue: 'Continue to {{host}}',
-    back: 'Go back',
     to: 'You are leaving {{appName}} for',
     from: 'The demo of {{title}}, added by {{name}}',
     warningTitle: 'This website is not on {{appName}}',
