@@ -14,7 +14,7 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
-import { AmbientHost, ambientStackStyle } from '../src/ui/AmbientHost'
+import { AmbientHost, hostedStackStyle } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
@@ -92,7 +92,7 @@ function ThemedChrome() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: isWeb ? ambientStackStyle : { backgroundColor: colors.background },
+        contentStyle: isWeb ? hostedStackStyle : { backgroundColor: colors.background },
       }}
     />
   )

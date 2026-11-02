@@ -20,7 +20,7 @@ import { useTheme } from './theme/ThemeProvider'
  * transparent, pour que la lumière posée dessous se voie à travers. C'est l'hôte qui pose le fond
  * de l'appli (ui-15 : la mise en page n'écrit aucune couleur).
  */
-export const ambientStackStyle = { backgroundColor: 'transparent' } as const
+export const hostedStackStyle = { backgroundColor: 'transparent' } as const
 
 /**
  * L'hôte : le fond de l'appli (`colors.background`), la lumière commune par-dessus, puis la pile.
@@ -46,9 +46,5 @@ export function AmbientHost({ children }: { children: ReactNode }) {
  */
 function HostLight() {
   const { source, wanted } = useAmbientSource()
-  // `off` vient de la lumière de la même tranche (LightSwitch, ui/AmbientLightSoft.tsx), écrite en
-  // même temps ailleurs : passé par un objet étalé tant que son type n'est pas encore là, sans quoi
-  // TypeScript refuserait la prop. À l'assemblage, s'écrit `off={!wanted}`.
-  const lightSwitch = { off: !wanted }
-  return <AmbientLight source={source} {...lightSwitch} />
+  return <AmbientLight source={source} off={!wanted} />
 }

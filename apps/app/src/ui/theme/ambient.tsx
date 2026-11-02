@@ -282,6 +282,8 @@ type Registration = {
   light: boolean
   /** L'écran est-il affiché, d'après le routeur ? */
   focused: boolean
+  /** Combien de fois la route est devenue affichée (useScreenShownCount, ui/screenFocus.ts). */
+  shown: number
   /** Le numéro du dernier passage à « affiché » : le plus grand gagne (ui-11). 0 : jamais. */
   shownAt: number
 }
@@ -292,6 +294,7 @@ type AmbientRegistry = {
   remove: (id: string) => void
   setLight: (id: string, light: boolean) => void
   setFocused: (id: string, focused: boolean) => void
+  setShown: (id: string, shown: number) => void
   setSource: (id: string, source: AmbientSource) => void
   pulse: (id: string, force?: number) => void
 }
@@ -389,6 +392,15 @@ export function AmbientHostProvider({ children }: { children: ReactNode }) {
         showIfFocused(entry)
         refresh()
       },
+      // ui-11 : la route est de nouveau devenue affichée (son compteur a monté), même si l'écran
+      // se disait déjà affiché : c'est l'événement qui la date, pas le booléen.
+      setShown: (id, shown) => {
+        const entry = entries.current.get(id)
+        if (!entry || entry.shown === shown) return
+        entry.shown = shown
+        showIfFocused(entry)
+        refresh()
+      },
       // S3 : un écran caché ne change pas la lumière ; son geste est ignoré, pas mis de côté.
       setSource: (id, source) => {
         const entry = entries.current.get(id)
@@ -431,6 +443,12 @@ export type ScreenAmbientOptions = {
   initialSource?: AmbientSource
   /** L'écran est-il affiché ? (`useScreenFocused()`, ui/screenFocus.ts) */
   focused: boolean
+  /**
+   * Combien de fois sa route est devenue affichée (`useScreenShownCount()`, ui/screenFocus.ts).
+   * Chaque montée date l'écran : le dernier daté parmi les affichés donne la lumière (ui-11).
+   * Sans compteur, seul le passage de `focused` à vrai date l'écran.
+   */
+  shown?: number
 }
 
 /**
@@ -443,14 +461,15 @@ export function useAmbientRegistration({
   light,
   initialSource = null,
   focused,
+  shown = 0,
 }: ScreenAmbientOptions): Ambient | null {
   const registry = useContext(AmbientRegistryContext)
   // useId : une identité stable, propre à cet écran, pour le registre.
   const id = useId()
   // Ce que l'inscription envoie : une ref, lue par l'effet d'inscription sans en être une
-  // dépendance (sinon chaque changement désinscrirait puis réinscrirait l'écran). Les deux effets
+  // dépendance (sinon chaque changement désinscrirait puis réinscrirait l'écran). Les effets
   // suivants la tiennent à jour.
-  const latest = useRef({ light, source: initialSource, focused })
+  const latest = useRef({ light, source: initialSource, focused, shown })
 
   // useLayoutEffect : avant que le navigateur ne peigne, pour que la lumière de la page qui arrive
   // parte dès sa première image. L'effet renvoie le désabonnement, joué au démontage (S3).
@@ -469,6 +488,11 @@ export function useAmbientRegistration({
     latest.current.focused = focused
     registry?.setFocused(id, focused)
   }, [registry, id, focused])
+
+  useLayoutEffect(() => {
+    latest.current.shown = shown
+    registry?.setShown(id, shown)
+  }, [registry, id, shown])
 
   return useMemo(
     () =>
