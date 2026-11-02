@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router'
 import type { ComponentProps, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
+import { useOpenDemo } from '../navigation/links'
 import { useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
@@ -33,6 +34,7 @@ type Props = {
 export function SummaryCard({ project, at = project.createdAt, overlay, coverRef }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
+  const openDemo = useOpenDemo()
   const toSource = useMediaSources()
   const wide = useLayout().sizeClass === 'wide'
   const visual = wide ? project.cover : (project.portraitCover ?? project.cover)
@@ -67,7 +69,7 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
           ? {
               label: t(($) => $.explore.test),
               // La page « Tu quittes {{appName}} » d'abord : elle montre l'adresse avant d'y aller.
-              onPress: () => router.push({ pathname: '/out', params: { url: demoUrl } }),
+              onPress: () => openDemo(demoUrl, project.id),
             }
           : undefined
       }

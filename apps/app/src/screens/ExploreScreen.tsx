@@ -17,7 +17,7 @@ import { useDiscoverFeed } from '../feed/api'
 import { DiscoverFeed } from '../feed/FeedList'
 import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
-import { useOpenOutside } from '../navigation/links'
+import { useOpenDemo } from '../navigation/links'
 import { TopNav } from '../navigation/TopNav'
 import { useTools } from '../tools/api'
 import { Carousel } from '../ui/Carousel'
@@ -126,7 +126,7 @@ function MemberExplore({ userId }: { userId: string }) {
 function Testers() {
   const { t } = useTranslation()
   const router = useRouter()
-  const openOutside = useOpenOutside()
+  const openDemo = useOpenDemo()
   const toSource = useMediaSources()
   const feed = useDiscoverFeed({ testers: true })
   const projects = (feed.data?.pages[0]?.items ?? []).flatMap((item) =>
@@ -189,7 +189,7 @@ function Testers() {
               : null
           }
           // La démo passe par la page d'avertissement des liens externes (« Tu quittes… »).
-          onTest={() => openOutside(demoUrl)}
+          onTest={() => openDemo(demoUrl, project.id)}
           // Le titre ouvre la page du projet (décision de Louis du 31/10/2026).
           onOpen={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
         />
