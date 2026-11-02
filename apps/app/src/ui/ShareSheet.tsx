@@ -170,6 +170,8 @@ function useShareContent({
 
   return {
     title: t(($) => $.share.title, { title }),
+    // Une feuille courte : la hauteur de son contenu sur téléphone, un titre plus petit (la planche).
+    compact: true,
     decoration,
     notice,
     children: (
