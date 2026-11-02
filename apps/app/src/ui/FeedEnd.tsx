@@ -12,6 +12,7 @@ import { space } from '@ruche/brand'
 import { type RefObject, useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
 import { Button } from './Button'
+import { focusTarget, holdsFocus } from './focus'
 import { Icon } from './Icon'
 import { Notice } from './Notice'
 import { Text } from './Text'
@@ -36,37 +37,10 @@ type Props = {
   firstArrived?: RefObject<View | null>
 }
 
-// Le peu du navigateur dont on a besoin ici : l'élément qui a le focus, et savoir si un élément en
-// contient un autre. (Les types de React Native ne décrivent pas la page web.)
-type WebNode = {
-  contains?: (node: unknown) => boolean
-  focus?: (options?: object) => void
-  matches?: (selector: string) => boolean
-  querySelector?: (selector: string) => WebNode | null
-  setAttribute?: (name: string, value: string) => void
-}
-const activeElement = () =>
-  (globalThis as { document?: { activeElement: unknown } }).document?.activeElement
-
-/** Ce que la touche Tab atteint dans une page web (les vues à tabIndex -1 n'en sont pas). */
-const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
-
-/**
- * Où poser le focus dans la première carte arrivée : la liste donne la case de l'élément (une carte
- * de projet, une ligne, une notification), qui ne sait pas où est son lien. La case elle-même si
- * Tab l'atteint ; sinon le premier élément qu'elle contient que Tab atteint (le lien de la carte,
- * « Débloquer ») : Tab repart de là, comme si le membre y était arrivé ; sinon (une notification
- * sans lien) la case, rendue focusable sans devenir une étape de Tab (tabIndex -1), dont le lecteur
- * d'écran lit le contenu.
- */
-const focusTarget = (node: WebNode | null): WebNode | null => {
-  if (!node) return null
-  if (node.matches?.(TABBABLE)) return node
-  const inner = node.querySelector?.(TABBABLE)
-  if (inner) return inner
-  node.setAttribute?.('tabindex', '-1')
-  return node
-}
+// Où poser le focus dans la première carte arrivée : la liste donne la case de l'élément (une carte
+// de projet, une ligne, une notification), qui ne sait pas où est son lien. `focusTarget`
+// (ui/focus.ts) y cherche le premier élément que Tab atteint (le lien de la carte, « Débloquer »),
+// sinon rend la case elle-même focusable, sans en faire une étape de Tab.
 
 /** La première carte arrivée avec la dernière page : son rang dans la liste, et sa vue. */
 export type FirstArrived = { index: number | null; ref: RefObject<View | null> }
@@ -122,16 +96,15 @@ export function FeedEnd({
   const more = () => {
     if (asked.current) return
     asked.current = true
-    const node = button.current as unknown as WebNode | null
-    hadFocus.current = Platform.OS === 'web' && Boolean(node?.contains?.(activeElement()))
+    hadFocus.current = holdsFocus(button.current)
     onMore()
   }
   useEffect(() => {
     if (state !== 'end' || !hadFocus.current) return
     hadFocus.current = false
     const target = end.current
-      ? (end.current as unknown as WebNode)
-      : focusTarget((firstArrived?.current ?? null) as unknown as WebNode | null)
+      ? (end.current as unknown as { focus?: (options?: object) => void })
+      : focusTarget(firstArrived?.current ?? null)
     target?.focus?.({ preventScroll: true })
   }, [state, firstArrived])
 

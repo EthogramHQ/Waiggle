@@ -52,6 +52,46 @@ export const revealWithoutJump = (node: unknown, calm: boolean) => {
   ;(node as WebNode).scrollIntoView?.({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' })
 }
 
+// Le peu du navigateur que lisent les deux aides suivantes. (Les types de React Native ne décrivent
+// pas la page web.)
+type WebPlace = {
+  contains?: (node: unknown) => boolean
+  focus?: (options?: object) => void
+  matches?: (selector: string) => boolean
+  querySelector?: (selector: string) => WebPlace | null
+  setAttribute?: (name: string, value: string) => void
+}
+
+/** Ce que la touche Tab atteint dans une page web (les vues à tabIndex -1 n'en sont pas). */
+const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Où poser le focus dans une place (une case de liste, la place d'un bouton) qui ne sait pas où est
+ * son contrôle : la place elle-même si Tab l'atteint ; sinon le premier élément qu'elle contient que
+ * Tab atteint (un lien, un bouton) : Tab repart de là, comme si le membre y était arrivé ; sinon la
+ * place, rendue focusable sans devenir une étape de Tab (tabIndex -1), dont le lecteur d'écran lit
+ * le contenu. (RF : `FeedEnd`, jur-RF2, puis le bouton que Screen change de place.)
+ */
+export const focusTarget = (node: unknown): WebPlace | null => {
+  if (!node) return null
+  const place = node as WebPlace
+  if (place.matches?.(TABBABLE)) return place
+  const inner = place.querySelector?.(TABBABLE)
+  if (inner) return inner
+  place.setAttribute?.('tabindex', '-1')
+  return place
+}
+
+/**
+ * Sur le web, `node` contient-il l'élément qui a le focus du clavier ? Faux ailleurs. Se lit avant
+ * de retirer ou de déplacer une place : son contenu remonté, le focus retomberait sur toute la page.
+ */
+export const holdsFocus = (node: unknown): boolean => {
+  if (Platform.OS !== 'web' || !node) return false
+  const active = (globalThis as { document?: { activeElement?: unknown } }).document?.activeElement
+  return Boolean(active && (node as WebPlace).contains?.(active))
+}
+
 /** Focalise `node` (une ref de View ou de Pressable) sans défilement. Vrai si c'était possible. */
 export const focusWithoutScroll = (node: unknown): boolean => {
   if (Platform.OS !== 'web' || !node) return false

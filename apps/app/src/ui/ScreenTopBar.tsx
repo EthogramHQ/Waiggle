@@ -27,7 +27,7 @@
 // vers un endroit de la page jusque sous cette place : Screen la donne à la zone qui défile
 // (`scrollPaddingTop`, rendu par `onSpace`, jur-RF3).
 import { layout, space } from '@ruche/brand'
-import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { type ReactNode, type Ref, useContext, useEffect, useRef, useState } from 'react'
 import { type LayoutChangeEvent, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenScrollContext } from './scrollLight'
@@ -72,6 +72,8 @@ type Props = {
   onHeight?: (height: number) => void
   /** Reçoit toute la place prise (voir TopBarSpace) quand elle change : fixe ou non, la marge web. */
   onSpace?: (space: TopBarSpace) => void
+  /** La place de `belowBar`, pour Screen, qui y rend le focus quand l'élément y arrive (ui-5). */
+  belowRef?: Ref<View>
 }
 
 /** La longueur du dégradé du voile, sous la barre (ou sous `belowBar`). */
@@ -87,6 +89,7 @@ export function ScreenTopBar({
   brand = false,
   onHeight,
   onSpace,
+  belowRef,
 }: Props) {
   const { colors } = useTheme()
   const { padding, sizeClass, height: windowHeight } = useLayout()
@@ -156,6 +159,24 @@ export function ScreenTopBar({
     if (!pinned) setFollow(lastScroll.current)
   }, [pinned])
   const shift = pinned ? 0 : follow
+  const shiftNow = useRef(shift)
+  shiftNow.current = shift
+
+  // Le focus dans la barre qui suit le contenu (correction après relecture, WCAG 2.4.11). Avant RF,
+  // la barre était dans la zone qui défile : un contrôle qui y recevait le focus (Maj+Tab depuis le
+  // contenu, Tab depuis la barre d'adresse) était ramené à l'écran par le navigateur. Posée hors de
+  // cette zone et seulement décalée, elle reste au-dessus de la fenêtre : le navigateur ne sait pas
+  // l'y ramener. La bande écoute donc le focus de ses enfants (il remonte jusqu'à elle, sur le web)
+  // et, si le contrôle est sorti par le haut, fait redescendre la page juste assez pour qu'il
+  // reparaisse, avec l'air de son anneau, d'un saut, comme le navigateur. Fixe, la barre ne quitte
+  // jamais l'écran : rien à faire.
+  const reveal = (event: { target?: unknown }) => {
+    if (Platform.OS !== 'web' || pinnedNow.current || !scroll) return
+    const target = event.target as { getBoundingClientRect?: () => { top: number } } | undefined
+    const top = target?.getBoundingClientRect?.().top
+    if (top === undefined || top >= 0) return
+    scroll.jumpTo(Math.max(0, shiftNow.current + top - space.sm))
+  }
 
   // Le voile : de la couleur du fond, presque plein en haut (au-dessus de la capsule), puis qui
   // s'efface jusqu'à rien, `VEIL_FADE` sous la barre (ou sous `belowBar`).
@@ -169,6 +190,7 @@ export function ScreenTopBar({
     // côté de la capsule vers le contenu et la barre de défilement (`box-none`, ui-4).
     <View
       pointerEvents="box-none"
+      onFocus={reveal}
       style={{
         position: 'absolute',
         top: 0,
@@ -217,7 +239,7 @@ export function ScreenTopBar({
           pointerEvents="box-none"
           style={{ paddingTop: space.sm, paddingHorizontal: padding, alignItems: 'center' }}
         >
-          <View pointerEvents="box-none" style={{ maxWidth: '100%' }}>
+          <View ref={belowRef} pointerEvents="box-none" style={{ maxWidth: '100%' }}>
             {belowBar}
           </View>
           <View
@@ -231,9 +253,11 @@ export function ScreenTopBar({
   )
 }
 
-// Les opacités du voile : presque plein tout en haut, à mi-chemin au bas de la barre, puis rien.
+// Les opacités du voile : presque plein tout en haut, léger au bas de la barre, puis rien. Au bas de
+// la barre, 0,3 et non plus 0,55 (relecture de design RF, n° 5) : à 0,55, la rangée posée juste
+// sous la barre (« Tester », un titre de carte) paraissait grisée, comme inactive.
 const VEIL_TOP = 0.85
-const VEIL_AT_BAR = 0.55
+const VEIL_AT_BAR = 0.3
 
 /** Une couleur `#RRGGBB` avec une opacité (`#RRGGBBAA`), comprise du web comme du téléphone. */
 const withAlpha = (hex: string, alpha: number) =>

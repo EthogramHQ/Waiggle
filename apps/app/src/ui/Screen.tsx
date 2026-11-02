@@ -25,6 +25,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -46,7 +47,7 @@ import { AmbientLight } from './AmbientLight'
 import { BrandAmbiance } from './BrandAmbiance'
 import { Button } from './Button'
 import { useFloatingClaim } from './floatingSpace'
-import type { Focusable } from './focus'
+import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
@@ -219,9 +220,11 @@ export function Screen({
   // « Réduire les animations » : un grand déplacement (remonter en haut) devient un saut.
   const calm = useCalmMotion()
   const toTop = useCallback(() => scroller.current?.scrollTo({ y: 0, animated: !calm }), [calm])
+  const jumpTo = useCallback((y: number) => scroller.current?.scrollTo({ y, animated: false }), [])
   // Le canal du défilement : `onScroll` de l'écran, et les composants posés dedans qui l'écoutent
-  // (la lumière au défilement du fil, ui/scrollLight.ts) ; `toTop()` pour remonter en haut (RF).
-  const scroll = useScreenScrollChannel(onScroll, toTop)
+  // (la lumière au défilement du fil, ui/scrollLight.ts) ; `toTop()` pour remonter en haut (RF),
+  // `jumpTo(y)` pour la barre qui suit le contenu et reçoit le focus (ui/ScreenTopBar.tsx).
+  const scroll = useScreenScrollChannel(onScroll, toTop, jumpTo)
   // Une fois l'écran affiché dans le navigateur, la page peut passer au thème, à la largeur et à la
   // langue réels du visiteur (voir theme/hydration.ts).
   useEffect(() => markHydrated(), [])
@@ -252,14 +255,29 @@ export function Screen({
   const contentTop = topBar
     ? (barSpace.height > 0 ? barSpace.height : insets.top + space.lg) + space.xl
     : (pinned ? 0 : insets.top) + space.lg
-  // ui-5 : `titleAside` passé sous la barre fixe, une fois le titre passé dessous.
+  // ui-5 : `titleAside` passé sous la barre fixe, une fois le titre passé dessous. Ses deux places,
+  // à côté du titre et sous la barre : il est remonté en changeant de place, et s'il avait le focus
+  // du clavier, le focus le suit (correction après relecture : il tombait sur toute la page).
+  const asideBeside = useRef<View>(null)
+  const asideUnderBar = useRef<View>(null)
   const aside = useAsideBelowBar({
     enabled: keepAsideInView && barPinned && Boolean(title) && Boolean(titleAside),
     scroll: scroll.channel,
     contentTop,
     covered: barSpace.height,
+    hadFocus: (below) => holdsFocus(below ? asideUnderBar.current : asideBeside.current),
   })
   const asideAway = aside.below
+  const { refocus } = aside
+  // Avant que la page soit redessinée (`useLayoutEffect`) : le focus ne reste pas, même une image, sur
+  // toute la page.
+  useLayoutEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    // Sur la nouvelle place, le premier élément que Tab atteint (le bouton), sans faire défiler.
+    const place = asideAway ? asideUnderBar.current : asideBeside.current
+    focusTarget(place)?.focus?.({ preventScroll: true })
+  }, [asideAway, refocus])
   // Le pied collé en bas : sur téléphone et tablette, hors du miel. Ailleurs, il suit le contenu.
   const pinnedFooter = footer !== undefined && sizeClass !== 'wide' && !brand
   // La place flottante (R5a) : sa hauteur mesurée (0 tant qu'elle ne l'est pas, ou sans place), la
@@ -346,6 +364,7 @@ export function Screen({
         <PageHeading
           title={title}
           aside={asideAway ? undefined : titleAside}
+          asideRef={asideBeside}
           subtitle={subtitle}
           titleRef={titleRef}
           {...(keepAsideInView
@@ -418,7 +437,11 @@ export function Screen({
               // La barre du haut (RF), avant la zone qui défile dans l'arbre : lue et atteinte par
               // Tab d'abord (ui-4). Toujours à cette place, fixe ou non : passer de l'un à l'autre
               // ne la remonte pas (ui-10). `belowBar` seulement quand elle est fixe.
-              <ScreenTopBar belowBar={barPinned ? shownBelowBar : undefined} onSpace={setBarSpace}>
+              <ScreenTopBar
+                belowBar={barPinned ? shownBelowBar : undefined}
+                belowRef={asideUnderBar}
+                onSpace={setBarSpace}
+              >
                 {header}
               </ScreenTopBar>
             ) : null}
@@ -622,11 +645,14 @@ export function PageHeading({
   onRowLayout,
   rowMinHeight,
   titleRef,
+  asideRef,
 }: {
   title?: string | undefined
   /** La vue du titre, pour y poser le focus. */
   titleRef?: Ref<Focusable> | undefined
   aside?: ReactNode
+  /** RF (ui-5) : la place de `aside`, pour Screen, qui y rend le focus quand l'élément revient. */
+  asideRef?: Ref<View> | undefined
   subtitle?: string | undefined
   /** Le niveau du titre : 1 dans une page ; 2 au catalogue, sous le titre de la page. */
   level?: 1 | 2
@@ -670,7 +696,11 @@ export function PageHeading({
           </View>
           {/* L'élément à côté se replie lui aussi dans la largeur de l'écran quand il passe à la
               ligne (à 320 points et 200 % de texte, le bouton des nouveautés sortait à droite). */}
-          {aside ? <View style={{ flexShrink: 1, maxWidth: '100%' }}>{aside}</View> : null}
+          {aside ? (
+            <View ref={asideRef} style={{ flexShrink: 1, maxWidth: '100%' }}>
+              {aside}
+            </View>
+          ) : null}
         </View>
       ) : title ? (
         <Text variant="title2" heading={level} focusRef={titleRef}>
@@ -817,23 +847,40 @@ function AmbientSourceSync({
  * l'en-tête dans la page et la hauteur de sa rangée (`onLayout`, rendus par PageHeading), puis
  * compare, à chaque défilement, le bas de la rangée au bas de la barre. Seul un changement redessine
  * l'écran. `contentTop` : la place réservée en haut du contenu ; `covered` : la hauteur de la barre.
+ * `hadFocus(below)` : la place où l'élément est encore (sous la barre ou non) a-t-elle le focus ?
+ * Lu juste avant le changement, tant que l'ancienne place est là ; `refocus` le garde pour Screen,
+ * qui rend le focus à la nouvelle place une fois l'élément remonté.
  */
 function useAsideBelowBar({
   enabled,
   scroll,
   contentTop,
   covered,
+  hadFocus,
 }: {
   enabled: boolean
   scroll: ScreenScroll
   contentTop: number
   covered: number
+  hadFocus: (below: boolean) => boolean
 }) {
   // Les mesures et le dernier défilement : des refs, lues au défilement sans redessiner.
   const headingY = useRef(0)
   const lastScroll = useRef(0)
   const [rowHeight, setRowHeight] = useState(0)
   const [below, setBelow] = useState(false)
+  // La place décidée en dernier, et « le focus est à rendre » (voir plus haut).
+  const decided = useRef(false)
+  const refocus = useRef(false)
+  const latestHadFocus = useRef(hadFocus)
+  latestHadFocus.current = hadFocus
+  const place = useCallback((next: boolean) => {
+    if (next !== decided.current) {
+      if (latestHadFocus.current(decided.current)) refocus.current = true
+      decided.current = next
+    }
+    setBelow(next)
+  }, [])
   // Le bas de la rangée du titre, compté depuis le haut du contenu : la place réservée, la place de
   // l'en-tête dans la colonne du contenu, puis la rangée (en tête de l'en-tête).
   const geometry = useRef({ contentTop, covered, rowHeight })
@@ -844,12 +891,12 @@ function useAsideBelowBar({
     // La rangée sort de la page par le haut quand son bas passe le bas de la barre. Sans mesure de
     // la rangée, rien ne bouge.
     const passed = height > 0 && lastScroll.current + bar >= top + headingY.current + height
-    setBelow(passed)
-  }, [])
+    place(passed)
+  }, [place])
 
   useEffect(() => {
     if (!enabled) {
-      setBelow(false)
+      place(false)
       return
     }
     decide()
@@ -857,7 +904,7 @@ function useAsideBelowBar({
       lastScroll.current = Math.max(0, event.nativeEvent.contentOffset.y)
       decide()
     })
-  }, [enabled, scroll, decide])
+  }, [enabled, scroll, decide, place])
 
   // La rangée ne garde que sa dernière mesure non nulle : une page cachée mesure 0, et la rangée
   // sans l'élément d'à côté garde déjà la hauteur qu'elle avait avec lui.
@@ -880,7 +927,7 @@ function useAsideBelowBar({
     if (enabled) decide()
   }, [enabled, decide, rowHeight, contentTop, covered])
 
-  return { below: enabled && below, rowHeight, onRowLayout, onHeadingLayout }
+  return { below: enabled && below, rowHeight, onRowLayout, onHeadingLayout, refocus }
 }
 
 /** La place de la barre du haut, avant sa première mesure. */

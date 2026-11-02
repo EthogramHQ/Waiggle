@@ -37,6 +37,13 @@ export type ScreenScroll = {
    */
   toTop: () => void
   /**
+   * Fait défiler la zone qui défile jusqu'à `y`, d'un saut (sans animation). Pour la barre du haut
+   * qui suit le contenu (RF, correction après relecture) : quand un de ses éléments reçoit le focus
+   * alors que la page a défilé, elle n'est plus dans l'écran, et le navigateur ne sait pas l'y
+   * ramener (elle n'est pas dans la zone qui défile) ; elle redescend la page juste assez.
+   */
+  jumpTo: (y: number) => void
+  /**
    * La hauteur du haut de la fenêtre couverte par la barre fixe (0 quand la barre suit le contenu,
    * ou qu'il n'y en a pas). Tenue à jour par Screen ; la lumière qui suit le défilement compte son
    * « milieu de l'écran » dans la place qui reste dessous (ui-15).
@@ -51,11 +58,12 @@ export const ScreenScrollContext = createContext<ScreenScroll | null>(null)
  * Hook de Screen : fabrique son canal de défilement. Rend la valeur à donner au contexte et la
  * fonction à brancher sur le `onScroll` de sa zone qui défile (qui prévient aussi `onScroll`, la
  * prop de l'écran). `toTop` : ce que fait `ScreenScroll.toTop()` (remonter la zone qui défile) ;
- * sans lui (le catalogue), rien.
+ * `jumpTo` : ce que fait `ScreenScroll.jumpTo(y)` ; sans eux (le catalogue), rien.
  */
 export function useScreenScrollChannel(
   onScroll?: (event: ScrollEvent) => void,
   toTop?: () => void,
+  jumpTo?: (y: number) => void,
 ) {
   // Des « refs » : gardées d'un affichage à l'autre, sans rien redessiner quand elles changent.
   const listeners = useRef(new Set<ScrollListener>())
@@ -65,6 +73,8 @@ export function useScreenScrollChannel(
   latestOnScroll.current = onScroll
   const latestToTop = useRef(toTop)
   latestToTop.current = toTop
+  const latestJumpTo = useRef(jumpTo)
+  latestJumpTo.current = jumpTo
 
   const subscribe = useCallback((listener: ScrollListener) => {
     listeners.current.add(listener)
@@ -73,12 +83,14 @@ export function useScreenScrollChannel(
     }
   }, [])
   // Le même objet tant que l'écran est monté : les abonnés ne se réabonnent pas à chaque affichage.
-  // `toTop` passe par la ref : la fonction du dernier affichage, sans changer l'objet.
+  // `toTop` et `jumpTo` passent par des refs : les fonctions du dernier affichage, sans changer
+  // l'objet.
   const channel = useRef<ScreenScroll>({
     subscribe,
     lightHeld,
     coveredTop,
     toTop: () => latestToTop.current?.(),
+    jumpTo: (y) => latestJumpTo.current?.(y),
   }).current
 
   const handleScroll = useCallback((event: ScrollEvent) => {
