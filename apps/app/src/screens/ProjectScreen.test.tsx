@@ -2172,15 +2172,15 @@ describe('the reactions of the project page (R5a)', () => {
     expect(names.indexOf('Waggle !, 0')).toBeGreaterThan(names.indexOf('Écrire un commentaire'))
   })
 
+  // L'éventail se cherche par son nom : sa couche n'est pas « accessible » (VoiceOver n'atteindrait
+  // plus ses lignes), et getByRole ne trouve que les éléments accessibles (ReactionFan.test.tsx).
   it('opens the fan of reactions on a long press on the capsule, without reacting', async () => {
     seenByOther(recipesProject)
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent(await screen.findByRole('button', { name: 'Utile, 0' }), 'longPress')
 
-    expect(
-      await screen.findByRole('dialog', { name: fr.t(($) => $.reactions.fan.title) }),
-    ).toBeTruthy()
+    expect(await screen.findByLabelText(fr.t(($) => $.reactions.fan.title))).toBeTruthy()
     expect(mockReact).not.toHaveBeenCalled()
   })
 
@@ -2189,9 +2189,7 @@ describe('the reactions of the project page (R5a)', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent(await screen.findByRole('button', { name: 'Utile, 0' }), 'longPress')
-    const fan = within(
-      await screen.findByRole('dialog', { name: fr.t(($) => $.reactions.fan.title) }),
-    )
+    const fan = within(await screen.findByLabelText(fr.t(($) => $.reactions.fan.title)))
     // Les lignes sont gardées un instant après l'ouverture (le doigt de l'appui long se lève).
     await passTapGuard()
     const funny = fan.getByRole('button', { name: 'Drôle, 0' })

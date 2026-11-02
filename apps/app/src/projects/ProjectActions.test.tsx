@@ -98,6 +98,30 @@ describe('ProjectActions', () => {
     expect(screen.getByText(fr.t(($) => $.project.page.privateBanner))).toBeTruthy()
   })
 
+  // Tranche 7a : un projet retiré par la modération ne se modifie plus (l'API refuserait, 409).
+  // L'ancienne page cachait « Modifier » ; le passage à ProjectActions l'avait perdu (R5a, U7b).
+  it('offers no « Modifier » on a project removed by the moderation', async () => {
+    await renderWithProviders(
+      <ProjectActions
+        project={{
+          ...recipesProject,
+          removal: {
+            ground: 'rules',
+            explanation: 'Publicité répétée.',
+            at: '2026-10-22T09:00:00.000Z',
+            afterReport: true,
+          },
+        }}
+        onOpenDemo={onOpenDemo}
+        onEdit={onEdit}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull()
+    // Témoin : le nombre d'abonnés reste.
+    expect(screen.getByText(fr.t(($) => $.follow.followers, { count: 0 }))).toBeTruthy()
+  })
+
   it('offers no « Modifier » to a suspended author', async () => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
     await renderWithProviders(
