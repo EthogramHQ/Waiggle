@@ -14,6 +14,7 @@ import { queryClient } from '../src/api/query-client'
 import { createI18n, detectLanguage } from '../src/i18n'
 import { AppTabBar } from '../src/navigation/AppTabBar'
 import { LanguageSync } from '../src/profile/LanguageSync'
+import { AmbientHost, ambientStackStyle } from '../src/ui/AmbientHost'
 import { CoverTransitionProvider } from '../src/ui/coverTransition'
 import { LaunchScreen } from '../src/ui/LoadingLogo'
 import { TabBarHost } from '../src/ui/TabBar'
@@ -84,14 +85,24 @@ export default function RootLayout() {
 /** La barre d'état (heure, batterie) et la navigation, aux couleurs du thème en cours. */
 function ThemedChrome() {
   const { scheme, colors } = useTheme()
+  // Stack : navigation en pile, chaque nouvelle page s'empile sur la précédente. Sur le web, les
+  // pages sont transparentes : la lumière commune de l'hôte se voit derrière elles. Sur téléphone,
+  // chaque page garde le fond de l'appli (et sa propre lumière, ui/Screen.tsx).
+  const stack = (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: isWeb ? ambientStackStyle : { backgroundColor: colors.background },
+      }}
+    />
+  )
   return (
     <>
       {/* Texte clair sur fond de nuit, foncé sur fond de jour. */}
       <StatusBar style={scheme === 'night' ? 'light' : 'dark'} />
-      {/* Stack : navigation en pile, chaque nouvelle page s'empile sur la précédente. */}
-      <Stack
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
-      />
+      {/* RF : sur le web, une seule lumière d'ambiance, posée sous toutes les pages : elle continue
+          d'une page à l'autre au lieu de repartir de zéro (ui/AmbientHost.tsx). */}
+      {isWeb ? <AmbientHost>{stack}</AmbientHost> : stack}
     </>
   )
 }
