@@ -743,8 +743,10 @@ Hors de R5a, et où ça va :
 - Alors l'éventail s'ouvre par-dessus la page floutée : chaque réaction avec son nom et son nombre,
   « Ta réaction » et un bouton « Retirer » sur les siennes
 - Et en bas : « Tu peux en poser plusieurs, une de chaque. »
-- Et la première fois seulement, une aide en haut : « Touche une réaction pour la poser. Un appui
-  long sur la capsule ouvre cet éventail, avec le nom de chacune. » et « J'ai compris »
+- Et la première fois seulement, une aide en haut : « Touche une réaction pour la poser. » en gras,
+  puis « Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune. » et « J'ai
+  compris »
+- Et pour un membre suspendu, l'éventail ne s'ouvre pas, et la capsule ne l'annonce pas
 - Et l'éventail se ferme par un toucher à côté, Échap ou Retour, et rend le focus à la capsule
 
 **L'auteur**
@@ -752,9 +754,9 @@ Hors de R5a, et où ça va :
 - Alors pas de capsule : un bloc « Les réactions à ton projet » donne chaque réaction avec son nom et
   son nombre, et « Des nombres seulement : personne ne voit qui a réagi. »
 - Et ses boutons sont « Modifier » (et « 4 abonnés » à côté), le journal reste en dessous
-- Et sur un projet privé, le bandeau « Privé : visible par toi seulement. Il te sert de brouillon :
-  les commentaires et les réactions reçus sont gardés, mais personne ne les voit. », et « Créé le
-  12 oct. » au lieu de « Publié le »
+- Et sur un projet privé, le bandeau « Privé : aucun autre membre ne le voit. Il te sert de
+  brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant
+  qu'il reste privé. », et « Créé le 12 oct. » au lieu de « Publié le »
 
 ### Partager (F-Pr1, F-Mb1, planche `R5a-Partager`)
 
@@ -763,7 +765,13 @@ Hors de R5a, et où ça va :
 - Et le bandeau « Seuls les membres de Waiggle pourront l'ouvrir. »
 - Et « Partager… », qui ouvre le menu de partage de l'appareil (s'il en a un), et « Copier le
   lien », qui dit « Lien copié »
+- Et si le menu de l'appareil tombe en panne (pas une simple annulation) : « Impossible d'ouvrir le
+  partage. Copie le lien à la place. »
 - Et le lien ne contient que l'adresse du projet : rien sur le membre qui partage
+- Étant donné l'auteur d'un projet privé : le bandeau dit « Ce projet est privé : le lien ne
+  s'ouvrira que pour toi. », et « Copier le lien » dit « Lien copié : il ne s'ouvrira que pour
+  toi. »
+- Étant donné l'auteur d'un projet retiré par la modération : ni Partager ni « Copier le lien »
 - Étant donné une personne connectée qui ouvre ce lien : le projet s'ouvre
 - Étant donné une personne non connectée : elle se connecte, puis arrive sur le projet
 - Et la page d'un membre a le même bouton Partager, avec la même feuille
@@ -781,9 +789,10 @@ Hors de R5a, et où ça va :
 - Alors après la description, une section « Le prompt de départ » montre le premier, en police à
   chasse fixe, avec un bouton « Copier »
 - Quand il touche « Copier »
-- Alors le prompt est copié, le bouton dit « Copié » et une bulle « Prompt copié » apparaît
-- Et sous le bouton : « Relis-le avant de t'en servir : une IA n'a jamais besoin de ton mot de
-  passe. »
+- Alors le prompt est copié, le bouton dit « Copié » (lu « Prompt de départ copié ») et une bulle
+  « Prompt copié » apparaît
+- Et toujours, repère ou non : « Relis-le avant de t'en servir. Ne donne jamais à une IA ton mot
+  de passe, une clé ou un code reçu. »
 - Et les deux autres sont repliés sous « Les autres prompts · 2 », chacun avec son « Copier »
 - Et un projet sans prompt n'a pas cette section
 
@@ -796,10 +805,11 @@ Hors de R5a, et où ça va :
 
 **« À lire avant de l'utiliser »**
 - Étant donné un prompt qui contient une commande (« curl », « sudo », « rm -rf », « | sh »,
-  PowerShell…), un lien, un long bloc codé (base64) ou une demande de mot de passe, de clé ou de
-  code
+  PowerShell…), un lien, un long bloc codé (base64) ou des informations à garder pour soi (mot de
+  passe, clé, code, données bancaires…), même coupés par un caractère invisible
 - Alors au-dessus du prompt, la pastille ambre « À lire avant de l'utiliser » et la raison (« Il
-  contient un lien. », « Il contient une commande. »…)
+  contient un lien. », « Il contient une commande. », « Il parle d'informations à garder pour soi
+  (mot de passe, clé, code, données bancaires…). »)
 - Et ce repère prévient, il ne garantit rien : un prompt sans repère n'est pas dit « sûr »
 
 ### La page de sortie et le portail (F-Out1, F-Out2, M6, planches `R5a-Portail`, `R5a-Portail-Nuit`)
@@ -809,11 +819,11 @@ Hors de R5a, et où ça va :
   centre et la lumière tourne
 - Et la page dit « Tu quittes Waiggle pour », le nom du site en gras et en entier
   (« carnet-cafes.vercel.app »), puis l'adresse complète en petit
-- Et « La démo de Carnet de cafés, par Léa Moreau », avec sa photo, quand le lien vient d'un
+- Et « La démo de Carnet de cafés, ajoutée par Léa Moreau », avec sa photo, quand le lien vient d'un
   projet que le membre peut voir (lu par l'API, jamais tiré de l'adresse de la page)
-- Et l'encadré « Ce site n'est pas sur Waiggle. N'y saisis jamais ton mot de passe Waiggle.
-  Waiggle ne vérifie pas son contenu : n'y entre pas d'informations personnelles si tu as un
-  doute. »
+- Et l'encadré « Ce site n'est pas sur Waiggle. Waiggle ne vérifie ni son contenu ni qui le gère.
+  N'y saisis jamais ton mot de passe Waiggle, et n'y entre des informations personnelles que si tu
+  sais à qui tu les confies. »
 - Et en bas, sur la feuille claire, « Ouvrir le site ↗ » en miel et « Rester sur Waiggle »
 - Et un Retour en haut ; « Rester sur Waiggle » et Retour ramènent à la page quittée
 - Et avec « Réduire les animations », le portail apparaît en fondu
@@ -824,7 +834,8 @@ Hors de R5a, et où ça va :
 - Étant donné un projet supprimé, retiré, privé d'un autre membre ou d'un membre bloqué, ou une
   adresse fausse
 - Alors la même page pour tous : des alvéoles de verre, la mascotte à la loupe, « Ce projet est
-  introuvable », « Il a peut-être été supprimé, ou le lien est incorrect. »
+  introuvable », « Il a peut-être été supprimé, il n'est pas visible pour toi, ou le lien est
+  incorrect. »
 - Et un Retour en haut, et « Retour au fil » en bas
 - Et rien ne permet de distinguer un projet caché d'un projet qui n'existe pas
 
