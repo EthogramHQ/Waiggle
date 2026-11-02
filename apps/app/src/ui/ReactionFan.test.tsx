@@ -14,7 +14,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { ReactionKind } from '@ruche/contracts'
 import { act, fireEvent, screen, userEvent } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { useState } from 'react'
+import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { focusWithoutScroll } from './focus'
@@ -148,6 +149,36 @@ const fakeDocument = (activeElement: object): object => {
     )
   return node({ activeElement })
 }
+
+/**
+ * Un éventail dont la page pose ou retire vraiment la réaction touchée (comme la page projet, avec
+ * sa mise à jour au toucher) : la ligne change de contrôle, « Retirer » prend sa place.
+ */
+const Live = () => {
+  const [list, setList] = useState(reactions)
+  return (
+    <ReactionFan
+      open
+      reactions={list}
+      onToggle={(kind) =>
+        setList((all) =>
+          all.map((item) =>
+            item.kind === kind
+              ? { ...item, mine: !item.mine, count: item.count + (item.mine ? -1 : 1) }
+              : item,
+          ),
+        )
+      }
+      onClose={jest.fn()}
+    />
+  )
+}
+
+/** Attend la fin de la garde d'ouverture (le doigt de l'appui long), en vrai temps. */
+const afterGuard = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, TAP_GUARD_MS + 50))
+  })
 
 // Chaque test part d'un appareil où l'aide n'a jamais été vue.
 beforeEach(() => AsyncStorage.clear())
@@ -449,6 +480,102 @@ describe('ReactionFan', () => {
         .mock.calls.map((call) => (call[0] as unknown as Host | null)?.props?.accessibilityLabel)
       expect(focused).toContain(rowName('amazing', 3))
     })
+
+    // Relecture de design R5a (C1) : poser une réaction remplace sa ligne-bouton par une vue avec
+    // « Retirer », et inversement ; le contrôle qui avait le focus est démonté. Le focus va au
+    // contrôle de la même réaction, dans les deux sens.
+    /** Les éléments qui ont reçu le focus du code depuis le dernier `mockClear`, par leur nom. */
+    const focusedNames = () =>
+      jest
+        .mocked(focusWithoutScroll)
+        .mock.calls.map((call) => (call[0] as unknown as Host | null)?.props?.accessibilityLabel)
+
+    it('moves the focus to « Retirer » of the same reaction once it is put', async () => {
+      await noteSeen('reaction-fan-help')
+      await renderWithProviders(<Live />)
+      await afterGuard()
+      jest.mocked(focusWithoutScroll).mockClear()
+
+      await fireEvent.press(screen.getByRole('button', { name: rowName('useful', 5) }))
+      await act(async () => {})
+
+      expect(screen.getByRole('button', { name: removeName('useful') })).toBeTruthy()
+      expect(focusedNames().at(-1)).toBe(removeName('useful'))
+    })
+
+    it('moves the focus back to the row of the same reaction once it is removed', async () => {
+      await noteSeen('reaction-fan-help')
+      await renderWithProviders(<Live />)
+      await afterGuard()
+      jest.mocked(focusWithoutScroll).mockClear()
+
+      await fireEvent.press(screen.getByRole('button', { name: removeName('bravo') }))
+      await act(async () => {})
+
+      expect(screen.getByRole('button', { name: rowName('bravo', 20) })).toBeTruthy()
+      expect(focusedNames().at(-1)).toBe(rowName('bravo', 20))
+    })
+
+    // Relecture de design R5a (C1) : l'éventail qui disparaît sous le doigt laissait la seconde tape
+    // d'une double tape tomber sur la page dessous (le « Retour » : on quittait le projet).
+    it('makes the page ignore taps for a moment when the scrim closes the fan', async () => {
+      const onClose = jest.fn()
+      const clickGuards = () =>
+        (document.addEventListener as unknown as jest.Mock).mock.calls.filter(
+          ([type, , capture]) => type === 'click' && capture === true,
+        )
+      await show({ onClose })
+      await afterGuard()
+      expect(clickGuards()).toHaveLength(0) // témoin : rien n'est retenu avant la fermeture
+
+      await fireEvent.press(scrim())
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(clickGuards()).toHaveLength(1)
+    })
+
+    it('gives the focus to the fan, not to the scrim, on a tap during the guard', async () => {
+      const onClose = jest.fn()
+      await show({ onClose })
+      jest.mocked(focusWithoutScroll).mockClear()
+
+      await fireEvent.press(scrim())
+
+      expect(onClose).not.toHaveBeenCalled()
+      // L'aide est là (première fois sur l'appareil) : le focus revient à « J’ai compris ».
+      expect(focusedNames().at(-1)).toBe(helpOk)
+    })
+
+    it('leaves the focus alone when a reaction changes without a choice (témoin)', async () => {
+      await noteSeen('reaction-fan-help')
+      const { rerender } = await renderWithProviders(<Fan />)
+      await act(async () => {})
+      jest.mocked(focusWithoutScroll).mockClear()
+
+      await rerender(
+        <Fan reactions={reactions.map((item) => ({ ...item, mine: item.kind === 'useful' }))} />,
+      )
+      await act(async () => {})
+
+      expect(focusedNames()).toEqual([])
+    })
+  })
+})
+
+// Relecture de design R5a (C1) : l'aide de la première fois se lit en deux temps, comme sur la
+// planche : une première phrase en gras, puis la suite.
+describe('ReactionFan, the help in two parts', () => {
+  const lead = fr.t(($) => $.reactions.fan.helpLead)
+
+  it('shows the bold first sentence, then the rest', async () => {
+    await show()
+
+    const first = screen.getByText(lead)
+    expect(screen.getByText(help)).toBeTruthy()
+    // En gras : une autre police que celle de la suite (le poids se choisit par la famille).
+    expect(StyleSheet.flatten(first.props.style).fontFamily).not.toBe(
+      StyleSheet.flatten(screen.getByText(help).props.style).fontFamily,
+    )
   })
 })
 

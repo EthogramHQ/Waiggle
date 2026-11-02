@@ -118,4 +118,14 @@ describe('shareLink', () => {
       for (const log of logs) expect(log).not.toHaveBeenCalled()
     },
   )
+
+  // Relecture de design R5a (C1) : toute autre erreur remonte, pour que la feuille la dise
+  // (`share.systemFailed`) au lieu de rester muette.
+  it('rethrows any other error from the browser, so the sheet can say it', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    const share = jest.fn().mockRejectedValue(new DOMException('no data', 'DataError'))
+    setNavigator({ share })
+
+    await expect(shareLink(url)).rejects.toThrow('no data')
+  })
 })

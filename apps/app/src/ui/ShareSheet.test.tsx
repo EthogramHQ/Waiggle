@@ -61,6 +61,7 @@ const t = {
   copiedMembers: fr.t(($) => $.share.copiedMembers),
   copiedPrivate: fr.t(($) => $.share.copiedPrivate),
   copyFailed: fr.t(($) => $.share.copyFailed),
+  systemFailed: fr.t(($) => $.share.systemFailed),
   close: fr.t(($) => $.common.close),
 }
 
@@ -152,6 +153,29 @@ describe('ShareSheet', () => {
       await fireEvent.press(button)
 
       expect(share.mock.calls).toEqual([[URL_OF_PROJECT]])
+    })
+
+    // Relecture de design R5a (C1) : une panne du menu de l'appareil (autre qu'un menu refermé,
+    // déjà muet dans `shareLink`) se dit dans le pied, comme « Copier le lien » refusé, et se lit.
+    it('says so in the footer, as an alert, when the share menu fails', async () => {
+      share.mockRejectedValueOnce(new Error('share failed'))
+      await renderWithProviders(<StillSheet />)
+
+      await fireEvent.press(screen.getByRole('button', { name: containing(t.system) }))
+      await act(async () => {})
+
+      expect(screen.getByRole('alert')).toHaveTextContent(t.systemFailed)
+      expect(mockEvents).not.toContain('close') // la feuille reste ouverte, « Copier » à portée
+    })
+
+    it('says nothing when the share menu was only closed (témoin)', async () => {
+      await renderWithProviders(<StillSheet />)
+
+      await fireEvent.press(screen.getByRole('button', { name: containing(t.system) }))
+      await act(async () => {})
+
+      expect(share).toHaveBeenCalledTimes(1) // le menu s'est ouvert, puis refermé sans rien choisir
+      expect(screen.queryByRole('alert')).toBeNull()
     })
 
     it('is absent when the device has no share menu', async () => {

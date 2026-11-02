@@ -34,7 +34,7 @@ import { IconButton } from './IconButton'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
-import { useTapsAllowed } from './tapGuard'
+import { holdPageTaps, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -99,6 +99,14 @@ type PanelProps = {
    * react-native-web est la boîte de dialogue). La feuille ne se déclare pas alors une seconde fois.
    */
   titleId?: string
+  /**
+   * Une feuille courte (« Partager », R5a) : sur téléphone, elle a la hauteur de son contenu, collée
+   * en bas, au lieu de prendre toute la hauteur (des centaines de points vides entre le contenu et
+   * le bouton), et son titre est plus petit, comme sur la planche. Elle défile quand même si le
+   * contenu dépasse la fenêtre. Les autres feuilles (formulaires, suppression) gardent la pleine
+   * hauteur.
+   */
+  compact?: boolean
 }
 
 /** Le message du pied d'une feuille : son texte, son ton, et s'il coupe la parole (alerte) ou non. */
@@ -246,6 +254,23 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
         }
       : {}
 
+  // Une tape sur le voile. Pendant une action `busy`, rien. Pendant la garde d'ouverture, elle ne
+  // ferme rien, mais sur le web elle a déjà pris le focus (le voile est une `div` focalisable,
+  // `tabIndex` -1) : on le rend à « Fermer », pour que Tab reparte de la feuille (relecture R5a,
+  // une double tape sur « Partager »). Hors garde, elle ferme, et la page dessous ignore les tapes
+  // un moment : la seconde tape d'une double tape y tomberait (le « Retour » de la page, qui
+  // fermait la feuille puis quittait la page : mesuré à 390 et 1280 px).
+  const onScrimPress = busy
+    ? undefined
+    : () => {
+        if (!tapsAllowed) {
+          if (Platform.OS === 'web') focusWithoutScroll(closeRef.current)
+          return
+        }
+        requestClose()
+        holdPageTaps()
+      }
+
   // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
   // Une Échap déjà prise par la feuille (touche enfoncée) n'y compte pas une seconde fois.
   const onRequestClose = () => {
@@ -332,7 +357,7 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
         <Pressable
           accessibilityElementsHidden
           importantForAccessibility="no"
-          onPress={tapsAllowed && !busy ? requestClose : undefined}
+          onPress={onScrimPress}
           {...(Platform.OS === 'web' ? { tabIndex: -1 } : null)}
           style={{ position: 'absolute', inset: 0 }}
         />
@@ -363,6 +388,7 @@ export function SheetPanel({
   keys,
   busy = false,
   titleId: givenTitleId,
+  compact = false,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -432,7 +458,7 @@ export function SheetPanel({
         <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
           {/* Niveau 2 : la feuille s'ouvre par-dessus une page qui a déjà son titre ; niveau 1
               quand la feuille est toute la page. */}
-          <Text variant="title2" heading={heading} nativeID={titleId}>
+          <Text variant={compact ? 'heading' : 'title2'} heading={heading} nativeID={titleId}>
             {title}
           </Text>
           {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
@@ -453,6 +479,8 @@ export function SheetPanel({
   // Sur ordinateur, avec une colonne à côté : la feuille et la colonne forment une rangée, dans la
   // même boîte de dialogue ; la feuille garde sa largeur de formulaire et sa hauteur maximale.
   const beside = aside !== undefined && !phone
+  // Une feuille courte sur téléphone : la hauteur de son contenu (voir `compact`).
+  const hug = compact && phone
   // La feuille elle-même : son en-tête, son contenu qui défile, son pied collé.
   const surface = (
     <Surface
@@ -462,10 +490,10 @@ export function SheetPanel({
       padding="none"
       // Téléphone : toute la hauteur sous l'écart du haut ; ordinateur : jusqu'à la hauteur permise.
       // Le contenu défile alors dans la feuille, et le pied reste en vue.
-      fit={phone ? 'fill' : 'shrink'}
+      fit={phone && !hug ? 'fill' : 'shrink'}
       {...(phone ? { shadow: 'card' as const } : null)}
     >
-      <View style={{ flexShrink: 1, ...(phone ? { flex: 1 } : null) }}>
+      <View style={{ flexShrink: 1, ...(phone && !hug ? { flex: 1 } : null) }}>
         <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>{header}</View>
         {/* Le contenu défile dans la feuille, le titre et le pied restant en place.
               keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du
@@ -475,7 +503,9 @@ export function SheetPanel({
           contentContainerStyle={{
             paddingHorizontal: space.xl,
             paddingTop: space.xl,
-            paddingBottom: pinned ? space.xl : insets.bottom + space.xxl,
+            // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
+            // le dernier bloc et le bouton (décision de Louis du 2/11).
+            paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
             gap: space.xl,
           }}
           keyboardShouldPersistTaps="handled"
@@ -518,7 +548,10 @@ export function SheetPanel({
       {...keys}
       style={
         phone
-          ? { flex: 1, marginTop: insets.top + SHEET_TOP_GAP }
+          ? hug
+            ? // Courte : la hauteur du contenu, qui rétrécit (et défile) si la fenêtre manque de place.
+              { flexShrink: 1, marginTop: insets.top + SHEET_TOP_GAP }
+            : { flex: 1, marginTop: insets.top + SHEET_TOP_GAP }
           : {
               alignSelf: 'center',
               width: '100%',

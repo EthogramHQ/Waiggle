@@ -9,7 +9,7 @@
 // l'affaire des captures et d'un essai --explore.
 import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { Button } from './Button'
@@ -473,5 +473,91 @@ describe('the message of the pinned footer', () => {
 
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy()
+  })
+})
+
+// Décision de Louis du 2/11 (R5a) : la feuille « Partager » a la hauteur de son contenu sur
+// téléphone, avec un titre plus petit ; les autres feuilles gardent la pleine hauteur et leur titre.
+describe('the compact sheet, on a phone', () => {
+  const style = (node: { props: Record<string, unknown> }) =>
+    StyleSheet.flatten(node.props.style as never) as Record<string, unknown>
+
+  it('has the height of its content and a smaller title', async () => {
+    await renderWithProviders(
+      <Sheet open compact title="Partager" onClose={() => {}}>
+        <Text>Contenu</Text>
+      </Sheet>,
+    )
+
+    expect(style(screen.getByLabelText('Partager')).flex).toBeUndefined()
+    expect(style(screen.getByLabelText('Partager')).flexShrink).toBe(1)
+    const title = style(screen.getByRole('header', { name: 'Partager' }))
+    expect(title.fontSize).toBeLessThan(30)
+  })
+
+  it('keeps the full height and the big title without the option (témoin)', async () => {
+    await renderWithProviders(
+      <Sheet open title="Partager" onClose={() => {}}>
+        <Text>Contenu</Text>
+      </Sheet>,
+    )
+
+    expect(style(screen.getByLabelText('Partager')).flex).toBe(1)
+    expect(style(screen.getByRole('header', { name: 'Partager' })).fontSize).toBeGreaterThanOrEqual(
+      30,
+    )
+  })
+})
+
+// Relecture de design R5a (C1) : sur le web, le voile qui disparaît sous le doigt laisse la seconde
+// tape d'une double tape tomber sur la page dessous (le « Retour » : on quittait la page), et
+// pendant la garde d'ouverture, cette tape sur le voile emportait le focus (une `div`).
+describe('the scrim on the web, against a double tap', () => {
+  const opener = { focus: jest.fn() }
+  /** Les écouteurs posés sur le document par `holdPageTaps` : les `click` à la capture. */
+  const clickGuards = () =>
+    (document.addEventListener as unknown as jest.Mock).mock.calls.filter(
+      ([type, , capture]) => type === 'click' && capture === true,
+    )
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.replaceProperty(Platform, 'OS', 'web')
+    jest.mocked(focusWithoutScroll).mockClear()
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument(opener),
+      configurable: true,
+    })
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('makes the page ignore taps for a moment when the scrim closes the sheet', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<StillSheet onClose={onClose} />)
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+    expect(clickGuards()).toHaveLength(0) // témoin : rien n'est retenu avant la fermeture
+
+    await fireEvent.press(scrim())
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(clickGuards()).toHaveLength(1)
+  })
+
+  it('gives the focus to « Fermer », not to the scrim, on a tap during the guard', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<StillSheet onClose={onClose} />)
+    jest.mocked(focusWithoutScroll).mockClear()
+
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS - 50))
+    await fireEvent.press(scrim())
+
+    expect(onClose).not.toHaveBeenCalled()
+    const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])
+    expect((focused.at(-1) as unknown as Host).props.accessibilityLabel).toBe(close)
+    expect(clickGuards()).toHaveLength(0) // rien n'a fermé : la page n'a rien à retenir
   })
 })

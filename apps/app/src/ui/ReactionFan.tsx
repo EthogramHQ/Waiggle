@@ -33,7 +33,7 @@ import { ReactionIcon } from './ReactionCapsule'
 import { Surface } from './Surface'
 import { shortCount } from './shortCount'
 import { Text } from './Text'
-import { TAP_GUARD_MS, useTapsAllowed } from './tapGuard'
+import { holdPageTaps, TAP_GUARD_MS, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -186,6 +186,19 @@ export function ReactionFan({ open, reactions, onToggle, onClose }: Props) {
         }
       : null
 
+  // Une tape sur le voile. Pendant la garde d'ouverture, elle ne ferme rien, mais sur le web elle a
+  // pris le focus (le voile est une `div` focalisable) : on le rend à l'éventail, comme Sheet. Hors
+  // garde, elle ferme, et la page dessous ignore les tapes un moment : la seconde tape d'une
+  // double tape y tomberait (le « Retour » de la page, qui quittait la page : relecture R5a, C1).
+  const onScrimPress = () => {
+    if (!tapsAllowed) {
+      if (web) focusWithoutScroll(helpShown.current ? helpOkRef.current : firstRef.current)
+      return
+    }
+    onClose()
+    holdPageTaps()
+  }
+
   // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
   const onRequestClose = () => {
     if (escapeHandled.current) {
@@ -249,7 +262,7 @@ export function ReactionFan({ open, reactions, onToggle, onClose }: Props) {
         <Pressable
           accessibilityElementsHidden
           importantForAccessibility="no"
-          onPress={tapsAllowed ? onClose : undefined}
+          onPress={onScrimPress}
           {...(web ? { tabIndex: -1 as const } : null)}
           style={StyleSheet.absoluteFill}
         >
@@ -291,8 +304,36 @@ export function ReactionFanPanel({
   helpOkRef,
 }: PanelProps) {
   const { t } = useTranslation()
-  const gestures = (id: string, kind: ReactionKind): Gestures =>
-    gesturesFor?.(id, kind) ?? { onPressIn: noop, onPressOut: noop, onPress: () => onToggle(kind) }
+  // Poser une réaction remplace sa ligne-bouton par une vue avec « Retirer », et retirer fait
+  // l'inverse : le contrôle qui avait le focus disparaît (relecture R5a, C1). On garde donc le
+  // contrôle de chaque réaction (`controls`) et la réaction que le membre vient de choisir
+  // (`chosen`, avec son état d'avant) ; dès que la page l'a changée, le focus va au contrôle qui
+  // a pris la place. Un `ref`, pas un état : le choix n'a rien à redessiner.
+  const controls = useRef(new Map<ReactionKind, View | null>())
+  const chosen = useRef<{ kind: ReactionKind; mine: boolean } | null>(null)
+  // useEffect : après chaque changement des réactions, une fois les nouveaux contrôles montés.
+  useEffect(() => {
+    const choice = chosen.current
+    if (!choice) return
+    const now = reactions.find((reaction) => reaction.kind === choice.kind)
+    if (!now || now.mine === choice.mine) return
+    chosen.current = null
+    focusWithoutScroll(controls.current.get(choice.kind) ?? null)
+  }, [reactions])
+  const gestures = (id: string, kind: ReactionKind, mine: boolean): Gestures => {
+    const base = gesturesFor?.(id, kind) ?? {
+      onPressIn: noop,
+      onPressOut: noop,
+      onPress: () => onToggle(kind),
+    }
+    return {
+      ...base,
+      onPress: () => {
+        chosen.current = { kind, mine }
+        base.onPress()
+      },
+    }
+  }
   return (
     <View style={styles.column}>
       {help ? <Help onUnderstood={onUnderstood} okRef={helpOkRef} /> : null}
@@ -311,8 +352,12 @@ export function ReactionFanPanel({
               gestures={gestures(
                 `${reaction.mine ? 'remove' : 'row'}-${reaction.kind}`,
                 reaction.kind,
+                reaction.mine,
               )}
-              {...(index === 0 && firstRef ? { controlRef: firstRef } : null)}
+              controlRef={(node: View | null) => {
+                controls.current.set(reaction.kind, node)
+                if (index === 0 && firstRef) setRef(firstRef, node)
+              }}
             />
           </View>
         ))}
@@ -333,6 +378,12 @@ export function ReactionFanPanel({
 
 const noop = () => {}
 
+/** Donne le nœud à une `ref`, qu'elle soit une fonction ou un objet (`useRef`). */
+function setRef(ref: Ref<View>, node: View | null) {
+  if (typeof ref === 'function') ref(node)
+  else if (ref) ref.current = node
+}
+
 /** L'aide de la première fois : la main qui touche, la phrase, et « J'ai compris ». */
 function Help({
   onUnderstood,
@@ -349,7 +400,11 @@ function Help({
         <View style={[styles.disk, { backgroundColor: colors.honeySoft }]}>
           <Icon name="hand-tap" size={20} tone="accent" />
         </View>
-        <View style={styles.shrink}>
+        {/* En deux temps, comme sur la planche : la 1re phrase en gras, puis la suite. */}
+        <View style={[styles.shrink, styles.helpText]}>
+          <Text variant="callout" weight={700}>
+            {t(($) => $.reactions.fan.helpLead)}
+          </Text>
           <Text variant="callout">{t(($) => $.reactions.fan.help)}</Text>
         </View>
       </View>
@@ -518,6 +573,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.small,
   },
   helpRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  helpText: { gap: space.xs },
   end: { alignItems: 'flex-end' },
   hint: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   shrink: { flexShrink: 1 },
