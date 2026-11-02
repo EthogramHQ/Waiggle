@@ -74,7 +74,10 @@ const spacingBetween = (from: Node, ancestor: Node) => {
   return found
 }
 
-// Le bouton des nouveautés, tel que le Fil le passera (un bouton nommé par son texte).
+// Le bouton des nouveautés, tel que le Fil le passe (un bouton nommé par son texte). Ces tests
+// décrivent le haut de la page, titre en vue (ici sur téléphone). RF (ui-5) : sur ordinateur, quand
+// le titre passe sous la barre fixe, ce même bouton se pose sous elle (Screen.pinned.test.tsx et
+// HomeScreen.test.tsx) ; à côté du titre, rien ne change.
 const news = <IconButton icon="arrow-left" label="3 nouveautés" onPress={() => {}} />
 
 describe('Screen titleAside', () => {

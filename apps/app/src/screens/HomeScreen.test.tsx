@@ -11,8 +11,8 @@ import type {
   ProjectSummary,
   SuggestedMember,
 } from '@ruche/contracts'
-import { act, fireEvent, screen, within } from '@testing-library/react-native'
-import { Linking, Platform, StyleSheet } from 'react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { Linking, Platform, ScrollView, StyleSheet } from 'react-native'
 import { useSession } from '../accounts/api'
 import { useDiscoverFeed, useFeedNews, useFollowingFeed, useMarkFeedRead } from '../feed/api'
 import { useFollow } from '../follows/api'
@@ -25,6 +25,7 @@ import { hrefOf, pathOf } from '../testing/navigation'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithI18n, setDesktopWindow } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import * as focusModule from '../ui/focus'
 import { HomeScreen } from './HomeScreen'
 
 // Le choix de la langue enregistre la langue sur le compte : on remplace aussi ces appels.
@@ -1385,4 +1386,167 @@ describe('the feed on a computer (R4)', () => {
         screen.getAllByRole('button', { name: fr.t(($) => $.feed.newProjects, { count: 2 }) }),
       ).toHaveLength(1)
     }))
+})
+
+// RF (point des listes « le bouton des nouveautés hors de vue dès qu'on descend », relecture du
+// plan ui-5) : sur ordinateur, la barre du haut est fixe. Quand le titre « Fil » passe sous elle, le
+// bouton des nouveautés, qui n'existe qu'une fois dans l'arbre, quitte le titre (`titleAside`) pour
+// la place sous la barre (`belowBar` de Screen). Son toucher fait ce qu'il faisait (relire le fil),
+// remonte en haut du fil (`toTop()` du canal de défilement de Screen) et pose le focus sur le titre
+// « Fil ».
+//
+// Ce que le test suppose (noms choisis au plan des tests) : Screen sait que le titre est passé sous
+// la barre par la mise en page de la rangée du titre (`onLayout`) comparée au défilement de la zone
+// qui défile ; le focus passe par `focusWithoutScroll` (ou `focusAndReveal`) de ui/focus.ts.
+describe('the news button under the pinned top bar (RF, ui-5)', () => {
+  type TreeNode = {
+    type: unknown
+    props: Record<string, unknown>
+    parent: TreeNode | null
+    children: (TreeNode | string)[]
+  }
+  const NEWS = '3 nouveautés'
+  const feedTitle = fr.t(($) => $.feed.title)
+
+  const nodes = (): TreeNode[] => {
+    const all: TreeNode[] = []
+    const visit = (node: TreeNode | string) => {
+      if (typeof node === 'string') return
+      all.push(node)
+      for (const child of node.children) visit(child)
+    }
+    visit(screen.root as unknown as TreeNode)
+    return all
+  }
+  const scroller = (): TreeNode => {
+    const found = nodes().find((node) => node.type === 'RCTScrollView')
+    if (!found) throw new Error('No scrolling page')
+    return found
+  }
+  const insideScroll = (element: unknown) => {
+    for (let node = element as TreeNode | null; node; node = node.parent) {
+      if (node === scroller()) return true
+    }
+    return false
+  }
+
+  /**
+   * Le membre descend : la rangée du titre reçoit sa place dans la page (chaque `onLayout` entre le
+   * titre et la zone qui défile, sur ses cadres ou sur une vue vide sœur qui mesure), puis la page
+   * défile bien au-delà.
+   */
+  const scrollTitleUnderBar = async () => {
+    const layout = {
+      nativeEvent: { layout: { x: 0, y: 40, width: 800, height: 44 } },
+      persist: () => {},
+    }
+    const scroll = scroller()
+    let path = screen.getByRole('header', { name: feedTitle }) as unknown as TreeNode
+    for (let node = path.parent; node && node !== scroll; path = node, node = node.parent) {
+      const handlers = [
+        node.props.onLayout,
+        ...node.children.map((child) =>
+          typeof child !== 'string' && child !== path && child.children.length === 0
+            ? child.props.onLayout
+            : undefined,
+        ),
+      ]
+      for (const handler of handlers) {
+        if (typeof handler === 'function') await act(async () => handler(layout))
+      }
+    }
+    const onScroll = scroll.props.onScroll
+    if (typeof onScroll !== 'function') throw new Error('The scrolling page does not listen')
+    await act(async () => {
+      onScroll({
+        nativeEvent: {
+          contentOffset: { x: 0, y: 2000 },
+          layoutMeasurement: { width: 1440, height: 900 },
+          contentSize: { width: 1440, height: 6000 },
+        },
+      })
+    })
+  }
+
+  /** Le nœud reçu par l'aide de focus est-il le titre « Fil » ? */
+  const isFeedTitle = (node: unknown) => {
+    const props = (node as { props?: Record<string, unknown> } | null)?.props ?? {}
+    return (
+      props.accessibilityLabel === feedTitle ||
+      props['aria-label'] === feedTitle ||
+      [props.children].flat().includes(feedTitle)
+    )
+  }
+
+  /**
+   * Un test sur ordinateur, la fenêtre de téléphone remise à la fin. Pas sur le web : la page y
+   * attendrait l'hydratation pour passer à l'ordinateur ; l'aide de focus, appelée partout, décide
+   * elle-même de la plateforme (ui/focus.ts).
+   */
+  const onComputer = async (test: () => Promise<void>) => {
+    const restore = setDesktopWindow()
+    try {
+      await test()
+    } finally {
+      jest.restoreAllMocks()
+      await act(async () => restore())
+    }
+  }
+
+  beforeEach(() => {
+    mockNews({ count: 3, kinds: ['project', 'note'], authors: [nora] })
+  })
+
+  it('moves the one news button under the bar once the title « Fil » is under it', () =>
+    onComputer(async () => {
+      await renderMemberHome()
+      // Témoin : en haut du fil, le bouton est à côté du titre, dans la page.
+      expect(insideScroll(screen.getByRole('button', { name: NEWS }))).toBe(true)
+
+      await scrollTitleUnderBar()
+
+      const buttons = screen.getAllByRole('button', { name: NEWS })
+      expect(buttons).toHaveLength(1)
+      expect(insideScroll(buttons[0])).toBe(false)
+      // Avant la page dans l'ordre de lecture, comme la barre (ui-4).
+      const order = nodes()
+      expect(order.indexOf(buttons[0] as unknown as TreeNode)).toBeLessThan(
+        order.indexOf(scroller()),
+      )
+    }))
+
+  it('shows the news, goes back to the top and moves the focus to « Fil » when touched under the bar', () =>
+    onComputer(async () => {
+      const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo')
+      const focusWithoutScroll = jest.spyOn(focusModule, 'focusWithoutScroll')
+      const focusAndReveal = jest.spyOn(focusModule, 'focusAndReveal')
+      const following = mockFollowing()
+      await renderMemberHome()
+      await scrollTitleUnderBar()
+      const button = screen.getByRole('button', { name: NEWS })
+      expect(insideScroll(button)).toBe(false) // témoin : sous la barre
+      scrollTo.mockClear()
+
+      await fireEvent.press(button)
+
+      expect(following.refetch).toHaveBeenCalledTimes(1)
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ y: 0 }))
+      await waitFor(() =>
+        expect(
+          [...focusWithoutScroll.mock.calls, ...focusAndReveal.mock.calls].some(([node]) =>
+            isFeedTitle(node),
+          ),
+        ).toBe(true),
+      )
+    }))
+
+  it('keeps the button beside the title on a phone, where nothing is pinned', async () => {
+    await renderMemberHome()
+    await scrollTitleUnderBar()
+
+    // Sur téléphone, le bouton est en tête du fil, dans la page, même loin en bas : rien ne change.
+    const buttons = screen.getAllByRole('button', { name: NEWS })
+    expect(buttons).toHaveLength(1)
+    expect(insideScroll(buttons[0])).toBe(true)
+  })
 })
