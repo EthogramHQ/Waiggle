@@ -210,8 +210,18 @@ export function Screen({
   // feuille, sa place dépendait du décor (téléphone) et de la hauteur du contenu (la carte centrée
   // sur ordinateur) : il changeait de place d'une page du compte à l'autre. Mesuré par l'ui-dev R :
   // (16, 16) à 390 px et (32, 48) à 1280 px sur les quatre pages, premier arrêt de Tab partout.
+  //
+  // Exception, R5a (`backLabel`, la page introuvable d'un projet, barre « Mon compte » connectée) :
+  // le retour écrit en toutes lettres ne tient pas sur la rangée de la barre (à 768 points, « Publier »
+  // sortait de l'écran ; de 1 024 à 1 440, le retour était 10 points plus haut que la barre). Il
+  // passe donc sous la barre, à gauche, comme sur la page d'un projet (où il est sous la barre).
   const brandHeader =
-    brand && backButton ? (
+    brand && backButton && backLabel !== undefined ? (
+      <View style={{ gap: space.md }}>
+        {header}
+        <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>{backButton}</View>
+      </View>
+    ) : brand && backButton ? (
       <View
         style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
       >

@@ -87,6 +87,19 @@ describe('AuthorLine', () => {
     ).toBeTruthy()
   })
 
+  it('keeps no place for a handle that will never come, so the name sits on the photo', async () => {
+    // `null` : la lecture de la page du membre a échoué, le pseudo ne viendra pas. Sans la ligne
+    // réservée (une espace insécable), le nom est seul dans sa colonne, donc centré sur la photo.
+    await renderWithProviders(line({ handle: null }))
+
+    // Témoin : le nom est là, et le lien aussi.
+    expect(screen.getByText('Léa')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Voir la page de Léa' })).toBeTruthy()
+    expect(
+      screen.queryByText(String.fromCodePoint(0xa0), { normalizer: (text) => text }),
+    ).toBeNull()
+  })
+
   it('keeps an inactive chip in place, announced as disabled', async () => {
     await renderWithProviders(line({ follow: chip(false, { disabled: true }) }))
 

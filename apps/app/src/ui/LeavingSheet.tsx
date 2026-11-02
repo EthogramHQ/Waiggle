@@ -61,7 +61,16 @@ export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, o
       {/* align="stretch" : les textes prennent toute la largeur de la feuille, et un nom de site
           très long se coupe (breakAnywhere) au lieu de sortir de l'écran. */}
       <Stack gap="xs" align="stretch">
-        <Text variant="callout" weight={600} tone="secondary" heading={1}>
+        {/* Le titre se lit en entier, avec le site (« Tu quittes Waiggle pour carnet-cafes… ») : un
+            lecteur d'écran qui parcourt la page par ses titres ne doit pas entendre une phrase
+            coupée. À l'œil, rien ne change : la phrase d'un côté, le nom du site en grand dessous. */}
+        <Text
+          variant="callout"
+          weight={600}
+          tone="secondary"
+          heading={1}
+          accessibilityLabel={t(($) => $.leaving.toHost, { host })}
+        >
           {t(($) => $.leaving.to)}
         </Text>
         {/* Le nom du site, en grand : c'est lui qu'on doit reconnaître (ou pas). */}

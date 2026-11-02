@@ -9,7 +9,8 @@
 //
 // Ce que la ligne ne sait pas encore ne bouge pas sous le doigt :
 // - le pseudo vient d'une seconde lecture (la page du membre) : sa ligne garde sa place, vide,
-//   tant qu'il n'est pas arrivé ;
+//   tant qu'il n'est pas arrivé ; si la lecture échoue (`handle: null`), la place est rendue et le
+//   nom, seul, se centre sur la photo ;
 // - l'état « déjà suivi » aussi : tant qu'il n'est pas connu, aucune pastille (un « Suivre » qui
 //   basculerait en « Tu suis Léa » sous le doigt ferait faire le geste inverse).
 // Ce composant ne lit rien : l'écran lui donne ce qu'il sait (voir `useAuthorLine`, projects/).
@@ -44,8 +45,12 @@ export type AuthorFollow = {
 
 export type AuthorLineProps = {
   name: string
-  /** Le pseudo déjà écrit (« @lea ») ; absent tant qu'il n'est pas lu : sa ligne reste réservée. */
-  handle?: string | undefined
+  /**
+   * Le pseudo déjà écrit (« @lea ») ; absent (undefined) tant qu'il n'est pas lu : sa ligne reste
+   * réservée. `null` : il ne viendra pas (la lecture a échoué) : plus de ligne réservée, le nom est
+   * seul dans sa colonne et se centre en hauteur sur la photo, comme la pastille.
+   */
+  handle?: string | null | undefined
   avatar: ImageSource | null
   /** Le nom du lien vers sa page (« Voir la page de Léa »). */
   openLabel: string
@@ -94,9 +99,11 @@ export function AuthorLine({
                 </Text>
                 {/* Le pseudo, discret ; une espace insécable tant qu'il n'est pas lu, pour que la
                     ligne garde sa hauteur et que rien ne bouge à son arrivée. */}
-                <Text variant="caption" tone="muted" breakAnywhere>
-                  {handle ?? KEEP_LINE}
-                </Text>
+                {handle === null ? null : (
+                  <Text variant="caption" tone="muted" breakAnywhere>
+                    {handle ?? KEEP_LINE}
+                  </Text>
+                )}
               </View>
             </View>
           </Pressed>

@@ -51,8 +51,10 @@ export type HeaderProject = Pick<
  * aussitôt la même chose.
  * - Tant que la lecture n'a pas répondu : aucune pastille. Un « Suivre » qui deviendrait « Tu suis
  *   Léa » une seconde plus tard ferait faire le geste inverse à qui touche vite.
- * - Si elle échoue : « Suivre ». Suivre quelqu'un qu'on suit déjà ne change rien côté serveur, et
- *   le geste reste possible même quand la page du membre ne se lit pas.
+ * - Si elle échoue : aucune pastille non plus (décision de Louis du 2/11/2026). Sans la page de
+ *   l'auteur, on ne sait pas si on le suit, et le geste échouerait sans doute aussi : mieux vaut
+ *   ne rien proposer que « Suivre » puis une erreur. Son pseudo ne viendra pas non plus : la ligne
+ *   qui lui était réservée disparaît (`handle: null`) et le nom se centre sur la photo.
  * - Sur son propre projet : aucune pastille (on ne se suit pas soi-même).
  * - Un compte suspendu (tranche 7c) ne suit plus personne, mais peut encore ne plus suivre : la
  *   pastille reste pour un auteur suivi à un moment de la visite, inactive une fois retirée.
@@ -68,9 +70,8 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
   const member = useMember(author.id)
   const follow = useFollow({ kind: 'member', id: author.id })
 
-  // L'état choisi au dernier toucher, gardé ici tant que la page du membre ne le dit pas encore :
-  // sans page lue (lecture en échec), rien d'autre ne le retiendrait. Le cache de `useFollow`,
-  // quand il existe, dit la même chose au même instant.
+  // L'état choisi au dernier toucher, gardé ici tant que la page du membre ne le dit pas encore.
+  // Le cache de `useFollow`, quand il existe, dit la même chose au même instant.
   const [chosen, setChosen] = useState<boolean | null>(null)
   // Le message d'échec n'appartient qu'à un geste fait ici : `touched` le réserve à la pastille
   // touchée pendant la visite.
@@ -80,7 +81,7 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
     if (follow.error) setChosen(null)
   }, [follow.error])
 
-  const known = member.data?.isFollowed ?? (member.isError ? false : undefined)
+  const known = member.data?.isFollowed
   const followed = chosen ?? known
   // Suivi à un moment de la visite : un compte suspendu garde la pastille pour ne plus suivre.
   const followedOnce = useRef(false)
@@ -90,7 +91,13 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
   const shown = !isMine && followed !== undefined && (!suspended || followedOnce.current)
   return {
     name,
-    handle: member.data ? t(($) => $.member.handle, { handle: member.data.handle }) : undefined,
+    // Lu : « @lea ». Pas encore lu : undefined (sa ligne garde sa place). Lecture en échec : null,
+    // il ne viendra pas, la ligne n'a plus à être réservée.
+    handle: member.data
+      ? t(($) => $.member.handle, { handle: member.data.handle })
+      : member.isError
+        ? null
+        : undefined,
     avatar: toSource(author.avatarUrl),
     openLabel: t(($) => $.member.open, { nameOf: nameOf(name) }),
     onOpen: () => router.push({ pathname: '/members/[id]', params: { id: author.id } }),

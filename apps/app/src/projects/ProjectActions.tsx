@@ -121,6 +121,8 @@ export function ProjectActionsView({
       errorAction={followErrorAction}
       // En blanc : « Tester la démo » est l'action miel de la page.
       prominent={false}
+      // Une cloche : « Suivre ce projet » n'est pas « Suivre » l'auteur, juste au-dessus.
+      icon="bell"
       disabled={suspended && !project.isFollowed}
     />
   ) : (
