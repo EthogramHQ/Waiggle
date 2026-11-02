@@ -60,6 +60,9 @@ export const layout = {
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)
   sideColumn: 320, // largeur de base de la colonne latérale
+  // La colonne latérale large (la page d'un projet, décision de Louis du 2/11/2026) : elle part de
+  // la même base, puis grandit jusqu'ici. À 320, le titre d'un projet long prenait six lignes.
+  sideColumnWide: 450,
   mainColumn: 560, // largeur minimale de la colonne principale avant de passer en pile
   settingsNavWidth: 256, // la colonne des rubriques des réglages, sur ordinateur (R2)
   screenPadding: { compact: 16, medium: 24, wide: 32 }, // marges sur les côtés de l'écran
@@ -71,7 +74,9 @@ export const layout = {
   chipControl: 28, // rond du bouton « retirer » posé dans une étiquette
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur
   // téléphone (une photo plus haute que large a besoin de hauteur pour ne pas être trop recadrée).
-  cover: { hero: 520, band: 240, portrait: 480 },
+  // medium : la galerie d'un projet sur tablette ou petite fenêtre (relecture de design de R5a) ; à
+  // 768 × 900, avec 520, « Tester la démo » tombait sous le premier écran.
+  cover: { hero: 520, band: 240, portrait: 480, medium: 400 },
   // Hauteur des boutons et des champs : xl pour l'action principale d'un écran de marque, small
   // pour un petit bouton dessiné (sa zone à toucher, autour, fait quand même 44).
   controlHeight: { xl: 56, regular: 52, compact: 44, small: 36 },

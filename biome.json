@@ -38,6 +38,7 @@
         "apps/app/src/screens/**",
         "apps/app/src/navigation/**",
         "apps/app/src/feed/**",
+        "apps/app/src/projects/**",
         "apps/app/src/suggestions/**",
         "apps/app/app/**",
         "!**/*.test.tsx"

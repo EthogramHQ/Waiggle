@@ -32,5 +32,10 @@ export const safeNext = (value: string | undefined): string | null => {
   // Une barre oblique (%2F) ou une barre inverse (%5C) encodée pourrait redevenir « //site » si
   // l'adresse était décodée une fois de plus : on n'en accepte aucune.
   if (/%(?:2f|5c)/i.test(value)) return null
+  // R5a (sec-B4) : aucun morceau « . » ou « .. » dans le chemin, écrit en clair ou encodé (%2e).
+  // Le navigateur les résout : « /projects/../out?url=… » commence comme une page permise, mais
+  // mène à la page de sortie (/out), qui ne doit jamais servir de retour.
+  const path = value.split(/[?#]/, 1)[0] ?? ''
+  if (path.split('/').some((segment) => /^(?:\.|%2e){1,2}$/i.test(segment))) return null
   return RETURN_PAGES.test(value) ? value : null
 }

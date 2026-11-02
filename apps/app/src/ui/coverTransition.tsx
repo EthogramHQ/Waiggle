@@ -39,7 +39,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Platform, type View } from 'react-native'
+import { Platform, StyleSheet, type View } from 'react-native'
 import Animated, {
   makeMutable,
   type SharedValue,
@@ -523,7 +523,34 @@ export function CoverArrival({ id, focusOnArrival, radius, children }: ArrivalPr
         flying ? { overflow: 'hidden', borderRadius: radius ? radii[radius] : 0 } : null,
       ]}
     >
-      <Animated.View style={inner}>{children}</Animated.View>
+      <Animated.View style={inner}>
+        <ArrivalContext.Provider value={id}>{children}</ArrivalContext.Provider>
+      </Animated.View>
+    </Animated.View>
+  )
+}
+
+// Le projet dont la photo arrive, pour ce qui est posé dedans (R5a) : la galerie y pose ses boutons
+// de verre, ses flèches, ses points et la capsule. Null hors d'un `CoverArrival`.
+const ArrivalContext = createContext<string | null>(null)
+
+/**
+ * Une couche posée sur la photo qui arrive (R5a : les boutons de verre, les flèches, les points et
+ * « 1 sur 3 » de la galerie). La carte du fil n'a rien de tout ça : seule la photo vole, de la carte
+ * à la première photo de la galerie, et cette couche apparaît en fondu avec le reste de la page (et
+ * s'efface avec lui au départ). Elle couvre la photo entière (`absoluteFill`) et ne prend pas le
+ * doigt entre ses éléments (`box-none`). Hors d'un `CoverArrival`, une simple couche.
+ */
+export function CoverDecor({ children }: { children: ReactNode }) {
+  const id = useContext(ArrivalContext)
+  const store = useContext(CoverContext)
+  const stage = store && id ? stageOf(store, id) : null
+  const idle = useSharedValue(1)
+  const rest = stage?.rest ?? idle
+  const style = useAnimatedStyle(() => ({ opacity: rest.value }))
+  return (
+    <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, style]}>
+      {children}
     </Animated.View>
   )
 }

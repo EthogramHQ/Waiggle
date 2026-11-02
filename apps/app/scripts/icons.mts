@@ -61,6 +61,7 @@ const icons = [
   'smiley',
   'hands-clapping',
   'hand-waving',
+  'hand-tap', // l'aide de l'éventail des réactions : « Touche une réaction pour la poser » (R5a)
   // Projet
   'lock-simple',
   'lock-simple-open',

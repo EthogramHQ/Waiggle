@@ -667,3 +667,204 @@ Pris dans R4 (choix de Louis, 31/10/2026), parce qu'ils touchent les écrans du 
 - Le parcours (`journey`) gagne : un nouveau membre voit « Ton fil t'attend », suit un proche
   depuis « Proches à suivre », retrouve son projet dans le fil avec sa date relative et son total
   de réactions, touche « Tester », puis revient et voit « Tu es à jour »
+
+## R5a — La page projet
+
+Scénario validé par Louis le 1/11/2026 vers 23 h, tel que proposé, avec ses sept choix
+(conversation 1 de R5a).
+
+R5a redessine la page d'un projet (planches `R5a-Projet`, `R5a-Projet-Suite`, `R5a-Projet-Nuit`,
+`R5a-Projet-Desktop`, `R5a-Auteur`, `R5a-Eventail`, `R5a-Partager`, `R5a-Portail`,
+`R5a-Portail-Nuit`, `R5a-Introuvable` ; décisions B3 F-Pr1, F-Pr2, F-Pr4 à F-Pr7, F-Pr9, F-Pr10,
+F-Pr12, F-Pr13, B5 F-Out1, F-Out2, F-404, B6 l'éventail et F-Re1, F-Mod4 pour les prompts, et le
+mouvement de B11) : la photo bord à bord et sa galerie, la capsule de réactions avec « Waggle ! »,
+l'éventail et la goutte, partager, suivre l'auteur, « Le prompt de départ » avec « Copier » et ses
+protections, la page de sortie avec le portail, la page introuvable, la vue de l'auteur, et la page
+sur ordinateur. Côté API, peu de chose : les caractères invisibles retirés des prompts, et la page de
+sortie qui sait de quel projet vient le lien. Relectures : sécurité (le repère des prompts, la page
+de sortie, le lien partagé), juridique (les phrases de prudence, ce que dit le partage).
+
+Hors de R5a, et où ça va :
+- les commentaires (l'aperçu de 3 ou 5, la feuille, le menu « … » d'un commentaire, le badge
+  Auteur, les réponses, les mentions) : R5b ;
+- la catégorie à côté du statut, « Facile à refaire ? », « Commencé en », la description de chaque
+  photo, la clé d'API repérée et le compteur du formulaire, « Supprimer » dans le menu « … » : R6 ;
+- « v1.2 » sous le titre, « Publier une mise à jour », « Les mises à jour » à la place du journal,
+  l'avant / après : R7 ;
+- le motif de signalement « Lien, démo ou prompt dangereux » et « Signaler » dans une feuille : R9 ;
+- un projet public ouvert par un visiteur : R12.
+
+### La photo et la galerie (F-Pr6, F-Pr7, planches `R5a-Projet`, `R5a-Projet-Desktop`)
+
+- Étant donné un membre qui ouvre un projet à trois photos, sur téléphone
+- Alors la photo occupe le haut de l'écran bord à bord, et la feuille du projet la chevauche
+- Et sur la photo, en verre : Retour à gauche, Partager et « … » à droite
+- Et en bas de la photo, des points et « 1 sur 3 »
+- Quand il fait glisser la photo
+- Alors la suivante arrive, les points et « 2 sur 3 » suivent, et la lumière d'ambiance prend la
+  couleur de cette photo, en fondu
+- Et le lecteur d'écran annonce « Photo 2 sur 3 » et peut passer d'une photo à l'autre sans glisser
+- Et sur ordinateur, des flèches de verre sur les côtés de la photo, et les flèches du clavier
+- Et un projet à une seule photo n'a ni points ni « 1 sur 1 » ; un projet sans photo garde sa
+  lumière miel d'aujourd'hui
+
+### Sous le titre (F-Pr5) et l'auteur (F-Pr4)
+
+- Sous le statut et le titre : « Publié le 3 oct. · Mis à jour hier » (dates de R4 : « hier »,
+  « mardi », « 12 oct. ») ; « Mis à jour » seulement si le projet a changé après sa publication
+- Puis la photo et le nom de l'auteur, son pseudo, et à droite un petit bouton « Suivre »
+- Quand il touche « Suivre »
+- Alors il suit l'auteur, et le bouton dit « Tu suis Papi Jean » (comme sur la page d'un membre)
+- Et le grand bouton « Suivre ce projet », sous « Tester la démo », reste celui d'aujourd'hui
+  (prévenu des notes), avec « 12 abonnés » à côté, un nombre sans noms
+- Et sous « Tester la démo », le nom du site et « un site hors de Waiggle »
+  (« decollage.lovable.app, un site hors de Waiggle »)
+
+### Les réactions : la capsule, « Waggle ! », l'éventail et la goutte (F-Pr9, F-Re1, B6, planche `R5a-Eventail`)
+
+**La capsule**
+- Étant donné un membre sur la page d'un projet qui n'est pas le sien
+- Alors une capsule de verre flotte en bas de l'écran, avec les cinq icônes et leur nombre :
+  Bluffant, Inspirant, Utile, Drôle et **« Waggle ! »** (l'abeille), qui remplace « Bravo »
+- Et sur ordinateur, la capsule est posée à cheval sur le bas de la photo
+- Et ses propres réactions sont en miel plein
+- Quand il touche une icône
+- Alors sa réaction est posée : une goutte de miel tombe et s'écrase, le nombre roule, un anneau
+  s'élargit et le bouton rebondit ; pour « Waggle ! », la petite abeille danse
+- Quand il touche une réaction déjà posée
+- Alors elle est retirée, le nombre redescend
+- Et le lecteur d'écran lit chaque bouton en entier (« Waggle !, 21, ta réaction »)
+- Et avec « Réduire les animations », la goutte et le rebond restent (petits mouvements, A11)
+- Et « Bravo » devient « Waggle ! » partout où il s'affiche (notifications, e-mails), en français
+  comme en anglais
+
+**L'éventail**
+- Quand il appuie longtemps sur la capsule (ou clic droit sur ordinateur)
+- Alors l'éventail s'ouvre par-dessus la page floutée : chaque réaction avec son nom et son nombre,
+  « Ta réaction » et un bouton « Retirer » sur les siennes
+- Et en bas : « Tu peux en poser plusieurs, une de chaque. »
+- Et la première fois seulement, une aide en haut : « Touche une réaction pour la poser. » en gras,
+  puis « Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune. » et « J'ai
+  compris »
+- Et pour un membre suspendu, l'éventail ne s'ouvre pas, et la capsule ne l'annonce pas
+- Et l'éventail se ferme par un toucher à côté, Échap ou Retour, et rend le focus à la capsule
+
+**L'auteur**
+- Étant donné l'auteur sur la page de son projet (planche `R5a-Auteur`)
+- Alors pas de capsule : un bloc « Les réactions à ton projet » donne chaque réaction avec son nom et
+  son nombre, et « Des nombres seulement : personne ne voit qui a réagi. »
+- Et ses boutons sont « Modifier » (et « 4 abonnés » à côté), le journal reste en dessous
+- Et sur un projet privé, le bandeau « Privé : aucun autre membre ne le voit. Il te sert de
+  brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant
+  qu'il reste privé. », et « Créé le 12 oct. » au lieu de « Publié le »
+
+### Partager (F-Pr1, F-Mb1, planche `R5a-Partager`)
+
+- Quand il touche Partager sur la photo
+- Alors une feuille montre la vignette, « Décollage! sur Waiggle » et l'adresse du projet
+- Et le bandeau « Seuls les membres de Waiggle pourront l'ouvrir. »
+- Et « Partager… », qui ouvre le menu de partage de l'appareil (s'il en a un), et « Copier le
+  lien », qui dit « Lien copié »
+- Et si le menu de l'appareil tombe en panne (pas une simple annulation) : « Impossible d'ouvrir le
+  partage. Copie le lien à la place. »
+- Et le lien ne contient que l'adresse du projet : rien sur le membre qui partage
+- Étant donné l'auteur d'un projet privé : le bandeau dit « Ce projet est privé : le lien ne
+  s'ouvrira que pour toi. », et « Copier le lien » dit « Lien copié : il ne s'ouvrira que pour
+  toi. »
+- Étant donné l'auteur d'un projet retiré par la modération : ni Partager ni « Copier le lien »
+- Étant donné une personne connectée qui ouvre ce lien : le projet s'ouvre
+- Étant donné une personne non connectée : elle se connecte, puis arrive sur le projet
+- Et la page d'un membre a le même bouton Partager, avec la même feuille
+
+### Le menu « … » et « Signaler » (F-Pr12)
+
+- Le menu « … » de la photo propose « Copier le lien » et « Signaler ce projet » (pour l'auteur :
+  « Copier le lien » et « Modifier »)
+- Et un lien gris « Signaler ce projet » en bas de la page, qui ouvre le signalement d'aujourd'hui
+
+### « Le prompt de départ » et ses protections (F-Pr2, F-Pr10, F-Mod4, planche `R5a-Projet-Suite`)
+
+**La section**
+- Étant donné un projet avec trois prompts
+- Alors après la description, une section « Le prompt de départ » montre le premier, en police à
+  chasse fixe, avec un bouton « Copier »
+- Quand il touche « Copier »
+- Alors le prompt est copié, le bouton dit « Copié » (lu « Prompt de départ copié ») et une bulle
+  « Prompt copié » apparaît
+- Et toujours, repère ou non : « Relis-le avant de t'en servir. Ne donne jamais à une IA ton mot
+  de passe, une clé ou un code reçu. »
+- Et les deux autres sont repliés sous « Les autres prompts · 2 », chacun avec son « Copier »
+- Et un projet sans prompt n'a pas cette section
+
+**Les caractères invisibles**
+- Étant donné un prompt qui contient des caractères invisibles (espaces de largeur nulle, marques
+  de sens d'écriture, caractères « tag »)
+- Quand l'auteur l'enregistre
+- Alors le serveur les retire
+- Et un prompt plus ancien qui en contient encore est copié sans eux
+
+**« À lire avant de l'utiliser »**
+- Étant donné un prompt qui contient une commande (« curl », « sudo », « rm -rf », « | sh »,
+  PowerShell…), un lien, un long bloc codé (base64) ou des informations à garder pour soi (mot de
+  passe, clé, code, données bancaires…), même coupés par un caractère invisible
+- Alors au-dessus du prompt, la pastille ambre « À lire avant de l'utiliser » et la raison (« Il
+  contient un lien. », « Il contient une commande. », « Il parle d'informations à garder pour soi
+  (mot de passe, clé, code, données bancaires…). »)
+- Et ce repère prévient, il ne garantit rien : un prompt sans repère n'est pas dit « sûr »
+
+### La page de sortie et le portail (F-Out1, F-Out2, M6, planches `R5a-Portail`, `R5a-Portail-Nuit`)
+
+- Quand il touche « Tester la démo »
+- Alors le portail s'ouvre : la page quittée se floute, des anneaux de lumière sont aspirés vers le
+  centre et la lumière tourne
+- Et la page dit « Tu quittes Waiggle pour », le nom du site en gras et en entier
+  (« carnet-cafes.vercel.app »), puis l'adresse complète en petit
+- Et « La démo de Carnet de cafés, ajoutée par Léa Moreau », avec sa photo, quand le lien vient d'un
+  projet que le membre peut voir (lu par l'API, jamais tiré de l'adresse de la page)
+- Et l'encadré « Ce site n'est pas sur Waiggle. Waiggle ne vérifie ni son contenu ni qui le gère.
+  N'y saisis jamais ton mot de passe Waiggle, et n'y entre des informations personnelles que si tu
+  sais à qui tu les confies. »
+- Et en bas, sur la feuille claire, « Ouvrir le site ↗ » en miel et « Rester sur Waiggle »
+- Et un Retour en haut ; « Rester sur Waiggle » et Retour ramènent à la page quittée
+- Et avec « Réduire les animations », le portail apparaît en fondu
+- Et un lien venu d'ailleurs (description, outil) garde la même page, sans la ligne « La démo de »
+
+### La page introuvable (F-404, planche `R5a-Introuvable`)
+
+- Étant donné un projet supprimé, retiré, privé d'un autre membre ou d'un membre bloqué, ou une
+  adresse fausse
+- Alors la même page pour tous : des alvéoles de verre, la mascotte à la loupe, « Ce projet est
+  introuvable », « Il a peut-être été supprimé, il n'est pas visible pour toi, ou le lien est
+  incorrect. »
+- Et un Retour en haut, et « Retour au fil » en bas
+- Et rien ne permet de distinguer un projet caché d'un projet qui n'existe pas
+
+### La page sur ordinateur (F-Pr13, planche `R5a-Projet-Desktop`)
+
+- « Retour au fil » en haut à gauche, Partager et « … » en haut à droite
+- À gauche, la galerie aux coins arrondis et la capsule ; à droite, le statut, le titre, la date,
+  l'auteur, l'accroche, « Tester la démo » et « Suivre ce projet » côte à côte, puis « La recette »
+  (les outils, et le temps passé jusqu'à R6)
+- Sous la ligne : à gauche la description, « Le prompt de départ », le journal et « Signaler ce
+  projet » ; à droite les commentaires d'aujourd'hui (redessinés en R5b)
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) gagne : un membre ouvre le projet d'un proche, passe à la 2e photo, pose
+  « Waggle ! » par la capsule, copie le prompt de départ (« Prompt copié »), suit l'auteur depuis la
+  page, touche « Tester la démo », lit « La démo de … par … » sur la page de sortie et revient par
+  « Rester sur Waiggle »
+
+### Les choix de Louis (1/11/2026)
+
+1. **Venus des listes**, parce qu'ils touchent la page projet : (a) le projet à 768 px, la mise en page de téléphone étirée et « Tester
+   la démo » de 720 px (la tablette de 768 à 1024 px) ; (b) l'ordre de Tab sur ordinateur : la
+   colonne de droite après tout le contenu.
+2. **Partager un profil** (F-Mb1) dans R5a : oui, même bouton et même feuille.
+3. **Les commentaires sur ordinateur** passent dès R5a dans la colonne de droite, tels quels.
+4. **Le temps passé** reste dans « La recette » jusqu'à R6.
+5. **« Waggle ! »** : seul le nom affiché et l'icône changent ; le nom interne `bravo` reste (pas de
+   migration).
+6. **L'aide de l'éventail** : retenue sur l'appareil (une fois par appareil, pas par compte).
+7. **Partager** : une feuille de Waiggle (avec le bandeau), puis le menu de l'appareil ; pas le menu
+   de l'appareil directement, qui ne peut pas montrer le bandeau.

@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
+import { useOpenDemo } from '../navigation/links'
 import { PeopleToFollow } from '../suggestions/PeopleToFollow'
 import { ListGroup } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
@@ -55,6 +56,7 @@ export function FeedSide({ withSuggestions, shownProjectIds }: Props) {
 function Testers({ exclude }: { exclude: ReadonlySet<string> }) {
   const { t } = useTranslation()
   const router = useRouter()
+  const openDemo = useOpenDemo()
   const toSource = useMediaSources()
   const feed = useDiscoverFeed({ testers: true })
   // React Query v5 : relancer une lecture en échec, sans données, efface l'erreur pendant la
@@ -113,7 +115,7 @@ function Testers({ exclude }: { exclude: ReadonlySet<string> }) {
             }
             // La démo passe par la page d'avertissement des liens externes (« Tu quittes… »,
             // relecture de sécurité sec-A7), jamais tout droit.
-            onTest={() => router.push({ pathname: '/out', params: { url: demoUrl } })}
+            onTest={() => openDemo(demoUrl, project.id)}
             // La vignette, le titre et l'auteur ouvrent la page du projet, comme dans Explorer.
             onOpen={() => router.push({ pathname: '/projects/[id]', params: { id: project.id } })}
           />

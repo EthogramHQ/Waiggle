@@ -49,6 +49,11 @@ type Props = {
   size?: ButtonSize
   icon?: IconName
   /**
+   * L'icône après le libellé plutôt qu'avant (R5a) : la flèche « ↗ » d'un lien qui sort de
+   * l'appli (« Ouvrir le site ↗ », comme « Tester ↗ » de `TestLink`). Décorative, comme avant.
+   */
+  iconAfter?: boolean
+  /**
    * Un décor posé avant le libellé, à la place d'une icône : les visages des auteurs dans le
    * bouton des nouveautés du fil (`AvatarStack` sans nom). Toujours décoratif : le nom du bouton
    * reste son libellé, le décor doit être caché aux lecteurs d'écran par celui qui le fournit.
@@ -77,6 +82,7 @@ export function Button({
   variant = 'primary',
   size = 'regular',
   icon,
+  iconAfter = false,
   leading,
   loading = false,
   disabled = false,
@@ -169,6 +175,14 @@ export function Button({
     inactive && variant === 'confirm' && { boxShadow: 'none' },
   ]
 
+  // L'icône, avant ou après le libellé (`iconAfter`). flexShrink: 0 : elle garde sa taille quand
+  // le libellé passe sur deux lignes.
+  const glyph = icon ? (
+    <View style={{ flexShrink: 0 }}>
+      <Icon name={icon} size={small ? 16 : 20} tone={tone} />
+    </View>
+  ) : null
+
   const content: ReactNode = (
     <>
       {/* Pendant le chargement, le libellé reste en place mais invisible et l'indicateur se pose
@@ -194,11 +208,7 @@ export function Button({
         {/* flexShrink: 0 : l'icône ou le décor gardent leur taille quand le libellé passe sur deux
             lignes. */}
         {leading ? <View style={{ flexShrink: 0 }}>{leading}</View> : null}
-        {icon ? (
-          <View style={{ flexShrink: 0 }}>
-            <Icon name={icon} size={small ? 16 : 20} tone={tone} />
-          </View>
-        ) : null}
+        {icon && !iconAfter ? glyph : null}
         {/* selectable={false} : un double-clic n'y surligne pas de texte. breakAnywhere : un nom de
             site très long (« Continuer vers … ») se coupe au lieu de sortir du bouton. Le petit
             bouton prend le texte d'une carte, en gras : celui des boutons ne tiendrait pas dans
@@ -213,6 +223,7 @@ export function Button({
         >
           {label}
         </Text>
+        {icon && iconAfter ? glyph : null}
       </View>
       {loading ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>

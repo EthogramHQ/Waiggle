@@ -312,9 +312,11 @@ describe('ExploreScreen, « Ils cherchent des testeurs »', () => {
 
     await fireEvent.press(screen.getByRole('link', { name: testName('Carnet de cafés') }))
 
-    expect(mockPush.mock.calls.map((call) => hrefOf(call[0]))).toContain(
-      '/out?url=https://cafes.example.com',
-    )
+    // R5a : l'identifiant du projet suit, pour que la page de sortie dise « La démo de … ».
+    const hrefs = mockPush.mock.calls.map((call) => hrefOf(call[0]))
+    expect(
+      hrefs.some((href) => href.startsWith('/out?url=https://cafes.example.com&project=')),
+    ).toBe(true)
   })
 
   it('opens the page of the project when its title is touched (Louis, 31/10)', async () => {

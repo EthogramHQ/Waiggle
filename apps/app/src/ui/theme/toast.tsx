@@ -29,6 +29,7 @@ import {
   useState,
 } from 'react'
 import { AccessibilityInfo, Platform, View, type ViewStyle } from 'react-native'
+import { type FloatingSpace, FloatingSpaceContext } from '../floatingSpace'
 import type { IconName } from '../Icon'
 import { Mascot, type MascotPose } from '../Mascot'
 import { readingTime, Toast } from '../Toast'
@@ -61,14 +62,20 @@ export const useToast = (): ToastApi => useContext(ToastContext)
 const BOTTOM = { compact: 104, wide: 32 } as const
 
 /**
- * Le décalage du toast : jamais sous la barre d'onglets du téléphone (R3). Quand elle est là, le
- * toast se pose juste au-dessus d'elle (sa hauteur mesurée, marge du bas de l'appareil comprise,
- * plus un peu d'air) ; sinon, ou si la barre est plus basse que la place habituelle, à sa place
+ * Le décalage du toast : jamais sous la barre d'onglets du téléphone (R3), ni sous la place
+ * flottante de l'écran affiché (la capsule des réactions de la page projet, R5a). Quand l'une
+ * d'elles est là, le toast se pose juste au-dessus (sa hauteur mesurée depuis le bas de l'écran,
+ * plus un peu d'air) ; sinon, ou si elle est plus basse que la place habituelle, à sa place
  * habituelle. Exporté pour être essayé sans écran.
  */
-export const toastBottom = (sizeClass: SizeClass, tabBarHeight: number): number => {
+export const toastBottom = (
+  sizeClass: SizeClass,
+  tabBarHeight: number,
+  floatingTop = 0,
+): number => {
   const usual = sizeClass === 'compact' ? BOTTOM.compact : BOTTOM.wide
-  return tabBarHeight > 0 ? Math.max(usual, tabBarHeight + space.sm) : usual
+  const above = Math.max(tabBarHeight, floatingTop)
+  return above > 0 ? Math.max(usual, above + space.sm) : usual
 }
 
 // Sur le web, la couche reste collée en bas de la fenêtre même si la page défile (position fixe,
@@ -85,6 +92,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // La barre d'onglets du téléphone (ui/tabBarSpace.ts) : le fournisseur des toasts doit donc être
   // posé dans son cadre (TabBarHost), sinon il ne la voit pas (hauteur 0) et peut la couvrir.
   const tabBar = useTabBarSpace()
+  // La place flottante de l'écran affiché (ui/floatingSpace.ts) : chaque écran qui en a une réserve
+  // sa hauteur sous un jeton à lui ; le toast monte au-dessus de la plus haute réserve en cours.
+  const claims = useRef(new Map<object, number>())
+  const [floatingTop, setFloatingTop] = useState(0)
+  const highest = useCallback(() => Math.max(0, ...claims.current.values()), [])
+  const floating = useMemo<FloatingSpace>(
+    () => ({
+      claim: (owner, top) => {
+        claims.current.set(owner, top)
+        setFloatingTop(highest())
+      },
+      release: (owner) => {
+        if (!claims.current.delete(owner)) return
+        setFloatingTop(highest())
+      },
+    }),
+    [highest],
+  )
   // Les minuteurs en cours (le départ, puis l'effacement) : une « ref » garde une valeur d'un
   // rendu à l'autre sans redessiner, ce qu'il faut pour pouvoir les annuler.
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -144,7 +169,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={api}>
-      {children}
+      <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
       <ToastLayer>
         <View
           // La région vivante, toujours présente. box-none : elle laisse passer les touchers vers la
@@ -157,7 +182,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ...pinned,
             left: 0,
             right: 0,
-            bottom: toastBottom(sizeClass, tabBar.height),
+            bottom: toastBottom(sizeClass, tabBar.height, floatingTop),
             alignItems: 'center',
             paddingHorizontal: layout.screenPadding.compact,
           }}

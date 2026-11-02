@@ -6,7 +6,13 @@ import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
 import { Removal } from './removal'
-import { FreeText, isCleanText, ShortLabel, uniqueIgnoringCase } from './text'
+import {
+  FreeText,
+  isCleanText,
+  removeForbiddenCharacters,
+  ShortLabel,
+  uniqueIgnoringCase,
+} from './text'
 
 export const PROJECT_TITLE_MAX = 80
 export const PROJECT_PITCH_MAX = 140
@@ -132,6 +138,24 @@ export const DemoUrl = z
   // href : l'adresse réécrite par URL (minuscules, nom « xn-- », « / » final…), la même partout.
   .transform((value) => publicHttpsUrl(value)?.href ?? value)
 
+/**
+ * Nettoie un prompt collé (décision F-Mod4, tranche R5a) : un prompt copié depuis une page ou une
+ * conversation d'IA traîne souvent des caractères invisibles (espaces sans largeur, caractère qui
+ * retourne le texte…). Au lieu de refuser tout le prompt, on les retire. Les séparateurs de ligne
+ * et de paragraphe Unicode (U+2028, U+2029) deviennent un vrai retour à la ligne. Les liants des
+ * emoji (U+200C, U+200D) et les sélecteurs de variante restent permis. L'appli se sert de la même
+ * fonction pour afficher, repérer et copier : ce qu'on copie est exactement ce qu'on lit (sec-B1).
+ */
+export const cleanPrompt = (text: string) =>
+  removeForbiddenCharacters(text.replace(/[\u2028\u2029]/g, '\n'))
+
+/**
+ * Un prompt : nettoyé d'abord, puis vérifié comme un texte libre. pipe enchaîne deux schémas : la
+ * longueur se compte donc après le retrait des invisibles (sec-B9). Le texte d'origine n'est gardé
+ * nulle part.
+ */
+const PromptText = z.string().transform(cleanPrompt).pipe(FreeText(PROJECT_PROMPT_MAX_LENGTH))
+
 // Les champs modifiables d'un projet, avec leurs règles.
 const fields = {
   title: ShortLabel(PROJECT_TITLE_MAX),
@@ -143,7 +167,7 @@ const fields = {
   tools: z.array(ShortLabel(TOOL_MAX_LENGTH)).max(PROJECT_TOOLS_MAX).transform(uniqueIgnoringCase),
   timeSpent: TimeSpent.nullable(),
   prompts: z
-    .array(FreeText(PROJECT_PROMPT_MAX_LENGTH))
+    .array(PromptText)
     .max(PROJECT_PROMPTS_MAX)
     .transform((prompts) => prompts.filter((prompt) => prompt.length > 0)), // ignore les cases vides
 }

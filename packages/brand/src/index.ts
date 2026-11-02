@@ -8,6 +8,7 @@ export {
   contrastPairs,
   focusHaloOpacity,
   honeyLight,
+  maskVisible,
   type Palette,
   palettes,
   type Scheme,

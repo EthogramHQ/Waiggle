@@ -68,6 +68,7 @@ import {
 import {
   draftProject,
   leaPage,
+  photo,
   projectWithPhotos,
   recipesProject,
   summaryOf,
@@ -358,6 +359,20 @@ const maxMember = {
   projects: feedItems
     .filter((item) => item.project.author.id === max.id)
     .map((item) => item.project),
+}
+// R5a : Inès, l'autrice du projet de la galerie (launchProject). Sans sa page, la lecture de
+// l'auteur échoue et la page projet cache « Suivre » (décision du 2/11) : la capture le perdrait.
+const inesMember = {
+  ...leaPage,
+  id: ines.id,
+  name: ines.name,
+  avatarUrl: ines.avatarUrl,
+  handle: 'ines_haddad',
+  bio: 'Je lance des petits outils pour l’association.',
+  isMe: false,
+  isFollowed: false,
+  followerCount: 7,
+  projects: [],
 }
 // Tranche 7c : deux membres que la modération connaît. Sam (celui de la file, testing/moderation.ts)
 // peut être suspendu ; Karim l'est déjà, 7 jours après un signalement.
@@ -655,6 +670,32 @@ const gardenProject = {
   title: 'Le carnet du potager',
   pitch: 'Il note les semis, la météo et les récoltes, et rappelle quand arroser.',
   followerCount: 8,
+}
+// Tranche R5a, la page projet : un projet d'Inès à trois photos (la galerie, « 1 sur 3 ») et trois
+// prompts (« Le prompt de départ », puis « Les autres prompts · 2 »). Le troisième contient un lien :
+// il porte le repère « À lire avant de l'utiliser » quand on déplie les autres. Ses photos ont leurs
+// propres identifiants, donc leurs propres couleurs (sampleImage).
+const launchProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000f1',
+  author: ines,
+  isMine: false,
+  title: 'Décollage !',
+  pitch: 'Un coach qui prépare ton premier 10 km, semaine après semaine.',
+  status: 'testable',
+  demoUrl: 'https://decollage.example.org',
+  followerCount: 12,
+  visuals: [
+    photo('a5e1c2d3-0000-4000-8000-0000000000f1'),
+    photo('5e2b3c4d-0000-4000-8000-0000000000f2', 1200, 1600),
+    photo('c83d4e5f-0000-4000-8000-0000000000f3'),
+  ],
+  prompts: [
+    'Tu es un coach de course à pied. À partir de mes trois dernières sorties (distance, temps, ressenti), propose-moi un plan de 4 semaines pour courir 10 km en moins d’une heure. Pose-moi d’abord deux questions si une information te manque.',
+    'Transforme ce plan en tableau : une ligne par séance, avec le jour, la durée, l’allure visée et un conseil court.',
+    'Lis https://www.example.org/conseils-10-km et résume les cinq conseils les plus utiles pour un débutant, en une phrase chacun.',
+  ],
+  notes: recipesNotes.slice(2),
 }
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
 // `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
@@ -1145,6 +1186,8 @@ const fakeApi = (
       return json(200, withExtras(commentedProject))
     }
     if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
+    // R5a : le brouillon privé de Léa, vu par elle (le bandeau privé, « Pas encore de réaction »).
+    if (pathname === `/v1/projects/${draftProject.id}`) return json(200, withExtras(draftProject))
     if (pathname === `/v1/projects/${removedProject.id}`) {
       return json(200, withExtras(removedProject))
     }
@@ -1153,6 +1196,10 @@ const fakeApi = (
     }
     if (pathname === `/v1/projects/${gardenProject.id}`) {
       return json(200, withExtras(gardenProject))
+    }
+    // R5a : la page projet à trois photos et trois prompts (les pages de captures : la session).
+    if (pathname === `/v1/projects/${launchProject.id}`) {
+      return json(200, withExtras(launchProject))
     }
     // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
     // A7 : « Ce projet est introuvable » au toucher d'une carte).
@@ -1200,6 +1247,7 @@ const fakeApi = (
       return json(200, blockedMemberPage(blocked.get(member[1])))
     }
     if (pathname === `/v1/members/${max.id}`) return json(200, maxMember)
+    if (pathname === `/v1/members/${ines.id}`) return json(200, inesMember)
     // Tranche 7c : Sam, auteur du commentaire signalé de la file, et Karim, déjà suspendu. Leur
     // page dit à un administrateur seul où en est la modération (`Member.moderation`) ; la page
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
@@ -1944,6 +1992,37 @@ const pages = [
   {
     name: 'projet-introuvable',
     path: '/projects/00000000-0000-4000-8000-000000000000',
+    signedIn: true,
+  },
+  // Tranche R5a, la page projet (planches R5a-*) : le projet d'Inès à trois photos et trois prompts,
+  // l'éventail des réactions (ouvert d'un clic droit, comme d'un appui long), la feuille Partager,
+  // le brouillon privé vu par Léa, et la page de sortie qui nomme le projet de la démo.
+  { name: 'projet-galerie', path: `/projects/${launchProject.id}`, signedIn: true, fullPage: true },
+  {
+    name: 'projet-eventail',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page
+        .getByRole('button', { name: /^Bluffant/ })
+        .first()
+        .click({ button: 'right' })
+      await page.getByRole('dialog', { name: 'Les réactions' }).waitFor()
+    },
+  },
+  {
+    name: 'projet-partager',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Partager', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Copier le lien' }).waitFor()
+    },
+  },
+  { name: 'projet-auteur-prive', path: `/projects/${draftProject.id}`, signedIn: true },
+  {
+    name: 'sortie-demo',
+    path: `/out?url=${encodeURIComponent(launchProject.demoUrl)}&project=${launchProject.id}`,
     signedIn: true,
   },
   // Tranche R3 : la recherche par mots (planche R3-Recherche) : des résultats, rien trouvé, le

@@ -1182,7 +1182,10 @@ describe('« Tester » on a card of the feed (R4, F-Fil2)', () => {
       await fireEvent.press(testers[0] as ReturnType<typeof screen.getByRole>)
 
       const hrefs = mockPush.mock.calls.map(([href]) => hrefOf(href))
-      expect(hrefs).toContain('/out?url=https://cafes.example.com')
+      // R5a : l'identifiant du projet suit, pour que la page de sortie dise « La démo de … ».
+      expect(
+        hrefs.some((href) => href.startsWith('/out?url=https://cafes.example.com&project=')),
+      ).toBe(true)
       expect(hrefs).not.toContain('https://cafes.example.com')
       expect(openURL).not.toHaveBeenCalled()
     } finally {
@@ -1351,7 +1354,10 @@ describe('the feed on a computer (R4)', () => {
       expect(testers).toHaveLength(1)
       await fireEvent.press(testers[0] as ReturnType<typeof screen.getByRole>)
       const hrefs = mockPush.mock.calls.map(([href]) => hrefOf(href))
-      expect(hrefs).toContain('/out?url=https://voyage.example.com')
+      // R5a : l'identifiant du projet suit, pour que la page de sortie dise « La démo de … ».
+      expect(
+        hrefs.some((href) => href.startsWith('/out?url=https://voyage.example.com&project=')),
+      ).toBe(true)
       expect(hrefs).not.toContain('https://voyage.example.com')
     }))
 

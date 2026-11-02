@@ -13,7 +13,7 @@ import { type HeadingLevel, Text } from './Text'
  * la leur cacheraient, ou pas selon le lecteur). C'est la recette « sr-only » du web, en styles de
  * React Native. `clipPath` et `whiteSpace` manquent aux types de React Native, d'où la conversion.
  */
-const hiddenFrame = {
+export const hiddenFrame = {
   position: 'absolute',
   top: 0,
   left: 0,

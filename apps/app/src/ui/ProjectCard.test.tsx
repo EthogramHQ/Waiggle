@@ -331,7 +331,7 @@ describe('SummaryCard, the feed card of a project summary', () => {
       expect(mockPush).toHaveBeenCalledTimes(1)
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/out',
-        params: { url: project.demoUrl },
+        params: { url: project.demoUrl, project: project.id },
       })
       expect(openURL).not.toHaveBeenCalled()
     } finally {

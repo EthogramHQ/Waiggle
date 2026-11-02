@@ -60,6 +60,12 @@ type Props = {
    * une photo : l'écran dit l'échec ailleurs), et `prominent` et `layout` n'y servent pas.
    */
   variant?: 'button' | 'chip'
+  /**
+   * L'icône avant le texte tant qu'on ne suit pas : la personne avec un « + » pour suivre quelqu'un
+   * (par défaut), la cloche pour suivre un projet (la page d'un projet montre les deux l'un au-dessus
+   * de l'autre : « Suivre » l'auteur, « Suivre ce projet »). Une fois suivi, la coche, dans les deux cas.
+   */
+  icon?: 'user-plus' | 'bell'
   /** La photo de l'auteur, au début de la pastille (variante chip seulement) ; décorative. */
   avatar?: { name: string; source: ImageSource | null }
 }
@@ -76,6 +82,7 @@ export function FollowButton({
   layout = 'row',
   disabled = false,
   variant = 'button',
+  icon = 'user-plus',
   avatar,
 }: Props) {
   if (variant === 'chip') {
@@ -104,7 +111,7 @@ export function FollowButton({
       // Une personne avec un « + », jamais le « + » seul : au téléphone, le « + » miel de la barre
       // d'onglets veut dire « Publier » ; deux ronds miel au même signe sur la page d'un membre
       // proposaient deux gestes différents (relecture de design de R3, #8 ; planche R3-Membre).
-      icon={followed ? 'check' : 'user-plus'}
+      icon={followed ? 'check' : icon}
       size="compact"
     />
   )

@@ -3,6 +3,7 @@ import { BLOCKS_PER_DAY, UNBLOCKS_PER_DAY } from '@ruche/contracts'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useBlock, useUnblock } from '../blocks/api'
+import { webAppUrl } from '../config'
 import { useFollow } from '../follows/api'
 import { getMember } from '../members/api'
 import { getMe } from '../profile/api'
@@ -19,7 +20,11 @@ import {
 } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { blockSentences, containing, fr, missingSentences } from '../testing/text'
+import { copyText } from '../ui/clipboard'
 import { MemberScreen } from './MemberScreen'
+
+// Le presse-papiers (R5a) : « Copier le lien » de la feuille Partager. Le test lit ce qui est copié.
+jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 // Les images de l'API voyagent avec la session (api/media.ts) : ici, l'adresse suffit.
@@ -902,5 +907,70 @@ describe('the « Moi » page (R3)', () => {
     // Le texte affiché aussi (la coche « ✓ » s'ajoute à l'affichage, hors du nom lu).
     expect(screen.getByText(containing(following))).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.follow.following))).toBeNull()
+  })
+})
+
+// --- Tranche R5a (F-Mb1) : partager la page d'un membre, avec la même feuille qu'un projet ---
+describe('sharing the page of a member', () => {
+  /** L'adresse publique de la page de Léa, sans rien d'autre (rien sur qui partage). */
+  const leaUrl = new URL('/members/u1', webAppUrl).href
+
+  beforeEach(() => {
+    jest.mocked(copyText).mockReset().mockResolvedValue(true)
+  })
+
+  it('offers « Partager » on the page of another member, which opens the share sheet', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+
+    expect(await screen.findByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.share.membersOnly))).toBeTruthy()
+    // L'adresse de la page, telle qu'elle sera copiée.
+    expect(screen.getAllByText(containing('/members/u1')).length).toBeGreaterThan(0)
+  })
+
+  it('copies the address of the member’s page and nothing else', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Copier le lien' }))
+
+    expect(copyText).toHaveBeenCalledWith(leaUrl)
+  })
+
+  // Décision de la session (R5a, questions de TW-3) : sur sa propre page aussi, à côté de la roue.
+  it('offers « Partager » on one’s own page too, beside the settings', async () => {
+    jest.mocked(getMember).mockResolvedValue({ ...leaPage, isMe: true })
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    expect(await screen.findByRole('button', { name: 'Réglages' })).toBeTruthy() // témoin : la roue
+    await fireEvent.press(screen.getByRole('button', { name: 'Partager' }))
+
+    expect(await screen.findByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeTruthy()
+    expect(screen.getByText(leaUrl)).toBeTruthy()
+  })
+
+  // Un membre qui m'a bloqué n'a pas de page pour moi : rien à partager.
+  it('offers no « Partager » on the page of a member who blocked me', async () => {
+    jest.mocked(getMember).mockRejectedValue(new ApiError('notFound'))
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    // Le témoin : la page « introuvable » est bien là.
+    expect(await screen.findByRole('header', { name: 'Ce membre est introuvable' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Partager' })).toBeNull()
+  })
+
+  it('closes the sheet once the link is copied, the « Partager » button still in place', async () => {
+    await renderWithProviders(<MemberScreen id="u1" />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Partager' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Copier le lien' }))
+
+    // La feuille s'est fermée après la copie : son titre n'est plus à l'écran.
+    await waitFor(() =>
+      expect(screen.queryByText(fr.t(($) => $.share.title, { title: 'Léa' }))).toBeNull(),
+    )
+    expect(screen.getByRole('button', { name: 'Partager' })).toBeTruthy()
   })
 })

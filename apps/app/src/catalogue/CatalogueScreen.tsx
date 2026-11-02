@@ -13,7 +13,7 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import { COMMENT_MAX, PROJECT_NOTE_MAX, REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
+import { COMMENT_MAX, PROJECT_NOTE_MAX } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -51,7 +51,6 @@ import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectCover } from '../ui/ProjectCover'
 import { ProjectGrid } from '../ui/ProjectGrid'
-import { ReactionBar } from '../ui/ReactionBar'
 import { Screen } from '../ui/Screen'
 import { Segmented } from '../ui/Segmented'
 import { SheetHeader } from '../ui/SheetHeader'
@@ -66,7 +65,6 @@ import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
 import { TextLink } from '../ui/TextLink'
-import { Thumbnails } from '../ui/Thumbnails'
 import type { Appearance } from '../ui/theme/appearance'
 import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
@@ -94,6 +92,16 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { ProjectPartsCatalogue } from './projet-auteur'
+import { CapsuleCatalogue } from './projet-capsule'
+import { ProjectFrameCatalogue } from './projet-ecran'
+import { FanCatalogue } from './projet-eventail'
+import { GalleryCatalogue } from './projet-galerie'
+import { NotFoundPortalCatalogue } from './projet-introuvable'
+import { ShareCatalogue } from './projet-partager'
+import { ProjectPromptsCatalogue } from './projet-prompts'
+import { ProjectGroundworkCatalogue } from './projet-socle'
+import { LeavingCatalogue } from './projet-sortie'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -438,7 +446,6 @@ export function CatalogueScreen() {
                 height={260}
                 image={{ source: null, thumbhash: samples.papillon, label: l.samplePhoto }}
               />
-              <ThumbnailsSample l={l} />
             </Stack>
           }
           side={
@@ -799,17 +806,6 @@ export function CatalogueScreen() {
       </Section>
 
       <Section title={l.commentsSection}>
-        {/* Les réactions sur le projet d'un autre : aucune posée, deux posées, puis un refus de
-            l'API. Pour l'auteur : les nombres seuls, sans bouton. */}
-        <ReactionSample l={l} mine={[]} />
-        <ReactionSample l={l} mine={['useful', 'bravo']} />
-        <ReactionSample l={l} mine={['bravo']} error={l.reactionError} />
-        <ReactionSample l={l} mine={[]} readOnly />
-        {/* Un compte suspendu (tranche 7c) : sa réaction donnée garde son bouton, pour la retirer ;
-            les autres ne montrent que leur nombre. */}
-        <ReactionSample l={l} mine={['bravo']} lockedExceptMine />
-        {/* Le même compte, qui vient de retirer « Utile » : la pastille reste, inactive. */}
-        <ReactionSample l={l} mine={['bravo']} lockedExceptMine takenBack={['useful']} />
         {/* Les cartes d'un commentaire : sans action (« Répondre » est au bout du fil ; « Signaler »,
             tranche 7a, est dans la section suivante), le sien, modifié (Modifier, Supprimer), le sien masqué (le bandeau pour
             son auteur), masqué vu par l'auteur du projet (Démasquer), Masquer en cours d'envoi, un
@@ -1090,6 +1086,20 @@ export function CatalogueScreen() {
       <ExploreCatalogue />
       <ToolsCatalogue />
       <SearchCatalogue />
+      {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
+          l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
+          actions, capsule, éventail et vue de l'auteur, prompts, Partager, la page de sortie et son
+          portail, l'introuvable (projet-*.tsx). */}
+      <ProjectGroundworkCatalogue />
+      <ProjectFrameCatalogue />
+      <GalleryCatalogue />
+      <ProjectPartsCatalogue />
+      <CapsuleCatalogue />
+      <FanCatalogue />
+      <ProjectPromptsCatalogue />
+      <ShareCatalogue />
+      <LeavingCatalogue />
+      <NotFoundPortalCatalogue />
 
       <Section title={l.icons}>
         <Icons />
@@ -1417,56 +1427,6 @@ function NoteComposerSample({
   )
 }
 
-/** La barre des réactions, avec des nombres d'exemple et les réactions posées données. */
-function ReactionSample({
-  l,
-  mine,
-  readOnly = false,
-  error,
-  lockedExceptMine = false,
-  takenBack = [],
-}: {
-  l: Labels
-  mine: ReactionKind[]
-  readOnly?: boolean
-  error?: string
-  /** Compte suspendu : seules les réactions posées restent des boutons. */
-  lockedExceptMine?: boolean
-  /** Compte suspendu : les réactions retirées pendant la visite, restées en place, inactives. */
-  takenBack?: ReactionKind[]
-}) {
-  const counts: Record<ReactionKind, number> = {
-    amazing: 2,
-    inspiring: 0,
-    useful: 5,
-    funny: 1,
-    bravo: 12,
-  }
-  const items = REACTION_KINDS.map((kind) => {
-    const text = l.reactionNames[kind]
-    const isMine = mine.includes(kind)
-    return {
-      kind,
-      text,
-      count: counts[kind],
-      mine: isMine,
-      label: isMine ? `${text}, ${l.reacted}, ${counts[kind]}` : `${text}, ${counts[kind]}`,
-      locked: lockedExceptMine && !isMine && !takenBack.includes(kind),
-      disabled: takenBack.includes(kind),
-    }
-  })
-  return readOnly ? (
-    <ReactionBar items={items} readOnly caption={l.ownReactions} />
-  ) : (
-    <ReactionBar
-      items={items}
-      onToggle={() => {}}
-      label={l.reactionGroup}
-      {...(error ? { error } : null)}
-    />
-  )
-}
-
 /** « Répondre », au bout d'un fil. */
 const replyAction = (l: Labels) => ({
   id: 'reply',
@@ -1513,20 +1473,6 @@ function ComposerSample({
       max={COMMENT_MAX}
       labels={{ open: submit, field, hint, submit, cancel: l.cancel }}
       autoFocus={false}
-    />
-  )
-}
-
-function ThumbnailsSample({ l }: { l: Labels }) {
-  const [selected, setSelected] = useState(0)
-  return (
-    <Thumbnails
-      items={[samples.cafe, samples.papillon, samples.cafe].map((thumbhash, index) => ({
-        key: `${index}`,
-        image: { source: null, thumbhash, label: `${l.samplePhoto} (${index + 1})` },
-      }))}
-      selected={selected}
-      onSelect={setSelected}
     />
   )
 }
