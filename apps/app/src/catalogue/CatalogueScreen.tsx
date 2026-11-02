@@ -96,6 +96,7 @@ import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectFrameCatalogue } from './projet-ecran'
+import { NotFoundPortalCatalogue } from './projet-introuvable'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -141,6 +142,9 @@ export function CatalogueScreen() {
         <LanguageSwitcher />
       </Surface>
 
+      {/* R5a : le portail et l'introuvable d'un projet (projet-introuvable.tsx). Tout en tête pour
+          les captures de la branche ; à ranger à l'assemblage. */}
+      <NotFoundPortalCatalogue />
       {/* Tranche R5a : l'encadré de prudence, le dépliant et la paire de boutons (projet-socle.tsx).
           En tête pour les captures de la branche ; à ranger à l'assemblage. */}
       <ProjectGroundworkCatalogue />
