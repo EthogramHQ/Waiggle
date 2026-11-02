@@ -74,6 +74,27 @@ describe('safeNext', () => {
     }
   })
 
+  // R5a (sec-B4) : la page de sortie (/out) n'est jamais une page de retour, même déguisée derrière
+  // le début d'une page permise. Un navigateur résout « .. » : « /projects/../out » devient « /out »,
+  // et le membre tout juste connecté arriverait sur une page « Tu quittes… » fabriquée par un autre.
+  it('never leads back to the page that leaves for another site, however it is written', () => {
+    for (const value of [
+      '/out',
+      '/out/',
+      '/out?url=https://faux-waiggle.example&project=6f1c2a8e-3b4d-4c5e-9f60-7a8b9c0d1e2f',
+      '/projects/../out?url=https://faux-waiggle.example',
+      '/members/x/../../out?url=https://faux-waiggle.example',
+      '/settings/./../out',
+      '/projects/%2e%2e/out?url=https://faux-waiggle.example',
+      '/projects/.%2E/out',
+      '/tags/..',
+    ]) {
+      expect(safeNext(value)).toBeNull()
+    }
+    // Témoin : un point ordinaire dans un chemin reste permis.
+    expect(safeNext('/tags/node.js')).toBe('/tags/node.js')
+  })
+
   it('refuses nothing and a very long path', () => {
     expect(safeNext(undefined)).toBeNull()
     expect(safeNext('')).toBeNull()
