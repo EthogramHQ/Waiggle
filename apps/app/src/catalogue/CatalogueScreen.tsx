@@ -81,6 +81,9 @@ import { ExploreCatalogue } from './explorer'
 import { SheetsCatalogue } from './feuilles'
 import { FeedCatalogue } from './fil'
 import { FeedEndCatalogue } from './fin-de-fil'
+import { FluidTopBarCatalogue } from './fluidite-barre'
+import { ScreenFadeCatalogue } from './fluidite-fondu'
+import { AmbientHostCatalogue } from './fluidite-lumiere'
 import { FormSamples } from './formulaire'
 import { SafeguardsCatalogue } from './garde-fous'
 import { TokensCatalogue } from './jetons'
@@ -1095,6 +1098,11 @@ export function CatalogueScreen() {
       <ShareCatalogue />
       <LeavingCatalogue />
       <NotFoundPortalCatalogue />
+      {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
+          pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
+      <FluidTopBarCatalogue />
+      <ScreenFadeCatalogue />
+      <AmbientHostCatalogue />
 
       <Section title={l.icons}>
         <Icons />
