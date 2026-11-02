@@ -554,6 +554,9 @@ export const fr = {
       copyStarting: 'Copier le prompt de départ',
       copyNamed: 'Copier le prompt {{index}}',
       copied: 'Copié',
+      // Le nom lu du bouton pendant « Copié » : il contient le texte affiché (WCAG 2.5.3, R5a ui B2).
+      copiedStarting: 'Prompt de départ copié',
+      copiedNamed: 'Prompt {{index}} copié',
       bubble: 'Prompt copié',
       copyFailed: 'Impossible de copier le prompt. Réessaie.',
       caution:
@@ -563,7 +566,8 @@ export const fr = {
         command: 'Il contient une commande.',
         link: 'Il contient un lien.',
         encoded: 'Il contient un long bloc codé, illisible tel quel.',
-        secret: 'Il parle de mot de passe, de clé ou de code.',
+        secret:
+          'Il parle d’informations à garder pour soi (mot de passe, clé, code, données bancaires…).',
       },
     },
     comments: {
@@ -644,7 +648,6 @@ export const fr = {
       createdOn: 'Créé {{when}}',
       updatedWhen: 'Mis à jour {{when}}',
       report: 'Signaler ce projet',
-      more: 'Plus d’actions',
       // Le bouton du haut, d'où qu'on arrive (ui-11 : « Retour au fil » mentirait en venant d'ailleurs).
       back: 'Retour',
       notFoundAction: 'Retour au fil',
@@ -652,7 +655,6 @@ export const fr = {
         'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
-      private: 'Privé : visible par toi seulement',
       tryDemo: 'Tester la démo',
       noDemo: 'Pas encore de démo',
       recipe: 'La recette',
@@ -666,7 +668,9 @@ export const fr = {
         'Le projet, sa description, sa recette, ses photos et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer le projet',
       notFoundTitle: 'Ce projet est introuvable',
-      notFound: 'Il a peut-être été supprimé, ou le lien est incorrect.',
+      // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
+      notFound:
+        'Il a peut-être été supprimé, il n’est pas visible pour toi, ou le lien est incorrect.',
       home: 'Retour à l’accueil',
       notMine: 'Seule la personne qui a publié ce projet peut le modifier.',
     },
@@ -1190,7 +1194,9 @@ export const fr = {
       remove: 'Retirer',
       removeNamed: 'Retirer {{name}}',
       hint: 'Tu peux en poser plusieurs, une de chaque.',
-      help: 'Touche une réaction pour la poser. Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune.',
+      // L'aide en deux temps, comme sur la planche : la 1re phrase en gras (`helpLead`), puis la suite.
+      helpLead: 'Touche une réaction pour la poser.',
+      help: 'Un appui long sur la capsule ouvre cet éventail, avec le nom de chacune.',
       helpOk: 'J’ai compris',
       // L'indice lu sur la capsule (ui-4) : dit qu'il existe une autre façon de l'ouvrir.
       open: 'Voir les réactions et leurs noms',
@@ -1215,11 +1221,15 @@ export const fr = {
     copiedMembers: 'Lien copié : seuls les membres de {{appName}} pourront l’ouvrir.',
     copiedPrivate: 'Lien copié : il ne s’ouvrira que pour toi.',
     copyFailed: 'Impossible de copier le lien. Réessaie.',
+    // Le menu de l'appareil a échoué (pas une annulation) : on propose l'autre chemin.
+    systemFailed: 'Impossible d’ouvrir le partage. Copie le lien à la place.',
   },
   leaving: {
     title: 'Tu quittes {{appName}}',
     // R5a, le portail (F-Out1, F-Out2, jur-8, sec-B5) : le nom du site en gras suit `to`.
     to: 'Tu quittes {{appName}} pour',
+    // Le titre lu de la page (h1) : la phrase entière, nom du site compris (R5a ui A2).
+    toHost: 'Tu quittes {{appName}} pour {{host}}',
     from: 'La démo de {{title}}, ajoutée par {{name}}',
     warningTitle: 'Ce site n’est pas sur {{appName}}',
     warningBody:
