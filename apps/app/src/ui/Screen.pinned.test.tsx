@@ -299,6 +299,33 @@ describe('Screen pinned top bar, the room it keeps', () => {
     expect(reservedTop()).toBeGreaterThan(before)
   })
 
+  it('gives a page that mounts the room of the bar measured before, from its first drawing', async () => {
+    // Le saut vu par Louis (2/11) : sur le web, une page ouverte pour la première fois (Explorer
+    // depuis le Fil) se dessinait d'abord avec la place d'une barre vide, puis descendait d'environ
+    // 75 points quand la barre était mesurée.
+    setDesktopWindow()
+    const first = await renderWithProviders(page())
+    await measureBar(80)
+    const measured = reservedTop()
+
+    // Une page neuve : une autre clé démonte l'écran et en monte un autre.
+    await act(async () => first.rerender(<View key="suivante">{page()}</View>))
+
+    expect(reservedTop()).toBe(measured)
+  })
+
+  it('does not reuse it in a window of another width, where the bar may wrap', async () => {
+    setDesktopWindow()
+    const first = await renderWithProviders(page())
+    const unmeasured = reservedTop()
+    await measureBar(80)
+
+    await act(async () => setWindow(900, 900))
+    await act(async () => first.rerender(<View key="suivante">{page()}</View>))
+
+    expect(reservedTop()).toBe(unmeasured)
+  })
+
   it('keeps the last height that was not zero, when the page is hidden (ui-6)', async () => {
     setDesktopWindow()
     await renderWithProviders(page())

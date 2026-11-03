@@ -82,6 +82,21 @@ const VEIL_FADE = space.xxl
 /** La part de la hauteur de la fenêtre au-delà de laquelle la barre ne reste plus fixe. */
 const MAX_PINNED_SHARE = 0.25
 
+// La dernière place mesurée de la barre, pour une largeur de fenêtre (correction du 3/11) : sur le
+// web, une page qui s'ouvre se dessinait d'abord avec la place d'une barre vide, puis descendait
+// d'environ 63 points à la mesure. Une page neuve part de cette place ; sa propre mesure la
+// corrige si la barre diffère. Une autre largeur ne la reprend pas : la barre peut s'y replier.
+let remembered: { windowWidth: number; space: TopBarSpace } | null = null
+
+/** La place de la barre déjà mesurée dans une fenêtre de cette largeur, sinon null. */
+export const rememberedTopBarSpace = (windowWidth: number): TopBarSpace | null =>
+  remembered && remembered.windowWidth === windowWidth ? remembered.space : null
+
+/** Pour les tests : oublier la place mesurée. */
+export const forgetTopBarSpace = () => {
+  remembered = null
+}
+
 export function ScreenTopBar({
   children,
   belowBar,
@@ -92,12 +107,15 @@ export function ScreenTopBar({
   belowRef,
 }: Props) {
   const { colors } = useTheme()
-  const { padding, sizeClass, height: windowHeight } = useLayout()
+  const { padding, sizeClass, height: windowHeight, width: windowWidth } = useLayout()
   const insets = useSafeAreaInsets()
 
   // Les hauteurs mesurées : la dernière mesure non nulle (ui-6). Sur le web, une page quittée reste
   // montée, cachée (`display: none`), et mesure 0 : la garder ferait sauter le contenu à son retour.
-  const [barHeight, setBarHeight] = useState(0)
+  // Avant sa propre mesure, la barre d'une page neuve reprend la place déjà mesurée (plus haut).
+  const [barHeight, setBarHeight] = useState(() =>
+    brand ? 0 : (rememberedTopBarSpace(windowWidth)?.height ?? 0),
+  )
   const [belowHeight, setBelowHeight] = useState(0)
   const keepHeight = (set: (height: number) => void) => (event: LayoutChangeEvent) => {
     const height = Math.ceil(event.nativeEvent.layout.height)
@@ -130,8 +148,9 @@ export function ScreenTopBar({
     )
       return
     reported.current = next
+    if (!brand && next.height > 0) remembered = { windowWidth, space: next }
     onSpace?.(next)
-  }, [pinned, barHeight, scrollPaddingTop, onSpace])
+  }, [pinned, barHeight, scrollPaddingTop, onSpace, brand, windowWidth])
 
   // La hauteur de la barre seule, rendue à Screen quand elle change (jamais 0 : voir plus haut).
   useEffect(() => {

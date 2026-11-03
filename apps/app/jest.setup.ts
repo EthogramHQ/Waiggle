@@ -32,3 +32,7 @@ Dimensions.set({ window: phone, screen: phone })
 // montrerait encore l'état d'avant. On prévient React dès la fin de la tâche en cours (une
 // « microtâche »), ce que act() attend.
 require('@tanstack/react-query').notifyManager.setScheduler(queueMicrotask)
+
+// La place de la barre du haut est retenue d'un écran à l'autre (ui/ScreenTopBar.tsx) : chaque test
+// part sans place mesurée, sinon un test hériterait de la mesure du précédent.
+afterEach(() => require('./src/ui/ScreenTopBar').forgetTopBarSpace())
