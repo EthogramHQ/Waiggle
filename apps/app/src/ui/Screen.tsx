@@ -51,7 +51,7 @@ import { type Focusable, focusTarget, holdsFocus } from './focus'
 import { IconButton } from './IconButton'
 import { NoticeScope } from './Notice'
 import { ScreenFade } from './ScreenFade'
-import { ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
+import { rememberedTopBarSpace, ScreenTopBar, type TopBarSpace } from './ScreenTopBar'
 import { Surface } from './Surface'
 import { useScreenFocused, useScreenShownCount } from './screenFocus'
 import { type ScreenScroll, ScreenScrollContext, useScreenScrollChannel } from './scrollLight'
@@ -208,7 +208,7 @@ export function Screen({
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { padding, sizeClass, card } = useLayout()
+  const { padding, sizeClass, card, width: windowWidth } = useLayout()
   // Les « marges de sécurité » : la place prise par l'encoche, l'heure, la barre du bas du téléphone.
   const insets = useSafeAreaInsets()
   // La barre d'onglets du téléphone (R3), quand elle est là : la place qu'elle prend en bas, à
@@ -242,7 +242,11 @@ export function Screen({
   // place (`barSpace`) : sa hauteur, réservée en haut du contenu, et si elle est fixe.
   const hasHeader = header !== undefined && header !== null && header !== false
   const topBar = hasHeader && !stickyHeader && !brand
-  const [barSpace, setBarSpace] = useState<TopBarSpace>(NO_BAR_SPACE)
+  // Dès le premier dessin, la place de la barre déjà mesurée dans cette fenêtre (ScreenTopBar) : sans
+  // elle, une page neuve se dessinait sous la barre puis descendait (correction du 3/11).
+  const [barSpace, setBarSpace] = useState<TopBarSpace>(
+    () => (topBar ? rememberedTopBarSpace(windowWidth) : null) ?? NO_BAR_SPACE,
+  )
   const barPinned = topBar && barSpace.pinned
   // Ce que la barre fixe couvre en haut de la fenêtre : la lumière qui suit le défilement cherche
   // son « milieu de l'écran » dessous (ui-15).
