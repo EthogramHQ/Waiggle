@@ -1,8 +1,9 @@
 // Tests de l'onglet Explorer (refonte, tranche R3, docs/scenarios/refonte.md, « Explorer ») : le
 // titre, le champ qui ouvre la recherche, « Ils cherchent des testeurs » (un carrousel), « Outils
 // populaires » et « Récents », qui reprend l'ancien fil « Découvrir » de l'accueil (ses tests
-// viennent de HomeScreen.test.tsx). Les fils, les outils et le suivi sont de faux hooks, choisis
-// par chaque test ; la barre du haut (TopNav) a ses propres tests et n'est pas dessinée ici.
+// viennent de l'ancien HomeScreen.test.tsx, coupé depuis en HomeScreen.*.test.tsx). Les fils, les
+// outils et le suivi sont de faux hooks, choisis par chaque test ; la barre du haut (TopNav) a ses
+// propres tests et n'est pas dessinée ici.
 import type {
   FeedItem,
   FeedPage,
@@ -125,7 +126,7 @@ const quiz = testerItem(
   'https://quiz.example.org',
 )
 
-/** Ce que renvoie un useInfiniteQuery de React Query (comme dans HomeScreen.test.tsx). */
+/** Ce que renvoie un useInfiniteQuery de React Query (comme dans HomeScreen.testkit.tsx). */
 const infiniteResult = (
   items: FeedItem[],
   { hasNextPage = false, isFetchingNextPage = false } = {},
@@ -379,8 +380,8 @@ describe('ExploreScreen, « Outils populaires »', () => {
   })
 })
 
-// Repris de HomeScreen.test.tsx (« the « discover » feed on the home screen ») : Découvrir est
-// devenu « Récents » (F-Nav6). Le filtre « Cherchent des testeurs » est devenu le carrousel.
+// Repris de l'ancien HomeScreen.test.tsx (« the « discover » feed on the home screen ») :
+// Découvrir est devenu « Récents » (F-Nav6). Le filtre « Cherchent des testeurs » est devenu le carrousel.
 describe('ExploreScreen, « Récents »', () => {
   it('shows the public projects of every member', async () => {
     await renderExplore()
