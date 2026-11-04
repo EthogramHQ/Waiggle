@@ -69,6 +69,28 @@ export const buildSite = () => {
 // construction d'avant ne prouverait rien. --tampon-ignore passe outre, pour un cas voulu (à dire
 // dans le rapport).
 const ignoreHint = ' (ou --tampon-ignore pour passer outre, en le disant dans ton rapport)'
+
+// Les chemins dont dépend la construction : l'appli, les paquets internes et la configuration de la
+// racine. Un commit qui ne touche rien d'autre (la CI, la documentation) ne change pas le site.
+// « :/ » devant un chemin le lit depuis la racine du dépôt, quel que soit le dossier où Git tourne.
+const sitePaths = [
+  ':/apps/app',
+  ':/packages',
+  ':/package.json',
+  ':/pnpm-lock.yaml',
+  ':/pnpm-workspace.yaml',
+  ':/tsconfig*.json',
+]
+
+// Une construction faite sur un commit propre vaut encore pour HEAD si, entre les deux, rien n'a
+// changé sous ces chemins, ni dans les commits (git diff --quiet rend 0 s'il n'y a aucune
+// différence) ni dans la copie de travail.
+export const stampStillValid = (built) => {
+  if (!/^[0-9a-f]{40}$/.test(built)) return false // tampon « modifié » ou « inconnu » : on ne sait pas
+  const unchanged = git('diff', '--quiet', built, 'HEAD', '--', ...sitePaths) === ''
+  return unchanged && git('status', '--porcelain', '--', ...sitePaths) === ''
+}
+
 export const checkStamp = ({ ignore = false } = {}) => {
   if (!existsSync(join(build, 'index.html'))) {
     fail(`Aucune construction dans ${build} : lance la commande une fois sans --no-build.`)
@@ -81,6 +103,10 @@ export const checkStamp = ({ ignore = false } = {}) => {
   if (!built) {
     stop(
       'La construction n’a pas de tampon (dist-shots/.commit), on ne sait pas de quel code elle vient : relance sans --no-build.',
+    )
+  } else if (built !== now && stampStillValid(built)) {
+    console.log(
+      `La construction vient de ${built.slice(0, 7)} ; depuis, rien n'a changé sous l'appli, les paquets ni la configuration : elle vaut pour le code actuel.`,
     )
   } else if (built !== now) {
     stop(
