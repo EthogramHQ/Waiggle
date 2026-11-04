@@ -989,15 +989,20 @@ Hors de R5b, et où ça va :
 - Alors sous les mises à jour, le titre « Commentaires 6 » (le nombre en gris, comme « Les autres
   prompts · 2 »)
 - Et les 3 premiers commentaires, dans l'ordre de la feuille (les fils les plus récents d'abord,
-  chacun suivi de ses réponses), sans « Répondre » ni menu « … »
+  chacun suivi de ses réponses), sans « Répondre » ni menu « … » ; seulement des commentaires
+  visibles de tous (un masqué, un retiré ou un emplacement reste dans la feuille, pas dans l'aperçu)
 - Et le bouton « Voir les 6 commentaires », qui ouvre la feuille
 - Et toucher un commentaire de l'aperçu ouvre aussi la feuille
 - Et sur ordinateur, dans la colonne de droite : 5 commentaires au plus, « Voir les 6
-  commentaires », puis le champ « Écrire un commentaire » et « Envoyer », avec « Tous les membres
-  connectés liront ton commentaire. » dessous
+  commentaires », puis le champ « Écrire un commentaire » et « Envoyer », avec l'aide d'aujourd'hui
+  dessous (qui lira le commentaire)
 - Et un projet sans commentaire montre « Commentaires », « Aucun commentaire pour l'instant. » et
   le bouton « Écrire un commentaire », qui ouvre la feuille, le champ prêt à écrire (sur
   ordinateur, le champ de la colonne suffit)
+- Et sur son projet privé, l'auteur lit à la place de « Aucun commentaire pour l'instant. » :
+  « Les commentaires des autres membres sont gardés, mais personne ne les lit tant que le projet
+  reste privé. » ; la bannière du projet privé ne lui dit plus qu'il les voit (décision D4,
+  relecture du plan)
 - Et un projet qui a 3 commentaires ou moins (5 sur ordinateur) n'a pas de « Voir les… » sur
   téléphone : le bouton devient « Commenter », qui ouvre la feuille
 
@@ -1014,8 +1019,9 @@ Hors de R5b, et où ça va :
 - Et le badge « Auteur » à côté du nom de l'auteur du projet
 - Et ses propres commentaires sur un fond gris arrondi
 - Et en bas, fixé, le champ compact : sa photo, « Écrire un commentaire », et le bouton d'envoi
-  (une flèche) grisé tant que le champ est vide ; « Tous les membres connectés liront ton
-  commentaire. » dessous
+  (une flèche) grisé tant que le champ est vide ; dessous, l'aide d'aujourd'hui, qui dit qui lira :
+  « Tous les membres connectés liront ton commentaire. », ou celle d'une réponse, d'une
+  modification, d'un commentaire masqué ou d'un projet privé (les six aides d'aujourd'hui gardées)
 - Et au-delà de 20 fils, « Afficher la suite » au bout de la liste
 - Et la feuille se ferme par Fermer, en la glissant vers le bas, par Échap ou Retour, et rend le
   focus au bouton qui l'a ouverte
@@ -1056,7 +1062,8 @@ Hors de R5b, et où ça va :
 - Alors au-dessus du champ, « Mentionner quelqu'un » propose 5 membres au plus : Léa Moreau et Hugo
   Lefèvre, chacun avec sa photo, son nom, son pseudo dessous, et les lettres tapées en gras
 - Et la recherche ignore les accents et les majuscules, et trouve le début du nom, d'un mot du nom
-  ou du pseudo (« @le » trouve aussi Léa et Lefèvre)
+  ou du pseudo (« @le » trouve aussi Léa et Lefèvre) ; un mot commence après une espace, un tiret ou
+  une apostrophe (« @pie » trouve Jean-Pierre ; décision D2)
 - Et les proches d'abord (l'auteur du projet, ceux qui l'ont commenté, ceux qu'il suit), comme
   aujourd'hui
 - Et les flèches du clavier passent d'une suggestion à l'autre, Entrée choisit, Échap ferme la
@@ -1068,8 +1075,8 @@ Hors de R5b, et où ça va :
 - Étant donné un commentaire publié qui mentionne Léa
 - Alors la mention s'affiche en pastille miel avec son nom, « @Léa Moreau »
 - Et le nom suit la personne : si elle change de nom, la pastille aussi
-- Et toucher la pastille ouvre la page de Léa ; le lecteur d'écran lit « Léa Moreau, @lea_moreau,
-  ouvre son profil »
+- Et toucher la pastille ouvre la page de Léa ; le lecteur d'écran lit « Léa Moreau, ouvre son
+  profil » (sans pseudo : le pseudo écrit peut être devenu celui d'un autre ; décision D3)
 - Et un pseudo qui ne désigne personne (ou un membre bloqué, dans un sens ou dans l'autre) reste du
   texte simple, comme aujourd'hui
 
@@ -1096,8 +1103,11 @@ Hors de R5b, et où ça va :
 **Masquer et démasquer** (pour l'auteur du projet)
 - Quand l'auteur du projet touche « Masquer » sur le commentaire de Hugo
 - Alors le commentaire reste à sa place pour lui, en gris, avec la pastille « Masqué par toi »,
-  « Les autres membres ne le voient plus. » et le lien « Démasquer »
-- Et Hugo, lui, voit encore son commentaire, avec « Masqué par l'auteur du projet »
+  « Il ne reste visible que de toi et de la personne qui l'a écrit. » et le lien « Démasquer »
+- Et Hugo, lui, voit encore son commentaire, avec « Masqué par l'auteur du projet » et « Il ne reste
+  visible que de toi et de l'auteur du projet. »
+- Et les autres membres voient à sa place « Commentaire masqué », s'il a des réponses (comme
+  aujourd'hui)
 
 **Signaler**
 - Quand il touche « Signaler »
@@ -1150,3 +1160,14 @@ Hors de R5b, et où ça va :
 4. **Le compteur** : à partir de 900 caractères.
 5. **Modifier** : dans le champ du bas, avec un bandeau, comme Répondre.
 6. **« Lire la suite »** après 10 lignes : dans R5b.
+
+Après la relecture du plan (sécurité, juridique, interface ; Louis, 4/11/2026 vers 23 h 55) :
+
+7. **D1, glisser la feuille** : toutes les feuilles se ferment en les glissant vers le bas, sauf
+   pendant un envoi.
+8. **D2, les mots du nom** : un mot commence après une espace, un tiret ou une apostrophe.
+9. **D3, la pastille lue** : le nom seul, « Léa Moreau, ouvre son profil ».
+10. **D4, le projet privé** : la bannière et l'état vide corrigés dans R5b (l'auteur d'un projet
+    privé ne lit pas les commentaires des autres).
+- Et les textes de masquage disent qui voit encore le commentaire, et les aides sous le champ
+  restent celles d'aujourd'hui (relecture juridique).
