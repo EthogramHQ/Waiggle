@@ -109,6 +109,20 @@ jobs:
           path: apps/app/shots/
           retention-days: 14
 
+  # Le résultat des deux parts sous un seul nom, « Screenshots » : c'est ce nom que la protection
+  # de main exige avant une fusion, et les parts s'appellent « Screenshots (1/2) » et « (2/2) ».
+  # `needs.shots.result` vaut « success » seulement si toutes les parts de la matrice ont réussi ;
+  # `if: always()` fait tourner cette tâche même quand une part échoue, pour qu'elle échoue à son
+  # tour au lieu d'être sautée (une vérification sautée compterait comme réussie).
+  shots-result:
+    name: Screenshots
+    if: always() && github.event_name != 'schedule'
+    needs: shots
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - run: test "${{ needs.shots.result }}" = success
+
   # Cherche des secrets (mots de passe, clés) oubliés dans tout l'historique Git.
   secrets:
     name: Secret scan
