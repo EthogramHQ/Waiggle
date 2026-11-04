@@ -18,6 +18,10 @@
 //                     2), et les pages longues coupées en tranches d'environ 1 600 pixels de haut
 //                     (nom-1, nom-2…), plus faciles à regarder qu'une image de 10 000 pixels.
 //   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/).
+//   --shard i/n       seulement la part i sur n des captures (--shard 1/2 puis --shard 2/2) : la
+//                     CI les prend en deux tâches parallèles. Le travail k de la liste va à la
+//                     part (k % n) + 1 (voir shard.ts). Chaque part construit le site et vérifie
+//                     les erreurs de ses pages ; toutes ensemble, elles font la liste entière.
 //   --explore x.mjs   confie le navigateur à un script d'essais au clic (voir plus bas).
 //   --serial          une capture à la fois, au lieu de trois (voir « La file » plus bas) : plus
 //                     lent, mais utile pour savoir si un défaut vient du parallélisme (une page
@@ -75,6 +79,7 @@ import {
 } from '../src/testing/projects.ts'
 import { build, buildSite, checkStamp, createSiteServer, root } from './dist-shots.mjs'
 import { loadingProblem, unfinishedTexts, waitUntilLoaded } from './loading-guard.ts'
+import { parseShard, shardOf } from './shard.ts'
 
 const defaultOut = join(root, 'shots')
 const apiUrl = 'http://localhost:3000' // adresse par défaut de l'API (src/config.ts)
@@ -106,15 +111,24 @@ const known = [
   '--layout',
   '--explore',
   '--serial',
+  '--shard',
 ]
 for (const [i, arg] of args.entries()) {
   // « -- » vient de « pnpm … shots -- --list » ; une valeur suit son option.
-  const isValue = ['--only', '--out', '--explore'].includes(args[i - 1])
+  const isValue = ['--only', '--out', '--explore', '--shard'].includes(args[i - 1])
   if (arg !== '--' && !isValue && !known.includes(arg)) {
     fail(`Option inconnue : ${arg}. Options possibles : ${known.join(', ')}.`)
   }
 }
 const read = has('--read')
+// La part des captures à prendre (« 1/2 »), ou undefined : toute la liste.
+const shardArg = optionValue('--shard')
+let shard
+try {
+  shard = shardArg === undefined ? undefined : parseShard(shardArg)
+} catch (error) {
+  fail(error.message)
+}
 const only = optionValue('--only')
   ?.split(',')
   .map((name) => name.trim())
@@ -2476,9 +2490,14 @@ const devicesFor = (shot) =>
     .map((device) =>
       shot.phone && device.name === 'telephone' ? { ...device, viewport: shot.phone } : device,
     )
-const jobs = selected.flatMap((shot) =>
+// Avec --shard, seule la part demandée de cette liste (le catalogue, en tête, se partage entre les
+// parts, au lieu de rester tout entier dans la première).
+const allJobs = selected.flatMap((shot) =>
   devicesFor(shot).flatMap((device) => schemes.map((scheme) => ({ shot, device, scheme }))),
 )
+const jobs = shardOf(allJobs, shard)
+if (shard)
+  console.log(`Part ${shard.index}/${shard.count} : ${jobs.length} travaux sur ${allJobs.length}.`)
 
 const browser = await chromium.launch()
 // Les erreurs de toutes les pages, réunies ici et signalées à la fin (le script échoue alors).
