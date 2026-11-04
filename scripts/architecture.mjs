@@ -127,7 +127,9 @@ const layerOf = (file) => {
   }
   return null
 }
-const isTest = (file) => /\.test\.tsx?$/.test(file)
+// Un « testkit » (`ProjectScreen.testkit.tsx`) rassemble les aides communes aux fichiers de test
+// d'un même écran : il n'est chargé que par eux, il compte donc comme un test.
+const isTest = (file) => /\.(test|testkit)\.tsx?$/.test(file)
 const isDomain = (layer) => /^(app|api)\/domaines\//.test(layer ?? '')
 
 // --- 4. Les règles ---------------------------------------------------------------------------------

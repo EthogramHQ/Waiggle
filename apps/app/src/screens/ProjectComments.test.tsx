@@ -1,7 +1,8 @@
 // Tests des mentions dans les commentaires d'un projet (tranche 6b) : Malik tape « @in » dans un
 // commentaire, une réponse ou une modification, choisit Inès, et « @ines_morel » part avec le
 // texte. Une fois publié, « @ines_morel » est un lien vers la page d'Inès (par son identifiant).
-// Le reste des commentaires (tranche 5) est testé dans ProjectScreen.test.tsx.
+// Le reste des commentaires (tranche 5) est testé dans ProjectScreen.comments.test.tsx et
+// ProjectScreen.comment-actions.test.tsx.
 import type { Comment, Project } from '@ruche/contracts'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Platform } from 'react-native'
@@ -108,7 +109,7 @@ beforeEach(() => {
   mockComments([])
 })
 
-/** Les actions d'un commentaire : on remonte depuis son texte jusqu'à sa carte (comme ProjectScreen.test). */
+/** Les actions d'un commentaire : on remonte depuis son texte jusqu'à sa carte (comme ProjectScreen.testkit). */
 const cardOf = (text: string) => {
   let node = screen.getByText(text).parent
   while (node && within(node).queryAllByRole('button').length === 0) node = node.parent

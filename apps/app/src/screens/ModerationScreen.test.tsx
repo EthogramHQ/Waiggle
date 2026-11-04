@@ -177,7 +177,7 @@ const cardOf = (text: string) => {
   return within(node)
 }
 
-/** Le contenu de la fenêtre qui porte ce titre (comme dans ProjectScreen.test.tsx). */
+/** Le contenu de la fenêtre qui porte ce titre (comme dans ProjectScreen.testkit.tsx). */
 const dialogTitled = (title: string) => {
   let node = screen.getByRole('header', { name: title }).parent
   while (node && within(node).queryAllByRole('button').length === 0) node = node.parent

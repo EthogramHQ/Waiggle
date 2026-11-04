@@ -1,0 +1,327 @@
+// Tests de la page d'un projet : l'ordre de lecture sur ordinateur, « Signaler ce projet » en
+// dernier, partager un projet retiré et le fondu de la page (RF).
+//
+// L'ancien ProjectScreen.test.tsx est coupé par sections (159 tests, de 50 à 100 s à lui seul) : Jest
+// donne un fichier entier à un seul processus, alors que plusieurs fichiers tournent en parallèle.
+// L'API est remplacée par de faux appels ; les aides et données communes sont dans
+// ProjectScreen.testkit.tsx.
+import { act, fireEvent, screen } from '@testing-library/react-native'
+import { getProject } from '../projects/api'
+import { removalByLaw } from '../testing/moderation'
+import { projectWithPhotos, recipesProject } from '../testing/projects'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
+import { containing, fr } from '../testing/text'
+import { CoverTransitionProvider, useCoverSource } from '../ui/coverTransition'
+import { ProjectScreen } from './ProjectScreen'
+import {
+  followAuthor,
+  id,
+  insideScroll,
+  mockPush,
+  mockReplace,
+  mockScreenProps,
+  readingOrder,
+  resetProjectScreenMocks,
+  seenByOther,
+  v2,
+} from './ProjectScreen.testkit'
+
+jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// Les images de l'API voyagent avec la session (api/media.ts) : ici, l'adresse suffit.
+jest.mock('../api/media', () => ({
+  useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),
+}))
+// La barre de navigation (ordinateur) lit le profil pour l'avatar : on remplace l'appel.
+jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
+jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest.fn() }))
+// Suivre : un faux hook, dont le test lit les appels (toggle) et choisit l'erreur.
+jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
+// La page de l'auteur est lue (« Suivre » n'est proposé qu'une fois qu'on sait si on le suit, et
+// plus quand la lecture échoue : décision du 2/11/2026). Ici, une lecture réussie, auteur non suivi.
+jest.mock('../members/api', () => ({
+  useMember: () => ({
+    data: { id: 'u1', name: 'Léa', handle: 'lea', isFollowed: false },
+    isError: false,
+    isPending: false,
+  }),
+}))
+// Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
+jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+// Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.
+jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
+jest.mock('../comments/api', () => ({
+  useComments: jest.fn(),
+  usePostComment: jest.fn(),
+  useEditComment: jest.fn(),
+  useDeleteComment: jest.fn(),
+  useHideComment: jest.fn(),
+}))
+// Les suggestions après « @ » (tranche 6b) : personne à proposer ; elles sont testées dans
+// ProjectComments.test.tsx.
+jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
+// Le presse-papiers (R5a) : « Copier le lien » du menu « … » et de la feuille Partager, « Copier »
+// d'un prompt. Le test lit ce qui est copié ; l'appareil, lui, n'est jamais touché.
+jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
+// Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
+let mockParams: Record<string, string | undefined> = {}
+// RF (ui-1) : la page est-elle affichée ? Sur le web, la page quittée reste montée, cachée ; le
+// retour la rend affichée de nouveau. `useIsFocused` et `useFocusEffect` suivent ce drapeau, relu
+// à chaque rendu (le test redessine après l'avoir changé).
+let mockFocused = true
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react')
+  return {
+    usePathname: () => '/page/actuelle',
+    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+    useLocalSearchParams: () => mockParams,
+    useIsFocused: () => mockFocused,
+    useFocusEffect: (effect: () => undefined | (() => void)) => {
+      const focused = mockFocused
+      useEffect(() => (focused ? effect() : undefined), [focused, effect])
+    },
+  }
+})
+// Le cadre de page, tel quel, mais dont le test lit les propriétés (RF : `fade`).
+jest.mock('../ui/Screen', () => {
+  const actual = jest.requireActual('../ui/Screen')
+  const { createElement } = require('react')
+  return {
+    ...actual,
+    Screen: (props: Record<string, unknown>) => {
+      mockScreenProps.push(props)
+      return createElement(actual.Screen, props)
+    },
+  }
+})
+
+beforeEach(() => {
+  resetProjectScreenMocks()
+  mockParams = {}
+  mockFocused = true
+})
+
+// F-Pr13 et le point des listes de début de tranche (choix de Louis du 1/11) : au clavier, « Suivre »
+// et les réactions venaient après tout le contenu de la colonne principale.
+describe('the reading order of the project page on a computer', () => {
+  it('reads the gallery, the header, « Suivre » and the reactions before the description', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const gallery = await screen.findByLabelText(fr.t(($) => $.gallery.label))
+      const [galleryAt, titleAt, authorAt, followAt, capsuleAt, descriptionAt] = readingOrder(
+        gallery,
+        screen.getByRole('header', { name: 'Mon agent de recettes' }),
+        screen.getByRole('switch', { name: followAuthor }),
+        screen.getByRole('switch', { name: 'Suivre ce projet' }),
+        screen.getByRole('button', { name: 'Waggle !, 0' }),
+        screen.getByRole('header', { name: 'Comment ça marche' }),
+      )
+      expect([galleryAt, titleAt, authorAt, followAt, capsuleAt, descriptionAt]).not.toContain(-1)
+      const at = (value: number | undefined) => value ?? -1
+      expect(at(titleAt)).toBeGreaterThan(at(galleryAt))
+      expect(at(authorAt)).toBeGreaterThan(at(titleAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(authorAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(followAt))
+      expect(at(capsuleAt)).toBeGreaterThan(at(galleryAt))
+      expect(at(descriptionAt)).toBeGreaterThan(at(capsuleAt))
+    } finally {
+      restore()
+    }
+  })
+
+  // RF (ui-14) : la barre du haut devient fixe sur ordinateur ; la capsule, elle, reste dans la page,
+  // sur la galerie (le test suivant), et sur téléphone elle flotte toujours hors de la page.
+  it('keeps the top bar out of the page and the capsule in it, on a computer (RF)', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther(projectWithPhotos)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const capsule = await screen.findByRole('button', { name: 'Waggle !, 0' })
+      expect(insideScroll(capsule)).toBe(true)
+      expect(insideScroll(screen.getByRole('link', { name: fr.t(($) => $.nav.feed) }))).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  it('puts the capsule on the gallery, inside the page, on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther(projectWithPhotos)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const capsule = await screen.findByRole('button', { name: 'Waggle !, 0' })
+      expect(insideScroll(capsule)).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  // R5a, décision de Louis du 2/11 : « Signaler ce projet » vient après les commentaires, comme sur téléphone.
+  it('reads the description, the prompt and the journal before the comments, and « Signaler » after them', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const prompt = await screen.findByRole('header', { name: 'Le prompt de départ' })
+      const report =
+        screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+        screen.getByRole('button', { name: 'Signaler ce projet' })
+      const [descriptionAt, promptAt, journalAt, reportAt, commentAt] = readingOrder(
+        screen.getByRole('header', { name: 'Comment ça marche' }),
+        prompt,
+        screen.getByRole('header', { name: 'Journal' }),
+        report,
+        screen.getByRole('button', { name: 'Écrire un commentaire' }),
+      )
+      const at = (value: number | undefined) => value ?? -1
+      expect(at(promptAt)).toBeGreaterThan(at(descriptionAt))
+      expect(at(journalAt)).toBeGreaterThan(at(promptAt))
+      expect(at(commentAt)).toBeGreaterThan(at(journalAt))
+      expect(at(reportAt)).toBeGreaterThan(at(commentAt))
+    } finally {
+      restore()
+    }
+  })
+})
+
+// --- Corrections après les relectures de R5a (C3) ---
+
+// Décision de Louis du 2/11/2026 : sur ordinateur aussi, « Signaler ce projet » vient en dernier,
+// après les commentaires, comme sur téléphone (au clavier, il passait avant la conversation).
+describe('« Signaler ce projet » on a computer', () => {
+  it('comes after the comments, as on a phone', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      const comment = await screen.findByRole('button', { name: 'Écrire un commentaire' })
+      const report =
+        screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+        screen.getByRole('button', { name: 'Signaler ce projet' })
+      const [journalAt, commentAt, reportAt] = readingOrder(
+        screen.getByRole('header', { name: 'Journal' }),
+        comment,
+        report,
+      )
+      const at = (value: number | undefined) => value ?? -1
+      expect([journalAt, commentAt, reportAt]).not.toContain(-1)
+      expect(at(commentAt)).toBeGreaterThan(at(journalAt))
+      expect(at(reportAt)).toBeGreaterThan(at(commentAt))
+    } finally {
+      restore()
+    }
+  })
+})
+
+// Décision de Louis du 2/11/2026 : un projet retiré par la modération ne s'ouvre plus que pour son
+// auteur (l'API répond 404 à tous les autres). La feuille « Partager » disait pourtant « seuls les
+// membres pourront l'ouvrir » : ni « Partager » ni « Copier le lien » sur un projet retiré.
+describe('sharing a project removed by the moderation', () => {
+  const removed = { ...recipesProject, removal: removalByLaw }
+  const share = fr.t(($) => $.share.action)
+  const copy = fr.t(($) => $.share.copy)
+  const menu = fr.t(($) => $.actionMenu.label)
+
+  it('offers its author neither « Partager » nor « Copier le lien » on a phone', async () => {
+    jest.mocked(getProject).mockResolvedValue(removed)
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page de l'auteur est là, avec son bandeau de retrait.
+    expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: share })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
+    // Plus rien dans le menu « … » (« Modifier » est déjà refusé sur un projet retiré) : pas de
+    // menu vide.
+    expect(screen.queryByRole('button', { name: menu })).toBeNull()
+  })
+
+  it('offers its author neither « Partager » nor « Copier le lien » on a computer', async () => {
+    const restore = setDesktopWindow()
+    try {
+      jest.mocked(getProject).mockResolvedValue(removed)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: share })).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
+      expect(screen.queryByRole('button', { name: menu })).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+
+  it('still offers « Partager » and « Copier le lien » on a project that was not removed', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getByRole('button', { name: share })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: menu }))
+    expect(screen.getByRole('menuitem', { name: copy })).toBeTruthy()
+  })
+})
+
+// RF (« Les pages apparaissent en fondu », relecture du plan ui-1) : la page d'un projet ouverte
+// depuis une carte garde son passage de R4 (la photo de la carte grandit, ou son propre fondu) ; le
+// fondu des pages ne s'y ajoute pas : ProjectScreen passe `fade={false}` à Screen pendant cette
+// arrivée, chargement compris. Au retour sur la page, restée montée (le membre revient d'une autre
+// page), elle apparaît en fondu comme les autres.
+describe('the page fade of the project page (RF, ui-1)', () => {
+  // La carte du fil, touchée : elle prévient la page qu'elle arrive d'elle (coverTransition.tsx).
+  let card: ReturnType<typeof useCoverSource> | undefined
+  function Card() {
+    card = useCoverSource(id)
+    return null
+  }
+  const stage = (page: boolean) => (
+    <CoverTransitionProvider>
+      <Card />
+      {page ? <ProjectScreen id={id} /> : null}
+    </CoverTransitionProvider>
+  )
+  const fades = () => mockScreenProps.map((props) => props.fade)
+
+  /** Ouvre la page depuis la carte touchée, et attend son titre. */
+  const openFromCard = async () => {
+    const view = await renderWithProviders(stage(false))
+    await act(async () => card?.capture(() => {}))
+    mockScreenProps.length = 0
+    await view.rerender(stage(true))
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    return view
+  }
+
+  it('does not fade in the page that arrives from a card, loading included', async () => {
+    await openFromCard()
+
+    expect(fades().length).toBeGreaterThan(0) // témoin : la page est passée par Screen
+    expect(fades().every((fade) => fade === false)).toBe(true)
+  })
+
+  it('fades in a page opened by its address, without a card (witness)', async () => {
+    await renderWithProviders(stage(true))
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+
+    expect(fades().at(-1)).not.toBe(false)
+  })
+
+  it('fades in the page when the member comes back to it', async () => {
+    const view = await openFromCard()
+    // Témoin : à l'arrivée depuis la carte, pas de fondu (sinon ce test passerait sans la règle).
+    expect(fades().at(-1)).toBe(false)
+
+    // Le membre part vers une autre page (celle-ci, restée montée, est cachée), puis revient.
+    mockFocused = false
+    await view.rerender(stage(true))
+    mockFocused = true
+    await view.rerender(stage(true))
+
+    expect(fades().at(-1)).not.toBe(false)
+  })
+})
