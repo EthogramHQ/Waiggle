@@ -1,7 +1,7 @@
 // Les niveaux de titre de la page d'un projet, tels qu'un lecteur d'écran les parcourt sur le web :
 // le titre du projet (h1), ses sections (h2), puis les titres écrits dans la description (h3, h4).
 // Avant, tous étaient des h1 : la page paraissait une suite de pages sans lien (relecture de design
-// du 22/10/2026). Fichier à part de ProjectScreen.test.tsx : il remplace la plateforme par le web.
+// du 22/10/2026). Fichier à part des ProjectScreen.*.test.tsx : il remplace la plateforme par le web.
 import { screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { useComments, useDeleteComment, usePostComment } from '../comments/api'

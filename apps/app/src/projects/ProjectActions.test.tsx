@@ -1,7 +1,7 @@
 // Tests des actions de la page d'un projet (R5a, ProjectActions) : « Tester la démo » et le site
 // qu'elle ouvre, « Suivre ce projet » et ses abonnés pour un autre membre, « Modifier » pour
 // l'auteur, le bandeau d'un projet privé. La page elle-même (ordre, menus) est testée par
-// screens/ProjectScreen.test.tsx.
+// screens/ProjectScreen.*.test.tsx.
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { useFollow } from '../follows/api'
 import { getMe } from '../profile/api'
