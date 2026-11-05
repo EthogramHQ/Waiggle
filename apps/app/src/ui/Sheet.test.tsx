@@ -7,9 +7,9 @@
 // Ce que Jest ne mesure pas : la feuille pleine hauteur sur téléphone, le panneau centré sur un fond
 // voilé sur ordinateur, et le pied qui reste au-dessus du clavier (jur-15, WCAG 2.4.11). C'est
 // l'affaire des captures et d'un essai --explore.
-import { act, fireEvent, screen, within } from '@testing-library/react-native'
-import { useState } from 'react'
-import { Platform, StyleSheet } from 'react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { createRef, type RefObject, useRef, useState } from 'react'
+import { Platform, StyleSheet, TextInput, View } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { Button } from './Button'
@@ -17,6 +17,7 @@ import { focusWithoutScroll } from './focus'
 import { Sheet } from './Sheet'
 import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
+import * as motion from './theme/motion'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 // La couche qui s'écarte du clavier (iOS) : une vue ordinaire, repérable, qui garde ses réglages
@@ -559,5 +560,374 @@ describe('the scrim on the web, against a double tap', () => {
     const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])
     expect((focused.at(-1) as unknown as Host).props.accessibilityLabel).toBe(close)
     expect(clickGuards()).toHaveLength(0) // rien n'a fermé : la page n'a rien à retenir
+  })
+})
+
+// --- R5b : la feuille des commentaires ---
+//
+// La feuille gagne ce que demande celle des commentaires (relecture de l'interface du plan R5b) :
+// - `titleCount` : « Commentaires 6 », dessiné par CountedTitle, et la boîte de dialogue lue
+//   « Commentaires, 6 commentaires » (ui-I3) ;
+// - `initialFocusRef` : « Écrire un commentaire » ouvre la feuille le champ prêt (ui-I3) ;
+// - Échap n'est prise que si elle vient de son panneau et n'a pas déjà servi (la liste des
+//   mentions, un menu, une confirmation ouverts dedans : ui-B1) ;
+// - un fondu au lieu de la montée avec « Réduire les animations » (ui-B4) ;
+// - le glisser vers le bas ferme, sauf pendant un envoi (`busy`, décision D1 de Louis).
+
+/** La feuille des commentaires : son titre, son nombre, et ce qu'on lit dedans. */
+function CommentsSheet({
+  onClose,
+  busy = false,
+  probe,
+}: {
+  onClose: jest.Mock
+  busy?: boolean
+  /** Une vue posée dans la feuille, pour prêter aux vues ce que le web leur donne (`contains`). */
+  probe?: RefObject<View | null>
+}) {
+  return (
+    <Sheet
+      open
+      busy={busy}
+      title="Commentaires"
+      titleCount={{ count: 6, spoken: '6 commentaires' }}
+      onClose={onClose}
+      footer={<Button label="Envoyer le commentaire" onPress={() => {}} />}
+    >
+      <Text>Super idée, je teste ce soir.</Text>
+      {probe ? <View ref={probe} /> : null}
+    </Sheet>
+  )
+}
+
+/** La boîte de dialogue de la feuille (téléphone) : la vue au rôle `dialog`. */
+const dialogNode = () => {
+  const found = hostsOf(root()).find((node) => roleOf(node.props) === 'dialog')
+  if (!found) throw new Error('no dialog')
+  return found
+}
+
+/** Le nom lu d'un élément : son nom donné, sinon son texte (comme le calcule un lecteur d'écran). */
+const nameOf = (node: Host): string => {
+  const given = node.props.accessibilityLabel ?? node.props['aria-label']
+  if (typeof given === 'string') return given
+  const text = (child: Host | string): string =>
+    typeof child === 'string' ? child : child.children.map(text).join('')
+  return text(node).replace(/\s+/g, ' ')
+}
+
+/** L'élément qui porte l'identifiant donné (`nativeID`, l'attribut id sur le web). */
+const byNativeId = (id: unknown) => {
+  const found = hostsOf(root()).find((node) => node.props.nativeID === id)
+  if (!found) throw new Error(`nothing has the nativeID ${String(id)}`)
+  return found
+}
+
+describe('the comments sheet title (R5b)', () => {
+  it('the comments sheet dialog is named « Commentaires, 6 commentaires »', async () => {
+    await renderWithProviders(<CommentsSheet onClose={jest.fn()} />)
+
+    // La boîte de dialogue est nommée par son titre (aria-labelledby), et ce titre se lit avec son
+    // nombre en toutes lettres, sans le chiffre seul.
+    const labelledBy = dialogNode().props['aria-labelledby']
+    expect(labelledBy).toEqual(expect.any(String))
+    expect(nameOf(byNativeId(labelledBy))).toBe('Commentaires, 6 commentaires')
+    // On voit « Commentaires 6 », un titre de la feuille.
+    const header = screen.getByRole('header', { name: 'Commentaires, 6 commentaires' })
+    expect(header.props.nativeID).toBe(labelledBy)
+    const shown = (child: unknown): string =>
+      typeof child === 'string' || typeof child === 'number'
+        ? String(child)
+        : Array.isArray(child)
+          ? child.map(shown).join('')
+          : child && typeof child === 'object' && 'props' in child
+            ? shown((child as { props: { children?: unknown } }).props.children)
+            : ''
+    expect(shown(header.props.children).replace(/\s+/g, ' ')).toBe('Commentaires 6')
+  })
+
+  it('names the layer of the Modal by the title and its count, on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument({ focus: jest.fn() }),
+      configurable: true,
+    })
+    try {
+      await renderWithProviders(<CommentsSheet onClose={jest.fn()} />)
+
+      expect(nameOf(byNativeId(layer().props['aria-labelledby']))).toBe(
+        'Commentaires, 6 commentaires',
+      )
+    } finally {
+      jest.restoreAllMocks()
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+  })
+})
+
+describe('the comments sheet on the web, with the keyboard (R5b)', () => {
+  const opener = { focus: jest.fn() }
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    jest.mocked(focusWithoutScroll).mockClear()
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument(opener),
+      configurable: true,
+    })
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  /** La page d'un projet, réduite à son bouton « Écrire un commentaire » et à la feuille. */
+  function WritePage() {
+    const [open, setOpen] = useState(false)
+    const field = useRef<TextInput>(null)
+    return (
+      <>
+        <Button label="Écrire un commentaire" onPress={() => setOpen(true)} />
+        <Sheet
+          open={open}
+          title="Commentaires"
+          initialFocusRef={field}
+          onClose={() => setOpen(false)}
+          footer={<TextInput ref={field} accessibilityLabel="Ton commentaire" />}
+        >
+          <Text>Aucun commentaire pour l’instant.</Text>
+        </Sheet>
+      </>
+    )
+  }
+
+  it('« Écrire un commentaire » opens the sheet with the focus in the comment field', async () => {
+    // Le focus peut arriver par focusWithoutScroll (sans défilement) ou par le focus() du champ :
+    // on retient le dernier arrivé, quelle que soit la voie.
+    const focus = jest.spyOn(TextInput.prototype, 'focus')
+    focus.mockClear()
+    await renderWithProviders(<WritePage />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Écrire un commentaire' }))
+
+    await waitFor(() => {
+      const arrivals = [
+        ...jest.mocked(focusWithoutScroll).mock.calls.map((call, index) => ({
+          order: jest.mocked(focusWithoutScroll).mock.invocationCallOrder[index] ?? 0,
+          node: call[0] as Host | undefined,
+        })),
+        ...focus.mock.contexts.map((context, index) => ({
+          order: focus.mock.invocationCallOrder[index] ?? 0,
+          node: context as unknown as Host | undefined,
+        })),
+      ].sort((a, b) => a.order - b.order)
+      expect(arrivals.at(-1)?.node?.props.accessibilityLabel).toBe('Ton commentaire')
+    })
+  })
+
+  it('opens with the focus on « Fermer » without initialFocusRef (témoin)', async () => {
+    await renderWithProviders(<Page />)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Corriger mon adresse' }))
+
+    const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0] as Host)
+    expect(focused.at(-1)?.props.accessibilityLabel).toBe(close)
+  })
+
+  it('ignores an Escape already handled by a field inside it', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<CommentsSheet onClose={onClose} />)
+
+    // La liste des mentions, ouverte dans le champ, a pris Échap pour se fermer : la touche arrive
+    // à la feuille déjà prise (`defaultPrevented`, sur l'événement de React comme sur celui du
+    // navigateur).
+    const handled = {
+      ...key('Escape'),
+      defaultPrevented: true,
+      isDefaultPrevented: () => true,
+      nativeEvent: { key: 'Escape', defaultPrevented: true },
+    }
+    await fireEvent(
+      screen.getByRole('button', { name: 'Envoyer le commentaire' }),
+      'keyDown',
+      handled,
+    )
+    // Puis la touche relâchée arrive au Modal : elle ne ferme pas non plus la feuille.
+    await act(() => layer().props.onRequestClose())
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+  })
+
+  it('ignores an Escape that comes from outside its panel, from a layer opened above it', async () => {
+    // Un menu « … » ou la confirmation de suppression, ouverts par-dessus la feuille, sont d'autres
+    // couches de la page : leurs touches remontent l'arbre de React jusqu'à la feuille, sans venir
+    // de son panneau. On prête aux vues le `contains` du navigateur.
+    const onClose = jest.fn()
+    const probe = createRef<View>()
+    await renderWithProviders(<CommentsSheet onClose={onClose} probe={probe} />)
+    const proto = Object.getPrototypeOf(probe.current) as { contains?: unknown }
+    const hadContains = Object.hasOwn(proto, 'contains')
+    const originalContains = proto.contains
+    const outside = { outside: true }
+    try {
+      proto.contains = (node: unknown) => node !== outside
+      await fireEvent(screen.getByRole('button', { name: 'Envoyer le commentaire' }), 'keyDown', {
+        ...key('Escape'),
+        target: outside,
+        nativeEvent: { key: 'Escape', target: outside },
+      })
+      expect(onClose).not.toHaveBeenCalled()
+
+      // Témoin : la même touche, venue du panneau, ferme la feuille.
+      const inside = { inside: true }
+      await fireEvent(screen.getByRole('button', { name: 'Envoyer le commentaire' }), 'keyDown', {
+        ...key('Escape'),
+        target: inside,
+        nativeEvent: { key: 'Escape', target: inside },
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    } finally {
+      if (hadContains) proto.contains = originalContains
+      else delete proto.contains
+    }
+  })
+})
+
+describe('the phone sheet with « Réduire les animations » (R5b)', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it('with reduce motion on, the phone sheet appears with a fade instead of sliding up', async () => {
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(true)
+    await renderWithProviders(<CommentsSheet onClose={jest.fn()} />)
+
+    expect(layer().props.animationType).toBe('fade')
+  })
+
+  it('slides up from the bottom on a phone without it (témoin)', async () => {
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(false)
+    await renderWithProviders(<CommentsSheet onClose={jest.fn()} />)
+
+    expect(layer().props.animationType).toBe('slide')
+  })
+})
+
+// Décision D1 de Louis (4/11/2026) : la feuille se ferme aussi en la glissant vers le bas, pour
+// toutes les feuilles, sauf pendant une action en cours (`busy` : un commentaire qui part). Le
+// glisser passe par le système de réponse au toucher de React Native (PanResponder ou les
+// `onResponder…` d'une vue) : on rejoue un doigt qui descend sur la zone qui se glisse, la première
+// vue de la feuille qui suit le doigt sans être un bouton ni la zone qui défile.
+
+/** Une vue de l'arbre rendu, avec son type natif (pour écarter la zone qui défile). */
+type TypedHost = Host & { type?: unknown }
+
+/** La zone de la feuille qui suit le doigt. */
+const dragArea = (): TypedHost => {
+  const found = (hostsOf(dialogNode()) as TypedHost[]).find(
+    (node) =>
+      typeof node.props.onResponderMove === 'function' &&
+      typeof node.props.onClick !== 'function' &&
+      node.props.accessibilityRole !== 'button' &&
+      node.props.role !== 'button' &&
+      node.type !== 'RCTScrollView',
+  )
+  if (!found) throw new Error('no drag area: nothing in the sheet follows the finger')
+  return found
+}
+
+/**
+ * Un doigt posé à 100 points, qui descend de `distance` points en 200 ms puis se lève : les
+ * événements du système de réponse, avec l'historique des touchers que lit PanResponder.
+ */
+const dragDown = async (distance: number) => {
+  const area = dragArea()
+  let previous = { y: 100, time: 1000 }
+  const start = previous
+  const touchAt = (y: number, time: number, active: boolean) => {
+    const touch = {
+      identifier: 0,
+      pageX: 200,
+      pageY: y,
+      locationX: 200,
+      locationY: y,
+      timestamp: time,
+    }
+    const event = {
+      nativeEvent: { ...touch, touches: active ? [touch] : [], changedTouches: [touch] },
+      touchHistory: {
+        numberActiveTouches: active ? 1 : 0,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: time,
+        touchBank: [
+          {
+            touchActive: active,
+            startPageX: 200,
+            startPageY: start.y,
+            startTimeStamp: start.time,
+            currentPageX: 200,
+            currentPageY: y,
+            currentTimeStamp: time,
+            previousPageX: 200,
+            previousPageY: previous.y,
+            previousTimeStamp: previous.time,
+          },
+        ],
+      },
+      target: area,
+      currentTarget: area,
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      isDefaultPrevented: () => false,
+      isPropagationStopped: () => false,
+      persist: () => {},
+    }
+    previous = { y, time }
+    return event
+  }
+  const call = (name: string, event: object) =>
+    (area.props[name] as ((event: object) => unknown) | undefined)?.(event)
+
+  await act(async () => {
+    const down = touchAt(100, 1000, true)
+    call('onStartShouldSetResponderCapture', down)
+    call('onStartShouldSetResponder', down)
+    // Le doigt bouge de 2 points : la zone demande le toucher, et le reçoit.
+    const first = touchAt(102, 1016, true)
+    call('onMoveShouldSetResponderCapture', first)
+    call('onMoveShouldSetResponder', first)
+    call('onResponderGrant', first)
+    call('onResponderStart', first)
+    call('onResponderMove', touchAt(100 + distance / 2, 1100, true))
+    call('onResponderMove', touchAt(100 + distance, 1200, true))
+    const up = touchAt(100 + distance, 1216, false)
+    call('onResponderEnd', up)
+    call('onResponderRelease', up)
+  })
+  // Le temps d'une animation de fermeture, si la feuille en joue une avant de se fermer.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+}
+
+describe('dragging the phone sheet down (R5b, D1)', () => {
+  it('dragging the sheet down closes it, except while a comment is being sent', async () => {
+    const onClose = jest.fn()
+    const { rerender } = await renderWithProviders(<CommentsSheet onClose={onClose} busy />)
+
+    // Pendant l'envoi : un glissement accidentel ne ferme rien.
+    await dragDown(400)
+    expect(onClose).not.toHaveBeenCalled()
+
+    // L'envoi fini, le même geste ferme la feuille.
+    await rerender(<CommentsSheet onClose={onClose} />)
+    await dragDown(400)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  it('a drag of a few points does not close it', async () => {
+    const onClose = jest.fn()
+    await renderWithProviders(<CommentsSheet onClose={onClose} />)
+
+    await dragDown(8)
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
   })
 })
