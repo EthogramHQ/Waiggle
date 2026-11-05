@@ -13,14 +13,23 @@ import {
   Fragment,
   type ReactNode,
   type Ref,
+  useCallback,
   useContext,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform, Pressable, TextInput, type TextInputProps, View } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  TextInput,
+  type TextInputProps,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { comboboxLinks, describedBy, invalid } from './aria'
 import { Icon } from './Icon'
 import { Text, type Tone } from './Text'
@@ -48,8 +57,29 @@ type Props = {
   keepHint?: boolean
   /** Affiche « 42 / 140 » à côté de l'étiquette (la limite : maxLength, ou `limit`). */
   showCount?: boolean
-  /** Une limite seulement affichée : on peut la dépasser, l'erreur vient à l'enregistrement. */
+  /**
+   * Une limite seulement affichée : on peut la dépasser, l'erreur vient à l'enregistrement (ou de
+   * l'écran, qui la dit). À préférer à `maxLength` quand le membre doit voir son dépassement : un
+   * `maxLength` couperait en silence un texte collé trop long (relecture du plan R5b, ui-I2).
+   */
   limit?: number
+  /**
+   * Le compteur « 900 / 1000 » apparaît sous le champ à partir de ce nombre de caractères (avec
+   * `limit` ou `maxLength`) : la règle se voit avant l'erreur, sans encombrer un texte court. Il est
+   * lu « 900 caractères sur 1000 ».
+   */
+  countFrom?: number
+  /**
+   * Un champ compact (le bas de la feuille des commentaires) : une ligne de haut, sans libellé
+   * affiché au-dessus. Le libellé reste son nom lu ; le texte d'attente (`placeholder`) dit à l'œil
+   * ce qu'on y tape.
+   */
+  compact?: boolean
+  /**
+   * Avec `multiline`, le champ commence haut d'une ligne et grandit avec son texte, jusqu'à ce
+   * nombre de lignes ; au-delà, son texte défile. Absent : la hauteur fixe d'un champ multiligne.
+   */
+  maxLines?: number
   /** Un petit texte à droite de l'étiquette (« 12 caractères minimum »). */
   aside?: string
   /** Une confirmation sous le champ, en vert (« Lien vérifié »). Une erreur passe avant. */
@@ -162,6 +192,9 @@ export function TextField({
   keepHint = false,
   showCount = false,
   limit,
+  countFrom,
+  compact = false,
+  maxLines,
   aside,
   success,
   prefix,
@@ -197,6 +230,77 @@ export function TextField({
   // « 999 / 1000 » quand le champ refusait déjà la lettre suivante.
   const counted = showCount && max ? value.length : null
   const counter = counted !== null ? `${counted} / ${max}` : aside
+  // Le compteur sous le champ (`countFrom`), compté de la même façon ; null tant qu'il n'est pas dû.
+  const below =
+    countFrom !== undefined && max && value.length >= countFrom
+      ? {
+          shown: t(($) => $.project.comments.counter, { count: value.length, max }),
+          spoken: t(($) => $.project.comments.counterSpoken, { count: value.length, max }),
+          tone: (value.length > max ? 'danger' : value.length >= max ? 'accent' : 'muted') as Tone,
+        }
+      : null
+  const counterId = useId()
+  // Ce qui décrit le champ (web) : le message, puis le compteur ; sur téléphone, l'indice les lit.
+  const described = [message ? messageId : null, below ? counterId : null].filter(Boolean).join(' ')
+  const spokenHint = [message, below?.spoken].filter(Boolean).join(' ')
+
+  // Le champ qui grandit (`multiline` et `maxLines`) : sa hauteur suit celle de son texte, d'une
+  // ligne à `maxLines`, plus sa marge. `content` est la hauteur du texte, `line` celle d'une ligne
+  // telle que l'écran la dessine (sur le web, la page peut agrandir le texte : on la lit).
+  const grows = Boolean(inputProps.multiline) && maxLines !== undefined
+  const padY = compact ? space.sm : space.xs
+  const [measured, setMeasured] = useState<{ content: number; line: number }>({
+    content: body.lineHeight,
+    line: body.lineHeight,
+  })
+  const lines = maxLines ?? 1
+  const growHeight = Math.max(
+    layout.touchTarget,
+    Math.min(Math.max(measured.content, measured.line), lines * measured.line) + 2 * padY,
+  )
+  // Sur le web, le navigateur ne dit pas la hauteur du texte d'une zone de saisie plus haute que
+  // lui (`scrollHeight` ne descend jamais sous la hauteur de la boîte) : on la mesure en ramenant
+  // un instant la boîte à zéro, puis en lui rendant sa hauteur (la recette des zones de texte qui
+  // s'ajustent). Rien ne se voit : tout se passe avant que le navigateur ne redessine.
+  const measureWeb = useCallback(() => {
+    const node = input.current as unknown as HTMLTextAreaElement | null
+    if (!node || typeof node.scrollHeight !== 'number' || typeof getComputedStyle !== 'function')
+      return
+    const before = node.style.height
+    node.style.height = '0px'
+    const content = node.scrollHeight - 2 * padY
+    node.style.height = before
+    const line = Number.parseFloat(getComputedStyle(node).lineHeight) || body.lineHeight
+    setMeasured((previous) =>
+      previous.content === content && previous.line === line ? previous : { content, line },
+    )
+  }, [padY])
+  // useLayoutEffect : après chaque frappe, avant que la page ne soit redessinée.
+  // (`value` est lu dans la condition pour que l'effet reparte à chaque texte nouveau.)
+  useLayoutEffect(() => {
+    if (grows && Platform.OS === 'web' && value !== undefined) measureWeb()
+  }, [grows, value, measureWeb])
+  // Sur téléphone, la saisie dit elle-même la hauteur de son texte (agrandie avec la taille de texte
+  // de l'appareil) ; une ligne y suit la même échelle, bornée à 2 comme les textes de l'appli.
+  const { fontScale } = useWindowDimensions()
+  const nativeLine = body.lineHeight * Math.min(Math.max(fontScale || 1, 1), 2)
+  const growing = grows
+    ? Platform.OS === 'web'
+      ? { onLayout: measureWeb }
+      : {
+          maxFontSizeMultiplier: 2,
+          onContentSizeChange: (event: {
+            nativeEvent: { contentSize: { width: number; height: number } }
+          }) => {
+            const content = event.nativeEvent.contentSize.height
+            setMeasured((previous) =>
+              previous.content === content && previous.line === nativeLine
+                ? previous
+                : { content, line: nativeLine },
+            )
+          },
+        }
+    : null
   // À la limite, le compteur prévient (ambre) ; au-delà (limite seulement affichée), il alerte.
   const counterTone: Tone =
     counted !== null && max && counted > max
@@ -222,30 +326,43 @@ export function TextField({
       }}
       style={{
         paddingHorizontal: space.lg,
-        paddingTop: space.md,
-        paddingBottom: space.sm,
+        // Compact : la saisie porte seule sa marge (une ligne, 44 points), sans rangée de libellé.
+        paddingTop: compact ? 0 : space.md,
+        paddingBottom: compact ? 0 : space.sm,
         // Dans un groupe, le champ n'a pas de cadre à lui : quand il est choisi, sa ligne prend un
         // fond doux (en plus de son libellé en couleur), pour qu'on voie où l'on tape.
         ...(inGroup && focused ? { backgroundColor: colors.honeySoft } : null),
       }}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.sm }}>
-        <Text variant="caption" weight={600} tone={wrong ? 'danger' : focused ? 'accent' : 'muted'}>
-          {label}
-        </Text>
-        {counter ? (
+      {/* Compact, le libellé n'est pas affiché : il reste le nom lu de la saisie. */}
+      {compact ? null : (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.sm }}>
           <Text
             variant="caption"
-            tone={counterTone}
-            weight={counterTone === 'muted' ? 400 : 700}
-            tabular
+            weight={600}
+            tone={wrong ? 'danger' : focused ? 'accent' : 'muted'}
           >
-            {counter}
+            {label}
           </Text>
-        ) : null}
-      </View>
+          {counter ? (
+            <Text
+              variant="caption"
+              tone={counterTone}
+              weight={counterTone === 'muted' ? 400 : 700}
+              tabular
+            >
+              {counter}
+            </Text>
+          ) : null}
+        </View>
+      )}
       <View
-        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xxs }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+          marginTop: compact ? 0 : space.xxs,
+        }}
       >
         {/* Le préfixe touche la saisie (« @lea », pas « @ lea ») : d'où ce rang à part, sans
             écart. aria-hidden : un lecteur d'écran lirait « arobase » à chaque passage. */}
@@ -262,8 +379,8 @@ export function TextField({
             accessibilityLabel={label}
             // Ce qui est écrit sous le champ, lu après son nom : sur le web par aria-describedby
             // (le navigateur relie le champ au texte), sur téléphone par l'indice.
-            accessibilityHint={Platform.OS === 'web' ? undefined : message}
-            {...describedBy(message ? messageId : undefined)}
+            accessibilityHint={Platform.OS === 'web' ? undefined : spokenHint || undefined}
+            {...describedBy(described || undefined)}
             // « Saisie invalide » : le lecteur d'écran le dit en arrivant sur le champ (web).
             {...invalid(wrong)}
             // Un champ à suggestions : le lecteur d'écran annonce « liste déroulante, réduite ou
@@ -299,11 +416,14 @@ export function TextField({
               lineHeight: body.lineHeight,
               color: colors.text,
               minHeight: layout.touchTarget,
-              paddingVertical: space.xs,
+              paddingVertical: padY,
               // Sur le web, le navigateur dessine son propre contour : le groupe s'en charge déjà.
               outlineWidth: 0,
               ...(inputProps.multiline ? { minHeight: 96, textAlignVertical: 'top' } : null),
+              // Le champ qui grandit : sa hauteur à lui, d'une ligne à `maxLines` (voir plus haut).
+              ...(grows ? { minHeight: layout.touchTarget, height: growHeight } : null),
             }}
+            {...growing}
             {...inputProps} // les autres réglages (type de clavier, saisie automatique…) sont transmis tels quels
             // Un mot de passe, même affiché, ne passe jamais par le correcteur orthographique ni par le
             // dictionnaire du clavier : certains correcteurs envoient le texte à un service en ligne,
@@ -344,6 +464,7 @@ export function TextField({
       {inGroup ? (
         <Message id={messageId} error={error} hint={hint} success={success} keepHint={keepHint} />
       ) : null}
+      {inGroup && below ? <Counter id={counterId} {...below} /> : null}
     </Pressable>
   )
 
@@ -359,6 +480,54 @@ export function TextField({
         keepHint={keepHint}
         outside
       />
+      {below ? <Counter id={counterId} {...below} outside /> : null}
+    </View>
+  )
+}
+
+/**
+ * Le compteur sous le champ (`countFrom`), rangé à droite : « 900 / 1000 » à l'œil, « 900
+ * caractères sur 1000 » au lecteur d'écran (une barre oblique se lirait « barre oblique »). Ambre à
+ * la limite, rouge au-delà. Il n'est pas une région vivante : l'annoncer à chaque lettre serait du
+ * bruit ; le champ le cite dans sa description (lue en y arrivant), et l'écran annonce lui-même un
+ * dépassement (« 1 caractère de trop. »).
+ */
+function Counter({
+  id,
+  shown,
+  spoken,
+  tone,
+  outside = false,
+}: {
+  /** L'identifiant que le champ cite dans aria-describedby. */
+  id: string
+  shown: string
+  spoken: string
+  tone: Tone
+  outside?: boolean
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        ...(outside
+          ? { paddingHorizontal: space.sm, paddingTop: space.xs }
+          : { paddingBottom: space.xs }),
+      }}
+    >
+      {/* nativeID devient l'attribut id sur le web : celui que cite aria-describedby, qui y lit le
+          nom (aria-label) plutôt que le texte affiché. */}
+      <Text
+        nativeID={id}
+        variant="caption"
+        tone={tone}
+        weight={tone === 'muted' ? 400 : 700}
+        tabular
+        accessibilityLabel={spoken}
+      >
+        {shown}
+      </Text>
     </View>
   )
 }
