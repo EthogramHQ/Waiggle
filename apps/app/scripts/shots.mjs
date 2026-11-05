@@ -548,9 +548,20 @@ const followingFeed = (feed) =>
 // identifiant (un numéro), son auteur (null : un emplacement), son texte, le jour et l'heure
 // (d'octobre 2026) de sa publication, et le reste au choix (state, isMine, editedAt, replies).
 const lea = { id: leaMe.id, name: leaMe.name, avatarUrl: null }
+// R5b : l'auteur d'un commentaire porte son pseudo actuel (`handle` du contrat, `null` sous un
+// blocage) : « Répondre » sous une réponse commence le champ par sa mention.
+const hugo = { id: 'hugo-id', name: 'Hugo Lefèvre', avatarUrl: null }
+const jean = { id: 'jean-id', name: 'Papi Jean', avatarUrl: null }
+const handleOf = {
+  [leaMe.id]: leaMe.handle,
+  [max.id]: 'max_durand',
+  [ines.id]: 'ines_haddad',
+  [hugo.id]: 'hugo_lefevre',
+  [jean.id]: 'papi_jean',
+}
 const comment = (n, author, body, day, hour, fields = {}) => ({
   id: `5e6f7081-92a3-4b4c-8d5e-${String(n).padStart(12, '0')}`,
-  author,
+  author: author && { ...author, handle: handleOf[author.id] ?? null },
   body: author ? body : '',
   createdAt: new Date(Date.UTC(2026, 9, day, hour)).toISOString(),
   editedAt: null,
@@ -632,6 +643,9 @@ const mentionable = [
   { id: ines.id, name: ines.name, handle: 'ines_haddad', avatarUrl: null },
   { id: 'iniko-id', name: 'Iniko Diallo', handle: 'iniko', avatarUrl: null },
   { id: max.id, name: max.name, handle: 'max_durand', avatarUrl: null },
+  // R5b : « @Lé » trouve Hugo Lefèvre par un mot de son nom (planche `R5b-Repondre`).
+  { id: hugo.id, name: hugo.name, handle: handleOf[hugo.id], avatarUrl: null },
+  { id: jean.id, name: jean.name, handle: handleOf[jean.id], avatarUrl: null },
 ]
 // Tranche 7a : le projet « Avis express » de Léa, retiré après un signalement, au nom des règles.
 // Elle seule le voit encore : le bandeau en tête, avec l'explication et l'adresse pour contester.
@@ -787,8 +801,78 @@ const gardenComments = [
     replies: [comment(45, max, 'Bonne idée, je l’ajoute à la prochaine version.', 16, 12)],
   }),
 ]
+// R5b, les commentaires redessinés (planches `R5b-Commentaires`, `R5b-Repondre`, `R5b-Menu-Etats`) :
+// un projet de Max, vu par Léa, à 6 commentaires visibles de tous. Dans l'ordre de la feuille : le
+// fil d'Inès, qui mentionne Max (la pastille, avec son nom), et la réponse de Max, l'auteur (le
+// badge) ; le commentaire de Léa (le fond gris des siens) ; un autre des siens, masqué par Max
+// (« Masqué par l'auteur du projet ») ; un supprimé, gardé pour la réponse de Hugo, longue de 14
+// lignes (« Lire la suite » après 10) ; un retiré par la modération, gardé pour la réponse d'Inès ;
+// celui de Sam, que Léa a bloqué, gardé pour la réponse de Papi Jean. L'aperçu en montre 3 sur
+// téléphone (Inès, Max, Léa) et 5 sur ordinateur (puis Hugo et Inès), sans les emplacements.
+const threadsProject = {
+  ...commentedProject,
+  id: '00000000-0000-4000-8000-0000000000c6',
+  title: 'Le chef des restes',
+  followerCount: 9,
+}
+const hugoLongReply = [
+  'J’ai tout essayé sur une semaine entière, voici mon bilan jour par jour.',
+  'Lundi : un gratin de pâtes avec le fond de crème, très réussi.',
+  'Mardi : une soupe de fanes de radis, étonnante mais bonne.',
+  'Mercredi : il m’a proposé une omelette, j’avais déjà mangé des œufs.',
+  'Jeudi : des galettes de riz, les enfants ont adoré.',
+  'Vendredi : une salade de lentilles, un peu fade sans citron.',
+  'Samedi : une pizza avec les restes de légumes grillés.',
+  'Dimanche : un crumble avec les pommes abîmées.',
+  'Ce qui marche bien : il tient compte de ce qu’on a vraiment.',
+  'Ce qui manque : les quantités, il faut deviner pour quatre.',
+  'Il oublie parfois ce qu’on a déjà cuisiné la veille.',
+  'Les temps de cuisson sont justes, c’est appréciable.',
+  'Je le garde pour la semaine prochaine, avec les desserts.',
+  'Merci Max, et vivement la version 2 !',
+].join('\n')
+const threadsComments = [
+  comment(
+    51,
+    ines,
+    'Testé avec les restes de raclette : trois idées, dont une soupe. @max_durand, tu as prévu les desserts ?',
+    19,
+    9,
+    {
+      mentions: [{ handle: 'max_durand', memberId: max.id, name: max.name }],
+      replies: [
+        comment(52, max, 'Pas encore, mais c’est noté pour la version 2 !', 19, 11, {
+          editedAt: new Date(Date.UTC(2026, 9, 19, 12)).toISOString(),
+        }),
+      ],
+    },
+  ),
+  comment(
+    53,
+    lea,
+    'Essayé avec un frigo presque vide : il a quand même trouvé une omelette.',
+    18,
+    20,
+  ),
+  comment(54, lea, 'Petite pub : mon tri des photos fait pareil pour les albums !', 18, 9, {
+    state: 'hidden',
+  }),
+  comment(55, null, '', 17, 9, {
+    state: 'deleted',
+    replies: [comment(56, hugo, hugoLongReply, 17, 18)],
+  }),
+  comment(57, null, '', 16, 9, {
+    state: 'removed',
+    replies: [comment(58, ines, 'Je ne suis pas sûre que ce soit une bonne idée…', 16, 11)],
+  }),
+  comment(59, null, '', 15, 9, {
+    state: 'blocked',
+    replies: [comment(60, jean, 'Moi, je le fais avec les enfants le dimanche.', 15, 12)],
+  }),
+]
 // Les commentaires de chaque projet : la première page, puis la suite (curseur « suite »).
 const commentsOf = {
+  [threadsProject.id]: [threadsComments],
   [gardenProject.id]: [gardenComments],
   [removedProject.id]: [removedComments],
   [recipesProject.id]: [recipesComments],
@@ -806,7 +890,12 @@ const reactionsOf = {
     mine: ['useful', 'bravo'],
   },
 }
-const commentCountOf = { [recipesProject.id]: 4, [commentedProject.id]: 7, [longProject.id]: 2 }
+const commentCountOf = {
+  [recipesProject.id]: 4,
+  [commentedProject.id]: 7,
+  [longProject.id]: 2,
+  [threadsProject.id]: 6,
+}
 
 // L'horloge des captures (relecture design R4, A6) : le mardi 20/10/2026, 12 h à Paris. Chaque
 // contexte du navigateur la pose avant sa première page (`installShotClock`), pour les captures,
@@ -1206,6 +1295,9 @@ const fakeApi = (
     if (pathname === `/v1/projects/${commentedProject.id}`) {
       return json(200, withExtras(commentedProject))
     }
+    if (pathname === `/v1/projects/${threadsProject.id}`) {
+      return json(200, withExtras(threadsProject))
+    }
     if (pathname === `/v1/projects/${longProject.id}`) return json(200, withExtras(longProject))
     // R5a : le brouillon privé de Léa, vu par elle (le bandeau privé, « Pas encore de réaction »).
     if (pathname === `/v1/projects/${draftProject.id}`) return json(200, withExtras(draftProject))
@@ -1387,8 +1479,19 @@ const fakeApi = (
       return json(200, searchResultsOf[q] ?? emptySearchResults)
     }
     if (pathname === '/v1/members/mentionable') {
-      const q = (url.searchParams.get('q') ?? '').toLowerCase()
-      return json(200, { members: mentionable.filter((m) => m.handle.startsWith(q)).slice(0, 5) })
+      // R5b, comme la vraie API : sans accents ni majuscules, le début du pseudo, du nom ou d'un
+      // mot du nom (après une espace, un tiret ou une apostrophe : décision D2).
+      const fold = (text) =>
+        text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/^@/, '')
+      const q = fold(url.searchParams.get('q') ?? '')
+      const found = mentionable.filter(
+        (m) =>
+          fold(m.handle).startsWith(q) ||
+          fold(m.name)
+            .split(/[\s'’-]+/)
+            .some((w) => w.startsWith(q)),
+      )
+      return json(200, { members: found.slice(0, 5) })
     }
     if (pathname === '/v1/members/erreur')
       return json(500, { error: { code: 'internal', message: '' } })
