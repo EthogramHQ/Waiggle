@@ -10,7 +10,7 @@ import {
   type TextVariant,
   textStyles,
 } from '@ruche/brand'
-import type { ReactNode, Ref } from 'react'
+import { type ReactNode, type Ref, useContext } from 'react'
 import {
   Text as NativeText,
   type TextProps as NativeTextProps,
@@ -18,6 +18,7 @@ import {
   type TextStyle,
 } from 'react-native'
 import type { Focusable } from './focus'
+import { TextLayoutContext } from './textLayout'
 import { fontFiles, fontName, monoFont } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -210,6 +211,7 @@ export function Text({
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
+  const onTextLayout = useContext(TextLayoutContext)
   const style = textStyles[variant]
   const giant = giantVariants.includes(variant)
   // Un grand titre (niveau 1 ou 2, 22 points ou plus) grossit moins que le texte courant : doublé,
@@ -251,8 +253,14 @@ export function Text({
       // `Focusable` est le nom commun des vues qu'un écran focalise ; le texte natif en est une.
       {...(focusRef ? { ref: focusRef as unknown as Ref<NativeText> } : null)}
       {...(focusRef && Platform.OS === 'web' ? { tabIndex: -1 } : null)}
+      // Un parent qui compte les lignes (ReadMore, sur téléphone) : voir textLayout.ts.
+      {...(onTextLayout ? { onTextLayout } : null)}
     >
-      {children}
+      {onTextLayout ? (
+        <TextLayoutContext.Provider value={null}>{children}</TextLayoutContext.Provider>
+      ) : (
+        children
+      )}
     </NativeText>
   )
 }
