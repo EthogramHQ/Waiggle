@@ -99,6 +99,18 @@ describe('Comment', () => {
     }
   })
 
+  // R5b : l'auteur porte son pseudo actuel (« Répondre » sous une réponse préremplit sa mention),
+  // ou null quand il ne doit pas sortir : un commentaire lu malgré un blocage (sec-B1, jur-P5).
+  it('gives the author handle of a root and of a reply, or null, but never leaves it out', () => {
+    expect(Comment.parse(root).replies[0]?.author?.handle).toBe('lea')
+    expect(Comment.parse(root).author?.handle).toBeNull()
+    const { handle: _omitted, ...withoutHandle } = lea
+    expect(Comment.safeParse({ ...root, author: withoutHandle }).success).toBe(false)
+    expect(
+      Comment.safeParse({ ...root, replies: [{ ...reply, author: withoutHandle }] }).success,
+    ).toBe(false)
+  })
+
   it('refuses an unknown state', () => {
     expect(Comment.safeParse({ ...root, state: 'flagged' }).success).toBe(false)
   })
