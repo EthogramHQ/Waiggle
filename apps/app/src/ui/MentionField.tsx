@@ -30,7 +30,16 @@
 
 import { type FontWeight, layout, radii, space, textStyles } from '@ruche/brand'
 import { foldForSearch, MENTION_QUERY_MAX, MENTION_QUERY_PATTERN } from '@ruche/contracts'
-import { type ComponentProps, type ReactElement, useEffect, useId, useRef, useState } from 'react'
+import {
+  type ComponentProps,
+  type ReactElement,
+  type Ref,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Text as NativeText,
@@ -85,6 +94,8 @@ type Props = FieldProps & {
   suggestionsTitle?: string
   /** Ce que le champ cherche, replié, sans « @ » (« @Lé » : « le »), ou null. */
   onQueryChange: (query: string | null) => void
+  /** Une poignée vers la saisie : pour que le composant qui l'utilise y remette le focus. */
+  inputRef?: Ref<TextInput>
 }
 
 // Le « @… » qui se tape juste avant le curseur : un « @ » qui ne suit ni une lettre, ni un chiffre,
@@ -182,11 +193,14 @@ export function MentionField({
   value,
   onChangeText,
   onKeyPress,
+  inputRef,
   ...fieldProps
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   const input = useRef<TextInput>(null)
+  // La même saisie, partagée avec le composant qui l'a demandée.
+  useImperativeHandle(inputRef, () => input.current as TextInput)
   // useId : des identifiants stables, pour relier le champ à sa liste et à son choix actif (web).
   const listId = useId()
   // Le curseur, quand le champ l'a dit depuis la dernière frappe ; sinon, on le suppose au bout.
