@@ -254,10 +254,8 @@ export function CommentCard({
     </View>
   ) : null
   const badge = isProjectAuthor ? (
-    // Le badge est dit par le nom du lien (« Léa Moreau, Auteur ») : caché ici aux lecteurs d'écran.
-    <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <StatusPill label={t(($) => $.project.comments.author)} />
-    </View>
+    // Dans le lien, dont le nom le dit déjà (« Léa Moreau, Auteur ») : lu une seule fois.
+    <StatusPill label={t(($) => $.project.comments.author)} />
   ) : null
   // La photo, le nom et le badge : le contenu du lien vers sa page, ou de la carte compacte.
   const who = (
@@ -455,8 +453,8 @@ export function CommentCard({
             {hidden && onUnhide ? (
               <CommentActionButton
                 action={{
-                  label: t(($) => $.project.comments.unhide),
-                  text: t(($) => $.project.comments.unhideShort),
+                  // Le nom lu est le texte affiché (« Démasquer ») ; la description dit lequel.
+                  label: t(($) => $.project.comments.unhideShort),
                   icon: 'eye',
                   pending: unhiding,
                   onPress: onUnhide,

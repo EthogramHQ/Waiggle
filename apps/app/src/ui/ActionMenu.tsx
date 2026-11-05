@@ -25,7 +25,6 @@ import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
-  findNodeHandle,
   type LayoutChangeEvent,
   Modal,
   Platform,
@@ -202,9 +201,8 @@ export function ActionMenu({
     }
     if (!wasOpen.current) return
     wasOpen.current = false
-    // findNodeHandle : le numéro de la vue native, que le lecteur d'écran sait viser.
-    const node = trigger.current ? findNodeHandle(trigger.current) : null
-    if (node) AccessibilityInfo.setAccessibilityFocus(node)
+    // sendAccessibilityEvent(vue, 'focus') : le lecteur d'écran se pose sur cette vue native.
+    if (trigger.current) AccessibilityInfo.sendAccessibilityEvent(trigger.current, 'focus')
     const action = chosen.current
     chosen.current = null
     action?.()
