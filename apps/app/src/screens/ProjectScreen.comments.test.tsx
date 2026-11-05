@@ -1,28 +1,43 @@
-// Tests de la page d'un projet : réagir au projet et ses commentaires (tranche 5), écrire un
-// commentaire et y répondre.
+// Tests de la page d'un projet : réagir au projet (tranche 5), et ses commentaires tels que R5b les
+// redessine (docs/scenarios/refonte.md, « R5b — Les commentaires ») : l'aperçu sous la page, la
+// feuille qui s'ouvre par-dessus sur téléphone, écrire, répondre, et sur ordinateur la liste qui se
+// déroule dans la colonne de droite, sans feuille (choix 1).
 //
 // L'ancien ProjectScreen.test.tsx est coupé par sections (159 tests, de 50 à 100 s à lui seul) : Jest
 // donne un fichier entier à un seul processus, alors que plusieurs fichiers tournent en parallèle.
 // L'API est remplacée par de faux appels ; les aides et données communes sont dans
-// ProjectScreen.testkit.tsx.
+// ProjectScreen.testkit.tsx (la page) et ProjectComments.testkit.tsx (les commentaires).
 import { NO_REACTIONS } from '@ruche/contracts'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { createRef } from 'react'
+import { View } from 'react-native'
 import { useComments, usePostComment } from '../comments/api'
 import { getProject } from '../projects/api'
 import { useReaction } from '../reactions/api'
-import {
-  commentOf,
-  leaReply,
-  maxAuthor,
-  maxComment,
-  zoeComment,
-  zoeReply,
-} from '../testing/comments'
+import { commentOf, maxAuthor, maxComment, zoeComment, zoeReply } from '../testing/comments'
 import { recipesProject } from '../testing/projects'
-import { renderWithProviders } from '../testing/render'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
+import { fr } from '../testing/text'
+import {
+  cardOf,
+  closeSheet,
+  commentField,
+  describeFocused,
+  hugoComment,
+  lineOf,
+  openSheet,
+  previewNames,
+  queryCommentField,
+  sendButton,
+  sheet,
+  sheetIsOpen,
+  sixComments,
+  sixTexts,
+  watchFocus,
+  writeAndSend,
+} from './ProjectComments.testkit'
 import { ProjectScreen } from './ProjectScreen'
 import {
-  commentSomething,
   id,
   mockComments,
   mockFetchNextPage,
@@ -33,9 +48,7 @@ import {
   mockScreenProps,
   resetProjectScreenMocks,
   seenByOther,
-  shownComments,
   signInAgain,
-  threadOf,
   withNotes,
   withReactions,
 } from './ProjectScreen.testkit'
@@ -76,6 +89,16 @@ jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
 // Le presse-papiers (R5a) : « Copier le lien » du menu « … » et de la feuille Partager, « Copier »
 // d'un prompt. Le test lit ce qui est copié ; l'appareil, lui, n'est jamais touché.
 jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
+// Où le code pose le focus : les aides de ui/focus, gardées telles quelles, mais dont le test lit
+// les appels (watchFocus de ProjectComments.testkit.tsx).
+jest.mock('../ui/focus', () => {
+  const actual = jest.requireActual('../ui/focus')
+  return {
+    ...actual,
+    focusWithoutScroll: jest.fn((node: unknown) => actual.focusWithoutScroll(node)),
+    focusAndReveal: jest.fn((node: unknown, calm: boolean) => actual.focusAndReveal(node, calm)),
+  }
+})
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
 let mockParams: Record<string, string | undefined> = {}
 // RF (ui-1) : la page est-elle affichée ? Sur le web, la page quittée reste montée, cachée ; le
@@ -182,161 +205,240 @@ describe('reacting to a project from its page', () => {
   })
 })
 
-describe('the comments of a project', () => {
-  it('shows the comments under their header, newest thread first, replies oldest first', async () => {
-    seenByOther({ ...recipesProject, commentCount: 4 })
-    mockComments([maxComment, zoeComment])
-    await renderWithProviders(<ProjectScreen id={id} />)
+/** Les blancs d'Intl et de la typographie française ramenés à des espaces, comme getByText. */
+const plain = (text: string) => text.replace(/\s+/g, ' ')
 
-    expect(await screen.findByRole('header', { name: 'Commentaires (4)' })).toBeTruthy()
+/** Une vue témoin à côté de la page : sa `ref` donne le prototype commun des vues (watchFocus). */
+const probe = createRef<View>()
+const renderPage = (language?: 'en') =>
+  renderWithProviders(
+    <>
+      <View ref={probe} />
+      <ProjectScreen id={id} />
+    </>,
+    language,
+  )
+
+/** Le projet de Léa, avec ce nombre de commentaires, vu par Max. */
+const seenWithCount = (commentCount: number) => seenByOther({ ...withNotes, commentCount })
+
+describe('the comments of a project', () => {
+  it('shows the preview under its header: the first 3 lines, newest thread first, replies included', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
+
+    expect(await screen.findByRole('header', { name: 'Commentaires, 6 commentaires' })).toBeTruthy()
     expect(useComments).toHaveBeenCalledWith(id)
-    const shown = shownComments()
-    expect(shown).toHaveLength(4)
-    expect(shown[0]).toHaveTextContent('Super idée, je teste ce soir.')
-    expect(shown[1]).toHaveTextContent('Moi aussi, dis-nous !')
-    expect(shown[2]).toHaveTextContent('Merci à vous deux.')
-    expect(shown[3]).toHaveTextContent('Ça marche aussi en anglais ?')
+    expect(previewNames()).toEqual([
+      expect.stringMatching(lineOf('Max', 'Super idée')),
+      expect.stringMatching(lineOf('Zoé', 'Moi aussi')),
+      expect.stringMatching(lineOf('Léa', 'Merci à vous deux')),
+    ])
+    expect(screen.getByRole('button', { name: 'Voir les 6 commentaires' })).toBeTruthy()
   })
 
-  it('leads from a comment to the page of its author', async () => {
-    seenByOther()
-    mockComments([zoeComment, commentOf({ id: maxComment.id, author: maxAuthor, body: 'Bravo' })])
-    await renderWithProviders(<ProjectScreen id={id} />)
+  it('lists in the sheet the threads newest first, each followed by its replies', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
 
-    await fireEvent.press(await screen.findByRole('link', { name: 'Voir la page de Max' }))
+    await screen.findByRole('button', { name: 'Voir les 6 commentaires' })
+    await openSheet()
+
+    const pattern = new RegExp(
+      `^(${sixTexts.map((text) => text.replace(/[.?]/g, '\\$&')).join('|')})$`,
+    )
+    expect(
+      sheet()
+        .getAllByText(pattern)
+        .map((node) => node.props.children),
+    ).toEqual(sixTexts)
+  })
+
+  it('leads from a comment of the sheet to the page of its author', async () => {
+    seenWithCount(2)
+    mockComments([zoeComment, commentOf({ id: maxComment.id, author: maxAuthor, body: 'Bravo' })])
+    await renderPage()
+
+    await screen.findByRole('button', { name: 'Commenter' })
+    await openSheet()
+    await fireEvent.press(sheet().getByRole('link', { name: 'Max' }))
 
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/members/[id]', params: { id: 'u2' } })
   })
 
   it('elides « de » before an author whose name starts with a vowel (« d’Inès »)', async () => {
-    // Tranche 6c : {{nameOf}}, rempli par useNameOf, pour l'autrice du projet et d'un commentaire.
+    // Tranche 6c : {{nameOf}}, rempli par useNameOf. Depuis R5b, le nom d'un commentaire est lu
+    // seul (« Inès, Auteur » pour l'autrice du projet) : seul le lien du haut de la page garde
+    // « Voir la page d’Inès ».
     const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
-    seenByOther({ ...withNotes, author: ines })
+    seenByOther({ ...withNotes, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    const links = await screen.findAllByRole('link', { name: 'Voir la page d’Inès' })
-    expect(links).toHaveLength(2) // l'autrice du projet, puis celle du commentaire
+    expect(await screen.findAllByRole('link', { name: 'Voir la page d’Inès' })).toHaveLength(1)
     expect(screen.queryByRole('link', { name: /de Inès/ })).toBeNull()
+    await openSheet()
+    expect(sheet().getByRole('link', { name: 'Inès, Auteur' })).toBeTruthy()
   })
 
-  it('writes the possessive in English (« See Inès’s page »)', async () => {
+  it('writes the possessive and the preview line in English', async () => {
     const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
-    seenByOther({ ...withNotes, author: ines })
+    seenByOther({ ...withNotes, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
-    await renderWithProviders(<ProjectScreen id={id} />, 'en')
+    await renderPage('en')
 
-    expect(await screen.findAllByRole('link', { name: 'See Inès’s page' })).toHaveLength(2)
+    expect(await screen.findAllByRole('link', { name: 'See Inès’s page' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^Comment by Inès: Thanks!/ })).toBeTruthy()
   })
 
-  it('says when a comment was edited', async () => {
-    seenByOther()
+  it('says in the sheet when a comment was edited', async () => {
+    seenWithCount(1)
     mockComments([{ ...zoeComment, editedAt: '2026-10-14T10:00:00.000Z' }])
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    expect(await screen.findByText('modifié')).toBeTruthy()
+    await screen.findByRole('button', { name: 'Commenter' })
+    await openSheet()
+
+    expect(sheet().getByText('modifié')).toBeTruthy()
   })
 
   it('invites to comment when there is no comment yet', async () => {
     seenByOther()
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    // Sans commentaire, le titre seul : « (0) » n’apprend rien que la liste vide ne dise.
+    // Sans commentaire, le titre seul : « 0 » n’apprend rien que la phrase ne dise.
     expect(await screen.findByRole('header', { name: 'Commentaires' })).toBeTruthy()
-    expect(screen.getByText('Pas encore de commentaire.')).toBeTruthy()
+    expect(screen.getByText('Aucun commentaire pour l’instant.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toBeTruthy()
     expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
-  it('offers the next comments, then ends the list without a word (RF, T4)', async () => {
-    seenByOther()
+  it('offers the next comments at the end of the sheet, then ends the list without a word (RF, T4)', async () => {
+    seenWithCount(25)
     mockComments([zoeComment], { hasNextPage: true })
-    const view = await renderWithProviders(<ProjectScreen id={id} />)
+    const view = await renderPage()
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Afficher la suite' }))
+    await screen.findByRole('button', { name: 'Voir les 25 commentaires' })
+    await openSheet()
+    await fireEvent.press(sheet().getByRole('button', { name: 'Afficher la suite' }))
     expect(mockFetchNextPage).toHaveBeenCalledTimes(1)
 
     mockComments([zoeComment])
-    await view.rerender(<ProjectScreen id={id} />)
+    await view.rerender(
+      <>
+        <View ref={probe} />
+        <ProjectScreen id={id} />
+      </>,
+    )
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Afficher la suite' })).toBeNull(),
+      expect(sheet().queryByRole('button', { name: 'Afficher la suite' })).toBeNull(),
     )
     expect(screen.queryByText('C’est tout')).toBeNull()
   })
 
-  it('shows « Commentaire supprimé » in place of a deleted comment, above its replies', async () => {
-    seenByOther()
+  it('shows « Commentaire supprimé » in the sheet in place of a deleted comment, above its replies', async () => {
+    seenWithCount(1)
     mockComments([{ ...maxComment, author: null, body: '', state: 'deleted', replies: [zoeReply] }])
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    expect(await screen.findByText('Commentaire supprimé')).toBeTruthy()
-    expect(screen.getByText('Moi aussi, dis-nous !')).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Voir la page de Max' })).toBeNull()
+    await screen.findByRole('button', { name: 'Commenter' })
+    await openSheet()
+
+    expect(sheet().getByText('Commentaire supprimé')).toBeTruthy()
+    expect(sheet().getByText('Moi aussi, dis-nous !')).toBeTruthy()
+    expect(sheet().queryByRole('link', { name: 'Max' })).toBeNull()
   })
 
-  it('shows « Commentaire masqué » in place of a hidden comment the member cannot read', async () => {
-    seenByOther()
+  it('shows « Commentaire masqué » in the sheet in place of a hidden comment the member cannot read', async () => {
+    seenWithCount(1)
     mockComments([{ ...maxComment, author: null, body: '', state: 'hidden', replies: [zoeReply] }])
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    expect(await screen.findByText('Commentaire masqué')).toBeTruthy()
-    expect(screen.getByText('Moi aussi, dis-nous !')).toBeTruthy()
-    // Le bandeau des deux auteurs n'est pas pour les autres : ils ne lisent rien du commentaire.
-    expect(
-      screen.queryByText(
-        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
-      ),
-    ).toBeNull()
+    await screen.findByRole('button', { name: 'Commenter' })
+    await openSheet()
+
+    expect(sheet().getByText('Commentaire masqué')).toBeTruthy()
+    expect(sheet().getByText('Moi aussi, dis-nous !')).toBeTruthy()
+    // La note des deux auteurs n'est pas pour les autres : ils ne lisent rien du commentaire.
+    expect(sheet().queryByText(plain(fr.t(($) => $.project.comments.hiddenNote)))).toBeNull()
+    expect(sheet().queryByText('Masqué par l’auteur du projet')).toBeNull()
+  })
+})
+
+describe('the comments sheet on a phone', () => {
+  it('opens over the page from « Voir les 6 commentaires », and closes with « Fermer »', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Voir les 6 commentaires' }))
+    expect(sheetIsOpen()).toBe(true)
+    // Le champ est fixé en bas de la feuille, pas sur la page.
+    expect(commentField(sheet())).toBeTruthy()
+
+    await closeSheet()
+    expect(sheetIsOpen()).toBe(false)
+    expect(queryCommentField()).toBeNull()
+  })
+
+  it('keeps the field off the page on a phone: it lives in the sheet', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
+
+    await screen.findByRole('button', { name: 'Voir les 6 commentaires' })
+
+    expect(queryCommentField()).toBeNull()
   })
 })
 
 describe('writing a comment', () => {
-  it('opens a field to write the comment, then publishes it', async () => {
+  it('opens the sheet with the field, then sends the comment', async () => {
     seenByOther()
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    // Le champ n'est pas ouvert d'office.
-    await screen.findByRole('button', { name: 'Écrire un commentaire' })
-    expect(screen.queryByLabelText('Ton commentaire')).toBeNull()
-    await commentSomething('Bravo, ça marche !')
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
     expect(usePostComment).toHaveBeenCalledWith(id)
     expect(mockPost).toHaveBeenCalledWith({ body: 'Bravo, ça marche !' })
   })
 
   it('lets the author comment her own project too', async () => {
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    await commentSomething('Merci pour vos retours.')
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Merci pour vos retours.')
 
     expect(mockPost).toHaveBeenCalledWith({ body: 'Merci pour vos retours.' })
   })
 
-  it('empties and closes the field once the comment is published, and says so', async () => {
+  it('empties the field once the comment is sent, and keeps the sheet open', async () => {
     seenByOther()
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    await commentSomething()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
-    await waitFor(() => expect(screen.queryByLabelText('Ton commentaire')).toBeNull())
-    expect(screen.getByRole('status')).toHaveTextContent('Commentaire publié.')
-    // Rouvert, le champ repart de zéro.
-    await fireEvent.press(screen.getByRole('button', { name: 'Écrire un commentaire' }))
-    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('')
+    await waitFor(() => expect(commentField()).toHaveDisplayValue(''))
+    expect(sheetIsOpen()).toBe(true)
   })
 
   it('says so when the comment could not be published, and keeps the text', async () => {
     seenByOther()
     mockPost.mockResolvedValue(false)
     jest.mocked(usePostComment).mockReturnValue({ post: mockPost, pending: false, error: true })
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    await commentSomething('Bravo, ça marche !')
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await sheet().findByRole('alert')).toHaveTextContent(
       'Le commentaire n’a pas pu être publié. Réessaie.',
     )
-    expect(screen.getByLabelText('Ton commentaire')).toHaveDisplayValue('Bravo, ça marche !')
+    expect(commentField()).toHaveDisplayValue('Bravo, ça marche !')
   })
 
   it('says that the 60 comments of the hour are used up', async () => {
@@ -345,11 +447,12 @@ describe('writing a comment', () => {
     jest
       .mocked(usePostComment)
       .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'limited' })
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    await commentSomething()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await sheet().findByRole('alert')).toHaveTextContent(
       'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
     )
   })
@@ -360,11 +463,12 @@ describe('writing a comment', () => {
     jest
       .mocked(usePostComment)
       .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'expired' })
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
-    await commentSomething()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await sheet().findByRole('alert')).toHaveTextContent(
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
   })
@@ -375,74 +479,142 @@ describe('writing a comment', () => {
     jest
       .mocked(usePostComment)
       .mockReturnValue({ post: mockPost, pending: false, error: true, reason: 'expired' })
-    await renderWithProviders(<ProjectScreen id={id} />)
-
-    await commentSomething()
-
-    await signInAgain()
-  })
-
-  it('asks for a text before publishing', async () => {
-    seenByOther()
-    await renderWithProviders(<ProjectScreen id={id} />)
+    await renderPage()
 
     await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
+    await writeAndSend('Bravo, ça marche !')
 
-    expect(screen.getByText('Écris ton commentaire avant de le publier.')).toBeTruthy()
-    expect(mockPost).not.toHaveBeenCalled()
+    await signInAgain()
   })
 })
 
 describe('replying to a comment', () => {
   beforeEach(() => {
-    seenByOther()
+    seenWithCount(4)
     mockComments([maxComment, zoeComment])
   })
 
-  it('opens a field under the comment, then publishes the reply in its thread', async () => {
-    await renderWithProviders(<ProjectScreen id={id} />)
+  it('offers « Répondre » under each comment of the sheet, replies included', async () => {
+    await renderPage()
 
-    await screen.findByText('Ça marche aussi en anglais ?')
+    await screen.findByRole('button', { name: 'Voir les 4 commentaires' })
+    await openSheet()
+
+    // Quatre commentaires, quatre « Répondre » (avant R5b : un seul par fil, au bout).
+    expect(sheet().getAllByRole('button', { name: 'Répondre' })).toHaveLength(4)
+  })
+
+  it('publishes the reply in the thread of the comment', async () => {
+    await renderPage()
+
+    await screen.findByRole('button', { name: 'Voir les 4 commentaires' })
+    await openSheet()
     await fireEvent.press(
-      threadOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
+      cardOf('Ça marche aussi en anglais ?').getByRole('button', { name: 'Répondre' }),
     )
-    await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Oui, en anglais aussi.')
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
+    await writeAndSend('Oui, en anglais aussi.')
 
     expect(mockPost).toHaveBeenCalledWith({
       body: 'Oui, en anglais aussi.',
       replyTo: zoeComment.id,
     })
-    // Une fois publiée, le champ de réponse se referme.
-    await waitFor(() => expect(screen.queryByLabelText('Ta réponse')).toBeNull())
   })
 
-  it('answers a reply in the same thread, under its first comment', async () => {
-    await renderWithProviders(<ProjectScreen id={id} />)
+  it('answers a reply in the same thread, under its first comment, with its author’s mention', async () => {
+    await renderPage()
 
-    await screen.findByText('Moi aussi, dis-nous !')
-    await fireEvent.press(
-      threadOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }),
-    )
-    await fireEvent.changeText(screen.getByLabelText('Ta réponse'), 'Je vous raconte demain.')
-    await fireEvent.press(screen.getByRole('button', { name: 'Publier la réponse' }))
+    await screen.findByRole('button', { name: 'Voir les 4 commentaires' })
+    await openSheet()
+    await fireEvent.press(cardOf('Moi aussi, dis-nous !').getByRole('button', { name: 'Répondre' }))
+    expect(commentField()).toHaveDisplayValue('@zoe ')
+    await writeAndSend('@zoe Je vous raconte demain.')
 
-    // Les réponses tiennent sur un seul niveau : on répond au commentaire racine.
     expect(mockPost).toHaveBeenCalledWith({
-      body: 'Je vous raconte demain.',
+      body: '@zoe Je vous raconte demain.',
       replyTo: maxComment.id,
     })
   })
 
   it('offers no reply under a deleted comment, even to its replies', async () => {
-    mockComments([{ ...zoeComment, author: null, body: '', state: 'deleted', replies: [leaReply] }])
-    await renderWithProviders(<ProjectScreen id={id} />)
+    mockComments([{ ...zoeComment, author: null, body: '', state: 'deleted', replies: [zoeReply] }])
+    await renderPage()
 
-    await screen.findByText('Commentaire supprimé')
-    // « Répondre » appartient au fil, et ce fil n’accepte plus de réponse : aucun bouton, pas même
-    // sous la réponse de Léa, encore visible.
-    expect(screen.getByText('Merci à vous deux.')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    await screen.findByRole('button', { name: /^(Voir les 4 commentaires|Commenter)$/ })
+    await openSheet()
+
+    // Ce fil n’accepte plus de réponse : aucun bouton, pas même sous la réponse encore visible.
+    expect(sheet().getByText('Moi aussi, dis-nous !')).toBeTruthy()
+    expect(sheet().queryByRole('button', { name: 'Répondre' })).toBeNull()
+  })
+})
+
+// Choix 1 de Louis (4/11/2026) : sur ordinateur, les commentaires sont dans la colonne de droite ;
+// 5 au plus, « Voir les 6 commentaires » déroule la liste en place, et le champ y est déjà.
+describe('the comments on a wide screen', () => {
+  let phone: () => void
+  beforeEach(() => {
+    phone = setDesktopWindow()
+  })
+  afterEach(() => {
+    phone()
+  })
+
+  it('shows 5 comments, « Voir les 6 commentaires », then the field and « Envoyer » with who will read', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
+
+    await screen.findByRole('button', { name: 'Voir les 6 commentaires' })
+    const shown = sixTexts.filter((text) => screen.queryAllByText(text).length > 0)
+    expect(shown).toEqual(sixTexts.slice(0, 5))
+    expect(commentField()).toBeTruthy()
+    expect(sendButton()).toBeTruthy()
+    expect(screen.getByText(plain(fr.t(($) => $.project.comments.hint)))).toBeTruthy()
+    expect(sheetIsOpen()).toBe(false)
+  })
+
+  it('on a wide screen with 5 comments or fewer there is no button under the comments', async () => {
+    seenWithCount(5)
+    mockComments([maxComment, zoeComment, sixComments[2] ?? zoeComment])
+    await renderPage()
+
+    // Témoin : les commentaires et le champ de la colonne sont là.
+    expect(await screen.findByText('Et pour les végétariens ?')).toBeTruthy()
+    expect(commentField()).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Voir (le|les)/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Commenter' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull()
+  })
+
+  it('after « Voir les 6 commentaires » on a wide screen the focus goes to the first newly shown comment', async () => {
+    seenWithCount(6)
+    mockComments(sixComments)
+    await renderPage()
+    const more = await screen.findByRole('button', { name: 'Voir les 6 commentaires' })
+    const focus = watchFocus(probe)
+    try {
+      await fireEvent.press(more)
+
+      // La liste se déroule en place : tous les commentaires, sans feuille, et le bouton s'en va.
+      expect(await screen.findByText(hugoComment.body)).toBeTruthy()
+      expect(sheetIsOpen()).toBe(false)
+      expect(screen.queryByRole('button', { name: 'Voir les 6 commentaires' })).toBeNull()
+      // Le premier nouvellement montré : le 6e, celui de Hugo.
+      await waitFor(() => expect(describeFocused(focus.last())).toMatch(/Hugo/))
+    } finally {
+      focus.restore()
+    }
+  })
+
+  it('sends from the field of the column, without a sheet', async () => {
+    seenWithCount(1)
+    mockComments([zoeComment])
+    await renderPage()
+
+    await screen.findByText('Ça marche aussi en anglais ?')
+    await writeAndSend('Bravo, ça marche !')
+
+    expect(mockPost).toHaveBeenCalledWith({ body: 'Bravo, ça marche !' })
+    expect(sheetIsOpen()).toBe(false)
   })
 })
