@@ -80,6 +80,13 @@ type Props = {
    * nombre de lignes ; au-delà, son texte défile. Absent : la hauteur fixe d'un champ multiligne.
    */
   maxLines?: number
+  /**
+   * Ce qui décrit aussi le champ, écrit ailleurs par le composant qui l'utilise (la légende sous
+   * toute la rangée de `CommentComposer`, son bandeau au-dessus) : lu après le nom, comme une aide.
+   * `ids` : les `nativeID` de ces textes, séparés par une espace (web, aria-describedby) ; `spoken` :
+   * les mêmes textes, pour l'indice du téléphone, où aria-describedby n'existe pas.
+   */
+  describedElsewhere?: { ids: string; spoken: string }
   /** Un petit texte à droite de l'étiquette (« 12 caractères minimum »). */
   aside?: string
   /** Une confirmation sous le champ, en vert (« Lien vérifié »). Une erreur passe avant. */
@@ -195,6 +202,7 @@ export function TextField({
   countFrom,
   compact = false,
   maxLines,
+  describedElsewhere,
   aside,
   success,
   prefix,
@@ -241,8 +249,10 @@ export function TextField({
       : null
   const counterId = useId()
   // Ce qui décrit le champ (web) : le message, puis le compteur ; sur téléphone, l'indice les lit.
-  const described = [message ? messageId : null, below ? counterId : null].filter(Boolean).join(' ')
-  const spokenHint = [message, below?.spoken].filter(Boolean).join(' ')
+  const described = [message ? messageId : null, below ? counterId : null, describedElsewhere?.ids]
+    .filter(Boolean)
+    .join(' ')
+  const spokenHint = [message, below?.spoken, describedElsewhere?.spoken].filter(Boolean).join(' ')
 
   // Le champ qui grandit (`multiline` et `maxLines`) : sa hauteur suit celle de son texte, d'une
   // ligne à `maxLines`, plus sa marge. `content` est la hauteur du texte, `line` celle d'une ligne
