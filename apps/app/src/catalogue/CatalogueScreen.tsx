@@ -70,6 +70,7 @@ import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
 import { LoadingCatalogue } from './chargement'
 import { CommentCardCatalogue } from './commentaires-carte'
+import { CommentComposerCatalogue } from './commentaires-composer'
 import { CommentThreadCatalogue } from './commentaires-fil'
 import { ReadMoreCatalogue } from './commentaires-lire-la-suite'
 import { CommentMentionsCatalogue } from './commentaires-mentions'
@@ -805,11 +806,12 @@ export function CatalogueScreen() {
         </Stack>
       </Section>
 
-      {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions. */}
+      {/* Tranche R5b : la carte, « Lire la suite », le fil et l'aperçu, les mentions, le champ. */}
       <CommentCardCatalogue />
       <ReadMoreCatalogue />
       <CommentThreadCatalogue />
       <CommentMentionsCatalogue />
+      <CommentComposerCatalogue />
 
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
