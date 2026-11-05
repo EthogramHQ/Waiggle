@@ -5,26 +5,26 @@
 // donne un fichier entier à un seul processus, alors que plusieurs fichiers tournent en parallèle.
 // L'API est remplacée par de faux appels ; les aides et données communes sont dans
 // ProjectScreen.testkit.tsx.
-import { NO_REACTIONS, type Project } from '@ruche/contracts'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { type Comment, NO_REACTIONS, type Project } from '@ruche/contracts'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { useState } from 'react'
 import { useFollow } from '../follows/api'
 import { getMe } from '../profile/api'
 import { deleteProject, getProject } from '../projects/api'
 import { projectQueryKey } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
-import { maxComment } from '../testing/comments'
+import { leaReply, maxComment, zoeReply } from '../testing/comments'
 import { leaMe, suspendedMe } from '../testing/fixtures'
 import { removalAfterReport, removalByLaw } from '../testing/moderation'
 import { reportsOpened } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
-import { renderWithProviders } from '../testing/render'
+import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr, missingSentences, removalSentences } from '../testing/text'
 import { ProjectScreen } from './ProjectScreen'
 import {
-  cardOf,
   deleteButton,
   dialogTitled,
+  type Element,
   firstVersion,
   id,
   mockComments,
@@ -35,6 +35,7 @@ import {
   mockReplace,
   mockScreenProps,
   mockToggle,
+  readingOrder,
   resetProjectScreenMocks,
   seenByOther,
   signInAgain,
@@ -116,6 +117,44 @@ beforeEach(() => {
   mockParams = {}
   mockFocused = true
 })
+
+// --- R5b : les commentaires passent dans une feuille, sur téléphone ---
+
+/**
+ * La feuille des commentaires, une fois ouverte : la vue modale (accessibilityViewIsModal) qui
+ * contient le titre « Commentaires ». La page reste montée dessous, avec son aperçu : on ne cherche
+ * que dans la feuille.
+ */
+const commentsSheet = () => {
+  const modals: Element[] = []
+  const walk = (node: Element) => {
+    if (node.props.accessibilityViewIsModal === true) modals.push(node)
+    for (const child of node.children) if (typeof child !== 'string') walk(child)
+  }
+  walk(screen.root as unknown as Element)
+  const sheet = modals.find(
+    (modal) => within(modal).queryAllByRole('header', { name: /^Commentaires/ }).length > 0,
+  )
+  if (!sheet) throw new Error('no comments sheet open')
+  return within(sheet)
+}
+
+/**
+ * Ouvre la feuille en touchant le premier commentaire de l'aperçu : chaque carte de l'aperçu est un
+ * seul bouton, « Commentaire de Zoé : … » (ui-B7), et la toucher ouvre la feuille (scénario R5b).
+ */
+const openCommentsSheet = async () => {
+  const [first] = await screen.findAllByRole('button', { name: /^Commentaire de / })
+  if (!first) throw new Error('no comment in the preview')
+  await fireEvent.press(first)
+  return commentsSheet()
+}
+
+/** Le nom lu de chaque menu « … » de la feuille, dans l'ordre. */
+const menusIn = (sheet: ReturnType<typeof commentsSheet>) =>
+  sheet
+    .queryAllByRole('button', { name: /^Actions du commentaire de / })
+    .map((menu) => String(menu.props.accessibilityLabel ?? menu.props['aria-label'] ?? ''))
 
 // --- Tranche 7a : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
 
@@ -330,15 +369,22 @@ describe('a project page seen by a suspended member', () => {
     expect(screen.getByLabelText('Waggle\u202f!, 3')).toBeTruthy()
   })
 
+  // R5b : les commentaires se lisent dans la feuille ; un membre suspendu l'ouvre, y lit tout, mais
+  // n'y a ni champ ni « Répondre » (scénario, « Les gardes reprises »). Avant R5b, ce test ne
+  // cherchait que l'absence du bouton « Écrire un commentaire » de la page.
   it('offers no comment to write, but keeps the comments readable', async () => {
     seenByOther()
     mockComments([maxComment])
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await screen.findByText('Super idée, je teste ce soir.')
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull(),
-    )
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    const sheet = await openCommentsSheet()
+    // Il lit tout : le commentaire et ses réponses.
+    expect(sheet.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+    expect(sheet.getByText(zoeReply.body)).toBeTruthy()
+    await waitFor(() => expect(sheet.queryByLabelText('Écrire un commentaire')).toBeNull())
+    expect(sheet.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Écrire un commentaire' })).toBeNull()
   })
 
   it('keeps every action for a member who is not suspended', async () => {
@@ -493,21 +539,179 @@ describe('the windows of the project page, right after opening', () => {
     expect(screen.getByRole('header', { name: 'Supprimer cette note ?' })).toBeTruthy()
   })
 
+  // R5b : « Supprimer » passe dans le menu « … » de chaque commentaire, dans la feuille (avant :
+  // un bouton « Supprimer le commentaire » sous la carte, sur la page).
   it('ignores a tap in the window to delete a comment', async () => {
     mockComments([{ ...maxComment, isMine: true }])
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await screen.findByText('Super idée, je teste ce soir.')
-    await fireEvent.press(
-      cardOf('Super idée, je teste ce soir.').getByRole('button', {
-        name: 'Supprimer le commentaire',
-      }),
-    )
+    const sheet = await openCommentsSheet()
+    await fireEvent.press(sheet.getByRole('button', { name: 'Actions du commentaire de Max' }))
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Supprimer' }))
     await fireEvent.press(
       dialogTitled('Supprimer ce commentaire ?').getByRole('button', { name: 'Supprimer' }),
     )
 
     expect(mockRemoveComment).not.toHaveBeenCalled()
     expect(screen.getByRole('header', { name: 'Supprimer ce commentaire ?' })).toBeTruthy()
+  })
+})
+
+// --- R5b : les états d'un commentaire dans la feuille, sur téléphone (planche R5b-Menu-Etats) ---
+//
+// Retiré par la modération, d'un membre qu'on a bloqué, d'un membre qui nous a bloqués : l'API ne
+// donne qu'un emplacement, sans auteur ni texte (CommentState). Dans la feuille, ces lignes n'ont ni
+// nom, ni « Répondre », ni menu « … » ; leurs réponses restent dessous. L'aperçu de la page, lui,
+// ne montre que des commentaires visibles de tous (jur-P4) : l'emplacement n'est que dans la feuille.
+describe('the states of a comment in the comments sheet, on a phone', () => {
+  /** Le commentaire de Max tel que l'API le donne quand il n'en reste qu'un emplacement. */
+  const placeholderOf = (state: 'removed' | 'blocked' | 'unavailable'): Comment => ({
+    ...maxComment,
+    state,
+    author: null,
+    body: '',
+    mentions: [],
+    removal: null,
+  })
+
+  /** Le projet de Léa, vu par Malik, qui n'a écrit aucun de ces commentaires. */
+  const seenByMalik = () => {
+    mockSession({ user: { id: 'u7', name: 'Malik' } })
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, isMine: false, commentCount: 2 })
+  }
+
+  it('keeps « Répondre » and the menu on a visible comment of the sheet (witness)', async () => {
+    seenByMalik()
+    mockComments([maxComment])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+    expect(sheet.getAllByRole('button', { name: 'Répondre' }).length).toBeGreaterThan(0)
+    expect(menusIn(sheet)).toContain('Actions du commentaire de Max')
+  })
+
+  it('shows a comment removed by the moderation as « Contenu retiré par la modération », with neither name, « Répondre » nor menu', async () => {
+    seenByMalik()
+    mockComments([placeholderOf('removed')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText('Contenu retiré par la modération')).toBeTruthy()
+    expect(sheet.queryByText('Max')).toBeNull()
+    expect(sheet.queryByText('Super idée, je teste ce soir.')).toBeNull()
+    // On ne répond pas dans le fil d'un contenu retiré (comme aujourd'hui) ; seules les réponses de
+    // Zoé et de Léa ont leur menu (pour les signaler), pas l'emplacement.
+    expect(sheet.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    expect(menusIn(sheet)).toEqual([
+      'Actions du commentaire de Zoé',
+      'Actions du commentaire de Léa',
+    ])
+  })
+
+  it('keeps the replies of a removed comment under it, in the sheet', async () => {
+    seenByMalik()
+    mockComments([placeholderOf('removed')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    const [placeholderAt, zoeAt, leaAt] = readingOrder(
+      sheet.getByText('Contenu retiré par la modération'),
+      sheet.getByText(zoeReply.body),
+      sheet.getByText(leaReply.body),
+    )
+    const at = (value: number | undefined) => value ?? -1
+    expect(at(placeholderAt)).toBeGreaterThan(-1)
+    expect(at(zoeAt)).toBeGreaterThan(at(placeholderAt))
+    expect(at(leaAt)).toBeGreaterThan(at(zoeAt))
+  })
+
+  it('leaves a removed comment out of the preview: it is in the sheet only', async () => {
+    seenByMalik()
+    mockComments([placeholderOf('removed')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : l'aperçu montre les réponses, visibles de tous.
+    expect(await screen.findByRole('button', { name: /^Commentaire de Zoé/ })).toBeTruthy()
+    expect(screen.queryByText('Contenu retiré par la modération')).toBeNull()
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText('Contenu retiré par la modération')).toBeTruthy()
+    expect(screen.getAllByText('Contenu retiré par la modération')).toHaveLength(1)
+  })
+
+  it('shows the author of the project the same placeholder in the sheet, never the removed text', async () => {
+    // Règle 1 de la relecture du plan 7a : l'auteur du projet lit un commentaire masqué, jamais un
+    // commentaire retiré (l'API ne lui en donne que l'emplacement).
+    mockComments([placeholderOf('removed')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText('Contenu retiré par la modération')).toBeTruthy()
+    expect(sheet.queryByText(containing(fr.t(($) => $.removal.onlyYou)))).toBeNull()
+    expect(sheet.queryByText('Super idée, je teste ce soir.')).toBeNull()
+  })
+
+  it('shows its author, in the sheet, the removed comment with the removal notice, and « Supprimer » but no « Modifier » in its menu', async () => {
+    // Max, l'auteur du commentaire retiré ; la réponse de Zoé le fait figurer dans l'aperçu.
+    seenByOther({ ...recipesProject, commentCount: 1 })
+    mockComments([
+      {
+        ...maxComment,
+        state: 'removed',
+        isMine: true,
+        removal: removalAfterReport,
+        replies: [zoeReply],
+      },
+    ])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    // Son texte, qu'il est désormais seul à lire, et l'encadré qui dit pourquoi et comment contester.
+    expect(sheet.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+    expect(sheet.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
+    expect(missingSentences(removalSentences(removalAfterReport), sheet)).toEqual([])
+    expect(sheet.queryByText('Contenu retiré par la modération')).toBeNull()
+    // Règle 28 du plan 7a : modifier un contenu retiré est refusé, le supprimer reste permis.
+    await fireEvent.press(sheet.getByRole('button', { name: 'Actions du commentaire de Max' }))
+    expect(screen.getByRole('menuitem', { name: 'Supprimer' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).toBeNull()
+  })
+
+  it('shows the comment of a member I blocked as « Commentaire d’un membre que tu as bloqué », with neither name, « Répondre » nor menu', async () => {
+    seenByMalik()
+    mockComments([placeholderOf('blocked')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText(fr.t(($) => $.project.comments.blockedPlaceholder))).toBeTruthy()
+    expect(sheet.queryByText('Max')).toBeNull()
+    expect(sheet.queryByText('Commentaire indisponible')).toBeNull()
+    // Plus d'interaction avec un membre bloqué : on ne répond pas dans son fil ; les réponses des
+    // autres restent lisibles, chacune avec son menu (pour la signaler).
+    expect(sheet.queryByRole('button', { name: 'Répondre' })).toBeNull()
+    expect(sheet.getByText(zoeReply.body)).toBeTruthy()
+    expect(sheet.getByText(leaReply.body)).toBeTruthy()
+    expect(menusIn(sheet)).toEqual([
+      'Actions du commentaire de Zoé',
+      'Actions du commentaire de Léa',
+    ])
+  })
+
+  it('shows the comment of a member who blocked me as « Commentaire indisponible », without a word on the block', async () => {
+    seenByMalik()
+    mockComments([placeholderOf('unavailable')])
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const sheet = await openCommentsSheet()
+    expect(sheet.getByText(fr.t(($) => $.project.comments.unavailablePlaceholder))).toBeTruthy()
+    // Rien ne dit à la personne bloquée qu'elle l'est, ni qui a écrit.
+    expect(sheet.queryByText(/bloqu/i)).toBeNull()
+    expect(sheet.queryByText('Max')).toBeNull()
+    // L'emplacement n'a pas de menu ; les réponses restent, avec le leur.
+    expect(sheet.getByText(zoeReply.body)).toBeTruthy()
+    expect(menusIn(sheet)).toEqual([
+      'Actions du commentaire de Zoé',
+      'Actions du commentaire de Léa',
+    ])
   })
 })
