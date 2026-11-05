@@ -24,7 +24,7 @@ const cm = schema.commentMention
  * avait repris l'ancien pseudo, la mention passerait à Zoé (relecture de sécurité, tranche 6b).
  *
  * Une seule requête, quel que soit le nombre de pseudos :
- *   select member_handle.handle, member_handle.user_id from member_handle
+ *   select member_handle.handle, member_handle.user_id, "user".name from member_handle
  *   inner join "user" on "user".id = member_handle.user_id
  *   where member_handle.handle in (…) and member_handle.released_at is null
  *     and "user".email_verified and member_handle.user_id <> $auteur
@@ -53,15 +53,17 @@ export const resolveMentions = async (
   // désignent toujours le même membre, quoi que soit devenu ce pseudo depuis (changé, ou repris
   // par un autre). Elles ne sont pas relues dans member_handle.
   const keptOf = new Map(
-    kept.filter((mention) => handles.includes(mention.handle)).map((m) => [m.handle, m.memberId]),
+    kept.filter((mention) => handles.includes(mention.handle)).map((m) => [m.handle, m]),
   )
-  const keptMembers = new Set(keptOf.values())
+  const keptMembers = new Set([...keptOf.values()].map((mention) => mention.memberId))
   const toResolve = handles.filter((handle) => !keptOf.has(handle))
   const rows =
     toResolve.length === 0
       ? []
       : await db
-          .select({ handle: h.handle, memberId: h.userId })
+          // Le nom actuel aussi (R5b) : la réponse de POST et de PATCH porte la pastille
+          // « Inès Morel » sans que l'appli ait à recharger la page.
+          .select({ handle: h.handle, memberId: h.userId, name: schema.user.name })
           .from(h)
           .innerJoin(schema.user, eq(schema.user.id, h.userId))
           .where(
@@ -80,35 +82,41 @@ export const resolveMentions = async (
   const blocks = designated.length === 0 ? noBlocks : await blocksOf(db, authorId)
   if (designated.some((memberId) => blocks.byMe.has(memberId))) return 'blocked_mention'
   const resolvedOf = new Map(
-    rows.filter((row) => !blocks.ofMe.has(row.memberId)).map((row) => [row.handle, row.memberId]),
+    rows.filter((row) => !blocks.ofMe.has(row.memberId)).map((row) => [row.handle, row]),
   )
   // L'ordre du texte (findMentions le donne déjà, sans doublon), un membre une seule fois, puis
   // les 5 premiers trouvés. Un membre déjà mentionné par un pseudo encore écrit garde ce pseudo-là,
   // même si son pseudo actuel est écrit aussi : une seule ligne par membre et par commentaire.
+  // Une mention gardée garde le nom que mentionsOf vient de lire (le nom actuel, lui aussi).
   const named = new Set<string>()
   return handles
-    .flatMap((handle) => {
-      const keptId = keptOf.get(handle)
-      const resolvedId = resolvedOf.get(handle)
-      const memberId = keptId ?? (resolvedId && !keptMembers.has(resolvedId) ? resolvedId : null)
-      if (!memberId || named.has(memberId)) return []
-      named.add(memberId)
-      return [{ handle, memberId }]
+    .flatMap((handle): Mention[] => {
+      const resolved = resolvedOf.get(handle)
+      const found =
+        keptOf.get(handle) ??
+        (resolved && !keptMembers.has(resolved.memberId) ? resolved : undefined)
+      if (!found || named.has(found.memberId)) return []
+      named.add(found.memberId)
+      return [{ handle, memberId: found.memberId, name: found.name }]
     })
     .slice(0, MENTIONS_MAX)
 }
 
 /**
- * Les mentions encore écrites d'un commentaire (à sa modification), par la clé primaire
- * (comment_id, member_id), qui range les lignes par commentaire d'abord :
- *   select handle, member_id from comment_mention where comment_id = $1 and withdrawn_at is null
+ * Les mentions encore écrites d'un commentaire (à sa modification), avec le nom actuel de chaque
+ * membre (R5b : resolveMentions les rend telles quelles dans la réponse). La clé primaire
+ * (comment_id, member_id) range les lignes par commentaire d'abord ; celle de "user" trouve le nom :
+ *   select handle, member_id, "user".name from comment_mention
+ *   inner join "user" on "user".id = comment_mention.member_id
+ *   where comment_id = $1 and withdrawn_at is null
  * Une mention retirée (tranche 7b, voir saveMentions) n'est plus « gardée » : si l'auteur réécrit
  * ce pseudo, il est relu comme un pseudo nouveau, avec les règles des blocages d'aujourd'hui.
  */
 export const mentionsOf = (db: Pick<Database, 'select'>, commentId: string) =>
   db
-    .select({ handle: cm.handle, memberId: cm.memberId })
+    .select({ handle: cm.handle, memberId: cm.memberId, name: schema.user.name })
     .from(cm)
+    .innerJoin(schema.user, eq(schema.user.id, cm.memberId))
     .where(and(eq(cm.commentId, commentId), isNull(cm.withdrawnAt)))
 
 /**
