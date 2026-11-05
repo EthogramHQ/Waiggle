@@ -23,7 +23,13 @@
 // L'écran garde une poignée (`handle`) pour ramener le focus sur « … » ou « Répondre » (après la
 // fermeture de la feuille, une suppression voisine).
 import { radii, space, textStyles } from '@ruche/brand'
-import { type CommentReply, type CommentState, type Mention, splitMentions } from '@ruche/contracts'
+import {
+  COMMENT_FOLD_LINES,
+  type CommentReply,
+  type CommentState,
+  type Mention,
+  splitMentions,
+} from '@ruche/contracts'
 import { type Ref, type RefObject, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -37,6 +43,7 @@ import type { ImageSource } from './image'
 import { MentionText } from './MentionText'
 import { Notice } from './Notice'
 import { Pressed } from './Pressed'
+import { ReadMore } from './ReadMore'
 import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { StatusPill } from './StatusPill'
@@ -421,12 +428,19 @@ export function CommentCard({
           </View>
         ) : null}
         {removed ? <RemovalNotice title={removed.title} lines={removed.lines} compact /> : null}
-        {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText). */}
-        <MentionText
-          text={comment.body}
-          mentions={comment.mentions}
-          onMemberPress={onMemberPress}
-        />
+        {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText). Au-delà de
+            10 lignes, il se replie : ReadMore lui donne le nombre de lignes à montrer, et
+            « Lire la suite » est décrit comme « Répondre » et « … ». */}
+        <ReadMore lines={COMMENT_FOLD_LINES} hint={described}>
+          {(numberOfLines) => (
+            <MentionText
+              text={comment.body}
+              mentions={comment.mentions}
+              onMemberPress={onMemberPress}
+              numberOfLines={numberOfLines}
+            />
+          )}
+        </ReadMore>
         {onReply || (hidden && onUnhide) ? (
           // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
           // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt.
