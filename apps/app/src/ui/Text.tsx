@@ -12,6 +12,7 @@ import {
 } from '@ruche/brand'
 import { type ReactNode, type Ref, useContext } from 'react'
 import {
+  Dimensions,
   Text as NativeText,
   type TextProps as NativeTextProps,
   Platform,
@@ -123,8 +124,58 @@ const bigTitleWebStyle = (variant: TextVariant): TextStyle => {
   } as unknown as TextStyle
 }
 
+/** Le texte le plus agrandi que l'appli doit tenir : le réglage d'un téléphone poussé à 200 %. */
+const LARGEST_TEXT_SCALE = 2
+
+/**
+ * Le nombre de lettres du plus long mot d'un texte. Seules les espaces ordinaires (et les sauts de
+ * ligne) séparent deux mots : une espace insécable les lie en un bloc qui ne se coupe pas
+ * (« projets · 3 »). `Array.from` compte les lettres, pas les unités du codage (un emoji = 1).
+ */
+const longestWord = (text: string) =>
+  Math.max(1, ...text.split(/[ \t\n]+/).map((word) => Array.from(word).length))
+
+/**
+ * Un titre dont aucun mot ne doit se couper (R5b, « Commentaires 6 » dans la feuille, en `title2`) :
+ * la formule des grands titres (`bigTitleWebStyle`), avec un troisième plafond, calculé sur le plus
+ * long mot. Doublé par le texte agrandi, ce mot tient encore dans la largeur de l'écran moins ses
+ * marges, sur 320 points comme ailleurs. La formule des grands titres est réglée sur 8 lettres
+ * (« Réglages ») : « Commentaires » en a 12, et le titre d'une feuille (34 points) se coupait au
+ * milieu du mot. Un titre court garde exactement la taille des autres titres.
+ */
+const wholeWordsWebStyle = (variant: TextVariant, words: string): TextStyle => {
+  const style = textStyles[variant]
+  const perLetter = LARGEST_TEXT_SCALE * longestWord(words) * GIANT_LETTER_WIDTH
+  const fit = `calc((100vw - ${GIANT_MARGINS}px) / ${perLetter.toFixed(2)})`
+  return {
+    fontSize: `min(${style.size}px, ${(style.size / 4).toFixed(2)}vw, ${fit})`,
+    lineHeight: `${(style.lineHeight / style.size).toFixed(3)}`,
+    letterSpacing: `${style.tracking}em`,
+  } as unknown as TextStyle
+}
+
+/**
+ * La même garde sur téléphone, où le réglage de l'appareil agrandit le texte : l'agrandissement
+ * s'arrête quand le plus long mot remplirait la largeur de la fenêtre (jamais sous 1). La largeur
+ * est lue au rendu, sans s'abonner à ses changements : seul un titre qui l'a demandée la lit, et
+ * le rendu suivant (une rotation redessine l'écran) prend la nouvelle.
+ */
+const wholeWordsScale = (variant: TextVariant, words: string) =>
+  Math.max(
+    1,
+    (Dimensions.get('window').width - GIANT_MARGINS) /
+      (longestWord(words) * GIANT_LETTER_WIDTH * textStyles[variant].size),
+  )
+
 export type TextProps = {
   children: ReactNode
+  /**
+   * Un texte dont aucun mot ne doit se couper, même agrandi à 200 % sur 320 points : la taille
+   * descend assez pour que le plus long mot de ce texte tienne sur une ligne (voir
+   * `wholeWordsWebStyle`). `CountedTitle` le donne au titre et à son nombre, qui gardent ainsi la
+   * même taille.
+   */
+  wholeWords?: string
   variant?: TextVariant
   tone?: TextTone
   /** Remplace la graisse prévue par la variante (par exemple un libellé en gras). */
@@ -208,6 +259,7 @@ export function Text({
   readable = false,
   heading,
   focusRef,
+  wholeWords,
   ...rest
 }: TextProps) {
   const { colors } = useTheme()
@@ -219,7 +271,12 @@ export function Text({
   // petites capitales (13 points) et les titres écrits par les membres (niveaux 3 et 4) gardent
   // l'agrandissement complet.
   const bigTitle = heading !== undefined && heading <= 2 && style.size >= textStyles.heading.size
-  const maxScale = maxScaleProp ?? (bigTitle ? maxHeadingScale : maxTextScale)
+  const maxScale = Math.min(
+    maxScaleProp ?? (bigTitle ? maxHeadingScale : maxTextScale),
+    wholeWords !== undefined && Platform.OS !== 'web'
+      ? wholeWordsScale(variant, wholeWords)
+      : Number.POSITIVE_INFINITY,
+  )
   return (
     <NativeText
       // Les textes grandissent avec le réglage de taille de l'appareil, jusqu'à deux fois leur taille.
@@ -247,6 +304,10 @@ export function Text({
         ...(readable ? { maxWidth: readableWidth } : null),
         ...(giant && Platform.OS === 'web' ? giantWebStyle(variant, children) : null),
         ...(bigTitle && Platform.OS === 'web' ? bigTitleWebStyle(variant) : null),
+        // Après la formule des grands titres, qu'elle reprend en y ajoutant son plafond.
+        ...(wholeWords !== undefined && Platform.OS === 'web'
+          ? wholeWordsWebStyle(variant, wholeWords)
+          : null),
       }}
       {...rest}
       {...(heading ? headingLevel(heading) : null)}
