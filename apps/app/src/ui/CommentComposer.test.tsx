@@ -327,6 +327,15 @@ describe('CommentComposer', () => {
       expect(place(screen.getByText(caption))).toBeGreaterThan(place(field()))
     })
 
+    it('names its field « Écrire un commentaire », not « Ton commentaire »', async () => {
+      // Décision de la session (R5b) : « Ton commentaire » est déjà le nom lu du fond des siens
+      // (`comments.yours`) ; le champ prend `comments.add`.
+      await renderWithProviders(<CommentComposer {...propsOf()} />)
+
+      expect(field().props.accessibilityLabel).toBe(fr.t(($) => $.project.comments.add))
+      expect(field().props.accessibilityLabel).toBe('Écrire un commentaire')
+    })
+
     it('gives its text input to inputRef, for the screen to put the focus in it', async () => {
       const inputRef = createRef<TextInput>()
       await renderWithProviders(<CommentComposer {...propsOf({ inputRef })} />)
