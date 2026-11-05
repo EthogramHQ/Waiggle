@@ -22,33 +22,33 @@ import { ThemeProvider } from '../ui/theme/ThemeProvider'
 const fr = {
   title: 'Carte d’un commentaire',
   intro:
-    'Un commentaire de la feuille : la photo et le nom (un lien), le badge « Auteur », la date, « modifié », le texte, « Répondre » dessous et « … » à droite. Ses propres commentaires sur fond gris, le commentaire visé en miel pâle ; les emplacements sans nom, ni date, ni action ; la carte compacte de l’aperçu, un seul bouton.',
-  other: 'Un autre membre, sur le projet d’un autre (« Signaler » seul)',
-  author: 'L’auteur du projet : le badge, et « modifié »',
-  mine: 'Le sien : fond gris, lu « Ton commentaire »',
-  highlighted: 'Visé par une réponse : miel pâle',
-  reply: 'Une réponse : photo plus petite',
+    'Un commentaire de la feuille : la photo et le nom (un lien), le badge « Auteur », la date, « modifié », le texte, « Répondre » dessous et « … » à droite. Ses propres commentaires sur fond gris, le commentaire visé en miel pâle ; les emplacements sans nom, ni date, ni action ; la carte compacte de l’aperçu, un seul bouton.',
+  other: 'Un autre membre, sur le projet d’un autre (« Signaler » seul)',
+  author: 'L’auteur du projet : le badge, et « modifié »',
+  mine: 'Le sien : fond gris, lu « Ton commentaire »',
+  highlighted: 'Visé par une réponse : miel pâle',
+  reply: 'Une réponse : photo plus petite',
   mention: 'Avec une mention',
-  hiddenByYou: 'Masqué, vu par l’auteur du projet : « Démasquer »',
-  unhiding: 'Masqué, « Démasquer » en route',
+  hiddenByYou: 'Masqué, vu par l’auteur du projet : « Démasquer »',
+  unhiding: 'Masqué, « Démasquer » en route',
   hiddenByAuthor: 'Masqué, vu par celui qui l’a écrit',
   removed: 'Retiré par la modération, vu par son auteur',
-  placeholders: 'Les emplacements : supprimé, retiré, masqué, bloqué, indisponible',
-  compact: 'Compacte (l’aperçu) : un seul bouton, sans lien ni action',
+  placeholders: 'Les emplacements : supprimé, retiré, masqué, bloqué, indisponible',
+  compact: 'Compacte (l’aperçu) : un seul bouton, sans lien ni action',
   error: 'Une action en échec',
   errorAction: 'Une action en échec, avec son lien',
-  menus: 'Les menus ouverts : le sien, sur son projet, ailleurs',
-  night: 'De nuit : le sien, le visé, masqué',
+  menus: 'Les menus ouverts : le sien, sur son projet, ailleurs',
+  night: 'De nuit : le sien, le visé, masqué',
   // Les exemples : des textes de membres, comme dans l'appli.
-  bodyOther: 'Super idée, je l’ai testé ce matin avec ma fille : elle a adoré la partie quiz.',
-  bodyAuthor: 'Merci à tous ! J’ai ajouté la recherche par ingrédient, dites-moi si ça marche.',
-  bodyMine: 'Est-ce que ça marche aussi avec des photos prises en intérieur ?',
+  bodyOther: 'Super idée, je l’ai testé ce matin avec ma fille : elle a adoré la partie quiz.',
+  bodyAuthor: 'Merci à tous ! J’ai ajouté la recherche par ingrédient, dites-moi si ça marche.',
+  bodyMine: 'Est-ce que ça marche aussi avec des photos prises en intérieur ?',
   bodyReply: 'Oui, j’ai essayé hier soir, la lumière de la cuisine suffit.',
-  bodyMention: 'Merci @lea_moreau, et @papi_jean tu devrais essayer !',
+  bodyMention: 'Merci @lea_moreau, et @papi_jean tu devrais essayer !',
   bodyHidden: 'Franchement, rien de nouveau là-dedans.',
   bodyRemoved: 'Un texte retiré par la modération.',
   removedTitle: 'Retiré par la modération',
-  removedLine: 'Motif : contenu blessant. Tu peux contester cette décision depuis tes réglages.',
+  removedLine: 'Motif : contenu blessant. Tu peux contester cette décision depuis tes réglages.',
   modify: 'Modifier',
   remove: 'Supprimer',
   hide: 'Masquer',
@@ -99,7 +99,7 @@ const en: typeof fr = {
 type Labels = typeof fr
 const noop = () => {}
 /** L'heure figée du catalogue : la date relative ne dépend pas du moment de la visite. */
-const NOW = new Date('2026-11-05T12:00:00.000Z')
+const NOW = new Date('2026-11-05T12 :00 :00.000Z')
 const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
 
 const LEA = { id: 'lea', name: 'Léa Moreau', avatarUrl: null, handle: 'lea_moreau' }

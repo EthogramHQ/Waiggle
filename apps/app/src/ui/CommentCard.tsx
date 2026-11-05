@@ -240,7 +240,8 @@ export function CommentCard({
   const short = excerpt(plain)
   const date = <RelativeTime date={comment.createdAt} {...(now ? { now } : null)} />
   const edited = comment.editedAt ? (
-    <>
+    // Le point et « modifié » passent à la ligne ensemble, jamais le point seul au bout de la date.
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
       {/* Le point sépare la date de « modifié » pour l'œil ; les lecteurs d'écran le sautent. */}
       <View aria-hidden>
         <Text variant="caption" tone="muted">
@@ -250,7 +251,7 @@ export function CommentCard({
       <Text variant="caption" tone="muted">
         {t(($) => $.project.comments.edited)}
       </Text>
-    </>
+    </View>
   ) : null
   const badge = isProjectAuthor ? (
     // Le badge est dit par le nom du lien (« Léa Moreau, Auteur ») : caché ici aux lecteurs d'écran.
@@ -405,7 +406,8 @@ export function CommentCard({
                 paddingHorizontal: space.sm,
                 paddingVertical: space.xxs,
                 borderRadius: radii.pill,
-                backgroundColor: colors.surfaceGrouped,
+                // Sur le fond gris des siens, la pastille prend le blanc de la carte : elle se voit.
+                backgroundColor: isMine && !highlighted ? colors.surface : colors.surfaceGrouped,
               }}
             >
               <Icon name="eye-slash" size={16} tone="muted" />
