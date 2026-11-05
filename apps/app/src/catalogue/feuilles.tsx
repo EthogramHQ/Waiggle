@@ -1,7 +1,9 @@
 // La section « Les feuilles du compte » du catalogue (tranche R2, profil et suppression) : la photo
 // de profil en tête de la feuille (AvatarCover : avec photo, sans photo, en chargement, sans
 // bouton), la pile de photos de la feuille de suppression (PhotoStack : avec et sans projets), et
-// la feuille d'ordinateur avec son décor et sa colonne à côté (SheetPanel `decoration`, `aside`).
+// la feuille d'ordinateur avec son décor et sa colonne à côté (SheetPanel `decoration`, `aside`),
+// et (R5b) la feuille de téléphone dont le titre porte un nombre (`titleCount`), avec et sans
+// commentaire.
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs agents travaillent
 // en même temps sur le catalogue. Ses exemples (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
@@ -33,6 +35,14 @@ const fr = {
   save: 'Enregistrer',
   tools: 'Outils favoris',
   bio: 'Je bricole des agents IA le week-end.',
+  counted:
+    'Feuille de téléphone avec un nombre après le titre (titleCount, R5b), lue « Commentaires, 6 commentaires » ; sa tête se glisse vers le bas pour fermer',
+  countedNone: 'La même sans commentaire : le titre seul, sans « 0 »',
+  comments: 'Commentaires',
+  spoken: '6 commentaires',
+  spokenNone: '0 commentaire',
+  comment: 'Super idée, je teste ce soir.',
+  send: 'Envoyer le commentaire',
 }
 const en: typeof fr = {
   title: 'Account sheets',
@@ -48,7 +58,18 @@ const en: typeof fr = {
   save: 'Save',
   tools: 'Favourite tools',
   bio: 'I tinker with AI agents at the weekend.',
+  counted:
+    'Phone sheet with a number after its title (titleCount, R5b), read “Comments, 6 comments”; its head drags down to close',
+  countedNone: 'The same with no comment: the title alone, no “0”',
+  comments: 'Comments',
+  spoken: '6 comments',
+  spokenNone: '0 comments',
+  comment: 'Great idea, I’ll try it tonight.',
+  send: 'Send the comment',
 }
+
+/** La hauteur d'une feuille de téléphone montrée dans la page (comme dans compte.tsx). */
+const PHONE_SHEET_HEIGHT = 420
 
 /**
  * Une image d'exemple (le dépôt n'en contient aucune) : un dégradé SVG entre deux couleurs de la
@@ -171,6 +192,36 @@ export function SheetsCatalogue() {
           <Text>{l.body}</Text>
         </SheetPanel>
       </View>
+
+      {/* R5b : le titre avec son nombre (« Commentaires 6 »), puis avec 0 (le titre seul). */}
+      {[
+        { key: 'six', caption: l.counted, count: 6, spoken: l.spoken },
+        { key: 'none', caption: l.countedNone, count: 0, spoken: l.spokenNone },
+      ].map((sample) => (
+        <Stack key={sample.key} gap="lg">
+          <Text tone="secondary">{sample.caption}</Text>
+          <View
+            style={{
+              height: PHONE_SHEET_HEIGHT,
+              maxWidth: layout.formWidth,
+              backgroundColor: colors.scrim,
+              borderRadius: radii.tile,
+              overflow: 'hidden',
+            }}
+          >
+            <SheetPanel
+              layout="phone"
+              title={l.comments}
+              titleCount={{ count: sample.count, spoken: sample.spoken }}
+              closeLabel={l.close}
+              onClose={noop}
+              footer={<Button label={l.send} onPress={noop} />}
+            >
+              <Text>{l.comment}</Text>
+            </SheetPanel>
+          </View>
+        </Stack>
+      ))}
     </Stack>
   )
 }
