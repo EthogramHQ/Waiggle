@@ -1,24 +1,26 @@
 // Tests du titre avec nombre (R3, page d'un membre) : le nombre affiché après le titre, « 50+ » au
 // plafond d'une liste, et un nom lu sans signe (« Mes projets, 3 projets »).
 import { screen } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { CountedTitle } from './CountedTitle'
+import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
+/** Les morceaux d'un texte réunis, tels qu'ils sont écrits (espaces insécables comprises). */
+const rawText = (node: unknown): string =>
+  typeof node === 'string' || typeof node === 'number'
+    ? String(node)
+    : Array.isArray(node)
+      ? node.map(rawText).join('')
+      : node && typeof node === 'object' && 'props' in node
+        ? rawText((node as { props: { children?: unknown } }).props.children)
+        : ''
+
 /** Le texte affiché d'un titre, ses morceaux réunis et ses blancs ramenés à des espaces simples. */
-const shown = (name: string) => {
-  const flatten = (node: unknown): string =>
-    typeof node === 'string'
-      ? node
-      : Array.isArray(node)
-        ? node.map(flatten).join('')
-        : node && typeof node === 'object' && 'props' in node
-          ? flatten((node as { props: { children?: unknown } }).props.children)
-          : ''
-  return flatten(screen.getByRole('header', { name }).props.children).replace(/\s+/g, ' ')
-}
+const shown = (name: string) =>
+  rawText(screen.getByRole('header', { name }).props.children).replace(/\s+/g, ' ')
 
 describe('CountedTitle', () => {
   it('is a heading read with the number in words, without the dot', async () => {
@@ -50,6 +52,83 @@ describe('CountedTitle', () => {
     const count = screen.getByText(/12$/)
     expect(header).toBeTruthy()
     expect(count.props.children).toBe(' · 12')
+  })
+
+  // R5b : le titre des commentaires, « Commentaires 6 », sur la page et dans la feuille (relecture
+  // de l'interface ui-I3). Une espace ordinaire entre le titre et le nombre : à 200 % et 320 px, le
+  // nombre passe à la ligne entier, au lieu que le bloc insécable « Commentaires · 6 » coupe le mot
+  // (repris des listes « À reprendre »). Sans commentaire, le titre seul.
+  describe("with separator 'space'", () => {
+    it("with separator 'space' the count can wrap whole to the next line", async () => {
+      await renderWithProviders(
+        <CountedTitle
+          title="Commentaires"
+          count={6}
+          spokenCount="6 commentaires"
+          separator="space"
+        />,
+      )
+
+      const header = screen.getByRole('header', { name: 'Commentaires, 6 commentaires' })
+      // Le texte tel qu'il est écrit, sans ramener les blancs : une seule espace ordinaire (U+0020),
+      // où la ligne peut se couper, et aucun « · ».
+      const raw = rawText(header.props.children)
+      expect(raw).toBe('Commentaires 6')
+      expect(raw.charCodeAt('Commentaires'.length)).toBe(0x20)
+    })
+
+    it('with no comment the title is « Commentaires » with no number', async () => {
+      await renderWithProviders(
+        <CountedTitle
+          title="Commentaires"
+          count={0}
+          spokenCount="0 commentaire"
+          separator="space"
+        />,
+      )
+
+      // Ni « 0 » à voir, ni « 0 commentaire » à entendre : le titre seul.
+      expect(shown('Commentaires')).toBe('Commentaires')
+      expect(screen.queryByText(/0/)).toBeNull()
+    })
+  })
+
+  it('carries the nativeID it is given, so that a dialog can be named by it', async () => {
+    await renderWithProviders(
+      <CountedTitle
+        title="Commentaires"
+        count={6}
+        spokenCount="6 commentaires"
+        separator="space"
+        nativeID="comments-title"
+      />,
+    )
+
+    expect(
+      screen.getByRole('header', { name: 'Commentaires, 6 commentaires' }).props.nativeID,
+    ).toBe('comments-title')
+  })
+
+  it("takes the size of a sheet title with variant 'title2'", async () => {
+    // La feuille des commentaires a le grand titre des feuilles (Text « title2 ») : le titre avec
+    // son nombre prend la même taille, le nombre compris.
+    await renderWithProviders(
+      <>
+        <Text variant="title2">Référence</Text>
+        <CountedTitle
+          title="Commentaires"
+          count={6}
+          spokenCount="6 commentaires"
+          separator="space"
+          variant="title2"
+        />
+      </>,
+    )
+
+    const reference = StyleSheet.flatten(screen.getByText('Référence').props.style)
+    const header = screen.getByRole('header', { name: 'Commentaires, 6 commentaires' })
+    expect(StyleSheet.flatten(header.props.style).fontSize).toBe(reference.fontSize)
+    expect(StyleSheet.flatten(screen.getByText(/6$/).props.style).fontSize).toBe(reference.fontSize)
   })
 
   it('is a section heading by default, and takes another level when asked (web)', async () => {

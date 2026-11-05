@@ -1,0 +1,377 @@
+// Tests du champ compact des commentaires (R5b, `CommentComposer`), fixé en bas de la feuille (et
+// sous la liste, dans la colonne de droite d'un écran large) : la photo du membre, le champ qui
+// propose des mentions après « @ », le bouton d'envoi (une flèche ronde ; « Envoyer » en texte dans
+// la colonne), le bandeau « Réponse à … » ou « Modifier ton commentaire » au-dessus avec sa croix,
+// le compteur à partir de 900 caractères, l'erreur au-dessus du champ avec « Réessayer », et la
+// légende dessous, qui dit qui lira (donnée par l'écran : relecture juridique jur-P1).
+//
+// Les gardes reprises de `NoteComposer` (Découpage du plan R5b) : rien ne part d'un champ vide ou
+// fait d'espaces, un double toucher n'envoie qu'une fois, l'envoi en cours est annoncé « occupé »,
+// le texte reste dans le champ après une erreur, et le focus revient au champ quand on ferme le
+// bandeau. Le composant ne garde aucun état du texte : l'écran (`useCommentDraft`) le lui donne.
+//
+// Le membre suspendu n'a pas de champ du tout (l'écran ne le rend pas : ui-I1) ; ce cas est testé
+// avec l'écran.
+import { COMMENT_COUNTER_FROM, COMMENT_MAX } from '@ruche/contracts'
+import { fireEvent, screen } from '@testing-library/react-native'
+import { type ComponentProps, createRef, useState } from 'react'
+import { Platform, TextInput } from 'react-native'
+import { inesMember } from '../testing/comments'
+import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
+import { CommentComposer } from './CommentComposer'
+
+jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+
+const sendLabel = fr.t(($) => $.project.comments.sendLabel)
+const sendShort = fr.t(($) => $.project.comments.send)
+const caption = fr.t(($) => $.project.comments.hint)
+
+type Props = ComponentProps<typeof CommentComposer>
+
+/** Les réglages d'un champ ordinaire, dans la feuille ; chaque test change ce qui l'intéresse. */
+const propsOf = (fields: Partial<Props> = {}): Props => ({
+  value: '',
+  onChangeText: jest.fn(),
+  onSend: jest.fn(),
+  pending: false,
+  banner: null,
+  onCancelBanner: jest.fn(),
+  caption,
+  avatar: null,
+  memberName: 'Sam Petit',
+  place: 'sheet',
+  suggestions: [],
+  suggestionsFor: null,
+  onQueryChange: jest.fn(),
+  inputRef: createRef<TextInput>(),
+  ...fields,
+})
+
+type Host = {
+  type?: unknown
+  props: Record<string, unknown>
+  children: ReadonlyArray<Host | string>
+  parent: Host | null
+}
+
+/** Tous les éléments de l'arbre rendu, dans l'ordre de lecture (en profondeur). */
+const hostsOf = (node: Host): Host[] => [
+  node,
+  ...node.children.flatMap((child) => (typeof child === 'string' ? [] : hostsOf(child))),
+]
+const all = () => hostsOf(screen.root as unknown as Host)
+
+/** La saisie du champ : le seul champ de texte natif du composant. */
+const field = () => {
+  const found = all().find((node) => node.type === 'TextInput')
+  if (!found) throw new Error('no text input')
+  return found
+}
+
+/** La place d'un élément dans l'ordre de lecture. */
+const place = (node: unknown) => all().indexOf(node as Host)
+
+/** Le bouton d'envoi de la feuille : la flèche ronde, nommée « Envoyer le commentaire ». */
+const sendButton = () => screen.getByRole('button', { name: sendLabel })
+
+/**
+ * Le texte est annoncé poliment : il est dans une région vivante polie (ou un `status`), et aucune
+ * région qui coupe la parole (`alert`, `assertive`) ne l'entoure.
+ */
+const politelyAnnounced = (element: unknown): boolean => {
+  let polite = false
+  for (let node = element as Host | null; node; node = node.parent) {
+    const { role, accessibilityRole, accessibilityLiveRegion } = node.props
+    const values = [role, accessibilityRole, node.props['aria-live'], accessibilityLiveRegion].map(
+      String,
+    )
+    if (values.some((value) => value === 'alert' || value === 'assertive')) return false
+    if (values.some((value) => value === 'polite' || value === 'status')) polite = true
+  }
+  return polite
+}
+
+/** Un `document` du navigateur prêté, complet en apparence (ThemeProvider y écrit, sur le web). */
+const loose = (): unknown =>
+  new Proxy(() => {}, {
+    get: (_target, key) =>
+      key === Symbol.toPrimitive ? () => '' : key === 'then' ? undefined : loose(),
+    set: () => true,
+    apply: () => loose(),
+  })
+
+describe('CommentComposer', () => {
+  describe('sending', () => {
+    it('sends what is written when the arrow is touched (témoin)', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci !', onSend })} />)
+
+      expect(sendButton()).not.toBeDisabled()
+      await fireEvent.press(sendButton())
+
+      expect(onSend).toHaveBeenCalledTimes(1)
+    })
+
+    it('greys out the send button and refuses to send while the field is empty', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(<CommentComposer {...propsOf({ value: '', onSend })} />)
+
+      expect(sendButton()).toBeDisabled()
+      await fireEvent.press(sendButton())
+
+      expect(onSend).not.toHaveBeenCalled()
+    })
+
+    it('a text made only of spaces cannot be sent', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(<CommentComposer {...propsOf({ value: '  \n   ', onSend })} />)
+
+      expect(sendButton()).toBeDisabled()
+      await fireEvent.press(sendButton())
+
+      expect(onSend).not.toHaveBeenCalled()
+    })
+
+    it('sends once on a double tap of the arrow', async () => {
+      // L'écran n'a pas encore passé `pending` quand la seconde tape arrive : la garde est celle du
+      // bouton lui-même (une `ref`, comme `useTapGuard`).
+      const onSend = jest.fn()
+      await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci !', onSend })} />)
+
+      await fireEvent.press(sendButton())
+      await fireEvent.press(sendButton())
+
+      expect(onSend).toHaveBeenCalledTimes(1)
+    })
+
+    it('the send button is announced busy while sending and ignores presses', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(
+        <CommentComposer {...propsOf({ value: 'Merci !', onSend, pending: true })} />,
+      )
+
+      const button = sendButton()
+      expect(
+        button.props['aria-busy'] === true ||
+          (button.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true,
+      ).toBe(true)
+      await fireEvent.press(button)
+
+      expect(onSend).not.toHaveBeenCalled()
+    })
+
+    it('in the column of a wide screen, sends with a text button « Envoyer »', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(
+        <CommentComposer {...propsOf({ value: 'Merci !', onSend, place: 'column' })} />,
+      )
+
+      // Le bouton porte le mot « Envoyer » à voir ; on remonte du texte au bouton qui le contient.
+      let button = screen.getByText(sendShort) as unknown as Host | null
+      while (
+        button &&
+        button.props.accessibilityRole !== 'button' &&
+        button.props.role !== 'button'
+      ) {
+        button = button.parent
+      }
+      expect(button).not.toBeNull()
+      await fireEvent.press(button as never)
+
+      expect(onSend).toHaveBeenCalledTimes(1)
+    })
+
+    it('in the sheet, the arrow has no visible word (témoin)', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci !' })} />)
+
+      expect(sendButton()).toBeTruthy()
+      expect(screen.queryByText(sendShort)).toBeNull()
+    })
+  })
+
+  describe('the counter, near the limit', () => {
+    it('the counter is absent at 899 characters and reads « 900 / 1000 » at 900', async () => {
+      expect(COMMENT_COUNTER_FROM).toBe(900)
+      const { rerender } = await renderWithProviders(
+        <CommentComposer {...propsOf({ value: 'a'.repeat(899) })} />,
+      )
+      expect(screen.queryByText(/\/\s*1\s?000/)).toBeNull()
+
+      await rerender(<CommentComposer {...propsOf({ value: 'a'.repeat(900) })} />)
+
+      expect(screen.getByText('900 / 1000')).toBeTruthy()
+    })
+
+    it('at 1001 characters the field is invalid, sending is refused and « 1 caractère de trop. » is announced politely', async () => {
+      // « Saisie invalide » se dit sur le web (`aria-invalid`), comme pour tout champ de l'appli.
+      jest.replaceProperty(Platform, 'OS', 'web')
+      Object.defineProperty(globalThis, 'document', {
+        value: new Proxy({ activeElement: null } as Record<string | symbol, unknown>, {
+          get: (target, key) => (key in target ? target[key] : loose()),
+          set: () => true,
+        }),
+        configurable: true,
+      })
+      try {
+        const onSend = jest.fn()
+        await renderWithProviders(
+          <CommentComposer {...propsOf({ value: 'a'.repeat(COMMENT_MAX + 1), onSend })} />,
+        )
+
+        expect(field().props['aria-invalid']).toBe(true)
+        await fireEvent.press(sendButton())
+        expect(onSend).not.toHaveBeenCalled()
+        const tooLong = fr.t(($) => $.project.comments.tooLong, { count: 1 })
+        expect(tooLong).toBe('1 caractère de trop.')
+        expect(politelyAnnounced(screen.getByText(tooLong))).toBe(true)
+      } finally {
+        jest.restoreAllMocks()
+        Reflect.deleteProperty(globalThis, 'document')
+      }
+    })
+
+    it('at the limit itself, 1000 characters still go (témoin)', async () => {
+      const onSend = jest.fn()
+      await renderWithProviders(
+        <CommentComposer {...propsOf({ value: 'a'.repeat(COMMENT_MAX), onSend })} />,
+      )
+
+      expect(screen.getByText('1000 / 1000')).toBeTruthy()
+      await fireEvent.press(sendButton())
+
+      expect(onSend).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('the banner above the field', () => {
+    it('the reply banner reads « Réponse à Léa Moreau », and its cross « Annuler la réponse » gives the focus back to the field', async () => {
+      // Sur téléphone comme sur le web, le focus va au champ par son `focus()` : le clavier reste
+      // ouvert, on continue d'écrire. La saisie simulée garde les appels des tests d'avant.
+      const focus = jest.spyOn(TextInput.prototype, 'focus')
+      focus.mockClear()
+      try {
+        const onCancelBanner = jest.fn()
+        await renderWithProviders(
+          <CommentComposer
+            {...propsOf({ banner: { kind: 'reply', name: 'Léa Moreau' }, onCancelBanner })}
+          />,
+        )
+
+        expect(screen.getByText('Réponse à Léa Moreau')).toBeTruthy()
+        await fireEvent.press(screen.getByRole('button', { name: 'Annuler la réponse' }))
+
+        expect(onCancelBanner).toHaveBeenCalledTimes(1)
+        expect(focus).toHaveBeenCalled()
+        expect(field().props.accessibilityLabel).toEqual(expect.any(String))
+        expect((focus.mock.contexts.at(-1) as unknown as Host).props.accessibilityLabel).toBe(
+          field().props.accessibilityLabel,
+        )
+      } finally {
+        focus.mockRestore()
+      }
+    })
+
+    it('the edit banner reads « Modifier ton commentaire », and its cross « Annuler la modification » cancels it', async () => {
+      const onCancelBanner = jest.fn()
+      await renderWithProviders(
+        <CommentComposer
+          {...propsOf({ value: 'Mon texte', banner: { kind: 'edit' }, onCancelBanner })}
+        />,
+      )
+
+      expect(screen.getByText('Modifier ton commentaire')).toBeTruthy()
+      await fireEvent.press(screen.getByRole('button', { name: 'Annuler la modification' }))
+
+      expect(onCancelBanner).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows no banner for a new comment', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci !' })} />)
+
+      expect(sendButton()).toBeTruthy() // témoin
+      expect(screen.queryByRole('button', { name: 'Annuler la réponse' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Annuler la modification' })).toBeNull()
+    })
+  })
+
+  describe('around the field', () => {
+    it('shows an error above the field, with « Réessayer », and keeps the text', async () => {
+      const retry = jest.fn()
+      const error = fr.t(($) => $.project.comments.error)
+      await renderWithProviders(
+        <CommentComposer
+          {...propsOf({
+            value: 'Merci !',
+            error,
+            errorAction: { label: fr.t(($) => $.common.retry), onPress: retry },
+          })}
+        />,
+      )
+
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent(error)
+      expect(place(alert)).toBeLessThan(place(field()))
+      expect(field().props.value).toBe('Merci !')
+      await fireEvent.press(
+        screen.queryByRole('link', { name: 'Réessayer' }) ??
+          screen.getByRole('button', { name: 'Réessayer' }),
+      )
+
+      expect(retry).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows under the field who will read the comment', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf()} />)
+
+      expect(place(screen.getByText(caption))).toBeGreaterThan(place(field()))
+    })
+
+    it('names its field « Écrire un commentaire », not « Ton commentaire »', async () => {
+      // Décision de la session (R5b) : « Ton commentaire » est déjà le nom lu du fond des siens
+      // (`comments.yours`) ; le champ prend `comments.add`.
+      await renderWithProviders(<CommentComposer {...propsOf()} />)
+
+      expect(field().props.accessibilityLabel).toBe(fr.t(($) => $.project.comments.add))
+      expect(field().props.accessibilityLabel).toBe('Écrire un commentaire')
+    })
+
+    it('gives its text input to inputRef, for the screen to put the focus in it', async () => {
+      const inputRef = createRef<TextInput>()
+      await renderWithProviders(<CommentComposer {...propsOf({ inputRef })} />)
+
+      expect(inputRef.current).not.toBeNull()
+      expect(field().props.accessibilityLabel).toEqual(expect.any(String))
+      expect((inputRef.current as unknown as Host).props.accessibilityLabel).toBe(
+        field().props.accessibilityLabel,
+      )
+    })
+
+    it('asks for members to mention after « @ », and lists them above the field', async () => {
+      const onQueryChange = jest.fn()
+      const ines = { ...inesMember, avatar: null }
+      /** Le champ avec son texte gardé, comme dans l'écran ; la réponse répond à « in ». */
+      function Typing() {
+        const [value, setValue] = useState('')
+        return (
+          <CommentComposer
+            {...propsOf({
+              value,
+              onChangeText: setValue,
+              onQueryChange,
+              suggestions: [ines],
+              suggestionsFor: 'in',
+            })}
+          />
+        )
+      }
+      await renderWithProviders(<Typing />)
+
+      await fireEvent.changeText(field() as never, 'Merci @in')
+
+      expect(onQueryChange.mock.calls.at(-1)?.[0]).toBe('in')
+      const option = screen.getByRole('option', { name: /Inès Morel/ })
+      expect(place(option)).toBeLessThan(place(field()))
+    })
+  })
+})
