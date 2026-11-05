@@ -1471,42 +1471,9 @@ const ancestorWithRole = (node: ReturnType<typeof screen.getByText>, role: strin
   return parent
 }
 
+// R5b : le « Répondre » unique au bout du fil et le champ de réponse à sa place sont retirés
+// (décisions B6 et choix 3 : « Répondre » sous chaque commentaire, le champ en bas de la feuille).
 describe('CommentThread, after the reviews', () => {
-  it('offers « Répondre » once, at the end of the thread, after the replies', async () => {
-    const reply = jest.fn()
-    await renderWithProviders(
-      <CommentThread
-        root={<Text>Le commentaire</Text>}
-        replies={[<Text key="a">Première réponse</Text>]}
-        replyAction={{ label: 'Répondre', description: 'Max : Le commentaire', onPress: reply }}
-      />,
-    )
-
-    const shown = screen.getAllByText(/^(Le commentaire|Première réponse|Répondre)$/)
-    expect(shown.map((node) => node.props.children)).toEqual([
-      'Le commentaire',
-      'Première réponse',
-      'Répondre',
-    ])
-    const button = screen.getByRole('button', { name: 'Répondre' })
-    expect(button).toHaveProp('accessibilityHint', 'Max : Le commentaire')
-    await fireEvent.press(button)
-    expect(reply).toHaveBeenCalledTimes(1)
-  })
-
-  it('puts the field of the reply in place of « Répondre »', async () => {
-    await renderWithProviders(
-      <CommentThread
-        root={<Text>Le commentaire</Text>}
-        replyAction={{ label: 'Répondre', onPress: jest.fn() }}
-        composer={<Text>Le champ de réponse</Text>}
-      />,
-    )
-
-    expect(screen.getByText('Le champ de réponse')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
-  })
-
   it('offers no « Répondre » when it is not given one', async () => {
     await renderWithProviders(<CommentThread root={<Text>Commentaire supprimé</Text>} />)
 
