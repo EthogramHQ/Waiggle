@@ -494,14 +494,18 @@ describe('the members proposed after « @ »', () => {
     expect(await proposed(malik, { q: 'ina', projectId: meteo.id })).toEqual(['ina'])
   })
 
-  it('searches the start of the handle only, with capitals and an « @ » accepted', async () => {
+  // R5b : la recherche trouve aussi un membre par le début d'un mot de son nom (avant : par le
+  // pseudo seul, et « morel » ne trouvait personne).
+  it('searches the start of the handle or of a word of the name, with capitals and an « @ » accepted', async () => {
     const meteo = await publish(ines)
 
     expect(await proposed(malik, { q: '@INES', projectId: meteo.id })).toEqual(['ines_morel'])
-    // Ni le milieu du pseudo, ni le nom.
-    expect(await proposed(malik, { q: 'morel', projectId: meteo.id })).toEqual([])
+    // « Morel », un mot du nom « Inès Morel » ; jamais le milieu d'un mot.
+    expect(await proposed(malik, { q: 'morel', projectId: meteo.id })).toEqual(['ines_morel'])
+    expect(await proposed(malik, { q: 'orel', projectId: meteo.id })).toEqual([])
     await changeHandle(ines, 'zebra')
-    expect(await proposed(malik, { q: 'ine', projectId: meteo.id })).toEqual([])
+    // Son nom commence toujours par « Inè » : elle reste trouvée, sous son nouveau pseudo.
+    expect(await proposed(malik, { q: 'ine', projectId: meteo.id })).toEqual(['zebra'])
     expect(await proposed(malik, { q: 'zeb', projectId: meteo.id })).toEqual(['zebra'])
   })
 
