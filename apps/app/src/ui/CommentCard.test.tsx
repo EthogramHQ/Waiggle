@@ -44,8 +44,12 @@ const hugo: CommentAuthor = {
   avatarUrl: null,
 }
 
-/** Il y a trois heures, à l'horloge de l'appareil : la carte écrit « il y a 3 h ». */
-const threeHoursAgo = () => new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+// L'heure de la carte est figée (`now`) : à l'horloge réelle, entre minuit et 3 h, « il y a trois
+// heures » tombe la veille et la carte écrit « hier » (vu à 1 h 42 le 5/11/2026).
+const NOW = new Date('2026-11-05T14:00:00.000Z')
+
+/** Trois heures avant `NOW` : la carte écrit « il y a 3 h ». */
+const threeHoursAgo = () => new Date(NOW.getTime() - 3 * 60 * 60 * 1000).toISOString()
 
 const BODY = 'Super idée, je teste ce soir.'
 
@@ -117,6 +121,7 @@ const card = (props: Partial<CardProps> = {}): ReactElement => (
     hiddenNote={null}
     onAuthorPress={jest.fn()}
     onMemberPress={jest.fn()}
+    now={NOW}
     {...props}
   />
 )
