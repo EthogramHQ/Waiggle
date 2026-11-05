@@ -1,33 +1,40 @@
 // Lire les mentions de commentaires (tranche 6b) : pour chaque commentaire d'une page, les membres
-// qu'il mentionne, avec le pseudo écrit (contrat `Mention`) ; et, pour l'export des données, les
-// identifiants des membres mentionnés. Une requête pour tous les commentaires demandés, quel que
-// soit leur nombre.
+// qu'il mentionne, avec le pseudo écrit et le nom actuel du membre (contrat `Mention`, R5b) ; et,
+// pour l'export des données, les identifiants des membres mentionnés. Une requête pour tous les
+// commentaires demandés, quel que soit leur nombre.
 import { findMentions, type Mention } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { Blocks } from '../blocks/visibility'
 
 type Reader = Pick<Database, 'select'>
 
 const cm = schema.commentMention
+const u = schema.user
 
 /** Un commentaire dont on cherche les mentions : son identifiant et son texte actuel. */
 type MentionSource = { id: string; body: string }
 
 /**
- * Les mentions encore écrites de ces commentaires :
- *   select comment_id, member_id, handle from comment_mention
+ * Les mentions encore écrites de ces commentaires, avec le nom actuel de chaque membre mentionné :
+ *   select comment_id, member_id, handle, "user".name from comment_mention
+ *   inner join "user" on "user".id = comment_mention.member_id
  *   where comment_id in (…) and withdrawn_at is null
  * La clé primaire (comment_id, member_id) commence par comment_id : elle trouve les mentions de
- * chaque commentaire. Un compte supprimé n'y a plus de ligne (effacement en cascade) : son pseudo
- * redevient du texte simple. Une mention retirée par l'auteur (tranche 7b, withdrawn_at, voir
- * mentions/write.ts) n'est plus une mention : ni lien, ni ligne dans l'export. Elle ne sert plus
- * qu'à laisser le membre mentionné lire le commentaire (règle 2, comments/load.ts).
+ * chaque commentaire ; la clé primaire de "user" trouve ensuite chaque membre (une jointure par
+ * clé primaire, dans la même requête : pas une requête de plus par mention).
+ * « inner join » (R5b, relecture de sécurité sec-A2) : une mention sans compte ne sort pas. Un
+ * compte supprimé n'a déjà plus de ligne ici (effacement en cascade) : son pseudo redevient du
+ * texte simple ; la jointure interne le redit, au cas où. Une mention retirée par l'auteur
+ * (tranche 7b, withdrawn_at, voir mentions/write.ts) n'est plus une mention : ni lien, ni nom, ni
+ * ligne dans l'export. Elle ne sert plus qu'à laisser le membre mentionné lire le commentaire
+ * (règle 2, comments/load.ts).
  */
 const mentionRows = (db: Reader, commentIds: string[]) =>
   db
-    .select({ commentId: cm.commentId, memberId: cm.memberId, handle: cm.handle })
+    .select({ commentId: cm.commentId, memberId: cm.memberId, handle: cm.handle, name: u.name })
     .from(cm)
+    .innerJoin(u, eq(u.id, cm.memberId))
     .where(and(inArray(cm.commentId, commentIds), isNull(cm.withdrawnAt)))
 
 /**
@@ -39,9 +46,13 @@ const mentionRows = (db: Reader, commentIds: string[]) =>
  * À n'appeler qu'avec les commentaires que le lecteur lit vraiment (pas une place vide de
  * commentaire masqué ou supprimé) : ce qu'on ne lit pas n'a pas de mentions.
  *
+ * Le nom, lui, est le nom ACTUEL du membre (R5b) : la pastille de l'appli l'affiche, et il suit la
+ * personne si elle en change.
+ *
  * `blocks` (tranche 7b) : les blocages du lecteur (`blocksOf`). Un membre bloqué avec lui, dans un
- * sens ou dans l'autre, n'a pas de lien : son pseudo reste du texte, et son identifiant ne sort
- * pas. Le filtre se fait ici, en mémoire, sur les blocages déjà lus : aucune requête de plus.
+ * sens ou dans l'autre, n'a pas de lien : son pseudo reste du texte, et ni son identifiant ni son
+ * nom ne sortent. Le filtre se fait ici, en mémoire, sur les blocages déjà lus : aucune requête de
+ * plus.
  */
 export const mentionsOf = async (
   db: Reader,
@@ -57,7 +68,7 @@ export const mentionsOf = async (
   for (const row of rows) {
     if (blocks.byMe.has(row.memberId) || blocks.ofMe.has(row.memberId)) continue
     const list = result.get(row.commentId) ?? []
-    list.push({ handle: row.handle, memberId: row.memberId })
+    list.push({ handle: row.handle, memberId: row.memberId, name: row.name })
     result.set(row.commentId, list)
   }
   for (const comment of comments) {
@@ -77,7 +88,9 @@ export const mentionsOf = async (
 
 /**
  * Pour l'export des données : les identifiants des membres mentionnés dans chacun de ces
- * commentaires (Map vide pour un commentaire sans mention). Même requête, même index.
+ * commentaires (Map vide pour un commentaire sans mention). Même requête, même index. Seuls les
+ * identifiants en sortent : le nom actuel d'un autre membre n'entre pas dans l'export (relecture
+ * juridique de R5b, sec-A2).
  */
 export const mentionsOfComments = async (
   db: Reader,
