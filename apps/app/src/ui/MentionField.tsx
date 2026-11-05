@@ -1,7 +1,10 @@
-// Le champ d'un commentaire qui propose des membres à mentionner (tranche 6b). Quand on tape « @ »
-// suivi de 2 caractères (« @in »), le champ dit à l'écran ce qu'il cherche (`onQueryChange`) ;
-// l'écran lui rend des suggestions (nom, pseudo, photo), que le champ montre juste dessous. Un
-// choix remplace « @in » par le pseudo entier, suivi d'une espace : « @ines_morel ».
+// Le champ d'un commentaire qui propose des membres à mentionner (tranche 6b, puis R5b). Quand on
+// tape « @ » suivi de 2 caractères (« @in », « @Lé »), le champ dit à l'écran ce qu'il cherche
+// (`onQueryChange`), replié comme l'API le replie (« @Lé » cherche « le » : sans accents ni
+// majuscules, `foldForSearch`) ; l'écran lui rend des suggestions (nom, pseudo, photo) et la
+// recherche à laquelle elles répondent (`suggestionsFor`), que le champ montre dessous, ou dessus
+// dans la feuille des commentaires (`suggestionsPlacement`), les lettres tapées en gras. Un choix
+// remplace « @Lé » par le pseudo entier, suivi d'une espace : « @lea_moreau ».
 //
 // C'est le motif « combobox » des lecteurs d'écran : le champ garde le focus, la liste (rôle
 // « listbox ») lui est liée, et le choix en surbrillance est lu sans quitter le champ.
@@ -12,23 +15,38 @@
 // - la liste se referme d'elle-même quand le mot est fini (une espace), et quand le focus quitte
 //   le champ (Tab, qui va au bouton suivant : la liste n'est pas un arrêt de Tab).
 //
-// La liste ne montre que les membres dont le pseudo commence par ce qui est tapé : l'écran peut
-// encore tenir la réponse d'une recherche précédente (« @in » pendant qu'on tape « @ma », avant que
-// la nouvelle réponse n'arrive). Sans ce tri, Entrée choisirait Inès pour « @ma ».
+// La liste ne montre que des suggestions qui répondent à la recherche en cours : l'écran peut encore
+// tenir la réponse d'une recherche précédente (« @in » pendant qu'on tape « @ine », avant que la
+// nouvelle réponse n'arrive). Sans cette garde, Entrée choisirait un membre trouvé pour une autre
+// recherche. Avant R5b, le champ gardait les membres dont le pseudo commençait par ce qui est tapé ;
+// l'API trouve désormais aussi un membre par son nom, ou un mot de son nom (« @le » trouve Hugo
+// Lefèvre, @hugo_l) : un tri par pseudo l'écarterait. L'écran dit donc à quelle recherche répondent
+// ses suggestions (`suggestionsFor`), et le champ n'en montre aucune tant que ce n'est pas la bonne
+// (relecture du plan R5b, ui-B6).
 //
-// La liste prend sa place sous le champ, dans la page : elle apparaît parce qu'on tape, et pousse
-// les boutons dessous plutôt que de les recouvrir.
+// Sous le champ (par défaut), la liste prend sa place dans la page : elle apparaît parce qu'on tape,
+// et pousse les boutons dessous plutôt que de les recouvrir. Au-dessus (le champ collé en bas de la
+// feuille des commentaires), elle grandit vers le haut et le champ ne bouge pas sous le doigt.
 
-import { layout, radii, space } from '@ruche/brand'
-import { HANDLE_MAX_LENGTH } from '@ruche/contracts'
-import { type ComponentProps, useEffect, useId, useRef, useState } from 'react'
+import { type FontWeight, layout, radii, space, textStyles } from '@ruche/brand'
+import { foldForSearch, MENTION_QUERY_MAX, MENTION_QUERY_PATTERN } from '@ruche/contracts'
+import { type ComponentProps, type ReactElement, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform, Pressable, type TextInput, View } from 'react-native'
+import {
+  Text as NativeText,
+  Platform,
+  Pressable,
+  type TextInput,
+  type TextStyle,
+  View,
+} from 'react-native'
 import { Avatar } from './Avatar'
 import { focusWithoutScroll } from './focus'
+import { highlightRanges } from './HighlightedText'
 import type { ImageSource } from './image'
-import { Text } from './Text'
+import { Text, type TextTone } from './Text'
 import { TextField } from './TextField'
+import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Un membre proposé : de quoi le reconnaître, la photo déjà prête (ou aucune). */
@@ -47,27 +65,104 @@ type FieldProps = Omit<
 type Props = FieldProps & {
   /** Les membres à proposer pour ce qui se tape (l'écran les cherche) ; vide : pas de liste. */
   suggestions: readonly MentionSuggestion[]
+  /**
+   * La recherche à laquelle répondent `suggestions` (repliée, comme `onQueryChange` la donne :
+   * « le »), ou null quand elles ne répondent à rien. La liste ne s'ouvre que si c'est celle qui se
+   * tape en ce moment : une réponse en retard ne se montre pas, et Entrée ne la choisit pas.
+   * Absente (un écran d'avant R5b, qui ne le sait pas) : le champ garde, comme avant, les membres
+   * dont le pseudo commence par ce qui est tapé (un membre trouvé par son nom seul n'est alors pas
+   * proposé, mais rien de périmé ne peut être choisi).
+   */
+  suggestionsFor?: string | null
   /** Le nom de la liste, lu par les lecteurs d'écran (« Membres à mentionner »). */
   suggestionsLabel: string
-  /** Ce que le champ cherche : le début du pseudo, sans « @ » (« in »), ou null. */
+  /**
+   * Où se montre la liste : sous le champ (`below`, par défaut), ou au-dessus (`above`) pour un
+   * champ collé au bas de l'écran, comme celui de la feuille des commentaires.
+   */
+  suggestionsPlacement?: 'above' | 'below'
+  /** Un titre affiché en tête de la liste ouverte (« Mentionner quelqu’un ») ; absent : aucun. */
+  suggestionsTitle?: string
+  /** Ce que le champ cherche, replié, sans « @ » (« @Lé » : « le »), ou null. */
   onQueryChange: (query: string | null) => void
 }
 
-// Le « @pseudo » qui se tape juste avant le curseur : un « @ » qui ne suit ni une lettre, ni un
-// chiffre, ni « _ », « . » ou « @ » (« andré@exemple.fr » est une adresse : la même règle que
-// splitMentions, dans @ruche/contracts), puis une lettre et des lettres, chiffres ou « _ »,
-// jusqu'au curseur ($).
-const TYPING = /(^|[^\p{L}\p{N}_@.])@([A-Za-z][A-Za-z0-9_]*)$/u
+// Le « @… » qui se tape juste avant le curseur : un « @ » qui ne suit ni une lettre, ni un chiffre,
+// ni « _ », « . » ou « @ » (« andré@exemple.fr » est une adresse : la même règle que
+// splitMentions, dans @ruche/contracts), puis ce que l'API accepte de chercher
+// (`MENTION_QUERY_PATTERN` : une lettre, de n'importe quelle langue, puis des lettres, chiffres ou
+// « _ »), jusqu'au curseur ($). Après chaque signe, des accents « combinants » (`\p{M}`) sont
+// permis : un clavier peut taper « é » en deux signes (e, puis l'accent), que la forme composée
+// (NFC) réunit ensuite. Ce qui est trouvé est vérifié, une fois replié, contre le motif exact du
+// contrat (QUERY). Le motif est une chaîne du contrat, compilée ici avec le drapeau u (sans lui,
+// `\p{L}` ne veut rien dire).
+const TYPING = /(^|[^\p{L}\p{N}_@.])@(\p{L}\p{M}*(?:[\p{L}\p{N}_]\p{M}*)*)$/u
+// Le motif de l'API, sur toute la recherche repliée : c'est ce que vérifie `MentionableQuery`.
+const QUERY = new RegExp(`^${MENTION_QUERY_PATTERN}$`, 'u')
 
 /** On ne cherche qu'à partir de 2 caractères après « @ » (MENTION_QUERY_MIN, côté API). */
 const QUERY_MIN = 2
 
-/** Où commence le « @pseudo » en cours devant `cursor`, et ce qu'il cherche ; null s'il n'y en a pas. */
+/**
+ * Où commence le « @… » en cours devant `cursor` (en unités UTF-16, celles de `slice`), et ce qu'il
+ * cherche, replié comme l'API le replie (« @Lé » : « le ») ; null s'il n'y en a pas, ou si la
+ * recherche a moins de 2 ou plus de `MENTION_QUERY_MAX` caractères (l'API la refuserait).
+ */
 export const mentionAt = (text: string, cursor: number) => {
   const match = TYPING.exec(text.slice(0, cursor))
   const raw = match?.[2]
-  if (!match || !raw || raw.length < QUERY_MIN || raw.length > HANDLE_MAX_LENGTH) return null
-  return { start: match.index + (match[1] ?? '').length, query: raw.toLowerCase() }
+  if (!match || !raw) return null
+  // Replié après la forme composée (NFC), comme `MentionableQuery` : un « é » tapé en deux signes
+  // (e + accent) cherche la même chose qu'un « é » d'un seul.
+  const query = foldForSearch(raw.normalize('NFC'))
+  if (query.length < QUERY_MIN || query.length > MENTION_QUERY_MAX || !QUERY.test(query))
+    return null
+  return { start: match.index + (match[1] ?? '').length, query }
+}
+
+/**
+ * Un texte dont les lettres qui répondent à la recherche sont en gras (le nom, le pseudo d'une
+ * suggestion), comme `HighlightedText` les surligne : la comparaison se fait sur le texte replié
+ * (`highlightRanges`), le texte affiché reste tel quel, et il reste un seul nœud lu (les parties en
+ * gras sont des textes imbriqués). Le gras est un indice pour l'œil, il ne change pas ce qui est lu.
+ */
+function Marked({
+  text,
+  query,
+  prefix = '',
+  variant,
+  tone,
+  weight,
+  bold,
+}: {
+  text: string
+  query: string
+  /** Un signe devant le texte, jamais en gras (« @ » d'un pseudo). */
+  prefix?: string
+  variant: 'callout' | 'caption'
+  tone: TextTone
+  weight: FontWeight
+  /** La graisse des lettres trouvées. */
+  bold: FontWeight
+}) {
+  const mark: TextStyle = { fontFamily: fontName(textStyles[variant].family, bold) }
+  const parts: (string | ReactElement)[] = prefix ? [prefix] : []
+  let from = 0
+  for (const [start, end] of highlightRanges(text, [query])) {
+    if (start > from) parts.push(text.slice(from, start))
+    parts.push(
+      <NativeText key={start} style={mark}>
+        {text.slice(start, end)}
+      </NativeText>,
+    )
+    from = end
+  }
+  if (from < text.length) parts.push(text.slice(from))
+  return (
+    <Text variant={variant} tone={tone} weight={weight} breakAnywhere>
+      {parts}
+    </Text>
+  )
 }
 
 // Le rôle « listbox » (une liste de choix) manque aux types de React Native, qui ne connaissent
@@ -79,7 +174,10 @@ type KeyPress = { nativeEvent: { key: string; preventDefault?: () => void } }
 
 export function MentionField({
   suggestions,
+  suggestionsFor,
   suggestionsLabel,
+  suggestionsPlacement = 'below',
+  suggestionsTitle,
   onQueryChange,
   value,
   onChangeText,
@@ -105,11 +203,17 @@ export function MentionField({
   const end = Math.min(cursor ?? value.length, value.length)
   const typing = end < 0 ? null : mentionAt(value, end)
   const query = typing && !dismissed ? typing.query : null
-  // Seulement les membres qui répondent à la recherche en cours (voir en tête du fichier).
+  // Seulement des suggestions qui répondent à la recherche en cours (voir en tête du fichier) :
+  // toutes si l'écran dit qu'elles répondent à celle-ci, aucune sinon ; sans ce renseignement,
+  // celles dont le pseudo commence par ce qui est tapé (la garde d'avant R5b).
   const shown =
     query === null
       ? []
-      : suggestions.filter((suggestion) => suggestion.handle.toLowerCase().startsWith(query))
+      : suggestionsFor === undefined
+        ? suggestions.filter((suggestion) => foldForSearch(suggestion.handle).startsWith(query))
+        : suggestionsFor === query
+          ? suggestions
+          : []
   const open = shown.length > 0
   // Le choix en surbrillance : celui des flèches pour cette recherche, sinon le premier (Entrée le
   // prend tout de suite, sans passer par les flèches).
@@ -214,31 +318,33 @@ export function MentionField({
     ;(onKeyPress as ((event: KeyPress) => void) | undefined)?.(event)
   }
 
-  return (
-    <View style={{ gap: space.xs }}>
-      <TextField
-        {...fieldProps}
-        value={value}
-        onChangeText={change}
-        inputRef={input}
-        onKeyPress={keyPress}
-        onSelectionChange={(event) => {
-          const { start, end } = event.nativeEvent.selection
-          // Une sélection de plusieurs lettres : pas de recherche (on ne remplacerait pas la bonne).
-          setCursor(start === end ? end : -1)
+  const list =
+    open && query !== null ? (
+      <View
+        // Sur le web, le champ perd le focus dès que le bouton de la souris s'enfonce, avant que
+        // le choix ne reçoive son « pressIn » : la liste se fermait et le clic tombait dans le
+        // vide. « pointerdown » arrive avant la perte du focus : voir startChoosing. Posé sur le
+        // cadre entier, titre compris : un clic sur le titre ne referme pas la liste.
+        onPointerDown={startChoosing}
+        style={{
+          backgroundColor: colors.surface,
+          borderRadius: radii.group,
+          borderWidth: 1,
+          borderColor: colors.groupBorder,
+          paddingVertical: space.xxs,
+          overflow: 'hidden',
         }}
-        onBlur={() => {
-          // Tab vers la suite : la liste se referme. (Un choix touché fait aussi perdre le focus,
-          // juste avant d'être pris : on le laisse faire.)
-          if (!choosing.current) setDismissed(true)
-        }}
-        combobox={{
-          expanded: open,
-          listId,
-          activeId: activeIndex >= 0 ? optionId(activeIndex) : undefined,
-        }}
-      />
-      {open ? (
+      >
+        {/* Le titre, hors de la liste elle-même : une liste de choix ne contient que des choix. */}
+        {suggestionsTitle ? (
+          <View
+            style={{ paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xxs }}
+          >
+            <Text variant="caption" weight={600} tone="muted">
+              {suggestionsTitle}
+            </Text>
+          </View>
+        ) : null}
         <View
           nativeID={listId}
           {...LISTBOX}
@@ -247,18 +353,6 @@ export function MentionField({
           // pourrait plus atteindre les membres un par un. focusable faux : ce n'est pas un arrêt
           // de Tab (les flèches, dans le champ, parcourent les choix).
           focusable={false}
-          // Sur le web, le champ perd le focus dès que le bouton de la souris s'enfonce, avant que
-          // le choix ne reçoive son « pressIn » : la liste se fermait et le clic tombait dans le
-          // vide. « pointerdown » arrive avant la perte du focus : voir startChoosing.
-          onPointerDown={startChoosing}
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: radii.group,
-            borderWidth: 1,
-            borderColor: colors.groupBorder,
-            paddingVertical: space.xxs,
-            overflow: 'hidden',
-          }}
         >
           {shown.map((suggestion, index) => {
             const selected = index === activeIndex
@@ -302,7 +396,8 @@ export function MentionField({
                     size={32}
                   />
                 </View>
-                {/* Le nom puis le pseudo ; ils passent l'un sous l'autre quand la place manque. */}
+                {/* Le nom puis le pseudo ; ils passent l'un sous l'autre quand la place manque. Les
+                    lettres tapées y sont en gras : le nom, d'un poids ordinaire, les fait ressortir. */}
                 <View
                   style={{
                     flex: 1,
@@ -313,18 +408,57 @@ export function MentionField({
                     columnGap: space.sm,
                   }}
                 >
-                  <Text variant="callout" weight={700} breakAnywhere>
-                    {suggestion.name}
-                  </Text>
-                  <Text variant="caption" tone="muted" breakAnywhere>
-                    {`@${suggestion.handle}`}
-                  </Text>
+                  <Marked
+                    text={suggestion.name}
+                    query={query}
+                    variant="callout"
+                    tone="default"
+                    weight={400}
+                    bold={700}
+                  />
+                  <Marked
+                    text={suggestion.handle}
+                    prefix="@"
+                    query={query}
+                    variant="caption"
+                    tone="muted"
+                    weight={400}
+                    bold={700}
+                  />
                 </View>
               </Pressable>
             )
           })}
         </View>
-      ) : null}
+      </View>
+    ) : null
+
+  return (
+    <View style={{ gap: space.xs }}>
+      {suggestionsPlacement === 'above' ? list : null}
+      <TextField
+        {...fieldProps}
+        value={value}
+        onChangeText={change}
+        inputRef={input}
+        onKeyPress={keyPress}
+        onSelectionChange={(event) => {
+          const { start, end } = event.nativeEvent.selection
+          // Une sélection de plusieurs lettres : pas de recherche (on ne remplacerait pas la bonne).
+          setCursor(start === end ? end : -1)
+        }}
+        onBlur={() => {
+          // Tab vers la suite : la liste se referme. (Un choix touché fait aussi perdre le focus,
+          // juste avant d'être pris : on le laisse faire.)
+          if (!choosing.current) setDismissed(true)
+        }}
+        combobox={{
+          expanded: open,
+          listId,
+          activeId: activeIndex >= 0 ? optionId(activeIndex) : undefined,
+        }}
+      />
+      {suggestionsPlacement === 'below' ? list : null}
     </View>
   )
 }
