@@ -99,7 +99,7 @@ const en: typeof fr = {
 type Labels = typeof fr
 const noop = () => {}
 /** L'heure figée du catalogue : la date relative ne dépend pas du moment de la visite. */
-const NOW = new Date('2026-11-05T12 :00 :00.000Z')
+const NOW = new Date('2026-11-05T12:00:00.000Z')
 const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
 
 const LEA = { id: 'lea', name: 'Léa Moreau', avatarUrl: null, handle: 'lea_moreau' }
