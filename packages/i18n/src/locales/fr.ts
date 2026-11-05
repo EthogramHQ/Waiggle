@@ -439,7 +439,7 @@ export const fr = {
       status: 'Où en est-il ?',
       public: 'Public',
       publicHint:
-        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
+        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais personne ne les voit tant qu’il reste privé.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
@@ -567,9 +567,40 @@ export const fr = {
       },
     },
     comments: {
-      title: 'Commentaires ({{count}})',
+      // R5b : le titre seul ; le nombre est dessiné à côté par `CountedTitle` et lu par `spokenCount`.
+      title: 'Commentaires',
       titleNone: 'Commentaires',
-      empty: 'Pas encore de commentaire.',
+      spokenCount_one: '{{count}} commentaire',
+      spokenCount_other: '{{count}} commentaires',
+      seeAll_one: 'Voir le commentaire',
+      seeAll_other: 'Voir les {{count}} commentaires',
+      empty: 'Aucun commentaire pour l’instant.',
+      // Un projet privé garde les commentaires des autres, que personne ne lit (R5b, jur-P9, `sees`).
+      emptyPrivate:
+        'Les commentaires des autres membres sont gardés, mais personne ne les lit tant que le projet reste privé.',
+      send: 'Envoyer',
+      sendLabel: 'Envoyer le commentaire',
+      replyTo: 'Réponse à {{name}}',
+      editing: 'Modifier ton commentaire',
+      cancelReply: 'Annuler la réponse',
+      cancelEdit: 'Annuler la modification',
+      counter: '{{count}} / {{max}}',
+      counterSpoken_one: '{{count}} caractère sur {{max}}',
+      counterSpoken_other: '{{count}} caractères sur {{max}}',
+      tooLong_one: '{{count}} caractère de trop.',
+      tooLong_other: '{{count}} caractères de trop.',
+      author: 'Auteur',
+      // Le lien du nom de l'auteur du projet, lu avec son badge (R5b, ui-M1).
+      authorLink: '{{name}}, Auteur',
+      menu: 'Actions du commentaire de {{name}}',
+      yours: 'Ton commentaire',
+      // La carte compacte de l'aperçu : un seul bouton, nommé par l'auteur et l'extrait (ui-B7).
+      openLine: 'Commentaire de {{name}} : {{excerpt}}',
+      hiddenNote: 'Il ne reste visible que de toi et de la personne qui l’a écrit.',
+      hiddenByAuthor: 'Masqué par l’auteur du projet',
+      hiddenByAuthorNote: 'Il ne reste visible que de toi et de l’auteur du projet.',
+      readMore: 'Lire la suite',
+      readLess: 'Réduire',
       add: 'Écrire un commentaire',
       addShort: 'Commenter',
       field: 'Ton commentaire',
@@ -646,8 +677,10 @@ export const fr = {
       // Le bouton du haut, d'où qu'on arrive (ui-11 : « Retour au fil » mentirait en venant d'ailleurs).
       back: 'Retour',
       notFoundAction: 'Retour au fil',
+      // R5b (D4, jur-P9) : l'auteur ne lit pas non plus les commentaires ni les réactions des autres
+      // sur son projet privé (`sees` des commentaires, `reactions/load.ts`).
       privateBanner:
-        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais personne ne les voit tant qu’il reste privé.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       tryDemo: 'Tester la démo',
@@ -1025,6 +1058,10 @@ export const fr = {
     suggestions: 'Membres à mentionner',
     /** Un membre proposé : son nom, puis son pseudo. */
     option: '{{name}}, @{{handle}}',
+    /** R5b : le titre de la liste, au-dessus des suggestions. */
+    title: 'Mentionner quelqu’un',
+    /** R5b (D3) : la pastille d'une mention, lue avec le nom seul (le pseudo écrit peut être périmé). */
+    pill: '{{name}}, ouvre son profil',
   },
   tag: {
     subtitle: 'Les projets publics faits avec cet outil.',

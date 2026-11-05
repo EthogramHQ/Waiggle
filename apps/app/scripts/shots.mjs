@@ -615,7 +615,7 @@ const notMineComments = [
     14,
     9,
     {
-      mentions: [{ handle: 'max_durand', memberId: max.id }],
+      mentions: [{ handle: 'max_durand', memberId: max.id, name: max.name }],
     },
   ),
 ]

@@ -137,7 +137,7 @@ describe('findMentions', () => {
 
 describe('Mention', () => {
   it('names a member by id, with the handle as it was written', () => {
-    const mention = { handle: 'ines_morel', memberId: 'ines-id' }
+    const mention = { handle: 'ines_morel', memberId: 'ines-id', name: 'Inès Morel' }
     expect(Mention.parse(mention)).toEqual(mention)
     expect(Mention.safeParse({ handle: 'ines_morel' }).success).toBe(false)
   })
@@ -158,8 +158,9 @@ describe('MentionableQuery', () => {
     expect(MentionableQuery.safeParse({ q: 'in', projectId }).success).toBe(true)
   })
 
-  it('searches on the start of a handle only: no space, no other character', () => {
-    for (const q of ['ines morel', 'in%', 'in*', "in'", '2in', '_in', 'a'.repeat(21)]) {
+  // R5b : la recherche vaut aussi pour un mot du nom, jusqu'à 30 caractères (avant : 20, un pseudo).
+  it('searches on one word only: no space, no other character, at most 30 characters', () => {
+    for (const q of ['ines morel', 'in%', 'in*', "in'", '2in', '_in', 'a'.repeat(31)]) {
       expect(MentionableQuery.safeParse({ q, projectId }).success, q).toBe(false)
     }
   })

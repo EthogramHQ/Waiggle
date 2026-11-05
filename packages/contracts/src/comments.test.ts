@@ -14,10 +14,11 @@ import { MENTIONS_MAX } from './mentions'
 
 const rootId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const replyId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
-const lea = { id: 'lea-id', name: 'Léa', avatarUrl: null }
+const lea = { id: 'lea-id', name: 'Léa', handle: 'lea', avatarUrl: null }
 const sam = {
   id: 'sam-id',
   name: 'Sam',
+  handle: null,
   avatarUrl: 'https://api.example.com/media/avatars/sam.webp',
 }
 
@@ -82,7 +83,7 @@ describe('Comment', () => {
     state: 'visible',
     isMine: false,
     // Les mentions (tranche 6b) : Sam y désigne Léa par son pseudo.
-    mentions: [{ handle: 'lea', memberId: 'lea-id' }],
+    mentions: [{ handle: 'lea', memberId: 'lea-id', name: 'Léa' }],
     removal: null,
     replies: [reply],
   }
@@ -121,6 +122,7 @@ describe('Comment', () => {
     const mentions = Array.from({ length: MENTIONS_MAX + 1 }, (_, i) => ({
       handle: `membre${i}`,
       memberId: `member-${i}`,
+      name: `Membre ${i}`,
     }))
     expect(Comment.safeParse({ ...root, mentions: mentions.slice(0, -1) }).success).toBe(true)
     expect(Comment.safeParse({ ...root, mentions }).success).toBe(false)

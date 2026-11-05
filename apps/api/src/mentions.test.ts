@@ -176,7 +176,7 @@ describe('writing a mention', () => {
 
     const published = await comment(meteo.id, malik, 'Merci @ines_morel !')
 
-    const expected = [{ handle: 'ines_morel', memberId: inesId }]
+    const expected = [{ handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' }]
     expect(published).toMatchObject({ body: 'Merci @ines_morel !', mentions: expected })
     expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual(expected)
   })
@@ -187,7 +187,9 @@ describe('writing a mention', () => {
     const published = await comment(meteo.id, malik, 'Merci @Ines_Morel !')
 
     expect(published.body).toBe('Merci @Ines_Morel !')
-    expect(published.mentions).toEqual([{ handle: 'ines_morel', memberId: inesId }])
+    expect(published.mentions).toEqual([
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
+    ])
   })
 
   it('leaves as plain text a handle that names nobody, and an email address', async () => {
@@ -200,7 +202,9 @@ describe('writing a mention', () => {
     )
 
     // Seule la dernière est une mention d'un membre (témoin : l'extraction a bien lieu).
-    expect(published.mentions).toEqual([{ handle: 'ines_morel', memberId: inesId }])
+    expect(published.mentions).toEqual([
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
+    ])
   })
 
   it('names each member once, in the order of the text', async () => {
@@ -209,8 +213,8 @@ describe('writing a mention', () => {
     const published = await comment(meteo.id, malik, '@zoe, @ines_morel et encore @ZOE')
 
     expect(published.mentions).toEqual([
-      { handle: 'zoe', memberId: zoeId },
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'zoe', memberId: zoeId, name: 'Zoé' },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
   })
 
@@ -253,7 +257,9 @@ describe('writing a mention', () => {
 
     const [thread] = await readComments(meteo.id, ines)
     expect(thread?.mentions).toEqual([])
-    expect(thread?.replies[0]?.mentions).toEqual([{ handle: 'malik', memberId: malikId }])
+    expect(thread?.replies[0]?.mentions).toEqual([
+      { handle: 'malik', memberId: malikId, name: 'Malik' },
+    ])
   })
 
   it('follows an edit: a mention added appears, a mention taken out disappears', async () => {
@@ -263,7 +269,7 @@ describe('writing a mention', () => {
     await editComment(meteo.id, published.id, malik, 'Tu as vu, @ines_morel ?')
 
     expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
   })
 
@@ -275,7 +281,7 @@ describe('writing a mention', () => {
     const hidden = await send('PUT', `/v1/projects/${meteo.id}/comments/${published.id}/hide`, ines)
     expect(hidden.status).toBe(204)
 
-    const expected = [{ handle: 'zoe', memberId: zoeId }]
+    const expected = [{ handle: 'zoe', memberId: zoeId, name: 'Zoé' }]
     expect((await readComments(meteo.id, ines))[0]?.mentions).toEqual(expected)
     expect((await readComments(meteo.id, malik))[0]?.mentions).toEqual(expected)
     // Pour Zoé, le commentaire n'est qu'une place vide : ni texte, ni mention.
@@ -307,7 +313,7 @@ describe('a handle that changes after the mention', () => {
 
     expect((await readComments(meteo.id, zoe))[0]).toMatchObject({
       body: 'Merci @ines_morel !',
-      mentions: [{ handle: 'ines_morel', memberId: inesId }],
+      mentions: [{ handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' }],
     })
   })
 
@@ -323,11 +329,11 @@ describe('a handle that changes after the mention', () => {
     await changeHandle(zoeAgain, 'ines_morel')
 
     expect((await readComments(meteo.id, zoeAgain))[0]?.mentions).toEqual([
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
     // Un nouveau commentaire, lui, désigne Zoé : le pseudo est à elle maintenant.
     const fresh = await comment(meteo.id, malikAgain, 'Salut @ines_morel')
-    expect(fresh.mentions).toEqual([{ handle: 'ines_morel', memberId: zoeId }])
+    expect(fresh.mentions).toEqual([{ handle: 'ines_morel', memberId: zoeId, name: 'Zoé' }])
   })
 
   // À la modification, une mention gardée ne se relit pas : le pseudo encore écrit désigne le
@@ -340,7 +346,7 @@ describe('a handle that changes after the mention', () => {
     await editComment(meteo.id, published.id, malik, 'Merci beaucoup @ines_morel !')
 
     expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
     expect(await mentionNotifications(ines)).toHaveLength(1)
   })
@@ -357,7 +363,7 @@ describe('a handle that changes after the mention', () => {
     await editComment(meteo.id, published.id, malikAgain, 'Merci encore @ines_morel !')
 
     expect((await readComments(meteo.id, zoeAgain))[0]?.mentions).toEqual([
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
     // Zoé n'est pas prévenue : le commentaire ne la désigne pas.
     expect(await mentionNotifications(zoeAgain)).toEqual([])
@@ -372,13 +378,13 @@ describe('a handle that changes after the mention', () => {
     // Les deux pseudos écrits : l'ancien, déjà gardé, l'emporte ; une seule mention d'Inès.
     await editComment(meteo.id, published.id, malik, 'Merci @ines_morel, alias @ines !')
     expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
-      { handle: 'ines_morel', memberId: inesId },
+      { handle: 'ines_morel', memberId: inesId, name: 'Inès Morel' },
     ])
 
     // L'ancien effacé : la mention prend le pseudo écrit, et garde sa date (pas de nouvelle alerte).
     await editComment(meteo.id, published.id, malik, 'Merci @ines !')
     expect((await readComments(meteo.id, zoe))[0]?.mentions).toEqual([
-      { handle: 'ines', memberId: inesId },
+      { handle: 'ines', memberId: inesId, name: 'Inès Morel' },
     ])
     expect(await ctx.db.select().from(schema.commentMention)).toHaveLength(1)
     expect((await mentionNotifications(ines)).map((n) => n.at)).toEqual([notified?.at])
@@ -390,7 +396,7 @@ describe('a deleted account', () => {
     const meteo = await publish(ines)
     const published = await comment(meteo.id, malik, 'Tu as vu, @zoe ?')
     // Témoin : avant la suppression, la mention désigne Zoé.
-    expect(published.mentions).toEqual([{ handle: 'zoe', memberId: zoeId }])
+    expect(published.mentions).toEqual([{ handle: 'zoe', memberId: zoeId, name: 'Zoé' }])
 
     await deleteAccount(zoe, zoeAccount.password)
 
@@ -407,7 +413,7 @@ describe('a deleted account', () => {
     await comment(meteo.id, zoe, 'Oui !', published.id) // sa place reste dans la liste
     // Témoin : avant la suppression, la mention est donnée avec le commentaire.
     expect((await readComments(meteo.id, ines))[0]?.mentions).toEqual([
-      { handle: 'zoe', memberId: zoeId },
+      { handle: 'zoe', memberId: zoeId, name: 'Zoé' },
     ])
 
     await deleteAccount(malik, malikAccount.password)

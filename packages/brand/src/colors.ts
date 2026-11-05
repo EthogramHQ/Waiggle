@@ -34,6 +34,12 @@ const day = {
   // Le surlignage miel sous les lettres trouvées par la recherche (R3, HighlightedText). Il porte
   // toujours l'encre (`text`), même dans une ligne grise : la partie trouvée se lit d'un coup d'œil.
   highlight: '#FFE58A',
+  // R5b : le miel pâle d'un commentaire visé par une réponse ou une modification (CommentCard,
+  // `highlighted`). Plus pâle que la pastille d'une mention, qui doit encore s'y voir.
+  highlightSoft: '#FFF7DB',
+  // R5b : le fond de la pastille d'une mention (« @Léa Moreau », MentionText), qui porte l'encre.
+  // Assez soutenu pour se détacher d'une carte blanche, grise (les siens) ou surlignée.
+  mentionPill: '#FFE58A',
   onHoney: '#1C1B19', // texte posé sur du miel (jamais du blanc : illisible)
   honeyDisabled: '#FFE7A3', // bouton miel inactif
   onHoneyDisabled: '#8A7A55',
@@ -126,6 +132,9 @@ const night = {
   // Un miel brun, deux fois plus clair que la carte de nuit (2:1) : la crème claire du texte
   // s'y lit encore à 8:1.
   highlight: '#5A4712',
+  // De nuit, un brun miel à peine plus clair que la carte ; la pastille, nettement plus claire.
+  highlightSoft: '#2A2313',
+  mentionPill: '#4F4118',
   onHoney: '#1C1B19',
   honeyDisabled: '#4A3D1C',
   onHoneyDisabled: '#A39B89',
@@ -280,6 +289,14 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Le surlignage d'une recherche (R3, relecture ui-9) : les lettres trouvées passent à l'encre sur
   // le miel, dans un titre comme dans une ligne grise.
   { text: 'text', on: 'highlight', min: 4.5 },
+  // R5b (relecture du plan ui-M2) : un commentaire visé par une réponse ou une modification porte
+  // son nom, sa date et son texte sur le miel pâle ; une mention, l'encre sur sa pastille. La
+  // pastille est opaque : posée sur une carte blanche, grise ou surlignée, seul son propre fond
+  // compte pour le texte.
+  { text: 'text', on: 'highlightSoft', min: 4.5 },
+  { text: 'textSecondary', on: 'highlightSoft', min: 4.5 },
+  { text: 'textMuted', on: 'highlightSoft', min: 4.5 },
+  { text: 'text', on: 'mentionPill', min: 4.5 },
   { text: 'amberText', on: 'background', min: 4.5 },
   // La carte d'une note et le journal d'un projet : texte posé sur une surface pleine.
   { text: 'amberText', on: 'surface', min: 4.5 },

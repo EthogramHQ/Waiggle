@@ -1036,14 +1036,14 @@ export function CatalogueScreen() {
         <Surface variant="grouped" padding="xl" gap="lg">
           <MentionText
             text={l.mentionBody}
-            mentions={[{ handle: 'ines_haddad', memberId: 'u5' }]}
+            mentions={[{ handle: 'ines_haddad', memberId: 'u5', name: 'Inès Haddad' }]}
             onMemberPress={() => {}}
           />
           <MentionText
             text={l.mentionLongBody}
             mentions={[
-              { handle: 'ines_haddad', memberId: 'u5' },
-              { handle: 'max_durand_cuisine_b', memberId: 'u2' },
+              { handle: 'ines_haddad', memberId: 'u5', name: 'Inès Haddad' },
+              { handle: 'max_durand_cuisine_b', memberId: 'u2', name: 'Max Durand' },
             ]}
             onMemberPress={() => {}}
           />
@@ -1053,7 +1053,7 @@ export function CatalogueScreen() {
             onAuthorPress={() => {}}
             when={l.commentWhen}
             body={l.mentionBody}
-            mentions={[{ handle: 'ines_haddad', memberId: 'u5' }]}
+            mentions={[{ handle: 'ines_haddad', memberId: 'u5', name: 'Inès Haddad' }]}
             onMemberPress={() => {}}
           />
         </Surface>

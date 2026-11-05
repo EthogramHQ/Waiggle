@@ -210,7 +210,7 @@ describe('the comments of a project', () => {
 
   it('elides « de » before an author whose name starts with a vowel (« d’Inès »)', async () => {
     // Tranche 6c : {{nameOf}}, rempli par useNameOf, pour l'autrice du projet et d'un commentaire.
-    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
     seenByOther({ ...withNotes, author: ines })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
     await renderWithProviders(<ProjectScreen id={id} />)
@@ -221,7 +221,7 @@ describe('the comments of a project', () => {
   })
 
   it('writes the possessive in English (« See Inès’s page »)', async () => {
-    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
     seenByOther({ ...withNotes, author: ines })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
     await renderWithProviders(<ProjectScreen id={id} />, 'en')

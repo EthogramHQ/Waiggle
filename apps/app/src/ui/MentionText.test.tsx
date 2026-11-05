@@ -33,7 +33,7 @@ describe('MentionText', () => {
     await renderWithProviders(
       <MentionText
         text="Merci @ines_morel"
-        mentions={[{ handle: 'ines_morel', memberId: 'u5' }]}
+        mentions={[{ handle: 'ines_morel', memberId: 'u5', name: 'Inès Morel' }]}
         onMemberPress={onMemberPress}
       />,
     )

@@ -4,6 +4,7 @@
 // texte : un pseudo se change et se libère, et pourrait un jour désigner quelqu'un d'autre.
 import { z } from 'zod'
 import { HANDLE_MAX_LENGTH, HANDLE_MIN_LENGTH } from './handles'
+import { foldForSearch } from './search'
 
 /** Au plus 5 membres mentionnés (et donc prévenus) par commentaire ; au-delà, du texte simple. */
 export const MENTIONS_MAX = 5
@@ -11,6 +12,20 @@ export const MENTIONS_MAX = 5
 export const MENTIONABLE_MAX = 5
 /** L'appli ne cherche qu'à partir de 2 caractères après « @ ». */
 export const MENTION_QUERY_MIN = 2
+/**
+ * Depuis R5b, on cherche aussi par le nom, plus long qu'un pseudo : 30 caractères au plus après
+ * « @ », comptés une fois la recherche repliée (« Œ » compte pour deux : « oe »).
+ */
+export const MENTION_QUERY_MAX = 30
+
+/**
+ * Le motif d'une recherche après « @ » (R5b) : une lettre de tout alphabet, accentuée ou non
+ * (\p{L}), puis des lettres, des chiffres (\p{N}) ou « _ ». C'est le texte d'une expression
+ * régulière, sans « ^ » ni « $ » : chacun l'entoure comme il lui faut et ajoute le drapeau u, sans
+ * lequel \p{…} n'est pas compris. Le contrat s'en sert pour `MentionableQuery.q` (`^…$`), l'appli
+ * pour reconnaître « @Lé » juste avant le curseur (`mentionAt`, `…$`).
+ */
+export const MENTION_QUERY_PATTERN = '\\p{L}[\\p{L}\\p{N}_]*'
 
 // Un « @ » suivi d'une lettre puis de lettres, chiffres ou « _ » (insensible à la casse). Le « @ »
 // ne doit pas suivre une lettre (accentuée ou non, de tout alphabet : \p{L}), un chiffre (\p{N}),
@@ -60,29 +75,36 @@ export const findMentions = (text: string): string[] => [
 
 /**
  * Une mention telle que l'API la renvoie avec un commentaire : le pseudo tel qu'il était écrit
- * (en minuscules, sans « @ »), et le membre qu'il désignait au moment de l'écriture. L'appli ne
- * fait un lien que des pseudos de cette liste, vers `/members/<memberId>`.
+ * (en minuscules, sans « @ »), le membre qu'il désignait au moment de l'écriture, et le **nom
+ * actuel** de ce membre (R5b : la pastille l'affiche, et il suit la personne si elle en change).
+ * L'appli ne fait un lien que des pseudos de cette liste, vers `/members/<memberId>`.
  */
 export const Mention = z
-  .object({ handle: z.string(), memberId: z.string() })
+  .object({ handle: z.string(), memberId: z.string(), name: z.string() })
   .meta({ id: 'Mention' })
 export type Mention = z.infer<typeof Mention>
 
 /**
- * Ce que l'appli demande pendant qu'on tape « @in… » (GET /v1/members/mentionable) : le début du
- * pseudo (un « @ » au début est retiré, majuscules acceptées) et le projet commenté, qui sert à
- * proposer d'abord ses proches (l'auteur du projet, ceux qui l'ont commenté, ceux qu'on suit).
+ * Ce que l'appli demande pendant qu'on tape « @Lé… » (GET /v1/members/mentionable) : le début du
+ * pseudo **ou d'un mot du nom** (R5b), et le projet commenté, qui sert à proposer d'abord ses
+ * proches (l'auteur du projet, ceux qui l'ont commenté, ceux qu'on suit).
+ *
+ * La recherche est d'abord remise en forme (`transform`), puis vérifiée (`pipe`) :
+ * - `normalize('NFC')` réunit une lettre et son accent tapé à part (« e » + « ◌́ » devient « é ») ;
+ * - les espaces autour et un « @ » au début sont retirés ;
+ * - `foldForSearch` met en minuscules et retire les accents : « @Lé » devient « le », comme le nom
+ *   « Léa » replié côté base (`foldSql`).
  */
 export const MentionableQuery = z.object({
   q: z
     .string()
-    .transform((text) => text.trim().replace(/^@/, '').toLowerCase())
+    .transform((text) => foldForSearch(text.normalize('NFC').trim().replace(/^@/, '')))
     .pipe(
       z
         .string()
         .min(MENTION_QUERY_MIN)
-        .max(HANDLE_MAX_LENGTH)
-        .regex(/^[a-z][a-z0-9_]*$/),
+        .max(MENTION_QUERY_MAX)
+        .regex(new RegExp(`^${MENTION_QUERY_PATTERN}$`, 'u')),
     ),
   projectId: z.uuid(),
 })
