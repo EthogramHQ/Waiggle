@@ -809,6 +809,18 @@ const gardenComments = [
 // lignes (« Lire la suite » après 10) ; un retiré par la modération, gardé pour la réponse d'Inès ;
 // celui de Sam, que Léa a bloqué, gardé pour la réponse de Papi Jean. L'aperçu en montre 3 sur
 // téléphone (Inès, Max, Léa) et 5 sur ordinateur (puis Hugo et Inès), sans les emplacements.
+/**
+ * Ouvre les commentaires d'un projet : la feuille sur téléphone, la liste déroulée sur ordinateur.
+ * Sur ordinateur, avec 5 commentaires ou moins, il n'y a pas de bouton : le champ est déjà là.
+ */
+async function openThreads(page) {
+  const open = page.getByRole('button', {
+    name: /^(Voir les \d+ commentaires|Commenter|Écrire un commentaire)$/,
+  })
+  if ((await open.count()) > 0) await open.first().click()
+  await page.getByLabel('Écrire un commentaire').waitFor()
+}
+
 const threadsProject = {
   ...commentedProject,
   id: '00000000-0000-4000-8000-0000000000c6',
@@ -1705,14 +1717,53 @@ const pages = [
   // La page d'un autre membre et son projet : les boutons « Suivre ».
   { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
   { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
-  // Les commentaires d'un projet (tranche 5) : les fils, leurs réponses, un commentaire masqué,
-  // un supprimé, « Afficher la suite » ; puis les champs ouverts (un commentaire en cours, une
-  // réponse), ouverts par un clic une fois la page prête (prepare).
+  // Les commentaires d'un projet (R5b) : l'aperçu sous le projet, puis la feuille (sur téléphone) ou
+  // la liste déroulée (sur ordinateur), ouverte par un clic une fois la page prête (prepare).
   {
-    name: 'projet-commentaires',
-    path: `/projects/${commentedProject.id}`,
+    name: 'projet-commentaires-apercu',
+    path: `/projects/${threadsProject.id}`,
     signedIn: true,
     fullPage: true,
+  },
+  {
+    name: 'projet-commentaires',
+    path: `/projects/${threadsProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: openThreads,
+  },
+  // Répondre à une réponse : « @max_durand » prérempli, le bandeau, le commentaire visé surligné, et
+  // « @Lé » tapé : la liste propose Hugo Lefèvre, trouvé par un mot de son nom.
+  {
+    name: 'projet-repondre',
+    path: `/projects/${threadsProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await openThreads(page)
+      await page
+        .getByRole('button', { name: /^Répondre/ })
+        .nth(1)
+        .click()
+      const field = page.getByLabel('Écrire un commentaire')
+      await field.press('End')
+      await field.pressSequentially('@Lé')
+      await page.getByRole('option', { name: /Hugo Lefèvre/ }).waitFor()
+    },
+  },
+  // Les états : masqué, supprimé, retiré, bloqué, et le texte long replié après 10 lignes.
+  {
+    name: 'projet-commentaires-etats',
+    path: `/projects/${threadsProject.id}`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await openThreads(page)
+      await page
+        .getByRole('button', { name: /^Lire la suite/ })
+        .first()
+        .scrollIntoViewIfNeeded()
+    },
   },
   {
     name: 'projet-commenter',
@@ -1720,11 +1771,10 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: 'Écrire un commentaire' }).click()
+      await openThreads(page)
       await page
-        .getByLabel('Ton commentaire')
+        .getByLabel('Écrire un commentaire')
         .fill('Testé ce soir : il m’a proposé une soupe de fanes de radis, une vraie réussite.')
-      await page.getByRole('button', { name: 'Répondre', exact: true }).first().click()
     },
   },
   // Mentionner (tranche 6b) : « @in » tapé dans un commentaire, la liste des membres ouverte, le
@@ -1735,8 +1785,8 @@ const pages = [
     signedIn: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByRole('button', { name: 'Écrire un commentaire' }).click()
-      const field = page.getByLabel('Ton commentaire')
+      await openThreads(page)
+      const field = page.getByLabel('Écrire un commentaire')
       await field.fill('Bravo, demande à @i')
       await field.press('n')
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()

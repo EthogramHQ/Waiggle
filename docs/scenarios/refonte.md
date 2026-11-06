@@ -1132,8 +1132,14 @@ Hors de R5b, et où ça va :
 - Pendant un envoi, la feuille ne se ferme pas d'un glissement accidentel
 - Un membre suspendu lit les commentaires, mais n'a ni champ ni « Répondre » ; le bandeau de
   suspension le dit (comme aujourd'hui)
+- Et sous l'aperçu, dès un commentaire, il a « Voir les N commentaires », qui ouvre la feuille en
+  lecture seule, jamais « Commenter » ; sans commentaire, le titre et « Aucun commentaire pour
+  l'instant. », sans bouton
 - Le focus du clavier ne se perd jamais : après un envoi, il reste dans le champ ; après une
   suppression, il va au commentaire voisin ; à la fermeture d'un bandeau, dans le champ
+- Après un envoi, « Commentaire publié. » est seulement lu par les lecteurs d'écran ; après une
+  suppression, « Ton commentaire a été supprimé. » aussi : aucun encadré, le commentaire qui apparaît
+  ou disparaît le montre déjà
 - Les textes suivent la taille de texte de l'appareil ; à 200 % et 320 px, « Commentaires 6 » ne se
   coupe pas au milieu d'un mot (repris des listes)
 
@@ -1169,5 +1175,16 @@ Après la relecture du plan (sécurité, juridique, interface ; Louis, 4/11/2026
 9. **D3, la pastille lue** : le nom seul, « Léa Moreau, ouvre son profil ».
 10. **D4, le projet privé** : la bannière et l'état vide corrigés dans R5b (l'auteur d'un projet
     privé ne lit pas les commentaires des autres).
+
+Pendant l'assemblage (Louis, 6/11/2026) :
+
+11. **Après un envoi ou une suppression** : l'avis est seulement lu par les lecteurs d'écran, sans
+    encadré.
+12. **Le membre suspendu** : « Voir les N commentaires » dès un commentaire, sans bouton s'il n'y en
+    a aucun.
+13. **Le glisser de la feuille** : au toucher seulement ; à la souris, « Fermer », Échap et le voile.
+14. **Un commentaire supprimé gardé pour ses réponses** n'a plus de date, comme le dit « ni nom, ni
+    date ».
+
 - Et les textes de masquage disent qui voit encore le commentaire, et les aides sous le champ
   restent celles d'aujourd'hui (relecture juridique).
