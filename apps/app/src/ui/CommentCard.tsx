@@ -48,7 +48,6 @@ import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
-import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 export type { ActionMenuItem } from './ActionMenu'
@@ -193,7 +192,6 @@ export function CommentCard({
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { sizeClass } = useLayout()
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie
   // « Répondre » et « … » à la description du commentaire qu'ils concernent.
   const descriptionId = useId()
@@ -343,10 +341,9 @@ export function CommentCard({
     )
   }
 
-  // Sur un écran large, le texte s'aligne sous le nom, pas sous la photo ; sur téléphone, il
-  // repart du bord : la place gagnée garde des lignes lisibles, même en retrait sous un fil et
-  // avec un texte agrandi.
-  const indent = sizeClass === 'compact' ? 0 : size + space.sm
+  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`) :
+  // le trait des réponses descend de la photo sans jamais passer sous le texte.
+  const indent = size + space.sm
   const piece = { paddingLeft: indent }
   const nextPiece = { paddingLeft: indent, marginTop: space.xs }
   const described = t(($) => $.project.comments.about, { name: author.name, text: short })

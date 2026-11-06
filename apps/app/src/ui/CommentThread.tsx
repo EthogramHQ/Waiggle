@@ -15,7 +15,7 @@
 // le navigateur répare en lisant la page pré-rendue, et React échoue alors à l'hydrater.
 //
 // Le trait est un dessin : caché aux lecteurs d'écran, jamais touchable.
-import { borders, space } from '@ruche/brand'
+import { borders, layout, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode } from 'react'
 import { View, type ViewStyle } from 'react-native'
 import { useTheme } from './theme/ThemeProvider'
@@ -28,8 +28,14 @@ import { useTheme } from './theme/ThemeProvider'
  */
 const AVATAR = { root: 36, reply: 28 } as const
 
+/**
+ * La carte pose sa photo à ce retrait du bord, dans une rangée de cette hauteur, où elle est centrée
+ * (la hauteur à toucher du lien du nom) ; le trait se place d'après eux, recopiés comme `AVATAR`.
+ */
+const CARD_PADDING = space.sm
+const CARD_ROW = layout.touchTarget
 /** Le trait vertical, centré sous la photo de la racine (sa position depuis le bord du fil). */
-const TRUNK = AVATAR.root / 2 - borders.thread / 2
+const TRUNK = CARD_PADDING + AVATAR.root / 2 - borders.thread / 2
 /** Le retrait des réponses : leur photo s'aligne sur le nom de la racine, à droite de sa photo. */
 const INDENT = AVATAR.root + space.sm
 /** L'arrondi du coude. */
@@ -37,7 +43,9 @@ const ELBOW_RADIUS = space.md
 /** Entre la racine et sa première réponse, puis entre deux réponses. */
 const GAP = { first: space.md, between: space.lg } as const
 /** La hauteur, depuis le haut d'une réponse, où le coude arrive : le milieu de sa photo. */
-const ELBOW_END = AVATAR.reply / 2
+const ELBOW_END = CARD_PADDING + CARD_ROW / 2
+/** Où le trait part, depuis le haut de la racine : juste sous sa photo. */
+const TRUNK_START = CARD_PADDING + (CARD_ROW + AVATAR.root) / 2 + space.xs
 
 type Props = {
   /** Le commentaire racine (une CommentCard), et ce qui le suit de près (une confirmation). */
@@ -101,7 +109,7 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
           <Line
             style={{
               left: TRUNK,
-              top: AVATAR.root + space.xs,
+              top: TRUNK_START,
               bottom: 0,
               width: borders.thread,
               backgroundColor: ink,
@@ -141,7 +149,7 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
                   style={{
                     left: TRUNK - INDENT,
                     top: ELBOW_END + 1 - ELBOW_RADIUS,
-                    width: INDENT - TRUNK - space.xs,
+                    width: INDENT + CARD_PADDING - TRUNK - space.xs,
                     height: ELBOW_RADIUS,
                     borderLeftWidth: borders.thread,
                     borderBottomWidth: borders.thread,
