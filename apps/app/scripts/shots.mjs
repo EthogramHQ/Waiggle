@@ -817,6 +817,12 @@ async function openThreads(page) {
   const open = page.getByRole('button', {
     name: /^(Voir les \d+ commentaires|Commenter|Écrire un commentaire)$/,
   })
+  // Le champ de la colonne est là avant les commentaires : on attend d'abord le bouton, ou la liste
+  // complète (« Répondre »), sinon une machine lente passerait à côté du bouton sans le voir.
+  await open
+    .or(page.getByRole('button', { name: /^Répondre/ }))
+    .first()
+    .waitFor()
   if ((await open.count()) > 0) await open.first().click()
   await page.getByRole('combobox', { name: 'Écrire un commentaire' }).waitFor()
 }
