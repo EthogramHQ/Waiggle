@@ -818,7 +818,7 @@ async function openThreads(page) {
     name: /^(Voir les \d+ commentaires|Commenter|Écrire un commentaire)$/,
   })
   if ((await open.count()) > 0) await open.first().click()
-  await page.getByLabel('Écrire un commentaire').waitFor()
+  await page.getByRole('combobox', { name: 'Écrire un commentaire' }).waitFor()
 }
 
 const threadsProject = {
@@ -1745,7 +1745,7 @@ const pages = [
         .getByRole('button', { name: /^Répondre/ })
         .nth(1)
         .click()
-      const field = page.getByLabel('Écrire un commentaire')
+      const field = page.getByRole('combobox', { name: 'Écrire un commentaire' })
       await field.press('End')
       await field.pressSequentially('@Lé')
       await page.getByRole('option', { name: /Hugo Lefèvre/ }).waitFor()
@@ -1773,7 +1773,7 @@ const pages = [
     prepare: async (page) => {
       await openThreads(page)
       await page
-        .getByLabel('Écrire un commentaire')
+        .getByRole('combobox', { name: 'Écrire un commentaire' })
         .fill('Testé ce soir : il m’a proposé une soupe de fanes de radis, une vraie réussite.')
     },
   },
@@ -1786,7 +1786,7 @@ const pages = [
     fullPage: true,
     prepare: async (page) => {
       await openThreads(page)
-      const field = page.getByLabel('Écrire un commentaire')
+      const field = page.getByRole('combobox', { name: 'Écrire un commentaire' })
       await field.fill('Bravo, demande à @i')
       await field.press('n')
       await page.getByRole('option', { name: /Inès Haddad/ }).waitFor()

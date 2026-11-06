@@ -63,6 +63,13 @@ const fail = (text) => {
  */
 const byRole = (scope, role, name, options = {}) =>
   scope.getByRole(role, name === undefined ? options : { exact: true, ...options, name })
+/**
+ * R5b : l'exemplaire visible d'un texte de commentaire. Il est aussi repris, caché, dans ce qui décrit
+ * les boutons de sa carte, et dans la mesure de « Lire la suite » ; Playwright compte certaines de
+ * ces copies comme visibles (elles occupent un peu de place) : on garde la première.
+ */
+const shownText = (page, text, exact = true) =>
+  page.getByText(text, { exact }).filter({ visible: true }).first()
 /** R5b : ce membre passe sur un téléphone (la feuille des commentaires), puis revient à l'ordinateur. */
 const asPhone = (page) => page.setViewportSize({ width: 390, height: 844 })
 const asDesktop = (page) => page.setViewportSize({ width: 1280, height: 900 })
@@ -637,13 +644,13 @@ try {
   const samSays = 'une soupe parfaite.'
   await asPhone(sam.page)
   await byRole(sam.page, 'button', 'Écrire un commentaire').click()
-  const samField = sam.page.getByLabel('Écrire un commentaire')
+  const samField = sam.page.getByRole('combobox', { name: 'Écrire un commentaire' })
   await samField.fill('Testé ce soir, @Le')
   await byRole(sam.page, 'option', new RegExp(`^Lea, @${handle}`)).click()
   await samField.pressSequentially(samSays)
   await byRole(sam.page, 'button', 'Envoyer le commentaire').click()
   // L'avis n'est que lu par les lecteurs d'écran : c'est le commentaire qui apparaît, dans la feuille.
-  await sam.page.getByText(samSays, { exact: false }).first().waitFor()
+  await shownText(sam.page, samSays, false).waitFor()
   await waitFor(
     'commentaire de Sam enregistré',
     async () => (await readProject(lea, projectId)).commentCount === 1,
@@ -665,9 +672,11 @@ try {
   expectEqual('nouveautés après la visite', unread.count, 0)
   await byRole(lea.page, 'button', 'Répondre').click()
   await lea.page.getByText(/Réponse à\s*Sam/).waitFor()
-  await lea.page.getByLabel('Écrire un commentaire').fill('Merci Sam, la version dessert arrive.')
+  await lea.page
+    .getByRole('combobox', { name: 'Écrire un commentaire' })
+    .fill('Merci Sam, la version dessert arrive.')
   await byRole(lea.page, 'button', 'Envoyer le commentaire').click()
-  await lea.page.getByText('Merci Sam, la version dessert arrive.', { exact: true }).waitFor()
+  await shownText(lea.page, 'Merci Sam, la version dessert arrive.').waitFor()
   // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer, par le menu « … ».
   await byRole(lea.page, 'button', 'Actions du commentaire de Sam').click()
   await byRole(lea.page, 'menuitem', 'Masquer').click()
@@ -677,7 +686,7 @@ try {
   expectEqual('commentaires comptés', (await readProject(lea, projectId)).commentCount, 1)
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Masqué par l’auteur du projet').waitFor()
-  await sam.page.getByText(samSays, { exact: false }).first().waitFor()
+  await shownText(sam.page, samSays, false).waitFor()
   console.log('  ok : Sam voit son commentaire, marqué « masqué »')
   expectEqual(
     'commentaires, sans compte',
@@ -781,9 +790,9 @@ try {
   step('Sam publie un second commentaire ; Malik le signale')
   const spam = 'Gagne 500 € par jour depuis chez toi, écris-moi en privé.'
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await sam.page.getByLabel('Écrire un commentaire').fill(spam)
+  await sam.page.getByRole('combobox', { name: 'Écrire un commentaire' }).fill(spam)
   await byRole(sam.page, 'button', 'Envoyer le commentaire').click()
-  await sam.page.getByText(spam, { exact: true }).waitFor()
+  await shownText(sam.page, spam).waitFor()
   await open(malik.page, `${appUrl}/projects/${projectId}`)
   // Le premier commentaire de Sam est masqué : pour Malik, il ne reste que celui-ci à son nom.
   await byRole(malik.page, 'button', 'Actions du commentaire de Sam').click()
@@ -904,9 +913,9 @@ try {
     'button',
     'Répondre',
   ).click()
-  await lea.page.getByLabel('Écrire un commentaire').fill(leaAnswer)
+  await lea.page.getByRole('combobox', { name: 'Écrire un commentaire' }).fill(leaAnswer)
   await byRole(lea.page, 'button', 'Envoyer le commentaire').click()
-  await lea.page.getByText(leaAnswer, { exact: true }).waitFor()
+  await shownText(lea.page, leaAnswer).waitFor()
   console.log('  ok : Léa a répondu au commentaire signalé')
 
   step('Un administrateur ouvre « Modération » depuis ses réglages, et retire le commentaire')
@@ -957,12 +966,12 @@ try {
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await sam.page.getByText('Retiré par la modération', { exact: true }).waitFor()
   await sam.page.getByText(new RegExp(`^Explication\\s*: ${explanation}$`)).waitFor()
-  await sam.page.getByText(spam, { exact: true }).waitFor()
+  await shownText(sam.page, spam).waitFor()
   console.log('  ok : Sam lit le bandeau, l’explication et son texte')
   await open(lea.page, `${appUrl}/projects/${projectId}`)
   // Pour Léa, le commentaire retiré n'est plus qu'un emplacement, sans auteur ; sa réponse reste.
   await lea.page.getByText('Contenu retiré par la modération', { exact: true }).waitFor()
-  await lea.page.getByText(leaAnswer, { exact: true }).waitFor()
+  await shownText(lea.page, leaAnswer).waitFor()
   console.log('  ok : Léa voit « Contenu retiré par la modération », et sa réponse dessous')
   expectEqual('commentaire retiré, à l’écran de Léa', await lea.page.getByText(spam).count(), 0)
   const leaComments = await (
