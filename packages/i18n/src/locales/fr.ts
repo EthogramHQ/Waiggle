@@ -569,7 +569,6 @@ export const fr = {
     comments: {
       // R5b : le titre seul ; le nombre est dessiné à côté par `CountedTitle` et lu par `spokenCount`.
       title: 'Commentaires',
-      titleNone: 'Commentaires',
       spokenCount_one: '{{count}} commentaire',
       spokenCount_other: '{{count}} commentaires',
       seeAll_one: 'Voir le commentaire',
@@ -603,38 +602,29 @@ export const fr = {
       readLess: 'Réduire',
       add: 'Écrire un commentaire',
       addShort: 'Commenter',
-      field: 'Ton commentaire',
       hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
       hintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
       about: '{{name}} : {{text}}',
-      submit: 'Publier le commentaire',
-      required: 'Écris ton commentaire avant de le publier.',
       published: 'Commentaire publié.',
       error: 'Le commentaire n’a pas pu être publié. Réessaie.',
       limited: 'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
       reply: 'Répondre',
-      replyField: 'Ta réponse',
       replyHint:
         'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient public, tous les membres la liront.',
-      replySubmit: 'Publier la réponse',
-      replyRequired: 'Écris ta réponse avant de la publier.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
       replyGone: 'Ce fil n’accepte plus de réponse.',
       replyPublished: 'Réponse publiée.',
-      edit: 'Modifier le commentaire',
       editShort: 'Modifier',
       editHint:
         'Tous les membres connectés liront la nouvelle version, marquée « modifié ». La personne qui a publié le projet peut la masquer.',
       editHintHidden:
         'Ce commentaire est masqué : il ne reste visible que de toi et de la personne qui a publié le projet.',
-      editSubmit: 'Enregistrer',
       editError: 'Le commentaire n’a pas pu être modifié. Réessaie.',
       saved: 'Commentaire modifié.',
       edited: 'modifié',
-      delete: 'Supprimer le commentaire',
       deleteShort: 'Supprimer',
       deleteTitle: 'Supprimer ce commentaire ?',
       deleteBody: 'Il disparaîtra pour tout le monde.',
@@ -643,12 +633,8 @@ export const fr = {
       confirmDelete: 'Supprimer',
       deleteError: 'Le commentaire n’a pas pu être supprimé. Réessaie.',
       deleted: 'Ton commentaire a été supprimé.',
-      hide: 'Masquer le commentaire',
-      unhide: 'Démasquer le commentaire',
       hideShort: 'Masquer',
       unhideShort: 'Démasquer',
-      hiddenBanner:
-        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
       hiddenByMe: 'Masqué par toi',
       hiddenDone:
         'Commentaire masqué : il ne reste visible que de toi et de la personne qui l’a écrit.',

@@ -5,8 +5,8 @@
 // suivent son rayon. Ce rayon est celui du contenu, donné par `radius` ou lu dans le style du
 // contenu (une carte arrondie à 28) : sinon l'anneau restait carré autour d'une carte arrondie.
 import { layout, pressScale, type Radius, radii } from '@ruche/brand'
-import { isValidElement, type ReactNode } from 'react'
-import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from 'react-native'
+import { isValidElement, type ReactNode, type Ref } from 'react'
+import { Pressable, type StyleProp, StyleSheet, type View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { enterActivates } from './keyboard'
@@ -29,6 +29,8 @@ type Props = {
    * le style porte déjà son rayon (`borderRadius`) : il y est lu.
    */
   radius?: Radius
+  /** L'élément touchable, pour y poser le focus (une carte d'aperçu qui l'a rendu à une feuille). */
+  ref?: Ref<View>
 }
 
 /** Le rayon écrit dans le style du contenu, s'il est une seule vue qui en a un. */
@@ -47,6 +49,7 @@ export function Pressed({
   fill = false,
   describedBy,
   radius,
+  ref,
 }: Props) {
   const borderRadius = radius === undefined ? radiusOf(children) : radii[radius]
   const scale = useSharedValue(1)
@@ -54,6 +57,7 @@ export function Pressed({
   return (
     <Animated.View style={[animated, fill && { flexGrow: 1 }]}>
       <Pressable
+        ref={ref}
         accessibilityRole={role}
         accessibilityLabel={label}
         {...describedByProps(describedBy)}

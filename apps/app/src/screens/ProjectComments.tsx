@@ -1,737 +1,303 @@
-// Les commentaires de la page d'un projet (tranche 5) : le titre « Commentaires (12) », le champ
-// pour en écrire un, puis les fils, du plus récent au plus ancien, chacun avec ses réponses.
-// Un membre répond à un fil (« Répondre », une fois au bout du fil : le champ s'ouvre là), modifie
-// ou supprime ses commentaires (après confirmation) ; l'auteur du projet masque ou démasque ceux
-// des autres.
+// Les commentaires de la page d'un projet (redessinés en R5b, docs/scenarios/refonte.md) :
+// - sur téléphone, un aperçu (le titre « Commentaires 6 », les 3 premières lignes, un bouton) ; le
+//   bouton ou une ligne ouvrent la feuille, avec la liste complète et le champ fixé en bas ;
+// - sur ordinateur, dans la colonne de droite : 5 lignes et « Voir les N commentaires », qui déroule
+//   la liste complète en place, puis le champ. Avec 5 commentaires ou moins, la liste complète
+//   d'emblée : l'aperçu ne montre que ce qui est visible de tous, et sans bouton un commentaire masqué
+//   ou retiré serait inatteignable pour ceux qui le lisent encore.
 //
-// Un composant à part, comme le journal : ses états (le texte en cours, la réponse ouverte, le
-// commentaire à supprimer) ne redessinent pas toute la page à chaque lettre tapée.
-// Le focus du clavier ne se perd jamais : un champ qui se referme le rend au bouton qui l'avait
-// ouvert (« Répondre », « Modifier ») ; après une suppression, il va sur l'action voisine.
-// Dans chaque champ (commentaire, réponse, modification), « @in » propose des membres à mentionner
-// (tranche 6b) ; une fois publié, « @ines_morel » est un lien vers la page d'Inès.
-import {
-  COMMENT_MAX,
-  type Comment,
-  type CommentReply,
-  type CommentState,
-  CommentText,
-  type Project,
-} from '@ruche/contracts'
-import { useRouter } from 'expo-router'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+// Un composant à part : le texte en cours ne redessine pas toute la page à chaque lettre. Le brouillon
+// vit ici, au-dessus de la feuille : la fermer garde le texte, et il reste à l'état React, jamais sur
+// l'appareil (`useCommentDraft`). La liste et ses gestes sont dans ProjectCommentThreads.tsx.
+//
+// Le focus du clavier ne se perd jamais : la feuille le rend à ce qui l'a ouverte, « Répondre » et
+// « Modifier » le posent dans le champ, un envoi l'y garde, une suppression l'envoie à la carte voisine.
+import { type Comment, type CommentReply, CommentText, type Project } from '@ruche/contracts'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import {
-  type CommentFailure,
-  useComments,
-  useDeleteComment,
-  useEditComment,
-  useHideComment,
-  usePostComment,
-} from '../comments/api'
+import { useComments } from '../comments/api'
+import { previewLines, threadLines } from '../comments/lines'
+import { useCommentDraft } from '../comments/useCommentDraft'
 import { useMentionable } from '../mentions/api'
 import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
-import { removalBanner } from '../reports/removal'
+import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
-import { excerpt } from '../ui/CommentAction'
-import { type CommentAction, CommentCard, type CommentCardHandle } from '../ui/CommentCard'
-import { CommentList } from '../ui/CommentList'
-import { CommentThread, type CommentThreadHandle } from '../ui/CommentThread'
-import { Dialog } from '../ui/Dialog'
-import { NoteComposer } from '../ui/NoteComposer'
+import { CommentCard } from '../ui/CommentCard'
+import { CommentComposer } from '../ui/CommentComposer'
+import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
-import { RelativeTime } from '../ui/RelativeTime'
+import { Sheet } from '../ui/Sheet'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
-import { useNameOf } from '../useNameOf'
+import type { TextFieldInput } from '../ui/TextField'
+import { useLayout } from '../ui/theme/layout'
+import {
+  type CommentCards,
+  CommentThreads,
+  focusFirstCard,
+  useCommentFailure,
+} from './ProjectCommentThreads'
 
-// Les actions possibles sur un commentaire, dans leur ordre d'affichage. (« Répondre » appartient
-// au fil, pas au commentaire.) « Signaler » (tranche 7a) ouvre la page du même nom.
-type ActionId = 'edit' | 'delete' | 'hide' | 'report'
+/** Le nombre de lignes de l'aperçu : 3 sur téléphone, 5 dans la colonne d'un ordinateur. */
+const PREVIEW_LINES = { phone: 3, column: 5 } as const
 
-// Où dire « Ton commentaire a été supprimé. » : à la place du commentaire disparu.
-// - une réponse : à sa place dans son fil ;
-// - une racine qui avait des réponses : juste sous « Commentaire supprimé » ;
-// - un fil entier (racine sans réponse) : à sa place dans la liste.
-type DeletedAt =
-  | { threadId: string; replyIndex: number | null }
-  | { threadIndex: number; threadId?: undefined }
-
-// La confirmation affichée après un geste, jusqu'au geste suivant. Celles qui concernent un fil
-// s'affichent au bout de ce fil, là où le membre regarde.
-type Done =
-  | { kind: 'published' }
-  | { kind: 'deleted'; at: DeletedAt }
-  | { kind: 'replied' | 'saved' | 'hidden' | 'shown'; threadId: string }
-
-// Ce que le focus peut viser après une suppression : une action d'une carte, ou « Répondre ».
-type FocusTarget = { card: string } | { thread: string }
-
-// Le champ où se tape une mention : le nouveau commentaire, la réponse, ou la modification.
-type MentionFrom = 'root' | 'reply' | 'edit'
-
-// Le texte de l'emplacement d'un commentaire sans auteur, selon son état. Un commentaire « visible »
-// a toujours son auteur : sa ligne ne sert pas, elle garde l'ancien texte par défaut.
-const placeholderKey = {
-  visible: 'hiddenPlaceholder',
-  hidden: 'hiddenPlaceholder',
-  deleted: 'deletedPlaceholder',
-  removed: 'removedPlaceholder',
-  blocked: 'blockedPlaceholder',
-  unavailable: 'unavailablePlaceholder',
-} as const satisfies Record<CommentState, string>
+const nothing = () => {}
 
 export function Comments({ project }: { project: Project }) {
   const { t } = useTranslation()
-  const nameOf = useNameOf()
-  const router = useRouter()
   const toSource = useMediaSources()
+  const { columns } = useLayout()
   const comments = useComments(project.id)
-  const post = usePostComment(project.id)
-  const edit = useEditComment(project.id)
-  const remove = useDeleteComment(project.id)
-  const hide = useHideComment(project.id)
-  // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
+  const draft = useCommentDraft(project.id)
+  const failure = useCommentFailure()
   const signInAgain = useSignInAgain()
+  // Un compte suspendu lit les commentaires, mais n'a ni champ ni « Répondre » (tranche 7c).
+  const { suspended } = useSuspension()
+  const { data: session } = useSession()
+  const me = useMe(Boolean(session), { retryOnMount: false })
+  const count = project.commentCount
   const isPrivate = project.visibility === 'private'
-  // Un compte suspendu (tranche 7c) lit les commentaires, mais n'en écrit plus, ne répond plus et
-  // ne modifie plus les siens ; il peut encore les supprimer, et masquer ceux de son projet.
-  const suspended = useSuspension().suspended
-
-  // Un nouveau commentaire : le champ ouvert ou non, son texte, et le problème du texte s'il y en a un.
-  const [composing, setComposing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [draftError, setDraftError] = useState<string | undefined>()
-  // Une réponse : le fil où elle ira (l'identifiant de sa racine).
-  const [replying, setReplying] = useState<string | null>(null)
-  const [replyDraft, setReplyDraft] = useState('')
-  const [replyError, setReplyError] = useState<string | undefined>()
-  // Les textes à jour, lus à la fin d'un envoi (la fonction en cours ne voit que les anciens).
-  const latestDraft = useRef('')
-  const latestReply = useRef('')
-  // Le champ qui a envoyé la dernière publication : son erreur s'affiche là, pas dans l'autre.
-  // Les erreurs de React Query restent jusqu'au prochain envoi : on ne les montre qu'après un envoi.
-  const [postFrom, setPostFrom] = useState<'root' | 'reply' | null>(null)
-  // Deux appuis dans le même instant arrivent avant que le bouton ne passe en « en cours » : ce
-  // drapeau, posé au premier, fait ignorer le second (un seul commentaire publié).
-  const sending = useRef(false)
-  // La modification en cours : le commentaire, son texte.
-  const [editing, setEditing] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState('')
-  const [editError, setEditError] = useState<string | undefined>()
-  const [showEditError, setShowEditError] = useState(false)
-  const saving = useRef(false)
-  // Le commentaire dont on demande confirmation de la suppression, et s'il a des réponses (la
-  // fenêtre ne dit pas la même chose).
-  const [deleting, setDeleting] = useState<{ id: string; hasReplies: boolean } | null>(null)
-  const [removing, setRemoving] = useState(false)
-  const [showDeleteError, setShowDeleteError] = useState(false)
-  // Masquer : le commentaire dont le dernier changement a échoué, et ceux en cours d'envoi (leur
-  // bouton attend, « occupé »).
-  const [hideFailed, setHideFailed] = useState<string | null>(null)
-  const [hiding, setHiding] = useState<ReadonlySet<string>>(new Set())
-  const hidingNow = useRef(new Set<string>())
-  const [done, setDone] = useState<Done | null>(null)
-  // La mention en cours de frappe (« @in ») et le champ où elle se tape : un seul à la fois, même
-  // si plusieurs champs sont ouverts. Les suggestions ne vont qu'à ce champ.
-  const [mentioning, setMentioning] = useState<{ from: MentionFrom; query: string } | null>(null)
-  const mentionable = useMentionable(project.id, mentioning?.query ?? null)
-
-  // Le focus du clavier. Chaque carte donne une poignée pour poser le focus sur une de ses actions,
-  // chaque fil une poignée pour le poser sur « Répondre ».
-  const cards = useRef(new Map<string, CommentCardHandle>())
-  const threadHandles = useRef(new Map<string, CommentThreadHandle>())
-  // L'action à focaliser au prochain dessin (son bouton vient de revenir, champ refermé).
-  const pendingFocus = useRef<{ id: string; action: ActionId } | null>(null)
-  // Après une suppression : les actions voisines, à essayer dans l'ordre, une fois la fenêtre fermée.
-  const focusAfterClose = useRef<FocusTarget[] | null>(null)
-
   const threads: Comment[] = comments.data?.pages.flatMap((page) => page.items) ?? []
 
-  /** Les actions permises sur ce commentaire, dans l'ordre d'affichage. */
-  const actionIds = (comment: CommentReply): ActionId[] => {
-    // Son propre commentaire retiré par la modération : on ne le modifie plus (l'API refuserait,
-    // 409 `removed`), on peut encore le supprimer.
-    // Suspendu (tranche 7c) : plus de modification non plus.
-    if (comment.isMine) {
-      return comment.state === 'removed' || suspended ? ['delete'] : ['edit', 'delete']
-    }
-    // Un emplacement (supprimé, masqué, retiré, ou caché par un blocage, pour qui regarde) n'a
-    // aucune action : rien à y lire, donc rien à signaler, et on n'interagit plus avec un membre
-    // bloqué.
-    if (
-      !comment.author ||
-      comment.state === 'deleted' ||
-      comment.state === 'removed' ||
-      comment.state === 'blocked' ||
-      comment.state === 'unavailable'
-    ) {
-      return []
-    }
-    // L'auteur du projet masque le commentaire d'un autre ; tout le monde peut le signaler,
-    // jamais le sien.
-    return project.isMine ? ['hide', 'report'] : ['report']
+  // La feuille (téléphone) : ouverte ou non, et si elle s'ouvre le champ prêt.
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [openOnField, setOpenOnField] = useState(false)
+  // La ligne de l'aperçu qui l'a ouverte : elle retrouve le focus à la fermeture (sinon le bouton).
+  const openedFrom = useRef<string | null>(null)
+  // La colonne (ordinateur) : la liste déroulée, par le bouton ou d'emblée. Une fois la liste complète
+  // affichée, elle le reste : un 6e commentaire ne la replie pas sous les yeux du membre. Une `ref`
+  // écrite pendant le rendu : elle ne fait que retenir ce qu'on vient de lire.
+  const [unrolled, setUnrolled] = useState(false)
+  const shownWhole = useRef(false)
+  if (count <= PREVIEW_LINES.column) shownWhole.current = true
+  const whole = columns && (unrolled || shownWhole.current)
+  const focusAfterUnroll = useRef<{ shown: Set<string>; target: string | null } | null>(null)
+
+  // Ce que la région annonce (seulement lu : décisions de Louis du 6/11), et ce qui refuse un texte
+  // avant même l'API (des caractères invisibles).
+  const [announcement, setAnnouncement] = useState('')
+  const [invalid, setInvalid] = useState(false)
+  // La mention en cours de frappe (« @in »), repliée : `useMentionable` y répond toujours, et le champ
+  // ne montre que les suggestions de cette recherche-là (`suggestionsFor`).
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const mentionable = useMentionable(project.id, mentionQuery)
+
+  const inputRef = useRef<TextFieldInput>(null)
+  const openButton = useRef<Focusable>(null)
+  const cards = useRef<CommentCards>(new Map())
+  const previewCards = useRef<CommentCards>(new Map())
+
+  /** Le champ prend le focus ; le navigateur le fait venir à l'écran, le clavier s'ouvre sur téléphone. */
+  const focusField = () => inputRef.current?.focus()
+
+  const lines = previewLines(threads, columns ? PREVIEW_LINES.column : PREVIEW_LINES.phone)
+  // Ce que le membre peut lire, lui : le compteur ne compte pas son commentaire masqué ou retiré.
+  const readable = threadLines(threads).filter((comment) => comment.author !== null).length
+
+  // --- La feuille -----------------------------------------------------------------------------------
+
+  const openSheet = (from: string | null, onField: boolean) => {
+    openedFrom.current = from
+    setOpenOnField(onField)
+    setSheetOpen(true)
   }
 
-  /**
-   * On répond à un fil dont la racine est visible : pas sous un emplacement (supprimé, ou masqué
-   * pour qui regarde), ni sous une racine masquée (la réponse s'afficherait sous « Commentaire
-   * masqué » pour les autres). Jamais depuis un compte suspendu (tranche 7c).
-   */
-  const canReply = (root: Comment) => !suspended && root.state === 'visible' && root.author !== null
+  const closeSheet = () => {
+    setSheetOpen(false)
+    setAnnouncement('')
+  }
 
-  // Après chaque dessin : si un champ de modification vient de se refermer, le focus revient sur
-  // « Modifier », revenu à sa place (sur le web ; ailleurs, rien à faire).
+  // La feuille vient de se fermer : le focus revient à ce qui l'a ouverte. Le bouton a pu changer de
+  // texte, pas de place ; une ligne a pu quitter l'aperçu (un commentaire arrivé en tête) : le bouton.
+  const wasOpen = useRef(false)
   useEffect(() => {
-    const target = pendingFocus.current
-    if (!target) return
-    pendingFocus.current = null
-    const comment = threads
-      .flatMap((root) => [root, ...root.replies])
-      .find((c) => c.id === target.id)
-    const index = comment ? actionIds(comment).indexOf(target.action) : -1
-    if (index >= 0) cards.current.get(target.id)?.focusAction(index)
-  })
-
-  // Le message d'un envoi refusé. 429 et 401 : « Réessaie » ne servirait à rien, on dit pourquoi.
-  // Une mention d'un membre qu'on a bloqué (422, tranche 7b) : on le dit, sans nommer qui (l'API ne
-  // le dit pas) ; le texte reste dans le champ, à corriger.
-  const failure = (
-    reason: CommentFailure | undefined,
-    otherwise: string,
-    limited = t(($) => $.project.comments.limited),
-  ) =>
-    reason === 'limited'
-      ? limited
-      : reason === 'expired'
-        ? t(($) => $.states.expired)
-        : reason === 'blockedMention'
-          ? t(($) => $.errors.blockedMention)
-          : otherwise
-  // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
-  // doit l'être avant de partir (la fenêtre de confirmation).
-  const failureAction = (reason: CommentFailure | undefined, before?: () => void) =>
-    reason === 'expired' ? signInAgain(before) : undefined
-
-  // La même règle que l'API (packages/contracts) : un texte non vide, sans caractères invisibles.
-  const check = (text: string, required: string) => {
-    const checked = CommentText.safeParse(text)
-    if (checked.success) return { body: checked.data, error: undefined }
-    return {
-      body: null,
-      error: text.trim() === '' ? required : t(($) => $.project.errors.invalidCharacters),
-    }
-  }
-
-  // --- Les mentions ------------------------------------------------------------------------------
-
-  /** Ce qu'il faut au champ `from` pour proposer des membres après « @ ». */
-  const mentionsFor = (from: MentionFrom) => ({
-    suggestions:
-      mentioning?.from === from
-        ? mentionable.map((member) => ({
-            id: member.id,
-            name: member.name,
-            handle: member.handle,
-            avatar: toSource(member.avatarUrl),
-          }))
-        : [],
-    label: t(($) => $.mentions.suggestions),
-    onQueryChange: (query: string | null) =>
-      setMentioning((current) =>
-        query !== null
-          ? { from, query }
-          : // Ce champ ne cherche plus : on n'efface que sa propre recherche.
-            current?.from === from
-            ? null
-            : current,
-      ),
-  })
-
-  /** Une mention touchée : la page du membre gardé avec elle (son identifiant). */
-  const openMember = (memberId: string) =>
-    router.push({ pathname: '/members/[id]', params: { id: memberId } })
-
-  // --- Un nouveau commentaire -------------------------------------------------------------------
-
-  const changeDraft = (text: string) => {
-    latestDraft.current = text
-    setDraft(text)
-    // Le texte a changé : l'ancien reproche (« Écris ton commentaire… ») ne vaut plus.
-    setDraftError(undefined)
-  }
-
-  const submit = async () => {
-    if (sending.current) return
-    const { body, error } = check(
-      draft,
-      t(($) => $.project.comments.required),
-    )
-    if (body === null) {
-      setDraftError(error)
-      return
-    }
-    sending.current = true
-    setPostFrom('root')
-    const sent = draft
-    const ok = await post.post({ body })
-    sending.current = false
-    // Refusé : le texte reste dans le champ, et l'erreur s'affiche (post.error).
-    if (!ok) return
-    // Publié. Si le texte a changé entre-temps, c'est un autre commentaire qui commence : on le garde.
-    if (latestDraft.current !== sent) return
-    changeDraft('')
-    setComposing(false)
-    setDone({ kind: 'published' })
-  }
-
-  // --- Répondre ---------------------------------------------------------------------------------
-
-  const changeReply = (text: string) => {
-    latestReply.current = text
-    setReplyDraft(text)
-    setReplyError(undefined)
-  }
-
-  // Le texte déjà tapé suit le champ s'il change de fil : rien de ce qui est écrit ne se perd.
-  const openReply = (rootId: string) => {
-    setReplying(rootId)
-    setReplyError(undefined)
-    if (postFrom === 'reply') setPostFrom(null)
-    setDone(null)
-  }
-
-  // Le champ se referme : le fil rend lui-même le focus à « Répondre » (CommentThread).
-  const closeReply = () => {
-    setReplying(null)
-    setReplyError(undefined)
-    if (postFrom === 'reply') setPostFrom(null)
-  }
-
-  const submitReply = async () => {
-    if (!replying || sending.current) return
-    const { body, error } = check(
-      replyDraft,
-      t(($) => $.project.comments.replyRequired),
-    )
-    if (body === null) {
-      setReplyError(error)
-      return
-    }
-    sending.current = true
-    setPostFrom('reply')
-    const rootId = replying
-    const sent = replyDraft
-    // Les réponses tiennent sur un seul niveau : on répond toujours à la racine du fil.
-    const ok = await post.post({ body, replyTo: rootId })
-    sending.current = false
-    if (!ok || latestReply.current !== sent) return
-    changeReply('')
-    setReplying(null)
-    setPostFrom(null)
-    setDone({ kind: 'replied', threadId: rootId })
-  }
-
-  // --- Modifier ---------------------------------------------------------------------------------
-
-  const openEdit = (comment: CommentReply) => {
-    setEditing(comment.id)
-    setEditDraft(comment.body)
-    setEditError(undefined)
-    setShowEditError(false)
-    setDone(null)
-  }
-
-  const closeEdit = () => {
-    if (editing) pendingFocus.current = { id: editing, action: 'edit' }
-    setEditing(null)
-    setEditError(undefined)
-    setShowEditError(false)
-  }
-
-  const submitEdit = async (threadId: string) => {
-    if (!editing || saving.current) return
-    const { body, error } = check(
-      editDraft,
-      t(($) => $.project.comments.required),
-    )
-    if (body === null) {
-      setEditError(error)
-      return
-    }
-    saving.current = true
-    setShowEditError(true)
-    const id = editing
-    const ok = await edit.edit({ id, body })
-    saving.current = false
-    // Refusé : le texte reste dans le champ, avec le message.
-    if (!ok) return
-    pendingFocus.current = { id, action: 'edit' }
-    setEditing(null)
-    setShowEditError(false)
-    setDone({ kind: 'saved', threadId })
-  }
-
-  // --- Supprimer --------------------------------------------------------------------------------
-
-  /** Tout ce qui peut recevoir le focus, dans l'ordre de la page : actions des cartes, « Répondre ». */
-  const focusTargets = (): { key: string; target: FocusTarget }[] =>
-    threads.flatMap((root) => [
-      ...[root, ...root.replies]
-        .filter((c) => actionIds(c).length > 0)
-        .map((c) => ({ key: c.id, target: { card: c.id } })),
-      ...(canReply(root) ? [{ key: `reply:${root.id}`, target: { thread: root.id } }] : []),
-    ])
-
-  /** Les actions voisines de ce commentaire : d'abord les suivantes, puis les précédentes. */
-  const neighborsOf = (id: string): FocusTarget[] => {
-    const order = focusTargets()
-    const at = order.findIndex((item) => item.key === id)
-    if (at < 0) return order.map((item) => item.target)
-    return [...order.slice(at + 1), ...order.slice(0, at).reverse()].map((item) => item.target)
-  }
-
-  /** Où le commentaire supprimé laissera sa confirmation (voir DeletedAt). */
-  const deletedAt = (id: string): DeletedAt => {
-    const threadIndex = threads.findIndex((root) => root.id === id)
-    const root = threads[threadIndex]
-    if (root) return root.replies.length > 0 ? { threadId: id, replyIndex: null } : { threadIndex }
-    const thread = threads.find((r) => r.replies.some((reply) => reply.id === id))
-    return {
-      threadId: thread?.id ?? '',
-      replyIndex: thread ? thread.replies.findIndex((reply) => reply.id === id) : 0,
-    }
-  }
-
-  const confirmDelete = async () => {
-    if (!deleting || removing) return
-    setRemoving(true)
-    setShowDeleteError(true)
-    // Calculé avant : une fois supprimé, le commentaire n'est plus dans la liste.
-    const at = deletedAt(deleting.id)
-    const neighbors = neighborsOf(deleting.id)
-    const ok = await remove.remove(deleting.id)
-    setRemoving(false)
-    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!ok) return
-    // Supprimé : ses boutons n'existent plus ; le focus ira sur un voisin, une fois la fenêtre
-    // refermée. « Ton commentaire a été supprimé. » le confirme, à sa place.
-    focusAfterClose.current = neighbors
-    setDone({ kind: 'deleted', at })
-    setDeleting(null)
-  }
-
-  // --- Masquer ----------------------------------------------------------------------------------
-
-  const setHidden = async (comment: CommentReply, hidden: boolean, threadId: string) => {
-    // Un seul envoi à la fois par commentaire, même après un double clic (le drapeau est lu tout
-    // de suite ; l'état, lui, fait attendre le bouton au prochain dessin).
-    if (hidingNow.current.has(comment.id)) return
-    hidingNow.current.add(comment.id)
-    setHiding(new Set(hidingNow.current))
-    setHideFailed(null)
-    setDone(null)
-    const ok = await hide.setHidden({ id: comment.id, hidden })
-    hidingNow.current.delete(comment.id)
-    setHiding(new Set(hidingNow.current))
-    if (!ok) {
-      setHideFailed(comment.id)
-      return
-    }
-    setDone({ kind: hidden ? 'hidden' : 'shown', threadId })
-  }
-
-  // --- Les cartes -------------------------------------------------------------------------------
-
-  const actionsOf = (comment: CommentReply, rootId: string): CommentAction[] =>
-    actionIds(comment).map((id) => ({ id, ...actionOf(id, comment, rootId) }))
-
-  const actionOf = (id: ActionId, comment: CommentReply, rootId: string): CommentAction => {
-    switch (id) {
-      case 'edit':
-        return {
-          label: t(($) => $.project.comments.edit),
-          text: t(($) => $.project.comments.editShort),
-          icon: 'pencil-simple',
-          onPress: () => openEdit(comment),
-        }
-      case 'delete':
-        return {
-          label: t(($) => $.project.comments.delete),
-          text: t(($) => $.project.comments.deleteShort),
-          icon: 'trash',
-          tone: 'danger',
-          onPress: () => {
-            setShowDeleteError(false)
-            setDone(null)
-            setDeleting({ id: comment.id, hasReplies: hasReplies(comment) })
-          },
-        }
-      case 'report':
-        // Une réponse est un commentaire comme un autre : la même sorte de cible.
-        return {
-          label: t(($) => $.report.action),
-          icon: 'flag',
-          onPress: () =>
-            router.push({ pathname: '/report', params: { kind: 'comment', id: comment.id } }),
-        }
-      default: {
-        // 'hide' : masquer, ou démasquer un commentaire déjà masqué.
-        const hidden = comment.state === 'hidden'
-        return {
-          label: hidden ? t(($) => $.project.comments.unhide) : t(($) => $.project.comments.hide),
-          text: hidden
-            ? t(($) => $.project.comments.unhideShort)
-            : t(($) => $.project.comments.hideShort),
-          icon: hidden ? 'eye' : 'eye-slash',
-          pending: hiding.has(comment.id),
-          onPress: () => void setHidden(comment, !hidden, rootId),
-        }
+    if (wasOpen.current && !sheetOpen) {
+      const line = openedFrom.current ? previewCards.current.get(openedFrom.current) : undefined
+      if (!line?.focusCard()) {
+        focusWithoutScroll(openButton.current)
+        moveReaderTo(openButton.current)
       }
     }
+    wasOpen.current = sheetOpen
+  }, [sheetOpen])
+
+  /** Quitter la page depuis une carte : la feuille se ferme d'abord, sinon elle resterait dessus (ui-B2). */
+  const leave = (go: () => void) => {
+    closeSheet()
+    go()
   }
 
-  /** Ce que les lecteurs d'écran entendent après le nom d'une action : l'auteur, le début du texte. */
-  const describe = (comment: CommentReply) =>
-    comment.author
-      ? t(($) => $.project.comments.about, {
-          name: comment.author.name,
-          text: excerpt(comment.body),
-        })
-      : undefined
+  // --- Dérouler la liste, sur ordinateur -------------------------------------------------------------
 
-  // L'aide du champ de modification : qui lira la nouvelle version.
-  const editHint = (comment: CommentReply) =>
-    isPrivate
-      ? t(($) => $.project.comments.hintPrivate)
-      : comment.state === 'hidden'
-        ? t(($) => $.project.comments.editHintHidden)
-        : t(($) => $.project.comments.editHint)
-
-  // « Ton commentaire a été supprimé. » : lu sans interrompre (role « status »).
-  const deletedNotice = (
-    <Notice key="deleted" tone="success" message={t(($) => $.project.comments.deleted)} polite />
-  )
-  const deleted = done?.kind === 'deleted' ? done.at : null
-
-  const card = (comment: CommentReply, rootId: string, reply: boolean) => {
-    const { author } = comment
-    return (
-      <CommentCard
-        key={comment.id}
-        handle={(handle) => {
-          if (handle) cards.current.set(comment.id, handle)
-          else cards.current.delete(comment.id)
-        }}
-        author={author ? { name: author.name, avatar: toSource(author.avatarUrl) } : null}
-        {...(author
-          ? {
-              authorLabel: t(($) => $.member.open, {
-                nameOf: nameOf(author.name),
-              }),
-              onAuthorPress: () =>
-                router.push({ pathname: '/members/[id]', params: { id: author.id } }),
-            }
-          : null)}
-        // R4 : « il y a 5 min », lu en entier (« 15 octobre à 11:00 ») ; une vue sur le web, que la
-        // carte pose à côté du nom, jamais dans un texte.
-        when={<RelativeTime date={comment.createdAt} />}
-        body={comment.body}
-        mentions={comment.mentions}
-        onMemberPress={openMember}
-        edited={comment.editedAt ? t(($) => $.project.comments.edited) : undefined}
-        // Le bandeau, pour les deux auteurs qui lisent encore un commentaire masqué : l'auteur du
-        // projet l'a masqué lui-même ; l'auteur du commentaire apprend que les autres ne le voient
-        // plus. Les autres ne voient qu'un emplacement, sans auteur.
-        hidden={
-          comment.state === 'hidden' && author
-            ? project.isMine
-              ? t(($) => $.project.comments.hiddenByMe)
-              : t(($) => $.project.comments.hiddenBanner)
-            : undefined
-        }
-        // Retiré par la modération (tranche 7a) : son auteur, seul à le lire encore, voit pourquoi
-        // et comment contester ; les autres, l'auteur du projet compris, un simple emplacement.
-        removed={
-          comment.state === 'removed' && author && comment.removal
-            ? removalBanner(comment.removal, t)
-            : undefined
-        }
-        // L'emplacement d'un commentaire qu'on ne lit pas. Un blocage (tranche 7b) a ses deux
-        // textes : « Commentaire d'un membre que tu as bloqué » pour qui a bloqué, « Commentaire
-        // indisponible » pour qui l'est (rien ne lui dit qu'il est bloqué). « Commentaire masqué »
-        // reste au geste de l'auteur du projet.
-        placeholder={t(($) => $.project.comments[placeholderKey[comment.state]])}
-        actions={actionsOf(comment, rootId)}
-        description={describe(comment)}
-        error={
-          hideFailed === comment.id
-            ? failure(
-                hide.reason,
-                t(($) => $.project.comments.hideError),
-                t(($) => $.errors.rateLimited),
-              )
-            : undefined
-        }
-        errorAction={hideFailed === comment.id ? failureAction(hide.reason) : undefined}
-        editor={
-          editing === comment.id ? (
-            <NoteComposer
-              open
-              onOpen={() => {}}
-              onCancel={closeEdit}
-              value={editDraft}
-              onChangeText={(text) => {
-                setEditDraft(text)
-                setEditError(undefined)
-              }}
-              onSubmit={() => void submitEdit(rootId)}
-              pending={edit.pending}
-              max={COMMENT_MAX}
-              reveal
-              mentions={mentionsFor('edit')}
-              labels={{
-                open: t(($) => $.project.comments.edit),
-                field: t(($) => $.project.comments.field),
-                hint: editHint(comment),
-                submit: t(($) => $.project.comments.editSubmit),
-                cancel: t(($) => $.common.cancel),
-              }}
-              fieldError={editError}
-              error={
-                showEditError && edit.error
-                  ? failure(
-                      edit.reason,
-                      t(($) => $.project.comments.editError),
-                    )
-                  : undefined
-              }
-              errorAction={showEditError && edit.error ? failureAction(edit.reason) : undefined}
-            />
-          ) : undefined
-        }
-        reply={reply}
-      />
-    )
+  const unroll = (target: string | null) => {
+    focusAfterUnroll.current = { shown: new Set(lines.map((line) => line.comment.id)), target }
+    setUnrolled(true)
   }
 
-  /** Le champ de la réponse en cours, s'il est ouvert dans ce fil. */
-  const composerOf = (root: Comment) =>
-    replying === root.id ? (
-      <NoteComposer
-        open
-        onOpen={() => {}}
-        onCancel={closeReply}
-        value={replyDraft}
-        onChangeText={changeReply}
-        onSubmit={() => void submitReply()}
-        pending={post.pending && postFrom === 'reply'}
-        max={COMMENT_MAX}
-        reveal
-        mentions={mentionsFor('reply')}
-        labels={{
-          open: t(($) => $.project.comments.reply),
-          field: t(($) => $.project.comments.replyField),
-          hint: isPrivate
-            ? t(($) => $.project.comments.replyHintPrivate)
-            : t(($) => $.project.comments.replyHint),
-          submit: t(($) => $.project.comments.replySubmit),
-          cancel: t(($) => $.common.cancel),
-        }}
-        fieldError={replyError}
-        error={
-          postFrom === 'reply' && post.error
-            ? // 404 : le fil n'accepte plus de réponse (racine supprimée ou masquée entre-temps).
-              post.reason === 'gone'
-              ? t(($) => $.project.comments.replyGone)
-              : failure(
-                  post.reason,
-                  t(($) => $.project.comments.replyError),
-                )
-            : undefined
-        }
-        errorAction={postFrom === 'reply' && post.error ? failureAction(post.reason) : undefined}
-      />
-    ) : null
+  // La liste vient de se dérouler par un geste : le bouton est parti avec le focus, qui va au premier
+  // commentaire nouvellement montré (ou à celui qu'on a touché). Sans liste de dépendances : la `ref`
+  // n'est posée que par ce geste, et les cartes existent une fois ce rendu posé.
+  useEffect(() => {
+    const pending = focusAfterUnroll.current
+    if (!pending || !whole) return
+    focusAfterUnroll.current = null
+    const order = threadLines(threads).map((comment) => comment.id)
+    const wanted = pending.target ? [pending.target] : order.filter((id) => !pending.shown.has(id))
+    if (!focusFirstCard(cards.current, wanted)) focusField()
+  })
 
-  /** La confirmation qui vient au bout d'un fil, s'il y en a une. */
-  const footerOf = (root: Comment) => {
-    if (!done || !('threadId' in done) || done.threadId !== root.id) return null
-    const message = {
-      replied: t(($) => $.project.comments.replyPublished),
-      saved: t(($) => $.project.comments.saved),
-      hidden: t(($) => $.project.comments.hiddenDone),
-      shown: t(($) => $.project.comments.shownDone),
-    }[done.kind]
-    // polite : une confirmation se lit sans interrompre (role « status »).
-    return <Notice tone="success" message={message} polite />
+  // --- Écrire ---------------------------------------------------------------------------------------
+
+  const changeText = (text: string) => {
+    draft.setText(text)
+    // Le texte a changé : l'ancien reproche et l'ancienne annonce ne valent plus. Vider la région
+    // fait aussi relire la même phrase au prochain envoi.
+    setInvalid(false)
+    setAnnouncement('')
   }
 
-  const thread = (root: Comment) => {
-    const replies: ReactNode[] = root.replies.map((reply) => card(reply, root.id, true))
-    // Une réponse supprimée : la confirmation prend sa place dans le fil.
-    if (deleted?.threadId === root.id && deleted.replyIndex !== null) {
-      replies.splice(deleted.replyIndex, 0, deletedNotice)
+  const send = async () => {
+    // La même règle que l'API (packages/contracts) : pas de caractères invisibles. Les textes vides ou
+    // trop longs, le champ les refuse lui-même.
+    if (!CommentText.safeParse(draft.text).success) {
+      setInvalid(true)
+      return
     }
-    return (
-      <CommentThread
-        key={root.id}
-        handle={(handle) => {
-          if (handle) threadHandles.current.set(root.id, handle)
-          else threadHandles.current.delete(root.id)
-        }}
-        root={
-          deleted?.threadId === root.id && deleted.replyIndex === null ? (
-            // La racine vient d'être supprimée ; ses réponses restent, sous l'emplacement.
-            <>
-              {card(root, root.id, false)}
-              {deletedNotice}
-            </>
-          ) : (
-            card(root, root.id, false)
-          )
-        }
-        replies={replies}
-        replyAction={
-          canReply(root)
-            ? {
-                id: 'reply',
-                label: t(($) => $.project.comments.reply),
-                icon: 'arrow-bend-up-left',
-                onPress: () => openReply(root.id),
-                // À quel commentaire on répond, pour les lecteurs d'écran (« Max : Super idée… »).
-                description: describe(root) ?? excerpt(root.body),
-              }
-            : undefined
-        }
-        composer={composerOf(root)}
-        footer={footerOf(root)}
-      />
+    setInvalid(false)
+    const { mode } = draft
+    const ok = await draft.send()
+    if (!ok) return
+    setAnnouncement(
+      mode.kind === 'reply'
+        ? t(($) => $.project.comments.replyPublished)
+        : mode.kind === 'edit'
+          ? t(($) => $.project.comments.saved)
+          : t(($) => $.project.comments.published),
     )
+    // Pour écrire la suite. `editable={false}` pendant l'envoi peut fermer le clavier sur iOS : ce
+    // focus le rouvre.
+    focusField()
   }
 
-  // --- La section -------------------------------------------------------------------------------
-
-  const threadNodes: ReactNode[] = threads.map(thread)
-  // Un fil entier supprimé : la confirmation prend sa place dans la liste (s'il en reste d'autres).
-  if (deleted && deleted.threadId === undefined && threads.length > 0) {
-    threadNodes.splice(deleted.threadIndex, 0, deletedNotice)
+  const reply = (root: Comment, target: CommentReply) => {
+    draft.startReply(root, target)
+    setInvalid(false)
+    setAnnouncement('')
+    focusField()
   }
+
+  const edit = (comment: CommentReply) => {
+    draft.startEdit(comment)
+    setInvalid(false)
+    setAnnouncement('')
+    focusField()
+  }
+
+  // Le message d'un envoi refusé : la raison, ou ce qui a raté selon le geste.
+  const reason = draft.error?.reason
+  const sendError = draft.error
+    ? draft.mode.kind === 'reply'
+      ? // 404 : le fil n'accepte plus de réponse (racine supprimée ou masquée entre-temps).
+        reason === 'gone'
+        ? t(($) => $.project.comments.replyGone)
+        : failure(
+            reason,
+            t(($) => $.project.comments.replyError),
+          )
+      : draft.mode.kind === 'edit'
+        ? failure(
+            reason,
+            t(($) => $.project.comments.editError),
+          )
+        : failure(
+            reason,
+            t(($) => $.project.comments.error),
+          )
+    : invalid
+      ? t(($) => $.project.errors.invalidCharacters)
+      : undefined
+  // « Réessayer » ne vaut que pour une panne : les autres refus se répéteraient à l'identique.
+  const sendAction = !draft.error
+    ? undefined
+    : reason === 'expired'
+      ? signInAgain(closeSheet)
+      : reason === undefined
+        ? { label: t(($) => $.common.retry), role: 'button' as const, onPress: () => void send() }
+        : undefined
+
+  // La légende dit qui lira, selon le geste et le projet (les six textes d'aujourd'hui, jur-P1).
+  const editedComment =
+    draft.mode.kind === 'edit'
+      ? threadLines(threads).find((comment) => comment.id === draft.highlightedId)
+      : undefined
+  const caption =
+    draft.mode.kind === 'reply'
+      ? isPrivate
+        ? t(($) => $.project.comments.replyHintPrivate)
+        : t(($) => $.project.comments.replyHint)
+      : draft.mode.kind === 'edit'
+        ? isPrivate
+          ? t(($) => $.project.comments.hintPrivate)
+          : editedComment?.state === 'hidden'
+            ? t(($) => $.project.comments.editHintHidden)
+            : t(($) => $.project.comments.editHint)
+        : isPrivate
+          ? t(($) => $.project.comments.hintPrivate)
+          : t(($) => $.project.comments.hint)
+
+  // Pas de `disabled` pour un suspendu : il n'a pas de champ du tout (relecture du plan, ui-I1).
+  const composer = suspended ? null : (
+    <CommentComposer
+      value={draft.text}
+      onChangeText={changeText}
+      onSend={() => void send()}
+      pending={draft.sending}
+      error={sendError}
+      errorAction={sendAction}
+      banner={
+        draft.mode.kind === 'reply'
+          ? { kind: 'reply', name: draft.mode.name }
+          : draft.mode.kind === 'edit'
+            ? { kind: 'edit' }
+            : null
+      }
+      onCancelBanner={() => {
+        draft.cancel()
+        setInvalid(false)
+      }}
+      caption={caption}
+      avatar={toSource(me.data?.avatarUrl)}
+      memberName={me.data?.name ?? session?.user.name ?? ''}
+      place={columns ? 'column' : 'sheet'}
+      suggestions={mentionable.map((member) => ({
+        id: member.id,
+        name: member.name,
+        handle: member.handle,
+        avatar: toSource(member.avatarUrl),
+      }))}
+      suggestionsFor={mentionQuery}
+      onQueryChange={setMentionQuery}
+      inputRef={inputRef}
+    />
+  )
+
+  // --- La section -----------------------------------------------------------------------------------
+
   const expired = errorKey(comments.error) === 'unauthorized'
-
-  const list = comments.isPending ? (
+  // La première page manque : on le dit, sans toucher au reste de la page. 401 : réessayer ne
+  // servirait à rien, il faut se reconnecter.
+  const trouble = comments.isPending ? (
     <Text tone="muted">{t(($) => $.project.comments.loading)}</Text>
   ) : comments.isError && threads.length === 0 ? (
-    // La première page n'a pas pu se charger : on le dit, et on propose de réessayer. Le reste
-    // de la page (le projet, son journal) reste là. 401 : réessayer ne servirait à rien, il faut
-    // se reconnecter ; pas de bouton.
     <>
       <Notice
         message={expired ? t(($) => $.states.expired) : t(($) => $.project.comments.loadError)}
-        action={expired ? signInAgain() : undefined}
+        action={expired ? signInAgain(closeSheet) : undefined}
       />
       {expired ? null : (
         <Button
@@ -742,153 +308,96 @@ export function Comments({ project }: { project: Project }) {
         />
       )}
     </>
-  ) : (
-    <>
-      {/* Le dernier commentaire vient d'être supprimé : la confirmation, puis la liste vide. */}
-      {deleted && threads.length === 0 ? deletedNotice : null}
-      <CommentList
-        state={
-          comments.isFetchingNextPage
-            ? 'loading'
-            : comments.isFetchNextPageError
-              ? 'error'
-              : comments.hasNextPage
-                ? 'more'
-                : 'end'
-        }
-        onMore={() => {
-          // Une seule demande à la fois, même après un double clic.
-          if (!comments.isFetchingNextPage) void comments.fetchNextPage()
-        }}
-        moreLabel={t(($) => $.project.comments.more)}
-        errorLabel={t(($) => $.project.comments.moreError)}
-        retryLabel={t(($) => $.common.retry)}
-        empty={t(($) => $.project.comments.empty)}
-      >
-        {threadNodes}
-      </CommentList>
-    </>
+  ) : null
+
+  const emptyLabel = isPrivate
+    ? t(($) => $.project.comments.emptyPrivate)
+    : t(($) => $.project.comments.empty)
+
+  const list = (
+    <CommentThreads
+      project={project}
+      threads={threads}
+      suspended={suspended}
+      trouble={trouble}
+      announcement={announcement}
+      announce={setAnnouncement}
+      draft={draft}
+      cards={cards}
+      onReply={reply}
+      onEdit={edit}
+      onFocusLost={focusField}
+      leave={leave}
+      emptyLabel={emptyLabel}
+    />
   )
-  const empty = !comments.isPending && threads.length === 0
+
+  const previewCardsNodes = lines.map(({ comment, kind }) => (
+    <CommentCard
+      key={comment.id}
+      handle={(handle) => {
+        if (handle) previewCards.current.set(comment.id, handle)
+        else previewCards.current.delete(comment.id)
+      }}
+      compact
+      comment={comment}
+      kind={kind}
+      isMine={comment.isMine}
+      isProjectAuthor={comment.author?.id === project.author.id}
+      menu={[]}
+      hiddenNote={null}
+      avatar={comment.author ? toSource(comment.author.avatarUrl) : null}
+      onAuthorPress={nothing}
+      onMemberPress={nothing}
+      onPress={() => (columns ? unroll(comment.id) : openSheet(comment.id, false))}
+    />
+  ))
+
+  // Le bouton de l'aperçu. Un suspendu n'écrit pas : « Voir » dès qu'il y a de quoi lire, y compris un
+  // commentaire que lui seul voit (retiré, masqué : le compteur ne le compte pas), sinon aucun bouton.
+  const action: CommentPreviewAction = columns
+    ? whole
+      ? null
+      : 'all'
+    : suspended
+      ? count > 0 || readable > 0
+        ? 'all'
+        : null
+      : count === 0
+        ? 'write'
+        : count > PREVIEW_LINES.phone
+          ? 'all'
+          : 'comment'
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" heading={2}>
-        {/* Sans commentaire, le titre seul : « (0) » n'apprend rien que la liste vide ne dise. */}
-        {project.commentCount > 0
-          ? t(($) => $.project.comments.title, { count: project.commentCount })
-          : t(($) => $.project.comments.titleNone)}
-      </Text>
-      {/* Pas encore de commentaire : l'invitation d'abord, puis le bouton qui y répond. */}
-      {empty ? list : null}
-      {/* Un compte suspendu n'écrit plus de commentaire (tranche 7c) : ni bouton, ni champ. */}
-      {suspended ? null : (
-        <NoteComposer
-          open={composing}
-          onOpen={() => {
-            setDone(null)
-            if (postFrom === 'root') setPostFrom(null)
-            setComposing(true)
-          }}
-          onCancel={() => {
-            setComposing(false)
-            setDraftError(undefined)
-            if (postFrom === 'root') setPostFrom(null)
-          }}
-          value={draft}
-          onChangeText={changeDraft}
-          onSubmit={() => void submit()}
-          pending={post.pending && postFrom === 'root'}
-          max={COMMENT_MAX}
-          mentions={mentionsFor('root')}
-          labels={{
-            open: t(($) => $.project.comments.add),
-            // Sur téléphone, « Commenter » : le nom lu reste « Écrire un commentaire ».
-            openShort: t(($) => $.project.comments.addShort),
-            field: t(($) => $.project.comments.field),
-            // L'aide dit qui lira : tous les membres, ou personne d'autre sur un projet privé.
-            hint: isPrivate
-              ? t(($) => $.project.comments.hintPrivate)
-              : t(($) => $.project.comments.hint),
-            submit: t(($) => $.project.comments.submit),
-            cancel: t(($) => $.common.cancel),
-          }}
-          fieldError={draftError}
-          error={
-            postFrom === 'root' && post.error
-              ? failure(
-                  post.reason,
-                  t(($) => $.project.comments.error),
-                )
-              : undefined
-          }
-          errorAction={postFrom === 'root' && post.error ? failureAction(post.reason) : undefined}
-          success={done?.kind === 'published' ? t(($) => $.project.comments.published) : undefined}
-        />
-      )}
-      {empty ? null : list}
-      {/* Supprimer un commentaire est définitif : une fenêtre demande confirmation. guardTaps :
-          elle s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une seconde tape trop
-          rapide n'y décide rien (design 7b). */}
-      <Dialog
-        visible={deleting !== null}
-        guardTaps
-        title={t(($) => $.project.comments.deleteTitle)}
-        // Une racine qui a des réponses ne disparaît pas tout à fait : la fenêtre le dit.
-        message={
-          deleting?.hasReplies
-            ? t(($) => $.project.comments.deleteBodyReplies)
-            : t(($) => $.project.comments.deleteBody)
-        }
-        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-        onDismiss={() => {
-          if (!removing) setDeleting(null)
-        }}
-        onClosed={() => {
-          const candidates = focusAfterClose.current
-          focusAfterClose.current = null
-          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
-          if (candidates) {
-            requestAnimationFrame(() => {
-              for (const target of candidates) {
-                const focused =
-                  'card' in target
-                    ? cards.current.get(target.card)?.focusAction(0)
-                    : threadHandles.current.get(target.thread)?.focusReply()
-                if (focused) return
-              }
-            })
-          }
-        }}
+      <CommentPreview
+        count={count}
+        action={action}
+        emptyLabel={emptyLabel}
+        // Le compteur vaut 0, mais le membre a quelque chose à lire : on dit ce qu'il va lire.
+        seeAllCount={count > 0 ? count : readable}
+        openRef={openButton}
+        onOpen={() => (columns ? unroll(null) : openSheet(null, action !== 'all'))}
       >
-        {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer. */}
-        {showDeleteError && remove.error ? (
-          <Notice
-            message={failure(
-              remove.reason,
-              t(($) => $.project.comments.deleteError),
-              t(($) => $.errors.rateLimited),
-            )}
-            action={failureAction(remove.reason, () => setDeleting(null))}
-          />
-        ) : null}
-        <Button
-          label={t(($) => $.project.comments.confirmDelete)}
-          variant="confirm"
-          onPress={() => void confirmDelete()}
-          loading={removing}
-        />
-        <Button
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => setDeleting(null)}
-          disabled={removing}
-        />
-      </Dialog>
+        {whole ? list : sheetOpen ? previewCardsNodes : (trouble ?? previewCardsNodes)}
+      </CommentPreview>
+      {columns ? (
+        composer
+      ) : (
+        <Sheet
+          open={sheetOpen}
+          onClose={closeSheet}
+          // Pendant un envoi, la feuille ne se ferme pas : l'erreur éventuelle n'aurait plus où se dire.
+          busy={draft.sending}
+          title={t(($) => $.project.comments.title)}
+          titleCount={{ count, spoken: t(($) => $.project.comments.spokenCount, { count }) }}
+          {...(openOnField ? { initialFocusRef: inputRef } : null)}
+          footer={composer}
+        >
+          {list}
+        </Sheet>
+      )}
     </Surface>
   )
 }
-
-/** Ce commentaire est une racine qui a des réponses (une réponse n'a pas de champ `replies`). */
-const hasReplies = (comment: CommentReply | Comment) =>
-  'replies' in comment && comment.replies.length > 0

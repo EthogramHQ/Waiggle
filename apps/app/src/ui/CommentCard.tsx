@@ -36,7 +36,7 @@ import { View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { Avatar } from './Avatar'
 import { ActionDescription, CommentActionButton, excerpt } from './CommentAction'
-import { focusWithoutScroll } from './focus'
+import { focusWithoutScroll, moveReaderTo } from './focus'
 import { hiddenFrame } from './HiddenHeading'
 import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
@@ -48,7 +48,6 @@ import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
-import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 export type { ActionMenuItem } from './ActionMenu'
@@ -59,6 +58,8 @@ export type CommentCardHandle = {
   focusMenu: () => boolean
   /** Vrai si le focus a pu être posé (la carte a « Répondre »). */
   focusReply: () => boolean
+  /** Vrai si le focus a pu être posé (la carte `compact`, qui est un seul bouton). */
+  focusCard: () => boolean
 }
 
 /** Qui a masqué le commentaire, vu par celui qui regarde : lui-même, ou l'auteur du projet. */
@@ -156,10 +157,14 @@ export const plainCommentText = (text: string, mentions: readonly Mention[]) => 
     .join('')
 }
 
-/** Pose le focus sur la vue d'une `ref`, sans faire défiler ; faux s'il n'y en a pas. */
+/**
+ * Pose le focus sur la vue d'une `ref`, sans faire défiler, et y amène le lecteur d'écran sur
+ * téléphone ; faux s'il n'y en a pas.
+ */
 const focusOn = (ref: RefObject<View | null>) => {
   if (!ref.current) return false
   focusWithoutScroll(ref.current)
+  moveReaderTo(ref.current)
   return true
 }
 
@@ -187,16 +192,17 @@ export function CommentCard({
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
-  const { sizeClass } = useLayout()
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie
   // « Répondre » et « … » à la description du commentaire qu'ils concernent.
   const descriptionId = useId()
   const menuRef = useRef<View>(null)
   const replyRef = useRef<View>(null)
+  const cardRef = useRef<View>(null)
   // useImperativeHandle : ce que l'écran reçoit dans `handle`, à la place de la vue elle-même.
   useImperativeHandle(handle, () => ({
     focusMenu: () => focusOn(menuRef),
     focusReply: () => focusOn(replyRef),
+    focusCard: () => focusOn(cardRef),
   }))
 
   const { author } = comment
@@ -308,6 +314,7 @@ export function CommentCard({
     // simple (aucun lien dans un bouton). Toucher n'importe où ouvre la feuille.
     return (
       <Pressed
+        ref={cardRef}
         label={t(($) => $.project.comments.openLine, { name: author.name, excerpt: short })}
         onPress={onPress ?? (() => {})}
         radius="small"
@@ -334,10 +341,11 @@ export function CommentCard({
     )
   }
 
-  // Sur un écran large, le texte s'aligne sous le nom, pas sous la photo ; sur téléphone, il
-  // repart du bord : la place gagnée garde des lignes lisibles, même en retrait sous un fil et
-  // avec un texte agrandi.
-  const indent = sizeClass === 'compact' ? 0 : size + space.sm
+  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`) :
+  // le trait des réponses descend de la photo sans jamais passer sous le texte.
+  const indent = size + space.sm
+  const piece = { paddingLeft: indent }
+  const nextPiece = { paddingLeft: indent, marginTop: space.xs }
   const described = t(($) => $.project.comments.about, { name: author.name, text: short })
   const hidden =
     hiddenNote === 'byYou'
@@ -398,39 +406,44 @@ export function CommentCard({
           />
         ) : null}
       </View>
-      <View style={{ paddingLeft: indent, gap: space.xs }}>
-        {hidden ? (
-          <View style={{ gap: space.xxs }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                alignSelf: 'flex-start',
-                maxWidth: '100%',
-                gap: space.xs,
-                paddingHorizontal: space.sm,
-                paddingVertical: space.xxs,
-                borderRadius: radii.pill,
-                // Sur le fond gris des siens, la pastille prend le blanc de la carte : elle se voit.
-                backgroundColor: isMine && !highlighted ? colors.surface : colors.surfaceGrouped,
-              }}
-            >
-              <Icon name="eye-slash" size={16} tone="muted" />
-              <View style={{ flexShrink: 1 }}>
-                <Text variant="caption" weight={600} tone="muted">
-                  {hidden.label}
-                </Text>
-              </View>
+      {/* Le corps : chaque morceau est un enfant direct de la carte, à côté de la rangée du haut. */}
+      {hidden ? (
+        <View style={[piece, { gap: space.xxs }]}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              maxWidth: '100%',
+              gap: space.xs,
+              paddingHorizontal: space.sm,
+              paddingVertical: space.xxs,
+              borderRadius: radii.pill,
+              // Sur le fond gris des siens, la pastille prend le blanc de la carte : elle se voit.
+              backgroundColor: isMine && !highlighted ? colors.surface : colors.surfaceGrouped,
+            }}
+          >
+            <Icon name="eye-slash" size={16} tone="muted" />
+            <View style={{ flexShrink: 1 }}>
+              <Text variant="caption" weight={600} tone="muted">
+                {hidden.label}
+              </Text>
             </View>
-            <Text variant="caption" tone="muted">
-              {hidden.note}
-            </Text>
           </View>
-        ) : null}
-        {removed ? <RemovalNotice title={removed.title} lines={removed.lines} compact /> : null}
-        {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText). Au-delà de
+          <Text variant="caption" tone="muted">
+            {hidden.note}
+          </Text>
+        </View>
+      ) : null}
+      {removed ? (
+        <View style={hidden ? nextPiece : piece}>
+          <RemovalNotice title={removed.title} lines={removed.lines} compact />
+        </View>
+      ) : null}
+      {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText). Au-delà de
             10 lignes, il se replie : ReadMore lui donne le nombre de lignes à montrer, et
             « Lire la suite » est décrit comme « Répondre » et « … ». */}
+      <View style={hidden || removed ? nextPiece : piece}>
         <ReadMore lines={COMMENT_FOLD_LINES} hint={described}>
           {(numberOfLines) => (
             <MentionText
@@ -441,46 +454,51 @@ export function CommentCard({
             />
           )}
         </ReadMore>
-        {onReply || (hidden && onUnhide) ? (
-          // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
-          // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt.
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              columnGap: space.xs,
-              marginLeft: -space.sm,
-            }}
-          >
-            {onReply ? (
-              <CommentActionButton
-                ref={replyRef}
-                action={{
-                  label: t(($) => $.project.comments.reply),
-                  icon: 'arrow-bend-up-left',
-                  onPress: onReply,
-                }}
-                describedById={descriptionId}
-                hint={described}
-              />
-            ) : null}
-            {hidden && onUnhide ? (
-              <CommentActionButton
-                action={{
-                  // Le nom lu est le texte affiché (« Démasquer ») ; la description dit lequel.
-                  label: t(($) => $.project.comments.unhideShort),
-                  icon: 'eye',
-                  pending: unhiding,
-                  onPress: onUnhide,
-                }}
-                describedById={descriptionId}
-                hint={described}
-              />
-            ) : null}
-          </View>
-        ) : null}
-        {error ? <Notice message={error} action={errorAction} /> : null}
       </View>
+      {onReply || (hidden && onUnhide) ? (
+        // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
+        // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt.
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            columnGap: space.xs,
+            marginTop: space.xs,
+            marginLeft: indent - space.sm,
+          }}
+        >
+          {onReply ? (
+            <CommentActionButton
+              ref={replyRef}
+              action={{
+                label: t(($) => $.project.comments.reply),
+                icon: 'arrow-bend-up-left',
+                onPress: onReply,
+              }}
+              describedById={descriptionId}
+              hint={described}
+            />
+          ) : null}
+          {hidden && onUnhide ? (
+            <CommentActionButton
+              action={{
+                // Le nom lu est le texte affiché (« Démasquer ») ; la description dit lequel.
+                label: t(($) => $.project.comments.unhideShort),
+                icon: 'eye',
+                pending: unhiding,
+                onPress: onUnhide,
+              }}
+              describedById={descriptionId}
+              hint={described}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {error ? (
+        <View style={nextPiece}>
+          <Notice message={error} action={errorAction} />
+        </View>
+      ) : null}
     </View>
   )
 }
