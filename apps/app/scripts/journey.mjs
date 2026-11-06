@@ -63,6 +63,9 @@ const fail = (text) => {
  */
 const byRole = (scope, role, name, options = {}) =>
   scope.getByRole(role, name === undefined ? options : { exact: true, ...options, name })
+/** R5b : ce membre passe sur un téléphone (la feuille des commentaires), puis revient à l'ordinateur. */
+const asPhone = (page) => page.setViewportSize({ width: 390, height: 844 })
+const asDesktop = (page) => page.setViewportSize({ width: 1280, height: 900 })
 const expectEqual = (what, actual, expected) => {
   if (actual !== expected) fail(`${what} : attendu ${expected}, obtenu ${actual}`)
   console.log(`  ok : ${what} (${actual})`)
@@ -628,18 +631,25 @@ try {
   await open(sam.page, `${appUrl}/`)
   await sam.page.getByText('1 réaction', { exact: true }).waitFor()
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  // exact : le texte est aussi repris, en tête « Sam : », dans la description cachée des boutons du
-  // commentaire (aria-describedby) ; sans exact, la recherche en trouverait trois.
-  // Tranche 6b : Sam mentionne Léa. Il tape « @ » et le début de son pseudo, choisit Léa dans la
-  // liste proposée (l'appli écrit « @pseudo » et une espace), puis finit sa phrase.
-  const samSays = `Testé ce soir, @${handle} une soupe parfaite.`
+  // R5b : Sam commente depuis un téléphone. Aucun commentaire encore : le bouton ouvre la feuille,
+  // le champ prêt à écrire. Il mentionne Léa par la suggestion, trouvée par le début de son nom
+  // (« @Le » ; l'appli écrit « @pseudo » et une espace), puis finit sa phrase.
+  const samSays = 'une soupe parfaite.'
+  await asPhone(sam.page)
   await byRole(sam.page, 'button', 'Écrire un commentaire').click()
-  const samField = sam.page.getByLabel('Ton commentaire')
-  await samField.fill(`Testé ce soir, @${handle.slice(0, 4)}`)
-  await byRole(sam.page, 'option', `Lea, @${handle}`).click()
-  await samField.pressSequentially('une soupe parfaite.')
-  await byRole(sam.page, 'button', 'Publier le commentaire').click()
-  await sam.page.getByText('Commentaire publié.').waitFor()
+  const samField = sam.page.getByLabel('Écrire un commentaire')
+  await samField.fill('Testé ce soir, @Le')
+  await byRole(sam.page, 'option', new RegExp(`^Lea, @${handle}`)).click()
+  await samField.pressSequentially(samSays)
+  await byRole(sam.page, 'button', 'Envoyer le commentaire').click()
+  // L'avis n'est que lu par les lecteurs d'écran : c'est le commentaire qui apparaît, dans la feuille.
+  await sam.page.getByText(samSays, { exact: false }).first().waitFor()
+  await waitFor(
+    'commentaire de Sam enregistré',
+    async () => (await readProject(lea, projectId)).commentCount === 1,
+  )
+  await byRole(sam.page, 'button', 'Fermer').click()
+  await asDesktop(sam.page)
 
   step('Léa voit la cloche, puis la notification de la mention, qui mène au projet')
   // Le nombre n'est relu que chaque minute : on recharge l'accueil pour le lire tout de suite.
@@ -649,23 +659,25 @@ try {
     .click()
   await byRole(lea.page, 'link', /Sam parle de toi dans un commentaire/).click()
   await lea.page.waitForURL(`**/projects/${projectId}`)
-  // Dans le texte publié, la mention est un lien vers la page de Léa.
-  await byRole(lea.page, 'link', `@${handle}`).waitFor()
+  // Dans le texte publié, la mention est une pastille : un lien vers la page de Léa, lu par son nom.
+  await byRole(lea.page, 'link', 'Lea, ouvre son profil').waitFor()
   const unread = await (await lea.request.get(`${apiUrl}/v1/notifications/unread`)).json()
   expectEqual('nouveautés après la visite', unread.count, 0)
   await byRole(lea.page, 'button', 'Répondre').click()
-  await lea.page.getByLabel('Ta réponse').fill('Merci Sam, la version dessert arrive.')
-  await byRole(lea.page, 'button', 'Publier la réponse').click()
-  await lea.page.getByText('Réponse publiée.').waitFor()
-  // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer.
-  await byRole(lea.page, 'button', 'Masquer le commentaire').click()
-  // C'est elle qui l'a masqué : son bandeau le dit ainsi ; Sam lit « Masqué par la personne qui a publié le projet ».
+  await lea.page.getByText(/Réponse à\s*Sam/).waitFor()
+  await lea.page.getByLabel('Écrire un commentaire').fill('Merci Sam, la version dessert arrive.')
+  await byRole(lea.page, 'button', 'Envoyer le commentaire').click()
+  await lea.page.getByText('Merci Sam, la version dessert arrive.', { exact: true }).waitFor()
+  // Sa propre réponse, Léa la supprimerait ; celui de Sam, elle peut le masquer, par le menu « … ».
+  await byRole(lea.page, 'button', 'Actions du commentaire de Sam').click()
+  await byRole(lea.page, 'menuitem', 'Masquer').click()
+  // C'est elle qui l'a masqué : sa pastille le dit ainsi ; Sam lit « Masqué par l'auteur du projet ».
   await lea.page.getByText('Masqué par toi').waitFor()
   // Un commentaire masqué ne compte plus : reste la réponse de Léa.
   expectEqual('commentaires comptés', (await readProject(lea, projectId)).commentCount, 1)
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await sam.page.getByText('Masqué par la personne qui a publié le projet').waitFor()
-  await sam.page.getByText(samSays, { exact: true }).waitFor()
+  await sam.page.getByText('Masqué par l’auteur du projet').waitFor()
+  await sam.page.getByText(samSays, { exact: false }).first().waitFor()
   console.log('  ok : Sam voit son commentaire, marqué « masqué »')
   expectEqual(
     'commentaires, sans compte',
@@ -769,23 +781,13 @@ try {
   step('Sam publie un second commentaire ; Malik le signale')
   const spam = 'Gagne 500 € par jour depuis chez toi, écris-moi en privé.'
   await open(sam.page, `${appUrl}/projects/${projectId}`)
-  await byRole(sam.page, 'button', 'Écrire un commentaire').click()
-  await sam.page.getByLabel('Ton commentaire').fill(spam)
-  await byRole(sam.page, 'button', 'Publier le commentaire').click()
-  await sam.page.getByText('Commentaire publié.').waitFor()
+  await sam.page.getByLabel('Écrire un commentaire').fill(spam)
+  await byRole(sam.page, 'button', 'Envoyer le commentaire').click()
+  await sam.page.getByText(spam, { exact: true }).waitFor()
   await open(malik.page, `${appUrl}/projects/${projectId}`)
-  // La réponse de Léa a aussi son « Signaler » : on prend le bouton de la carte du commentaire de
-  // Sam, c'est-à-dire le plus petit bloc qui contient à la fois son texte et un « Signaler » (les
-  // blocs sont rangés du plus grand au plus petit dans la page : le dernier est la carte).
-  await byRole(
-    malik.page
-      .locator('div')
-      .filter({ has: malik.page.getByText(spam, { exact: true }) })
-      .filter({ has: byRole(malik.page, 'button', 'Signaler') })
-      .last(),
-    'button',
-    'Signaler',
-  ).click()
+  // Le premier commentaire de Sam est masqué : pour Malik, il ne reste que celui-ci à son nom.
+  await byRole(malik.page, 'button', 'Actions du commentaire de Sam').click()
+  await byRole(malik.page, 'menuitem', 'Signaler').click()
   await malik.page.waitForURL(/\/report\?/)
   // La page vise bien le commentaire de Sam : son identifiant, lu par l'API, est celui de l'adresse.
   // Et elle le montre (le dernier exemplaire du texte : la page du projet, sous celle-ci dans la
@@ -902,9 +904,9 @@ try {
     'button',
     'Répondre',
   ).click()
-  await lea.page.getByLabel('Ta réponse').fill(leaAnswer)
-  await byRole(lea.page, 'button', 'Publier la réponse').click()
-  await lea.page.getByText('Réponse publiée.').waitFor()
+  await lea.page.getByLabel('Écrire un commentaire').fill(leaAnswer)
+  await byRole(lea.page, 'button', 'Envoyer le commentaire').click()
+  await lea.page.getByText(leaAnswer, { exact: true }).waitFor()
   console.log('  ok : Léa a répondu au commentaire signalé')
 
   step('Un administrateur ouvre « Modération » depuis ses réglages, et retire le commentaire')
