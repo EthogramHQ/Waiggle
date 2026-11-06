@@ -111,6 +111,9 @@ export function CommentComposer({
   const sendControl = useRef<View>(null)
   // useTapGuard : une `ref`, car la seconde tape arrive avant que l'écran ait pu passer `pending`.
   const guard = useTapGuard()
+  // La sienne pour l'action sous le message : « Réessayer » suit un envoi raté de près, et ce n'est
+  // pas la seconde tape de la flèche, posée ailleurs ; seule sa propre double tape se garde.
+  const actionGuard = useTapGuard()
   // useId : des identifiants stables, qui relient le champ aux textes qui le décrivent (web).
   const bannerId = useId()
   const tooLongId = useId()
@@ -204,7 +207,7 @@ export function CommentComposer({
               ...action,
               // Pendant un nouvel envoi, et sur une double tape, « Réessayer » ne renvoie rien.
               onPress: () => {
-                if (!pending) guard(action.onPress)()
+                if (!pending) actionGuard(action.onPress)()
               },
             }
           }

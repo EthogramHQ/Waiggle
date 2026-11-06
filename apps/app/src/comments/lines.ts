@@ -40,6 +40,14 @@ export function previewLines(items: Comment[], max: number): PreviewLine[] {
 }
 
 /**
+ * Tous les commentaires, dans l'ordre de la feuille : chaque fil, puis ses réponses, emplacements
+ * compris (où poser le focus après une suppression, ce que le membre peut lire).
+ */
+export function threadLines(items: Comment[]): CommentReply[] {
+  return items.flatMap((root) => [root, ...root.replies])
+}
+
+/**
  * Le début du champ quand on répond à `target` : « @pseudo » et une espace pour la réponse d'un
  * autre membre, afin qu'on sache à qui l'on répond. Rien pour une racine (la réponse va à son propre
  * fil), pour sa propre réponse, ni pour un auteur sans pseudo (lu malgré un blocage : l'API ne le

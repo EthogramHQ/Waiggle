@@ -317,7 +317,8 @@ export function Text({
       // Un parent qui compte les lignes (ReadMore, sur téléphone) : voir textLayout.ts.
       {...(onTextLayout ? { onTextLayout } : null)}
     >
-      {onTextLayout ? (
+      {/* Un texte simple n'a pas de texte imbriqué à protéger : pas de contexte pour rien. */}
+      {onTextLayout && typeof children !== 'string' ? (
         <TextLayoutContext.Provider value={null}>{children}</TextLayoutContext.Provider>
       ) : (
         children

@@ -14,7 +14,7 @@
 // Le bouton est donné à `openRef` : la feuille, en se fermant, y rend le focus (sinon il
 // retomberait en haut de la page).
 import { space } from '@ruche/brand'
-import type { ReactNode, Ref } from 'react'
+import { Children, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from './Button'
@@ -27,6 +27,13 @@ export type CommentPreviewAction = 'all' | 'comment' | 'write' | null
 type Props = {
   /** Le nombre de commentaires du projet (`Project.commentCount`), pour le titre et « Voir les N ». */
   count: number
+  /**
+   * Le nombre lu dans « Voir les N », s'il diffère du titre : un suspendu dont le seul commentaire est
+   * retiré a de quoi lire, le compteur du projet ne le compte pas.
+   */
+  seeAllCount?: number
+  /** La phrase sans commentaire ; par défaut « Aucun commentaire pour l'instant. ». */
+  emptyLabel?: string
   /** Le bouton sous les lignes (voir plus haut). */
   action: CommentPreviewAction
   /** Ouvre la feuille des commentaires (sur ordinateur, déroule la liste en place). */
@@ -37,10 +44,21 @@ type Props = {
   children?: ReactNode
 }
 
-export function CommentPreview({ count, action, onOpen, openRef, children }: Props) {
+export function CommentPreview({
+  count,
+  seeAllCount = count,
+  emptyLabel,
+  action,
+  onOpen,
+  openRef,
+  children,
+}: Props) {
   const { t } = useTranslation()
+  // Children.toArray retire les « rien » : sans ligne à montrer, la phrase prend leur place, quoi que
+  // dise le nombre (l'écran peut aussi donner autre chose : un chargement, une panne, la liste).
+  const hasLines = Children.toArray(children).length > 0
   const labels = {
-    all: t(($) => $.project.comments.seeAll, { count }),
+    all: t(($) => $.project.comments.seeAll, { count: seeAllCount }),
     comment: t(($) => $.project.comments.addShort),
     write: t(($) => $.project.comments.add),
   }
@@ -52,11 +70,11 @@ export function CommentPreview({ count, action, onOpen, openRef, children }: Pro
         spokenCount={t(($) => $.project.comments.spokenCount, { count })}
         separator="space"
       />
-      {count === 0 ? (
-        <Text tone="secondary">{t(($) => $.project.comments.empty)}</Text>
-      ) : (
+      {hasLines ? (
         <View style={{ gap: space.md }}>{children}</View>
-      )}
+      ) : count === 0 ? (
+        <Text tone="secondary">{emptyLabel ?? t(($) => $.project.comments.empty)}</Text>
+      ) : null}
       {action === null ? null : (
         // Rangé à gauche, comme le titre ; le cadre étiré garde au bouton toute la largeur pour
         // passer à la ligne à 200 % de texte (alignItems seul le bornerait à son plus long mot).

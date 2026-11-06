@@ -50,6 +50,12 @@ type Props = {
    */
   footer?: ReactNode
   /**
+   * Le fil est un élément de liste (par défaut). Faux quand `CommentList` pose déjà cet élément autour
+   * de lui : un élément dans un élément est du HTML invalide (voir plus haut), et la liste compterait
+   * deux fois chaque fil.
+   */
+  listItem?: boolean
+  /**
    * Retirés en R5b : « Répondre » est dans chaque carte (`CommentCard onReply`), et le champ en bas
    * de la feuille (`CommentComposer`). `never` refuse toute valeur, une erreur de typage par
    * propriété : un écran qui les passe encore se voit à la compilation.
@@ -77,7 +83,7 @@ function Line({ style }: { style: ViewStyle }) {
   )
 }
 
-export function CommentThread({ root, replies, footer }: Props) {
+export function CommentThread({ root, replies, footer, listItem = true }: Props) {
   const { colors } = useTheme()
   // Children.toArray retire les « rien » (null, false) : sans réponse, ni liste vide ni trait.
   const items = Children.toArray(replies)
@@ -86,7 +92,7 @@ export function CommentThread({ root, replies, footer }: Props) {
   const ink = colors.line
 
   return (
-    <View role="listitem" style={{ gap: GAP.first }}>
+    <View {...(listItem ? { role: 'listitem' as const } : null)} style={{ gap: GAP.first }}>
       {/* zIndex: 0 fait de chaque bloc sa propre pile : le trait (zIndex -1) passe sous la carte,
           mais reste au-dessus du fond de la page. */}
       <View style={{ zIndex: 0 }}>
