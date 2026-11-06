@@ -76,7 +76,7 @@ describe('ProjectScreen headings', () => {
       await renderWithProviders(<ProjectScreen id={recipesProject.id} />)
       await screen.findByRole('header', { name: 'Mon agent de recettes' })
 
-      const tagNamed = (name: string) => tagOf(screen.getByRole('header', { name }).props)
+      const tagNamed = (name: string | RegExp) => tagOf(screen.getByRole('header', { name }).props)
       const tags = screen.getAllByRole('header').map((heading) => tagOf(heading.props))
 
       // Un seul titre de niveau 1 : celui du projet, le premier de la page.
@@ -84,7 +84,8 @@ describe('ProjectScreen headings', () => {
       expect(tags.filter((tag) => tag === 'h1')).toHaveLength(1)
       expect(tagNamed('Mon agent de recettes')).toBe('h1')
       expect(tagNamed('Description')).toBe('h2')
-      expect(tagNamed('Commentaires')).toBe('h2')
+      // Le titre lu porte son nombre (« Commentaires, 2 commentaires », R5b, ui-I3).
+      expect(tagNamed(/^Commentaires/)).toBe('h2')
       expect(tagNamed('La recette')).toBe('h2')
       // « ## Comment ça marche », écrit par le membre : sous la section « Description ».
       expect(tagNamed('Comment ça marche')).toBe('h3')

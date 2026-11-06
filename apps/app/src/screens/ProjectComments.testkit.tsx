@@ -65,7 +65,9 @@ export const sixThreads: Comment[] = Array.from({ length: 6 }, (_, index) =>
 
 /** Le nom d'une carte compacte de l'aperçu : « Commentaire de Max : Super idée… » (ui-B7). */
 export const lineOf = (name: string, start: string) =>
-  new RegExp(`^Commentaire de ${name} : ${escapeRegExp(start)}`)
+  // `\s` : le « : » français a une espace insécable devant et une espace après ; `previewNames` et le
+  // suivi du focus lisent le nom brut, sans la normalisation des requêtes par rôle.
+  new RegExp(`^Commentaire de ${name}\\s:\\s${escapeRegExp(start)}`)
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
