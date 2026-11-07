@@ -76,6 +76,11 @@ type Props = {
   isProjectAuthor: boolean
   /** Le commentaire visé par une réponse ou une modification en cours : le miel pâle. */
   highlighted?: boolean
+  /**
+   * Le projet est privé : un emplacement `hidden` est gardé, personne ne l'a masqué (l'API rend ce
+   * même état pour le commentaire d'un autre sur un projet devenu privé). Il le dit (décision 22).
+   */
+  keptWhilePrivate?: boolean
   /** L'aperçu sous le projet : un seul bouton (`onPress`), sans lien ni action dedans. */
   compact?: boolean
   /** Les actions du menu « … » ; vide : pas de « … ». */
@@ -174,6 +179,7 @@ export function CommentCard({
   isMine,
   isProjectAuthor,
   highlighted = false,
+  keptWhilePrivate = false,
   compact = false,
   menu,
   onReply,
@@ -227,6 +233,8 @@ export function CommentCard({
     // ne se replie pas sans eux (react-native-web lui donne flexShrink 0).
     const placeholder =
       comment.state === 'visible' ? PLACEHOLDERS.deleted : PLACEHOLDERS[comment.state]
+    const phrase =
+      comment.state === 'hidden' && keptWhilePrivate ? 'privateKeptPlaceholder' : placeholder.text
     return (
       <View
         style={{
@@ -241,7 +249,7 @@ export function CommentCard({
         </View>
         <View style={{ flex: 1, flexShrink: 1, minWidth: 0 }}>
           <Text variant="callout" tone="muted">
-            {t(($) => $.project.comments[placeholder.text])}
+            {t(($) => $.project.comments[phrase])}
           </Text>
         </View>
       </View>

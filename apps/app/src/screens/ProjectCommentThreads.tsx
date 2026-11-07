@@ -59,18 +59,24 @@ export const focusFirstCard = (cards: CommentCards, ids: readonly string[]) =>
 type Props = {
   project: Project
   threads: Comment[]
-  suspended: boolean
+  /** Le membre lit sans écrire (compte suspendu, projet retiré) : ni « Répondre », ni « Modifier ». */
+  readOnly: boolean
   /** La première page manque (chargement, panne) : ce qu'il faut montrer à la place des fils. */
   trouble: ReactNode
-  /** Ce que la région annonce : lu, jamais montré (décisions de Louis du 6/11). */
-  announcement: string
+  /**
+   * Ce que la région de la feuille annonce : lu, jamais montré (décisions de Louis du 6/11). `null` :
+   * pas de région ici, l'écran porte la sienne (la colonne, où la liste n'est pas toujours montée).
+   * Dans la feuille, elle est ici et nulle part ailleurs : hors d'une fenêtre `aria-modal`, elle ne
+   * serait pas lue.
+   */
+  announcement: string | null
   announce: (message: string) => void
   draft: ReturnType<typeof useCommentDraft>
   cards: RefObject<CommentCards>
   /** « Répondre » et « Modifier » touchés : le champ prend le geste et le focus. */
   onReply: (root: Comment, target: CommentReply) => void
   onEdit: (comment: CommentReply) => void
-  /** Rien de voisin où poser le focus : le champ, s'il y en a un. */
+  /** Rien de voisin où poser le focus : l'écran sait où il va (le champ, sinon le titre). */
   onFocusLost: () => void
   /** Quitter la page : la feuille se ferme d'abord, sinon elle resterait par-dessus (ui-B2). */
   leave: (go: () => void) => void
@@ -81,7 +87,7 @@ type Props = {
 export function CommentThreads({
   project,
   threads,
-  suspended,
+  readOnly,
   trouble,
   announcement,
   announce,
@@ -195,8 +201,8 @@ export function CommentThreads({
     }
     if (comment.isMine) {
       // Son commentaire retiré par la modération : l'API refuserait de le modifier (409 `removed`),
-      // il peut encore le supprimer. Un compte suspendu ne modifie plus non plus.
-      return comment.state === 'removed' || suspended
+      // il peut encore le supprimer. Sans champ (compte suspendu, projet retiré), rien à modifier.
+      return comment.state === 'removed' || readOnly
         ? [deleteItem]
         : [
             {
@@ -234,9 +240,9 @@ export function CommentThreads({
     const { author } = comment
     // Pas de « Répondre » dans un fil dont la racine n'est pas visible (supprimée, masquée, retirée,
     // bloquée, indisponible : décision de Louis du 5/11), ni sous un commentaire qui ne l'est pas,
-    // ni depuis un compte suspendu.
+    // ni sans champ où écrire (compte suspendu, projet retiré).
     const canReply =
-      !suspended &&
+      !readOnly &&
       root.state === 'visible' &&
       root.author !== null &&
       comment.state === 'visible' &&
@@ -254,6 +260,7 @@ export function CommentThreads({
         isMine={comment.isMine}
         isProjectAuthor={author?.id === project.author.id}
         highlighted={draft.highlightedId === comment.id}
+        keptWhilePrivate={project.visibility === 'private'}
         menu={menuOf(comment)}
         {...(canReply ? { onReply: () => onReply(root, comment) } : null)}
         // Les deux qui lisent encore un commentaire masqué : l'auteur du projet, qui l'a masqué, et
@@ -294,7 +301,7 @@ export function CommentThreads({
     <>
       {/* Toujours montée, vide plutôt qu'absente : un lecteur d'écran n'annonce que ce qui change
           dans une région qu'il connaît déjà. Lue, jamais montrée : le geste se voit déjà. */}
-      <LiveStatus message={announcement} visible={false} />
+      {announcement === null ? null : <LiveStatus message={announcement} visible={false} />}
       {trouble ?? (
         <CommentList
           state={

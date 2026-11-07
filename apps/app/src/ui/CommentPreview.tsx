@@ -8,17 +8,20 @@
 // - `write` : « Écrire un commentaire », qui ouvre la feuille le champ prêt ;
 // - `null` : pas de bouton (sur ordinateur, 5 commentaires ou moins : le champ est déjà dans la
 //   colonne, relecture de l'interface ui-I4).
-// Sans commentaire, « Aucun commentaire pour l'instant. » prend la place des lignes, et le titre
-// n'a pas de nombre.
+// Sans rien à lire, « Aucun commentaire pour l'instant. » prend la place des lignes, et le titre
+// n'a pas de nombre. Un compteur à 0 ne suffit pas à le dire : il ne compte ni le commentaire retiré
+// de son auteur, ni celui qu'il a masqué (`seeAllCount`, décision 22 du scénario).
 //
 // Le bouton est donné à `openRef` : la feuille, en se fermant, y rend le focus (sinon il
-// retomberait en haut de la page).
+// retomberait en haut de la page). Le titre est donné à `titleRef`, pour la même raison, quand il
+// ne reste rien d'autre à focaliser dans la section.
 import { space } from '@ruche/brand'
 import { Children, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
+import type { Focusable } from './focus'
 import { Text } from './Text'
 
 /** Le bouton sous l'aperçu ; `null` : aucun. */
@@ -40,6 +43,8 @@ type Props = {
   onOpen: () => void
   /** La `ref` du bouton, où la feuille rend le focus en se fermant. */
   openRef?: Ref<View>
+  /** La `ref` du titre, pour y poser le focus quand rien d'autre ne peut le prendre. */
+  titleRef?: Ref<Focusable>
   /** Les premières lignes de la feuille (des `CommentCard compact`), dans l'ordre. */
   children?: ReactNode
 }
@@ -51,6 +56,7 @@ export function CommentPreview({
   action,
   onOpen,
   openRef,
+  titleRef,
   children,
 }: Props) {
   const { t } = useTranslation()
@@ -69,10 +75,11 @@ export function CommentPreview({
         count={count}
         spokenCount={t(($) => $.project.comments.spokenCount, { count })}
         separator="space"
+        {...(titleRef ? { focusRef: titleRef } : null)}
       />
       {hasLines ? (
         <View style={{ gap: space.md }}>{children}</View>
-      ) : count === 0 ? (
+      ) : count === 0 && seeAllCount === 0 ? (
         <Text tone="secondary">{emptyLabel ?? t(($) => $.project.comments.empty)}</Text>
       ) : null}
       {action === null ? null : (

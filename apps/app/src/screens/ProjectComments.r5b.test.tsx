@@ -302,7 +302,10 @@ describe('a suspended member (decision 3 of 6/11)', () => {
     ])
     await renderComments(counted(0))
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Voir le commentaire' }))
+    // jur-J2 : « Aucun commentaire » serait faux, il en a un à lire.
+    const see = await screen.findByRole('button', { name: 'Voir le commentaire' })
+    expect(screen.queryByText('Aucun commentaire pour l’instant.')).toBeNull()
+    await fireEvent.press(see)
 
     expect(sheet().getByText('Super idée, je teste ce soir.')).toBeTruthy()
     expect(queryCommentField()).toBeNull()

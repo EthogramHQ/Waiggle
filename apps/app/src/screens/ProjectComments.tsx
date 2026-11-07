@@ -11,7 +11,12 @@
 // l'appareil (`useCommentDraft`). La liste et ses gestes sont dans ProjectCommentThreads.tsx.
 //
 // Le focus du clavier ne se perd jamais : la feuille le rend à ce qui l'a ouverte, « Répondre » et
-// « Modifier » le posent dans le champ, un envoi l'y garde, une suppression l'envoie à la carte voisine.
+// « Modifier » le posent dans le champ, un envoi l'y garde, une suppression l'envoie à la carte voisine,
+// « Réessayer » à la première carte une fois les commentaires lus. Plus rien à côté : le champ, sinon
+// le titre de la section.
+//
+// Qui n'écrit pas : un compte suspendu, et tout le monde sur un projet retiré par la modération (l'API
+// refuse, 409). Ni champ, ni audience, ni « Écrire » ; mais « Voir » s'il y a de quoi lire.
 import { type Comment, type CommentReply, CommentText, type Project } from '@ruche/contracts'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -30,6 +35,7 @@ import { CommentCard } from '../ui/CommentCard'
 import { CommentComposer } from '../ui/CommentComposer'
 import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
+import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
 import { Sheet } from '../ui/Sheet'
 import { Surface } from '../ui/Surface'
@@ -62,6 +68,9 @@ export function Comments({ project }: { project: Project }) {
   const me = useMe(Boolean(session), { retryOnMount: false })
   const count = project.commentCount
   const isPrivate = project.visibility === 'private'
+  // Retiré par la modération : son auteur le lit encore, mais rien ne s'y ajoute (décision 22).
+  const closed = project.removal !== null
+  const readOnly = suspended || closed
   const threads: Comment[] = comments.data?.pages.flatMap((page) => page.items) ?? []
 
   // La feuille (téléphone) : ouverte ou non, et si elle s'ouvre le champ prêt.
@@ -82,6 +91,9 @@ export function Comments({ project }: { project: Project }) {
   // avant même l'API (des caractères invisibles).
   const [announcement, setAnnouncement] = useState('')
   const [invalid, setInvalid] = useState(false)
+  // « Réessayer » relit la première page, et où va le focus une fois qu'il a fini.
+  const [retrying, setRetrying] = useState(false)
+  const focusAfterRetry = useRef(false)
   // La mention en cours de frappe (« @in »), repliée : `useMentionable` y répond toujours, et le champ
   // ne montre que les suggestions de cette recherche-là (`suggestionsFor`).
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -89,11 +101,25 @@ export function Comments({ project }: { project: Project }) {
 
   const inputRef = useRef<TextFieldInput>(null)
   const openButton = useRef<Focusable>(null)
+  const titleRef = useRef<Focusable>(null)
   const cards = useRef<CommentCards>(new Map())
   const previewCards = useRef<CommentCards>(new Map())
 
   /** Le champ prend le focus ; le navigateur le fait venir à l'écran, le clavier s'ouvre sur téléphone. */
   const focusField = () => inputRef.current?.focus()
+
+  /**
+   * Plus rien de voisin où poser le focus : le champ, s'il y en a un ; sinon le titre de la section.
+   * Pas dans une feuille sans champ : le titre serait hors de la fenêtre `aria-modal`, et le Modal rend
+   * lui-même le focus à « Fermer » quand la confirmation part (mesuré, `suspendu-colonne.mjs`).
+   */
+  const focusLost = () => {
+    if (inputRef.current) focusField()
+    else if (!sheetOpen) {
+      focusWithoutScroll(titleRef.current)
+      moveReaderTo(titleRef.current)
+    }
+  }
 
   const lines = previewLines(threads, columns ? PREVIEW_LINES.column : PREVIEW_LINES.phone)
   // Ce que le membre peut lire, lui : le compteur ne compte pas son commentaire masqué ou retiré.
@@ -148,7 +174,7 @@ export function Comments({ project }: { project: Project }) {
     focusAfterUnroll.current = null
     const order = threadLines(threads).map((comment) => comment.id)
     const wanted = pending.target ? [pending.target] : order.filter((id) => !pending.shown.has(id))
-    if (!focusFirstCard(cards.current, wanted)) focusField()
+    if (!focusFirstCard(cards.current, wanted)) focusLost()
   })
 
   // --- Écrire ---------------------------------------------------------------------------------------
@@ -250,8 +276,8 @@ export function Comments({ project }: { project: Project }) {
           ? t(($) => $.project.comments.hintPrivate)
           : t(($) => $.project.comments.hint)
 
-  // Pas de `disabled` pour un suspendu : il n'a pas de champ du tout (relecture du plan, ui-I1).
-  const composer = suspended ? null : (
+  // Pas de `disabled` pour qui n'écrit pas : il n'a pas de champ du tout (relecture du plan, ui-I1).
+  const composer = readOnly ? null : (
     <CommentComposer
       value={draft.text}
       onChangeText={changeText}
@@ -289,44 +315,74 @@ export function Comments({ project }: { project: Project }) {
   // --- La section -----------------------------------------------------------------------------------
 
   const expired = errorKey(comments.error) === 'unauthorized'
-  // La première page manque : on le dit, sans toucher au reste de la page. 401 : réessayer ne
-  // servirait à rien, il faut se reconnecter.
-  const trouble = comments.isPending ? (
-    <Text tone="muted">{t(($) => $.project.comments.loading)}</Text>
-  ) : comments.isError && threads.length === 0 ? (
-    <>
-      <Notice
-        message={expired ? t(($) => $.states.expired) : t(($) => $.project.comments.loadError)}
-        action={expired ? signInAgain(closeSheet) : undefined}
-      />
-      {expired ? null : (
-        <Button
-          label={t(($) => $.common.retry)}
-          variant="secondary"
-          size="compact"
-          onPress={() => void comments.refetch()}
-        />
-      )}
-    </>
-  ) : null
+  const failed = comments.isError && threads.length === 0
 
-  const emptyLabel = isPrivate
-    ? t(($) => $.project.comments.emptyPrivate)
-    : t(($) => $.project.comments.empty)
+  const retry = async () => {
+    setRetrying(true)
+    await comments.refetch()
+    focusAfterRetry.current = true
+    setRetrying(false)
+  }
+
+  // « Réessayer » a fini. Encore en panne : le bouton est toujours là, avec son focus. Sinon il est
+  // parti : le focus va à la première carte montée, et les cartes existent une fois ce rendu posé.
+  // Sans liste de dépendances, comme plus haut : la `ref` n'est posée que par ce geste.
+  useEffect(() => {
+    if (!focusAfterRetry.current || retrying) return
+    focusAfterRetry.current = false
+    if (failed && !expired) return
+    const ids = threadLines(threads).map((comment) => comment.id)
+    const focused =
+      whole || sheetOpen
+        ? focusFirstCard(cards.current, ids)
+        : lines.some((line) => previewCards.current.get(line.comment.id)?.focusCard())
+    if (!focused) focusLost()
+  })
+
+  // La première page manque : on le dit, sans toucher au reste de la page. 401 : réessayer ne
+  // servirait à rien, il faut se reconnecter. Pendant « Réessayer », le message et le bouton occupé
+  // restent : React Query efface l'erreur dès la relecture, et un « Chargement… » à leur place
+  // emporterait le focus du bouton.
+  const trouble =
+    failed || retrying ? (
+      <>
+        <Notice
+          message={expired ? t(($) => $.states.expired) : t(($) => $.project.comments.loadError)}
+          action={expired ? signInAgain(closeSheet) : undefined}
+        />
+        {expired ? null : (
+          <Button
+            label={t(($) => $.common.retry)}
+            variant="secondary"
+            size="compact"
+            loading={retrying}
+            onPress={() => void retry()}
+          />
+        )}
+      </>
+    ) : comments.isPending ? (
+      <Text tone="muted">{t(($) => $.project.comments.loading)}</Text>
+    ) : null
+
+  const emptyLabel = closed
+    ? t(($) => $.project.comments.emptyRemoved)
+    : isPrivate
+      ? t(($) => $.project.comments.emptyPrivate)
+      : t(($) => $.project.comments.empty)
 
   const list = (
     <CommentThreads
       project={project}
       threads={threads}
-      suspended={suspended}
+      readOnly={readOnly}
       trouble={trouble}
-      announcement={announcement}
+      announcement={columns ? null : announcement}
       announce={setAnnouncement}
       draft={draft}
       cards={cards}
       onReply={reply}
       onEdit={edit}
-      onFocusLost={focusField}
+      onFocusLost={focusLost}
       leave={leave}
       emptyLabel={emptyLabel}
     />
@@ -353,24 +409,28 @@ export function Comments({ project }: { project: Project }) {
     />
   ))
 
-  // Le bouton de l'aperçu. Un suspendu n'écrit pas : « Voir » dès qu'il y a de quoi lire, y compris un
-  // commentaire que lui seul voit (retiré, masqué : le compteur ne le compte pas), sinon aucun bouton.
+  // Le bouton de l'aperçu. Dès qu'il y a de quoi lire, y compris un commentaire que le membre seul voit
+  // (retiré, masqué : le compteur ne le compte pas), « Voir » ; sans rien à lire, écrire, ou aucun
+  // bouton pour qui n'écrit pas.
   const action: CommentPreviewAction = columns
     ? whole
       ? null
       : 'all'
-    : suspended
-      ? count > 0 || readable > 0
+    : count === 0
+      ? readable > 0
         ? 'all'
-        : null
-      : count === 0
-        ? 'write'
-        : count > PREVIEW_LINES.phone
-          ? 'all'
-          : 'comment'
+        : readOnly
+          ? null
+          : 'write'
+      : readOnly || count > PREVIEW_LINES.phone
+        ? 'all'
+        : 'comment'
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
+      {/* En colonne, la région vit ici, toujours montée : la liste, repliée, ne l'est pas, et un envoi
+          n'y serait jamais annoncé. Dans la feuille, c'est la liste qui la porte. */}
+      {columns ? <LiveStatus message={announcement} visible={false} /> : null}
       <CommentPreview
         count={count}
         action={action}
@@ -378,6 +438,7 @@ export function Comments({ project }: { project: Project }) {
         // Le compteur vaut 0, mais le membre a quelque chose à lire : on dit ce qu'il va lire.
         seeAllCount={count > 0 ? count : readable}
         openRef={openButton}
+        titleRef={titleRef}
         onOpen={() => (columns ? unroll(null) : openSheet(null, action !== 'all'))}
       >
         {whole ? list : sheetOpen ? previewCardsNodes : (trouble ?? previewCardsNodes)}
@@ -393,7 +454,16 @@ export function Comments({ project }: { project: Project }) {
           title={t(($) => $.project.comments.title)}
           titleCount={{ count, spoken: t(($) => $.project.comments.spokenCount, { count }) }}
           {...(openOnField ? { initialFocusRef: inputRef } : null)}
-          footer={composer}
+          // Une feuille couvre le bandeau de la suspension : elle redit pourquoi il n'y a pas de champ.
+          footer={
+            suspended ? (
+              <Text variant="callout" tone="secondary">
+                {t(($) => $.project.comments.suspendedNote)}
+              </Text>
+            ) : (
+              composer
+            )
+          }
         >
           {list}
         </Sheet>

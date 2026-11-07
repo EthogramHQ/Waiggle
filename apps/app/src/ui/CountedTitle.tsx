@@ -15,6 +15,8 @@
 // des listes « À reprendre ») : le titre et son nombre reçoivent `wholeWords` (voir Text.tsx), et la
 // taille descend juste assez pour que leur plus long bloc insécable tienne sur une ligne.
 import { maxHeadingScale, maxTextScale } from '@ruche/brand'
+import type { Ref } from 'react'
+import type { Focusable } from './focus'
 import { type HeadingLevel, Text } from './Text'
 
 // Le « · » entre deux espaces insécables : le nombre ne part jamais seul à la ligne suivante, et
@@ -37,6 +39,7 @@ export function CountedTitle({
   separator = 'dot',
   variant = 'heading',
   nativeID,
+  focusRef,
 }: {
   /** Le titre de la section (« Mes projets »). */
   title: string
@@ -54,10 +57,17 @@ export function CountedTitle({
   variant?: 'heading' | 'title2'
   /** L'identifiant du titre, pour qu'une fenêtre se nomme par lui (`aria-labelledby`). */
   nativeID?: string
+  /**
+   * Pour poser le focus sur le titre depuis le code (voir Text) : la section n'a plus rien d'autre
+   * qui puisse le prendre (R5b : le dernier commentaire d'un membre sans champ, supprimé).
+   */
+  focusRef?: Ref<Focusable>
 }) {
+  // Passée seulement si l'écran en donne une : sur le web, un titre focalisable reçoit `tabIndex`.
+  const focusable = focusRef ? { focusRef } : null
   if (count === 0) {
     return (
-      <Text variant={variant} heading={level} wholeWords={title} nativeID={nativeID}>
+      <Text variant={variant} heading={level} wholeWords={title} nativeID={nativeID} {...focusable}>
         {title}
       </Text>
     )
@@ -71,6 +81,7 @@ export function CountedTitle({
       wholeWords={words}
       accessibilityLabel={`${title}, ${spokenCount}`}
       nativeID={nativeID}
+      {...focusable}
     >
       {title}
       {/* Le nombre, dans le titre : même taille, même agrandissement (un grand titre de section
