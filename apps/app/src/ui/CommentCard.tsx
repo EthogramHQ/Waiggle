@@ -350,21 +350,6 @@ export function CommentCard({
       {badge}
     </View>
   )
-  // La photo, le nom et le badge : le contenu de la carte compacte.
-  const who = (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: space.sm,
-        flexShrink: 1,
-        minWidth: 0,
-      }}
-    >
-      <Avatar name={author.name} source={avatar} label={author.name} size={size} />
-      {nameAndBadge}
-    </View>
-  )
   // « Ton commentaire » : le fond gris dit à l'œil que c'est le sien ; le lecteur d'écran l'entend
   // en arrivant sur la carte (un texte caché à l'œil seulement, comme HiddenHeading). Pas sur la
   // carte compacte, un seul bouton : son nom l'emporte sur son contenu, il le dit donc lui-même.
@@ -403,15 +388,39 @@ export function CommentCard({
           <View
             style={{
               flexDirection: 'row',
-              flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: space.sm,
               minHeight: NAME_ROW,
             }}
           >
-            {who}
-            {date}
-            {edited}
+            <Avatar name={author.name} source={avatar} label={author.name} size={size} />
+            {/* Comme dans la feuille : la photo a sa colonne, rien ne passe à la ligne sous elle, et
+                la date reste avec « · modifié » (le point n'ouvre jamais une ligne). */}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                columnGap: space.sm,
+                minWidth: 0,
+              }}
+            >
+              {nameAndBadge}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: large ? 'wrap' : 'nowrap',
+                  alignItems: 'center',
+                  columnGap: space.sm,
+                  flexShrink: 1,
+                  maxWidth: '100%',
+                }}
+              >
+                {date}
+                {large ? editedWord : edited}
+              </View>
+            </View>
           </View>
           {/* marginTop négatif : la rangée a 44 points, le texte remonte dans l'air de sa photo. */}
           <View

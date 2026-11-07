@@ -613,6 +613,15 @@ describe('CommentCard, the row of its name (design C6)', () => {
     expect(screen.queryByText('·', { includeHiddenElements: true })).not.toBeNull()
   })
 
+  it('keeps the same row on a compact card: no point opens a line, nothing wraps under the photo', async () => {
+    await renderWithProviders(card({ comment: editedComment(), compact: true }))
+
+    const row = commonParent(shown('Hugo Lefèvre'), shown('il y a 3 h'))
+    expect(flat(row).flexWrap).toBe('wrap')
+    expect(chainOf(photo())).not.toContain(row)
+    expect(flat(commonParent(shown('il y a 3 h'), shown(text.edited))).flexWrap).not.toBe('wrap')
+  })
+
   it('reads one link only, the photo being hidden from screen readers and from the finger', async () => {
     await renderWithProviders(card())
 
