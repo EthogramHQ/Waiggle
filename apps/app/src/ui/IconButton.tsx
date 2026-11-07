@@ -15,8 +15,12 @@ type Props = {
   icon: IconName
   label: string
   onPress: () => void
-  /** glass : sur une image ou une lumière ; plain : sur une surface ; honey : action principale. */
-  variant?: 'glass' | 'plain' | 'honey'
+  /**
+   * glass : sur une image ou une lumière ; plain : sur une surface ; honey : action principale ;
+   * bare : répété dans une liste (le « … » de chaque commentaire), sans disque au repos ; il n'en
+   * prend un, de verre, que sous le doigt ou quand ce qu'il ouvre est ouvert (`expanded`).
+   */
+  variant?: 'glass' | 'plain' | 'honey' | 'bare'
   /** regular : 44 points ; large : 64 (jeton `layout.fab`), sans l'enfoncement du bouton flottant. */
   size?: 'regular' | 'large'
   /**
@@ -98,6 +102,7 @@ export function IconButton({
       tone: 'default',
     },
     plain: { box: { backgroundColor: colors.surfaceGrouped }, tone: 'default' },
+    bare: { box: {}, tone: 'default' },
     honey: {
       box: { backgroundColor: colors.honey, boxShadow: `${shadows.highlight}, ${shadows.honey}` },
       tone: 'onHoney',
@@ -136,7 +141,7 @@ export function IconButton({
           scale.value = spring(1)
         }}
         // Le contour du focus clavier est commun à tous les éléments : voir app/+html.tsx.
-        style={[
+        style={({ pressed }) => [
           {
             width: diameter,
             height: diameter,
@@ -145,6 +150,8 @@ export function IconButton({
             justifyContent: 'center',
           },
           look.box,
+          // Le disque de `bare` : le verre se voit sur la feuille comme sur le gris de ses cartes.
+          variant === 'bare' && (pressed || expanded === true) && looks.glass.box,
           inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
           inactive && !inactiveHoney && { opacity: 0.55 },
         ]}

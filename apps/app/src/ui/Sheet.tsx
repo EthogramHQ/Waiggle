@@ -200,8 +200,8 @@ type WebDocument = {
 type WebElement = {
   tabIndex: number
   hasAttribute: (name: string) => boolean
-  getClientRects: () => { length: number }
   closest: (selector: string) => unknown
+  getClientRects: () => { length: number }
   focus: () => void
 }
 type WebRoot = { querySelectorAll?: (selector: string) => ArrayLike<WebElement> }

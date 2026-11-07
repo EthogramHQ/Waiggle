@@ -8,7 +8,9 @@
 // Changé en R5b (relecture du plan, ui-M5, D3) : avant, la mention restait le « @pseudo » écrit,
 // souligné, et le lien portait ce nom (`@ines_morel`) ; ces tests cherchent désormais la pastille par
 // son nom lu, et le texte entier avec le nom du membre à la place du pseudo.
+import { palettes } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { inesMention } from '../testing/comments'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -33,6 +35,25 @@ const wholeText = (shown: string) =>
       `^\\s*${Array.from(squash(shown), (char) => char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')}\\s*$`,
     ),
   )
+
+describe('MentionText, its tone', () => {
+  const BODY = 'Pas convaincu, sans mention.'
+  const colorOf = () => StyleSheet.flatten(screen.getByText(BODY).props.style)?.color
+
+  it('writes the text in ink by default', async () => {
+    await renderWithProviders(<MentionText text={BODY} mentions={[]} onMemberPress={jest.fn()} />)
+
+    expect(colorOf()).toBe(palettes.day.text)
+  })
+
+  it('writes the text in the tone it is given (a hidden comment, in grey)', async () => {
+    await renderWithProviders(
+      <MentionText text={BODY} mentions={[]} onMemberPress={jest.fn()} tone="muted" />,
+    )
+
+    expect(colorOf()).toBe(palettes.day.textMuted)
+  })
+})
 
 describe('MentionText', () => {
   it("shows a mention given by the API as a pill with the member's current name, keeping the whole text", async () => {

@@ -16,15 +16,23 @@
 // Ce que Jest ne voit pas (à regarder dans les captures et le catalogue) : le fond gris des siens, le
 // miel pâle d'une carte surlignée (`highlighted`), les icônes des emplacements (bulle, bouclier,
 // interdiction, œil barré), la photo plus petite d'une réponse.
+import { palettes, textStyles } from '@ruche/brand'
 import type { CommentAuthor, CommentReply } from '@ruche/contracts'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { type ComponentProps, createRef, type ReactElement } from 'react'
-import { AccessibilityInfo, Platform, View } from 'react-native'
+import {
+  AccessibilityInfo,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { labelOf, lendWebPage } from '../testing/arrivedFocus'
 import { inesMention, replyOf } from '../testing/comments'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
-import { CommentCard, type CommentCardHandle } from './CommentCard'
+import { COMMENT_AVATAR, CommentCard, type CommentCardHandle } from './CommentCard'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -540,6 +548,293 @@ describe('CommentCard, an action that failed', () => {
     expect(screen.getByText('Ta session a expiré.')).toBeTruthy()
     await fireEvent.press(linkOrButton('Me reconnecter'))
     expect(reconnect).toHaveBeenCalledTimes(1)
+  })
+})
+
+// --- Les corrections de la relecture de design (K2) ---------------------------------------------
+// Ces tests lisent la structure et quelques styles : ils fixent des règles de mise en page (qui est
+// dans quelle colonne, ce qui ne se sépare pas). Les positions réelles se mesurent dans le navigateur.
+
+type Node = {
+  props: Record<string, unknown>
+  parent: Node | null
+  children: ReadonlyArray<Node | string>
+}
+const flat = (node: Node) =>
+  (StyleSheet.flatten(node.props.style as never) ?? {}) as ViewStyle & { color?: string }
+const nodesOf = (node: Node): Node[] => [
+  node,
+  ...node.children.flatMap((child) => (typeof child === 'string' ? [] : nodesOf(child))),
+]
+const allNodes = () => nodesOf(screen.root as unknown as Node)
+const chainOf = (node: Node): Node[] => {
+  const chain: Node[] = []
+  for (let at: Node | null = node; at; at = at.parent) chain.push(at)
+  return chain
+}
+const commonParent = (a: Node, b: Node) => {
+  const others = chainOf(b)
+  return chainOf(a).find((node) => others.includes(node)) as Node
+}
+const shown = (value: string) => screen.getByText(value) as unknown as Node
+const placeOf = (node: Node) => allNodes().indexOf(node)
+/** Le retrait du texte : la somme des `paddingLeft` entre le texte et la carte. */
+const indentOf = (node: Node) =>
+  chainOf(node).reduce((sum, at) => sum + Number(flat(at).paddingLeft ?? 0), 0)
+/** La photo de l'auteur (sans image : ses initiales, sur un rond au rôle d'image). */
+const photo = () =>
+  allNodes().find((node) => node.props.accessibilityRole === 'image') as unknown as Node
+
+const editedComment = () => hugoComment({ editedAt: threeHoursAgo() })
+const hiddenByMe = (fields: Partial<CardProps> = {}) =>
+  card({
+    comment: hugoComment({ state: 'hidden' }),
+    hiddenNote: 'byYou',
+    onUnhide: jest.fn(),
+    ...fields,
+  })
+
+describe('CommentCard, the row of its name (design C6)', () => {
+  it('keeps the photo out of the row where the name, the date and « modifié » wrap', async () => {
+    await renderWithProviders(card({ comment: editedComment() }))
+
+    const row = commonParent(shown('Hugo Lefèvre'), shown('il y a 3 h'))
+    expect(flat(row).flexWrap).toBe('wrap')
+    expect(chainOf(photo())).not.toContain(row)
+    // « modifié » passe à la ligne dans cette rangée, à droite de la photo.
+    expect(chainOf(shown(text.edited))).toContain(row)
+  })
+
+  it('never separates the date from « · modifié » at the normal text size', async () => {
+    await renderWithProviders(card({ comment: editedComment() }))
+
+    expect(flat(commonParent(shown('il y a 3 h'), shown(text.edited))).flexWrap).not.toBe('wrap')
+    // Témoin : le point est là.
+    expect(screen.queryByText('·', { includeHiddenElements: true })).not.toBeNull()
+  })
+
+  it('reads one link only, the photo being hidden from screen readers and from the finger', async () => {
+    await renderWithProviders(card())
+
+    expect(screen.getAllByRole('link', { name: 'Hugo Lefèvre' })).toHaveLength(1)
+    const hidden = chainOf(photo()).find(
+      (node) => node.props.importantForAccessibility === 'no-hide-descendants',
+    )
+    expect(hidden?.props['aria-hidden']).toBe(true)
+    // Le doigt passe à travers elle, jusqu'au lien qui la recouvre (`pointerEvents` en propriété).
+    expect(hidden?.props.pointerEvents).toBe('none')
+  })
+
+  it('spreads the link over the photo: pulled back by its width, given back to the name', async () => {
+    await renderWithProviders(card())
+
+    const over = COMMENT_AVATAR.root + 8
+    const chain = chainOf(shown('Hugo Lefèvre'))
+    const link = screen.getByRole('link', { name: 'Hugo Lefèvre' }) as unknown as Node
+    const inside = chain.slice(0, chain.indexOf(link))
+    const outside = chain.slice(chain.indexOf(link))
+    expect(inside.some((node) => flat(node).paddingLeft === over)).toBe(true)
+    expect(outside.some((node) => flat(node).marginLeft === -over)).toBe(true)
+  })
+})
+
+describe('CommentCard, the place of its text (design C6, decision 21)', () => {
+  const setFontScale = async (fontScale: number) => {
+    const window = { width: 320, height: 844, scale: 3, fontScale }
+    await act(async () => Dimensions.set({ window, screen: window }))
+  }
+
+  afterEach(async () => {
+    const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+    await act(async () => Dimensions.set({ window: phone, screen: phone }))
+  })
+
+  it('stays under the name at the normal text size, on a phone too', async () => {
+    await setFontScale(1)
+    await renderWithProviders(card())
+
+    expect(indentOf(shown(BODY))).toBe(COMMENT_AVATAR.root + 8)
+  })
+
+  it('stays under the name up to 149 %', async () => {
+    await setFontScale(1.49)
+    await renderWithProviders(card({ kind: 'reply' }))
+
+    expect(indentOf(shown(BODY))).toBe(COMMENT_AVATAR.reply + 8)
+  })
+
+  it('goes under the photo from 150 %', async () => {
+    await setFontScale(1.5)
+    await renderWithProviders(card({ comment: editedComment() }))
+
+    expect(indentOf(shown(BODY))).toBe(0)
+    // Agrandi, « modifié » peut passer sous la date : il perd son point, plutôt que d'en commencer
+    // sa ligne.
+    expect(screen.queryByText('·', { includeHiddenElements: true })).toBeNull()
+    expect(screen.getByText(text.edited)).toBeTruthy()
+  })
+
+  it('goes under the photo on the web when the measured text is that large', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await setFontScale(1)
+    await renderWithProviders(card())
+    expect(indentOf(shown(BODY))).toBe(COMMENT_AVATAR.root + 8) // témoin
+
+    // Sur le web, `fontScale` vaut toujours 1 : seule la hauteur d'une ligne cachée le dit.
+    const probe = allNodes().find(
+      (node) => node.props.onLayout !== undefined && node.props['aria-hidden'] === true,
+    ) as unknown as Parameters<typeof fireEvent>[0]
+    await fireEvent(probe, 'layout', {
+      nativeEvent: { layout: { height: textStyles.body.lineHeight * 2 } },
+    })
+
+    expect(indentOf(shown(BODY))).toBe(0)
+  })
+})
+
+describe('CommentCard, its density (design A3)', () => {
+  it('a highlighted card does not take more room than a plain one: the text does not jump', async () => {
+    await renderWithProviders(card({ highlighted: true }))
+
+    const frame = chainOf(shown(BODY)).find(
+      (node) => flat(node).backgroundColor === palettes.day.highlightSoft,
+    ) as unknown as Node
+    const style = flat(frame)
+    expect(Number(style.paddingTop ?? style.padding ?? 0) + Number(style.marginTop ?? 0)).toBe(0)
+    expect(
+      Number(style.paddingBottom ?? style.padding ?? 0) + Number(style.marginBottom ?? 0),
+    ).toBe(0)
+  })
+
+  it('the row of the name keeps its 44 points, hung over the text it stays above', async () => {
+    await renderWithProviders(card({ onReply: jest.fn() }))
+
+    const link = screen.getByRole('link', { name: 'Hugo Lefèvre' }) as unknown as Node
+    expect(flat(link).minHeight).toBe(44)
+    const hung = chainOf(link).find((node) => flat(node).marginVertical === -8)
+    expect(hung).toBeDefined()
+    // Au-dessus du texte, mais le doigt l'atteint à côté des zones : ni le nom ni la pastille d'une
+    // mention ne sont masqués par la rangée elle-même.
+    const row = chainOf(link).find(
+      (node) => flat(node).zIndex === 1 && node.props.pointerEvents === 'box-none',
+    )
+    expect(row).toBeDefined()
+    expect(chainOf(shown(BODY))).not.toContain(row)
+  })
+
+  it('« Répondre » hangs its 44 points over the gap below it', async () => {
+    await renderWithProviders(card({ onReply: jest.fn() }))
+
+    const button = screen.getByRole('button', { name: text.reply }) as unknown as Node
+    expect(flat(button).minHeight).toBe(44)
+    expect(Number(flat(button.parent as Node).marginBottom)).toBeLessThan(0)
+  })
+
+  it('« Répondre » does not hang over the error that follows it', async () => {
+    await renderWithProviders(card({ onReply: jest.fn(), error: 'Ta session a expiré.' }))
+
+    const button = screen.getByRole('button', { name: text.reply }) as unknown as Node
+    expect(Number(flat(button.parent as Node).marginBottom ?? 0)).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('CommentCard, its « … » (design A1)', () => {
+  const menu = [{ label: 'Signaler', onPress: jest.fn() }]
+  const discOf = () =>
+    flat(screen.getByRole('button', { name: text.menu('Hugo Lefèvre') }) as unknown as Node)
+      .backgroundColor
+
+  it('has no disc at rest, only once its menu is open', async () => {
+    await renderWithProviders(card({ menu }))
+    expect(discOf()).toBeUndefined()
+
+    await fireEvent.press(screen.getByRole('button', { name: text.menu('Hugo Lefèvre') }))
+
+    expect(discOf()).toBe(palettes.day.glass)
+  })
+})
+
+describe('CommentCard, hidden: its order and its grey (design A4)', () => {
+  it('writes the text in grey for both people who still see it', async () => {
+    await renderWithProviders(hiddenByMe())
+    expect(flat(shown(BODY)).color).toBe(palettes.day.textMuted)
+  })
+
+  it('writes the text in grey for the author of the comment too', async () => {
+    await renderWithProviders(
+      card({
+        comment: hugoComment({ state: 'hidden', isMine: true }),
+        isMine: true,
+        hiddenNote: 'byProjectAuthor',
+      }),
+    )
+    expect(flat(shown(BODY)).color).toBe(palettes.day.textMuted)
+  })
+
+  it('keeps the ink on a comment that is not hidden', async () => {
+    await renderWithProviders(card())
+    expect(flat(shown(BODY)).color).toBe(palettes.day.text)
+  })
+
+  it('puts the pill on the row of the name, and the note under the text', async () => {
+    await renderWithProviders(hiddenByMe())
+
+    const row = commonParent(shown('Hugo Lefèvre'), shown('il y a 3 h'))
+    expect(chainOf(shown(text.hiddenByMe))).toContain(row)
+    expect(chainOf(shown(BODY))).not.toContain(row)
+    expect(placeOf(shown(BODY))).toBeLessThan(placeOf(shown(text.hiddenNote)))
+    expect(placeOf(shown(text.hiddenNote))).toBeLessThan(
+      placeOf(screen.getByRole('button', { name: text.unhide }) as unknown as Node),
+    )
+  })
+})
+
+describe('CommentCard, a placeholder (design A5)', () => {
+  /** La tuile : le rond qui porte l'icône, de la taille de la photo. */
+  const tileOf = (size: number) =>
+    allNodes().filter((node) => {
+      const style = flat(node)
+      return style.width === size && style.height === size && style.borderRadius === size / 2
+    })
+
+  it('draws its icon on a round tile the size of a photo, its text where a name would be', async () => {
+    await renderWithProviders(card({ comment: placeholderOf('deleted') }))
+
+    const [tile] = tileOf(COMMENT_AVATAR.root)
+    expect(tile).toBeDefined()
+    expect(flat(tile as Node).backgroundColor).toBe(palettes.day.surfaceGrouped)
+    // La phrase n'est pas dans la tuile : elle vient à côté, à la place du nom (photo + 8 points).
+    const phrase = shown(text.placeholder.deleted)
+    expect(chainOf(phrase)).not.toContain(tile)
+    expect(flat(commonParent(phrase, tile as Node)).gap).toBe(8)
+  })
+
+  it('takes the size of a reply photo in a reply', async () => {
+    await renderWithProviders(card({ comment: placeholderOf('deleted'), kind: 'reply' }))
+
+    expect(tileOf(COMMENT_AVATAR.reply)).toHaveLength(1)
+  })
+})
+
+describe('CommentCard, compact and yours (ui-A5)', () => {
+  it('names your own compact card « Ton commentaire : » and the start of the text', async () => {
+    await renderWithProviders(
+      card({ comment: hugoComment({ isMine: true }), isMine: true, compact: true }),
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: fr.t(($) => $.project.comments.openLineMine, { excerpt: BODY }),
+      }),
+    ).toBeTruthy()
+    // Le nom du bouton l'emporte sur son contenu : un texte caché n'y serait jamais lu.
+    expect(screen.queryByText(text.yours, { includeHiddenElements: true })).toBeNull()
+  })
+
+  it('keeps « Commentaire de Hugo » on the compact card of someone else', async () => {
+    await renderWithProviders(card({ compact: true }))
+
+    expect(screen.getByRole('button', { name: text.openLine('Hugo Lefèvre', BODY) })).toBeTruthy()
   })
 })
 

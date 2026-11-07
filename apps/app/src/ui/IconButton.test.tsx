@@ -3,8 +3,9 @@
 // garde son nom, et ignore les appuis : un double toucher n'envoie qu'un commentaire. Comme
 // `Button`, il ne quitte pas pour autant le parcours au clavier sur le web : le membre qui vient
 // d'envoyer avec Entrée garde le focus là où il était.
+import { palettes } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet, type ViewStyle } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { IconButton } from './IconButton'
 
@@ -60,5 +61,56 @@ describe('IconButton', () => {
     } finally {
       jest.restoreAllMocks()
     }
+  })
+})
+
+// La variante `bare` (R5b, relecture de design A1) : le « … » d'un commentaire, répété à chaque carte,
+// ne pose aucun disque au repos (la planche n'en a qu'à l'ouverture), mais la zone reste de 44 points.
+describe('IconButton, the bare variant', () => {
+  const disc = (name: string) =>
+    (StyleSheet.flatten(screen.getByRole('button', { name }).props.style) as ViewStyle)
+      .backgroundColor
+
+  it('keeps its 44-point target but draws no disc at rest', async () => {
+    await renderWithProviders(
+      <IconButton variant="bare" icon="dots-three" label={LABEL} onPress={() => {}} />,
+    )
+
+    const style = StyleSheet.flatten(
+      screen.getByRole('button', { name: LABEL }).props.style,
+    ) as ViewStyle
+    expect(style.width).toBe(44)
+    expect(style.height).toBe(44)
+    expect(disc(LABEL)).toBeUndefined()
+  })
+
+  it('draws its disc when what it opens is open', async () => {
+    await renderWithProviders(
+      <IconButton variant="bare" icon="dots-three" label={LABEL} onPress={() => {}} expanded />,
+    )
+
+    expect(disc(LABEL)).toBe(palettes.day.glass)
+  })
+
+  it('draws its disc under the finger', async () => {
+    await renderWithProviders(
+      <IconButton variant="bare" icon="dots-three" label={LABEL} onPress={() => {}} />,
+    )
+
+    await fireEvent(screen.getByRole('button', { name: LABEL }), 'responderGrant', {
+      nativeEvent: { touches: [], changedTouches: [] },
+      dispatchConfig: { registrationName: 'onResponderGrant' },
+      persist: () => {},
+    })
+
+    expect(disc(LABEL)).toBe(palettes.day.glass)
+  })
+
+  it('leaves the plain variant its disc at rest', async () => {
+    await renderWithProviders(
+      <IconButton variant="plain" icon="share-network" label={LABEL} onPress={() => {}} />,
+    )
+
+    expect(disc(LABEL)).toBe(palettes.day.surfaceGrouped)
   })
 })

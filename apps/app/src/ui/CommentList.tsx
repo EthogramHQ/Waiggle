@@ -43,7 +43,9 @@ export function CommentList({
   return (
     <View style={{ gap: space.xl }}>
       {/* role « list » : les lecteurs d'écran annoncent une liste et son nombre de fils. */}
-      <View role="list" style={{ gap: space.xl }}>
+      {/* L'écart est celui que « Répondre » laisse dépasser sous sa carte (CommentCard, ACTION_HANG) :
+          sa zone de 44 points touche celle du nom suivant, sans la chevaucher (décision 18). */}
+      <View role="list" style={{ gap: space.md }}>
         {threads.map((thread, i) => (
           // Depuis R5b, aucun trait entre les fils : l'espace les sépare (planche `R5b-Commentaires`).
           <View
