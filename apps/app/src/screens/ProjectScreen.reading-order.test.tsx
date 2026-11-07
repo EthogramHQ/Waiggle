@@ -7,6 +7,7 @@
 // ProjectScreen.testkit.tsx.
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { getProject } from '../projects/api'
+import { commentOf, maxAuthor, zoeAuthor } from '../testing/comments'
 import { removalByLaw } from '../testing/moderation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -17,6 +18,7 @@ import {
   followAuthor,
   id,
   insideScroll,
+  mockComments,
   mockPush,
   mockReplace,
   mockScreenProps,
@@ -100,6 +102,18 @@ beforeEach(() => {
   mockFocused = true
 })
 
+/**
+ * R5b : sur ordinateur, le champ des commentaires est toujours dans la colonne de droite, sous la
+ * liste (« Écrire un commentaire », le nom du champ compact, au lieu d'un bouton qui l'ouvrait).
+ */
+const commentField = () => {
+  const field = screen
+    .queryAllByLabelText('Écrire un commentaire')
+    .find((node) => node.type === 'TextInput')
+  if (!field) throw new Error('no comment field on the page')
+  return field
+}
+
 // F-Pr13 et le point des listes de début de tranche (choix de Louis du 1/11) : au clavier, « Suivre »
 // et les réactions venaient après tout le contenu de la colonne principale.
 describe('the reading order of the project page on a computer', () => {
@@ -176,7 +190,7 @@ describe('the reading order of the project page on a computer', () => {
         prompt,
         screen.getByRole('header', { name: 'Journal' }),
         report,
-        screen.getByRole('button', { name: 'Écrire un commentaire' }),
+        commentField(),
       )
       const at = (value: number | undefined) => value ?? -1
       expect(at(promptAt)).toBeGreaterThan(at(descriptionAt))
@@ -200,7 +214,9 @@ describe('« Signaler ce projet » on a computer', () => {
       seenByOther({ ...projectWithPhotos, notes: [v2] })
       await renderWithProviders(<ProjectScreen id={id} />)
 
-      const comment = await screen.findByRole('button', { name: 'Écrire un commentaire' })
+      // R5b : sur ordinateur, le champ de la colonne remplace le bouton « Écrire un commentaire ».
+      await screen.findByRole('header', { name: 'Journal' })
+      const comment = commentField()
       const report =
         screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
         screen.getByRole('button', { name: 'Signaler ce projet' })
@@ -213,6 +229,73 @@ describe('« Signaler ce projet » on a computer', () => {
       expect([journalAt, commentAt, reportAt]).not.toContain(-1)
       expect(at(commentAt)).toBeGreaterThan(at(journalAt))
       expect(at(reportAt)).toBeGreaterThan(at(commentAt))
+    } finally {
+      restore()
+    }
+  })
+})
+
+// R5b (choix 1 du scénario) : sur ordinateur, « Voir les 6 commentaires » déroule toute la liste dans
+// la colonne de droite, sans feuille, et le champ reste sous la liste. Au clavier et au lecteur
+// d'écran, la liste déroulée et le champ viennent après tout le contenu de gauche (la description,
+// le prompt, le journal), et « Signaler ce projet » toujours en dernier.
+describe('the comments unrolled on a computer', () => {
+  /** Six fils d'une seule racine, du plus récent au plus ancien, tels que l'API les donne. */
+  const sixThreads = [
+    'Premier fil, le plus récent.',
+    'Deuxième fil.',
+    'Troisième fil.',
+    'Quatrième fil.',
+    'Cinquième fil.',
+    'Sixième fil, le plus ancien.',
+  ].map((body, index) =>
+    commentOf({
+      id: `7f8091a2-b3c4-4dd5-8ee6-f708192a3b4${index}`,
+      author: index % 2 === 0 ? maxAuthor : zoeAuthor,
+      body,
+      createdAt: `2026-10-1${5 - (index % 5)}T0${index}:00:00.000Z`,
+    }),
+  )
+
+  it('keeps the unrolled list and the comment field after the content of the left column', async () => {
+    const restore = setDesktopWindow()
+    try {
+      seenByOther({ ...projectWithPhotos, notes: [v2], commentCount: 6 })
+      mockComments(sixThreads)
+      await renderWithProviders(<ProjectScreen id={id} />)
+
+      // Avant : 5 commentaires au plus, puis le bouton qui déroule la liste.
+      await fireEvent.press(await screen.findByRole('button', { name: 'Voir les 6 commentaires' }))
+      // Le sixième fil apparaît en place : aucune feuille ne s'ouvre sur ordinateur.
+      const sixth = await screen.findByText('Sixième fil, le plus ancien.')
+      expect(screen.queryByRole('button', { name: 'Voir les 6 commentaires' })).toBeNull()
+      const report =
+        screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
+        screen.getByRole('button', { name: 'Signaler ce projet' })
+      const [descriptionAt, promptAt, journalAt, firstAt, sixthAt, fieldAt, sendAt, reportAt] =
+        readingOrder(
+          screen.getByRole('header', { name: 'Comment ça marche' }),
+          screen.getByRole('header', { name: 'Le prompt de départ' }),
+          screen.getByRole('header', { name: 'Journal' }),
+          screen.getByText('Premier fil, le plus récent.'),
+          sixth,
+          commentField(),
+          screen.getByRole('button', { name: /^Envoyer( le commentaire)?$/ }),
+          report,
+        )
+      const at = (value: number | undefined) => value ?? -1
+      expect([descriptionAt, promptAt, journalAt, firstAt, sixthAt, fieldAt, sendAt]).not.toContain(
+        -1,
+      )
+      // Tout le contenu de gauche d'abord…
+      expect(at(firstAt)).toBeGreaterThan(at(descriptionAt))
+      expect(at(firstAt)).toBeGreaterThan(at(promptAt))
+      expect(at(firstAt)).toBeGreaterThan(at(journalAt))
+      // … puis la liste, dans l'ordre, puis le champ et son envoi, puis « Signaler ce projet ».
+      expect(at(sixthAt)).toBeGreaterThan(at(firstAt))
+      expect(at(fieldAt)).toBeGreaterThan(at(sixthAt))
+      expect(at(sendAt)).toBeGreaterThan(at(fieldAt))
+      expect(at(reportAt)).toBeGreaterThan(at(sendAt))
     } finally {
       restore()
     }

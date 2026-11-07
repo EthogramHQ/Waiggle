@@ -75,7 +75,7 @@ describe('ProfileScreen', () => {
 
     expect(
       screen.getByText(
-        'Les membres connectés peuvent te trouver par ton nom ou ton pseudo dans la recherche.',
+        'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
       ),
     ).toBeTruthy()
   })

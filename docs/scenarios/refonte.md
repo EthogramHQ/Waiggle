@@ -755,8 +755,9 @@ Hors de R5a, et où ça va :
   son nombre, et « Des nombres seulement : personne ne voit qui a réagi. »
 - Et ses boutons sont « Modifier » (et « 4 abonnés » à côté), le journal reste en dessous
 - Et sur un projet privé, le bandeau « Privé : aucun autre membre ne le voit. Il te sert de
-  brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant
-  qu'il reste privé. », et « Créé le 12 oct. » au lieu de « Publié le »
+  brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre,
+  toi compris, ne les voit tant qu'il reste privé. Ils reviendront s'il redevient public. »
+  (texte corrigé en R5b), et « Créé le 12 oct. » au lieu de « Publié le »
 
 ### Partager (F-Pr1, F-Mb1, planche `R5a-Partager`)
 
@@ -958,3 +959,255 @@ plus suivent la même règle et reviennent à Louis avant le code.
 **Repris des listes « À reprendre »**
 - Le bouton des nouveautés du Fil, aujourd'hui hors de vue dès qu'on descend : sur ordinateur, il
   reste visible sous la barre fixe, et le toucher remonte en haut du fil
+
+---
+
+## R5b — Les commentaires
+
+Statut : **validé par Louis** le 4/11/2026, tel quel, avec les six choix proposés (conversation 1
+de R5b).
+
+R5b redessine les commentaires de la page d'un projet (planches `R5b-Commentaires`,
+`R5b-Repondre`, `R5b-Menu-Etats`, et le bas de `R5a-Projet-Nuit` et `R5a-Projet-Desktop` ;
+décisions B6 « Les commentaires », F-Pr11 et F-Co8) : l'aperçu sur la page, la feuille des
+commentaires, le menu « … » de chaque commentaire, le badge Auteur, son commentaire sur fond gris,
+le trait vers les réponses, « Répondre » sous chacun, le bandeau « Réponse à X », les mentions en
+pastille et leurs suggestions, le compteur près de la limite, et les états (masqué, supprimé,
+retiré, bloqué). Les règles d'aujourd'hui ne changent pas : qui voit quoi, qui modifie, supprime,
+masque ou signale, les fils sur un seul niveau, 1 000 caractères, 5 mentions au plus, les quotas.
+
+Côté API, deux ajouts : le nom des membres mentionnés (la pastille l'affiche), et des suggestions
+de mention qui cherchent aussi dans les noms, sans tenir compte des accents.
+
+Hors de R5b, et où ça va :
+- « Voir en contexte » depuis une notification (ouvrir la feuille sur le commentaire visé) : R8 ;
+- le motif « Lien, démo ou prompt dangereux » et « Signaler » dans une feuille en deux étapes : R9 ;
+- les commentaires d'un projet public vus par un visiteur (une phrase à la place) : R12.
+
+### L'aperçu sur la page (F-Pr11, planches `R5a-Projet-Nuit`, `R5a-Projet-Desktop`)
+
+- Étant donné un membre sur la page d'un projet qui a 6 commentaires, sur téléphone
+- Alors sous les mises à jour, le titre « Commentaires 6 » (le nombre en gris, comme « Les autres
+  prompts · 2 »)
+- Et les 3 premiers commentaires, dans l'ordre de la feuille (les fils les plus récents d'abord,
+  chacun suivi de ses réponses), sans « Répondre » ni menu « … » ; seulement des commentaires
+  visibles de tous (un masqué, un retiré ou un emplacement reste dans la feuille, pas dans l'aperçu)
+- Et le bouton « Voir les 6 commentaires », qui ouvre la feuille
+- Et toucher un commentaire de l'aperçu ouvre aussi la feuille
+- Et sur ordinateur, dans la colonne de droite : 5 commentaires au plus, « Voir les 6
+  commentaires », puis le champ « Écrire un commentaire » et « Envoyer », avec l'aide d'aujourd'hui
+  dessous (qui lira le commentaire)
+- Et un projet sans commentaire montre « Commentaires », « Aucun commentaire pour l'instant. » et
+  le bouton « Écrire un commentaire », qui ouvre la feuille, le champ prêt à écrire (sur
+  ordinateur, le champ de la colonne suffit)
+- Et sur son projet privé, l'auteur lit à la place de « Aucun commentaire pour l'instant. » :
+  « Aucun commentaire à lire pour l'instant. Ceux que d'autres membres auraient laissés sont gardés :
+  aucun membre, toi compris, ne les lit tant que le projet reste privé. » ; la bannière du projet privé ne lui dit plus qu'il les voit (décision D4,
+  relecture du plan)
+- Et un projet qui a 3 commentaires ou moins (5 sur ordinateur) n'a pas de « Voir les… » sur
+  téléphone : le bouton devient « Commenter », qui ouvre la feuille
+
+### La feuille des commentaires (planche `R5b-Commentaires`)
+
+- Quand il touche « Voir les 6 commentaires »
+- Alors une grande feuille monte par-dessus la page floutée : une poignée, « Commentaires 6 » et un
+  bouton Fermer
+- Et les fils, les plus récents d'abord ; sous chaque racine, ses réponses, reliées par un trait
+  arrondi qui part de la racine
+- Et chaque commentaire : la photo et le nom de son auteur, la date relative (« il y a 3 h »,
+  « hier », « lundi »), « modifié » s'il l'a été, le texte, « Répondre » dessous, et le menu « … » à
+  droite
+- Et le badge « Auteur » à côté du nom de l'auteur du projet
+- Et ses propres commentaires sur un fond gris arrondi
+- Et en bas, fixé, le champ compact : sa photo, « Écrire un commentaire », et le bouton d'envoi
+  (une flèche) grisé tant que le champ est vide ; dessous, l'aide d'aujourd'hui, qui dit qui lira :
+  « Tous les membres connectés liront ton commentaire. », ou celle d'une réponse, d'une
+  modification, d'un commentaire masqué ou d'un projet privé (les six aides d'aujourd'hui gardées)
+- Et au-delà de 20 fils, « Afficher la suite » au bout de la liste
+- Et la feuille se ferme par Fermer, en la glissant vers le bas, par Échap ou Retour, et rend le
+  focus au bouton qui l'a ouverte
+- Et un texte commencé et pas envoyé est gardé si la feuille se ferme, et retrouvé à sa
+  réouverture (tant qu'on reste sur la page)
+- Et avec « Réduire les animations », la feuille apparaît en fondu au lieu de monter
+- Et sur ordinateur, « Voir les 6 commentaires » déroule toute la liste dans la colonne de droite,
+  sans feuille (choix 1)
+
+### Écrire et envoyer
+
+- Quand il écrit, puis touche la flèche
+- Alors son commentaire apparaît en tête de la liste, sur fond gris, et le champ se vide
+- Et le nombre du titre monte, dans la feuille comme sur la page
+- Et à partir de 900 caractères, un compteur « 962 / 1000 » apparaît sous le champ ; au-delà de
+  1 000, il passe en rouge et l'envoi est refusé avec la raison
+- Et le champ grandit avec son texte jusqu'à 5 lignes, puis défile
+- Et une erreur (réseau, quota) s'affiche au-dessus du champ, le texte est gardé, et « Réessayer »
+  renvoie
+
+### Répondre (planche `R5b-Repondre`)
+
+- Quand il touche « Répondre » sous le commentaire de Léa Moreau
+- Alors le commentaire de Léa est surligné en miel pâle, et au-dessus du champ un bandeau
+  « Réponse à **Léa Moreau** » avec une croix qui annule
+- Et le champ reçoit le focus, le clavier s'ouvre
+- Et sa réponse s'ajoute au bout du fil de Léa
+- Et « Répondre » sous une réponse (celle de Papi Jean, dans le fil de Léa) répond dans le même fil,
+  et le champ commence par la mention de Papi Jean, pour qu'on sache à qui il répond
+- Et sur son propre commentaire, « Répondre » répond dans le fil, sans mention
+- Et sur un commentaire masqué, supprimé, retiré ou d'un membre bloqué, pas de « Répondre »
+  (comme aujourd'hui)
+
+### Les mentions (F-Co8, planche `R5b-Repondre`)
+
+**Les suggestions**
+- Quand il tape « @Lé » dans le champ
+- Alors au-dessus du champ, « Mentionner quelqu'un » propose 5 membres au plus : Léa Moreau et Hugo
+  Lefèvre, chacun avec sa photo, son nom, son pseudo dessous, et les lettres tapées en gras
+- Et la recherche ignore les accents et les majuscules, et trouve le début du nom, d'un mot du nom
+  ou du pseudo (« @le » trouve aussi Léa et Lefèvre) ; un mot commence après une espace, un tiret ou
+  une apostrophe (« @pie » trouve Jean-Pierre ; décision D2)
+- Et les proches d'abord (l'auteur du projet, ceux qui l'ont commenté, ceux qu'il suit), comme
+  aujourd'hui
+- Et les flèches du clavier passent d'une suggestion à l'autre, Entrée choisit, Échap ferme la
+  liste sans fermer la feuille
+- Quand il choisit Léa
+- Alors « @lea_moreau » est écrit dans le champ, suivi d'une espace
+
+**La pastille**
+- Étant donné un commentaire publié qui mentionne Léa
+- Alors la mention s'affiche en pastille miel avec son nom, « @Léa Moreau »
+- Et le nom suit la personne : si elle change de nom, la pastille aussi
+- Et toucher la pastille ouvre la page de Léa ; le lecteur d'écran lit « Léa Moreau, ouvre son
+  profil » (sans pseudo : le pseudo écrit peut être devenu celui d'un autre ; décision D3)
+- Et un pseudo qui ne désigne personne (ou un membre bloqué, dans un sens ou dans l'autre) reste du
+  texte simple, comme aujourd'hui
+
+### Le menu « … » (planches `R5b-Commentaires`, `R5b-Menu-Etats`)
+
+- Sur son propre commentaire : « Modifier » et « Supprimer » (en rouge)
+- Sur le commentaire d'un autre, sur son propre projet : « Masquer » et « Signaler »
+- Sur le commentaire d'un autre, ailleurs : « Signaler »
+- Et le lecteur d'écran lit le bouton « Actions du commentaire de Léa Moreau »
+- Et le menu se ferme par un toucher à côté, Échap ou Retour, et rend le focus à « … »
+
+**Modifier**
+- Quand il touche « Modifier »
+- Alors le texte passe dans le champ du bas, avec un bandeau « Modifier ton commentaire » et une
+  croix qui annule, et le commentaire est surligné
+- Et l'envoi remplace le texte ; « modifié » apparaît à côté de la date
+
+**Supprimer**
+- Quand il touche « Supprimer »
+- Alors la fenêtre de confirmation d'aujourd'hui s'ouvre (« Supprimer ce commentaire ? ») ;
+  confirmer le supprime, et le nombre du titre descend
+- Et une racine qui a des réponses devient « Commentaire supprimé », comme aujourd'hui
+
+**Masquer et démasquer** (pour l'auteur du projet)
+- Quand l'auteur du projet touche « Masquer » sur le commentaire de Hugo
+- Alors le commentaire reste à sa place pour lui, en gris, avec la pastille « Masqué par toi »,
+  « Il ne reste visible que de toi et de la personne qui l'a écrit. » et le lien « Démasquer »
+- Et Hugo, lui, voit encore son commentaire, avec « Masqué par l'auteur du projet » et « Il ne reste
+  visible que de toi et de l'auteur du projet. »
+- Et les autres membres voient à sa place « Commentaire masqué », s'il a des réponses (comme
+  aujourd'hui)
+
+**Signaler**
+- Quand il touche « Signaler »
+- Alors le signalement d'aujourd'hui s'ouvre sur ce commentaire
+
+### Les états (planche `R5b-Menu-Etats`)
+
+- Un commentaire supprimé qui a des réponses : une icône de bulle et « Commentaire supprimé »
+- Retiré par la modération : une icône de bouclier et « Contenu retiré par la modération » (et pour
+  son auteur, l'encadré de retrait d'aujourd'hui)
+- D'un membre qu'il a bloqué : une icône d'interdiction et « Commentaire d'un membre que tu as
+  bloqué »
+- D'un membre qui l'a bloqué : « Commentaire indisponible »
+- Et ces lignes n'ont ni nom, ni date, ni « Répondre », ni menu ; leurs réponses restent dessous,
+  avec le trait
+- Et un commentaire long se replie après 10 lignes, avec « Lire la suite » (repris des listes)
+
+### Les gardes reprises
+
+- Un double toucher sur l'envoi n'envoie qu'un commentaire ; sur « Supprimer », une seule
+  suppression
+- Pendant un envoi, la feuille ne se ferme pas d'un glissement accidentel
+- Un membre suspendu lit les commentaires, mais n'a ni champ ni « Répondre » ; le bandeau de
+  suspension le dit (comme aujourd'hui)
+- Et sous l'aperçu, dès un commentaire, il a « Voir les N commentaires », qui ouvre la feuille en
+  lecture seule, jamais « Commenter » ; sans commentaire, le titre et « Aucun commentaire pour
+  l'instant. », sans bouton
+- Le focus du clavier ne se perd jamais : après un envoi, il reste dans le champ ; après une
+  suppression, il va au commentaire voisin ; à la fermeture d'un bandeau, dans le champ
+- Après un envoi, « Commentaire publié. » est seulement lu par les lecteurs d'écran ; après une
+  suppression, « Ton commentaire a été supprimé. » aussi : aucun encadré, le commentaire qui apparaît
+  ou disparaît le montre déjà
+- Les textes suivent la taille de texte de l'appareil ; à 200 % et 320 px, « Commentaires 6 » ne se
+  coupe pas au milieu d'un mot (repris des listes)
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) passe par la feuille : Sam ouvre « Voir les … commentaires », commente en
+  mentionnant l'auteur par la suggestion, Léa répond par « Répondre », puis masque le commentaire de
+  Sam par le menu « … » ; le reste du parcours (signalement, blocage) passe aussi par le menu
+
+### Repris des listes « À reprendre »
+
+- « Commentaires (7) » coupé au milieu du mot à 200 % de texte et 320 px
+- Replier un commentaire long après une dizaine de lignes (« Lire la suite »)
+- Les états `errorAction` de `CommentCard` au catalogue
+- Sur téléphone, le focus du lecteur d'écran qui ne revient pas à « … » quand le menu se ferme
+  (pour le menu d'un commentaire)
+
+### Les choix de Louis (4/11/2026)
+
+1. **Sur ordinateur, « Voir les 6 commentaires »** : la liste se déroule dans la colonne de droite,
+   où le champ est déjà ; pas de feuille par-dessus la page.
+2. **L'aperçu** : les 3 (ou 5) premières lignes de la feuille, réponses comprises.
+3. **Répondre à une réponse** : le champ commence par la mention de la personne.
+4. **Le compteur** : à partir de 900 caractères.
+5. **Modifier** : dans le champ du bas, avec un bandeau, comme Répondre.
+6. **« Lire la suite »** après 10 lignes : dans R5b.
+
+Après la relecture du plan (sécurité, juridique, interface ; Louis, 4/11/2026 vers 23 h 55) :
+
+7. **D1, glisser la feuille** : toutes les feuilles se ferment en les glissant vers le bas, sauf
+   pendant un envoi.
+8. **D2, les mots du nom** : un mot commence après une espace, un tiret ou une apostrophe.
+9. **D3, la pastille lue** : le nom seul, « Léa Moreau, ouvre son profil ».
+10. **D4, le projet privé** : la bannière et l'état vide corrigés dans R5b (l'auteur d'un projet
+    privé ne lit pas les commentaires des autres).
+
+Pendant l'assemblage (Louis, 6/11/2026) :
+
+11. **Après un envoi ou une suppression** : l'avis est seulement lu par les lecteurs d'écran, sans
+    encadré.
+12. **Le membre suspendu** : « Voir les N commentaires » dès un commentaire, sans bouton s'il n'y en
+    a aucun.
+13. **Le glisser de la feuille** : au toucher seulement ; à la souris, « Fermer », Échap et le voile.
+14. **Un commentaire supprimé gardé pour ses réponses** n'a plus de date, comme le dit « ni nom, ni
+    date ».
+
+Après les relectures de la branche (Louis, 7/11/2026) :
+
+15. **La feuille de jour** est crème et opaque, comme la planche, sur toutes les feuilles ; la nuit ne
+    change pas.
+16. **Un emplacement n'a plus de date, dans l'API non plus** : `createdAt` vaut `null` pour un
+    commentaire supprimé, masqué, retiré, bloqué ou indisponible.
+17. **Répondre depuis la colonne** : le bandeau rappelle un extrait d'une ligne, sur ordinateur
+    seulement, puisque la carte visée peut être hors de l'écran.
+18. **La densité** : les écarts se réduisent pour montrer 4 commentaires par écran à 390 × 844, zones
+    à toucher de 44 points gardées.
+19. **Les fenêtres basses** : la légende se réduit à la phrase qui dit qui lira.
+20. **La photo en mode réponse** : gardée dès 360 px, retirée en dessous, où le champ serait trop
+    étroit.
+21. **Gardés** : le texte sous le nom et plus de trait entre les fils ; « Envoyer » de la colonne en
+    blanc ; le glisser limité à la tête de la feuille ; sur ordinateur, à 5 commentaires ou moins, la
+    liste complète plutôt que l'aperçu.
+22. **Les textes vrais** : un compteur à zéro n'est pas « aucun » pour qui lit un commentaire non
+    compté ; un projet retiré n'a ni champ ni audience (« Aucun commentaire à lire pendant le retrait
+    du projet… ») ; un suspendu lit dans la feuille pourquoi il n'y a pas de champ ; sur un projet
+    privé, un emplacement dit « Commentaire gardé tant que le projet est privé » plutôt que
+    « masqué » ; le réglage de recherche dit qu'on te trouve aussi après « @ ».
+
+- Et les textes de masquage disent qui voit encore le commentaire, et les aides sous le champ
+  restent celles d'aujourd'hui (relecture juridique).

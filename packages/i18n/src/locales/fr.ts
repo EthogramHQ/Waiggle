@@ -419,7 +419,7 @@ export const fr = {
     previewTitle: 'Aperçu de ta page',
     /** R3 : sous le nom, la rubrique dit que la recherche trouve le membre (relecture juridique, jur-J3). */
     searchable:
-      'Les membres connectés peuvent te trouver par ton nom ou ton pseudo dans la recherche.',
+      'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
   },
   project: {
     new: {
@@ -439,7 +439,7 @@ export const fr = {
       status: 'Où en est-il ?',
       public: 'Public',
       publicHint:
-        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
+        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
@@ -567,43 +567,76 @@ export const fr = {
       },
     },
     comments: {
-      title: 'Commentaires ({{count}})',
-      titleNone: 'Commentaires',
-      empty: 'Pas encore de commentaire.',
+      // R5b : le titre seul ; le nombre est dessiné à côté par `CountedTitle` et lu par `spokenCount`.
+      title: 'Commentaires',
+      spokenCount_one: '{{count}} commentaire',
+      spokenCount_other: '{{count}} commentaires',
+      seeAll_one: 'Voir le commentaire',
+      seeAll_other: 'Voir les {{count}} commentaires',
+      empty: 'Aucun commentaire pour l’instant.',
+      // Un projet privé garde les commentaires des autres, que personne ne lit (R5b, jur-P9, `sees`).
+      emptyPrivate:
+        'Aucun commentaire à lire pour l’instant. Ceux que d’autres membres auraient laissés sont gardés : aucun membre, toi compris, ne les lit tant que le projet reste privé.',
+      emptyRemoved:
+        'Aucun commentaire à lire pendant le retrait du projet. Ceux que d’autres membres auraient laissés restent gardés.',
+      suspendedNote: 'Tu ne peux pas commenter pendant la suspension.',
+      send: 'Envoyer',
+      sendLabel: 'Envoyer le commentaire',
+      replyTo: 'Réponse à {{name}}',
+      replyToExcerpt: 'Réponse à {{name}} : « {{excerpt}} »',
+      editing: 'Modifier ton commentaire',
+      cancelReply: 'Annuler la réponse',
+      cancelEdit: 'Annuler la modification',
+      counter: '{{count}} / {{max}}',
+      counterSpoken_one: '{{count}} caractère sur {{max}}',
+      counterSpoken_other: '{{count}} caractères sur {{max}}',
+      tooLong_one: '{{count}} caractère de trop.',
+      tooLong_other: '{{count}} caractères de trop.',
+      author: 'Auteur',
+      // Le lien du nom de l'auteur du projet, lu avec son badge (R5b, ui-M1).
+      authorLink: '{{name}}, Auteur',
+      menu: 'Actions du commentaire de {{name}}',
+      yours: 'Ton commentaire',
+      // La carte compacte de l'aperçu : un seul bouton, nommé par l'auteur et l'extrait (ui-B7).
+      openLine: 'Commentaire de {{name}} : {{excerpt}}',
+      openLineMine: 'Ton commentaire : {{excerpt}}',
+      hiddenNote: 'Il ne reste visible que de toi et de la personne qui l’a écrit.',
+      hiddenByAuthor: 'Masqué par l’auteur du projet',
+      hiddenByAuthorNote: 'Il ne reste visible que de toi et de l’auteur du projet.',
+      readMore: 'Lire la suite',
+      readLess: 'Réduire',
       add: 'Écrire un commentaire',
       addShort: 'Commenter',
-      field: 'Ton commentaire',
       hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
+      // Les légendes réduites d'une fenêtre basse (R5b) : seulement qui lira.
+      hintShort: 'Tous les membres connectés liront ton commentaire.',
+      hintPrivateShort: 'Ce projet est privé : personne d’autre que toi ne lira ce commentaire.',
+      replyHintShort: 'Tous les membres connectés liront ta réponse.',
+      replyHintPrivateShort:
+        'Ce projet est privé : personne d’autre que toi ne lira cette réponse.',
+      editHintShort: 'Tous les membres connectés liront la nouvelle version.',
       hintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
       about: '{{name}} : {{text}}',
-      submit: 'Publier le commentaire',
-      required: 'Écris ton commentaire avant de le publier.',
       published: 'Commentaire publié.',
       error: 'Le commentaire n’a pas pu être publié. Réessaie.',
       limited: 'Tu as publié 60 commentaires en une heure. Attends un peu avant le suivant.',
       reply: 'Répondre',
-      replyField: 'Ta réponse',
       replyHint:
         'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient public, tous les membres la liront.',
-      replySubmit: 'Publier la réponse',
-      replyRequired: 'Écris ta réponse avant de la publier.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
       replyGone: 'Ce fil n’accepte plus de réponse.',
       replyPublished: 'Réponse publiée.',
-      edit: 'Modifier le commentaire',
       editShort: 'Modifier',
       editHint:
         'Tous les membres connectés liront la nouvelle version, marquée « modifié ». La personne qui a publié le projet peut la masquer.',
       editHintHidden:
         'Ce commentaire est masqué : il ne reste visible que de toi et de la personne qui a publié le projet.',
-      editSubmit: 'Enregistrer',
       editError: 'Le commentaire n’a pas pu être modifié. Réessaie.',
       saved: 'Commentaire modifié.',
       edited: 'modifié',
-      delete: 'Supprimer le commentaire',
       deleteShort: 'Supprimer',
       deleteTitle: 'Supprimer ce commentaire ?',
       deleteBody: 'Il disparaîtra pour tout le monde.',
@@ -612,12 +645,8 @@ export const fr = {
       confirmDelete: 'Supprimer',
       deleteError: 'Le commentaire n’a pas pu être supprimé. Réessaie.',
       deleted: 'Ton commentaire a été supprimé.',
-      hide: 'Masquer le commentaire',
-      unhide: 'Démasquer le commentaire',
       hideShort: 'Masquer',
       unhideShort: 'Démasquer',
-      hiddenBanner:
-        'Masqué par la personne qui a publié le projet : les autres membres ne le voient plus.',
       hiddenByMe: 'Masqué par toi',
       hiddenDone:
         'Commentaire masqué : il ne reste visible que de toi et de la personne qui l’a écrit.',
@@ -625,6 +654,8 @@ export const fr = {
       hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
       deletedPlaceholder: 'Commentaire supprimé',
       hiddenPlaceholder: 'Commentaire masqué',
+      privateKeptPlaceholder: 'Commentaire gardé tant que le projet est privé',
+      removedKeptPlaceholder: 'Commentaire gardé pendant le retrait du projet',
       removedPlaceholder: 'Contenu retiré par la modération',
       // Tranche 7b : « Commentaire masqué » reste au geste de l'auteur du projet (J6).
       blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',
@@ -646,8 +677,10 @@ export const fr = {
       // Le bouton du haut, d'où qu'on arrive (ui-11 : « Retour au fil » mentirait en venant d'ailleurs).
       back: 'Retour',
       notFoundAction: 'Retour au fil',
+      // R5b (D4, jur-P9) : l'auteur ne lit pas non plus les commentaires ni les réactions des autres
+      // sur son projet privé (`sees` des commentaires, `reactions/load.ts`).
       privateBanner:
-        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant qu’il reste privé.',
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       tryDemo: 'Tester la démo',
@@ -1025,6 +1058,10 @@ export const fr = {
     suggestions: 'Membres à mentionner',
     /** Un membre proposé : son nom, puis son pseudo. */
     option: '{{name}}, @{{handle}}',
+    /** R5b : le titre de la liste, au-dessus des suggestions. */
+    title: 'Mentionner quelqu’un',
+    /** R5b (D3) : la pastille d'une mention, lue avec le nom seul (le pseudo écrit peut être périmé). */
+    pill: '{{name}}, ouvre son profil',
   },
   tag: {
     subtitle: 'Les projets publics faits avec cet outil.',

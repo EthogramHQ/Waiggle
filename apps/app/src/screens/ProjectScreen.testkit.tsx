@@ -169,13 +169,6 @@ export const shownComments = () =>
     /^(Super idée, je teste ce soir\.|Moi aussi, dis-nous !|Merci à vous deux\.|Ça marche aussi en anglais \?)$/,
   )
 
-/** Ouvre le champ, écrit un commentaire et le publie. */
-export const commentSomething = async (text = 'Bravo, ça marche !') => {
-  await fireEvent.press(await screen.findByRole('button', { name: 'Écrire un commentaire' }))
-  await fireEvent.changeText(screen.getByLabelText('Ton commentaire'), text)
-  await fireEvent.press(screen.getByRole('button', { name: 'Publier le commentaire' }))
-}
-
 /** L'ancêtre le plus proche qui porte ce rôle (les listes et les groupes ne sont pas « accessibles »
  * sur téléphone : getByRole ne les trouve pas, leur rôle sert au web). */
 export const ancestorWithRole = (node: ReturnType<typeof screen.getByText>, role: string) => {

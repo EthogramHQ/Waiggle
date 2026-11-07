@@ -3,7 +3,7 @@
 // l'API (GET /v1/members/mentionable), et abandonne une demande devenue inutile. Les écrans
 // n'appellent que ce hook ; les tests le remplacent par un faux.
 import { MENTION_QUERY_MIN, type Mentionable, MentionableList } from '@ruche/contracts'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { request } from '../api/client'
 
@@ -42,18 +42,18 @@ const pathOf = (projectId: string, query: string) => {
 
 /**
  * Hook : les membres à proposer pour « @<query> » sur ce projet (les proches d'abord, l'API les
- * range). `query` est le début du pseudo, sans « @ », ou null quand on ne cherche rien.
+ * range). `query` est la recherche repliée, sans « @ » (le début du pseudo ou d'un mot du nom), ou
+ * null quand on ne cherche rien.
  *
  * - Rien sous 2 caractères : la recherche serait trop large.
  * - On attend 250 ms après la dernière lettre : une demande par mot plutôt qu'une par lettre.
  * - React Query passe un `signal` (AbortSignal) à la fonction de lecture. Transmis à fetch, il
  *   permet d'abandonner la demande : quand le texte change, l'ancienne recherche n'a plus de
  *   lecteur, et React Query l'annule au lieu d'attendre une réponse qui ne servira plus.
- * - Pendant qu'une nouvelle recherche part, la liste précédente reste affichée
- *   (`keepPreviousData`) : les suggestions ne clignotent pas à chaque lettre. Elle peut donc
- *   répondre à une autre recherche (« in » pendant qu'on tape « ma ») : MentionField ne garde que
- *   les membres dont le pseudo commence par ce qui est tapé (l'API cherche par début de pseudo,
- *   la règle est la même), et rien d'une réponse périmée ne peut être choisi.
+ * - La liste rendue répond toujours à `query`, jamais à une recherche plus ancienne : pendant
+ *   l'attente et jusqu'à la réponse, personne (R5b, ui-B6 ; l'API trouve aussi par le nom, le champ
+ *   ne peut plus trier une liste périmée par pseudo). L'écran passe donc `query` en `suggestionsFor`
+ *   de MentionField.
  * - Un refus de l'API (quota dépassé, réseau) ne propose personne, sans message : écrire le
  *   commentaire reste possible, on tape alors le pseudo en entier.
  */
@@ -69,10 +69,9 @@ export const useMentionable = (projectId: string, query: string | null): Mention
     enabled: settled !== null,
     // Les mêmes lettres retapées dans la minute : la réponse déjà reçue suffit.
     staleTime: 60_000,
-    placeholderData: keepPreviousData,
   })
-  // Plus rien à chercher (le mot est fini, la liste refermée) : personne, même si une ancienne
-  // réponse est encore en mémoire.
-  if (wanted === null) return NOBODY
+  // Plus rien à chercher (le mot est fini, la liste refermée), ou la recherche demandée n'est pas
+  // encore celle qui part (les 250 ms) : personne, même si une ancienne réponse est en mémoire.
+  if (wanted === null || settled !== wanted) return NOBODY
   return result.data ?? NOBODY
 }

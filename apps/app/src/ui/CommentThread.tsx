@@ -1,30 +1,57 @@
-// Un fil de commentaires (tranche 5) : le commentaire « racine », puis ses réponses, de la plus
-// ancienne à la plus récente, en retrait derrière un trait fin qui les rattache à lui. Au bout du
-// fil, un seul « Répondre » : les réponses vont toujours au bout du fil (elles tiennent sur un seul
-// niveau), et c'est là que le champ s'ouvre, à la place du bouton, là où la réponse viendra se
-// ranger. L'écran ne donne pas « Répondre » quand on ne peut pas répondre (racine supprimée ou
-// masquée).
-// Le composant fait la mise en page et garde le focus : quand le champ se referme (réponse publiée
-// ou annulée), le focus du clavier revient sur « Répondre », revenu à sa place. Les cartes
-// (CommentCard) et le champ (NoteComposer) sont donnés par l'écran.
-import { borders, space } from '@ruche/brand'
-import {
-  Children,
-  type ReactNode,
-  type Ref,
-  useEffect,
-  useId,
-  useImperativeHandle,
-  useRef,
-} from 'react'
-import { Platform, View } from 'react-native'
-import { ActionDescription, type CommentAction, CommentActionButton } from './CommentAction'
-import { COMMENT_AVATAR } from './CommentCard'
-import { focusWithoutScroll } from './focus'
+// Un fil de commentaires (tranche 5, redessiné en R5b, planche `R5b-Commentaires`) : le commentaire
+// « racine », puis ses réponses, de la plus ancienne à la plus récente, en retrait. Un trait part de
+// sous la photo de la racine, descend le long des réponses et tourne vers chacune par un coude
+// arrondi, jusqu'à sa photo. Sans réponse, aucun trait.
+//
+// Depuis R5b, « Répondre » est sous chaque commentaire (dans sa carte) et le champ est en bas de la
+// feuille : le fil ne fait plus que la mise en page. Les cartes (des `CommentCard`) sont données par
+// l'écran ; un emplacement (« Commentaire supprimé ») garde ses réponses dessous, avec le trait.
+//
+// Pour les lecteurs d'écran (relecture de l'interface ui-M1) : le fil est un élément de la liste des
+// fils (`listitem`), et ses réponses une liste imbriquée, dont chaque réponse est un élément. On
+// entend ainsi « liste, 2 éléments » sous un commentaire, et l'on saute d'une réponse à l'autre.
+// La liste qui contient les fils n'enveloppe donc pas ses enfants dans des éléments de liste
+// (pas de `Stack accessibilityRole="list"`) : un élément dans un élément est du HTML invalide, que
+// le navigateur répare en lisant la page pré-rendue, et React échoue alors à l'hydrater.
+//
+// Le trait est un dessin : caché aux lecteurs d'écran, jamais touchable.
+import { borders, layout, space } from '@ruche/brand'
+import { Children, isValidElement, type ReactNode } from 'react'
+import { View, type ViewStyle } from 'react-native'
+import { useLargeText } from './textScale'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Ce qu'un écran peut demander au fil : poser le focus sur « Répondre » (vrai s'il est là). */
-export type CommentThreadHandle = { focusReply: () => boolean }
+/**
+ * Les tailles des photos d'une carte (`COMMENT_AVATAR` de CommentCard : 36 pour la racine, 28 pour
+ * une réponse). Le trait se place d'après elles : sous le milieu de la photo de la racine, jusqu'au
+ * milieu de celle de chaque réponse. Recopiées ici pour que le fil ne dépende pas de la carte ;
+ * elles changent ensemble.
+ */
+const AVATAR = { root: 36, reply: 28 } as const
+
+/**
+ * La carte pose sa photo à ce retrait du bord gauche, dans une rangée de cette hauteur, où elle est
+ * centrée (la hauteur à toucher du lien du nom), sans marge au-dessus ; le trait se place d'après
+ * eux, recopiés comme `AVATAR`.
+ */
+const CARD_PADDING = space.sm
+const CARD_ROW = layout.touchTarget
+/** Le trait vertical, centré sous la photo de la racine (sa position depuis le bord du fil). */
+const TRUNK = CARD_PADDING + AVATAR.root / 2 - borders.thread / 2
+/** Le retrait des réponses : leur photo s'aligne sur le nom de la racine, à droite de sa photo. */
+const INDENT = AVATAR.root + space.sm
+/** L'arrondi du coude. */
+const ELBOW_RADIUS = space.md
+/**
+ * Entre la racine et sa première réponse, puis entre deux réponses. Le même écart qu'entre deux fils,
+ * celui que « Répondre » laisse dépasser sous sa carte : les zones de 44 points se touchent sans se
+ * chevaucher (décision 18).
+ */
+const GAP = { first: space.md, between: space.md } as const
+/** La hauteur, depuis le haut d'une réponse, où le coude arrive : le milieu de sa photo. */
+const ELBOW_END = CARD_ROW / 2
+/** Où le trait part, depuis le haut de la racine : juste sous sa photo. */
+const TRUNK_START = (CARD_ROW + AVATAR.root) / 2 + space.xs
 
 type Props = {
   /** Le commentaire racine (une CommentCard), et ce qui le suit de près (une confirmation). */
@@ -32,82 +59,120 @@ type Props = {
   /** Ses réponses, dans l'ordre (des CommentCard). */
   replies?: ReactNode
   /**
-   * « Répondre », au bout du fil ; absent quand on ne peut pas répondre. `description` dit aux
-   * lecteurs d'écran à quel commentaire (« Max : Super idée… »).
+   * Ce qui vient tout au bout du fil, sous les réponses et à leur retrait, sans trait : une
+   * confirmation, une erreur propre au fil.
    */
-  replyAction?: (CommentAction & { description?: string }) | undefined
-  /** Le champ d'une réponse en cours : il prend la place de « Répondre ». */
-  composer?: ReactNode
-  /** Ce qui vient tout au bout du fil : une confirmation (« Réponse publiée. »). */
   footer?: ReactNode
-  handle?: Ref<CommentThreadHandle>
+  /**
+   * Le fil est un élément de liste (par défaut). Faux quand `CommentList` pose déjà cet élément autour
+   * de lui : un élément dans un élément est du HTML invalide (voir plus haut), et la liste compterait
+   * deux fois chaque fil.
+   */
+  listItem?: boolean
+  /**
+   * Retirés en R5b : « Répondre » est dans chaque carte (`CommentCard onReply`), et le champ en bas
+   * de la feuille (`CommentComposer`). `never` refuse toute valeur, une erreur de typage par
+   * propriété : un écran qui les passe encore se voit à la compilation.
+   */
+  replyAction?: never
+  composer?: never
 }
 
-// Le peu du navigateur dont on a besoin ici : savoir si le focus est retombé sur la page.
-const lostFocus = () => {
-  const document = (globalThis as { document?: { activeElement: unknown; body: unknown } }).document
-  return !document?.activeElement || document.activeElement === document.body
+/**
+ * Un morceau du trait. Caché aux lecteurs d'écran sur le web (`aria-hidden`) comme sur téléphone
+ * (Android : `importantForAccessibility`, iOS : `accessibilityElementsHidden`), et laissé passer au
+ * doigt (`pointerEvents` en propriété : en style, react-native-web le traduit mal). Posé sous le
+ * contenu (`zIndex: -1`, dans un élément qui forme sa propre pile) : sur la carte grise de ses
+ * propres commentaires, il passe dessous au lieu de la barrer.
+ */
+function Line({ style }: { style: ViewStyle }) {
+  return (
+    <View
+      aria-hidden
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+      pointerEvents="none"
+      style={[{ position: 'absolute', zIndex: -1 }, style]}
+    />
+  )
 }
 
-export function CommentThread({ root, replies, replyAction, composer, footer, handle }: Props) {
+export function CommentThread({ root, replies, footer, listItem = true }: Props) {
   const { colors } = useTheme()
-  const replyButton = useRef<View>(null)
-  const descriptionId = useId()
-  useImperativeHandle(handle, () => ({
-    focusReply: () => focusWithoutScroll(replyButton.current),
-  }))
-
-  // Children.toArray retire les « rien » (null, false) : sans réponse ni champ, pas de retrait vide.
-  const hasReplies = Children.toArray(replies).length > 0
-  const hasComposer = Children.toArray(composer).length > 0
+  // Children.toArray retire les « rien » (null, false) : sans réponse, ni liste vide ni trait.
+  const items = Children.toArray(replies)
+  const hasReplies = items.length > 0
   const hasFooter = Children.toArray(footer).length > 0
-
-  // Le champ vient de se refermer : le bouton qu'on avait touché (« Publier la réponse »,
-  // « Annuler ») a disparu, et sur le web le focus est retombé sur la page. On le pose sur
-  // « Répondre », revenu à la même place, sans faire défiler la page.
-  const wasComposing = useRef(hasComposer)
-  useEffect(() => {
-    const closed = wasComposing.current && !hasComposer
-    wasComposing.current = hasComposer
-    if (closed && Platform.OS === 'web' && lostFocus()) focusWithoutScroll(replyButton.current)
-  }, [hasComposer])
-
-  const reply = hasComposer ? (
-    composer
-  ) : replyAction ? (
-    // marginLeft négatif : le texte de « Répondre » s'aligne sur celui des réponses.
-    <View style={{ flexDirection: 'row', marginLeft: -space.sm }}>
-      {replyAction.description ? (
-        <ActionDescription id={descriptionId} text={replyAction.description} />
-      ) : null}
-      <CommentActionButton
-        ref={replyButton}
-        action={replyAction}
-        describedById={replyAction.description ? descriptionId : undefined}
-        hint={replyAction.description}
-      />
-    </View>
-  ) : null
+  const ink = colors.line
+  // Très agrandi, le texte de la carte passe sous la photo (CommentCard) : le trait n'y descend plus.
+  const { large, probe } = useLargeText()
 
   return (
-    <View style={{ gap: space.md }}>
-      {root}
-      {hasReplies || reply || hasFooter ? (
-        <View
-          style={{
-            // Le trait part sous le milieu de la photo de la racine.
-            marginLeft: COMMENT_AVATAR.root / 2 - borders.thread / 2,
-            paddingLeft: space.lg,
-            borderLeftWidth: borders.thread,
-            borderLeftColor: colors.line,
-            gap: space.lg,
-          }}
-        >
-          {replies}
-          {reply}
-          {footer}
+    <View {...(listItem ? { role: 'listitem' as const } : null)} style={{ gap: GAP.first }}>
+      {hasReplies ? probe : null}
+      {/* zIndex: 0 fait de chaque bloc sa propre pile : le trait (zIndex -1) passe sous la carte,
+          mais reste au-dessus du fond de la page. */}
+      <View style={{ zIndex: 0 }}>
+        {hasReplies && !large ? (
+          // Le départ du trait : de sous la photo de la racine jusqu'au bas de sa carte.
+          <Line
+            style={{
+              left: TRUNK,
+              top: TRUNK_START,
+              bottom: 0,
+              width: borders.thread,
+              backgroundColor: ink,
+            }}
+          />
+        ) : null}
+        {root}
+      </View>
+      {hasReplies ? (
+        <View accessibilityRole="list" style={{ marginLeft: INDENT, gap: GAP.between }}>
+          {items.map((reply, index) => {
+            const last = index === items.length - 1
+            // L'écart au-dessus de cette réponse, que son morceau de trait franchit.
+            const above = index === 0 ? GAP.first : GAP.between
+            return (
+              <View
+                key={isValidElement(reply) && reply.key !== null ? reply.key : index}
+                role="listitem"
+                style={{ zIndex: 0 }}
+              >
+                {/* Le trait vertical, de la réponse d'au-dessus (ou de la racine) jusqu'au coude ;
+                    il continue jusqu'en bas de la réponse quand une autre la suit. Les morceaux
+                    se touchent bout à bout : de nuit, le trait est translucide, et deux morceaux
+                    posés l'un sur l'autre se verraient plus clairs. Seul le départ du coude d'une
+                    réponse suivie d'une autre croise le trait qui continue, sur quelques points. */}
+                <Line
+                  style={{
+                    left: TRUNK - INDENT,
+                    top: -above,
+                    width: borders.thread,
+                    backgroundColor: ink,
+                    ...(last ? { height: above + ELBOW_END + 1 - ELBOW_RADIUS } : { bottom: 0 }),
+                  }}
+                />
+                {/* Le coude : un quart d'arrondi, du trait vertical jusqu'au bord de la photo. */}
+                <Line
+                  style={{
+                    left: TRUNK - INDENT,
+                    top: ELBOW_END + 1 - ELBOW_RADIUS,
+                    width: INDENT + CARD_PADDING - TRUNK - space.xs,
+                    height: ELBOW_RADIUS,
+                    borderLeftWidth: borders.thread,
+                    borderBottomWidth: borders.thread,
+                    borderBottomLeftRadius: ELBOW_RADIUS,
+                    borderColor: ink,
+                  }}
+                />
+                {reply}
+              </View>
+            )
+          })}
         </View>
       ) : null}
+      {hasFooter ? <View style={{ marginLeft: INDENT }}>{footer}</View> : null}
     </View>
   )
 }

@@ -123,8 +123,10 @@ export function Surface({
       borderWidth: borders.hairline,
       borderColor: colors.panelBorder,
     },
+    // De jour, la feuille est opaque, partout, Android compris. De nuit, sans flou (Android), la surface
+    // pleine plutôt qu'un verre où passerait la page.
     sheet: {
-      backgroundColor: realBlur ? colors.sheet : colors.surface,
+      backgroundColor: realBlur || scheme === 'day' ? colors.sheet : colors.surface,
     },
     // Sans flou (Android), le même voile que derrière une feuille ou une fenêtre.
     veil: { backgroundColor: colors.scrim },
@@ -152,6 +154,8 @@ export function Surface({
     ...fitStyle,
   }
 
+  // Android n'a pas ces couches : le contenu est posé sur la surface. La feuille de jour, partout
+  // ailleurs, garde les deux boîtes (l'une pour l'ombre, l'autre pour les coins), sans flou.
   if (blur > 0 && realBlur) {
     // Deux boîtes : l'extérieure porte l'ombre, l'intérieure rogne aux coins arrondis
     // (overflow: 'hidden'), ce qui rognerait aussi l'ombre si elles étaient ensemble.
@@ -178,8 +182,9 @@ export function Surface({
       <View style={{ ...corners, ...(boxShadow ? { boxShadow } : null), alignSelf, ...fitStyle }}>
         <View style={{ ...inner, overflow: 'hidden' }}>
           {/* Les couches reprennent les coins arrondis : sur le web, une couche floutée n'est pas
-              rognée par l'arrondi de son parent, et ses coins carrés dépasseraient. */}
-          {Platform.OS === 'web' ? (
+              rognée par l'arrondi de son parent, et ses coins carrés dépasseraient.
+              La feuille de jour est opaque : aucun flou, il coûterait sans se voir. */}
+          {variant === 'sheet' && scheme === 'day' ? null : Platform.OS === 'web' ? (
             <View style={[StyleSheet.absoluteFill, layerCorners, webBlur(blur)]} />
           ) : (
             <BlurView

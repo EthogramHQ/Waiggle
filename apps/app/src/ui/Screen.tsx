@@ -452,9 +452,9 @@ export function Screen({
               </ScreenTopBar>
             ) : null}
             {pinned ? (
-              // La barre fixe, hors de la zone qui défile. Son fond « feuille » est presque opaque : il
-              // cache le contenu qui passe dessous, mais laisse transparaître la lumière d'ambiance, qui ne
-              // s'arrête plus net sous la barre.
+              // La barre fixe, hors de la zone qui défile. Son fond « feuille » cache le contenu qui
+              // passe dessous : opaque de jour (la crème de la page, décision du 7/11/2026), presque
+              // opaque de nuit, où il laisse transparaître la lumière d'ambiance.
               <View
                 style={{
                   paddingTop: insets.top + space.sm,

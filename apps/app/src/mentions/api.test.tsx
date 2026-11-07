@@ -100,6 +100,24 @@ describe('useMentionable', () => {
     await waitFor(() => expect(requested()).toEqual([pathFor('in'), pathFor('ine')]))
   })
 
+  it('never answers a search with the members of an older one', async () => {
+    const { result, rerender } = await renderHook(
+      ({ query }: { query: string }) => useMentionable(projectId, query),
+      { wrapper, initialProps: { query: 'in' } },
+    )
+    await wait(250)
+    await waitFor(() => expect(result.current).toEqual([inesMember, inikoMember]))
+
+    await rerender({ query: 'ma' })
+
+    // Pendant l'attente de 250 ms, puis de la réponse : personne, plutôt que les membres de « in ».
+    expect(result.current).toEqual([])
+    jest.mocked(request).mockReturnValueOnce(new Promise(() => {}))
+    await wait(250)
+    await waitFor(() => expect(requested()).toEqual([pathFor('in'), pathFor('ma')]))
+    expect(result.current).toEqual([])
+  })
+
   it('proposes nobody when the API refuses', async () => {
     jest.mocked(request).mockResolvedValue({ ok: false, error: 'rateLimited' })
     const { result } = await renderHook(() => useMentionable(projectId, 'in'), { wrapper })

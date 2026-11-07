@@ -12,6 +12,12 @@ import { VisibleFreeText } from './text'
 
 /** Un commentaire fait au plus 1 000 caractères, comme une note. */
 export const COMMENT_MAX = 1_000
+/** R5b : le compteur « 900 / 1000 » n'apparaît sous le champ qu'à partir de 900 caractères. */
+export const COMMENT_COUNTER_FROM = 900
+/** R5b : l'aperçu sous le projet montre 3 commentaires sur téléphone, 5 sur un écran large. */
+export const COMMENT_PREVIEW = { phone: 3, wide: 5 } as const
+/** R5b : un texte plus long que 10 lignes se replie, avec « Lire la suite ». */
+export const COMMENT_FOLD_LINES = 10
 /** La page d'un projet charge ses commentaires racines 20 par 20, du plus récent au plus ancien. */
 export const COMMENT_PAGE_SIZE = 20
 /** Chaque racine vient avec ses réponses, du plus ancien au plus récent, 50 au plus. */
@@ -70,15 +76,30 @@ export const CommentState = z.enum([
 ])
 export type CommentState = z.infer<typeof CommentState>
 
+/**
+ * L'auteur d'un commentaire (R5b) : celui d'un projet, plus son pseudo actuel, dont l'appli se sert
+ * pour préremplir « @pseudo » quand on répond à une réponse. Null s'il n'a pas de pseudo, ou si le
+ * commentaire est lu malgré un blocage (sécurité B1 : comme la photo, le pseudo est un moyen de
+ * joindre la personne, et le blocage les retire tous).
+ */
+export const CommentAuthor = ProjectAuthor.extend({ handle: z.string().nullable() }).meta({
+  id: 'CommentAuthor',
+})
+export type CommentAuthor = z.infer<typeof CommentAuthor>
+
 /** Une réponse, ou une racine sans ses réponses. */
 export const CommentReply = z
   .object({
     id: CommentId,
     /** Null quand le commentaire n'est qu'un emplacement (« supprimé », « masqué » pour un tiers). */
-    author: ProjectAuthor.nullable(),
+    author: CommentAuthor.nullable(),
     /** Le texte tel qu'écrit ; vide quand l'auteur est null. */
     body: z.string(),
-    createdAt: z.iso.datetime(),
+    /**
+     * La date d'écriture ; null quand le commentaire n'est qu'un emplacement : un supprimé gardé pour
+     * ses réponses n'a plus de date, dans la réponse de l'API comme à l'écran (R5b, 7/11/2026).
+     */
+    createdAt: z.iso.datetime().nullable(),
     /** La dernière modification par son auteur ; null s'il n'y en a pas eu (« modifié »). */
     editedAt: z.iso.datetime().nullable(),
     state: CommentState,

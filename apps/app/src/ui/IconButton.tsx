@@ -3,7 +3,7 @@
 // lui qui permet aux tests de retrouver le bouton.
 import { borders, layout, pressScale, pressScaleFab, radii, space } from '@ruche/brand'
 import type { ReactNode, Ref } from 'react'
-import { Platform, Pressable, View, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Platform, Pressable, View, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { describedBy as describedByProps } from './aria'
 import { BADGE_SIZE } from './CountBadge'
@@ -15,8 +15,12 @@ type Props = {
   icon: IconName
   label: string
   onPress: () => void
-  /** glass : sur une image ou une lumière ; plain : sur une surface ; honey : action principale. */
-  variant?: 'glass' | 'plain' | 'honey'
+  /**
+   * glass : sur une image ou une lumière ; plain : sur une surface ; honey : action principale ;
+   * bare : répété dans une liste (le « … » de chaque commentaire), sans disque au repos ; il n'en
+   * prend un, de verre, que sous le doigt ou quand ce qu'il ouvre est ouvert (`expanded`).
+   */
+  variant?: 'glass' | 'plain' | 'honey' | 'bare'
   /** regular : 44 points ; large : 64 (jeton `layout.fab`), sans l'enfoncement du bouton flottant. */
   size?: 'regular' | 'large'
   /**
@@ -26,6 +30,13 @@ type Props = {
    */
   fab?: boolean
   disabled?: boolean
+  /**
+   * Une action est en route (l'envoi d'un commentaire) : le bouton est annoncé occupé, garde son nom,
+   * montre une roue à la place de l'icône et ignore les appuis, pour éviter un double envoi. Il n'est
+   * pas pour autant désactivé : sur le web, `disabled` le retirerait du parcours au clavier, et le
+   * focus retomberait sur la page (comme `Button`).
+   */
+  loading?: boolean
   /**
    * Le `nativeID` d'un texte qui précise sur quoi porte le bouton (voir aria.ts) : plusieurs
    * boutons « Supprimer la note » se distinguent ainsi par la note qu'ils suppriment.
@@ -64,6 +75,7 @@ export function IconButton({
   variant = 'glass',
   size = 'regular',
   disabled = false,
+  loading = false,
   describedBy,
   hint,
   ref,
@@ -90,12 +102,17 @@ export function IconButton({
       tone: 'default',
     },
     plain: { box: { backgroundColor: colors.surfaceGrouped }, tone: 'default' },
+    bare: { box: {}, tone: 'default' },
     honey: {
       box: { backgroundColor: colors.honey, boxShadow: `${shadows.highlight}, ${shadows.honey}` },
       tone: 'onHoney',
     },
   }
   const look = looks[variant]
+  // Un bouton miel inactif garde sa forme mais pâlit, sans ombre, comme `Button` : à 55 % d'opacité,
+  // son icône perdrait le contraste que garde le couple `honeyDisabled` / `onHoneyDisabled`.
+  const inactive = disabled || loading
+  const inactiveHoney = inactive && variant === 'honey'
 
   return (
     <Animated.View style={animated}>
@@ -107,18 +124,24 @@ export function IconButton({
         // Sur le web, aria-describedby suffit ; ailleurs, l'indice joue ce rôle.
         accessibilityHint={Platform.OS === 'web' ? undefined : hint}
         aria-disabled={disabled}
+        // « Occupé » : `aria-busy`, que react-native-web transmet au navigateur et que React Native
+        // traduit pour VoiceOver et TalkBack (accessibilityState seul serait ignoré sur le web).
+        aria-busy={loading}
         {...(expanded === undefined ? null : { 'aria-expanded': expanded })}
         {...(hasMenu && Platform.OS === 'web' ? { 'aria-haspopup': 'menu' } : null)}
         disabled={disabled}
-        onPress={onPress}
+        onPress={() => {
+          if (!loading) onPress()
+        }}
         onPressIn={() => {
-          scale.value = spring(fab ? pressScaleFab : pressScale, 'firm')
+          // Pendant une action en route, le bouton ne répond pas au doigt : il ne s'enfonce pas.
+          if (!loading) scale.value = spring(fab ? pressScaleFab : pressScale, 'firm')
         }}
         onPressOut={() => {
           scale.value = spring(1)
         }}
         // Le contour du focus clavier est commun à tous les éléments : voir app/+html.tsx.
-        style={[
+        style={({ pressed }) => [
           {
             width: diameter,
             height: diameter,
@@ -127,10 +150,18 @@ export function IconButton({
             justifyContent: 'center',
           },
           look.box,
-          disabled && { opacity: 0.55 },
+          // Le disque de `bare` : le verre se voit sur la feuille comme sur le gris de ses cartes.
+          variant === 'bare' && (pressed || expanded === true) && looks.glass.box,
+          inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
+          inactive && !inactiveHoney && { opacity: 0.55 },
         ]}
       >
-        <Icon name={icon} size={big ? 28 : 22} tone={look.tone} />
+        {/* La roue remplace l'icône dans le même rond : le bouton ne change pas de taille. */}
+        {loading ? (
+          <ActivityIndicator color={colors.textMuted} />
+        ) : (
+          <Icon name={icon} size={big ? 28 : 22} tone={inactiveHoney ? 'disabled' : look.tone} />
+        )}
       </Pressable>
       {badge ? (
         // Par-dessus le coin haut droit : elle déborde un peu du rond, sans agrandir la zone à

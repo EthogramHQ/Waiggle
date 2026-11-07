@@ -1,19 +1,23 @@
-// Une action sur un commentaire (tranche 5) : « Modifier », « Supprimer », « Masquer », ou
-// « Répondre » au bout d'un fil. Un simple texte avec son icône, sans bordure : sous chaque
+// Une action posée sous un commentaire (tranche 5) : depuis R5b, « Répondre » sous chacun, et
+// « Démasquer » sous un commentaire masqué par l'auteur du projet (les autres actions sont passées
+// dans le menu « … » de la carte). Un simple texte avec son icône, sans bordure : sous chaque
 // commentaire, des boutons bordés pèseraient plus lourd que le texte qu'ils servent. Sa zone à
 // toucher fait 44 points ; son fond n'apparaît que sous le doigt.
 //
-// Plusieurs commentaires ont chacun leur « Supprimer » : le lecteur d'écran dit lequel grâce à une
+// Plusieurs commentaires ont chacun leur « Répondre » : le lecteur d'écran dit lequel grâce à une
 // courte description (l'auteur et le début du texte), liée au bouton par aria-describedby sur le
 // web, et lue comme indice (accessibilityHint) sur téléphone.
 // Pendant l'envoi (`pending`), l'icône laisse la place à un indicateur, le bouton est annoncé
-// « occupé » (aria-busy) et ignore les appuis, sans perdre le focus du clavier.
+// « occupé » (aria-busy) et ignore les appuis, sans perdre le focus du clavier. Avant même que
+// l'écran le dise occupé, la seconde tape d'une double tape est ignorée (`useTapGuard`, 600 ms) :
+// « Démasquer » touché deux fois n'envoie qu'une demande (R5b, ui-B8).
 import { layout, radii, space } from '@ruche/brand'
 import type { Ref } from 'react'
 import { ActivityIndicator, Platform, Pressable, Text as RNText, View } from 'react-native'
 import { describedBy } from './aria'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
+import { useTapGuard } from './tapGuard'
 import { useTheme } from './theme/ThemeProvider'
 
 /** Une action sur un commentaire. */
@@ -49,6 +53,7 @@ export function CommentActionButton({ action, describedById, hint, ref }: Props)
   const danger = action.tone === 'danger'
   const pending = action.pending ?? false
   const tone = danger ? 'danger' : 'secondary'
+  const guard = useTapGuard()
   return (
     <Pressable
       ref={ref}
@@ -60,7 +65,7 @@ export function CommentActionButton({ action, describedById, hint, ref }: Props)
       // « occupé » pour les lecteurs d'écran (web et téléphone), comme les boutons (Button).
       aria-busy={pending}
       onPress={() => {
-        if (!pending) action.onPress()
+        if (!pending) guard(action.onPress)()
       }}
       style={({ pressed }) => ({
         flexDirection: 'row',

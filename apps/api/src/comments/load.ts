@@ -7,10 +7,10 @@ import {
   COMMENT_PAGE_SIZE,
   COMMENT_REPLIES_SHOWN,
   type Comment,
+  type CommentAuthor,
   type CommentPage,
   type CommentReply,
   type Mention,
-  type Project,
   type Removal,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -37,8 +37,6 @@ import { listedProject } from '../projects/visibility'
 import { removalsOf } from '../removals/load'
 
 type Reader = Pick<Database, 'select'>
-// L'auteur d'un commentaire, sous la même forme que l'auteur d'un projet (contrat `ProjectAuthor`).
-type ProjectAuthor = Project['author']
 
 const c = schema.projectComment
 
@@ -220,7 +218,7 @@ export const seesSql = (
 export const presentComment = (
   row: CommentRow & { mentionsViewer?: boolean },
   viewer: Viewer,
-  authors: Map<string, ProjectAuthor>,
+  authors: Map<string, CommentAuthor>,
   hasShownReplies: boolean,
   mentions: Mention[] = [],
   removals: Map<string, Removal> = new Map(),
@@ -230,12 +228,16 @@ export const presentComment = (
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
   }
+  // Un emplacement ne donne aucune date, quel que soit son état (R5b, sec-A3 et jur-J7) : la date
+  // d'un commentaire qu'on ne montre plus (retiré, masqué, d'un membre bloqué) serait encore une
+  // donnée sur lui. Seule la réponse se tait : l'ordre et le curseur lisent la ligne de la base.
   const placeholder = (
     state: 'hidden' | 'deleted' | 'removed' | 'blocked' | 'unavailable',
   ): CommentReply | null =>
     hasShownReplies
       ? {
           ...base,
+          createdAt: null,
           author: null,
           body: '',
           editedAt: null,
@@ -261,8 +263,10 @@ export const presentComment = (
     ...base,
     // Un commentaire qu'il lit malgré un blocage (règles 1 et 2) : l'auteur garde son nom, pour
     // savoir qui a écrit, mais pas sa photo (règle 11 : aucune réponse ne donne à l'un l'adresse
-    // de la photo de l'autre ; décision du 24/10/2026, relecture de sécurité A1).
-    author: block === null ? author : { ...author, avatarUrl: null },
+    // de la photo de l'autre ; décision du 24/10/2026, relecture de sécurité A1), ni son pseudo
+    // (R5b, sec-B1 et jur-P5 : avec lui, l'appli préremplirait « @pseudo » sous « Répondre », et
+    // le pseudo mène au profil). Dans les deux sens du blocage.
+    author: block === null ? author : { ...author, avatarUrl: null, handle: null },
     body: row.body,
     state: removed ? 'removed' : row.hiddenAt === null ? 'visible' : 'hidden',
     isMine: row.authorId === viewer.id,
@@ -279,23 +283,38 @@ const ownRemovalIds = (rows: CommentRow[], viewer: Viewer) =>
   rows.map((row) => (row.removedAt !== null && row.authorId === viewer.id ? row.removalId : null))
 
 /**
- * Les auteurs de ces commentaires, en une requête quelle que soit leur nombre : leur nom, et
- * l'adresse de leur photo (contrat `ProjectAuthor`). Jamais leur e-mail ni leur langue : seules
- * ces trois colonnes sont demandées.
+ * Les auteurs de ces commentaires, en une requête quelle que soit leur nombre : leur nom, leur
+ * pseudo actuel (R5b : « Répondre » préremplit « @pseudo »), et l'adresse de leur photo (contrat
+ * `CommentAuthor`). Jamais leur e-mail ni leur langue : seules ces quatre colonnes sont demandées.
  *
- * En SQL : select user.id, user.name, profile.avatar_key from user left join profile
- * on profile.user_id = user.id where user.id in (…). La clé primaire de user trouve chacun.
+ * En SQL :
+ *   select "user".id, "user".name, member_handle.handle, profile.avatar_key from "user"
+ *   left join member_handle on member_handle.user_id = "user".id
+ *     and member_handle.released_at is null
+ *   left join profile on profile.user_id = "user".id
+ *   where "user".id in (…)
+ * La clé primaire de "user" trouve chacun ; l'index partiel unique member_handle_current_idx
+ * (user_id, seulement les pseudos actuels) trouve son pseudo : au plus une ligne par membre, la
+ * jointure ne double donc jamais un auteur. « left join » : un membre sans pseudo (il n'en a pas
+ * encore choisi) reste un auteur, avec `handle: null`.
  */
 export const authorsOf = async (
   db: Reader,
   authorIds: string[],
   publicApiUrl: string,
-): Promise<Map<string, ProjectAuthor>> => {
+): Promise<Map<string, CommentAuthor>> => {
   const ids = [...new Set(authorIds)]
   if (ids.length === 0) return new Map()
+  const h = schema.memberHandle
   const rows = await db
-    .select({ id: schema.user.id, name: schema.user.name, avatarKey: schema.profile.avatarKey })
+    .select({
+      id: schema.user.id,
+      name: schema.user.name,
+      handle: h.handle,
+      avatarKey: schema.profile.avatarKey,
+    })
     .from(schema.user)
+    .leftJoin(h, and(eq(h.userId, schema.user.id), isNull(h.releasedAt)))
     .leftJoin(schema.profile, eq(schema.profile.userId, schema.user.id))
     .where(inArray(schema.user.id, ids))
   return new Map(
@@ -304,6 +323,7 @@ export const authorsOf = async (
       {
         id: row.id,
         name: row.name,
+        handle: row.handle,
         avatarUrl: row.avatarKey ? mediaUrl(publicApiUrl, row.avatarKey) : null,
       },
     ]),

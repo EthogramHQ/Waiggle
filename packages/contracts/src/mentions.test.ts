@@ -1,7 +1,8 @@
 // Tests des mentions « @pseudo » (tranche 6b) : le découpage d'un texte en morceaux, partagé par
 // l'API (qui retrouve les membres mentionnés) et par l'appli (qui fait de chaque mention un lien),
 // et ce que l'appli peut demander pendant qu'on tape « @in… ». Scénario :
-// docs/scenarios/phase-1.md, « Précisions (tranche 6b) », « Mentionner ».
+// docs/scenarios/phase-1.md, « Précisions (tranche 6b) », « Mentionner » ; depuis R5b, le nom du
+// membre mentionné et la recherche par le nom (docs/scenarios/refonte.md, « Les mentions »).
 import { describe, expect, it } from 'vitest'
 import { HANDLE_MAX_LENGTH } from './handles'
 import {
@@ -137,9 +138,18 @@ describe('findMentions', () => {
 
 describe('Mention', () => {
   it('names a member by id, with the handle as it was written', () => {
-    const mention = { handle: 'ines_morel', memberId: 'ines-id' }
+    const mention = { handle: 'ines_morel', memberId: 'ines-id', name: 'Inès Morel' }
     expect(Mention.parse(mention)).toEqual(mention)
     expect(Mention.safeParse({ handle: 'ines_morel' }).success).toBe(false)
+  })
+
+  // R5b : la pastille affiche le nom actuel du membre ; une mention sans nom n'est pas une réponse
+  // valable de l'API (elle répondrait 500 plutôt que de laisser l'appli sans nom à montrer).
+  it('needs the current name of the member', () => {
+    expect(Mention.safeParse({ handle: 'ines_morel', memberId: 'ines-id' }).success).toBe(false)
+    expect(
+      Mention.safeParse({ handle: 'ines_morel', memberId: 'ines-id', name: null }).success,
+    ).toBe(false)
   })
 })
 
@@ -158,10 +168,70 @@ describe('MentionableQuery', () => {
     expect(MentionableQuery.safeParse({ q: 'in', projectId }).success).toBe(true)
   })
 
-  it('searches on the start of a handle only: no space, no other character', () => {
-    for (const q of ['ines morel', 'in%', 'in*', "in'", '2in', '_in', 'a'.repeat(21)]) {
+  // R5b : la recherche vaut aussi pour un mot du nom, jusqu'à 30 caractères (avant : 20, un pseudo).
+  it('searches on one word only: no space, no other character, at most 30 characters', () => {
+    for (const q of ['ines morel', 'in%', 'in*', "in'", '2in', '_in', 'a'.repeat(31)]) {
       expect(MentionableQuery.safeParse({ q, projectId }).success, q).toBe(false)
     }
+  })
+
+  // R5b, sec-A1 : les bornes comptent des caractères, pas des unités UTF-16. « 𐐀 » (une lettre
+  // hors du plan de base) pèse 2 unités.
+  it('counts characters, not UTF-16 units, for the bounds (30 accepted, 31 refused)', () => {
+    const deseret = String.fromCodePoint(0x10400)
+    expect(MentionableQuery.safeParse({ q: deseret.repeat(30), projectId }).success).toBe(true)
+    expect(MentionableQuery.safeParse({ q: deseret.repeat(31), projectId }).success).toBe(false)
+    // Le minimum : une seule lettre hors du plan de base reste une seule lettre.
+    expect(MentionableQuery.safeParse({ q: deseret, projectId }).success).toBe(false)
+    expect(MentionableQuery.safeParse({ q: `${deseret}a`, projectId }).success).toBe(true)
+  })
+
+  it('keeps the code of the error: too_small below 2 characters, too_big above 30', () => {
+    const codes = (q: string) => {
+      const result = MentionableQuery.safeParse({ q, projectId })
+      return result.success ? [] : result.error.issues.map((issue) => issue.code)
+    }
+    expect(codes('l')).toEqual(['too_small'])
+    expect(codes('a'.repeat(31))).toEqual(['too_big'])
+  })
+
+  // R5b : on cherche aussi le début d'un mot du nom, qui peut être accentué ou d'un autre alphabet.
+  // « @Lé », tapé dans le champ, devient « le » : la base replie le nom « Léa » de la même façon.
+  it('folds « @Lé » to « le », as the name is folded in the database', () => {
+    expect(MentionableQuery.parse({ q: '@Lé', projectId })).toEqual({ q: 'le', projectId })
+    expect(MentionableQuery.parse({ q: 'Lefèvre', projectId }).q).toBe('lefevre')
+    // « Œ » se replie en deux lettres, comme dans la recherche (R3).
+    expect(MentionableQuery.parse({ q: 'Œdipe', projectId }).q).toBe('oedipe')
+  })
+
+  it('accepts a letter of any alphabet, not only the latin one', () => {
+    expect(MentionableQuery.parse({ q: 'Жанна', projectId }).q).toBe('жанна')
+    expect(MentionableQuery.parse({ q: '@Жа', projectId }).q).toBe('жа')
+  })
+
+  it('refuses a single letter, or an « @ » alone', () => {
+    for (const q of ['l', '@l', '@', ' @ ', 'Ж']) {
+      expect(MentionableQuery.safeParse({ q, projectId }).success, q).toBe(false)
+    }
+  })
+
+  it('accepts 30 characters, and refuses 31, counted once folded', () => {
+    expect(MentionableQuery.safeParse({ q: 'a'.repeat(30), projectId }).success).toBe(true)
+    expect(MentionableQuery.safeParse({ q: `@${'a'.repeat(30)}`, projectId }).success).toBe(true)
+    expect(MentionableQuery.safeParse({ q: 'a'.repeat(31), projectId }).success).toBe(false)
+    // 15 « œ » donnent 30 lettres repliées ; 16 en donnent 32.
+    expect(MentionableQuery.safeParse({ q: 'œ'.repeat(15), projectId }).success).toBe(true)
+    expect(MentionableQuery.safeParse({ q: 'œ'.repeat(16), projectId }).success).toBe(false)
+  })
+
+  // Relecture de sécurité sec-A5 : un accent peut être tapé à part, après sa lettre (« e » puis
+  // l'accent aigu combinant U+0301). Sans `normalize('NFC')`, l'accent seul n'est pas une lettre
+  // (\p{L}) et la recherche serait refusée, ou ne trouverait pas « Léa ».
+  it('folds « @Léa » typed with a combining accent to « lea »', () => {
+    const combiningAcute = String.fromCodePoint(0x0301)
+    const typed = `@Le${combiningAcute}a`
+    expect(typed).toHaveLength(5) // témoin : l'accent est bien un caractère à part
+    expect(MentionableQuery.parse({ q: typed, projectId })).toEqual({ q: 'lea', projectId })
   })
 
   it('needs the project being commented, by a well-formed id', () => {

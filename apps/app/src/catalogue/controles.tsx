@@ -34,6 +34,8 @@ const fr = {
   fab: 'Le bouton rond flottant (64 points), qui s’enfonce davantage sous le doigt.',
   fabLabel: 'Publier un projet',
   share: 'Partager',
+  bare: 'Le bouton rond sans disque (`bare`), répété dans une liste (le « … » des commentaires) : le verre ne paraît que sous le doigt ou une fois ce qu’il ouvre ouvert.',
+  moreActions: 'Plus d’actions',
   segmented: 'Le contrôle segmenté : un seul arrêt de Tab, les flèches changent le choix.',
   appearance: 'Apparence',
   auto: 'Automatique',
@@ -71,6 +73,8 @@ const en: typeof fr = {
   fab: 'The floating round button (64 points), which sinks deeper under the finger.',
   fabLabel: 'Publish a project',
   share: 'Share',
+  bare: 'The round button with no disc (`bare`), repeated in a list (the “…” of comments): the glass only shows under the finger, or while what it opens is open.',
+  moreActions: 'More actions',
   segmented: 'The segmented control: a single Tab stop, the arrows change the choice.',
   appearance: 'Appearance',
   auto: 'Automatic',
@@ -157,6 +161,21 @@ export function ControlsCatalogue() {
       <Stack direction="row" gap="lg" wrap align="center">
         <IconButton fab variant="honey" icon="plus" label={l.fabLabel} onPress={noop} />
         <IconButton variant="plain" icon="share-network" label={l.share} onPress={noop} />
+      </Stack>
+
+      {/* Sans disque au repos (`bare`) : au repos, sous le doigt (verre), et « ouvert » (`expanded`). */}
+      <Text variant="caption" tone="muted">
+        {l.bare}
+      </Text>
+      <Stack direction="row" gap="lg" wrap align="center">
+        <IconButton variant="bare" icon="dots-three" label={l.moreActions} onPress={noop} />
+        <IconButton
+          variant="bare"
+          icon="dots-three"
+          label={l.moreActions}
+          expanded
+          onPress={noop}
+        />
       </Stack>
 
       {/* Le choix actif : blanc le jour, crème la nuit, toujours à l'encre. */}

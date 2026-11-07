@@ -71,10 +71,12 @@ Le composant `Surface` porte cinq matières. C'est le seul endroit qui décide d
 - `grouped` : groupe blanc bordé, pour des champs ou des réglages.
 - `glass` : verre, pour ce qui flotte (barres, boutons ronds sur une image).
 - `panel` : verre plus dense, pour du texte posé sur une image.
-- `sheet` : feuille qui monte du bas de l'écran.
+- `sheet` : feuille qui monte du bas de l'écran. De jour, elle est crème et opaque (décision du
+  7/11/2026, R5b : le gris translucide effaçait les cartes grises posées dessus) ; de nuit, dense et
+  floutée.
 
 Le flou est calculé par l'appareil et coûte cher. Le canevas des maquettes, qui en affichait des
-centaines à la fois, figeait le navigateur. Le vrai flou est donc réservé au verre et aux feuilles,
+centaines à la fois, figeait le navigateur. Le vrai flou est donc réservé au verre et aux feuilles de nuit,
 quelques-uns par écran. Sur Android, le vrai flou demande de désigner à l'avance ce qu'il faut
 flouter : en attendant de le brancher, le verre y est un peu plus opaque, sans flou.
 

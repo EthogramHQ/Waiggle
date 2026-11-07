@@ -1,11 +1,12 @@
 // Commentaires d'exemple pour les tests de l'appli (tranche 5) : des fils sur le projet de Léa,
 // tels que l'API les donne (GET /v1/projects/{id}/comments). Depuis la tranche 6b, chaque
-// commentaire a aussi ses mentions (vides par défaut), et Inès peut être mentionnée.
-import type { Comment, CommentReply, Mention, Mentionable } from '@ruche/contracts'
+// commentaire a aussi ses mentions (vides par défaut), et Inès peut être mentionnée. Depuis R5b,
+// chaque auteur a son pseudo actuel (`handle`) et chaque mention le nom actuel du membre (`name`).
+import type { Comment, CommentAuthor, CommentReply, Mention, Mentionable } from '@ruche/contracts'
 
-export const leaAuthor = { id: 'u1', name: 'Léa', avatarUrl: null }
-export const maxAuthor = { id: 'u2', name: 'Max', avatarUrl: null }
-export const zoeAuthor = { id: 'u3', name: 'Zoé', avatarUrl: null }
+export const leaAuthor: CommentAuthor = { id: 'u1', name: 'Léa', handle: 'lea', avatarUrl: null }
+export const maxAuthor: CommentAuthor = { id: 'u2', name: 'Max', handle: 'max', avatarUrl: null }
+export const zoeAuthor: CommentAuthor = { id: 'u3', name: 'Zoé', handle: 'zoe', avatarUrl: null }
 
 /** Une réponse visible de Zoé ; chaque test change ce qui l'intéresse. */
 export const replyOf = (
@@ -39,8 +40,15 @@ export const inikoMember: Mentionable = {
   avatarUrl: null,
 }
 
-/** La mention d'Inès, telle que l'API la rend avec un commentaire : le pseudo écrit, et son membre. */
-export const inesMention: Mention = { handle: 'ines_morel', memberId: inesMember.id }
+/**
+ * La mention d'Inès, telle que l'API la rend avec un commentaire : le pseudo écrit, son membre, et
+ * son nom actuel (R5b).
+ */
+export const inesMention: Mention = {
+  handle: 'ines_morel',
+  memberId: inesMember.id,
+  name: inesMember.name,
+}
 
 /** Un commentaire racine, avec ses réponses (aucune par défaut). */
 export const commentOf = ({
