@@ -55,16 +55,28 @@ export const compare = (a, b) => {
   return 0
 }
 
-// Une condition : un opérateur facultatif, puis une version (« >= 1.0.0 », « <1.10.1 », « 2.1.5 »).
-const CONDITION = /(<=|>=|<|>|=)?\s*(v?\d[^\s,]*)/g
+// Une condition : un opérateur facultatif, puis une version complète (« >= 1.0.0 », « <1.10.1 »,
+// « 2.1.5 », « 1.0.0-beta.19 »), suivie d'une espace, d'une virgule ou de la fin du texte.
+const VERSION = String.raw`v?\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?`
+const CONDITION = new RegExp(String.raw`(<=|>=|<|>|=)?\s*(${VERSION})(?=[\s,]|$)`, 'g')
+
+const conditionsOf = (text) => [...String(text ?? '').matchAll(CONDITION)]
+
+// Vrai si tout le texte d'une plage est fait de conditions qu'on sait lire.
+const readable = (range) =>
+  conditionsOf(range).length > 0 && range.replace(CONDITION, '').replace(/[\s,]+/g, '') === ''
 
 /**
  * Vrai si `version` est dans `range`, écrit comme GitHub l'écrit : des conditions toutes vraies,
  * séparées par des virgules (« >= 1.0.0, < 1.7.16 ») ou, dans des avis écrits à la main, par des
- * espaces seuls (« >=1.3.0 < 1.10.1 ») ; ou une version seule (« = 2.1.5 »).
+ * espaces seuls (« >=1.3.0 < 1.10.1 ») ; ou une version seule (« = 2.1.5 »). Une plage écrite
+ * autrement (« 1.7.0 - 1.7.15 », « ^1.7.0 », « 1.7.x », « || ») est tenue pour toucher toutes les
+ * versions : mieux vaut un rouge à vérifier qu'une faille passée sous silence (relecture de la
+ * PR #86, A1).
  */
 export const inRange = (version, range) =>
-  [...range.matchAll(CONDITION)].every(([, op = '=', bound = '']) => {
+  !readable(range) ||
+  conditionsOf(range).every(([, op = '=', bound = '']) => {
     const diff = compare(version, bound)
     if (op === '<') return diff < 0
     if (op === '<=') return diff <= 0
@@ -74,29 +86,48 @@ export const inRange = (version, range) =>
   })
 
 const major = (version) => parse(version).parts[0]
+const minorLine = (version) => parse(version).parts.slice(0, 2).join('.')
 
 /**
  * Vrai si `version`, prise dans `range`, a déjà un correctif de l'avis. Les avis écrits par les
  * mainteneurs ont parfois une plage trop large (« >= 4.12.0 », corrigé en 4.12.2), ou deux lignes
  * de versions dont la plage de l'une contient l'autre (« <= 0.45.1 » corrigé en 0.45.2, et
- * « <= 1.0.0-beta.19 ») : un correctif fait foi s'il est de la même version majeure, antérieur ou
- * égal à `version`, et au-dessus de la borne basse de `range`. Cette dernière condition garde
- * rouge une faille revenue après un premier correctif (corrigée en 1.6.11, revenue en 1.6.14 :
- * « >= 1.6.14, < 1.7.16 »).
+ * « <= 1.0.0-beta.19 »). Un correctif fait foi s'il est antérieur ou égal à `version`, au-dessus
+ * de la borne basse de `range`, et :
+ * - pour le correctif de la même ligne de l'avis (`ownPatched`), de la même version majeure ;
+ * - pour celui d'une autre ligne (`otherPatched`), de la même version mineure (0.45.2 pour
+ *   0.45.4) : 1.6.11 ne corrige pas 1.7.13 (relecture de la PR #86, A2).
+ * La borne basse garde rouge une faille revenue après un premier correctif (corrigée en 1.6.11,
+ * revenue en 1.6.14 : « >= 1.6.14, < 1.7.16 »).
  */
-export const patchedBy = (version, range, patchedLists) => {
-  const lowerBounds = [...range.matchAll(CONDITION)]
+export const patchedBy = (version, range, ownPatched, otherPatched = []) => {
+  const lowerBounds = conditionsOf(range)
     .filter(([, op]) => op === '>' || op === '>=')
     .map(([, , bound]) => bound)
-  return patchedLists
-    .flatMap((patched) => [...(patched ?? '').matchAll(CONDITION)].map(([, , bound]) => bound))
-    .some(
-      (fix) =>
-        major(fix) === major(version) &&
-        compare(version, fix) >= 0 &&
-        lowerBounds.every((lower) => compare(fix, lower) >= 0),
-    )
+  const fixesOf = (patched) => conditionsOf(patched).map(([, , bound]) => bound)
+  const counts = (fix) =>
+    compare(version, fix) >= 0 && lowerBounds.every((lower) => compare(fix, lower) >= 0)
+  return (
+    fixesOf(ownPatched).some((fix) => major(fix) === major(version) && counts(fix)) ||
+    otherPatched
+      .flatMap(fixesOf)
+      .some((fix) => minorLine(fix) === minorLine(version) && counts(fix))
+  )
 }
+
+/**
+ * Un texte venu d'un avis (titre, plage), écrit par les mainteneurs d'un autre dépôt, donc non
+ * fiable : sur une ligne, sans les caractères qui changeraient le sens du journal ou du résumé de
+ * la CI. Un retour à la ligne suivi de « :: » serait une commande du runner de GitHub Actions
+ * (relecture de la PR #86, A3).
+ */
+export const oneLine = (text) =>
+  String(text ?? '')
+    .replace(/[<>|`]/g, ' ')
+    // \s couvre aussi les retours à la ligne et les séparateurs de ligne d'Unicode.
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300)
 
 // ─── Lire le verrou et les dépendances ──────────────────────────────────────────────────────────
 
@@ -149,12 +180,13 @@ export const findAffected = ({ advisories, locked, accepted, today }) => {
       if (!ECOSYSTEMS.has(ecosystem)) continue
       const range = vulnerability.vulnerable_version_range
       if (!range) continue
-      // Les versions corrigées de ce paquet, toutes lignes de l'avis confondues.
-      const fixes = (advisory.vulnerabilities ?? [])
-        .filter((other) => other.package?.name === name)
+      // Les versions corrigées de ce paquet dans les autres lignes de l'avis.
+      const otherFixes = (advisory.vulnerabilities ?? [])
+        .filter((other) => other !== vulnerability && other.package?.name === name)
         .map((other) => other.patched_versions)
       for (const version of locked.get(name) ?? []) {
-        if (!inRange(version, range) || patchedBy(version, range, fixes)) continue
+        if (!inRange(version, range)) continue
+        if (patchedBy(version, range, vulnerability.patched_versions, otherFixes)) continue
         const exception = accepted.find((a) => a.ghsa === advisory.ghsa_id && a.package === name)
         const expired = exception !== undefined && exception.until < today
         const covered = exception !== undefined && !expired
@@ -235,7 +267,10 @@ const github = async (path) => {
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`${path} : GitHub répond ${res.status}`)
     results.push(...(await res.json()))
-    url = res.headers.get('link')?.match(/<([^>]+)>;\s*rel="next"/)?.[1]
+    // La page suivante, seulement chez GitHub : le jeton ne part jamais vers une autre adresse
+    // (relecture de la PR #86, A3).
+    const next = res.headers.get('link')?.match(/<([^>]+)>;\s*rel="next"/)?.[1]
+    url = next?.startsWith('https://api.github.com/') ? next : undefined
   }
   return results
 }
@@ -301,8 +336,12 @@ const main = async () => {
       : f.accepted
         ? `⚪ accepté jusqu'au ${f.accepted.until} : ${f.accepted.reason}`
         : '🟡'
+    // Tout ce qui vient de l'avis est aplati (oneLine) ; le lien n'est gardé que vers GitHub.
+    const link = String(f.url ?? '').startsWith('https://github.com/')
+      ? `[${oneLine(f.ghsa)}](${oneLine(f.url)})`
+      : oneLine(f.ghsa)
     lines.push(
-      `- ${state} **${f.severity}** [${f.ghsa}](${f.url}) ${f.package} ${f.version} (touché : ${f.range} ; corrigé : ${f.patched ?? 'aucune version'}) : ${f.summary}`,
+      `- ${state} **${oneLine(f.severity)}** ${link} ${oneLine(f.package)} ${f.version} (touché : ${oneLine(f.range)} ; corrigé : ${oneLine(f.patched) || 'aucune version'}) : ${oneLine(f.summary)}`,
     )
   }
   if (noRepo.length > 0) lines.push('', `Sans dépôt GitHub connu : ${noRepo.sort().join(', ')}.`)

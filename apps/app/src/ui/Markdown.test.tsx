@@ -107,7 +107,7 @@ describe('Markdown', () => {
   it('shows at once a description built to trap the reading of links', async () => {
     for (const text of [
       `[a](${' '.repeat(9990)})`,
-      `[a](${' '.repeat(9990)})`,
+      `[a](${'\u00a0'.repeat(9990)})`,
       '[a]('.repeat(2500),
       '!['.repeat(5000),
     ]) {

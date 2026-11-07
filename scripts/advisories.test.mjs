@@ -3,7 +3,14 @@
 // sont des données d'essai écrites ici : aucun appel réseau.
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { findAffected, inRange, lockedVersions, repoOf, sortFindings } from './advisories.mjs'
+import {
+  findAffected,
+  inRange,
+  lockedVersions,
+  oneLine,
+  repoOf,
+  sortFindings,
+} from './advisories.mjs'
 
 // Un morceau de pnpm-lock.yaml, dans sa forme réelle (version 9).
 const LOCK = `---
@@ -71,6 +78,20 @@ describe('inRange', () => {
     assert.equal(inRange('1.5.0', '>=1.3.0 < 1.10.1'), true)
     assert.equal(inRange('2.1.5', '>=1.3.0 < 1.10.1'), false)
     assert.equal(inRange('18.1.1', '> 1.1.1 < 2.0.0'), false)
+  })
+
+  it('takes a range it cannot read as touching every version', () => {
+    // Relecture de la PR #86, A1 : mieux vaut un rouge à vérifier qu'une faille passée sous silence.
+    for (const range of [
+      '1.7.0 - 1.7.15',
+      '1.7.x',
+      '^1.7.0',
+      '~1.7.0',
+      '< 1.6.0 || >= 1.7.0',
+      'all',
+    ]) {
+      assert.equal(inRange('1.7.13', range), true, range)
+    }
   })
 
   it('puts a pre-release before its release', () => {
@@ -167,6 +188,28 @@ describe('findAffected', () => {
     assert.equal(findings[0]?.red, true)
   })
 
+  it('stays red when two lines overlap and the fix of the other one is older', () => {
+    // Relecture de la PR #86, A2 : « < 1.6.11 » corrigé en 1.6.11, et « < 1.7.16 » (sans borne
+    // basse) corrigé en 1.7.16 : 1.7.13 n'est pas corrigée par 1.6.11.
+    const overlapping = advisory({
+      severity: 'high',
+      vulnerabilities: [
+        {
+          package: { ecosystem: 'npm', name: 'better-auth' },
+          vulnerable_version_range: '< 1.6.11',
+          patched_versions: '1.6.11',
+        },
+        {
+          package: { ecosystem: 'npm', name: 'better-auth' },
+          vulnerable_version_range: '< 1.7.16',
+          patched_versions: '1.7.16',
+        },
+      ],
+    })
+
+    assert.equal(run([overlapping])[0]?.red, true)
+  })
+
   it('lists a moderate advisory without turning red', () => {
     const findings = run([advisory({ severity: 'medium' })])
 
@@ -229,6 +272,18 @@ describe('findAffected', () => {
       findings.map((finding) => finding.ghsa),
       ['GHSA-high', 'GHSA-low'],
     )
+  })
+})
+
+describe('oneLine', () => {
+  it('flattens a text from an advisory before it reaches the logs of the CI', () => {
+    // Relecture de la PR #86, A3 : un retour à la ligne suivi de « :: » serait une commande du
+    // runner de GitHub Actions ; les chevrons et les barres casseraient le résumé.
+    const flat = oneLine('Titre\n::error::faux\r\n<b>gras</b> | `code`')
+
+    assert.equal(flat.includes('\n') || flat.includes('\r'), false)
+    assert.equal(/[<>|`]/.test(flat), false)
+    assert.equal(oneLine(undefined), '')
   })
 })
 
