@@ -49,7 +49,9 @@ function Field({
   initial = '',
   placement,
   title,
+  maxHeight,
 }: {
+  maxHeight?: number
   suggestions?: Suggestion[]
   suggestionsFor?: string | null
   onQueryChange?: (query: string | null) => void
@@ -70,6 +72,7 @@ function Field({
       multiline
       {...(placement ? { suggestionsPlacement: placement } : null)}
       {...(title ? { suggestionsTitle: title } : null)}
+      {...(maxHeight ? { suggestionsMaxHeight: maxHeight } : null)}
     />
   )
 }
@@ -440,5 +443,57 @@ describe('MentionField with a keyboard (web)', () => {
     await type('Bravo @in')
 
     for (const option of screen.getAllByRole('option')) expect(option).toHaveProp('tabIndex', -1)
+  })
+
+  describe('in a list limited in height', () => {
+    /** Un `document` prêté, complet en apparence (ThemeProvider y écrit), qui trouve les choix. */
+    const lendDocument = () => {
+      const reveal = jest.fn()
+      const loose = (): unknown =>
+        new Proxy(() => {}, {
+          get: (_target, name) =>
+            name === Symbol.toPrimitive ? () => '' : name === 'then' ? undefined : loose(),
+          set: () => true,
+          apply: () => loose(),
+        })
+      const target: Record<string | symbol, unknown> = {
+        activeElement: null,
+        getElementById: () => ({ scrollIntoView: reveal }),
+      }
+      Object.defineProperty(globalThis, 'document', {
+        value: new Proxy(target, {
+          get: (from, name) => (name in from ? from[name] : loose()),
+          set: () => true,
+        }),
+        configurable: true,
+      })
+      return reveal
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis, 'document')
+    })
+
+    it('brings into view the member reached with the arrows', async () => {
+      const reveal = lendDocument()
+      await renderWithProviders(<Field maxHeight={88} />)
+      await type('Bravo @in')
+      reveal.mockClear()
+
+      await key('ArrowDown')
+
+      expect(reveal).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it('without a limit, moves nothing: the page stays where it is', async () => {
+      const reveal = lendDocument()
+      await renderWithProviders(<Field />)
+      await type('Bravo @in')
+
+      await key('ArrowDown')
+
+      expect(screen.getByRole('option', { name: /Iniko Diallo/ })).toBeSelected() // témoin
+      expect(reveal).not.toHaveBeenCalled()
+    })
   })
 })

@@ -415,6 +415,52 @@ describe('CommentComposer', () => {
     })
   })
 
+  describe('the list of members in a low window', () => {
+    afterEach(() => {
+      const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+      Dimensions.set({ window: phone, screen: phone })
+    })
+
+    /** Le champ avec son texte, une recherche qui répond, et le cadre de la liste qui s'ouvre. */
+    const listHeightIn = async (height: number, where: Props['place']) => {
+      const size = { width: where === 'sheet' ? 844 : 1440, height, scale: 2, fontScale: 1 }
+      Dimensions.set({ window: size, screen: size })
+      function Typing() {
+        const [value, setValue] = useState('')
+        return (
+          <CommentComposer
+            {...propsOf({
+              value,
+              onChangeText: setValue,
+              place: where,
+              suggestions: [{ ...inesMember, avatar: null }],
+              suggestionsFor: 'in',
+            })}
+          />
+        )
+      }
+      await renderWithProviders(<Typing />)
+      await fireEvent.changeText(field() as never, 'Merci @in')
+      let at = screen.getByRole('option', { name: /Inès Morel/ }) as unknown as Host | null
+      while (at && styleOf(at).maxHeight === undefined) at = at.parent
+      return at ? styleOf(at).maxHeight : undefined
+    }
+
+    it('in the sheet, leaves the field in the window, however low', async () => {
+      // La hauteur de la fenêtre moins l'en-tête de la feuille (143) et le reste du pied (161) ;
+      // au moins de quoi lire un membre sous le titre.
+      expect(await listHeightIn(508, 'sheet')).toBe(508 - 304)
+    })
+
+    it('in the sheet of a landscape phone, keeps room for one member', async () => {
+      expect(await listHeightIn(390, 'sheet')).toBe(88)
+    })
+
+    it('in the column, the page scrolls: no limit', async () => {
+      expect(await listHeightIn(500, 'column')).toBeUndefined()
+    })
+  })
+
   describe('the width left to the field in the column (des-C5)', () => {
     /** Le premier ancêtre de la saisie qui se donne une largeur de base, et son parent. */
     const fieldRow = () => {

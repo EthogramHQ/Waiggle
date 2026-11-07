@@ -89,6 +89,14 @@ const REPLY_PHOTO_FROM = 360
 /** La place gardée à l'extrait, à côté du nom : en dessous, il passe à la ligne, le nom reste entier. */
 const EXCERPT_MIN = 64
 
+/**
+ * La liste des membres, dans la feuille, ne sort jamais le champ de l'écran : elle laisse l'en-tête de
+ * la feuille (143) et le reste du pied, légende courte comprise (161) ; elle garde de quoi lire un
+ * membre sous son titre, et défile au-delà.
+ */
+const MENTION_LIST_ROOM = 304
+const MENTION_LIST_MIN = 88
+
 /** Sous cette hauteur, la fenêtre est basse : la légende doit laisser sa place à la liste. */
 const LOW_WINDOW_BELOW = 600
 
@@ -143,7 +151,7 @@ export function CommentComposer({
   inputRef,
 }: Props) {
   const { t } = useTranslation()
-  const { width } = useLayout()
+  const { width, height } = useLayout()
   const input = useRef<TextFieldInput>(null)
   const sendControl = useRef<View>(null)
   // useTapGuard : une `ref`, car la seconde tape arrive avant que l'écran ait pu passer `pending`.
@@ -239,6 +247,9 @@ export function CommentComposer({
     suggestionsFor,
     suggestionsLabel: t(($) => $.mentions.suggestions),
     suggestionsTitle: t(($) => $.mentions.title),
+    ...(place === 'sheet'
+      ? { suggestionsMaxHeight: Math.max(MENTION_LIST_MIN, height - MENTION_LIST_ROOM) }
+      : null),
     onQueryChange,
   })
   // La même saisie, partagée avec l'écran (useImperativeHandle : ce que voit la `ref` du parent). Après

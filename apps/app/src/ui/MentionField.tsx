@@ -46,6 +46,7 @@ import {
   Text as NativeText,
   Platform,
   Pressable,
+  ScrollView,
   type TextInput,
   type TextStyle,
   View,
@@ -93,6 +94,11 @@ type Props = FieldProps & {
   suggestionsPlacement?: 'above' | 'below'
   /** Un titre affiché en tête de la liste ouverte (« Mentionner quelqu’un ») ; absent : aucun. */
   suggestionsTitle?: string
+  /**
+   * La hauteur que la liste ne dépasse pas : au-delà, elle défile (une fenêtre basse où elle
+   * sortirait le champ de l'écran). Absente : toute la hauteur de ses membres.
+   */
+  suggestionsMaxHeight?: number
   /** Ce que le champ cherche, replié, sans « @ » (« @Lé » : « le »), ou null. */
   onQueryChange: (query: string | null) => void
   /** Une poignée vers la saisie : pour que le composant qui l'utilise y remette le focus. */
@@ -184,6 +190,21 @@ const LISTBOX = { role: 'listbox' } as object
 // La touche reçue par onKeyPress (sur le web, l'évènement du navigateur, qu'on peut arrêter).
 type KeyPress = { nativeEvent: { key: string; preventDefault?: () => void } }
 
+// Chrome rend atteignable par Tab une zone qui défile sans élément focalisable : ici, les flèches
+// parcourent les choix depuis le champ. `tabIndex` manque aux types du ScrollView de React Native.
+const NOT_A_TAB_STOP = { tabIndex: -1 } as object
+
+/** Les choix, dans une zone qui défile si la liste est limitée en hauteur ; sinon tels quels. */
+function OptionsScroll({ limited, children }: { limited: boolean; children: ReactElement }) {
+  if (!limited) return children
+  return (
+    // keyboardShouldPersistTaps : un membre touché, clavier ouvert, est choisi du premier coup.
+    <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" {...NOT_A_TAB_STOP}>
+      {children}
+    </ScrollView>
+  )
+}
+
 /** Le champ et sa liste, tels que `useMentionField` les rend, chacun à poser où l'on veut. */
 export type MentionFieldParts = {
   /** La saisie : toujours là. */
@@ -203,6 +224,7 @@ export function useMentionField({
   suggestionsFor,
   suggestionsLabel,
   suggestionsTitle,
+  suggestionsMaxHeight,
   onQueryChange,
   value,
   onChangeText,
@@ -251,6 +273,18 @@ export function useMentionField({
       ? active.index
       : 0
   const optionId = (index: number) => `${listId}-${index}`
+
+  // Dans une liste limitée en hauteur, le membre atteint par les flèches vient à l'écran : le focus
+  // reste dans le champ, le navigateur ne le ferait pas de lui-même. Seulement après une flèche, et
+  // seulement là : ailleurs, la liste ne défile pas, et c'est la page qui bougerait.
+  const arrowed = active?.query === query ? activeIndex : -1
+  const limited = suggestionsMaxHeight !== undefined
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `optionId` ne dépend que de `listId`.
+  useEffect(() => {
+    if (limited && arrowed >= 0 && Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.getElementById(optionId(arrowed))?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [limited, arrowed, listId])
 
   // L'écran apprend ce qu'on cherche à chaque changement (et null quand on ne cherche plus rien).
   // Une ref garde sa dernière fonction : l'effet ne dépend que de la recherche.
@@ -361,6 +395,7 @@ export function useMentionField({
           borderColor: colors.groupBorder,
           paddingVertical: space.xxs,
           overflow: 'hidden',
+          ...(limited ? { maxHeight: suggestionsMaxHeight } : null),
         }}
       >
         {/* Le titre, hors de la liste elle-même : une liste de choix ne contient que des choix. */}
@@ -373,82 +408,84 @@ export function useMentionField({
             </Text>
           </View>
         ) : null}
-        <View
-          nativeID={listId}
-          {...LISTBOX}
-          accessibilityLabel={suggestionsLabel}
-          // Pas d'« accessible » : sur iOS, il ferait de la liste un seul bloc, et VoiceOver ne
-          // pourrait plus atteindre les membres un par un. focusable faux : ce n'est pas un arrêt
-          // de Tab (les flèches, dans le champ, parcourent les choix).
-          focusable={false}
-        >
-          {shown.map((suggestion, index) => {
-            const selected = index === activeIndex
-            return (
-              <Pressable
-                key={suggestion.id}
-                nativeID={optionId(index)}
-                role="option"
-                accessibilityLabel={t(($) => $.mentions.option, {
-                  name: suggestion.name,
-                  handle: suggestion.handle,
-                })}
-                aria-selected={selected}
-                // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ. Sur le
-                // web, Pressable pose de lui-même tabIndex 0 : -1 l'en retire.
-                focusable={false}
-                tabIndex={-1}
-                onPressIn={() => {
-                  choosing.current = true
-                }}
-                onPressOut={() => {
-                  // Le doigt a glissé hors du choix : rien n'est choisi, la liste reste ouverte.
-                  if (Platform.OS !== 'web') choosing.current = false
-                }}
-                onPress={() => choose(suggestion)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: space.sm,
-                  minHeight: layout.touchTarget,
-                  paddingHorizontal: space.md,
-                  paddingVertical: space.xs,
-                  backgroundColor: selected || pressed ? colors.honeySoft : colors.surface,
-                })}
-              >
-                <View aria-hidden>
-                  <Avatar
-                    name={suggestion.name}
-                    source={suggestion.avatar}
-                    label={suggestion.name}
-                    size={32}
-                  />
-                </View>
-                {/* Le nom, le pseudo dessous, comme le dit le scénario. Les lettres tapées y sont en
+        <OptionsScroll limited={limited}>
+          <View
+            nativeID={listId}
+            {...LISTBOX}
+            accessibilityLabel={suggestionsLabel}
+            // Pas d'« accessible » : sur iOS, il ferait de la liste un seul bloc, et VoiceOver ne
+            // pourrait plus atteindre les membres un par un. focusable faux : ce n'est pas un arrêt
+            // de Tab (les flèches, dans le champ, parcourent les choix).
+            focusable={false}
+          >
+            {shown.map((suggestion, index) => {
+              const selected = index === activeIndex
+              return (
+                <Pressable
+                  key={suggestion.id}
+                  nativeID={optionId(index)}
+                  role="option"
+                  accessibilityLabel={t(($) => $.mentions.option, {
+                    name: suggestion.name,
+                    handle: suggestion.handle,
+                  })}
+                  aria-selected={selected}
+                  // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ. Sur le
+                  // web, Pressable pose de lui-même tabIndex 0 : -1 l'en retire.
+                  focusable={false}
+                  tabIndex={-1}
+                  onPressIn={() => {
+                    choosing.current = true
+                  }}
+                  onPressOut={() => {
+                    // Le doigt a glissé hors du choix : rien n'est choisi, la liste reste ouverte.
+                    if (Platform.OS !== 'web') choosing.current = false
+                  }}
+                  onPress={() => choose(suggestion)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: space.sm,
+                    minHeight: layout.touchTarget,
+                    paddingHorizontal: space.md,
+                    paddingVertical: space.xs,
+                    backgroundColor: selected || pressed ? colors.honeySoft : colors.surface,
+                  })}
+                >
+                  <View aria-hidden>
+                    <Avatar
+                      name={suggestion.name}
+                      source={suggestion.avatar}
+                      label={suggestion.name}
+                      size={32}
+                    />
+                  </View>
+                  {/* Le nom, le pseudo dessous, comme le dit le scénario. Les lettres tapées y sont en
                     gras : le nom, d'un poids ordinaire, les fait ressortir. */}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Marked
-                    text={suggestion.name}
-                    query={query}
-                    variant="callout"
-                    tone="default"
-                    weight={400}
-                    bold={700}
-                  />
-                  <Marked
-                    text={suggestion.handle}
-                    prefix="@"
-                    query={query}
-                    variant="caption"
-                    tone="muted"
-                    weight={400}
-                    bold={700}
-                  />
-                </View>
-              </Pressable>
-            )
-          })}
-        </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Marked
+                      text={suggestion.name}
+                      query={query}
+                      variant="callout"
+                      tone="default"
+                      weight={400}
+                      bold={700}
+                    />
+                    <Marked
+                      text={suggestion.handle}
+                      prefix="@"
+                      query={query}
+                      variant="caption"
+                      tone="muted"
+                      weight={400}
+                      bold={700}
+                    />
+                  </View>
+                </Pressable>
+              )
+            })}
+          </View>
+        </OptionsScroll>
       </View>
     ) : null
 
