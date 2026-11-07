@@ -414,7 +414,14 @@ export function CommentCard({
             {edited}
           </View>
           {/* marginTop négatif : la rangée a 44 points, le texte remonte dans l'air de sa photo. */}
-          <View style={{ paddingLeft: indent, marginTop: -space.xs, paddingBottom: space.xs }}>
+          <View
+            style={{
+              paddingLeft: indent,
+              marginTop: -space.xs,
+              // Sur un fond (le gris des siens), le texte ne touche pas le bord, comme dans la feuille.
+              paddingBottom: tint ? space.sm : space.xs,
+            }}
+          >
             <Text numberOfLines={COMPACT_LINES} breakAnywhere>
               {plain}
             </Text>
