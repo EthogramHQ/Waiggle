@@ -22,14 +22,13 @@
 // l'arbre), dont seul le texte change, et les lecteurs d'écran disent s'il est déplié
 // (`aria-expanded`). Une pastille de mention sous le pli reste atteignable au clavier : le texte se
 // déplie quand le focus y arrive.
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { ActionDescription } from './CommentAction'
 import { revealWithoutJump } from './focus'
 import { TextLink } from './TextLink'
 import { TextLayoutContext, type TextLayoutListener } from './textLayout'
-import { useCalmMotion } from './theme/motion'
 
 type Props = {
   /** Le nombre de lignes montrées replié (10, `COMMENT_FOLD_LINES`, par défaut). */
@@ -84,7 +83,6 @@ export const overflowsCount = (count: number, lines: number, previous: boolean):
 export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false }: Props) {
   const { t } = useTranslation()
   const web = Platform.OS === 'web'
-  const calm = useCalmMotion()
   const [expanded, setExpanded] = useState(initiallyExpanded)
 
   // Téléphone : le nombre de lignes compté par le texte natif.
@@ -129,9 +127,11 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
   // de sa ligne, sans être cachée.
   //
   // À l'image suivante, pas dans l'événement : le navigateur fait défiler jusqu'à l'élément juste après
-  // l'avoir prévenu, et il vise trop loin pour un élément pris dans un texte replié (mesuré dans la
-  // feuille à 390 points : la pastille finissait au-dessus de l'écran, y = -104). Le texte déplié, une
-  // image plus tard, elle est ramenée en vue, sans saut si elle y est déjà.
+  // l'avoir prévenu. Puis, le texte déplié, l'élément est ramené en vue : le navigateur garde à leur
+  // place à l'écran les cartes que le texte vient de pousser vers le bas (« scroll anchoring »), et la
+  // pastille, elle, partait d'autant vers le haut (mesuré dans la feuille à 390 points : de y = 424 à
+  // y = -104). Avant de dessiner (useLayoutEffect), et sans animation : aucune image à la mauvaise place.
+  const focusToReveal = useRef<unknown>(null)
   const unfoldForFocus = ({ target, currentTarget }: FocusEvent) => {
     if (!folded || !overflows) return
     const bottom = target?.getBoundingClientRect?.().bottom
@@ -139,10 +139,15 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
     if (bottom === undefined || frameBottom === undefined) return
     if (bottom <= frameBottom + (heights.line ?? 0) / 2) return
     requestAnimationFrame(() => {
+      focusToReveal.current = target
       setExpanded(true)
-      requestAnimationFrame(() => revealWithoutJump(target, calm))
     })
   }
+  useLayoutEffect(() => {
+    if (!expanded) return
+    revealWithoutJump(focusToReveal.current, true)
+    focusToReveal.current = null
+  }, [expanded])
 
   // L'identifiant du texte caché qui décrit le bouton (web), stable entre le pré-rendu et le
   // navigateur (useId).

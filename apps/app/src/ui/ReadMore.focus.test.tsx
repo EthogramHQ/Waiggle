@@ -49,10 +49,8 @@ const focusPillEndingAt = async (bottom: number) => {
     target: { getBoundingClientRect: () => ({ bottom }), scrollIntoView },
     currentTarget: { getBoundingClientRect: () => ({ bottom: 200 }) },
   })
-  // Le dépliage attend l'image suivante, et la vérification celle d'après.
-  for (let frame = 0; frame < 2; frame++) {
-    await act(() => new Promise((resolve) => requestAnimationFrame(resolve)))
-  }
+  // Le dépliage attend l'image suivante.
+  await act(() => new Promise((resolve) => requestAnimationFrame(resolve)))
   return scrollIntoView
 }
 
@@ -70,8 +68,9 @@ describe('ReadMore, the focus inside a folded text (web)', () => {
     // Le même bouton, qui dit maintenant « Réduire » : le texte entier est montré.
     expect(screen.getByRole('button', { name: 'Réduire' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Lire la suite' })).toBeNull()
-    // La pastille est ramenée en vue si la page a défilé trop loin, sans saut si elle y est déjà.
-    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'nearest' }))
+    // La pastille est ramenée en vue si le texte déplié l'a déplacée, sans saut si elle y est déjà, et
+    // sans animation : aucune image à la mauvaise place.
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' })
   })
 
   it('stays folded when the focus lands on a pill of the shown lines', async () => {
