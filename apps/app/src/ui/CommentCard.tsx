@@ -251,7 +251,11 @@ export function CommentCard({
   const size = kind === 'reply' ? COMMENT_AVATAR.reply : COMMENT_AVATAR.root
   const plain = plainCommentText(comment.body, comment.mentions)
   const short = excerpt(plain)
-  const date = <RelativeTime date={comment.createdAt} {...(now ? { now } : null)} />
+  // Null seulement pour un emplacement, traité plus haut : une carte écrite a toujours sa date.
+  const date =
+    comment.createdAt === null ? null : (
+      <RelativeTime date={comment.createdAt} {...(now ? { now } : null)} />
+    )
   const edited = comment.editedAt ? (
     // Le point et « modifié » passent à la ligne ensemble, jamais le point seul au bout de la date.
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>

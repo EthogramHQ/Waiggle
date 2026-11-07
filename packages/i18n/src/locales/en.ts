@@ -351,7 +351,8 @@ export const en: Translation = {
       invalidCharacters: 'Some characters are not allowed (invisible or control characters).',
     },
     previewTitle: 'Preview of your page',
-    searchable: 'Signed-in members can find you by your name or your handle in the search.',
+    searchable:
+      'Signed-in members can find you by your name or your handle, in the search and after “@” in a comment.',
   },
   project: {
     new: {
@@ -371,7 +372,7 @@ export const en: Translation = {
       status: 'Where is it at?',
       public: 'Public',
       publicHint:
-        'Visible to signed-in members. Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but nobody sees them while it stays private.',
+        'Visible to signed-in members. Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but no member, you included, can see them while it stays private. They come back if it becomes public again.',
       demoUrl: 'Demo link (optional)',
       demoUrlHint: 'An https address, for example https://myproject.vercel.app',
       demoUrlOk: 'Good: a public website over https.',
@@ -498,10 +499,14 @@ export const en: Translation = {
       seeAll_other: 'See the {{count}} comments',
       empty: 'No comments yet.',
       emptyPrivate:
-        'Other members’ comments are kept, but nobody reads them while the project stays private.',
+        'No comments to read for now. Any left by other members are kept: no member, you included, reads them while the project stays private.',
+      emptyRemoved:
+        'No comments to read while the project is removed. Any left by other members are kept.',
+      suspendedNote: 'You can’t comment during the suspension.',
       send: 'Send',
       sendLabel: 'Send the comment',
       replyTo: 'Replying to {{name}}',
+      replyToExcerpt: 'Replying to {{name}}: “{{excerpt}}”',
       editing: 'Edit your comment',
       cancelReply: 'Cancel the reply',
       cancelEdit: 'Cancel the edit',
@@ -515,6 +520,7 @@ export const en: Translation = {
       menu: 'Actions for {{name}}’s comment',
       yours: 'Your comment',
       openLine: 'Comment by {{name}}: {{excerpt}}',
+      openLineMine: 'Your comment: {{excerpt}}',
       hiddenNote: 'Only its author and you can still see it.',
       hiddenByAuthor: 'Hidden by the project’s author',
       hiddenByAuthorNote: 'Only you and the project’s author can still see it.',
@@ -523,6 +529,11 @@ export const en: Translation = {
       add: 'Write a comment',
       addShort: 'Comment',
       hint: 'Every signed-in member will read your comment. The project’s author can hide it.',
+      hintShort: 'Every signed-in member will read your comment.',
+      hintPrivateShort: 'This project is private: nobody but you will read this comment.',
+      replyHintShort: 'Every signed-in member will read your reply.',
+      replyHintPrivateShort: 'This project is private: nobody but you will read this reply.',
+      editHintShort: 'Every signed-in member will read the new version.',
       hintPrivate:
         'This project is private: nobody but you will read this comment. If it becomes public, every member will read it.',
       about: '{{name}}: {{text}}',
@@ -560,6 +571,7 @@ export const en: Translation = {
       hideError: 'The change could not be saved. Try again.',
       deletedPlaceholder: 'Deleted comment',
       hiddenPlaceholder: 'Hidden comment',
+      privateKeptPlaceholder: 'Comment kept while the project is private',
       removedPlaceholder: 'Removed by moderation',
       blockedPlaceholder: 'Comment from a member you blocked',
       unavailablePlaceholder: 'Comment unavailable',
@@ -578,7 +590,7 @@ export const en: Translation = {
       back: 'Back',
       notFoundAction: 'Back to the feed',
       privateBanner:
-        'Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but nobody sees them while it stays private.',
+        'Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but no member, you included, can see them while it stays private. They come back if it becomes public again.',
       external: '{{host}}, a website outside {{appName}}',
       description: 'Description',
       tryDemo: 'Try the demo',

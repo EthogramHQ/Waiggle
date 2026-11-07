@@ -755,8 +755,9 @@ Hors de R5a, et où ça va :
   son nombre, et « Des nombres seulement : personne ne voit qui a réagi. »
 - Et ses boutons sont « Modifier » (et « 4 abonnés » à côté), le journal reste en dessous
 - Et sur un projet privé, le bandeau « Privé : aucun autre membre ne le voit. Il te sert de
-  brouillon : les commentaires et les réactions déjà reçus sont gardés, et toi seul les vois tant
-  qu'il reste privé. », et « Créé le 12 oct. » au lieu de « Publié le »
+  brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre,
+  toi compris, ne les voit tant qu'il reste privé. Ils reviendront s'il redevient public. »
+  (texte corrigé en R5b), et « Créé le 12 oct. » au lieu de « Publié le »
 
 ### Partager (F-Pr1, F-Mb1, planche `R5a-Partager`)
 
@@ -1000,8 +1001,8 @@ Hors de R5b, et où ça va :
   le bouton « Écrire un commentaire », qui ouvre la feuille, le champ prêt à écrire (sur
   ordinateur, le champ de la colonne suffit)
 - Et sur son projet privé, l'auteur lit à la place de « Aucun commentaire pour l'instant. » :
-  « Les commentaires des autres membres sont gardés, mais personne ne les lit tant que le projet
-  reste privé. » ; la bannière du projet privé ne lui dit plus qu'il les voit (décision D4,
+  « Aucun commentaire à lire pour l'instant. Ceux que d'autres membres auraient laissés sont gardés :
+  aucun membre, toi compris, ne les lit tant que le projet reste privé. » ; la bannière du projet privé ne lui dit plus qu'il les voit (décision D4,
   relecture du plan)
 - Et un projet qui a 3 commentaires ou moins (5 sur ordinateur) n'a pas de « Voir les… » sur
   téléphone : le bouton devient « Commenter », qui ouvre la feuille
@@ -1185,6 +1186,28 @@ Pendant l'assemblage (Louis, 6/11/2026) :
 13. **Le glisser de la feuille** : au toucher seulement ; à la souris, « Fermer », Échap et le voile.
 14. **Un commentaire supprimé gardé pour ses réponses** n'a plus de date, comme le dit « ni nom, ni
     date ».
+
+Après les relectures de la branche (Louis, 7/11/2026) :
+
+15. **La feuille de jour** est crème et opaque, comme la planche, sur toutes les feuilles ; la nuit ne
+    change pas.
+16. **Un emplacement n'a plus de date, dans l'API non plus** : `createdAt` vaut `null` pour un
+    commentaire supprimé, masqué, retiré, bloqué ou indisponible.
+17. **Répondre depuis la colonne** : le bandeau rappelle un extrait d'une ligne, sur ordinateur
+    seulement, puisque la carte visée peut être hors de l'écran.
+18. **La densité** : les écarts se réduisent pour montrer 4 commentaires par écran à 390 × 844, zones
+    à toucher de 44 points gardées.
+19. **Les fenêtres basses** : la légende se réduit à la phrase qui dit qui lira.
+20. **La photo en mode réponse** : gardée dès 360 px, retirée en dessous, où le champ serait trop
+    étroit.
+21. **Gardés** : le texte sous le nom et plus de trait entre les fils ; « Envoyer » de la colonne en
+    blanc ; le glisser limité à la tête de la feuille ; sur ordinateur, à 5 commentaires ou moins, la
+    liste complète plutôt que l'aperçu.
+22. **Les textes vrais** : un compteur à zéro n'est pas « aucun » pour qui lit un commentaire non
+    compté ; un projet retiré n'a ni champ ni audience (« Aucun commentaire à lire pendant le retrait
+    du projet… ») ; un suspendu lit dans la feuille pourquoi il n'y a pas de champ ; sur un projet
+    privé, un emplacement dit « Commentaire gardé tant que le projet est privé » plutôt que
+    « masqué » ; le réglage de recherche dit qu'on te trouve aussi après « @ ».
 
 - Et les textes de masquage disent qui voit encore le commentaire, et les aides sous le champ
   restent celles d'aujourd'hui (relecture juridique).

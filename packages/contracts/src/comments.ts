@@ -95,7 +95,11 @@ export const CommentReply = z
     author: CommentAuthor.nullable(),
     /** Le texte tel qu'écrit ; vide quand l'auteur est null. */
     body: z.string(),
-    createdAt: z.iso.datetime(),
+    /**
+     * La date d'écriture ; null quand le commentaire n'est qu'un emplacement : un supprimé gardé pour
+     * ses réponses n'a plus de date, dans la réponse de l'API comme à l'écran (R5b, 7/11/2026).
+     */
+    createdAt: z.iso.datetime().nullable(),
     /** La dernière modification par son auteur ; null s'il n'y en a pas eu (« modifié »). */
     editedAt: z.iso.datetime().nullable(),
     state: CommentState,

@@ -419,7 +419,7 @@ export const fr = {
     previewTitle: 'Aperçu de ta page',
     /** R3 : sous le nom, la rubrique dit que la recherche trouve le membre (relecture juridique, jur-J3). */
     searchable:
-      'Les membres connectés peuvent te trouver par ton nom ou ton pseudo dans la recherche.',
+      'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
   },
   project: {
     new: {
@@ -439,7 +439,7 @@ export const fr = {
       status: 'Où en est-il ?',
       public: 'Public',
       publicHint:
-        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais personne ne les voit tant qu’il reste privé.',
+        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
@@ -576,10 +576,14 @@ export const fr = {
       empty: 'Aucun commentaire pour l’instant.',
       // Un projet privé garde les commentaires des autres, que personne ne lit (R5b, jur-P9, `sees`).
       emptyPrivate:
-        'Les commentaires des autres membres sont gardés, mais personne ne les lit tant que le projet reste privé.',
+        'Aucun commentaire à lire pour l’instant. Ceux que d’autres membres auraient laissés sont gardés : aucun membre, toi compris, ne les lit tant que le projet reste privé.',
+      emptyRemoved:
+        'Aucun commentaire à lire pendant le retrait du projet. Ceux que d’autres membres auraient laissés restent gardés.',
+      suspendedNote: 'Tu ne peux pas commenter pendant la suspension.',
       send: 'Envoyer',
       sendLabel: 'Envoyer le commentaire',
       replyTo: 'Réponse à {{name}}',
+      replyToExcerpt: 'Réponse à {{name}} : « {{excerpt}} »',
       editing: 'Modifier ton commentaire',
       cancelReply: 'Annuler la réponse',
       cancelEdit: 'Annuler la modification',
@@ -595,6 +599,7 @@ export const fr = {
       yours: 'Ton commentaire',
       // La carte compacte de l'aperçu : un seul bouton, nommé par l'auteur et l'extrait (ui-B7).
       openLine: 'Commentaire de {{name}} : {{excerpt}}',
+      openLineMine: 'Ton commentaire : {{excerpt}}',
       hiddenNote: 'Il ne reste visible que de toi et de la personne qui l’a écrit.',
       hiddenByAuthor: 'Masqué par l’auteur du projet',
       hiddenByAuthorNote: 'Il ne reste visible que de toi et de l’auteur du projet.',
@@ -603,6 +608,13 @@ export const fr = {
       add: 'Écrire un commentaire',
       addShort: 'Commenter',
       hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
+      // Les légendes réduites d'une fenêtre basse (R5b) : seulement qui lira.
+      hintShort: 'Tous les membres connectés liront ton commentaire.',
+      hintPrivateShort: 'Ce projet est privé : personne d’autre que toi ne lira ce commentaire.',
+      replyHintShort: 'Tous les membres connectés liront ta réponse.',
+      replyHintPrivateShort:
+        'Ce projet est privé : personne d’autre que toi ne lira cette réponse.',
+      editHintShort: 'Tous les membres connectés liront la nouvelle version.',
       hintPrivate:
         'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
       about: '{{name}} : {{text}}',
@@ -642,6 +654,7 @@ export const fr = {
       hideError: 'Le changement n’a pas pu être enregistré. Réessaie.',
       deletedPlaceholder: 'Commentaire supprimé',
       hiddenPlaceholder: 'Commentaire masqué',
+      privateKeptPlaceholder: 'Commentaire gardé tant que le projet est privé',
       removedPlaceholder: 'Contenu retiré par la modération',
       // Tranche 7b : « Commentaire masqué » reste au geste de l'auteur du projet (J6).
       blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',
@@ -666,7 +679,7 @@ export const fr = {
       // R5b (D4, jur-P9) : l'auteur ne lit pas non plus les commentaires ni les réactions des autres
       // sur son projet privé (`sees` des commentaires, `reactions/load.ts`).
       privateBanner:
-        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais personne ne les voit tant qu’il reste privé.',
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       tryDemo: 'Tester la démo',

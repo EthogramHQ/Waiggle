@@ -260,7 +260,7 @@ describe('the preview of the comments on a phone', () => {
   })
 
   // jur-P9, décision D4 : sur son projet privé, l'auteur ne lit pas « Aucun commentaire » ; les
-  // commentaires des autres sont gardés, et personne ne les lit tant que le projet reste privé.
+  // commentaires des autres sont gardés, et aucun membre ne les lit tant que le projet reste privé.
   it("does not say there are no comments on a private project that keeps others' comments", async () => {
     mockSession({ user: { id: 'u1', name: 'Léa' } })
     await renderComments(counted(0, { isMine: true, visibility: 'private' }))
@@ -1123,7 +1123,9 @@ describe('when a comment was written', () => {
     expect(sheet().queryByLabelText(plain(parisDateTime(createdAt, 'fr').dateTime))).toBeNull()
     // Témoin : les réponses gardent la leur.
     expect(
-      cardOf(zoeReply.body).getByLabelText(plain(parisDateTime(zoeReply.createdAt, 'fr').dateTime)),
+      cardOf(zoeReply.body).getByLabelText(
+        plain(parisDateTime(zoeReply.createdAt ?? '', 'fr').dateTime),
+      ),
     ).toBeTruthy()
   })
 })

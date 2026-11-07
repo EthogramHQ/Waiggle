@@ -247,7 +247,7 @@ describe('the comments of a project', () => {
     await openSheet()
 
     const pattern = new RegExp(
-      `^(${sixTexts.map((text) => text.replace(/[.?]/g, '\\$&')).join('|')})$`,
+      `^(${sixTexts.map((text) => text.replace(/[\\.?]/g, '\\$&')).join('|')})$`,
     )
     expect(
       sheet()

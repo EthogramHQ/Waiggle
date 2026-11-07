@@ -223,7 +223,7 @@ describe('publishing a comment', () => {
       replies: [],
     })
     // Sa date est celle de la publication (l'horloge du test).
-    expect(Date.parse(published.createdAt)).toBe(Date.now())
+    expect(Date.parse(published.createdAt ?? '')).toBe(Date.now())
     // Les autres le lisent aussi, sans qu'il soit le leur.
     expect((await readComments(project.id, lea)).items).toEqual([{ ...published, isMine: false }])
     expect((await readComments(project.id, zoe)).items).toEqual([{ ...published, isMine: false }])
