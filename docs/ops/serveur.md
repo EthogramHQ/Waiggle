@@ -191,6 +191,9 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
   | CAA | `@` | `0 issue "letsencrypt.org"` (seul Let's Encrypt peut délivrer des certificats) |
   | TXT | `@` | `v=spf1 include:_spf.mail.hostinger.com include:_spf.tem.scaleway.com ~all` (un seul SPF) |
   | TXT | `<projet>._domainkey` | le DKIM donné par Scaleway |
+  | A, AAAA | `mta-sts` | adresses du VPS (la politique MTA-STS, plus bas) |
+  | TXT | `_mta-sts` | `v=STSv1; id=AAAAMMJJ01` (plus bas) |
+  | TXT | `_smtp._tls` | `v=TLSRPTv1; rua=mailto:contact@waiggle.com` (plus bas) |
   | … | … | MX, DKIM (`hostingermail-a/b/c`), `autodiscover` et `autoconfig` de la boîte Hostinger ; plus tard, pour le marketing, ceux de Brevo (`news.waiggle.com`) |
 
   **Les anciens domaines** (`waiggle.io`, `waiggle.fr`) gardent leurs A et AAAA (ou la
@@ -206,12 +209,36 @@ de hPanel : `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
   Attention : activer puis supprimer une boîte Hostinger sur un domaine efface ses
   enregistrements mail (SPF, DKIM, DMARC, MX) ; c'est arrivé à `waiggle.io` le 23/10/2026.
 
-  Pour DMARC, commence par `p=none` : on observe d'abord, on durcit ensuite. Les rapports des
-  messageries (adresse `rua` de l'enregistrement `_dmarc`) partent chez Postmark « DMARC Digests »,
-  un service gratuit qui envoie à Louis un résumé chaque semaine. Postmark donne l'enregistrement
-  complet à recopier ; sa clé d'API, inutile tant qu'on lit le résumé, reste dans le gestionnaire
-  de mots de passe de Louis. Avant de passer à `p=quarantine`, vérifier dans ces résumés que
-  Scaleway (et Brevo, s'il envoie) passent SPF ou DKIM.
+  Pour DMARC, commence par `p=none` : on observe d'abord, on durcit ensuite. L'enregistrement de
+  `waiggle.com` est aujourd'hui `v=DMARC1; p=none; sp=reject; rua=mailto:contact@waiggle.com` :
+  les rapports des messageries (adresse `rua`) arrivent dans la boîte `contact@` (depuis le
+  24/10/2026 ; audit de sécurité du 25/10, C10), et `sp=reject` refuse tout e-mail d'un
+  sous-domaine qui n'envoie rien (depuis le 25/10). Avant de passer à `p=quarantine` (prévu
+  mi-novembre 2026, décision du 7/11) : ces rapports montrent Scaleway (et Brevo, s'il envoie) en
+  SPF ou DKIM `pass`, et Louis lit `dkim=pass` et `dmarc=pass` dans les en-têtes d'un vrai e-mail
+  reçu de Waiggle. Le changement d'enregistrement est une action de Louis.
+
+- **MTA-STS et TLS-RPT** (audit de sécurité du 7/11/2026) : les e-mails reçus à `contact@waiggle.com`
+  voyagent d'un serveur de messagerie à l'autre. Sans règle, un intermédiaire peut retirer le
+  chiffrement de cette connexion, ou se faire passer pour nos serveurs de réception. MTA-STS
+  publie la règle « chiffrement obligatoire, vers ces serveurs-là seulement » ; TLS-RPT demande aux
+  messageries de nous écrire quand une livraison chiffrée échoue.
+  - La politique est le fichier `infra/web/mta-sts.txt`, servi par Caddy à
+    `https://mta-sts.waiggle.com/.well-known/mta-sts.txt` (`infra/Caddyfile`, `stack-test.sh` le
+    vérifie). Elle nomme les serveurs de réception (les MX de Hostinger). D'abord en
+    `mode: testing` (les messageries signalent les échecs sans refuser le courrier), puis en
+    `mode: enforce` après deux à quatre semaines de rapports propres, par une pull request.
+  - Elle demande trois enregistrements DNS (action de Louis, dans cet ordre) : `A` et `AAAA` pour
+    `mta-sts`, avec les adresses du VPS, **avant** le déploiement qui la sert (sinon Caddy n'obtient
+    pas son certificat) ; puis, une fois la politique lisible en ligne, `TXT` `_mta-sts` =
+    `v=STSv1; id=<date du jour, AAAAMMJJ01>` et `TXT` `_smtp._tls` =
+    `v=TLSRPTv1; rua=mailto:contact@waiggle.com`. L'`id` change à chaque modification du fichier :
+    c'est lui qui dit aux messageries de relire la politique.
+  - Si Hostinger change ses serveurs MX, mettre à jour le fichier avant tout.
+- **CAA de `waiggle.fr`** : comme `waiggle.com` et `waiggle.io`, `CAA` `@` =
+  `0 issue "letsencrypt.org"` (seul Let's Encrypt peut délivrer un certificat ; la redirection de
+  Hostinger en a un de Let's Encrypt). **DNSSEC** (signature des réponses DNS, contre une
+  falsification) s'active dans hPanel pour chaque domaine.
 
 Les changements DNS mettent de quelques minutes à quelques heures à se propager. C'est pour ça
 qu'on les fait tôt : ils se propagent pendant les étapes suivantes.
@@ -659,8 +686,28 @@ la bascule, fusionné puis déployé.
     de sécurité compris. Si Renovate s'arrête, les mettre à jour à la main, une fois par mois,
     dans une pull request (l'empreinte se lit sur le registre de l'image, ou par `gh api` pour
     une action).
-  - L'audit des dépendances (`pnpm audit`, job `audit` de la CI) tourne aussi chaque lundi sur
-    `main`, même sans commit : GitHub prévient par e-mail s'il échoue.
+  - L'audit des dépendances (job `audit` de la CI) tourne aussi **chaque jour** sur `main`, même
+    sans commit : GitHub prévient par e-mail s'il échoue. Il lance `pnpm audit`, puis le guetteur
+    d'avis (`scripts/advisories.mjs`, audit de sécurité du 7/11/2026), qui lit les avis publiés
+    dans les dépôts GitHub de nos dépendances directes et de Caddy : ils n'arrivent dans la base
+    de `pnpm audit` que des jours plus tard, voire jamais. Le guetteur rougit sur un avis haut ou
+    critique qui touche une version du verrou. Pour le lancer sur le PC :
+    `GH_TOKEN=$(gh auth token) node scripts/advisories.mjs`.
+
+#### Un avis de sécurité
+
+Règle du 7/11/2026 : `minimumReleaseAge` (7 jours) et le passage de Renovate le lundi retardent un
+correctif de 14 jours au plus. Un avis **haut ou critique qui nous touche** n'attend donc pas :
+
+1. le jour même, l'assistant de code juge l'avis contre notre configuration, condition par
+   condition, avec un essai (modèle : l'audit du 7/11, partie 2) ;
+2. s'il nous touche, **une pull request à la main le jour même** : la version corrigée, avec
+   `minimumReleaseAgeExclude` pour ce seul paquet, sa raison et sa date de retrait
+   (`pnpm-workspace.yaml`), et un test qui montre la faille fermée ; fusion et déploiement avec
+   l'accord de Louis ;
+3. s'il ne nous touche pas (plugin absent, route fermée…), une exception datée dans
+   `scripts/advisories-accepted.json`, avec sa raison, jusqu'à la montée ordinaire ; passée sa
+   date, le guetteur rougit de nouveau.
 - **PostgreSQL** : une nouvelle version majeure (17 → 18) ne se fait pas par un simple
   déploiement. Elle demande une sauvegarde, puis une restauration dans la nouvelle version. À
   préparer le moment venu.
