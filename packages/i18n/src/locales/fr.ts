@@ -655,6 +655,7 @@ export const fr = {
       deletedPlaceholder: 'Commentaire supprimé',
       hiddenPlaceholder: 'Commentaire masqué',
       privateKeptPlaceholder: 'Commentaire gardé tant que le projet est privé',
+      removedKeptPlaceholder: 'Commentaire gardé pendant le retrait du projet',
       removedPlaceholder: 'Contenu retiré par la modération',
       // Tranche 7b : « Commentaire masqué » reste au geste de l'auteur du projet (J6).
       blockedPlaceholder: 'Commentaire d’un membre que tu as bloqué',

@@ -572,6 +572,7 @@ export const en: Translation = {
       deletedPlaceholder: 'Deleted comment',
       hiddenPlaceholder: 'Hidden comment',
       privateKeptPlaceholder: 'Comment kept while the project is private',
+      removedKeptPlaceholder: 'Comment kept while the project is removed',
       removedPlaceholder: 'Removed by moderation',
       blockedPlaceholder: 'Comment from a member you blocked',
       unavailablePlaceholder: 'Comment unavailable',
