@@ -418,20 +418,12 @@ export function CommentCard({
   return (
     // Une carte sans fond n'a aucune marge en haut ni en bas : ce sont ses zones à toucher, de
     // 44 points, qui font l'air (décision 18). Un fond (le gris des siens, le miel d'une carte visée)
-    // déborde de la carte par une marge négative égale à son retrait : le texte ne saute pas quand le
-    // surlignage arrive ou part. « box-none » : ce débord laisse passer le doigt jusqu'à la zone de
-    // « Répondre » de la carte du dessus (`pointerEvents` en propriété : voir CommentThread).
+    // déborde sous la carte par une marge négative égale à son retrait : le texte ne saute pas quand
+    // le surlignage arrive ou part, et il reste de l'air entre deux cartes grises (space.md − space.sm).
     <View
-      pointerEvents="box-none"
       style={[
         { borderRadius: radii.small, paddingHorizontal: space.sm },
-        tint && {
-          ...tint,
-          paddingTop: space.xs,
-          marginTop: -space.xs,
-          paddingBottom: space.sm,
-          marginBottom: -space.sm,
-        },
+        tint && { ...tint, paddingBottom: space.sm, marginBottom: -space.sm },
       ]}
     >
       {probe}
@@ -485,8 +477,9 @@ export function CommentCard({
           >
             {/* Le lien remonte par-dessus la photo (marge négative, rendue au nom par un retrait) :
                 on la touche comme le nom, l'anneau du clavier les entoure tous deux, et un nom très
-                court (« Léa ») garde ses 44 points sans repousser la date. */}
-            <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -hang }}>
+                court (« Léa ») garde ses 44 points sans repousser la date. zIndex : une date passée
+                à la ligne vient dans le bas de sa zone, et ne la recouvre pas. */}
+            <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -hang, zIndex: 1 }}>
               <View style={{ marginLeft: -overPhoto }}>
                 <Pressed
                   label={
