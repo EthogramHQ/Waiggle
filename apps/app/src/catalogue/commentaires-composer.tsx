@@ -8,8 +8,9 @@
 // prises dans les deux thèmes.
 import { type ComponentProps, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { View } from 'react-native'
 import { CommentComposer } from '../ui/CommentComposer'
-import type { MentionSuggestion } from '../ui/MentionField'
+import { MentionField, type MentionSuggestion } from '../ui/MentionField'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -35,6 +36,15 @@ const fr = {
   typing: 'Merci @in',
   member: 'Sam Petit',
   replyTo: 'Léa Moreau',
+  replyExcerpt:
+    'En réponse, dans la colonne : le bandeau rappelle le début du commentaire visé (`banner.excerpt`).',
+  excerpt: 'Super idée, je l’ai testé ce matin avec ma fille : elle a adoré le quiz.',
+  narrow:
+    'Dans une colonne étroite (300 points) : « Envoyer » passe sous le champ, à droite, au lieu de le serrer.',
+  limited:
+    'La liste des membres limitée en hauteur (`suggestionsMaxHeight`, fenêtre basse) : elle défile, le nom et le pseudo restent l’un sous l’autre.',
+  limitedField: 'Écrire un commentaire',
+  limitedList: 'Membres à mentionner',
 }
 
 const en: typeof fr = {
@@ -55,13 +65,61 @@ const en: typeof fr = {
   typing: 'Thanks @in',
   member: 'Sam Petit',
   replyTo: 'Léa Moreau',
+  replyExcerpt:
+    'Replying, in the column: the banner recalls the start of the targeted comment (`banner.excerpt`).',
+  excerpt: 'Great idea, I tried it this morning with my daughter: she loved the quiz.',
+  narrow:
+    'In a narrow column (300 points): “Send” goes under the field, on the right, instead of squeezing it.',
+  limited:
+    'The member list limited in height (`suggestionsMaxHeight`, low window): it scrolls, the name and the handle stay one under the other.',
+  limitedField: 'Write a comment',
+  limitedList: 'Members to mention',
 }
+
+/** La largeur de la colonne étroite : la rangée du champ n'y tient plus d'une ligne. */
+const NARROW = 300
 
 /** Les membres simulés que la recherche « in » trouve. */
 const members: MentionSuggestion[] = [
   { id: 'u5', name: 'Inès Morel', handle: 'ines_morel', avatar: null },
   { id: 'u6', name: 'Iniko Diallo', handle: 'iniko', avatar: null },
 ]
+
+/** Cinq membres que « in » trouve, dont un au nom long : de quoi remplir une liste limitée. */
+const manyMembers: MentionSuggestion[] = [
+  ...members,
+  { id: 'u8', name: 'Inaya Benali', handle: 'inaya', avatar: null },
+  { id: 'u9', name: 'Ingrid Hansen-Delacroix de Montmorency', handle: 'ingrid_h', avatar: null },
+  { id: 'u10', name: 'Inigo Montoya', handle: 'inigo', avatar: null },
+]
+
+/**
+ * Un champ dont la liste de membres a une hauteur limitée, comme dans la feuille d'une fenêtre
+ * basse (le champ de la feuille calcule cette hauteur d'après la fenêtre) : la liste défile.
+ */
+function LimitedList({ field, list }: { field: string; list: string }) {
+  const [value, setValue] = useState('Merci @in')
+  const [query, setQuery] = useState<string | null>(null)
+  return (
+    <Surface variant="grouped" padding="lg" gap="md">
+      <MentionField
+        label={field}
+        value={value}
+        onChangeText={setValue}
+        suggestions={query === 'in' ? manyMembers : []}
+        suggestionsFor={query}
+        suggestionsLabel={list}
+        suggestionsPlacement="above"
+        suggestionsMaxHeight={LIMITED_HEIGHT}
+        onQueryChange={setQuery}
+        multiline
+      />
+    </Surface>
+  )
+}
+
+/** La hauteur de la liste limitée : un peu plus de deux choix de 44 points. */
+const LIMITED_HEIGHT = 110
 
 /** Un texte fait de la même phrase, coupé à la longueur voulue. */
 const textOf = (phrase: string, length: number) =>
@@ -175,6 +233,29 @@ export function CommentComposerCatalogue() {
           ))}
         </Stack>
       ))}
+
+      {/* Les états qui ne tiennent pas dans la boucle ci-dessus : le rappel du commentaire visé (la
+          colonne seule en a besoin), la colonne étroite, la liste de membres limitée en hauteur. */}
+      <Stack gap="sm">
+        <Text tone="secondary">{l.replyExcerpt}</Text>
+        <Composer
+          {...none}
+          initial=""
+          caption={replyHint}
+          banner={{ kind: 'reply', name: l.replyTo, excerpt: l.excerpt }}
+          place="column"
+        />
+      </Stack>
+      <Stack gap="sm">
+        <Text tone="secondary">{l.narrow}</Text>
+        <View style={{ width: NARROW, maxWidth: '100%' }}>
+          <Composer {...none} initial={l.sample} place="column" />
+        </View>
+      </Stack>
+      <Stack gap="sm">
+        <Text tone="secondary">{l.limited}</Text>
+        <LimitedList field={l.limitedField} list={l.limitedList} />
+      </Stack>
     </Stack>
   )
 }

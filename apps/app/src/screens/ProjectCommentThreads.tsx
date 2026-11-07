@@ -260,7 +260,13 @@ export function CommentThreads({
         isMine={comment.isMine}
         isProjectAuthor={author?.id === project.author.id}
         highlighted={draft.highlightedId === comment.id}
-        keptWhilePrivate={project.visibility === 'private'}
+        // Un emplacement masqué que personne n'a masqué : le projet est retiré (le retrait l'emporte,
+        // il est aussi public) ou privé.
+        {...(project.removal !== null
+          ? { keptBecause: 'removed' as const }
+          : project.visibility === 'private'
+            ? { keptBecause: 'private' as const }
+            : null)}
         menu={menuOf(comment)}
         {...(canReply ? { onReply: () => onReply(root, comment) } : null)}
         // Les deux qui lisent encore un commentaire masqué : l'auteur du projet, qui l'a masqué, et

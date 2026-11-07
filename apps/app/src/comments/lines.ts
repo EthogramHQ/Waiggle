@@ -40,6 +40,31 @@ export function previewLines(items: Comment[], max: number): PreviewLine[] {
 }
 
 /**
+ * Les lignes de l'aperçu rangées par fil, pour dessiner le coude des réponses comme dans la feuille :
+ * `root` est la racine du fil si elle est dans l'aperçu (sinon `null`, ses réponses visibles restent
+ * seules, sans trait), `replies` ses réponses gardées, dans l'ordre.
+ */
+export type PreviewThread = {
+  rootId: string
+  root: PreviewLine | null
+  replies: PreviewLine[]
+}
+
+export function previewThreads(lines: PreviewLine[]): PreviewThread[] {
+  const threads: PreviewThread[] = []
+  for (const line of lines) {
+    let thread = threads.find((other) => other.rootId === line.rootId)
+    if (!thread) {
+      thread = { rootId: line.rootId, root: null, replies: [] }
+      threads.push(thread)
+    }
+    if (line.kind === 'root') thread.root = line
+    else thread.replies.push(line)
+  }
+  return threads
+}
+
+/**
  * Tous les commentaires, dans l'ordre de la feuille : chaque fil, puis ses réponses, emplacements
  * compris (où poser le focus après une suppression, ce que le membre peut lire).
  */

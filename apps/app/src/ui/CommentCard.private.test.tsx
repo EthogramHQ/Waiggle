@@ -10,7 +10,7 @@ import { CommentCard } from './CommentCard'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
-const placeholder = (state: CommentState, keptWhilePrivate?: boolean) => (
+const placeholder = (state: CommentState, keptBecause?: 'private' | 'removed') => (
   <CommentCard
     comment={{
       ...maxComment,
@@ -28,16 +28,24 @@ const placeholder = (state: CommentState, keptWhilePrivate?: boolean) => (
     hiddenNote={null}
     onAuthorPress={() => {}}
     onMemberPress={() => {}}
-    {...(keptWhilePrivate === undefined ? null : { keptWhilePrivate })}
+    {...(keptBecause === undefined ? null : { keptBecause })}
   />
 )
 
 describe('CommentCard, a placeholder on a private project', () => {
   it('says the comment is kept when the project is private', async () => {
-    await renderWithProviders(placeholder('hidden', true))
+    await renderWithProviders(placeholder('hidden', 'private'))
 
     expect(screen.getByText(fr.t(($) => $.project.comments.privateKeptPlaceholder))).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.project.comments.hiddenPlaceholder))).toBeNull()
+  })
+
+  it('says the comment is kept while the project is removed, not « masqué »', async () => {
+    await renderWithProviders(placeholder('hidden', 'removed'))
+
+    expect(screen.getByText(fr.t(($) => $.project.comments.removedKeptPlaceholder))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.project.comments.hiddenPlaceholder))).toBeNull()
+    expect(screen.queryByText(fr.t(($) => $.project.comments.privateKeptPlaceholder))).toBeNull()
   })
 
   it('says « masqué » by default', async () => {
@@ -48,7 +56,7 @@ describe('CommentCard, a placeholder on a private project', () => {
   })
 
   it('keeps « supprimé » on a private project: that one was deleted', async () => {
-    await renderWithProviders(placeholder('deleted', true))
+    await renderWithProviders(placeholder('deleted', 'private'))
 
     expect(screen.getByText(fr.t(($) => $.project.comments.deletedPlaceholder))).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.project.comments.privateKeptPlaceholder))).toBeNull()

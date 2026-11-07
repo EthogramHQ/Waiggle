@@ -24,7 +24,7 @@ import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useComments } from '../comments/api'
-import { previewLines, threadLines } from '../comments/lines'
+import { type PreviewLine, previewLines, previewThreads, threadLines } from '../comments/lines'
 import { useCommentDraft } from '../comments/useCommentDraft'
 import { useMentionable } from '../mentions/api'
 import { useSuspension } from '../moderation/suspension'
@@ -35,6 +35,7 @@ import { excerpt } from '../ui/CommentAction'
 import { CommentCard, plainCommentText } from '../ui/CommentCard'
 import { CommentComposer, useLowWindow } from '../ui/CommentComposer'
 import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
+import { CommentThread } from '../ui/CommentThread'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
@@ -422,7 +423,7 @@ export function Comments({ project }: { project: Project }) {
     />
   )
 
-  const previewCardsNodes = lines.map(({ comment, kind }) => (
+  const previewCard = ({ comment, kind }: PreviewLine) => (
     <CommentCard
       key={comment.id}
       handle={(handle) => {
@@ -441,7 +442,24 @@ export function Comments({ project }: { project: Project }) {
       onMemberPress={nothing}
       onPress={() => (columns ? unroll(comment.id) : openSheet(comment.id, false))}
     />
-  ))
+  )
+
+  // Les lignes rangées par fil, comme dans la feuille : le coude relie chaque réponse à sa racine
+  // (CommentThread). Des réponses dont la racine n'est pas montrée restent seules, sans trait.
+  const previewCardsNodes = previewThreads(lines).flatMap((thread) =>
+    thread.root
+      ? [
+          <CommentThread
+            key={thread.rootId}
+            // L'aperçu n'est pas une liste de fils : pas d'élément de liste autour (la liste des
+            // réponses, elle, reste une liste).
+            listItem={false}
+            root={previewCard(thread.root)}
+            replies={thread.replies.map(previewCard)}
+          />,
+        ]
+      : thread.replies.map(previewCard),
+  )
 
   // Le bouton de l'aperçu. Dès qu'il y a de quoi lire, y compris un commentaire que le membre seul voit
   // (retiré, masqué : le compteur ne le compte pas), « Voir » ; sans rien à lire, écrire, ou aucun

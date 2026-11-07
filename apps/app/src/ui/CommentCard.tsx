@@ -84,10 +84,12 @@ type Props = {
   /** Le commentaire visé par une réponse ou une modification en cours : le miel pâle. */
   highlighted?: boolean
   /**
-   * Le projet est privé : un emplacement `hidden` est gardé, personne ne l'a masqué (l'API rend ce
-   * même état pour le commentaire d'un autre sur un projet devenu privé). Il le dit (décision 22).
+   * Pourquoi un emplacement `hidden` est gardé alors que personne ne l'a masqué : le projet est
+   * privé, ou retiré par la modération (l'API rend ce même état pour le commentaire d'un autre sur
+   * un projet devenu privé, ou retiré). La carte le dit au lieu de « Commentaire masqué »
+   * (décision 22). Absent : un vrai masquage.
    */
-  keptWhilePrivate?: boolean
+  keptBecause?: 'private' | 'removed'
   /** L'aperçu sous le projet : un seul bouton (`onPress`), sans lien ni action dedans. */
   compact?: boolean
   /** Les actions du menu « … » ; vide : pas de « … ». */
@@ -200,7 +202,7 @@ export function CommentCard({
   isMine,
   isProjectAuthor,
   highlighted = false,
-  keptWhilePrivate = false,
+  keptBecause,
   compact = false,
   menu,
   onReply,
@@ -255,7 +257,11 @@ export function CommentCard({
     const placeholder =
       comment.state === 'visible' ? PLACEHOLDERS.deleted : PLACEHOLDERS[comment.state]
     const phrase =
-      comment.state === 'hidden' && keptWhilePrivate ? 'privateKeptPlaceholder' : placeholder.text
+      comment.state === 'hidden' && keptBecause
+        ? keptBecause === 'removed'
+          ? 'removedKeptPlaceholder'
+          : 'privateKeptPlaceholder'
+        : placeholder.text
     return (
       <View
         style={{
@@ -368,9 +374,19 @@ export function CommentCard({
     </View>
   ) : null
 
+  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`,
+  // décision 21) : le trait des réponses descend de la photo sans jamais passer sous le texte. Très
+  // agrandi (150 % et plus), il passe sous la photo, sinon il resterait à 12 caractères par ligne
+  // à 320 px ; le trait du fil, lui, ne descend alors plus de la photo (CommentThread). L'aperçu
+  // (`compact`) a le même retrait : dérouler la liste ne décale pas le texte de 44 points.
+  const overPhoto = size + space.sm
+  const indent = large ? 0 : overPhoto
+
   if (compact) {
     // L'aperçu : un seul bouton, nommé par l'auteur et l'extrait ; les mentions y sont du texte
-    // simple (aucun lien dans un bouton). Toucher n'importe où ouvre la feuille.
+    // simple (aucun lien dans un bouton). Toucher n'importe où ouvre la feuille. La rangée du nom a
+    // la hauteur de celle de la feuille et la même marge à gauche : la photo, et le coude du fil
+    // (CommentThread, qui range aussi les réponses de l'aperçu), tombent au même endroit.
     return (
       <Pressed
         ref={cardRef}
@@ -382,33 +398,32 @@ export function CommentCard({
         onPress={onPress ?? (() => {})}
         radius="small"
       >
-        <View style={[{ borderRadius: radii.small, padding: space.sm, gap: space.xs }, tint]}>
+        <View style={[{ borderRadius: radii.small, paddingHorizontal: space.sm }, tint]}>
+          {probe}
           <View
             style={{
               flexDirection: 'row',
               flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: space.sm,
+              minHeight: NAME_ROW,
             }}
           >
             {who}
             {date}
             {edited}
           </View>
-          <Text numberOfLines={COMPACT_LINES} breakAnywhere>
-            {plain}
-          </Text>
+          {/* marginTop négatif : la rangée a 44 points, le texte remonte dans l'air de sa photo. */}
+          <View style={{ paddingLeft: indent, marginTop: -space.xs, paddingBottom: space.xs }}>
+            <Text numberOfLines={COMPACT_LINES} breakAnywhere>
+              {plain}
+            </Text>
+          </View>
         </View>
       </Pressed>
     )
   }
 
-  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`,
-  // décision 21) : le trait des réponses descend de la photo sans jamais passer sous le texte. Très
-  // agrandi (150 % et plus), il passe sous la photo, sinon il resterait à 12 caractères par ligne
-  // à 320 px ; le trait du fil, lui, ne descend alors plus de la photo (CommentThread).
-  const overPhoto = size + space.sm
-  const indent = large ? 0 : overPhoto
   // Très agrandi, le nom remplit sa zone : il n'y a plus de vide à faire déborder sur le texte.
   const hang = large ? 0 : NAME_HANG
   const piece = { paddingLeft: indent }

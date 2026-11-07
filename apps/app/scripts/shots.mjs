@@ -663,6 +663,12 @@ const removedProject = {
     note(6, 'Première version : il propose trois avis à recopier.', 14),
   ],
 }
+// R5b (K5) : le même projet retiré, sans aucun commentaire : l'aperçu dit « emptyRemoved », sans
+// champ ni bouton (rien ne s'y ajoute).
+const removedEmptyProject = {
+  ...removedProject,
+  id: '00000000-0000-4000-8000-0000000000de',
+}
 const removedComments = [
   comment(31, lea, 'Écris-moi en privé, je te fais tes avis pour 5 €.', 19, 9, {
     state: 'removed',
@@ -1322,6 +1328,9 @@ const fakeApi = (
     if (pathname === `/v1/projects/${removedProject.id}`) {
       return json(200, withExtras(removedProject))
     }
+    if (pathname === `/v1/projects/${removedEmptyProject.id}`) {
+      return json(200, withExtras(removedEmptyProject))
+    }
     if (pathname === `/v1/members/${leaMe.id}`) {
       return json(200, { ...leaMember, name: me.name, handle: me.handle, bio: me.bio })
     }
@@ -1756,6 +1765,21 @@ const pages = [
       await field.pressSequentially('@Lé')
       await page.getByRole('option', { name: /Hugo Lefèvre/ }).waitFor()
     },
+  },
+  // Les commentaires d'un projet privé, vu par son auteur, sans commentaire : la bannière « privé »
+  // et l'état vide qui le dit (jur-J10) ; puis ceux d'un projet public retiré par la modération,
+  // vu par son auteur : pas de champ, « emptyRemoved ».
+  {
+    name: 'projet-prive-commentaires',
+    path: `/projects/${draftProject.id}`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'projet-retire-commentaires',
+    path: `/projects/${removedEmptyProject.id}`,
+    signedIn: true,
+    fullPage: true,
   },
   // Les états : masqué, supprimé, retiré, bloqué, et le texte long replié après 10 lignes.
   {

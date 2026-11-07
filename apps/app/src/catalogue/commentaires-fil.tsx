@@ -12,8 +12,11 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne (plusieurs personnes écrivent le
 // catalogue en même temps). Ses exemples, un outil de développement absent de l'appli publiée, sont
 // écrits ici en français et en anglais.
+import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '../ui/Avatar'
+import { CommentCard } from '../ui/CommentCard'
+import { CommentList } from '../ui/CommentList'
 import { CommentPreview } from '../ui/CommentPreview'
 import { CommentThread } from '../ui/CommentThread'
 import { CountedTitle } from '../ui/CountedTitle'
@@ -47,6 +50,17 @@ const fr = {
   footer: 'Réponse publiée.',
   previews:
     'L’aperçu sous un projet : « Voir les 6 commentaires », « Commenter », sans commentaire, puis sans bouton (ordinateur).',
+  compactThread:
+    'Les lignes de l’aperçu sont des cartes compactes rangées par fil : le texte sous le nom, le coude vers la réponse.',
+  emptyLabel:
+    'La phrase sans commentaire donnée par l’écran (`emptyLabel`) : projet privé, puis projet retiré (sans bouton).',
+  seeAllCount:
+    'Le compteur vaut 0 mais le membre a un commentaire à lire (`seeAllCount`) : « Voir le commentaire ».',
+  kept: 'Un emplacement gardé sans que personne l’ait masqué (`keptBecause`) : projet privé, puis projet retiré.',
+  list: 'La liste des fils (`CommentList`, fils en `listItem={false}`) : « Afficher la suite », chargement, erreur, puis vide.',
+  rootCommentText: 'Super idée, je l’ai testé ce matin avec ma fille.',
+  replyCommentText: 'Oui, la lumière de la cuisine suffit.',
+  mineText: 'Est-ce que ça marche aussi en intérieur ?',
 }
 
 const en: typeof fr = {
@@ -74,7 +88,57 @@ const en: typeof fr = {
   footer: 'Reply posted.',
   previews:
     'The preview under a project: “See all 6 comments”, “Comment”, no comment, then no button (computer).',
+  compactThread:
+    'The preview lines are compact cards grouped by thread: the text under the name, the elbow to the reply.',
+  emptyLabel:
+    'The no-comment sentence given by the screen (`emptyLabel`): private project, then removed project (no button).',
+  seeAllCount:
+    'The count is 0 but the member has a comment to read (`seeAllCount`): “See the comment”.',
+  kept: 'A placeholder kept although nobody hid it (`keptBecause`): private project, then removed project.',
+  list: 'The list of threads (`CommentList`, threads as `listItem={false}`): “Show more”, loading, error, then empty.',
+  rootCommentText: 'Great idea, I tried it this morning with my daughter.',
+  replyCommentText: 'Yes, the kitchen light is enough.',
+  mineText: 'Does it work indoors too?',
 }
+
+const noop = () => {}
+/** L'heure figée du catalogue : la date relative ne dépend pas du moment de la visite. */
+const NOW = new Date('2026-11-05T12:00:00.000Z')
+const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
+const HUGO = { id: 'hugo', name: 'Hugo Lefèvre', avatarUrl: null, handle: 'hugo_l' }
+const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b' }
+
+/** Les props communes d'une carte d'exemple : ni menu, ni masquage, rien à ouvrir. */
+const base = {
+  kind: 'root' as const,
+  isMine: false,
+  isProjectAuthor: false,
+  menu: [],
+  hiddenNote: null,
+  onAuthorPress: noop,
+  onMemberPress: noop,
+  now: NOW,
+}
+
+/** Un commentaire d'exemple, tel que l'API le rend. */
+const sample = (l: typeof fr, which: 'root' | 'reply' | 'mine' | 'kept'): CommentReply => ({
+  id: which,
+  author: which === 'kept' ? null : which === 'mine' ? SAM : HUGO,
+  body:
+    which === 'root'
+      ? l.rootCommentText
+      : which === 'reply'
+        ? l.replyCommentText
+        : which === 'mine'
+          ? l.mineText
+          : '',
+  createdAt: which === 'kept' ? null : HOURS_AGO(which === 'reply' ? 1 : 3),
+  editedAt: null,
+  state: which === 'kept' ? 'hidden' : 'visible',
+  isMine: which === 'mine',
+  mentions: [],
+  removal: null,
+})
 
 /** Une carte simplifiée : la photo à la taille de `CommentCard` (36 la racine, 28 une réponse). */
 function Line({ name, text, reply = false }: { name: string; text: string; reply?: boolean }) {
@@ -92,7 +156,7 @@ function Line({ name, text, reply = false }: { name: string; text: string; reply
 }
 
 export function CommentThreadCatalogue() {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
   const replies = [
     <Line key="zoe" name={l.zoe} text={l.zoeText} reply />,
@@ -165,6 +229,84 @@ export function CommentThreadCatalogue() {
       <CommentPreview count={3} action={null} onOpen={() => {}}>
         {lines}
       </CommentPreview>
+
+      {/* Les lignes sont des cartes compactes (CommentCard), rangées par fil comme dans la feuille :
+          le texte sous le nom, le coude relie la réponse à sa racine (des-A10). */}
+      <Text tone="secondary">{l.compactThread}</Text>
+      <CommentPreview count={2} action="all" onOpen={() => {}}>
+        <CommentThread
+          listItem={false}
+          root={<CommentCard {...base} compact comment={sample(l, 'root')} />}
+          replies={[
+            <CommentCard key="reply" {...base} compact kind="reply" comment={sample(l, 'reply')} />,
+          ]}
+        />
+      </CommentPreview>
+
+      {/* `emptyLabel` : la phrase de l'écran remplace « Aucun commentaire » (projet privé). Sans
+          bouton : un lecteur qui n'écrit pas (projet retiré) n'en a pas. */}
+      <Text tone="secondary">{l.emptyLabel}</Text>
+      <CommentPreview
+        count={0}
+        action={null}
+        emptyLabel={t(($) => $.project.comments.emptyPrivate)}
+        onOpen={() => {}}
+      />
+      <CommentPreview
+        count={0}
+        action={null}
+        emptyLabel={t(($) => $.project.comments.emptyRemoved)}
+        onOpen={() => {}}
+      />
+
+      {/* `seeAllCount` : le compteur vaut 0, mais le membre a un commentaire à lire (le sien, que le
+          compteur ne compte pas) : le bouton dit « Voir le commentaire ». */}
+      <Text tone="secondary">{l.seeAllCount}</Text>
+      <CommentPreview count={0} seeAllCount={1} action="all" onOpen={() => {}}>
+        <CommentCard {...base} compact isMine comment={sample(l, 'mine')} />
+      </CommentPreview>
+
+      {/* Un emplacement `hidden` que personne n'a masqué : `keptBecause` dit pourquoi il est gardé. */}
+      <Text tone="secondary">{l.kept}</Text>
+      <Stack gap="sm">
+        <CommentCard {...base} keptBecause="private" comment={sample(l, 'kept')} />
+        <CommentCard {...base} keptBecause="removed" comment={sample(l, 'kept')} />
+      </Stack>
+
+      {/* `CommentList` : les fils d'un projet, dans une liste que les lecteurs d'écran annoncent ;
+          `listItem={false}` : la liste pose déjà l'élément de liste autour de chaque fil. */}
+      <Text tone="secondary">{l.list}</Text>
+      {(['more', 'loading', 'error'] as const).map((state) => (
+        <CommentList
+          key={state}
+          state={state}
+          onMore={() => {}}
+          moreLabel={t(($) => $.project.comments.more)}
+          errorLabel={t(($) => $.project.comments.moreError)}
+          retryLabel={t(($) => $.common.retry)}
+          empty={t(($) => $.project.comments.empty)}
+        >
+          <CommentThread
+            listItem={false}
+            root={<CommentCard {...base} comment={sample(l, 'root')} onReply={() => {}} />}
+            replies={[
+              <CommentCard
+                key="reply"
+                {...base}
+                kind="reply"
+                comment={sample(l, 'reply')}
+                onReply={() => {}}
+              />,
+            ]}
+          />
+        </CommentList>
+      ))}
+      <CommentList
+        state="end"
+        onMore={() => {}}
+        moreLabel={t(($) => $.project.comments.more)}
+        empty={t(($) => $.project.comments.empty)}
+      />
     </Stack>
   )
 }

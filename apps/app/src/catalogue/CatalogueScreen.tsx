@@ -235,6 +235,12 @@ export function CatalogueScreen() {
         <Notice tone="success" message={l.successMessage} />
         {/* Avec une action : un lien sous le message (« Me reconnecter », tranche 6c). */}
         <Notice message={l.expired} action={{ label: l.signInAgain, onPress: () => {} }} />
+        {/* Une action faite sur place (« Réessayer ») : `role: 'button'`, annoncée comme un bouton et
+            non comme un lien vers une autre page. */}
+        <Notice
+          message={l.errorMessage}
+          action={{ label: l.retry, role: 'button', onPress: () => {} }}
+        />
         {/* Une information avec une action, lue sans couper le lecteur d'écran (polite). */}
         <Notice
           tone="info"

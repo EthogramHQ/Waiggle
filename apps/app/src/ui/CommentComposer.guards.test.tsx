@@ -148,15 +148,13 @@ describe('CommentComposer, its guards', () => {
             value: 'Merci',
             pending: true,
             error,
-            errorAction: { label: retryLabel, onPress },
+            // Comme l'écran : « Réessayer » se fait sur place, c'est un bouton (ui-A3).
+            errorAction: { label: retryLabel, role: 'button', onPress },
           })}
         />,
       )
 
-      await fireEvent.press(
-        screen.queryByRole('link', { name: retryLabel }) ??
-          screen.getByRole('button', { name: retryLabel }),
-      )
+      await fireEvent.press(screen.getByRole('button', { name: retryLabel }))
 
       expect(onPress).not.toHaveBeenCalled()
     })
@@ -165,12 +163,14 @@ describe('CommentComposer, its guards', () => {
       const onPress = jest.fn()
       await renderWithProviders(
         <CommentComposer
-          {...propsOf({ value: 'Merci', error, errorAction: { label: retryLabel, onPress } })}
+          {...propsOf({
+            value: 'Merci',
+            error,
+            errorAction: { label: retryLabel, role: 'button', onPress },
+          })}
         />,
       )
-      const retry = () =>
-        screen.queryByRole('link', { name: retryLabel }) ??
-        screen.getByRole('button', { name: retryLabel })
+      const retry = () => screen.getByRole('button', { name: retryLabel })
 
       await fireEvent.press(retry())
       await fireEvent.press(retry())

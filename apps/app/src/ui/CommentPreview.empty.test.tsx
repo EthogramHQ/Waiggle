@@ -19,6 +19,16 @@ describe('CommentPreview, with a count of 0', () => {
     expect(screen.getByText(empty)).toBeTruthy()
   })
 
+  it('says the sentence the screen gives, instead of the default one (`emptyLabel`)', async () => {
+    const given = fr.t(($) => $.project.comments.emptyPrivate)
+    await renderWithProviders(
+      <CommentPreview count={0} action="write" emptyLabel={given} onOpen={() => {}} />,
+    )
+
+    expect(screen.getByText(given)).toBeTruthy()
+    expect(screen.queryByText(empty)).toBeNull()
+  })
+
   it('says nothing of the kind when the reader has a comment that the count leaves out', async () => {
     await renderWithProviders(
       <CommentPreview count={0} seeAllCount={1} action="all" onOpen={() => {}} />,
