@@ -40,6 +40,8 @@ RUN node infra/web/check-web.mjs apps/app/dist infra/Caddyfile
 FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
 COPY infra/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/app/dist /srv/app
+# La politique MTA-STS des e-mails (voir infra/Caddyfile, « MTA-STS »), servie à part.
+COPY infra/web/mta-sts.txt /srv/mta-sts/.well-known/mta-sts.txt
 # Caddy tourne avec son propre utilisateur, jamais en root. Il ne peut écrire que dans /data et
 # /config (les certificats) ; les fichiers de l'appli et le Caddyfile appartiennent à root : même
 # en cas de faille, il ne pourrait pas les modifier. -S : utilisateur « système », sans mot de

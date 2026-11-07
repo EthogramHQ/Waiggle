@@ -66,7 +66,18 @@ describe('security headers', () => {
 
     expect(res.headers.get('x-content-type-options')).toBe('nosniff')
     expect(res.headers.get('x-frame-options')).toBe('SAMEORIGIN')
-    expect(res.headers.get('strict-transport-security')).toContain('max-age=')
+  })
+
+  // Audit de sécurité du 7/11/2026 : un an, comme le site de l'appli (infra/Caddyfile), au lieu
+  // des 180 jours par défaut de Hono ; les images de /media aussi.
+  it('ask the browser to use only HTTPS for one year, sub-domains included', async () => {
+    for (const path of ['/health', '/media/avatars/unknown.webp']) {
+      const res = await ctx.request(path)
+
+      expect(res.headers.get('strict-transport-security'), path).toBe(
+        'max-age=31536000; includeSubDomains',
+      )
+    }
   })
 
   // Le domaine de l'API porte le cookie de session et sert parfois du HTML (la page d'erreur de
