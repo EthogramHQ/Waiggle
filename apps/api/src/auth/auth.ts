@@ -24,7 +24,7 @@ import type { Mailer } from '../email/mailer'
 // L'e-mail de vérification part de auth/verification-resend.ts (tranche R2).
 import { existingAccountEmail } from '../email/templates'
 import { ensureHandle } from '../handles/claim'
-import { describeError } from '../log'
+import { describeError, writeAuthLog } from '../log'
 import type { FileStorage } from '../media/storage'
 import { suspensionEmailKey } from '../moderation/suspend'
 import { mediaKeysOf } from '../projects/load'
@@ -408,6 +408,15 @@ export const createAuth = ({
       },
     },
 
+    // Le journal (audit de sécurité du 7/11/2026, N4). Better Auth écrivait ses erreurs entières :
+    // celle d'une base en panne contient la requête et ses paramètres, dont le jeton de session du
+    // visiteur. Son journal passe par writeAuthLog (log.ts), qui n'en garde que la nature. Et une
+    // erreur imprévue n'est plus écrite par Better Auth : `throw` la renvoie à l'API (app.onError,
+    // app.ts), qui la résume comme les autres et répond le message d'erreur traduit. Les refus
+    // prévus (400, 401…) gardent la réponse de Better Auth.
+    logger: { log: writeAuthLog },
+    onAPIError: { throw: true },
+
     advanced: {
       // L'adresse IP du visiteur est transmise par Caddy dans l'en-tête X-Real-IP
       // (Caddy remplace toute valeur envoyée par le visiteur : impossible de la falsifier).
@@ -447,6 +456,8 @@ export const createAuth = ({
             return emailChange.beforeLink(ctx)
           case '/request-password-reset':
             return passwordFlows.beforeResetRequest(ctx)
+          case '/reset-password':
+            return passwordFlows.beforeReset(ctx)
           case '/change-password':
             return passwordFlows.beforeChange(ctx)
           case '/send-verification-email':

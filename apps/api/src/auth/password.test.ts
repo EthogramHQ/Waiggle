@@ -460,6 +460,29 @@ describe('choosing a new password from the link', () => {
     expect(ctx.auth.options.emailAndPassword?.resetPasswordTokenExpiresIn).toBe(3600)
   })
 
+  // Audit de sécurité du 7/11/2026, N7 : PostgreSQL refuse un texte qui contient le caractère
+  // NUL. Un jeton qui en portait un faisait échouer la recherche en base, et le visiteur, sans
+  // compte, recevait une erreur du serveur (500), avec 94 lignes de journal à chaque essai.
+  it('refuses a link with a NUL character as a damaged link, without a server error', async () => {
+    await ctx.verifiedMember(lea)
+    await forgot(lea.email)
+    const token = lastToken(lea.email)
+
+    const inBody = await reset(`${token.slice(0, 4)}\u0000${token.slice(4)}`)
+    const inQuery = await post(
+      `/api/auth/reset-password?token=${encodeURIComponent(`a\u0000b`)}`,
+      { newPassword: NEW_PASSWORD },
+      ip(2),
+    )
+
+    for (const res of [inBody, inQuery]) {
+      expect(res.status).toBe(400)
+      expect(await codeOf(res)).toBe('INVALID_TOKEN')
+    }
+    // Le vrai lien sert toujours.
+    expect((await reset(token)).status).toBe(200)
+  })
+
   it('keeps the rules of the password: too short is refused and nothing changes', async () => {
     await ctx.verifiedMember(lea)
     await forgot(lea.email)
