@@ -263,7 +263,10 @@ const main = async () => {
     await Promise.all(
       names.slice(i, i + 8).map(async (name) => {
         const version = [...locked.get(name)].sort(compare).at(-1)
-        const res = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}/${version}`)
+        // Un nom à portée (« @better-auth/expo ») s'écrit « @better-auth%2Fexpo » dans l'adresse.
+        const res = await fetch(
+          `https://registry.npmjs.org/${name.replaceAll('/', '%2F')}/${version}`,
+        )
         const repo = res.ok ? repoOf(await res.json()) : null
         if (repo) repos.add(repo)
         else noRepo.push(name)
