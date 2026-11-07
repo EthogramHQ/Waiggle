@@ -1,0 +1,32 @@
+[
+  {
+    "ghsa": "GHSA-4wq4-2ppv-q3hg",
+    "package": "better-auth",
+    "reason": "audit du 7/11/2026, N1 : la route /expo-authorization-proxy est fermée par disabledPaths depuis le 13/10 (auth.ts, test invite-code.test.ts) ; montée en 1.7.18 le 12/11 (décision 2)",
+    "until": "2026-11-13"
+  },
+  {
+    "ghsa": "GHSA-4wq4-2ppv-q3hg",
+    "package": "@better-auth/expo",
+    "reason": "audit du 7/11/2026, N1 : la route /expo-authorization-proxy est fermée par disabledPaths depuis le 13/10 (auth.ts, test invite-code.test.ts) ; montée en 1.7.18 le 12/11 (décision 2)",
+    "until": "2026-11-13"
+  },
+  {
+    "ghsa": "GHSA-q747-mqgr-4gh7",
+    "package": "better-auth",
+    "reason": "audit du 7/11/2026, N1 : vise le plugin des numéros de téléphone, que nous n'avons pas (plugins: [expo()]) ; montée en 1.7.18 le 12/11",
+    "until": "2026-11-13"
+  },
+  {
+    "ghsa": "GHSA-fmh4-wcc4-5jm3",
+    "package": "better-auth",
+    "reason": "audit du 7/11/2026, N1 : vise le plugin des organisations, que nous n'avons pas (plugins: [expo()]) ; montée en 1.7.18 le 12/11",
+    "until": "2026-11-13"
+  },
+  {
+    "ghsa": "GHSA-r766-rf9f-588h",
+    "package": "github.com/caddyserver/caddy/v2",
+    "reason": "audit du 7/11/2026, N6 : vise une racine de fichiers qui dépend du nom d'hôte ; la nôtre est fixe (root * /srv/app), sur des sites nommés ; montée en 2.11.9 le 12/11",
+    "until": "2026-11-13"
+  }
+]
