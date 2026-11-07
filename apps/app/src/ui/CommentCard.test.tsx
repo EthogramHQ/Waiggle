@@ -613,17 +613,28 @@ describe('CommentCard, the row of its name (design C6)', () => {
     expect(screen.queryByText('·', { includeHiddenElements: true })).not.toBeNull()
   })
 
-  it('opens the author from the photo too, without reading a second link', async () => {
-    const onAuthorPress = jest.fn()
-    await renderWithProviders(card({ onAuthorPress }))
+  it('reads one link only, the photo being hidden from screen readers and from the finger', async () => {
+    await renderWithProviders(card())
 
     expect(screen.getAllByRole('link', { name: 'Hugo Lefèvre' })).toHaveLength(1)
     const hidden = chainOf(photo()).find(
       (node) => node.props.importantForAccessibility === 'no-hide-descendants',
     )
-    await fireEvent.press(hidden as never)
+    expect(hidden?.props['aria-hidden']).toBe(true)
+    // Le doigt passe à travers elle, jusqu'au lien qui la recouvre (`pointerEvents` en propriété).
+    expect(hidden?.props.pointerEvents).toBe('none')
+  })
 
-    expect(onAuthorPress).toHaveBeenCalledTimes(1)
+  it('spreads the link over the photo: pulled back by its width, given back to the name', async () => {
+    await renderWithProviders(card())
+
+    const over = COMMENT_AVATAR.root + 8
+    const chain = chainOf(shown('Hugo Lefèvre'))
+    const link = screen.getByRole('link', { name: 'Hugo Lefèvre' }) as unknown as Node
+    const inside = chain.slice(0, chain.indexOf(link))
+    const outside = chain.slice(chain.indexOf(link))
+    expect(inside.some((node) => flat(node).paddingLeft === over)).toBe(true)
+    expect(outside.some((node) => flat(node).marginLeft === -over)).toBe(true)
   })
 })
 
@@ -693,6 +704,20 @@ describe('CommentCard, its density (design A3)', () => {
     expect(
       Number(style.paddingBottom ?? style.padding ?? 0) + Number(style.marginBottom ?? 0),
     ).toBe(0)
+  })
+
+  it('the row of the name keeps its 44 points, hung over the text it stays above', async () => {
+    await renderWithProviders(card({ onReply: jest.fn() }))
+
+    const link = screen.getByRole('link', { name: 'Hugo Lefèvre' }) as unknown as Node
+    expect(flat(link).minHeight).toBe(44)
+    const hung = chainOf(link).find((node) => flat(node).marginVertical === -8)
+    expect(hung).toBeDefined()
+    // Au-dessus du texte, mais le doigt l'atteint à côté des zones : ni le nom ni la pastille d'une
+    // mention ne sont masqués par la rangée elle-même.
+    const row = chainOf(link).find((node) => flat(node).zIndex === 1)
+    expect(row?.props.pointerEvents).toBe('box-none')
+    expect(chainOf(shown(BODY))).not.toContain(row)
   })
 
   it('« Répondre » hangs its 44 points over the gap below it', async () => {

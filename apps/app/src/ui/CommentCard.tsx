@@ -36,7 +36,7 @@ import {
 } from '@ruche/contracts'
 import { type Ref, type RefObject, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform, Pressable, View } from 'react-native'
+import { View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { Avatar } from './Avatar'
 import { ActionDescription, CommentActionButton, excerpt } from './CommentAction'
@@ -126,6 +126,11 @@ export const COMMENT_AVATAR = { root: 36, reply: 28 } as const
  * centre, et le trait d'un fil (CommentThread) se place d'après elle.
  */
 const NAME_ROW = layout.touchTarget
+/**
+ * Ce que les zones de 44 points de la rangée du nom (la photo, le lien, « … ») laissent dépasser sur
+ * le texte du dessous : le vide autour du nom ne repousse plus ce texte (décision 18, planche).
+ */
+const NAME_HANG = space.sm
 /**
  * Ce que « Répondre » laisse dépasser sous la carte, dans l'écart qui la sépare de la suivante
  * (`space.md`, dans CommentThread et CommentList) : sa zone de 44 points touche celle du nom suivant
@@ -390,7 +395,10 @@ export function CommentCard({
   // décision 21) : le trait des réponses descend de la photo sans jamais passer sous le texte. Très
   // agrandi (150 % et plus), il passe sous la photo, sinon il resterait à 12 caractères par ligne
   // à 320 px ; le trait du fil, lui, ne descend alors plus de la photo (CommentThread).
-  const indent = large ? 0 : size + space.sm
+  const overPhoto = size + space.sm
+  const indent = large ? 0 : overPhoto
+  // Très agrandi, le nom remplit sa zone : il n'y a plus de vide à faire déborder sur le texte.
+  const hang = large ? 0 : NAME_HANG
   const piece = { paddingLeft: indent }
   const nextPiece = { paddingLeft: indent, marginTop: space.xs }
   const described = t(($) => $.project.comments.about, { name: author.name, text: short })
@@ -431,9 +439,15 @@ export function CommentCard({
       <ActionDescription id={descriptionId} text={described} />
       {/* La photo dans sa colonne ; à sa droite, l'auteur, la date et « modifié », puis « … » au bout
           de la rangée. Quand la place manque (texte agrandi, nom long), la date passe à la ligne,
-          toujours à droite de la photo, au lieu d'être coupée. */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xs }}>
+          toujours à droite de la photo, au lieu d'être coupée. zIndex : la rangée reste au-dessus du
+          texte, sur lequel ses zones à toucher débordent (`hang`) ; « box-none » : hors de ces zones,
+          le doigt atteint le texte (`pointerEvents` en propriété, à chaque étage). */}
+      <View
+        pointerEvents="box-none"
+        style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xs, zIndex: 1 }}
+      >
         <View
+          pointerEvents="box-none"
           style={{
             flex: 1,
             flexShrink: 1,
@@ -443,22 +457,21 @@ export function CommentCard({
             gap: space.sm,
           }}
         >
-          {/* La photo se touche comme le nom, mais le lien du nom suffit aux lecteurs d'écran et au
-              clavier : le même lien deux fois de suite ne dirait rien de plus. tabIndex -1 : sur le
-              web, `focusable` faux ne sort pas un `Pressable` de la touche Tab (design.md, 6b). */}
-          <Pressable
-            accessible={false}
+          {/* La photo se touche par le lien du nom, qui la recouvre (plus bas) : le lecteur d'écran
+              n'a pas à la lire en plus de lui, ni le doigt à la trouver. */}
+          <View
             aria-hidden
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
-            focusable={false}
-            {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
-            onPress={onAuthorPress}
-            style={{ minHeight: NAME_ROW, justifyContent: 'center' }}
+            pointerEvents="none"
+            style={{ minHeight: NAME_ROW, justifyContent: 'center', marginBottom: -hang }}
           >
             <Avatar name={author.name} source={avatar} label={author.name} size={size} />
-          </Pressable>
+          </View>
+          {/* Le retrait du haut rend à la première ligne la place que le nom retire de ses marges :
+              le nom et la date restent centrés sur la photo. */}
           <View
+            pointerEvents="box-none"
             style={{
               flex: 1,
               flexShrink: 1,
@@ -467,20 +480,26 @@ export function CommentCard({
               flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: space.sm,
+              paddingTop: hang,
             }}
           >
-            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-              <Pressed
-                label={
-                  isProjectAuthor
-                    ? t(($) => $.project.comments.authorLink, { name: author.name })
-                    : author.name
-                }
-                role="link"
-                onPress={onAuthorPress}
-              >
-                {nameAndBadge}
-              </Pressed>
+            {/* Le lien remonte par-dessus la photo (marge négative, rendue au nom par un retrait) :
+                on la touche comme le nom, l'anneau du clavier les entoure tous deux, et un nom très
+                court (« Léa ») garde ses 44 points sans repousser la date. */}
+            <View style={{ flexShrink: 1, maxWidth: '100%', marginVertical: -hang }}>
+              <View style={{ marginLeft: -overPhoto }}>
+                <Pressed
+                  label={
+                    isProjectAuthor
+                      ? t(($) => $.project.comments.authorLink, { name: author.name })
+                      : author.name
+                  }
+                  role="link"
+                  onPress={onAuthorPress}
+                >
+                  <View style={{ paddingLeft: overPhoto }}>{nameAndBadge}</View>
+                </Pressed>
+              </View>
             </View>
             {hidden ? (
               <View
@@ -524,17 +543,19 @@ export function CommentCard({
           </View>
         </View>
         {menu.length > 0 ? (
-          <ActionMenu
-            ref={menuRef}
-            items={menu}
-            label={t(($) => $.project.comments.menu, { name: author.name })}
-            describedById={descriptionId}
-            hint={described}
-            // Sans disque au repos : répété à chaque carte, il pèserait plus que le texte (planche).
-            variant="bare"
-            // Au bout de la rangée : le menu s'ouvre vers la gauche, au-dessus de la carte.
-            align="end"
-          />
+          <View style={{ marginBottom: -hang }}>
+            <ActionMenu
+              ref={menuRef}
+              items={menu}
+              label={t(($) => $.project.comments.menu, { name: author.name })}
+              describedById={descriptionId}
+              hint={described}
+              // Sans disque au repos : répété à chaque carte, il pèserait plus que le texte (planche).
+              variant="bare"
+              // Au bout de la rangée : le menu s'ouvre vers la gauche, au-dessus de la carte.
+              align="end"
+            />
+          </View>
         ) : null}
       </View>
       {/* Le corps : chaque morceau est un enfant direct de la carte, à côté de la rangée du haut. */}
@@ -568,15 +589,16 @@ export function CommentCard({
       ) : null}
       {onReply || (hidden && onUnhide) ? (
         // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
-        // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt. marginBottom
-        // négatif : sa zone de 44 points déborde dans l'écart du dessous (ACTION_HANG), sauf si une
-        // erreur vient juste après, qu'elle recouvrirait.
+        // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt. marginTop négatif :
+        // le vide de sa zone de 44 points mord un peu sur la dernière ligne, comme sur la planche.
+        // marginBottom négatif : cette zone déborde dans l'écart du dessous (ACTION_HANG), sauf si
+        // une erreur vient juste après, qu'elle recouvrirait.
         <View
           style={{
             flexDirection: 'row',
             flexWrap: 'wrap',
             columnGap: space.xs,
-            marginTop: space.xs,
+            marginTop: -space.xs,
             marginLeft: indent - space.sm,
             ...(error ? null : { marginBottom: -ACTION_HANG }),
           }}
