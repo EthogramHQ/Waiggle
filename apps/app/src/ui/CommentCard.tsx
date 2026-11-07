@@ -3,18 +3,22 @@
 // seule de son allure ; l'écran lui dit seulement qui regarde (`isMine`, `isProjectAuthor`) et
 // quelles actions offrir (`menu`, `onReply`, `onUnhide`).
 //
-// - En tête : la photo et le nom de l'auteur (un lien vers sa page), le badge « Auteur » si c'est
-//   l'auteur du projet, la date relative (« il y a 3 h »), « modifié » s'il l'a été, et à droite le
-//   menu « … » (ActionMenu : Modifier, Supprimer, Masquer, Signaler, selon le membre).
-// - Puis le texte, ses mentions en pastilles (MentionText), et « Répondre » dessous.
+// - En tête : la photo de l'auteur dans sa colonne ; à sa droite, dans une rangée qui passe à la
+//   ligne, son nom (un lien vers sa page), le badge « Auteur » si c'est l'auteur du projet, la date
+//   relative (« il y a 3 h ») et « modifié » s'il l'a été ; au bout, le menu « … » (ActionMenu :
+//   Modifier, Supprimer, Masquer, Signaler, selon le membre).
+// - Puis le texte, ses mentions en pastilles (MentionText), et « Répondre » dessous. Le texte
+//   s'aligne sous le nom ; très agrandi (150 % et plus), il passe sous la photo pour garder sa place.
 // - Ses propres commentaires sont posés sur un fond gris arrondi, et le lecteur d'écran l'entend :
 //   « Ton commentaire ». Le commentaire visé par une réponse ou une modification est surligné en
 //   miel pâle (`highlighted`).
-// - Masqué par l'auteur du projet : une pastille (« Masqué par toi », ou « Masqué par l'auteur du
-//   projet » pour celui qui l'a écrit), une phrase qui dit qui le voit encore, et « Démasquer ».
+// - Masqué par l'auteur du projet : son texte en gris, une pastille sur la rangée du nom (« Masqué
+//   par toi », ou « Masqué par l'auteur du projet » pour celui qui l'a écrit), sous le texte une
+//   phrase qui dit qui le voit encore, et « Démasquer ».
 // - Retiré par la modération, pour son auteur : l'encadré du retrait (RemovalNotice).
 // - Un emplacement (l'API ne rend pas l'auteur : supprimé, retiré, masqué pour un tiers, écrit par
-//   un membre bloqué) : une icône et une phrase, sans nom, ni date, ni action.
+//   un membre bloqué) : une icône sur une tuile ronde à la place de la photo et une phrase à la place
+//   du nom, sans date ni action.
 // - `compact` (l'aperçu sous le projet) : la carte entière est un seul bouton, qui ouvre la feuille
 //   des commentaires ; ni lien, ni « Répondre », ni menu dedans.
 //
@@ -22,7 +26,7 @@
 // l'auteur et le début du texte (« Léa Moreau : Super idée… »), et le lecteur d'écran dit lequel.
 // L'écran garde une poignée (`handle`) pour ramener le focus sur « … » ou « Répondre » (après la
 // fermeture de la feuille, une suppression voisine).
-import { radii, space, textStyles } from '@ruche/brand'
+import { layout, radii, space } from '@ruche/brand'
 import {
   COMMENT_FOLD_LINES,
   type CommentReply,
@@ -32,7 +36,7 @@ import {
 } from '@ruche/contracts'
 import { type Ref, type RefObject, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { Avatar } from './Avatar'
 import { ActionDescription, CommentActionButton, excerpt } from './CommentAction'
@@ -48,6 +52,7 @@ import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
+import { useLargeText } from './textScale'
 import { useTheme } from './theme/ThemeProvider'
 
 export type { ActionMenuItem } from './ActionMenu'
@@ -116,8 +121,17 @@ type Props = {
  * Exportée : le trait des réponses (CommentThread) part sous le milieu de la photo de la racine.
  */
 export const COMMENT_AVATAR = { root: 36, reply: 28 } as const
-/** La hauteur d'une ligne de texte « callout » : l'icône d'un emplacement se centre sur la première. */
-const CALLOUT_LINE = textStyles.callout.lineHeight
+/**
+ * La rangée du nom a la hauteur à toucher de son lien : la photo, ou la tuile d'un emplacement, s'y
+ * centre, et le trait d'un fil (CommentThread) se place d'après elle.
+ */
+const NAME_ROW = layout.touchTarget
+/**
+ * Ce que « Répondre » laisse dépasser sous la carte, dans l'écart qui la sépare de la suivante
+ * (`space.md`, dans CommentThread et CommentList) : sa zone de 44 points touche celle du nom suivant
+ * sans la chevaucher, et les commentaires se resserrent (décision 18 : 4 par écran à 390 × 844).
+ */
+const ACTION_HANG = space.md
 /** L'aperçu montre le début du texte : au plus ces lignes, la feuille donne le reste. */
 const COMPACT_LINES = 3
 
@@ -206,25 +220,23 @@ export function CommentCard({
   }))
 
   const { author } = comment
+  const { large, probe } = useLargeText()
+  const size = kind === 'reply' ? COMMENT_AVATAR.reply : COMMENT_AVATAR.root
 
   // Le fond de la carte : miel pâle quand elle est visée (il l'emporte), gris pour les siennes.
-  // Une carte sans fond garde le même retrait : le texte ne saute pas quand le surlignage part.
-  const frame = {
-    borderRadius: radii.small,
-    padding: space.sm,
-    ...(highlighted
-      ? { backgroundColor: colors.highlightSoft }
-      : isMine
-        ? { backgroundColor: colors.surfaceGrouped }
-        : null),
-  }
+  const tint = highlighted
+    ? { backgroundColor: colors.highlightSoft }
+    : isMine
+      ? { backgroundColor: colors.surfaceGrouped }
+      : null
 
   if (!author) {
-    // Un emplacement : ni photo, ni nom, ni date, ni action ; une icône et une phrase discrètes,
-    // gardées parce que des réponses suivent. Sans fond ni hauteur de bouton : on ne peut rien en
-    // faire, il ne doit pas en avoir l'air. L'icône reste en tête de la première ligne, la phrase
-    // passe à la ligne à côté d'elle (texte agrandi) ; flexShrink et minWidth : sur le web, une vue
-    // ne se replie pas sans eux (react-native-web lui donne flexShrink 0).
+    // Un emplacement : ni nom, ni date, ni action ; une icône sur une tuile ronde à la place de la
+    // photo, et une phrase discrète à la place du nom, gardées parce que des réponses suivent. Sans
+    // fond de carte ni bouton : on ne peut rien en faire, il ne doit pas en avoir l'air. La tuile se
+    // centre sur la même rangée que la photo : le trait du fil part juste sous elle. La phrase passe
+    // à la ligne à côté d'elle (texte agrandi) ; flexShrink et minWidth : sur le web, une vue ne se
+    // replie pas sans eux (react-native-web lui donne flexShrink 0).
     const placeholder =
       comment.state === 'visible' ? PLACEHOLDERS.deleted : PLACEHOLDERS[comment.state]
     return (
@@ -233,13 +245,32 @@ export function CommentCard({
           flexDirection: 'row',
           alignItems: 'flex-start',
           gap: space.sm,
-          padding: space.sm,
+          paddingHorizontal: space.sm,
         }}
       >
-        <View style={{ minHeight: CALLOUT_LINE, justifyContent: 'center' }}>
-          <Icon name={placeholder.icon} size={16} tone="muted" />
+        <View style={{ minHeight: NAME_ROW, justifyContent: 'center' }}>
+          <View
+            style={{
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.surfaceGrouped,
+            }}
+          >
+            <Icon name={placeholder.icon} size={16} tone="muted" />
+          </View>
         </View>
-        <View style={{ flex: 1, flexShrink: 1, minWidth: 0 }}>
+        <View
+          style={{
+            flex: 1,
+            flexShrink: 1,
+            minWidth: 0,
+            minHeight: NAME_ROW,
+            justifyContent: 'center',
+          }}
+        >
           <Text variant="callout" tone="muted">
             {t(($) => $.project.comments[placeholder.text])}
           </Text>
@@ -248,7 +279,6 @@ export function CommentCard({
     )
   }
 
-  const size = kind === 'reply' ? COMMENT_AVATAR.reply : COMMENT_AVATAR.root
   const plain = plainCommentText(comment.body, comment.mentions)
   const short = excerpt(plain)
   // Null seulement pour un emplacement, traité plus haut : une carte écrite a toujours sa date.
@@ -256,7 +286,12 @@ export function CommentCard({
     comment.createdAt === null ? null : (
       <RelativeTime date={comment.createdAt} {...(now ? { now } : null)} />
     )
-  const edited = comment.editedAt ? (
+  const editedWord = comment.editedAt ? (
+    <Text variant="caption" tone="muted">
+      {t(($) => $.project.comments.edited)}
+    </Text>
+  ) : null
+  const edited = editedWord ? (
     // Le point et « modifié » passent à la ligne ensemble, jamais le point seul au bout de la date.
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
       {/* Le point sépare la date de « modifié » pour l'œil ; les lecteurs d'écran le sautent. */}
@@ -265,16 +300,34 @@ export function CommentCard({
           ·
         </Text>
       </View>
-      <Text variant="caption" tone="muted">
-        {t(($) => $.project.comments.edited)}
-      </Text>
+      {editedWord}
     </View>
   ) : null
   const badge = isProjectAuthor ? (
     // Dans le lien, dont le nom le dit déjà (« Léa Moreau, Auteur ») : lu une seule fois.
     <StatusPill label={t(($) => $.project.comments.author)} />
   ) : null
-  // La photo, le nom et le badge : le contenu du lien vers sa page, ou de la carte compacte.
+  // Le nom et le badge : le contenu du lien vers sa page.
+  const nameAndBadge = (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: space.xs,
+        flexShrink: 1,
+        minWidth: 0,
+      }}
+    >
+      <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+        <Text variant="callout" weight={700} breakAnywhere>
+          {author.name}
+        </Text>
+      </View>
+      {badge}
+    </View>
+  )
+  // La photo, le nom et le badge : le contenu de la carte compacte.
   const who = (
     <View
       style={{
@@ -286,27 +339,12 @@ export function CommentCard({
       }}
     >
       <Avatar name={author.name} source={avatar} label={author.name} size={size} />
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: space.xs,
-          flexShrink: 1,
-          minWidth: 0,
-        }}
-      >
-        <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-          <Text variant="callout" weight={700} breakAnywhere>
-            {author.name}
-          </Text>
-        </View>
-        {badge}
-      </View>
+      {nameAndBadge}
     </View>
   )
   // « Ton commentaire » : le fond gris dit à l'œil que c'est le sien ; le lecteur d'écran l'entend
-  // en arrivant sur la carte (un texte caché à l'œil seulement, comme HiddenHeading).
+  // en arrivant sur la carte (un texte caché à l'œil seulement, comme HiddenHeading). Pas sur la
+  // carte compacte, un seul bouton : son nom l'emporte sur son contenu, il le dit donc lui-même.
   const yours = isMine ? (
     <View style={hiddenFrame} pointerEvents="none">
       <Text>{t(($) => $.project.comments.yours)}</Text>
@@ -319,12 +357,15 @@ export function CommentCard({
     return (
       <Pressed
         ref={cardRef}
-        label={t(($) => $.project.comments.openLine, { name: author.name, excerpt: short })}
+        label={
+          isMine
+            ? t(($) => $.project.comments.openLineMine, { excerpt: short })
+            : t(($) => $.project.comments.openLine, { name: author.name, excerpt: short })
+        }
         onPress={onPress ?? (() => {})}
         radius="small"
       >
-        <View style={[frame, { gap: space.xs }]}>
-          {yours}
+        <View style={[{ borderRadius: radii.small, padding: space.sm, gap: space.xs }, tint]}>
           <View
             style={{
               flexDirection: 'row',
@@ -345,9 +386,11 @@ export function CommentCard({
     )
   }
 
-  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`) :
-  // le trait des réponses descend de la photo sans jamais passer sous le texte.
-  const indent = size + space.sm
+  // Le texte s'aligne sous le nom, pas sous la photo, sur téléphone aussi (planche `R5b-Commentaires`,
+  // décision 21) : le trait des réponses descend de la photo sans jamais passer sous le texte. Très
+  // agrandi (150 % et plus), il passe sous la photo, sinon il resterait à 12 caractères par ligne
+  // à 320 px ; le trait du fil, lui, ne descend alors plus de la photo (CommentThread).
+  const indent = large ? 0 : size + space.sm
   const piece = { paddingLeft: indent }
   const nextPiece = { paddingLeft: indent, marginTop: space.xs }
   const described = t(($) => $.project.comments.about, { name: author.name, text: short })
@@ -365,11 +408,30 @@ export function CommentCard({
         : null
 
   return (
-    <View style={frame}>
+    // Une carte sans fond n'a aucune marge en haut ni en bas : ce sont ses zones à toucher, de
+    // 44 points, qui font l'air (décision 18). Un fond (le gris des siens, le miel d'une carte visée)
+    // déborde de la carte par une marge négative égale à son retrait : le texte ne saute pas quand le
+    // surlignage arrive ou part. « box-none » : ce débord laisse passer le doigt jusqu'à la zone de
+    // « Répondre » de la carte du dessus (`pointerEvents` en propriété : voir CommentThread).
+    <View
+      pointerEvents="box-none"
+      style={[
+        { borderRadius: radii.small, paddingHorizontal: space.sm },
+        tint && {
+          ...tint,
+          paddingTop: space.xs,
+          marginTop: -space.xs,
+          paddingBottom: space.sm,
+          marginBottom: -space.sm,
+        },
+      ]}
+    >
+      {probe}
       {yours}
       <ActionDescription id={descriptionId} text={described} />
-      {/* L'auteur, la date et « modifié », puis « … » au bout de la rangée. Quand la place manque
-          (texte agrandi, nom long), la date passe à la ligne au lieu d'être coupée. */}
+      {/* La photo dans sa colonne ; à sa droite, l'auteur, la date et « modifié », puis « … » au bout
+          de la rangée. Quand la place manque (texte agrandi, nom long), la date passe à la ligne,
+          toujours à droite de la photo, au lieu d'être coupée. */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.xs }}>
         <View
           style={{
@@ -377,26 +439,89 @@ export function CommentCard({
             flexShrink: 1,
             minWidth: 0,
             flexDirection: 'row',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            columnGap: space.sm,
+            alignItems: 'flex-start',
+            gap: space.sm,
           }}
         >
-          <View style={{ flexShrink: 1, maxWidth: '100%' }}>
-            <Pressed
-              label={
-                isProjectAuthor
-                  ? t(($) => $.project.comments.authorLink, { name: author.name })
-                  : author.name
-              }
-              role="link"
-              onPress={onAuthorPress}
+          {/* La photo se touche comme le nom, mais le lien du nom suffit aux lecteurs d'écran et au
+              clavier : le même lien deux fois de suite ne dirait rien de plus. tabIndex -1 : sur le
+              web, `focusable` faux ne sort pas un `Pressable` de la touche Tab (design.md, 6b). */}
+          <Pressable
+            accessible={false}
+            aria-hidden
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+            focusable={false}
+            {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : null)}
+            onPress={onAuthorPress}
+            style={{ minHeight: NAME_ROW, justifyContent: 'center' }}
+          >
+            <Avatar name={author.name} source={avatar} label={author.name} size={size} />
+          </Pressable>
+          <View
+            style={{
+              flex: 1,
+              flexShrink: 1,
+              minWidth: 0,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: space.sm,
+            }}
+          >
+            <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+              <Pressed
+                label={
+                  isProjectAuthor
+                    ? t(($) => $.project.comments.authorLink, { name: author.name })
+                    : author.name
+                }
+                role="link"
+                onPress={onAuthorPress}
+              >
+                {nameAndBadge}
+              </Pressed>
+            </View>
+            {hidden ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flexShrink: 1,
+                  maxWidth: '100%',
+                  gap: space.xs,
+                  paddingHorizontal: space.sm,
+                  paddingVertical: space.xxs,
+                  borderRadius: radii.pill,
+                  // Sur le fond gris des siens, la pastille prend le blanc de la carte : elle se voit.
+                  backgroundColor: isMine && !highlighted ? colors.surface : colors.surfaceGrouped,
+                }}
+              >
+                <Icon name="eye-slash" size={16} tone="muted" />
+                <View style={{ flexShrink: 1 }}>
+                  <Text variant="caption" weight={600} tone="muted">
+                    {hidden.label}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            {/* La date et « · modifié » ne se séparent pas : le point n'ouvre jamais une ligne. Très
+                agrandis, ils ne tiendraient plus ensemble : « modifié » passe alors à la ligne, sans
+                son point. flexShrink : sur le web, une vue ne se replie pas sans lui. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: large ? 'wrap' : 'nowrap',
+                alignItems: 'center',
+                columnGap: space.sm,
+                flexShrink: 1,
+                maxWidth: '100%',
+              }}
             >
-              {who}
-            </Pressed>
+              <View style={{ flexShrink: 1, minWidth: 0 }}>{date}</View>
+              {large ? editedWord : edited}
+            </View>
           </View>
-          {date}
-          {edited}
         </View>
         {menu.length > 0 ? (
           <ActionMenu
@@ -405,49 +530,23 @@ export function CommentCard({
             label={t(($) => $.project.comments.menu, { name: author.name })}
             describedById={descriptionId}
             hint={described}
+            // Sans disque au repos : répété à chaque carte, il pèserait plus que le texte (planche).
+            variant="bare"
             // Au bout de la rangée : le menu s'ouvre vers la gauche, au-dessus de la carte.
             align="end"
           />
         ) : null}
       </View>
       {/* Le corps : chaque morceau est un enfant direct de la carte, à côté de la rangée du haut. */}
-      {hidden ? (
-        <View style={[piece, { gap: space.xxs }]}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'flex-start',
-              maxWidth: '100%',
-              gap: space.xs,
-              paddingHorizontal: space.sm,
-              paddingVertical: space.xxs,
-              borderRadius: radii.pill,
-              // Sur le fond gris des siens, la pastille prend le blanc de la carte : elle se voit.
-              backgroundColor: isMine && !highlighted ? colors.surface : colors.surfaceGrouped,
-            }}
-          >
-            <Icon name="eye-slash" size={16} tone="muted" />
-            <View style={{ flexShrink: 1 }}>
-              <Text variant="caption" weight={600} tone="muted">
-                {hidden.label}
-              </Text>
-            </View>
-          </View>
-          <Text variant="caption" tone="muted">
-            {hidden.note}
-          </Text>
-        </View>
-      ) : null}
       {removed ? (
-        <View style={hidden ? nextPiece : piece}>
+        <View style={piece}>
           <RemovalNotice title={removed.title} lines={removed.lines} compact />
         </View>
       ) : null}
-      {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText). Au-delà de
-            10 lignes, il se replie : ReadMore lui donne le nombre de lignes à montrer, et
-            « Lire la suite » est décrit comme « Répondre » et « … ». */}
-      <View style={hidden || removed ? nextPiece : piece}>
+      {/* Texte brut, affiché tel quel, ses mentions en pastilles (MentionText), en gris s'il est
+            masqué. Au-delà de 10 lignes, il se replie : ReadMore lui donne le nombre de lignes à
+            montrer, et « Lire la suite » est décrit comme « Répondre » et « … ». */}
+      <View style={removed ? nextPiece : piece}>
         <ReadMore lines={COMMENT_FOLD_LINES} hint={described}>
           {(numberOfLines) => (
             <MentionText
@@ -455,13 +554,23 @@ export function CommentCard({
               mentions={comment.mentions}
               onMemberPress={onMemberPress}
               numberOfLines={numberOfLines}
+              tone={hidden ? 'muted' : 'default'}
             />
           )}
         </ReadMore>
       </View>
+      {hidden ? (
+        <View style={nextPiece}>
+          <Text variant="caption" tone="muted">
+            {hidden.note}
+          </Text>
+        </View>
+      ) : null}
       {onReply || (hidden && onUnhide) ? (
         // marginLeft négatif : le texte de la première action s'aligne sur celui du commentaire ;
-        // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt.
+        // le fond de l'action, qui déborde un peu, n'apparaît que sous le doigt. marginBottom
+        // négatif : sa zone de 44 points déborde dans l'écart du dessous (ACTION_HANG), sauf si une
+        // erreur vient juste après, qu'elle recouvrirait.
         <View
           style={{
             flexDirection: 'row',
@@ -469,6 +578,7 @@ export function CommentCard({
             columnGap: space.xs,
             marginTop: space.xs,
             marginLeft: indent - space.sm,
+            ...(error ? null : { marginBottom: -ACTION_HANG }),
           }}
         >
           {onReply ? (

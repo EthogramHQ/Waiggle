@@ -55,8 +55,11 @@ type Props = {
   items: ActionMenuItem[]
   /** Le nom du bouton, lu par les lecteurs d'écran : « Plus d'actions » par défaut. */
   label?: string
-  /** glass : sur une image ou une lumière ; plain (par défaut) : sur une surface. */
-  variant?: 'plain' | 'glass'
+  /**
+   * glass : sur une image ou une lumière ; plain (par défaut) : sur une surface ; bare : répété dans
+   * une liste, sans disque tant que le menu est fermé (voir IconButton).
+   */
+  variant?: 'plain' | 'glass' | 'bare'
   /**
    * De quel côté du bouton le menu s'aligne. Sans réglage : sur son bord droit s'il est dans la
    * moitié droite de l'écran, sur son bord gauche sinon. end : toujours sur son bord droit, le menu

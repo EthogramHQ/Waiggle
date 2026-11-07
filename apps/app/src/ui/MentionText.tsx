@@ -31,7 +31,7 @@ import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Text as NativeText, Platform, type TextStyle } from 'react-native'
 import { enterActivates } from './keyboard'
-import { Text } from './Text'
+import { Text, type TextTone } from './Text'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -47,6 +47,11 @@ type Props = {
    * `ReadMore`) ; absent : tout le texte.
    */
   numberOfLines?: number | undefined
+  /**
+   * Le ton du texte, à l'encre par défaut ; `muted` pour un commentaire masqué, gris (planche
+   * `R5b-Menu-Etats`). Les pastilles gardent leur encre sur le miel : c'est un couple mesuré.
+   */
+  tone?: TextTone
 }
 
 // L'espace fine insécable (U+202F), écrite par son numéro : un éditeur la changerait en espace
@@ -70,7 +75,13 @@ const pillShape = (
 /** Ce qui entoure le nom dans la pastille : de la marge sur le web, des espaces fines ailleurs. */
 const pad = Platform.OS === 'web' ? '' : THIN
 
-export function MentionText({ text, mentions, onMemberPress, numberOfLines }: Props) {
+export function MentionText({
+  text,
+  mentions,
+  onMemberPress,
+  numberOfLines,
+  tone = 'default',
+}: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   // La mention de chaque pseudo reconnu (une Map : pseudo → mention, avec son membre et son nom).
@@ -95,6 +106,7 @@ export function MentionText({ text, mentions, onMemberPress, numberOfLines }: Pr
       selectable
       breakAnywhere
       readable
+      tone={tone}
       {...(numberOfLines !== undefined ? { numberOfLines } : null)}
     >
       {/* Sans mention, aucun découpage : le texte tel quel. */}

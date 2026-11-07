@@ -25,12 +25,13 @@
 import { borders, layout, radii, space, textStyles } from '@ruche/brand'
 import { type ReactNode, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type LayoutChangeEvent, Platform, Pressable, TextInput, View } from 'react-native'
+import { Platform, Pressable, TextInput, View } from 'react-native'
 import { Icon } from './Icon'
 import type { PressEvent } from './ListGroup'
 import { linkProps } from './SettingsNav'
 import { Text } from './Text'
 import { TAP_GUARD_MS } from './tapGuard'
+import { useTextScale } from './textScale'
 import { placeholderCopy } from './theme/document'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
@@ -101,35 +102,6 @@ export const usePill = (focused: boolean, grow: boolean) => {
     borderWidth: width,
     borderColor: focused ? colors.focusRing : colors.outline,
   }
-}
-
-/**
- * Hook : la taille du texte par rapport à la normale (1 au texte normal, 2 à 200 %). Elle se lit sur
- * la hauteur d'une ligne de texte invisible : `fontScale` vaut toujours 1 sur le web, où un texte
- * agrandi (réglage du navigateur, essais à 200 %) ne se voit qu'à la taille des lettres. Rend la
- * mesure et la ligne à poser (hors du flux, cachée à l'œil et aux lecteurs d'écran).
- */
-const useTextScale = (sample: string) => {
-  const [scale, setScale] = useState(1)
-  const measure = (event: LayoutChangeEvent) => {
-    const next = event.nativeEvent.layout.height / textStyles.body.lineHeight
-    // Une mesure à 0 (vue pas encore dessinée) ne dit rien.
-    if (next > 0 && Math.abs(next - scale) > 0.05) setScale(next)
-  }
-  const probe = (
-    <View
-      aria-hidden
-      importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
-      onLayout={measure}
-      style={{ position: 'absolute', top: 0, left: 0, opacity: 0 }}
-    >
-      <Text numberOfLines={1} selectable={false}>
-        {sample}
-      </Text>
-    </View>
-  )
-  return { scale, probe }
 }
 
 export function SearchField({

@@ -18,6 +18,7 @@
 import { borders, layout, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode } from 'react'
 import { View, type ViewStyle } from 'react-native'
+import { useLargeText } from './textScale'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -29,8 +30,9 @@ import { useTheme } from './theme/ThemeProvider'
 const AVATAR = { root: 36, reply: 28 } as const
 
 /**
- * La carte pose sa photo à ce retrait du bord, dans une rangée de cette hauteur, où elle est centrée
- * (la hauteur à toucher du lien du nom) ; le trait se place d'après eux, recopiés comme `AVATAR`.
+ * La carte pose sa photo à ce retrait du bord gauche, dans une rangée de cette hauteur, où elle est
+ * centrée (la hauteur à toucher du lien du nom), sans marge au-dessus ; le trait se place d'après
+ * eux, recopiés comme `AVATAR`.
  */
 const CARD_PADDING = space.sm
 const CARD_ROW = layout.touchTarget
@@ -40,12 +42,16 @@ const TRUNK = CARD_PADDING + AVATAR.root / 2 - borders.thread / 2
 const INDENT = AVATAR.root + space.sm
 /** L'arrondi du coude. */
 const ELBOW_RADIUS = space.md
-/** Entre la racine et sa première réponse, puis entre deux réponses. */
-const GAP = { first: space.md, between: space.lg } as const
+/**
+ * Entre la racine et sa première réponse, puis entre deux réponses. Le même écart qu'entre deux fils,
+ * celui que « Répondre » laisse dépasser sous sa carte : les zones de 44 points se touchent sans se
+ * chevaucher (décision 18).
+ */
+const GAP = { first: space.md, between: space.md } as const
 /** La hauteur, depuis le haut d'une réponse, où le coude arrive : le milieu de sa photo. */
-const ELBOW_END = CARD_PADDING + CARD_ROW / 2
+const ELBOW_END = CARD_ROW / 2
 /** Où le trait part, depuis le haut de la racine : juste sous sa photo. */
-const TRUNK_START = CARD_PADDING + (CARD_ROW + AVATAR.root) / 2 + space.xs
+const TRUNK_START = (CARD_ROW + AVATAR.root) / 2 + space.xs
 
 type Props = {
   /** Le commentaire racine (une CommentCard), et ce qui le suit de près (une confirmation). */
@@ -98,13 +104,16 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
   const hasReplies = items.length > 0
   const hasFooter = Children.toArray(footer).length > 0
   const ink = colors.line
+  // Très agrandi, le texte de la carte passe sous la photo (CommentCard) : le trait n'y descend plus.
+  const { large, probe } = useLargeText()
 
   return (
     <View {...(listItem ? { role: 'listitem' as const } : null)} style={{ gap: GAP.first }}>
+      {hasReplies ? probe : null}
       {/* zIndex: 0 fait de chaque bloc sa propre pile : le trait (zIndex -1) passe sous la carte,
           mais reste au-dessus du fond de la page. */}
       <View style={{ zIndex: 0 }}>
-        {hasReplies ? (
+        {hasReplies && !large ? (
           // Le départ du trait : de sous la photo de la racine jusqu'au bas de sa carte.
           <Line
             style={{

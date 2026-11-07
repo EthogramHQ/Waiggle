@@ -6,8 +6,8 @@
 //
 // Les cartes sont données par l'écran (des `CommentCard`) ; ici, des textes simples tiennent leur
 // place. Le trait est un dessin : il ne se lit pas, et n'existe que s'il y a des réponses.
-import { screen } from '@testing-library/react-native'
-import { TextInput } from 'react-native'
+import { act, screen } from '@testing-library/react-native'
+import { Dimensions, TextInput } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { CommentThread } from './CommentThread'
 import { Text } from './Text'
@@ -99,5 +99,38 @@ describe('CommentThread', () => {
 
     expect(screen.getByText('Zoé : Ça marche aussi en anglais ?')).toBeTruthy() // témoin
     expect(decorations()).toHaveLength(0)
+  })
+
+  // Relecture de design de R5b : à partir de 150 %, le texte de la carte passe sous la photo. Le
+  // morceau du trait qui descend de la photo de la racine passerait alors sous ce texte : il disparaît,
+  // et le trait ne part plus que du bas de la racine.
+  describe('with the text very enlarged', () => {
+    const setFontScale = async (fontScale: number) => {
+      const window = { width: 390, height: 844, scale: 3, fontScale }
+      await act(async () => Dimensions.set({ window, screen: window }))
+    }
+
+    afterEach(async () => {
+      await setFontScale(1)
+    })
+
+    const thread = (
+      <CommentThread root={<Text>Max : Super idée, je teste ce soir.</Text>} replies={replies} />
+    )
+
+    it('draws the line from the photo of the root at the normal size', async () => {
+      await renderWithProviders(thread)
+
+      // Le départ sous la photo, puis pour chaque réponse un trait et un coude.
+      expect(decorations()).toHaveLength(5)
+    })
+
+    it('draws no line under the text of the root from 150 %', async () => {
+      await setFontScale(1.5)
+      await renderWithProviders(thread)
+
+      expect(screen.getByText('Zoé : Moi aussi, dis-nous !')).toBeTruthy() // témoin
+      expect(decorations()).toHaveLength(4)
+    })
   })
 })
