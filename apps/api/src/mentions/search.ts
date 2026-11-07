@@ -143,7 +143,9 @@ export const searchMentionable = async (
         // commencent par ce début).
         notBlockedWith(viewer.id, u.id),
         // Trop court pour chercher dans tout le réseau : les proches seulement.
-        prefix.length < OTHERS_FROM ? close : undefined,
+        // En caractères, pas en unités UTF-16 : « 𐐀a » (2 caractères) en vaut 3 pour `length`
+        // (R5b, sec-A1).
+        [...prefix].length < OTHERS_FROM ? close : undefined,
       ),
     )
     .orderBy(

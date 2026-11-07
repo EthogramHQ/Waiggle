@@ -228,12 +228,16 @@ export const presentComment = (
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
   }
+  // Un emplacement ne donne aucune date, quel que soit son état (R5b, sec-A3 et jur-J7) : la date
+  // d'un commentaire qu'on ne montre plus (retiré, masqué, d'un membre bloqué) serait encore une
+  // donnée sur lui. Seule la réponse se tait : l'ordre et le curseur lisent la ligne de la base.
   const placeholder = (
     state: 'hidden' | 'deleted' | 'removed' | 'blocked' | 'unavailable',
   ): CommentReply | null =>
     hasShownReplies
       ? {
           ...base,
+          createdAt: null,
           author: null,
           body: '',
           editedAt: null,

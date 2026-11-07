@@ -21,7 +21,7 @@ import {
   Project,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { type SQL, sql } from 'drizzle-orm'
+import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
 
@@ -1511,5 +1511,96 @@ describe('the comments of blocked members', () => {
 
     expect(written).toMatchObject({ body: `Bonjour @${zoeHandle}`, mentions: [] })
     expect((await readComments(project.id, lea)).items[0]?.mentions).toEqual([])
+  })
+})
+
+// R5b, sec-A3 et jur-J7 : un emplacement ne dit pas quand le commentaire a été écrit. La date
+// reste dans la base : elle règle l'ordre des fils et le curseur de pagination.
+describe('the date of a placeholder', () => {
+  const block = async (memberId: string, cookie: string) => {
+    later()
+    await expectDone(await send('PUT', `/v1/members/${encodeURIComponent(memberId)}/block`, cookie))
+  }
+
+  /** Un projet de Léa, avec une racine de Max et une réponse de Zoé qui la garde à sa place. */
+  const threadOfMax = async () => {
+    const project = await publish(lea)
+    const root = await comment(project.id, max, 'Le commentaire de Max')
+    await comment(project.id, zoe, 'Réponse de Zoé', root.id)
+    return { project, root }
+  }
+
+  it('gives a placeholder no date, whatever its state', async () => {
+    // « hidden » : masqué par l'autrice du projet, lu par Zoé.
+    const hidden = await threadOfMax()
+    await expectDone(await hide(hidden.project.id, hidden.root.id, lea))
+    // « deleted » : supprimé par Max.
+    const deleted = await threadOfMax()
+    await expectDone(await deleteComment(deleted.project.id, deleted.root.id, max))
+    // « removed » : retiré par la modération (posé directement dans la base).
+    const removed = await threadOfMax()
+    await ctx.db
+      .update(schema.projectComment)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.projectComment.id, removed.root.id))
+    // « blocked » : Zoé bloquera Max (plus bas, après les trois premiers : un blocage change ce
+    // que Zoé lit des commentaires de Max).
+    const blocked = await threadOfMax()
+    // « unavailable » : Max, bloqué par Zoé, lit le commentaire de Zoé.
+    const unavailable = await publish(lea)
+    const zoeRoot = await comment(unavailable.id, zoe, 'Le commentaire de Zoé')
+    await comment(unavailable.id, lea, 'Réponse de Léa', zoeRoot.id)
+
+    const cases = [
+      { state: 'hidden', projectId: hidden.project.id, rootId: hidden.root.id, cookie: zoe },
+      { state: 'deleted', projectId: deleted.project.id, rootId: deleted.root.id, cookie: zoe },
+      { state: 'removed', projectId: removed.project.id, rootId: removed.root.id, cookie: zoe },
+      { state: 'blocked', projectId: blocked.project.id, rootId: blocked.root.id, cookie: zoe },
+      { state: 'unavailable', projectId: unavailable.id, rootId: zoeRoot.id, cookie: max },
+    ]
+    for (const { state, projectId, rootId, cookie } of cases) {
+      if (state === 'blocked') await block(maxId, zoe)
+      const res = await send('GET', commentsPath(projectId), cookie)
+      const raw = await res.text()
+      const [thread] = CommentPage.parse(JSON.parse(raw)).items
+      expect(thread, state).toMatchObject({ id: rootId, state, author: null, createdAt: null })
+      // Aucune date du commentaire ne passe, pas même dans le texte brut de la réponse.
+      const row = await ctx.db
+        .select({ createdAt: schema.projectComment.createdAt })
+        .from(schema.projectComment)
+        .where(eq(schema.projectComment.id, rootId))
+      const written = row[0]?.createdAt.toISOString() ?? ''
+      expect(written, state).not.toBe('')
+      expect(raw, state).not.toContain(written)
+    }
+  })
+
+  it('keeps the date of a visible comment, as a witness', async () => {
+    const project = await publish(lea)
+    const written = await comment(project.id, max, 'Un commentaire visible')
+
+    const [thread] = (await readComments(project.id, zoe)).items
+    expect(thread).toMatchObject({ id: written.id, state: 'visible' })
+    expect(Date.parse(thread?.createdAt ?? '')).toBe(Date.parse(written.createdAt ?? ''))
+    expect(thread?.createdAt).not.toBeNull()
+  })
+
+  it('keeps a thread whose root is a placeholder in its place, and the cursor working', async () => {
+    const project = await publish(lea)
+    const older = await comment(project.id, zoe, 'La plus ancienne')
+    const root = await comment(project.id, max, 'Le commentaire masqué de Max')
+    await comment(project.id, zoe, 'Réponse de Zoé', root.id)
+    await expectDone(await hide(project.id, root.id, lea))
+    // 19 racines plus récentes : l'emplacement est la 20e, la dernière de la première page.
+    for (let i = 1; i < COMMENT_PAGE_SIZE; i++) await comment(project.id, zoe, `Racine ${i}`)
+
+    const first = await readComments(project.id, zoe)
+    expect(first.items).toHaveLength(COMMENT_PAGE_SIZE)
+    expect(first.items.at(-1)).toMatchObject({ id: root.id, state: 'hidden', createdAt: null })
+    // Le curseur est celui de la ligne de la base : la page suivante reprend juste après.
+    expect(first.nextCursor).not.toBeNull()
+    const second = await readComments(project.id, zoe, first.nextCursor ?? undefined)
+    expect(second.items.map((item) => item.id)).toEqual([older.id])
+    expect(second.nextCursor).toBeNull()
   })
 })

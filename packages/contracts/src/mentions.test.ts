@@ -175,6 +175,26 @@ describe('MentionableQuery', () => {
     }
   })
 
+  // R5b, sec-A1 : les bornes comptent des caractères, pas des unités UTF-16. « 𐐀 » (une lettre
+  // hors du plan de base) pèse 2 unités.
+  it('counts characters, not UTF-16 units, for the bounds (30 accepted, 31 refused)', () => {
+    const deseret = String.fromCodePoint(0x10400)
+    expect(MentionableQuery.safeParse({ q: deseret.repeat(30), projectId }).success).toBe(true)
+    expect(MentionableQuery.safeParse({ q: deseret.repeat(31), projectId }).success).toBe(false)
+    // Le minimum : une seule lettre hors du plan de base reste une seule lettre.
+    expect(MentionableQuery.safeParse({ q: deseret, projectId }).success).toBe(false)
+    expect(MentionableQuery.safeParse({ q: `${deseret}a`, projectId }).success).toBe(true)
+  })
+
+  it('keeps the code of the error: too_small below 2 characters, too_big above 30', () => {
+    const codes = (q: string) => {
+      const result = MentionableQuery.safeParse({ q, projectId })
+      return result.success ? [] : result.error.issues.map((issue) => issue.code)
+    }
+    expect(codes('l')).toEqual(['too_small'])
+    expect(codes('a'.repeat(31))).toEqual(['too_big'])
+  })
+
   // R5b : on cherche aussi le début d'un mot du nom, qui peut être accentué ou d'un autre alphabet.
   // « @Lé », tapé dans le champ, devient « le » : la base replie le nom « Léa » de la même façon.
   it('folds « @Lé » to « le », as the name is folded in the database', () => {

@@ -10,6 +10,7 @@
 // ines_morel), Malik (qui commente et cherche, pseudo malik) et Zoé (pseudo zoe). Les autres membres
 // sont rangés directement dans la base : plus rapide, et l'inscription est limitée par adresse IP.
 // Le temps est maîtrisé par le test (fausse horloge), pour que chaque geste ait sa propre date.
+import { randomUUID } from 'node:crypto'
 import {
   Comment,
   CommentPage,
@@ -404,6 +405,46 @@ describe('the members proposed after « @ », by the name', () => {
     expect(await proposed(malik, 'lea', meteo.id)).toEqual(['durand'])
     // Témoin : une proche (l'autrice du projet) est trouvée par deux lettres d'un mot de son nom.
     expect(await proposed(malik, 'mo', meteo.id)).toEqual(['ines_morel'])
+  })
+
+  // R5b, sec-A1 : « 𐐀a » compte 2 caractères mais 3 unités UTF-16 ; il ne doit pas ouvrir la
+  // recherche dans tout le réseau.
+  it('searches only among close members for two characters outside the base plane', async () => {
+    const meteo = await publish(ines)
+    const deseret = String.fromCodePoint(0x10400)
+    await insertMember('deseret_far', `${deseret}ab Loin`) // un inconnu pour Malik
+    await follow(malik, await insertMember('deseret_near', `${deseret}ac Près`))
+
+    // Deux caractères : les proches seulement.
+    expect(await proposed(malik, `${deseret}a`, meteo.id)).toEqual(['deseret_near'])
+    // Témoin : avec un troisième caractère, l'inconnu est trouvé.
+    expect(await proposed(malik, `${deseret}ab`, meteo.id)).toEqual(['deseret_far'])
+  })
+
+  it('accepts a 30-character query made of characters outside the base plane', async () => {
+    const meteo = await publish(ines)
+    const res = await mentionable(malik, String.fromCodePoint(0x10400).repeat(30), meteo.id)
+    expect(res.status).toBe(200)
+    const tooLong = await mentionable(malik, String.fromCodePoint(0x10400).repeat(31), meteo.id)
+    expect(tooLong.status).toBe(400)
+  })
+
+  // R5b, jur-J11 : un membre suspendu reste nommé et proposé (décision du scénario).
+  it('keeps naming and suggesting a suspended member', async () => {
+    const meteo = await publish(ines)
+    // Zoé est suspendue, sans fin ni levée : la ligne que lit la suspension active (7c).
+    await ctx.db.insert(schema.accountSuspension).values({
+      id: randomUUID(),
+      userId: zoeId,
+      startsAt: new Date(),
+      endsAt: null,
+    })
+    // Témoin : Zoé est bien proposée, nommée et prévenue comme avant sa suspension.
+    expect(await proposed(malik, 'zoe', meteo.id)).toEqual(['zoe'])
+    const published = await comment(meteo.id, malik, 'Merci @zoe !')
+    expect(published.mentions.map((m) => m.name)).toEqual(['Zoé'])
+    const { items } = await readComments(meteo.id, ines)
+    expect(items[0]?.mentions.map((m) => m.name)).toEqual(['Zoé'])
   })
 
   it('never suggests a member found by name who is blocked either way', async () => {
