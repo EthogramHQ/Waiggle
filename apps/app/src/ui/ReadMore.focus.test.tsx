@@ -2,7 +2,7 @@
 // pastille de mention sous le pli est un arrêt de Tab : le texte se déplie quand le focus l'atteint,
 // au lieu de garder un focus invisible. Le navigateur, lui, ne fait plus défiler un cadre : les copies
 // mesurées sont rognées par leur propre couche (l'essai dans le navigateur mesure `scrollTop`).
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { createRef } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { renderWithProviders as render } from '../testing/render'
@@ -42,10 +42,16 @@ const renderFolded = async () => {
  * s'arrête à `bottom`.
  */
 const focusPillEndingAt = async (bottom: number) => {
+  const scrollIntoView = jest.fn()
   await fireEvent(screen.getByText(LONG), 'focus', {
-    target: { getBoundingClientRect: () => ({ bottom }) },
+    target: { getBoundingClientRect: () => ({ bottom }), scrollIntoView },
     currentTarget: { getBoundingClientRect: () => ({ bottom: 200 }) },
   })
+  // Le dépliage attend l'image suivante, et la vérification celle d'après.
+  for (let frame = 0; frame < 2; frame++) {
+    await act(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+  }
+  return scrollIntoView
 }
 
 describe('ReadMore, the focus inside a folded text (web)', () => {
@@ -57,11 +63,13 @@ describe('ReadMore, the focus inside a folded text (web)', () => {
   it('unfolds when the focus lands on a pill below the fold', async () => {
     await renderFolded()
 
-    await focusPillEndingAt(320)
+    const scrollIntoView = await focusPillEndingAt(320)
 
     // Le même bouton, qui dit maintenant « Réduire » : le texte entier est montré.
     expect(screen.getByRole('button', { name: 'Réduire' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Lire la suite' })).toBeNull()
+    // La pastille est ramenée en vue si la page a défilé trop loin, sans saut si elle y est déjà.
+    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'nearest' }))
   })
 
   it('stays folded when the focus lands on a pill of the shown lines', async () => {

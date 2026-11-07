@@ -182,6 +182,11 @@ describe('revealOffset', () => {
   it('never asks for a position above the top of the list', () => {
     expect(revealOffset({ top: 4, height: 100 }, zone, 12)).toBe(0)
   })
+
+  it('shares what is left around a card that barely fits, rather than cutting it for its margin', () => {
+    // 290 points dans 300 : 5 de chaque côté ; toute la carte se voit.
+    expect(revealOffset({ top: 500, height: 290 }, zone, 12)).toBe(500 + 290 + 5 - 300)
+  })
 })
 
 describe('The sheet brings an element into its zone (des-C4)', () => {
@@ -232,6 +237,24 @@ describe('The sheet brings an element into its zone (des-C4)', () => {
     scrollTo.mockClear()
     await zoneHeight(200)
     expect(scrollTo).toHaveBeenLastCalledWith({ y: 400 + 120 + 12 - 200, animated: true })
+  })
+
+  it('counts the margin above the content, which the card is not measured from', async () => {
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo')
+    const reveal = await renderSheet()
+    await zoneHeight(500)
+    const inner = hosts().find(
+      (node) => node.props.collapsable === false && flat(node).gap === space.xl,
+    )
+    if (!inner) throw new Error('vue du contenu attendue')
+    await fireEvent(inner as never, 'layout', {
+      nativeEvent: { layout: { x: 20, y: 12, width: 350, height: 900 } },
+    })
+    scrollTo.mockClear()
+
+    await act(() => reveal.current?.reveal(card(400, 120)))
+
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 12 + 400 + 120 + 12 - 500, animated: true })
   })
 
   it('leaves the list alone once the member scrolls by hand', async () => {

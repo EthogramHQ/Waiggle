@@ -38,10 +38,14 @@ export const revealOffset = (
   zone: { offset: number; height: number },
   margin: number = MARGIN,
 ): number | null => {
-  const atTop = Math.max(0, card.top - margin)
-  if (card.height + 2 * margin > zone.height) return atTop === zone.offset ? null : atTop
+  const fits = card.height <= zone.height
+  // Une carte qui tient tout juste : elle partage la place qui reste, plutôt que de déborder pour
+  // garder sa marge.
+  const air = fits ? Math.min(margin, (zone.height - card.height) / 2) : margin
+  const atTop = Math.max(0, card.top - air)
+  if (!fits) return Math.abs(atTop - zone.offset) < 1 ? null : atTop
   if (atTop < zone.offset) return atTop
-  const atBottom = card.top + card.height + margin - zone.height
+  const atBottom = card.top + card.height + air - zone.height
   return atBottom > zone.offset ? atBottom : null
 }
 
@@ -61,6 +65,8 @@ type Measurable = {
 export const useSheetReveal = (handle: Ref<SheetReveal> | undefined, calm: boolean) => {
   const scroller = useRef<ScrollView>(null)
   const content = useRef<unknown>(null)
+  // Où commence le contenu dans ce qui défile : après la marge du haut de la liste.
+  const contentTop = useRef(0)
   const target = useRef<Measurable | null>(null)
   const zone = useRef({ offset: 0, height: 0 })
 
@@ -71,7 +77,7 @@ export const useSheetReveal = (handle: Ref<SheetReveal> | undefined, calm: boole
     node.measureLayout(content.current, (_x, top, _width, height) => {
       // Entre-temps, le membre a pu faire défiler, ou le geste a pu finir.
       if (target.current !== node) return
-      const y = revealOffset({ top, height }, zone.current)
+      const y = revealOffset({ top: top + contentTop.current, height }, zone.current)
       if (y !== null) scroller.current?.scrollTo({ y, animated: !calm })
     })
   }
@@ -91,6 +97,9 @@ export const useSheetReveal = (handle: Ref<SheetReveal> | undefined, calm: boole
   return {
     scroller,
     content,
+    onContentLayout: ({ nativeEvent }: LayoutChangeEvent) => {
+      contentTop.current = nativeEvent.layout.y
+    },
     listProps: {
       scrollEventThrottle: 16,
       onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {

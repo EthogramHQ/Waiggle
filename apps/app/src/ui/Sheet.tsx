@@ -758,7 +758,12 @@ export function SheetPanel({
         >
           {/* Une vue autour du contenu, pour y mesurer la place d'un élément à amener en vue. */}
           {revealRef ? (
-            <View ref={reveal.content as Ref<View>} collapsable={false} style={{ gap: space.xl }}>
+            <View
+              ref={reveal.content as Ref<View>}
+              onLayout={reveal.onContentLayout}
+              collapsable={false}
+              style={{ gap: space.xl }}
+            >
               {children}
             </View>
           ) : (

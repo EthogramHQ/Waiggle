@@ -26,8 +26,10 @@ import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { ActionDescription } from './CommentAction'
+import { revealWithoutJump } from './focus'
 import { TextLink } from './TextLink'
 import { TextLayoutContext, type TextLayoutListener } from './textLayout'
+import { useCalmMotion } from './theme/motion'
 
 type Props = {
   /** Le nombre de lignes montrées replié (10, `COMMENT_FOLD_LINES`, par défaut). */
@@ -82,6 +84,7 @@ export const overflowsCount = (count: number, lines: number, previous: boolean):
 export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false }: Props) {
   const { t } = useTranslation()
   const web = Platform.OS === 'web'
+  const calm = useCalmMotion()
   const [expanded, setExpanded] = useState(initiallyExpanded)
 
   // Téléphone : le nombre de lignes compté par le texte natif.
@@ -124,12 +127,21 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
   // atteint un élément qui dépasse le bas du texte, le texte se déplie (web, relecture de R5b, ui-B2).
   // La marge d'une demi-ligne : une pastille de la dernière ligne montrée déborde de quelques points
   // de sa ligne, sans être cachée.
+  //
+  // À l'image suivante, pas dans l'événement : le navigateur fait défiler jusqu'à l'élément juste après
+  // l'avoir prévenu. Une page qui change de hauteur à cet instant le fait défiler trop loin (dans la
+  // feuille à 390 points : 1038 au lieu de 530, et la pastille finissait au-dessus de l'écran). Une
+  // image plus tard, on vérifie qu'elle est bien en vue.
   const unfoldForFocus = ({ target, currentTarget }: FocusEvent) => {
     if (!folded || !overflows) return
     const bottom = target?.getBoundingClientRect?.().bottom
     const frameBottom = currentTarget?.getBoundingClientRect?.().bottom
     if (bottom === undefined || frameBottom === undefined) return
-    if (bottom > frameBottom + (heights.line ?? 0) / 2) setExpanded(true)
+    if (bottom <= frameBottom + (heights.line ?? 0) / 2) return
+    requestAnimationFrame(() => {
+      setExpanded(true)
+      requestAnimationFrame(() => revealWithoutJump(target, calm))
+    })
   }
 
   // L'identifiant du texte caché qui décrit le bouton (web), stable entre le pré-rendu et le
