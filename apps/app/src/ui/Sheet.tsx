@@ -193,6 +193,7 @@ type WebDocument = {
 type WebElement = {
   tabIndex: number
   hasAttribute: (name: string) => boolean
+  closest: (selector: string) => unknown
   getClientRects: () => { length: number }
   focus: () => void
 }
@@ -325,6 +326,9 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
           (element) =>
             element.tabIndex >= 0 &&
             !element.hasAttribute('disabled') &&
+            // Les copies mesurées de « Lire la suite » (ReadMore) : `focus()` n'y fait rien, et Tab
+            // resterait pour toujours sur la mention d'un commentaire, juste avant elles.
+            element.closest('[inert]') === null &&
             element.getClientRects().length > 0,
         )
       : []
