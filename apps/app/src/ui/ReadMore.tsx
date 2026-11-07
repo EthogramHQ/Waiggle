@@ -20,11 +20,13 @@
 //
 // Le bouton garde le focus quand il change de libellé : c'est le même bouton (même place dans
 // l'arbre), dont seul le texte change, et les lecteurs d'écran disent s'il est déplié
-// (`aria-expanded`).
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+// (`aria-expanded`). Une pastille de mention sous le pli reste atteignable au clavier : le texte se
+// déplie quand le focus y arrive.
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { ActionDescription } from './CommentAction'
+import { revealWithoutJump } from './focus'
 import { TextLink } from './TextLink'
 import { TextLayoutContext, type TextLayoutListener } from './textLayout'
 
@@ -50,6 +52,10 @@ type Props = {
 
 /** Les deux hauteurs mesurées sur le web, en points ; `null` tant qu'on ne les connaît pas. */
 type Heights = { full: number | null; line: number | null }
+
+/** Le peu du navigateur que lit le focus qui entre dans le texte : le bas de deux boîtes. */
+type WebBox = { getBoundingClientRect?: () => { bottom: number } } | null | undefined
+type FocusEvent = { target?: WebBox; currentTarget?: WebBox }
 
 /**
  * La marge, en fraction de ligne : le texte entier dépasse s'il est plus haut que `lines` lignes et
@@ -115,6 +121,34 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
     node?.setAttribute?.('inert', '')
   }, [web])
 
+  // Une pastille de mention sous le pli reste un arrêt de Tab : le focus y serait invisible. Quand il
+  // atteint un élément qui dépasse le bas du texte, le texte se déplie (web, relecture de R5b, ui-B2).
+  // La marge d'une demi-ligne : une pastille de la dernière ligne montrée déborde de quelques points
+  // de sa ligne, sans être cachée.
+  //
+  // À l'image suivante, pas dans l'événement : le navigateur fait défiler jusqu'à l'élément juste après
+  // l'avoir prévenu. Puis, le texte déplié, l'élément est ramené en vue : le navigateur garde à leur
+  // place à l'écran les cartes que le texte vient de pousser vers le bas (« scroll anchoring »), et la
+  // pastille, elle, partait d'autant vers le haut (mesuré dans la feuille à 390 points : de y = 424 à
+  // y = -104). Avant de dessiner (useLayoutEffect), et sans animation : aucune image à la mauvaise place.
+  const focusToReveal = useRef<unknown>(null)
+  const unfoldForFocus = ({ target, currentTarget }: FocusEvent) => {
+    if (!folded || !overflows) return
+    const bottom = target?.getBoundingClientRect?.().bottom
+    const frameBottom = currentTarget?.getBoundingClientRect?.().bottom
+    if (bottom === undefined || frameBottom === undefined) return
+    if (bottom <= frameBottom + (heights.line ?? 0) / 2) return
+    requestAnimationFrame(() => {
+      focusToReveal.current = target
+      setExpanded(true)
+    })
+  }
+  useLayoutEffect(() => {
+    if (!expanded) return
+    revealWithoutJump(focusToReveal.current, true)
+    focusToReveal.current = null
+  }, [expanded])
+
   // L'identifiant du texte caché qui décrit le bouton (web), stable entre le pré-rendu et le
   // navigateur (useId).
   const descriptionId = useId()
@@ -122,16 +156,27 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
   return (
     <View>
       {web ? (
-        // overflow hidden : les copies mesurées, plus hautes que le texte replié, ne dépassent pas
-        // du cadre (elles allongeraient la page qu'on fait défiler).
-        <View style={{ overflow: 'hidden' }}>
+        // Le cadre lui-même ne rogne rien : `overflow: hidden` en ferait une zone que le navigateur
+        // fait défiler jusqu'à l'élément qui prend le focus (le texte sortait du cadre, et y restait),
+        // et couperait l'anneau de focus d'une pastille en tête de texte (ui-B2, ui-A1).
+        <View {...({ onFocus: unfoldForFocus } as object)}>
           {children(numberOfLines)}
           <View
             ref={hidden}
             // Ni vues, ni lues, ni touchées : seulement mesurées.
             aria-hidden
             pointerEvents="none"
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, opacity: 0 }}
+            // Une couche sans hauteur, qui rogne ses copies : plus hautes que le texte replié, elles
+            // allongeraient sinon la page qu'on fait défiler.
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 0,
+              overflow: 'hidden',
+              opacity: 0,
+            }}
           >
             <View onLayout={measure('full')}>{children(undefined)}</View>
             <View onLayout={measure('line')}>{children(1)}</View>

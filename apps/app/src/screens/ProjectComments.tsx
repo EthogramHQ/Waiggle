@@ -40,6 +40,7 @@ import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
 import { Sheet } from '../ui/Sheet'
 import { Surface } from '../ui/Surface'
+import type { SheetReveal } from '../ui/sheetReveal'
 import { Text } from '../ui/Text'
 import type { TextFieldInput } from '../ui/TextField'
 import { useLayout } from '../ui/theme/layout'
@@ -104,6 +105,7 @@ export function Comments({ project }: { project: Project }) {
   const inputRef = useRef<TextFieldInput>(null)
   const openButton = useRef<Focusable>(null)
   const titleRef = useRef<Focusable>(null)
+  const sheetReveal = useRef<SheetReveal>(null)
   const cards = useRef<CommentCards>(new Map())
   const previewCards = useRef<CommentCards>(new Map())
 
@@ -211,6 +213,15 @@ export function Comments({ project }: { project: Project }) {
     // focus le rouvre.
     focusField()
   }
+
+  // La carte visée par « Répondre » ou « Modifier » reste en vue : le bandeau du champ, puis le clavier,
+  // réduisent la liste sous elle. Rien n'est visé (le geste a pris fin) : la feuille la laisse tranquille.
+  // Aussi quand la feuille revient sur un geste en cours : sa liste vient de renaître.
+  const aimedAt = draft.highlightedId
+  useEffect(() => {
+    if (!sheetOpen) return
+    sheetReveal.current?.reveal(aimedAt ? (cards.current.get(aimedAt)?.view() ?? null) : null)
+  }, [aimedAt, sheetOpen])
 
   const reply = (root: Comment, target: CommentReply) => {
     draft.startReply(root, target)
@@ -477,6 +488,7 @@ export function Comments({ project }: { project: Project }) {
           title={t(($) => $.project.comments.title)}
           titleCount={{ count, spoken: t(($) => $.project.comments.spokenCount, { count }) }}
           {...(openOnField ? { initialFocusRef: inputRef } : null)}
+          revealRef={sheetReveal}
           // Une feuille couvre le bandeau de la suspension : elle redit pourquoi il n'y a pas de champ.
           footer={
             suspended ? (

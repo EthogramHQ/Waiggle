@@ -55,6 +55,7 @@ import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
+import { type SheetReveal, useSheetReveal } from './sheetReveal'
 import { Text } from './Text'
 import { holdPageTaps, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
@@ -142,6 +143,12 @@ type PanelProps = {
    * « Fermer » et le titre), pour la glisser vers le bas.
    */
   dragHandlers?: object
+  /**
+   * Ce que l'écran reçoit pour amener un élément dans la zone qui défile, et l'y garder quand elle
+   * rétrécit (le pied qui grandit, le clavier qui sort : voir sheetReveal.ts). Les autres feuilles ne
+   * le demandent pas.
+   */
+  revealRef?: Ref<SheetReveal>
 }
 
 /** Le message du pied d'une feuille : son texte, son ton, et s'il coupe la parole (alerte) ou non. */
@@ -194,6 +201,7 @@ type WebElement = {
   tabIndex: number
   hasAttribute: (name: string) => boolean
   getClientRects: () => { length: number }
+  closest: (selector: string) => unknown
   focus: () => void
 }
 type WebRoot = { querySelectorAll?: (selector: string) => ArrayLike<WebElement> }
@@ -325,7 +333,10 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
           (element) =>
             element.tabIndex >= 0 &&
             !element.hasAttribute('disabled') &&
-            element.getClientRects().length > 0,
+            element.getClientRects().length > 0 &&
+            // Une zone `inert` (les copies mesurées de ReadMore) a une boîte, mais `focus()` y échoue
+            // sans rien dire : le focus restait sur place, et Tab n'avançait plus (R5b, des-C1).
+            !element.closest('[inert]'),
         )
       : []
     if (nodes.length === 0) {
@@ -594,10 +605,12 @@ export function SheetPanel({
   compact = false,
   titleCount,
   dragHandlers,
+  revealRef,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
+  const reveal = useSheetReveal(revealRef, useCalmMotion())
   const phone = disposition === 'phone'
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par
   // son titre (celui de Sheet, quand la couche du Modal porte déjà le nom).
@@ -671,13 +684,16 @@ export function SheetPanel({
         </View>
       </View>
       {/* Le titre et, à sa droite, le décor (s'il y en a un). Sans décor, la rangée garde à droite
-          la place du bouton « Fermer », pour que les deux bords du titre restent alignés. */}
+          la place du bouton « Fermer », pour que les deux bords du titre restent alignés. Sauf un
+          titre avec son nombre : sa taille est calculée pour que son plus long mot tienne dans la
+          largeur de la feuille (`wholeWords`), et « Commentaires » se coupait à 200 % de texte dans
+          cette place en moins (R5b, des-C2) ; « Fermer » est dans la rangée du dessus. */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: space.md,
-          ...(decoration ? null : { paddingRight: layout.touchTarget + space.md }),
+          ...(decoration || titleCount ? null : { paddingRight: layout.touchTarget + space.md }),
         }}
       >
         <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
@@ -717,15 +733,22 @@ export function SheetPanel({
       {...(phone ? { shadow: 'card' as const } : null)}
     >
       <View style={{ flexShrink: 1, ...(phone && !hug ? { flex: 1 } : null) }}>
-        <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>{header}</View>
+        {/* paddingBottom : la liste défilée passe sous la tête, et son texte ne touche pas le titre
+            (R5b, des-A8). Le haut du contenu en rend autant : au repos, rien ne change de place. */}
+        <View
+          style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm }}
+        >
+          {header}
+        </View>
         {/* Le contenu défile dans la feuille, le titre et le pied restant en place.
               keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du
               premier coup. */}
         <ScrollView
+          {...(revealRef ? { ref: reveal.scroller, ...reveal.listProps } : null)}
           style={{ flexShrink: 1 }}
           contentContainerStyle={{
             paddingHorizontal: space.xl,
-            paddingTop: space.xl,
+            paddingTop: space.xl - space.sm,
             // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
             // le dernier bloc et le bouton (décision de Louis du 2/11).
             paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
@@ -733,7 +756,19 @@ export function SheetPanel({
           }}
           keyboardShouldPersistTaps="handled"
         >
-          {children}
+          {/* Une vue autour du contenu, pour y mesurer la place d'un élément à amener en vue. */}
+          {revealRef ? (
+            <View
+              ref={reveal.content as Ref<View>}
+              onLayout={reveal.onContentLayout}
+              collapsable={false}
+              style={{ gap: space.xl }}
+            >
+              {children}
+            </View>
+          ) : (
+            children
+          )}
         </ScrollView>
         {pinned ? (
           <View

@@ -93,7 +93,9 @@ const day = {
   glassBorder: 'rgba(255,255,255,0.75)',
   panel: 'rgba(255,255,255,0.76)', // verre qui porte du texte, posé sur une image
   panelBorder: 'rgba(255,255,255,0.8)',
-  sheet: 'rgba(255,255,255,0.86)', // feuille qui monte du bas de l'écran
+  // Feuille qui monte du bas de l'écran : la crème de la page, opaque (décision du 7/11/2026, R5b). Le
+  // blanc translucide d'avant, posé sur son voile, donnait un gris où les cartes grises s'effaçaient.
+  sheet: '#FFFCF5',
   scrim: 'rgba(28,27,25,0.32)', // voile derrière une feuille ou une fenêtre
   // Le reflet qui suit la souris sur une carte inclinée (ui/tilt.ts) : une lueur blanche au centre,
   // qui s'efface vers ses bords. Il ne porte aucun texte.
