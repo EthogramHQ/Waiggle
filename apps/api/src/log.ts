@@ -53,9 +53,12 @@ export type AuthLogLevel = 'debug' | 'info' | 'warn' | 'error'
  * qui suit un « : », ni rien qui ressemble à une adresse e-mail ; chaque erreur passe par
  * describeError, et tout autre argument n'est noté que par son type.
  */
-export const writeAuthLog = (level: AuthLogLevel, message: string, ...args: unknown[]) => {
+export const writeAuthLog = (level: AuthLogLevel, message: unknown, ...args: unknown[]) => {
   const write = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log
-  const short = (message.split('\n')[0] ?? '')
+  // Better Auth passe parfois une erreur au lieu d'un texte : on n'en garde que la nature.
+  const text =
+    typeof message === 'string' ? message : message instanceof Error ? message.name : typeof message
+  const short = (text.split('\n')[0] ?? '')
     .split(/:\s/)[0]
     ?.replace(/\S+@\S+/g, '[adresse]')
     .slice(0, 120)

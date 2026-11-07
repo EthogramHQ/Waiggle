@@ -55,4 +55,14 @@ describe('writeAuthLog', () => {
       expect(written).not.toContain(secret)
     }
   })
+
+  it('copes with a message that is not a text', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Better Auth passe parfois une erreur là où il attend un texte.
+    const notText = new Error('Failed query\nparams: secret-token') as unknown as string
+
+    expect(() => writeAuthLog('error', notText)).not.toThrow()
+    expect(JSON.stringify(error.mock.calls)).not.toContain('secret-token')
+    error.mockRestore()
+  })
 })

@@ -269,6 +269,16 @@ export const createApp = ({
   // dire « Nouvel essai possible à 21 h 47 ».
   app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
     const res = await auth.handler(await countableRequest(c.req.raw))
+    // Une erreur du serveur que Better Auth rend lui-même (une APIError 500, prévue par son code) :
+    // depuis `onAPIError.throw` (auth/auth.ts), il ne l'écrit plus. On note la route et le code,
+    // jamais l'adresse complète, dont la requête peut porter un jeton (relecture de la PR #86, A4).
+    if (res.status >= 500) {
+      console.error('Better Auth server error', {
+        method: c.req.method,
+        path: c.req.path,
+        status: res.status,
+      })
+    }
     const retryAfter = res.headers.get('x-retry-after')
     if (res.status !== 429 || retryAfter === null || res.headers.has('retry-after')) return res
     // Une copie de la réponse : les en-têtes d'une réponse reçue peuvent être en lecture seule.

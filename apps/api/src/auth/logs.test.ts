@@ -53,4 +53,20 @@ describe('the logs, when the database fails', () => {
     expect(journal).not.toContain('lea@example.com')
     expect(journal).not.toMatch(/params:|Failed query|select "/i)
   })
+
+  // Relecture de la PR #86, A4 : depuis `onAPIError.throw`, une erreur 500 prévue par Better Auth
+  // (une APIError) est rendue par lui sans rien écrire. L'API note la route et le code, sans
+  // l'adresse complète, dont la requête peut porter un jeton ou une adresse e-mail.
+  it('write one line, without the query, when Better Auth answers a server error', async () => {
+    vi.spyOn(ctx.auth, 'handler').mockResolvedValue(new Response(null, { status: 500 }))
+
+    const res = await ctx.request('/api/auth/verify-email?token=secret-token&email=lea@example.com')
+
+    expect(res.status).toBe(500)
+    const journal = written.join('\n')
+    expect(journal).toContain('/api/auth/verify-email')
+    expect(journal).toContain('500')
+    expect(journal).not.toContain('secret-token')
+    expect(journal).not.toContain('lea@example.com')
+  })
 })
