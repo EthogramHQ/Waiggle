@@ -475,7 +475,15 @@ describe('choosing a new password from the link', () => {
       ip(2),
     )
 
-    for (const res of [inBody, inQuery]) {
+    // Relecture de la PR #86, B1 : Better Auth prend le jeton de la requête quand celui du corps
+    // est vide (`||`) ; la garde lisait seulement le corps, présent mais vide.
+    const emptyBody = await post(
+      `/api/auth/reset-password?token=${encodeURIComponent(`a\u0000b`)}`,
+      { token: '', newPassword: NEW_PASSWORD },
+      ip(3),
+    )
+
+    for (const res of [inBody, inQuery, emptyBody]) {
       expect(res.status).toBe(400)
       expect(await codeOf(res)).toBe('INVALID_TOKEN')
     }

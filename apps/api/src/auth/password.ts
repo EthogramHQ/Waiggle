@@ -235,8 +235,11 @@ export const createPasswordFlows = ({
      * serveur (500). Aucun vrai jeton n'en contient : on répond comme à un lien abîmé.
      */
     beforeReset: (ctx: AuthContext) => {
-      const token = objectBody(ctx).token ?? ctx.query?.token
-      if (typeof token === 'string' && token.includes('\u0000')) {
+      // Better Auth prend le jeton du corps, ou celui de la requête si le premier est vide
+      // (`ctx.body.token || ctx.query?.token`) : on regarde les deux, quel que soit l'ordre
+      // (relecture de la PR #86, B1).
+      const candidates: unknown[] = [objectBody(ctx).token, ctx.query?.token]
+      if (candidates.some((token) => typeof token === 'string' && token.includes('\u0000'))) {
         throw new APIError('BAD_REQUEST', { code: 'INVALID_TOKEN', message: 'Invalid token' })
       }
     },
