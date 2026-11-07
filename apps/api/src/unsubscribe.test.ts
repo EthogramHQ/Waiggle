@@ -15,7 +15,7 @@
 import { ErrorResponse } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { resources } from '@ruche/i18n'
-import { eq } from 'drizzle-orm'
+import { eq, like } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createUnsubscribeToken } from './email/unsubscribe-token'
 import { activity } from './testing/activity'
@@ -328,6 +328,24 @@ describe('the limits', () => {
     expect(elsewhere.status).toBe(204)
     later(HOUR)
     expect((await unsubscribe({ token: tokenOf(inesId, 'mentions') })).status).toBe(204)
+  })
+
+  // Audit de sécurité du 7/11/2026, N3 : tout un réseau IPv6 « /64 » compte comme une seule
+  // adresse, sinon changer d'adresse dans son réseau suffisait à ne jamais rencontrer le quota.
+  it('counts every address of one IPv6 /64 network as the same address', async () => {
+    const network = (n: number) => ({ headers: { 'x-real-ip': `2001:db8:1:2::${n}` } })
+    await expectInvalid(await unsubscribe({ token: 'not-a-token' }, network(1)))
+    // Le compteur de ce réseau, comme s'il avait déjà servi 299 fois en tout.
+    await ctx.db
+      .update(schema.apiRateLimit)
+      .set({ count: 299 })
+      .where(like(schema.apiRateLimit.key, 'unsubscribe-ip:%'))
+    expect((await unsubscribe({ token: tokenOf(malikId, 'recap') }, network(2))).status).toBe(204)
+
+    const blocked = await unsubscribe({ token: tokenOf(inesId, 'recap') }, network(3))
+
+    expect(blocked.status).toBe(429)
+    expect((await act.preferences(ines)).weeklyRecap).toBe(true)
   })
 
   it('answers 10 valid links an hour per member, whatever the address', async () => {
