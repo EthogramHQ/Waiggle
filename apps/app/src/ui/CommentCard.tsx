@@ -60,6 +60,8 @@ export type CommentCardHandle = {
   focusReply: () => boolean
   /** Vrai si le focus a pu être posé (la carte `compact`, qui est un seul bouton). */
   focusCard: () => boolean
+  /** La vue de la carte, pour l'amener en vue dans une liste (`reveal` de la feuille). */
+  view: () => unknown
 }
 
 /** Qui a masqué le commentaire, vu par celui qui regarde : lui-même, ou l'auteur du projet. */
@@ -198,11 +200,13 @@ export function CommentCard({
   const menuRef = useRef<View>(null)
   const replyRef = useRef<View>(null)
   const cardRef = useRef<View>(null)
+  const frameRef = useRef<View>(null)
   // useImperativeHandle : ce que l'écran reçoit dans `handle`, à la place de la vue elle-même.
   useImperativeHandle(handle, () => ({
     focusMenu: () => focusOn(menuRef),
     focusReply: () => focusOn(replyRef),
     focusCard: () => focusOn(cardRef),
+    view: () => frameRef.current,
   }))
 
   const { author } = comment
@@ -365,7 +369,7 @@ export function CommentCard({
         : null
 
   return (
-    <View style={frame}>
+    <View ref={frameRef} style={frame}>
       {yours}
       <ActionDescription id={descriptionId} text={described} />
       {/* L'auteur, la date et « modifié », puis « … » au bout de la rangée. Quand la place manque
