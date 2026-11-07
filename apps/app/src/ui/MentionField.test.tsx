@@ -15,7 +15,7 @@
 import { foldForSearch, MENTION_QUERY_MAX, type Mentionable } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { inesMember, inikoMember } from '../testing/comments'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -314,6 +314,24 @@ describe('MentionField', () => {
     expect(marks('@lea_moreau')).toEqual(['le'])
     expect(marks('Hugo Lefèvre')).toEqual(['Le'])
     expect(marks('@hugo_l')).toEqual([])
+  })
+
+  it('writes the handle under the name, not beside it (scenario, des-A6)', async () => {
+    await renderWithProviders(<Field suggestions={[lea]} suggestionsFor="le" />)
+
+    await type('Merci @Le')
+
+    const name = screen.getByText('Léa Moreau') as unknown as Node
+    const handle = screen.getByText('@lea_moreau') as unknown as Node
+    // Le plus proche bloc commun aux deux textes.
+    const holds = (node: Node, target: Node): boolean =>
+      node === target ||
+      node.children.some((child) => typeof child !== 'string' && holds(child, target))
+    let block = name.parent as Node
+    while (!holds(block, handle)) block = block.parent as Node
+    const style = StyleSheet.flatten(block.props.style as never) as Record<string, unknown>
+    expect(style.flexDirection ?? 'column').toBe('column')
+    expect(comesBefore(name, handle)).toBe(true)
   })
 })
 

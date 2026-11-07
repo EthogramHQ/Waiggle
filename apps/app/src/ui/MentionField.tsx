@@ -26,7 +26,8 @@
 //
 // Sous le champ (par défaut), la liste prend sa place dans la page : elle apparaît parce qu'on tape,
 // et pousse les boutons dessous plutôt que de les recouvrir. Au-dessus (le champ collé en bas de la
-// feuille des commentaires), elle grandit vers le haut et le champ ne bouge pas sous le doigt.
+// feuille des commentaires), elle grandit vers le haut et le champ ne bouge pas sous le doigt. Un
+// composant qui veut la poser ailleurs prend le champ et la liste séparément (`useMentionField`).
 
 import { type FontWeight, layout, radii, space, textStyles } from '@ruche/brand'
 import { foldForSearch, MENTION_QUERY_MAX, MENTION_QUERY_PATTERN } from '@ruche/contracts'
@@ -183,11 +184,24 @@ const LISTBOX = { role: 'listbox' } as object
 // La touche reçue par onKeyPress (sur le web, l'évènement du navigateur, qu'on peut arrêter).
 type KeyPress = { nativeEvent: { key: string; preventDefault?: () => void } }
 
-export function MentionField({
+/** Le champ et sa liste, tels que `useMentionField` les rend, chacun à poser où l'on veut. */
+export type MentionFieldParts = {
+  /** La saisie : toujours là. */
+  field: ReactElement
+  /** La liste des membres : null tant qu'il n'y a rien à proposer. */
+  list: ReactElement | null
+}
+
+/**
+ * Le champ et sa liste, séparés. `MentionField` les pose l'un sur l'autre ; `CommentComposer` pose la
+ * liste au-dessus de son bandeau, sur toute sa largeur, alors que la saisie reste dans sa rangée, à
+ * côté de la photo et du bouton (relecture design, des-A6). Un hook plutôt qu'un portail : les deux
+ * restent dans le même arbre, donc l'ordre de lecture suit l'écran.
+ */
+export function useMentionField({
   suggestions,
   suggestionsFor,
   suggestionsLabel,
-  suggestionsPlacement = 'below',
   suggestionsTitle,
   onQueryChange,
   value,
@@ -195,7 +209,7 @@ export function MentionField({
   onKeyPress,
   inputRef,
   ...fieldProps
-}: Props) {
+}: Omit<Props, 'suggestionsPlacement'>): MentionFieldParts {
   const { t } = useTranslation()
   const { colors } = useTheme()
   const input = useRef<TextInput>(null)
@@ -410,18 +424,9 @@ export function MentionField({
                     size={32}
                   />
                 </View>
-                {/* Le nom puis le pseudo ; ils passent l'un sous l'autre quand la place manque. Les
-                    lettres tapées y sont en gras : le nom, d'un poids ordinaire, les fait ressortir. */}
-                <View
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    alignItems: 'baseline',
-                    columnGap: space.sm,
-                  }}
-                >
+                {/* Le nom, le pseudo dessous, comme le dit le scénario. Les lettres tapées y sont en
+                    gras : le nom, d'un poids ordinaire, les fait ressortir. */}
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Marked
                     text={suggestion.name}
                     query={query}
@@ -447,31 +452,40 @@ export function MentionField({
       </View>
     ) : null
 
+  const field = (
+    <TextField
+      {...fieldProps}
+      value={value}
+      onChangeText={change}
+      inputRef={input}
+      onKeyPress={keyPress}
+      onSelectionChange={(event) => {
+        const { start, end } = event.nativeEvent.selection
+        // Une sélection de plusieurs lettres : pas de recherche (on ne remplacerait pas la bonne).
+        setCursor(start === end ? end : -1)
+      }}
+      onBlur={() => {
+        // Tab vers la suite : la liste se referme. (Un choix touché fait aussi perdre le focus,
+        // juste avant d'être pris : on le laisse faire.)
+        if (!choosing.current) setDismissed(true)
+      }}
+      combobox={{
+        expanded: open,
+        listId,
+        activeId: activeIndex >= 0 ? optionId(activeIndex) : undefined,
+      }}
+    />
+  )
+
+  return { field, list }
+}
+
+export function MentionField({ suggestionsPlacement = 'below', ...props }: Props) {
+  const { field, list } = useMentionField(props)
   return (
     <View style={{ gap: space.xs }}>
       {suggestionsPlacement === 'above' ? list : null}
-      <TextField
-        {...fieldProps}
-        value={value}
-        onChangeText={change}
-        inputRef={input}
-        onKeyPress={keyPress}
-        onSelectionChange={(event) => {
-          const { start, end } = event.nativeEvent.selection
-          // Une sélection de plusieurs lettres : pas de recherche (on ne remplacerait pas la bonne).
-          setCursor(start === end ? end : -1)
-        }}
-        onBlur={() => {
-          // Tab vers la suite : la liste se referme. (Un choix touché fait aussi perdre le focus,
-          // juste avant d'être pris : on le laisse faire.)
-          if (!choosing.current) setDismissed(true)
-        }}
-        combobox={{
-          expanded: open,
-          listId,
-          activeId: activeIndex >= 0 ? optionId(activeIndex) : undefined,
-        }}
-      />
+      {field}
       {suggestionsPlacement === 'below' ? list : null}
     </View>
   )
