@@ -31,8 +31,9 @@ import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
-import { CommentCard } from '../ui/CommentCard'
-import { CommentComposer } from '../ui/CommentComposer'
+import { excerpt } from '../ui/CommentAction'
+import { CommentCard, plainCommentText } from '../ui/CommentCard'
+import { CommentComposer, useLowWindow } from '../ui/CommentComposer'
 import { CommentPreview, type CommentPreviewAction } from '../ui/CommentPreview'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
@@ -58,6 +59,7 @@ export function Comments({ project }: { project: Project }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const { columns } = useLayout()
+  const lowWindow = useLowWindow()
   const comments = useComments(project.id)
   const draft = useCommentDraft(project.id)
   const failure = useCommentFailure()
@@ -256,25 +258,37 @@ export function Comments({ project }: { project: Project }) {
         ? { label: t(($) => $.common.retry), role: 'button' as const, onPress: () => void send() }
         : undefined
 
-  // La légende dit qui lira, selon le geste et le projet (les six textes d'aujourd'hui, jur-P1).
-  const editedComment =
-    draft.mode.kind === 'edit'
-      ? threadLines(threads).find((comment) => comment.id === draft.highlightedId)
-      : undefined
+  // Le commentaire visé par le geste en cours (surligné) : la réponse ou le commentaire modifié.
+  const targetComment =
+    draft.mode.kind === 'new'
+      ? undefined
+      : threadLines(threads).find((comment) => comment.id === draft.highlightedId)
+
+  // La légende dit qui lira, selon le geste et le projet (les six textes d'aujourd'hui, jur-P1). Dans
+  // une fenêtre basse, seulement la phrase qui dit qui lira (décision 19) ; celle d'un commentaire
+  // masqué reste entière : c'est déjà une seule phrase, celle qui dit qui le lit.
   const caption =
     draft.mode.kind === 'reply'
       ? isPrivate
-        ? t(($) => $.project.comments.replyHintPrivate)
-        : t(($) => $.project.comments.replyHint)
+        ? t(($) =>
+            lowWindow
+              ? $.project.comments.replyHintPrivateShort
+              : $.project.comments.replyHintPrivate,
+          )
+        : t(($) => (lowWindow ? $.project.comments.replyHintShort : $.project.comments.replyHint))
       : draft.mode.kind === 'edit'
         ? isPrivate
-          ? t(($) => $.project.comments.hintPrivate)
-          : editedComment?.state === 'hidden'
+          ? t(($) =>
+              lowWindow ? $.project.comments.hintPrivateShort : $.project.comments.hintPrivate,
+            )
+          : targetComment?.state === 'hidden'
             ? t(($) => $.project.comments.editHintHidden)
-            : t(($) => $.project.comments.editHint)
+            : t(($) => (lowWindow ? $.project.comments.editHintShort : $.project.comments.editHint))
         : isPrivate
-          ? t(($) => $.project.comments.hintPrivate)
-          : t(($) => $.project.comments.hint)
+          ? t(($) =>
+              lowWindow ? $.project.comments.hintPrivateShort : $.project.comments.hintPrivate,
+            )
+          : t(($) => (lowWindow ? $.project.comments.hintShort : $.project.comments.hint))
 
   // Pas de `disabled` pour qui n'écrit pas : il n'a pas de champ du tout (relecture du plan, ui-I1).
   const composer = readOnly ? null : (
@@ -287,7 +301,16 @@ export function Comments({ project }: { project: Project }) {
       errorAction={sendAction}
       banner={
         draft.mode.kind === 'reply'
-          ? { kind: 'reply', name: draft.mode.name }
+          ? {
+              kind: 'reply',
+              name: draft.mode.name,
+              // Dans la colonne, la carte visée a pu sortir de l'écran : le bandeau la rappelle
+              // (décision 17). Dans la feuille, elle reste en vue, surlignée.
+              excerpt:
+                columns && targetComment
+                  ? excerpt(plainCommentText(targetComment.body, targetComment.mentions))
+                  : undefined,
+            }
           : draft.mode.kind === 'edit'
             ? { kind: 'edit' }
             : null

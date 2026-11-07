@@ -15,7 +15,7 @@
 import { COMMENT_COUNTER_FROM, COMMENT_MAX } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { type ComponentProps, createRef, useState } from 'react'
-import { Platform, TextInput } from 'react-native'
+import { Dimensions, Platform, StyleSheet, TextInput } from 'react-native'
 import { inesMember } from '../testing/comments'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -68,6 +68,10 @@ const field = () => {
   if (!found) throw new Error('no text input')
   return found
 }
+
+/** Le style aplati d'un élément : une mise en page ne se dit pas autrement sous Jest. */
+const styleOf = (node: Host) =>
+  (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>
 
 /** La place d'un élément dans l'ordre de lecture. */
 const place = (node: unknown) => all().indexOf(node as Host)
@@ -372,6 +376,212 @@ describe('CommentComposer', () => {
       expect(onQueryChange.mock.calls.at(-1)?.[0]).toBe('in')
       const option = screen.getByRole('option', { name: /Inès Morel/ })
       expect(place(option)).toBeLessThan(place(field()))
+    })
+
+    it('opens the list of members above the banner, as wide as the composer', async () => {
+      // des-A6 : dans la colonne du champ, la liste faisait 182 pt à 320 px, et passait sous le bandeau.
+      const ines = { ...inesMember, avatar: null }
+      function Typing() {
+        const [value, setValue] = useState('')
+        return (
+          <CommentComposer
+            {...propsOf({
+              value,
+              onChangeText: setValue,
+              banner: { kind: 'reply', name: 'Léa Moreau' },
+              suggestions: [ines],
+              suggestionsFor: 'in',
+            })}
+          />
+        )
+      }
+      await renderWithProviders(<Typing />)
+
+      await fireEvent.changeText(field() as never, 'Merci @in')
+
+      const option = screen.getByRole('option', { name: /Inès Morel/ })
+      expect(place(option)).toBeLessThan(
+        place(screen.getByRole('button', { name: 'Annuler la réponse' })),
+      )
+      // Hors de la rangée du champ : aucun ancêtre de la liste ne contient aussi la saisie, sauf le
+      // bloc entier du composant, celui qui porte aussi le bandeau.
+      const input = field()
+      const contains = (node: Host): boolean => hostsOf(node).includes(input)
+      let around = option as unknown as Host
+      while (around.parent && !contains(around.parent)) around = around.parent
+      const shared = around.parent as Host
+      expect(contains(shared)).toBe(true)
+      expect(hostsOf(shared)).toContain(screen.getByText('Réponse à Léa Moreau'))
+    })
+  })
+
+  describe('the list of members in a low window', () => {
+    afterEach(() => {
+      const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+      Dimensions.set({ window: phone, screen: phone })
+    })
+
+    /** Le champ avec son texte, une recherche qui répond, et le cadre de la liste qui s'ouvre. */
+    const listHeightIn = async (height: number, where: Props['place']) => {
+      const size = { width: where === 'sheet' ? 844 : 1440, height, scale: 2, fontScale: 1 }
+      Dimensions.set({ window: size, screen: size })
+      function Typing() {
+        const [value, setValue] = useState('')
+        return (
+          <CommentComposer
+            {...propsOf({
+              value,
+              onChangeText: setValue,
+              place: where,
+              suggestions: [{ ...inesMember, avatar: null }],
+              suggestionsFor: 'in',
+            })}
+          />
+        )
+      }
+      await renderWithProviders(<Typing />)
+      await fireEvent.changeText(field() as never, 'Merci @in')
+      let at = screen.getByRole('option', { name: /Inès Morel/ }) as unknown as Host | null
+      while (at && styleOf(at).maxHeight === undefined) at = at.parent
+      return at ? styleOf(at).maxHeight : undefined
+    }
+
+    it('in the sheet, leaves the field in the window, however low', async () => {
+      // La hauteur de la fenêtre moins l'en-tête de la feuille (143) et le reste du pied (161) ;
+      // au moins de quoi lire un membre sous le titre.
+      expect(await listHeightIn(508, 'sheet')).toBe(508 - 304)
+    })
+
+    it('in the sheet of a landscape phone, keeps room for one member', async () => {
+      expect(await listHeightIn(390, 'sheet')).toBe(88)
+    })
+
+    it('in the column, the page scrolls: no limit', async () => {
+      expect(await listHeightIn(500, 'column')).toBeUndefined()
+    })
+  })
+
+  describe('the width left to the field in the column (des-C5)', () => {
+    /** Le premier ancêtre de la saisie qui se donne une largeur de base, et son parent. */
+    const fieldRow = () => {
+      let at: Host | null = field()
+      while (at && styleOf(at).flexBasis === undefined) at = at.parent
+      if (!at?.parent) throw new Error('no base width around the field')
+      return { group: at, row: at.parent }
+    }
+
+    it('in the column, the field keeps a real width and « Envoyer » goes below it when it would not', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf({ place: 'column' })} />)
+
+      const { group, row } = fieldRow()
+      // La photo (36), l'écart (8) et les 180 points du champ.
+      expect(styleOf(group).flexBasis).toBeGreaterThanOrEqual(36 + 8 + 180)
+      expect(styleOf(group).flexGrow).toBe(1)
+      expect(styleOf(row).flexWrap).toBe('wrap')
+      // À droite, une fois passé dessous.
+      expect(styleOf(row).justifyContent).toBe('flex-end')
+    })
+
+    it('in the sheet, the arrow never leaves the row of the field', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf()} />)
+
+      let at: Host | null = field()
+      while (at) {
+        expect(styleOf(at).flexWrap).not.toBe('wrap')
+        at = at.parent
+      }
+    })
+  })
+
+  describe('the photo while replying (decision 20)', () => {
+    const photo = () =>
+      screen.queryAllByLabelText('Sam Petit', { includeHiddenElements: true }).length > 0
+    const replying: Partial<Props> = { banner: { kind: 'reply', name: 'Léa Moreau' } }
+
+    afterEach(() => {
+      const phone = { width: 390, height: 844, scale: 3, fontScale: 1 }
+      Dimensions.set({ window: phone, screen: phone })
+    })
+
+    const windowOf = (width: number) => {
+      const size = { width, height: 844, scale: 2, fontScale: 1 }
+      Dimensions.set({ window: size, screen: size })
+    }
+
+    it('keeps the photo from 360 points', async () => {
+      windowOf(360)
+      await renderWithProviders(<CommentComposer {...propsOf(replying)} />)
+
+      expect(photo()).toBe(true)
+    })
+
+    it('drops the photo below 360 points, where the field would be too narrow', async () => {
+      windowOf(359)
+      await renderWithProviders(<CommentComposer {...propsOf(replying)} />)
+
+      expect(field()).toBeTruthy() // témoin
+      expect(photo()).toBe(false)
+    })
+
+    it('keeps the photo below 360 points when not replying', async () => {
+      windowOf(320)
+      await renderWithProviders(<CommentComposer {...propsOf()} />)
+
+      expect(photo()).toBe(true)
+    })
+
+    it('keeps the same input when the photo goes, for the focus to stay in it', async () => {
+      windowOf(320)
+      const { rerender } = await renderWithProviders(<CommentComposer {...propsOf()} />)
+      const focus = jest.spyOn(TextInput.prototype, 'focus')
+      focus.mockClear()
+      const before = field()
+
+      await rerender(<CommentComposer {...propsOf(replying)} />)
+
+      expect(photo()).toBe(false)
+      expect(field()).toBe(before)
+      focus.mockRestore()
+    })
+  })
+
+  describe('the excerpt in the banner (decision 17)', () => {
+    const replying = (excerpt?: string): Partial<Props> => ({
+      banner: { kind: 'reply', name: 'Léa Moreau', ...(excerpt ? { excerpt } : null) },
+    })
+    const sentence = fr.t(($) => $.project.comments.replyToExcerpt, {
+      name: 'Léa Moreau',
+      excerpt: 'Revanche dimanche',
+    })
+    const tail = sentence.slice(sentence.indexOf('Moreau') + 'Moreau'.length)
+
+    it('reminds the replied comment, on one line, the name kept whole', async () => {
+      await renderWithProviders(
+        <CommentComposer {...propsOf({ place: 'column', ...replying('Revanche dimanche') })} />,
+      )
+
+      expect(tail).toContain('Revanche dimanche')
+      // Le nom d'un côté, jamais coupé (décision du 1/11) ; l'extrait de l'autre, sur une ligne.
+      const name = screen.getByText('Réponse à Léa Moreau')
+      expect(name.props.numberOfLines).toBeUndefined()
+      expect(screen.getByText(tail).props.numberOfLines).toBe(1)
+    })
+
+    it('reads the name to whoever writes, not the excerpt', async () => {
+      await renderWithProviders(
+        <CommentComposer {...propsOf({ place: 'column', ...replying('Revanche dimanche') })} />,
+      )
+
+      const hint = String(field().props.accessibilityHint)
+      expect(hint).toContain('Réponse à Léa Moreau')
+      expect(hint).not.toContain('Revanche dimanche')
+    })
+
+    it('without an excerpt, the banner stays « Réponse à Léa Moreau » alone', async () => {
+      await renderWithProviders(<CommentComposer {...propsOf(replying())} />)
+
+      expect(screen.getByText('Réponse à Léa Moreau')).toBeTruthy()
+      expect(screen.queryByText(tail)).toBeNull()
     })
   })
 })

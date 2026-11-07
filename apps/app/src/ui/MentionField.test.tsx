@@ -15,7 +15,7 @@
 import { foldForSearch, MENTION_QUERY_MAX, type Mentionable } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { inesMember, inikoMember } from '../testing/comments'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -49,7 +49,9 @@ function Field({
   initial = '',
   placement,
   title,
+  maxHeight,
 }: {
+  maxHeight?: number
   suggestions?: Suggestion[]
   suggestionsFor?: string | null
   onQueryChange?: (query: string | null) => void
@@ -70,6 +72,7 @@ function Field({
       multiline
       {...(placement ? { suggestionsPlacement: placement } : null)}
       {...(title ? { suggestionsTitle: title } : null)}
+      {...(maxHeight ? { suggestionsMaxHeight: maxHeight } : null)}
     />
   )
 }
@@ -315,6 +318,24 @@ describe('MentionField', () => {
     expect(marks('Hugo Lefèvre')).toEqual(['Le'])
     expect(marks('@hugo_l')).toEqual([])
   })
+
+  it('writes the handle under the name, not beside it (scenario, des-A6)', async () => {
+    await renderWithProviders(<Field suggestions={[lea]} suggestionsFor="le" />)
+
+    await type('Merci @Le')
+
+    const name = screen.getByText('Léa Moreau') as unknown as Node
+    const handle = screen.getByText('@lea_moreau') as unknown as Node
+    // Le plus proche bloc commun aux deux textes.
+    const holds = (node: Node, target: Node): boolean =>
+      node === target ||
+      node.children.some((child) => typeof child !== 'string' && holds(child, target))
+    let block = name.parent as Node
+    while (!holds(block, handle)) block = block.parent as Node
+    const style = StyleSheet.flatten(block.props.style as never) as Record<string, unknown>
+    expect(style.flexDirection ?? 'column').toBe('column')
+    expect(comesBefore(name, handle)).toBe(true)
+  })
 })
 
 describe('MentionField with a keyboard (web)', () => {
@@ -422,5 +443,57 @@ describe('MentionField with a keyboard (web)', () => {
     await type('Bravo @in')
 
     for (const option of screen.getAllByRole('option')) expect(option).toHaveProp('tabIndex', -1)
+  })
+
+  describe('in a list limited in height', () => {
+    /** Un `document` prêté, complet en apparence (ThemeProvider y écrit), qui trouve les choix. */
+    const lendDocument = () => {
+      const reveal = jest.fn()
+      const loose = (): unknown =>
+        new Proxy(() => {}, {
+          get: (_target, name) =>
+            name === Symbol.toPrimitive ? () => '' : name === 'then' ? undefined : loose(),
+          set: () => true,
+          apply: () => loose(),
+        })
+      const target: Record<string | symbol, unknown> = {
+        activeElement: null,
+        getElementById: () => ({ scrollIntoView: reveal }),
+      }
+      Object.defineProperty(globalThis, 'document', {
+        value: new Proxy(target, {
+          get: (from, name) => (name in from ? from[name] : loose()),
+          set: () => true,
+        }),
+        configurable: true,
+      })
+      return reveal
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis, 'document')
+    })
+
+    it('brings into view the member reached with the arrows', async () => {
+      const reveal = lendDocument()
+      await renderWithProviders(<Field maxHeight={88} />)
+      await type('Bravo @in')
+      reveal.mockClear()
+
+      await key('ArrowDown')
+
+      expect(reveal).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it('without a limit, moves nothing: the page stays where it is', async () => {
+      const reveal = lendDocument()
+      await renderWithProviders(<Field />)
+      await type('Bravo @in')
+
+      await key('ArrowDown')
+
+      expect(screen.getByRole('option', { name: /Iniko Diallo/ })).toBeSelected() // témoin
+      expect(reveal).not.toHaveBeenCalled()
+    })
   })
 })

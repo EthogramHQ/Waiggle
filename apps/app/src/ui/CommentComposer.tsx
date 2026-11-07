@@ -28,14 +28,22 @@ import { Icon, type IconName } from './Icon'
 import { IconButton } from './IconButton'
 import type { ImageSource } from './image'
 import { escapeCloses } from './keyboard'
-import { MentionField, type MentionSuggestion } from './MentionField'
+import { type MentionSuggestion, useMentionField } from './MentionField'
 import { Notice, type NoticeAction } from './Notice'
 import { Text } from './Text'
 import type { TextFieldInput } from './TextField'
 import { useTapGuard } from './tapGuard'
+import { useLayout } from './theme/layout'
 
-/** Ce que dit le bandeau au-dessus du champ : à qui l'on répond, ou que l'on modifie ; sinon rien. */
-export type CommentBanner = { kind: 'reply'; name: string } | { kind: 'edit' } | null
+/**
+ * Ce que dit le bandeau au-dessus du champ : à qui l'on répond, ou que l'on modifie ; sinon rien.
+ * `excerpt` : le début du commentaire visé, à rappeler quand sa carte a pu sortir de l'écran (la
+ * colonne d'un ordinateur, décision 17). Sans lui, « Réponse à Léa Moreau » seul.
+ */
+export type CommentBanner =
+  | { kind: 'reply'; name: string; excerpt?: string | undefined }
+  | { kind: 'edit' }
+  | null
 
 type Props = {
   value: string
@@ -67,6 +75,44 @@ type Props = {
 
 /** La taille de la photo, en points : plus petite que la rangée d'un champ d'une ligne (44). */
 const PHOTO_SIZE = 36
+
+/**
+ * Dans la colonne, la largeur de base de la photo et du champ : 180 points de texte (« Écrire un
+ * commentaire » y tient sur une ligne), plus les marges du champ. Si « Envoyer » ne tient plus à côté,
+ * il passe dessous (relecture design, des-C5 : 83 points à 1000, « commentair/e » coupé).
+ */
+const FIELD_BASIS = PHOTO_SIZE + space.sm + 180 + 2 * space.lg
+
+/** La fenêtre la plus étroite qui garde la photo en mode réponse (décision 20). */
+const REPLY_PHOTO_FROM = 360
+
+/** La place gardée à l'extrait, à côté du nom : en dessous, il passe à la ligne, le nom reste entier. */
+const EXCERPT_MIN = 64
+
+/**
+ * La liste des membres, dans la feuille, ne sort jamais le champ de l'écran : elle laisse l'en-tête de
+ * la feuille (143) et le reste du pied, légende courte comprise (161) ; elle garde de quoi lire un
+ * membre sous son titre, et défile au-delà.
+ */
+const MENTION_LIST_ROOM = 304
+const MENTION_LIST_MIN = 88
+
+/** Sous cette hauteur, la fenêtre est basse : la légende doit laisser sa place à la liste. */
+const LOW_WINDOW_BELOW = 600
+
+/**
+ * Hook : la feuille manque-t-elle de hauteur ? Le champ y est collé en bas et chaque ligne de légende
+ * est prise à la liste : l'écran choisit alors la phrase courte (décision 19). 600 points : le paysage
+ * (844 × 390) et une fenêtre web réduite par le clavier (390 × 508 ou 562) en sont ; un téléphone tenu
+ * en hauteur, à partir de 667 points, garde la phrase entière. Dans la colonne d'un ordinateur, le
+ * champ défile avec la page : la légende n'y retire rien à personne.
+ *
+ * La hauteur vaut 0 avant l'hydratation (web) : pas basse, comme le pré-rendu.
+ */
+export const useLowWindow = () => {
+  const { columns, height } = useLayout()
+  return !columns && height > 0 && height < LOW_WINDOW_BELOW
+}
 
 /** Les icônes du bandeau : la flèche de « Répondre », le crayon de « Modifier ». */
 const BANNER_ICON: Record<'reply' | 'edit', IconName> = {
@@ -105,9 +151,8 @@ export function CommentComposer({
   inputRef,
 }: Props) {
   const { t } = useTranslation()
+  const { width, height } = useLayout()
   const input = useRef<TextFieldInput>(null)
-  // La même saisie, partagée avec l'écran (useImperativeHandle : ce que voit la `ref` du parent).
-  useImperativeHandle(inputRef, () => input.current as TextFieldInput)
   const sendControl = useRef<View>(null)
   // useTapGuard : une `ref`, car la seconde tape arrive avant que l'écran ait pu passer `pending`.
   const guard = useTapGuard()
@@ -167,7 +212,9 @@ export function CommentComposer({
         ? t(($) => $.project.comments.editing)
         : ''
   // Le focus arrive dans le champ quand on touche « Répondre » : le lecteur d'écran y lit à qui l'on
-  // répond, puis qui lira, sans région vivante de plus (voir `describedElsewhere` de TextField).
+  // répond, puis qui lira, sans région vivante de plus (voir `describedElsewhere` de TextField). Pas
+  // l'extrait : la description d'un champ ne se coupe pas, il lirait jusqu'à 80 caractères à chaque
+  // arrivée, alors que l'extrait se lit à sa place, avant le champ.
   const describedElsewhere = {
     ids: [banner ? bannerId : null, tooLong ? tooLongId : null, captionId]
       .filter(Boolean)
@@ -175,16 +222,62 @@ export function CommentComposer({
     spoken: [bannerText, tooLong, caption].filter(Boolean).join(' '),
   }
 
+  // La saisie et la liste des membres sont posées séparément : la liste prend toute la largeur du
+  // composant, au-dessus du bandeau (planche `R5b-Repondre`), la saisie reste dans sa rangée. Quand elle
+  // grandit, le champ, collé au bas de la feuille, ne bouge pas sous le doigt.
+  const { field, list } = useMentionField({
+    // Échap referme le bandeau, comme la croix (web), sauf pendant l'envoi. Sans bandeau, elle
+    // fait ce qu'elle fait d'habitude. (Avec une liste de membres, elle la referme d'abord.)
+    ...(banner ? escapeCloses(cancelBanner, pending) : null),
+    inputRef: input,
+    label: t(($) => $.project.comments.add),
+    placeholder: t(($) => $.project.comments.add),
+    value,
+    onChangeText,
+    compact: true,
+    multiline: true,
+    maxLines: 5,
+    limit: COMMENT_MAX,
+    countFrom: COMMENT_COUNTER_FROM,
+    invalid: over > 0,
+    describedElsewhere,
+    autoCapitalize: 'sentences',
+    editable: !pending,
+    suggestions,
+    suggestionsFor,
+    suggestionsLabel: t(($) => $.mentions.suggestions),
+    suggestionsTitle: t(($) => $.mentions.title),
+    ...(place === 'sheet'
+      ? { suggestionsMaxHeight: Math.max(MENTION_LIST_MIN, height - MENTION_LIST_ROOM) }
+      : null),
+    onQueryChange,
+  })
+  // La même saisie, partagée avec l'écran (useImperativeHandle : ce que voit la `ref` du parent). Après
+  // `useMentionField`, qui remplit `input` : dans un composant, ces poignées se posent dans l'ordre.
+  useImperativeHandle(inputRef, () => input.current as TextFieldInput)
+
+  // En mode réponse, sous 360 points, la photo laisse sa place au champ (décision 20). Son emplacement
+  // reste réservé dans l'arbre (`null`) : la saisie ne se remonte pas, et garde le focus.
+  const showPhoto = !(banner?.kind === 'reply' && width < REPLY_PHOTO_FROM)
+
   return (
     <View style={{ gap: space.sm }}>
+      {list}
       {banner ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           <Icon name={BANNER_ICON[banner.kind]} size={18} tone="muted" />
           {/* minWidth 0 : un nom long passe à la ligne au lieu de pousser la croix hors de l'écran. */}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text nativeID={bannerId} variant="callout" tone="secondary">
-              <BannerWords text={bannerText} name={banner.kind === 'reply' ? banner.name : null} />
-            </Text>
+            {banner.kind === 'reply' && banner.excerpt ? (
+              <BannerWithExcerpt id={bannerId} name={banner.name} excerpt={banner.excerpt} />
+            ) : (
+              <Text nativeID={bannerId} variant="callout" tone="secondary">
+                <BannerWords
+                  text={bannerText}
+                  name={banner.kind === 'reply' ? banner.name : null}
+                />
+              </Text>
+            )}
           </View>
           <IconButton
             icon="x"
@@ -214,40 +307,38 @@ export function CommentComposer({
         />
       ) : null}
       {/* En bas : quand le champ grandit, ses voisins ne bougent pas sous le doigt (le champ est collé
-          au bas de la feuille, il grandit vers le haut). */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm }}>
-        {/* La photo est un décor : son nom n'apporte rien à qui écrit. Dans une boîte haute d'une
-            ligne de champ, pour rester centrée sur lui quand il n'a qu'une ligne. */}
-        <View aria-hidden style={{ height: layout.touchTarget, justifyContent: 'center' }}>
-          <Avatar name={memberName} source={avatar} label={memberName} size={PHOTO_SIZE} />
-        </View>
-        {/* minWidth 0 : sans lui, un champ du navigateur déborde de la rangée à texte agrandi. */}
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <MentionField
-            // Échap referme le bandeau, comme la croix (web), sauf pendant l'envoi. Sans bandeau, elle
-            // fait ce qu'elle fait d'habitude. (Avec une liste de membres, elle la referme d'abord.)
-            {...(banner ? escapeCloses(cancelBanner, pending) : null)}
-            inputRef={input}
-            label={t(($) => $.project.comments.add)}
-            placeholder={t(($) => $.project.comments.add)}
-            value={value}
-            onChangeText={onChangeText}
-            compact
-            multiline
-            maxLines={5}
-            limit={COMMENT_MAX}
-            countFrom={COMMENT_COUNTER_FROM}
-            invalid={over > 0}
-            describedElsewhere={describedElsewhere}
-            autoCapitalize="sentences"
-            editable={!pending}
-            suggestions={suggestions}
-            suggestionsFor={suggestionsFor}
-            suggestionsLabel={t(($) => $.mentions.suggestions)}
-            suggestionsPlacement="above"
-            suggestionsTitle={t(($) => $.mentions.title)}
-            onQueryChange={onQueryChange}
-          />
+          au bas de la feuille, il grandit vers le haut). Dans la colonne, la rangée peut passer à la
+          ligne : « Envoyer » va dessous, à droite, plutôt que de serrer le champ. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: space.sm,
+          ...(place === 'column' ? { flexWrap: 'wrap', justifyContent: 'flex-end' } : null),
+        }}
+      >
+        {/* La photo et le champ, d'un seul bloc. Pas `flex: 1` dans la colonne : sa base nulle ne
+            ferait jamais passer le bouton à la ligne. minWidth 0 : sans lui, un champ du navigateur
+            déborde de la rangée à texte agrandi. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: space.sm,
+            minWidth: 0,
+            ...(place === 'column'
+              ? { flexGrow: 1, flexShrink: 1, flexBasis: FIELD_BASIS, maxWidth: '100%' }
+              : { flex: 1 }),
+          }}
+        >
+          {/* La photo est un décor : son nom n'apporte rien à qui écrit. Dans une boîte haute d'une
+              ligne de champ, pour rester centrée sur lui quand il n'a qu'une ligne. */}
+          {showPhoto ? (
+            <View aria-hidden style={{ height: layout.touchTarget, justifyContent: 'center' }}>
+              <Avatar name={memberName} source={avatar} label={memberName} size={PHOTO_SIZE} />
+            </View>
+          ) : null}
+          <View style={{ flex: 1, minWidth: 0 }}>{field}</View>
         </View>
         {place === 'sheet' ? (
           <IconButton
@@ -290,6 +381,32 @@ export function CommentComposer({
         </View>
         <Text nativeID={captionId} variant="caption" tone="muted">
           {caption}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+/**
+ * Le bandeau avec l'extrait du commentaire visé : « Réponse à **Léa Moreau** : « Revanche dim… ». La
+ * phrase vient d'une seule clé, coupée après le nom : le nom d'un côté, jamais coupé par « … » (décision
+ * du 1/11 : il prend 2 lignes s'il le faut), et lu dans la description du champ (`id`) ; l'extrait de
+ * l'autre, sur une ligne, dans la place qui reste. Si le nom la prend toute, l'extrait passe dessous.
+ */
+function BannerWithExcerpt({ id, name, excerpt }: { id: string; name: string; excerpt: string }) {
+  const { t } = useTranslation()
+  const text = t(($) => $.project.comments.replyToExcerpt, { name, excerpt })
+  const end = text.indexOf(name) + name.length
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline' }}>
+      <View style={{ flexShrink: 1, maxWidth: '100%' }}>
+        <Text nativeID={id} variant="callout" tone="secondary">
+          <BannerWords text={text.slice(0, end)} name={name} />
+        </Text>
+      </View>
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: EXCERPT_MIN }}>
+        <Text variant="callout" tone="secondary" numberOfLines={1}>
+          {text.slice(end)}
         </Text>
       </View>
     </View>
