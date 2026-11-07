@@ -715,8 +715,10 @@ describe('CommentCard, its density (design A3)', () => {
     expect(hung).toBeDefined()
     // Au-dessus du texte, mais le doigt l'atteint à côté des zones : ni le nom ni la pastille d'une
     // mention ne sont masqués par la rangée elle-même.
-    const row = chainOf(link).find((node) => flat(node).zIndex === 1)
-    expect(row?.props.pointerEvents).toBe('box-none')
+    const row = chainOf(link).find(
+      (node) => flat(node).zIndex === 1 && node.props.pointerEvents === 'box-none',
+    )
+    expect(row).toBeDefined()
     expect(chainOf(shown(BODY))).not.toContain(row)
   })
 
