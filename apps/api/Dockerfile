@@ -10,7 +10,7 @@
 # changeant l'empreinte (Renovate le propose, voir docs/ops/serveur.md, « Mises à jour »).
 
 # --- Étape 1 : construction ---
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
+FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS build
 WORKDIR /repo
 RUN corepack enable
 
@@ -41,7 +41,7 @@ RUN pnpm --filter @ruche/api-runtime deploy --prod --offline \
 
 # --- Étape 2 : exécution ---
 # On repart d'une image vide : ni code source, ni outils de build, ni dépendances de dev.
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8
 WORKDIR /app
 ENV NODE_ENV=production
 # Les migrations SQL (création et évolution des tables) sont appliquées au démarrage.
