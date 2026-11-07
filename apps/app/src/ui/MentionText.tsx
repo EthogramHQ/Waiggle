@@ -82,6 +82,9 @@ export function MentionText({ text, mentions, onMemberPress, numberOfLines }: Pr
     color: colors.text,
     fontFamily: fontName('text', 600),
     ...pillShape,
+    // Quand le navigateur l'amène en vue (Tab), il garde cet air autour d'elle : collée au bord d'une
+    // liste, son anneau de focus serait coupé. Cette propriété CSS manque aux types de React Native.
+    ...(Platform.OS === 'web' ? ({ scrollMargin: space.md } as TextStyle) : null),
   }
   return (
     // Texte brut ; selectable : on peut le copier. Un mot très long (une adresse) se coupe au lieu

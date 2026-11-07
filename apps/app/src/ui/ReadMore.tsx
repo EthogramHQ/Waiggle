@@ -129,9 +129,9 @@ export function ReadMore({ lines = 10, children, hint, initiallyExpanded = false
   // de sa ligne, sans être cachée.
   //
   // À l'image suivante, pas dans l'événement : le navigateur fait défiler jusqu'à l'élément juste après
-  // l'avoir prévenu. Une page qui change de hauteur à cet instant le fait défiler trop loin (dans la
-  // feuille à 390 points : 1038 au lieu de 530, et la pastille finissait au-dessus de l'écran). Une
-  // image plus tard, on vérifie qu'elle est bien en vue.
+  // l'avoir prévenu, et il vise trop loin pour un élément pris dans un texte replié (mesuré dans la
+  // feuille à 390 points : la pastille finissait au-dessus de l'écran, y = -104). Le texte déplié, une
+  // image plus tard, elle est ramenée en vue, sans saut si elle y est déjà.
   const unfoldForFocus = ({ target, currentTarget }: FocusEvent) => {
     if (!folded || !overflows) return
     const bottom = target?.getBoundingClientRect?.().bottom

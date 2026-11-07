@@ -2,10 +2,12 @@
 // pastille de mention sous le pli est un arrêt de Tab : le texte se déplie quand le focus l'atteint,
 // au lieu de garder un focus invisible. Le navigateur, lui, ne fait plus défiler un cadre : les copies
 // mesurées sont rognées par leur propre couche (l'essai dans le navigateur mesure `scrollTop`).
+import { space } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { createRef } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { renderWithProviders as render } from '../testing/render'
+import { MentionText } from './MentionText'
 import { ReadMore } from './ReadMore'
 import { Text } from './Text'
 
@@ -100,6 +102,24 @@ describe('ReadMore, the focus inside a folded text (web)', () => {
         hosts(node).some((inner) => inner.props.children === LONG),
     )
     expect(clipped).toEqual([])
+  })
+})
+
+describe('MentionText, a pill brought into view (web)', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it('keeps some air around it, so that the edge of a list does not cut its focus ring', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await render(
+      <MentionText
+        text="@hugo merci"
+        mentions={[{ handle: 'hugo', memberId: 'u7', name: 'Hugo Lefèvre' }]}
+        onMemberPress={() => {}}
+      />,
+    )
+
+    const pill = screen.getByRole('link', { name: 'Hugo Lefèvre, ouvre son profil' })
+    expect(StyleSheet.flatten(pill.props.style)).toMatchObject({ scrollMargin: space.md })
   })
 })
 
