@@ -14,10 +14,11 @@ import { MENTIONS_MAX } from './mentions'
 
 const rootId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const replyId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
-const lea = { id: 'lea-id', name: 'Léa', avatarUrl: null }
+const lea = { id: 'lea-id', name: 'Léa', handle: 'lea', avatarUrl: null }
 const sam = {
   id: 'sam-id',
   name: 'Sam',
+  handle: null,
   avatarUrl: 'https://api.example.com/media/avatars/sam.webp',
 }
 
@@ -82,7 +83,7 @@ describe('Comment', () => {
     state: 'visible',
     isMine: false,
     // Les mentions (tranche 6b) : Sam y désigne Léa par son pseudo.
-    mentions: [{ handle: 'lea', memberId: 'lea-id' }],
+    mentions: [{ handle: 'lea', memberId: 'lea-id', name: 'Léa' }],
     removal: null,
     replies: [reply],
   }
@@ -96,6 +97,18 @@ describe('Comment', () => {
       const placeholder = { ...root, author: null, body: '', state, mentions: [] }
       expect(Comment.parse(placeholder)).toEqual(placeholder)
     }
+  })
+
+  // R5b : l'auteur porte son pseudo actuel (« Répondre » sous une réponse préremplit sa mention),
+  // ou null quand il ne doit pas sortir : un commentaire lu malgré un blocage (sec-B1, jur-P5).
+  it('gives the author handle of a root and of a reply, or null, but never leaves it out', () => {
+    expect(Comment.parse(root).replies[0]?.author?.handle).toBe('lea')
+    expect(Comment.parse(root).author?.handle).toBeNull()
+    const { handle: _omitted, ...withoutHandle } = lea
+    expect(Comment.safeParse({ ...root, author: withoutHandle }).success).toBe(false)
+    expect(
+      Comment.safeParse({ ...root, replies: [{ ...reply, author: withoutHandle }] }).success,
+    ).toBe(false)
   })
 
   it('refuses an unknown state', () => {
@@ -121,6 +134,7 @@ describe('Comment', () => {
     const mentions = Array.from({ length: MENTIONS_MAX + 1 }, (_, i) => ({
       handle: `membre${i}`,
       memberId: `member-${i}`,
+      name: `Membre ${i}`,
     }))
     expect(Comment.safeParse({ ...root, mentions: mentions.slice(0, -1) }).success).toBe(true)
     expect(Comment.safeParse({ ...root, mentions }).success).toBe(false)

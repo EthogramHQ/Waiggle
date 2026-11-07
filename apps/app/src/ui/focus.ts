@@ -3,7 +3,7 @@
 // va sur un voisin logique au lieu de retomber tout en haut de la page, et la page reste où elle est
 // (preventScroll), là où la personne lisait. Sur téléphone, il n'y a pas de clavier à suivre : rien.
 // À l'inverse, revealWithoutJump fait venir dans l'écran un élément qui vient de s'ouvrir hors de vue.
-import { Platform, type View } from 'react-native'
+import { AccessibilityInfo, Platform, type View } from 'react-native'
 
 /**
  * Ce qu'un écran garde dans une ref pour y poser le focus plus tard (un Button, un TextLink) : les
@@ -90,6 +90,16 @@ export const holdsFocus = (node: unknown): boolean => {
   if (Platform.OS !== 'web' || !node) return false
   const active = (globalThis as { document?: { activeElement?: unknown } }).document?.activeElement
   return Boolean(active && (node as WebPlace).contains?.(active))
+}
+
+/**
+ * Sur téléphone, amène le lecteur d'écran (VoiceOver, TalkBack) sur `node` : il n'a pas de focus du
+ * clavier, et repartirait du haut de l'écran quand l'élément qu'il lisait disparaît. Rien sur le web.
+ */
+export const moveReaderTo = (node: unknown) => {
+  if (Platform.OS !== 'web' && node) {
+    AccessibilityInfo.sendAccessibilityEvent(node as View, 'focus')
+  }
 }
 
 /** Focalise `node` (une ref de View ou de Pressable) sans défilement. Vrai si c'était possible. */

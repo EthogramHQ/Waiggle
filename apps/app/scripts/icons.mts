@@ -22,6 +22,7 @@ const icons = [
   'squares-four',
   'arrow-left',
   'arrow-right',
+  'arrow-up', // le bouton rond d'envoi d'un commentaire (R5b)
   'arrow-up-right',
   'arrow-square-out',
   'arrow-bend-up-left',

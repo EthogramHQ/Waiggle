@@ -16,19 +16,41 @@
 // Relecture de l'interface (R2) : le voile a la garde de double tape de Dialog ; `busy` refuse
 // toute fermeture pendant une action qui ne s'arrête plus ; Échap ne ferme qu'une fois ; sur iOS,
 // le clavier ne cache plus le pied collé.
-import { borders, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, type Ref, useEffect, useId, useRef } from 'react'
+//
+// Tranche R5b (la feuille des commentaires), pour toutes les feuilles :
+// - un titre avec son nombre (`titleCount`, « Commentaires 6 »), lu « Commentaires, 6 commentaires » ;
+// - `initialFocusRef` : le focus arrive où la feuille l'attend (le champ de « Écrire un
+//   commentaire »), au lieu de « Fermer » ;
+// - Échap et Tab ne sont pris que s'ils viennent du panneau et n'ont pas déjà servi (la liste des
+//   mentions, un menu, une confirmation ouverts dedans les gardent pour eux) ;
+// - « Réduire les animations » : la feuille de téléphone paraît par un fondu, sans monter ;
+// - on la ferme aussi en la glissant vers le bas par sa tête (décision D1 de Louis), sauf pendant
+//   une action en cours (`busy`).
+import { borders, durations, layout, radii, space } from '@ruche/brand'
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
+  type PanResponderGestureState,
   Platform,
   Pressable,
   ScrollView,
   useWindowDimensions,
   View,
 } from 'react-native'
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { CountedTitle } from './CountedTitle'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { Notice } from './Notice'
@@ -36,10 +58,18 @@ import { Surface } from './Surface'
 import { Text } from './Text'
 import { holdPageTaps, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
+import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
 type PanelProps = {
   title: string
+  /**
+   * Un nombre après le titre (« Commentaires 6 », R5b), dessiné par CountedTitle, une espace
+   * ordinaire entre les deux : à 200 % de texte, le nombre passe entier à la ligne. `spoken` est ce
+   * nombre en toutes lettres (« 6 commentaires ») : la feuille se lit « Commentaires, 6 commentaires ».
+   * Avec 0, le titre seul.
+   */
+  titleCount?: { count: number; spoken: string }
   /** Une phrase sous le titre (« Voici ce qui disparaît avec lui. »). */
   subtitle?: string
   children: ReactNode
@@ -107,6 +137,11 @@ type PanelProps = {
    * hauteur.
    */
   compact?: boolean
+  /**
+   * Pour Sheet, sur téléphone : ce qui fait suivre le doigt à la tête de la feuille (la poignée,
+   * « Fermer » et le titre), pour la glisser vers le bas.
+   */
+  dragHandlers?: object
 }
 
 /** Le message du pied d'une feuille : son texte, son ton, et s'il coupe la parole (alerte) ou non. */
@@ -118,9 +153,15 @@ export type SheetNotice = {
 
 type Props = Omit<
   PanelProps,
-  'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys' | 'titleId'
+  'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys' | 'titleId' | 'dragHandlers'
 > & {
   open: boolean
+  /**
+   * Où poser le focus à l'ouverture (le champ, pour « Écrire un commentaire ») ; sans lui, ou s'il
+   * n'est pas encore là, « Fermer ». Sur le web, sans défilement ; sur téléphone, une fois la
+   * feuille montée (le clavier s'ouvre alors avec elle).
+   */
+  initialFocusRef?: RefObject<{ focus: () => void } | null>
 }
 
 type KeyEvent = {
@@ -128,6 +169,23 @@ type KeyEvent = {
   shiftKey?: boolean
   repeat?: boolean
   preventDefault: () => void
+  /** Déjà prise plus bas (un champ, une liste) : l'événement de React, puis celui du navigateur. */
+  defaultPrevented?: boolean
+  isDefaultPrevented?: () => boolean
+  /** L'élément d'où vient la touche (web). */
+  target?: unknown
+  nativeEvent?: { defaultPrevented?: boolean; target?: unknown }
+}
+
+/** Le peu d'une touche du navigateur que la feuille relit au relâchement d'Échap. */
+type BrowserKey = { key?: string; defaultPrevented?: boolean }
+type WebDocument = {
+  addEventListener?: (type: string, listener: (event: BrowserKey) => void, capture: boolean) => void
+  removeEventListener?: (
+    type: string,
+    listener: (event: BrowserKey) => void,
+    capture: boolean,
+  ) => void
 }
 
 // Le peu du navigateur dont Tab a besoin : les éléments de la feuille qu'on peut atteindre, dans
@@ -157,11 +215,37 @@ const ASIDE_GAP = space.xxl
 /** La largeur de fenêtre qu'il faut pour poser la colonne à côté du panneau. */
 const ASIDE_ROOM = layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
 
-export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
+// Le glisser vers le bas (téléphone, D1). Le doigt doit d'abord descendre de quelques points pour
+// que la feuille le suive : une tape sur « Fermer », un peu tremblée, reste une tape. Au lâcher, la
+// feuille se ferme si elle a assez descendu, ou si le doigt filait vers le bas ; sinon elle remonte.
+// Les 8 points d'un geste hésitant ne ferment rien.
+/** Ce que le doigt descend avant que la feuille le suive (points). */
+const DRAG_SLOP = 6
+/** Une descente de plus que cela ferme la feuille (points). */
+const DRAG_CLOSE_DISTANCE = 120
+/** Un doigt qui file vers le bas plus vite que cela (points par milliseconde)… */
+const DRAG_CLOSE_SPEED = 0.5
+/** … ferme aussi, passé ces quelques points (un lancer). */
+const DRAG_FLICK_MIN = 24
+
+/** Le geste a-t-il fini assez bas, ou assez vite, pour fermer la feuille ? */
+const dragCloses = ({ dy, vy }: Pick<PanResponderGestureState, 'dy' | 'vy'>) =>
+  dy > DRAG_CLOSE_DISTANCE || (vy > DRAG_CLOSE_SPEED && dy > DRAG_FLICK_MIN)
+
+/** La touche a-t-elle déjà servi plus bas (la liste des mentions qui se ferme, un menu) ? */
+const alreadyHandled = (event: KeyEvent) =>
+  event.defaultPrevented === true ||
+  event.isDefaultPrevented?.() === true ||
+  event.nativeEvent?.defaultPrevented === true
+
+export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...panel }: Props) {
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
   const phone = sizeClass === 'compact'
+  // « Réduire les animations » : la feuille de téléphone paraît par un fondu, au lieu de monter du
+  // bas de l'écran (un grand déplacement).
+  const calm = useCalmMotion()
   const closeRef = useRef<View>(null)
   const panelRef = useRef<View>(null)
   // L'élément qui avait le focus avant l'ouverture (le bouton d'origine) : il le retrouve à la
@@ -186,20 +270,50 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
     onClose()
   }
 
-  // useEffect : à l'ouverture (web), on retient qui avait le focus et on le pose sur « Fermer »,
-  // le premier élément de la feuille ; à la fermeture, on le rend. Le Modal de react-native-web
-  // fait de même de son côté : les deux gestes se recouvrent, sans se gêner.
+  // useEffect : à l'ouverture (web), on retient qui avait le focus et on le pose sur l'élément
+  // attendu (`initialFocusRef`, le champ d'un commentaire), sinon sur « Fermer », le premier
+  // élément de la feuille ; à la fermeture, on le rend. Le Modal de react-native-web pose d'abord
+  // le focus sur le premier élément (son effet passe avant celui-ci) : le nôtre arrive ensuite, au
+  // bon endroit, toujours dans la feuille.
   useEffect(() => {
     escapeHandled.current = false
     if (Platform.OS !== 'web') return
     if (open) {
       opener.current = activeElement()
-      focusWithoutScroll(closeRef.current)
+      const wanted = initialFocusRef?.current
+      if (!wanted || !focusWithoutScroll(wanted)) focusWithoutScroll(closeRef.current)
       return
     }
     const back = opener.current
     opener.current = null
     if (back) focusWithoutScroll(back)
+  }, [open, initialFocusRef])
+
+  // Sur téléphone (iOS, Android), le champ attendu reçoit le focus quand la feuille a fini de
+  // paraître (`onShow` du Modal) : plus tôt, la fenêtre n'existe pas encore, et le clavier ne
+  // s'ouvrirait pas.
+  const onShow =
+    Platform.OS !== 'web' && initialFocusRef
+      ? { onShow: () => initialFocusRef.current?.focus() }
+      : null
+
+  // La dernière Échap enfoncée, lue au relâchement (web). Un champ de react-native-web arrête la
+  // touche enfoncée avant qu'elle n'atteigne la feuille (`stopPropagation`) : la liste des mentions
+  // qui s'y ferme sur Échap, la feuille ne le voit pas. Mais la touche relâchée arrive au Modal, qui
+  // fermait la feuille avec la liste. On écoute donc la touche enfoncée sur le document, à la
+  // descente (`capture`, avant le champ), et on garde l'événement : au relâchement, il dit si
+  // quelqu'un l'a déjà prise (`defaultPrevented`, posé entre-temps par le champ).
+  const lastEscape = useRef<BrowserKey | null>(null)
+  useEffect(() => {
+    lastEscape.current = null
+    if (!open || Platform.OS !== 'web') return
+    const page = (globalThis as { document?: WebDocument }).document
+    if (!page?.addEventListener) return
+    const note = (event: BrowserKey) => {
+      if (event.key === 'Escape') lastEscape.current = event
+    }
+    page.addEventListener('keydown', note, true)
+    return () => page.removeEventListener?.('keydown', note, true)
   }, [open])
 
   // Tab (web) : le focus tourne dans la feuille. Après le dernier élément, le premier ; avant le
@@ -234,12 +348,34 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
     nodes[next]?.focus()
   }
 
+  // La touche vient-elle du panneau de la feuille ? Un menu « … » ou une confirmation ouverts
+  // par-dessus sont d'autres couches de la page (d'autres Modal), mais leurs touches remontent
+  // l'arbre de React jusqu'ici : sans ce test, Échap dans le menu fermait aussi la feuille, et Tab
+  // y était ramené dans la feuille. `contains` est celui du navigateur ; sans lui (téléphone), ou
+  // sans élément d'origine, la touche est à la feuille.
+  const fromPanel = (event: KeyEvent) => {
+    const panelNode = panelRef.current as unknown as {
+      contains?: (node: unknown) => boolean
+    } | null
+    const origin = event.target ?? event.nativeEvent?.target
+    if (typeof panelNode?.contains !== 'function' || origin == null) return true
+    return panelNode.contains(origin)
+  }
+
   // Les touches de la feuille (web) : Échap ferme, Tab reste dedans. Les touches montent depuis
-  // l'élément qui a le focus jusqu'à la feuille.
+  // l'élément qui a le focus jusqu'à la feuille ; seules les siennes comptent, et pas celles qu'un
+  // élément dedans a déjà prises (la liste des mentions, fermée par Échap : ui-B1 de R5b).
   const keys =
     Platform.OS === 'web'
       ? {
           onKeyDown: (event: KeyEvent) => {
+            if (event.key !== 'Escape' && event.key !== 'Tab') return
+            if (!fromPanel(event)) return
+            if (alreadyHandled(event)) {
+              // La touche relâchée, qui suit, n'est pas non plus pour la feuille.
+              if (event.key === 'Escape') escapeHandled.current = true
+              return
+            }
             if (event.key === 'Escape') {
               event.preventDefault()
               // La touche relâchée arrivera aussi au Modal : elle est déjà prise en compte.
@@ -272,14 +408,75 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
       }
 
   // Le Modal appelle onRequestClose au retour d'Android, et sur le web quand Échap est relâchée.
-  // Une Échap déjà prise par la feuille (touche enfoncée) n'y compte pas une seconde fois.
+  // Une Échap déjà prise par la feuille (touche enfoncée) n'y compte pas une seconde fois, ni une
+  // Échap qu'un élément de la feuille a gardée pour lui (la liste des mentions).
   const onRequestClose = () => {
+    const pressed = lastEscape.current
+    lastEscape.current = null
     if (escapeHandled.current) {
       escapeHandled.current = false
       return
     }
+    if (pressed?.defaultPrevented === true) return
     requestClose()
   }
+
+  // Le glisser vers le bas (téléphone, D1). useSharedValue : une valeur que Reanimated lit sur le
+  // fil des animations ; la feuille descend avec le doigt (`translateY`), sans repasser par React.
+  const offset = useSharedValue(0)
+  const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
+  // Le geste est créé une fois (PanResponder, plus bas) : il lit ici l'état du moment (`busy`
+  // change pendant un envoi, la fermeture et la hauteur de la fenêtre aussi).
+  const now = useRef({ busy, open, calm, close: requestClose, height: window.height })
+  now.current = { busy, open, calm, close: requestClose, height: window.height }
+  // Après une fermeture demandée par le geste, si la feuille est encore ouverte un moment plus
+  // tard (la fermeture n'a pas eu lieu), elle remonte : jamais une feuille ouverte hors de l'écran.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current)
+    },
+    [],
+  )
+  // useLayoutEffect : avant que la feuille ne soit dessinée, elle repart de sa place (elle a pu se
+  // fermer glissée à mi-hauteur).
+  useLayoutEffect(() => {
+    if (open) offset.value = 0
+  }, [open, offset])
+
+  // PanResponder : le système de réponse au toucher de React Native. La tête de la feuille demande
+  // le doigt dès qu'il descend franchement (à la descente, `Capture`, avant « Fermer » qu'il a pu
+  // toucher en premier) ; elle suit alors le doigt, puis, au lâcher, se ferme ou remonte.
+  const drag = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+        !now.current.busy && gesture.dy > DRAG_SLOP && gesture.dy > Math.abs(gesture.dx),
+      onPanResponderMove: (_event, gesture) => {
+        // Pendant une action en cours, la feuille ne bouge pas : un glissement ne ferme rien.
+        if (now.current.busy) return
+        offset.value = Math.max(0, gesture.dy)
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const state = now.current
+        if (state.busy || !dragCloses(gesture)) {
+          offset.value = spring(0)
+          return
+        }
+        // La feuille continue de descendre, et se ferme. Avec « Réduire les animations », elle
+        // reste où le doigt l'a laissée, et la couche disparaît par son fondu.
+        if (!state.calm) offset.value = withTiming(state.height, { duration: durations.quick })
+        state.close()
+        if (settleTimer.current) clearTimeout(settleTimer.current)
+        settleTimer.current = setTimeout(() => {
+          if (now.current.open) offset.value = spring(0)
+        }, durations.slow)
+      },
+      // Un autre geste a pris le doigt (le système, un défilement) : la feuille remonte.
+      onPanResponderTerminate: () => {
+        offset.value = spring(0)
+      },
+    }),
+  ).current
 
   // Sur le web, le Modal de react-native-web est déjà une boîte de dialogue modale (`role="dialog"`,
   // `aria-modal`), sans nom : on le nomme par le titre, et la feuille ne s'en déclare pas une
@@ -289,12 +486,14 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
 
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap. Sur
-    // téléphone, la feuille glisse du bas ; sur ordinateur, le panneau paraît par un fondu.
+    // téléphone, la feuille glisse du bas (par un fondu avec « Réduire les animations ») ; sur
+    // ordinateur, le panneau paraît par un fondu.
     <Modal
       visible={open}
       transparent
-      animationType={phone ? 'slide' : 'fade'}
+      animationType={phone && !calm ? 'slide' : 'fade'}
       onRequestClose={onRequestClose}
+      {...onShow}
       {...named}
     >
       {/* KeyboardAvoidingView : sur iOS, la couche se raccourcit de la hauteur du clavier quand il
@@ -314,10 +513,11 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
             passer les clics) : cette couche couvre l'écran (téléphone) ou toute la largeur
             (ordinateur), et prenait pour elle les tapes posées à côté de la feuille ; elles
             n'arrivaient jamais au voile, et le focus partait sur la page (essai de R5a, feuille
-            Partager, 390 et 1280 px). Seule la feuille les reçoit, le reste va au voile. */}
-        <View
+            Partager, 390 et 1280 px). Seule la feuille les reçoit, le reste va au voile.
+            Sur téléphone, cette couche descend avec le doigt qui glisse la feuille (`dragStyle`). */}
+        <Animated.View
           pointerEvents="box-none"
-          style={
+          style={[
             phone
               ? { zIndex: 1, flex: 1, justifyContent: 'flex-end' }
               : {
@@ -334,8 +534,9 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
                   minHeight: 0,
                   maxHeight: '100%',
                   justifyContent: 'center',
-                }
-          }
+                },
+            phone ? dragStyle : null,
+          ]}
         >
           <SheetPanel
             {...panel}
@@ -349,8 +550,10 @@ export function Sheet({ open, onClose, aside, busy = false, ...panel }: Props) {
             panelRef={panelRef}
             keys={keys}
             {...(Platform.OS === 'web' ? { titleId } : null)}
+            // Sur ordinateur, le panneau centré ne se glisse pas : « Fermer », Échap et le voile.
+            {...(phone ? { dragHandlers: drag.panHandlers } : null)}
           />
-        </View>
+        </Animated.View>
         {/* Toucher le voile ferme la feuille, comme « Fermer ». Caché aux lecteurs d'écran (ils
             ont le bouton) et hors de la touche Tab. Pendant la garde, la seconde tape d'une
             double tape n'y fait rien ; pendant une action `busy`, aucune tape. */}
@@ -389,6 +592,8 @@ export function SheetPanel({
   busy = false,
   titleId: givenTitleId,
   compact = false,
+  titleCount,
+  dragHandlers,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -407,8 +612,28 @@ export function SheetPanel({
   // Le pied collé existe dès qu'il a des boutons ou un message à montrer.
   const pinned = Boolean(footer) || Boolean(notice)
 
+  // Le titre : seul, ou suivi de son nombre (« Commentaires 6 »). Le même identifiant le relie au
+  // nom de la boîte de dialogue, qui se lit alors avec le nombre en toutes lettres.
+  const titleNode = titleCount ? (
+    <CountedTitle
+      title={title}
+      count={titleCount.count}
+      spokenCount={titleCount.spoken}
+      separator="space"
+      level={heading}
+      nativeID={titleId}
+      {...(compact ? null : { variant: 'title2' as const })}
+    />
+  ) : (
+    <Text variant={compact ? 'heading' : 'title2'} heading={heading} nativeID={titleId}>
+      {title}
+    </Text>
+  )
+
   const header = (
-    <View style={{ gap: space.md }}>
+    // Sur téléphone, toute la tête de la feuille (poignée, « Fermer », titre) se saisit pour la
+    // glisser vers le bas (`dragHandlers`, donnés par Sheet).
+    <View style={{ gap: space.md }} {...dragHandlers}>
       {/* La rangée du haut a la hauteur du bouton « Fermer » (44) : il y tient entier, au lieu de
           déborder du coin arrondi de la feuille, et la poignée est centrée dans la même rangée. */}
       <View
@@ -458,9 +683,7 @@ export function SheetPanel({
         <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
           {/* Niveau 2 : la feuille s'ouvre par-dessus une page qui a déjà son titre ; niveau 1
               quand la feuille est toute la page. */}
-          <Text variant={compact ? 'heading' : 'title2'} heading={heading} nativeID={titleId}>
-            {title}
-          </Text>
+          {titleNode}
           {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
         </View>
         {decoration ? (

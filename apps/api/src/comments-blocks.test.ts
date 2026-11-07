@@ -72,7 +72,7 @@ describe('mentions and blocks', () => {
     expect(forZoe).toMatchObject({ body: `Merci @${maxHandle}`, mentions: [] })
     expect(JSON.stringify(forZoe)).not.toContain(maxId)
     const [forLea] = await readComments(project.id, lea)
-    expect(forLea?.mentions).toEqual([{ handle: maxHandle, memberId: maxId }])
+    expect(forLea?.mentions).toEqual([{ handle: maxHandle, memberId: maxId, name: 'Max' }])
   })
 
   // Règle 2 : la mention écrite avant le blocage reste en base, et une modification ne la retire
@@ -95,7 +95,7 @@ describe('mentions and blocks', () => {
     // Mais la mention reste : Zoé ne lit pas le commentaire (c'est elle qui a bloqué), Léa voit
     // toujours le lien.
     const [forLea] = await readComments(project.id, lea)
-    expect(forLea?.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId }])
+    expect(forLea?.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId, name: 'Zoé' }])
   })
 })
 
@@ -181,7 +181,7 @@ describe('a mention taken out by an edit', () => {
 
     // Réécrite, la mention revient, datée de cette modification, comme une mention nouvelle.
     const again = await edit(project.id, written.id, `Merci encore @${zoeHandle}`)
-    expect(again.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId }])
+    expect(again.mentions).toEqual([{ handle: zoeHandle, memberId: zoeId, name: 'Zoé' }])
     expect((await readComments(project.id, lea))[0]?.mentions).toEqual(again.mentions)
     expect((await zoeMentions()).map((n) => n.at)).toEqual([again.editedAt])
     expect(await runMentionEmails()).toHaveLength(1)

@@ -31,6 +31,8 @@ const ICON_SIZE = 20
 export type NoticeAction = {
   label: string
   onPress: () => void
+  /** `button` : une action sur place (« Réessayer »), annoncée comme telle ; un lien par défaut. */
+  role?: 'link' | 'button'
   /**
    * Le nom d'un groupe (« session ») : parmi les messages du même groupe affichés en même temps
    * sur un écran, seul le premier arrivé se montre. Deux actions refusées parce que la session a
@@ -224,7 +226,12 @@ export function Notice({ message, tone = 'error', polite = false, action, ref }:
     <View style={[frame, { paddingBottom: 0 }]}>
       {alert}
       <View style={{ paddingLeft: ICON_SIZE + space.sm, alignItems: 'flex-start' }}>
-        <TextLink label={action.label} onPress={action.onPress} tone={look.text} />
+        <TextLink
+          label={action.label}
+          onPress={action.onPress}
+          tone={look.text}
+          {...(action.role ? { role: action.role } : null)}
+        />
       </View>
     </View>
   )

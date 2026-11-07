@@ -4,7 +4,13 @@
 // du 22/10/2026). Fichier à part des ProjectScreen.*.test.tsx : il remplace la plateforme par le web.
 import { screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
-import { useComments, useDeleteComment, usePostComment } from '../comments/api'
+import {
+  useComments,
+  useDeleteComment,
+  useEditComment,
+  useHideComment,
+  usePostComment,
+} from '../comments/api'
 import { useFollow } from '../follows/api'
 import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getProject } from '../projects/api'
@@ -52,7 +58,9 @@ beforeEach(() => {
   jest.mocked(usePublishNote).mockReturnValue({ publish: jest.fn(), pending: false, error: false })
   jest.mocked(useDeleteNote).mockReturnValue({ remove: jest.fn(), error: false })
   jest.mocked(usePostComment).mockReturnValue({ post: jest.fn(), pending: false, error: false })
+  jest.mocked(useEditComment).mockReturnValue({ edit: jest.fn(), pending: false, error: false })
   jest.mocked(useDeleteComment).mockReturnValue({ remove: jest.fn(), error: false })
+  jest.mocked(useHideComment).mockReturnValue({ setHidden: jest.fn(), error: false })
   jest.mocked(useComments).mockReturnValue({
     data: { pages: [{ items: [], nextCursor: null }], pageParams: [undefined] },
     status: 'success',
@@ -76,7 +84,7 @@ describe('ProjectScreen headings', () => {
       await renderWithProviders(<ProjectScreen id={recipesProject.id} />)
       await screen.findByRole('header', { name: 'Mon agent de recettes' })
 
-      const tagNamed = (name: string) => tagOf(screen.getByRole('header', { name }).props)
+      const tagNamed = (name: string | RegExp) => tagOf(screen.getByRole('header', { name }).props)
       const tags = screen.getAllByRole('header').map((heading) => tagOf(heading.props))
 
       // Un seul titre de niveau 1 : celui du projet, le premier de la page.
@@ -84,7 +92,9 @@ describe('ProjectScreen headings', () => {
       expect(tags.filter((tag) => tag === 'h1')).toHaveLength(1)
       expect(tagNamed('Mon agent de recettes')).toBe('h1')
       expect(tagNamed('Description')).toBe('h2')
-      expect(tagNamed('Commentaires')).toBe('h2')
+      // Le titre lu peut porter son nombre (« Commentaires, 6 commentaires », R5b, ui-I3) : seul son
+      // niveau compte ici.
+      expect(tagNamed(/^Commentaires/)).toBe('h2')
       expect(tagNamed('La recette')).toBe('h2')
       // « ## Comment ça marche », écrit par le membre : sous la section « Description ».
       expect(tagNamed('Comment ça marche')).toBe('h3')

@@ -10,7 +10,6 @@ import { fr } from '../testing/text'
 import { Avatar } from './Avatar'
 import { Button } from './Button'
 import { Choices } from './Choices'
-import { CommentCard, type CommentCardHandle } from './CommentCard'
 import { CommentList } from './CommentList'
 import { CommentThread } from './CommentThread'
 import { CountBadge } from './CountBadge'
@@ -1378,91 +1377,6 @@ describe('TextLink', () => {
 
 // --- Tranche 5 : réagir et commenter ---
 
-describe('CommentCard', () => {
-  const card = {
-    author: { name: 'Max', avatar: null },
-    authorLabel: 'Voir la page de Max',
-    when: '15 oct.',
-    body: 'Super idée, je teste ce soir.',
-  }
-
-  it('shows its author, its date and its text exactly as written', async () => {
-    // Un commentaire est du texte brut : les astérisques et les balises restent des caractères.
-    const body = '**Bravo** : <b>ça marche</b>\nEt vite.'
-    await renderWithProviders(<CommentCard {...card} body={body} onAuthorPress={jest.fn()} />)
-
-    expect(screen.getByText(body)).toBeTruthy()
-    expect(screen.getByText('Max')).toBeTruthy()
-    expect(screen.getByText('15 oct.')).toBeTruthy()
-  })
-
-  it('leads to the page of its author', async () => {
-    const onAuthorPress = jest.fn()
-    await renderWithProviders(<CommentCard {...card} onAuthorPress={onAuthorPress} />)
-
-    await fireEvent.press(screen.getByRole('link', { name: 'Voir la page de Max' }))
-
-    expect(onAuthorPress).toHaveBeenCalledTimes(1)
-  })
-
-  it('says when it was edited', async () => {
-    await renderWithProviders(<CommentCard {...card} onAuthorPress={jest.fn()} edited="modifié" />)
-
-    expect(screen.getByText('modifié')).toBeTruthy()
-  })
-
-  it('offers the actions it is given, as buttons named after them', async () => {
-    const reply = jest.fn()
-    const remove = jest.fn()
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        onAuthorPress={jest.fn()}
-        actions={[
-          { label: 'Répondre', onPress: reply },
-          { label: 'Supprimer le commentaire', onPress: remove },
-        ]}
-      />,
-    )
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Répondre' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le commentaire' }))
-
-    expect(reply).toHaveBeenCalledTimes(1)
-    expect(remove).toHaveBeenCalledTimes(1)
-  })
-
-  it('offers no action when it is given none', async () => {
-    await renderWithProviders(<CommentCard {...card} onAuthorPress={jest.fn()} />)
-
-    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy() // témoin : la carte est là
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
-  })
-
-  it('shows the banner of a hidden comment, with its text, for the two authors', async () => {
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        onAuthorPress={jest.fn()}
-        hidden="Masqué par la personne qui a publié le projet"
-      />,
-    )
-
-    expect(screen.getByText('Masqué par la personne qui a publié le projet')).toBeTruthy()
-    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
-  })
-
-  it('shows only its placeholder when it has no author', async () => {
-    await renderWithProviders(
-      <CommentCard author={null} when="15 oct." body="" placeholder="Commentaire supprimé" />,
-    )
-
-    expect(screen.getByText('Commentaire supprimé')).toBeTruthy()
-    expect(screen.queryByRole('link')).toBeNull()
-    expect(screen.queryByText('Max')).toBeNull()
-  })
-})
-
 describe('CommentList', () => {
   const labels = { moreLabel: 'Afficher la suite', endLabel: 'C’est tout' }
 
@@ -1557,144 +1471,9 @@ const ancestorWithRole = (node: ReturnType<typeof screen.getByText>, role: strin
   return parent
 }
 
-describe('CommentCard, after the reviews', () => {
-  const card = {
-    author: { name: 'Max', avatar: null },
-    authorLabel: 'Voir la page de Max',
-    onAuthorPress: jest.fn(),
-    when: '15 oct.',
-    body: 'Super idée, je teste ce soir.',
-  }
-
-  it('shows the short text of an action, and gives it its full name', async () => {
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        actions={[{ label: 'Modifier le commentaire', text: 'Modifier', onPress: jest.fn() }]}
-      />,
-    )
-
-    const edit = screen.getByRole('button', { name: 'Modifier le commentaire' })
-    expect(edit).toHaveTextContent('Modifier')
-  })
-
-  it('tells screen readers which comment an action is about', async () => {
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        description="Max : Super idée, je teste ce soir."
-        actions={[{ label: 'Supprimer le commentaire', onPress: jest.fn() }]}
-      />,
-    )
-
-    // Sur téléphone, l'indice (sur le web : aria-describedby, vérifié dans --explore).
-    expect(screen.getByRole('button', { name: 'Supprimer le commentaire' })).toHaveProp(
-      'accessibilityHint',
-      'Max : Super idée, je teste ce soir.',
-    )
-  })
-
-  it('shows the field in place of the text and the actions while editing', async () => {
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        actions={[{ label: 'Modifier le commentaire', onPress: jest.fn() }]}
-        editor={<Text>Le champ de modification</Text>}
-      />,
-    )
-
-    expect(screen.getByText('Le champ de modification')).toBeTruthy()
-    expect(screen.queryByText('Super idée, je teste ce soir.')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Modifier le commentaire' })).toBeNull()
-    // Le nom de l'auteur reste : on sait quel commentaire on modifie.
-    expect(screen.getByRole('link', { name: 'Voir la page de Max' })).toBeTruthy()
-  })
-
-  it('keeps a busy action from acting twice, and says it is busy', async () => {
-    const hide = jest.fn()
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        actions={[{ label: 'Masquer le commentaire', pending: true, onPress: hide }]}
-      />,
-    )
-
-    const button = screen.getByRole('button', { name: 'Masquer le commentaire' })
-    expect(button).toBeBusy()
-    await fireEvent.press(button)
-    expect(hide).not.toHaveBeenCalled()
-  })
-
-  it('keeps the same button when « Masquer » becomes « Démasquer » and another action goes', async () => {
-    const actions = (hidden: boolean) => [
-      ...(hidden ? [] : [{ id: 'edit', label: 'Modifier le commentaire', onPress: jest.fn() }]),
-      {
-        id: 'hide',
-        label: hidden ? 'Démasquer le commentaire' : 'Masquer le commentaire',
-        onPress: jest.fn(),
-      },
-    ]
-    const view = await renderWithProviders(<CommentCard {...card} actions={actions(false)} />)
-    const before = screen.getByRole('button', { name: 'Masquer le commentaire' })
-
-    await view.rerender(<CommentCard {...card} actions={actions(true)} />)
-
-    // La même clé (« hide ») : React garde le bouton, qui garde le focus du clavier.
-    expect(screen.getByRole('button', { name: 'Démasquer le commentaire' })).toBe(before)
-  })
-
-  it('focuses an action only where there is a keyboard to follow (web)', async () => {
-    const handle = createRef<CommentCardHandle>()
-    await renderWithProviders(
-      <CommentCard
-        {...card}
-        handle={handle}
-        actions={[{ label: 'Modifier le commentaire', onPress: jest.fn() }]}
-      />,
-    )
-
-    // Sur téléphone, rien à faire : la poignée répond « non » sans erreur, même hors des actions.
-    expect(handle.current?.focusAction(0)).toBe(false)
-    expect(handle.current?.focusAction(5)).toBe(false)
-  })
-})
-
+// R5b : le « Répondre » unique au bout du fil et le champ de réponse à sa place sont retirés
+// (décisions B6 et choix 3 : « Répondre » sous chaque commentaire, le champ en bas de la feuille).
 describe('CommentThread, after the reviews', () => {
-  it('offers « Répondre » once, at the end of the thread, after the replies', async () => {
-    const reply = jest.fn()
-    await renderWithProviders(
-      <CommentThread
-        root={<Text>Le commentaire</Text>}
-        replies={[<Text key="a">Première réponse</Text>]}
-        replyAction={{ label: 'Répondre', description: 'Max : Le commentaire', onPress: reply }}
-      />,
-    )
-
-    const shown = screen.getAllByText(/^(Le commentaire|Première réponse|Répondre)$/)
-    expect(shown.map((node) => node.props.children)).toEqual([
-      'Le commentaire',
-      'Première réponse',
-      'Répondre',
-    ])
-    const button = screen.getByRole('button', { name: 'Répondre' })
-    expect(button).toHaveProp('accessibilityHint', 'Max : Le commentaire')
-    await fireEvent.press(button)
-    expect(reply).toHaveBeenCalledTimes(1)
-  })
-
-  it('puts the field of the reply in place of « Répondre »', async () => {
-    await renderWithProviders(
-      <CommentThread
-        root={<Text>Le commentaire</Text>}
-        replyAction={{ label: 'Répondre', onPress: jest.fn() }}
-        composer={<Text>Le champ de réponse</Text>}
-      />,
-    )
-
-    expect(screen.getByText('Le champ de réponse')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
-  })
-
   it('offers no « Répondre » when it is not given one', async () => {
     await renderWithProviders(<CommentThread root={<Text>Commentaire supprimé</Text>} />)
 
@@ -2213,41 +1992,6 @@ const removedBanner = {
     'Pour contester : contact@example.com',
   ],
 }
-
-describe('CommentCard, removed by the moderation', () => {
-  it('shows its author the banner of the removal, every sentence of it, and the text', async () => {
-    await renderWithProviders(
-      <CommentCard
-        author={{ name: 'Max', avatar: null }}
-        when="15 oct."
-        body="Super idée, je teste ce soir."
-        removed={removedBanner}
-      />,
-    )
-
-    expect(screen.getByText('Retiré par la modération')).toBeTruthy()
-    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
-    expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
-  })
-
-  it('shows the others only « Contenu retiré par la modération », without author or text', async () => {
-    await renderWithProviders(
-      <CommentCard
-        author={null}
-        when="15 oct."
-        body=""
-        placeholder="Contenu retiré par la modération"
-        removed={removedBanner}
-      />,
-    )
-
-    expect(screen.getByText('Contenu retiré par la modération')).toBeTruthy()
-    // Un emplacement n'a ni bandeau, ni lien, ni action, même si on lui en donne.
-    expect(screen.queryByText('Retiré par la modération')).toBeNull()
-    expect(screen.queryByRole('link')).toBeNull()
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
-  })
-})
 
 describe('NoteList, reporting and removed notes', () => {
   const notes = [

@@ -4,6 +4,7 @@
 // de ses images. Un fichier à part, avec ses propres textes : la section de la modération
 // (`moderation.tsx`) vit à côté, sans que deux personnes écrivent dans le même fichier.
 // Outil de développement : les exemples sont écrits ici, pas dans les traductions des membres.
+import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { CommentCard } from '../ui/CommentCard'
 import { NoteList } from '../ui/NoteList'
@@ -168,6 +169,32 @@ const en: typeof fr = {
   ],
 }
 
+/** Un commentaire tel que l'API le rend (R5b : la carte le reçoit entier). */
+const comment = (overrides: Partial<CommentReply> & { id: string }): CommentReply => ({
+  author: null,
+  body: '',
+  createdAt: '2026-10-18T09:00:00.000Z',
+  editedAt: null,
+  state: 'visible',
+  isMine: false,
+  mentions: [],
+  removal: null,
+  ...overrides,
+})
+
+/** Ce que les cartes d'exemple ont en commun : aucun masquage, rien à ouvrir. */
+const card = {
+  kind: 'root' as const,
+  isMine: false,
+  isProjectAuthor: false,
+  menu: [],
+  hiddenNote: null,
+  onAuthorPress: () => {},
+  onMemberPress: () => {},
+  // Une heure figée : la date relative ne dépend pas du moment de la visite.
+  now: new Date('2026-10-20T09:00:00.000Z'),
+}
+
 export function ReportSamples() {
   const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
@@ -193,33 +220,34 @@ export function ReportSamples() {
           bandeau, et « Supprimer » seul : il ne se modifie plus) ; l'emplacement que lisent les
           autres, l'auteur du projet compris. */}
       <Surface variant="grouped" padding="xl" gap="xl">
+        {/* R5b : la carte reçoit le commentaire tel que l'API le rend ; ses actions passent par
+            le menu « … ». */}
         <CommentCard
-          author={{ name: 'Inès Haddad', avatar: null }}
-          authorLabel={l.inesPage}
-          onAuthorPress={() => {}}
-          when={l.when}
-          body={l.commentBody}
-          actions={[{ id: 'report', label: l.report, icon: 'flag', onPress: () => {} }]}
+          {...card}
+          comment={comment({
+            id: 'ines',
+            author: { id: 'ines', name: 'Inès Haddad', avatarUrl: null, handle: 'ines_h' },
+            body: l.commentBody,
+          })}
+          menu={[{ label: l.report, icon: 'flag', onPress: () => {} }]}
         />
         <CommentCard
-          author={{ name: 'Max Durand', avatar: null }}
-          authorLabel={l.maxPage}
-          onAuthorPress={() => {}}
-          when={l.when}
-          body={l.removedBody}
+          {...card}
+          comment={comment({
+            id: 'max',
+            author: { id: 'max', name: 'Max Durand', avatarUrl: null, handle: 'max_d' },
+            body: l.removedBody,
+            state: 'removed',
+            isMine: true,
+          })}
+          isMine
           removed={afterReport}
-          actions={[
-            {
-              id: 'delete',
-              label: l.deleteComment,
-              text: l.deleteShort,
-              icon: 'trash',
-              tone: 'danger',
-              onPress: () => {},
-            },
-          ]}
+          menu={[{ label: l.deleteShort, icon: 'trash', tone: 'danger', onPress: () => {} }]}
         />
-        <CommentCard author={null} when={l.when} body="" placeholder={l.removedPlaceholder} />
+        <CommentCard
+          {...card}
+          comment={comment({ id: 'placeholder', author: null, state: 'removed' })}
+        />
       </Surface>
       {/* Le journal : vu par un autre membre (un drapeau par note), puis par son auteur, avec une
           note retirée. */}

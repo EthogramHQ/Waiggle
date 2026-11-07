@@ -14,10 +14,17 @@
 // Tab referme aussi le menu, et le focus continue son chemin : au contrôle qui suit « … » dans la
 // page, comme si le menu, posé juste après son bouton, venait d'être traversé (modèle du bouton de
 // menu) ; Maj+Tab revient au bouton « … », le contrôle qui le précède (relecture 7b).
+//
+// Sur téléphone (R5b), le lecteur d'écran (VoiceOver, TalkBack) revient lui aussi sur « … » quand
+// le menu se ferme, au lieu de repartir du haut de l'écran ; l'action choisie part ensuite, et
+// peut poser le focus ailleurs (« Modifier » le pose dans le champ). Plusieurs « … » d'une liste
+// (un par commentaire) se distinguent par une description (`describedById`, `hint`), et l'écran
+// peut poser le focus sur le bouton par sa `ref`.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type RefObject, useEffect, useRef, useState } from 'react'
+import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  AccessibilityInfo,
   type LayoutChangeEvent,
   Modal,
   Platform,
@@ -57,6 +64,21 @@ type Props = {
    * colonne au lieu de couvrir la voisine (la colonne latérale d'un projet, relecture 7b).
    */
   align?: 'end'
+  /**
+   * Le `nativeID` d'un texte qui dit sur quoi porte le menu (voir aria.ts), lu après le nom du
+   * bouton sur le web : « Actions du commentaire de Léa », puis le début du commentaire.
+   */
+  describedById?: string
+  /** La même précision sur téléphone, où `aria-describedby` n'existe pas : un indice lu après le nom. */
+  hint?: string
+  /** Le bouton « … » lui-même, pour y poser le focus depuis le composant qui l'utilise. */
+  ref?: Ref<View>
+}
+
+/** Donne `node` à une `ref` reçue, qu'elle soit une fonction ou un objet (`useRef`). */
+const assign = (ref: Ref<View> | undefined, node: View | null) => {
+  if (typeof ref === 'function') ref(node)
+  else if (ref) (ref as RefObject<View | null>).current = node
 }
 
 /** La largeur du menu, en points : de quoi lire « Signaler ce profil » sur une ligne. */
@@ -113,7 +135,15 @@ const nextTabbable = (node: unknown): WebElement | null => {
   )
 }
 
-export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
+export function ActionMenu({
+  items,
+  label,
+  variant = 'plain',
+  align,
+  describedById,
+  hint,
+  ref,
+}: Props) {
   const { t } = useTranslation()
   const window = useWindowDimensions()
   const [open, setOpen] = useState(false)
@@ -153,12 +183,30 @@ export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
   const choose = (item: ActionMenuItem) => {
     if (!opened.current) return
     hide()
-    // Sur le web, l'action attend la fin de la fermeture : le focus est alors revenu au bouton
-    // « … », et une fenêtre ouverte par l'action (« Bloquer @lea ? ») le lui rendra en se fermant.
-    // Ailleurs, pas de focus clavier à suivre : l'action part tout de suite.
-    if (Platform.OS === 'web') chosen.current = item.onPress
-    else item.onPress()
+    // L'action attend la fin de la fermeture : le focus est alors revenu au bouton « … » (celui du
+    // clavier sur le web, celui du lecteur d'écran sur téléphone), et l'action peut le poser
+    // ailleurs ; une fenêtre ouverte par l'action (« Bloquer @lea ? ») le lui rendra en se fermant.
+    chosen.current = item.onPress
   }
+
+  // Sur téléphone, le menu vient de se fermer (un choix, un toucher à côté, Retour) : le lecteur
+  // d'écran revient sur « … », puis l'action choisie part. Sans cela, VoiceOver et TalkBack
+  // repartaient du haut de l'écran (point des listes de R5b). `wasOpen` : rien au premier dessin.
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (Platform.OS === 'web') return
+    if (open) {
+      wasOpen.current = true
+      return
+    }
+    if (!wasOpen.current) return
+    wasOpen.current = false
+    // sendAccessibilityEvent(vue, 'focus') : le lecteur d'écran se pose sur cette vue native.
+    if (trigger.current) AccessibilityInfo.sendAccessibilityEvent(trigger.current, 'focus')
+    const action = chosen.current
+    chosen.current = null
+    action?.()
+  }, [open])
 
   // Tab (web) : le menu se ferme, et le focus ira plus loin que « … » (voir `closed`) ; Maj+Tab
   // le rend seulement au bouton.
@@ -241,9 +289,14 @@ export function ActionMenu({ items, label, variant = 'plain', align }: Props) {
   return (
     <>
       <IconButton
-        ref={trigger}
+        ref={(node: View | null) => {
+          trigger.current = node
+          assign(ref, node)
+        }}
         icon="dots-three"
         label={label ?? t(($) => $.actionMenu.label)}
+        {...(describedById ? { describedBy: describedById } : null)}
+        {...(hint ? { hint } : null)}
         variant={variant}
         expanded={open}
         hasMenu
