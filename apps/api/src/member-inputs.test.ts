@@ -17,7 +17,7 @@
 // une troisième, lit encore tout.
 import { Project, ReportSnapshot } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq, getTableName, is } from 'drizzle-orm'
+import { asc, eq, getTableName, is } from 'drizzle-orm'
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -444,6 +444,26 @@ describe('every field of the register', () => {
       .map((e) => e.value)
       .sort()
     expect(imageValues).toEqual(media.map((m) => m.key).sort())
+  })
+
+  // jur-J13 (R6a) : la copie dit quelle photo est décrite. Sa description suit, dans la copie,
+  // l'entrée de l'image qu'elle décrit (décision de la session du 9/11/2026, forme `{ field, value }`
+  // du contrat inchangée) ; une photo sans description n'en a pas.
+  it('puts the description of a photo right after the key of that photo in the copy', async () => {
+    await reportEverything()
+
+    const media = await ctx.db
+      .select({ key: schema.projectMedia.storageKey })
+      .from(schema.projectMedia)
+      .where(eq(schema.projectMedia.projectId, projectId))
+      .orderBy(asc(schema.projectMedia.position))
+    const project = await snapshotOf('project')
+    const images = project.filter((e) => ['cover', 'photo', 'photoDescription'].includes(e.field))
+    expect(images).toEqual([
+      { field: 'cover', value: media[0]?.key },
+      { field: 'photoDescription', value: WITNESSES['project.project_media.description'] },
+      { field: 'photo', value: media[1]?.key },
+    ])
   })
 
   it("puts every field in its author's export, never in the export of who reports", async () => {
