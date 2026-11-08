@@ -1,9 +1,11 @@
 // Une étiquette d'outil ou de modèle (« Claude », « Python »). Touchée, elle mène à la page de
 // l'étiquette ; sans `onPress`, c'est une simple pastille. Avec `count` (R3, « Outils populaires »
 // d'Explorer sur ordinateur), elle affiche aussi le nombre de projets publics qui citent l'outil.
+// Avec `icon` (R6a), elle sert aussi à la catégorie d'un projet, en verre sur sa photo.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
+import { Icon, type IconName } from './Icon'
 import { enterActivates } from './keyboard'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -19,9 +21,15 @@ type Props = {
    * l'interface de R3 : un nombre nu, lu seul, ne dit pas ce qu'il compte).
    */
   count?: number
+  /**
+   * R6a : une icône dessinée avant le libellé (la catégorie d'un projet sur sa carte : la planète de
+   * « Sciences et espace »). Décorative : le nom lu reste le libellé, l'icône est cachée aux
+   * lecteurs d'écran (Icon).
+   */
+  icon?: IconName
 }
 
-export function Tag({ label, onPress, onGlass = false, count }: Props) {
+export function Tag({ label, onPress, onGlass = false, count, icon }: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
   // Le nom lu : le libellé seul, ou le libellé et son nombre au pluriel de la langue de l'appli.
@@ -53,17 +61,21 @@ export function Tag({ label, onPress, onGlass = false, count }: Props) {
     </Text>
   )
   const content =
-    count === undefined ? (
+    count === undefined && icon === undefined ? (
       name
     ) : (
-      // Le nom puis le nombre, plus discret, sur la même ligne. Le nom peut rétrécir (flexShrink, et
-      // son « … ») ; le nombre, jamais : on le lit toujours en entier. Chiffres de même largeur
-      // (tabular) : deux étiquettes voisines gardent leurs nombres alignés.
+      // L'icône, le nom, puis le nombre, plus discret, sur la même ligne. Le nom peut rétrécir
+      // (flexShrink, et son « … ») ; l'icône et le nombre, jamais : on lit toujours le nombre en
+      // entier. Chiffres de même largeur (tabular) : deux étiquettes voisines gardent leurs nombres
+      // alignés.
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%' }}>
+        {icon === undefined ? null : <Icon name={icon} size={18} />}
         <View style={{ flexShrink: 1 }}>{name}</View>
-        <Text variant="mono" tone="muted" tabular>
-          {String(count)}
-        </Text>
+        {count === undefined ? null : (
+          <Text variant="mono" tone="muted" tabular>
+            {String(count)}
+          </Text>
+        )}
       </View>
     )
   // La pastille dessinée fait 36 points de haut ; autour d'elle, une zone de 44. Touchable, c'est
