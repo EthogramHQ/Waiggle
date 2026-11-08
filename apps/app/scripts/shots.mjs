@@ -738,6 +738,76 @@ const launchProject = {
   ],
   notes: recipesNotes.slice(2),
 }
+// Tranche R6a, la feuille de modification (planches `R6-Modifier`, `R6-Publier-Suite`) : un projet
+// de Léa à trois photos décrites, deux catégories, « Commencé en » et « Facile à refaire ? », et un
+// prompt de départ où traîne une clé d'API (l'encadré « Clé : … » et « Retirer la clé »). La clé
+// est écrite en morceaux : un faux, mais à la forme connue, que l'analyse des secrets de GitHub
+// prendrait pour un vrai si elle était d'un seul tenant.
+const fakeApiKey = ['sk', '-proj-', 'Qm7Lr2Xv9TkB4sWn8JcY', '3pHd6FaZ1uE5gNoa91f'].join('')
+const skyProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000e1',
+  title: 'Le ciel de ce soir',
+  pitch: 'Les planètes et les constellations visibles ce soir, depuis ton jardin.',
+  description:
+    'Il lit la météo et la position des planètes, puis dit quoi regarder et à quelle heure.\n\n- **Jupiter** au sud-est\n- la *Grande Ourse* au nord',
+  status: 'building',
+  visibility: 'public',
+  demoUrl: 'https://ciel-du-soir.fr',
+  tools: [
+    { label: 'Claude', slug: 'claude' },
+    { label: 'Stellarium', slug: 'stellarium' },
+  ],
+  primaryCategory: 'science',
+  secondaryCategory: 'learning',
+  difficulty: 'medium',
+  startedOn: '2026-03',
+  visuals: [
+    photo(
+      'e1a2b3c4-0000-4000-8000-0000000000e1',
+      1600,
+      900,
+      'La Lune au-dessus du toit, en croissant.',
+    ),
+    photo(
+      'e2b3c4d5-0000-4000-8000-0000000000e2',
+      1200,
+      1600,
+      'Jupiter et ses quatre lunes, vues à la lunette.',
+    ),
+    photo(
+      'e3c4d5e6-0000-4000-8000-0000000000e3',
+      1600,
+      1200,
+      'L’écran du projet : la carte du ciel à 22 h.',
+    ),
+  ],
+  portraitCover: null,
+  prompts: [
+    `Tu es un guide d’astronomie pour débutants. Avec la météo de ma ville et l’heure, dis-moi les trois choses à regarder ce soir. Ma clé pour l’API météo : ${fakeApiKey}`,
+    'Explique en deux phrases pourquoi Jupiter brille plus que les étoiles.',
+  ],
+  followerCount: 4,
+  notes: [],
+}
+// Un projet de Léa publié avant R6a, jamais modifié depuis : sans catégorie (la ligne « Catégorie »
+// dit « Choisis une catégorie »), sans mois ni difficulté.
+const oldProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000e2',
+  title: 'Mon tri de factures',
+  pitch: 'Il range les factures du mois par fournisseur et prépare le récapitulatif.',
+  status: 'done',
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  primaryCategory: null,
+  secondaryCategory: null,
+  difficulty: null,
+  startedOn: null,
+  visuals: [],
+  portraitCover: null,
+  prompts: [],
+  notes: [],
+}
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
 // `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
 // utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
@@ -1340,6 +1410,26 @@ const fakeApi = (
     // R5a : la page projet à trois photos et trois prompts (les pages de captures : la session).
     if (pathname === `/v1/projects/${launchProject.id}`) {
       return json(200, withExtras(launchProject))
+    }
+    // R6a : la feuille de modification (trois photos décrites, une clé dans le prompt) et un projet
+    // d'avant R6a, sans catégorie. Les pages de captures qui les ouvrent : la session.
+    if (pathname === `/v1/projects/${skyProject.id}`) return json(200, withExtras(skyProject))
+    if (pathname === `/v1/projects/${oldProject.id}`) return json(200, withExtras(oldProject))
+    // R6a : décrire une photo (PATCH …/visuals/{id}) rend le projet, la description posée.
+    const described = pathname.match(/^\/v1\/projects\/([^/]+)\/visuals\/([^/]+)$/)
+    if (described && method === 'PATCH') {
+      const { description } = JSON.parse(route.request().postData() ?? '{}')
+      const known = [skyProject, oldProject, photosProject].find((p) => p.id === described[1])
+      if (!known) return json(404, { error: { code: 'not_found', message: '' } })
+      return json(
+        200,
+        withExtras({
+          ...known,
+          visuals: known.visuals.map((v) =>
+            v.id === described[2] ? { ...v, description: description || null } : v,
+          ),
+        }),
+      )
     }
     // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
     // A7 : « Ce projet est introuvable » au toucher d'une carte).
