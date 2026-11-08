@@ -104,8 +104,9 @@ export function Button({
 }: Props) {
   const { colors, shadows } = useTheme()
   const inactive = disabled || loading
-  // Inactif mais gardé dans le parcours au clavier (web) : le Pressable n'est pas désactivé (il
-  // perdrait sa place dans Tab), c'est le bouton qui ignore l'appui et ne s'enfonce pas.
+  // Inactif mais gardé dans le parcours au clavier (web) : le Pressable reste désactivé (il ignore
+  // clic, Entrée et Espace, et react-native-web en tire `aria-disabled`), mais avec une étape de
+  // Tab explicite : sans elle, react-native-web lui donnerait `tabIndex -1`.
   const keptInTab = Platform.OS === 'web' && disabled && focusableWhenDisabled
   const small = size === 'small'
   // La hauteur dessinée. Plus basse que la zone à toucher (le petit bouton), la pilule se pose
@@ -268,7 +269,8 @@ export function Button({
         aria-busy={loading}
         // Sur le web, un bouton occupé reste dans le parcours au clavier (voir plus haut) ; sur
         // téléphone, il n'y a pas ce souci : il est désactivé, et annoncé comme tel.
-        disabled={Platform.OS === 'web' ? disabled && !keptInTab : inactive}
+        disabled={Platform.OS === 'web' ? disabled : inactive}
+        {...(keptInTab ? { tabIndex: 0 as const } : null)}
         // Pendant le chargement, l'appui ne fait rien (le bouton reste pourtant focalisable) ; un
         // bouton inactif gardé dans Tab non plus (Entrée, Espace, clic).
         onPress={() => {
@@ -277,8 +279,6 @@ export function Button({
         // Un interrupteur s'active aussi avec la barre d'espace sur le web (voir keyboard.ts).
         {...(checked === undefined ? null : spaceToggles(onPress, inactive))}
         onPressIn={() => {
-          // Un bouton qui ne fera rien ne s'enfonce pas sous le doigt.
-          if (keptInTab) return
           scale.value = spring(pressScale, 'firm')
         }}
         onPressOut={() => {
@@ -290,12 +290,10 @@ export function Button({
         style={(state) =>
           framed
             ? { minHeight: layout.touchTarget, justifyContent: 'center', borderRadius: radii.pill }
-            : pill(state.pressed && !keptInTab)
+            : pill(state.pressed)
         }
       >
-        {(state) =>
-          framed ? <View style={pill(state.pressed && !keptInTab)}>{content}</View> : content
-        }
+        {(state) => (framed ? <View style={pill(state.pressed)}>{content}</View> : content)}
       </Pressable>
     </Animated.View>
   )
