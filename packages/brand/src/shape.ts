@@ -77,6 +77,19 @@ export const layout = {
   // R6a : la vignette d'un projet en tête de la fenêtre « Supprimer » (ProjectThumb), et le rond
   // de son badge (la corbeille), posé à cheval sur son coin bas droit.
   thumb: { size: 84, badge: 32 },
+  // R6a : la danse de publication (PublishDance, planche R6-Danse), dessinée pour un téléphone de
+  // 390 points et gardée telle quelle sur ordinateur : l'abeille ; le huit qu'elle dessine (sa
+  // largeur, sa hauteur) ; où il se pose, en part de la hauteur de la scène (sous l'en-tête du
+  // fil) ; la traînée de miel, fraîche puis plus fine quand elle s'efface ; la plus grosse goutte.
+  publishDance: {
+    bee: 52,
+    eightWidth: 246,
+    eightHeight: 76,
+    eightTop: 0.29,
+    trail: 7,
+    trailFaded: 5,
+    drop: 4,
+  },
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur
   // téléphone (une photo plus haute que large a besoin de hauteur pour ne pas être trop recadrée).
   // medium : la galerie d'un projet sur tablette ou petite fenêtre (relecture de design de R5a) ; à
