@@ -777,7 +777,7 @@ export const en: Translation = {
       tooManyTools: '{{max}} tools at most.',
       toolTooLong: 'Each tool must be at most {{max}} characters long.',
       tooManyPrompts: '{{max}} prompts at most.',
-      promptTooLong: 'Each prompt must be at most {{max}} characters long.',
+      promptTooLong: 'Each prompt must be at most {{max, number}} characters long.',
       invalidCharacters: 'Some characters are not allowed (invisible or control characters).',
     },
   },

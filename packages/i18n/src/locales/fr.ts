@@ -899,7 +899,7 @@ export const fr = {
       tooManyTools: '{{max}} outils au plus.',
       toolTooLong: 'Chaque outil doit faire au plus {{max}} caractères.',
       tooManyPrompts: '{{max}} prompts au plus.',
-      promptTooLong: 'Chaque prompt doit faire au plus {{max}} caractères.',
+      promptTooLong: 'Chaque prompt doit faire au plus {{max, number}} caractères.',
       invalidCharacters:
         'Certains caractères ne sont pas autorisés (caractères invisibles ou de contrôle).',
     },
