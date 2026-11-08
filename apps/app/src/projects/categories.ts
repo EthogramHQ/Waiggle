@@ -1,7 +1,7 @@
 // Les catégories d'un projet (R6a) : l'icône de chacune, et la liste des choix qu'affichent la
 // feuille de publication et les cartes. Les noms viennent des traductions (`project.category.*`),
 // les codes du contrat (`PROJECT_CATEGORIES`), dans l'ordre de la feuille.
-import { PROJECT_CATEGORIES, type ProjectCategory } from '@ruche/contracts'
+import { PROJECT_CATEGORIES, type ProjectCategory, type ProjectDifficulty } from '@ruche/contracts'
 import type { useTranslation } from 'react-i18next'
 import type { IconName } from '../ui/Icon'
 
@@ -41,6 +41,17 @@ export const categoryOption = (t: T, value: ProjectCategory): CategoryOption => 
   label: t(($) => $.project.category[value]),
   icon: CATEGORY_ICONS[value],
 })
+
+/**
+ * La pastille de couleur de chaque réponse à « Facile à refaire ? » (vert, jaune, rouge), passée à
+ * `Choices` (`dot`). Des noms de couleur du design, jamais seuls porteurs du sens : le texte dit
+ * tout. `as const` garde les noms exacts ; `satisfies` vérifie qu'aucune réponse n'est oubliée.
+ */
+export const DIFFICULTY_DOTS = {
+  easy: 'success',
+  medium: 'amber',
+  hard: 'danger',
+} as const satisfies Record<ProjectDifficulty, string>
 
 /** Les seize catégories, dans l'ordre de la feuille de publication. */
 export const categoryOptions = (t: T): CategoryOption[] =>

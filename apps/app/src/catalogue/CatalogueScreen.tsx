@@ -106,6 +106,7 @@ import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
 import { PublishSheetCatalogue } from './publier-feuille'
+import { PublishPillsCatalogue } from './publier-pastilles'
 import { PublishPhotosCatalogue } from './publier-photos'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -857,6 +858,7 @@ export function CatalogueScreen() {
       <ProjectPartsCatalogue />
       {/* Tranche R6a, la feuille de publication (publier-*.tsx). */}
       <PublishPhotosCatalogue />
+      <PublishPillsCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />
       <ProjectPromptsCatalogue />

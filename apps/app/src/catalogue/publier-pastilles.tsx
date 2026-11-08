@@ -11,7 +11,7 @@ import type { ProjectDifficulty } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { categoryOption } from '../projects/categories'
+import { categoryOption, DIFFICULTY_DOTS } from '../projects/categories'
 import { Choices } from '../ui/Choices'
 import { ProjectCover } from '../ui/ProjectCover'
 import { Stack } from '../ui/Stack'
@@ -50,12 +50,8 @@ const en: typeof fr = {
   night: 'night',
 }
 
-/** Le rond de chaque niveau : vert, jaune, rouge (les rôles de la marque, décision de la session). */
-const DOTS: Record<ProjectDifficulty, ColorName> = {
-  easy: 'success',
-  medium: 'amber',
-  hard: 'danger',
-}
+/** Le rond de chaque niveau : vert, jaune, rouge (partagé avec la feuille de publication). */
+const DOTS: Record<ProjectDifficulty, ColorName> = DIFFICULTY_DOTS
 
 const noop = () => {}
 
