@@ -938,7 +938,7 @@ export function SheetPanel({
   const content = (
     <ScrollView
       {...(revealRef ? { ref: reveal.scroller, ...reveal.listProps } : null)}
-      style={beside ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } : { flexShrink: 1 }}
+      style={{ flexShrink: 1 }}
       contentContainerStyle={{
         paddingHorizontal: space.xl,
         paddingTop: space.xl - space.sm,
@@ -1039,17 +1039,22 @@ export function SheetPanel({
           <View
             style={{ flexDirection: 'row', flexShrink: 1, minHeight: 0, gap: ASIDE_GAP - space.xl }}
           >
-            {content}
-            <ScrollView
-              style={{ width: ASIDE_WIDTH, flexShrink: 1 }}
-              contentContainerStyle={{
-                paddingRight: space.xl,
-                paddingTop: space.xl - space.sm,
-                paddingBottom: space.xl,
-              }}
-            >
-              {aside}
-            </ScrollView>
+            {/* Deux vues de largeur fixée autour des zones qui défilent : la largeur posée sur une
+                ScrollView de react-native-web n'était pas tenue (l'aperçu prenait 600 points et le
+                formulaire 230, capture du catalogue à 1440 px). */}
+            <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>{content}</View>
+            <View style={{ width: ASIDE_WIDTH, flexGrow: 0, flexShrink: 0, minHeight: 0 }}>
+              <ScrollView
+                style={{ flexShrink: 1 }}
+                contentContainerStyle={{
+                  paddingRight: space.xl,
+                  paddingTop: space.xl - space.sm,
+                  paddingBottom: space.xl,
+                }}
+              >
+                {aside}
+              </ScrollView>
+            </View>
           </View>
         ) : (
           content
