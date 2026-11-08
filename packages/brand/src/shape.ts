@@ -74,6 +74,9 @@ export const layout = {
   chipControl: 28, // rond du bouton « retirer » posé dans une étiquette
   // R6a : le rond de couleur posé devant le libellé d'un choix (« Facile à refaire ? », Choices `dot`)
   choiceDot: 12,
+  // R6a : la vignette d'un projet en tête de la fenêtre « Supprimer » (ProjectThumb), et le rond
+  // de son badge (la corbeille), posé à cheval sur son coin bas droit.
+  thumb: { size: 84, badge: 32 },
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur
   // téléphone (une photo plus haute que large a besoin de hauteur pour ne pas être trop recadrée).
   // medium : la galerie d'un projet sur tablette ou petite fenêtre (relecture de design de R5a) ; à
