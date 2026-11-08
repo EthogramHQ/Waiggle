@@ -1217,7 +1217,8 @@ Après les relectures de la branche (Louis, 7/11/2026) :
 
 ## R6a — La feuille de publication
 
-Statut : **à valider par Louis** (conversation 1 de R6a, 8/11/2026).
+Statut : **validé par Louis** le 8/11/2026, tel quel, avec les huit choix proposés (conversation 1
+de R6a).
 
 R6 est coupée en deux (Louis, 8/11/2026), comme R5 : **R6a**, la feuille de publication et la
 modification ; **R6b**, les outils et les catégories (le catalogue). R6a redessine la publication
@@ -1459,7 +1460,7 @@ Hors de R6a, et où ça va :
 - Le mot « Public » pour « visible des membres connectés », à revoir face à « Public sur le web »
   (liste de conformité, R12) : il devient « Membres de Waiggle »
 
-### Les choix proposés à Louis
+### Les choix de Louis (8/11/2026, validés tels quels)
 
 1. **Fermer avec des changements** : « Abandonner ce projet ? » (« Continuer » / « Abandonner »),
    en publication comme en modification (« Abandonner les changements ? »).
