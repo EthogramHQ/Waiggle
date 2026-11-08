@@ -217,6 +217,37 @@ describe('promptWarnings', () => {
     })
   })
 
+  // R6a (relecture juridique du plan, jur-J7) : une clé d'API reconnue par `findApiKeys` (le
+  // contrat) reçoit sa propre raison, `apiKey` (« Il contient ce qui ressemble à une clé d'API :
+  // quelqu'un pourrait s'en servir aux frais de son propriétaire. »), vraie pour qui lit le prompt
+  // comme pour son auteur. La recherche se fait sur le texte nettoyé par `cleanPrompt`, pas sur la
+  // copie pliée (sec-A4) : en minuscules, « AKIA… » ne serait plus reconnue.
+  describe('an API key', () => {
+    // De fausses clés, de la forme des vraies, écrites en morceaux : un outil qui cherche les
+    // secrets dans le dépôt public ne doit pas les prendre pour de vraies clés.
+    const OPENAI_KEY = ['sk-proj', '-Zq8xT2mN4vR7wK1pL9sD3fG6hJ0', 'a91f'].join('')
+    const AWS_KEY = ['AK', 'IA', 'Q3Z7X2M4N8B6V1C5'].join('')
+    const GITHUB_KEY = ['gh', 'p_', 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6', 'wxyz'].join('')
+
+    it('names an API key found in the prompt, for the author too', () => {
+      // La raison du repère est celle de la clé, pas celle, plus vague, d'un secret dont on parle.
+      const flagged = (text: string) => flags(text, 'apiKey')
+      expect(flagged(`Utilise cette clé : ${OPENAI_KEY} pour appeler le modèle.`)).toBe(true)
+      expect(flagged(`AWS ${AWS_KEY} région Paris`)).toBe(true)
+      expect(flagged(`Mon jeton ${GITHUB_KEY}`)).toBe(true)
+      // Une clé coupée par un espace sans largeur, une fois le prompt nettoyé comme à l'affichage.
+      const split = `${OPENAI_KEY.slice(0, 12)}${ZERO_WIDTH_SPACE}${OPENAI_KEY.slice(12)}`
+      expect(flagged(cleanPrompt(`Clé ${split}`))).toBe(true)
+      // Une seule fois, même avec deux clés.
+      expect(
+        promptWarnings(`${OPENAI_KEY} et ${GITHUB_KEY}`).filter((kind) => kind === 'apiKey'),
+      ).toHaveLength(1)
+      // Témoin : des mots composés qui ressemblent au début d'une clé n'en sont pas.
+      expect(flagged('Écris un sk-manager-and-planner pour ma liste de courses.')).toBe(false)
+      expect(flagged('Propose-moi un menu de la semaine.')).toBe(false)
+    })
+  })
+
   // sec-B2 : la recherche reste rapide sur un texte écrit pour la ralentir (les expressions qui
   // reviennent en arrière sans fin), à la longueur maximale d'un prompt.
   it('stays fast on 4 000 characters written to slow it down', () => {
