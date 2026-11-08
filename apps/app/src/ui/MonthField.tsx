@@ -220,7 +220,9 @@ export function MonthField({
   }
 
   return (
-    <View style={{ gap: space.sm }}>
+    // Jamais plus large qu'un formulaire : sur un grand écran, trois mois par rangée resteraient
+    // des pastilles de 400 points.
+    <View style={{ gap: space.sm, alignSelf: 'stretch', maxWidth: layout.formWidth }}>
       {/* La question à gauche, « Effacer » à droite, sur une rangée toujours haute de 44 points :
           quand le bouton paraît ou disparaît, rien ne bouge dessous (comme `Choices`). */}
       <View
@@ -303,11 +305,16 @@ export function MonthField({
                 borderRadius: radii.pill,
                 borderWidth: borders.strong,
                 borderColor: checked ? colors.honey : colors.outline,
+                // Un mois pas encore arrivé : un contour en tirets, sans fond, en plus du texte
+                // pâle (la couleur seule ne dit pas « inactif »).
+                borderStyle: enabled ? 'solid' : 'dashed',
                 backgroundColor: checked
                   ? colors.honey
-                  : pressed && enabled
-                    ? colors.honeySoft
-                    : colors.surface,
+                  : !enabled
+                    ? 'transparent'
+                    : pressed
+                      ? colors.honeySoft
+                      : colors.surface,
               })}
             >
               <Text
