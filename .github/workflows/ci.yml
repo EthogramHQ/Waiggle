@@ -10,14 +10,16 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Chaque lundi à 4 h 23 (heure UTC), sur main : le seul audit des dépendances. Une faille publiée
-  # pendant une semaine sans commit serait sinon passée inaperçue. GitHub prévient par e-mail
+  # Chaque jour à 4 h 23 (heure UTC), sur main : l'audit des dépendances et le guetteur d'avis
+  # (tâche `audit`). Une faille publiée pendant des jours sans commit passerait sinon inaperçue ;
+  # tous les jours plutôt que le lundi depuis l'audit de sécurité du 7/11/2026 (un avis critique de
+  # Better Auth du mardi 3/11 n'aurait été vu que le lundi suivant). GitHub prévient par e-mail
   # quand une exécution planifiée échoue (la personne qui a écrit cette ligne `cron` en dernier),
   # et suspend la planification d'un dépôt public resté 60 jours sans activité. Pas à l'heure pile :
   # GitHub retarde, voire abandonne, les exécutions planifiées quand la charge est forte, surtout
   # au début de chaque heure ; celle de 5 h n'a pas tourné le lundi 26/10/2026.
   schedule:
-    - cron: '23 4 * * 1'
+    - cron: '23 4 * * *'
 
 # Toutes les tâches tournent sur Ubuntu 26.04, nommé en clair, et non sur « ubuntu-latest » : une
 # machine nommée ne change pas sous nos pieds. Le 22/10/2026, GitHub a fait passer
@@ -34,14 +36,14 @@ permissions:
 # Sur main, chaque commit a son propre groupe : aucune fusion n'est annulée, chacune publie ses
 # images. L'audit planifié a son groupe à lui : il n'annule jamais la vérification d'un commit.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'schedule' && 'weekly-audit' || github.sha }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'schedule' && 'daily-audit' || github.sha }}
   cancel-in-progress: true
 
 jobs:
   # Lint, types, tests et construction de l'API et de l'appli web.
   check:
     name: Lint, types, tests, build
-    # Pas pendant l'audit planifié du lundi (voir `schedule`, en tête) : le code n'a pas changé.
+    # Pas pendant l'audit planifié du jour (voir `schedule`, en tête) : le code n'a pas changé.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-26.04
     steps:
@@ -141,6 +143,11 @@ jobs:
       - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --verbose
 
   # Signale les failles connues dans les dépendances (exceptions justifiées dans pnpm-workspace.yaml).
+  # Puis le guetteur d'avis (scripts/advisories.mjs, audit de sécurité du 7/11/2026) : les avis
+  # publiés dans les dépôts GitHub de nos dépendances directes et de Caddy, qui n'arrivent dans
+  # la base de `pnpm audit` que des jours plus tard, voire jamais. Rouge sur un avis haut ou
+  # critique qui touche une version du verrou ; exceptions datées dans
+  # scripts/advisories-accepted.json. Le jeton de la CI ne sert qu'à lire ces avis publics.
   audit:
     name: Dependency audit
     runs-on: ubuntu-26.04
@@ -152,6 +159,10 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false # rien n'est installé ici, donc rien à mettre en cache
       - run: pnpm audit --audit-level high
+      - run: pnpm test:scripts
+      - run: node scripts/advisories.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   # Construit l'image Docker de l'API, puis la démarre comme en production pour un test
   # « de fumée » de bout en bout (voir infra/smoke-test.sh).

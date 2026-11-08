@@ -43,6 +43,20 @@ describe('member content in translated texts', () => {
     )
   })
 
+  // Audit de sécurité du 25/10/2026, C3 (test écrit le 7/11) : avant i18next 26.4.4, un « $t( »
+  // jamais fermé dans un texte de membre (un titre, un nom) faisait tourner sa recherche si
+  // longtemps que la page se figeait chez qui la lisait.
+  it('shows at once a member text full of « $t( » never closed', () => {
+    const typed = '$t('.repeat(30000)
+    const start = performance.now()
+
+    const shown = t(($) => $.common.remove, { item: typed })
+
+    expect(shown).toBe(`Retirer ${typed}`)
+    // Un rendu ordinaire prend moins d'une milliseconde ; la faille, des secondes ou plus.
+    expect(performance.now() - start).toBeLessThan(500)
+  })
+
   // Pour chaque texte de l'appli, dans chaque langue : chaque paramètre reçoit un texte piégé qui
   // cite tous les paramètres du texte. Le résultat attendu est celui d'un simple remplacement.
   it.each(['fr', 'en'] as const)('shows member content as typed in every %s text', (language) => {

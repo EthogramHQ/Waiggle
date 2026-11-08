@@ -51,6 +51,7 @@ pnpm --filter @ruche/app journey # le parcours d'un membre de bout en bout, sans
 pnpm --filter @ruche/app icons   # régénère les icônes après un ajout dans scripts/icons.mts
 pnpm --filter <paquet> test      # tests d'un seul paquet
 infra/stack-test.sh              # la pile de production complète, comme en CI (Docker requis)
+node scripts/advisories.mjs      # avis de sécurité des dépôts de nos dépendances (CI : chaque jour)
 ```
 
 ## Comment on développe

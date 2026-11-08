@@ -70,10 +70,12 @@
 
 	# Trouver le fichier d'une adresse. « route » garde l'ordre d'écriture des règles.
 	route {
-		# 0. Le plan du site d'Expo Router (/_sitemap) est un outil de développement : en ligne,
-		#    il est « introuvable », comme le catalogue des composants.
-		@sitemap path /_sitemap /_sitemap.html
-		error @sitemap 404
+		# 0. Le plan du site d'Expo Router (/_sitemap) et le catalogue des composants (/catalogue)
+		#    sont des outils de développement, construits avec l'appli : en ligne, ils sont
+		#    « introuvables » (audit de sécurité du 7/11/2026 : /catalogue répondait 200).
+		#    infra/web/check-web.mjs fait échouer la construction si l'un d'eux manque ici.
+		@devtools path /_sitemap /_sitemap.html /catalogue /catalogue.html
+		error @devtools 404
 		# 1. Le fichier lui-même (/_expo/static/js/…), ou la page du même nom :
 		#    /sign-in → sign-in.html, /account/delete → account/delete.html.
 		try_files {path} {path}.html {path}/index.html
@@ -114,6 +116,26 @@
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
+	}
+}
+
+# MTA-STS (audit de sécurité du 7/11/2026) : la politique qui demande aux serveurs de messagerie
+# du monde entier de ne livrer le courrier de waiggle.com (contact@…) qu'en connexion chiffrée,
+# vers nos serveurs de réception, et jamais à un intermédiaire qui se ferait passer pour eux. Elle
+# se lit à une adresse fixe, https://mta-sts.waiggle.com/.well-known/mta-sts.txt ; le fichier est
+# infra/web/mta-sts.txt, copié dans l'image. Le DNS l'annonce (enregistrement _mta-sts) : voir
+# docs/ops/serveur.md, « MTA-STS et TLS-RPT ». Toute autre adresse de ce nom : 404.
+mta-sts.{$APP_DOMAIN:localhost} {
+	import redirect_headers
+	@policy path /.well-known/mta-sts.txt
+	handle @policy {
+		root * /srv/mta-sts
+		header Content-Type "text/plain; charset=utf-8"
+		header Cache-Control "max-age=3600"
+		file_server
+	}
+	handle {
+		respond 404
 	}
 }
 

@@ -70,6 +70,25 @@ for (const page of pages.filter((p) => p.includes('['))) {
   }
 }
 
+// 3. Les pages d'outil de développement (audit de sécurité du 7/11/2026) : le plan du site
+//    d'Expo Router et le catalogue des composants sont construits avec l'appli, mais n'ont rien à
+//    faire en ligne. Le Caddyfile doit répondre « introuvable » à leur adresse, avec ou sans
+//    « .html » : la règle « @devtools path … » suivie de « error @devtools 404 ».
+const DEV_TOOLS = ['_sitemap', 'catalogue']
+const devtools =
+  caddyfile
+    .match(/^\s*@devtools\s+path\s+(.+)$/m)?.[1]
+    ?.trim()
+    .split(/\s+/) ?? []
+const closed = new Set(/^\s*error\s+@devtools\s+404\s*$/m.test(caddyfile) ? devtools : [])
+for (const tool of DEV_TOOLS.filter((name) => pages.includes(`${name}.html`))) {
+  for (const path of [`/${tool}`, `/${tool}.html`]) {
+    if (!closed.has(path)) {
+      problems.push(`${path} : outil de développement servi en ligne ; l'ajouter à @devtools.`)
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error(
     `L'appli construite et infra/Caddyfile ne vont pas ensemble :\n- ${problems.join('\n- ')}`,

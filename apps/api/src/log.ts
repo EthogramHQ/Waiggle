@@ -42,3 +42,29 @@ export const describeError = (
       .slice(0, 8),
   }
 }
+
+/** Les niveaux de journal que Better Auth emploie. */
+export type AuthLogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+/**
+ * Le journal de Better Auth (audit de sécurité du 7/11/2026, N4). Par défaut, il écrit l'erreur
+ * telle quelle : celle de la base contient la requête et ses paramètres (« params: <jeton de
+ * session> »). On garde son message court (« INTERNAL_SERVER_ERROR », « Failed query »), sans ce
+ * qui suit un « : », ni rien qui ressemble à une adresse e-mail ; chaque erreur passe par
+ * describeError, et tout autre argument n'est noté que par son type.
+ */
+export const writeAuthLog = (level: AuthLogLevel, message: unknown, ...args: unknown[]) => {
+  const write = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log
+  // Better Auth passe parfois une erreur au lieu d'un texte : on n'en garde que la nature.
+  const text =
+    typeof message === 'string' ? message : message instanceof Error ? message.name : typeof message
+  const short = (text.split('\n')[0] ?? '')
+    .split(/:\s/)[0]
+    ?.replace(/\S+@\S+/g, '[adresse]')
+    .slice(0, 120)
+  const where = { method: '-', path: 'better-auth' }
+  write(
+    `[Better Auth] ${level} ${short ?? ''}`,
+    ...args.map((arg) => (arg instanceof Error ? describeError(arg, where) : typeof arg)),
+  )
+}

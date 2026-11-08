@@ -27,6 +27,7 @@ import {
 import { readUnsubscribeToken } from '../email/unsubscribe-token'
 import { errorBody, languageOf } from '../errors'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { ipCounterId } from '../security/ip'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -143,7 +144,8 @@ export const emailRoutes = ({ db, limiter, secret, appUrl }: Deps) => {
   // Le quota par adresse IP de la désinscription, avant l'examen du lien. X-Real-IP est posé par
   // Caddy, qui remplace toute valeur envoyée par le visiteur.
   app.on('POST', UNSUBSCRIBE_PATH, async (c, next) => {
-    const ip = c.req.header('x-real-ip') ?? 'unknown'
+    // Tout un réseau IPv6 /64 compte comme une seule adresse (security/ip.ts).
+    const ip = ipCounterId(c.req.header('x-real-ip'))
     const decision = await limiter.hit(`unsubscribe-ip:${ip}`, unsubscribeIpRule)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     await next()

@@ -100,4 +100,21 @@ describe('Markdown', () => {
 
     expect(screen.queryByRole('link')).toBeNull()
   })
+
+  // Audit de sécurité du 25/10/2026, C9 (test écrit le 7/11) : avant marked 18.1.0, l'adresse d'un
+  // lien faite de milliers d'espaces, ou de liens ouverts sans fin, faisait chercher l'analyseur
+  // un temps qui croissait au cube de la longueur : une description piégée figeait la page.
+  it('shows at once a description built to trap the reading of links', async () => {
+    for (const text of [
+      `[a](${' '.repeat(9990)})`,
+      `[a](${'\u00a0'.repeat(9990)})`,
+      '[a]('.repeat(2500),
+      '!['.repeat(5000),
+    ]) {
+      const start = performance.now()
+      await show(text)
+      // Quelques dizaines de millisecondes d'ordinaire ; la faille, des minutes.
+      expect(performance.now() - start).toBeLessThan(2000)
+    }
+  })
 })

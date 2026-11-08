@@ -1,6 +1,6 @@
 // Tests du résumé d'erreur écrit dans les journaux (logs) du serveur.
-import { describe, expect, it } from 'vitest'
-import { describeError } from './log'
+import { describe, expect, it, vi } from 'vitest'
+import { describeError, writeAuthLog } from './log'
 
 describe('describeError', () => {
   it('keeps what helps to debug: the kind of error, its code and where it happened', () => {
@@ -34,5 +34,35 @@ describe('describeError', () => {
 
   it('copes with something thrown that is not an Error', () => {
     expect(describeError('oops', { method: 'GET', path: '/' })).toMatchObject({ name: 'string' })
+  })
+})
+
+// Audit de sécurité du 7/11/2026, N4 : le journal de Better Auth.
+describe('writeAuthLog', () => {
+  it('keeps the kind of a message, never what follows a colon nor an address', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failure = new Error('Failed query: select "token" from "session"\nparams: secret-token')
+
+    writeAuthLog('error', 'INTERNAL_SERVER_ERROR', failure, 'lea@example.com')
+    writeAuthLog('error', 'Failed query: select "token"\nparams: secret-token')
+    writeAuthLog('error', 'Could not send to lea@example.com')
+
+    const written = JSON.stringify(error.mock.calls)
+    error.mockRestore()
+    expect(written).toContain('INTERNAL_SERVER_ERROR')
+    expect(written).toContain('Failed query')
+    for (const secret of ['secret-token', 'lea@example.com', 'select', 'params']) {
+      expect(written).not.toContain(secret)
+    }
+  })
+
+  it('copes with a message that is not a text', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Better Auth passe parfois une erreur là où il attend un texte.
+    const notText = new Error('Failed query\nparams: secret-token') as unknown as string
+
+    expect(() => writeAuthLog('error', notText)).not.toThrow()
+    expect(JSON.stringify(error.mock.calls)).not.toContain('secret-token')
+    error.mockRestore()
   })
 })

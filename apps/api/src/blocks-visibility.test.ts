@@ -140,6 +140,24 @@ describe.each(DIRECTIONS)('the contents, when %s', (_, blockNow) => {
     await get(`/v1/projects/${meteo.id}`, zoe)
   })
 
+  // Audit de sécurité du 25/10/2026, C13 (test écrit le 7/11) : modifier ou supprimer le projet
+  // de l'autre reçoit la réponse d'un projet inconnu, sans rien révéler ni rien changer.
+  it('answers a change or a deletion of a project of the other one as an unknown project', async () => {
+    await blockNow()
+
+    for (const [method, body] of [
+      ['PATCH', { title: 'Vol' }],
+      ['DELETE', undefined],
+    ] as const) {
+      const res = await act.send(method, `/v1/projects/${meteo.id}`, malik, body)
+      const unknown = await act.send(method, `/v1/projects/${UNKNOWN}`, malik, body)
+      expect(res.status, method).toBe(404)
+      expect(await res.json()).toEqual(await unknown.json())
+    }
+    const page = Project.parse(await (await get(`/v1/projects/${meteo.id}`, ines)).json())
+    expect(page.title).toBe('Météo')
+  })
+
   // Précision 4 : les réactions déjà données restent dans les compteurs, les mêmes pour tous.
   it('keeps the reactions already given in the counts', async () => {
     await act.react(meteo.id, 'bravo', malik)

@@ -66,7 +66,7 @@ web() {
     --resolve "$API_HOST:443:127.0.0.1" --resolve "www.$APP_HOST:443:127.0.0.1" \
     --resolve "$OLD_HOST:443:127.0.0.1" --resolve "$OLD_HOST:80:127.0.0.1" \
     --resolve "www.$OLD_HOST:443:127.0.0.1" \
-    --resolve "$OLD_API_HOST:443:127.0.0.1" "$@"
+    --resolve "$OLD_API_HOST:443:127.0.0.1" --resolve "mta-sts.$APP_HOST:443:127.0.0.1" "$@"
 }
 
 # Le nombre de membres dans la base.
@@ -136,7 +136,9 @@ EOF
 
 step "Une adresse inconnue mène à « introuvable », avec le code 404"
 page_in_image +not-found.html >"$WORK/not-found"
-for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_sitemap /catalogue.php; do
+# /catalogue : un outil de développement, construit avec l'appli (audit de sécurité du 7/11/2026).
+for path in /nope /projects /projects/a/b/c /members /tags/a/b /sign-in/extra /_sitemap /_sitemap.html \
+  /catalogue /catalogue.html /catalogue.php; do
   status=$(web -o "$WORK/body" -w '%{http_code}' "https://$APP_HOST$path")
   expect "code HTTP de $path" "$status" 404
   cmp -s "$WORK/not-found" "$WORK/body" || die "$path ne sert pas la page introuvable"
@@ -174,6 +176,14 @@ if web "https://$APP_HOST$script" | grep -q 'localhost:8081'; then
   die "$script : contient localhost:8081 (EXPO_PUBLIC_APP_URL absente à la construction ?)"
 fi
 echo "ok : $script sans adresse de développement"
+
+step "La politique MTA-STS des e-mails, et rien d'autre à son adresse"
+# Le fichier exact du dépôt, en texte brut ; toute autre adresse de ce nom : 404.
+web -D "$WORK/mta-headers" -o "$WORK/mta-sts.txt" "https://mta-sts.$APP_HOST/.well-known/mta-sts.txt"
+cmp -s "$WORK/mta-sts.txt" infra/web/mta-sts.txt || die "mta-sts.txt : ce n'est pas infra/web/mta-sts.txt"
+grep -qi '^content-type: text/plain' "$WORK/mta-headers" || die "mta-sts.txt : pas servi en text/plain"
+expect "autre adresse de mta-sts" "$(web -o /dev/null -w '%{http_code}' "https://mta-sts.$APP_HOST/")" 404
+echo "ok"
 
 step "Redirections"
 expect "HTTP → HTTPS" "$(web -o /dev/null -w '%{http_code} %{redirect_url}' "http://$APP_HOST/sign-in")" \

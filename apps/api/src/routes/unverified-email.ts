@@ -32,6 +32,7 @@ import {
   type RateLimiter,
   type RateRule,
 } from '../rate-limit'
+import { ipCounterId } from '../security/ip'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -160,7 +161,8 @@ export const unverifiedEmailRoutes = ({ db, limiter, auth, mailer, appUrl, secre
   // une demande mal formée compte aussi. X-Real-IP est posé par Caddy, qui remplace toute valeur
   // envoyée par le visiteur.
   app.on('POST', UNVERIFIED_EMAIL_PATH, async (c, next) => {
-    const ip = c.req.header('x-real-ip') ?? 'unknown'
+    // Tout un réseau IPv6 /64 compte comme une seule adresse (security/ip.ts).
+    const ip = ipCounterId(c.req.header('x-real-ip'))
     const decision = await limiter.hit(`unverified-email-ip:${ip}`, IP_RULE)
     if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
     await next()

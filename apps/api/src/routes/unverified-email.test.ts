@@ -346,6 +346,23 @@ describe('the quotas of the correction', () => {
     expect((await leaCorrects(RIGHT, ip(9))).status).toBe(200)
   })
 
+  // Audit de sécurité du 7/11/2026, N3 : une box ou un serveur reçoit tout un réseau IPv6 « /64 »
+  // (des milliards d'adresses). Comptée adresse par adresse, chaque demande changeait d'adresse et
+  // ne rencontrait jamais le quota ; or chacune coûte au serveur un calcul de mot de passe.
+  it('counts every address of one IPv6 /64 network as the same connection', async () => {
+    await ctx.signUp(lea)
+    for (let i = 1; i <= 5; i++) {
+      expect((await correct('x', { 'x-real-ip': `2001:db8:1:2::${i}` })).status).toBe(400)
+    }
+
+    const sixth = await leaCorrects(RIGHT, { 'x-real-ip': '2001:db8:1:2:ffff::9' })
+
+    expect(sixth.status).toBe(429)
+    expect((await accountNamed('Léa')).email).toBe(TYPO)
+    // Témoin : le réseau voisin passe.
+    expect((await leaCorrects(RIGHT, { 'x-real-ip': '2001:db8:1:3::1' })).status).toBe(200)
+  })
+
   // Par adresse de départ, 3 par heure, comptés avant la recherche du compte : trois essais sur
   // une adresse sans compte, puis le compte est créé, et le quatrième essai est refusé.
   it('counts the address before looking for its account: 3 per hour, from any connection', async () => {

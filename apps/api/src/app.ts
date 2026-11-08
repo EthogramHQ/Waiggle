@@ -170,7 +170,13 @@ export const createApp = ({
   // (frame-ancestors 'none'), et isole la page comme dans un bac à sable (sandbox : ni script, ni
   // formulaire, ni accès aux cookies du domaine). Elle ne gêne pas l'appli : une CSP ne s'applique
   // qu'aux pages ouvertes par le navigateur, pas aux réponses lues par fetch.
+  //
+  // HSTS (Strict-Transport-Security) : le navigateur retient de n'appeler l'API qu'en HTTPS. Un an,
+  // comme le site de l'appli (infra/Caddyfile), au lieu des 180 jours par défaut de Hono (audit de
+  // sécurité du 7/11/2026).
+  const hsts = 'max-age=31536000; includeSubDomains'
   const apiHeaders = secureHeaders({
+    strictTransportSecurity: hsts,
     crossOriginResourcePolicy: 'same-site',
     contentSecurityPolicy: {
       defaultSrc: ["'none'"],
@@ -182,7 +188,10 @@ export const createApp = ({
   // Les images de /media ont leur propre CSP, encore plus stricte (voir routes/media.ts) :
   // secureHeaders écrit ses en-têtes après la route et effacerait la sienne, d'où ce second
   // réglage, sans CSP.
-  const mediaHeaders = secureHeaders({ crossOriginResourcePolicy: 'same-site' })
+  const mediaHeaders = secureHeaders({
+    strictTransportSecurity: hsts,
+    crossOriginResourcePolicy: 'same-site',
+  })
   app.use((c, next) =>
     c.req.path.startsWith('/media/') ? mediaHeaders(c, next) : apiHeaders(c, next),
   )
@@ -260,6 +269,16 @@ export const createApp = ({
   // dire « Nouvel essai possible à 21 h 47 ».
   app.on(['GET', 'POST'], '/api/auth/*', async (c) => {
     const res = await auth.handler(await countableRequest(c.req.raw))
+    // Une erreur du serveur que Better Auth rend lui-même (une APIError 500, prévue par son code) :
+    // depuis `onAPIError.throw` (auth/auth.ts), il ne l'écrit plus. On note la route et le code,
+    // jamais l'adresse complète, dont la requête peut porter un jeton (relecture de la PR #86, A4).
+    if (res.status >= 500) {
+      console.error('Better Auth server error', {
+        method: c.req.method,
+        path: c.req.path,
+        status: res.status,
+      })
+    }
     const retryAfter = res.headers.get('x-retry-after')
     if (res.status !== 429 || retryAfter === null || res.headers.has('retry-after')) return res
     // Une copie de la réponse : les en-têtes d'une réponse reçue peuvent être en lecture seule.

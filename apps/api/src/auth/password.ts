@@ -229,6 +229,22 @@ export const createPasswordFlows = ({
     },
 
     /**
+     * Hook `before` de POST /api/auth/reset-password (audit de sécurité du 7/11/2026, N7).
+     * PostgreSQL refuse tout texte qui contient le caractère NUL (U+0000) : un jeton qui en
+     * portait un faisait échouer la recherche en base, et le visiteur recevait une erreur du
+     * serveur (500). Aucun vrai jeton n'en contient : on répond comme à un lien abîmé.
+     */
+    beforeReset: (ctx: AuthContext) => {
+      // Better Auth prend le jeton du corps, ou celui de la requête si le premier est vide
+      // (`ctx.body.token || ctx.query?.token`) : on regarde les deux, quel que soit l'ordre
+      // (relecture de la PR #86, B1).
+      const candidates: unknown[] = [objectBody(ctx).token, ctx.query?.token]
+      if (candidates.some((token) => typeof token === 'string' && token.includes('\u0000'))) {
+        throw new APIError('BAD_REQUEST', { code: 'INVALID_TOKEN', message: 'Invalid token' })
+      }
+    },
+
+    /**
      * Réglage `emailAndPassword.sendResetPassword` de Better Auth : il l'appelle seulement si un
      * compte a l'adresse, avec le jeton qu'il vient de ranger. On n'utilise jamais son `url`, qui
      * mène à sa route GET /reset-password/:token et à la page de retour choisie par le visiteur
