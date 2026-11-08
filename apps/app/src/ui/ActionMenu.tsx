@@ -76,6 +76,13 @@ type Props = {
   hint?: string
   /** Le bouton « … » lui-même, pour y poser le focus depuis le composant qui l'utilise. */
   ref?: Ref<View>
+  /**
+   * L'icône du bouton, « … » par défaut. R6a : la poignée d'une photo (`dots-six-vertical`), qui
+   * ouvre « Mettre en couverture », « Avancer », « Reculer » (`PhotoTiles`).
+   */
+  icon?: IconName
+  /** small : un petit rond posé sur une vignette, zone à toucher de 44 points (voir IconButton). */
+  size?: 'regular' | 'small'
 }
 
 /** Donne `node` à une `ref` reçue, qu'elle soit une fonction ou un objet (`useRef`). */
@@ -146,6 +153,8 @@ export function ActionMenu({
   describedById,
   hint,
   ref,
+  icon = 'dots-three',
+  size = 'regular',
 }: Props) {
   const { t } = useTranslation()
   const window = useWindowDimensions()
@@ -296,7 +305,8 @@ export function ActionMenu({
           trigger.current = node
           assign(ref, node)
         }}
-        icon="dots-three"
+        icon={icon}
+        size={size}
         label={label ?? t(($) => $.actionMenu.label)}
         {...(describedById ? { describedBy: describedById } : null)}
         {...(hint ? { hint } : null)}
