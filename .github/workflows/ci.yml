@@ -55,6 +55,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile # échoue si pnpm-lock.yaml n'est pas à jour
       - run: pnpm lint
+      # Seuls les fichiers prévus entrent dans le dépôt public (voir scripts/repo-layout.mjs).
+      - run: node scripts/repo-layout.mjs
       # Les frontières entre les parties du projet, et le schéma docs/architecture/dependances.md à jour.
       - run: pnpm arch --check
       - run: pnpm typecheck

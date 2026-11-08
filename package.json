@@ -14,8 +14,8 @@
     "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "check": "pnpm lint && pnpm arch --check && pnpm typecheck && pnpm test && pnpm test:scripts",
-    "test:scripts": "node --test scripts/advisories.test.mjs",
+    "check": "pnpm lint && node scripts/repo-layout.mjs && pnpm arch --check && pnpm typecheck && pnpm test && pnpm test:scripts",
+    "test:scripts": "node --test scripts/advisories.test.mjs scripts/repo-layout.test.mjs",
     "arch": "node scripts/architecture.mjs"
   },
   "devDependencies": {
