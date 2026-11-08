@@ -23,8 +23,12 @@ export const recipesProject: Project = {
     { label: 'Claude Code', slug: 'claude-code' },
     { label: 'Cursor', slug: 'cursor' },
   ],
-  timeSpent: 'weekend',
   prompts: ['Propose trois recettes avec : {ingrédients}'],
+  // R6a : les catégories, la difficulté et le mois de début (le temps passé a disparu).
+  primaryCategory: 'cooking',
+  secondaryCategory: 'family',
+  difficulty: 'easy',
+  startedOn: '2026-09',
   visuals: [],
   portraitCover: null,
   isMine: true,
@@ -42,13 +46,19 @@ export const recipesProject: Project = {
  * Une photo de projet, telle que l'API la décrit. Son adresse est sur l'API de développement
  * (localhost:3000) : les captures d'écran (scripts/shots.mjs) y répondent par une image d'exemple.
  */
-export const photo = (id: string, width = 1600, height = 900): ProjectVisual => ({
+export const photo = (
+  id: string,
+  width = 1600,
+  height = 900,
+  description: string | null = null, // R6a : lue par les lecteurs d'écran quand elle existe
+): ProjectVisual => ({
   id,
   kind: 'image',
   url: `http://localhost:3000/media/visuals/${id}.webp`,
   width,
   height,
   thumbhash: '3OcRJYB4d3h/iIeHeEh3eIhw+j3A', // gitleaks:allow (un résumé d'image, pas une clé)
+  description,
 })
 
 /** Le même projet, avec trois photos et une couverture verticale. */
@@ -75,9 +85,25 @@ export const summaryOf = ({ visuals, ...project }: Project): ProjectSummary => (
   demoUrl: project.demoUrl,
   reactionTotal: 0,
   portraitCover: project.portraitCover,
+  primaryCategory: project.primaryCategory,
+  secondaryCategory: project.secondaryCategory,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
 })
+
+/**
+ * R6a : un projet publié avant les catégories, jamais modifié depuis : ni catégorie, ni
+ * difficulté, ni mois de début.
+ */
+export const legacyProject: Project = {
+  ...recipesProject,
+  id: '8b3e4c0a-5d6f-4e70-9b82-9c0d1e2f3a41',
+  title: 'Mon vieux projet',
+  primaryCategory: null,
+  secondaryCategory: null,
+  difficulty: null,
+  startedOn: null,
+}
 
 /** Un second projet de Léa, privé : un brouillon. */
 export const draftProject: Project = {

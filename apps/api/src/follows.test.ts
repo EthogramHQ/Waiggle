@@ -55,6 +55,7 @@ const me = async (cookie: string) => Me.parse(await (await send('GET', '/v1/me',
 const publish = async (cookie: string, body: object = {}) => {
   const res = await send('POST', '/v1/projects', cookie, {
     title: 'Mon agent de recettes',
+    primaryCategory: 'other',
     pitch: 'Un menu avec ce qu’il y a au frigo.',
     ...body,
   })

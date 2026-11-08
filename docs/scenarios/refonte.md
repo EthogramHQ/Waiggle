@@ -1264,7 +1264,8 @@ Hors de R6a, et où ça va :
   par-dessus le fil
 - Et la feuille se ferme par « Annuler », en la glissant vers le bas (au toucher), par Échap ou
   Retour, et rend le focus au bouton qui l'a ouverte
-- Et si quelque chose a été écrit ou choisi, fermer demande d'abord « Abandonner ce projet ? »
+- Et si quelque chose a été écrit ou choisi, fermer demande d'abord « Abandonner ce projet ? »,
+  « Rien n'a encore été envoyé : ce que tu as écrit et les photos choisies seront perdus. »
   (« Continuer » / « Abandonner »), et rien n'est perdu sans cette réponse (choix 1)
 - Et avec « Réduire les animations », la feuille apparaît en fondu au lieu de monter
 - Et un membre suspendu n'a ni « + » ni « Publier » (comme aujourd'hui) ; s'il ouvre l'adresse, il
@@ -1292,7 +1293,8 @@ Hors de R6a, et où ça va :
 **La description de chaque photo** (nouveau) :
 - Quand il touche une tuile, elle s'entoure de miel
 - Alors dessous, « Description de la photo 1, facultative », et l'aide « Lue à voix haute par les
-  lecteurs d'écran. »
+  lecteurs d'écran, pour chaque personne qui voit le projet. Ne nomme personne sans son accord. »
+  (texte du juridique)
 - Et 250 caractères au plus, sans caractères invisibles
 - Et sur la page du projet, un lecteur d'écran lit cette description à la place de « Photo 1 sur 3 »
   quand elle existe
@@ -1304,8 +1306,8 @@ Hors de R6a, et où ça va :
   leurs règles
 - Le lien : « Lien de la démo, facultatif »
 - Quand il a tapé une adresse https publique
-- Alors une coche se dessine, avec « Lien valide », et dessous « Waiggle ne vérifie pas le contenu
-  des sites. »
+- Alors une coche se dessine, avec « Lien valide », et dessous « Waiggle n'ouvre pas ce site et ne
+  vérifie pas son contenu. » (texte du juridique)
 - Et « valide » veut dire la forme seulement : https, et une adresse publique ; ni l'appli ni le
   serveur n'ouvrent le site (décision de Louis du 8/11/2026)
 - Et une adresse refusée dit pourquoi, comme aujourd'hui, sans coche
@@ -1348,7 +1350,8 @@ Hors de R6a, et où ça va :
   verte), « Il faut s'accrocher » (jaune), « Pour les initiés » (rouge) ; la couleur n'est jamais
   seule, le texte dit tout
 - Et le temps passé disparaît partout : du formulaire, de « La recette », de l'API ; les valeurs
-  déjà enregistrées sont effacées (décision F-Pr14)
+  déjà enregistrées sont effacées (décision F-Pr14) en R6b, pas en R6a, pour qu'un retour à la
+  version d'avant reste possible (relecture du plan, sec-A6, décision de Louis du 8/11/2026)
 - Et sur la page du projet, « La recette » montre « Commencé en mars 2026 » et « Facile à refaire :
   Il faut s'accrocher » quand l'auteur les a donnés
 
@@ -1360,14 +1363,17 @@ Hors de R6a, et où ça va :
 - Alors ils sont retirés, et la ligne « 2 caractères invisibles ont été retirés. » le dit
 - Quand il colle un prompt qui contient une clé d'API (une forme connue : `sk-…`, `sk-ant-…`,
   `AKIA…`, `ghp_…`, `github_pat_…`, `xoxb-…`, `AIza…`, un jeton `Bearer`…)
-- Alors la clé est surlignée en rouge pâle, et un encadré dit « Clé : sk-proj-4f…a91f », « Une clé
-  d'API est collée ici. Quelqu'un pourrait s'en servir à tes frais. », avec le bouton « Retirer la
-  clé »
+- Alors un encadré sous le champ montre la clé masquée, « Clé : sk-proj…a91f », et dit « Une clé
+  d'API est collée ici. Les membres qui liront ce prompt pourraient s'en servir à tes frais. », avec
+  le bouton « Retirer la clé » (relecture du plan, ui-I9 : le champ ne surligne pas une partie de
+  son texte)
 - Et « Retirer la clé » la remplace par « [clé retirée] »
+- Et en modification, pour une clé déjà enregistrée, l'encadré ajoute : « Si elle a déjà été
+  visible, la retirer ne suffit pas : désactive-la chez son fournisseur. »
 - Et il peut publier quand même : l'encadré prévient, il ne bloque pas (choix 3) ; à la lecture,
   le repère « À lire avant de l'utiliser » de R5a reconnaît aussi ces formes de clé
-- Et la clé n'est jamais envoyée ailleurs ni gardée à part : le repérage se fait sur l'appareil, et
-  par l'API au moment de lire
+- Et la clé n'est jamais envoyée ailleurs ni gardée à part : le repérage se fait sur l'appareil, à
+  l'écriture comme à la lecture
 - Et « Les autres prompts » (4 de plus au plus) restent dans une partie repliable, avec les mêmes
   protections
 
@@ -1375,11 +1381,13 @@ Hors de R6a, et où ça va :
 
 - « Qui peut le voir ? », deux choix (décision de Louis du 8/11/2026) :
   - « Membres de Waiggle », « Toute personne qui a un compte. » (par défaut) ;
-  - « Privé », « Un brouillon, visible par toi seulement. »
+  - « Privé », « Un brouillon : aucun autre membre ne le voit. » (texte du juridique)
 - Et une phrase en bas du formulaire dit qui le verra : « Les membres de Waiggle verront ce projet,
-  et tes abonnés le trouveront dans leur fil. », ou, en privé, ce que dit aujourd'hui l'aide
-  « Privé » (personne d'autre ne le voit ; commentaires et réactions gardés, lus par personne tant
-  qu'il reste privé)
+  et tes abonnés le trouveront dans leur fil. » ; en privé, pour un nouveau projet, « Aucun autre
+  membre ne le verra. Tu pourras le montrer aux membres quand tu voudras. », et en modification ce
+  que dit aujourd'hui l'aide « Privé » (personne d'autre ne le voit ; commentaires et réactions
+  gardés, lus par personne tant qu'il reste privé ; ils reviendront s'il redevient visible des
+  membres)
 - Et « Public » n'est plus le nom de la visibilité des membres : le mot est gardé pour R12, « Public
   sur le web » (liste de conformité)
 
@@ -1410,8 +1418,13 @@ Hors de R6a, et où ça va :
 - Et un avis « Projet publié », avec la mascotte, lu aussi par les lecteurs d'écran
 - Et avec « Réduire les animations », la carte apparaît en fondu, l'abeille ne vole pas
 - Et un projet privé ne danse pas : la feuille se ferme sur la page du projet, avec « Brouillon
-  enregistré. Toi seul le vois. » (choix 5)
+  enregistré. Aucun autre membre ne le voit. » (choix 5, texte du juridique)
 - Et une erreur (réseau, quota) s'affiche en haut du formulaire, tout est gardé, « Publier » renvoie
+- Et si une photo échoue après la création du projet : ni danse ni « Projet publié » ; la feuille
+  de modification s'ouvre et dit quelles photos ajouter à nouveau, la description tapée gardée
+  (relecture du plan, jur-J11)
+- Et ses propres projets visibles des membres entrent dans son propre fil, à leur date, sans
+  jamais compter dans les nouveautés (décision de Louis du 8/11/2026)
 
 ### Modifier (F-Mod1, planche `R6-Modifier`)
 
@@ -1419,26 +1432,35 @@ Hors de R6a, et où ça va :
 - Quand il touche « Modifier »
 - Alors la même feuille (la même fenêtre sur ordinateur) : « Annuler », « Modifier le projet »,
   « Enregistrer »
-- Et « Enregistrer » est grisé tant que rien n'a changé, avec « Rien n'a changé pour l'instant. »
-  sous l'en-tête ; il redevient actif dès un changement, et grisé si le changement est défait
+- Et « Enregistrer » est grisé tant que rien n'a changé, avec « Rien à enregistrer pour
+  l'instant. » sous l'en-tête ; il redevient actif dès un changement, et grisé si le changement est
+  défait
 - Et les photos, comme aujourd'hui, s'enregistrent tout de suite (ajout, retrait, ordre,
-  description) ; « Enregistrer » vaut pour le reste (choix 6)
+  description) ; « Enregistrer » vaut pour le reste (choix 6) ; sous « Photos », « Les photos
+  s'enregistrent tout de suite. »
+- Et abandonner les changements dit « Tes changements seront perdus. Les photos, elles, sont déjà
+  enregistrées : elles restent comme tu les as laissées. »
 - Et un projet sans catégorie (publié avant R6a) : la ligne « Catégorie » dit « Choisis une
-  catégorie », et « Enregistrer » attend qu'elle soit choisie (décision de Louis du 8/11/2026)
+  catégorie », et « Enregistrer » attend qu'elle soit choisie (décision de Louis du 8/11/2026) ;
+  seul le passage en « Privé » n'en demande pas (relecture du plan, jur-J8, décision de Louis du
+  8/11/2026 : restreindre l'audience ne demande jamais une donnée nouvelle)
 - Et après « Enregistrer », la feuille se ferme sur la page, avec « Modifications enregistrées. »
 - Et seul l'auteur modifie ; un autre membre qui ouvre l'adresse lit le refus d'aujourd'hui
 
 ### Supprimer (F-Mod2, F-Mod3, planche `R6-Supprimer`)
 
-- En bas de la feuille de modification, une zone rouge : « Supprimer ce projet », et dessous « Tu es
-  la seule personne à pouvoir modifier ou supprimer ce projet. »
+- En bas de la feuille de modification, une zone rouge : « Supprimer ce projet », et dessous
+  « Aucun autre membre ne peut modifier ni supprimer ce projet. » (texte du juridique)
 - Et dans le menu « … » de la page, pour l'auteur, « Supprimer » ; le gros bouton rouge de la page
-  disparaît
+  disparaît ; « Supprimer » reste au menu pour tout auteur, même d'un projet retiré ou pendant une
+  suspension (sans « Modifier »)
 - Quand il touche « Supprimer ce projet »
 - Alors une fenêtre : la vignette du projet avec un badge de corbeille, « Supprimer « Le ciel de ce
-  soir » ? », « Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent
+  soir » ? », « Le projet, sa description, ses photos, ses prompts et ses notes disparaissent
   tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en
-  arrière. », « Annuler » et « Supprimer »
+  arrière. » (texte du juridique ; R7 dira « mises à jour »), « Annuler » et « Supprimer »
+- Et pour un projet retiré par la modération, la fenêtre ajoute que la décision de la modération et
+  la copie du signalement restent gardées un an
 - Et pendant la suppression, « Supprimer » reste occupé et la fenêtre ne se ferme pas ; une seconde
   tape n'envoie rien
 - Et après, il arrive sur « Mes projets », avec « Projet supprimé. » (choix 7)
@@ -1481,4 +1503,9 @@ Hors de R6a, et où ça va :
   de R5b vont en R6b.
 - « Qui peut le voir ? » : « Membres de Waiggle » et « Privé » seulement.
 - « Lien valide » : la forme seulement ; le serveur n'ouvre jamais le lien.
-- Les projets publiés avant R6a restent sans catégorie jusqu'à leur prochaine modification.
+- Les projets publiés avant R6a restent sans catégorie jusqu'à leur prochaine modification ;
+  passer en « Privé » n'en demande pas (relecture du plan, jur-J8).
+- Ses propres projets visibles des membres entrent dans son fil, à leur date, et ne comptent
+  jamais dans les nouveautés.
+- Relecture du plan : les textes du juridique remplacent ceux des planches (abandon, suppression,
+  « Privé », clé d'API, description d'une photo) ; la colonne du temps passé s'efface en R6b.

@@ -352,7 +352,11 @@ describe('exporting my data', () => {
     const project = await ctx.request('/v1/projects', {
       method: 'POST',
       headers: json(ines),
-      body: JSON.stringify({ title: 'Météo', pitch: 'La pluie de demain.' }),
+      body: JSON.stringify({
+        title: 'Météo',
+        primaryCategory: 'other',
+        pitch: 'La pluie de demain.',
+      }),
     })
     expect(project.status).toBe(201)
     const { id: projectId } = (await project.json()) as { id: string }
@@ -450,7 +454,11 @@ describe('deleting my account', () => {
     const project = await ctx.request('/v1/projects', {
       method: 'POST',
       headers: json(ines),
-      body: JSON.stringify({ title: 'Météo', pitch: 'La pluie de demain.' }),
+      body: JSON.stringify({
+        title: 'Météo',
+        primaryCategory: 'other',
+        pitch: 'La pluie de demain.',
+      }),
     })
     const { id: projectId } = (await project.json()) as { id: string }
     // Léa mentionne Inès, Inès mentionne Léa (son pseudo : « lea »).

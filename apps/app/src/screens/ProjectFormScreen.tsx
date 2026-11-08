@@ -11,7 +11,6 @@ import {
   type Project,
   ProjectStatus,
   publicHttpsUrl,
-  TimeSpent,
   TOOL_MAX_LENGTH,
   VISUALS_MAX,
   type VisualSlot,
@@ -372,7 +371,7 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
 
   // L'adresse de démo est vérifiée pendant la frappe : le membre sait tout de suite si elle ira.
   const demoOk = form.demoUrl.trim() !== '' && publicHttpsUrl(form.demoUrl.trim()) !== null
-  const hasRecipe = form.tools.trim() !== '' || form.timeSpent !== null || form.prompts.length > 0
+  const hasRecipe = form.tools.trim() !== '' || form.prompts.length > 0
   const back = useGoBack('/')
   const submit = {
     label: projectId ? t(($) => $.project.edit.submit) : t(($) => $.project.new.submit),
@@ -471,16 +470,6 @@ function ProjectFormView({ initial, projectId, uploadFailed = false }: ViewProps
           removeLabel={(item) => t(($) => $.common.remove, { item })}
           limit={t(($) => $.project.fields.toolsLimit, { max: PROJECT_TOOLS_MAX })}
           error={errorText(errors.tools)}
-        />
-        <Choices
-          label={t(($) => $.project.fields.timeSpent)}
-          // « Non précisé » correspond à null : on le représente par la valeur 'unknown'.
-          options={(['unknown', ...TimeSpent.options] as const).map((value) => ({
-            value,
-            label: t(($) => $.project.timeSpent[value]),
-          }))}
-          value={form.timeSpent ?? 'unknown'}
-          onChange={(value) => change('timeSpent')(value === 'unknown' ? null : value)}
         />
         <Stack gap="md">
           <Text variant="headline">{t(($) => $.project.fields.prompts)}</Text>

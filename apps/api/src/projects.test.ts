@@ -26,7 +26,11 @@ afterEach(async () => {
   await ctx.close()
 })
 
-const recipes = { title: 'Mon agent de recettes', pitch: 'Un menu avec ce qu’il y a au frigo.' }
+const recipes = {
+  title: 'Mon agent de recettes',
+  pitch: 'Un menu avec ce qu’il y a au frigo.',
+  primaryCategory: 'cooking',
+}
 
 const send = (method: string, path: string, cookie: string | null, body?: unknown) =>
   ctx.request(path, {
@@ -48,7 +52,7 @@ const publish = async (body: object = recipes, cookie = lea) => {
 const read = (id: string, cookie: string | null) => send('GET', `/v1/projects/${id}`, cookie)
 
 describe('publishing a project', () => {
-  it('only needs a title and a pitch, and starts as a public idea without demo', async () => {
+  it('only needs a title, a pitch and a category, and starts as a public idea without demo', async () => {
     const project = await publish()
 
     expect(project).toMatchObject({
@@ -58,7 +62,6 @@ describe('publishing a project', () => {
       visibility: 'public',
       demoUrl: null,
       tools: [],
-      timeSpent: null,
       prompts: [],
       isMine: true,
       author: { name: 'Léa', avatarUrl: null },
@@ -72,7 +75,6 @@ describe('publishing a project', () => {
       status: 'testable',
       demoUrl: 'https://recettes.example.com',
       tools: ['Claude Code', 'claude-code', 'Éclair 2.0'],
-      timeSpent: 'weekend',
       prompts: ['Propose trois recettes avec : {ingrédients}'],
     })
 
@@ -84,7 +86,6 @@ describe('publishing a project', () => {
         { label: 'Claude Code', slug: 'claude-code' },
         { label: 'Éclair 2.0', slug: 'eclair-2-0' },
       ],
-      timeSpent: 'weekend',
       prompts: ['Propose trois recettes avec : {ingrédients}'],
     })
   })

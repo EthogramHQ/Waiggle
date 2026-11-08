@@ -56,7 +56,6 @@ import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { Dialog } from '../ui/Dialog'
 import type { Focusable } from '../ui/focus'
-import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
 import { NoteComposer } from '../ui/NoteComposer'
@@ -171,7 +170,6 @@ function ProjectView({ project }: { project: Project }) {
   const goBack = useGoBack('/')
   const back = () => coverTarget.leave(goBack)
   const reaction = useReaction(project.id)
-  const { timeSpent } = project
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
   // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne réagit plus et n'écrit plus
@@ -354,9 +352,10 @@ function ProjectView({ project }: { project: Project }) {
   // et comment contester.
   const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
 
-  // La recette : les outils et le temps passé (jusqu'à R6). Les prompts ont leur propre bloc.
+  // La recette : les outils (R6a : le temps passé a disparu ; le mois de début et la difficulté
+  // arrivent avec U6a). Les prompts ont leur propre bloc.
   const recipe =
-    project.tools.length > 0 || timeSpent ? (
+    project.tools.length > 0 ? (
       <Surface variant="grouped" padding="xl" gap="lg">
         <Text variant="heading" heading={2}>
           {t(($) => $.project.page.recipe)}
@@ -377,17 +376,6 @@ function ProjectView({ project }: { project: Project }) {
                 />
               ))}
             </Stack>
-          </Stack>
-        ) : null}
-        {timeSpent ? (
-          <Stack gap="sm">
-            <Text variant="caption" weight={600} tone="muted">
-              {t(($) => $.project.page.timeSpent)}
-            </Text>
-            <Row gap="sm">
-              <Icon name="clock" size={20} tone="amber" />
-              <Text weight={600}>{t(($) => $.project.timeSpent[timeSpent])}</Text>
-            </Row>
           </Stack>
         ) : null}
       </Surface>

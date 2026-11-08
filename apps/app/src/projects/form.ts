@@ -6,7 +6,6 @@ import {
   ProjectInput,
   type ProjectStatus,
   type ProjectVisibility,
-  type TimeSpent,
 } from '@ruche/contracts'
 import { parseTools } from '../profile/form'
 
@@ -19,7 +18,6 @@ export type ProjectForm = {
   visibility: ProjectVisibility
   demoUrl: string
   tools: string
-  timeSpent: TimeSpent | null
   prompts: string[]
 }
 
@@ -32,7 +30,6 @@ export const emptyProjectForm: ProjectForm = {
   visibility: 'public',
   demoUrl: '',
   tools: '',
-  timeSpent: null,
   prompts: [],
 }
 
@@ -45,7 +42,6 @@ export const formFromProject = (project: Project): ProjectForm => ({
   visibility: project.visibility,
   demoUrl: project.demoUrl ?? '',
   tools: project.tools.map((tool) => tool.label).join(', '),
-  timeSpent: project.timeSpent,
   prompts: project.prompts,
 })
 

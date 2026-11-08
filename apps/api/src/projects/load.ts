@@ -12,7 +12,6 @@ import {
   ProjectVisibility,
   type ProjectVisual,
   Thumbhash,
-  TimeSpent,
   toolSlug,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -49,6 +48,9 @@ const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
   height: media.height,
   // Calculé par notre serveur ; vérifié quand même, comme tout ce qui sort de la base.
   thumbhash: Thumbhash.parse(media.thumbhash),
+  // R6a : provisoire (commit du contrat) ; la colonne `project_media.description` arrive avec le
+  // backend de la tranche, qui la lit ici.
+  description: null,
 })
 
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
@@ -108,8 +110,13 @@ const toProjectBase = (
     label,
     slug: project.toolSlugs[i] ?? toolSlug(label),
   })),
-  timeSpent: project.timeSpent === null ? null : TimeSpent.parse(project.timeSpent),
   prompts: project.prompts,
+  // R6a : provisoire (commit du contrat) ; les colonnes arrivent avec le backend de la tranche, qui
+  // les lit ici. Le temps passé n'est plus renvoyé (sa colonne s'efface en R6b).
+  primaryCategory: null,
+  secondaryCategory: null,
+  difficulty: null,
+  startedOn: null,
   // Les médias arrivent déjà triés par position : la galerie garde l'ordre choisi par l'auteur.
   visuals: media
     .filter((m) => m.projectId === project.id && m.slot === 'gallery')
@@ -243,6 +250,9 @@ const toSummary = (
   // R3 : le lien de la démo sur la carte (« Tester » sans ouvrir la page du projet).
   demoUrl: project.demoUrl,
   portraitCover: project.portraitCover,
+  // R6a : les catégories, pour l'étiquette de la carte.
+  primaryCategory: project.primaryCategory,
+  secondaryCategory: project.secondaryCategory,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
   reactionTotal,

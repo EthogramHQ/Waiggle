@@ -154,7 +154,6 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       visibility,
       demoUrl: input.demoUrl ?? null,
       ...withSlugs(input.tools ?? []),
-      timeSpent: input.timeSpent ?? null,
       prompts: input.prompts ?? [],
       // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
       // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
@@ -204,7 +203,6 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
       ...(changes.tools !== undefined && withSlugs(changes.tools)),
-      ...(changes.timeSpent !== undefined && { timeSpent: changes.timeSpent }),
       ...(changes.prompts !== undefined && { prompts: changes.prompts }),
     }
     // Tout dans une transaction : si le nouvel ordre des photos est refusé, rien n'est enregistré,

@@ -43,8 +43,9 @@ export const MODERATION_PASSWORD_FAILURES_PER_DAY = 5
 /**
  * Les champs qu'un membre saisit (tranche 7b), nommés comme au registre des entrées
  * (apps/api/src/moderation/inputs.ts) : profil (name, handle, bio, favoriteTools, avatar), projet
- * (title, pitch, description, prompt, tools, demoUrl, cover, photo), note et commentaire (body).
- * `text` : la copie d'un signalement d'avant 7b, un texte seul (il ne se retire pas comme une partie).
+ * (title, pitch, description, prompt, tools, demoUrl, cover, photo, photoDescription), note et
+ * commentaire (body). `text` : la copie d'un signalement d'avant 7b, un texte seul (il ne se retire
+ * pas comme une partie). `photoDescription` (R6a) : la description d'une photo, du texte.
  */
 export const MemberInputField = z.enum([
   'text',
@@ -61,6 +62,7 @@ export const MemberInputField = z.enum([
   'demoUrl',
   'cover',
   'photo',
+  'photoDescription',
   'body',
 ])
 export type MemberInputField = z.infer<typeof MemberInputField>

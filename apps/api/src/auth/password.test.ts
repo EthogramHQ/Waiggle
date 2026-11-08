@@ -573,7 +573,7 @@ describe('choosing a new password from the link', () => {
     expect((await me(cookie)).status).toBe(200)
     const post1 = await post(
       '/v1/projects',
-      { title: 'Météo', pitch: 'La pluie de demain.' },
+      { title: 'Météo', primaryCategory: 'other', pitch: 'La pluie de demain.' },
       { cookie },
     )
     expect(post1.status).toBe(403)
@@ -841,7 +841,7 @@ describe('changing my password from the settings', () => {
     expect(res.status).toBe(200)
     const project = await post(
       '/v1/projects',
-      { title: 'Météo', pitch: 'La pluie de demain.' },
+      { title: 'Météo', primaryCategory: 'other', pitch: 'La pluie de demain.' },
       { cookie },
     )
     expect(project.status).toBe(403)

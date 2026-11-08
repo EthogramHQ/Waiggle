@@ -18,10 +18,11 @@ import { NO_REACTIONS } from './reactions'
 const valid = {
   title: 'Mon agent de recettes',
   pitch: 'Il propose un menu avec ce qu’il y a au frigo.',
+  primaryCategory: 'cooking',
 }
 
 describe('ProjectInput', () => {
-  it('only needs a title and a pitch', () => {
+  it('only needs a title, a pitch and a category', () => {
     expect(ProjectInput.parse(valid)).toEqual(valid)
   })
 
@@ -43,12 +44,12 @@ describe('ProjectInput', () => {
     )
   })
 
-  it('only accepts the known statuses, visibilities and time spans', () => {
+  it('only accepts the known statuses, visibilities and difficulties', () => {
     expect(ProjectInput.safeParse({ ...valid, status: 'testable' }).success).toBe(true)
     expect(ProjectInput.safeParse({ ...valid, status: 'abandonné' }).success).toBe(false)
     expect(ProjectInput.safeParse({ ...valid, visibility: 'friends' }).success).toBe(false)
-    expect(ProjectInput.safeParse({ ...valid, timeSpent: 'weekend' }).success).toBe(true)
-    expect(ProjectInput.safeParse({ ...valid, timeSpent: '3h' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, difficulty: 'medium' }).success).toBe(true)
+    expect(ProjectInput.safeParse({ ...valid, difficulty: 'facile' }).success).toBe(false)
   })
 
   it('removes duplicate tools and empty prompts, within their limits', () => {
@@ -156,6 +157,7 @@ const visual = {
   height: 900,
   // Le ThumbHash d'une vraie image : une vingtaine d'octets, écrits en base64.
   thumbhash: '3OcRJYB4d3h/iIeHeEh3eIhw+j3A', // gitleaks:allow (un résumé d'image, pas une clé)
+  description: null,
 }
 
 describe('Thumbhash', () => {
@@ -200,8 +202,11 @@ describe('Project with its visuals', () => {
     visibility: 'public',
     demoUrl: null,
     tools: [],
-    timeSpent: null,
     prompts: [],
+    primaryCategory: null,
+    secondaryCategory: null,
+    difficulty: null,
+    startedOn: null,
     isMine: true,
     isFollowed: false,
     followerCount: 0,

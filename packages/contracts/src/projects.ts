@@ -59,21 +59,99 @@ export const ProjectVisual = z
     width: z.int().positive(),
     height: z.int().positive(),
     thumbhash: Thumbhash,
+    /**
+     * La description de la photo écrite par l'auteur (R6a), lue par les lecteurs d'écran à la place
+     * de « Photo 1 sur 3 ». Du texte brut, jamais du Markdown ; null : pas de description.
+     */
+    description: z.string().nullable(),
   })
   .meta({ id: 'ProjectVisual' })
 export type ProjectVisual = z.infer<typeof ProjectVisual>
+
+/** La description d'une photo : 250 caractères au plus (R6a). */
+export const PHOTO_DESCRIPTION_MAX = 250
+
+/**
+ * Ce qu'un membre écrit pour décrire une photo. Une case vide (ou faite d'espaces) devient null :
+ * effacer la description, c'est vider le champ.
+ */
+export const VisualDescription = FreeText(PHOTO_DESCRIPTION_MAX)
+  .nullable()
+  .transform((text) => (text ? text : null))
+
+/** Ce que PATCH /v1/projects/{id}/visuals/{visualId} accepte (R6a) : la description, seule. */
+export const VisualUpdate = z
+  .strictObject({ description: VisualDescription })
+  .meta({ id: 'VisualUpdate' })
+export type VisualUpdate = z.infer<typeof VisualUpdate>
 
 // z.enum : une liste fermée de valeurs. Les textes affichés (« En construction »…) sont dans les
 // traductions ; ici, seulement des codes stables, en anglais.
 export const ProjectStatus = z.enum(['idea', 'building', 'testable', 'done', 'paused'])
 export type ProjectStatus = z.infer<typeof ProjectStatus>
 
+// « public » reste le code stable ; l'appli l'affiche « Membres de Waiggle » (R6a) : seuls les
+// membres connectés voient un projet, jamais le web ouvert.
 export const ProjectVisibility = z.enum(['public', 'private'])
 export type ProjectVisibility = z.infer<typeof ProjectVisibility>
 
-/** Temps passé, par tranches : moins d'une heure, une soirée, un week-end, des semaines, des mois. */
-export const TimeSpent = z.enum(['hour', 'evening', 'weekend', 'weeks', 'months'])
-export type TimeSpent = z.infer<typeof TimeSpent>
+/**
+ * Les catégories d'un projet (R6a), dans l'ordre de la feuille de publication. Une principale,
+ * obligatoire à la création, et une seconde facultative. Les noms affichés sont dans les traductions
+ * (`project.category.<code>`).
+ */
+export const PROJECT_CATEGORIES = [
+  'home-garden',
+  'cooking',
+  'family',
+  'learning',
+  'games',
+  'art',
+  'music',
+  'photo-video',
+  'health-sport',
+  'travel',
+  'money',
+  'work',
+  'code',
+  'animals',
+  'science',
+  'other',
+] as const
+export const ProjectCategory = z.enum(PROJECT_CATEGORIES)
+export type ProjectCategory = z.infer<typeof ProjectCategory>
+
+/** « Facile à refaire ? » (R6a) : facile, il faut s'accrocher, difficile. */
+export const ProjectDifficulty = z.enum(['easy', 'medium', 'hard'])
+export type ProjectDifficulty = z.infer<typeof ProjectDifficulty>
+
+/** Le plus ancien mois accepté pour « Commencé en ». */
+export const STARTED_MONTH_FLOOR = '2000-01'
+
+// Kiritimati (îles de la Ligne) vit à UTC+14 : c'est là que chaque mois commence en premier.
+const EARLIEST_TIME_ZONE_OFFSET_MS = 14 * 60 * 60 * 1000
+
+/**
+ * Le dernier mois accepté pour « Commencé en » : le mois en cours à Kiritimati. Ainsi, quel que soit
+ * le fuseau du membre, le mois qu'il voit sur son calendrier n'est jamais refusé. L'appli lit la
+ * même borne pour griser les mois à venir.
+ */
+export const startedMonthMax = (now: Date): string => {
+  const ahead = new Date(now.getTime() + EARLIEST_TIME_ZONE_OFFSET_MS)
+  const month = String(ahead.getUTCMonth() + 1).padStart(2, '0')
+  return `${ahead.getUTCFullYear()}-${month}`
+}
+
+/**
+ * Un mois « AAAA-MM » (R6a) : chiffres ASCII seulement, mois de 01 à 12, de janvier 2000 au mois en
+ * cours (lu à l'heure de la vérification). Deux chaînes de cette forme se comparent comme des dates.
+ */
+export const StartedMonth = z
+  .string()
+  .regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/, { message: 'must be a month written YYYY-MM' })
+  .refine((month) => month >= STARTED_MONTH_FLOOR && month <= startedMonthMax(new Date()), {
+    message: 'must be a month between 2000-01 and now',
+  })
 
 // Suffixes de noms qui ne désignent pas un site public : réseaux locaux (box, imprimante, NAS…),
 // noms réservés aux tests ou aux documentations, réseau Tor. Un lien vers eux ne marcherait que
@@ -165,17 +243,31 @@ const fields = {
   visibility: ProjectVisibility,
   demoUrl: DemoUrl.nullable(), // null : pas (ou plus) de démo
   tools: z.array(ShortLabel(TOOL_MAX_LENGTH)).max(PROJECT_TOOLS_MAX).transform(uniqueIgnoringCase),
-  timeSpent: TimeSpent.nullable(),
   prompts: z
     .array(PromptText)
     .max(PROJECT_PROMPTS_MAX)
     .transform((prompts) => prompts.filter((prompt) => prompt.length > 0)), // ignore les cases vides
+  // R6a : les catégories, la difficulté et le mois de début. (Le temps passé a disparu.)
+  primaryCategory: ProjectCategory,
+  secondaryCategory: ProjectCategory.nullable(),
+  difficulty: ProjectDifficulty.nullable(),
+  startedOn: StartedMonth.nullable(),
 }
 
+// Le message d'une seconde catégorie égale à la principale ; l'API le traduit pour le membre.
+const SAME_CATEGORY = { message: 'the second category must differ from the primary one' }
+const secondDiffers = (value: {
+  primaryCategory?: ProjectCategory | undefined
+  secondaryCategory?: ProjectCategory | null | undefined
+}) => value.secondaryCategory == null || value.secondaryCategory !== value.primaryCategory
+
 /**
- * Ce que POST /v1/projects accepte : un titre et un pitch, le reste est facultatif (le serveur
- * applique les valeurs par défaut : idée, public, sans démo…). strictObject refuse tout champ
- * inconnu, par exemple un « authorId » qui ferait publier au nom de quelqu'un d'autre.
+ * Ce que POST /v1/projects accepte : un titre, un pitch et une catégorie principale ; le reste est
+ * facultatif (le serveur applique les valeurs par défaut : idée, public, sans démo…). strictObject
+ * refuse tout champ inconnu, par exemple un « authorId » qui ferait publier au nom de quelqu'un
+ * d'autre (ou un « timeSpent » envoyé par une appli d'avant R6a).
+ * refine ajoute une règle qui lit plusieurs champs à la fois : la seconde catégorie diffère de la
+ * principale.
  */
 export const ProjectInput = z
   .strictObject({
@@ -186,9 +278,12 @@ export const ProjectInput = z
     visibility: fields.visibility.optional(),
     demoUrl: fields.demoUrl.optional(),
     tools: fields.tools.optional(),
-    timeSpent: fields.timeSpent.optional(),
     prompts: fields.prompts.optional(),
+    secondaryCategory: fields.secondaryCategory.optional(),
+    difficulty: fields.difficulty.optional(),
+    startedOn: fields.startedOn.optional(),
   })
+  .refine(secondDiffers, { ...SAME_CATEGORY, path: ['secondaryCategory'] })
   .meta({ id: 'ProjectInput' })
 export type ProjectInput = z.infer<typeof ProjectInput>
 
@@ -203,11 +298,15 @@ const VisualOrder = z
 
 /**
  * Ce que PATCH /v1/projects/:id accepte : n'importe quelle partie des champs, et le nouvel ordre
- * des photos. (Ajouter ou retirer une photo passe par ses propres routes.)
+ * des photos. (Ajouter ou retirer une photo passe par ses propres routes ; la décrire aussi.)
+ * La catégorie principale peut changer mais jamais redevenir nulle. La règle « seconde différente
+ * de la principale » se vérifie ici quand le corps porte les deux ; l'API la vérifie en plus contre
+ * les valeurs déjà enregistrées quand il n'en porte qu'une.
  */
 export const ProjectUpdate = z
   .strictObject({ ...fields, visualOrder: VisualOrder })
   .partial()
+  .refine(secondDiffers, { ...SAME_CATEGORY, path: ['secondaryCategory'] })
   .meta({ id: 'ProjectUpdate' })
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>
 
@@ -233,8 +332,16 @@ export const Project = z
     visibility: ProjectVisibility,
     demoUrl: z.string().nullable(),
     tools: z.array(ProjectTool),
-    timeSpent: TimeSpent.nullable(),
     prompts: z.array(z.string()),
+    /** La catégorie principale ; null pour un projet publié avant R6a et jamais modifié depuis. */
+    primaryCategory: ProjectCategory.nullable(),
+    secondaryCategory: ProjectCategory.nullable(),
+    difficulty: ProjectDifficulty.nullable(),
+    /**
+     * Le mois de début, « AAAA-MM ». En sortie, une chaîne simple (sec-M1) : la borne du mois en
+     * cours ne vaut qu'à l'écriture, et une heure de serveur en avance ne doit pas casser la lecture.
+     */
+    startedOn: z.string().nullable(),
     /** La galerie, dans l'ordre choisi par l'auteur : la première photo sert de couverture. */
     visuals: z.array(ProjectVisual).max(VISUALS_MAX),
     /** La couverture verticale, affichée sur téléphone ; null : on recadre la première photo. */
@@ -280,6 +387,8 @@ export const ProjectSummary = Project.pick({
   tools: true,
   demoUrl: true,
   portraitCover: true,
+  primaryCategory: true,
+  secondaryCategory: true,
   createdAt: true,
   updatedAt: true,
 })

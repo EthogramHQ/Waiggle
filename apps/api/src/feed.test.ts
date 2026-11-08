@@ -87,6 +87,7 @@ const publish = async (cookie: string, body: object = {}, { wait = true } = {}) 
   if (wait) later()
   const res = await send('POST', '/v1/projects', cookie, {
     title: 'Un projet',
+    primaryCategory: 'other',
     pitch: 'Un pitch.',
     ...body,
   })

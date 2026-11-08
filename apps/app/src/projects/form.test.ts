@@ -16,7 +16,6 @@ describe('toProjectChanges', () => {
         visibility: 'public',
         demoUrl: null, // case vide : pas de démo
         tools: [],
-        timeSpent: null,
         prompts: [],
       },
     })
@@ -95,7 +94,6 @@ describe('formFromProject', () => {
       visibility: 'public',
       demoUrl: 'https://recettes.example.com',
       tools: 'Claude Code, Cursor',
-      timeSpent: 'weekend',
       prompts: ['Propose trois recettes avec : {ingrédients}'],
     })
   })

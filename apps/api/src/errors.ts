@@ -33,6 +33,9 @@ const errorMessages = {
   cannot_suspend_admin: 'cannotSuspendAdmin',
   // Tranche R2 : corriger l'adresse d'un compte déjà vérifié.
   already_verified: 'alreadyVerified',
+  // Tranche R6a : les catégories d'un projet.
+  category_required: 'categoryRequired',
+  same_category: 'sameCategory',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

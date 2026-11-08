@@ -39,6 +39,7 @@ const sendJson = (method: string, path: string, cookie: string, body?: unknown) 
 const publish = async (visibility: 'public' | 'private' = 'public', cookie = lea) => {
   const res = await sendJson('POST', '/v1/projects', cookie, {
     title: 'Mon agent de recettes',
+    primaryCategory: 'other',
     pitch: 'Un menu avec ce qu’il y a au frigo.',
     visibility,
   })
