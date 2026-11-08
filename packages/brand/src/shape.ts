@@ -72,6 +72,8 @@ export const layout = {
   tabBar: { publish: 56, avatar: 28 },
   chipHeight: 36, // hauteur dessinée d'une étiquette (sa zone à toucher, autour, fait 44)
   chipControl: 28, // rond du bouton « retirer » posé dans une étiquette
+  // R6a : le rond de couleur posé devant le libellé d'un choix (« Facile à refaire ? », Choices `dot`)
+  choiceDot: 12,
   // Hauteurs d'une couverture de projet : grande sur ordinateur, bande sans photo, verticale sur
   // téléphone (une photo plus haute que large a besoin de hauteur pour ne pas être trop recadrée).
   // medium : la galerie d'un projet sur tablette ou petite fenêtre (relecture de design de R5a) ; à
