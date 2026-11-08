@@ -105,6 +105,7 @@ import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
+import { PublishSheetCatalogue } from './publier-feuille'
 import { PublishPhotosCatalogue } from './publier-photos'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
@@ -830,6 +831,7 @@ export function CatalogueScreen() {
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
       <AccountCatalogue />
       <SheetsCatalogue />
+      <PublishSheetCatalogue />
       {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
       <EntryCatalogue />
       {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
