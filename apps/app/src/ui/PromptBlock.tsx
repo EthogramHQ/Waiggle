@@ -200,6 +200,8 @@ const reasonText = (t: ReturnType<typeof useTranslation>['t'], warning: PromptWa
       return t(($) => $.project.prompts.reasons.link)
     case 'encoded':
       return t(($) => $.project.prompts.reasons.encoded)
+    case 'apiKey':
+      return t(($) => $.project.prompts.reasons.apiKey)
     case 'secret':
       return t(($) => $.project.prompts.reasons.secret)
   }

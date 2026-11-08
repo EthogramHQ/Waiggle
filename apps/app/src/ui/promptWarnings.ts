@@ -1,14 +1,17 @@
 // Les repères d'un prompt (tranche R5a, F-Pr10) : « À lire avant de l'utiliser », quand un prompt
 // partagé contient une commande, un lien, un long bloc codé, ou parle d'un secret. Un prompt se
 // copie pour être collé dans une IA, parfois dans un terminal : ces quatre familles sont celles qui
-// peuvent faire agir la personne sans qu'elle s'en rende compte.
+// peuvent faire agir la personne sans qu'elle s'en rende compte. Depuis R6a, une cinquième : une clé
+// d'API reconnue par sa forme (« sk-proj-… », « AKIA… »), pour qui lit le prompt comme pour son
+// auteur.
 //
 // Le repère dit ce qu'il a trouvé, jamais une intention (relecture juridique jur-7) : il prévient,
 // il ne garantit rien. Un prompt sans repère n'est pas « sûr » ; c'est pourquoi la phrase de
 // prudence s'affiche toujours, repère ou non (PromptBlock).
 //
-// Fonction pure, sans dépendance : rangée dans `src/ui`, à côté de son seul appelant, car un
-// composant de `ui` n'importe aucun domaine (scripts/architecture.mjs).
+// Fonction pure, sans autre dépendance que le contrat (`findApiKeys`, pur lui aussi) : rangée dans
+// `src/ui`, à côté de son seul appelant, car un composant de `ui` n'importe aucun domaine
+// (scripts/architecture.mjs).
 //
 // Comment on cherche (relecture de sécurité sec-B2) :
 // - sur une copie « pliée » du texte : NFKC (les lettres de pleine chasse « ＣＵＲＬ » redeviennent
@@ -23,10 +26,19 @@
 //   dans une répétition) : un texte écrit pour la ralentir reste lu en un passage (sec-B2 : 20
 //   lectures de 4 000 caractères piégés en moins de 200 ms, promptWarnings.test.ts).
 
-/** Les quatre familles de repères, dans l'ordre où elles s'affichent. */
-export type PromptWarning = 'command' | 'link' | 'encoded' | 'secret'
+import { findApiKeys } from '@ruche/contracts'
 
-const ORDER: readonly PromptWarning[] = ['command', 'link', 'encoded', 'secret']
+/**
+ * Les familles de repères, dans l'ordre où elles s'affichent. `apiKey` (R6a, jur-J12) : une clé
+ * d'API reconnue par sa forme (`findApiKeys`, le contrat), et non plus seulement un mot qui parle
+ * d'un secret.
+ */
+export type PromptWarning = 'command' | 'link' | 'encoded' | 'apiKey' | 'secret'
+
+// La clé passe juste avant `secret` : les deux parlent de ce qu'il faut garder pour soi, et la plus
+// précise se lit d'abord (« ce qui ressemble à une clé d'API », puis « il parle d'informations à
+// garder pour soi »). Les trois premières gardent la place qu'elles avaient en R5a.
+const ORDER: readonly PromptWarning[] = ['command', 'link', 'encoded', 'apiKey', 'secret']
 
 // Les apostrophes courbes (‘ ’) et la lettre-apostrophe (ʼ), écrites par leur numéro : recopiées
 // telles quelles, on ne les distinguerait pas de l'apostrophe droite en relisant le code.
@@ -158,18 +170,23 @@ const SECRET_WORDS = words([
 
 /**
  * Les repères d'un prompt, chaque famille une fois au plus, toujours dans l'ordre commande, lien,
- * bloc codé, secret (l'ordre d'affichage ne suit pas le texte). Le prompt reçu doit être celui
- * qu'on affiche et qu'on copie, déjà nettoyé par `cleanPrompt` (sec-B1) : un espace sans largeur
- * glissé au milieu de « curl » en a été retiré.
+ * bloc codé, clé d'API, secret (l'ordre d'affichage ne suit pas le texte). Le prompt reçu doit être
+ * celui qu'on affiche et qu'on copie, déjà nettoyé par `cleanPrompt` (sec-B1) : un espace sans
+ * largeur glissé au milieu de « curl » en a été retiré.
  */
 export function promptWarnings(text: string): PromptWarning[] {
   const lines = fold(text)
   // Pour les mots sur plusieurs lignes (« mot de\npasse ») : tous les blancs deviennent une espace.
   const flat = lines.replace(/\s+/g, ' ')
+  // Le texte sans ses caractères sans largeur, mais avec sa casse : une clé se reconnaît à ses
+  // majuscules (« AKIA… »), que la copie pliée a perdues (sec-A4 : la recherche se fait sur le texte
+  // nettoyé, avant le repli). NFKC ramène aussi une clé écrite en pleine chasse à sa forme ordinaire.
+  const visible = text.normalize('NFKC').replace(INVISIBLE, '')
   const found: Record<PromptWarning, boolean> = {
     command: COMMAND_WORDS.test(flat) || COMMAND_PIPE.test(flat) || COMMAND_PROMPT.test(lines),
     link: LINK.test(flat),
-    encoded: ENCODED.test(text.normalize('NFKC').replace(INVISIBLE, '').replace(ADDRESSES, ' ')),
+    encoded: ENCODED.test(visible.replace(ADDRESSES, ' ')),
+    apiKey: findApiKeys(visible).length > 0,
     secret: SECRET_WORDS.test(flat),
   }
   return ORDER.filter((warning) => found[warning])
