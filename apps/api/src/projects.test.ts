@@ -1,7 +1,21 @@
 // Tests d'intégration de la tranche 3a : publier, lire, modifier et supprimer un projet.
 // Scénarios : docs/scenarios/phase-1.md, tranche 3. Deux membres : Léa (l'autrice) et Max.
-import { AccountExport, Comment, ErrorResponse, Me, Project, ProjectNote } from '@ruche/contracts'
+import {
+  AccountExport,
+  Comment,
+  DiscoverFeedPage,
+  ErrorResponse,
+  Me,
+  Member,
+  Project,
+  ProjectNote,
+  type ProjectSummary,
+  SearchResults,
+  startedMonthMax,
+  TagPage,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -677,5 +691,350 @@ describe('my reactions and comments in my data', () => {
 
     expect(data.reactions).toEqual([])
     expect(data.comments).toEqual([])
+  })
+})
+
+// --- Tranche R6a : catégories, « Commencé en » et « Facile à refaire ? » ---
+// Scénario : docs/scenarios/refonte.md, section R6a (« Catégorie et outils », « Commencé en » et
+// « Facile à refaire ? », « Modifier ») ; relecture du plan : sec-M2, jur-J8, jur-J13.
+// Les descriptions des photos ont leurs tests dans visuals.test.ts (export et effacement compris).
+
+/** Le corps d'erreur d'une réponse, vérifié par le contrat. */
+const errorOf = async (res: Response) => ErrorResponse.parse(await res.json())
+
+/**
+ * Un projet publié avant R6a, sans catégorie. L'API exige maintenant la catégorie à la création :
+ * on publie normalement, puis on efface les catégories dans la base, comme les lignes d'avant la
+ * migration (colonnes ajoutées vides). Le SQL est brut : les colonnes n'existent pas encore dans
+ * le schéma typé quand ce test est écrit.
+ */
+const publishBeforeR6a = async (body: object = recipes, cookie = lea) => {
+  const project = await publish(body, cookie)
+  await ctx.db.execute(
+    sql`update project set primary_category = null, secondary_category = null where id = ${project.id}`,
+  )
+  return project
+}
+
+const readProject = async (id: string, cookie = lea) =>
+  Project.parse(await (await read(id, cookie)).json())
+
+describe('the categories, the month and the difficulty of a project (R6a)', () => {
+  const telescope = {
+    title: 'Le télescope qui raconte',
+    pitch: 'Il nomme les étoiles que vise la lunette.',
+    primaryCategory: 'science',
+    secondaryCategory: 'learning',
+    startedOn: '2024-03',
+    difficulty: 'medium',
+  }
+
+  it('saves the categories, the month and the difficulty, and shows them to another member', async () => {
+    const project = await publish(telescope)
+
+    const expected = {
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+      startedOn: '2024-03',
+      difficulty: 'medium',
+    }
+    expect(project).toMatchObject(expected)
+    expect(await readProject(project.id, max)).toMatchObject(expected)
+  })
+
+  it('leaves the second category, the month and the difficulty empty when they are not given', async () => {
+    const project = await publish()
+
+    expect(project).toMatchObject({
+      primaryCategory: 'cooking',
+      secondaryCategory: null,
+      startedOn: null,
+      difficulty: null,
+    })
+  })
+
+  it('changes and clears them in an update', async () => {
+    const { id } = await publish(telescope)
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, {
+      primaryCategory: 'games',
+      secondaryCategory: null,
+      startedOn: null,
+      difficulty: 'hard',
+    })
+
+    expect(res.status).toBe(200)
+    const expected = {
+      primaryCategory: 'games',
+      secondaryCategory: null,
+      startedOn: null,
+      difficulty: 'hard',
+    }
+    expect(Project.parse(await res.json())).toMatchObject(expected)
+    expect(await readProject(id)).toMatchObject(expected)
+  })
+
+  it('keeps the categories when an update does not mention them', async () => {
+    const { id } = await publish(telescope)
+
+    expect((await send('PATCH', `/v1/projects/${id}`, lea, { status: 'done' })).status).toBe(200)
+
+    expect(await readProject(id)).toMatchObject({
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+      startedOn: '2024-03',
+      difficulty: 'medium',
+    })
+  })
+
+  it('refuses a creation without a category, or with an unknown one', async () => {
+    const { primaryCategory: _, ...withoutCategory } = recipes
+
+    for (const body of [withoutCategory, { ...recipes, primaryCategory: 'jardinage' }]) {
+      expect((await send('POST', '/v1/projects', lea, body)).status).toBe(400)
+    }
+    expect(await ctx.db.select().from(schema.project)).toHaveLength(0)
+  })
+
+  it('refuses a second category equal to the primary, at creation as in an update', async () => {
+    const creation = await send('POST', '/v1/projects', lea, {
+      ...recipes,
+      secondaryCategory: 'cooking',
+    })
+    expect(creation.status).toBe(400)
+    expect(await ctx.db.select().from(schema.project)).toHaveLength(0)
+
+    const { id } = await publish(telescope)
+    const update = await send('PATCH', `/v1/projects/${id}`, lea, {
+      primaryCategory: 'art',
+      secondaryCategory: 'art',
+    })
+    expect(update.status).toBe(400)
+    expect(await readProject(id)).toMatchObject({
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+    })
+  })
+
+  it('refuses a second category equal to the current primary when the update leaves it unchanged', async () => {
+    // Le corps ne porte que la seconde : le contrat ne peut pas comparer, c'est l'API qui lit la
+    // principale enregistrée.
+    const { id } = await publish(telescope)
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, { secondaryCategory: 'science' })
+
+    expect(res.status).toBe(400)
+    expect((await errorOf(res)).error.code).toBe('same_category')
+    expect(await readProject(id)).toMatchObject({ secondaryCategory: 'learning' })
+    // Témoin : une autre seconde est acceptée.
+    const other = await send('PATCH', `/v1/projects/${id}`, lea, { secondaryCategory: 'art' })
+    expect(other.status).toBe(200)
+    expect(Project.parse(await other.json()).secondaryCategory).toBe('art')
+  })
+
+  it('refuses a new primary equal to the current second category when the update does not send the second', async () => {
+    // sec-M2 : sans la seconde dans le corps, la nouvelle principale se compare à la seconde
+    // enregistrée ; l'appli, elle, envoie toujours les deux ensemble.
+    const { id } = await publish(telescope)
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, { primaryCategory: 'learning' })
+
+    expect(res.status).toBe(400)
+    expect((await errorOf(res)).error.code).toBe('same_category')
+    expect(await readProject(id)).toMatchObject({
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+    })
+    // Témoin : échanger les deux, envoyées ensemble, est permis.
+    const swap = await send('PATCH', `/v1/projects/${id}`, lea, {
+      primaryCategory: 'learning',
+      secondaryCategory: 'science',
+    })
+    expect(swap.status).toBe(200)
+    expect(Project.parse(await swap.json())).toMatchObject({
+      primaryCategory: 'learning',
+      secondaryCategory: 'science',
+    })
+  })
+
+  it('refuses timeSpent sent by an app of before R6a', async () => {
+    // sec-M4 : un onglet ouvert avant le déploiement reçoit un refus net jusqu'au rechargement.
+    const creation = await send('POST', '/v1/projects', lea, { ...recipes, timeSpent: 'week' })
+    expect(creation.status).toBe(400)
+
+    const { id } = await publish()
+    const update = await send('PATCH', `/v1/projects/${id}`, lea, { timeSpent: 'week' })
+    expect(update.status).toBe(400)
+  })
+
+  it('refuses a month after the current one in Kiritimati, or before January 2000', async () => {
+    // Le dernier mois permis se lit dans le contrat (le mois en cours à UTC+14), le suivant est
+    // refusé. Sans fausse horloge : la session de Léa a été ouverte à l'heure réelle.
+    const { id } = await publish()
+    const latest = startedMonthMax(new Date())
+    const [year, month] = latest.split('-').map(Number) as [number, number]
+    const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`
+
+    for (const startedOn of [next, '1999-12', '2026-3', '2026-03-01']) {
+      const res = await send('PATCH', `/v1/projects/${id}`, lea, { startedOn })
+      expect(res.status, startedOn).toBe(400)
+    }
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, { startedOn: latest })
+    expect(res.status).toBe(200)
+    expect(Project.parse(await res.json()).startedOn).toBe(latest)
+    expect((await readProject(id)).startedOn).toBe(latest)
+  })
+})
+
+describe('a project published before R6a, without category', () => {
+  it('shows an old project without category, while a new one has its own', async () => {
+    const old = await publishBeforeR6a()
+    const recent = await publish({
+      ...recipes,
+      title: 'Mon carnet de jardin',
+      primaryCategory: 'home-garden',
+    })
+
+    expect(await readProject(old.id, max)).toMatchObject({
+      primaryCategory: null,
+      secondaryCategory: null,
+    })
+    // Témoin : le projet publié après R6a garde sa catégorie.
+    expect((await readProject(recent.id, max)).primaryCategory).toBe('home-garden')
+  })
+
+  it('refuses a second category without a primary on an old project', async () => {
+    const { id } = await publishBeforeR6a()
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, { secondaryCategory: 'learning' })
+
+    expect(res.status).toBe(400)
+    expect((await errorOf(res)).error.code).toBe('category_required')
+    expect(await readProject(id)).toMatchObject({ primaryCategory: null, secondaryCategory: null })
+  })
+
+  it('translates the refusal of a second category without a primary', async () => {
+    const { id } = await publishBeforeR6a()
+    const ask = (language: string) =>
+      ctx.request(`/v1/projects/${id}`, {
+        method: 'PATCH',
+        headers: { cookie: lea, 'content-type': 'application/json', 'accept-language': language },
+        body: JSON.stringify({ secondaryCategory: 'learning' }),
+      })
+
+    const fr = await errorOf(await ask('fr'))
+    const en = await errorOf(await ask('en'))
+
+    expect([fr.error.code, en.error.code]).toEqual(['category_required', 'category_required'])
+    expect(fr.error.message).not.toBe(en.error.message)
+  })
+
+  it('lets the author of an old project choose its categories', async () => {
+    const { id } = await publishBeforeR6a()
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, {
+      primaryCategory: 'learning',
+      secondaryCategory: 'science',
+    })
+
+    expect(res.status).toBe(200)
+    expect(await readProject(id)).toMatchObject({
+      primaryCategory: 'learning',
+      secondaryCategory: 'science',
+    })
+  })
+
+  it('lets an old project without category become private', async () => {
+    // jur-J8 (décision de Louis du 8/11/2026) : restreindre l'audience ne demande jamais une donnée
+    // nouvelle.
+    const { id } = await publishBeforeR6a()
+
+    const res = await send('PATCH', `/v1/projects/${id}`, lea, { visibility: 'private' })
+
+    expect(res.status).toBe(200)
+    expect(Project.parse(await res.json())).toMatchObject({
+      visibility: 'private',
+      primaryCategory: null,
+    })
+    // Témoin : la seconde seule, elle, attend toujours une principale.
+    const second = await send('PATCH', `/v1/projects/${id}`, lea, {
+      visibility: 'public',
+      secondaryCategory: 'learning',
+    })
+    expect(second.status).toBe(400)
+    expect(await readProject(id)).toMatchObject({ visibility: 'private', secondaryCategory: null })
+  })
+
+  it('never returns timeSpent, even for a project created before', async () => {
+    // La colonne reste en R6a (sec-A6 : effacée en R6b) ; ce qu'elle contient ne sort plus.
+    const old = await publishBeforeR6a({ ...recipes, tools: ['Claude'] })
+    await ctx.db.execute(sql`update project set time_spent = 'week' where id = ${old.id}`)
+    const leaId = Me.parse(await (await send('GET', '/v1/me', lea)).json()).id
+
+    for (const path of [
+      `/v1/projects/${old.id}`,
+      '/v1/feed/discover',
+      `/v1/members/${leaId}`,
+      '/v1/tags/claude',
+      '/v1/me/export',
+    ]) {
+      const res = await send('GET', path, path === '/v1/me/export' ? lea : max)
+      expect(res.status, path).toBe(200)
+      const raw = await res.text()
+      expect(raw, path).toContain(old.id)
+      expect(raw, path).not.toContain('timeSpent')
+      expect(raw, path).not.toContain('"week"')
+    }
+  })
+})
+
+describe('the lists carry the categories (R6a)', () => {
+  it('gives the categories to the cards of the feed, the profile, the tag and the search', async () => {
+    const project = await publish({
+      title: 'Le télescope qui raconte',
+      pitch: 'Il nomme les étoiles que vise la lunette.',
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+      tools: ['Claude'],
+    })
+    const leaId = Me.parse(await (await send('GET', '/v1/me', lea)).json()).id
+    const get = async (path: string) => {
+      const res = await send('GET', path, max)
+      expect(res.status, path).toBe(200)
+      return res.json()
+    }
+    const cardIn = (cards: ProjectSummary[]) => cards.find((card) => card.id === project.id)
+
+    const feed = DiscoverFeedPage.parse(await get('/v1/feed/discover')).items.flatMap((item) =>
+      item.kind === 'project' ? [item.project] : [],
+    )
+    const profile = Member.parse(await get(`/v1/members/${leaId}`)).projects
+    const tag = TagPage.parse(await get('/v1/tags/claude')).projects
+    const search = SearchResults.parse(
+      await get(`/v1/search?${new URLSearchParams({ q: 'télescope' })}`),
+    ).projects.items
+
+    for (const [list, cards] of [
+      ['feed', feed],
+      ['profile', profile],
+      ['tag', tag],
+      ['search', search],
+    ] as const) {
+      expect(cardIn(cards), list).toMatchObject({
+        primaryCategory: 'science',
+        secondaryCategory: 'learning',
+      })
+    }
+  })
+
+  it('gives no category to the card of an old project', async () => {
+    const old = await publishBeforeR6a({ ...recipes, tools: ['Claude'] })
+
+    const tag = TagPage.parse(await (await send('GET', '/v1/tags/claude', max)).json()).projects
+
+    expect(tag.find((card) => card.id === old.id)).toMatchObject({
+      primaryCategory: null,
+      secondaryCategory: null,
+    })
   })
 })
