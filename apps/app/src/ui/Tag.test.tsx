@@ -2,9 +2,11 @@
 // outils ») : avec un nombre, elle l'affiche et son nom lu devient « Claude, 41 projets publics »
 // (`tools.withCount` et le pluriel `tools.projects`) ; le nombre affiché reste hors du nom lu
 // (relecture de l'interface, « À noter »). Sans nombre, rien ne change : le libellé seul.
+// Puis (R6a) l'étiquette à icône : la catégorie d'un projet, sur sa carte (« Sciences et espace »).
 import { screen } from '@testing-library/react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
+import { iconPaths } from './icons.generated'
 import { Tag } from './Tag'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -72,5 +74,51 @@ describe('Tag without a count', () => {
 
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.getByText('Claude')).toBeTruthy()
+  })
+})
+
+/** Un nœud de l'arbre rendu, le peu qu'on en lit (RNTL 14 n'exporte pas ce type). */
+type Host = { props: Record<string, unknown>; children: ReadonlyArray<Host | string> }
+
+/**
+ * Ce qui est dessiné, dans l'ordre : le nom d'une icône reconnue à son tracé (`iconPaths`, le dessin
+ * de chaque icône), le texte sinon. On ne lit aucun style.
+ */
+const drawnOrder = (node: Host | string): string[] => {
+  if (typeof node === 'string') return [node]
+  const d = node.props.d
+  if (typeof d === 'string') {
+    const icon = Object.entries(iconPaths).find(([, paths]) => paths[0] === d)?.[0]
+    return icon ? [`icône ${icon}`] : []
+  }
+  return node.children.flatMap(drawnOrder)
+}
+
+// R6a (scénario « La catégorie sur les cartes et la page » ; relecture du plan ui-B5) : la catégorie
+// principale d'un projet, en étiquette de verre, « avec son icône ». L'icône est décorative : le nom
+// lu reste le libellé (`Icon` est déjà cachée aux lecteurs d'écran).
+describe('Tag with an icon (R6a)', () => {
+  const science = fr.t(($) => $.project.category.science)
+
+  it('draws the icon before the label, the spoken name unchanged', async () => {
+    await renderWithProviders(<Tag label={science} icon="planet" onPress={() => {}} />)
+
+    const link = screen.getByRole('link', { name: science })
+    expect(drawnOrder(link as unknown as Host)).toEqual(['icône planet', science])
+  })
+
+  it('draws it on a plain glass pill too, the label still shown', async () => {
+    await renderWithProviders(<Tag label={science} icon="planet" onGlass />)
+
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getByText(science)).toBeTruthy()
+    expect(drawnOrder(screen.root as unknown as Host)).toEqual(['icône planet', science])
+  })
+
+  it('draws no icon without one (witness)', async () => {
+    await renderWithProviders(<Tag label={science} onPress={() => {}} />)
+
+    const link = screen.getByRole('link', { name: science })
+    expect(drawnOrder(link as unknown as Host)).toEqual([science])
   })
 })
