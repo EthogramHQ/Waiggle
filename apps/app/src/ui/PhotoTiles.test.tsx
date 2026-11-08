@@ -197,7 +197,12 @@ async function renderWatchingFocus(ui: ReactNode) {
 }
 
 beforeEach(() => {
-  jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {})
+  // mockClear : le mock de React Native garde les annonces des tests précédents, que spyOn ne vide
+  // pas ; sans lui, un témoin « rien n'est encore annoncé » échoue selon l'ordre des tests.
+  jest
+    .spyOn(AccessibilityInfo, 'announceForAccessibility')
+    .mockImplementation(() => {})
+    .mockClear()
 })
 afterEach(() => {
   jest.restoreAllMocks()
