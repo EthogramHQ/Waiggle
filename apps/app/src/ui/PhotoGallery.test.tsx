@@ -309,3 +309,86 @@ describe('PhotoGallery', () => {
     })
   })
 })
+
+// R6a (scénario « La description de chaque photo », relecture du plan ui-M2 et sec-M3) : une photo
+// décrite par son auteur est lue par sa description, à la place de « Photo 1 sur 3 », en gardant sa
+// place (« …, photo 1 sur 3 ») ; une photo sans description garde « Photo 2 sur 3 ». La
+// description est du texte brut : jamais lue comme du Markdown, ni comme un texte à remplir.
+// L'API supposée : `GalleryPhoto.description?: string | null` (null ou absente : pas décrite).
+describe('PhotoGallery, the description of a photo (R6a)', () => {
+  const sky = 'Le ciel de ce soir, la Lune au-dessus des toits'
+  const described: GalleryPhoto[] = photos.map((photo, rank) => ({
+    ...photo,
+    description: rank === 0 ? sky : null,
+  }))
+  /** Ce que lit le lecteur d'écran pour une photo décrite (« …, photo 1 sur 3 »). */
+  const describedAs = (description: string, index: number, count: number) =>
+    fr.t(($) => $.gallery.photoDescribed, { description, index, count })
+
+  /**
+   * Tout ce qu'un lecteur d'écran peut lire dans la galerie : les noms et les valeurs des éléments
+   * qui ne lui sont pas cachés.
+   */
+  const spoken = (): string[] => {
+    const found: string[] = []
+    const visit = (node: Node | string) => {
+      if (typeof node === 'string') return
+      const props = node.props
+      if (props.accessibilityElementsHidden === true || props['aria-hidden'] === true) return
+      for (const value of [props.accessibilityLabel, props['aria-label'], valueTextOf(props)]) {
+        if (typeof value === 'string') found.push(value)
+      }
+      for (const child of node.children) visit(child)
+    }
+    visit(screen.root as unknown as Node)
+    return found
+  }
+
+  it('reads a described photo by its description, keeping its place', async () => {
+    await renderWithProviders(<PhotoGallery photos={described} />)
+
+    expect(valueTextOf(gallery().props)).toBe(describedAs(sky, 1, 3))
+    // ui-M2 : « 1 sur 3 » reste affiché à côté.
+    expect(screen.getByText(countOf(1, 3))).toBeTruthy()
+  })
+
+  it('reads « Photo 2 sur 3 » for the next photo, which has no description', async () => {
+    await renderWithProviders(<PhotoGallery photos={described} />)
+    expect(valueTextOf(gallery().props)).toBe(describedAs(sky, 1, 3)) // témoin : la décrite
+
+    await fireEvent(gallery(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } })
+
+    expect(valueTextOf(gallery().props)).toBe(photoOf(2, 3))
+  })
+
+  it('reads the description on the web too, as the value of the gallery', async () => {
+    const restore = jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(<PhotoGallery photos={described} />)
+
+      expect(gallery().props['aria-valuetext']).toBe(describedAs(sky, 1, 3))
+    } finally {
+      restore.restore()
+    }
+  })
+
+  it('reads the description of a single photo', async () => {
+    await renderWithProviders(<PhotoGallery photos={described.slice(0, 1)} />)
+
+    expect(spoken().some((text) => text.includes(sky))).toBe(true)
+  })
+
+  it('reads the description as plain text, markup included', async () => {
+    // Des astérisques, une balise et des accolades : rien n'est interprété, tout est lu tel quel.
+    const raw = '**Le ciel** <b>ce soir</b> {{appName}} _Lune_'
+    await renderWithProviders(
+      <PhotoGallery
+        photos={photos.map((photo, rank) => ({ ...photo, description: rank === 0 ? raw : null }))}
+      />,
+    )
+
+    expect(valueTextOf(gallery().props)).toBe(`${raw}, photo 1 sur 3`)
+    // Ni gras dessiné, ni texte sans ses astérisques : la description n'est jamais du Markdown.
+    expect(spoken().some((text) => text.includes('Le ciel ce soir'))).toBe(false)
+  })
+})
