@@ -124,8 +124,17 @@ const decorative = {
   importantForAccessibility: 'no-hide-descendants',
 } as const
 
-/** Les hauteurs mesurées : les deux rangées posées sur le verre, le titre et la carte entière. */
-type Measures = { author: number; bottom: number; title: number | null; card: number }
+/**
+ * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre, la carte entière, et la
+ * colonne du haut de la photo (catégorie, « Suivre » ; 0 sans elle).
+ */
+type Measures = {
+  author: number
+  bottom: number
+  title: number | null
+  card: number
+  top: number
+}
 
 /** Hook : une mesure (`onLayout`) qui ne redessine que si la hauteur a changé. */
 const useMeasures = (height: number) => {
@@ -136,6 +145,7 @@ const useMeasures = (height: number) => {
     bottom: layout.touchTarget,
     title: null,
     card: height,
+    top: 0,
   })
   const measure = (key: keyof Measures) => (event: LayoutChangeEvent) => {
     const value = Math.round(event.nativeEvent.layout.height)
@@ -190,6 +200,8 @@ export function ProjectCard({
     ? t(($) => $.card.category, { category: category.label })
     : null
   const hasPhoto = Boolean(image)
+  // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
+  const topColumn = Boolean(overlay) || (hasPhoto && Boolean(category))
   // L'étiquette dessinée : décor pour les lecteurs d'écran (la description du lien la dit), et le
   // doigt passe au travers, vers la carte (`pointerEvents` en propriété : sur le web, seule cette
   // forme devient du CSS).
@@ -218,7 +230,14 @@ export function ProjectCard({
   const body = (
     <View
       onLayout={measure('card')}
-      style={{ minHeight: height, justifyContent: 'flex-end', padding: INSET }}
+      style={{
+        minHeight: height,
+        justifyContent: 'flex-end',
+        padding: INSET,
+        // Le verre ne monte jamais sous la colonne du haut (catégorie, « Suivre ») : à texte
+        // agrandi sur une carte basse, la carte grandit plutôt (relecture de design R3, C2).
+        paddingTop: INSET + (topColumn && measures.top > 0 ? measures.top + ROW_GAP : 0),
+      }}
     >
       {/* La photo remplit la carte, même agrandie par le texte. Elle décore : le lien porte déjà
           le nom du projet. */}
@@ -437,11 +456,12 @@ export function ProjectCard({
         >
           {bottomRow}
         </View>
-        {overlay || (hasPhoto && categoryTag) ? (
+        {topColumn ? (
           // La colonne du haut de la photo : la catégorie, puis l'emplacement dessous (« Suivre
           // Nora »). box-none : la colonne laisse passer le doigt hors du contrôle, vers la carte
           // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
           <View
+            onLayout={measure('top')}
             pointerEvents="box-none"
             style={{
               position: 'absolute',

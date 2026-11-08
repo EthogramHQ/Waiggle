@@ -298,6 +298,10 @@ export function MonthField({
                 flexBasis: '30%',
                 maxWidth: '100%',
                 flexShrink: 1,
+                // Sur le web, jamais plus étroit que le nom du mois (« septembre » ne se coupe pas) :
+                // à texte agrandi, la rangée passe à deux mois, ou à un (react-native-web pose
+                // `min-width: 0` sur chaque vue ; « auto » rend au navigateur la largeur du mot).
+                ...(Platform.OS === 'web' ? { minWidth: 'auto' as const } : null),
                 minHeight: layout.touchTarget,
                 alignItems: 'center',
                 justifyContent: 'center',
