@@ -814,41 +814,42 @@ export function SheetPanel({
   // R6-Publier-Outils) : la poignée, puis « Annuler », le titre et l'action. Seules la poignée et le
   // titre se saisissent pour glisser : un glissé commencé sur « Publier » ou « Annuler » ne ferme
   // rien (ui-M1). Le focus arrive sur « Annuler » à l'ouverture ; sans lui, sur l'action (« OK »).
-  const actionHeader = action ? (
-    <View style={{ gap: space.xs }}>
-      <View
-        {...dragHandlers}
-        style={{ alignItems: 'center', justifyContent: 'center', minHeight: space.xl }}
-      >
-        {handle}
+  const actionHeader =
+    phone && action ? (
+      <View style={{ gap: space.xs }}>
+        <View
+          {...dragHandlers}
+          style={{ alignItems: 'center', justifyContent: 'center', minHeight: space.xl }}
+        >
+          {handle}
+        </View>
+        <SheetHeader
+          title={title}
+          heading={heading}
+          titleId={titleId}
+          {...(dragHandlers ? { dragHandlers } : null)}
+          {...(cancelLabel
+            ? {
+                cancel: {
+                  label: cancelLabel,
+                  onPress: onClose,
+                  disabled: busy,
+                  ...(closeRef ? { ref: closeRef } : null),
+                },
+              }
+            : null)}
+          action={{
+            label: action.label,
+            onPress: action.onPress,
+            loading: action.busy ?? false,
+            disabled: action.disabled ?? false,
+            ...reachable,
+            ...described,
+            ...(cancelLabel === undefined && closeRef ? { ref: closeRef } : null),
+          }}
+        />
       </View>
-      <SheetHeader
-        title={title}
-        heading={heading}
-        titleId={titleId}
-        {...(dragHandlers ? { dragHandlers } : null)}
-        {...(cancelLabel
-          ? {
-              cancel: {
-                label: cancelLabel,
-                onPress: onClose,
-                disabled: busy,
-                ...(closeRef ? { ref: closeRef } : null),
-              },
-            }
-          : null)}
-        action={{
-          label: action.label,
-          onPress: action.onPress,
-          loading: action.busy ?? false,
-          disabled: action.disabled ?? false,
-          ...reachable,
-          ...described,
-          ...(cancelLabel === undefined && closeRef ? { ref: closeRef } : null),
-        }}
-      />
-    </View>
-  ) : null
+    ) : null
 
   const header = actionHeader ?? (
     // Sur téléphone, toute la tête de la feuille (poignée, « Fermer », titre) se saisit pour la
