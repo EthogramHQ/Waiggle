@@ -41,6 +41,7 @@ import { IconButton } from './IconButton'
 import { LiveStatus } from './LiveStatus'
 import type { CoverImage } from './ProjectCover'
 import { Text } from './Text'
+import { TextLink } from './TextLink'
 import { useTextScale } from './textScale'
 import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
@@ -56,25 +57,18 @@ export type PhotoTile = {
   error?: string
 }
 
-/** Les textes, venus de t() : le composant n'en écrit aucun. */
+/**
+ * Les textes, venus de t() : le composant n'en écrit aucun. Le titre « Photos », le compte
+ * « 2 / 6 » et les aides (formats, ordre) sont posés par l'écran autour des tuiles.
+ */
 export type PhotoTilesLabels = {
-  /** « Photos », le titre de la section. */
-  title: string
-  /** « 2 / 6 », dessiné à droite du titre. */
-  count: (count: number, max: number) => string
-  /** « 2 photos sur 6 », ce que lit le lecteur d'écran à la place de « 2 / 6 ». */
-  countSpoken: (count: number, max: number) => string
   /** « Les photos du projet, dans l'ordre », le nom de la liste. */
   list: string
   /** « Ajouter », écrit sur la tuile en pointillés. */
   add: string
   /** « Ajouter des photos », son nom lu. */
   addLabel: string
-  /** « JPEG, PNG ou WebP, 5 Mo au plus. » */
-  rules: string
-  /** « La première sert de couverture : fais glisser une photo pour changer l'ordre. » */
-  order: string
-  /** « Glisse tes images ici, ou », puis le lien « choisis-les » (zone de dépôt, ordinateur). */
+  /** « Glisse tes images ici, ou », puis le bouton « choisis-les » (zone de dépôt, web). */
   dropZone: string
   dropZoneChoose: string
   /** « Couverture », le badge de la première photo. */
@@ -145,9 +139,9 @@ type WebDataTransfer = {
 }
 type WebDragEvent = { dataTransfer?: WebDataTransfer | null; preventDefault: () => void }
 type WebElement = {
-  setAttribute: (name: string, value: string) => void
+  setAttribute?: (name: string, value: string) => void
   addEventListener: (type: string, listener: (event: WebDragEvent) => void) => void
-  removeEventListener: (type: string, listener: (event: WebDragEvent) => void) => void
+  removeEventListener?: (type: string, listener: (event: WebDragEvent) => void) => void
 }
 
 const hasType = (event: WebDragEvent, type: string) =>
@@ -156,8 +150,6 @@ const hasType = (event: WebDragEvent, type: string) =>
 /**
  * Branche des gestionnaires de glisser-déposer sur l'élément du navigateur d'une vue. Sur le web,
  * react-native-web ne transmet pas `onDrop` ni `onDragOver` : on les pose sur l'élément lui-même.
- * Les mêmes fonctions sont aussi passées en propriétés à la vue (voir `dropProps`), que les tests
- * appellent directement.
  */
 const useWebDrag = (
   node: { current: unknown },
@@ -171,7 +163,7 @@ const useWebDrag = (
     if (Platform.OS !== 'web') return
     const element = node.current as WebElement | null
     if (!element?.addEventListener) return
-    element.setAttribute('draggable', draggable ? 'true' : 'false')
+    element.setAttribute?.('draggable', draggable ? 'true' : 'false')
     const names = Object.keys(latest.current)
     const bound = names.map((name) => {
       const listener = (event: WebDragEvent) => latest.current[name]?.(event)
@@ -179,22 +171,10 @@ const useWebDrag = (
       return [name, listener] as const
     })
     return () => {
-      for (const [name, listener] of bound) element.removeEventListener(name, listener)
+      for (const [name, listener] of bound) element.removeEventListener?.(name, listener)
     }
   }, [draggable])
 }
-
-/** Les mêmes gestionnaires, en propriétés (`onDrop`…) : lus par les tests, ignorés par le web. */
-const PROP_NAMES: Record<string, string> = {
-  dragstart: 'onDragStart',
-  dragover: 'onDragOver',
-  dragleave: 'onDragLeave',
-  drop: 'onDrop',
-}
-const dropProps = (handlers: Record<string, (event: WebDragEvent) => void>): object =>
-  Object.fromEntries(
-    Object.entries(handlers).map(([name, handler]) => [PROP_NAMES[name] ?? name, handler]),
-  )
 
 export function PhotoTiles({
   tiles,
@@ -220,7 +200,9 @@ export function PhotoTiles({
   // Les places qu'on peut échanger : les photos en place (une photo en route n'a pas encore d'ordre).
   const movable = tiles.flatMap((tile, index) => (tile.state === 'ready' ? [index] : []))
   const coverKey = kept[0]?.key ?? null
-  const dropZone = Platform.OS === 'web' && onDropFiles !== undefined && sizeClass !== 'compact'
+  // Sur le web, la zone de dépôt garde la tuile « + Ajouter » et ajoute sa phrase (les fichiers se
+  // glissent aussi depuis un téléphone tenu en mode bureau, une tablette).
+  const dropZone = Platform.OS === 'web' && onDropFiles !== undefined
 
   // Les vues à focaliser, par tuile : la tuile, sa poignée. Et « Ajouter ».
   const tileRefs = useRef(new Map<string, View | null>())
@@ -263,16 +245,6 @@ export function PhotoTiles({
     const node = tileRefs.current.get(last.key)
     if (!focusWithoutScroll(node)) moveReaderTo(node)
   }, [full])
-
-  // Les annonces : la place d'une photo déplacée, la raison d'une photo refusée (une fois chacune).
-  const failedSeen = useRef(new Set(tiles.filter((t) => t.state === 'failed').map((t) => t.key)))
-  useEffect(() => {
-    tiles.forEach((tile, index) => {
-      if (tile.state !== 'failed' || failedSeen.current.has(tile.key)) return
-      failedSeen.current.add(tile.key)
-      setMessage(labels.failed(index + 1, tile.error ?? ''))
-    })
-  }, [tiles, labels])
 
   const move = (key: string, to: number) => {
     const from = tiles.findIndex((tile) => tile.key === key)
@@ -350,30 +322,8 @@ export function PhotoTiles({
   }
 
   return (
-    <View style={{ gap: space.sm }}>
+    <View>
       {probe}
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          columnGap: space.md,
-        }}
-      >
-        <Text variant="headline" heading={2}>
-          {labels.title}
-        </Text>
-        <Text
-          variant="caption"
-          tone="muted"
-          tabular
-          accessibilityLabel={labels.countSpoken(kept.length, max)}
-        >
-          {labels.count(kept.length, max)}
-        </Text>
-      </View>
-
       <View
         accessibilityRole="list"
         accessibilityLabel={labels.list}
@@ -447,10 +397,6 @@ export function PhotoTiles({
           </View>
         )}
       </View>
-
-      <Text variant="caption" tone="muted">
-        {dropZone ? labels.order : `${labels.rules} ${labels.order}`}
-      </Text>
       <LiveStatus message={message} visible={false} />
     </View>
   )
@@ -727,11 +673,11 @@ function Tile({
         </View>
       </View>
 
-      {failed ? (
-        <Text variant="caption" tone="danger" nativeID={reasonId}>
-          {labels.failed(number, tile.error ?? '')}
-        </Text>
-      ) : null}
+      {/* La raison, dans une région annoncée toujours montée sous la tuile (vide tant que la photo
+          n'a pas échoué) : elle est lue en apparaissant, sans annonce à part. */}
+      <View nativeID={reasonId}>
+        <LiveStatus tone="danger" message={failed ? labels.failed(number, tile.error ?? '') : ''} />
+      </View>
     </Animated.View>
   )
 }
@@ -769,17 +715,19 @@ function AddTile({
   fileHandlers,
   addRef,
   onGone,
-}: AddProps) {
+  inZone = false,
+}: AddProps & { inZone?: boolean }) {
   useGoneWatch(addRef, onGone)
-  useWebDrag(addRef, fileHandlers ?? {}, false)
+  // Dans la zone de dépôt, c'est la zone qui reçoit les fichiers.
+  useWebDrag(addRef, inZone ? {} : (fileHandlers ?? {}), false)
   return (
     <DashedPlace
       ref={addRef}
       label={labels.addLabel}
       onPress={onPress}
       busy={busy}
-      dragOver={dragOver}
-      fileHandlers={fileHandlers}
+      dragOver={dragOver && !inZone}
+      dashed={!inZone}
       style={{ width: size.width, height: size.height, borderRadius: radii.small }}
     >
       <Icon name="plus" size={22} tone="accent" />
@@ -790,41 +738,49 @@ function AddTile({
   )
 }
 
-/** La zone « Glisse tes images ici, ou choisis-les » (ordinateur), qui reçoit des fichiers. */
-function DropZone({
-  busy,
-  labels,
-  size,
-  dragOver,
-  onPress,
-  fileHandlers,
-  addRef,
-  onGone,
-}: AddProps) {
-  useGoneWatch(addRef, onGone)
-  useWebDrag(addRef, fileHandlers ?? {}, false)
+/**
+ * La zone « Glisse tes images ici, ou choisis-les » (web, dès la tablette), qui reçoit des
+ * fichiers. Elle garde dedans la tuile « + Ajouter » (même nom, même place dans l'ordre de Tab que
+ * sur téléphone), puis la phrase et son bouton « choisis-les ».
+ */
+function DropZone(props: AddProps) {
+  const { colors } = useTheme()
+  const zone = useRef<View>(null)
+  useWebDrag(zone, props.fileHandlers ?? {}, false)
   return (
-    <DashedPlace
-      ref={addRef}
-      // Le nom lu reprend la phrase entière, lien compris : il contient tout le texte affiché.
-      label={`${labels.dropZone} ${labels.dropZoneChoose}`}
-      onPress={onPress}
-      busy={busy}
-      dragOver={dragOver}
-      fileHandlers={fileHandlers}
-      style={{ minHeight: size.height, borderRadius: radii.group, padding: space.lg }}
+    <View
+      ref={zone}
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'center',
+        columnGap: space.lg,
+        rowGap: space.xs,
+        minHeight: props.size.height,
+        padding: space.sm,
+        borderRadius: radii.group,
+        borderWidth: borders.strong,
+        borderStyle: 'dashed',
+        borderColor: colors.dashed,
+        backgroundColor: props.dragOver ? colors.honeySoft : 'transparent',
+      }}
     >
-      <Icon name="images" size={26} tone="accent" />
-      <Text variant="callout" weight={700} align="center">
-        {`${labels.dropZone} `}
-        <Text variant="callout" weight={700} tone="accent" underline>
-          {labels.dropZoneChoose}
+      <AddTile {...props} inZone />
+      <View style={{ flexShrink: 1, maxWidth: '100%', alignItems: 'flex-start' }}>
+        <Text variant="callout" weight={700}>
+          {props.labels.dropZone}
         </Text>
-      </Text>
-      <Text variant="caption" tone="muted" align="center">
-        {labels.rules}
-      </Text>
-    </DashedPlace>
+        <TextLink
+          role="button"
+          tone="accent"
+          label={props.labels.dropZoneChoose}
+          onPress={() => {
+            if (!props.busy) props.onPress()
+          }}
+        />
+      </View>
+    </View>
   )
 }
 
@@ -835,7 +791,7 @@ function DashedPlace({
   onPress,
   busy,
   dragOver,
-  fileHandlers,
+  dashed = true,
   style,
   children,
 }: {
@@ -844,7 +800,8 @@ function DashedPlace({
   onPress: () => void
   busy: boolean
   dragOver: boolean
-  fileHandlers: Record<string, (event: WebDragEvent) => void> | null
+  /** Faux dans la zone de dépôt, qui porte déjà les pointillés. */
+  dashed?: boolean
   style: object
   children: ReactNode
 }) {
@@ -858,10 +815,9 @@ function DashedPlace({
       onPress={() => {
         if (!busy) onPress()
       }}
-      {...(fileHandlers ? dropProps(fileHandlers) : null)}
       style={[
         {
-          borderWidth: borders.strong,
+          borderWidth: dashed ? borders.strong : 0,
           borderStyle: 'dashed',
           borderColor: colors.dashed,
           backgroundColor: dragOver ? colors.honeySoft : 'transparent',

@@ -89,14 +89,9 @@ const noop = () => {}
 export const usePhotoTilesLabels = (): PhotoTilesLabels => {
   const { t } = useTranslation()
   return {
-    title: t(($) => $.project.form.photos),
-    count: (count, max) => t(($) => $.project.form.photosCount, { count, max }),
-    countSpoken: (count, max) => t(($) => $.project.form.photosCountSpoken, { count, max }),
     list: t(($) => $.project.form.photosList),
     add: t(($) => $.project.form.addPhotos),
     addLabel: t(($) => $.project.form.addPhotosLabel),
-    rules: t(($) => $.project.form.photosRules),
-    order: t(($) => $.project.form.photosOrder),
     dropZone: t(($) => $.project.form.dropZone),
     dropZoneChoose: t(($) => $.project.form.dropZoneChoose),
     cover: t(($) => $.project.form.cover),
