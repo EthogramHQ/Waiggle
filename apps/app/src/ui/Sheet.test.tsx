@@ -10,7 +10,8 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { createRef, type RefObject, useRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput, View } from 'react-native'
-import { renderWithProviders } from '../testing/render'
+import { getAnimatedStyle } from 'react-native-reanimated'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { Button } from './Button'
 import { focusWithoutScroll } from './focus'
@@ -929,5 +930,303 @@ describe('dragging the phone sheet down (R5b, D1)', () => {
 
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByText('Super idée, je teste ce soir.')).toBeTruthy()
+  })
+})
+
+// --- R6a : la feuille de publication (relecture du plan, ui-B2, ui-I3, ui-I10) ---
+//
+// La feuille gagne ce que demande « Nouveau projet » :
+// - `closeGuard` : quand il est donné, toute demande de fermeture (« Annuler », Échap, le voile,
+//   le retour d'Android, le glisser) l'appelle au lieu de `onClose` : l'écran demande d'abord
+//   « Abandonner ce projet ? » s'il y a quelque chose d'écrit. `busy` l'emporte sur tout ;
+// - `cancelLabel` : un bouton texte (« Annuler ») à gauche de la tête sur téléphone, à la place de
+//   la croix ; `action` : le bouton de l'action (« Publier ») à droite de la tête sur téléphone. Sur
+//   ordinateur, les deux vont dans le pied ;
+// - la `notice` passe sous la tête quand l'action y est (le message reste près du bouton touché) ;
+// - une seconde feuille ouverte par-dessus (« Catégorie et outils ») est la couche du dessus : Échap
+//   ne ferme qu'elle, et le focus revient à la ligne qui l'a ouverte.
+
+/** Le contenu de la feuille de publication, réduit à un texte et à la ligne « Catégorie ». */
+const PUBLISH_CONTENT = 'Le titre de ton projet'
+
+/** La feuille de publication : « Annuler », « Nouveau projet », « Publier ». */
+function PublishSheet({
+  onClose,
+  closeGuard,
+  busy = false,
+  notice,
+}: {
+  onClose: jest.Mock
+  closeGuard?: jest.Mock
+  busy?: boolean
+  notice?: { message: string }
+}) {
+  return (
+    <Sheet
+      open
+      busy={busy}
+      title="Nouveau projet"
+      onClose={onClose}
+      {...(closeGuard ? { closeGuard } : null)}
+      cancelLabel="Annuler"
+      action={{ label: 'Publier', onPress: () => {}, busy }}
+      {...(notice ? { notice } : null)}
+    >
+      <Text>{PUBLISH_CONTENT}</Text>
+      <Button label="Catégorie" onPress={() => {}} />
+    </Sheet>
+  )
+}
+
+/** Le rang d'un élément dans l'ordre de lecture (parcours de l'arbre en profondeur). */
+const readingIndex = (element: unknown) => {
+  const index = hostsOf(root()).indexOf(element as Host)
+  if (index === -1) throw new Error('element not found in the rendered tree')
+  return index
+}
+
+/** Ce dont la feuille de téléphone est descendue (le `translateY` de sa couche animée), en points. */
+const slideOffset = (): number => {
+  for (const node of hostsOf(root())) {
+    let animated: Record<string, unknown> | undefined
+    try {
+      animated = getAnimatedStyle(node as never) as Record<string, unknown> | undefined
+    } catch {
+      continue
+    }
+    const transform = Array.isArray(animated?.transform)
+      ? (animated.transform as Record<string, unknown>[])
+      : []
+    const shift = transform.find((step) => typeof step.translateY === 'number')?.translateY
+    if (typeof shift === 'number') return shift
+  }
+  throw new Error('nothing in the sheet slides')
+}
+
+describe('the publish sheet (R6a)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('calls closeGuard, never onClose, from cancel, Escape, the scrim and Android back', async () => {
+    jest.useFakeTimers()
+    const onClose = jest.fn()
+    const closeGuard = jest.fn()
+    await renderWithProviders(<PublishSheet onClose={onClose} closeGuard={closeGuard} />)
+    // Après la garde de double tape : le voile répond.
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+
+    // « Annuler », le bouton texte de la tête.
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    expect(closeGuard).toHaveBeenCalledTimes(1)
+    // Le voile.
+    await fireEvent.press(scrim())
+    expect(closeGuard).toHaveBeenCalledTimes(2)
+    // Le retour d'Android : le Modal reçoit onRequestClose.
+    await act(() => layer().props.onRequestClose())
+    expect(closeGuard).toHaveBeenCalledTimes(3)
+
+    // Échap, sur le web : la touche enfoncée dans la feuille, puis relâchée (le Modal), une fois.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument({ focus: jest.fn() }),
+      configurable: true,
+    })
+    await screen.rerender(<PublishSheet onClose={onClose} closeGuard={closeGuard} />)
+    await fireEvent(screen.getByRole('button', { name: 'Catégorie' }), 'keyDown', key('Escape'))
+    await act(() => layer().props.onRequestClose())
+    expect(closeGuard).toHaveBeenCalledTimes(4)
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText(PUBLISH_CONTENT)).toBeTruthy()
+  })
+
+  it('refuses every close while busy, closeGuard included', async () => {
+    jest.useFakeTimers()
+    const onClose = jest.fn()
+    const closeGuard = jest.fn()
+    await renderWithProviders(<PublishSheet onClose={onClose} closeGuard={closeGuard} busy />)
+    await act(() => jest.advanceTimersByTime(TAP_GUARD_MS))
+
+    const cancel = screen.getByRole('button', { name: 'Annuler' })
+    expect(cancel).toBeDisabled()
+    await fireEvent.press(cancel)
+    await fireEvent.press(scrim())
+    await act(() => layer().props.onRequestClose())
+    jest.useRealTimers()
+    await dragDown(400)
+
+    jest.replaceProperty(Platform, 'OS', 'web')
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument({ focus: jest.fn() }),
+      configurable: true,
+    })
+    await screen.rerender(<PublishSheet onClose={onClose} closeGuard={closeGuard} busy />)
+    await fireEvent(screen.getByRole('button', { name: 'Catégorie' }), 'keyDown', key('Escape'))
+    await act(() => layer().props.onRequestClose())
+
+    expect(closeGuard).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    // Témoin : l'envoi fini, « Annuler » demande de nouveau.
+    await screen.rerender(<PublishSheet onClose={onClose} closeGuard={closeGuard} />)
+    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    expect(closeGuard).toHaveBeenCalledTimes(1)
+  })
+
+  it('springs back instead of sliding away when a drag ends with a closeGuard', async () => {
+    const onClose = jest.fn()
+    const closeGuard = jest.fn()
+    await renderWithProviders(<PublishSheet onClose={onClose} closeGuard={closeGuard} />)
+
+    // Un glissé qui fermerait une feuille ordinaire (400 points) : la demande part à l'écran, et la
+    // feuille remonte au lieu de descendre hors de l'écran (844 points, la hauteur du téléphone) ;
+    // si l'écran ouvre « Abandonner ce projet ? », la feuille est encore là, en place.
+    await dragDown(400)
+
+    expect(slideOffset()).toBeLessThan(200)
+    expect(closeGuard).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('puts the text cancel button and the action in the header on a phone, in the footer on a computer', async () => {
+    const restorePhone = setDesktopWindow()
+    restorePhone() // le téléphone d'abord (jest.setup.ts), l'ordinateur ensuite
+    try {
+      await renderWithProviders(<PublishSheet onClose={jest.fn()} closeGuard={jest.fn()} />)
+
+      // Téléphone : « Annuler » à gauche, le titre, « Publier » à droite, puis le contenu. La croix
+      // « Fermer » laisse sa place au bouton texte.
+      const title = () => screen.getByRole('header', { name: 'Nouveau projet' })
+      const cancel = () => screen.getByRole('button', { name: 'Annuler' })
+      const action = () => screen.getByRole('button', { name: 'Publier' })
+      const content = () => screen.getByText(PUBLISH_CONTENT)
+      expect(readingIndex(cancel())).toBeLessThan(readingIndex(title()))
+      expect(readingIndex(title())).toBeLessThan(readingIndex(action()))
+      expect(readingIndex(action())).toBeLessThan(readingIndex(content()))
+      expect(screen.queryByRole('button', { name: close })).toBeNull()
+
+      // Ordinateur : les deux boutons passent dans le pied, après le contenu.
+      await act(() => {
+        setDesktopWindow()
+      })
+      expect(readingIndex(content())).toBeLessThan(readingIndex(action()))
+      expect(readingIndex(content())).toBeLessThan(readingIndex(cancel()))
+    } finally {
+      restorePhone()
+    }
+  })
+
+  it('shows the notice under the header when the action is in the header', async () => {
+    await renderWithProviders(
+      <PublishSheet
+        onClose={jest.fn()}
+        closeGuard={jest.fn()}
+        notice={{ message: 'Choisis une catégorie' }}
+      />,
+    )
+
+    // Le message suit « Publier » (dans la tête, sur téléphone) et précède le contenu : il est
+    // près du bouton touché, au lieu d'un pied collé loin en bas.
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Choisis une catégorie')
+    expect(readingIndex(screen.getByRole('button', { name: 'Publier' }))).toBeLessThan(
+      readingIndex(alert),
+    )
+    expect(readingIndex(alert)).toBeLessThan(readingIndex(screen.getByText(PUBLISH_CONTENT)))
+  })
+
+  it('keeps the inner sheet as the only one closed by Escape, and gives the focus back to its opener', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    const page = fakeDocument({ focus: jest.fn() }) as Record<string, unknown>
+    Object.defineProperty(globalThis, 'document', { value: page, configurable: true })
+    jest.mocked(focusWithoutScroll).mockClear()
+    const outerClose = jest.fn()
+    const outerGuard = jest.fn()
+    const innerClose = jest.fn()
+
+    /** La feuille de publication et, par-dessus, « Catégorie et outils », ouverte par sa ligne. */
+    function TwoSheets() {
+      const [inner, setInner] = useState(false)
+      return (
+        <Sheet
+          open
+          title="Nouveau projet"
+          onClose={outerClose}
+          closeGuard={outerGuard}
+          cancelLabel="Annuler"
+          action={{ label: 'Publier', onPress: () => {} }}
+        >
+          <Text>{PUBLISH_CONTENT}</Text>
+          <Button label="Catégorie" onPress={() => setInner(true)} />
+          <Sheet
+            open={inner}
+            title="Catégorie et outils"
+            onClose={() => {
+              innerClose()
+              setInner(false)
+            }}
+            action={{ label: 'OK', onPress: () => setInner(false) }}
+          >
+            <Button label="Sciences et espace" onPress={() => {}} />
+          </Sheet>
+        </Sheet>
+      )
+    }
+    await renderWithProviders(<TwoSheets />)
+
+    // La ligne « Catégorie » a le focus quand elle ouvre la seconde feuille.
+    const row = screen.getByRole('button', { name: 'Catégorie' })
+    page.activeElement = row
+    await fireEvent.press(row)
+    expect(screen.getByRole('button', { name: 'Sciences et espace' })).toBeTruthy()
+    jest.mocked(focusWithoutScroll).mockClear()
+
+    /**
+     * Échap comme le navigateur : enfoncée (les écouteurs du document, à la capture, puis l'élément
+     * qui a le focus), puis relâchée (le Modal encore ouvert reçoit onRequestClose). Une feuille qui
+     * prend la touche la marque prise (`preventDefault`), et le navigateur le dit à tous.
+     */
+    const typeEscape = async (focused: unknown) => {
+      const native = { key: 'Escape', defaultPrevented: false, target: undefined }
+      const listeners = (page.addEventListener as jest.Mock).mock.calls.filter(
+        ([type]) => type === 'keydown',
+      )
+      await act(() => {
+        for (const [, listener] of listeners) (listener as (event: object) => void)(native)
+      })
+      await fireEvent(focused as never, 'keyDown', {
+        ...key('Escape'),
+        preventDefault: () => {
+          native.defaultPrevented = true
+        },
+        nativeEvent: native,
+      })
+      const open = hostsOf(root()).filter(
+        (node) => typeof node.props.onRequestClose === 'function' && node.props.visible !== false,
+      ) as (Host & { props: { onRequestClose: () => void } })[]
+      await act(() => {
+        for (const layerNode of open) layerNode.props.onRequestClose()
+      })
+    }
+
+    await typeEscape(screen.getByRole('button', { name: 'Sciences et espace' }))
+
+    // Seule la seconde feuille se ferme ; la première reste, sans rien demander.
+    expect(innerClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Sciences et espace' })).toBeNull()
+    expect(outerGuard).not.toHaveBeenCalled()
+    expect(outerClose).not.toHaveBeenCalled()
+    expect(screen.getByText(PUBLISH_CONTENT)).toBeTruthy()
+    // Le focus revient à la ligne « Catégorie », sans passer par la tête de la première feuille.
+    const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])
+    expect(focused.at(-1)).toBe(row)
+    expect(focused).not.toContain(screen.getByRole('button', { name: 'Annuler' }))
+
+    // Témoin : la seconde fermée, Échap revient à la première, qui demande avant de fermer.
+    await typeEscape(screen.getByRole('button', { name: 'Catégorie' }))
+    expect(outerGuard).toHaveBeenCalledTimes(1)
+    expect(outerClose).not.toHaveBeenCalled()
   })
 })
