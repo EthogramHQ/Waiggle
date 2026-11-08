@@ -105,6 +105,7 @@ import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
+import { PublishWindowsCatalogue } from './publier-fenetres'
 import { PublishSheetCatalogue } from './publier-feuille'
 import { PublishPillsCatalogue } from './publier-pastilles'
 import { PublishPhotosCatalogue } from './publier-photos'
@@ -839,6 +840,7 @@ export function CatalogueScreen() {
       <SettingsCatalogue />
       {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
       <SafeguardsCatalogue />
+      <PublishWindowsCatalogue />
       {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
           (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
       <NavigationCatalogue />
