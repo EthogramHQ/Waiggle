@@ -3,10 +3,11 @@
 Statut : R1 **validé par Louis** le 28/10/2026 ; R2 **validé** le 29/10/2026.
 
 La refonte applique les maquettes et les décisions du 28/10/2026 (image de marque validée le
-27/10, décisions pour la refonte, maquettes du 27 au 28/10), en douze tranches : R1 les
+27/10, décisions pour la refonte, maquettes du 27 au 28/10), en treize tranches : R1 les
 fondations, R2 le compte, R3 la navigation et Explorer, R4 le fil, R5a la page projet, R5b les
-commentaires, R6 publier, R7 les mises à jour, R8 les notifications, R9 la modération, R10 les
-Ruches, R11 la conformité, R12 les projets publics. Chaque tranche ajoute ici ses scénarios.
+commentaires, R6a la feuille de publication, R6b les outils et les catégories, R7 les mises à
+jour, R8 les notifications, R9 la modération, R10 les Ruches, R11 la conformité, R12 les projets
+publics. Chaque tranche ajoute ici ses scénarios.
 Les scénarios de la phase 1 (`phase-1.md`) restent valables : la refonte change l'apparence et
 le mouvement, jamais une règle métier sans le dire.
 
@@ -1211,3 +1212,272 @@ Après les relectures de la branche (Louis, 7/11/2026) :
 
 - Et les textes de masquage disent qui voit encore le commentaire, et les aides sous le champ
   restent celles d'aujourd'hui (relecture juridique).
+
+---
+
+## R6a — La feuille de publication
+
+Statut : **à valider par Louis** (conversation 1 de R6a, 8/11/2026).
+
+R6 est coupée en deux (Louis, 8/11/2026), comme R5 : **R6a**, la feuille de publication et la
+modification ; **R6b**, les outils et les catégories (le catalogue). R6a redessine la publication
+et la modification d'un projet (planches `R6-Publier`, `R6-Publier-Suite`, `R6-Publier-Outils`,
+`R6-Publier-Desktop`, `R6-Modifier`, `R6-Supprimer`, `R6-Danse` ; décisions B4 « Publier et
+modifier », F-Pr14 et « Les catégories ») : une feuille qui monte du bas sur téléphone, une
+fenêtre par-dessus le fil sur ordinateur, les tuiles des photos et leur description, les
+catégories, « Facile à refaire ? » et « Commencé en » à la place du temps passé, le compteur et la
+clé d'API repérée dans le prompt, « Lien valide », l'aperçu de la carte, « Enregistrer » grisé, la
+suppression depuis le formulaire, et la danse de publication.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : qui modifie et
+supprime, les limites des textes (titre 80, pitch 140, description 10 000, 15 outils, 5 prompts de
+4 000 caractères), les photos (6 au plus, JPEG, PNG ou WebP de 5 Mo, ré-encodées sans
+métadonnées), le lien de démo (`https://` et public, **jamais ouvert par le serveur** : décision
+de Louis du 8/11/2026), les quotas, et ce que voit un membre suspendu.
+
+Côté API : deux catégories (une principale, une seconde facultative), « Facile à refaire ? »,
+« Commencé en », la description de chaque photo ; le temps passé disparaît.
+
+Hors de R6a, et où ça va :
+- le catalogue normé des outils, leurs logos et leurs familles, l'outil « Autre », la page d'un
+  outil redessinée (filtres par statut et par catégorie, « Afficher la suite »), les catégories en
+  filtre dans Explorer et dans la recherche, le récap du lundi des « Autre » aux administrateurs,
+  et les restes de R5b (« fais tout », 8/11/2026) : **R6b**. En R6a, « Outils » veut dire les
+  étiquettes libres d'aujourd'hui ;
+- « Une ruche » dans « Qui peut le voir ? » : R10 ; « Public, trouvable sur Google » : R12
+  (décision de Louis du 8/11/2026 : R6a ne montre que les deux choix qui marchent) ;
+- « Ce qui a changé », la version, l'avant / après : R7 ;
+- les badges par catégorie (« Explorateur du jardin ») : après la refonte ;
+- le motif de signalement « Lien, démo ou prompt dangereux » : R9.
+
+### Ouvrir la feuille (F-Pub1, planches `R6-Publier`, `R6-Publier-Desktop`)
+
+- Étant donné un membre sur téléphone, sur n'importe quel onglet
+- Quand il touche « + » au milieu de la barre
+- Alors une grande feuille monte du bas par-dessus l'écran flouté : une poignée, « Annuler » à
+  gauche, « Nouveau projet » au milieu, « Publier » à droite
+- Et sur ordinateur, « Publier » de la barre du haut ouvre une fenêtre au milieu, par-dessus le fil
+  flouté : « Nouveau projet », « Montre à tes proches ce que tu construis. Tu pourras tout modifier
+  ensuite. », le formulaire à gauche et l'aperçu à droite
+- Et ouvrir directement l'adresse de publication (un lien, un rechargement) ouvre la même feuille
+  par-dessus le fil
+- Et la feuille se ferme par « Annuler », en la glissant vers le bas (au toucher), par Échap ou
+  Retour, et rend le focus au bouton qui l'a ouverte
+- Et si quelque chose a été écrit ou choisi, fermer demande d'abord « Abandonner ce projet ? »
+  (« Continuer » / « Abandonner »), et rien n'est perdu sans cette réponse (choix 1)
+- Et avec « Réduire les animations », la feuille apparaît en fondu au lieu de monter
+- Et un membre suspendu n'a ni « + » ni « Publier » (comme aujourd'hui) ; s'il ouvre l'adresse, il
+  lit pourquoi il ne peut pas publier, sans jamais voir le formulaire d'abord (repris des listes)
+
+### Les photos (F-Pub2 à F-Pub5, planches `R6-Publier`, `R6-Publier-Desktop`)
+
+- Étant donné la feuille ouverte
+- Alors en tête, « Photos 0 / 6 » et une tuile « + Ajouter » en pointillés
+- Quand il touche « + Ajouter »
+- Alors il choisit plusieurs photos d'un coup, jusqu'à compléter les 6
+- Et chaque photo devient une tuile : une poignée en haut à gauche pour la déplacer, une croix en
+  haut à droite pour la retirer (« Retirer la photo 2 »), et le badge « Couverture » sur la première
+- Et sous les tuiles : « JPEG, PNG ou WebP, 5 Mo au plus. » et « La première sert de couverture :
+  fais glisser une photo pour changer l'ordre. »
+- Et une photo en cours d'envoi montre sa progression ; une photo refusée (trop lourde, mauvais
+  format, 6 déjà) dit pourquoi sous sa tuile, et les autres continuent
+- Et il change l'ordre en faisant glisser une tuile ; un lecteur d'écran ou un clavier le fait par
+  les actions de la tuile (« Mettre en couverture », « Avancer », « Reculer »), sans glisser
+- Et sur ordinateur, une zone en pointillés : « Glisse tes images ici, ou choisis-les » ; déposer
+  des fichiers les ajoute comme le bouton
+- Et la couverture verticale du téléphone reste possible : « Couverture verticale, facultative »
+  (comme aujourd'hui)
+
+**La description de chaque photo** (nouveau) :
+- Quand il touche une tuile, elle s'entoure de miel
+- Alors dessous, « Description de la photo 1, facultative », et l'aide « Lue à voix haute par les
+  lecteurs d'écran. »
+- Et 250 caractères au plus, sans caractères invisibles
+- Et sur la page du projet, un lecteur d'écran lit cette description à la place de « Photo 1 sur 3 »
+  quand elle existe
+
+### Le titre, l'accroche, la description et le lien (F-Pub8)
+
+- Le titre (« Titre », compteur « 18 / 80 »), « En une phrase » (compteur « 65 / 140 ») et la
+  description (« Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…). ») gardent
+  leurs règles
+- Le lien : « Lien de la démo, facultatif »
+- Quand il a tapé une adresse https publique
+- Alors une coche se dessine, avec « Lien valide », et dessous « Waiggle ne vérifie pas le contenu
+  des sites. »
+- Et « valide » veut dire la forme seulement : https, et une adresse publique ; ni l'appli ni le
+  serveur n'ouvrent le site (décision de Louis du 8/11/2026)
+- Et une adresse refusée dit pourquoi, comme aujourd'hui, sans coche
+
+### Où en est le projet (F-Mod6)
+
+- « Où en est le projet ? » : Idée, En construction, Testable, Terminé, En pause, Idée par défaut
+- Et les pastilles passent à la ligne aux grandes tailles de texte, sans être coupées
+
+### Catégorie et outils (planche `R6-Publier-Outils`, décisions « Les catégories »)
+
+- Étant donné la feuille, sous le statut, la ligne « Catégorie » et la ligne « Outils »
+- Quand il touche « Catégorie »
+- Alors une seconde feuille monte : « Catégorie et outils », « OK » à droite
+- Et « Catégorie » : « Une principale, et une seconde si tu veux. », puis seize pastilles avec leur
+  icône : Maison et jardin, Cuisine, Famille et enfants, Apprendre, Jeux, Art et dessin, Musique,
+  Photo et vidéo, Santé et sport, Voyages, Argent et budget, Travail, Code et outils, Animaux,
+  Sciences et espace, et Autre
+- Quand il touche « Sciences et espace », puis « Apprendre »
+- Alors « Sciences et espace » passe en miel avec un « 1 », « Apprendre » en miel pâle avec un « 2 »
+- Et un lecteur d'écran lit « Sciences et espace, catégorie principale » et « Apprendre,
+  catégorie seconde »
+- Et toucher une catégorie choisie la retire ; si c'est la principale, la seconde prend sa place
+- Et avec deux catégories choisies, toucher une troisième remplace la seconde (choix 2)
+- Et « Autre » ne demande aucun texte
+- Et dessous, « Outils 2 / 15 » : les outils choisis en pastilles avec une croix, et un champ de
+  recherche ; il propose les outils déjà utilisés par les membres, avec leur nombre de projets
+  (« Claude · 41 projets ») ; un nom absent s'ajoute tel quel (« Ajouter « Teachable Machine » »),
+  comme aujourd'hui
+- Et « OK » referme la seconde feuille ; dans le formulaire, « Catégorie » montre la principale,
+  « Seconde, facultative » la seconde, et « Outils » ses pastilles et « Ajouter »
+- Et la catégorie principale est obligatoire pour publier ; sans elle, « Publier » dit « Choisis
+  une catégorie » sous la ligne « Catégorie » et y met le focus
+
+### « Commencé en » et « Facile à refaire ? » (F-Pr14, F-Mod5)
+
+- « Commencé en » : un mois et une année, facultatif (« mars 2026 ») ; pas après le mois en cours,
+  pas avant janvier 2000
+- « Facile à refaire ? » : trois pastilles, facultatives : « À la portée de tous » (pastille
+  verte), « Il faut s'accrocher » (jaune), « Pour les initiés » (rouge) ; la couleur n'est jamais
+  seule, le texte dit tout
+- Et le temps passé disparaît partout : du formulaire, de « La recette », de l'API ; les valeurs
+  déjà enregistrées sont effacées (décision F-Pr14)
+- Et sur la page du projet, « La recette » montre « Commencé en mars 2026 » et « Facile à refaire :
+  Il faut s'accrocher » quand l'auteur les a donnés
+
+### Le prompt de départ (F-Mod4, planche `R6-Publier-Suite`)
+
+- « Le prompt de départ », avec son compteur toujours visible (« 148 / 4 000 ») et l'aide « Retire
+  ce qui est personnel : noms, adresses, mots de passe. »
+- Quand il colle un texte qui contient des caractères invisibles
+- Alors ils sont retirés, et la ligne « 2 caractères invisibles ont été retirés. » le dit
+- Quand il colle un prompt qui contient une clé d'API (une forme connue : `sk-…`, `sk-ant-…`,
+  `AKIA…`, `ghp_…`, `github_pat_…`, `xoxb-…`, `AIza…`, un jeton `Bearer`…)
+- Alors la clé est surlignée en rouge pâle, et un encadré dit « Clé : sk-proj-4f…a91f », « Une clé
+  d'API est collée ici. Quelqu'un pourrait s'en servir à tes frais. », avec le bouton « Retirer la
+  clé »
+- Et « Retirer la clé » la remplace par « [clé retirée] »
+- Et il peut publier quand même : l'encadré prévient, il ne bloque pas (choix 3) ; à la lecture,
+  le repère « À lire avant de l'utiliser » de R5a reconnaît aussi ces formes de clé
+- Et la clé n'est jamais envoyée ailleurs ni gardée à part : le repérage se fait sur l'appareil, et
+  par l'API au moment de lire
+- Et « Les autres prompts » (4 de plus au plus) restent dans une partie repliable, avec les mêmes
+  protections
+
+### Qui peut le voir (F-Pub6, planche `R6-Modifier`)
+
+- « Qui peut le voir ? », deux choix (décision de Louis du 8/11/2026) :
+  - « Membres de Waiggle », « Toute personne qui a un compte. » (par défaut) ;
+  - « Privé », « Un brouillon, visible par toi seulement. »
+- Et une phrase en bas du formulaire dit qui le verra : « Les membres de Waiggle verront ce projet,
+  et tes abonnés le trouveront dans leur fil. », ou, en privé, ce que dit aujourd'hui l'aide
+  « Privé » (personne d'autre ne le voit ; commentaires et réactions gardés, lus par personne tant
+  qu'il reste privé)
+- Et « Public » n'est plus le nom de la visibilité des membres : le mot est gardé pour R12, « Public
+  sur le web » (liste de conformité)
+
+### L'aperçu de la carte (F-Pub7, planche `R6-Publier-Desktop`)
+
+- Sur ordinateur, à droite, « Aperçu dans le fil », « Il suit ce que tu écris. »
+- Et la carte du fil telle qu'elle sera : la vraie photo de profil de l'auteur, « à l'instant », la
+  catégorie, le titre, l'accroche, le statut, « Tester » s'il y a un lien
+- Et posée sur une scène sombre éclairée par la première photo : « La lumière autour de la carte
+  vient de ta première photo. Change-la, elle change aussi. »
+- Et sur téléphone, pas d'aperçu : la feuille garde la place pour écrire (choix 4)
+
+### La catégorie sur les cartes et la page (décision « Catégorie sur la carte du fil »)
+
+- Sur la carte du fil et d'Explorer : la catégorie principale, en étiquette de verre en haut à
+  gauche de la photo, avec son icône ; sans photo, au-dessus du titre
+- Sur la page du projet : la catégorie à côté du statut, la seconde après un point
+  (« Sciences et espace · Apprendre »)
+- Et un projet publié avant R6a n'a pas de catégorie : aucune étiquette (décision de Louis du
+  8/11/2026)
+
+### Publier et la danse (planche `R6-Danse`)
+
+- Quand il touche « Publier » avec un projet visible des membres
+- Alors le bouton reste occupé pendant l'envoi ; une seconde tape n'envoie rien
+- Et la feuille se ferme, et le fil montre la danse : l'abeille du logo dessine son huit avec une
+  traînée de miel, puis file vers la nouvelle carte, qui tombe en place en tête du fil
+- Et un avis « Projet publié », avec la mascotte, lu aussi par les lecteurs d'écran
+- Et avec « Réduire les animations », la carte apparaît en fondu, l'abeille ne vole pas
+- Et un projet privé ne danse pas : la feuille se ferme sur la page du projet, avec « Brouillon
+  enregistré. Toi seul le vois. » (choix 5)
+- Et une erreur (réseau, quota) s'affiche en haut du formulaire, tout est gardé, « Publier » renvoie
+
+### Modifier (F-Mod1, planche `R6-Modifier`)
+
+- Étant donné l'auteur sur la page de son projet
+- Quand il touche « Modifier »
+- Alors la même feuille (la même fenêtre sur ordinateur) : « Annuler », « Modifier le projet »,
+  « Enregistrer »
+- Et « Enregistrer » est grisé tant que rien n'a changé, avec « Rien n'a changé pour l'instant. »
+  sous l'en-tête ; il redevient actif dès un changement, et grisé si le changement est défait
+- Et les photos, comme aujourd'hui, s'enregistrent tout de suite (ajout, retrait, ordre,
+  description) ; « Enregistrer » vaut pour le reste (choix 6)
+- Et un projet sans catégorie (publié avant R6a) : la ligne « Catégorie » dit « Choisis une
+  catégorie », et « Enregistrer » attend qu'elle soit choisie (décision de Louis du 8/11/2026)
+- Et après « Enregistrer », la feuille se ferme sur la page, avec « Modifications enregistrées. »
+- Et seul l'auteur modifie ; un autre membre qui ouvre l'adresse lit le refus d'aujourd'hui
+
+### Supprimer (F-Mod2, F-Mod3, planche `R6-Supprimer`)
+
+- En bas de la feuille de modification, une zone rouge : « Supprimer ce projet », et dessous « Tu es
+  la seule personne à pouvoir modifier ou supprimer ce projet. »
+- Et dans le menu « … » de la page, pour l'auteur, « Supprimer » ; le gros bouton rouge de la page
+  disparaît
+- Quand il touche « Supprimer ce projet »
+- Alors une fenêtre : la vignette du projet avec un badge de corbeille, « Supprimer « Le ciel de ce
+  soir » ? », « Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent
+  tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en
+  arrière. », « Annuler » et « Supprimer »
+- Et pendant la suppression, « Supprimer » reste occupé et la fenêtre ne se ferme pas ; une seconde
+  tape n'envoie rien
+- Et après, il arrive sur « Mes projets », avec « Projet supprimé. » (choix 7)
+- Et Échap ou « Annuler » ferme la fenêtre et rend le focus à « Supprimer ce projet »
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) publie par la feuille : Léa ajoute trois photos d'un coup, décrit la
+  première, choisit « Sciences et espace » puis « Apprendre », « Il faut s'accrocher », publie et
+  voit sa carte en tête du fil ; puis elle modifie (« Enregistrer » grisé, puis actif), passe le
+  projet en privé, et le supprime depuis la feuille
+- Et Sam, suspendu, ouvre l'adresse de publication et lit pourquoi il ne peut pas publier
+
+### Repris des listes « À reprendre »
+
+- `ProjectFormScreen` montre le formulaire avant d'avoir lu le profil, puis l'écran du suspendu (un
+  texte tapé se perd si le profil est lent) : le formulaire attend le profil (relecture de
+  l'interface de 7c)
+- Le mot « Public » pour « visible des membres connectés », à revoir face à « Public sur le web »
+  (liste de conformité, R12) : il devient « Membres de Waiggle »
+
+### Les choix proposés à Louis
+
+1. **Fermer avec des changements** : « Abandonner ce projet ? » (« Continuer » / « Abandonner »),
+   en publication comme en modification (« Abandonner les changements ? »).
+2. **Une troisième catégorie** remplace la seconde, plutôt qu'un refus.
+3. **La clé d'API** prévient sans bloquer la publication ; l'API ne la refuse pas.
+4. **L'aperçu de la carte** : sur ordinateur seulement.
+5. **Un projet privé** ne danse pas : la feuille se ferme sur sa page, « Brouillon enregistré. Toi
+   seul le vois. »
+6. **Les photos en modification** s'enregistrent tout de suite, comme aujourd'hui ; « Enregistrer »
+   vaut pour le reste.
+7. **Après une suppression** : « Mes projets », avec « Projet supprimé. »
+8. **La description d'une photo** : 250 caractères ; « Commencé en » : de janvier 2000 au mois en
+   cours.
+
+### Les décisions de Louis (8/11/2026)
+
+- R6 coupée en R6a (la feuille de publication) et R6b (les outils et les catégories) ; les restes
+  de R5b vont en R6b.
+- « Qui peut le voir ? » : « Membres de Waiggle » et « Privé » seulement.
+- « Lien valide » : la forme seulement ; le serveur n'ouvre jamais le lien.
+- Les projets publiés avant R6a restent sans catégorie jusqu'à leur prochaine modification.
