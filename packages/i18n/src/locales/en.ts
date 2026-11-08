@@ -394,6 +394,9 @@ export const en: Translation = {
       photoTooLarge: 'it is larger than 5 MB.',
       photoWrongType: 'this format is not accepted.',
       photoTooMany: 'there are already 6 photos.',
+      photosCut_one: 'Only {{count}} photo was added: a project keeps {{max}} at most.',
+      photosCut_other:
+        'Only the first {{count}} photos were added: a project keeps {{max}} at most.',
       photoUploadError: 'the upload failed.',
       movePhoto: 'Move photo {{number}}',
       movePhotoEarlier: 'Move earlier',

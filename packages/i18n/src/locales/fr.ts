@@ -468,6 +468,11 @@ export const fr = {
       photoTooLarge: 'elle dépasse 5 Mo.',
       photoWrongType: 'ce format n’est pas accepté.',
       photoTooMany: 'il y a déjà 6 photos.',
+      // Plusieurs photos choisies d'un coup, au-delà des places qui restent : pickVisuals garde les
+      // premières, et la feuille le dit (décision de la session, R6a).
+      photosCut_one: 'Seule {{count}} photo a été ajoutée : un projet en garde {{max}} au plus.',
+      photosCut_other:
+        'Seules les {{count}} premières photos ont été ajoutées : un projet en garde {{max}} au plus.',
       photoUploadError: 'l’envoi a échoué.',
       movePhoto: 'Déplacer la photo {{number}}',
       movePhotoEarlier: 'Avancer',
