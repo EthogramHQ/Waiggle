@@ -526,9 +526,9 @@ export const fr = {
       clear: 'Effacer',
       difficulty: 'Facile à refaire ?',
       // Les prompts.
-      promptCounter: '{{count}} / {{max}}',
-      promptCounterSpoken_one: '{{count}} caractère sur {{max}}',
-      promptCounterSpoken_other: '{{count}} caractères sur {{max}}',
+      promptCounter: '{{count, number}} / {{max, number}}',
+      promptCounterSpoken_one: '{{count, number}} caractère sur {{max, number}}',
+      promptCounterSpoken_other: '{{count, number}} caractères sur {{max, number}}',
       promptHint: 'Retire ce qui est personnel : noms, adresses, mots de passe.',
       invisibleRemoved_one: '{{count}} caractère invisible a été retiré.',
       invisibleRemoved_other: '{{count}} caractères invisibles ont été retirés.',
