@@ -67,6 +67,9 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'DELETE /v1/projects/:id': ['own', 'allowed'],
   'POST /v1/projects/:id/visuals': ['own', 'refused'],
   'DELETE /v1/projects/:id/visuals/:visualId': ['own', 'allowed'],
+  // Décrire une photo de son projet (R6a) : ne touche qu'à ce qui est à soi ; c'est écrire un
+  // texte, refusé pendant une suspension comme les autres écritures du projet (POST …/visuals).
+  'PATCH /v1/projects/:id/visuals/:visualId': ['own', 'refused'],
   'POST /v1/projects/:id/notes': ['own', 'refused'],
   'DELETE /v1/projects/:id/notes/:noteId': ['own', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
