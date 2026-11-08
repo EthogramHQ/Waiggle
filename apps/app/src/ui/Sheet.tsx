@@ -26,6 +26,19 @@
 // - « Réduire les animations » : la feuille de téléphone paraît par un fondu, sans monter ;
 // - on la ferme aussi en la glissant vers le bas par sa tête (décision D1 de Louis), sauf pendant
 //   une action en cours (`busy`).
+//
+// Tranche R6a (la feuille de publication), pour toutes les feuilles, chaque prop facultative :
+// - `closeGuard` : la feuille a des changements à ne pas perdre. Toute demande de fermeture
+//   (« Annuler », « Fermer », Échap, voile, retour d'Android, glisser) l'appelle au lieu de
+//   `onClose` ; l'écran demande alors « Abandonner ce projet ? ». Une feuille glissée revient en
+//   place au lieu de partir. `busy` l'emporte sur tout : rien n'est appelé pendant une action ;
+// - `action` et `cancelLabel` : l'action de la feuille (« Publier ») et « Annuler ». Sur téléphone,
+//   dans la tête (« Annuler » à gauche, à la place de la croix ; l'action à droite), et le message
+//   d'un envoi juste dessous ; sur ordinateur, au pied, après la phrase `footerNote` ;
+// - `aside` : la colonne d'à côté est maintenant **dans** la feuille, à droite du contenu, sous la
+//   même tête et au-dessus du même pied (l'aperçu de la carte) ;
+// - une feuille ouverte par-dessus une autre (« Catégorie et outils ») est la seule à se fermer
+//   (Échap, retour d'Android) : la pile des feuilles ouvertes, plus bas.
 import { borders, durations, layout, radii, space } from '@ruche/brand'
 import {
   type ReactNode,
@@ -50,13 +63,16 @@ import {
 } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { Notice } from './Notice'
+import { SheetHeader } from './SheetHeader'
 import { Surface } from './Surface'
 import { type SheetReveal, useSheetReveal } from './sheetReveal'
 import { Text } from './Text'
+import { TextLink } from './TextLink'
 import { holdPageTaps, useTapsAllowed } from './tapGuard'
 import { useLayout } from './theme/layout'
 import { spring, useCalmMotion } from './theme/motion'
@@ -149,6 +165,36 @@ type PanelProps = {
    * le demandent pas.
    */
   revealRef?: Ref<SheetReveal>
+  /**
+   * L'action de la feuille (« Publier », « Enregistrer », « OK », R6a) : dans la tête sur téléphone,
+   * à droite ; au pied sur ordinateur, en dernier. Voir `SheetAction`.
+   */
+  action?: SheetAction
+  /**
+   * « Annuler » (R6a) : sur téléphone, un bouton texte à gauche de la tête, à la place de la croix ;
+   * sur ordinateur, un bouton à côté de l'action (la croix reste en haut). Il demande la fermeture
+   * comme les autres voies : par `closeGuard` s'il y en a un.
+   */
+  cancelLabel?: string
+  /**
+   * Une phrase à côté des boutons du pied, sur ordinateur (« Les membres de {{appName}} verront ce
+   * projet… », R6a) ; sur téléphone, où l'action est dans la tête, à la fin du contenu.
+   */
+  footerNote?: ReactNode
+}
+
+/**
+ * L'action d'une feuille (R6a). `disabled` : grisée (« Enregistrer » tant que rien n'a changé) ;
+ * avec `focusableWhenDisabled`, elle reste atteignable par Tab et se décrit par le message de la
+ * feuille (`notice` : « Rien à enregistrer pour l'instant. »). `busy` : en cours (un envoi), elle
+ * montre son chargement et ne se touche plus.
+ */
+export type SheetAction = {
+  label: string
+  onPress: () => void
+  disabled?: boolean
+  busy?: boolean
+  focusableWhenDisabled?: boolean
 }
 
 /** Le message du pied d'une feuille : son texte, son ton, et s'il coupe la parole (alerte) ou non. */
@@ -169,6 +215,11 @@ type Props = Omit<
    * feuille montée (le clavier s'ouvre alors avec elle).
    */
   initialFocusRef?: RefObject<{ focus: () => void } | null>
+  /**
+   * La feuille a quelque chose à ne pas perdre (R6a) : toute demande de fermeture l'appelle au lieu
+   * de `onClose`, qui ne part plus que de l'écran (après « Abandonner »). Sans lui, `onClose`.
+   */
+  closeGuard?: () => void
 }
 
 type KeyEvent = {
@@ -211,6 +262,13 @@ const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]'
 const activeElement = (): unknown =>
   (globalThis as { document?: { activeElement?: unknown } }).document?.activeElement ?? null
 
+/** Le focus s'est-il perdu (web) : sur la page elle-même, ou sur un élément qui n'y est plus ? */
+const focusLost = (): boolean => {
+  const page = (globalThis as { document?: { body?: unknown } }).document
+  const active = activeElement() as { isConnected?: boolean } | null
+  return active === null || active === page?.body || active.isConnected === false
+}
+
 /** La poignée : ce qu'on saisit pour faire glisser la feuille vers le bas. */
 const HANDLE = { width: 36, height: 5 }
 /** L'espace gardé au-dessus de la feuille sur téléphone : on voit encore l'écran dessous. */
@@ -246,7 +304,26 @@ const alreadyHandled = (event: KeyEvent) =>
   event.isDefaultPrevented?.() === true ||
   event.nativeEvent?.defaultPrevented === true
 
-export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...panel }: Props) {
+// La pile des feuilles ouvertes, de la plus ancienne à celle du dessus (R6a). « Catégorie et
+// outils » s'ouvre par-dessus « Nouveau projet » : Échap, le retour d'Android ou le voile ne ferment
+// alors que la feuille du dessus. Sur le web, les touches de la seconde remontent l'arbre de React
+// jusqu'à la première (une couche dans une autre) ; sur Android, le système peut prévenir les deux.
+// Chaque feuille se demande donc, au moment du geste, si elle est en haut de la pile. Un module
+// plutôt qu'un contexte React : la seconde feuille peut être rendue à côté de la première, pas
+// dedans. (Au catalogue, les feuilles dessinées dans la page, `SheetPanel`, n'y entrent pas.)
+const openSheets: string[] = []
+/** La feuille `id` est-elle celle du dessus (ou la seule) ? */
+const onTop = (id: string) => openSheets.length === 0 || openSheets[openSheets.length - 1] === id
+
+export function Sheet({
+  open,
+  onClose,
+  closeGuard,
+  aside,
+  busy = false,
+  initialFocusRef,
+  ...panel
+}: Props) {
   const { colors } = useTheme()
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
@@ -259,9 +336,12 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
   // L'élément qui avait le focus avant l'ouverture (le bouton d'origine) : il le retrouve à la
   // fermeture, sans faire défiler la page.
   const opener = useRef<unknown>(null)
+  // Le même, gardé jusqu'à la fin du fondu de sortie (voir `onDismiss`, plus bas).
+  const returnTo = useRef<unknown>(null)
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
-  const titleId = `${useId()}-title`
+  const sheetId = useId()
+  const titleId = `${sheetId}-title`
   // La garde contre la double tape (celle de Dialog) : la feuille s'ouvre souvent sous le doigt qui
   // vient de toucher « Modifier » ou « Supprimer mon compte », et la seconde tape tombait sur le
   // voile, qui la refermait aussitôt (un retour arrière, pour une feuille qui a son adresse).
@@ -271,11 +351,25 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
   // onClose partait deux fois : deux retours arrière, qui quittaient aussi la page d'avant.
   const escapeHandled = useRef(false)
 
+  // La feuille entre dans la pile en s'ouvrant, et en sort en se fermant (ou en disparaissant).
+  useEffect(() => {
+    if (!open) return
+    openSheets.push(sheetId)
+    return () => {
+      const index = openSheets.lastIndexOf(sheetId)
+      if (index !== -1) openSheets.splice(index, 1)
+    }
+  }, [open, sheetId])
+
   // Toute demande de fermeture passe ici : pendant une action qui ne s'arrête plus (`busy`), elle
-  // est refusée, quelle que soit la voie (« Fermer », Échap, voile, retour Android).
+  // est refusée, quelle que soit la voie (« Fermer », Échap, voile, retour Android, glisser) ;
+  // `busy` l'emporte même sur `closeGuard` (R6a, ui-I3). Une feuille couverte par une autre ne se
+  // ferme pas : la demande est pour celle du dessus. Avec `closeGuard`, c'est lui qui décide
+  // (« Abandonner ce projet ? ») ; `onClose` ne part alors que de l'écran.
   const requestClose = () => {
-    if (busy) return
-    onClose()
+    if (busy || !onTop(sheetId)) return
+    if (closeGuard) closeGuard()
+    else onClose()
   }
 
   // useEffect : à l'ouverture (web), on retient qui avait le focus et on le pose sur l'élément
@@ -294,8 +388,25 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
     }
     const back = opener.current
     opener.current = null
+    returnTo.current = back
     if (back) focusWithoutScroll(back)
   }, [open, initialFocusRef])
+
+  // Le Modal du web garde la feuille le temps de son fondu de sortie, et le focus avec elle : en
+  // disparaissant, elle le laissait parfois sur la page (`body`), où la feuille de dessous le
+  // reprenait par sa tête au lieu de la ligne touchée (« Catégorie », R6a, ui-I10). À la fin
+  // (`onDismiss`), on le rend donc encore au bouton d'origine, seulement s'il s'est perdu : un focus
+  // posé ailleurs entre-temps (la page d'arrivée) est gardé.
+  const onDismiss =
+    Platform.OS === 'web'
+      ? {
+          onDismiss: () => {
+            const back = returnTo.current
+            returnTo.current = null
+            if (back && focusLost()) focusWithoutScroll(back)
+          },
+        }
+      : null
 
   // Sur téléphone (iOS, Android), le champ attendu reçoit le focus quand la feuille a fini de
   // paraître (`onShow` du Modal) : plus tôt, la fenêtre n'existe pas encore, et le clavier ne
@@ -438,8 +549,9 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
   const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }))
   // Le geste est créé une fois (PanResponder, plus bas) : il lit ici l'état du moment (`busy`
   // change pendant un envoi, la fermeture et la hauteur de la fenêtre aussi).
-  const now = useRef({ busy, open, calm, close: requestClose, height: window.height })
-  now.current = { busy, open, calm, close: requestClose, height: window.height }
+  const guarded = closeGuard !== undefined
+  const now = useRef({ busy, open, calm, guarded, close: requestClose, height: window.height })
+  now.current = { busy, open, calm, guarded, close: requestClose, height: window.height }
   // Après une fermeture demandée par le geste, si la feuille est encore ouverte un moment plus
   // tard (la fermeture n'a pas eu lieu), elle remonte : jamais une feuille ouverte hors de l'écran.
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -471,6 +583,14 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
         const state = now.current
         if (state.busy || !dragCloses(gesture)) {
           offset.value = spring(0)
+          return
+        }
+        // Avec `closeGuard` (R6a, ui-I3), la feuille ne part pas : elle remonte aussitôt à sa
+        // place, et la question (« Abandonner ce projet ? ») s'ouvre par-dessus. Partie à mi-écran,
+        // elle laisserait le formulaire hors de vue pendant qu'on y répond.
+        if (state.guarded) {
+          offset.value = spring(0)
+          state.close()
           return
         }
         // La feuille continue de descendre, et se ferme. Avec « Réduire les animations », elle
@@ -505,6 +625,7 @@ export function Sheet({ open, onClose, aside, busy = false, initialFocusRef, ...
       animationType={phone && !calm ? 'slide' : 'fade'}
       onRequestClose={onRequestClose}
       {...onShow}
+      {...onDismiss}
       {...named}
     >
       {/* KeyboardAvoidingView : sur iOS, la couche se raccourcit de la hauteur du clavier quand il
@@ -606,6 +727,9 @@ export function SheetPanel({
   titleCount,
   dragHandlers,
   revealRef,
+  action,
+  cancelLabel,
+  footerNote,
 }: PanelProps) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -614,16 +738,46 @@ export function SheetPanel({
   const phone = disposition === 'phone'
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par
   // son titre (celui de Sheet, quand la couche du Modal porte déjà le nom).
-  const ownTitleId = `${useId()}-title`
+  const panelId = useId()
+  const ownTitleId = `${panelId}-title`
   const titleId = givenTitleId ?? ownTitleId
+  // L'identifiant du message de la feuille : il décrit l'action grisée (« Rien à enregistrer pour
+  // l'instant. »), qu'on peut encore atteindre par Tab (R6a, ui-B5).
+  const noticeId = `${panelId}-notice`
   // La couche du Modal (web) est déjà la boîte de dialogue : la feuille n'en redéclare pas une.
   const dialog =
     givenTitleId === undefined
       ? { role: 'dialog' as const, 'aria-modal': true, 'aria-labelledby': titleId }
       : null
   const close = closeLabel ?? t(($) => $.common.close)
+  // Sur téléphone, l'action monte dans la tête (« Annuler », le titre, « Publier ») ; le message
+  // d'un envoi se pose alors juste sous la tête, près du bouton touché (ui-B2).
+  const actionOnTop = phone && action !== undefined
+  // Les boutons du pied, sur ordinateur : « Annuler » et l'action, après la phrase `footerNote`.
+  const footerActions = !phone && (action !== undefined || cancelLabel !== undefined)
   // Le pied collé existe dès qu'il a des boutons ou un message à montrer.
-  const pinned = Boolean(footer) || Boolean(notice)
+  const noticeBelow = Boolean(notice) && !actionOnTop
+  const pinned = Boolean(footer) || noticeBelow || footerActions
+
+  // L'action grisée qu'on peut encore atteindre se décrit par le message de la feuille.
+  const described =
+    action?.disabled && action.focusableWhenDisabled && notice
+      ? { describedById: noticeId, hint: notice.message }
+      : null
+  // `focusableWhenDisabled` n'est passé à Button que s'il est demandé (sa prop de R6a).
+  const reachable = action?.focusableWhenDisabled ? { focusableWhenDisabled: true } : null
+
+  // Le message de la feuille, sous la tête ou en tête du pied : dans une vue à son identifiant, pour
+  // décrire l'action grisée.
+  const noticeNode = notice ? (
+    <View nativeID={noticeId}>
+      <Notice
+        message={notice.message}
+        tone={notice.tone ?? 'error'}
+        polite={notice.polite ?? false}
+      />
+    </View>
+  ) : null
 
   // Le titre : seul, ou suivi de son nombre (« Commentaires 6 »). Le même identifiant le relie au
   // nom de la boîte de dialogue, qui se lit alors avec le nombre en toutes lettres.
@@ -643,7 +797,60 @@ export function SheetPanel({
     </Text>
   )
 
-  const header = (
+  // La poignée, au centre ; décorative (« Fermer » ou « Annuler » font le même geste).
+  const handle = (
+    <View
+      aria-hidden
+      style={{
+        width: HANDLE.width,
+        height: HANDLE.height,
+        borderRadius: radii.pill,
+        backgroundColor: colors.line,
+      }}
+    />
+  )
+
+  // La tête d'une feuille qui porte son action, sur téléphone (R6a, planches R6-Publier et
+  // R6-Publier-Outils) : la poignée, puis « Annuler », le titre et l'action. Seules la poignée et le
+  // titre se saisissent pour glisser : un glissé commencé sur « Publier » ou « Annuler » ne ferme
+  // rien (ui-M1). Le focus arrive sur « Annuler » à l'ouverture ; sans lui, sur l'action (« OK »).
+  const actionHeader = action ? (
+    <View style={{ gap: space.xs }}>
+      <View
+        {...dragHandlers}
+        style={{ alignItems: 'center', justifyContent: 'center', minHeight: space.xl }}
+      >
+        {handle}
+      </View>
+      <SheetHeader
+        title={title}
+        heading={heading}
+        titleId={titleId}
+        {...(dragHandlers ? { dragHandlers } : null)}
+        {...(cancelLabel
+          ? {
+              cancel: {
+                label: cancelLabel,
+                onPress: onClose,
+                disabled: busy,
+                ...(closeRef ? { ref: closeRef } : null),
+              },
+            }
+          : null)}
+        action={{
+          label: action.label,
+          onPress: action.onPress,
+          loading: action.busy ?? false,
+          disabled: action.disabled ?? false,
+          ...reachable,
+          ...described,
+          ...(cancelLabel === undefined && closeRef ? { ref: closeRef } : null),
+        }}
+      />
+    </View>
+  ) : null
+
+  const header = actionHeader ?? (
     // Sur téléphone, toute la tête de la feuille (poignée, « Fermer », titre) se saisit pour la
     // glisser vers le bas (`dragHandlers`, donnés par Sheet).
     <View style={{ gap: space.md }} {...dragHandlers}>
@@ -657,31 +864,33 @@ export function SheetPanel({
           minHeight: layout.touchTarget,
         }}
       >
-        {phone ? (
-          // La poignée, au centre ; décorative (le bouton « Fermer » fait le même geste).
-          <View
-            aria-hidden
-            style={{
-              width: HANDLE.width,
-              height: HANDLE.height,
-              borderRadius: radii.pill,
-              backgroundColor: colors.line,
-            }}
-          />
-        ) : null}
+        {phone ? handle : null}
         {/* « Fermer », à côté de la poignée, au bord droit : le premier élément atteignable de la
-            feuille, où le focus arrive à l'ouverture. */}
-        <View style={{ position: 'absolute', right: 0 }}>
-          <IconButton
-            icon="x"
-            label={close}
-            variant="plain"
-            onPress={onClose}
-            // Pendant une action qui ne s'arrête plus, « Fermer » est inactif : il ne mentirait pas.
-            disabled={busy}
-            {...(closeRef ? { ref: closeRef } : null)}
-          />
-        </View>
+            feuille, où le focus arrive à l'ouverture. Sur téléphone, « Annuler » (R6a) le
+            remplace, au bord gauche ; sur ordinateur, « Annuler » est au pied, et la croix reste. */}
+        {phone && cancelLabel !== undefined ? (
+          <View style={{ position: 'absolute', left: 0 }}>
+            <TextLink
+              label={cancelLabel}
+              onPress={onClose}
+              role="button"
+              disabled={busy}
+              {...(closeRef ? { ref: closeRef } : null)}
+            />
+          </View>
+        ) : (
+          <View style={{ position: 'absolute', right: 0 }}>
+            <IconButton
+              icon="x"
+              label={close}
+              variant="plain"
+              onPress={onClose}
+              // Pendant une action qui ne s'arrête plus, « Fermer » est inactif : il ne mentirait pas.
+              disabled={busy}
+              {...(closeRef ? { ref: closeRef } : null)}
+            />
+          </View>
+        )}
       </View>
       {/* Le titre et, à sa droite, le décor (s'il y en a un). Sans décor, la rangée garde à droite
           la place du bouton « Fermer », pour que les deux bords du titre restent alignés. Sauf un
@@ -715,12 +924,84 @@ export function SheetPanel({
     </View>
   )
 
-  // Sur ordinateur, avec une colonne à côté : la feuille et la colonne forment une rangée, dans la
-  // même boîte de dialogue ; la feuille garde sa largeur de formulaire et sa hauteur maximale.
+  // Sur ordinateur, avec une colonne à côté : le contenu et la colonne forment une rangée, dans la
+  // feuille même, sous sa tête et au-dessus de son pied (R6a : le formulaire à gauche, l'aperçu à
+  // droite). Chacun défile pour lui.
   const beside = aside !== undefined && !phone
   // Une feuille courte sur téléphone : la hauteur de son contenu (voir `compact`).
   const hug = compact && phone
-  // La feuille elle-même : son en-tête, son contenu qui défile, son pied collé.
+
+  // Le contenu, qui défile dans la feuille, le titre et le pied restant en place.
+  // keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du premier
+  // coup.
+  const content = (
+    <ScrollView
+      {...(revealRef ? { ref: reveal.scroller, ...reveal.listProps } : null)}
+      style={beside ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } : { flexShrink: 1 }}
+      contentContainerStyle={{
+        paddingHorizontal: space.xl,
+        paddingTop: space.xl - space.sm,
+        // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
+        // le dernier bloc et le bouton (décision de Louis du 2/11).
+        paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
+        gap: space.xl,
+      }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Une vue autour du contenu, pour y mesurer la place d'un élément à amener en vue. */}
+      {revealRef ? (
+        <View
+          ref={reveal.content as Ref<View>}
+          onLayout={reveal.onContentLayout}
+          collapsable={false}
+          style={{ gap: space.xl }}
+        >
+          {children}
+        </View>
+      ) : (
+        children
+      )}
+      {/* Sur téléphone, la phrase du pied (« Les membres verront ce projet… ») finit le contenu :
+          l'action est dans la tête, il n'y a pas de pied où la poser. */}
+      {phone && footerNote ? footerNote : null}
+    </ScrollView>
+  )
+
+  // Les boutons du pied sur ordinateur (R6a, planche R6-Publier-Desktop) : la phrase à gauche, qui
+  // prend la place qui reste, puis « Annuler » et l'action. Ils passent à la ligne quand la place
+  // manque (texte agrandi), la phrase d'abord seule sur sa ligne.
+  const actionRow = footerActions ? (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: space.md,
+      }}
+    >
+      {footerNote ? (
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: layout.sideColumn, minWidth: 0 }}>
+          {footerNote}
+        </View>
+      ) : null}
+      {cancelLabel !== undefined ? (
+        <Button label={cancelLabel} variant="secondary" onPress={onClose} disabled={busy} />
+      ) : null}
+      {action ? (
+        <Button
+          label={action.label}
+          onPress={action.onPress}
+          loading={action.busy ?? false}
+          disabled={action.disabled ?? false}
+          {...described}
+          {...reachable}
+        />
+      ) : null}
+    </View>
+  ) : null
+
+  // La feuille elle-même : son en-tête, son contenu qui défile (et sa colonne), son pied collé.
   const surface = (
     <Surface
       variant="sheet"
@@ -734,42 +1015,44 @@ export function SheetPanel({
     >
       <View style={{ flexShrink: 1, ...(phone && !hug ? { flex: 1 } : null) }}>
         {/* paddingBottom : la liste défilée passe sous la tête, et son texte ne touche pas le titre
-            (R5b, des-A8). Le haut du contenu en rend autant : au repos, rien ne change de place. */}
+            (R5b, des-A8). Le haut du contenu en rend autant : au repos, rien ne change de place.
+            Avec l'action dans la tête, un trait la sépare du contenu, comme sur la planche. */}
         <View
-          style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm }}
+          style={{
+            paddingHorizontal: actionOnTop ? space.md : space.xl,
+            paddingTop: actionOnTop ? space.xs : space.md,
+            paddingBottom: space.sm,
+            ...(actionOnTop
+              ? { borderBottomWidth: borders.hairline, borderBottomColor: colors.line }
+              : null),
+          }}
         >
           {header}
         </View>
-        {/* Le contenu défile dans la feuille, le titre et le pied restant en place.
-              keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du
-              premier coup. */}
-        <ScrollView
-          {...(revealRef ? { ref: reveal.scroller, ...reveal.listProps } : null)}
-          style={{ flexShrink: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: space.xl,
-            paddingTop: space.xl - space.sm,
-            // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
-            // le dernier bloc et le bouton (décision de Louis du 2/11).
-            paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
-            gap: space.xl,
-          }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Une vue autour du contenu, pour y mesurer la place d'un élément à amener en vue. */}
-          {revealRef ? (
-            <View
-              ref={reveal.content as Ref<View>}
-              onLayout={reveal.onContentLayout}
-              collapsable={false}
-              style={{ gap: space.xl }}
+        {/* Avec l'action dans la tête : le message juste dessous, toujours en vue. */}
+        {actionOnTop && noticeNode ? (
+          <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>{noticeNode}</View>
+        ) : null}
+        {beside ? (
+          // minHeight 0 : la rangée peut être moins haute que son contenu, qui défile alors.
+          <View
+            style={{ flexDirection: 'row', flexShrink: 1, minHeight: 0, gap: ASIDE_GAP - space.xl }}
+          >
+            {content}
+            <ScrollView
+              style={{ width: ASIDE_WIDTH, flexShrink: 1 }}
+              contentContainerStyle={{
+                paddingRight: space.xl,
+                paddingTop: space.xl - space.sm,
+                paddingBottom: space.xl,
+              }}
             >
-              {children}
-            </View>
-          ) : (
-            children
-          )}
-        </ScrollView>
+              {aside}
+            </ScrollView>
+          </View>
+        ) : (
+          content
+        )}
         {pinned ? (
           <View
             style={{
@@ -781,14 +1064,9 @@ export function SheetPanel({
               borderTopColor: colors.line,
             }}
           >
-            {notice ? (
-              <Notice
-                message={notice.message}
-                tone={notice.tone ?? 'error'}
-                polite={notice.polite ?? false}
-              />
-            ) : null}
+            {noticeBelow ? noticeNode : null}
             {footer}
+            {actionRow}
           </View>
         ) : null}
       </View>
@@ -813,34 +1091,17 @@ export function SheetPanel({
           : {
               alignSelf: 'center',
               width: '100%',
+              // Avec la colonne, la feuille s'élargit d'autant : le contenu garde sa largeur de
+              // formulaire, la colonne s'y ajoute à droite.
               maxWidth: beside
                 ? layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
                 : layout.formWidth,
               paddingHorizontal: PANEL_MARGIN,
               ...(maxHeight === undefined ? null : { maxHeight }),
-              ...(beside
-                ? { flexDirection: 'row' as const, alignItems: 'center' as const, gap: ASIDE_GAP }
-                : null),
             }
       }
     >
-      {beside ? (
-        // La feuille, à gauche : elle prend la place qui reste à côté de la colonne, sans dépasser
-        // la hauteur de la fenêtre (une hauteur en nombre : un pourcentage ne se calculerait pas
-        // dans une rangée sans hauteur fixe).
-        <View
-          style={{
-            flex: 1,
-            minWidth: 0,
-            ...(maxHeight === undefined ? null : { maxHeight }),
-          }}
-        >
-          {surface}
-        </View>
-      ) : (
-        surface
-      )}
-      {beside ? <View style={{ width: ASIDE_WIDTH }}>{aside}</View> : null}
+      {surface}
     </View>
   )
 }
