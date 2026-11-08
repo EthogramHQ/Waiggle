@@ -58,6 +58,15 @@ type Props = {
   /** Affiche « 42 / 140 » à côté de l'étiquette (la limite : maxLength, ou `limit`). */
   showCount?: boolean
   /**
+   * Le compteur de `showCount` écrit par l'appelant (R6a, `PromptField`) : `shown` à l'œil
+   * (« 148 / 4 000 », le nombre mis en forme par la langue), `spoken` au lecteur d'écran (« 148
+   * caractères sur 4 000 » : une barre oblique se lirait « barre oblique »). Le champ le cite alors
+   * dans sa description : on l'entend en arrivant dessus.
+   */
+  counterText?: { shown: string; spoken: string }
+  /** La saisie en chasse fixe, comme un bloc de code (un prompt, R6a). */
+  code?: boolean
+  /**
    * Une limite seulement affichée : on peut la dépasser, l'erreur vient à l'enregistrement (ou de
    * l'écran, qui la dit). À préférer à `maxLength` quand le membre doit voir son dépassement : un
    * `maxLength` couperait en silence un texte collé trop long (relecture du plan R5b, ui-I2).
@@ -125,6 +134,8 @@ type Props = {
   | 'returnKeyType'
   // Où est le curseur : MentionField cherche le « @pseudo » qui se tape juste avant lui.
   | 'onSelectionChange'
+  // Où poser le curseur : PromptField le garde après un texte collé dont il a retiré des caractères.
+  | 'selection'
 >
 
 // Vrai quand le champ est dans un FieldGroup : il ne dessine alors pas son propre groupe.
@@ -198,6 +209,8 @@ export function TextField({
   invalid: invalidElsewhere = false,
   keepHint = false,
   showCount = false,
+  counterText,
+  code = false,
   limit,
   countFrom,
   compact = false,
@@ -231,13 +244,16 @@ export function TextField({
   // En erreur, que la phrase soit sous le champ (`error`) ou dans le pied de la feuille (`invalid`).
   const wrong = Boolean(error) || invalidElsewhere
   const message = keepHint && status && hint ? `${status} ${hint}` : status || hint
-  const body = textStyles.body
+  const body = code ? textStyles.code : textStyles.body
   const max = limit ?? inputProps.maxLength
   // Le compteur compte comme la limite : en « unités » de texte (value.length), comme maxLength et
   // les schémas Zod de l'API. Un emoji en vaut souvent deux : compter en caractères affichait
   // « 999 / 1000 » quand le champ refusait déjà la lettre suivante.
   const counted = showCount && max ? value.length : null
-  const counter = counted !== null ? `${counted} / ${max}` : aside
+  const counter = counted !== null ? (counterText?.shown ?? `${counted} / ${max}`) : aside
+  // Le compteur écrit par l'appelant est lu par son nom (`spoken`), et décrit le champ.
+  const spokenCounter = counted !== null ? counterText?.spoken : undefined
+  const topCounterId = useId()
   // Le compteur sous le champ (`countFrom`), compté de la même façon ; null tant qu'il n'est pas dû.
   const below =
     countFrom !== undefined && max && value.length >= countFrom
@@ -249,10 +265,17 @@ export function TextField({
       : null
   const counterId = useId()
   // Ce qui décrit le champ (web) : le message, puis le compteur ; sur téléphone, l'indice les lit.
-  const described = [message ? messageId : null, below ? counterId : null, describedElsewhere?.ids]
+  const described = [
+    spokenCounter ? topCounterId : null,
+    message ? messageId : null,
+    below ? counterId : null,
+    describedElsewhere?.ids,
+  ]
     .filter(Boolean)
     .join(' ')
-  const spokenHint = [message, below?.spoken, describedElsewhere?.spoken].filter(Boolean).join(' ')
+  const spokenHint = [spokenCounter, message, below?.spoken, describedElsewhere?.spoken]
+    .filter(Boolean)
+    .join(' ')
 
   // Le champ qui grandit (`multiline` et `maxLines`) : sa hauteur suit celle de son texte, d'une
   // ligne à `maxLines`, plus sa marge. `content` est la hauteur du texte, `line` celle d'une ligne
@@ -284,7 +307,7 @@ export function TextField({
     setMeasured((previous) =>
       previous.content === content && previous.line === line ? previous : { content, line },
     )
-  }, [padY])
+  }, [padY, body.lineHeight])
   // useLayoutEffect : après chaque frappe, avant que la page ne soit redessinée.
   // (`value` est lu dans la condition pour que l'effet reparte à chaque texte nouveau.)
   useLayoutEffect(() => {
@@ -360,6 +383,9 @@ export function TextField({
               tone={counterTone}
               weight={counterTone === 'muted' ? 400 : 700}
               tabular
+              {...(spokenCounter
+                ? { nativeID: topCounterId, accessibilityLabel: spokenCounter }
+                : null)}
             >
               {counter}
             </Text>

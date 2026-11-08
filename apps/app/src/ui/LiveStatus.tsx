@@ -25,6 +25,11 @@ type Props = {
    * raison d'une photo refusée, sous sa tuile) ; muted par défaut.
    */
   tone?: 'muted' | 'danger'
+  /**
+   * small (R6a) : en petit même en gris, comme l'aide d'un champ qu'elle suit (« 2 caractères
+   * invisibles ont été retirés. », sous le prompt).
+   */
+  small?: boolean
 }
 
 /**
@@ -42,7 +47,7 @@ const visuallyHidden = {
   ...(Platform.OS === 'web' ? { clipPath: 'inset(50%)', whiteSpace: 'nowrap' } : null),
 } as ViewStyle
 
-export function LiveStatus({ message, visible = true, tone = 'muted' }: Props) {
+export function LiveStatus({ message, visible = true, tone = 'muted', small = false }: Props) {
   // Le texte déjà connu de VoiceOver : au premier rendu, la page entière est lue de toute façon ;
   // seuls les changements suivants sont annoncés (comme la région du web).
   const announced = useRef(message)
@@ -62,7 +67,7 @@ export function LiveStatus({ message, visible = true, tone = 'muted' }: Props) {
       // Vide, elle ne prend aucune place : pas de ligne blanche entre deux blocs de la page.
       style={visible && message !== '' ? undefined : visuallyHidden}
     >
-      <Text variant={tone === 'danger' ? 'caption' : 'callout'} tone={tone}>
+      <Text variant={tone === 'danger' || small ? 'caption' : 'callout'} tone={tone}>
         {message}
       </Text>
     </View>
