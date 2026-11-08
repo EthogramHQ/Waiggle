@@ -254,6 +254,14 @@ type RowBase = {
    * groupe radio garde déjà sa vue pour les flèches.
    */
   ref?: Ref<View> | undefined
+  /**
+   * Ce qui manque à la ligne, déjà traduit (R6a : « Choisis une catégorie » sous la ligne
+   * « Catégorie », quand « Publier » la refuse). La phrase s'affiche sous le libellé, en rouge avec
+   * une icône, et décrit la ligne : `aria-describedby` sur le web, l'indice sur téléphone. Ce n'est
+   * pas une alerte : l'écran met le focus sur la ligne, et c'est en y arrivant qu'on l'entend (une
+   * alerte en plus la ferait lire deux fois).
+   */
+  error?: string | undefined
 }
 
 export function ListRow({
@@ -276,11 +284,18 @@ export function ListRow({
   current = false,
   hint,
   ref,
+  error,
 }: RowProps) {
   const { colors } = useTheme()
   // L'identifiant du texte caché qui décrit la ligne (web) : useId en donne un, unique dans la page.
   const hintId = useId()
   const webHint = Platform.OS === 'web' && hint !== undefined && onPress !== undefined
+  // Celui de la phrase d'erreur, citée en premier dans la description : on entend d'abord ce qui
+  // manque, puis l'aide habituelle de la ligne.
+  const errorId = useId()
+  const described = [error ? errorId : null, webHint ? hintId : null].filter(Boolean).join(' ')
+  // Sur téléphone, l'indice lu après le nom dit la même chose, dans le même ordre.
+  const nativeHint = [error, hint].filter(Boolean).join('. ') || undefined
   // Sa place dans un groupe de choix (ListGroup radio), s'il y en a un.
   const slot = useContext(RadioSlotContext)
   const isChoice = selected !== undefined
@@ -369,6 +384,21 @@ export function ListRow({
         ) : detail && !detailRight ? (
           detailText
         ) : null}
+        {error ? (
+          // nativeID devient l'attribut id sur le web : c'est lui que cite aria-describedby. La
+          // même allure que l'erreur d'un champ (TextField) : icône et texte rouges.
+          <View
+            nativeID={errorId}
+            style={{ flexDirection: 'row', gap: space.xs, alignItems: 'center' }}
+          >
+            <Icon name="warning-circle" size={16} tone="danger" />
+            <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+              <Text variant="caption" tone="danger">
+                {error}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
       {/* Le côté droit, d'un seul bloc : il passe à la ligne tout entier, rangé à droite
           (`marginLeft: 'auto'`), au lieu que la pastille et le chevron se séparent. */}
@@ -435,8 +465,8 @@ export function ListRow({
     <Pressable
       accessibilityRole={isChoice ? 'radio' : href ? 'link' : 'button'}
       accessibilityLabel={spokenLabel ?? label}
-      accessibilityHint={Platform.OS === 'web' ? undefined : hint}
-      {...describedBy(webHint ? hintId : undefined)}
+      accessibilityHint={Platform.OS === 'web' ? undefined : nativeHint}
+      {...describedBy(described || undefined)}
       aria-disabled={disabled}
       // Un lien avec adresse : `href` et `aria-current` manquent aux types de React Native (sur
       // téléphone, ils sont ignorés ; sur le web, react-native-web dessine un vrai `<a>`).

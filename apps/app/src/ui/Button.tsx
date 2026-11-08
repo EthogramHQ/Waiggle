@@ -61,6 +61,15 @@ type Props = {
   leading?: ReactNode
   loading?: boolean
   disabled?: boolean
+  /**
+   * Inactif mais toujours atteignable au clavier (web) : le bouton reste une étape de Tab, annoncé
+   * « désactivé » (`aria-disabled`), et un appui ne fait rien. Pour un bouton dont on doit pouvoir
+   * apprendre pourquoi il attend (R6a : « Enregistrer » grisé, décrit par « Rien à enregistrer pour
+   * l'instant. ») : la raison se lie par `describedById` (web) et `hint` (téléphone). Un bouton
+   * désactivé pour de bon sort du parcours au clavier, et sa raison avec lui. Sur téléphone, les
+   * lecteurs d'écran atteignent déjà un bouton désactivé : rien ne change.
+   */
+  focusableWhenDisabled?: boolean
   /** Le nom lu par les lecteurs d'écran, s'il diffère du texte affiché (« Suivi » → « Suivre Léa »). */
   spokenLabel?: string
   /** Fait du bouton un interrupteur, activé ou non (role « switch »). */
@@ -86,6 +95,7 @@ export function Button({
   leading,
   loading = false,
   disabled = false,
+  focusableWhenDisabled = false,
   spokenLabel,
   checked,
   describedById,
@@ -94,6 +104,9 @@ export function Button({
 }: Props) {
   const { colors, shadows } = useTheme()
   const inactive = disabled || loading
+  // Inactif mais gardé dans le parcours au clavier (web) : le Pressable n'est pas désactivé (il
+  // perdrait sa place dans Tab), c'est le bouton qui ignore l'appui et ne s'enfonce pas.
+  const keptInTab = Platform.OS === 'web' && disabled && focusableWhenDisabled
   const small = size === 'small'
   // La hauteur dessinée. Plus basse que la zone à toucher (le petit bouton), la pilule se pose
   // dans un « cadre » invisible de 44 points : c'est lui que le doigt touche. Un débord invisible
@@ -255,14 +268,17 @@ export function Button({
         aria-busy={loading}
         // Sur le web, un bouton occupé reste dans le parcours au clavier (voir plus haut) ; sur
         // téléphone, il n'y a pas ce souci : il est désactivé, et annoncé comme tel.
-        disabled={Platform.OS === 'web' ? disabled : inactive}
-        // Pendant le chargement, l'appui ne fait rien (le bouton reste pourtant focalisable).
+        disabled={Platform.OS === 'web' ? disabled && !keptInTab : inactive}
+        // Pendant le chargement, l'appui ne fait rien (le bouton reste pourtant focalisable) ; un
+        // bouton inactif gardé dans Tab non plus (Entrée, Espace, clic).
         onPress={() => {
-          if (!loading) onPress()
+          if (!inactive) onPress()
         }}
         // Un interrupteur s'active aussi avec la barre d'espace sur le web (voir keyboard.ts).
         {...(checked === undefined ? null : spaceToggles(onPress, inactive))}
         onPressIn={() => {
+          // Un bouton qui ne fera rien ne s'enfonce pas sous le doigt.
+          if (keptInTab) return
           scale.value = spring(pressScale, 'firm')
         }}
         onPressOut={() => {
@@ -274,10 +290,12 @@ export function Button({
         style={(state) =>
           framed
             ? { minHeight: layout.touchTarget, justifyContent: 'center', borderRadius: radii.pill }
-            : pill(state.pressed)
+            : pill(state.pressed && !keptInTab)
         }
       >
-        {(state) => (framed ? <View style={pill(state.pressed)}>{content}</View> : content)}
+        {(state) =>
+          framed ? <View style={pill(state.pressed && !keptInTab)}>{content}</View> : content
+        }
       </Pressable>
     </Animated.View>
   )
