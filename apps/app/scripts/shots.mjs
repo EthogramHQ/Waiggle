@@ -39,6 +39,17 @@ import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { fr } from '../../../packages/i18n/src/locales/fr.ts'
 import { blockedPageOf, blockedSam } from '../src/testing/blocks.ts'
+import {
+  adminToolOf,
+  admitChange,
+  lovableTool,
+  makeTool,
+  mergeChange,
+  pendingTools,
+  recategorizeChange,
+  uncategorizedProjects,
+  zapierTool,
+} from '../src/testing/catalogue.ts'
 import { categoryList } from '../src/testing/categories.ts'
 import {
   leaEmailPreferences,
@@ -1754,6 +1765,17 @@ const fakeApi = (
     if (pathname.startsWith('/v1/moderation/') && !admin) {
       return json(404, { error: { code: 'not_found', message: '' } })
     }
+    // R6b : l'administration du catalogue (pages « Outils » et « Catégories »), les données des
+    // tests de ces pages (`testing/catalogue.ts`), chaque liste en une seule page.
+    const onePage = (items) => json(200, { items, nextCursor: null })
+    if (pathname === '/v1/moderation/tools/pending') return onePage(pendingTools)
+    if (pathname === '/v1/moderation/tools' && method === 'GET') {
+      return onePage([makeTool, zapierTool, lovableTool].map(adminToolOf))
+    }
+    if (pathname === '/v1/moderation/categories/pending') return onePage(uncategorizedProjects)
+    if (pathname === '/v1/moderation/catalogue-changes') {
+      return onePage([admitChange, mergeChange, recategorizeChange])
+    }
     if (pathname === '/v1/moderation/reports') {
       const page = moderationQueuePageOf()
       return json(200, { ...page, items: page.items.filter((i) => !decided.has(i.target.id)) })
@@ -2310,6 +2332,50 @@ const pages = [
     prepare: async (page) => {
       await page.getByRole('button', { name: 'Retirer', exact: true }).first().click()
       await page.getByRole('heading', { name: 'Retirer ce contenu ?' }).waitFor()
+    },
+  },
+  // R6b : les pages du catalogue de la Modération. « Outils » : les autres outils à vérifier, puis
+  // l'onglet « Catalogue » ; « Catégories » : les projets à ranger, puis l'onglet des catégories.
+  {
+    name: 'moderation-outils',
+    path: '/moderation/tools',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText('Make.com', { exact: true }).waitFor()
+    },
+  },
+  {
+    name: 'moderation-outils-catalogue',
+    path: '/moderation/tools',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: 'Catalogue' }).click()
+      await page.getByText('Zapier', { exact: true }).first().waitFor()
+    },
+  },
+  {
+    name: 'moderation-categories',
+    path: '/moderation/categories',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByText('La cabane à oiseaux connectée').first().waitFor()
+    },
+  },
+  {
+    name: 'moderation-categories-liste',
+    path: '/moderation/categories',
+    signedIn: true,
+    admin: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: 'Catégories' }).click()
+      await page.getByRole('button', { name: 'Nouvelle catégorie' }).waitFor()
     },
   },
   { name: 'reglages-admin', path: '/settings', signedIn: true, admin: true, fullPage: true },
