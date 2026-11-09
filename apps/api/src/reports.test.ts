@@ -670,7 +670,8 @@ describe('the full copy of a report', () => {
         { field: 'description', value: 'Une description de vélo.' },
         { field: 'prompt', value: 'Premier prompt' },
         { field: 'prompt', value: 'Second prompt' },
-        { field: 'tools', value: 'Le Chat, Cursor' },
+        // « Mistral » est un outil du catalogue depuis 0017, plus un alias de Le Chat.
+        { field: 'tools', value: 'Mistral, Cursor' },
         { field: 'demoUrl', value: 'https://velo.dev/' },
       ]),
     )

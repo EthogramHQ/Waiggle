@@ -397,7 +397,8 @@ describe('removing a project', () => {
       '/v1/feed/discover',
       '/v1/feed/following',
       `/v1/members/${leaId}`,
-      '/v1/tags/le-chat',
+      // « Mistral » désigne les modèles depuis 0017 (outil Mistral), plus l'appli Le Chat.
+      '/v1/tags/mistral',
     ]) {
       const res = await act.send('GET', path, zoe)
       expect(res.status, path).toBe(200)

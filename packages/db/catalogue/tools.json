@@ -5,7 +5,7 @@
     "descriptionFr": "Assistant conversationnel qui répond par écrit, résume, rédige et aide à réfléchir.",
     "descriptionEn": "Conversational assistant that answers in writing, summarises, drafts and helps think things through.",
     "siteUrl": "https://claude.ai",
-    "aliases": ["Claude AI"]
+    "aliases": ["Claude AI", "Claude Sonnet", "Claude Opus", "Claude Haiku"]
   },
   {
     "name": "ChatGPT",
@@ -13,7 +13,7 @@
     "descriptionFr": "Assistant conversationnel qui répond aux questions, rédige des textes et aide à programmer.",
     "descriptionEn": "Conversational assistant that answers questions, writes texts and helps with programming.",
     "siteUrl": "https://chatgpt.com",
-    "aliases": ["GPT"]
+    "aliases": []
   },
   {
     "name": "Gemini",
@@ -21,7 +21,7 @@
     "descriptionFr": "Assistant conversationnel de Google, qui comprend le texte, les images et le son.",
     "descriptionEn": "Google’s conversational assistant, which works with text, images and sound.",
     "siteUrl": "https://gemini.google.com",
-    "aliases": ["Bard"]
+    "aliases": ["Bard", "Gemini Pro", "Gemini Flash"]
   },
   {
     "name": "Copilot",
@@ -37,7 +37,7 @@
     "descriptionFr": "Assistant conversationnel de Mistral AI, qui répond en français comme en anglais.",
     "descriptionEn": "Mistral AI’s conversational assistant, which answers in French as well as English.",
     "siteUrl": "https://chat.mistral.ai",
-    "aliases": ["Mistral"]
+    "aliases": []
   },
   {
     "name": "Perplexity",
@@ -53,7 +53,7 @@
     "descriptionFr": "Assistant conversationnel de xAI, lié au réseau social X.",
     "descriptionEn": "xAI’s conversational assistant, linked to the X social network.",
     "siteUrl": "https://grok.com",
-    "aliases": []
+    "aliases": ["xAI"]
   },
   {
     "name": "DeepSeek",
@@ -61,7 +61,7 @@
     "descriptionFr": "Assistant conversationnel et modèles de langage du laboratoire DeepSeek.",
     "descriptionEn": "Conversational assistant and language models from the DeepSeek lab.",
     "siteUrl": "https://www.deepseek.com",
-    "aliases": []
+    "aliases": ["DeepSeek R1", "DeepSeek V3"]
   },
   {
     "name": "Meta AI",
@@ -93,7 +93,7 @@
     "descriptionFr": "Assistant conversationnel de Moonshot AI, capable de lire de longs documents.",
     "descriptionEn": "Moonshot AI’s conversational assistant, able to read long documents.",
     "siteUrl": "https://www.kimi.com",
-    "aliases": []
+    "aliases": ["Moonshot AI", "Kimi K2"]
   },
   {
     "name": "Qwen",
@@ -101,7 +101,7 @@
     "descriptionFr": "Famille de modèles de langage et assistant conversationnel d’Alibaba.",
     "descriptionEn": "Family of language models and conversational assistant from Alibaba.",
     "siteUrl": null,
-    "aliases": ["Tongyi Qianwen"]
+    "aliases": ["Tongyi Qianwen", "Qwen3", "QwQ"]
   },
   {
     "name": "HuggingChat",
@@ -168,6 +168,166 @@
     "aliases": []
   },
   {
+    "name": "GPT",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage d’OpenAI, utilisés par son API.",
+    "descriptionEn": "OpenAI’s family of language models, used through its API.",
+    "siteUrl": "https://openai.com/api/",
+    "aliases": ["GPT-4", "GPT-4o", "GPT-4.1", "GPT-5", "OpenAI API", "gpt-oss"]
+  },
+  {
+    "name": "Mistral",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage de Mistral AI, ouverts ou par API.",
+    "descriptionEn": "Mistral AI’s family of language models, open or through an API.",
+    "siteUrl": "https://mistral.ai",
+    "aliases": ["Mistral AI", "Mixtral", "Codestral", "Devstral", "Magistral", "Ministral"]
+  },
+  {
+    "name": "Llama",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage ouverts de Meta.",
+    "descriptionEn": "Meta’s family of open language models.",
+    "siteUrl": "https://www.llama.com",
+    "aliases": ["Meta Llama", "Llama 3", "Llama 4", "Code Llama"]
+  },
+  {
+    "name": "Gemma",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage ouverts de Google.",
+    "descriptionEn": "Google’s family of open language models.",
+    "siteUrl": "https://deepmind.google/models/gemma/",
+    "aliases": ["Google Gemma", "CodeGemma"]
+  },
+  {
+    "name": "Phi",
+    "family": "assistant",
+    "descriptionFr": "Famille de petits modèles de langage ouverts de Microsoft.",
+    "descriptionEn": "Microsoft’s family of small open language models.",
+    "siteUrl": "https://azure.microsoft.com/products/phi",
+    "aliases": ["Microsoft Phi", "Phi-3", "Phi-4"]
+  },
+  {
+    "name": "Cohere",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage Command et Aya, utilisés par l’API de Cohere.",
+    "descriptionEn": "Command and Aya language models, used through Cohere’s API.",
+    "siteUrl": "https://cohere.com",
+    "aliases": ["Command R", "Command A", "Aya"]
+  },
+  {
+    "name": "GLM",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage de Zhipu AI, et son assistant.",
+    "descriptionEn": "Zhipu AI’s family of language models, and its assistant.",
+    "siteUrl": "https://z.ai",
+    "aliases": ["ChatGLM", "Zhipu", "Zhipu AI", "Z.ai"]
+  },
+  {
+    "name": "MiniMax",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage et assistant de MiniMax.",
+    "descriptionEn": "Language models and assistant from MiniMax.",
+    "siteUrl": "https://www.minimax.io",
+    "aliases": []
+  },
+  {
+    "name": "Nemotron",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage ouverts de NVIDIA.",
+    "descriptionEn": "NVIDIA’s family of open language models.",
+    "siteUrl": "https://www.nvidia.com/en-us/ai-data-science/foundation-models/nemotron/",
+    "aliases": ["NVIDIA Nemotron"]
+  },
+  {
+    "name": "Granite",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage ouverts d’IBM.",
+    "descriptionEn": "IBM’s family of open language models.",
+    "siteUrl": "https://www.ibm.com/granite",
+    "aliases": ["IBM Granite"]
+  },
+  {
+    "name": "OLMo",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage entièrement ouverts de l’institut Ai2.",
+    "descriptionEn": "Fully open language models from the Ai2 institute.",
+    "siteUrl": "https://allenai.org/olmo",
+    "aliases": ["Ai2 OLMo"]
+  },
+  {
+    "name": "Falcon",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage ouverts du Technology Innovation Institute.",
+    "descriptionEn": "Family of open language models from the Technology Innovation Institute.",
+    "siteUrl": "https://falconllm.tii.ae",
+    "aliases": ["Falcon LLM"]
+  },
+  {
+    "name": "Jamba",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage d’AI21 Labs.",
+    "descriptionEn": "Language models from AI21 Labs.",
+    "siteUrl": "https://www.ai21.com",
+    "aliases": ["AI21", "AI21 Labs"]
+  },
+  {
+    "name": "Hermes",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage ouverts de Nous Research.",
+    "descriptionEn": "Open language models from Nous Research.",
+    "siteUrl": "https://nousresearch.com",
+    "aliases": ["Nous Hermes", "Nous Research"]
+  },
+  {
+    "name": "Reka",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage et assistant de Reka AI.",
+    "descriptionEn": "Language models and assistant from Reka AI.",
+    "siteUrl": "https://www.reka.ai",
+    "aliases": ["Reka AI"]
+  },
+  {
+    "name": "Doubao",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel et modèles de langage de ByteDance.",
+    "descriptionEn": "ByteDance’s conversational assistant and language models.",
+    "siteUrl": "https://www.doubao.com",
+    "aliases": []
+  },
+  {
+    "name": "ERNIE",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage et assistant de Baidu.",
+    "descriptionEn": "Baidu’s language models and assistant.",
+    "siteUrl": "https://yiyan.baidu.com",
+    "aliases": ["ERNIE Bot", "Wenxin Yiyan"]
+  },
+  {
+    "name": "Hunyuan",
+    "family": "assistant",
+    "descriptionFr": "Modèles de langage de Tencent.",
+    "descriptionEn": "Tencent’s language models.",
+    "siteUrl": "https://hunyuan.tencent.com",
+    "aliases": ["Tencent Hunyuan"]
+  },
+  {
+    "name": "Manus",
+    "family": "assistant",
+    "descriptionFr": "Agent qui mène des tâches en plusieurs étapes à partir d’une demande écrite.",
+    "descriptionEn": "Agent that carries out multi-step tasks from a written request.",
+    "siteUrl": "https://manus.im",
+    "aliases": []
+  },
+  {
+    "name": "Apple Intelligence",
+    "family": "assistant",
+    "descriptionFr": "Fonctions d’IA intégrées aux appareils d’Apple.",
+    "descriptionEn": "AI features built into Apple devices.",
+    "siteUrl": "https://www.apple.com/apple-intelligence/",
+    "aliases": []
+  },
+  {
     "name": "Midjourney",
     "family": "creation",
     "descriptionFr": "Outil qui crée des images à partir d’une description écrite.",
@@ -180,7 +340,7 @@
     "family": "creation",
     "descriptionFr": "Modèle qui crée des images à partir d’une description écrite.",
     "descriptionEn": "Model that creates images from a written description.",
-    "siteUrl": "https://openai.com/dall-e-3",
+    "siteUrl": null,
     "aliases": ["DALL·E"]
   },
   {
@@ -608,11 +768,35 @@
     "aliases": []
   },
   {
+    "name": "Dify",
+    "family": "no-code",
+    "descriptionFr": "Plateforme pour construire des applications à base de modèles de langage.",
+    "descriptionEn": "Platform to build applications on language models.",
+    "siteUrl": "https://dify.ai",
+    "aliases": []
+  },
+  {
+    "name": "Flowise",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour assembler des agents et des chaînes de modèles.",
+    "descriptionEn": "Visual tool to assemble agents and model chains.",
+    "siteUrl": "https://flowiseai.com",
+    "aliases": []
+  },
+  {
+    "name": "Langflow",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour construire des applications à base de modèles.",
+    "descriptionEn": "Visual tool to build applications on models.",
+    "siteUrl": "https://www.langflow.org",
+    "aliases": []
+  },
+  {
     "name": "Claude Code",
     "family": "development",
     "descriptionFr": "Assistant de programmation qui travaille dans le terminal, sur le code d’un projet.",
     "descriptionEn": "Programming assistant that works in the terminal, on a project’s code.",
-    "siteUrl": "https://www.anthropic.com/claude-code",
+    "siteUrl": "https://claude.com/product/claude-code",
     "aliases": []
   },
   {
@@ -674,8 +858,8 @@
   {
     "name": "Zed",
     "family": "development",
-    "descriptionFr": "Éditeur de code rapide, qui se travaille aussi à plusieurs.",
-    "descriptionEn": "Fast code editor that can also be used together with others.",
+    "descriptionFr": "Éditeur de code qui se travaille aussi à plusieurs.",
+    "descriptionEn": "Code editor that several people can also use together.",
     "siteUrl": "https://zed.dev",
     "aliases": []
   },
@@ -802,8 +986,8 @@
   {
     "name": "Go",
     "family": "development",
-    "descriptionFr": "Langage de programmation compilé, simple à lire.",
-    "descriptionEn": "Compiled programming language that is simple to read.",
+    "descriptionFr": "Langage de programmation compilé, créé chez Google.",
+    "descriptionEn": "Compiled programming language created at Google.",
     "siteUrl": "https://go.dev",
     "aliases": ["Golang"]
   },
@@ -950,6 +1134,150 @@
     "descriptionEn": "Python library for creating a web interface around a model.",
     "siteUrl": "https://www.gradio.app",
     "aliases": []
+  },
+  {
+    "name": "OpenRouter",
+    "family": "development",
+    "descriptionFr": "Service qui donne accès à de nombreux modèles de langage par une seule API.",
+    "descriptionEn": "Service that gives access to many language models through a single API.",
+    "siteUrl": "https://openrouter.ai",
+    "aliases": []
+  },
+  {
+    "name": "Groq",
+    "family": "development",
+    "descriptionFr": "Service qui fait tourner des modèles de langage ouverts par une API.",
+    "descriptionEn": "Service that runs open language models through an API.",
+    "siteUrl": "https://groq.com",
+    "aliases": ["GroqCloud"]
+  },
+  {
+    "name": "Together AI",
+    "family": "development",
+    "descriptionFr": "Service qui fait tourner et affine des modèles ouverts par une API.",
+    "descriptionEn": "Service that runs and fine-tunes open models through an API.",
+    "siteUrl": "https://www.together.ai",
+    "aliases": []
+  },
+  {
+    "name": "Replicate",
+    "family": "development",
+    "descriptionFr": "Service qui fait tourner des modèles d’IA par une API.",
+    "descriptionEn": "Service that runs AI models through an API.",
+    "siteUrl": "https://replicate.com",
+    "aliases": []
+  },
+  {
+    "name": "Fireworks AI",
+    "family": "development",
+    "descriptionFr": "Service qui fait tourner des modèles ouverts par une API.",
+    "descriptionEn": "Service that runs open models through an API.",
+    "siteUrl": "https://fireworks.ai",
+    "aliases": ["Fireworks"]
+  },
+  {
+    "name": "Amazon Bedrock",
+    "family": "development",
+    "descriptionFr": "Service d’Amazon Web Services qui donne accès à plusieurs modèles par une API.",
+    "descriptionEn": "Amazon Web Services offering that gives access to several models through an API.",
+    "siteUrl": "https://aws.amazon.com/bedrock/",
+    "aliases": ["Bedrock", "AWS Bedrock"]
+  },
+  {
+    "name": "Vertex AI",
+    "family": "development",
+    "descriptionFr": "Plateforme d’IA de Google Cloud, pour utiliser et entraîner des modèles.",
+    "descriptionEn": "Google Cloud’s AI platform, to use and train models.",
+    "siteUrl": "https://cloud.google.com/vertex-ai",
+    "aliases": ["Google Vertex AI"]
+  },
+  {
+    "name": "Azure AI Foundry",
+    "family": "development",
+    "descriptionFr": "Plateforme de Microsoft Azure pour utiliser des modèles d’IA.",
+    "descriptionEn": "Microsoft Azure platform to use AI models.",
+    "siteUrl": "https://ai.azure.com",
+    "aliases": ["Azure OpenAI", "Azure AI"]
+  },
+  {
+    "name": "llama.cpp",
+    "family": "development",
+    "descriptionFr": "Programme qui fait tourner des modèles de langage sur son propre ordinateur.",
+    "descriptionEn": "Program that runs language models on your own computer.",
+    "siteUrl": "https://github.com/ggml-org/llama.cpp",
+    "aliases": []
+  },
+  {
+    "name": "vLLM",
+    "family": "development",
+    "descriptionFr": "Serveur qui fait tourner des modèles de langage ouverts.",
+    "descriptionEn": "Server that runs open language models.",
+    "siteUrl": "https://docs.vllm.ai",
+    "aliases": []
+  },
+  {
+    "name": "Jan",
+    "family": "development",
+    "descriptionFr": "Application qui fait tourner des modèles de langage hors ligne.",
+    "descriptionEn": "App that runs language models offline.",
+    "siteUrl": "https://jan.ai",
+    "aliases": ["Jan.ai"]
+  },
+  {
+    "name": "GPT4All",
+    "family": "development",
+    "descriptionFr": "Application qui fait tourner des modèles de langage sur son ordinateur.",
+    "descriptionEn": "App that runs language models on your computer.",
+    "siteUrl": "https://www.nomic.ai/gpt4all",
+    "aliases": []
+  },
+  {
+    "name": "Open WebUI",
+    "family": "development",
+    "descriptionFr": "Interface web pour discuter avec des modèles locaux ou distants.",
+    "descriptionEn": "Web interface to chat with local or remote models.",
+    "siteUrl": "https://openwebui.com",
+    "aliases": []
+  },
+  {
+    "name": "LiteLLM",
+    "family": "development",
+    "descriptionFr": "Bibliothèque qui appelle de nombreux modèles par une même interface.",
+    "descriptionEn": "Library that calls many models through one interface.",
+    "siteUrl": "https://www.litellm.ai",
+    "aliases": []
+  },
+  {
+    "name": "LlamaIndex",
+    "family": "development",
+    "descriptionFr": "Bibliothèque pour relier des modèles de langage à ses propres données.",
+    "descriptionEn": "Library to connect language models to your own data.",
+    "siteUrl": "https://www.llamaindex.ai",
+    "aliases": []
+  },
+  {
+    "name": "CrewAI",
+    "family": "development",
+    "descriptionFr": "Bibliothèque pour faire travailler plusieurs agents ensemble.",
+    "descriptionEn": "Library to make several agents work together.",
+    "siteUrl": "https://www.crewai.com",
+    "aliases": []
+  },
+  {
+    "name": "AutoGen",
+    "family": "development",
+    "descriptionFr": "Bibliothèque de Microsoft pour construire des systèmes de plusieurs agents.",
+    "descriptionEn": "Microsoft library to build multi-agent systems.",
+    "siteUrl": "https://microsoft.github.io/autogen/",
+    "aliases": []
+  },
+  {
+    "name": "GNU Make",
+    "family": "development",
+    "descriptionFr": "Outil qui construit un programme en suivant les règles d’un Makefile.",
+    "descriptionEn": "Tool that builds a program by following the rules of a Makefile.",
+    "siteUrl": "https://www.gnu.org/software/make/",
+    "aliases": ["Makefile"]
   },
   {
     "name": "Zapier",
@@ -1244,7 +1572,7 @@
     "family": "hardware",
     "descriptionFr": "Petit appareil portable pour explorer des signaux radio et des protocoles.",
     "descriptionEn": "Small portable device for exploring radio signals and protocols.",
-    "siteUrl": "https://flipperzero.one",
+    "siteUrl": "https://flipper.net",
     "aliases": []
   },
   {
@@ -1320,11 +1648,11 @@
     "aliases": []
   },
   {
-    "name": "Jetson Nano",
+    "name": "NVIDIA Jetson",
     "family": "hardware",
-    "descriptionFr": "Petit ordinateur sur une carte, pensé pour faire tourner de l’IA.",
-    "descriptionEn": "Small single-board computer designed to run AI.",
-    "siteUrl": "https://developer.nvidia.com/embedded/jetson-nano",
-    "aliases": ["NVIDIA Jetson"]
+    "descriptionFr": "Gamme de petits ordinateurs sur carte de NVIDIA, pensés pour faire tourner de l’IA.",
+    "descriptionEn": "NVIDIA’s range of small single-board computers, designed to run AI.",
+    "siteUrl": "https://developer.nvidia.com/embedded-computing",
+    "aliases": ["Jetson Nano", "Jetson Orin", "Jetson"]
   }
 ]
