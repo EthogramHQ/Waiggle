@@ -95,7 +95,7 @@ export function ProjectActionsView({
   // nombre seul, comme pour l'auteur).
   const second = project.isMine ? (
     suspended ? (
-      <FollowerCount text={followers} key="second" />
+      <FollowerCount text={followers} inButtonRow key="second" />
     ) : (
       <Row wrap gap="md" align="center" key="second">
         <Button
@@ -126,7 +126,7 @@ export function ProjectActionsView({
       disabled={suspended && !project.isFollowed}
     />
   ) : (
-    <FollowerCount text={followers} key="second" />
+    <FollowerCount text={followers} inButtonRow key="second" />
   )
 
   return (
