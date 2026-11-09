@@ -35,6 +35,11 @@ const fr = {
   bleed: 'Bord à bord sur téléphone, la feuille de la page chevauche le bas de la photo',
   sheet: 'La feuille de la page : le statut, le titre, l’auteur…',
   sampleTitle: 'Décollage !',
+  described:
+    'Photos décrites (R6a) : le lecteur d’écran entend la description et la place, « 1 sur 2 » reste affiché',
+  describedOne: 'Une seule photo décrite : son nom lu est sa description',
+  heard: 'Lu : {{spoken}}',
+  description: 'Le ciel de ce soir, la Lune au-dessus des toits',
   back: 'Retour',
   share: 'Partager',
   more: 'Plus d’actions',
@@ -54,6 +59,11 @@ const en: typeof fr = {
   bleed: 'Edge to edge on phones, the page sheet overlapping the bottom of the photo',
   sheet: 'The page sheet: status, title, author…',
   sampleTitle: 'Lift-off!',
+  described:
+    'Described photos (R6a): screen readers hear the description and the place, “1 of 2” stays shown',
+  describedOne: 'A single described photo: its spoken name is its description',
+  heard: 'Heard: {{spoken}}',
+  description: 'Tonight’s sky, the Moon above the roofs',
   back: 'Back',
   share: 'Share',
   more: 'More actions',
@@ -98,8 +108,12 @@ const reactions = REACTION_KINDS.map((kind) => ({
   mine: kind === 'bravo',
 }))
 
+/** Les mêmes photos, la première décrite par son auteur (R6a), les autres non. */
+const describe = (photos: GalleryPhoto[], description: string): GalleryPhoto[] =>
+  photos.map((photo, rank) => ({ ...photo, description: rank === 0 ? description : null }))
+
 export function GalleryCatalogue() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
   const schemes = ['day', 'night'] as const
   return (
@@ -125,6 +139,24 @@ export function GalleryCatalogue() {
 
       <Example caption={l.none}>
         <PhotoGallery photos={[]} title={l.sampleTitle} />
+      </Example>
+
+      {/* R6a : la première photo décrite, la seconde non ; puis une photo seule, décrite. Ce que
+          lit le lecteur d'écran est écrit dessous (le dessin, lui, ne change pas). */}
+      <Example caption={l.described}>
+        <PhotoGallery photos={describe(PHOTOS.slice(0, 2), l.description)} />
+        <Text variant="caption" tone="muted">
+          {l.heard.replace(
+            '{{spoken}}',
+            t(($) => $.gallery.photoDescribed, { description: l.description, index: 1, count: 2 }),
+          )}
+        </Text>
+      </Example>
+      <Example caption={l.describedOne}>
+        <PhotoGallery photos={describe(PHOTOS.slice(0, 1), l.description)} />
+        <Text variant="caption" tone="muted">
+          {l.heard.replace('{{spoken}}', l.description)}
+        </Text>
       </Example>
 
       <Text variant="caption" tone="muted">

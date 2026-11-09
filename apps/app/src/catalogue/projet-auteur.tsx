@@ -1,5 +1,5 @@
 // La section « En-tête et actions d'un projet » du catalogue (R5a, U7a) : ce que la page projet pose
-// sous la galerie. L'en-tête (statut, titre, ligne de dates, auteur et sa pastille « Suivre »,
+// sous la galerie. L'en-tête (statut et catégorie, titre, ligne de dates, auteur et sa pastille « Suivre »,
 // pitch) et les actions (« Tester la démo » et son site, « Suivre ce projet » ou « Modifier », et
 // leurs abonnés ; le bandeau d'un projet privé), vus par un autre membre, par l'auteur, et pour un
 // projet privé, de jour et de nuit. Puis la ligne de l'auteur seule, dans ses autres états : pas
@@ -26,7 +26,8 @@ const fr = {
     'Sous la galerie : le statut, le titre, « Publié le … · Mis à jour … » (« Créé le … » pour un projet privé), l’auteur et sa pastille « Suivre » (jamais sur sa propre page), le pitch. Puis « Tester la démo », la seule action miel, et à côté « Suivre ce projet » ou, pour l’auteur, « Modifier » : côte à côte quand ils tiennent, l’un sous l’autre sinon.',
   other: 'Vu par un autre membre (touche « Suivre » et « Suivre ce projet »)',
   mine: 'Vu par l’auteur',
-  private: 'Projet privé, vu par l’auteur',
+  private: 'Projet privé, vu par l’auteur (une seule catégorie)',
+  legacy: 'Projet publié avant les catégories (R6a) : rien à côté du statut',
   lineTitle: 'La ligne de l’auteur, ses autres états',
   unknown: 'Pas encore lue : ni pastille ni pseudo, leur place est gardée',
   followed: 'Déjà suivie à l’ouverture',
@@ -48,7 +49,8 @@ const en: typeof fr = {
     'Under the gallery: the status, the title, “Published … · Updated …” (“Created …” for a private project), the author and the “Follow” chip (never on one’s own page), the pitch. Then “Try the demo”, the only honey action, and beside it “Follow this project” or, for the author, “Edit”: side by side when they fit, one under the other otherwise.',
   other: 'Seen by another member (tap “Follow” and “Follow this project”)',
   mine: 'Seen by the author',
-  private: 'Private project, seen by the author',
+  private: 'Private project, seen by the author (a single category)',
+  legacy: 'Project published before categories (R6a): nothing beside the status',
   lineTitle: 'The author line, its other states',
   unknown: 'Not read yet: no chip, no handle, their place is kept',
   followed: 'Already followed at opening',
@@ -80,6 +82,9 @@ const sample = (l: Labels): Project => ({
   updatedAt: '2026-10-19T17:00:00.000Z',
   demoUrl: 'https://decollage.lovable.app',
   followerCount: 12,
+  // R6a : la catégorie à côté du statut, « Sciences et espace · Apprendre ».
+  primaryCategory: 'science',
+  secondaryCategory: 'learning',
 })
 
 export function ProjectPartsCatalogue() {
@@ -102,7 +107,26 @@ export function ProjectPartsCatalogue() {
               <Parts l={l} project={{ ...sample(l), isMine: true }} />
             </Example>
             <Example caption={`${l.private} — ${l[scheme]}`}>
-              <Parts l={l} project={{ ...sample(l), isMine: true, visibility: 'private' }} />
+              <Parts
+                l={l}
+                project={{
+                  ...sample(l),
+                  isMine: true,
+                  visibility: 'private',
+                  secondaryCategory: null,
+                }}
+              />
+            </Example>
+            <Example caption={`${l.legacy} — ${l[scheme]}`}>
+              <Parts
+                l={l}
+                project={{
+                  ...sample(l),
+                  isMine: true,
+                  primaryCategory: null,
+                  secondaryCategory: null,
+                }}
+              />
             </Example>
             <Example caption={`${l.lineTitle} — ${l[scheme]}`}>
               <LineStates l={l} />
