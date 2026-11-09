@@ -357,6 +357,23 @@ describe('otherRecapEmail', () => {
     }
   })
 
+  it('shows no button to a page whose number is zero', () => {
+    // Relecture du design (e-mail) : « Voir les outils » sous un seul projet à ranger et aucun outil
+    // menait à une page vide. Chaque bouton n'apparaît que si son nombre dépasse zéro.
+    const projectsOnly = otherRecapEmail('fr', otherRecapData({ tools: 0, projects: 2, older: 0 }))
+    expect(projectsOnly.html).not.toContain(`>${fill(fr.otherRecap.toolsButton)}</a>`)
+    expect(hrefsOf(projectsOnly.html)).not.toContain(OTHER_TOOLS_URL)
+    expect(projectsOnly.text).not.toContain(OTHER_TOOLS_URL)
+    // Témoin : le bouton des projets, lui, est là.
+    expect(projectsOnly.html).toContain(`>${fill(fr.otherRecap.projectsButton)}</a>`)
+    expect(projectsOnly.text).toContain(OTHER_CATEGORIES_URL)
+
+    const toolsOnly = otherRecapEmail('fr', otherRecapData({ tools: 1, projects: 0, older: 0 }))
+    expect(toolsOnly.html).toContain(`>${fill(fr.otherRecap.toolsButton)}</a>`)
+    expect(toolsOnly.html).not.toContain(`>${fill(fr.otherRecap.projectsButton)}</a>`)
+    expect(toolsOnly.text).not.toContain(OTHER_CATEGORIES_URL)
+  })
+
   it('has a text version, and no remote image, no unsubscribe link and no extra header', () => {
     for (const language of ['fr', 'en'] as const) {
       const email = otherRecapEmail(language, otherRecapData())

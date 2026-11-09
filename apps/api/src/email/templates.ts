@@ -692,6 +692,13 @@ export const otherRecapEmail = (language: Language, data: OtherRecapData): Email
     data.tools > 0 ? counted(r.tools_one, r.tools_other, data.tools) : null,
     data.projects > 0 ? counted(r.projects_one, r.projects_other, data.projects) : null,
   ].filter((line): line is string => line !== null)
+  // Un bouton par page qui a quelque chose à montrer (relecture du design) : sans outil, « Voir les
+  // outils » menait à une page vide. L'e-mail ne part que si l'un des deux nombres dépasse zéro
+  // (`jobs/other-recap.ts`) : il garde donc toujours au moins un bouton.
+  const [button, ...moreButtons] = [
+    data.tools > 0 ? { label: fill(r.toolsButton), url: data.toolsUrl } : null,
+    data.projects > 0 ? { label: fill(r.projectsButton), url: data.projectsUrl } : null,
+  ].filter((link) => link !== null)
   return {
     subject: fill(r.subject),
     ...render({
@@ -700,8 +707,8 @@ export const otherRecapEmail = (language: Language, data: OtherRecapData): Email
       greeting: fill(t.greeting, { name: defangLinks(data.name, linkPlaceholder(language)) }),
       paragraphs: lines,
       after: data.older > 0 ? [counted(r.older_one, r.older_other, data.older)] : [],
-      button: { label: fill(r.toolsButton), url: data.toolsUrl },
-      moreButtons: [{ label: fill(r.projectsButton), url: data.projectsUrl }],
+      ...(button && { button }),
+      moreButtons,
       notes: [],
       reason: fill(r.reason),
       footer: fill(t.footer),
