@@ -37,6 +37,7 @@ import {
 import { type Ref, type RefObject, useId, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import { useNameOf } from '../useNameOf'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { Avatar } from './Avatar'
 import { ActionDescription, CommentActionButton, excerpt } from './CommentAction'
@@ -220,6 +221,8 @@ export function CommentCard({
   handle,
 }: Props) {
   const { t } = useTranslation()
+  // « de Léa », « d’Inès » : le nom relié au texte selon la langue (`{{nameOf}}` des textes).
+  const nameOf = useNameOf()
   const { colors } = useTheme()
   // useId : un identifiant stable (le même au pré-rendu web et dans le navigateur), qui relie
   // « Répondre » et « … » à la description du commentaire qu'ils concernent.
@@ -378,7 +381,10 @@ export function CommentCard({
         label={
           isMine
             ? t(($) => $.project.comments.openLineMine, { excerpt: short })
-            : t(($) => $.project.comments.openLine, { name: author.name, excerpt: short })
+            : t(($) => $.project.comments.openLine, {
+                nameOf: nameOf(author.name),
+                excerpt: short,
+              })
         }
         onPress={onPress ?? (() => {})}
         radius="small"
@@ -584,7 +590,7 @@ export function CommentCard({
             <ActionMenu
               ref={menuRef}
               items={menu}
-              label={t(($) => $.project.comments.menu, { name: author.name })}
+              label={t(($) => $.project.comments.menu, { nameOf: nameOf(author.name) })}
               describedById={descriptionId}
               hint={described}
               // Sans disque au repos : répété à chaque carte, il pèserait plus que le texte (planche).
