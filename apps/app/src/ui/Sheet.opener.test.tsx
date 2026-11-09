@@ -2,7 +2,7 @@
 // de la barre d'onglets est redessiné pendant que la feuille est ouverte. L'élément retenu à
 // l'ouverture n'est plus dans la page à la fermeture : la feuille rend le focus à l'élément de même
 // nom qui est maintenant là, au lieu de le laisser sur `body`.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -88,6 +88,39 @@ describe('Sheet, the focus given back to a redrawn opener', () => {
     const focused = jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])
     expect(focused).toContain(redrawn)
     expect(focused).not.toContain(gone)
+  })
+
+  // Une feuille de téléphone à adresse disparaît avec sa page, encore ouverte : le focus est sur
+  // `body`, et la barre redessinée est retrouvée un instant après (design-C1, mesuré à 390 px).
+  it('gives the focus back after the sheet unmounted still open, once the page is back', async () => {
+    jest.useFakeTimers()
+    try {
+      const gone = named('Publier', { isConnected: false })
+      const redrawn = named('Publier', { isConnected: true, getClientRects: () => [{}] })
+      const found: object[] = []
+      const doc = fakeDocument(gone, found) as { activeElement: unknown; body: unknown }
+      Object.defineProperty(globalThis, 'document', { value: doc, configurable: true })
+      const view = await renderWithProviders(
+        <Sheet open title="Publier" onClose={() => {}}>
+          <Text>Contenu</Text>
+        </Sheet>,
+      )
+      jest.mocked(focusWithoutScroll).mockClear()
+
+      await view.unmount()
+      doc.activeElement = doc.body
+      // La barre n'est pas encore revenue : rien à focaliser, on attend.
+      await act(() => jest.advanceTimersByTimeAsync(100))
+      expect(jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])).not.toContain(
+        redrawn,
+      )
+      found.push(redrawn)
+      await act(() => jest.advanceTimersByTimeAsync(100))
+
+      expect(jest.mocked(focusWithoutScroll).mock.calls.map((call) => call[0])).toContain(redrawn)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('keeps the remembered element when it is still in the page', async () => {

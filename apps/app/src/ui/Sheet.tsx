@@ -304,6 +304,27 @@ const reachableOpener = (node: unknown, name: string | null): unknown => {
   return same ?? node
 }
 
+/**
+ * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
+ * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
+ * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
+ * page d'avant reparaisse : quelques essais rapprochés, qui s'arrêtent dès que le focus est quelque
+ * part (la page d'arrivée l'a pris : on ne le lui reprend pas).
+ */
+const RESTORE_TRIES = 8
+const RESTORE_EVERY_MS = 100
+const restoreAfterUnmount = (back: unknown, name: string | null, left = RESTORE_TRIES): void => {
+  setTimeout(() => {
+    if (!focusLost()) return
+    const target = reachableOpener(back, name)
+    if ((target as FoundElement | null)?.isConnected === false && left > 1) {
+      restoreAfterUnmount(back, name, left - 1)
+      return
+    }
+    focusWithoutScroll(target)
+  }, RESTORE_EVERY_MS)
+}
+
 /** La poignée : ce qu'on saisit pour faire glisser la feuille vers le bas. */
 const HANDLE = { width: 36, height: 5 }
 /** L'espace gardé au-dessus de la feuille sur téléphone : on voit encore l'écran dessous. */
@@ -450,6 +471,17 @@ export function Sheet({
     returnTo.current = back
     if (back) focusWithoutScroll(reachableOpener(back, openerName.current))
   }, [open, initialFocusRef])
+
+  // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
+  // `restoreAfterUnmount`. `opener` n'est plein que tant que la feuille est ouverte.
+  useEffect(
+    () => () => {
+      if (Platform.OS === 'web' && opener.current) {
+        restoreAfterUnmount(opener.current, openerName.current)
+      }
+    },
+    [],
+  )
 
   // Le Modal du web garde la feuille le temps de son fondu de sortie, et le focus avec elle : en
   // disparaissant, elle le laissait parfois sur la page (`body`), où la feuille de dessous le
