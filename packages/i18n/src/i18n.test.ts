@@ -32,6 +32,20 @@ describe('translations', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(fr).sort())
   })
 
+  it('never says that other tools are checked every week', () => {
+    // Relecture juridique du plan R6b (jur-T3) : « vérifiés chaque semaine » promettait un délai que
+    // rien ne tient, et un contrôle de l'outil ; les « Autre » d'un projet privé ne sont relus par
+    // personne. Seul le sujet du récapitulatif des administrateurs parle de « la semaine ».
+    // \p{L} (drapeau u) : toute lettre, accentuée comprise (« vérifiés ») ; \w ne connaît que l'ASCII.
+    const promise = /(vérifi|relu)\p{L}*\s+chaque\s+semaine|(checked|reviewed)\s+every\s+week/iu
+    // Témoin : l'ancienne phrase serait bien trouvée.
+    expect(promise.test('Vérifiés chaque semaine avant d’entrer au catalogue.')).toBe(true)
+    expect(promise.test('Checked every week before they join the catalogue.')).toBe(true)
+    for (const [key, text] of [...Object.entries(fr), ...Object.entries(en)]) {
+      expect(promise.test(text), `${key} : ${text}`).toBe(false)
+    }
+  })
+
   it('has no empty text', () => {
     for (const [key, text] of [...Object.entries(fr), ...Object.entries(en)]) {
       // Le second argument d'expect est le message affiché si le test échoue.
