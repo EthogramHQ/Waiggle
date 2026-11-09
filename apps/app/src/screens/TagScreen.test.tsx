@@ -35,6 +35,9 @@ import { lendContains, lendPage, watchFocus } from './ProjectComments.testkit'
 import { TagScreen } from './TagScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// Les tests web passent Platform.OS à 'web' : sans cette ligne, `useBrowserLanguage` (dans `Screen`)
+// lirait la langue du navigateur simulé et passerait le premier test web en anglais.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 jest.mock('../api/media', () => ({
   useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),
 }))

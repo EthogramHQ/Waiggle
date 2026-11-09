@@ -100,6 +100,7 @@ import { ToolFieldCatalogue } from './outils-champ'
 import { ToolHeaderCatalogue } from './outils-entete'
 import { ToolTagsCatalogue } from './outils-etiquettes'
 import { ToolFiltersCatalogue } from './outils-filtres'
+import { ToolPageSheetsCatalogue } from './outils-page'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
 import { ProjectFrameCatalogue } from './projet-ecran'
@@ -865,6 +866,7 @@ export function CatalogueScreen() {
       <ToolFieldCatalogue />
       <ToolHeaderCatalogue />
       <AdminCardsCatalogue />
+      <ToolPageSheetsCatalogue />
       <SearchCatalogue />
       {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
           l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
