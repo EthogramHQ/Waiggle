@@ -2241,6 +2241,41 @@ const pages = [
     signedIn: true,
     fullPage: true,
   },
+  // R6a : la seconde feuille « Catégorie et outils », une catégorie cochée.
+  {
+    name: 'publier-categorie',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
+      await page.getByRole('checkbox', { name: /^Sciences et espace/ }).click()
+    },
+  },
+  // R6a : un titre tapé, puis Échap : « Abandonner ce projet ? » par-dessus la feuille.
+  {
+    name: 'publier-abandon',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByLabel('Titre', { exact: true }).fill('Le ciel de ce soir')
+      await page.keyboard.press('Escape')
+      await page.getByText('Abandonner ce projet ?').waitFor()
+    },
+  },
+  // R6a : « Supprimer » du menu « … » de l'auteur ouvre la fenêtre (vignette, badge corbeille).
+  {
+    name: 'supprimer-projet',
+    path: project,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Plus d’actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Supprimer', exact: true }).click()
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: 'Supprimer', exact: true })
+        .waitFor()
+    },
+  },
   // La page d'un membre (la sienne : avec un brouillon privé), et celle d'une étiquette, pleine
   // puis vide.
   { name: 'membre', path: `/members/${leaMe.id}`, signedIn: true, fullPage: true },
