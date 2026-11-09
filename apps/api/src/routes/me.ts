@@ -39,7 +39,7 @@ import { reactionsOfMember } from '../reactions/load'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
-import { countNewOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
+import { countChargedOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
 import { legacyToolColumns, replaceProfileTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -197,9 +197,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }
     }
 
-    // Les nouveaux « Autre » parmi ses outils favoris se comptent AVANT d'écrire (sec-A5), dans le
-    // même quota que ceux de ses projets : trop nombreux, rien de la demande n'est gardé.
-    const counted = favoriteTools === undefined ? 0 : await countNewOtherTools(db, favoriteTools)
+    // Les noms hors catalogue de ses outils favoris se comptent AVANT d'écrire (sec-A5, sec-B1),
+    // dans le même quota que ceux de ses projets : trop nombreux, rien de la demande n'est gardé.
+    const counted =
+      favoriteTools === undefined ? 0 : await countChargedOtherTools(db, user.id, favoriteTools)
     const toolsRetry = await chargeOtherTools(limiter, user.id, counted)
     if (toolsRetry !== null) return tooMany(c, toolsRetry, 'too_many_other_tools')
     let createdHere = 0

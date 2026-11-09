@@ -1,8 +1,9 @@
 // Le quota des nouveaux « Autre » (tranche R6b, relecture de sécurité sec-A5) : un membre en crée au
 // plus 30 par jour, projets et profil confondus. Sans cela, publier et effacer des projets aux noms
 // tous différents ferait grossir la table `tool` sans fin. Chaque création compte, même si elle est
-// défaite ensuite (un projet effacé ne rend rien) ; un outil du catalogue ou un « Autre » qui
-// existe déjà n'est pas une création.
+// défaite ensuite (un projet effacé ne rend rien). Depuis sec-B1, chaque nom hors du catalogue
+// compte, qu'un « Autre » de ce nom existe déjà ou non, sauf ceux que le membre cite déjà lui-même
+// (`countChargedOtherTools`, tools/resolve.ts) : le 429 ne dit jamais ce qu'ont tapé les autres.
 //
 // Ce quota compte APRÈS la validation par Zod, par construction : il compte des noms nouveaux, et
 // il faut des noms validés pour savoir lesquels le sont. Une demande mal formée ne crée rien, n'est

@@ -22,7 +22,8 @@ export const legacyToolColumns = (resolved: readonly ResolvedTool[]) => ({
 /**
  * Efface les « Autre » de `ids` que plus aucun projet ni profil ne cite (tous les « Autre » si `ids`
  * est absent : le ménage de la purge de nuit et de la suppression d'un compte). Un outil du catalogue
- * ou « laissé hors du catalogue » ne s'efface jamais ici.
+ * ne s'efface jamais ici ; un « Autre » laissé hors du catalogue non plus : il garde le nom écarté
+ * pendant un an, puis la purge de nuit l'efface (`dropDismissedOthers`, ci-dessous).
  *
  * Deux protections contre une écriture simultanée :
  * - `(select 1 … limit 1) is null` lit chaque index `tool_id` pour UNE ligne, au lieu de joindre ;
@@ -49,6 +50,49 @@ export const dropOrphanOthers = async (tx: Writer, ids?: readonly string[]): Pro
       inArray(
         schema.tool.id,
         orphans.map((row) => row.id),
+      ),
+    )
+    .returning({ id: schema.tool.id })
+  return gone.length
+}
+
+/** Combien de temps un « Autre » écarté se garde après sa décision (jur-J5) : un an, comme le journal. */
+export const DISMISSED_TOOL_KEEP_DAYS = 365
+
+/**
+ * La purge de nuit (relecture juridique jur-J5, décision de Louis du 9/11/2026 au soir) : efface les
+ * « Autre » laissés hors du catalogue depuis plus d'un an que plus aucun projet ni profil ne cite.
+ * Un nom écarté est souvent injurieux, ou nomme quelqu'un : il ne se garde pas sans fin. Tant qu'il
+ * est cité, il reste (règle de tout « Autre » : ses mentions sont le texte de leurs auteurs, qui
+ * partent avec leur projet ou leur compte), et s'efface la nuit qui suit sa dernière mention.
+ *
+ * « Plus d'un an » se lit dans le journal : aucune ligne `tool_dismiss` de cet outil depuis
+ * `cutoff`. Le journal s'efface lui-même après un an (nightly-purge.ts) : un écarté sans ligne a donc
+ * été écarté il y a plus d'un an, et la règle tient encore après cet effacement. Les écartés sont
+ * peu nombreux (`tool_status_created_idx` les trouve par leur statut) ; le `not exists` lit le
+ * journal, quelques lignes par jour, sans index sur `tool_id` : une fois par nuit, cela coûte peu.
+ * Même verrou que `dropOrphanOthers` : un écarté qu'un membre est en train de citer est sauté.
+ */
+export const dropDismissedOthers = async (tx: Writer, cutoff: Date): Promise<number> => {
+  const expired = await tx
+    .select({ id: schema.tool.id })
+    .from(schema.tool)
+    .where(
+      sql`${schema.tool.status} = 'dismissed'
+        and (select 1 from project_tool where project_tool.tool_id = tool.id limit 1) is null
+        and (select 1 from profile_tool where profile_tool.tool_id = tool.id limit 1) is null
+        and not exists (select 1 from catalogue_change c
+          where c.tool_id = tool.id and c.action = 'tool_dismiss'
+            and c.created_at >= ${cutoff.toISOString()}::timestamptz at time zone 'UTC')`,
+    )
+    .for('update', { skipLocked: true })
+  if (expired.length === 0) return 0
+  const gone = await tx
+    .delete(schema.tool)
+    .where(
+      inArray(
+        schema.tool.id,
+        expired.map((row) => row.id),
       ),
     )
     .returning({ id: schema.tool.id })

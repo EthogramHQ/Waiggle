@@ -503,6 +503,48 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     expect(await authors()).toEqual([{ created_by: null }])
   })
 
+  // Relecture juridique jur-J5 (décision de Louis du 9/11/2026 au soir) : un « Autre » laissé hors
+  // du catalogue (souvent un nom injurieux, ou qui nomme quelqu'un) ne se garde pas sans fin. Un an
+  // après sa ligne `tool_dismiss`, il s'efface la nuit dès que plus rien ne le cite, comme tout
+  // « Autre » ; tant qu'un projet ou un profil le cite, il reste (et s'efface la nuit qui suit le
+  // retrait de sa dernière mention, même si la ligne du journal est déjà partie).
+  it('deletes an « other » tool left out of the catalogue a year after it was dismissed', async () => {
+    const dismiss = async (name: string, at: Date) => {
+      const id = await insertTool(name, 'other')
+      await ctx.db.execute(sql`update tool set status = 'dismissed' where id = ${id}`)
+      await ctx.db.execute(
+        sql`insert into catalogue_change (id, action, tool_id, created_at) values (${randomUUID()}, 'tool_dismiss', ${id}, ${utc(at)})`,
+      )
+      return id
+    }
+    const old = await dismiss('Zorblax Laissé', START)
+    await dismiss('Zorblax Récent', at(START, 200 * DAY))
+    const cited = await dismiss('Zorblax Cité', START)
+    await ctx.db.execute(
+      sql`insert into profile_tool (user_id, tool_id, position, label) values (${inesId}, ${cited}, 0, 'Zorblax Cité')`,
+    )
+
+    // Le catalogue semé par la migration reste là : on ne regarde que les noms de ce test.
+    const zorblax = async () => (await toolNames()).filter((name) => name.startsWith('Zorblax'))
+    const catalogue = await catalogueCount()
+
+    // Moins d'un an : tout reste, même l'écarté que plus rien ne cite.
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    expect(await zorblax()).toEqual(['Zorblax Cité', 'Zorblax Laissé', 'Zorblax Récent'])
+
+    // Un an après : l'écarté orphelin s'efface ; celui qu'un profil cite reste, le récent aussi.
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    expect(await zorblax()).toEqual(['Zorblax Cité', 'Zorblax Récent'])
+    expect(await rows(sql`select 1 from tool where id = ${old}`)).toEqual([])
+
+    // La dernière mention retirée (sa ligne du journal est partie la nuit d'avant) : il s'efface.
+    await ctx.db.execute(sql`delete from profile_tool where tool_id = ${cited}`)
+    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR))
+    expect(await zorblax()).toEqual(['Zorblax Récent'])
+    // Le catalogue, lui, n'a rien perdu.
+    expect(await catalogueCount()).toBe(catalogue)
+  })
+
   it('deletes the catalogue journal lines older than a year', async () => {
     const insertChange = async (createdAt: Date) => {
       const id = randomUUID()
