@@ -1019,6 +1019,7 @@ export const en: Translation = {
       formEditTitle: 'Edit the tool',
       name: 'Name',
       family: 'Family',
+      familyRequired: 'Choose a family.',
       descriptionFr: 'Description in French',
       descriptionEn: 'Description in English',
       descriptionHint:
@@ -1070,7 +1071,10 @@ export const en: Translation = {
       createTitle: 'New category',
       nameFr: 'Name in French',
       nameEn: 'Name in English',
+      nameFrRequired: 'Write the name in French.',
+      nameEnRequired: 'Write the name in English.',
       icon: 'Icon',
+      iconRequired: 'Choose an icon.',
       createHint:
         'A category describes what a project is about, never the person who publishes it.',
       preview: 'Preview',
@@ -1201,6 +1205,7 @@ export const en: Translation = {
     categoriesLabel: 'Categories of recent projects',
     allCategories: 'All',
     categoryEmpty: 'No project in “{{name}}” for now.',
+    seeAllProjects: 'See all projects',
     categoriesError: 'The categories could not load.',
   },
   search: {

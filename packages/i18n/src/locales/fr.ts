@@ -1194,6 +1194,8 @@ export const fr = {
       formEditTitle: 'Modifier l’outil',
       name: 'Nom',
       family: 'Famille',
+      /** Sous le groupe des familles, quand aucune n'est choisie (ui-C2). */
+      familyRequired: 'Choisis une famille.',
       descriptionFr: 'Description en français',
       descriptionEn: 'Description en anglais',
       descriptionHint:
@@ -1250,7 +1252,11 @@ export const fr = {
       createTitle: 'Nouvelle catégorie',
       nameFr: 'Nom en français',
       nameEn: 'Nom en anglais',
+      /** Sous chaque champ resté vide, et sous la grille sans icône (des-C3, ui-C2). */
+      nameFrRequired: 'Écris le nom en français.',
+      nameEnRequired: 'Écris le nom en anglais.',
       icon: 'Icône',
+      iconRequired: 'Choisis une icône.',
       /** Relecture juridique jur-T15 (article 9 du RGPD). */
       createHint: 'Une catégorie décrit le sujet d’un projet, jamais la personne qui le publie.',
       preview: 'Aperçu',
@@ -1428,6 +1434,8 @@ export const fr = {
     categoriesLabel: 'Catégories des projets récents',
     allCategories: 'Toutes',
     categoryEmpty: 'Aucun projet dans « {{name}} » pour l’instant.',
+    /** Sous une catégorie vide : retire le filtre (des-C4). */
+    seeAllProjects: 'Voir tous les projets',
     categoriesError: 'Les catégories n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
