@@ -2495,6 +2495,9 @@ const pages = [
             body: JSON.stringify({ error: { code: 'internal', message: '' } }),
           }),
       )
+      // Depuis R6b, le formulaire lit les catégories dès son ouverture : la page est rechargée
+      // pour que cette première lecture tombe déjà en panne (sinon la feuille garde la liste lue).
+      await page.reload()
       await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
       await page.getByRole('button', { name: 'Réessayer' }).first().waitFor({ timeout: 15_000 })
     },
