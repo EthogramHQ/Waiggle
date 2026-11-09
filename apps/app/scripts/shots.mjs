@@ -891,6 +891,8 @@ const biscotteProject = {
   title: 'Biscotte au parc',
   pitch: 'Où promener le chien selon la météo.',
   status: 'building',
+  primaryCategory: 'animals',
+  secondaryCategory: null,
   tools: [{ label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true }],
   excerpt: '… Le carnet de balades de Biscotte, mis à jour chaque dimanche après la promenade …',
 }
@@ -1791,7 +1793,13 @@ const fakeApi = (
       const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
       // « quota » : le quota de recherches est dépassé (page `recherche-429`).
       if (q === 'quota') return json(429, { error: { code: 'rate_limited', message: '' } })
-      return json(200, searchResultsOf[q] ?? emptySearchResults)
+      const found = searchResultsOf[q] ?? emptySearchResults
+      const category = url.searchParams.get('category')
+      if (!category) return json(200, found)
+      const items = found.projects.items.filter(
+        (p) => p.primaryCategory === category || p.secondaryCategory === category,
+      )
+      return json(200, { ...found, projects: { items, more: false } })
     }
     if (pathname === '/v1/members/mentionable') {
       // R5b, comme la vraie API : sans accents ni majuscules, le début du pseudo, du nom ou d'un
@@ -2622,6 +2630,18 @@ const pages = [
   { name: 'recherche', path: '/search?q=carn', signedIn: true, fullPage: true },
   { name: 'recherche-vide', path: '/search?q=carnaval', signedIn: true },
   { name: 'recherche-429', path: '/search?q=quota', signedIn: true },
+  // R6b : la recherche filtrée par une catégorie (« Animaux » : un projet sur deux), puis par une
+  // catégorie où rien n'est trouvé, sur l'onglet « Projets » (le message et de quoi retirer le filtre).
+  { name: 'recherche-categorie', path: '/search?q=carn&category=animals', signedIn: true },
+  {
+    name: 'recherche-categorie-vide',
+    path: '/search?q=carn&category=travel',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('radio', { name: /^Projets/ }).click()
+      await page.getByText('Aucun projet trouvé dans cette catégorie.').waitFor()
+    },
+  },
   { name: 'ruches', path: '/hives', signedIn: true },
 ]
 // Le garde des captures (loading-guard.ts) : juste avant chaque capture, après les attentes
