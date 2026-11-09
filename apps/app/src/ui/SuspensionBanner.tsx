@@ -9,7 +9,8 @@
 //
 // Il se montre déplié sur l'accueil (`initiallyOpen`), et à la première visite après une suspension
 // nouvelle ou changée (suspensionMemory.ts) ; replié ailleurs, pour que la page arrive vite sur un
-// téléphone.
+// téléphone. La feuille de publication en pose un aussi, replié, en tête : elle couvre la barre du
+// haut, et le membre doit y lire la date de fin et le recours (R6a, jur-C1).
 //
 // Il reçoit la suspension telle que l'API la donne et écrit lui-même ses phrases : la barre du haut
 // (`TopNav`) n'a qu'à le poser, une seule fois pour toutes les pages. Ce n'est pas une alerte : il
@@ -49,7 +50,8 @@ type Props = {
   suspension: Suspension
   /**
    * true : déplié dès l'affichage, même si la suspension a déjà été vue (l'accueil). false : replié
-   * dès l'affichage (le catalogue). Absent : selon la mémoire de l'appareil, déplié à la première
+   * dès l'affichage, sans compter la suspension comme vue (le catalogue, la feuille de publication,
+   * qui couvre le bandeau de la barre). Absent : selon la mémoire de l'appareil, déplié à la première
    * visite après une suspension nouvelle ou changée, replié ensuite.
    */
   initiallyOpen?: boolean | undefined

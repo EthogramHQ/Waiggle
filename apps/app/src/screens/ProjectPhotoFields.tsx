@@ -144,6 +144,11 @@ export function ProjectPhotoFields({
       <Text variant="caption" tone="muted">
         {photoRules}
       </Text>
+      {/* Le droit à l'image et les droits sur la photo (jur-S1, décision de Louis du 9/11/2026) :
+          une phrase à elle, sous les règles techniques, pour qu'elle ne s'y perde pas. */}
+      <Text variant="caption" tone="muted">
+        {t(($) => $.project.form.photosConsent)}
+      </Text>
       {selected ? (
         <TextField
           key={selected.key}

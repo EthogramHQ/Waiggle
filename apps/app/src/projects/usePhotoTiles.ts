@@ -104,7 +104,9 @@ export function usePhotoTiles(projectId?: string) {
   const draftsRef = useRef<Record<string, string>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [cut, setCut] = useState<PhotosCut | null>(null)
-  const [problem, setProblem] = useState<ApiErrorKey | 'describeFailed' | null>(null)
+  // `photoGone` : retirer une photo que le serveur ne connaît plus (404, retirée depuis un autre
+  // appareil) ; « Cette page n'existe pas. » n'aurait pas de sens ici (R6a, relecture de design).
+  const [problem, setProblem] = useState<ApiErrorKey | 'describeFailed' | 'photoGone' | null>(null)
 
   const counter = useRef(0)
   const newKey = () => {
@@ -297,7 +299,7 @@ export function usePhotoTiles(projectId?: string) {
     void enqueue(async (last) => {
       const result = await safely(() => deleteVisual(projectId, key))
       if (!result.ok) {
-        setProblem(result.error)
+        setProblem(result.error === 'notFound' ? 'photoGone' : result.error)
         refetch(projectId)
       } else if (last()) {
         setProject(result.data)
@@ -402,7 +404,10 @@ export function usePhotoTiles(projectId?: string) {
     flushPending,
     /** Des photos choisies d'un coup dépassaient les places : `project.form.photosCut`. */
     cut,
-    /** Une écriture a échoué : la clé du message (`errors.*`), ou `describeFailed`. */
+    /**
+     * Une écriture a échoué : la clé du message (`errors.*`), `describeFailed`, ou `photoGone`
+     * (`project.form.photoGone`).
+     */
     problem,
     clearNotices: () => {
       setCut(null)

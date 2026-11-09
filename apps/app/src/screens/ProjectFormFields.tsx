@@ -14,7 +14,6 @@
 // Corrections après les relectures de R6a : « Lien valide » suit le schéma du contrat (`DemoUrl`,
 // longueur comprise : sec-A2) ; les outils d'une ligne se lient selon la langue (`Intl.ListFormat`).
 import {
-  DemoUrl,
   PROJECT_DESCRIPTION_MAX,
   PROJECT_PITCH_MAX,
   PROJECT_PROMPT_MAX_LENGTH,
@@ -30,7 +29,12 @@ import {
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { categoryOption } from '../projects/categories'
-import type { ProjectForm, ProjectFormErrors } from '../projects/form'
+import {
+  demoUrlLooksValid,
+  type ProjectAudience,
+  type ProjectForm,
+  type ProjectFormErrors,
+} from '../projects/form'
 import type { PhotoActions } from '../projects/usePhotoTiles'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
@@ -137,6 +141,11 @@ type Props = {
    * l'écran les pose ailleurs (l'aperçu et le pied de la feuille, sur ordinateur).
    */
   withAudience?: boolean
+  /**
+   * L'audience enregistrée du projet modifié : la phrase passe au futur quand le choix en diffère
+   * (`audienceSentence`). Absente en modification : celle du formulaire (tests des seuls champs).
+   */
+  savedAudience?: ProjectAudience | undefined
 }
 
 // Les erreurs du formulaire qui ont leur phrase dans `project.errors` (la catégorie a la sienne).
@@ -180,6 +189,7 @@ export function ProjectFormFields({
   fieldRefs,
   savedPrompts,
   withAudience = true,
+  savedAudience,
 }: Props) {
   const { t, i18n } = useTranslation()
   const editing = projectId !== undefined
@@ -189,8 +199,7 @@ export function ProjectFormFields({
   // --- Le lien : sa forme est vérifiée pendant la frappe, le site n'est jamais ouvert (jur-J16) ---
   // Par le schéma du contrat, celui de l'API : « Lien valide » ne promet rien que l'envoi refuse
   // (une adresse au-delà de DEMO_URL_MAX_LENGTH était cochée, puis refusée : sec-A2).
-  const demoUrl = form.demoUrl.trim()
-  const demoOk = demoUrl !== '' && DemoUrl.safeParse(demoUrl).success
+  const demoOk = demoUrlLooksValid(form)
 
   // --- Les catégories et les outils (les lignes qui ouvrent la seconde feuille) ---
   const categoryLabel = t(($) => $.project.form.category)
@@ -465,7 +474,7 @@ export function ProjectFormFields({
         <Stack gap="md">
           <ProjectAudienceChoice audience={form.audience} change={change} />
           <Text variant="callout" tone="secondary">
-            {audienceSentence(t, form.audience, editing)}
+            {audienceSentence(t, form.audience, editing ? (savedAudience ?? form.audience) : null)}
           </Text>
         </Stack>
       ) : null}
