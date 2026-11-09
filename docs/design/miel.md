@@ -119,10 +119,13 @@ quelques dizaines d'octets, que le serveur calcule à l'envoi.
 `Screen` prend une prop `ambiance` :
 
 - `light` (par défaut) : la lumière d'ambiance derrière le contenu.
-- `brand` : le **miel vif** des moments de marque (accueil d'un visiteur, connexion, inscription,
-  adresse vérifiée, page introuvable…). Un dégradé de miel en haut de l'écran
-  (`ui/BrandAmbiance.tsx`), et une feuille claire qui remonte dessus et porte le contenu et les
-  boutons. La lumière d'ambiance est alors coupée. Aucun bouton encre n'est posé sur le miel.
+- `brand` : le **miel vif** des moments de marque (accueil d'un visiteur, page introuvable…). Un
+  dégradé de miel en haut de l'écran (`ui/BrandAmbiance.tsx`), et une feuille claire qui remonte
+  dessus et porte le contenu et les boutons. La lumière d'ambiance est alors coupée. Aucun bouton
+  encre n'est posé sur le miel.
+- Les **pages du compte** (connexion, inscription, « Vérifie ta boîte mail », mot de passe oublié,
+  nouveau mot de passe, adresse vérifiée) restent sur `light`, le fond crème : la mascotte ou
+  l'emblème ouvre la page, dans le contenu (décision du 9/11/2026).
 
 ## La marque : logo, mascotte, chargement
 

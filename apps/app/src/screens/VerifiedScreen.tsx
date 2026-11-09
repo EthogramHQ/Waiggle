@@ -23,8 +23,7 @@ export function VerifiedScreen() {
 
   return (
     <Screen
-      // Un moment de marque (l'adresse est confirmée) : le « miel vif », le contenu sur la feuille.
-      ambiance="brand"
+      // Sur le fond crème, comme les autres pages du compte (décision de Louis du 9/11/2026, R6b).
       pageTitle={t(($) => $.auth.verified.title)}
     >
       <Stack align="center">
