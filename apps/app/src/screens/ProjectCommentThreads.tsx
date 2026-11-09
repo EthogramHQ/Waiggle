@@ -21,6 +21,7 @@ import { type ActionMenuItem, CommentCard, type CommentCardHandle } from '../ui/
 import { CommentList } from '../ui/CommentList'
 import { CommentThread } from '../ui/CommentThread'
 import { Dialog } from '../ui/Dialog'
+import type { Focusable } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
 import { Notice } from '../ui/Notice'
 
@@ -116,6 +117,8 @@ export function CommentThreads({
   const [showDeleteError, setShowDeleteError] = useState(false)
   // Après une suppression : les cartes voisines à essayer, une fois la fenêtre fermée.
   const focusAfterClose = useRef<string[] | null>(null)
+  // « Annuler » de la fenêtre de suppression reçoit le focus à l'ouverture (H3).
+  const cancelDeleteRef = useRef<Focusable>(null)
   // Masquer : le commentaire dont le dernier changement a échoué, et ceux en cours d'envoi. La `ref`
   // est lue tout de suite (un double clic n'envoie qu'une fois) ; l'état fait attendre le bouton.
   const [hideFailed, setHideFailed] = useState<string | null>(null)
@@ -356,6 +359,7 @@ export function CommentThreads({
           if (!removing) setDeleting(null)
         }}
         onClosed={focusNeighbor}
+        initialFocusRef={cancelDeleteRef}
       >
         {showDeleteError && remove.error ? (
           <Notice
@@ -374,6 +378,7 @@ export function CommentThreads({
           loading={removing}
         />
         <Button
+          ref={cancelDeleteRef}
           label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setDeleting(null)}

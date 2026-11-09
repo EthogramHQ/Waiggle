@@ -658,6 +658,8 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
   const router = useRouter()
   const notesHandle = useRef<NoteListHandle>(null)
   const focusAfterClose = useRef<number | null>(null)
+  // « Annuler » de la fenêtre de suppression d'une note reçoit le focus à l'ouverture (H3).
+  const cancelDeleteRef = useRef<Focusable>(null)
 
   // Arrivé du formulaire après un changement de statut (?announce=testable) : le champ s'ouvre avec
   // une note toute prête (« Le projet passe en « Testable ». »). Seulement pour l'auteur, et
@@ -844,6 +846,7 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
         guardTaps
         title={t(($) => $.project.notes.deleteTitle)}
         message={t(($) => $.project.notes.deleteBody)}
+        initialFocusRef={cancelDeleteRef}
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
         onDismiss={() => {
           if (!removing) setDeleting(null)
@@ -872,6 +875,7 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
           loading={removing}
         />
         <Button
+          ref={cancelDeleteRef}
           label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setDeleting(null)}

@@ -76,6 +76,9 @@ export function DeleteProjectDialog({
   // Une ref en plus de l'état : deux tapes dans la même image (double tape) voient toutes deux
   // l'ancien `busy` ; la ref, elle, est déjà à vrai pour la seconde.
   const sending = useRef(false)
+  // « Annuler » reçoit le focus à l'ouverture : supprimer ne se défait pas, et Entrée à l'arrivée ne
+  // doit rien supprimer (relecture de design de R6a, H3).
+  const cancelRef = useRef<Focusable>(null)
   // Supprimé : à la fermeture, le focus ne revient pas au « … » d'une page qu'on quitte.
   const deleted = useRef(false)
 
@@ -158,6 +161,7 @@ export function DeleteProjectDialog({
       error={refusal && refusal !== 'unauthorized' ? refusalMessage : undefined}
       onDismiss={cancel}
       onClosed={closed}
+      initialFocusRef={cancelRef}
     >
       {refusal === 'unauthorized' ? (
         <Notice message={refusalMessage} action={signInAgain(onCancel)} />
@@ -169,6 +173,7 @@ export function DeleteProjectDialog({
         loading={busy}
       />
       <Button
+        ref={cancelRef}
         label={t(($) => $.common.cancel)}
         variant="secondary"
         onPress={cancel}
