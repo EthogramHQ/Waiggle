@@ -10,6 +10,7 @@ import { requestPasswordReset } from '../accounts/api'
 import { visited } from '../testing/navigation'
 import { renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import * as motion from '../ui/theme/motion'
 import { ForgotPasswordScreen } from './ForgotPasswordScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn(), requestPasswordReset: jest.fn() }))
@@ -54,6 +55,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers()
+  jest.restoreAllMocks()
 })
 
 describe('ForgotPasswordScreen', () => {
@@ -126,6 +128,11 @@ describe('too many attempts on the forgotten password', () => {
   })
 
   it('unblocks the button by itself when the time comes', async () => {
+    // « Réduire les animations » le temps de l'attente simulée : la page est sur le fond crème, dont
+    // la lumière d'ambiance respire sans fin ; sous les fausses horloges, chaque milliseconde
+    // avancée rejouerait une image (comme dans ChangePasswordScreen.test.tsx). Ce que le test
+    // vérifie (l'heure dite, le bouton bloqué puis rendu) ne dépend pas d'elle.
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(true)
     jest.useFakeTimers()
     jest.setSystemTime(now)
     jest

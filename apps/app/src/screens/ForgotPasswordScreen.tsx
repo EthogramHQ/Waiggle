@@ -1,5 +1,5 @@
-// Page « Mot de passe oublié ? » (tranche R2, /forgot-password), sur le miel vif des moments de
-// marque. Le visiteur donne son adresse ; la page dit toujours la même chose, qu'un compte existe
+// Page « Mot de passe oublié ? » (tranche R2, /forgot-password), sur le fond crème des pages du
+// compte. Le visiteur donne son adresse ; la page dit toujours la même chose, qu'un compte existe
 // ou non : c'est le serveur qui décide d'envoyer l'e-mail, sans le dire (sinon la page servirait à
 // savoir qui est inscrit). Au-delà du quota, elle donne l'heure du prochain essai (D3).
 import { ForgotPasswordRequest, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@ruche/contracts'
@@ -117,7 +117,6 @@ export function ForgotPasswordScreen() {
 
   return (
     <Screen
-      ambiance="brand"
       title={t(($) => $.auth.forgotPassword.title)}
       subtitle={t(($) => $.auth.forgotPassword.intro)}
       onBack={back}

@@ -117,8 +117,8 @@ export function CheckEmailScreen() {
     />
   ) : null
 
-  // L'image de la page : l'abeille en vol, qui part porter le message. Seule sur son décor, elle
-  // garde son nom pour les lecteurs d'écran (J10).
+  // L'image de la page : l'abeille en vol, qui part porter le message. Seule, elle garde son nom
+  // pour les lecteurs d'écran (J10).
   const picture = (
     <Stack align="center">
       <Mascot pose="fly" />
@@ -126,12 +126,9 @@ export function CheckEmailScreen() {
   )
 
   return (
-    // Le « miel vif » des moments de marque, comme l'inscription d'où l'on arrive : l'image est le
-    // décor (`scene`), que l'ambiance place selon la largeur (sur le miel, ou en tête de la carte) ;
-    // le texte est sur la feuille claire.
+    // Sur le fond crème, comme les autres pages du compte (décision de Louis du 9/11/2026) :
+    // l'abeille ouvre la page, dans le contenu.
     <Screen
-      ambiance="brand"
-      scene={picture}
       pageTitle={t(($) => $.auth.checkEmail.title)}
       // Le « Retour » du cadre de page, en tête de la feuille comme sur les autres pages du compte
       // (R3) : il ne dépend pas du navigateur, il est donc là dès le premier dessin.
@@ -185,6 +182,7 @@ export function CheckEmailScreen() {
         ) : undefined
       }
     >
+      {picture}
       <Text variant="title2" heading={1}>
         {t(($) => $.auth.checkEmail.title)}
       </Text>

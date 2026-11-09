@@ -11,6 +11,7 @@ import { resetPassword } from '../accounts/api'
 import { pathOf, visited } from '../testing/navigation'
 import { renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import * as motion from '../ui/theme/motion'
 import { ResetPasswordScreen } from './ResetPasswordScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn(), resetPassword: jest.fn() }))
@@ -54,6 +55,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers()
+  jest.restoreAllMocks()
 })
 
 describe('ResetPasswordScreen', () => {
@@ -146,6 +148,11 @@ describe('ResetPasswordScreen', () => {
   })
 
   it('tells at what fixed time to try again when the quota is reached', async () => {
+    // « Réduire les animations » le temps de l'attente simulée : la page est sur le fond crème, dont
+    // la lumière d'ambiance respire sans fin ; sous les fausses horloges, chaque milliseconde
+    // avancée rejouerait une image (comme dans ChangePasswordScreen.test.tsx). Ce que le test
+    // vérifie (l'heure dite, le bouton bloqué puis rendu) ne dépend pas d'elle.
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(true)
     jest.useFakeTimers()
     jest.setSystemTime(now)
     jest

@@ -12,6 +12,7 @@ import { createI18n } from '../i18n'
 import { pathOf, visited } from '../testing/navigation'
 import { renderWithI18n, setDesktopWindow } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import * as motion from '../ui/theme/motion'
 import { SignInScreen } from './SignInScreen'
 
 // signUp aussi : sur ordinateur, le panneau porte les deux formulaires.
@@ -307,7 +308,10 @@ describe('too many sign-in attempts', () => {
       retryAfterSeconds: FIFTEEN_MINUTES,
     })
   })
-  afterEach(() => jest.useRealTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
 
   it('says « Trop d’essais pour l’instant » and the fixed hour of the next try, without « tu »', async () => {
     await renderWithI18n(<SignInScreen />)
@@ -348,6 +352,11 @@ describe('too many sign-in attempts', () => {
   })
 
   it('unblocks the button by itself once the hour has come', async () => {
+    // « Réduire les animations » le temps de l'attente simulée : la page est sur le fond crème, dont
+    // la lumière d'ambiance respire sans fin ; sous les fausses horloges, chaque milliseconde
+    // avancée rejouerait une image (comme dans ChangePasswordScreen.test.tsx). Ce que le test
+    // vérifie (l'heure dite, le bouton bloqué puis rendu) ne dépend pas d'elle.
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(true)
     await renderWithI18n(<SignInScreen />)
     await submit()
     expect(screen.getByRole('button', { name: 'Me connecter' })).toBeDisabled() // témoin

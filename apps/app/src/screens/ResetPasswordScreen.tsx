@@ -105,18 +105,14 @@ export function ResetPasswordScreen() {
   if (!hydrated)
     return (
       // Le « Retour » est déjà là : il ne dépend pas du jeton, et ne bouge pas à l'hydratation.
-      <Screen ambiance="brand" pageTitle={null} onBack={back}>
+      <Screen pageTitle={null} onBack={back}>
         {null}
       </Screen>
     )
 
   if (refused || !token) {
     return (
-      <Screen
-        ambiance="brand"
-        pageTitle={t(($) => $.auth.resetPassword.invalidTitle)}
-        onBack={back}
-      >
+      <Screen pageTitle={t(($) => $.auth.resetPassword.invalidTitle)} onBack={back}>
         <Fragment key="refused">
           <Stack align="center">
             <Emblem icon="warning-circle" />
@@ -143,7 +139,6 @@ export function ResetPasswordScreen() {
 
   return (
     <Screen
-      ambiance="brand"
       title={t(($) => $.auth.resetPassword.title)}
       onBack={back}
       footer={

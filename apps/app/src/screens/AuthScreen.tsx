@@ -1,5 +1,5 @@
 // La page d'entrée (tranche R2), commune à « Se connecter » (/sign-in) et « Créer un compte »
-// (/sign-up). Sur le miel vif : la langue et le retour sur le miel ; sur ordinateur, la scène
+// (/sign-up). Sur le fond crème des pages du compte (décision de Louis du 9/11/2026) ; sur ordinateur, la scène
 // d'accueil à gauche et le panneau en carte à droite, avec ses deux onglets (AuthPanel).
 // L'adresse suit l'onglet : changer d'onglet remplace la page (/sign-in ↔ /sign-up), et le relais
 // (accounts/authHandoff.ts) passe à la nouvelle ce qui était tapé et le focus de l'onglet.
@@ -77,14 +77,13 @@ export function AuthScreen({ tab: initial }: { tab: AuthTab }) {
 
   return (
     <Screen
-      ambiance="brand"
       // Le titre de l'onglet du navigateur suit l'onglet choisi (jur-15, WCAG 2.4.2).
       pageTitle={titles[tab]}
       // Le « Retour » est celui du cadre de page, en tête de la feuille, comme sur les autres
       // pages du compte (mot de passe oublié, « Vérifie ta boîte mail », nouveau mot de passe) :
       // au même endroit d'une page à l'autre (R3, « Venus des listes »).
       onBack={back}
-      // Sur le miel, en haut à droite, il ne reste que le choix de la langue.
+      // En haut à droite, il ne reste que le choix de la langue.
       header={
         <Row justify="end" align="center">
           <LanguageSwitcher compact visitor />
