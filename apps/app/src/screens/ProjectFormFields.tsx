@@ -1,6 +1,6 @@
 // Les champs de la feuille de publication et de modification (R6a, planches R6-Publier,
-// R6-Publier-Suite et R6-Publier-Desktop), dans l'ordre des planches : les photos et la description
-// de la photo choisie ; le titre, « En une phrase », la description, le lien de la démo ; « Où en
+// R6-Publier-Suite et R6-Publier-Desktop), dans l'ordre des planches : les photos, la description
+// de la photo choisie et la couverture verticale du téléphone (scénario : « reste possible ») ; le titre, « En une phrase », la description, le lien de la démo ; « Où en
 // est le projet ? » ; les lignes « Catégorie », « Seconde » et « Outils » (qui ouvrent la seconde
 // feuille, `ProjectCategorySheet`) ; « Commencé en » ; « Facile à refaire ? » ; le prompt de départ
 // et les autres prompts ; enfin « Qui peut le voir ? » et la phrase qui dit qui verra le projet.
@@ -43,6 +43,7 @@ import { Row, Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
+import { VisualEditor, type VisualEditorLabels, type VisualTile } from '../ui/VisualEditor'
 
 // La fonction `t` de react-i18next, pour les textes calculés hors du rendu.
 type T = ReturnType<typeof useTranslation>['t']
@@ -114,6 +115,17 @@ export type PhotoDescriptions = {
   onLeave: (key: string) => void
 }
 
+/**
+ * La couverture verticale, sous les photos : l'écran branche ici ce que rend `usePortraitCover`
+ * (`tile`, `onPick`, `onRemove`, `busy`).
+ */
+export type PortraitCover = {
+  tile: VisualTile | null
+  onPick: () => void
+  onRemove: () => void
+  busy?: boolean
+}
+
 /** Change un champ du formulaire : `change('title')('Le ciel de ce soir')`. */
 export type ChangeField = <K extends keyof ProjectForm>(key: K) => (value: ProjectForm[K]) => void
 
@@ -128,6 +140,11 @@ type Props = {
   tiles: PhotoTile[]
   photos: PhotoActions
   descriptions: PhotoDescriptions
+  /**
+   * La couverture verticale du téléphone, facultative (`usePortraitCover`). L'écran la donne
+   * toujours ; absente, la section n'a que les photos (tests des seuls champs).
+   */
+  portrait?: PortraitCover | undefined
   /** L'envoi du projet est en cours : les gestes sur les photos attendent. */
   photosBusy?: boolean
   /** Une ligne « Catégorie », « Seconde » ou « Outils » touchée : l'écran ouvre la seconde feuille. */
@@ -216,6 +233,7 @@ export function ProjectFormFields({
   tiles,
   photos,
   descriptions,
+  portrait,
   photosBusy = false,
   onOpenCategories,
   fieldRefs,
@@ -260,6 +278,13 @@ export function ProjectFormFields({
     later: t(($) => $.project.form.movePhotoLater),
     moved: (place) => t(($) => $.project.form.photoMoved, { place }),
     remove: (number) => t(($) => $.project.form.removePhoto, { number }),
+  }
+  const portraitLabels: VisualEditorLabels = {
+    portrait: t(($) => $.project.visuals.portrait),
+    portraitHint: t(($) => $.project.visuals.portraitHint),
+    choosePortrait: t(($) => $.project.visuals.choosePortrait),
+    replacePortrait: t(($) => $.project.visuals.replacePortrait),
+    removePortrait: t(($) => $.project.visuals.removePortrait),
   }
   // Les règles des photos ; en modification, chaque geste s'enregistre tout de suite (jur-J4).
   const photoRules = [
@@ -349,7 +374,7 @@ export function ProjectFormFields({
 
   return (
     <Stack gap="xxl">
-      {/* Les photos, puis la description de la photo choisie (facultative). */}
+      {/* Les photos, la description de la photo choisie (facultative), puis la couverture verticale. */}
       <Stack gap="sm">
         <Row justify="between" align="center">
           <Text variant="headline" heading={2}>
@@ -393,6 +418,16 @@ export function ProjectFormFields({
             hint={t(($) => $.project.form.photoDescriptionHint)}
             limit={PHOTO_DESCRIPTION_MAX}
             countFrom={PHOTO_DESCRIPTION_COUNT_FROM}
+          />
+        ) : null}
+        {/* La couverture verticale du téléphone, facultative : sous les photos, dans leur section. */}
+        {portrait ? (
+          <VisualEditor
+            labels={portraitLabels}
+            portrait={portrait.tile}
+            onPickPortrait={portrait.onPick}
+            onRemovePortrait={portrait.onRemove}
+            busy={photosBusy || Boolean(portrait.busy)}
           />
         ) : null}
       </Stack>

@@ -8,7 +8,8 @@
 // - la `Sheet` : sur téléphone, poignée, « Annuler », titre et « Publier » / « Enregistrer » dans la
 //   tête ; sur ordinateur, deux colonnes, l'aperçu de la carte du fil à droite (`aside`) ;
 // - les champs (`ProjectFormFields`), la seconde feuille « Catégorie et outils »
-//   (`ProjectCategorySheet`), les photos (`usePhotoTiles`) et la fenêtre de suppression ;
+//   (`ProjectCategorySheet`), les photos (`usePhotoTiles`), la couverture verticale
+//   (`usePortraitCover`) et la fenêtre de suppression ;
 // - la fenêtre « Abandonner ce projet ? », demandée par toute fermeture quand quelque chose a été
 //   écrit, y compris le retour du navigateur (`useLeaveGuard`).
 // Le profil est lu avant le formulaire : un compte suspendu ne tape jamais un texte qui se perdrait.
@@ -36,6 +37,7 @@ import {
 } from '../projects/form'
 import { useProject, useSetProject } from '../projects/hooks'
 import { usePhotoTiles } from '../projects/usePhotoTiles'
+import { usePortraitCover } from '../projects/usePortraitCover'
 import { Button } from '../ui/Button'
 import { CardPreview } from '../ui/CardPreview'
 import { Dialog } from '../ui/Dialog'
@@ -230,6 +232,8 @@ function ProjectFormView({
   // Une `ref` en plus de l'état : deux tapes dans la même image voient toutes deux l'ancien `busy`.
   const sending = useRef(false)
   const photos = usePhotoTiles(projectId)
+  // La couverture verticale du téléphone, à côté des photos, avec les mêmes deux modes.
+  const portrait = usePortraitCover(projectId)
   const fieldRefs = useProjectFieldRefs()
   // La seconde feuille, et la ligne qui l'a ouverte : gardée après la fermeture, pour que la
   // feuille y rende le focus (ui-I10).
@@ -255,9 +259,11 @@ function ProjectFormView({
     if (!focusWithoutScroll(deleteRef.current)) moveReaderTo(deleteRef.current)
   }, [deleting])
 
-  // Ce qui serait perdu en fermant : un champ changé ; à la création, aussi une photo choisie (en
-  // modification, les photos sont déjà enregistrées).
-  const dirty = isDirty(initial, form) || (!editing && photos.tiles.length > 0)
+  // Ce qui serait perdu en fermant : un champ changé ; à la création, aussi une photo ou une
+  // couverture verticale choisie (en modification, elles sont déjà enregistrées).
+  const dirty = isDirty(initial, form) || (!editing && (photos.tiles.length > 0 || portrait.chosen))
+  // Une photo ou la couverture se prépare encore sur l'appareil : « Publier » attend.
+  const preparing = photos.preparing || portrait.preparing
 
   // --- Fermer, abandonner ---
   // `asking` : la fenêtre d'abandon est ouverte ; `held` : le retour du navigateur arrêté, à rejouer.
@@ -333,6 +339,7 @@ function ProjectFormView({
     if (sending.current) return
     setMessage(null)
     photos.clearNotices()
+    portrait.clearProblem()
     const checked = projectId ? toProjectChanges(form, initial) : toProjectChanges(form)
     if (!checked.ok) {
       setErrors(checked.errors)
@@ -363,8 +370,10 @@ function ProjectFormView({
       // Le fil la montre tout de suite (plan, U5a) ; puis les photos partent, dans l'ordre.
       void queryClient.invalidateQueries({ queryKey: ['feed'] })
       const { failed } = await photos.flushPending(id)
+      // La couverture verticale ensuite ; un échec compte comme une photo qui n'est pas partie.
+      const portraitSent = await portrait.flush(id)
       guard.release()
-      if (failed > 0) {
+      if (failed + portraitSent.failed > 0) {
         // Ni danse ni « Projet publié » : la modification dit quelles photos manquent (jur-J11).
         router.replace({ pathname: '/projects/[id]/edit', params: { id, photos: 'failed' } })
       } else if (form.audience === 'private') {
@@ -406,20 +415,24 @@ function ProjectFormView({
   }
 
   // --- Ce que la feuille dit au-dessus des champs (un seul message à la fois) ---
+  // Recopié dans une constante : le sélecteur de `t` ne garde pas le rétrécissement de `null`.
+  const portraitProblem = portrait.problem
   const photoNotice = photos.cut
     ? t(($) => $.project.form.photosCut, photos.cut)
     : photos.problem === 'describeFailed'
       ? t(($) => $.project.form.describeFailed)
       : photos.problem
         ? t(($) => $.errors[photos.problem as Exclude<typeof photos.problem, 'describeFailed'>])
-        : null
+        : portraitProblem
+          ? t(($) => $.errors[portraitProblem])
+          : null
   const notice: SheetNotice | null = message
     ? { message, tone: 'error' }
     : photoNotice
       ? { message: photoNotice, tone: 'error' }
       : uploadFailed && editing
         ? { message: t(($) => $.project.form.uploadFailed), tone: 'info' }
-        : !editing && photos.preparing
+        : !editing && preparing
           ? { message: t(($) => $.project.visuals.preparing), tone: 'info', polite: true }
           : editing && !dirty
             ? { message: t(($) => $.project.form.unchanged), tone: 'info', polite: true }
@@ -446,7 +459,7 @@ function ProjectFormView({
           busy,
           // Rien à enregistrer, ou des photos encore en préparation : l'action attend, atteignable
           // au clavier et décrite par la phrase de la feuille.
-          disabled: editing ? !dirty : photos.preparing,
+          disabled: editing ? !dirty : preparing,
           focusableWhenDisabled: true,
         }}
         notice={notice}
@@ -475,6 +488,12 @@ function ProjectFormView({
             onLeave: () => {
               if (projectId) void photos.flushPending(projectId)
             },
+          }}
+          portrait={{
+            tile: portrait.tile,
+            onPick: portrait.onPick,
+            onRemove: portrait.onRemove,
+            busy: portrait.busy,
           }}
           photosBusy={busy}
           onOpenCategories={openCategories}
