@@ -269,17 +269,82 @@ const focusLost = (): boolean => {
   return active === null || active === page?.body || active.isConnected === false
 }
 
+// L'ouvreur retenu à l'ouverture peut ne plus être dans la page à la fermeture : sur téléphone, le
+// « + » de la barre d'onglets est redessiné quand la page de la feuille se ferme (un autre élément,
+// le même nom), et le focus retombait sur `body` (R6a, design-C1). On le retrouve alors par son nom
+// parmi les boutons et liens visibles de la page.
+type FoundElement = {
+  isConnected?: boolean
+  getAttribute?: (name: string) => string | null
+  getClientRects?: () => { length: number }
+}
+const OPENERS = 'a, button, [role="button"], [role="link"]'
+
+/** Le nom d'un élément du navigateur (`aria-label`), pour le retrouver plus tard ; sinon null. */
+const nameOf = (element: unknown): string | null =>
+  (element as FoundElement | null)?.getAttribute?.('aria-label') ?? null
+
+/**
+ * L'élément à qui rendre le focus : `node` s'il est encore dans la page (ou si on ne sait pas), sinon
+ * le premier élément visible de même nom, sinon `node`.
+ */
+const reachableOpener = (node: unknown, name: string | null): unknown => {
+  if ((node as FoundElement | null)?.isConnected !== false || !name) return node
+  const page = (
+    globalThis as { document?: { querySelectorAll?: (selector: string) => ArrayLike<unknown> } }
+  ).document
+  const candidates = page?.querySelectorAll?.(OPENERS)
+  const same = candidates
+    ? Array.from(candidates).find(
+        (element) =>
+          nameOf(element) === name &&
+          ((element as FoundElement).getClientRects?.().length ?? 0) > 0,
+      )
+    : undefined
+  return same ?? node
+}
+
+/**
+ * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
+ * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
+ * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
+ * page d'avant reparaisse : quelques essais rapprochés, qui s'arrêtent dès que le focus est quelque
+ * part (la page d'arrivée l'a pris : on ne le lui reprend pas).
+ */
+const RESTORE_TRIES = 8
+const RESTORE_EVERY_MS = 100
+const restoreAfterUnmount = (back: unknown, name: string | null, left = RESTORE_TRIES): void => {
+  setTimeout(() => {
+    if (!focusLost()) return
+    const target = reachableOpener(back, name)
+    if ((target as FoundElement | null)?.isConnected === false && left > 1) {
+      restoreAfterUnmount(back, name, left - 1)
+      return
+    }
+    focusWithoutScroll(target)
+  }, RESTORE_EVERY_MS)
+}
+
 /** La poignée : ce qu'on saisit pour faire glisser la feuille vers le bas. */
 const HANDLE = { width: 36, height: 5 }
 /** L'espace gardé au-dessus de la feuille sur téléphone : on voit encore l'écran dessous. */
 const SHEET_TOP_GAP = space.huge
 /** Les marges autour du panneau sur ordinateur. */
 const PANEL_MARGIN = space.xxxl
-/** La colonne posée à droite du panneau (`aside`), et l'écart entre les deux. */
-const ASIDE_WIDTH = layout.sideColumn + space.xxl
+/**
+ * La fenêtre avec sa colonne d'à côté (`aside`), d'après la planche R6-Publier-Desktop : 1 120
+ * points en tout, dont un aperçu de 420 (le contenu a le reste, 656). Le contenu garde 480 points
+ * au moins : en deçà, la colonne n'est plus posée à côté (voir `useSheetAside`) ; la fenêtre
+ * rétrécit avec l'écran, la colonne gardant sa largeur.
+ */
+const BESIDE_WIDTH = 1120
+const BESIDE_CONTENT_MIN = 480
+/** La colonne d'à côté : l'aperçu (420) et la marge à sa droite (celle du contenu, à gauche). */
+const ASIDE_PREVIEW = 420
+const ASIDE_WIDTH = ASIDE_PREVIEW + space.xl
 const ASIDE_GAP = space.xxl
 /** La largeur de fenêtre qu'il faut pour poser la colonne à côté du panneau. */
-const ASIDE_ROOM = layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
+const ASIDE_ROOM = BESIDE_CONTENT_MIN + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
 
 /**
  * Hook : vrai si une feuille ouverte maintenant poserait sa colonne `aside` à côté du contenu
@@ -350,6 +415,8 @@ export function Sheet({
   const opener = useRef<unknown>(null)
   // Le même, gardé jusqu'à la fin du fondu de sortie (voir `onDismiss`, plus bas).
   const returnTo = useRef<unknown>(null)
+  // Son nom, pour le retrouver s'il a été redessiné entre-temps (voir `reachableOpener`).
+  const openerName = useRef<string | null>(null)
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
   const sheetId = useId()
@@ -394,6 +461,7 @@ export function Sheet({
     if (Platform.OS !== 'web') return
     if (open) {
       opener.current = activeElement()
+      openerName.current = nameOf(opener.current)
       const wanted = initialFocusRef?.current
       if (!wanted || !focusWithoutScroll(wanted)) focusWithoutScroll(closeRef.current)
       return
@@ -401,8 +469,19 @@ export function Sheet({
     const back = opener.current
     opener.current = null
     returnTo.current = back
-    if (back) focusWithoutScroll(back)
+    if (back) focusWithoutScroll(reachableOpener(back, openerName.current))
   }, [open, initialFocusRef])
+
+  // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
+  // `restoreAfterUnmount`. `opener` n'est plein que tant que la feuille est ouverte.
+  useEffect(
+    () => () => {
+      if (Platform.OS === 'web' && opener.current) {
+        restoreAfterUnmount(opener.current, openerName.current)
+      }
+    },
+    [],
+  )
 
   // Le Modal du web garde la feuille le temps de son fondu de sortie, et le focus avec elle : en
   // disparaissant, elle le laissait parfois sur la page (`body`), où la feuille de dessous le
@@ -415,7 +494,7 @@ export function Sheet({
           onDismiss: () => {
             const back = returnTo.current
             returnTo.current = null
-            if (back && focusLost()) focusWithoutScroll(back)
+            if (back && focusLost()) focusWithoutScroll(reachableOpener(back, openerName.current))
           },
         }
       : null
@@ -1109,11 +1188,9 @@ export function SheetPanel({
           : {
               alignSelf: 'center',
               width: '100%',
-              // Avec la colonne, la feuille s'élargit d'autant : le contenu garde sa largeur de
-              // formulaire, la colonne s'y ajoute à droite.
-              maxWidth: beside
-                ? layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
-                : layout.formWidth,
+              // Avec la colonne, la feuille s'élargit jusqu'à la largeur de la planche ; le contenu
+              // prend ce que la colonne laisse.
+              maxWidth: beside ? BESIDE_WIDTH + 2 * PANEL_MARGIN : layout.formWidth,
               paddingHorizontal: PANEL_MARGIN,
               ...(maxHeight === undefined ? null : { maxHeight }),
             }
