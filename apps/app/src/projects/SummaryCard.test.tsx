@@ -67,7 +67,7 @@ describe('SummaryCard, its category (R6b)', () => {
     await renderWithProviders(<SummaryCard project={cardOf('knitting')} />)
 
     expect(await screen.findByText('Tricot', HIDDEN_TOO)).toBeTruthy()
-    expect(screen.getByText(containing(described('Tricot')))).toBeTruthy()
+    expect(screen.getByText(containing(described('Tricot')), HIDDEN_TOO)).toBeTruthy()
     expect(categoryReads()).toBe(1)
   })
 
