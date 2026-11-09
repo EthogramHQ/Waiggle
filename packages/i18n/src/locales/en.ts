@@ -318,8 +318,6 @@ export const en: Translation = {
         'Members see you as @handle on your page. It was made from your name and does not change with it. {{min}} to {{max}} characters: letters without accents, digits and “_”.',
       bio: 'Bio',
       tools: 'Favorite tools',
-      toolsLimit: '{{max}} at most',
-      toolsPlaceholder: 'Add a tool',
       toolsHint: 'Visible to all members on your page.',
     },
     save: 'Save',

@@ -380,8 +380,6 @@ export const fr = {
         'Les membres te voient sous @pseudo sur ta page. Il a été tiré de ton nom et ne change pas avec lui. {{min}} à {{max}} caractères : lettres sans accent, chiffres et « _ ».',
       bio: 'Bio',
       tools: 'Outils favoris',
-      toolsLimit: '{{max}} au plus',
-      toolsPlaceholder: 'Ajouter un outil',
       // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3).
       toolsHint: 'Visibles de tous les membres sur ta page.',
     },
