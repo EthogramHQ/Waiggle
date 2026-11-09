@@ -48,6 +48,7 @@ import {
   inside,
   layerOf,
   lendContains,
+  lendPage,
   lineOf,
   menuButtonOf,
   openMenuOf,
@@ -318,9 +319,13 @@ describe('the comments sheet', () => {
   })
 
   describe('on the web, with the keyboard', () => {
+    // Le faux document : la fenêtre de confirmation y écoute l'Échap enfoncée (ui-B3).
+    let returnPage: () => void = () => {}
     beforeEach(() => {
       jest.replaceProperty(Platform, 'OS', 'web')
+      returnPage = lendPage()
     })
+    afterEach(() => returnPage())
 
     it('closes with « Fermer » and gives the focus back to « Voir les 6 commentaires »', async () => {
       mockComments(sixComments)
