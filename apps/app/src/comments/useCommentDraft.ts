@@ -39,6 +39,22 @@ const withoutPrefill = ({ text, prefill }: Draft): string =>
   prefill && text.startsWith(prefill) ? text.slice(prefill.length) : text
 
 /**
+ * Le brouillon une fois `sent` publié, `now` étant le brouillon d'à présent (le champ est resté
+ * modifiable pendant l'envoi) :
+ * - le texte parti encore en tête, tel quel : il s'efface, la suite tapée pendant l'envoi reste ;
+ * - le membre l'a effacé ou réécrit : rien de ce qu'on voit n'est parti, tout reste ;
+ * - le geste n'a pas changé pendant l'envoi : retour à un nouveau commentaire, et le texte d'avant
+ *   une modification revient devant ce qui reste. S'il a changé (« Répondre » touché entre-temps),
+ *   le nouveau geste est gardé, seul le texte parti s'en va.
+ */
+const afterSent = (now: Draft, sent: Pick<Draft, 'mode' | 'text' | 'before'>): Draft => {
+  const rest = now.text.startsWith(sent.text) ? now.text.slice(sent.text.length) : now.text
+  if (now.mode !== sent.mode) return { ...now, text: rest }
+  const before = sent.mode.kind === 'edit' ? sent.before : ''
+  return { ...fresh, text: before + rest }
+}
+
+/**
  * Hook : le brouillon des commentaires d'un projet.
  * - `startReply(root, target)` : répond dans le fil de `root`, sous `target` (la racine ou l'une de
  *   ses réponses). Un texte déjà commencé est gardé, la mention vient devant ; une première mention
@@ -46,7 +62,8 @@ const withoutPrefill = ({ text, prefill }: Draft): string =>
  * - `startEdit(comment)` : met le texte du commentaire dans le champ ; le texte d'avant est mis de côté.
  * - `cancel()` : revient à un nouveau commentaire. Une modification rend le texte d'avant ; une
  *   réponse garde le texte tapé, sans la mention préremplie.
- * - `send()` : vrai une fois publié (le champ se vide), faux sinon (le texte reste, `error` le dit).
+ * - `send()` : vrai une fois publié (le texte parti quitte le champ, ce qui a été tapé pendant
+ *   l'envoi reste), faux sinon (tout le texte reste, `error` le dit).
  * - `retry()` : le même envoi, sans que l'erreur disparaisse avant la réponse.
  */
 export function useCommentDraft(projectId: string) {
@@ -125,8 +142,10 @@ export function useCommentDraft(projectId: string) {
           ? await edit({ id: mode.commentId, body })
           : await post(mode.kind === 'reply' ? { body, replyTo: mode.rootId } : { body })
       setFailed(!ok)
-      // Publié : retour à un nouveau commentaire. Après une modification, le texte d'avant revient.
-      if (ok) setDraft({ ...fresh, text: mode.kind === 'edit' ? before : '' })
+      // Publié : seul le texte parti quitte le champ (R6b). Le champ reste modifiable pendant
+      // l'envoi : ce que le membre a tapé entre-temps est le brouillon du lendemain, il ne se perd
+      // pas. On lit donc le brouillon d'à présent (`prev`), pas celui du départ.
+      if (ok) setDraft((prev) => afterSent(prev, { mode, text, before }))
       return ok
     } finally {
       busy.current = false

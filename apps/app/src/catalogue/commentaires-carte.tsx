@@ -18,6 +18,7 @@ import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
+import { useNameOf } from '../useNameOf'
 
 const fr = {
   title: 'Carte d’un commentaire',
@@ -349,7 +350,9 @@ export function CommentCardCatalogue() {
   const { i18n, t } = useTranslation()
   const l: Labels = i18n.language === 'en' ? en : fr
   const menu = menus(l)
-  const name = (who: string) => t(($) => $.project.comments.menu, { name: who })
+  // Le nom du bouton « … » : « Actions du commentaire de Léa », « d’Inès » (`{{nameOf}}`).
+  const nameOf = useNameOf()
+  const name = (who: string) => t(($) => $.project.comments.menu, { nameOf: nameOf(who) })
   return (
     <Stack gap="lg">
       <Text variant="headline" heading={2}>

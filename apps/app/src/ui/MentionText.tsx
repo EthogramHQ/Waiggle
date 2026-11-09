@@ -109,6 +109,9 @@ export function MentionText({
       selectable
       breakAnywhere
       readable
+      // Replié, le texte rogne ce qui dépasse sa boîte : la place de l'anneau de focus d'une
+      // pastille en tête de texte (R6b).
+      focusRoom
       tone={tone}
       {...(numberOfLines !== undefined ? { numberOfLines } : null)}
     >
