@@ -241,24 +241,26 @@ describe('the feed after publishing a project (R6a)', () => {
     expect(await screen.findByText(published)).toBeTruthy()
   })
 
-  it('ignores ?published= naming a project that is not mine or not in the feed, and cleans the address', async () => {
-    // Trois adresses forgées : un projet de Max (dans le fil), un projet absent du fil, un
-    // identifiant mal formé. Aucune ne montre la danse ni « Projet publié ».
-    for (const forged of [fromMax.project.id, 'e1000000-0000-4000-8000-000000000009', 'abc']) {
-      mockEvents.length = 0
-      mockDanceProps.length = 0
-      mockReplace.mockReset()
-      mockSetParams.mockReset()
-      mockParams = { published: forged }
-      const view = await renderHome()
+  // Trois adresses forgées : un projet de Max (dans le fil), un projet absent du fil, un
+  // identifiant mal formé. Aucune ne montre la danse ni « Projet publié ». Un cas par test : trois
+  // rendus dans un même test laissent le troisième vide sous Jest (R6a, U6b).
+  it.each([
+    ['a project of Max', fromMax.project.id],
+    ['a project missing from the feed', 'e1000000-0000-4000-8000-000000000009'],
+    ['a malformed id', 'abc'],
+  ])('ignores ?published= naming %s, and cleans the address', async (_case, forged) => {
+    mockEvents.length = 0
+    mockDanceProps.length = 0
+    mockReplace.mockReset()
+    mockSetParams.mockReset()
+    mockParams = { published: forged }
+    await renderHome()
 
-      // Témoin : le fil est là.
-      expect(screen.getByRole('link', { name: 'Le ciel de ce soir' })).toBeTruthy()
-      await waitFor(() => expect(cleaned()).toBe(true))
-      expect(danced()).toBe(false)
-      expect(screen.queryByText(published)).toBeNull()
-      view.unmount()
-    }
+    // Témoin : le fil est là.
+    expect(screen.getByRole('link', { name: 'Le ciel de ce soir' })).toBeTruthy()
+    await waitFor(() => expect(cleaned()).toBe(true))
+    expect(danced()).toBe(false)
+    expect(screen.queryByText(published)).toBeNull()
   })
 
   // Décision de la session (R6a, TW-A2) : l'API garde `followsAnyone: false` tant que le membre ne
