@@ -1399,4 +1399,28 @@ describe('the daily limit of new « other » tools (R6b, sec-A5)', () => {
     vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000 + 60 * 1000)
     expect((await patchTools(third.id, ['Claude', 'Outil maison 32'])).status).toBe(200)
   })
+
+  // Relecture de sécurité sec-B1 (décision de Louis du 9/11/2026 au soir) : le quota épuisé, un nom
+  // hors du catalogue est refusé qu'un autre membre l'ait déjà tapé ou non. Sinon le 429 dirait
+  // « personne n'a jamais tapé ce nom », et le 200 « quelqu'un l'a tapé » (projet privé compris).
+  it('answers 429 the same way for a new and an already typed « other » name once the quota is spent', async () => {
+    // Max tape « Zorblax Secret » sur un projet privé : un « Autre » que Léa ne voit nulle part.
+    await publish(
+      { ...recipes, title: 'Carnet de Max', visibility: 'private', tools: ['Zorblax Secret'] },
+      max,
+    )
+    await publish({ ...recipes, tools: names(1, 15) })
+    const project = await publish({ ...recipes, title: 'Le second', tools: names(16, 15) })
+
+    const typed = await patchTools(project.id, ['Zorblax Secret'])
+    const fresh = await patchTools(project.id, ['Zorblax Inédit'])
+
+    for (const res of [typed, fresh]) {
+      expect(res.status).toBe(429)
+      expect(res.headers.get('retry-after')).toBeTruthy()
+    }
+    expect(await typed.text()).toBe(await fresh.text())
+    // Témoin : un nom du catalogue passe, et ses propres « Autre » déjà cités aussi.
+    expect((await patchTools(project.id, ['Claude', 'Outil maison 1'])).status).toBe(200)
+  })
 })

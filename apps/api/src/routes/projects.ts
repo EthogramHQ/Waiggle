@@ -13,7 +13,7 @@ import { loadVisibleProject, mediaKeysOf, projectAccess } from '../projects/load
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { chargeOtherTools } from '../tools/quota'
 import {
-  countNewOtherTools,
+  countChargedOtherTools,
   NO_FREE_TOOL_SLUG,
   noFreeToolSlug,
   resolveTools,
@@ -168,8 +168,9 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!(await categoriesExist(db, [input.primaryCategory, input.secondaryCategory]))) {
       return unknownCategory(c)
     }
-    // Les nouveaux « Autre » se comptent AVANT d'écrire : trop nombreux, rien n'est gardé.
-    const counted = await countNewOtherTools(db, toolNames)
+    // Les noms hors catalogue se comptent AVANT d'écrire (sec-A5, sec-B1) : trop nombreux, rien
+    // n'est gardé.
+    const counted = await countChargedOtherTools(db, user.id, toolNames)
     const retryAfter = await chargeOtherTools(limiter, user.id, counted)
     if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
     // Une transaction : le projet, ses outils et les « Autre » créés pour lui s'écrivent ensemble,
@@ -236,8 +237,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // On n'écrit que les champs envoyés (même astuce que pour le profil).
     const changes = c.req.valid('json')
-    // Les nouveaux « Autre » se comptent AVANT d'écrire (sec-A5) : trop nombreux, rien n'est gardé.
-    const counted = changes.tools === undefined ? 0 : await countNewOtherTools(db, changes.tools)
+    // Les noms hors catalogue se comptent AVANT d'écrire (sec-A5, sec-B1) : trop nombreux, rien
+    // n'est gardé.
+    const counted =
+      changes.tools === undefined ? 0 : await countChargedOtherTools(db, user.id, changes.tools)
     const retryAfter = await chargeOtherTools(limiter, user.id, counted)
     if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
     const set = {

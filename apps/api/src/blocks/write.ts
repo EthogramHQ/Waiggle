@@ -30,6 +30,14 @@ export const lockPair = async (tx: Tx, memberA: string, memberB: string) => {
 }
 
 /**
+ * Un compte qui a une page de membre, quel que soit le visiteur : son adresse est vérifiée (un
+ * compte jamais vérifié ne peut ni se connecter ni publier) ; un compte supprimé n'a plus de ligne
+ * dans "user". C'est la part de `reachableBy` sans le blocage, reprise telle quelle par les pages
+ * d'administration du catalogue (R6b, décision 1 : les profils qui citent un « Autre »).
+ */
+export const memberWithPage = () => eq(schema.user.emailVerified, true)
+
+/**
  * La condition « ce membre-là existe pour moi » de PUT /v1/members/{id}/block et de la page d'un
  * membre (règle 6) : un compte vérifié, qui ne m'a pas bloqué, à moins que je l'aie bloqué aussi (un
  * double blocage se lit « je l'ai bloqué »). « Il m'a bloqué » se lit ainsi dans le même `where` que
@@ -41,7 +49,7 @@ export const lockPair = async (tx: Tx, memberA: string, memberB: string) => {
 export const reachableBy = (viewerId: string, memberId: string) =>
   and(
     eq(schema.user.id, memberId),
-    eq(schema.user.emailVerified, true),
+    memberWithPage(),
     sql`(not exists (select 1 from ${b} where ${b.blockerId} = ${memberId} and ${b.blockedId} = ${viewerId})
       or exists (select 1 from ${b} where ${b.blockerId} = ${viewerId} and ${b.blockedId} = ${memberId}))`,
   )

@@ -4,7 +4,7 @@
 // outil. Les écritures des outils d'un projet ou d'un profil sont dans `tools/write.ts`.
 import { foldTool, toolSlug } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 /** Une ligne de la table `tool`. */
 export type ToolRow = typeof schema.tool.$inferSelect
@@ -46,27 +46,59 @@ export const noFreeToolSlug = (error: unknown): typeof NO_FREE_TOOL_SLUG => {
 }
 
 /**
- * Combien de noms de cette liste n'ont encore aucun outil, ni au catalogue, ni parmi les « Autre » :
- * autant de créations à compter dans le quota du jour AVANT d'écrire (sec-A5). C'est une lecture
- * seule : deux demandes simultanées peuvent compter un nom de trop (le sens sûr), jamais l'oublier
- * (`resolveTools` rend le nombre exact de créations, que la route ajoute au besoin).
+ * Combien de noms de cette liste comptent dans le quota du jour des « Autre », AVANT d'écrire
+ * (sec-A5) : chaque nom hors du catalogue, qu'un « Autre » de ce nom existe déjà ou non (relecture
+ * de sécurité sec-B1, décision de Louis du 9/11/2026 au soir). Si l'on ne comptait que les noms
+ * jamais tapés, le quota épuisé ferait un oracle : 429 voudrait dire « personne n'a jamais tapé ce
+ * nom », 200 « quelqu'un l'a tapé », projet privé compris. Ne comptent pas : un nom du catalogue ou
+ * l'un de ses alias (une liste publique), et un « Autre » que ce membre cite déjà lui-même, sur un
+ * de ses projets ou dans ses outils favoris (ses propres données : enregistrer de nouveau son profil
+ * ou son projet ne coûte rien). La réponse ne dépend ainsi jamais de ce qu'ont tapé les autres.
  *
- * Deux requêtes, quel que soit le nombre de noms : « in (…) » sur `tool.folded` (index unique) et sur
- * `tool_alias.folded` (clé primaire).
+ * C'est une lecture seule : deux demandes simultanées peuvent compter un nom de trop (le sens sûr),
+ * jamais l'oublier (`resolveTools` rend le nombre exact de créations, que la route ajoute au besoin).
+ *
+ * Quatre requêtes, quel que soit le nombre de noms :
+ * 1. les outils de ces noms, « in (…) » sur `tool.folded` (index unique) ;
+ * 2. les alias, « in (…) » sur `tool_alias.folded` (clé primaire), joints à leur outil du catalogue ;
+ * 3. ceux de ces outils que ses projets citent : `project_tool_tool_idx` (tool_id), puis la clé
+ *    primaire du projet pour son auteur ;
+ * 4. ceux que ses outils favoris citent : la clé primaire de `profile_tool` (user_id, tool_id).
  */
-export const countNewOtherTools = async (db: Reader, names: readonly string[]): Promise<number> => {
+export const countChargedOtherTools = async (
+  db: Reader,
+  userId: string,
+  names: readonly string[],
+): Promise<number> => {
   const folded = [...new Set(names.map(foldTool))]
   if (folded.length === 0) return 0
   const tools = await db
-    .select({ folded: schema.tool.folded })
+    .select({ id: schema.tool.id, folded: schema.tool.folded, status: schema.tool.status })
     .from(schema.tool)
     .where(inArray(schema.tool.folded, folded))
   const aliases = await db
     .select({ folded: schema.toolAlias.folded })
     .from(schema.toolAlias)
-    .where(inArray(schema.toolAlias.folded, folded))
-  const known = new Set([...tools, ...aliases].map((row) => row.folded))
-  return folded.filter((key) => !known.has(key)).length
+    .innerJoin(schema.tool, eq(schema.tool.id, schema.toolAlias.toolId))
+    .where(and(inArray(schema.toolAlias.folded, folded), eq(schema.tool.status, 'catalogue')))
+  const others = tools.filter((tool) => tool.status !== 'catalogue')
+  const otherIds = others.map((tool) => tool.id)
+  const inProjects = await db
+    .select({ toolId: schema.projectTool.toolId })
+    .from(schema.projectTool)
+    .innerJoin(schema.project, eq(schema.project.id, schema.projectTool.projectId))
+    .where(and(inArray(schema.projectTool.toolId, otherIds), eq(schema.project.authorId, userId)))
+  const inProfile = await db
+    .select({ toolId: schema.profileTool.toolId })
+    .from(schema.profileTool)
+    .where(and(eq(schema.profileTool.userId, userId), inArray(schema.profileTool.toolId, otherIds)))
+  const mine = new Set([...inProjects, ...inProfile].map((row) => row.toolId))
+  const free = new Set([
+    ...tools.filter((tool) => tool.status === 'catalogue').map((tool) => tool.folded),
+    ...aliases.map((row) => row.folded),
+    ...others.filter((tool) => mine.has(tool.id)).map((tool) => tool.folded),
+  ])
+  return folded.filter((key) => !free.has(key)).length
 }
 
 /**

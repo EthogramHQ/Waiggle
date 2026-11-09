@@ -18,6 +18,7 @@ import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Tx } from '../moderation/guard'
 import { categoriesExist } from '../projects/categories'
 import { listedVerifiedProject } from '../projects/visibility'
+import { NoFreeToolSlugError } from '../tools/resolve'
 
 /** Ce que fait une écriture : réussie (avec ce qu'elle rend), ou refusée avec un code d'erreur. */
 type Result<T, E extends string> = { ok: true; value: T } | { ok: false; error: E }
@@ -131,7 +132,9 @@ const slugAfterRename = async (
 ) => {
   if (toolSlug(name) === toolSlug(tool.name)) return tool.slug
   const [slug] = await freeSlugs(tx, name, tool.id)
-  if (slug === undefined) throw new Error('no free address for a tool')
+  // Les 51 adresses prises : la même erreur que pour un nouvel « Autre » (sec-B4), que la route
+  // change en 400 traduit ; la transaction annulée n'écrit rien.
+  if (slug === undefined) throw new NoFreeToolSlugError()
   await tx.delete(schema.toolSlugRedirect).where(eq(schema.toolSlugRedirect.slug, slug))
   return slug
 }
@@ -199,7 +202,7 @@ export const createTool = async (
       }
       if (await nameTaken(tx, folded, null)) return { ok: false, error: 'tool_name_taken' }
     }
-    throw new Error('no free address for a new tool')
+    throw new NoFreeToolSlugError()
   })
 }
 

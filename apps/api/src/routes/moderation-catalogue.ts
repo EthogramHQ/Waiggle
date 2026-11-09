@@ -60,6 +60,7 @@ import { errorBody, languageOf } from '../errors'
 import { countDecision } from '../moderation/guard'
 import type { RateLimiter } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
+import { NO_FREE_TOOL_SLUG, NoFreeToolSlugError } from '../tools/resolve'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -309,11 +310,16 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
    * (il ne prend pas notre verrou) : l'index unique refuse alors l'une des deux, et c'est « nom
    * déjà pris », jamais une erreur 500.
    */
-  const guarded = async <T>(write: () => Promise<T>): Promise<T | 'tool_name_taken'> => {
+  const guarded = async <T>(
+    write: () => Promise<T>,
+  ): Promise<T | 'tool_name_taken' | typeof NO_FREE_TOOL_SLUG> => {
     try {
       return await write()
     } catch (error) {
       if (isUniqueViolation(error)) return 'tool_name_taken'
+      // Les 51 adresses de ce nom déjà prises (comme sec-B4 pour un « Autre ») : 400 traduit,
+      // jamais 500 ; la transaction annulée n'a rien écrit.
+      if (error instanceof NoFreeToolSlugError) return NO_FREE_TOOL_SLUG
       throw error
     }
   }
@@ -322,6 +328,7 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
     const adminId = adminOf(c)
     if (adminId === null) return notFound(c)
     const result = await guarded(() => createTool(db, adminId, c.req.valid('json'), new Date()))
+    if (result === NO_FREE_TOOL_SLUG) return fail(c, 'validation', 400)
     if (result === 'tool_name_taken' || !result.ok) return fail(c, 'tool_name_taken', 409)
     return c.json(await toolResponse(result.value), 201)
   })
@@ -332,6 +339,7 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
     if (adminId === null || slug === null) return notFound(c)
     const input = c.req.valid('json')
     const result = await guarded(() => admitTool(db, adminId, slug, input, new Date()))
+    if (result === NO_FREE_TOOL_SLUG) return fail(c, 'validation', 400)
     if (result === 'tool_name_taken') return fail(c, 'tool_name_taken', 409)
     if (!result.ok) {
       if (result.error === 'not_found') return notFound(c)
@@ -346,6 +354,7 @@ export const moderationCatalogueRoutes = ({ db, limiter }: Deps) => {
     if (adminId === null || slug === null) return notFound(c)
     const input = c.req.valid('json')
     const result = await guarded(() => editTool(db, adminId, slug, input, new Date()))
+    if (result === NO_FREE_TOOL_SLUG) return fail(c, 'validation', 400)
     if (result === 'tool_name_taken') return fail(c, 'tool_name_taken', 409)
     if (!result.ok) {
       if (result.error === 'not_found') return notFound(c)

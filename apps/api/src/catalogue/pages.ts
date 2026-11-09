@@ -19,6 +19,7 @@ import { type Database, schema } from '@ruche/db'
 import type { Language } from '@ruche/i18n'
 import { and, asc, desc, eq, inArray, isNull, lte, or, type SQL, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
+import { memberWithPage } from '../blocks/write'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { listedVerifiedProject } from '../projects/visibility'
 
@@ -43,43 +44,76 @@ const authorHandleJoin = and(eq(authorHandle.userId, p.authorId), isNull(authorH
 
 // ─── « À vérifier » ──────────────────────────────────────────────────────────────────────────────
 
+/** Le pseudo actuel d'un membre qui cite un « Autre » dans ses outils favoris. */
+const memberHandle = alias(schema.memberHandle, 'member_handle_now')
+
 /**
- * Les « Autre » en attente cités par au moins un projet visible, du plus récent au plus ancien.
- * Deux requêtes :
- * 1. les outils de la page et leur nombre de projets visibles : `tool_status_created_idx` (status,
- *    created_at) lu à l'envers donne l'ordre sans tri ; la jointure passe par
- *    `project_tool_tool_idx` puis la clé primaire du projet ;
- * 2. les 5 projets montrés de chacun : `row_number() over (partition by …)` numérote les projets
- *    de chaque outil, du plus récent au plus ancien, et l'on garde les 5 premiers (une « fonction
- *    de fenêtre » : un calcul sur un groupe de lignes, sans les fusionner comme `group by`).
+ * Les « Autre » en attente cités par au moins un projet visible, ou par les outils favoris d'un
+ * membre qui a une page (compte vérifié et non supprimé : `memberWithPage`, la règle de la page
+ * d'un membre sans le blocage ; décision de Louis du 9/11/2026 au soir), du plus récent au plus
+ * ancien. Trois requêtes, quelle que soit la page :
+ * 1. les outils de la page : `tool_status_created_idx` (status, created_at) lu à l'envers donne
+ *    l'ordre sans tri ; pour chaque « Autre » lu, deux sous-requêtes « une ligne suffit »
+ *    (`(select 1 … limit 1) is not null`, charte de l'API 7b : jamais un `exists` dans un `or`, qui
+ *    peut lire toute la table) : un projet visible par `project_tool_tool_idx` puis la clé primaire
+ *    du projet, un profil par `profile_tool_tool_idx` puis la clé primaire de "user". La lecture
+ *    s'arrête aux 21 premiers trouvés ;
+ * 2. les 5 projets montrés de chacun et leur nombre : `row_number() over (partition by …)` numérote
+ *    les projets de chaque outil, du plus récent au plus ancien, et l'on garde les 5 premiers (une
+ *    « fonction de fenêtre » : un calcul sur un groupe de lignes, sans les fusionner comme
+ *    `group by`) ; `count(*) over (partition by …)`, dans la même lecture, donne leur nombre ;
+ * 3. les 5 membres montrés de chacun et leur nombre, de même, par `profile_tool_tool_idx` ; rangés
+ *    par nom (un favori n'a pas de date).
  * Un « Autre » écarté n'y est jamais (status `dismissed`, décision 8).
  */
 export const loadPendingTools = async (
   db: Database,
   cursor: CursorContent | null,
 ): Promise<{ items: PendingTool[]; nextCursor: string | null }> => {
+  // `"tool"."id"` en toutes lettres : dans ces sous-requêtes, Drizzle pourrait écrire `id` seul
+  // (charte de l'API, 6b). Les tables de la sous-requête sont nommées sans alias : la règle
+  // `listedVerifiedProject` écrit `"project"."author_id"`.
+  const toolId = sql.raw('"tool"."id"')
+  const cited = or(
+    sql`(select 1 from ${pt} join ${p} on ${p.id} = ${pt.projectId}
+      where ${pt.toolId} = ${toolId} and ${listedVerifiedProject()} limit 1) is not null`,
+    sql`(select 1 from ${schema.profileTool} join ${schema.user} on ${schema.user.id} = ${schema.profileTool.userId}
+      where ${schema.profileTool.toolId} = ${toolId} and ${memberWithPage()} limit 1) is not null`,
+  )
   const rows = await db
-    .select({
-      id: t.id,
-      slug: t.slug,
-      name: t.name,
-      createdAt: t.createdAt,
-      projectCount: sql<number>`count(*)::int`,
-    })
+    .select({ id: t.id, slug: t.slug, name: t.name, createdAt: t.createdAt })
     .from(t)
-    .innerJoin(pt, eq(pt.toolId, t.id))
-    .innerJoin(p, eq(p.id, pt.projectId))
-    .where(
-      and(
-        eq(t.status, 'other'),
-        listedVerifiedProject(),
-        cursor ? after(cursor, t.createdAt, t.id) : undefined,
-      ),
-    )
-    .groupBy(t.id)
+    .where(and(eq(t.status, 'other'), cited, cursor ? after(cursor, t.createdAt, t.id) : undefined))
     .orderBy(desc(t.createdAt), desc(t.id))
     .limit(CATALOGUE_PAGE_SIZE + 1)
   const page = pageOf(rows, (row) => ({ at: row.createdAt, id: row.id }))
+  const ids = page.items.map((row) => row.id)
+
+  const rankedProfiles = db
+    .select({
+      toolId: schema.profileTool.toolId,
+      name: schema.user.name,
+      handle: sql<string | null>`${memberHandle.handle}`.as('member_handle'),
+      rank: sql<number>`row_number() over (partition by ${schema.profileTool.toolId} order by ${schema.user.name}, ${schema.user.id})`.as(
+        'profile_rank',
+      ),
+      total: sql<number>`count(*) over (partition by ${schema.profileTool.toolId})`.as(
+        'profile_total',
+      ),
+    })
+    .from(schema.profileTool)
+    .innerJoin(schema.user, eq(schema.user.id, schema.profileTool.userId))
+    .leftJoin(
+      memberHandle,
+      and(eq(memberHandle.userId, schema.user.id), isNull(memberHandle.releasedAt)),
+    )
+    .where(and(inArray(schema.profileTool.toolId, ids), memberWithPage()))
+    .as('ranked_profiles')
+  const profiles = await db
+    .select()
+    .from(rankedProfiles)
+    .where(lte(rankedProfiles.rank, PENDING_TOOL_PROJECTS_SHOWN))
+    .orderBy(asc(rankedProfiles.rank))
 
   const ranked = db
     .select({
@@ -91,6 +125,7 @@ export const loadPendingTools = async (
       rank: sql<number>`row_number() over (partition by ${pt.toolId} order by ${p.publishedAt} desc, ${p.id} desc)`.as(
         'rank',
       ),
+      total: sql<number>`count(*) over (partition by ${pt.toolId})`.as('total'),
     })
     .from(pt)
     .innerJoin(p, eq(p.id, pt.projectId))
@@ -114,19 +149,25 @@ export const loadPendingTools = async (
 
   return {
     nextCursor: page.nextCursor,
-    items: page.items.map((row) => ({
-      slug: row.slug,
-      name: row.name,
-      createdAt: row.createdAt.toISOString(),
-      projectCount: Number(row.projectCount),
-      projects: shown
-        .filter((project) => project.toolId === row.id)
-        .map((project) => ({
+    items: page.items.map((row) => {
+      const itsProjects = shown.filter((project) => project.toolId === row.id)
+      const itsProfiles = profiles.filter((profile) => profile.toolId === row.id)
+      return {
+        slug: row.slug,
+        name: row.name,
+        createdAt: row.createdAt.toISOString(),
+        // Le nombre de la fenêtre, le même sur chaque ligne d'un outil (`count(*)` rend un
+        // `bigint`, que le pilote donne en texte) ; aucune ligne : zéro.
+        projectCount: Number(itsProjects[0]?.total ?? 0),
+        projects: itsProjects.map((project) => ({
           id: project.projectId,
           title: project.title,
           author: { name: project.authorName, handle: project.authorHandle },
         })),
-    })),
+        profileCount: Number(itsProfiles[0]?.total ?? 0),
+        profiles: itsProfiles.map((profile) => ({ name: profile.name, handle: profile.handle })),
+      }
+    }),
   }
 }
 

@@ -11,7 +11,8 @@
 // - les signalements et les décisions de modération arrivés au terme de leur durée de garde
 //   (tranche 7a, reports/retention.ts) ;
 // - les « Autre » (noms d'outils tapés par des membres) que plus rien ne cite, et les lignes du
-//   journal du catalogue de plus d'un an (tranche R6b).
+//   journal du catalogue de plus d'un an (tranche R6b) ; les « Autre » laissés hors du catalogue
+//   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5).
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
@@ -27,7 +28,7 @@ import { utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
-import { dropOrphanOthers } from '../tools/write'
+import { DISMISSED_TOOL_KEEP_DAYS, dropDismissedOthers, dropOrphanOthers } from '../tools/write'
 
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
@@ -99,6 +100,12 @@ export const nightlyPurge = async (db: Database, now: Date) => {
   // deux écritures, une suppression de compte, une ligne effacée à la main). Un outil du catalogue
   // ne s'efface jamais ici.
   const otherTools = await dropOrphanOthers(db)
+  // jur-J5 : les « Autre » laissés hors du catalogue depuis plus d'un an, que plus rien ne cite
+  // (tools/write.ts). Avant l'effacement du journal, qui porte la date de leur décision.
+  const dismissedTools = await dropDismissedOthers(
+    db,
+    new Date(now.getTime() - DISMISSED_TOOL_KEEP_DAYS * DAY),
+  )
   // Le journal « Changements récents » ne se garde pas plus d'un an. Lecture par l'index
   // `catalogue_change_created_idx` (date décroissante : la plage « avant telle date » en est la fin).
   const catalogueChanges = await db
@@ -114,6 +121,7 @@ export const nightlyPurge = async (db: Database, now: Date) => {
     handles,
     unverifiedAccounts: unverifiedAccounts.length,
     otherTools,
+    dismissedTools,
     catalogueChanges: catalogueChanges.length,
     ...moderation,
   }

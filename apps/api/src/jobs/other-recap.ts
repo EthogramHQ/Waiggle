@@ -39,17 +39,24 @@ const countOf = async (db: Database, query: SQL) =>
   Count.parse(await db.execute(query)).rows[0]?.n ?? 0
 
 /**
- * Les « Autre » en attente cités par au moins un projet visible, créés dans la période donnée.
- * Le « exists » s'arrête au premier projet trouvé (index project_tool_tool_idx, puis la clé
- * primaire du projet) ; la liste des « Autre » vient de l'index tool_status_created_idx
- * (status = 'other', rangé par created_at). Jamais un « Autre » écarté (décision 8).
+ * Les « Autre » en attente cités par au moins un projet visible, ou par les outils favoris d'un
+ * compte vérifié (décision de Louis du 9/11/2026 au soir ; la règle `memberWithPage` de
+ * blocks/write.ts, écrite ici en SQL brut comme `listed`), créés dans la période donnée. Les mêmes
+ * que l'onglet « À vérifier » (catalogue/pages.ts). Chaque sous-requête s'arrête à la première
+ * ligne trouvée (`(select 1 … limit 1) is not null` plutôt qu'un `exists` dans un `or`, charte de
+ * l'API) : un projet par l'index project_tool_tool_idx puis la clé primaire du projet, un profil
+ * par profile_tool_tool_idx puis la clé primaire de "user". La liste des « Autre » vient de l'index
+ * tool_status_created_idx (status = 'other', rangé par created_at). Jamais un « Autre » écarté
+ * (décision 8).
  */
 const pendingTools = (period: SQL) => sql`
   select count(*)::int as n from tool t
   where t.status = 'other' and ${period}
-    and exists (
-      select 1 from project_tool pt join project p on p.id = pt.project_id
-      where pt.tool_id = t.id and ${listed('p')}
+    and (
+      (select 1 from project_tool pt join project p on p.id = pt.project_id
+        where pt.tool_id = t.id and ${listed('p')} limit 1) is not null
+      or (select 1 from profile_tool pf join "user" u on u.id = pf.user_id
+        where pf.tool_id = t.id and u.email_verified limit 1) is not null
     )`
 
 /**
