@@ -366,7 +366,7 @@ describe('the projects found', () => {
       author: { id: inesId, name: 'Inès Morel' },
       status: 'testable',
       visibility: 'public',
-      tools: [{ label: 'Claude Code', slug: 'claude-code' }],
+      tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
       excerpt: null,
     })
   })

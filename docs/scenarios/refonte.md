@@ -1591,7 +1591,7 @@ Hors de R6b, et où ça va :
 
 - Étant donné Explorer, « Tous les outils »
 - Alors la page « Outils » dit « Le catalogue des outils d'IA, de développement et de projets
-  numériques. », puis un champ « Chercher un outil » et des pastilles de familles (Tous, et
+  numériques, et les projets des membres qui s'en servent. » (jur-T12), puis un champ « Chercher un outil » et des pastilles de familles (Tous, et
   chaque famille)
 - Et « Les plus utilisés » : les dix outils qui comptent le plus de projets, avec leur lettre, leur
   famille et « 41 projets »

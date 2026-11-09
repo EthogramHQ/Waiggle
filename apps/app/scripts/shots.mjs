@@ -234,7 +234,7 @@ const longProject = {
       label: 'gpt-4o-mini-2024-07-18-instruct-previews',
       slug: 'gpt-4o-mini-2024-07-18-instruct-previews',
     },
-    { label: 'Claude Code', slug: 'claude-code' },
+    { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
   ],
   notes: [note(5, longNote, 17), note(4, urlNote, 16)],
 }
@@ -396,7 +396,7 @@ const samPage = {
   name: samMember.name,
   handle: samMember.handle,
   bio: 'Je teste des robots de messagerie.',
-  favoriteTools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  favoriteTools: [{ label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true }],
   isMe: false,
   isFollowed: false,
   followerCount: 1,
@@ -409,7 +409,7 @@ const karimPage = {
   name: karim.name,
   handle: 'karim_b',
   bio: 'Des petits jeux faits avec Cursor.',
-  favoriteTools: [{ label: 'Cursor', slug: 'cursor' }],
+  favoriteTools: [{ label: 'Cursor', slug: 'cursor', inCatalogue: true }],
   isMe: false,
   isFollowed: false,
   followerCount: 4,
@@ -755,8 +755,8 @@ const skyProject = {
   visibility: 'public',
   demoUrl: 'https://ciel-du-soir.fr',
   tools: [
-    { label: 'Claude', slug: 'claude' },
-    { label: 'Stellarium', slug: 'stellarium' },
+    { label: 'Claude', slug: 'claude', inCatalogue: true },
+    { label: 'Stellarium', slug: 'stellarium', inCatalogue: true },
   ],
   primaryCategory: 'science',
   secondaryCategory: 'learning',
@@ -798,7 +798,7 @@ const oldProject = {
   title: 'Mon tri de factures',
   pitch: 'Il range les factures du mois par fournisseur et prépare le récapitulatif.',
   status: 'done',
-  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true }],
   primaryCategory: null,
   secondaryCategory: null,
   difficulty: null,
@@ -833,7 +833,7 @@ const coffeeProject = {
   title: 'Carnet de cafés',
   pitch: 'Chaque café goûté, noté et comparé.',
   status: 'testable',
-  tools: [{ label: 'Notion', slug: 'notion' }],
+  tools: [{ label: 'Notion', slug: 'notion', inCatalogue: true }],
   excerpt: null,
 }
 const biscotteProject = {
@@ -843,7 +843,7 @@ const biscotteProject = {
   title: 'Biscotte au parc',
   pitch: 'Où promener le chien selon la météo.',
   status: 'building',
-  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true }],
   excerpt: '… Le carnet de balades de Biscotte, mis à jour chaque dimanche après la promenade …',
 }
 const camille = {

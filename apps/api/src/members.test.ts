@@ -128,13 +128,15 @@ describe('the page of a member', () => {
       avatarUrl: null,
       bio: 'Je bricole des agents.',
       favoriteTools: [
-        { label: 'Claude Code', slug: 'claude-code' },
-        { label: 'Cursor', slug: 'cursor' },
+        { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+        { label: 'Cursor', slug: 'cursor', inCatalogue: true },
       ],
       isMe: false,
     })
     expect(page.projects.map((project) => project.id)).toEqual([second.id, first.id])
-    expect(page.projects[0]?.tools).toEqual([{ label: 'Claude Code', slug: 'claude-code' }])
+    expect(page.projects[0]?.tools).toEqual([
+      { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+    ])
   })
 
   it('also shows her private projects to the member herself', async () => {

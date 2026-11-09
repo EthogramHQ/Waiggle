@@ -382,6 +382,8 @@ export const fr = {
       tools: 'Outils favoris',
       toolsLimit: '{{max}} au plus',
       toolsPlaceholder: 'Ajouter un outil',
+      // R6b : les favoris se choisissent dans le catalogue ; l'aide dit qui les voit (jur-T3).
+      toolsHint: 'Visibles de tous les membres sur ta page.',
     },
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
@@ -520,6 +522,15 @@ export const fr = {
       toolSuggestion_other: '{{name}}, {{count}} projets',
       addTool: 'Ajouter « {{name}} »',
       addToolButton: 'Ajouter un outil',
+      // R6b : le catalogue et les « Autre » (textes de la relecture juridique jur-T3 et jur-T4).
+      addOtherTool: 'Ajouter « {{name}} » comme autre outil',
+      otherToolsHint:
+        'Les autres outils sont relus par les administrateurs : ils peuvent les ajouter au catalogue, ou les rattacher à un outil qui y est déjà.',
+      otherToolsHintPrivate:
+        'Projet privé : ce nom n’est montré à personne et n’est pas relu. S’il entre au catalogue grâce à un autre projet, le tien suivra.',
+      otherCategoryHint:
+        'Les administrateurs pourront ranger ton projet dans une catégorie qui lui va. Tu pourras la modifier comme le reste du projet.',
+      categoriesError: 'Les catégories n’ont pas pu se charger.',
       removeTool: 'Retirer {{name}}',
       // « Commencé en » et « Facile à refaire ? ».
       startedOn: 'Commencé en',
@@ -741,10 +752,10 @@ export const fr = {
       author: 'Auteur',
       // Le lien du nom de l'auteur du projet, lu avec son badge (R5b, ui-M1).
       authorLink: '{{name}}, Auteur',
-      menu: 'Actions du commentaire de {{name}}',
+      menu: 'Actions du commentaire {{nameOf}}',
       yours: 'Ton commentaire',
       // La carte compacte de l'aperçu : un seul bouton, nommé par l'auteur et l'extrait (ui-B7).
-      openLine: 'Commentaire de {{name}} : {{excerpt}}',
+      openLine: 'Commentaire {{nameOf}} : {{excerpt}}',
       openLineMine: 'Ton commentaire : {{excerpt}}',
       hiddenNote: 'Il ne reste visible que de toi et de la personne qui l’a écrit.',
       hiddenByAuthor: 'Masqué par l’auteur du projet',
@@ -1101,7 +1112,7 @@ export const fr = {
       confirm: 'Confirmer',
     },
     suspend: {
-      title: 'Suspendre le compte de {{name}}',
+      title: 'Suspendre le compte {{nameOf}}',
       intro:
         'Le compte passe en lecture seule : la personne lit tout, peut supprimer ses contenus, mais ne publie plus et n’interagit plus. Elle est prévenue par e‑mail et par notification, avec ton explication.',
       durationLabel: 'Durée',
@@ -1118,7 +1129,7 @@ export const fr = {
       errorTitle: 'La page n’a pas pu se charger',
     },
     lift: {
-      title: 'Lever la suspension de {{name}}',
+      title: 'Lever la suspension {{nameOf}}',
       intro:
         'Le compte retrouve toutes ses actions. La personne est prévenue par une notification, avec ton explication.',
       current: 'Suspendu depuis le {{since}}, jusqu’au {{endsAt}} (heure de Paris).',
@@ -1143,6 +1154,142 @@ export const fr = {
     blockedTarget: 'Tu as bloqué ce membre : un autre administrateur doit décider.',
     memberSuspended: 'Compte suspendu jusqu’au {{date}} à {{time}} (heure de Paris)',
     memberSuspendedIndefinite: 'Compte suspendu jusqu’à nouvel ordre',
+    // R6b : les liens vers les pages du catalogue, sous les onglets de la Modération.
+    catalogueLinksLabel: 'Le catalogue',
+    toolsLink: 'Outils',
+    toolsLinkHint: 'Les autres outils à vérifier, et le catalogue',
+    categoriesLink: 'Catégories',
+    categoriesLinkHint: 'Les projets à ranger, et les catégories',
+    // R6b : la page « Outils » de la Modération (/moderation/tools).
+    catalogue: {
+      title: 'Outils',
+      subtitle:
+        'Les autres outils tapés par les membres, et le catalogue. Chaque changement entre dans « Changements récents ».',
+      tabPending: 'À vérifier',
+      tabCatalogue: 'Catalogue',
+      emptyPending: 'Aucun autre outil à vérifier.',
+      /** Sous le nom d'un autre outil : son nombre de projets visibles des membres. */
+      pendingProjects_one: 'Cité par {{count}} projet',
+      pendingProjects_other: 'Cité par {{count}} projets',
+      /** Un projet sur la carte d'un autre outil : « Quel papillon ?, de Hugo Lefèvre ». */
+      projectBy: '{{title}}, {{authorOf}}',
+      admit: 'Ajouter au catalogue',
+      merge: 'Rattacher à un outil',
+      dismiss: 'Laisser hors du catalogue',
+      dismissHint: 'Pour un nom qui n’est pas un outil. Il reste sur ses projets, en texte simple.',
+      /** Le résultat d'une carte décidée, à la place de ses boutons. */
+      admitted: 'Ajouté au catalogue.',
+      merged: 'Rattaché à {{target}}.',
+      dismissed: 'Laissé hors du catalogue.',
+      searchCatalogue: 'Chercher dans le catalogue',
+      createTool: 'Ajouter un outil',
+      edit: 'Modifier',
+      emptyCatalogue: 'Aucun outil ne correspond.',
+      // La feuille d'un outil (ajouter, modifier ; relecture juridique jur-T7).
+      formAdmitTitle: 'Ajouter au catalogue',
+      formCreateTitle: 'Nouvel outil',
+      formEditTitle: 'Modifier l’outil',
+      name: 'Nom',
+      family: 'Famille',
+      descriptionFr: 'Description en français',
+      descriptionEn: 'Description en anglais',
+      descriptionHint:
+        'Une phrase neutre : ce que fait l’outil. Ni prix, ni superlatif, ni promesse, ni avis.',
+      site: 'Site, facultatif',
+      siteHint: 'L’adresse du site officiel, sans lien d’affiliation ni paramètre de suivi.',
+      save: 'Enregistrer',
+      cancel: 'Annuler',
+      saved: 'Outil enregistré.',
+      // Rattacher (relecture juridique jur-T5).
+      mergeTitle: 'Rattacher « {{name}} »',
+      mergeSearch: 'Chercher l’outil du catalogue',
+      mergeConfirmTitle: 'Rattacher « {{name}} » à {{target}} ?',
+      mergeConfirm:
+        'Les {{projects}} et {{profiles}} qui le citent citeront {{target}}, projets privés compris. « {{name}} » deviendra un autre nom de {{target}} : qui le tapera choisira {{target}}. Cela ne s’annule pas dans l’appli.',
+      mergeProjects_one: '{{count}} projet',
+      mergeProjects_other: '{{count}} projets',
+      mergeProfiles_one: '{{count}} profil',
+      mergeProfiles_other: '{{count}} profils',
+      mergeAction: 'Rattacher',
+      // « Changements récents » (le journal du catalogue, gardé un an).
+      changes: 'Changements récents',
+      changesEmpty: 'Aucun changement pour l’instant.',
+      change: {
+        tool_admit: '{{admin}} a ajouté {{tool}} au catalogue',
+        tool_create: '{{admin}} a créé {{tool}}',
+        tool_edit: '{{admin}} a modifié {{tool}}',
+        tool_merge: '{{admin}} a rattaché « {{merged}} » à {{tool}}',
+        tool_dismiss: '{{admin}} a laissé « {{tool}} » hors du catalogue',
+        category_create: '{{admin}} a créé la catégorie {{category}}',
+        project_recategorize: '{{admin}} a rangé {{project}} dans {{category}}',
+        project_recategorize_hidden: '{{admin}} a rangé un projet dans {{category}}',
+      },
+      /** Un administrateur dont le compte a été supprimé. */
+      formerAdmin: 'Un ancien administrateur',
+    },
+    // R6b : la page « Catégories » de la Modération (/moderation/categories).
+    categories: {
+      title: 'Catégories',
+      subtitle:
+        'Les projets classés « Autre », et les catégories. Chaque changement entre dans « Changements récents ».',
+      tabUncategorized: 'À ranger',
+      tabCategories: 'Catégories',
+      emptyUncategorized: 'Aucun projet à ranger.',
+      sort: 'Ranger dans une catégorie',
+      sortTitle: 'Ranger « {{title}} »',
+      sortChoice: 'La catégorie',
+      sortAction: 'Ranger',
+      sorted: 'Rangé dans {{category}}.',
+      /** Sous le nom d'une catégorie : son nombre de projets. */
+      projects_one: '{{count}} projet',
+      projects_other: '{{count}} projets',
+      create: 'Nouvelle catégorie',
+      createTitle: 'Nouvelle catégorie',
+      nameFr: 'Nom en français',
+      nameEn: 'Nom en anglais',
+      icon: 'Icône',
+      /** Relecture juridique jur-T15 (article 9 du RGPD). */
+      createHint: 'Une catégorie décrit le sujet d’un projet, jamais la personne qui le publie.',
+      preview: 'Aperçu',
+      createAction: 'Créer',
+      cancel: 'Annuler',
+      created: 'Catégorie créée.',
+      /** Le sens de chaque icône qu'on peut choisir, lu par les lecteurs d'écran. */
+      iconName: {
+        plant: 'Plante',
+        'cooking-pot': 'Casserole',
+        'users-three': 'Trois personnes',
+        'graduation-cap': 'Toque de diplômé',
+        'game-controller': 'Manette',
+        'paint-brush': 'Pinceau',
+        'music-notes': 'Notes de musique',
+        'film-strip': 'Pellicule',
+        heartbeat: 'Battement de cœur',
+        'airplane-tilt': 'Avion',
+        'piggy-bank': 'Tirelire',
+        briefcase: 'Mallette',
+        code: 'Code',
+        'paw-print': 'Patte',
+        planet: 'Planète',
+        shapes: 'Formes',
+        flower: 'Fleur',
+        tree: 'Arbre',
+        bicycle: 'Vélo',
+        car: 'Voiture',
+        house: 'Maison',
+        'book-open': 'Livre ouvert',
+        'chat-circle': 'Bulle de discussion',
+        camera: 'Appareil photo',
+        microphone: 'Micro',
+        't-shirt': 'Tee-shirt',
+        baby: 'Bébé',
+        globe: 'Globe',
+        lightbulb: 'Ampoule',
+        robot: 'Robot',
+        sparkle: 'Étincelle',
+        heart: 'Cœur',
+      },
+    },
   },
   // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa
   // durée, le fondement, l'explication, ce qui reste possible, et comment contester.
@@ -1269,6 +1416,11 @@ export const fr = {
     testersError: 'Les projets qui cherchent des testeurs n’ont pas pu se charger.',
     recentError: 'Les projets récents n’ont pas pu se charger.',
     toolsError: 'Les outils populaires n’ont pas pu se charger.',
+    // R6b : les catégories en filtre, au-dessus de « Récents ».
+    categoriesLabel: 'Catégories des projets récents',
+    allCategories: 'Toutes',
+    categoryEmpty: 'Aucun projet dans « {{name}} » pour l’instant.',
+    categoriesError: 'Les catégories n’ont pas pu se charger.',
   },
   // R3 : la recherche par mots (planche R3-Recherche). Les nombres affichés (« 2 », « 20+ ») restent
   // hors du nom lu, qui passe par les pluriels ci-dessous.
@@ -1313,18 +1465,92 @@ export const fr = {
     tabsLabel: 'Résultats à montrer',
     /** Le nom lu d'un projet trouvé : son titre et sa pastille (« Carnet de cafés, Testable »). */
     projectWithStatus: '{{title}}, {{status}}',
+    // R6b : le filtre par catégorie, sur le groupe Projets.
+    allCategories: 'Toutes les catégories',
+    categoryChosen: 'Catégorie : {{name}}',
   },
   // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
   tools: {
-    title: 'Tous les outils',
-    subtitle: 'Les outils des projets publics.',
-    projects_one: '{{count}} projet public',
-    projects_other: '{{count}} projets publics',
-    /** Le nom lu d'un outil avec son nombre : « Claude, 41 projets publics ». */
+    // R6b : le catalogue (planche R3-Outils). « projets » sans « publics » : depuis R6a, un projet
+    // des membres de Waiggle n'est pas public (choix 1 de la session, scénario R6b).
+    title: 'Outils',
+    subtitle:
+      'Le catalogue des outils d’IA, de développement et de projets numériques, et les projets des membres qui s’en servent.',
+    projects_one: '{{count}} projet',
+    projects_other: '{{count}} projets',
+    /** Un outil du catalogue sans projet (0 serait « 0 projet » au singulier en français). */
+    noProjects: 'Aucun projet pour l’instant',
+    /** Le nom lu d'un outil avec son nombre : « Claude, 41 projets ». */
     withCount: '{{label}}, {{projects}}',
+    /** Sous le nom d'un outil : sa famille et son nombre (« Assistant IA · 41 projets »). */
+    detail: '{{family}} · {{projects}}',
+    search: 'Chercher un outil',
+    /** Le nom lu du groupe des pastilles de familles. */
+    familiesLabel: 'Familles d’outils',
+    all: 'Tous',
+    mostUsed: 'Les plus utilisés',
+    aToZ: 'De A à Z',
+    noMatch: 'Aucun outil ne correspond.',
+    others: 'Pas encore dans le catalogue',
+    othersHint:
+      'Des outils ajoutés par les membres avec « Autre ». Les administrateurs les relisent et peuvent les ajouter au catalogue.',
     emptyTitle: 'Encore aucun outil',
-    empty: 'Les outils apparaîtront ici dès qu’un projet public en citera un.',
+    empty: 'Les outils apparaîtront ici dès qu’un projet en citera un.',
     errorTitle: 'Les outils n’ont pas pu se charger',
+    /** Une famille, au singulier, sous le nom d'un outil. */
+    family: {
+      assistant: 'Assistant IA',
+      creation: 'Création',
+      'no-code': 'Sans code',
+      development: 'Développement',
+      automation: 'Automatisation',
+      'smart-home': 'Maison connectée',
+      hardware: 'Matériel et objets',
+    },
+    /** Une famille, en court, sur les pastilles de « Outils ». */
+    familyPill: {
+      assistant: 'IA',
+      creation: 'Création',
+      'no-code': 'Sans code',
+      development: 'Développement',
+      automation: 'Automatisation',
+      'smart-home': 'Maison connectée',
+      hardware: 'Objets',
+    },
+  },
+  // R6b : la page d'un outil du catalogue (planches R6-Outil, R6-Outil-Desktop).
+  tool: {
+    statusLabel: 'Où en sont les projets',
+    statusAll: 'Tous',
+    statusTestable: 'Testables',
+    statusDone: 'Terminés',
+    categoryLabel: 'Catégorie',
+    allCategories: 'Toutes les catégories',
+    /** La pastille de toutes les catégories, sur ordinateur. */
+    all: 'Toutes',
+    /** Le nom lu du bouton des catégories, une fois l'une choisie : « Catégorie : Cuisine ». */
+    categoryChosen: 'Catégorie : {{name}}',
+    /** Une catégorie avec son nombre, lue : « Cuisine, 3 projets ». */
+    categoryWithCount: '{{name}}, {{projects}}',
+    categorySheetTitle: 'Catégories',
+    close: 'Fermer',
+    emptyTitle: 'Encore aucun projet ici',
+    empty: 'Le tien sera peut-être le premier.',
+    emptyFiltered: 'Aucun projet ici pour l’instant.',
+    clearFilters: 'Voir tous les projets',
+    more: 'Afficher la suite',
+    edit: 'Modifier',
+    notFoundTitle: 'Outil introuvable',
+    notFound: 'Cet outil n’est pas dans le catalogue, ou son adresse a changé.',
+    seeAllTools: 'Voir tous les outils',
+    /** Sous la description (relecture juridique jur-T7). */
+    disclaimer: 'Description écrite par {{appName}}, sans lien avec l’éditeur de l’outil.',
+    /** Le nom lu du lien du site : son nom, puis la page d'avertissement. */
+    siteLink: '{{host}}, s’ouvre après une page d’avertissement',
+    /** Un « Autre » sur une pastille, et ce qu'en lit un lecteur d'écran. */
+    otherBadge: 'Autre',
+    otherSpoken: '{{name}}, autre outil, pas encore dans le catalogue',
+    errorTitle: 'Cet outil n’a pas pu se charger',
   },
   // R3 : l'onglet Ruches existe avant les ruches (R10 ; Louis, 30/10/2026). Ni date, ni promesse,
   // ni « Préviens-moi » (relecture juridique, jur-J9).
@@ -1473,6 +1699,22 @@ export const fr = {
       button: 'Ouvrir la modération',
       reason:
         'Tu reçois cet e‑mail parce que tu es administrateur de {{appName}}. Au plus un par heure.',
+    },
+    // R6b : le récap des « Autre » aux administrateurs, le lundi. Des nombres et deux liens, rien de
+    // plus : ni nom d'outil, ni titre, ni auteur (relecture juridique jur-T1, option A).
+    otherRecap: {
+      subject: 'Les « Autre » de la semaine sur {{appName}}',
+      heading: 'Les « Autre » de la semaine',
+      tools_one: '{{count}} autre outil à vérifier',
+      tools_other: '{{count}} autres outils à vérifier',
+      projects_one: '{{count}} projet à ranger dans une catégorie',
+      projects_other: '{{count}} projets à ranger dans une catégorie',
+      older_one: 'Et {{count}} autre en attente depuis plus d’une semaine.',
+      older_other: 'Et {{count}} autres en attente depuis plus d’une semaine.',
+      toolsButton: 'Voir les outils',
+      projectsButton: 'Voir les projets à ranger',
+      reason:
+        'Tu reçois cet e‑mail parce que tu es administrateur de {{appName}}. Le lundi, seulement s’il y a des « Autre » à voir.',
     },
     greeting: 'Bonjour {{name}},',
     verify: {
@@ -1789,5 +2031,10 @@ export const fr = {
     // Tranche R6a.
     categoryRequired: 'Choisis d’abord une catégorie principale.',
     sameCategory: 'La seconde catégorie doit être différente de la principale.',
+    // Tranche R6b.
+    unknownCategory: 'Cette catégorie n’existe pas ou plus. Choisis-en une autre.',
+    toolNameTaken: 'Ce nom est déjà celui d’un outil du catalogue, ou un autre de ses noms.',
+    categoryNameTaken: 'Une catégorie porte déjà ce nom.',
+    tooManyOtherTools: 'Tu as ajouté beaucoup d’autres outils aujourd’hui. Réessaie demain.',
   },
 } as const

@@ -19,7 +19,7 @@ const summary = {
   pitch: 'Un menu avec ce qu’il y a au frigo.',
   status: 'testable',
   visibility: 'public',
-  tools: [{ label: 'Claude Code', slug: 'claude-code' }],
+  tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
   cover: null,
   demoUrl: null,
   portraitCover: null,

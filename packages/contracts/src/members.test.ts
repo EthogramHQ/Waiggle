@@ -1,7 +1,7 @@
 // Tests des pages de liste : la page d'un membre et la page d'une étiquette.
 import { describe, expect, it } from 'vitest'
 import { Member, MemberId } from './members'
-import { PROJECT_LIST_MAX, TagPage, TagParam } from './projects'
+import { PROJECT_LIST_MAX, TagParam } from './projects'
 
 const summary = {
   id: '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6',
@@ -10,7 +10,7 @@ const summary = {
   pitch: 'Un menu avec ce qu’il y a au frigo.',
   status: 'idea',
   visibility: 'public',
-  tools: [{ label: 'Claude Code', slug: 'claude-code' }],
+  tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
   cover: null,
   demoUrl: null,
   portraitCover: null,
@@ -27,7 +27,7 @@ const lea = {
   handle: 'lea',
   avatarUrl: null,
   bio: 'Je bricole des agents.',
-  favoriteTools: [{ label: 'Claude Code', slug: 'claude-code' }],
+  favoriteTools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
   isMe: false,
   isBlocked: false,
   isFollowed: false,
@@ -56,17 +56,6 @@ describe('Member', () => {
   it('lists at most 50 projects', () => {
     const many = Array.from({ length: PROJECT_LIST_MAX + 1 }, () => summary)
     expect(Member.safeParse({ ...lea, projects: many }).success).toBe(false)
-  })
-})
-
-describe('TagPage', () => {
-  it('names the tag after the most recent project that carries it', () => {
-    const page = { slug: 'claude-code', label: 'Claude Code', projects: [summary] }
-    expect(TagPage.parse(page)).toEqual(page)
-  })
-
-  it('may have no project and no name, like an unknown tag', () => {
-    expect(TagPage.parse({ slug: 'claude-code', label: null, projects: [] }).projects).toEqual([])
   })
 })
 

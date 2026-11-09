@@ -4,8 +4,9 @@
 // par Member.parse : un champ de plus, lu par erreur dans la base, ne pourrait pas en sortir.
 import { z } from 'zod'
 import { FollowState } from './follows'
-import { PROJECT_LIST_MAX, ProjectSummary, ProjectTool } from './projects'
+import { PROJECT_LIST_MAX, ProjectSummary } from './projects'
 import { Suspension } from './suspension'
+import { ProjectTool } from './tools'
 
 /**
  * L'identifiant d'un membre dans une adresse. Ceux de Better Auth sont faits de lettres, de

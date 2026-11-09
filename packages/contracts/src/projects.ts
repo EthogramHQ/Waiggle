@@ -1,18 +1,22 @@
 // Formes des données d'un projet : ce qu'un membre peut publier ou modifier, et ce que l'API renvoie.
 // Les règles de texte (longueurs, caractères interdits) viennent de text.ts, comme pour le profil.
 import { z } from 'zod'
+import { CategoryCode } from './categories'
 import { FollowState } from './follows'
 import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
 import { Removal } from './removal'
+import { FreeText, removeForbiddenCharacters, ShortLabel } from './text'
 import {
-  FreeText,
-  isCleanText,
-  removeForbiddenCharacters,
-  ShortLabel,
-  uniqueIgnoringCase,
-} from './text'
+  ProjectTool,
+  TOOL_PAGE_SIZE,
+  ToolFamily,
+  ToolSlug,
+  ToolStatusFilter,
+  uniqueTools,
+} from './tools'
+import { publicHttpsUrl } from './url'
 
 export const PROJECT_TITLE_MAX = 80
 export const PROJECT_PITCH_MAX = 140
@@ -96,9 +100,10 @@ export const ProjectVisibility = z.enum(['public', 'private'])
 export type ProjectVisibility = z.infer<typeof ProjectVisibility>
 
 /**
- * Les catégories d'un projet (R6a), dans l'ordre de la feuille de publication. Une principale,
- * obligatoire à la création, et une seconde facultative. Les noms affichés sont dans les traductions
- * (`project.category.<code>`).
+ * Les seize catégories de départ (R6a), dans l'ordre de la feuille de publication. Depuis R6b, les
+ * catégories vivent en base (un administrateur peut en créer) : cette liste ne sert plus qu'à
+ * semer la table et aux données de test. Une principale, obligatoire à la création, et une seconde
+ * facultative ; leurs noms et icônes viennent de GET /v1/categories.
  */
 export const PROJECT_CATEGORIES = [
   'home-garden',
@@ -118,7 +123,12 @@ export const PROJECT_CATEGORIES = [
   'science',
   'other',
 ] as const
-export const ProjectCategory = z.enum(PROJECT_CATEGORIES)
+/**
+ * Le code d'une catégorie (« cooking », « jardinage ») : depuis R6b, toute chaîne bien formée ;
+ * l'API refuse un code qui n'est pas en base (400 `unknown_category`). Même nom qu'en R6a, pour ne
+ * pas changer tous ceux qui l'utilisent.
+ */
+export const ProjectCategory = CategoryCode
 export type ProjectCategory = z.infer<typeof ProjectCategory>
 
 /** « Facile à refaire ? » (R6a) : facile, il faut s'accrocher, difficile. */
@@ -152,60 +162,6 @@ export const StartedMonth = z
   .refine((month) => month >= STARTED_MONTH_FLOOR && month <= startedMonthMax(new Date()), {
     message: 'must be a month between 2000-01 and now',
   })
-
-// Suffixes de noms qui ne désignent pas un site public : réseaux locaux (box, imprimante, NAS…),
-// noms réservés aux tests ou aux documentations, réseau Tor. Un lien vers eux ne marcherait que
-// chez l'auteur, ou pourrait viser la machine de celui qui clique.
-const RESERVED_SUFFIXES = [
-  'localhost',
-  'localdomain',
-  'local',
-  'lan',
-  'home',
-  'internal',
-  'intranet',
-  'corp',
-  'private',
-  'arpa',
-  'test',
-  'invalid',
-  'example',
-  'onion',
-]
-
-/**
- * L'adresse découpée si c'est un lien https vers un site public, désigné par son nom ; sinon null.
- * On laisse la classe URL découper l'adresse : elle connaît toutes les façons tordues d'écrire une
- * adresse IP (« 0x7f.1 », « 2130706433 »…) et les ramène à la forme habituelle.
- * Sert à l'API (lien de démo), à l'appli (liens Markdown) et à la page d'avertissement.
- */
-export const publicHttpsUrl = (value: string): URL | null => {
-  // Aucun caractère invisible ou de contrôle, nulle part dans l'adresse.
-  if (!isCleanText(value)) return null
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    return null // ce n'est pas une adresse
-  }
-  if (url.protocol !== 'https:') return null
-  // « https://waiggle.com@pirate.example.com » mène à pirate.example.com : ce qui précède @ est un identifiant.
-  if (url.username || url.password) return null
-
-  // Un seul point final est permis (« example.com. » est une écriture valide) ; plusieurs, non.
-  if (/\.\.$/.test(url.hostname)) return null
-  const host = url.hostname.toLowerCase().replace(/\.$/, '')
-  // Une adresse IPv4 (4 nombres) plutôt qu'un nom.
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return null
-  // Un nom ordinaire : des lettres latines, des chiffres et des tirets, en au moins deux parties
-  // non vides séparées par des points. Cela écarte les adresses IPv6 ([::1]), les noms sans point
-  // (« intranet ») et les noms dans un autre alphabet que le téléphone n'a pas convertis en
-  // « xn--… » (impossible de vérifier qu'ils n'imitent pas un nom connu).
-  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) return null
-  if (RESERVED_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`)))
-    return null
-  return url
-}
 
 /** Le lien de démo : https, vers un site public. Il est enregistré sous sa forme standard. */
 export const DemoUrl = z
@@ -242,7 +198,9 @@ const fields = {
   status: ProjectStatus,
   visibility: ProjectVisibility,
   demoUrl: DemoUrl.nullable(), // null : pas (ou plus) de démo
-  tools: z.array(ShortLabel(TOOL_MAX_LENGTH)).max(PROJECT_TOOLS_MAX).transform(uniqueIgnoringCase),
+  // Des noms : l'API rattache chacun à l'outil du catalogue qui porte ce nom ou cet alias, sinon à
+  // un « Autre » (R6b). Un même outil écrit deux fois (« Chat GPT », « ChatGPT ») n'en fait qu'un.
+  tools: z.array(ShortLabel(TOOL_MAX_LENGTH)).max(PROJECT_TOOLS_MAX).transform(uniqueTools),
   prompts: z
     .array(PromptText)
     .max(PROJECT_PROMPTS_MAX)
@@ -317,9 +275,6 @@ export const ProjectAuthor = z.object({
   name: z.string(),
   avatarUrl: z.url().nullable(),
 })
-
-/** Un outil affiché comme étiquette : son nom, et l'identifiant de sa page (« claude-code »). */
-export const ProjectTool = z.object({ label: z.string(), slug: z.string() })
 
 export const Project = z
   .object({
@@ -415,15 +370,44 @@ export const PROJECT_LIST_MAX = 50
 export const TagParam = z.string().min(1).max(200)
 
 /**
- * La page d'une étiquette (GET /v1/tags/{slug}) : les projets publics faits avec cet outil.
- * `label` est le nom tapé sur le plus récent d'entre eux (« Claude Code ») ; null s'il n'y en a
- * aucun, et l'appli affiche alors l'étiquette elle-même.
+ * Le curseur d'une page de projets : la même forme que celui du fil (`FeedCursor`), recopiée ici
+ * parce que feed.ts importe ce fichier (sinon les deux s'attendraient au chargement).
  */
-export const TagPage = z
+const PageCursor = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/)
+
+/**
+ * Les filtres de la page d'un outil (GET /v1/tags/{slug}?status=&category=&cursor=, R6b) :
+ * testables ou terminés (absent : tous), une catégorie en principale ou en seconde, et la page
+ * suivante. Les noms des paramètres sont en anglais, comme partout dans les adresses.
+ */
+export const ToolPageQuery = z.object({
+  status: ToolStatusFilter.optional(),
+  category: CategoryCode.optional(),
+  cursor: PageCursor.optional(),
+})
+export type ToolPageQuery = z.infer<typeof ToolPageQuery>
+
+/**
+ * La page d'un outil du catalogue (GET /v1/tags/{slug}, R6b). `tool.slug` est l'identifiant
+ * officiel : l'appli remplace l'adresse quand on est arrivé par un ancien nom (« chat-gpt »).
+ * `description` est dans la langue du visiteur (`Accept-Language`, le français par défaut).
+ * `projectCount` et `projects` suivent la même règle : ce que ce membre peut voir (jur-T18).
+ * `categories` : celles des projets de l'outil, avec leur nombre, filtre de statut compris mais
+ * sans le filtre de catégorie (pour pouvoir en changer). Un « Autre » ou un nom inconnu : 404.
+ */
+export const ToolPage = z
   .object({
-    slug: z.string(),
-    label: z.string().nullable(),
-    projects: z.array(ProjectSummary).max(PROJECT_LIST_MAX),
+    tool: z.object({
+      slug: ToolSlug,
+      name: z.string(),
+      family: ToolFamily,
+      description: z.string().nullable(),
+      siteUrl: z.string().nullable(),
+      projectCount: z.int().nonnegative(),
+    }),
+    categories: z.array(z.object({ code: CategoryCode, projectCount: z.int().positive() })),
+    projects: z.array(ProjectSummary).max(TOOL_PAGE_SIZE),
+    nextCursor: PageCursor.nullable(),
   })
-  .meta({ id: 'TagPage' })
-export type TagPage = z.infer<typeof TagPage>
+  .meta({ id: 'ToolPage' })
+export type ToolPage = z.infer<typeof ToolPage>

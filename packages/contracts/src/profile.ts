@@ -2,7 +2,8 @@
 import { z } from 'zod'
 import { LanguageSchema } from './accounts'
 import { Handle } from './handles'
-import { DisplayName, FreeText, ShortLabel, uniqueIgnoringCase } from './text'
+import { DisplayName, FreeText, ShortLabel } from './text'
+import { uniqueTools } from './tools'
 
 export const BIO_MAX_LENGTH = 280
 export const FAVORITE_TOOLS_MAX = 10
@@ -28,7 +29,9 @@ export const ProfileUpdate = z
     favoriteTools: z
       .array(ShortLabel(TOOL_MAX_LENGTH))
       .max(FAVORITE_TOOLS_MAX)
-      .transform(uniqueIgnoringCase) // transform : Zod modifie la valeur après l'avoir validée
+      // transform : Zod modifie la valeur après l'avoir validée. R6b : un même outil écrit de deux
+      // façons (« Chat GPT », « ChatGPT ») n'en fait qu'un, comme pour un projet.
+      .transform(uniqueTools)
       .optional(),
     language: LanguageSchema.optional(),
   })

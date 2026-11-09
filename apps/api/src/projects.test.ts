@@ -97,8 +97,8 @@ describe('publishing a project', () => {
       demoUrl: 'https://recettes.example.com/', // enregistrée sous sa forme standard
       // « claude-code » est la même étiquette que « Claude Code » : gardée une seule fois.
       tools: [
-        { label: 'Claude Code', slug: 'claude-code' },
-        { label: 'Éclair 2.0', slug: 'eclair-2-0' },
+        { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+        { label: 'Éclair 2.0', slug: 'eclair-2-0', inCatalogue: true },
       ],
       prompts: ['Propose trois recettes avec : {ingrédients}'],
     })
