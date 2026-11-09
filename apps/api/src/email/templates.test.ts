@@ -393,6 +393,20 @@ describe('otherRecapEmail', () => {
     expect(english.text).toContain('[link]')
     expect(hrefsOf(french.html).every((href) => href.startsWith('https://waiggle.com/'))).toBe(true)
   })
+
+  // Adresse-E1 : un nom de 88 caractères sans espace faisait défiler la carte à 320 px ; la
+  // salutation se coupe désormais n'importe où, dans cet e-mail comme dans les autres.
+  it('breaks a long name without spaces in the greeting', () => {
+    const name = `Malik${'o'.repeat(83)}`
+    for (const email of [
+      otherRecapEmail('fr', otherRecapData({ name })),
+      verificationEmail('en', { name, url: 'https://api.waiggle.com/verify' }),
+    ]) {
+      expect(email.html).toMatch(
+        new RegExp(`<p style="[^"]*overflow-wrap:anywhere[^"]*">[^<]*${name}`),
+      )
+    }
+  })
 })
 
 // ─── Tranche 7c : l'e-mail de suspension ─────────────────────────────────────────────────────────

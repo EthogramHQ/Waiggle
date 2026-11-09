@@ -262,7 +262,7 @@ const render = ({
 <div class="page" style="padding:24px;background:${c.surfaceGrouped};font-family:Arial,sans-serif;color:${c.text}">
   <div class="card" style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
     ${top}
-    ${p(greeting, 'font-size:16px')}
+    ${p(greeting, 'font-size:16px;overflow-wrap:anywhere;word-break:break-word')}
     ${paragraphs
       .map((value) =>
         typeof value === 'string'
