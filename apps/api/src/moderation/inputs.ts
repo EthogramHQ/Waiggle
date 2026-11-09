@@ -230,10 +230,10 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     visibility: 'public ou privé, une liste fermée par Zod',
     tool_slugs:
       'les étiquettes tirées de project.tools (minuscules, tirets), déjà au registre : elles suivent ses changements',
-    time_spent:
-      'ancienne durée choisie dans une liste fermée : plus lue ni écrite depuis R6a, la colonne part en R6b',
-    primary_category: 'une catégorie choisie dans une liste fermée par Zod (ProjectCategory)',
-    secondary_category: 'une catégorie choisie dans une liste fermée par Zod (ProjectCategory)',
+    primary_category:
+      'un code de la table category, vérifié par la base et par l’API (clé étrangère)',
+    secondary_category:
+      'un code de la table category, vérifié par la base et par l’API (clé étrangère)',
     difficulty: 'un niveau choisi dans une liste fermée par Zod (ProjectDifficulty)',
     started_on: 'un mois « AAAA-MM » vérifié par Zod (StartedMonth), jamais un texte libre',
     created_at: 'date',
@@ -316,6 +316,54 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     granted_at: 'date',
     revoked_at: 'date',
     alerted_at: 'date',
+    other_recap_at: 'date',
+  },
+  // R6b : le catalogue. Les noms que tapent les membres (tool.name, project_tool.label,
+  // profile_tool.label, catalogue_change.merged_name) sont au registre MEMBER_INPUTS ; tout le reste
+  // est écrit par l'API ou par un administrateur.
+  tool: {
+    id: 'identifiant',
+    slug: 'adresse tirée du nom par toolSlug (lettres, chiffres, tirets), jamais envoyée par le client',
+    folded: 'le nom replié (foldTool), calculé par l’API à partir de tool.name, déjà au registre',
+    status: 'catalogue, other ou dismissed : écrit par l’API sur décision d’un administrateur',
+    family: 'une famille choisie dans une liste fermée par Zod (ToolFamily)',
+    description_fr:
+      'une phrase écrite par un administrateur (limitée à 160 caractères par Zod), jamais par un membre',
+    description_en:
+      'une phrase écrite par un administrateur (limitée à 160 caractères par Zod), jamais par un membre',
+    site_url: 'un lien https public écrit par un administrateur, vérifié par Zod (ToolSiteUrl)',
+    created_at: 'date',
+    created_by: 'identifiant',
+    admitted_at: 'date',
+  },
+  tool_alias: {
+    folded: 'un nom replié écrit par un administrateur (autre nom d’un outil)',
+    tool_id: 'identifiant',
+  },
+  tool_slug_redirect: {
+    slug: 'une ancienne adresse d’outil, écrite par l’API',
+    tool_id: 'identifiant',
+  },
+  project_tool: { project_id: 'identifiant', tool_id: 'identifiant', position: 'nombre' },
+  profile_tool: { user_id: 'identifiant', tool_id: 'identifiant', position: 'nombre' },
+  category: {
+    code: 'un code tiré du nom par l’API (minuscules, chiffres, tirets), jamais envoyé tel quel',
+    name_fr: 'un nom écrit par un administrateur (30 caractères au plus, vérifié par Zod)',
+    name_en: 'un nom écrit par un administrateur (30 caractères au plus, vérifié par Zod)',
+    icon: 'une icône choisie dans une liste fermée par Zod (CategoryIcon)',
+    position: 'nombre',
+    created_at: 'date',
+    created_by: 'identifiant',
+  },
+  catalogue_change: {
+    id: 'identifiant',
+    action: 'une action d’une liste fermée, écrite par l’API',
+    admin_id: 'identifiant',
+    tool_id: 'identifiant',
+    category_code: 'un code de la table category',
+    project_id: 'identifiant',
+    from_category: 'un code de la table category',
+    created_at: 'date',
   },
   content_report: {
     id: 'identifiant',

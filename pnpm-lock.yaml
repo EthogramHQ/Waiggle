@@ -449,6 +449,9 @@ importers:
       '@electric-sql/pglite':
         specifier: 0.5.11
         version: 0.5.11
+      '@ruche/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
