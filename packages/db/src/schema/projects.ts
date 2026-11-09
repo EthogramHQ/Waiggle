@@ -26,7 +26,17 @@ export const project = pgTable(
     // (« claude-code »), qui sert à retrouver tous les projets faits avec un outil.
     tools: text('tools').array().default(sql`'{}'::text[]`).notNull(),
     toolSlugs: text('tool_slugs').array().default(sql`'{}'::text[]`).notNull(),
+    // Ancienne colonne « temps passé » (R6a) : plus lue ni écrite par l'API. Son DROP COLUMN part
+    // en R6b, pour qu'un retour à l'image d'avant le déploiement démarre encore (sec-A6).
     timeSpent: text('time_spent'), // null : non renseigné
+    // R6a : la catégorie du projet, un code de @ruche/contracts (ProjectCategory). Null pour un
+    // projet d'avant R6a, qui n'en avait pas ; la seconde est facultative.
+    primaryCategory: text('primary_category'),
+    secondaryCategory: text('secondary_category'),
+    // « Facile à refaire ? » : easy, medium ou hard ; null : non renseigné.
+    difficulty: text('difficulty'),
+    // Le mois où le projet a commencé, écrit « AAAA-MM » (texte, vérifié par Zod) ; null : non renseigné.
+    startedOn: text('started_on'),
     prompts: text('prompts').array().default(sql`'{}'::text[]`).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
@@ -89,6 +99,8 @@ export const projectMedia = pgTable(
     width: integer('width').notNull(),
     height: integer('height').notNull(),
     thumbhash: text('thumbhash').notNull(),
+    // R6a : ce que la photo montre, lu à voix haute par les lecteurs d'écran. Null : pas de description.
+    description: text('description'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => [
