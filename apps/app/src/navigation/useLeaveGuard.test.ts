@@ -5,13 +5,13 @@
 // qui la consomme avant qu'Expo Router l'entende.
 //
 // Le navigateur est remplacé par un faux : un historique (des entrées, une position), et une fenêtre
-// qui envoie `popstate` à ses écouteurs comme un vrai navigateur (ceux posés « à la capture »
-// d'abord, `stopImmediatePropagation` arrête les suivants). Un écouteur « Expo Router », posé avant
-// le hook, dit si Expo Router aurait entendu le retour. Un `history.back()` du code ne bouge qu'à
+// qui envoie `popstate` à ses écouteurs comme Chromium (dans l'ordre de pose ;
+// `stopImmediatePropagation` arrête les suivants). Un écouteur « Expo Router », posé après le
+// chargement du module et avant le hook, dit si Expo Router aurait entendu le retour. Un `history.back()` du code ne bouge qu'à
 // `flush()`, comme dans le navigateur, où il arrive dans une tâche suivante.
 import { act, renderHook } from '@testing-library/react-native'
 import { Platform } from 'react-native'
-import { useLeaveGuard } from './useLeaveGuard'
+import { listenBeforeRouter, useLeaveGuard } from './useLeaveGuard'
 
 /** La fausse navigation d'Expo Router (`useNavigation()`), lue par le hook. */
 const mockNavigation = {
@@ -86,10 +86,11 @@ const makeBrowser = () => {
         stopped = true
       },
     }
-    const all = listeners.filter((it) => it.type === 'popstate').map((it) => it.listener)
-    for (const { fn } of [...all.filter((it) => it.capture), ...all.filter((it) => !it.capture)]) {
+    // Dans l'ordre de pose, capture ou non : mesuré dans Chromium (R6a, U5e), où « à la capture »
+    // ne fait pas passer devant sur la fenêtre elle-même.
+    for (const { listener } of listeners.filter((it) => it.type === 'popstate')) {
       if (stopped) break
-      fn(event)
+      listener.fn(event)
     }
   }
   const traverse = (delta: number) => {
@@ -98,13 +99,13 @@ const makeBrowser = () => {
     index = next
     popstate()
   }
-  // L'écouteur d'Expo Router, posé au démarrage de l'appli, donc avant le hook.
   const expoRouter = jest.fn()
-  page.addEventListener('popstate', expoRouter)
   return {
     page,
     entries,
     expoRouter,
+    /** L'écouteur d'Expo Router, posé au démarrage de l'appli (son `useLinking`). */
+    startExpoRouter: () => page.addEventListener('popstate', expoRouter),
     /** L'entrée où se trouve le navigateur. */
     here: () => entries[index] as Entry,
     /** Le nombre d'entrées jusqu'à la position actuelle comprise. */
@@ -157,6 +158,10 @@ describe('on the web', () => {
       configurable: true,
       writable: true,
     })
+    // L'ordre de l'appli : le module du hook est chargé avec l'appli, avant que l'effet d'Expo
+    // Router pose son écouteur ; la feuille, et le hook, viennent bien plus tard.
+    listenBeforeRouter(browser.page as unknown as Parameters<typeof listenBeforeRouter>[0])
+    browser.startExpoRouter()
     onHeld.mockClear()
     mockNavigation.dispatch.mockClear()
   })
@@ -292,14 +297,38 @@ describe('on the web', () => {
   })
 
   it('stops nothing once unmounted', async () => {
-    const hook = await guard(false)
+    const hook = await guard(true)
     await hook.unmount()
-    expect(
-      browser.page.addEventListener.mock.calls.filter(([type]) => type === 'popstate').length,
-    ).toBe(
-      browser.page.removeEventListener.mock.calls.filter(([type]) => type === 'popstate').length +
-        1,
-    )
+    await browser.userBack()
+
+    expect(onHeld).not.toHaveBeenCalled()
+    expect(browser.expoRouter).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('when the app loads on the web', () => {
+  it('listens to popstate before Expo Router, whose listener comes with its first effect', () => {
+    const page = makeBrowser().page
+    const original = (globalThis as { window?: unknown }).window
+    Object.defineProperty(globalThis, 'window', { value: page, configurable: true, writable: true })
+    try {
+      // Un chargement neuf du module, comme à l'ouverture de l'appli (avec sa propre copie de
+      // React Native, dont on règle la plateforme avant).
+      jest.isolateModules(() => {
+        jest.replaceProperty(require('react-native').Platform, 'OS', 'web')
+        require('./useLeaveGuard')
+      })
+      const popstate = page.addEventListener.mock.calls.filter(([type]) => type === 'popstate')
+      expect(popstate).toHaveLength(1)
+      expect(popstate[0]?.[2]).toBe(true)
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        value: original,
+        configurable: true,
+        writable: true,
+      })
+      jest.restoreAllMocks()
+    }
   })
 })
 

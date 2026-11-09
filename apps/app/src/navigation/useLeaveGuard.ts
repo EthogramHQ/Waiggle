@@ -13,7 +13,8 @@
 //   `popstate`, et Expo Router remet alors toute la pile d'un coup (`resetRoot` dans son
 //   `useLinking`) : la feuille partait sans demander. Tant qu'il y a des changements, on pose donc
 //   une entrée de plus, à la même adresse (`history.pushState`). Le Retour la consomme sans changer
-//   d'adresse ; on arrête son `popstate` avant Expo Router, on la remet, et on demande.
+//   d'adresse ; on arrête son `popstate` avant Expo Router (un relais posé au chargement du
+//   module, plus bas), on la remet, et on demande.
 // - `beforeunload` (web) : le navigateur va fermer l'onglet ou recharger la page. On ne peut pas y
 //   poser notre fenêtre ; on demande seulement au navigateur la sienne (« Quitter le site ? »).
 import { useNavigation } from 'expo-router'
@@ -72,6 +73,41 @@ const browserWindow = (): BrowserWindow | null => {
   return page.history && page.location ? (page as BrowserWindow) : null
 }
 
+// --- Entendre `popstate` avant Expo Router ---
+// Sur la fenêtre elle-même, Chromium appelle les écouteurs dans l'ordre où ils ont été posés, « à la
+// capture » ou non (mesuré en R6a, U5e) : un écouteur posé à l'ouverture de la feuille passerait
+// après celui d'Expo Router, posé au démarrage, qui remettrait la pile avant qu'on ait rien dit. Le
+// module pose donc un relais dès son chargement, avec l'appli et avant le premier effet d'Expo
+// Router ; la feuille ouverte s'y inscrit.
+let relayWindow: BrowserWindow | null = null
+const popHandlers = new Set<(event: PopEvent) => void>()
+const relayPopState = (event: PopEvent) => {
+  for (const handler of [...popHandlers]) handler(event)
+}
+
+/** Pose le relais de `popstate` sur cette fenêtre (au chargement du module ; les tests, sur un faux). */
+export const listenBeforeRouter = (page: BrowserWindow) => {
+  if (relayWindow === page) return
+  relayWindow?.removeEventListener('popstate', relayPopState, true)
+  relayWindow = page
+  page.addEventListener('popstate', relayPopState, true)
+}
+
+const loadedIn = browserWindow()
+if (loadedIn) listenBeforeRouter(loadedIn)
+
+/** Écoute `popstate` par le relais s'il est posé sur cette fenêtre, sinon directement (plus tard). */
+const listenPopState = (page: BrowserWindow, handler: (event: PopEvent) => void) => {
+  if (relayWindow === page) {
+    popHandlers.add(handler)
+    return () => {
+      popHandlers.delete(handler)
+    }
+  }
+  page.addEventListener('popstate', handler, true)
+  return () => page.removeEventListener('popstate', handler, true)
+}
+
 const isMarked = (state: unknown) =>
   typeof state === 'object' &&
   state !== null &&
@@ -118,9 +154,8 @@ const createBackStep = (page: BrowserWindow, onBack: () => void) => {
     }
     settle()
   }
-  // Écouté « à la capture » (troisième argument à `true`) : sur la fenêtre, ces écouteurs passent
-  // avant les autres, quel que soit l'ordre de pose ; `stopImmediatePropagation` empêche alors
-  // celui d'Expo Router d'entendre le déplacement.
+  // Appelé par le relais, avant Expo Router : `stopImmediatePropagation` l'empêche alors d'entendre
+  // le déplacement.
   const onPopState = (event: PopEvent) => {
     if (step === 'removing') {
       // Notre propre retrait : rien à montrer, rien à dire à Expo Router.
@@ -145,7 +180,7 @@ const createBackStep = (page: BrowserWindow, onBack: () => void) => {
     sync()
     onBack()
   }
-  page.addEventListener('popstate', onPopState, true)
+  const stopListening = listenPopState(page, onPopState)
   // Une entrée marquée laissée par une vie précédente de la page (rechargée sur l'étape) : on la
   // reprend, pour la retirer si rien n'est à garder.
   if (isMarked(page.history.state)) step = 'kept'
@@ -163,7 +198,7 @@ const createBackStep = (page: BrowserWindow, onBack: () => void) => {
       }),
     dispose: () => {
       clearTimeout(timer)
-      page.removeEventListener('popstate', onPopState, true)
+      stopListening()
       // Une page qui disparaît n'attend plus rien.
       wanted = false
       step = 'none'
