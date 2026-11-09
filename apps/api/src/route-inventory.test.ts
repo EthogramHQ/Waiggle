@@ -117,6 +117,26 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   'POST /v1/moderation/decisions': ['admin', 'allowed'],
   // L'historique des décisions (tranche 7c).
   'GET /v1/moderation/decisions': ['admin', 'allowed'],
+  // Les catégories (R6b) : leurs nombres de projets ne comptent pas ceux d'un membre bloqué.
+  'GET /v1/categories': ['hidesBlocked', 'allowed'],
+  // L'administration du catalogue (R6b, routes/moderation-catalogue.ts) : sans filtre de blocage
+  // (décision 1). Les lectures restent permises pendant une suspension, comme tout GET ; un
+  // administrateur suspendu n'en est plus un, et la garde de la modération lui répond 404. Les
+  // écritures sont refusées (403 `suspended`) comme toute écriture non permise, adresse inconnue
+  // comprise : un administrateur suspendu reçoit donc, sur chaque route, la même réponse que sur
+  // une adresse qui n'existe pas (sec-B2, décision 13 ; moderation-catalogue.test.ts).
+  'GET /v1/moderation/tools/pending': ['admin', 'allowed'],
+  'GET /v1/moderation/tools': ['admin', 'allowed'],
+  'POST /v1/moderation/tools': ['admin', 'refused'],
+  'POST /v1/moderation/tools/:slug/admit': ['admin', 'refused'],
+  'PATCH /v1/moderation/tools/:slug': ['admin', 'refused'],
+  'GET /v1/moderation/tools/:slug/impact': ['admin', 'allowed'],
+  'POST /v1/moderation/tools/:slug/merge': ['admin', 'refused'],
+  'POST /v1/moderation/tools/:slug/dismiss': ['admin', 'refused'],
+  'GET /v1/moderation/categories/pending': ['admin', 'allowed'],
+  'POST /v1/moderation/projects/:id/category': ['admin', 'refused'],
+  'POST /v1/moderation/categories': ['admin', 'refused'],
+  'GET /v1/moderation/catalogue-changes': ['admin', 'allowed'],
 }
 
 /** La classe « blocage » d'une route (première colonne). */
@@ -200,11 +220,17 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   },
   'GET /v1/search': {
     file: 'search.test.ts',
-    test: 'hides a blocked member, its projects and their tools, in both directions',
+    // R6b (TW-A3) : le test a été réécrit pour les outils du catalogue, qui restent listés.
+    test: 'hides a blocked member and its projects, and takes them out of the tool counts, in both directions',
   },
   'GET /v1/tools': {
+    // R6b (TW-A1) : le catalogue reste entier ; ce sont les nombres de projets qui changent.
     file: 'tools.test.ts',
-    test: 'leaves the tools of a blocked member out of the list, in both directions',
+    test: 'leaves the projects of a blocked member out of the counts, in both directions',
+  },
+  'GET /v1/categories': {
+    file: 'tools.test.ts',
+    test: 'leaves the projects of a blocked member out of the counts, in both directions',
   },
   'GET /v1/notifications': {
     file: 'blocks-visibility.test.ts',

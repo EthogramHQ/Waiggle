@@ -46,12 +46,13 @@ afterEach(() => {
 })
 
 describe('starting the job scheduler', () => {
-  // Tranche 7a : une quatrième tâche, l'alerte de modération.
-  it('plans the four tasks and stops pg-boss gracefully when asked', async () => {
+  // Tranche 7a : une quatrième tâche, l'alerte de modération ; R6b : une cinquième, le récap des
+  // « Autre » aux administrateurs.
+  it('plans the five tasks and stops pg-boss gracefully when asked', async () => {
     const scheduler = await start()
 
     expect(boss.start).toHaveBeenCalledOnce()
-    expect(boss.schedule).toHaveBeenCalledTimes(4)
+    expect(boss.schedule).toHaveBeenCalledTimes(5)
     expect(boss.stop).not.toHaveBeenCalled()
     await scheduler.stop()
     expect(boss.stop).toHaveBeenCalledWith({ graceful: true, timeout: 30_000 })
@@ -96,6 +97,33 @@ describe('the moderation alert task', () => {
     expect(boss.unschedule).toHaveBeenCalledWith('moderation-alert')
     expect(boss.schedule).not.toHaveBeenCalledWith(
       'moderation-alert',
+      expect.anything(),
+      null,
+      expect.anything(),
+    )
+  })
+})
+
+// Tranche R6b : le récap des « Autre » aux administrateurs, le lundi à 8 h de Paris (une heure
+// avant celui des membres) ; c'est un e-mail : EMAIL_JOBS=off le coupe, comme les autres.
+describe('the recap of the « other » items', () => {
+  it('runs on Mondays at 8, Paris time', async () => {
+    await start()
+
+    expect(boss.schedule).toHaveBeenCalledWith(
+      'other-recap',
+      '0 8 * * 1',
+      null,
+      expect.objectContaining({ tz: 'Europe/Paris' }),
+    )
+  })
+
+  it('is switched off with the other e-mails', async () => {
+    await startScheduler({ databaseUrl: 'postgres://test', deps, emailJobs: false })
+
+    expect(boss.unschedule).toHaveBeenCalledWith('other-recap')
+    expect(boss.schedule).not.toHaveBeenCalledWith(
+      'other-recap',
       expect.anything(),
       null,
       expect.anything(),

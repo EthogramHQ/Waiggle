@@ -15,9 +15,9 @@
 //
 // Inès écrit tout (profil, projet, note, commentaire), Malik signale, puis Inès bloque Malik ; Zoé,
 // une troisième, lit encore tout.
-import { Project, ReportSnapshot } from '@ruche/contracts'
+import { AccountExport, Project, ReportSnapshot } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { asc, eq, getTableName, is } from 'drizzle-orm'
+import { asc, eq, getTableName, is, sql } from 'drizzle-orm'
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -29,6 +29,7 @@ import {
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { avatarForm, jpegImage, visualForm } from './testing/images'
+import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
 // ─── L'inventaire du schéma ──────────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,111 @@ describe('the register of member inputs', () => {
     expect(notAnInput('project_media', 'description')).toBe(false)
   })
 
+  // Tranche R6b (plan, « Le modèle de données » et décisions 2, 4, 6 et 14) : les tables du catalogue.
+  // Le nom partagé d'un « Autre » (tool.name), le nom tapé par chaque membre sur son projet ou son
+  // profil (project_tool.label, profile_tool.label) et le nom d'un « Autre » rattaché gardé au
+  // journal (catalogue_change.merged_name) sont des saisies de membres ; le reste est écrit par
+  // l'API ou par un administrateur. Ces tests échouent tant que la migration 0016 n'existe pas,
+  // puis tant qu'une colonne n'est pas classée comme il faut.
+  const SLICE_R6B = {
+    tool: [
+      'id',
+      'slug',
+      'name',
+      'folded',
+      'status',
+      'family',
+      'description_fr',
+      'description_en',
+      'site_url',
+      'created_at',
+      'created_by',
+      'admitted_at',
+    ],
+    tool_alias: ['folded', 'tool_id'],
+    tool_slug_redirect: ['slug', 'tool_id'],
+    project_tool: ['project_id', 'tool_id', 'position', 'label'],
+    profile_tool: ['user_id', 'tool_id', 'position', 'label'],
+    category: ['code', 'name_fr', 'name_en', 'icon', 'position', 'created_at', 'created_by'],
+    catalogue_change: [
+      'id',
+      'action',
+      'admin_id',
+      'tool_id',
+      'merged_name',
+      'category_code',
+      'project_id',
+      'from_category',
+      'created_at',
+    ],
+    admin_member: ['other_recap_at'],
+  }
+  /** Les colonnes de R6b qu'un membre écrit (décision 14). */
+  const R6B_INPUTS = [
+    ['tool', 'name'],
+    ['project_tool', 'label'],
+    ['profile_tool', 'label'],
+    ['catalogue_change', 'merged_name'],
+  ] as const
+
+  it('reads the tables and columns of slice R6b, and no longer the time spent', () => {
+    for (const [table, columns] of Object.entries(SLICE_R6B)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+    const project = tables.find((t) => t.name === 'project')?.columns.map((c) => c.name) ?? []
+    expect(project).not.toContain('time_spent')
+  })
+
+  it('classes the names typed by members in the catalogue as inputs, and the rest as not', () => {
+    const notInRegister = R6B_INPUTS.filter(([table, column]) => !inRegister(table, column)).map(
+      ([table, column]) => `${table}.${column}`,
+    )
+    expect(notInRegister).toEqual([])
+    // Un « Autre » est copié au signalement d'un projet avec ses outils (champ « tools »), et le
+    // nom tapé sur un profil avec ses outils favoris (« favoriteTools »), comme avant R6b.
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({ object: 'project', table: 'tool', column: 'name', field: 'tools' }),
+    )
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'project',
+        table: 'project_tool',
+        column: 'label',
+        field: 'tools',
+        snapshot: true,
+        export: true,
+      }),
+    )
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'member',
+        table: 'profile_tool',
+        column: 'label',
+        field: 'favoriteTools',
+        snapshot: true,
+        export: true,
+      }),
+    )
+    // Le journal n'est ni copié ni exporté : l'« Autre » rattaché n'a plus d'auteur (décision 5).
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        table: 'catalogue_change',
+        column: 'merged_name',
+        snapshot: false,
+        export: false,
+      }),
+    )
+    // Toutes les autres colonnes de R6b : « pas une saisie », avec leur raison.
+    const wrong = Object.entries(SLICE_R6B).flatMap(([table, columns]) =>
+      columns
+        .filter((column) => !R6B_INPUTS.some(([t, c]) => t === table && c === column))
+        .filter((column) => inRegister(table, column) || !notAnInput(table, column))
+        .map((column) => `${table}.${column}`),
+    )
+    expect(wrong).toEqual([])
+  })
+
   it('classes every column of every table', () => {
     const unclassified = tables.flatMap((table) =>
       table.columns
@@ -253,6 +359,13 @@ const WITNESSES: Record<string, string> = {
   'project.project.description': 'Description témoin, unique.',
   'project.project.prompts': 'Prompt témoin, unique.',
   'project.project.tools': 'OutilProjetTémoin',
+  // R6b : le nom tapé devient un « Autre » (tool.name) et reste sur le projet (project_tool.label),
+  // comme sur le profil (profile_tool.label). Le nom d'un « Autre » rattaché, gardé au journal,
+  // n'est ni copié ni exporté : son témoin ne sert qu'à prouver qu'il en a un.
+  'project.tool.name': 'OutilProjetTémoin',
+  'project.project_tool.label': 'OutilProjetTémoin',
+  'member.profile_tool.label': 'OutilFavoriTémoin',
+  'project.catalogue_change.merged_name': 'NomRattachéTémoin',
   'project.project.demo_url': 'https://demo-temoin.dev/app',
   // R6a : la description d'une photo, écrite par PATCH /v1/projects/{id}/visuals/{visualId}.
   'project.project_media.description': 'Légende de photo témoin, unique.',
@@ -517,5 +630,95 @@ describe('every field of the register', () => {
     ).text()
     expect(zoeComments).toContain(WITNESSES['comment.project_comment.body'])
     expect((await act.send('GET', `/v1/projects/${projectId}`, zoe)).status).toBe(200)
+  })
+})
+
+// ─── R6b : les outils lus par les tables du catalogue ────────────────────────────────────────────
+
+// Décisions 6 et 14 du plan R6b : l'export et la copie d'un signalement lisent les outils dans
+// project_tool et profile_tool, avec le nom que CE membre a tapé pour un « Autre » (et le nom du
+// catalogue pour un outil du catalogue). Les anciennes colonnes (project.tools, profile.favorite_tools)
+// sont encore écrites jusqu'en R7, mais plus jamais lues : le test y met un texte qui ne doit sortir
+// nulle part. Zoé tape la première « TEACHABLE machine » : c'est le nom partagé de l'« Autre » ;
+// Inès tape « teachable MACHINE », et c'est son écriture à elle qui la suit.
+describe('the tools of a member, read from the catalogue tables', () => {
+  let ctx: TestContext
+  let act: ReturnType<typeof activity>
+  let ines: string
+  let malik: string
+  let zoe: string
+  let inesId: string
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-15T08:00:00.000Z'))
+    ctx = await createTestContext()
+    act = activity(ctx)
+    ines = await ctx.verifiedMember({
+      name: 'Inès',
+      email: 'ines@example.com',
+      password: 'ines-long-password',
+    })
+    malik = await ctx.verifiedMember({
+      name: 'Malik',
+      email: 'malik@example.com',
+      password: 'malik-long-password',
+    })
+    zoe = await ctx.verifiedMember({
+      name: 'Zoé',
+      email: 'zoe@example.com',
+      password: 'zoe-long-password',
+    })
+    inesId = (await act.me(ines)).id
+    await clearCatalogue(ctx.db)
+    await addCatalogueTool(ctx.db, { name: 'Claude', family: 'assistant' })
+    await act.publish(zoe, 'Tri des déchets', { tools: ['TEACHABLE machine'] })
+    vi.setSystemTime(Date.now() + 1000)
+    await act.updateProfile(ines, { favoriteTools: ['claude', 'teachable MACHINE'] })
+    await act.publish(ines, 'Mon chat qui parle', { tools: ['CLAUDE', 'teachable MACHINE'] })
+    // Les anciennes colonnes reçoivent un texte qui ne doit plus jamais être lu.
+    await ctx.db.execute(sql`update project set tools = array['AncienneColonne']`)
+    await ctx.db.execute(sql`update profile set favorite_tools = array['AncienneColonne']`)
+  })
+
+  afterEach(async () => {
+    await ctx.close()
+    vi.useRealTimers()
+  })
+
+  it("exports the member's favourite tools, project tools and the names he typed", async () => {
+    const res = await act.send('GET', '/v1/me/export', ines)
+    expect(res.status).toBe(200)
+    const raw = await res.text()
+    const data = AccountExport.parse(JSON.parse(raw))
+
+    expect(data.user.favoriteTools).toEqual(['Claude', 'teachable MACHINE'])
+    expect(data.projects.map((project) => project.tools)).toEqual([
+      [
+        { label: 'Claude', slug: 'claude', inCatalogue: true },
+        expect.objectContaining({ label: 'teachable MACHINE', inCatalogue: false }),
+      ],
+    ])
+    for (const leak of ['AncienneColonne', 'TEACHABLE machine']) {
+      expect(raw, leak).not.toContain(leak)
+    }
+  })
+
+  it('copies the favourite tools of a reported profile from profile_tool', async () => {
+    const report = await act.report(malik, { kind: 'member', id: inesId })
+
+    const [row] = await ctx.db
+      .select({ snapshot: schema.contentReport.snapshot })
+      .from(schema.contentReport)
+      .where(eq(schema.contentReport.id, report.id))
+    const copied = ReportSnapshot.parse(row?.snapshot)
+      .filter((entry) => entry.field === 'favoriteTools')
+      .map((entry) => entry.value)
+      .join('\n')
+
+    expect(copied).toContain('Claude')
+    expect(copied).toContain('teachable MACHINE')
+    expect(copied).not.toContain('AncienneColonne')
+    expect(copied).not.toContain('TEACHABLE machine')
   })
 })
