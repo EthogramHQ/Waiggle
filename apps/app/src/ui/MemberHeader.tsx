@@ -1,5 +1,6 @@
 // L'en-tête de la page d'un membre : son avatar, son nom et son pseudo, sa bio et ses outils
-// favoris, chacun menant à la page de son étiquette.
+// favoris, chacun menant à la page de son étiquette (un « Autre », hors du catalogue, en texte
+// simple : R6b).
 import { readableWidth } from '@ruche/brand'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
@@ -19,9 +20,11 @@ type Props = {
   toolsTitle: string
   /**
    * Les outils ; sans `onPress`, une simple pastille (le profil d'un compte suspendu, tranche 7c,
-   * où seuls les noms des outils sont connus, pas leur étiquette).
+   * où seuls les noms des outils sont connus, pas leur étiquette). R6b : `inCatalogue: false`, un
+   * « Autre » (pas encore au catalogue, sans page) : texte simple, jamais un lien, même avec
+   * `onPress`, lu « Teachable Machine, autre outil, pas encore dans le catalogue » (voir `Tag`).
    */
-  tools: { label: string; onPress?: (() => void) | undefined }[]
+  tools: { label: string; onPress?: (() => void) | undefined; inCatalogue?: boolean }[]
   /** Un bouton sous l'en-tête (« Modifier mon profil », sur sa propre page). */
   action?: ReactNode
   /**
@@ -82,6 +85,7 @@ export function MemberHeader({
                 key={tool.label}
                 label={tool.label}
                 {...(tool.onPress ? { onPress: tool.onPress } : null)}
+                {...(tool.inCatalogue === false ? { inCatalogue: false } : null)}
               />
             ))}
           </Stack>
