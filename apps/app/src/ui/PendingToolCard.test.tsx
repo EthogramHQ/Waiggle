@@ -10,7 +10,6 @@
 // onOpenProject(id: ProjectId): void }). La carte écrit ses textes elle-même
 // (`moderation.catalogue.*`).
 import { PENDING_TOOL_PROJECTS_SHOWN, type PendingTool } from '@ruche/contracts'
-import { nameOf } from '@ruche/i18n'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { makeComPending, sunoPending, teachablePending } from '../testing/catalogue'
 import { renderWithProviders } from '../testing/render'
@@ -27,9 +26,9 @@ const MERGE = fr.t(($) => $.moderation.catalogue.merge)
 const DISMISS = fr.t(($) => $.moderation.catalogue.dismiss)
 const DECISIONS = [ADMIT, MERGE, DISMISS]
 
-/** « Le tri des factures, de Hugo Lefèvre » : un projet de la carte, tel qu'il se lit. */
+/** « Le tri des factures, par Hugo Lefèvre » : un projet de la carte, tel qu'il se lit. */
 const projectLine = ({ title, author }: PendingTool['projects'][number]) =>
-  fr.t(($) => $.moderation.catalogue.projectBy, { title, authorOf: nameOf('fr', author.name) })
+  fr.t(($) => $.moderation.catalogue.projectBy, { title, author: author.name })
 
 /** Un élément qu'on touche, lien ou bouton : la carte choisit le rôle qui convient. */
 const pressable = (name: string) =>
@@ -58,8 +57,8 @@ describe('PendingToolCard', () => {
     for (const project of makeComPending.projects) {
       expect(pressable(projectLine(project))).toBeTruthy()
     }
-    // « d’Inès » : l'auteur suit l'élision du français (nameOf).
-    expect(pressable('Mes rappels de plantes, d’Inès Moreau')).toBeTruthy()
+    // « par » ne s'élide pas : « par Inès », jamais « d’Inès » ni « de Inès ».
+    expect(pressable('Mes rappels de plantes, par Inès Moreau')).toBeTruthy()
   })
 
   it('says « Cité par 1 projet » in the singular', async () => {

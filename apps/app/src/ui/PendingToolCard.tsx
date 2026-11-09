@@ -20,7 +20,6 @@ import type { PendingTool } from '@ruche/contracts'
 import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { useNameOf } from '../useNameOf'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
 import { DecidedZone } from './DecidedZone'
@@ -65,7 +64,6 @@ export function PendingToolCard({
 }: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
-  const nameOf = useNameOf()
   // Une garde par bouton (charte, R5b) : la seconde tape d'une double tape sur « Laisser hors »
   // n'écrit pas deux fois, celle sur « Ajouter » n'ouvre pas deux feuilles. Une garde commune aux
   // liens des projets : la seconde tape n'ouvre pas, à côté, la page d'un autre projet.
@@ -104,7 +102,7 @@ export function PendingToolCard({
       </View>
 
       {/* Les projets qui le citent (cinq au plus) : une liste de liens, chacun vers sa page. Le nom
-          lu est la ligne affichée (« Le tri des factures, de Hugo Lefèvre »). Rangés à gauche,
+          lu est la ligne affichée (« Le tri des factures, par Hugo Lefèvre » : « par » ne s’élide jamais). Rangés à gauche,
           jamais plus larges que la carte : un titre long passe à la ligne dans son lien. */}
       <View role="list" style={{ gap: space.xxs }}>
         {tool.projects.map((project) => (
@@ -116,7 +114,7 @@ export function PendingToolCard({
             <TextLink
               label={t(($) => $.moderation.catalogue.projectBy, {
                 title: project.title,
-                authorOf: nameOf(project.author.name),
+                author: project.author.name,
               })}
               onPress={linkGuard(() => onOpenProject(project.id))}
             />

@@ -1170,7 +1170,7 @@ export const fr = {
       pendingProjects_one: 'Cité par {{count}} projet',
       pendingProjects_other: 'Cité par {{count}} projets',
       /** Un projet sur la carte d'un autre outil : « Quel papillon ?, de Hugo Lefèvre ». */
-      projectBy: '{{title}}, {{authorOf}}',
+      projectBy: '{{title}}, par {{author}}',
       admit: 'Ajouter au catalogue',
       merge: 'Rattacher à un outil',
       dismiss: 'Laisser hors du catalogue',
@@ -1219,7 +1219,7 @@ export const fr = {
         tool_merge: '{{admin}} a rattaché « {{merged}} » à {{tool}}',
         tool_dismiss: '{{admin}} a laissé « {{tool}} » hors du catalogue',
         category_create: '{{admin}} a créé la catégorie {{category}}',
-        project_recategorize: '{{admin}} a rangé {{project}} dans {{category}}',
+        project_recategorize: '{{admin}} a rangé « {{project}} » dans {{category}}',
         project_recategorize_hidden: '{{admin}} a rangé un projet dans {{category}}',
       },
       /** Un administrateur dont le compte a été supprimé. */
