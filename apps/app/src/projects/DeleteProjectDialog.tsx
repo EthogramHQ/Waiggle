@@ -101,8 +101,10 @@ export function DeleteProjectDialog({
     const result = await remove(project.id)
     sending.current = false
     setBusy(false)
-    // Refusé : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!result.ok) {
+    // Refusé : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer. Sauf un
+    // 404 : le projet n'existe déjà plus (supprimé d'un autre appareil), ce que le membre voulait ;
+    // la suite est celle d'un succès.
+    if (!result.ok && result.error !== 'notFound') {
       setRefusal(result.error)
       return
     }

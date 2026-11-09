@@ -73,7 +73,16 @@ export function usePhotoTiles(projectId?: string) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const queryClient = useQueryClient()
-  const setProject = useSetProject()
+  const setWholeProject = useSetProject()
+  /**
+   * Range dans le cache le projet qu'une réponse de photo renvoie, sans toucher à la couverture
+   * verticale : elle a sa propre file (`usePortraitCover`), et une réponse partie avant qu'elle change
+   * en porte l'ancienne, qui la ferait disparaître de la feuille.
+   */
+  const setProject = (project: Project) => {
+    const current = savedProject(queryClient, project.id)
+    setWholeProject(current ? { ...project, portraitCover: current.portraitCover } : project)
+  }
   // En modification : le projet tel qu'il est dans le cache, tenu à jour après chaque geste.
   const saved = useProject(projectId ?? '', Boolean(projectId)).data
 

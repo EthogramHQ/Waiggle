@@ -200,9 +200,10 @@ export function PhotoTiles({
   // Les places qu'on peut échanger : les photos en place (une photo en route n'a pas encore d'ordre).
   const movable = tiles.flatMap((tile, index) => (tile.state === 'ready' ? [index] : []))
   const coverKey = kept[0]?.key ?? null
-  // Sur le web, la zone de dépôt garde la tuile « + Ajouter » et ajoute sa phrase (les fichiers se
-  // glissent aussi depuis un téléphone tenu en mode bureau, une tablette).
-  const dropZone = Platform.OS === 'web' && onDropFiles !== undefined
+  // Sur le web, à largeur d'ordinateur, la zone de dépôt garde la tuile « + Ajouter » et ajoute sa
+  // phrase. Plus étroit, « Ajouter » et « choisis-les » feraient la même chose : la tuile seule
+  // reste (elle reçoit encore des fichiers déposés, `fileHandlers`).
+  const dropZone = Platform.OS === 'web' && onDropFiles !== undefined && sizeClass === 'wide'
 
   // Les vues à focaliser, par tuile : la tuile, sa poignée. Et « Ajouter ».
   const tileRefs = useRef(new Map<string, View | null>())
@@ -739,7 +740,7 @@ function AddTile({
 }
 
 /**
- * La zone « Glisse tes images ici, ou choisis-les » (web, dès la tablette), qui reçoit des
+ * La zone « Glisse tes images ici, ou choisis-les » (web, largeur d'ordinateur), qui reçoit des
  * fichiers. Elle garde dedans la tuile « + Ajouter » (même nom, même place dans l'ordre de Tab que
  * sur téléphone), puis la phrase et son bouton « choisis-les ».
  */

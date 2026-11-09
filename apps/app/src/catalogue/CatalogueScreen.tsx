@@ -103,6 +103,7 @@ import { GalleryCatalogue } from './projet-galerie'
 import { NotFoundPortalCatalogue } from './projet-introuvable'
 import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
+import { RecipeCatalogue } from './projet-recette'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
 import { PublishCategoriesCatalogue } from './publier-categories'
@@ -871,6 +872,7 @@ export function CatalogueScreen() {
       <PublishDanceCatalogue />
       <PublishDeleteCatalogue />
       <PublishCategoriesCatalogue />
+      <RecipeCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />
       <ProjectPromptsCatalogue />
