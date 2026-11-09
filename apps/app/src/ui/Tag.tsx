@@ -116,7 +116,12 @@ export function Tag({
       // entier. Chiffres de même largeur (tabular) : deux étiquettes voisines gardent leurs nombres
       // alignés.
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%' }}>
-        {icon === undefined ? null : <Icon name={icon} size={18} />}
+        {icon === undefined ? null : (
+          // flexShrink 0 : sur le web, un `<svg>` rétrécirait avec la rangée.
+          <View style={{ flexShrink: 0 }}>
+            <Icon name={icon} size={18} />
+          </View>
+        )}
         <View style={{ flexShrink: 1 }}>{name}</View>
         {count === undefined ? null : (
           <Text variant="mono" tone="muted" tabular>

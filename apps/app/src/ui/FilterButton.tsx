@@ -69,14 +69,19 @@ export function FilterButton({ label, spokenLabel, icon, onPress, ref }: Props) 
         backgroundColor: pressed ? colors.honeySoft : colors.surface,
       })}
     >
-      <Icon name={icon} size={18} tone="muted" />
-      {/* minWidth 0 : le libellé rétrécit et passe à la ligne ; les deux icônes gardent leur taille. */}
+      {/* minWidth 0 : le libellé rétrécit et passe à la ligne ; les deux icônes gardent leur taille
+          (flexShrink 0 : sur le web, un `<svg>` rétrécirait avec la rangée). */}
+      <View style={{ flexShrink: 0 }}>
+        <Icon name={icon} size={18} tone="muted" />
+      </View>
       <View style={{ flexShrink: 1, minWidth: 0 }}>
         <Text variant="callout" weight={600}>
           {label}
         </Text>
       </View>
-      <Icon name="caret-down" size={14} tone="muted" />
+      <View style={{ flexShrink: 0 }}>
+        <Icon name="caret-down" size={14} tone="muted" />
+      </View>
     </Pressable>
   )
 }

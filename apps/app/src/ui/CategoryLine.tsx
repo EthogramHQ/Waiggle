@@ -44,7 +44,11 @@ export function CategoryLine({ label, icon, onPress, href }: Props) {
         flexShrink: 1,
       }}
     >
-      <Icon name={icon} size={18} tone="secondary" />
+      {/* flexShrink 0 : sur le web, un `<svg>` rétrécit avec la rangée quand le texte passe à la
+          ligne ; l'icône garde sa taille. */}
+      <View style={{ flexShrink: 0 }}>
+        <Icon name={icon} size={18} tone="secondary" />
+      </View>
       {/* flexShrink : le texte rétrécit et passe à la ligne ; l'icône garde sa taille. */}
       <View style={{ flexShrink: 1 }}>
         <Text variant="caption" weight={600} tone="secondary">
