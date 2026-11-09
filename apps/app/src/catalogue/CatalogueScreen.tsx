@@ -105,6 +105,7 @@ import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
+import { PublishCategoriesCatalogue } from './publier-categories'
 import { PublishWindowsCatalogue } from './publier-fenetres'
 import { PublishSheetCatalogue } from './publier-feuille'
 import { PublishToolsPreviewCatalogue } from './publier-outils-apercu'
@@ -865,6 +866,7 @@ export function CatalogueScreen() {
       <PublishToolsPreviewCatalogue />
       <PublishPromptCatalogue />
       <PublishPillsCatalogue />
+      <PublishCategoriesCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />
       <ProjectPromptsCatalogue />
