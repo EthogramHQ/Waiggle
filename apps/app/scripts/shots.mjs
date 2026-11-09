@@ -2343,7 +2343,9 @@ const pages = [
     admin: true,
     fullPage: true,
     prepare: async (page) => {
-      await page.getByText('Make.com', { exact: true }).waitFor()
+      // `first()` : le nom de l'outil paraît deux fois, sur sa carte et dans la description cachée
+      // qui relie ses boutons à lui (`ActionDescription`).
+      await page.getByText('Make.com', { exact: true }).first().waitFor()
     },
   },
   {
