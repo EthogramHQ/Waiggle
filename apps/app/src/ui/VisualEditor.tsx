@@ -5,8 +5,10 @@
 // Le composant ne connaît ni l'API ni les traductions : l'écran lui donne les textes et les actions.
 import { radii } from '@ruche/brand'
 import { Image } from 'expo-image'
+import { useRef } from 'react'
 import { View } from 'react-native'
 import { Button } from './Button'
+import { focusWithoutScroll } from './focus'
 import type { CoverImage } from './ProjectCover'
 import { Row, Stack } from './Stack'
 import { Surface } from './Surface'
@@ -44,6 +46,14 @@ export function VisualEditor({
   busy = false,
 }: Props) {
   const { colors } = useTheme()
+  // Le premier bouton, le seul qui reste après un retrait (« Remplacer » devient « Choisir… » à la
+  // même place) : le focus du clavier y va quand « Retirer » disparaît, que le serveur réponde bien
+  // ou non (sinon il retombait sur la page). Ref : un accès direct à l'élément affiché.
+  const first = useRef<View>(null)
+  const removePortrait = () => {
+    onRemovePortrait()
+    focusWithoutScroll(first.current)
+  }
   return (
     <Surface variant="grouped" padding="lg" gap="lg">
       <Stack gap="xs">
@@ -69,13 +79,17 @@ export function VisualEditor({
           </View>
         ) : null}
         <Stack gap="sm" grow>
+          {/* `loading` plutôt que `disabled` : sur le web, un bouton désactivé sort du parcours au
+              clavier (tabIndex -1) et perd le focus pendant l'écriture ; un bouton « en cours »
+              reste atteignable et ne fait rien (ses appuis sont ignorés). */}
           <Button
+            ref={first}
             label={portrait ? labels.replacePortrait : labels.choosePortrait}
             variant="secondary"
             size="compact"
             icon="device-mobile"
             onPress={onPickPortrait}
-            disabled={busy}
+            loading={busy}
           />
           {portrait ? (
             <Button
@@ -83,8 +97,8 @@ export function VisualEditor({
               variant="secondary"
               size="compact"
               icon="trash"
-              onPress={onRemovePortrait}
-              disabled={busy}
+              onPress={removePortrait}
+              loading={busy}
             />
           ) : null}
         </Stack>
