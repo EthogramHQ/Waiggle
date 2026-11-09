@@ -170,6 +170,8 @@ type ViewProps = {
   categories?: HeaderCategories | undefined
   /** Toucher la catégorie : Explorer filtré sur son code (donné par `ProjectHeader`). */
   onOpenCategory?: (() => void) | undefined
+  /** L'adresse de ce lien (`/explore?category=science`) : un vrai `<a href>` sur le web (R6b, S4). */
+  categoryHref?: string | undefined
   /** La ligne de l'auteur (voir `useAuthorLine`). */
   author: AuthorLineProps
   /** Pour poser le focus sur le titre à l'arrivée de la page (la carte qui devient la page). */
@@ -183,6 +185,7 @@ export function ProjectHeaderView({
   project,
   categories,
   onOpenCategory,
+  categoryHref,
   author,
   titleRef,
   now,
@@ -203,7 +206,9 @@ export function ProjectHeaderView({
           label={t(($) => $.project.status[project.status])}
           strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
         />
-        {category ? <CategoryLine {...category} onPress={onOpenCategory} /> : null}
+        {category ? (
+          <CategoryLine {...category} onPress={onOpenCategory} href={categoryHref} />
+        ) : null}
       </Stack>
       <Stack gap="xs">
         <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
@@ -245,7 +250,7 @@ export function ProjectHeaderView({
   )
 }
 
-type Props = Omit<ViewProps, 'author' | 'categories' | 'onOpenCategory'>
+type Props = Omit<ViewProps, 'author' | 'categories' | 'onOpenCategory' | 'categoryHref'>
 
 /**
  * L'en-tête de la page d'un projet, avec la ligne de l'auteur et les catégories qu'il lit lui-même.
@@ -266,6 +271,11 @@ export function ProjectHeader(props: Props) {
         primaryCategory
           ? () => router.push({ pathname: '/explore', params: { category: primaryCategory } })
           : undefined
+      }
+      // Le même but, en adresse : le code d'une catégorie n'a que des lettres minuscules et des
+      // traits d'union (contrat), rien à échapper ; `encodeURIComponent` par prudence.
+      categoryHref={
+        primaryCategory ? `/explore?category=${encodeURIComponent(primaryCategory)}` : undefined
       }
     />
   )

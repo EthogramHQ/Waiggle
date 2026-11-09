@@ -55,6 +55,7 @@ export function DiscoverFeed({
   category = null,
   ready = true,
   emptyMessage,
+  emptyAction,
 }: {
   /**
    * L'identifiant du membre connecté : R6a, ses propres projets ne comptent jamais comme
@@ -77,6 +78,8 @@ export function DiscoverFeed({
    * l'instant. ») : celui d'une catégorie sans projet, nommée par l'écran.
    */
   emptyMessage?: string
+  /** R6b (des-C4) : l'issue d'un fil vide, sous son message (« Voir tous les projets »). */
+  emptyAction?: { label: string; onPress: () => void } | undefined
 }) {
   const { t } = useTranslation()
   const feed = useDiscoverFeed({ testers: false, category, enabled: ready })
@@ -109,6 +112,7 @@ export function DiscoverFeed({
         />
       }
       empty={emptyMessage ?? t(($) => $.feed.discoverEmpty)}
+      emptyAction={emptyAction}
       overlay={overlay ? (project) => overlay(project, followed) : undefined}
     />
   )
@@ -180,6 +184,8 @@ type FeedListProps = {
   | {
       /** Le message d'un fil vide (Explorer, sans « Tu es à jour »). */
       empty: string
+      /** L'issue d'un fil vide, sous son message (voir ProjectGrid). */
+      emptyAction?: { label: string; onPress: () => void } | undefined
       upToDate?: never
     }
   | {
@@ -195,6 +201,7 @@ type FeedListProps = {
         hideMascot?: boolean
       }
       empty?: never
+      emptyAction?: never
     }
 )
 
@@ -227,7 +234,16 @@ const useArrivals = (items: readonly FeedItem[]): ReadonlySet<string> => {
  * Les cartes d'un fil, le bouton des nouveautés au-dessus, « Tu es à jour » à sa place, et la fin du
  * fil en dessous.
  */
-export function FeedList({ feed, items, news, empty, overlay, upToDate, columns }: FeedListProps) {
+export function FeedList({
+  feed,
+  items,
+  news,
+  empty,
+  emptyAction,
+  overlay,
+  upToDate,
+  columns,
+}: FeedListProps) {
   const { t } = useTranslation()
   // La lumière suit la carte du milieu de l'écran (R4). Ce hook s'appelle ici, dans un enfant de
   // Screen, jamais dans le corps de l'écran : la lumière d'ambiance est fournie par Screen
@@ -301,7 +317,7 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
           {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (
-        <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
+        <ProjectGrid empty={empty} emptyAction={emptyAction} {...(columns ? { columns } : null)}>
           {items.map(cardOf)}
         </ProjectGrid>
       )}

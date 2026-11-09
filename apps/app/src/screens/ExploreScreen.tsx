@@ -27,6 +27,7 @@ import { useTools } from '../tools/api'
 import { Carousel } from '../ui/Carousel'
 import { FilterPills } from '../ui/FilterPills'
 import { FollowButton } from '../ui/FollowButton'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { SearchLink } from '../ui/SearchLink'
@@ -168,9 +169,17 @@ function Recent({ viewerId, overlay }: { viewerId: string; overlay: CardOverlay 
   const { t } = useTranslation()
   const { category, categories, ready, choose } = useCategoryFilter()
   const chosen = categoryOf(categories.data?.categories, category)
+  // Le titre de la section : il reçoit le focus quand « Voir tous les projets » retire le filtre
+  // et disparaît avec lui (le focus ne se perd pas ; il reste juste au-dessus des projets revenus).
+  const heading = useRef<Focusable>(null)
+  const seeAll = () => {
+    choose(null)
+    focusWithoutScroll(heading.current)
+    moveReaderTo(heading.current)
+  }
   return (
     <Stack gap="md">
-      <Text variant="heading" heading={2}>
+      <Text variant="heading" heading={2} focusRef={heading}>
         {t(($) => $.explore.recent)}
       </Text>
       <RecentCategories categories={categories} category={category} onChange={choose} />
@@ -188,6 +197,8 @@ function Recent({ viewerId, overlay }: { viewerId: string; overlay: CardOverlay 
               emptyMessage: chosen
                 ? t(($) => $.explore.categoryEmpty, { name: chosen.name })
                 : t(($) => $.tool.emptyFiltered),
+              // Et une issue, comme sur la page d'un outil (relecture de design de R6b, C4).
+              emptyAction: { label: t(($) => $.explore.seeAllProjects), onPress: seeAll },
             })}
       />
     </Stack>

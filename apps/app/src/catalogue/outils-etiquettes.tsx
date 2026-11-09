@@ -8,6 +8,7 @@
 import { CATEGORY_ICON_CHOICES, type CategoryIcon } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { View } from 'react-native'
 import { FilterButton } from '../ui/FilterButton'
 import { IconGrid } from '../ui/IconGrid'
 import { Stack } from '../ui/Stack'
@@ -22,6 +23,8 @@ const fr = {
     'Un outil du catalogue est une étiquette qui mène à sa page ; un « Autre », cité par un membre mais pas encore au catalogue, est un texte simple, jamais un lien, lu en entier. La grille d’icônes sert à créer une catégorie : un groupe de choix nommés par le sens de leur icône. Le bouton de filtre ouvre la feuille des catégories.',
   tags: 'Étiquettes : dans le catalogue, « Autre »',
   tagsOnGlass: 'Étiquette « Autre » sur verre',
+  tagsLong: 'Un « Autre » au nom de 40 caractères, dans une colonne étroite : il passe à la ligne',
+  filterLong: 'Bouton de filtre dans une colonne étroite : le libellé passe à la ligne',
   grid: 'Grille d’icônes : rien de coché, un choix coché',
   filter: 'Bouton de filtre : toutes les catégories, une catégorie choisie',
   gridLabel: 'Icône',
@@ -38,6 +41,8 @@ const en: typeof fr = {
     'A catalogue tool is a tag that leads to its page; an “Other”, named by a member but not in the catalogue yet, is plain text, never a link, read in full. The icon grid is for creating a category: a group of choices named by the meaning of their icon. The filter button opens the categories sheet.',
   tags: 'Tags: in the catalogue, “Other”',
   tagsOnGlass: '“Other” tag on glass',
+  tagsLong: 'An “Other” with a 40-character name, in a narrow column: it wraps',
+  filterLong: 'Filter button in a narrow column: the label wraps',
   grid: 'Icon grid: nothing checked, one choice checked',
   filter: 'Filter button: all categories, one category chosen',
   gridLabel: 'Icon',
@@ -89,6 +94,13 @@ export function ToolTagsCatalogue() {
                 <Tag label="Mon assistant maison" inCatalogue={false} onPress={noop} />
               </Stack>
             </Example>
+            <Example caption={`${l.tagsLong} — ${l[scheme]}`}>
+              {/* Relectures de R6b : un « Autre » de 40 caractères (la limite) passe à la ligne,
+                  jamais « … » : aucune page ne permet de relire son nom. */}
+              <View style={{ width: 200, maxWidth: '100%' }}>
+                <Tag label="gpt-4o-mini-2024-07-18-instruct-previews" inCatalogue={false} />
+              </View>
+            </Example>
             <Example caption={`${l.tagsOnGlass} — ${l[scheme]}`}>
               <Tag label="Teachable Machine" inCatalogue={false} onGlass />
             </Example>
@@ -106,6 +118,13 @@ export function ToolTagsCatalogue() {
                   onPress={noop}
                 />
               </Stack>
+            </Example>
+            <Example caption={`${l.filterLong} — ${l[scheme]}`}>
+              {/* Relectures de R6b : à 320 px et texte à 200 %, le libellé passe à la ligne ; la
+                  pastille grandit, ses coins deviennent ceux d'un panneau. */}
+              <View style={{ width: 160, maxWidth: '100%' }}>
+                <FilterButton label={l.all} spokenLabel={l.all} icon="shapes" onPress={noop} />
+              </View>
             </Example>
           </Stack>
         </ThemeProvider>

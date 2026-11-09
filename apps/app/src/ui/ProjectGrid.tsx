@@ -9,6 +9,8 @@
 import { space } from '@ruche/brand'
 import { Children, type ReactNode } from 'react'
 import { View } from 'react-native'
+import { Button } from './Button'
+import { Stack } from './Stack'
 import { Surface } from './Surface'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
@@ -17,6 +19,12 @@ type Props = {
   children: ReactNode
   /** Le message affiché quand la liste est vide ; sans lui, une liste vide n'affiche rien. */
   empty?: string | undefined
+  /**
+   * L'issue d'une liste vide, sous son message (relecture de design de R6b, C4 : une catégorie
+   * vide d'Explorer, « Voir tous les projets »). Un bouton secondaire : l'action miel de la page
+   * reste ailleurs. Ignorée sans `empty`.
+   */
+  emptyAction?: { label: string; onPress: () => void } | undefined
   /**
    * Le nombre de colonnes, imposé par l'écran (un entier de 1 à 3) ; sans lui, il suit la largeur.
    * C'est l'écran qui le choisit (2 en `wide` et 1 sinon, pour le Fil) : la grille ne sait pas ce
@@ -32,7 +40,7 @@ const columnsFor = { compact: 1, medium: 2, wide: 3 } as const
 const boundedColumns = (columns: number) =>
   Number.isFinite(columns) ? Math.min(3, Math.max(1, Math.round(columns))) : 1
 
-export function ProjectGrid({ children, empty, columns: imposed }: Props) {
+export function ProjectGrid({ children, empty, emptyAction, columns: imposed }: Props) {
   const { sizeClass } = useLayout()
   // Children.toArray : la liste des cartes, sans les « trous » (null, false) laissés par l'écran,
   // chacune avec sa clé.
@@ -41,9 +49,14 @@ export function ProjectGrid({ children, empty, columns: imposed }: Props) {
     if (empty === undefined) return null
     return (
       <Surface variant="grouped" padding="xl">
-        <Text tone="secondary" align="center">
-          {empty}
-        </Text>
+        <Stack gap="md" align="center">
+          <Text tone="secondary" align="center">
+            {empty}
+          </Text>
+          {emptyAction ? (
+            <Button label={emptyAction.label} variant="secondary" onPress={emptyAction.onPress} />
+          ) : null}
+        </Stack>
       </Surface>
     )
   }

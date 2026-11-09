@@ -7,9 +7,10 @@
 // L'icône est un décor (Icon la cache aux lecteurs d'écran) : le texte dit tout, lu tel quel. Le
 // texte passe à la ligne au lieu de sortir de la colonne (320 points, texte à 200 %).
 import { layout, space } from '@ruche/brand'
-import { Pressable, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { enterActivates } from './keyboard'
+import { linkProps } from './SettingsNav'
 import { STATUS_PILL_HEIGHT } from './StatusPill'
 import { Text } from './Text'
 
@@ -19,10 +20,16 @@ type Props = {
   /** L'icône de la catégorie principale (`optionOf`, projects/categories.ts). */
   icon: IconName
   /** R6b : donné, la ligne devient un lien (vers Explorer filtré sur la catégorie). */
-  onPress?: () => void
+  onPress?: (() => void) | undefined
+  /**
+   * L'adresse du lien (`/explore?category=science`), relecture de l'interface de R6b (S4) : sur le
+   * web, la ligne est un vrai `<a href>`, comme les autres liens de l'appli (ouvrir dans un nouvel
+   * onglet, l'adresse au survol). Ignorée sans `onPress`, et sur téléphone.
+   */
+  href?: string | undefined
 }
 
-export function CategoryLine({ label, icon, onPress }: Props) {
+export function CategoryLine({ label, icon, onPress, href }: Props) {
   const line = (
     <View
       style={{
@@ -53,8 +60,13 @@ export function CategoryLine({ label, icon, onPress }: Props) {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={label}
+      {...(href === undefined ? null : linkProps(href, false))}
       {...enterActivates(onPress)}
-      onPress={onPress}
+      onPress={(event) => {
+        // Le routeur change de page ; sur le web, le navigateur ne recharge pas celle du `<a>`.
+        if (Platform.OS === 'web' && href !== undefined) event?.preventDefault?.()
+        onPress()
+      }}
       style={{
         minHeight: layout.touchTarget,
         justifyContent: 'center',
