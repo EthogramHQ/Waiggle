@@ -17,6 +17,13 @@
 // Un emplacement `overlay` pose un contrôle sur la photo, en haut (la pastille « Suivre Nora »
 // d'Explorer, R3) : à côté du lien de la carte, jamais dedans (relecture de l'interface, ui-4).
 //
+// R6a : la catégorie principale du projet (`category`), une étiquette de verre avec son icône, en
+// haut à gauche de la photo ; avec un `overlay`, celui-ci passe dessous, dans la même colonne. Sans
+// photo, elle se pose dans le verre, au-dessus du titre. Un projet d'avant R6a n'en a pas : rien ne
+// se dessine. L'étiquette est hors du lien de la carte et laisse passer le doigt vers lui
+// (`pointerEvents="none"`) ; elle est cachée aux lecteurs d'écran, qui l'entendent dans la
+// description du lien (« Catégorie : Sciences et espace », relecture du plan ui-I5).
+//
 // Sur ordinateur, une carte qui est un lien s'incline vers la souris, avec un reflet sur sa photo
 // (`useTilt`, R4) ; elle se remet à plat avant que sa photo soit mesurée au toucher.
 import { layout, pressScale, radii, space } from '@ruche/brand'
@@ -26,13 +33,14 @@ import { type LayoutChangeEvent, Platform, Pressable, View, type ViewStyle } fro
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Avatar } from './Avatar'
 import { describedBy } from './aria'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
+import { Tag } from './Tag'
 import { TestLink } from './TestLink'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
@@ -78,6 +86,11 @@ type Props = {
    */
   overlay?: ReactNode
   /**
+   * R6a : la catégorie principale du projet, son nom traduit et son icône (`categoryOption` de
+   * `projects/categories.ts`) ; absente pour un projet d'avant R6a.
+   */
+  category?: { label: string; icon: IconName }
+  /**
    * La vue qui entoure la photo, pour qui veut la mesurer (`measureInWindow`) : la photo de la carte
    * qui s'agrandit en page du projet (le mouvement de R4).
    */
@@ -111,8 +124,17 @@ const decorative = {
   importantForAccessibility: 'no-hide-descendants',
 } as const
 
-/** Les hauteurs mesurées : les deux rangées posées sur le verre, le titre et la carte entière. */
-type Measures = { author: number; bottom: number; title: number | null; card: number }
+/**
+ * Les hauteurs mesurées : les deux rangées posées sur le verre, le titre, la carte entière, et la
+ * colonne du haut de la photo (catégorie, « Suivre » ; 0 sans elle).
+ */
+type Measures = {
+  author: number
+  bottom: number
+  title: number | null
+  card: number
+  top: number
+}
 
 /** Hook : une mesure (`onLayout`) qui ne redessine que si la hauteur a changé. */
 const useMeasures = (height: number) => {
@@ -123,6 +145,7 @@ const useMeasures = (height: number) => {
     bottom: layout.touchTarget,
     title: null,
     card: height,
+    top: 0,
   })
   const measure = (key: keyof Measures) => (event: LayoutChangeEvent) => {
     const value = Math.round(event.nativeEvent.layout.height)
@@ -144,6 +167,7 @@ export function ProjectCard({
   onPress,
   height = PROJECT_CARD_HEIGHT,
   overlay,
+  category,
   coverRef,
 }: Props) {
   const { t } = useTranslation()
@@ -168,6 +192,28 @@ export function ProjectCard({
   // L'accroche décrit le lien de la carte sur le web (lue après son nom) : useId donne le même
   // identifiant au pré-rendu et dans le navigateur.
   const pitchId = useId()
+  // R6a : la catégorie décrit aussi le lien (« Catégorie : Sciences et espace »), après l'accroche.
+  // Sur le web, par un texte caché que désigne `aria-describedby` ; sur téléphone, par l'indice du
+  // lien (`accessibilityHint`), lu après son nom.
+  const categoryId = useId()
+  const categoryDescription = category
+    ? t(($) => $.card.category, { category: category.label })
+    : null
+  const hasPhoto = Boolean(image)
+  // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
+  const topColumn = Boolean(overlay) || (hasPhoto && Boolean(category))
+  // L'étiquette dessinée : décor pour les lecteurs d'écran (la description du lien la dit), et le
+  // doigt passe au travers, vers la carte (`pointerEvents` en propriété : sur le web, seule cette
+  // forme devient du CSS).
+  const categoryTag = category ? (
+    <View
+      pointerEvents="none"
+      {...decorative}
+      style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
+    >
+      <Tag label={category.label} icon={category.icon} onGlass />
+    </View>
+  ) : null
 
   // La carte s'enfonce un peu sous le doigt, comme les boutons (`Pressed`), mais toute entière :
   // l'auteur et « Tester », posés dessus, s'enfoncent avec elle et restent à leur place.
@@ -184,7 +230,14 @@ export function ProjectCard({
   const body = (
     <View
       onLayout={measure('card')}
-      style={{ minHeight: height, justifyContent: 'flex-end', padding: INSET }}
+      style={{
+        minHeight: height,
+        justifyContent: 'flex-end',
+        padding: INSET,
+        // Le verre ne monte jamais sous la colonne du haut (catégorie, « Suivre ») : à texte
+        // agrandi sur une carte basse, la carte grandit plutôt (relecture de design R3, C2).
+        paddingTop: INSET + (topColumn && measures.top > 0 ? measures.top + ROW_GAP : 0),
+      }}
     >
       {/* La photo remplit la carte, même agrandie par le texte. Elle décore : le lien porte déjà
           le nom du projet. */}
@@ -217,6 +270,9 @@ export function ProjectCard({
         {/* La place de la rangée de l'auteur, posée par-dessus. */}
         <View style={{ height: measures.author }} />
         <View onLayout={measure('title')} style={{ gap: ROW_GAP }}>
+          {/* Sans photo, la catégorie se pose au-dessus du titre (mesurée avec lui : la rangée de
+              l'auteur reste au-dessus d'elle). */}
+          {hasPhoto ? null : categoryTag}
           <Text variant="title3" numberOfLines={2}>
             {title}
           </Text>
@@ -236,7 +292,8 @@ export function ProjectCard({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={title}
-      {...describedBy(pitchId)}
+      {...describedBy(categoryDescription ? `${pitchId} ${categoryId}` : pitchId)}
+      {...(categoryDescription && !web ? { accessibilityHint: categoryDescription } : null)}
       // Entrée ouvre le projet sur le web, comme un vrai lien (voir keyboard.ts).
       {...enterActivates(open)}
       onPress={open}
@@ -399,14 +456,33 @@ export function ProjectCard({
         >
           {bottomRow}
         </View>
-        {overlay ? (
-          // box-none : la vue de l'emplacement laisse passer le doigt hors du contrôle, vers la carte
+        {topColumn ? (
+          // La colonne du haut de la photo : la catégorie, puis l'emplacement dessous (« Suivre
+          // Nora »). box-none : la colonne laisse passer le doigt hors du contrôle, vers la carte
           // qui est dessous. Ses bords suivent ceux du panneau de verre du bas.
           <View
+            onLayout={measure('top')}
             pointerEvents="box-none"
-            style={{ position: 'absolute', top: INSET, left: INSET, right: INSET, zIndex: 1 }}
+            style={{
+              position: 'absolute',
+              top: INSET,
+              left: INSET,
+              right: INSET,
+              zIndex: 1,
+              gap: space.xs,
+            }}
           >
+            {hasPhoto ? categoryTag : null}
             {overlay}
+          </View>
+        ) : null}
+        {categoryDescription ? (
+          // La description du lien, lue seulement par lui (`aria-describedby` lit aussi un texte
+          // caché) : cachée à l'œil et au parcours du lecteur d'écran, qui ne l'entend pas deux fois.
+          <View style={hiddenFrame} {...decorative}>
+            <Text variant="caption" nativeID={categoryId}>
+              {categoryDescription}
+            </Text>
           </View>
         ) : null}
       </Animated.View>
