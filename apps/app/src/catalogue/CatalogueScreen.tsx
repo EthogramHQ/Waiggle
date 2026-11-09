@@ -106,6 +106,7 @@ import { ProjectPromptsCatalogue } from './projet-prompts'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
 import { PublishCategoriesCatalogue } from './publier-categories'
+import { PublishDanceCatalogue } from './publier-danse'
 import { PublishWindowsCatalogue } from './publier-fenetres'
 import { PublishSheetCatalogue } from './publier-feuille'
 import { PublishToolsPreviewCatalogue } from './publier-outils-apercu'
@@ -866,6 +867,7 @@ export function CatalogueScreen() {
       <PublishToolsPreviewCatalogue />
       <PublishPromptCatalogue />
       <PublishPillsCatalogue />
+      <PublishDanceCatalogue />
       <PublishCategoriesCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />
