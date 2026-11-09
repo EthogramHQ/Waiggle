@@ -28,7 +28,7 @@ import {
   type ToolAdmit,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, type ApiResult, errorKey } from '../api/errors'
@@ -53,7 +53,7 @@ import { Button } from '../ui/Button'
 import { CatalogueChangeRow } from '../ui/CatalogueChangeRow'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
-import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import type { Focusable } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { PendingToolCard, type PendingToolOutcome } from '../ui/PendingToolCard'
 import { Screen } from '../ui/Screen'
@@ -175,25 +175,25 @@ function AdminTools() {
   //   (la feuille le rendrait au bouton de même nom de la carte voisine) ;
   // - sans décision, le bouton qui l'a ouverte (sur le web, la feuille ne le connaît pas toujours :
   //   un bouton touché du doigt n'a pas forcément eu le focus).
-  // L'effet de l'écran passe après celui de la feuille qui se ferme (les effets d'un enfant passent
-  // d'abord) : il a le dernier mot.
+  // La feuille pose elle-même le focus à cette place (`returnFocusTo`) : à la fermeture, puis encore
+  // à la fin de son fondu de sortie, pendant lequel le piège à focus du Modal du web le ramène en
+  // elle. Posé par l'écran à la seule fermeture, il finissait sur le bouton de même nom de la carte
+  // voisine (R6b, u8f).
   const [lastDecided, setLastDecided] = useState<string | null>(null)
   const resultRef = useRef<Focusable | null>(null)
   const openers = useRef(new Map<string, Focusable | null>())
   const decidedInSheet = useRef(false)
   const focusAfterClose = useRef<string | null>(null)
-  const [focusTick, setFocusTick] = useState(0)
-  useEffect(() => {
-    if (focusTick === 0) return
-    const target = focusAfterClose.current
-    focusAfterClose.current = null
-    focusWithoutScroll(target === RESULT ? resultRef.current : openers.current.get(target ?? ''))
-  }, [focusTick])
-  /** Une feuille de carte se ferme : où va le focus (voir plus haut). */
-  const focusOnClose = (opener: string) => {
-    focusAfterClose.current = decidedInSheet.current ? RESULT : opener
+  /** Une feuille de carte se ferme : où va le focus (voir plus haut) ; null pour les autres feuilles. */
+  const focusOnClose = (opener: string | null) => {
+    focusAfterClose.current = opener && decidedInSheet.current ? RESULT : opener
     decidedInSheet.current = false
-    setFocusTick((count) => count + 1)
+  }
+  /** La place du focus à la fermeture, lue par la feuille ; null : son ouvreur. */
+  const closedFocus = () => {
+    const target = focusAfterClose.current
+    if (target === null) return null
+    return target === RESULT ? resultRef.current : (openers.current.get(target) ?? null)
   }
   /** La ref d'un bouton de carte, rangée par carte et par geste (« make-com:merge »). */
   const openerRef = (key: string) => (node: Focusable | null) => {
@@ -229,8 +229,8 @@ function AdminTools() {
   }
   const closeForm = () => {
     setFormOpen(false)
-    // Créer, modifier : la feuille rend elle-même le focus à son bouton, toujours là.
-    if (form?.mode === 'admit') focusOnClose(`${form.tool.slug}:admit`)
+    // Créer, modifier : la feuille rend le focus à son ouvreur, toujours là (null).
+    focusOnClose(form?.mode === 'admit' ? `${form.tool.slug}:admit` : null)
   }
 
   const formInitial: Partial<ToolAdmit> =
@@ -467,6 +467,7 @@ function AdminTools() {
         initial={formInitial}
         onSubmit={submitForm}
         onClose={closeForm}
+        returnFocusTo={closedFocus}
       />
       <MergeSheet
         open={mergeOpen}
@@ -474,6 +475,7 @@ function AdminTools() {
         deciding={deciding}
         onMerged={onMerged}
         onClose={closeMerge}
+        returnFocusTo={closedFocus}
       />
     </Screen>
   )
@@ -592,6 +594,7 @@ function MergeSheet({
   deciding,
   onMerged,
   onClose,
+  returnFocusTo,
 }: {
   open: boolean
   tool: PendingTool | null
@@ -600,6 +603,8 @@ function MergeSheet({
   /** Le rattachement a réussi, vers l'outil de ce nom. */
   onMerged: (target: string) => void
   onClose: () => void
+  /** Où va le focus quand la feuille se ferme (voir `Sheet`) : le résultat après un rattachement. */
+  returnFocusTo: () => unknown
 }) {
   const { t } = useTranslation()
   const labels = useToolLabels('public')
@@ -679,6 +684,7 @@ function MergeSheet({
         open={open}
         title={t(($) => $.moderation.catalogue.mergeTitle, { name })}
         onClose={onClose}
+        returnFocusTo={returnFocusTo}
         closeGuard={chosen.length > 0 ? requestClose : undefined}
         busy={saving}
         compact

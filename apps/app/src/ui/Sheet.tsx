@@ -234,6 +234,13 @@ type Props = Omit<
    * de `onClose`, qui ne part plus que de l'écran (après « Abandonner »). Sans lui, `onClose`.
    */
   closeGuard?: () => void
+  /**
+   * Web : l'élément qui reçoit le focus à la fermeture, à la place de l'ouvreur, lu au moment de
+   * fermer (R6b, u8f). Pour un ouvreur parti avec ce que la feuille a décidé : la carte décidée
+   * montre son résultat à la place de ses boutons ; retrouvé par son nom, l'ouvreur aurait été le
+   * bouton de même nom de la carte voisine. Rien (null) : l'ouvreur, comme sans cette prop.
+   */
+  returnFocusTo?: () => unknown
 }
 
 type KeyEvent = {
@@ -389,6 +396,16 @@ const giveFocusBack = (back: unknown, name: string | null): void => {
 }
 
 /**
+ * Rend le focus à la fermeture : à la place choisie par l'écran (`returnFocusTo`) s'il en donne une,
+ * sinon comme `giveFocusBack`. Elle sert deux fois : à la fermeture, puis à la fin du fondu de sortie
+ * si le focus s'est perdu entre-temps (voir `onDismiss` dans `Sheet`).
+ */
+const giveFocusTo = (chosen: unknown, back: unknown, name: string | null): void => {
+  if (chosen && focusWithoutScroll(chosen)) return
+  giveFocusBack(back, name)
+}
+
+/**
  * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
  * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
  * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
@@ -538,6 +555,7 @@ export function Sheet({
   aside,
   busy = false,
   initialFocusRef,
+  returnFocusTo,
   ...panel
 }: Props) {
   const { colors } = useTheme()
@@ -563,6 +581,10 @@ export function Sheet({
   const shown = useRef(false)
   // Son nom, pour le retrouver s'il a été redessiné entre-temps (voir `reachableOpener`).
   const openerName = useRef<string | null>(null)
+  // La place choisie par l'écran (`returnFocusTo`), la dernière reçue : la fin du fondu la relit
+  // après que l'écran a été redessiné.
+  const returnFocusRef = useRef(returnFocusTo)
+  returnFocusRef.current = returnFocusTo
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
   const sheetId = useId()
@@ -647,7 +669,7 @@ export function Sheet({
     const back = opener.current
     opener.current = null
     returnTo.current = { node: back }
-    giveFocusBack(back, openerName.current)
+    giveFocusTo(returnFocusRef.current?.(), back, openerName.current)
   }, [open, initialFocusRef])
 
   // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
@@ -665,14 +687,19 @@ export function Sheet({
   // disparaissant, elle le laissait parfois sur la page (`body`), où la feuille de dessous le
   // reprenait par sa tête au lieu de la ligne touchée (« Catégorie », R6a, ui-I10). À la fin
   // (`onDismiss`), on le rend donc encore au bouton d'origine, seulement s'il s'est perdu : un focus
-  // posé ailleurs entre-temps (la page d'arrivée) est gardé.
+  // posé ailleurs entre-temps (la page d'arrivée) est gardé. Pendant ce fondu, le piège à focus du
+  // Modal est encore actif : il ramène dans la feuille tout focus posé hors d'elle, celui de la
+  // fermeture compris. La place choisie par l'écran (`returnFocusTo`) passe donc aussi ici, sinon
+  // le bouton retrouvé par son nom l'emportait (R6b, u8f : celui de la carte voisine).
   const onDismiss =
     Platform.OS === 'web'
       ? {
           onDismiss: () => {
             const back = returnTo.current
             returnTo.current = null
-            if (back && focusLost()) giveFocusBack(back.node, openerName.current)
+            if (back && focusLost()) {
+              giveFocusTo(returnFocusRef.current?.(), back.node, openerName.current)
+            }
           },
         }
       : null
