@@ -21,6 +21,9 @@ const SERVICE = [
   'existing-account',
   'moderation-alert',
   'new-email',
+  // R6b : le récap hebdomadaire des « Autre » aux administrateurs.
+  'other-recap-one-project',
+  'other-recap',
   // R2 : le mot de passe oublié et « Ton mot de passe a changé », deux e-mails de sécurité.
   'password-changed',
   'reset-password',
