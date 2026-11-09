@@ -211,7 +211,7 @@ export function ProjectCard({
       {...decorative}
       style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
     >
-      <Tag label={category.label} icon={category.icon} onGlass />
+      <Tag label={category.label} icon={category.icon} kind="category" onGlass />
     </View>
   ) : null
 
