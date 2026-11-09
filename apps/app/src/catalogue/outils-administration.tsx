@@ -32,6 +32,8 @@ const fr = {
   pending: 'À vérifier, cité par 3 projets',
   single: 'Cité par 1 projet',
   many: 'Cité par 7 projets : cinq montrés',
+  profilesOnly: 'Cité par 2 profils seulement : leurs membres, aucun projet',
+  both: 'Cité par 2 projets et 3 profils : les projets, puis les profils',
   admitted: 'Ajouté au catalogue',
   merged: 'Rattaché à un outil',
   dismissed: 'Laissé hors du catalogue',
@@ -54,6 +56,8 @@ const en: typeof fr = {
   pending: 'To check, named by 3 projects',
   single: 'Named by 1 project',
   many: 'Named by 7 projects: five shown',
+  profilesOnly: 'Named by 2 profiles only: their members, no project',
+  both: 'Named by 2 projects and 3 profiles: the projects, then the profiles',
   admitted: 'Added to the catalogue',
   merged: 'Linked to a tool',
   dismissed: 'Left out of the catalogue',
@@ -87,6 +91,8 @@ const makeCom: PendingTool = {
     { id: id(12), title: 'Mes rappels de plantes', author: ines },
     { id: id(13), title: 'Le résumé du conseil de classe', author: yann },
   ],
+  profileCount: 0,
+  profiles: [],
 }
 
 const teachable: PendingTool = {
@@ -95,6 +101,8 @@ const teachable: PendingTool = {
   createdAt: '2026-11-07T18:40:00.000Z',
   projectCount: 1,
   projects: [{ id: id(21), title: 'Le papillon du jardin', author: hugo }],
+  profileCount: 0,
+  profiles: [],
 }
 
 const suno: PendingTool = {
@@ -113,6 +121,8 @@ const suno: PendingTool = {
       author: { name: 'Paul Roux', handle: null },
     },
   ],
+  profileCount: 0,
+  profiles: [],
 }
 
 const longName: PendingTool = {
@@ -128,6 +138,41 @@ const longName: PendingTool = {
       author: { name: 'Maximilien de La Tour-Fontaine', handle: null },
     },
     { id: id(42), title: 'Soupes du dimanche', author: yann },
+  ],
+  profileCount: 0,
+  profiles: [],
+}
+
+/** Un « Autre » des seuls outils favoris de deux membres : aucun projet, deux profils (jur-J1). */
+const napkin: PendingTool = {
+  slug: 'napkin-ai',
+  name: 'Napkin AI',
+  createdAt: '2026-11-05T15:20:00.000Z',
+  projectCount: 0,
+  projects: [],
+  profileCount: 2,
+  profiles: [ines, yann],
+}
+
+/** Un « Autre » cité par deux projets et trois profils : les projets, puis les profils. */
+const gamma: PendingTool = {
+  slug: 'gamma-app',
+  name: 'Gamma App',
+  createdAt: '2026-11-04T08:30:00.000Z',
+  projectCount: 2,
+  projects: [
+    {
+      id: id(36),
+      title: 'Les diapos du club photo',
+      author: { name: 'Samuel Petit', handle: 'sam' },
+    },
+    { id: id(37), title: 'L’exposé sur les volcans', author: nora },
+  ],
+  profileCount: 3,
+  profiles: [
+    hugo,
+    { name: 'Élodie Martin', handle: 'elodie' },
+    { name: 'Paul Roux', handle: null },
   ],
 }
 
@@ -245,6 +290,12 @@ export function AdminCardsCatalogue() {
             </Example>
             <Example caption={`${l.many} — ${l[scheme]}`}>
               <PendingToolCard tool={suno} outcome={null} {...pendingHandlers} />
+            </Example>
+            <Example caption={`${l.profilesOnly} — ${l[scheme]}`}>
+              <PendingToolCard tool={napkin} outcome={null} {...pendingHandlers} />
+            </Example>
+            <Example caption={`${l.both} — ${l[scheme]}`}>
+              <PendingToolCard tool={gamma} outcome={null} {...pendingHandlers} />
             </Example>
             <Example caption={`${l.admitted} — ${l[scheme]}`}>
               <PendingToolCard

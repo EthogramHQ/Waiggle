@@ -16,7 +16,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { useTools } from '../tools/api'
 import { FilterPills } from '../ui/FilterPills'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
-import { ListGroup, ListRow } from '../ui/ListGroup'
+import { ListBlock, ListGroup, ListRow } from '../ui/ListGroup'
 import { LiveStatus } from '../ui/LiveStatus'
 import { Screen } from '../ui/Screen'
 import { SearchField } from '../ui/SearchField'
@@ -248,11 +248,12 @@ function OtherTools({
   if (shown.length === 0) return null
   return (
     <ListGroup title={t(($) => $.tools.others)} footer={t(($) => $.tools.othersHint)}>
-      <Stack direction="row" gap="sm" wrap padding="md">
+      {/* Une case de pastilles, aux marges d'une ligne (ListBlock) : l'écran n'en écrit aucune. */}
+      <ListBlock wrap>
         {shown.map((other) => (
           <Tag key={other.name} label={other.name} inCatalogue={false} />
         ))}
-      </Stack>
+      </ListBlock>
     </ListGroup>
   )
 }

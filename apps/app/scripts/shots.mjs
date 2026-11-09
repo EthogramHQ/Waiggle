@@ -46,6 +46,7 @@ import {
   makeTool,
   mergeChange,
   pendingTools,
+  pendingToolsWithProfiles,
   recategorizeChange,
   uncategorizedProjects,
   zapierTool,
@@ -1768,7 +1769,11 @@ const fakeApi = (
     // R6b : l'administration du catalogue (pages « Outils » et « Catégories »), les données des
     // tests de ces pages (`testing/catalogue.ts`), chaque liste en une seule page.
     const onePage = (items) => json(200, { items, nextCursor: null })
-    if (pathname === '/v1/moderation/tools/pending') return onePage(pendingTools)
+    // Depuis jur-J1 (décision de Louis du 9/11/2026 au soir), un « Autre » des seuls profils et un
+    // « Autre » cité par des projets et des profils suivent ceux des tests d'écran.
+    if (pathname === '/v1/moderation/tools/pending') {
+      return onePage([...pendingTools, ...pendingToolsWithProfiles])
+    }
     if (pathname === '/v1/moderation/tools' && method === 'GET') {
       return onePage([makeTool, zapierTool, lovableTool].map(adminToolOf))
     }

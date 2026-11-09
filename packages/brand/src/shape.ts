@@ -56,6 +56,10 @@ export const layout = {
     // passent plus tôt à la scène à gauche et à la carte à droite : à 1 024 points, la colonne
     // seule laissait de grands vides de miel de chaque côté.
     card: 1000,
+    // R6b (relecture ui-C6) : *sous* cette largeur, un téléphone étroit (320 points). Le fil des
+    // commentaires y resserre le retrait des réponses, et le champ de réponse y laisse la photo.
+    // Un seul seuil pour les deux, écrit ici plutôt que deux fois dans les composants.
+    narrow: 360,
   },
   maxContentWidth: 1280, // le contenu ne s'étale pas au-delà, même sur un grand écran
   formWidth: 520, // largeur d'un formulaire seul (connexion, inscription…)

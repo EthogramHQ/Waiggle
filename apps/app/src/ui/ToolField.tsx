@@ -71,8 +71,13 @@ export type ToolFieldLabels = {
   counter: (count: number, max: number) => { shown: string; spoken: string }
   /** Le nombre de projets affiché sous un nom (« 41 projets »). */
   uses: (count: number) => string
-  /** Le nom lu d'une suggestion (« Claude, 41 projets »). */
-  suggestion: (name: string, count: number) => string
+  /**
+   * Le nom lu d'une suggestion (« Claude, 41 projets »). Quand l'écran donne `detail`, le champ lui
+   * passe aussi la ligne affichée sous le nom (« Assistant IA · Aucun projet pour l'instant ») : le
+   * nom lu doit dire ce qui se voit, famille comprise (relecture ui-C3 de R6b ; « Claude, 0 projet »
+   * contredisait la ligne). Un écran qui l'ignore garde le nom d'avant.
+   */
+  suggestion: (name: string, count: number, detail?: string) => string
   /** Le choix qui ajoute un nom nouveau (« Ajouter « Teachable Machine » »). */
   add: (name: string) => string
   /** Le nom de la croix d'une pastille (« Retirer Claude »). */
@@ -547,6 +552,13 @@ export function ToolField({
             {options.map((option, index) => {
               const selected = index === activeIndex
               const name = option.kind === 'add' ? option.name : option.tool.name
+              // La ligne sous le nom d'une suggestion, affichée et reprise dans son nom lu.
+              const detail =
+                option.kind === 'add'
+                  ? undefined
+                  : labels.detail
+                    ? labels.detail(option.tool.family ?? null, option.tool.uses)
+                    : labels.uses(option.tool.uses)
               return (
                 <Pressable
                   key={`${option.kind}-${same(name)}`}
@@ -555,7 +567,11 @@ export function ToolField({
                   accessibilityLabel={
                     option.kind === 'add'
                       ? addLabel(option)
-                      : labels.suggestion(option.tool.name, option.tool.uses)
+                      : labels.suggestion(
+                          option.tool.name,
+                          option.tool.uses,
+                          labels.detail ? detail : undefined,
+                        )
                   }
                   aria-selected={selected}
                   // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ.
@@ -610,9 +626,7 @@ export function ToolField({
                           {option.tool.name}
                         </Text>
                         <Text variant="caption" tone="muted" tabular>
-                          {labels.detail
-                            ? labels.detail(option.tool.family ?? null, option.tool.uses)
-                            : labels.uses(option.tool.uses)}
+                          {detail}
                         </Text>
                       </>
                     )}
