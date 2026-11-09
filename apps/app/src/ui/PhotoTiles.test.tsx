@@ -23,7 +23,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, type ReactNode, useState } from 'react'
 import { AccessibilityInfo, Platform, View } from 'react-native'
 import { lendWebPage } from '../testing/arrivedFocus'
-import { renderWithProviders } from '../testing/render'
+import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { type PhotoTile, PhotoTiles, type PhotoTilesLabels } from './PhotoTiles'
 
@@ -490,6 +490,8 @@ describe('PhotoTiles, the drop zone (web)', () => {
 
   it('accepts dropped files only, and ignores a tile dragged onto the drop zone (web)', async () => {
     const restorePage = lendWebPage()
+    // La zone de dépôt n'existe que sur ordinateur (scénario R6a, relecture du design).
+    const restoreWindow = setDesktopWindow()
     const probe = createRef<View>()
     // react-native-web ne transmet pas `onDrop` au navigateur : la zone écoute `drop` par
     // `addEventListener` sur sa vue. On note ces écoutes (sur le prototype des vues natives), et on
@@ -554,6 +556,7 @@ describe('PhotoTiles, the drop zone (web)', () => {
       expect(on.onDropFiles).toHaveBeenCalledTimes(1)
       expect(on.onDropFiles.mock.calls[0]?.[0]).toEqual(files)
     } finally {
+      restoreWindow()
       restorePage()
     }
   })
