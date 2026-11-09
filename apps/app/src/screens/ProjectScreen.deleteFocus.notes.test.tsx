@@ -8,29 +8,18 @@
 // L'API est remplacée par de faux appels ; les aides et données communes sont dans
 // ProjectScreen.testkit.tsx.
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getProject } from '../projects/api'
-import { passTapGuard } from '../testing/dialog'
 import { watchOpeningFocus } from '../testing/openingFocus'
-import { recipesProject } from '../testing/projects'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
 import { ProjectScreen } from './ProjectScreen'
 import {
   deleteButton,
   dialogTitled,
   id,
-  mockPublish,
   mockPush,
-  mockRemove,
   mockReplace,
   mockScreenProps,
-  publishSomething,
   resetProjectScreenMocks,
-  seenByOther,
-  shownNotes,
-  signInAgain,
-  v2,
   withNotes,
 } from './ProjectScreen.testkit'
 

@@ -1,61 +1,19 @@
-// Le focus d'ouverture de la fenêtre « Supprimer ce commentaire ? » (R6a, correction C8, H3). Mêmes
-// simulations que ProjectScreen.comment-actions.test.tsx, dont voici le début :
-// Tests de la page d'un projet : modifier, supprimer, masquer et démasquer un commentaire par son
-// menu « … » (R5b : les boutons texte sous chaque carte deviennent un menu), ce que montre l'aperçu
-// d'un commentaire masqué ou retiré (jur-P4), puis les corrections des relectures de la tranche 5.
-//
-// L'ancien ProjectScreen.test.tsx est coupé par sections (159 tests, de 50 à 100 s à lui seul) : Jest
-// donne un fichier entier à un seul processus, alors que plusieurs fichiers tournent en parallèle.
-// L'API est remplacée par de faux appels ; les aides et données communes sont dans
-// ProjectScreen.testkit.tsx (la page) et ProjectComments.testkit.tsx (les commentaires).
-import { NO_REACTIONS } from '@ruche/contracts'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
-import { ApiError } from '../api/errors'
-import {
-  useComments,
-  useDeleteComment,
-  useEditComment,
-  useHideComment,
-  usePostComment,
-} from '../comments/api'
-import { getProject } from '../projects/api'
-import { leaReply, maxComment, zoeComment, zoeReply } from '../testing/comments'
-import { passTapGuard } from '../testing/dialog'
-import { removalAfterReport } from '../testing/moderation'
+import { screen, waitFor } from '@testing-library/react-native'
+import { maxComment, zoeComment } from '../testing/comments'
 import { watchOpeningFocus } from '../testing/openingFocus'
 import { recipesProject } from '../testing/projects'
 import { renderWithProviders } from '../testing/render'
-import { containing, fr } from '../testing/text'
-import {
-  cardOf,
-  chooseInMenu,
-  commentField,
-  lineOf,
-  linkOrButton,
-  openMenuOf,
-  openSheet,
-  previewNames,
-  sheet,
-  writeAndSend,
-} from './ProjectComments.testkit'
+import { chooseInMenu, openSheet } from './ProjectComments.testkit'
 import { ProjectScreen } from './ProjectScreen'
 import {
-  ancestorWithRole,
   dialogTitled,
   id,
   mockComments,
-  mockEdit,
-  mockFetchNextPage,
-  mockPost,
   mockPush,
-  mockRemoveComment,
   mockReplace,
   mockScreenProps,
-  mockSetHidden,
   resetProjectScreenMocks,
   seenByOther,
-  signInAgain,
-  withReactions,
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
