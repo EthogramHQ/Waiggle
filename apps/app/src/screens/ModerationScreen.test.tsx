@@ -67,6 +67,8 @@ jest.mock('../moderation/api', () => ({
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 const mockSetParams = jest.fn()
+// Tranche R6b : les liens « Outils » et « Catégories » peuvent naviguer par `navigate`.
+const mockNavigate = jest.fn()
 /**
  * Les paramètres de l'adresse (tranche 7c : `?tab=history&member=u5`), choisis par chaque test.
  * `router.setParams` les change, comme le ferait Expo Router.
@@ -77,6 +79,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
+    navigate: mockNavigate,
     setParams: mockSetParams,
     back: jest.fn(),
     canGoBack: () => true,
@@ -1160,5 +1163,47 @@ describe('the record of a card, after the design review of slice 7c', () => {
     expect(
       await screen.findByRole('button', { name: fr.t(($) => $.moderation.historyAll) }),
     ).toBeTruthy()
+  })
+})
+
+// Tranche R6b : sous les onglets, deux liens vers les pages du catalogue (« Outils » et
+// « Catégories »), dans un groupe de lignes (relecture du plan, point 15). Chaque lien dit ce qu'on
+// trouve derrière (son aide).
+describe('the catalogue links (R6b)', () => {
+  const TOOLS = fr.t(($) => $.moderation.toolsLink)
+  const CATEGORIES = fr.t(($) => $.moderation.categoriesLink)
+
+  /** Un lien de la page : une ligne-lien, ou un bouton qui navigue. */
+  const linkNamed = (name: string) =>
+    screen.queryByRole('link', { name }) ?? screen.getByRole('button', { name })
+
+  /** Les adresses demandées au routeur, quelle que soit la méthode choisie par l'écran. */
+  const opened = () =>
+    [...mockPush.mock.calls, ...mockNavigate.mock.calls].map(([href]) => pathOf(href))
+
+  it.each([
+    [TOOLS, fr.t(($) => $.moderation.toolsLinkHint), '/moderation/tools'],
+    [CATEGORIES, fr.t(($) => $.moderation.categoriesLinkHint), '/moderation/categories'],
+  ])('offers « %s » with its hint « %s », and opens %s', async (name, hint, path) => {
+    mockNavigate.mockReset()
+    await openModeration()
+
+    const link = linkNamed(name)
+    expect(screen.getByText(containing(hint))).toBeTruthy()
+    await fireEvent.press(link)
+
+    expect(opened()).toEqual([path])
+  })
+
+  it('shows none of these links to a member who is not an administrator', async () => {
+    jest.mocked(getMe).mockResolvedValue(leaMe)
+    await renderWithProviders(<ModerationScreen />)
+
+    // Témoin : la page introuvable est dessinée…
+    expect(await screen.findByRole('button', { name: 'Retour à l’accueil' })).toBeTruthy()
+    // … sans aucun lien vers le catalogue.
+    expect(screen.queryByRole('link', { name: TOOLS })).toBeNull()
+    expect(screen.queryByRole('button', { name: TOOLS })).toBeNull()
+    expect(screen.queryByText(fr.t(($) => $.moderation.categoriesLinkHint))).toBeNull()
   })
 })
