@@ -1261,3 +1261,121 @@ describe('titleRef, the title that can take the focus (R6b)', () => {
     expect(titleRef.current).toMatchObject({ props: { nativeID: heading.props.nativeID } })
   })
 })
+
+describe('the sheet and the on-screen keyboard of a phone browser (R6b, U15)', () => {
+  // Un faux `window.visualViewport` : la zone réellement visible, que le clavier à l'écran
+  // rétrécit. Jest n'a pas de navigateur : le test garde les écouteurs posés pour les appeler.
+  type Listener = () => void
+  const fakeViewport = (height: number, offsetTop = 0) => {
+    const listeners = new Map<string, Listener[]>()
+    const viewport = {
+      height,
+      offsetTop,
+      addEventListener: jest.fn((type: string, listener: Listener) => {
+        listeners.set(type, [...(listeners.get(type) ?? []), listener])
+      }),
+      removeEventListener: jest.fn((type: string, listener: Listener) => {
+        listeners.set(
+          type,
+          (listeners.get(type) ?? []).filter((item) => item !== listener),
+        )
+      }),
+    }
+    const fire = (type: string) => {
+      for (const listener of listeners.get(type) ?? []) listener()
+    }
+    return { viewport, fire, count: (type: string) => (listeners.get(type) ?? []).length }
+  }
+  const setViewport = (value: object | undefined) => {
+    Object.defineProperty(globalThis, 'visualViewport', { value, configurable: true })
+  }
+  const layer = () => StyleSheet.flatten(screen.getByTestId('keyboard-avoiding').props.style)
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    Reflect.deleteProperty(globalThis, 'visualViewport')
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  const openSheet = () =>
+    renderWithProviders(
+      <Sheet open title="Commentaires" onClose={() => undefined}>
+        <Text>Contenu</Text>
+      </Sheet>,
+    )
+
+  describe('on the web', () => {
+    beforeEach(() => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      Object.defineProperty(globalThis, 'document', {
+        value: fakeDocument({ focus: jest.fn() }),
+        configurable: true,
+      })
+    })
+
+    it('takes the height of the visible area when the keyboard shrinks it', async () => {
+      const fake = fakeViewport(844)
+      setViewport(fake.viewport)
+      await openSheet()
+      // Témoin : le clavier fermé, la couche n'a pas de hauteur imposée.
+      expect(layer().height).toBeUndefined()
+
+      fake.viewport.height = 508
+      await act(async () => fake.fire('resize'))
+
+      expect(layer().height).toBe(508)
+    })
+
+    it('follows the visible area when the page scrolls under the keyboard', async () => {
+      const fake = fakeViewport(500, 0)
+      setViewport(fake.viewport)
+      await openSheet()
+
+      fake.viewport.offsetTop = 120
+      await act(async () => fake.fire('scroll'))
+
+      expect(layer().marginTop).toBe(120)
+    })
+
+    it('goes back to its own height when the keyboard closes', async () => {
+      const fake = fakeViewport(500)
+      setViewport(fake.viewport)
+      await openSheet()
+      expect(layer().height).toBe(500)
+
+      fake.viewport.height = 844
+      await act(async () => fake.fire('resize'))
+
+      expect(layer().height).toBeUndefined()
+    })
+
+    it('stops listening when the sheet is unmounted', async () => {
+      const fake = fakeViewport(844)
+      setViewport(fake.viewport)
+      const view = await openSheet()
+      expect(fake.count('resize')).toBe(1)
+      expect(fake.count('scroll')).toBe(1)
+
+      await view.unmount()
+
+      expect(fake.count('resize')).toBe(0)
+      expect(fake.count('scroll')).toBe(0)
+    })
+
+    it('does nothing in a browser without visualViewport', async () => {
+      setViewport(undefined)
+      await openSheet()
+
+      expect(layer().height).toBeUndefined()
+    })
+  })
+
+  it('does not listen to the viewport on iOS and Android', async () => {
+    const fake = fakeViewport(300)
+    setViewport(fake.viewport)
+    await openSheet()
+
+    expect(fake.viewport.addEventListener).not.toHaveBeenCalled()
+    expect(layer().height).toBeUndefined()
+  })
+})

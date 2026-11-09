@@ -48,6 +48,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -75,6 +76,7 @@ import { type SheetReveal, useSheetReveal } from './sheetReveal'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { holdPageTaps, useTapsAllowed } from './tapGuard'
+import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -479,6 +481,47 @@ const openSheets: string[] = []
 /** La feuille `id` est-elle celle du dessus (ou la seule) ? */
 const onTop = (id: string) => openSheets.length === 0 || openSheets[openSheets.length - 1] === id
 
+// Le clavier à l'écran d'un navigateur de téléphone (R6b, U15). `window.visualViewport` est la zone
+// que le membre voit réellement : quand le clavier s'ouvre, elle rétrécit (sa `height`) et peut se
+// décaler (`offsetTop`) si le navigateur fait défiler la page pour amener le champ en vue. Selon le
+// navigateur, la fenêtre « de mise en page » (celle où une couche `position: fixed` se calcule) suit
+// ou non : la méta `interactive-widget=resizes-content` (`app/+html.tsx`) le demande à Chrome, mais
+// Safari sur iPhone l'ignore. Sans cette mesure, la feuille gardait toute la hauteur de la fenêtre
+// de mise en page, et son pied (le champ « Écrire un commentaire ») restait sous le clavier. La
+// feuille prend donc la hauteur du `visualViewport`, seulement quand il est plus court que la
+// fenêtre : clavier fermé, ou navigateur qui redimensionne déjà la page, rien ne change.
+// Rien sur iOS et Android natifs (React Native gère le clavier : `KeyboardAvoidingView`), et rien
+// avant `useHydrated()` : le pré-rendu ne connaît pas le navigateur.
+type VisualViewportLike = {
+  height: number
+  offsetTop: number
+  addEventListener: (type: 'resize' | 'scroll', listener: () => void) => void
+  removeEventListener: (type: 'resize' | 'scroll', listener: () => void) => void
+}
+/** La zone visible quand le clavier la rétrécit : sa hauteur et son décalage ; sinon null. */
+type VisibleArea = { height: number; top: number }
+
+/** Hook : la zone visible de la page web, tant qu'elle est plus courte que la fenêtre ; sinon null. */
+const useVisibleArea = (windowHeight: number): VisibleArea | null => {
+  const hydrated = useHydrated()
+  const [measured, setMeasured] = useState<VisibleArea | null>(null)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !hydrated) return
+    const viewport = (globalThis as { visualViewport?: VisualViewportLike }).visualViewport
+    if (!viewport) return
+    const read = () => setMeasured({ height: viewport.height, top: viewport.offsetTop })
+    read()
+    viewport.addEventListener('resize', read)
+    viewport.addEventListener('scroll', read)
+    return () => {
+      viewport.removeEventListener('resize', read)
+      viewport.removeEventListener('scroll', read)
+    }
+  }, [hydrated])
+  // Un point d'écart (arrondis du navigateur) n'est pas un clavier.
+  return measured && measured.height < windowHeight - 1 ? measured : null
+}
+
 export function Sheet({
   open,
   onClose,
@@ -493,6 +536,8 @@ export function Sheet({
   const window = useWindowDimensions()
   const phone = sizeClass === 'compact'
   const besideRoom = useSheetAside()
+  // Le clavier à l'écran du web : la zone visible, quand il la rétrécit (voir `useVisibleArea`).
+  const visible = useVisibleArea(window.height)
   // « Réduire les animations » : la feuille de téléphone paraît par un fondu, au lieu de monter du
   // bas de l'écran (un grand déplacement).
   const calm = useCalmMotion()
@@ -849,7 +894,22 @@ export function Sheet({
           (relecture juridique jur-15, WCAG 2.4.11). Android redimensionne la fenêtre de lui-même,
           le web aussi. */}
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center' }}
+        style={{
+          flex: 1,
+          backgroundColor: colors.scrim,
+          justifyContent: 'center',
+          // Clavier à l'écran sur le web : la couche prend la zone visible (pas de `flex: 0`, dont
+          // la base web est nulle) ; son pied reste au-dessus du clavier.
+          ...(visible
+            ? {
+                flexGrow: 0,
+                flexShrink: 0,
+                flexBasis: 'auto',
+                height: visible.height,
+                marginTop: visible.top,
+              }
+            : null),
+        }}
         enabled={Platform.OS === 'ios'}
         {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
       >
@@ -892,7 +952,7 @@ export function Sheet({
             onClose={requestClose}
             busy={busy}
             layout={phone ? 'phone' : 'desktop'}
-            maxHeight={window.height - 2 * PANEL_MARGIN}
+            maxHeight={(visible?.height ?? window.height) - 2 * PANEL_MARGIN}
             closeRef={closeRef}
             panelRef={panelRef}
             keys={keys}
