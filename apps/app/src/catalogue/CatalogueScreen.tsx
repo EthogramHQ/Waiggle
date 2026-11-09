@@ -113,6 +113,7 @@ import { PublishToolsPreviewCatalogue } from './publier-outils-apercu'
 import { PublishPillsCatalogue } from './publier-pastilles'
 import { PublishPhotosCatalogue } from './publier-photos'
 import { PublishPromptCatalogue } from './publier-prompt'
+import { PublishDeleteCatalogue } from './publier-supprimer'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -868,6 +869,7 @@ export function CatalogueScreen() {
       <PublishPromptCatalogue />
       <PublishPillsCatalogue />
       <PublishDanceCatalogue />
+      <PublishDeleteCatalogue />
       <PublishCategoriesCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />

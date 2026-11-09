@@ -91,7 +91,13 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react')
   return {
     usePathname: () => '/page/actuelle',
-    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+    // `dismissTo` : après une suppression réussie, la page revient à « Mon profil » (R6a, ui-M3).
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockReplace,
+      back: jest.fn(),
+      dismissTo: jest.fn(),
+    }),
     useLocalSearchParams: () => mockParams,
     useIsFocused: () => mockFocused,
     useFocusEffect: (effect: () => undefined | (() => void)) => {
