@@ -617,7 +617,13 @@ export function Screen({
               </ScreenFloating>
             ) : null}
             {/* La couche du dessus (R6a), après tout le reste : dessinée au-dessus de la page. */}
-            {overlay}
+            {/* Enveloppée en `box-none` : la couche ne prend aucun toucher elle-même, ses seuls
+              enfants dessinés en reçoivent. On ne compte plus sur l'enfant pour la laisser passer. */}
+            {overlay ? (
+              <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+                {overlay}
+              </View>
+            ) : null}
           </View>
         </ScreenScrollContext.Provider>
       </ScreenAmbient>

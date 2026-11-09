@@ -99,7 +99,9 @@ export function SheetHeader({
   // `focusableWhenDisabled` n'est passé que s'il est demandé : Button le reçoit (tranche R6a).
   const reachable = action.focusableWhenDisabled ? { focusableWhenDisabled: true } : null
   const actionButton = (
-    <View onLayout={measure('right')} style={{ alignSelf: 'flex-start', flexShrink: 1 }}>
+    // Jamais de `flexShrink` : un bouton rétréci coupait « Enregistrer » au milieu du mot (320 points,
+    // 200 %, R6a). Sa largeur naturelle est gardée ; c'est la rangée qui passe à la ligne.
+    <View onLayout={measure('right')} style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
       <Button
         label={action.label}
         size="compact"
@@ -135,6 +137,8 @@ export function SheetHeader({
         <View
           style={{
             flexDirection: 'row',
+            // Si les deux boutons ne tiennent pas côte à côte, le second passe à la ligne.
+            flexWrap: 'wrap',
             alignItems: 'center',
             justifyContent: cancel ? 'space-between' : 'flex-end',
             gap: space.md,
