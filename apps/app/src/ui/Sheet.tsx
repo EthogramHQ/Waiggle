@@ -406,6 +406,29 @@ const giveFocusTo = (chosen: unknown, back: unknown, name: string | null): void 
 }
 
 /**
+ * Cache aux pièges à focus des couches qui se ferment le focus que la feuille rend à sa fermeture
+ * (R6b, U2, des-C5). Pendant les fondus de sortie, le piège de chaque Modal de react-native-web
+ * reste actif : celui d'une fenêtre fermée en même temps que la feuille (« Rattacher » confirmé)
+ * ramenait chez lui le focus posé sur le résultat de la carte (« Rattacher », puis « Annuler »), et le
+ * résultat ne l'avait qu'à la fin du fondu ; un lecteur d'écran lisait « Annuler » entre les deux.
+ * On écoute donc le focus sur `window`, à la descente : le navigateur nous appelle avant les pièges,
+ * posés sur le document (comme l'écoute des couches du dessus, plus bas). Un focus qui arrive sur
+ * l'une des places données (`given` : celle choisie par l'écran, l'ouvreur) ne leur est pas
+ * transmis, et il y reste ; tout autre focus passe. Rend de quoi retirer l'écoute (fin du fondu,
+ * réouverture, disparition), ou null s'il n'y a rien à garder (hors du web).
+ */
+const keepFocusGiven = (given: readonly unknown[]): (() => void) | null => {
+  const page = globalThis as unknown as WebWindow
+  const targets: unknown[] = given.filter((node) => node != null)
+  if (Platform.OS !== 'web' || targets.length === 0 || !page.addEventListener) return null
+  const keep = (event: FocusEventLike) => {
+    if (targets.includes(event.target)) event.stopImmediatePropagation?.()
+  }
+  page.addEventListener('focus', keep, true)
+  return () => page.removeEventListener?.('focus', keep, true)
+}
+
+/**
  * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
  * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
  * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
@@ -585,6 +608,9 @@ export function Sheet({
   // après que l'écran a été redessiné.
   const returnFocusRef = useRef(returnFocusTo)
   returnFocusRef.current = returnFocusTo
+  // L'écoute qui cache aux pièges le focus rendu à la fermeture (voir `keepFocusGiven`) : de quoi la
+  // retirer, à la fin du fondu de sortie.
+  const keptFocus = useRef<(() => void) | null>(null)
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
   const sheetId = useId()
@@ -669,8 +695,27 @@ export function Sheet({
     const back = opener.current
     opener.current = null
     returnTo.current = { node: back }
-    giveFocusTo(returnFocusRef.current?.(), back, openerName.current)
+    const chosen = returnFocusRef.current?.()
+    // Le focus que la feuille va poser, caché aux pièges des couches qui se ferment (voir
+    // `keepFocusGiven`), jusqu'à la fin de son fondu.
+    keptFocus.current?.()
+    keptFocus.current = keepFocusGiven([chosen, back])
+    giveFocusTo(chosen, back, openerName.current)
   }, [open, initialFocusRef])
+
+  // Rouverte, la feuille ne cache plus rien ; démontée, elle retire son écoute.
+  useEffect(() => {
+    if (!open) return
+    keptFocus.current?.()
+    keptFocus.current = null
+  }, [open])
+  useEffect(
+    () => () => {
+      keptFocus.current?.()
+      keptFocus.current = null
+    },
+    [],
+  )
 
   // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
   // `restoreAfterUnmount`. `opener` n'est plein que tant que la feuille est ouverte.
@@ -695,6 +740,9 @@ export function Sheet({
     Platform.OS === 'web'
       ? {
           onDismiss: () => {
+            // Le fondu est fini, les pièges de la feuille aussi : le focus n'a plus à leur être caché.
+            keptFocus.current?.()
+            keptFocus.current = null
             const back = returnTo.current
             returnTo.current = null
             if (back && focusLost()) {
