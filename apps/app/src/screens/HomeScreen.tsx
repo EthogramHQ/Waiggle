@@ -60,7 +60,7 @@ import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
-import { useToast } from '../ui/theme/toast'
+import { useToast, useToastShown } from '../ui/theme/toast'
 import { WelcomeHero } from '../ui/WelcomeHero'
 import { Wordmark } from '../ui/Wordmark'
 import { SessionErrorScreen } from './states'
@@ -203,6 +203,7 @@ function MemberHome({ session }: { session: SessionData }) {
       // place, jusqu'à l'ordinateur (`wide`), où les deux tiennent à côté d'elle.
       columns={compact || (columns && sizeClass !== 'wide') ? 1 : 2}
       onExplore={onExplore}
+      hideMascot={published.noticeUp}
     />
   )
   // Les projets déjà en carte dans le fil : la colonne de droite ne les propose pas une seconde fois.
@@ -324,6 +325,15 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
   const [rereadDone, setRereadDone] = useState<string | null>(null)
   // La danse finie (ou l'adresse écartée) pendant que l'écran était caché : nettoyée au retour.
   const [cleanLater, setCleanLater] = useState(false)
+  // H1 (relecture de design de R6a) : l'avis « Projet publié » porte sa mascotte et se posait sur
+  // l'abeille de « Tu es à jour » à 390 points. `noticeUp` vaut vrai de l'instant où cet avis part
+  // jusqu'à sa disparition ; la liste cache alors l'abeille endormie. Le toast est posé dans le même
+  // geste que `setNoticeUp` : React les groupe, `toastShown` est donc déjà vrai au rendu suivant.
+  const toastShown = useToastShown()
+  const [noticeUp, setNoticeUp] = useState(false)
+  useEffect(() => {
+    if (noticeUp && !toastShown) setNoticeUp(false)
+  }, [noticeUp, toastShown])
 
   const clean = useCallback(() => {
     // Sans le paramètre, l'adresse redevient celle du fil. `setParams` garde l'historique tel quel.
@@ -407,11 +417,12 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
       t(($) => $.project.form.published),
       { mascot: 'fly' },
     )
+    setNoticeUp(true)
     clean()
   }, [toast, t, clean])
 
   const target = useMemo(() => (dancing ? { id: dancing, onCover } : null), [dancing, onCover])
-  return { target, dance: dancing ? { id: dancing, cover, onDone } : null }
+  return { target, dance: dancing ? { id: dancing, cover, onDone } : null, noticeUp }
 }
 
 /**
@@ -508,6 +519,8 @@ type FollowingFeedProps = {
   news: ReactNode
   columns: number
   onExplore: () => void
+  /** L'avis « Projet publié » est à l'écran : l'abeille de « Tu es à jour » s'efface (H1). */
+  hideMascot: boolean
 }
 
 /** Le fil « Abonnements » : les nouveaux projets des personnes suivies, les notes des projets suivis. */
@@ -520,6 +533,7 @@ function FollowingFeed({
   news,
   columns,
   onExplore,
+  hideMascot,
 }: FollowingFeedProps) {
   // L'écran d'erreur seulement si rien n'est encore affiché : une suite ratée ne doit pas effacer
   // les cartes déjà lues (voir FeedList).
@@ -537,7 +551,7 @@ function FollowingFeed({
       items={items}
       news={news}
       // Pas de message de fil vide : un fil vide finit sur « Tu es à jour ».
-      upToDate={{ readBefore: readBefore ?? null, onExplore }}
+      upToDate={{ readBefore: readBefore ?? null, onExplore, hideMascot }}
       columns={columns}
     />
   )

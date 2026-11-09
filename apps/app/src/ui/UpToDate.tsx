@@ -28,12 +28,18 @@ import { useTheme } from './theme/ThemeProvider'
 type Props = {
   /** « Explorer d'autres projets » : l'écran qui l'utilise mène à Explorer. */
   onExplore: () => void
+  /**
+   * Cache l'abeille endormie (la place qu'elle prend est gardée : rien ne bouge). Le Fil s'en sert
+   * le temps de l'avis « Projet publié », qui porte sa propre mascotte et se posait sur celle-ci à
+   * 390 points : une seule mascotte à la fois (R6a, relecture de design H1).
+   */
+  hideMascot?: boolean
 }
 
 /** Le diamètre de la sphère, en points. */
 const SPHERE = 128
 
-export function UpToDate({ onExplore }: Props) {
+export function UpToDate({ onExplore, hideMascot = false }: Props) {
   const { t } = useTranslation()
   const { scheme } = useTheme()
   const night = scheme === 'night'
@@ -92,7 +98,7 @@ export function UpToDate({ onExplore }: Props) {
       >
         <HoneySphere size={SPHERE} />
         <View style={{ position: 'absolute', top: 0, right: 0 }}>
-          <Mascot pose="sleep" size="sm" />
+          {hideMascot ? null : <Mascot pose="sleep" size="sm" />}
         </View>
       </View>
       {night ? (

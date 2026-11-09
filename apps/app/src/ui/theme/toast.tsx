@@ -57,6 +57,16 @@ const ToastContext = createContext<ToastApi>({ show: () => {} })
 /** Hook : la fonction qui affiche un toast. */
 export const useToast = (): ToastApi => useContext(ToastContext)
 
+// Un toast est-il à l'écran ? Un contexte à part : `show` ne change jamais, et les écrans qui ne
+// font qu'afficher un toast ne doivent pas être redessinés à chaque apparition (voir `api` plus bas).
+const ToastShownContext = createContext(false)
+
+/**
+ * Hook : un toast est-il à l'écran en ce moment ? Sert à un écran qui doit s'écarter le temps d'un
+ * avis (le Fil cache l'abeille de « Tu es à jour » sous « Projet publié »). Faux sans fournisseur.
+ */
+export const useToastShown = (): boolean => useContext(ToastShownContext)
+
 // La hauteur du toast au-dessus du bas de l'écran : près du bas sur tablette et ordinateur ; plus
 // haut sur téléphone, où un pied collé (les boutons d'un formulaire) occupe souvent le bas.
 const BOTTOM = { compact: 104, wide: 32 } as const
@@ -169,7 +179,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={api}>
-      <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
+      <ToastShownContext.Provider value={shown !== null}>
+        <FloatingSpaceContext.Provider value={floating}>{children}</FloatingSpaceContext.Provider>
+      </ToastShownContext.Provider>
       <ToastLayer>
         <View
           // La région vivante, toujours présente. box-none : elle laisse passer les touchers vers la

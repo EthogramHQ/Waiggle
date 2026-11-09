@@ -164,7 +164,12 @@ type FeedListProps = {
        * figée pour la visite (`useReadBefore`), et ce que fait « Explorer d'autres projets ». Sans
        * elle (Explorer), une seule liste, et la fin ordinaire.
        */
-      upToDate: { readBefore: string | null; onExplore: () => void }
+      upToDate: {
+        readBefore: string | null
+        onExplore: () => void
+        /** Cache l'abeille de « Tu es à jour » (le temps de l'avis « Projet publié », H1). */
+        hideMascot?: boolean
+      }
       empty?: never
     }
 )
@@ -263,7 +268,12 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
         // fil vide finit donc sur la sphère seule.
         <>
           {segment(items.slice(0, sphereAt ?? items.length), cardOf, columns)}
-          {sphereAt !== null ? <UpToDate onExplore={upToDate.onExplore} /> : null}
+          {sphereAt !== null ? (
+            <UpToDate
+              onExplore={upToDate.onExplore}
+              {...(upToDate.hideMascot ? { hideMascot: true } : null)}
+            />
+          ) : null}
           {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (
