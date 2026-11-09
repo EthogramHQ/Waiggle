@@ -1509,3 +1509,252 @@ Hors de R6a, et où ça va :
   jamais dans les nouveautés.
 - Relecture du plan : les textes du juridique remplacent ceux des planches (abandon, suppression,
   « Privé », clé d'API, description d'une photo) ; la colonne du temps passé s'efface en R6b.
+
+---
+
+## R6b — Les outils et les catégories
+
+Statut : **validé d'avance par Louis** le 9/11/2026 vers 7 h 15 (délégation de la nuit : le
+scénario suit ses quatre choix et les décisions déjà prises ; les choix que la session a faits
+seule sont listés à la fin, pour son bilan).
+
+R6b remplace les étiquettes libres des outils par un **catalogue normé** (planches `R3-Outils`,
+`R6-Publier-Outils`, `R6-Outil`, `R6-Outil-Desktop`, `R6-Email-Autre` ; décisions F-Nav5, F-Et1 à
+F-Et3 et « Les catégories »), avec un choix « Autre » vérifié chaque semaine par les
+administrateurs ; elle redessine la page d'un outil, fait des catégories un filtre dans Explorer et
+dans la recherche, donne aux administrateurs de quoi ranger les « Autre » et créer une catégorie,
+efface la colonne du temps passé, et reprend les restes de R5b.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : 15 outils par
+projet, 10 outils favoris par profil, un nom d'outil de 40 caractères au plus, ce que voit chacun
+(un projet privé d'un autre membre, retiré, ou d'un membre bloqué n'est compté ni montré nulle
+part), et les adresses des pages d'outils (`/tags/<nom>`), qui restent valables.
+
+Hors de R6b, et où ça va :
+- les vrais logos des outils : une PR à part, après la vérification du juridique (décision de
+  Louis du 9/11/2026 : des lettres d'abord) ;
+- prévenir l'auteur quand un administrateur range son projet ou rattache son outil : R8 (les
+  notifications) ;
+- renommer ou supprimer une catégorie, les badges par catégorie : après la refonte ;
+- la mosaïque de tuiles sur la page d'un membre et dans « Récents » (F-Et5) : R10, avec les Ruches ;
+- effacer les anciennes colonnes de texte des outils (projets et profils) : R7, une fois le
+  retour en arrière vers R6a devenu inutile.
+
+### Le catalogue
+
+- Un outil du catalogue a un nom (« Claude »), une famille, une courte description en français et
+  en anglais, et souvent l'adresse de son site
+- Les familles : Assistants IA, Création (image, son, vidéo), Sans code, Développement,
+  Automatisation, Maison connectée, Matériel et objets
+- Son image est une **lettre** : l'initiale de son nom sur un carré de couleur, comme sur la
+  planche `R6-Outil` (décision de Louis du 9/11/2026)
+- Il peut avoir d'autres noms, ses **alias** (« Chat GPT » pour « ChatGPT ») : un alias tapé trouve
+  l'outil
+- Au lancement, le catalogue compte environ 120 outils connus (IA, développement, sans code,
+  maison connectée, objets)
+
+### Choisir ses outils (planche `R6-Publier-Outils`)
+
+- Étant donné la feuille « Catégorie et outils » d'un projet, ou « Outils favoris » de son profil
+- Quand il tape « clau » dans le champ des outils
+- Alors les outils du catalogue dont le nom ou un alias contient ces lettres lui sont proposés,
+  ceux qui commencent par elles d'abord, chacun avec sa lettre, sa famille et son nombre de projets
+  (« Claude · Assistant IA · 41 projets ») ; les accents et les majuscules ne comptent pas
+- Quand il touche « Claude »
+- Alors Claude devient une pastille avec une croix, et le compteur dit « Outils 1 / 15 »
+- Étant donné qu'il tape « Teachable Machine », absent du catalogue
+- Alors la dernière proposition dit « Ajouter « Teachable Machine » comme autre outil »
+- Quand il la touche
+- Alors une pastille « Teachable Machine » s'ajoute, marquée « Autre », et une ligne dit « Les
+  autres outils sont vérifiés chaque semaine avant d'entrer au catalogue. »
+- Et un nom qui correspond à un outil du catalogue ou à un alias (« chat gpt ») ne crée jamais un
+  « Autre » : c'est l'outil du catalogue qui est choisi
+- Et deux membres qui tapent le même autre outil, aux accents et majuscules près, ajoutent le même
+  « Autre »
+- Et le profil n'a plus de champ de texte séparé par des virgules : ses outils favoris se
+  choisissent de la même façon, 10 au plus (décision de Louis du 9/11/2026)
+
+### Où les outils s'affichent
+
+- Sur la page d'un projet, la page d'un membre et dans ses outils favoris : un outil du catalogue
+  est une étiquette qui mène à sa page ; un « Autre » est écrit en texte simple, sans lien, tant
+  qu'il n'est pas entré au catalogue
+- Un lecteur d'écran lit « Teachable Machine, autre outil, pas encore dans le catalogue »
+
+### Tous les outils (planche `R3-Outils`)
+
+- Étant donné Explorer, « Tous les outils »
+- Alors la page « Outils » dit « Les outils d'IA, de développement et de projets numériques que les
+  membres utilisent. », puis un champ « Chercher un outil » et des pastilles de familles (Tous, et
+  chaque famille)
+- Et « Les plus utilisés » : les dix outils qui comptent le plus de projets, avec leur lettre, leur
+  famille et « 41 projets »
+- Et « De A à Z » : tout le catalogue, par ordre alphabétique ; un outil sans projet dit « Aucun
+  projet pour l'instant »
+- Et le champ et les pastilles filtrent les deux listes ; sans résultat, « Aucun outil ne
+  correspond. »
+- Et « Pas encore dans le catalogue » : les autres outils des projets qu'il peut voir, en texte
+  simple, avec « Des outils ajoutés par les membres avec « Autre ». Ils sont vérifiés chaque semaine
+  avant d'entrer au catalogue. »
+- Et le nombre de projets d'un outil ne compte que ceux que ce membre peut voir
+
+### La page d'un outil (F-Et1 à F-Et3, planches `R6-Outil`, `R6-Outil-Desktop`)
+
+- Étant donné un membre qui ouvre la page de Lovable
+- Alors il voit le nom en très grand (« Lovable »), sa lettre, « 34 projets » et sa famille (« Sans
+  code »), sa description dans sa langue, et l'adresse de son site (« lovable.dev ↗ »), qui passe
+  par la page « Tu quittes Waiggle »
+- Et dessous, les pastilles « Tous », « Testables », « Terminés », et le choix de la catégorie :
+  sur téléphone, un bouton « Toutes les catégories » qui ouvre une feuille ; sur ordinateur, une
+  rangée de pastilles « Toutes », puis chaque catégorie de ses projets, avec son icône
+- Et les projets en mosaïque de tuiles (photo, titre, auteur), du plus récent au plus ancien : deux
+  colonnes sur téléphone, quatre sur ordinateur
+- Quand il touche « Testables », puis « Cuisine »
+- Alors seuls les projets testables classés « Cuisine » (en principale ou en seconde) restent
+- Et l'adresse de la page garde les filtres (`/tags/lovable?statut=testable&categorie=cooking`)
+- Et sans projet pour ces filtres : « Aucun projet ici pour l'instant. » avec « Voir tous les
+  projets », qui retire les filtres
+- Et au-delà de 50 projets, « Afficher la suite » ajoute les 50 suivants
+- Et la feuille des catégories ne propose que les catégories de ses projets, chacune avec son
+  nombre
+- Et un outil sans projet garde « Encore aucun projet ici » et « Publier »
+- Et l'adresse d'une ancienne étiquette rattachée au catalogue (`/tags/chat-gpt`) mène à la page de
+  l'outil (`/tags/chatgpt`) ; celle d'un « Autre » ou d'un nom inconnu mène à « Outil introuvable »
+- Et un administrateur voit en plus « Modifier » (le nom, la famille, les descriptions, le site)
+
+### Les catégories en filtre (décision « Les catégories »)
+
+**Explorer**
+- Étant donné Explorer, au-dessus de « Récents »
+- Alors une rangée de pastilles : « Toutes », puis chaque catégorie qui a au moins un projet qu'il
+  peut voir, avec son icône, dans l'ordre de la feuille de publication
+- Quand il touche « Animaux »
+- Alors « Récents » ne montre que les projets classés « Animaux » (en principale ou en seconde),
+  page après page
+- Et l'adresse garde le filtre (`/explore?categorie=animals`)
+- Et sans projet : « Aucun projet dans « Animaux » pour l'instant. »
+
+**La page d'un projet**
+- Quand il touche la catégorie à côté du statut
+- Alors Explorer s'ouvre, filtré sur cette catégorie
+
+**La recherche**
+- Étant donné des résultats de recherche, onglet « Tout » ou « Projets »
+- Alors un bouton « Toutes les catégories » ouvre la feuille des catégories
+- Quand il choisit « Cuisine »
+- Alors le groupe Projets ne garde que les projets classés « Cuisine », et le bouton dit « Cuisine »
+- Et l'adresse garde le filtre (`/search?q=carn&categorie=cooking`)
+- Et les projets d'avant R6a, sans catégorie, ne sortent que sans filtre
+
+### Le récap des « Autre » aux administrateurs (planche `R6-Email-Autre`)
+
+- Étant donné un lundi à 8 h (heure de Paris)
+- Quand des membres ont choisi « Autre » dans les sept derniers jours, pour un outil ou pour une
+  catégorie
+- Alors chaque administrateur en fonction, à l'adresse vérifiée et non suspendu, reçoit dans sa
+  langue « Les « Autre » de la semaine : 3 outils, 2 projets à ranger »
+- Et l'e-mail liste les autres outils apparus dans la semaine (nom, projet, auteur et pseudo), avec
+  « Ajouter au catalogue », puis les projets classés « Autre » dans la semaine (titre, auteur,
+  accroche), avec « Ranger dans une catégorie »
+- Et une ligne dit combien attendent depuis plus longtemps (« Et 4 autres en attente depuis plus
+  d'une semaine. »)
+- Et seuls les projets que les membres peuvent voir y figurent : jamais un projet privé, retiré, ni
+  d'un compte supprimé
+- Et sans aucun « Autre » dans la semaine, rien n'est envoyé
+- Et l'e-mail a sa version texte, et aucune image distante
+
+### Ranger les « Autre » (pages de Modération, réservées aux administrateurs)
+
+**Les outils** (`/moderation/outils`, lien « Ajouter au catalogue » de l'e-mail)
+- Étant donné un administrateur sur « Outils » de la Modération, onglet « À vérifier »
+- Alors il voit chaque autre outil, du plus récent au plus ancien, avec ses projets (titre, auteur)
+  et son nombre de projets
+- Quand il touche « Ajouter au catalogue »
+- Alors un formulaire, prérempli du nom, demande la famille, la description en français et en
+  anglais (160 caractères chacune) et le site (facultatif, `https://`)
+- Et une fois ajouté, l'outil a sa page, devient une étiquette partout, et quitte « À vérifier »
+- Quand il touche plutôt « Rattacher à un outil » et choisit « Make » dans le catalogue
+- Alors chaque projet et chaque profil qui citaient cet autre outil citent l'outil du catalogue
+  (sans doublon), et le nom tapé devient un alias de cet outil
+- Et l'onglet « Catalogue » cherche un outil, le modifie, ou en ajoute un nouveau
+- Et chaque ajout, rattachement ou modification entre dans l'historique des décisions
+
+**Les catégories** (`/moderation/categories`, lien « Ranger dans une catégorie » de l'e-mail)
+- Étant donné un administrateur sur « Catégories » de la Modération, onglet « À ranger »
+- Alors il voit les projets visibles classés « Autre », du plus ancien au plus récent
+- Quand il touche « Ranger dans une catégorie » et choisit « Animaux »
+- Alors « Autre » est remplacée par « Animaux » à sa place (principale ou seconde) ; si le projet
+  avait déjà « Animaux », « Autre » est simplement retirée
+- Et l'onglet « Catégories » liste les catégories avec leur nombre de projets, et « Nouvelle
+  catégorie »
+- Quand il crée « Jardinage » / « Gardening » avec une icône choisie dans une grille
+- Alors elle apparaît partout (feuille de publication, filtres), juste avant « Autre » (décision de
+  Louis du 9/11/2026 : tout dans l'appli)
+- Et deux catégories ne peuvent pas porter le même nom
+- Et chaque rangement ou création entre dans l'historique des décisions
+
+**Les gardes**
+- Ces pages et leurs adresses répondent à tout autre visiteur comme une adresse qui n'existe pas,
+  comme le reste de la Modération
+- L'auteur d'un projet rangé le voit dans sa nouvelle catégorie ; il en sera prévenu en R8
+
+### La bascule des étiquettes existantes
+
+- Le jour de la mise en ligne, chaque outil déjà cité par un projet ou un profil est rattaché à
+  l'outil du catalogue qui porte ce nom ou cet alias, sans accents ni majuscules (décision de Louis
+  du 9/11/2026)
+- Les autres deviennent des « Autre », en texte simple, et entrent dans le premier récap (« en
+  attente depuis plus d'une semaine »)
+- Aucun projet ni profil ne perd un outil
+
+### La colonne du temps passé
+
+- La colonne du temps passé, plus lue ni écrite depuis R6a, est effacée (jur-P1)
+
+### Repris des restes de R5b (« fais tout », Louis, 8/11/2026)
+
+- À 320 px et 200 % de texte, une réponse garde au moins une vingtaine de caractères par ligne (le
+  retrait des réponses se réduit)
+- Une mention en tête d'un long commentaire replié a son anneau de focus entier
+- Dans la feuille des commentaires sans champ, après « Réessayer » sur une liste vide, le focus va
+  au titre de la feuille, pas à la page dessous
+- À 844 × 200 % et à 320 × 508 avec un texte long, le champ d'un commentaire reste à l'écran ; sur
+  le web, la page suit le clavier (`interactive-widget=resizes-content`, `visualViewport`), à
+  essayer ensuite sur un vrai téléphone
+- Pendant l'envoi d'un commentaire, le champ ne se fige plus d'une façon qui ferme le clavier sur
+  iOS ; un second envoi reste impossible
+- « d'Inès », et non « de Inès », partout où un nom suit « de »
+- Sur la page de profil : un double appui à 60 ms n'enregistre qu'une fois ; une panne au
+  chargement montre une erreur avec « Réessayer », pas des messages vides
+- La page « Vérifie ta boîte mail » prend le fond crème des feuilles
+- Les restes de R5a prévus en R5b, s'ils sont encore là : la marche de teinte en haut de la photo
+  sous « Testable », une ligne de l'éventail teintée de miel, la recette sortie dans son propre
+  composant, et « 0 abonné » calé avec « Tester la démo » sur la page d'un projet retiré à
+  l'ordinateur
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) : Léa publie en choisissant « Claude » dans le catalogue et en ajoutant
+  « Teachable Machine » comme autre outil ; elle ouvre la page de Claude, choisit « Testables »,
+  puis filtre Explorer sur « Sciences et espace »
+- Puis Louis, administrateur, ajoute « Teachable Machine » au catalogue, range un projet « Autre »
+  dans « Animaux », et Léa voit Teachable Machine devenu une étiquette sur son projet
+
+### Les choix de la session (nuit du 9/11/2026, délégation de Louis)
+
+Pris par la session, à revoir par Louis au bilan :
+
+1. **« 34 projets »**, et non « 34 projets publics » : depuis R6a, un projet « Membres de
+   Waiggle » n'est pas public.
+2. **Les familles** : sept, nommées plus haut.
+3. **« Tous les outils »** montre tout le catalogue (« Les plus utilisés », puis « De A à Z »), et
+   les autres outils en texte simple.
+4. **Le récap** part le lundi à 8 h, une heure avant celui des membres, et seulement s'il a quelque
+   chose à dire ; il ne porte **pas de vignettes** (la planche en montre) : moins de données
+   personnelles dans une boîte mail.
+5. **Ranger un projet** ne prévient pas son auteur avant R8 ; l'historique des décisions le garde.
+6. **Les anciennes colonnes** de texte des outils restent jusqu'en R7, pour qu'un retour à R6a
+   reste possible ; `time_spent` est effacée.
+7. **Une catégorie créée** se place juste avant « Autre » ; on ne la renomme ni ne la supprime en
+   R6b.
+8. **Le filtre par catégorie** de la recherche ne vise que le groupe Projets.
