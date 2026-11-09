@@ -8,7 +8,7 @@
 // Toutes deux s'enfoncent sous le doigt (jeton `pressScale`), comme les boutons.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import { createContext, type ReactNode, useContext } from 'react'
+import { createContext, type ReactNode, type Ref, useContext } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Icon } from './Icon'
@@ -51,12 +51,14 @@ function TileFrame({
   onPress,
   style,
   children,
+  frameRef,
 }: {
   label: string
   role: 'button' | 'link'
   onPress: () => void
   style: object
   children: ReactNode
+  frameRef?: Ref<View> | undefined
 }) {
   const scale = useSharedValue(1)
   const pressed = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
@@ -66,6 +68,7 @@ function TileFrame({
   return (
     <Animated.View style={[pressed, cell ? { flexGrow: 1 } : null]}>
       <Pressable
+        ref={frameRef}
         accessibilityRole={role}
         accessibilityLabel={label}
         // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
@@ -101,6 +104,11 @@ type ProjectTileProps = {
   variant?: TileVariant
   /** La photo de couverture ; sans elle, le titre prend la place, en plus grand. */
   image?: CoverImage | null
+  /**
+   * Le lien de la tuile, pour y poser le focus (R6b : la première tuile arrivée par « Afficher la
+   * suite », quand le bouton disparaît).
+   */
+  ref?: Ref<View>
 }
 
 export function ProjectTile({
@@ -109,6 +117,7 @@ export function ProjectTile({
   onPress,
   variant = 'honey',
   image = null,
+  ref,
 }: ProjectTileProps) {
   const { colors } = useTheme()
   // Chaque teinte a son fond et ses deux couleurs de texte, toutes mesurées dans contrastPairs :
@@ -125,6 +134,7 @@ export function ProjectTile({
       label={title}
       role="link"
       onPress={onPress}
+      frameRef={ref}
       style={{ backgroundColor: look.background, padding: space.sm, gap: space.sm }}
     >
       {image ? (

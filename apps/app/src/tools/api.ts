@@ -8,6 +8,7 @@
 // Les écrans n'appellent que ces hooks ; leurs tests les remplacent, ou remplacent le réseau.
 import {
   AdminCatalogueTool,
+  AdminCatalogueToolsPage,
   type CategoryCode,
   type ToolAdmit,
   type ToolEdit,
@@ -15,7 +16,13 @@ import {
   ToolPage,
   type ToolStatusFilter,
 } from '@ruche/contracts'
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { request } from '../api/client'
@@ -106,9 +113,52 @@ export const useToolPage = (slug: string, filters: ToolPageFilters, enabled = tr
     queryFn: ({ pageParam }) => getToolPage(slug, filters, language, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+    // Un filtre changé garde la page affichée jusqu'à la réponse (`keepPreviousData`) : l'en-tête
+    // et les pastilles restent sous le doigt, et le focus sur la pastille touchée, au lieu d'un
+    // écran de chargement entier à chaque filtre.
+    placeholderData: keepPreviousData,
     enabled,
   })
 }
+
+// --- La lecture d'un administrateur ---
+
+/**
+ * La clé de cache d'un outil lu par un administrateur (ses deux descriptions, ses autres noms) :
+ * sous `['tool']`, pour qu'une écriture la marque périmée avec les pages d'outil.
+ */
+const adminToolQueryKey = (slug: string, name: string) =>
+  [...toolPageQueryKey, 'admin', slug, name] as const
+
+/** La recherche du catalogue d'administration demande 2 caractères au moins (contrat, sec-B7). */
+const CATALOGUE_QUERY_MIN = 2
+
+/**
+ * GET /v1/moderation/tools?q=<nom> : la recherche du catalogue d'administration, dont on garde
+ * l'outil de ce slug (`null` s'il n'y est pas). Il n'y a pas de lecture d'un seul outil : la page
+ * d'un outil cherche par son nom, puis reconnaît l'outil par son slug.
+ */
+export const getAdminTool = async (
+  slug: string,
+  name: string,
+): Promise<AdminCatalogueTool | null> => {
+  const query = new URLSearchParams({ q: name.trim() }).toString()
+  const result = await request(`/v1/moderation/tools?${query}`, {}, AdminCatalogueToolsPage)
+  if (!result.ok) throw new ApiError(result.error)
+  return result.data.items.find((tool) => tool.slug === slug) ?? null
+}
+
+/**
+ * Hook : un outil du catalogue tel que l'administrateur le modifie (`ToolEditSheet` en mode
+ * `edit`), lu seulement pour un administrateur (`enabled`) et quand son nom a les 2 caractères
+ * que la recherche demande. Un membre ordinaire ne demande rien : la route lui répondrait 404.
+ */
+export const useAdminTool = (slug: string, name: string, enabled: boolean) =>
+  useQuery({
+    queryKey: adminToolQueryKey(slug, name),
+    queryFn: () => getAdminTool(slug, name),
+    enabled: enabled && name.trim().length >= CATALOGUE_QUERY_MIN,
+  })
 
 // --- Les écritures d'un administrateur ---
 
