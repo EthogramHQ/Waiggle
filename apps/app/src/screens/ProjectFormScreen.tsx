@@ -296,6 +296,22 @@ function ProjectFormView({
     if (!asking) return
     focusWithoutScroll(keepRef.current)
     moveReaderTo(keepRef.current)
+    // Sur le web, la fenêtre monte son contenu quelques images plus tard, puis son piège à focus
+    // le pose sur son voile (mesuré dans le navigateur : un `div` vide). On le reprend à chaque
+    // image, jusqu'à ce qu'il tienne deux images de suite sur « Continuer » (une demi-seconde au plus).
+    let frame = 0
+    let held = 0
+    const step = (left: number) => {
+      const node = keepRef.current as unknown
+      if (typeof document !== 'undefined' && node && document.activeElement === node) held += 1
+      else {
+        held = 0
+        focusWithoutScroll(node)
+      }
+      if (held < 2 && left > 0) frame = requestAnimationFrame(() => step(left - 1))
+    }
+    frame = requestAnimationFrame(() => step(30))
+    return () => cancelAnimationFrame(frame)
   }, [asking])
 
   // --- Changer un champ ---

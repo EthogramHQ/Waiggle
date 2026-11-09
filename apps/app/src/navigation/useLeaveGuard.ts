@@ -10,6 +10,9 @@
 //   (`usePreventRemove` n'existe pas dans expo-router 6 : on écoute l'événement soi-même.)
 // - `beforeunload` (web) : le navigateur va fermer l'onglet ou recharger la page. On ne peut pas y
 //   poser notre fenêtre ; on demande seulement au navigateur la sienne (« Quitter le site ? »).
+// Limite connue (R6a, mesurée dans le navigateur) : sur le web, le bouton Retour du navigateur, à
+// l'intérieur de l'appli, n'envoie pas `beforeRemove` : Expo Router remet alors toute la pile d'un
+// coup (`resetRoot` dans son `useLinking`), et la feuille part sans demander.
 import { useNavigation } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
