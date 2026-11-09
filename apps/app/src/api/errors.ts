@@ -37,6 +37,8 @@ export type ApiErrorKey =
   | 'categoryNameTaken'
   | 'unknownCategory'
   | 'ownProject'
+  // Tranche R6b : le 31e nouvel « autre outil » d'un membre dans la journée (429).
+  | 'tooManyOtherTools'
   | 'internal'
   | 'network'
 
@@ -103,6 +105,9 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   category_name_taken: 'categoryNameTaken',
   unknown_category: 'unknownCategory',
   own_project: 'ownProject',
+  // Et un 429 : trop de nouveaux « autres outils » aujourd'hui (projets et profil ensemble). Il a
+  // son propre message (réessayer demain), comme le 6e changement de pseudo du jour.
+  too_many_other_tools: 'tooManyOtherTools',
 }
 
 /**

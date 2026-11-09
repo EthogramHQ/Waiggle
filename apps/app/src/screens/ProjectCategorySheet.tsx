@@ -22,13 +22,14 @@ import {
   PROJECT_TOOLS_MAX,
   type ProjectCategory,
   type ProjectVisibility,
-  type ToolFamily,
 } from '@ruche/contracts'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCategories } from '../categories/api'
 import { categoryOptions } from '../projects/categories'
 import { useTools } from '../tools/api'
+// Les textes du champ des outils, partagés avec les favoris du profil (R6b).
+import { useToolLabels } from '../tools/labels'
 import { isCatalogueName, matchTools } from '../tools/match'
 import { CategoryPicker } from '../ui/CategoryPicker'
 import {
@@ -43,7 +44,7 @@ import { Sheet } from '../ui/Sheet'
 import { SkeletonCard } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
-import { ToolField, type ToolFieldLabels } from '../ui/ToolField'
+import { ToolField } from '../ui/ToolField'
 
 /** Ce que la feuille fait choisir : les deux catégories et les outils, dans l'ordre. */
 export type CategoriesAndTools = {
@@ -269,44 +270,4 @@ function Tools({
       isOther={(name) => catalogue !== undefined && !isCatalogueName(catalogue, name)}
     />
   )
-}
-
-/**
- * Les textes du champ des outils. Sous un nom proposé, sa famille et son nombre de projets
- * (« Assistant IA · 41 projets », ou « Aucun projet pour l'instant » : « 0 projet » serait faux en
- * français). `ToolSuggestion.family` porte le code de la famille (« assistant »), traduit ici.
- */
-const useToolLabels = (visibility: ProjectVisibility): ToolFieldLabels => {
-  const { t } = useTranslation()
-  const projects = (count: number) =>
-    count === 0 ? t(($) => $.tools.noProjects) : t(($) => $.tools.projects, { count })
-  return {
-    search: t(($) => $.project.form.toolSearch),
-    suggestions: t(($) => $.project.form.toolSuggestions),
-    chosen: t(($) => $.project.form.toolsChosen),
-    counter: (count, max) => ({
-      shown: t(($) => $.project.form.toolsCount, { count, max }),
-      spoken: t(($) => $.project.form.toolsCountSpoken, { count, max }),
-    }),
-    uses: (count) => t(($) => $.project.form.toolUses, { count }),
-    suggestion: (name, count) => t(($) => $.project.form.toolSuggestion, { name, count }),
-    add: (name) => t(($) => $.project.form.addTool, { name }),
-    remove: (name) => t(($) => $.project.form.removeTool, { name }),
-    detail: (family, count) => {
-      if (family === null) return projects(count)
-      const code = family as ToolFamily
-      return t(($) => $.tools.detail, {
-        family: t(($) => $.tools.family[code]),
-        projects: projects(count),
-      })
-    },
-    addOther: (name) => t(($) => $.project.form.addOtherTool, { name }),
-    otherBadge: t(($) => $.tool.otherBadge),
-    otherSpoken: (name) => t(($) => $.tool.otherSpoken, { name }),
-    // Un projet privé : ses « Autre » ne sont montrés à personne et ne sont pas relus (jur-T3).
-    otherHint:
-      visibility === 'private'
-        ? t(($) => $.project.form.otherToolsHintPrivate)
-        : t(($) => $.project.form.otherToolsHint),
-  }
 }
