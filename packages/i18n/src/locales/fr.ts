@@ -1381,7 +1381,6 @@ export const fr = {
     pill: '{{name}}, ouvre son profil',
   },
   tag: {
-    subtitle: 'Les projets publics faits avec cet outil.',
     emptyTitle: 'Encore aucun projet ici',
     empty: 'Le tien sera peut-être le premier.',
   },

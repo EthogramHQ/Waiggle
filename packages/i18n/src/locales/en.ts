@@ -1170,7 +1170,6 @@ export const en: Translation = {
     pill: '{{name}}, opens their profile',
   },
   tag: {
-    subtitle: 'The public projects made with this tool.',
     emptyTitle: 'No project here yet',
     empty: 'Yours may be the first.',
   },
