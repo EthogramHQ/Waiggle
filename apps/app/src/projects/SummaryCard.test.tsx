@@ -38,6 +38,9 @@ const categoryReads = () =>
   jest.mocked(request).mock.calls.filter(([path]) => String(path).startsWith('/v1/categories'))
     .length
 
+/** L'étiquette est un décor caché aux lecteurs d'écran (lue dans la description du lien) : on la cherche quand même. */
+const HIDDEN_TOO = { includeHiddenElements: true }
+
 /** Ce que dit la carte de sa catégorie : « Catégorie : Tricot » (description du lien). */
 const described = (name: string) => fr.t(($) => $.card.category, { category: name })
 
@@ -63,7 +66,7 @@ describe('SummaryCard, its category (R6b)', () => {
   it('names the category as the API does, a category created by an administrator included', async () => {
     await renderWithProviders(<SummaryCard project={cardOf('knitting')} />)
 
-    expect(await screen.findByText('Tricot')).toBeTruthy()
+    expect(await screen.findByText('Tricot', HIDDEN_TOO)).toBeTruthy()
     expect(screen.getByText(containing(described('Tricot')))).toBeTruthy()
     expect(categoryReads()).toBe(1)
   })
@@ -74,8 +77,8 @@ describe('SummaryCard, its category (R6b)', () => {
 
     // Témoin : la carte est là.
     expect(await screen.findByText(recipesProject.title)).toBeTruthy()
-    expect(screen.queryByText('Cuisine')).toBeNull()
-    expect(screen.queryByText(/cooking/)).toBeNull()
+    expect(screen.queryByText('Cuisine', HIDDEN_TOO)).toBeNull()
+    expect(screen.queryByText(/cooking/, HIDDEN_TOO)).toBeNull()
     expect(screen.queryByText(containing(described('Cuisine')))).toBeNull()
   })
 
@@ -89,7 +92,7 @@ describe('SummaryCard, its category (R6b)', () => {
     expect(categoryReads()).toBe(2)
     // Témoin : la carte est là, sans étiquette.
     expect(screen.getByText(recipesProject.title)).toBeTruthy()
-    expect(screen.queryByText(/pottery/)).toBeNull()
+    expect(screen.queryByText(/pottery/, HIDDEN_TOO)).toBeNull()
     expect(screen.queryByText(/project\.category/)).toBeNull()
     expect(screen.queryByText(containing(described('')))).toBeNull()
   })
