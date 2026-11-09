@@ -13,7 +13,7 @@
 // sur ordinateur, le titre « Fil » porte le bouton des nouveautés à côté de lui, et une colonne de
 // droite propose des proches à suivre et des projets qui cherchent des testeurs.
 
-import { durations, sourceUrl } from '@ruche/brand'
+import { sourceUrl } from '@ruche/brand'
 import { type FollowingFeedPage, ProjectId } from '@ruche/contracts'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
@@ -286,6 +286,13 @@ type DanceProps = { id: string; cover: RefObject<Measurable | null>; onDone: () 
  *   contient ce projet, publié par le membre lui-même (relecture du plan, sec-A7). Sinon l'adresse
  *   est nettoyée sans rien montrer. Le fil gardé en mémoire peut dater d'avant la publication : il
  *   est relu une fois avant de conclure.
+ *
+ * Correction C2 (relecture de design de R6a, B1) : en publiant, la feuille demande déjà au cache de
+ * relire le fil (`invalidateQueries`, ProjectFormScreen). Cette lecture en route, on la laisse
+ * finir : la relancer l'annulait, et l'accueil, redessiné entre-temps (les nouveautés relues en
+ * même temps), concluait sur la page d'avant la publication. « Projet publié » manquait alors une
+ * fois sur deux. Une lecture annulée ne vaut donc pas un refus : on ne décide que sur une page
+ * arrivée, quand plus aucune lecture n'est en route.
  */
 const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId: string) => {
   const { t } = useTranslation()
@@ -295,10 +302,13 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
   const focused = useScreenFocused()
   const asked = usePublishedParam()
   const firstPage = feed.data?.pages[0]
-  // Les valeurs du moment, pour les rappels qui arrivent plus tard (la relecture du fil, la fin de
-  // la danse) : un `ref` se lit toujours à jour, sans relancer d'effet.
-  const latest = useRef({ firstPage, focused })
-  latest.current = { firstPage, focused }
+  // Lus pendant le rendu (et pas seulement dans l'effet) : React Query ne redessine l'écran que
+  // pour les champs qu'il a vu lire, et l'effet doit repasser quand une lecture s'achève.
+  const { isFetching, isError, refetch } = feed
+  // L'état du moment, pour la fin de la danse, qui arrive plus tard : un `ref` se lit toujours à
+  // jour, sans relancer d'effet.
+  const latest = useRef({ focused })
+  latest.current = { focused }
 
   // Le projet dont la danse a lieu, et la vue de sa carte, que la carte donne d'elle-même.
   const [dancing, setDancing] = useState<string | null>(null)
@@ -307,9 +317,11 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
     cover.current = node
   }, [])
   // L'identifiant déjà traité (dansé ou écarté), et celui dont le fil a déjà été relu : chacun une
-  // fois, même si l'écran se redessine avant que l'adresse soit nettoyée.
+  // fois, même si l'écran se redessine avant que l'adresse soit nettoyée. `rereadDone` : la
+  // relecture de cet identifiant a abouti (un état, et pas un `ref` : sa fin relance l'effet).
   const handled = useRef<string | null>(null)
   const reread = useRef<string | null>(null)
+  const [rereadDone, setRereadDone] = useState<string | null>(null)
   // La danse finie (ou l'adresse écartée) pendant que l'écran était caché : nettoyée au retour.
   const [cleanLater, setCleanLater] = useState(false)
 
@@ -340,19 +352,41 @@ const usePublishedArrival = (feed: ReturnType<typeof useFollowingFeed>, viewerId
     }
     // Le fil n'est pas encore là : on attend sa première page (une panne, elle, écarte l'adresse).
     if (!firstPage) {
-      if (feed.isError) decide(undefined)
+      if (isError && !isFetching) decide(undefined)
       return
     }
-    if (isMine(firstPage) || reread.current === asked) {
+    if (isMine(firstPage)) {
       decide(firstPage)
       return
     }
+    // Une lecture du fil est en route (celle que la feuille a demandée en publiant, ou la nôtre) :
+    // on attend sa page ; l'effet repasse dès qu'elle arrive.
+    if (isFetching) return
+    // Le fil a été relu et le projet n'y est toujours pas : l'adresse est écartée.
+    if (rereadDone === asked) {
+      decide(firstPage)
+      return
+    }
+    // La relecture vient de partir ; sa fin relance l'effet.
+    if (reread.current === asked) return
     // Absent de la page gardée en mémoire : le fil est relu une fois, puis on décide.
+    // `cancelRefetch: false` : si une lecture part entre-temps, on la rejoint au lieu de l'annuler.
     reread.current = asked
-    Promise.resolve(feed.refetch())
-      .then((result) => decide(result?.data?.pages[0] ?? latest.current.firstPage))
-      .catch(() => decide(undefined))
-  }, [hydrated, focused, asked, firstPage, feed, viewerId, clean])
+    Promise.resolve(refetch({ cancelRefetch: false }))
+      .catch(() => undefined)
+      .finally(() => setRereadDone(asked))
+  }, [
+    hydrated,
+    focused,
+    asked,
+    firstPage,
+    isFetching,
+    isError,
+    refetch,
+    rereadDone,
+    viewerId,
+    clean,
+  ])
 
   // Le retour sur l'accueil après une danse finie ailleurs : l'adresse est nettoyée, sans avis.
   useEffect(() => {
@@ -396,24 +430,16 @@ const usePublishedParam = (): string | undefined => {
 }
 
 /**
- * Les instants où la carte est mesurée pendant la danse : tout de suite, une fois le fil remonté
- * (un déplacement, `durations.medium`), et à la fin du huit, juste avant le vol. L'abeille suit la
- * dernière mesure (ui/PublishDance.tsx).
- */
-const MEASURE_AT = [0, durations.medium, durations.dance]
-
-/**
  * La danse (R6a), posée par Screen par-dessus l'écran (`overlay`) : elle remonte d'abord le fil en
  * haut (le canal du défilement de Screen, `toTop()`), puis l'abeille part vers la carte.
  *
- * Le repère de la cible : la danse couvre tout l'écran, dont le coin haut gauche est celui de la
- * fenêtre (ui/Screen.tsx, `overlay`). Le coin haut gauche de la carte, mesuré dans la fenêtre
- * (`measureInWindow`), est donc déjà dans son repère : là où se pose l'étiquette de la catégorie.
+ * La carte visée, la danse la mesure elle-même pendant son huit (`aim`, ui/PublishDance.tsx) : la
+ * danse couvre tout l'écran, dont le coin haut gauche est celui de la fenêtre (ui/Screen.tsx,
+ * `overlay`), et l'abeille se pose sur le coin haut gauche de la carte, là où est sa catégorie.
  */
 function PublishedDance({ id, cover, onDone }: DanceProps) {
   const scroll = useContext(ScreenScrollContext)
   const [playing, setPlaying] = useState(false)
-  const [target, setTarget] = useState<{ x: number; y: number } | null>(null)
 
   // Une danse par projet : remonter, puis danser. La clé `id` la relance pour une autre publication.
   useEffect(() => {
@@ -422,20 +448,7 @@ function PublishedDance({ id, cover, onDone }: DanceProps) {
     setPlaying(true)
   }, [id, scroll])
 
-  useEffect(() => {
-    if (!playing) return
-    const measure = () =>
-      cover.current?.measureInWindow((x, y, width, height) => {
-        // Une vue cachée répond un cadre vide : la cible reste celle d'avant.
-        if (width > 0 && height > 0) setTarget({ x, y })
-      })
-    const timers = MEASURE_AT.map((at) => setTimeout(measure, at))
-    return () => {
-      for (const timer of timers) clearTimeout(timer)
-    }
-  }, [playing, cover])
-
-  return <PublishDance playing={playing} target={target} onDone={onDone} />
+  return <PublishDance playing={playing} target={null} aim={cover} onDone={onDone} />
 }
 
 /**

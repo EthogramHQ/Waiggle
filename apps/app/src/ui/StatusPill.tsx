@@ -7,13 +7,19 @@ import { useTheme } from './theme/ThemeProvider'
 
 type Props = { label: string; strong?: boolean }
 
+/**
+ * La hauteur de la pastille, en points. Exportée : ce qui s'aligne sur elle (la catégorie écrite à
+ * côté du statut, `CategoryLine`) la lit ici, pour qu'elle ne vive qu'à un seul endroit.
+ */
+export const STATUS_PILL_HEIGHT = 26
+
 export function StatusPill({ label, strong = false }: Props) {
   const { colors } = useTheme()
   return (
     <View
       style={{
         alignSelf: 'flex-start',
-        minHeight: 26,
+        minHeight: STATUS_PILL_HEIGHT,
         justifyContent: 'center',
         paddingHorizontal: space.md,
         borderRadius: radii.pill,

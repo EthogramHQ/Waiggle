@@ -27,9 +27,17 @@ type Props = {
    * lecteurs d'écran (Icon).
    */
   icon?: IconName
+  /**
+   * Correction C2 de R6a (relecture de design, C3) : ce que l'étiquette nomme. `tool` (par défaut) :
+   * un outil ou un modèle, en police à chasse fixe (`mono`), que Miel réserve aux outils, versions
+   * et prompts. `category` : la catégorie d'un projet (« Sciences et espace »), en police de texte,
+   * comme sur les planches R6-Danse et R6-Publier-Desktop ; plus étroite, elle tient aussi entière
+   * dans l'aperçu de la feuille de publication.
+   */
+  kind?: 'tool' | 'category'
 }
 
-export function Tag({ label, onPress, onGlass = false, count, icon }: Props) {
+export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool' }: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
   // Le nom lu : le libellé seul, ou le libellé et son nombre au pluriel de la langue de l'appli.
@@ -52,14 +60,20 @@ export function Tag({ label, onPress, onGlass = false, count, icon }: Props) {
     backgroundColor: onGlass ? colors.glass : colors.surface,
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
-  const name = (
+  const name =
     // Un nom très long tient sur une ligne, abrégé par « … » : la pastille garde sa forme. Le nom
     // complet reste lu par les lecteurs d'écran (accessibilityLabel) et présent dans la page.
-    // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe.
-    <Text variant="mono" numberOfLines={1}>
-      {label}
-    </Text>
-  )
+    // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe ; une
+    // catégorie, en police de texte, à la même taille et en demi-gras.
+    kind === 'category' ? (
+      <Text variant="caption" weight={600} numberOfLines={1}>
+        {label}
+      </Text>
+    ) : (
+      <Text variant="mono" numberOfLines={1}>
+        {label}
+      </Text>
+    )
   const content =
     count === undefined && icon === undefined ? (
       name

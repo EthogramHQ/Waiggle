@@ -89,15 +89,17 @@ export function PublishPillsCatalogue() {
           <Stack gap="md">
             <Example caption={`${l.tags} — ${l[scheme]}`}>
               <Stack direction="row" wrap gap="sm">
-                <Tag label={science.label} icon={science.icon} onPress={noop} />
-                <Tag label={cooking.label} icon={cooking.icon} />
+                <Tag label={science.label} icon={science.icon} kind="category" onPress={noop} />
+                <Tag label={cooking.label} icon={cooking.icon} kind="category" />
+                {/* Pour comparer : une étiquette d'outil, en police à chasse fixe. */}
+                <Tag label="Claude" onPress={noop} />
               </Stack>
             </Example>
             <Example caption={`${l.glass} — ${l[scheme]}`}>
               {/* La lumière miel d'une couverture sans photo, sous le verre de l'étiquette. */}
               <ProjectCover height={160} radius="tile">
                 <Stack padding="md">
-                  <Tag label={science.label} icon={science.icon} onGlass />
+                  <Tag label={science.label} icon={science.icon} kind="category" onGlass />
                 </Stack>
               </ProjectCover>
             </Example>

@@ -80,4 +80,13 @@ describe('ProjectCard, the column at the top of its photo (R6a)', () => {
     // Sans photo, la catégorie est dans le verre : pas de colonne en haut, la marge seule.
     expect(panelTop()).toBe(space.sm)
   })
+
+  // Correction C2 de R6a (relecture de design, C3) : la catégorie sur la photo s'écrit en police de
+  // texte ; la chasse fixe reste aux outils (`Tag`, `kind`).
+  it('writes the category on the photo in the text font, not the fixed-width one', async () => {
+    await renderWithProviders(<ProjectCard {...card} onPress={() => {}} />)
+
+    const label = screen.getByText(card.category.label, { includeHiddenElements: true })
+    expect(String(StyleSheet.flatten(label.props.style).fontFamily)).not.toMatch(/mono/i)
+  })
 })

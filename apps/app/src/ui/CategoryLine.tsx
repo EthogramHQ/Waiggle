@@ -9,6 +9,7 @@
 import { space } from '@ruche/brand'
 import { View } from 'react-native'
 import { Icon, type IconName } from './Icon'
+import { STATUS_PILL_HEIGHT } from './StatusPill'
 import { Text } from './Text'
 
 type Props = {
@@ -18,9 +19,6 @@ type Props = {
   icon: IconName
 }
 
-/** La hauteur de la pastille du statut (`StatusPill`) : le texte se centre sur elle. */
-const PILL_HEIGHT = 26
-
 export function CategoryLine({ label, icon }: Props) {
   return (
     <View
@@ -28,7 +26,8 @@ export function CategoryLine({ label, icon }: Props) {
         flexDirection: 'row',
         alignItems: 'center',
         gap: space.xs,
-        minHeight: PILL_HEIGHT,
+        // La hauteur de la pastille du statut, lue chez elle : le texte se centre sur elle.
+        minHeight: STATUS_PILL_HEIGHT,
         // Sur le web, une rangée ne rétrécit pas d'elle-même dans sa colonne : sans ces deux
         // lignes, un long nom de catégorie sortirait de l'écran à 320 points.
         maxWidth: '100%',

@@ -4,6 +4,7 @@
 // (relecture de l'interface, « À noter »). Sans nombre, rien ne change : le libellé seul.
 // Puis (R6a) l'étiquette à icône : la catégorie d'un projet, sur sa carte (« Sciences et espace »).
 import { screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { iconPaths } from './icons.generated'
@@ -120,5 +121,35 @@ describe('Tag with an icon (R6a)', () => {
 
     const link = screen.getByRole('link', { name: science })
     expect(drawnOrder(link as unknown as Host)).toEqual([science])
+  })
+})
+
+// Correction C2 de R6a (relecture de design, C3) : Miel réserve la police à chasse fixe aux outils,
+// versions et prompts ; la catégorie d'un projet s'écrit en police de texte (planches R6-Danse et
+// R6-Publier-Desktop). Le test lit la règle (« pas la chasse fixe »), pas le nom d'une police.
+describe('Tag of a category (R6a, C2)', () => {
+  const science = fr.t(($) => $.project.category.science)
+  const familyOf = (text: string) =>
+    String(StyleSheet.flatten(screen.getByText(text).props.style).fontFamily)
+
+  it('writes a tool in the fixed-width font (witness)', async () => {
+    await renderWithProviders(<Tag label="Claude" onPress={() => {}} />)
+
+    expect(familyOf('Claude')).toMatch(/mono/i)
+  })
+
+  it('writes a category in the text font, its spoken name unchanged', async () => {
+    await renderWithProviders(<Tag label={science} icon="planet" kind="category" onGlass />)
+
+    expect(familyOf(science)).not.toMatch(/mono/i)
+  })
+
+  it('keeps the text font for a category that is a link', async () => {
+    await renderWithProviders(
+      <Tag label={science} icon="planet" kind="category" onPress={() => {}} />,
+    )
+
+    expect(screen.getByRole('link', { name: science })).toBeTruthy()
+    expect(familyOf(science)).not.toMatch(/mono/i)
   })
 })
