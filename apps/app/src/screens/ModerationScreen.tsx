@@ -263,6 +263,9 @@ function AdminModeration() {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const focusAfterClose = useRef(false)
+  // « Annuler » de la fenêtre de retrait reçoit le focus à l'ouverture : retirer un contenu ne se
+  // défait pas d'une touche Entrée distraite (relecture de design de R6a, H3).
+  const cancelRemoveRef = useRef<Focusable>(null)
   // Le mot de passe, quand l'API le redemande (`password_required`, au-delà de
   // REMOVALS_BEFORE_PASSWORD retraits en une heure) : le champ apparaît, et « Confirmer » renvoie la
   // même décision avec lui. Le focus va au champ (autoFocus), que l'on tape aussitôt : le bouton
@@ -696,6 +699,7 @@ function AdminModeration() {
         // la seconde tape d'une double tape (design 7b).
         guardTaps
         onDismiss={closeRemove}
+        initialFocusRef={cancelRemoveRef}
         onClosed={() => {
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
@@ -760,6 +764,7 @@ function AdminModeration() {
           }
         />
         <Button
+          ref={cancelRemoveRef}
           label={t(($) => $.moderation.cancel)}
           variant="secondary"
           onPress={closeRemove}

@@ -15,6 +15,7 @@ import type { ApiErrorKey, ApiResult } from '../api/errors'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
+import type { Focusable } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 
 /** Le geste à confirmer. */
@@ -47,6 +48,8 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
   // Une ref en plus de l'état : deux tapes dans la même image (double tape) voient toutes deux
   // l'ancien `busy` ; la ref, elle, est déjà à vrai pour la seconde.
   const sending = useRef(false)
+  // « Annuler » reçoit le focus à l'ouverture, comme les autres fenêtres de geste lourd (H3).
+  const cancelRef = useRef<Focusable>(null)
 
   // Une nouvelle demande : on la retient, et le refus d'une fenêtre précédente ne s'y montre pas
   // (pôle design). Changer l'état pendant le dessin est permis par React pour suivre une prop : il
@@ -117,6 +120,7 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
       // d'une double tape ne confirme rien (relecture de design, 7b).
       guardTaps
       onDismiss={close}
+      initialFocusRef={cancelRef}
       {...(onClosed ? { onClosed } : null)}
     >
       {refusal ? (
@@ -133,6 +137,7 @@ export function BlockDialog({ asking, send, onDone, onCancel, onClosed }: Props)
         loading={busy}
       />
       <Button
+        ref={cancelRef}
         label={t(($) => $.block.cancel)}
         variant="secondary"
         onPress={close}
