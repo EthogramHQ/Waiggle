@@ -38,7 +38,6 @@ import {
   RemovedPage,
   type ReportTarget,
   SUSPENSIONS_BEFORE_PASSWORD,
-  toolSlug,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
@@ -398,7 +397,7 @@ describe('removing a project', () => {
       '/v1/feed/discover',
       '/v1/feed/following',
       `/v1/members/${leaId}`,
-      `/v1/tags/${toolSlug('Mistral')}`,
+      '/v1/tags/le-chat',
     ]) {
       const res = await act.send('GET', path, zoe)
       expect(res.status, path).toBe(200)
