@@ -18,6 +18,7 @@
 // interdiction, œil barré), la photo plus petite d'une réponse.
 import { palettes, textStyles } from '@ruche/brand'
 import type { CommentAuthor, CommentReply } from '@ruche/contracts'
+import { nameOf } from '@ruche/i18n'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { type ComponentProps, createRef, type ReactElement } from 'react'
 import {
@@ -91,10 +92,10 @@ const removedBanner = {
 const text = {
   author: fr.t(($) => $.project.comments.author),
   authorLink: (name: string) => fr.t(($) => $.project.comments.authorLink, { name }),
-  menu: (name: string) => fr.t(($) => $.project.comments.menu, { name }),
+  menu: (name: string) => fr.t(($) => $.project.comments.menu, { nameOf: nameOf('fr', name) }),
   yours: fr.t(($) => $.project.comments.yours),
   openLine: (name: string, excerpt: string) =>
-    fr.t(($) => $.project.comments.openLine, { name, excerpt }),
+    fr.t(($) => $.project.comments.openLine, { nameOf: nameOf('fr', name), excerpt }),
   reply: fr.t(($) => $.project.comments.reply),
   edited: fr.t(($) => $.project.comments.edited),
   hiddenByMe: fr.t(($) => $.project.comments.hiddenByMe),
@@ -270,7 +271,7 @@ describe('CommentCard, « Répondre » and the « … » menu', () => {
     expect(screen.queryByRole('button', { name: text.reply })).toBeNull()
   })
 
-  it('opens its menu from « … », named « Actions du commentaire de Hugo Lefèvre »', async () => {
+  it('opens its menu from « … », named « Actions du commentaire d’Hugo Lefèvre »', async () => {
     const report = jest.fn()
     await renderWithProviders(card({ menu: [{ label: 'Signaler', onPress: report }] }))
 
@@ -521,14 +522,14 @@ describe('CommentCard, compact (the preview)', () => {
 
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(1)
-    expect(buttons[0]?.props.accessibilityLabel).toMatch(/^Commentaire de Hugo Lefèvre\s:\s/)
+    expect(buttons[0]?.props.accessibilityLabel).toMatch(/^Commentaire d’Hugo Lefèvre\s:\s/)
     // Ni le nom, ni la pastille ne sont des liens : toute la carte ouvre la feuille.
     expect(screen.queryAllByRole('link')).toHaveLength(0)
     await fireEvent.press(buttons[0] as NonNullable<(typeof buttons)[0]>)
     expect(onPress).toHaveBeenCalledTimes(1)
   })
 
-  it('names the compact card « Commentaire de Hugo Lefèvre : » and the start of the text', async () => {
+  it('names the compact card « Commentaire d’Hugo Lefèvre : » and the start of the text', async () => {
     await renderWithProviders(card({ compact: true, onPress: jest.fn() }))
 
     expect(screen.getByRole('button', { name: text.openLine('Hugo Lefèvre', BODY) })).toBeTruthy()
@@ -840,7 +841,7 @@ describe('CommentCard, compact and yours (ui-A5)', () => {
     expect(screen.queryByText(text.yours, { includeHiddenElements: true })).toBeNull()
   })
 
-  it('keeps « Commentaire de Hugo » on the compact card of someone else', async () => {
+  it('keeps « Commentaire d’Hugo » on the compact card of someone else', async () => {
     await renderWithProviders(card({ compact: true }))
 
     expect(screen.getByRole('button', { name: text.openLine('Hugo Lefèvre', BODY) })).toBeTruthy()

@@ -208,7 +208,7 @@ describe('the preview of the comments on a phone', () => {
     // Témoin : les lignes de l'aperçu sont là.
     expect(previewLines()).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Répondre' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Actions du commentaire de / })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Actions du commentaire d(?:e |’)/ })).toBeNull()
   })
 
   it('titles the preview « Commentaires 6 », read « Commentaires, 6 commentaires »', async () => {
@@ -290,7 +290,9 @@ describe('the comments sheet', () => {
     await openSheet()
 
     expect(sheet().getAllByRole('button', { name: 'Répondre' })).toHaveLength(6)
-    expect(sheet().getAllByRole('button', { name: /^Actions du commentaire de / })).toHaveLength(6)
+    expect(
+      sheet().getAllByRole('button', { name: /^Actions du commentaire d(?:e |’)/ }),
+    ).toHaveLength(6)
     expect(sheet().getByRole('button', { name: 'Actions du commentaire de Max' })).toBeTruthy()
   })
 
@@ -933,7 +935,7 @@ describe('a comment removed by the moderation', () => {
     // racine n'est plus visible : l'API refuserait la réponse).
     expect(sheet().getByText(zoeReply.body)).toBeTruthy()
     expect(sheet().queryByRole('button', { name: 'Répondre' })).toBeNull()
-    expect(sheet().getAllByRole('button', { name: /^Actions du commentaire de / })).toEqual([
+    expect(sheet().getAllByRole('button', { name: /^Actions du commentaire d(?:e |’)/ })).toEqual([
       sheet().getByRole('button', { name: 'Actions du commentaire de Zoé' }),
     ])
   })
@@ -1016,7 +1018,9 @@ describe('a comment hidden by a block', () => {
     // Témoin : la réponse de Zoé est là, avec son propre « … ». Plus d'interaction avec un membre
     // bloqué : on ne répond pas dans son fil.
     expect(sheet().getByText(zoeReply.body)).toBeTruthy()
-    expect(sheet().getAllByRole('button', { name: /^Actions du commentaire de / })).toHaveLength(1)
+    expect(
+      sheet().getAllByRole('button', { name: /^Actions du commentaire d(?:e |’)/ }),
+    ).toHaveLength(1)
     expect(sheet().queryByRole('button', { name: 'Répondre' })).toBeNull()
   })
 })
