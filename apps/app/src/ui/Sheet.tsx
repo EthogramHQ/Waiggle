@@ -65,7 +65,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
-import { focusTarget, focusWithoutScroll } from './focus'
+import { type Focusable, focusTarget, focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './modalLayers'
 import { Notice, type NoticeAction } from './Notice'
@@ -166,6 +166,12 @@ type PanelProps = {
    * le demandent pas.
    */
   revealRef?: Ref<SheetReveal>
+  /**
+   * Le titre de la feuille, pour y poser le focus quand rien d'autre n'est là (la liste relue est
+   * vide, la feuille n'a pas de champ : R6b). Pas de la tête à action (téléphone, `action`) : seules
+   * les feuilles à titre simple ou à nombre (« Commentaires 6 ») la reçoivent.
+   */
+  titleRef?: Ref<Focusable>
   /**
    * L'action de la feuille (« Publier », « Enregistrer », « OK », R6a) : dans la tête sur téléphone,
    * à droite ; au pied sur ordinateur, en dernier. Voir `SheetAction`.
@@ -936,6 +942,7 @@ export function SheetPanel({
   titleCount,
   dragHandlers,
   revealRef,
+  titleRef,
   action,
   cancelLabel,
   footerNote,
@@ -999,10 +1006,16 @@ export function SheetPanel({
       separator="space"
       level={heading}
       nativeID={titleId}
+      {...(titleRef ? { focusRef: titleRef } : null)}
       {...(compact ? null : { variant: 'title2' as const })}
     />
   ) : (
-    <Text variant={compact ? 'heading' : 'title2'} heading={heading} nativeID={titleId}>
+    <Text
+      variant={compact ? 'heading' : 'title2'}
+      heading={heading}
+      nativeID={titleId}
+      {...(titleRef ? { focusRef: titleRef } : null)}
+    >
       {title}
     </Text>
   )

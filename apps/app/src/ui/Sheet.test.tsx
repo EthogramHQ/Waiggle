@@ -1230,3 +1230,34 @@ describe('the publish sheet (R6a)', () => {
     expect(outerClose).not.toHaveBeenCalled()
   })
 })
+
+describe('titleRef, the title that can take the focus (R6b)', () => {
+  const Titled = ({
+    counted,
+    titleRef,
+  }: {
+    counted: boolean
+    titleRef: RefObject<View | null>
+  }) => (
+    <Sheet
+      open
+      title="Commentaires"
+      {...(counted ? { titleCount: { count: 2, spoken: '2 commentaires' } } : null)}
+      titleRef={titleRef}
+      onClose={() => undefined}
+    >
+      <Text>Contenu</Text>
+    </Sheet>
+  )
+
+  it.each([
+    ['a plain title', false],
+    ['a title with its count', true],
+  ])('gives the heading of %s to the ref', async (_name, counted) => {
+    const titleRef = createRef<View>()
+    await renderWithProviders(<Titled counted={counted} titleRef={titleRef} />)
+
+    const heading = screen.getByRole('header', { name: /Commentaires/ })
+    expect(titleRef.current).toMatchObject({ props: { nativeID: heading.props.nativeID } })
+  })
+})

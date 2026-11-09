@@ -9,7 +9,10 @@ export default function Root({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no, interactive-widget=resizes-content"
+        />
         {/* Le favicon (fabriqué par scripts/images.mts) : le SVG d'abord, qui suit le thème du
             navigateur, puis le PNG pour ceux qui ne lisent pas le SVG. Chemins relatifs à la racine
             du site, aucun domaine (règle de sécurité S6 du plan de R1). */}
