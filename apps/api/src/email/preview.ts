@@ -1,5 +1,5 @@
 // L'aperçu de chaque e-mail de templates.ts (notifications de la tranche 6c, changement d'adresse,
-// inscription, mot de passe, alerte de modération), pour les relectures de design et juridique : les e-mails
+// inscription, mot de passe, alerte de modération, récap des « Autre »), pour les relectures de design et juridique : les e-mails
 // rendus, en français et en anglais, avec les données des tests (Inès reçoit, Malik, Zoé et Sam
 // commentent, répondent et la mentionnent ; Inès change d'adresse). preview.test.ts refuse un
 // modèle sans aperçu ni exception écrite. Rien ici n'est envoyé ni lu par l'API :
@@ -16,6 +16,7 @@ import {
   moderationAlertEmail,
   type NotificationLinks,
   newEmailVerificationEmail,
+  otherRecapEmail,
   passwordChangedEmail,
   type RecapData,
   type RecapLine,
@@ -178,6 +179,34 @@ const variants: [string, (language: Language) => EmailContent][] = [
     'moderation-alert',
     (language) =>
       moderationAlertEmail(language, { name: 'Malik', count: 3, url: `${APP_URL}/moderation` }),
+  ],
+  // Le récap des « Autre » (tranche R6b), à un administrateur : des nombres et deux boutons. Une
+  // semaine chargée (pluriels, « et 4 autres »), puis une semaine d'un seul projet à ranger (aucune
+  // ligne pour un nombre nul) dont l'administrateur porte un nom de 88 caractères sans espace : la
+  // carte doit le couper sans défiler (adresse-E1). Les liens sont les vrais, les plus longs.
+  [
+    'other-recap',
+    (language) =>
+      otherRecapEmail(language, {
+        name: 'Malik',
+        tools: 3,
+        projects: 2,
+        older: 4,
+        toolsUrl: `${APP_URL}/moderation/tools`,
+        projectsUrl: `${APP_URL}/moderation/categories`,
+      }),
+  ],
+  [
+    'other-recap-one-project',
+    (language) =>
+      otherRecapEmail(language, {
+        name: `Malik${'o'.repeat(83)}`,
+        tools: 0,
+        projects: 1,
+        older: 0,
+        toolsUrl: `${APP_URL}/moderation/tools`,
+        projectsUrl: `${APP_URL}/moderation/categories`,
+      }),
   ],
   // La suspension d'un compte (tranche 7c), e-mail de service : 7 jours après un signalement, avec
   // la fin à l'heure de Paris (23 h 30 UTC un soir de novembre : le lendemain à 0 h 30), puis sans
