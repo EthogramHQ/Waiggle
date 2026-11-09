@@ -1,15 +1,19 @@
 // Tests des gardes de `CommentComposer` qui s'ajoutent à la commande (`CommentComposer.test.tsx`) :
 // ce qui décrit le champ, ce qui attend pendant un envoi, et le focus qui ne se perd pas quand un
 // contrôle disparaît ou devient inactif.
-import { fireEvent, screen } from '@testing-library/react-native'
-import { type ComponentProps, createRef } from 'react'
+import { act, fireEvent, screen } from '@testing-library/react-native'
+import { type ComponentProps, createRef, useState } from 'react'
 import { Platform, TextInput } from 'react-native'
+import { useEditComment, usePostComment } from '../comments/api'
+import { useCommentDraft } from '../comments/useCommentDraft'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { CommentComposer } from './CommentComposer'
 import { holdsFocus } from './focus'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// Les écritures du brouillon, simulées : le brouillon lui-même est le vrai (voir plus bas).
+jest.mock('../comments/api', () => ({ usePostComment: jest.fn(), useEditComment: jest.fn() }))
 
 // `holdsFocus` lit le document du navigateur, absent ici : c'est sa réponse qui décide.
 jest.mock('./focus', () => ({
@@ -98,10 +102,13 @@ describe('CommentComposer, its guards', () => {
   })
 
   describe('while sending', () => {
-    it('freezes the text', async () => {
+    // R6b (restes de R5b) : le champ ne se fige plus pendant l'envoi.  fermait le
+    // clavier sur iOS ; la garde contre un second envoi est celle de la flèche, pas celle du champ.
+    // (Ce test remplace « freezes the text », qui demandait l'inverse.)
+    it('leaves the field editable while sending, so iOS keeps the keyboard open', async () => {
       await renderWithProviders(<CommentComposer {...propsOf({ value: 'Merci', pending: true })} />)
 
-      expect(field().props.editable).toBe(false)
+      expect(field().props.editable).not.toBe(false)
     })
 
     it('the cross of the banner waits: the comment leaves anyway', async () => {
@@ -176,6 +183,120 @@ describe('CommentComposer, its guards', () => {
       await fireEvent.press(retry())
 
       expect(onPress).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // R6b (restes de R5b) : le champ reste modifiable pendant l'envoi ; ce qu'on y tape alors ne se perd
+  // pas. Le champ est branché ici comme dans l'écran, sur le vrai brouillon (`useCommentDraft`) ;
+  // seule l'écriture est simulée, et sa réponse attend que le test la donne.
+  describe('while sending, wired to the draft as on the screen', () => {
+    const pendingPost = () => {
+      let finish: (ok: boolean) => void = () => {}
+      const post = jest.fn(
+        (_comment: { body: string }) =>
+          new Promise<boolean>((resolve) => {
+            finish = resolve
+          }),
+      )
+      jest.mocked(usePostComment).mockReturnValue({
+        post,
+        pending: false,
+        error: false,
+        reason: undefined,
+      } as unknown as ReturnType<typeof usePostComment>)
+      /** L'API répond (`true` : publié) ; React redessine dans le même `act`. */
+      const answer = (ok: boolean) =>
+        act(async () => {
+          finish(ok)
+        })
+      return { post, answer }
+    }
+
+    /** Le champ et le brouillon de l'écran (ProjectComments.tsx), sans le reste de la section. */
+    function WithDraft() {
+      const draft = useCommentDraft('p1')
+      // Les autres props ne changent pas d'un rendu à l'autre (la `ref` du champ surtout).
+      const [rest] = useState(() => propsOf())
+      return (
+        <CommentComposer
+          {...rest}
+          value={draft.text}
+          onChangeText={draft.setText}
+          onSend={() => void draft.send()}
+          pending={draft.sending}
+        />
+      )
+    }
+
+    const sendButton = () => screen.getByRole('button', { name: /^Envoyer( le commentaire)?$/ })
+    const typed = () => String(field().props.value ?? '')
+
+    beforeEach(() => {
+      jest.mocked(useEditComment).mockReturnValue({
+        edit: jest.fn().mockResolvedValue(true),
+        pending: false,
+        error: false,
+        reason: undefined,
+      } as unknown as ReturnType<typeof useEditComment>)
+    })
+
+    it('keeps what is typed while sending, and clears only the sent text', async () => {
+      const { post, answer } = pendingPost()
+      await renderWithProviders(<WithDraft />)
+      await fireEvent.changeText(field(), 'Bravo !')
+      await fireEvent.press(sendButton())
+      expect(post).toHaveBeenCalledWith({ body: 'Bravo !' })
+
+      // Pendant l'envoi, le membre écrit la suite : le champ la prend.
+      expect(field().props.editable).not.toBe(false)
+      await fireEvent.changeText(field(), 'Bravo ! Je teste ce soir.')
+      expect(typed()).toBe('Bravo ! Je teste ce soir.')
+
+      await answer(true)
+
+      // Publié : « Bravo ! » quitte le champ, la suite y reste (le blanc qui la séparait, au choix).
+      expect(typed().trimStart()).toBe('Je teste ce soir.')
+      expect(post).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps a text rewritten while sending once the sent one is published', async () => {
+      const { answer } = pendingPost()
+      await renderWithProviders(<WithDraft />)
+      await fireEvent.changeText(field(), 'Bravo !')
+      await fireEvent.press(sendButton())
+
+      // Le membre a effacé le texte parti et en écrit un autre : rien de lui n'est parti.
+      await fireEvent.changeText(field(), 'Et en anglais ?')
+      await answer(true)
+
+      expect(typed()).toBe('Et en anglais ?')
+    })
+
+    it('keeps the whole text, what was typed meanwhile included, when the sending fails', async () => {
+      const { answer } = pendingPost()
+      await renderWithProviders(<WithDraft />)
+      await fireEvent.changeText(field(), 'Bravo !')
+      await fireEvent.press(sendButton())
+
+      expect(field().props.editable).not.toBe(false)
+      await fireEvent.changeText(field(), 'Bravo ! Je teste ce soir.')
+      await answer(false)
+
+      expect(typed()).toBe('Bravo ! Je teste ce soir.')
+    })
+
+    it('sends once on a double tap, the field staying editable', async () => {
+      const { post, answer } = pendingPost()
+      await renderWithProviders(<WithDraft />)
+      await fireEvent.changeText(field(), 'Bravo !')
+
+      await fireEvent.press(sendButton())
+      await fireEvent.press(sendButton())
+
+      expect(post).toHaveBeenCalledTimes(1)
+      expect(field().props.editable).not.toBe(false)
+      await answer(true)
+      expect(post).toHaveBeenCalledTimes(1)
     })
   })
 
