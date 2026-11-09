@@ -19,6 +19,7 @@ import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
 import { blocksOfMember } from '../blocks/list'
+import { categoryChangesOf } from '../catalogue/export'
 import { commentsOfAuthor } from '../comments/load'
 import { exportEmailPreferences } from '../email/preferences'
 import { errorBody, languageOf } from '../errors'
@@ -37,6 +38,9 @@ import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limi
 import { reactionsOfMember } from '../reactions/load'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
+import { chargeOtherTools } from '../tools/quota'
+import { countNewOtherTools, resolveTools } from '../tools/resolve'
+import { legacyToolColumns, replaceProfileTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -134,7 +138,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   const tooMany = (
     c: Context<AppEnv>,
     retryAfterSeconds: number,
-    code: 'rate_limited' | 'handle_change_limit' = 'rate_limited',
+    code: 'rate_limited' | 'handle_change_limit' | 'too_many_other_tools' = 'rate_limited',
   ) => {
     // Retry-After : en-tête standard qui dit dans combien de secondes réessayer.
     c.header('Retry-After', String(retryAfterSeconds))
@@ -193,6 +197,13 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }
     }
 
+    // Les nouveaux « Autre » parmi ses outils favoris se comptent AVANT d'écrire (sec-A5), dans le
+    // même quota que ceux de ses projets : trop nombreux, rien de la demande n'est gardé.
+    const counted = favoriteTools === undefined ? 0 : await countNewOtherTools(db, favoriteTools)
+    const toolsRetry = await chargeOtherTools(limiter, user.id, counted)
+    if (toolsRetry !== null) return tooMany(c, toolsRetry, 'too_many_other_tools')
+    let createdHere = 0
+
     // Tout le profil s'écrit dans une seule transaction : si le pseudo est pris, claimHandle lève
     // HandleTakenError, la transaction est annulée, et rien de la demande n'est enregistré.
     try {
@@ -212,16 +223,25 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
         // encore, sinon la mettre à jour (insert … on conflict do update).
         if (bio !== undefined || favoriteTools !== undefined) {
+          // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool ; l'ancienne
+          // colonne `favorite_tools` reste écrite (noms tapés) jusqu'en R7, sans être relue.
+          const resolved =
+            favoriteTools === undefined ? undefined : await resolveTools(tx, favoriteTools)
+          const legacy = resolved && legacyToolColumns(resolved.tools).tools
           await tx
             .insert(schema.profile)
-            .values({ userId: user.id, bio: bio ?? '', favoriteTools: favoriteTools ?? [] })
+            .values({ userId: user.id, bio: bio ?? '', favoriteTools: legacy ?? [] })
             .onConflictDoUpdate({
               target: schema.profile.userId,
               set: {
                 ...(bio !== undefined && { bio }),
-                ...(favoriteTools !== undefined && { favoriteTools }),
+                ...(legacy !== undefined && { favoriteTools: legacy }),
               },
             })
+          if (resolved) {
+            createdHere = resolved.created
+            await replaceProfileTools(tx, user.id, resolved.tools)
+          }
         }
       })
     } catch (error) {
@@ -231,6 +251,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }
       throw error
     }
+    // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
+    if (createdHere > counted) await chargeOtherTools(limiter, user.id, createdHere - counted)
 
     const me = await loadMe(db, user.id, publicApiUrl)
     if (!me) return unauthorized(c)
@@ -332,6 +354,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // Tous ses projets, privés compris (c'est lui qui regarde).
     const projects = await loadProjectsOf(db, user.id, user.id, publicApiUrl)
+    // Les rangements de catégorie faits par un administrateur sur ses projets (R6b, jur-T4), sans
+    // nommer l'administrateur.
+    const categoryChanges = await categoryChangesOf(db, user.id)
     // Toutes les notes de ses projets, privés compris, et pas seulement les 20 du journal de chaque
     // projet. Jamais celles des projets qu'il suit : elles appartiennent à leurs auteurs.
     const notes = await notesOfAuthor(db, user.id)
@@ -430,6 +455,7 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         user: me,
         formerHandle,
         projects,
+        categoryChanges,
         notes,
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,

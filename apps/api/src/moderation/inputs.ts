@@ -64,6 +64,17 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: true,
   },
+  // R6b : le nom tapé pour chaque outil favori (`profile_tool.label`), qui remplace en lecture la
+  // colonne d'avant ci-dessus (gardée pour un retour à R6a).
+  {
+    field: 'favoriteTools',
+    object: 'member',
+    table: 'profile_tool',
+    column: 'label',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
   {
     field: 'avatar',
     object: 'member',
@@ -118,6 +129,39 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     kind: 'list',
     snapshot: true,
     export: true,
+  },
+  // R6b : les outils lus par le catalogue. Le nom d'un « Autre » est partagé (le premier tapé), le nom
+  // tapé par l'auteur de CE projet est dans `project_tool.label` : l'un et l'autre sont des textes de
+  // membres, copiés au signalement et exportés sous le champ « tools ». Les colonnes d'avant
+  // (`project.tools`, plus haut) restent listées pour un retour à R6a, mais ne sont plus lues.
+  {
+    field: 'tools',
+    object: 'project',
+    table: 'tool',
+    column: 'name',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  {
+    field: 'tools',
+    object: 'project',
+    table: 'project_tool',
+    column: 'label',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  // Le nom d'un « Autre » rattaché à un outil du catalogue, gardé au journal des administrateurs
+  // seulement : ni copié, ni exporté (l'« Autre » n'a plus d'auteur, décision 5), effacé après un an.
+  {
+    field: null,
+    object: 'project',
+    table: 'catalogue_change',
+    column: 'merged_name',
+    kind: 'text',
+    snapshot: false,
+    export: false,
   },
   {
     field: 'demoUrl',

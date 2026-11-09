@@ -8,6 +8,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { loadActiveSuspension } from '../suspension/load'
+import { favoriteToolsOf } from './tools'
 
 const isLanguage = (value: unknown): value is Language =>
   typeof value === 'string' && (supportedLanguages as readonly string[]).includes(value)
@@ -65,7 +66,8 @@ export const loadMe = async (
     language: isLanguage(user.language) ? user.language : defaultLanguage,
     createdAt: user.createdAt.toISOString(), // le JSON ne connaît pas les dates : on les écrit en texte
     bio: profile?.bio ?? '',
-    favoriteTools: profile?.favoriteTools ?? [],
+    // R6b : lus par profile_tool ; « Mon profil » montre les noms que le membre a tapés.
+    favoriteTools: (await favoriteToolsOf(db, user.id)).map((tool) => tool.label),
     avatarUrl: profile?.avatarKey ? mediaUrl(publicApiUrl, profile.avatarKey) : null,
     // Seulement pour que l'appli montre l'entrée « Modération » : les routes de modération relisent
     // elles-mêmes admin_member à chaque demande, sans croire l'appli. Un administrateur suspendu
