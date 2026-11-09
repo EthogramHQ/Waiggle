@@ -25,6 +25,8 @@ import { ToastProvider } from '../src/ui/theme/toast'
 const isWeb = Platform.OS === 'web'
 // Sur le web, le thème de la navigation de l'hôte de la lumière (ui/AmbientHost.tsx).
 const webNavigationTheme = hostedNavigationTheme(DefaultTheme)
+// Les routes qui sont des feuilles (R6a) : voir ThemedChrome.
+const sheetRoute = { presentation: 'transparentModal', animation: 'none' } as const
 
 export default function RootLayout() {
   // Sur le web, les pages sont préparées à l'avance (« pré-rendues ») en français, puis passent à la
@@ -96,7 +98,15 @@ function ThemedChrome() {
         headerShown: false,
         contentStyle: isWeb ? hostedStackStyle : { backgroundColor: colors.background },
       }}
-    />
+    >
+      {/* R6a : publier et modifier sont des feuilles posées sur la page d'où l'on vient. Une
+          fenêtre transparente (`transparentModal`) garde cette page dessinée dessous ; la feuille
+          anime elle-même son entrée (`animation: 'none'`). Ouverte sans page d'avant, la feuille
+          pose le fil dessous (ProjectFormScreen) : pas d'`initialRouteName` ici, qui ferait
+          croire à toutes les pages qu'elles ont une page d'avant (relecture du plan, ui-I1). */}
+      <Stack.Screen name="projects/new" options={sheetRoute} />
+      <Stack.Screen name="projects/[id]/edit" options={sheetRoute} />
+    </Stack>
   )
   return (
     <>

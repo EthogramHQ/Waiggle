@@ -68,6 +68,8 @@ export const activity = (ctx: TestContext) => {
           await expectStatus(201, 'POST', '/v1/projects', cookie, {
             title,
             pitch: 'Un petit projet pour essayer.',
+            // R6a : la catégorie principale est obligatoire ; « Autre » par défaut.
+            primaryCategory: 'other',
             ...body,
           })
         ).json(),

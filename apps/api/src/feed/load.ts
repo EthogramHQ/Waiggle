@@ -124,10 +124,11 @@ const selectFollowingEntries = (
   viewerId: string,
   cursor: CursorContent | null,
 ): Promise<Entry[]> => {
-  const followedMembers = db
-    .select({ id: schema.memberFollow.memberId })
-    .from(schema.memberFollow)
-    .where(eq(schema.memberFollow.followerId, viewerId))
+  // Les auteurs dont le fil montre les nouveaux projets : les membres suivis ET le membre lui-même
+  // (R6a : il retrouve son projet tout juste publié). « union all » ajoute une ligne, le visiteur,
+  // à la liste des suivis ; plus sûr qu'un « or » avec un « in (sous-requête) », que PostgreSQL
+  // lirait sans l'index : ici le « in » reste une jointure sur l'index (author_id, published_at).
+  const followedMembers = sql`(select member_id from member_follow where follower_id = ${viewerId} union all select ${viewerId}::text)`
   const newProjects = db
     .select({
       // sql<…>`…` : une valeur écrite en SQL, dont on donne le type à TypeScript. .as() la nomme.

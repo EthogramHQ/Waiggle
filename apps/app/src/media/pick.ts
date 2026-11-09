@@ -3,6 +3,9 @@
 // ici évite surtout d'envoyer une photo de 8 Mo pour rien.
 // Trois usages : l'avatar (carré), une photo de galerie (proportions gardées) et la couverture
 // verticale d'un projet (format téléphone).
+// `slot` (R6a) : où va une photo de projet, la galerie (proportions gardées) ou la couverture
+// verticale ; le type vient du contrat.
+import type { VisualSlot } from '@ruche/contracts'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import { Platform } from 'react-native'
@@ -44,7 +47,55 @@ export const pickImage = async (
   const asset = result.canceled ? undefined : result.assets[0]
   if (!asset) return null
   onChosen?.()
+  return prepare(shape, asset)
+}
 
+/**
+ * R6a : ouvre la galerie de photos pour un projet et prépare chaque image choisie, comme
+ * `pickImage`. Pour la galerie, plusieurs photos d'un coup, jusqu'à `remaining` (les places
+ * libres sur 6 : la galerie de l'appareil empêche d'en cocher plus) ; pour la couverture
+ * verticale, une seule, recadrée en 9:16. Rend les images préparées, dans l'ordre du choix ; une
+ * liste vide si le membre annule ou s'il ne reste aucune place (la galerie ne s'ouvre pas).
+ * `onChosen` reçoit les images choisies dès le choix, avant leur préparation (quelques instants) :
+ * l'écran peut poser leurs tuiles tout de suite. Jamais appelé si le membre annule.
+ */
+export const pickVisuals = async (
+  slot: VisualSlot,
+  remaining: number,
+  onChosen?: (images: PickedImage[]) => void,
+): Promise<PickedImage[]> => {
+  if (remaining < 1) return []
+  const shape: PickShape = slot === 'portrait' ? 'portrait' : 'free'
+  const many = slot === 'gallery'
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    // Plusieurs photos d'un coup : la galerie de l'appareil compte elle-même les places libres.
+    // Le recadrage n'existe que pour une seule photo (la couverture verticale).
+    allowsMultipleSelection: many,
+    selectionLimit: many ? remaining : 1,
+    // L'ordre dans lequel le membre les a cochées devient leur ordre dans le projet.
+    orderedSelection: true,
+    allowsEditing: !many,
+    ...(many ? null : { aspect: [PORTRAIT.width, PORTRAIT.height] as [number, number] }),
+    quality: 1,
+  })
+  if (result.canceled) return []
+  // Une galerie qui ne sait pas limiter (certains navigateurs) : on garde les premières.
+  const assets = result.assets.slice(0, many ? remaining : 1)
+  if (assets.length === 0) return []
+  onChosen?.(assets.map(({ uri, width, height }) => ({ uri, width, height })))
+  // L'une après l'autre : préparer six photos de 12 Mpx en même temps saturerait la mémoire d'un
+  // téléphone modeste.
+  const prepared: PickedImage[] = []
+  for (const asset of assets) prepared.push(await prepare(shape, asset))
+  return prepared
+}
+
+/** Recadre si besoin, réduit et enregistre en JPEG une image choisie. */
+const prepare = async (
+  shape: PickShape,
+  asset: { uri: string; width: number; height: number },
+): Promise<PickedImage> => {
   const context = ImageManipulator.manipulate(asset.uri)
   let { width, height } = asset
   const crop = cropFor(shape, width, height)

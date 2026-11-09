@@ -10,15 +10,21 @@
 // module que pour ce fichier.
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Platform, ScrollView } from 'react-native'
+import { request } from '../api/client'
+import { useFeedNews } from '../feed/api'
 import { setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import * as focusModule from '../ui/focus'
+import { HomeScreen } from './HomeScreen'
 import {
+  fromMax,
   mockFollowing,
   mockNews,
   mockPush,
   mockScreenProps,
   nora,
+  october,
+  projectItem,
   renderMemberHome,
   resetHomeMocks,
   sam,
@@ -39,6 +45,9 @@ jest.mock('../feed/api', () => ({
   useFeedNews: jest.fn(),
   useMarkFeedRead: jest.fn(),
 }))
+// R6a : le vrai calcul des nouveautés (`useFeedNews`) relit la tête du fil par l'API ; la réponse
+// est choisie par le test (describe « one's own items » ci-dessous).
+jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
 // R4 : « Proches à suivre » (premier lancement, colonne de droite sur ordinateur) et le bouton
 // « Suivre » de chaque ligne.
 jest.mock('../suggestions/api', () => ({
@@ -345,5 +354,97 @@ describe('the news button under the pinned top bar (RF, ui-5)', () => {
     const buttons = screen.getAllByRole('button', { name: NEWS })
     expect(buttons).toHaveLength(1)
     expect(insideScroll(buttons[0])).toBe(true)
+  })
+})
+
+// R6a (décision de Louis du 8/11/2026) : ses propres projets visibles des membres entrent dans son
+// propre fil, à leur date, sans jamais compter dans les nouveautés. Ici, le vrai calcul des
+// nouveautés (`useFeedNews` de feed/api.ts), branché sur l'écran : le fil affiché reste le faux de
+// `mockFollowing`, et la tête du fil relue par l'API est la réponse de `request`. Le test ne
+// suppose pas comment le calcul apprend qui est le membre (la session, ou un paramètre de l'écran).
+describe('one’s own items in the news (R6a)', () => {
+  const lea = { id: 'u1', name: 'Léa', avatarUrl: null }
+  /** Un projet de Léa, publié après le premier élément affiché (Max, le 12 octobre). */
+  const myProject = projectItem(
+    'd1000000-0000-4000-8000-000000000001',
+    'Le ciel de ce soir',
+    lea,
+    october('21'),
+  )
+  /** Une note de Léa, sur son propre projet : son auteur est celui du projet. */
+  const myNote = {
+    kind: 'note' as const,
+    at: october('22'),
+    note: {
+      id: 'd2000000-0000-4000-8000-000000000001',
+      body: 'v2 : les constellations',
+      createdAt: october('22'),
+      removal: null,
+    },
+    project: myProject.project,
+  }
+  /** Un projet de Nora, arrivé lui aussi au-dessus. */
+  const fromNora = projectItem(
+    'd1000000-0000-4000-8000-000000000002',
+    'Carnet de cafés',
+    nora,
+    october('23'),
+  )
+
+  /**
+   * L'accueil de Léa : le fil affiché commence par le projet de Max ; la tête relue par l'API est
+   * `head`. Le cache reçoit le fil affiché après le premier rendu (le faux `useFollowingFeed` ne
+   * l'écrit pas), puis l'écran est redessiné : la vérification des nouveautés part alors.
+   */
+  const renderWithHead = async (head: unknown[]) => {
+    const actual = jest.requireActual<typeof import('../feed/api')>('../feed/api')
+    jest.mocked(useFeedNews).mockImplementation(actual.useFeedNews)
+    const page = { items: [fromMax], nextCursor: null, followsAnyone: true, lastReadAt: null }
+    mockFollowing(page)
+    jest
+      .mocked(request)
+      .mockReset()
+      .mockResolvedValue({
+        ok: true,
+        data: { ...page, items: [...head, fromMax] },
+      })
+    const view = await renderMemberHome()
+    await act(async () => {
+      view.queryClient.setQueryData(
+        ['feed', 'following', false],
+        { pages: [page], pageParams: [undefined] },
+        { updatedAt: Date.now() - 120_000 },
+      )
+    })
+    await view.rerender(<HomeScreen />)
+    // La tête du fil a bien été relue (sinon l'absence du bouton ne prouverait rien).
+    await waitFor(() => expect(request).toHaveBeenCalled())
+    await act(async () => {})
+    return view
+  }
+
+  it('never counts my own new project in the news', async () => {
+    await renderWithHead([myProject])
+
+    // Témoin : le fil affiché est là.
+    expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
+  })
+
+  it('never counts a note on my own project in the news', async () => {
+    await renderWithHead([myNote])
+
+    expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
+  })
+
+  it('counts the new project of another member, without mine, and never shows my face', async () => {
+    await renderWithHead([fromNora, myNote, myProject])
+
+    const banner = await screen.findByRole('button', {
+      name: fr.t(($) => $.feed.newProjects, { count: 1 }),
+    })
+    expect(within(banner).getByLabelText('Nora', { includeHiddenElements: true })).toBeTruthy()
+    expect(within(banner).queryByLabelText('Léa', { includeHiddenElements: true })).toBeNull()
   })
 })

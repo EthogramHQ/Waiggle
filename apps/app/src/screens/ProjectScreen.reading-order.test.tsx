@@ -320,9 +320,12 @@ describe('sharing a project removed by the moderation', () => {
     expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: share })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
-    // Plus rien dans le menu « … » (« Modifier » est déjà refusé sur un projet retiré) : pas de
-    // menu vide.
-    expect(screen.queryByRole('button', { name: menu })).toBeNull()
+    // Le menu « … » ne garde que « Supprimer » (jur-J1, R6a : l'auteur peut toujours supprimer un
+    // projet retiré ; « Modifier » y est refusé). Avant R6a : aucun menu.
+    await fireEvent.press(screen.getByRole('button', { name: menu }))
+    expect(screen.getAllByRole('menuitem').map((item) => item.props.accessibilityLabel)).toEqual([
+      'Supprimer',
+    ])
   })
 
   it('offers its author neither « Partager » nor « Copier le lien » on a computer', async () => {
@@ -334,7 +337,11 @@ describe('sharing a project removed by the moderation', () => {
       expect(await screen.findByRole('header', { name: 'Mon agent de recettes' })).toBeTruthy()
       expect(screen.queryByRole('button', { name: share })).toBeNull()
       expect(screen.queryByRole('menuitem', { name: copy })).toBeNull()
-      expect(screen.queryByRole('button', { name: menu })).toBeNull()
+      // jur-J1 (R6a) : le menu ne garde que « Supprimer ».
+      await fireEvent.press(screen.getByRole('button', { name: menu }))
+      expect(screen.getAllByRole('menuitem').map((item) => item.props.accessibilityLabel)).toEqual([
+        'Supprimer',
+      ])
     } finally {
       restore()
     }

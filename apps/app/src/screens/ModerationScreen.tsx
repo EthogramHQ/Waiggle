@@ -263,6 +263,11 @@ function AdminModeration() {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const focusAfterClose = useRef(false)
+  // La fenêtre de retrait s'ouvre sur sa première question, le groupe « Fondement » (contre-visite
+  // du design de R6a, S1). Une fenêtre sans champ s'ouvre sur « Annuler » (une Entrée distraite ne
+  // supprime rien, H3) ; ici, « Retirer » reste inactif tant que le fondement et l'explication
+  // manquent : « Annuler » ne protégeait de rien, et coûtait un Tab de plus avant le formulaire.
+  const groundRef = useRef<Focusable>(null)
   // Le mot de passe, quand l'API le redemande (`password_required`, au-delà de
   // REMOVALS_BEFORE_PASSWORD retraits en une heure) : le champ apparaît, et « Confirmer » renvoie la
   // même décision avec lui. Le focus va au champ (autoFocus), que l'on tape aussitôt : le bouton
@@ -696,6 +701,7 @@ function AdminModeration() {
         // la seconde tape d'une double tape (design 7b).
         guardTaps
         onDismiss={closeRemove}
+        initialFocusRef={groundRef}
         onClosed={() => {
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
@@ -712,6 +718,7 @@ function AdminModeration() {
           ]}
           value={ground}
           onChange={setGround}
+          entryRef={groundRef}
         />
         <TextField
           label={t(($) => $.moderation.explanation)}

@@ -490,7 +490,7 @@ describe('the comments, after the reviews', () => {
 
     await fireEvent.press(sheet().getByRole('button', { name: 'Répondre' }))
 
-    expect(sheet().getByText(/personne d’autre que toi ne lira cette réponse/)).toBeTruthy()
+    expect(sheet().getByText(/aucun autre membre ne lira cette réponse/)).toBeTruthy()
   })
 
   it('offers no retry when the comments could not load because the session expired', async () => {
@@ -555,15 +555,15 @@ describe('the comments, after the reviews', () => {
   })
 
   // R5a (scénario, « L'auteur ») : « Modifier » monte à la place de « Suivre ce projet », sous
-  // « Tester la démo » ; « Supprimer » garde sa place d'aujourd'hui, après les commentaires, jusqu'à
-  // R6. (Avant R5a : les deux après les commentaires.)
-  it('puts « Modifier » before the comments and « Supprimer » after them on a phone', async () => {
+  // « Tester la démo ». R6a : « Supprimer » quitte la page pour le menu « … » ; plus aucun bouton
+  // « Supprimer » après les commentaires. (Avant R5a : les deux après les commentaires.)
+  it('puts « Modifier » before the comments and no « Supprimer » button in the page on a phone', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('button', { name: 'Écrire un commentaire' })
     const order = screen
       .getAllByRole('button', { name: /^(Écrire un commentaire|Modifier|Supprimer)$/ })
       .map((button) => button.props.accessibilityLabel)
-    expect(order).toEqual(['Modifier', 'Écrire un commentaire', 'Supprimer'])
+    expect(order).toEqual(['Modifier', 'Écrire un commentaire'])
   })
 })

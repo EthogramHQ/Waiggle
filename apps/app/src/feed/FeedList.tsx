@@ -44,9 +44,16 @@ export type CardOverlay = (
  * (relecture juridique de R3, jur-J7 : pas de fil sans fin qui se charge tout seul).
  */
 export function DiscoverFeed({
+  viewerId,
   overlay,
   errorMessage,
 }: {
+  /**
+   * L'identifiant du membre connecté : R6a, ses propres projets ne comptent jamais comme
+   * nouveautés, ici comme dans son fil. Donné par l'écran, qui n'affiche ce fil qu'à un membre
+   * (correction C2, ui-C3 : lu ici par `useSession`, il manquait pendant une lecture de la session).
+   */
+  viewerId: string
   overlay?: CardOverlay
   /** Le message d'une section en panne (voir FeedError, `section`) : ce fil n'est qu'une section. */
   errorMessage?: string
@@ -55,7 +62,7 @@ export function DiscoverFeed({
   const feed = useDiscoverFeed({ testers: false })
   const pages = feed.data?.pages ?? []
   const items = pages.flatMap((page) => page.items)
-  const news = useFeedNews('discover', items[0], false)
+  const news = useFeedNews('discover', items[0], false, viewerId)
   // Les auteurs suivis, d'après chaque page lue (l'API le dit page par page, pour ses auteurs).
   // `?? []` : une page sans ce champ (un faux fil de test, une ancienne réponse) n'en suit aucun.
   const followed = new Set(pages.flatMap((page) => page.followedAuthorIds ?? []))
@@ -157,7 +164,12 @@ type FeedListProps = {
        * figée pour la visite (`useReadBefore`), et ce que fait « Explorer d'autres projets ». Sans
        * elle (Explorer), une seule liste, et la fin ordinaire.
        */
-      upToDate: { readBefore: string | null; onExplore: () => void }
+      upToDate: {
+        readBefore: string | null
+        onExplore: () => void
+        /** Cache l'abeille de « Tu es à jour » (le temps de l'avis « Projet publié », H1). */
+        hideMascot?: boolean
+      }
       empty?: never
     }
 )
@@ -256,7 +268,12 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
         // fil vide finit donc sur la sphère seule.
         <>
           {segment(items.slice(0, sphereAt ?? items.length), cardOf, columns)}
-          {sphereAt !== null ? <UpToDate onExplore={upToDate.onExplore} /> : null}
+          {sphereAt !== null ? (
+            <UpToDate
+              onExplore={upToDate.onExplore}
+              {...(upToDate.hideMascot ? { hideMascot: true } : null)}
+            />
+          ) : null}
           {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (

@@ -39,8 +39,12 @@ const SIZES = {
 type Props = {
   /** Le titre du projet, ajouté au nom lu (« Tester Carnet de cafés »). */
   title: string
-  /** Ouvre la démo (déjà gardé contre la double tape par l'appelant). */
-  onPress: () => void
+  /**
+   * Ouvre la démo (déjà gardé contre la double tape par l'appelant). Absent : la pastille est
+   * seulement dessinée (l'aperçu de la carte dans la feuille de publication, R6a, design-C5) : ni
+   * lien, ni arrêt de Tab, ni nom lu, à la même place et à la même taille que la vraie.
+   */
+  onPress?: (() => void) | undefined
   size: TestLinkSize
   /** Le texte affiché ; par défaut « Tester ». Le nom lu ajoute toujours le projet. */
   label?: string
@@ -60,6 +64,56 @@ export function TestLink({ title, onPress, size, label, style }: Props) {
   const name = t(($) => $.explore.testProject, { title })
   const outside = t(($) => $.common.externalSite)
 
+  // La zone à toucher autour de la pastille (44 points), la même pour le lien et pour le dessin.
+  const frame: StyleProp<ViewStyle> = [
+    {
+      minHeight: layout.touchTarget,
+      minWidth: layout.touchTarget,
+      maxWidth: '100%',
+      flexShrink: 1,
+      justifyContent: 'center',
+      borderRadius: radii.pill,
+    },
+    style,
+  ]
+  const pill = (pressed: boolean) => (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
+        minHeight: height,
+        paddingHorizontal: padding,
+        borderRadius: radii.pill,
+        backgroundColor: pressed ? colors.honeyPressed : colors.honey,
+        // Le halo détache la pastille d'une photo claire.
+        boxShadow: `${shadows.highlight}, ${shadows.honey}`,
+      }}
+    >
+      <Text variant="callout" weight={700} tone="onHoney" numberOfLines={1}>
+        {label ?? t(($) => $.explore.test)}
+      </Text>
+      <View aria-hidden>
+        <Icon name="arrow-up-right" size={space.lg} tone="onHoney" />
+      </View>
+    </View>
+  )
+
+  // Seulement dessinée : une vue simple, que ni le doigt, ni Tab, ni un lecteur d'écran n'atteint.
+  if (!onPress) {
+    return (
+      <View
+        style={frame}
+        pointerEvents="none"
+        aria-hidden
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {pill(false)}
+      </View>
+    )
+  }
+
   return (
     <Pressable
       accessibilityRole="link"
@@ -67,40 +121,9 @@ export function TestLink({ title, onPress, size, label, style }: Props) {
       accessibilityHint={web ? undefined : outside}
       {...enterActivates(onPress)}
       onPress={onPress}
-      style={[
-        {
-          minHeight: layout.touchTarget,
-          minWidth: layout.touchTarget,
-          maxWidth: '100%',
-          flexShrink: 1,
-          justifyContent: 'center',
-          borderRadius: radii.pill,
-        },
-        style,
-      ]}
+      style={frame}
     >
-      {({ pressed }) => (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: space.xs,
-            minHeight: height,
-            paddingHorizontal: padding,
-            borderRadius: radii.pill,
-            backgroundColor: pressed ? colors.honeyPressed : colors.honey,
-            // Le halo détache la pastille d'une photo claire.
-            boxShadow: `${shadows.highlight}, ${shadows.honey}`,
-          }}
-        >
-          <Text variant="callout" weight={700} tone="onHoney" numberOfLines={1}>
-            {label ?? t(($) => $.explore.test)}
-          </Text>
-          <View aria-hidden>
-            <Icon name="arrow-up-right" size={space.lg} tone="onHoney" />
-          </View>
-        </View>
-      )}
+      {({ pressed }) => pill(pressed)}
     </Pressable>
   )
 }

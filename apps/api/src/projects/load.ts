@@ -6,13 +6,14 @@ import {
   NO_REACTIONS,
   PROJECT_LIST_MAX,
   type Project,
+  ProjectCategory,
+  ProjectDifficulty,
   ProjectId,
   ProjectStatus,
   type ProjectSummary,
   ProjectVisibility,
   type ProjectVisual,
   Thumbhash,
-  TimeSpent,
   toolSlug,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -49,6 +50,8 @@ const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
   height: media.height,
   // Calculé par notre serveur ; vérifié quand même, comme tout ce qui sort de la base.
   thumbhash: Thumbhash.parse(media.thumbhash),
+  // R6a : la description de la photo, null si l'auteur n'en a pas écrit.
+  description: media.description,
 })
 
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
@@ -108,8 +111,14 @@ const toProjectBase = (
     label,
     slug: project.toolSlugs[i] ?? toolSlug(label),
   })),
-  timeSpent: project.timeSpent === null ? null : TimeSpent.parse(project.timeSpent),
   prompts: project.prompts,
+  // R6a : catégories, difficulté et mois de départ. Les listes fermées sont revérifiées à la
+  // lecture (comme `status`) ; null pour un projet d'avant R6a. Le temps passé n'est plus lu
+  // (sa colonne s'efface en R6b). Le mois sort tel quel : le contrat de sortie est souple (sec-M1).
+  primaryCategory: ProjectCategory.nullable().parse(project.primaryCategory),
+  secondaryCategory: ProjectCategory.nullable().parse(project.secondaryCategory),
+  difficulty: ProjectDifficulty.nullable().parse(project.difficulty),
+  startedOn: project.startedOn,
   // Les médias arrivent déjà triés par position : la galerie garde l'ordre choisi par l'auteur.
   visuals: media
     .filter((m) => m.projectId === project.id && m.slot === 'gallery')
@@ -243,6 +252,9 @@ const toSummary = (
   // R3 : le lien de la démo sur la carte (« Tester » sans ouvrir la page du projet).
   demoUrl: project.demoUrl,
   portraitCover: project.portraitCover,
+  // R6a : les catégories, pour l'étiquette de la carte.
+  primaryCategory: project.primaryCategory,
+  secondaryCategory: project.secondaryCategory,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
   reactionTotal,

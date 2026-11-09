@@ -3,8 +3,10 @@
 // Deux membres : Léa (l'autrice) et Max.
 import { AccountExport, ErrorResponse, Me, Project } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { eq, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { avatarForm, jpegImage, photoWithGps, visualForm } from './testing/images'
 
@@ -39,6 +41,7 @@ const sendJson = (method: string, path: string, cookie: string, body?: unknown) 
 const publish = async (visibility: 'public' | 'private' = 'public', cookie = lea) => {
   const res = await sendJson('POST', '/v1/projects', cookie, {
     title: 'Mon agent de recettes',
+    primaryCategory: 'other',
     pitch: 'Un menu avec ce qu’il y a au frigo.',
     visibility,
   })
@@ -525,5 +528,334 @@ describe('my data export', () => {
 
     expect(data.projects[0]?.visuals).toHaveLength(1)
     expect(data.projects[0]?.portraitCover).not.toBeNull()
+  })
+})
+
+// --- Tranche R6a : la description de chaque photo ---
+// PATCH /v1/projects/{id}/visuals/{visualId} { description } : l'auteur décrit une photo, lue par
+// les lecteurs d'écran à la place de « Photo 1 sur 3 ». Scénario : docs/scenarios/refonte.md,
+// section R6a (« Les photos ») ; relecture du plan : sec-B1 (les réponses de DELETE), sec-A1 (le
+// quota avant le corps), sec-A3 (la petite limite de taille), jur-J13 (export et effacement).
+
+/** Décrit une photo (ou essaie). */
+const describePhoto = (projectId: string, visualId: string, body: unknown, cookie = lea) =>
+  sendJson('PATCH', `/v1/projects/${projectId}/visuals/${visualId}`, cookie, body)
+
+/** Un projet de Léa (ou d'un autre) avec une photo ; rend le projet et l'identifiant de la photo. */
+const projectWithPhoto = async (visibility: 'public' | 'private' = 'public', cookie = lea) => {
+  const project = await publish(visibility, cookie)
+  const res = await upload(project.id, visualForm(await photoWithGps()), cookie)
+  expect(res.status).toBe(201)
+  const visualId = Project.parse(await res.json()).visuals[0]?.id ?? ''
+  return { projectId: project.id, visualId }
+}
+
+/**
+ * Les descriptions présentes en base, toutes photos confondues. SQL brut : la colonne
+ * `project_media.description` n'est pas encore dans le schéma typé quand ces tests sont écrits.
+ */
+const storedDescriptions = async () =>
+  (
+    (await ctx.db.execute(
+      sql`select description from project_media where description is not null`,
+    )) as unknown as { rows: { description: string }[] }
+  ).rows.map((row) => row.description)
+
+const idOf = async (cookie: string) =>
+  Me.parse(await (await sendJson('GET', '/v1/me', cookie)).json()).id
+
+describe('describing a photo (R6a)', () => {
+  it('lets the author describe a photo, and shows the description to the others', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    await addPhoto(projectId)
+
+    const res = await describePhoto(projectId, visualId, {
+      description: 'Le frigo ouvert, trois tomates et un reste de riz.',
+    })
+
+    expect(res.status).toBe(200)
+    const project = Project.parse(await res.json())
+    expect(project.visuals.map((v) => [v.id, v.description])).toEqual([
+      [visualId, 'Le frigo ouvert, trois tomates et un reste de riz.'],
+      [project.visuals[1]?.id, null], // l'autre photo reste sans description, à sa place
+    ])
+    const seenByMax = await read(projectId, max)
+    expect(seenByMax.visuals[0]?.description).toBe(
+      'Le frigo ouvert, trois tomates et un reste de riz.',
+    )
+  })
+
+  it('clears the description with an empty text', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(200)
+
+    const res = await describePhoto(projectId, visualId, { description: '   ' })
+
+    expect(res.status).toBe(200)
+    expect(Project.parse(await res.json()).visuals[0]?.description).toBeNull()
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('refuses a description longer than 250 characters, with invisible characters, or with other fields', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    // Témoin : 250 caractères passent.
+    const longest = 'é'.repeat(250)
+    expect((await describePhoto(projectId, visualId, { description: longest })).status).toBe(200)
+
+    const zeroWidthSpace = String.fromCodePoint(0x200b)
+    for (const body of [
+      { description: 'é'.repeat(251) },
+      { description: `Le frigo${zeroWidthSpace} ouvert` },
+      { description: 'Le frigo', position: 3 },
+      {},
+    ]) {
+      expect((await describePhoto(projectId, visualId, body)).status).toBe(400)
+    }
+    expect(await storedDescriptions()).toEqual([longest])
+  })
+
+  it('refuses another member on a public project', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+
+    const res = await describePhoto(projectId, visualId, { description: 'Piraté' }, max)
+
+    expect(res.status).toBe(403)
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('answers the same « not found » to a PATCH on a photo of an unknown, private, removed or blocked author’s project', async () => {
+    const body = { description: 'Piraté' }
+    const reference = await describePhoto(crypto.randomUUID(), crypto.randomUUID(), body, max)
+    expect(reference.status).toBe(404)
+    const expected = await reference.json()
+    const expectSameNotFound = async (res: Response, what: string) => {
+      expect(res.status, what).toBe(404)
+      expect(await res.json(), what).toEqual(expected)
+    }
+
+    const hidden = await projectWithPhoto('private')
+    await expectSameNotFound(
+      await describePhoto(hidden.projectId, hidden.visualId, body, max),
+      'private',
+    )
+
+    const removed = await projectWithPhoto()
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.project.id, removed.projectId))
+    await expectSameNotFound(
+      await describePhoto(removed.projectId, removed.visualId, body, max),
+      'removed',
+    )
+
+    const blocked = await projectWithPhoto()
+    // Témoin : sans blocage, Max voit ce projet public ; il est seulement « refusé ».
+    expect((await describePhoto(blocked.projectId, blocked.visualId, body, max)).status).toBe(403)
+    const [leaId, maxId] = [await idOf(lea), await idOf(max)]
+    const act = activity(ctx)
+    await act.block(maxId, lea)
+    await expectSameNotFound(
+      await describePhoto(blocked.projectId, blocked.visualId, body, max),
+      'the author blocked the member',
+    )
+    await act.unblock(maxId, lea)
+    await act.block(leaId, max)
+    await expectSameNotFound(
+      await describePhoto(blocked.projectId, blocked.visualId, body, max),
+      'the member blocked the author',
+    )
+
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('answers 409 « removed » when I describe a photo of my project removed by the moderation', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.project.id, projectId))
+
+    const res = await describePhoto(projectId, visualId, { description: 'Le frigo' })
+
+    expect(res.status).toBe(409)
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe('removed')
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('still lets me remove a photo of my project removed by the moderation, while describing it answers 409', async () => {
+    // sec-A1 : la règle 7a (je peux toujours retirer ce qui est à moi) vaut pour le DELETE, pas pour
+    // le PATCH. La description publique du PATCH doit le dire elle-même, sans renvoyer au DELETE.
+    const { projectId, visualId } = await projectWithPhoto()
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.project.id, projectId))
+
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(409)
+    const doc = (await (await ctx.request('/openapi.json')).json()) as {
+      paths: Record<string, Record<string, { description?: string }>>
+    }
+    const patch = doc.paths['/v1/projects/{id}/visuals/{visualId}']?.patch?.description ?? ''
+    expect(patch).toContain('409')
+    expect(patch).not.toMatch(/removal of a photo/i)
+
+    const res = await sendJson('DELETE', `/v1/projects/${projectId}/visuals/${visualId}`, lea)
+    expect(res.status).toBe(200)
+  })
+
+  it('answers « not found » to a malformed photo identifier and to a photo of another project reached through mine', async () => {
+    const mine = await projectWithPhoto()
+    const maxs = await projectWithPhoto('public', max)
+    // Témoin : sa propre photo, par son propre projet, se décrit.
+    expect(
+      (await describePhoto(mine.projectId, mine.visualId, { description: 'Le frigo' })).status,
+    ).toBe(200)
+
+    const malformed = await describePhoto(mine.projectId, 'not-a-photo', { description: 'X' })
+    const foreign = await describePhoto(mine.projectId, maxs.visualId, { description: 'Piraté' })
+
+    expect(malformed.status).toBe(404)
+    expect(foreign.status).toBe(404)
+    expect((await read(maxs.projectId, max)).visuals[0]?.description).toBeNull()
+    expect(await storedDescriptions()).toEqual(['Le frigo'])
+  })
+
+  it('counts a PATCH with a malformed body in the hourly limit of changes', async () => {
+    // sec-A1 : le quota « changements d'un projet » passe avant la lecture du corps et avant la
+    // recherche du projet : chaque demande compte, mal formée ou visant un projet inconnu.
+    const { projectId, visualId } = await projectWithPhoto()
+    for (let i = 0; i < 30; i++) {
+      expect((await describePhoto(projectId, visualId, { description: 42 })).status).toBe(400)
+    }
+    for (let i = 0; i < 30; i++) {
+      const res = await describePhoto(crypto.randomUUID(), visualId, { description: 'Le frigo' })
+      expect(res.status).toBe(404)
+    }
+
+    // La 61e demande de l'heure, valide et sur sa vraie photo, est refusée.
+    const res = await describePhoto(projectId, visualId, { description: 'Le frigo' })
+    expect(res.status).toBe(429)
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('refuses a photo description body larger than 16 KB', async () => {
+    // sec-A3 : une description pèse au plus 250 caractères ; la petite limite (16 Ko) suffit,
+    // celle des projets (256 Ko) laisserait lire au serveur un corps inutilement gros.
+    const { projectId, visualId } = await projectWithPhoto()
+
+    const res = await describePhoto(projectId, visualId, { description: 'a'.repeat(20 * 1024) })
+
+    expect(res.status).toBe(413)
+    // Témoin : la même route, avec un corps ordinaire, répond.
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(200)
+  })
+
+  it('refuses a suspended author, and lets her describe again once the suspension is gone', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    // Léa est suspendue, sans fin : la ligne que lit la garde de suspension (tranche 7c).
+    await ctx.db.insert(schema.accountSuspension).values({
+      id: crypto.randomUUID(),
+      userId: await idOf(lea),
+      startsAt: new Date(),
+      endsAt: null,
+    })
+
+    const refused = await describePhoto(projectId, visualId, { description: 'Le frigo' })
+    expect(refused.status).toBe(403)
+    expect(ErrorResponse.parse(await refused.json()).error.code).toBe('suspended')
+    expect(await storedDescriptions()).toEqual([])
+
+    // Témoin : sans la suspension, la même demande passe.
+    await ctx.db.delete(schema.accountSuspension)
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(200)
+  })
+
+  it('cannot be triggered from another website', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+    const describeFrom = (origin?: string) =>
+      ctx.request(`/v1/projects/${projectId}/visuals/${visualId}`, {
+        method: 'PATCH',
+        headers: { cookie: lea, 'content-type': 'application/json', ...(origin && { origin }) },
+        body: JSON.stringify({ description: 'Le frigo' }),
+      })
+
+    expect((await describeFrom('https://evil.example')).status).toBe(403)
+    expect(await storedDescriptions()).toEqual([])
+    // Témoin : la même demande, sans origine étrangère, passe.
+    expect((await describeFrom()).status).toBe(200)
+  })
+
+  it('refuses a visitor without an account', async () => {
+    const { projectId, visualId } = await projectWithPhoto()
+
+    const anonymous = await ctx.request(`/v1/projects/${projectId}/visuals/${visualId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ description: 'Le frigo' }),
+    })
+
+    expect(anonymous.status).toBe(401)
+    expect(await storedDescriptions()).toEqual([])
+    // Témoin : avec sa session, l'autrice décrit sa photo.
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(200)
+  })
+})
+
+describe('photo descriptions in my data (R6a, jur-J13)', () => {
+  it('puts the categories, the month, the difficulty and each photo description in the export', async () => {
+    const created = await sendJson('POST', '/v1/projects', lea, {
+      title: 'Le télescope qui raconte',
+      pitch: 'Il nomme les étoiles que vise la lunette.',
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+      startedOn: '2024-03',
+      difficulty: 'hard',
+      visibility: 'private',
+    })
+    expect(created.status).toBe(201)
+    const projectId = Project.parse(await created.json()).id
+    await addPhoto(projectId)
+    const withTwo = await addPhoto(projectId)
+    const [first, second] = withTwo.visuals.map((v) => v.id) as [string, string]
+    expect(
+      (await describePhoto(projectId, second, { description: 'La lunette, la nuit.' })).status,
+    ).toBe(200)
+
+    const data = AccountExport.parse(await (await sendJson('GET', '/v1/me/export', lea)).json())
+
+    expect(data.projects[0]).toMatchObject({
+      primaryCategory: 'science',
+      secondaryCategory: 'learning',
+      startedOn: '2024-03',
+      difficulty: 'hard',
+    })
+    expect(data.projects[0]?.visuals.map((v) => [v.id, v.description])).toEqual([
+      [first, null],
+      [second, 'La lunette, la nuit.'],
+    ])
+  })
+
+  it('erases the photo descriptions with the project and with the account', async () => {
+    const first = await projectWithPhoto()
+    const second = await projectWithPhoto()
+    for (const { projectId, visualId } of [first, second]) {
+      expect(
+        (await describePhoto(projectId, visualId, { description: `Photo de ${projectId}` })).status,
+      ).toBe(200)
+    }
+    expect(await storedDescriptions()).toHaveLength(2)
+
+    // Avec le projet…
+    expect((await sendJson('DELETE', `/v1/projects/${first.projectId}`, lea)).status).toBe(204)
+    expect(await storedDescriptions()).toEqual([`Photo de ${second.projectId}`])
+
+    // … et avec le compte.
+    await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: { cookie: lea, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: leaAccount.password }),
+    })
+    expect(await storedDescriptions()).toEqual([])
   })
 })

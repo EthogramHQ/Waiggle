@@ -14,6 +14,7 @@ import { deleteProject, getProject } from '../projects/api'
 import { projectQueryKey } from '../projects/hooks'
 import { useReaction } from '../reactions/api'
 import { leaReply, maxComment, zoeReply } from '../testing/comments'
+import { passTapGuard } from '../testing/dialog'
 import { leaMe, suspendedMe } from '../testing/fixtures'
 import { removalAfterReport, removalByLaw } from '../testing/moderation'
 import { reportsOpened } from '../testing/navigation'
@@ -90,7 +91,13 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react')
   return {
     usePathname: () => '/page/actuelle',
-    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+    // `dismissTo` : après une suppression réussie, la page revient à « Mon profil » (R6a, ui-M3).
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockReplace,
+      back: jest.fn(),
+      dismissTo: jest.fn(),
+    }),
     useLocalSearchParams: () => mockParams,
     useIsFocused: () => mockFocused,
     useFocusEffect: (effect: () => undefined | (() => void)) => {
@@ -117,6 +124,12 @@ beforeEach(() => {
   mockParams = {}
   mockFocused = true
 })
+
+// R6a : « Supprimer » du projet est dans le menu « … » de la page (« Plus d'actions »).
+const openMenu = async () =>
+  fireEvent.press(await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
+/** Le titre de la fenêtre de suppression : « Supprimer « Mon agent de recettes » ? ». */
+const deleteTitle = fr.t(($) => $.project.page.deleteTitle, { title: recipesProject.title })
 
 // --- R5b : les commentaires passent dans une feuille, sur téléphone ---
 
@@ -266,6 +279,28 @@ describe('a project removed by the moderation, seen by its author', () => {
     expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
   })
 
+  // R6a (relecture du plan, jur-J1) : « Supprimer » reste au menu pour tout auteur ; le menu se
+  // dessine même avec ce seul geste (ni « Copier le lien » ni « Modifier » pour un projet retiré).
+  it('keeps Delete in the menu for the author of a removed project', async () => {
+    jest.mocked(deleteProject).mockResolvedValue({ ok: true, data: null })
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, removal: removalByLaw })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    await openMenu()
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Copier le lien' })).toBeNull()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Supprimer' }))
+
+    // La fenêtre dit que la décision et la copie du signalement restent gardées jusqu’à un an après la décision.
+    expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.project.page.deleteConfirmRemoved))).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.project.page.deleteConfirm))).toBeNull()
+    await passTapGuard()
+    await fireEvent.press(dialogTitled(deleteTitle).getByRole('button', { name: 'Supprimer' }))
+    expect(deleteProject).toHaveBeenCalledWith(id)
+  })
+
   it('shows no such banner on a project that was not removed', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
@@ -347,11 +382,26 @@ describe('a project page seen by a suspended member', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull())
     expect(screen.queryByRole('button', { name: 'Publier une note' })).toBeNull()
     expect(screen.queryByLabelText('Ta note')).toBeNull()
-    // Supprimer reste possible : le projet, chacune de ses notes.
-    expect(screen.getByRole('button', { name: 'Supprimer' })).toBeTruthy()
+    // Supprimer reste possible : chacune de ses notes, et le projet (R6a : par le menu « … », plus
+    // par un bouton de la page ; voir « keeps Delete in the menu for a suspended author »).
     expect(screen.getAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Supprimer' })).toBeTruthy()
     // Le journal reste lisible.
     expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+  })
+
+  // R6a (relecture du plan, jur-J1) : suspendu, l'auteur garde « Supprimer » au menu, sans
+  // « Modifier » (l'API refuserait).
+  it('keeps Delete in the menu for a suspended author, without Edit', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : le bandeau de la suspension est là (le profil est lu).
+    expect(await screen.findByText(containing(fr.t(($) => $.suspension.title)))).toBeTruthy()
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Supprimer' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Supprimer' })).toBeNull()
   })
 
   it('offers neither to follow nor to react on the project of another member, but shows the numbers', async () => {
@@ -518,12 +568,14 @@ describe('the windows of the project page, right after opening', () => {
   it('ignores a tap in the window to delete the project', async () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le projet' }))
+    // R6a : « Supprimer » est dans le menu « … » ; le bouton de la fenêtre s'appelle « Supprimer ».
+    await openMenu()
+    await fireEvent.press(screen.getByRole('menuitem', { name: 'Supprimer' }))
+    await fireEvent.press(dialogTitled(deleteTitle).getByRole('button', { name: 'Supprimer' }))
 
-    // « Supprimer le projet » touché pendant la garde : rien n'est supprimé, la fenêtre reste.
+    // « Supprimer » touché pendant la garde : rien n'est supprimé, la fenêtre reste.
     expect(deleteProject).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Supprimer le projet' })).toBeTruthy()
+    expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
   })
 
   it('ignores a tap in the window to delete a note', async () => {

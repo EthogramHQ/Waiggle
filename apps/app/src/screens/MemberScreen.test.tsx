@@ -142,7 +142,7 @@ describe('MemberScreen', () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, projects: [] })
     await renderWithProviders(<MemberScreen id="u1" />)
 
-    expect(await screen.findByText('Pas encore de projet public.')).toBeTruthy()
+    expect(await screen.findByText('Pas encore de projet visible des membres.')).toBeTruthy()
   })
 
   it('says « not found » for an unknown or deleted member', async () => {

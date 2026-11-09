@@ -45,7 +45,11 @@ const me = async (cookie: string) => Me.parse(await (await send('GET', '/v1/me',
 
 /** Publie un projet et renvoie ce que l'API a répondu. */
 const publish = async (cookie: string, body: object) => {
-  const res = await send('POST', '/v1/projects', cookie, { pitch: 'Un pitch.', ...body })
+  const res = await send('POST', '/v1/projects', cookie, {
+    primaryCategory: 'other',
+    pitch: 'Un pitch.',
+    ...body,
+  })
   expect(res.status).toBe(201)
   return Project.parse(await res.json())
 }

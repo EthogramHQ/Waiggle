@@ -1,9 +1,11 @@
 // Une étiquette d'outil ou de modèle (« Claude », « Python »). Touchée, elle mène à la page de
 // l'étiquette ; sans `onPress`, c'est une simple pastille. Avec `count` (R3, « Outils populaires »
 // d'Explorer sur ordinateur), elle affiche aussi le nombre de projets publics qui citent l'outil.
+// Avec `icon` (R6a), elle sert aussi à la catégorie d'un projet, en verre sur sa photo.
 import { borders, layout, radii, space } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
+import { Icon, type IconName } from './Icon'
 import { enterActivates } from './keyboard'
 import { Text } from './Text'
 import { useTheme } from './theme/ThemeProvider'
@@ -19,9 +21,23 @@ type Props = {
    * l'interface de R3 : un nombre nu, lu seul, ne dit pas ce qu'il compte).
    */
   count?: number
+  /**
+   * R6a : une icône dessinée avant le libellé (la catégorie d'un projet sur sa carte : la planète de
+   * « Sciences et espace »). Décorative : le nom lu reste le libellé, l'icône est cachée aux
+   * lecteurs d'écran (Icon).
+   */
+  icon?: IconName
+  /**
+   * Correction C2 de R6a (relecture de design, C3) : ce que l'étiquette nomme. `tool` (par défaut) :
+   * un outil ou un modèle, en police à chasse fixe (`mono`), que Miel réserve aux outils, versions
+   * et prompts. `category` : la catégorie d'un projet (« Sciences et espace »), en police de texte,
+   * comme sur les planches R6-Danse et R6-Publier-Desktop ; plus étroite, elle tient aussi entière
+   * dans l'aperçu de la feuille de publication.
+   */
+  kind?: 'tool' | 'category'
 }
 
-export function Tag({ label, onPress, onGlass = false, count }: Props) {
+export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool' }: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
   // Le nom lu : le libellé seul, ou le libellé et son nombre au pluriel de la langue de l'appli.
@@ -44,26 +60,36 @@ export function Tag({ label, onPress, onGlass = false, count }: Props) {
     backgroundColor: onGlass ? colors.glass : colors.surface,
     borderColor: onGlass ? colors.glassBorder : colors.outline,
   }
-  const name = (
+  const name =
     // Un nom très long tient sur une ligne, abrégé par « … » : la pastille garde sa forme. Le nom
     // complet reste lu par les lecteurs d'écran (accessibilityLabel) et présent dans la page.
-    // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe.
-    <Text variant="mono" numberOfLines={1}>
-      {label}
-    </Text>
-  )
+    // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe ; une
+    // catégorie, en police de texte, à la même taille et en demi-gras.
+    kind === 'category' ? (
+      <Text variant="caption" weight={600} numberOfLines={1}>
+        {label}
+      </Text>
+    ) : (
+      <Text variant="mono" numberOfLines={1}>
+        {label}
+      </Text>
+    )
   const content =
-    count === undefined ? (
+    count === undefined && icon === undefined ? (
       name
     ) : (
-      // Le nom puis le nombre, plus discret, sur la même ligne. Le nom peut rétrécir (flexShrink, et
-      // son « … ») ; le nombre, jamais : on le lit toujours en entier. Chiffres de même largeur
-      // (tabular) : deux étiquettes voisines gardent leurs nombres alignés.
+      // L'icône, le nom, puis le nombre, plus discret, sur la même ligne. Le nom peut rétrécir
+      // (flexShrink, et son « … ») ; l'icône et le nombre, jamais : on lit toujours le nombre en
+      // entier. Chiffres de même largeur (tabular) : deux étiquettes voisines gardent leurs nombres
+      // alignés.
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%' }}>
+        {icon === undefined ? null : <Icon name={icon} size={18} />}
         <View style={{ flexShrink: 1 }}>{name}</View>
-        <Text variant="mono" tone="muted" tabular>
-          {String(count)}
-        </Text>
+        {count === undefined ? null : (
+          <Text variant="mono" tone="muted" tabular>
+            {String(count)}
+          </Text>
+        )}
       </View>
     )
   // La pastille dessinée fait 36 points de haut ; autour d'elle, une zone de 44. Touchable, c'est

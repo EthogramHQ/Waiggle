@@ -211,6 +211,8 @@ describe('SearchResults', () => {
     cover: null,
     demoUrl: null,
     portraitCover: null,
+    primaryCategory: null,
+    secondaryCategory: null,
     createdAt: '2026-10-12T09:00:00.000Z',
     updatedAt: '2026-10-12T09:00:00.000Z',
     reactionTotal: 0,

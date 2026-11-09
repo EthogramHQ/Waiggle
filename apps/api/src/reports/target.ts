@@ -141,7 +141,12 @@ const loadVisible = async (
       // Les images du projet, dans l'ordre de la page (index project_media_project_idx : projet,
       // emplacement, position). Seule leur clé est lue : aucun fichier n'est copié.
       const media = await db
-        .select({ slot: m.slot, position: m.position, key: m.storageKey })
+        .select({
+          slot: m.slot,
+          position: m.position,
+          key: m.storageKey,
+          description: m.description,
+        })
         .from(m)
         .where(eq(m.projectId, target.id))
         .orderBy(asc(m.slot), asc(m.position))
@@ -152,7 +157,12 @@ const loadVisible = async (
         ...row.prompts.flatMap((prompt) => filled('prompt', prompt)),
         ...filled('tools', oneLine(row.tools)),
         ...filled('demoUrl', row.demoUrl),
-        ...media.map((item) => ({ field: imageField(item), value: item.key })),
+        // Chaque image, suivie de sa description si elle en a une (R6a, jur-J13) : la modération
+        // sait ainsi quelle photo est décrite.
+        ...media.flatMap((item) => [
+          { field: imageField(item), value: item.key },
+          ...filled('photoDescription', item.description),
+        ]),
       ]
       return {
         authorId: row.authorId,

@@ -109,7 +109,11 @@ const expectDone = async (res: Response) => {
 /** Publie un projet public, une minute après ce qui précède. */
 const publish = async (cookie: string, title = 'Carnet de cafés') => {
   later()
-  const res = await send('POST', '/v1/projects', cookie, { title, pitch: 'Un petit projet.' })
+  const res = await send('POST', '/v1/projects', cookie, {
+    title,
+    primaryCategory: 'other',
+    pitch: 'Un petit projet.',
+  })
   expect(res.status).toBe(201)
   return Project.parse(await res.json())
 }
@@ -209,7 +213,11 @@ describe('who may mark the feed read', () => {
     await act.decide(zoe, suspension)
     // Témoin : la suspension refuse bien à Max d'écrire ailleurs (publier).
     later()
-    const refused = await send('POST', '/v1/projects', max, { title: 'Non', pitch: 'Refusé.' })
+    const refused = await send('POST', '/v1/projects', max, {
+      title: 'Non',
+      primaryCategory: 'other',
+      pitch: 'Refusé.',
+    })
     expect(refused.status).toBe(403)
 
     await expectDone(await markRead(max, newest))

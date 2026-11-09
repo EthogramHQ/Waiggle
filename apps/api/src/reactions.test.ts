@@ -73,6 +73,7 @@ const UNKNOWN = '00000000-0000-4000-8000-000000000000'
 const publish = async (cookie: string, body: object = {}) => {
   const res = await send('POST', '/v1/projects', cookie, {
     title: 'Mon agent de recettes',
+    primaryCategory: 'other',
     pitch: 'Un menu avec ce qu’il y a au frigo.',
     ...body,
   })

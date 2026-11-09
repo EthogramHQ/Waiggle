@@ -57,6 +57,29 @@ describe('translations', () => {
       )
     }
   })
+
+  // R6a (relecture du plan, jur-J5) : « public » est gardé pour R12, « Public sur le web ». Les
+  // phrases qui disent qui voit un projet parlent des « membres », dans les deux langues.
+  it('never calls a project visible to members « public » in the sentences about who sees it', () => {
+    const audienceKeys = [
+      'project.form.membersHint',
+      'project.form.privateHint',
+      'project.form.audienceMembers',
+      'project.form.audienceMembersEdit',
+      'project.form.audiencePrivateNew',
+      'project.form.audiencePrivate',
+      'project.form.draftSaved',
+      'project.page.privateBanner',
+      'project.notes.hintPrivate',
+      'project.comments.hintPrivate',
+      'project.comments.replyHintPrivate',
+    ]
+    for (const key of audienceKeys) {
+      expect(fr[key], `missing ${key}`).toBeDefined()
+      expect(fr[key], `say « visible des membres » in ${key}`).not.toMatch(/\bpublic\b/i)
+      expect(en[key], `say « visible to members » in ${key}`).not.toMatch(/\bpublic\b/i)
+    }
+  })
 })
 
 describe('resolveLanguage', () => {

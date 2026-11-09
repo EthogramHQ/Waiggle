@@ -83,7 +83,7 @@ echo "ok : $AVATAR_URL"
 
 step "Photo d'un projet : WebP 1 600 px au plus et ThumbHash (la bibliothèque est bien dans l'image)"
 PROJECT_ID=$(curl -fsS -b "$WORK/cookies" -H "Origin: $APP" -H 'Content-Type: application/json' \
-  -d '{"title":"Fumée","pitch":"Un projet de test"}' $API/v1/projects |
+  -d '{"title":"Fumée","pitch":"Un projet de test","primaryCategory":"other"}' $API/v1/projects |
   node -e "let d = ''; process.stdin.on('data', (c) => { d += c }).on('end', () => console.log(JSON.parse(d).id))")
 # La réponse est le projet mis à jour ; on en garde l'adresse de la photo, sa taille et son ThumbHash.
 VISUAL=$(curl -fsS -b "$WORK/cookies" -H "Origin: $APP" -F "visual=@$WORK/photo.jpg;type=image/jpeg" -F slot=gallery \

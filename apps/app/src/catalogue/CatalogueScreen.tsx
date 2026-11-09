@@ -103,8 +103,18 @@ import { GalleryCatalogue } from './projet-galerie'
 import { NotFoundPortalCatalogue } from './projet-introuvable'
 import { ShareCatalogue } from './projet-partager'
 import { ProjectPromptsCatalogue } from './projet-prompts'
+import { RecipeCatalogue } from './projet-recette'
 import { ProjectGroundworkCatalogue } from './projet-socle'
 import { LeavingCatalogue } from './projet-sortie'
+import { PublishCategoriesCatalogue } from './publier-categories'
+import { PublishDanceCatalogue } from './publier-danse'
+import { PublishWindowsCatalogue } from './publier-fenetres'
+import { PublishSheetCatalogue } from './publier-feuille'
+import { PublishToolsPreviewCatalogue } from './publier-outils-apercu'
+import { PublishPillsCatalogue } from './publier-pastilles'
+import { PublishPhotosCatalogue } from './publier-photos'
+import { PublishPromptCatalogue } from './publier-prompt'
+import { PublishDeleteCatalogue } from './publier-supprimer'
 import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
@@ -367,7 +377,7 @@ export function CatalogueScreen() {
         <Button label={l.longHost} icon="arrow-up-right" onPress={() => {}} />
         <TagSample l={l} />
         <VisualEditorSample l={l} />
-        {/* Sans photo : pas de rangée vide entre la consigne et le bouton. */}
+        {/* Sans couverture verticale : le bouton seul. */}
         <VisualEditorSample l={l} empty />
         {/* La jauge vide (discrète), en cours, puis remplie. */}
         <HoneyMeter value={0} max={12} label={l.meterEmpty} />
@@ -829,12 +839,14 @@ export function CatalogueScreen() {
       {/* Tranche R2 : onglets, rubriques des réglages, feuille, « Nouvel essai à… », pied (compte.tsx). */}
       <AccountCatalogue />
       <SheetsCatalogue />
+      <PublishSheetCatalogue />
       {/* Tranche R2 : le panneau d'entrée et le lien qui quitte l'appli (entrer.tsx). */}
       <EntryCatalogue />
       {/* Tranche R2 : la carte du membre et la mise en page des réglages (reglages.tsx). */}
       <SettingsCatalogue />
       {/* Tranche R2 : le bouton « à réessayer plus tard » et l'encadré « à savoir » (garde-fous.tsx). */}
       <SafeguardsCatalogue />
+      <PublishWindowsCatalogue />
       {/* Tranche R3 : la barre d'onglets (navigation.tsx), la pastille « Suivre » sur une carte
           (cartes.tsx), le carrousel et la carte testeur (explorer.tsx), le surlignage (recherche.tsx). */}
       <NavigationCatalogue />
@@ -852,6 +864,15 @@ export function CatalogueScreen() {
       <ProjectFrameCatalogue />
       <GalleryCatalogue />
       <ProjectPartsCatalogue />
+      {/* Tranche R6a, la feuille de publication (publier-*.tsx). */}
+      <PublishPhotosCatalogue />
+      <PublishToolsPreviewCatalogue />
+      <PublishPromptCatalogue />
+      <PublishPillsCatalogue />
+      <PublishDanceCatalogue />
+      <PublishDeleteCatalogue />
+      <PublishCategoriesCatalogue />
+      <RecipeCatalogue />
       <CapsuleCatalogue />
       <FanCatalogue />
       <ProjectPromptsCatalogue />
@@ -1057,34 +1078,20 @@ function Fields({ l }: { l: Labels }) {
   )
 }
 
-/** L'éditeur de visuels, avec trois photos d'exemple (leurs résumés flous) qu'on peut réordonner. */
+/**
+ * La couverture verticale (R6a : `VisualEditor` ne garde qu'elle ; la galerie est `PhotoTiles`,
+ * dans « Publier : les photos »).
+ */
 function VisualEditorSample({ l, empty = false }: { l: Labels; empty?: boolean }) {
-  const [order, setOrder] = useState(empty ? [] : [samples.cafe, samples.papillon, samples.cafe])
   const [portrait, setPortrait] = useState<string | null>(empty ? null : samples.papillon)
-  const move = (from: number, to: number) =>
-    setOrder((list) => {
-      const copy = [...list]
-      const [item] = copy.splice(from, 1)
-      if (item !== undefined) copy.splice(to, 0, item)
-      return copy
-    })
   return (
     <VisualEditor
       labels={l.visualEditor}
-      gallery={order.map((thumbhash, index) => ({
-        key: `${index}-${thumbhash}`,
-        image: { source: null, thumbhash, label: `${l.samplePhoto} (${index + 1})` },
-      }))}
-      max={6}
       portrait={
         portrait
           ? { key: 'portrait', image: { source: null, thumbhash: portrait, label: l.samplePhoto } }
           : null
       }
-      onAdd={() => setOrder((list) => [...list, samples.papillon])}
-      onMove={(index, delta) => move(index, index + delta)}
-      onMakeCover={(index) => move(index, 0)}
-      onRemove={(index) => setOrder((list) => list.filter((_, i) => i !== index))}
       onPickPortrait={() => setPortrait(samples.cafe)}
       onRemovePortrait={() => setPortrait(null)}
     />

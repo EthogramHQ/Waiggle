@@ -84,11 +84,16 @@ export const useDiscoverFeed = ({ testers }: { testers: boolean }) =>
  * fil affiché, lui, ne bouge pas. On compte les éléments plus récents que le premier affiché.
  * `count` null : rien de neuf. `more` vrai : plus d'une page de nouveautés. R4 : `authors` (qui les
  * a publiées) et `kinds` (projets, notes) pour le bouton des nouveautés.
+ *
+ * R6a (décision de Louis du 8/11/2026) : ses propres projets entrent dans son fil, mais ne sont
+ * jamais une nouveauté pour lui, ni les notes sur ses projets (leur auteur est celui du projet).
+ * `viewerId`, l'identifiant du membre connecté, les laisse hors du compte et des visages.
  */
 export const useFeedNews = (
   kind: FeedKind,
   first: FeedItem | undefined,
   testers = false,
+  viewerId?: string,
 ): FeedNews => {
   const queryClient = useQueryClient()
   const shown = keyOf(kind, testers)
@@ -110,7 +115,7 @@ export const useFeedNews = (
   // useMemo : le résultat n'est recalculé que si la page relue ou le premier élément affiché
   // changent. Les listes rendues gardent ainsi la même identité d'un rendu à l'autre, et le bouton
   // des nouveautés ne croit pas à une nouvelle arrivée à chaque rendu de l'écran.
-  return useMemo(() => newsOf(page, firstAt, firstId), [page, firstAt, firstId])
+  return useMemo(() => newsOf(page, firstAt, firstId, viewerId), [page, firstAt, firstId, viewerId])
 }
 
 /** Ce que dit le bouton des nouveautés : combien, s'il y en a plus d'une page, qui, et quoi. */
@@ -133,17 +138,21 @@ const newsOf = (
   page: FeedPage | undefined,
   firstAt: string | undefined,
   firstId: string | undefined,
+  viewerId: string | undefined,
 ): FeedNews => {
   const items = page?.items ?? []
   // Plus récent : publié après le premier élément affiché (à date égale, l'API range par
   // identifiant décroissant). Comparer les dates plutôt que chercher l'identifiant : si le premier
   // élément a disparu (passé en privé), on ne croit pas pour autant à 20 nouveautés.
-  const newer =
+  const above =
     firstAt !== undefined && firstId !== undefined
       ? items.filter(
           (item) => item.at > firstAt || (item.at === firstAt && feedItemId(item) > firstId),
         )
       : items
+  // R6a : ce que le membre a publié lui-même (un projet, ou une note sur son projet) n'est jamais
+  // une nouveauté pour lui. `more` se lit avant ce tri : une page pleine au-dessus annonce une suite.
+  const newer = viewerId ? above.filter((item) => item.project.author.id !== viewerId) : above
   if (newer.length === 0) return nothingNew
   // La page est rangée du plus récent au plus ancien : le premier auteur rencontré est celui de la
   // dernière nouveauté. Une note a pour auteur celui de son projet. Une Map garde l'ordre
@@ -156,7 +165,7 @@ const newsOf = (
   }
   return {
     count: newer.length,
-    more: newer.length >= FEED_PAGE_SIZE && page?.nextCursor != null,
+    more: above.length >= FEED_PAGE_SIZE && page?.nextCursor != null,
     authors: [...authors.values()],
     kinds: [...new Set(newer.map((item) => item.kind))],
   }
@@ -185,6 +194,10 @@ export const putFeedRead = async (upTo: string): Promise<void> => {
  *
  * Un échec (réseau, quota) ne se dit pas : rien ne change à l'écran, et la prochaine visite
  * marquera le fil lu.
+ *
+ * R6a : `first` n'est jamais un élément du membre lui-même (ses projets entrent dans son fil) :
+ * l'écran donne le premier élément d'un autre (`firstOfOthers` de feed/items.ts). La date de sa
+ * propre publication, toute récente, dirait quand il était là plutôt que jusqu'où il a lu (J3).
  */
 export const useMarkFeedRead = (first: FeedItem | undefined) => {
   // Un `ref` : une valeur gardée d'un rendu à l'autre, sans redessiner quand elle change. Ici, la

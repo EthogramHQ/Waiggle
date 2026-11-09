@@ -21,6 +21,8 @@ const latestProject = {
   cover: null,
   demoUrl: null,
   portraitCover: null,
+  primaryCategory: null,
+  secondaryCategory: null,
   createdAt: '2026-10-18T08:30:00.000Z',
   updatedAt: '2026-10-18T08:30:00.000Z',
   reactionTotal: 4,

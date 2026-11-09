@@ -115,6 +115,7 @@ const publish = async (cookie: string, body: object = {}) => {
   later()
   const res = await send('POST', '/v1/projects', cookie, {
     title: 'Météo',
+    primaryCategory: 'other',
     pitch: 'La pluie de demain, quartier par quartier.',
     ...body,
   })

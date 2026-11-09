@@ -641,94 +641,52 @@ describe('ProjectCover', () => {
   })
 })
 
-describe('VisualEditor', () => {
+// R6a (plan, ligne U1) : la galerie passe aux tuiles de `PhotoTiles` (PhotoTiles.test.tsx, qui
+// reprend ses gardes : boutons nommés d'après leur photo, gestes sans glisser, « Ajouter » absent à
+// 6) ; `VisualEditor` ne garde que la couverture verticale du téléphone (« Couverture verticale,
+// facultative », comme avant). Interface attendue : `VisualEditor({ labels: { portrait;
+// portraitHint; choosePortrait; replacePortrait; removePortrait }; portrait: VisualTile | null;
+// onPickPortrait(); onRemovePortrait(); busy? })`.
+describe('VisualEditor, the vertical cover only', () => {
   const labels: VisualEditorLabels = {
-    gallery: 'Photos',
-    galleryHint: '6 au plus.',
-    cover: 'Couverture',
-    add: 'Ajouter une photo',
-    earlier: (n) => `Avancer la photo ${n}`,
-    later: (n) => `Reculer la photo ${n}`,
-    makeCover: (n) => `Mettre la photo ${n} en couverture`,
-    remove: (n) => `Retirer la photo ${n}`,
-    portrait: 'Couverture verticale',
+    portrait: 'Couverture verticale, facultative',
     portraitHint: 'Sur téléphone.',
     choosePortrait: 'Choisir une couverture verticale',
     replacePortrait: 'Remplacer la couverture verticale',
     removePortrait: 'Retirer la couverture verticale',
   }
-  const actions = () => ({
-    onAdd: jest.fn(),
-    onMove: jest.fn(),
-    onMakeCover: jest.fn(),
-    onRemove: jest.fn(),
-    onPickPortrait: jest.fn(),
-    onRemovePortrait: jest.fn(),
-  })
-
-  it('names every button after its photo, so that the order can be changed without seeing', async () => {
-    const on = actions()
-    await renderWithProviders(
-      <VisualEditor
-        labels={labels}
-        gallery={[tile(1), tile(2), tile(3)]}
-        max={6}
-        portrait={null}
-        {...on}
-      />,
-    )
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Avancer la photo 2' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Reculer la photo 2' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Mettre la photo 3 en couverture' }))
-    await fireEvent.press(screen.getByRole('button', { name: 'Retirer la photo 1' }))
-
-    expect(on.onMove).toHaveBeenNthCalledWith(1, 1, -1)
-    expect(on.onMove).toHaveBeenNthCalledWith(2, 1, 1)
-    expect(on.onMakeCover).toHaveBeenCalledWith(2)
-    expect(on.onRemove).toHaveBeenCalledWith(0)
-  })
-
-  it('cannot move the first photo earlier, the last one later, or the cover to the cover', async () => {
-    await renderWithProviders(
-      <VisualEditor
-        labels={labels}
-        gallery={[tile(1), tile(2)]}
-        max={6}
-        portrait={null}
-        {...actions()}
-      />,
-    )
-
-    const button = (name: string) => screen.getByRole('button', { name })
-    expect(button('Avancer la photo 1')).toBeDisabled()
-    expect(button('Reculer la photo 2')).toBeDisabled()
-    expect(button('Mettre la photo 1 en couverture')).toBeDisabled()
-    expect(button('Reculer la photo 1')).toBeEnabled()
-  })
-
-  it('stops offering to add photos once the gallery is full', async () => {
-    const full = Array.from({ length: 6 }, (_, i) => tile(i + 1))
-    await renderWithProviders(
-      <VisualEditor labels={labels} gallery={full} max={6} portrait={null} {...actions()} />,
-    )
-
-    expect(screen.getByRole('button', { name: 'Ajouter une photo' })).toBeDisabled()
-  })
+  const actions = () => ({ onPickPortrait: jest.fn(), onRemovePortrait: jest.fn() })
 
   it('offers to choose a vertical cover, then to replace or remove it', async () => {
     const on = actions()
     const { rerender } = await renderWithProviders(
-      <VisualEditor labels={labels} gallery={[]} max={6} portrait={null} {...on} />,
+      <VisualEditor labels={labels} portrait={null} {...on} />,
     )
+    expect(screen.getByText(labels.portrait)).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Choisir une couverture verticale' }))
     expect(on.onPickPortrait).toHaveBeenCalled()
 
-    await rerender(<VisualEditor labels={labels} gallery={[]} max={6} portrait={tile(9)} {...on} />)
+    await rerender(<VisualEditor labels={labels} portrait={tile(9)} {...on} />)
     await fireEvent.press(screen.getByRole('button', { name: 'Retirer la couverture verticale' }))
 
     expect(screen.getByRole('button', { name: 'Remplacer la couverture verticale' })).toBeTruthy()
     expect(on.onRemovePortrait).toHaveBeenCalled()
+  })
+
+  it('keeps its buttons waiting while a photo is being sent', async () => {
+    await renderWithProviders(
+      <VisualEditor labels={labels} portrait={tile(9)} busy {...actions()} />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Remplacer la couverture verticale' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Retirer la couverture verticale' })).toBeDisabled()
+  })
+
+  it('no longer draws the gallery: no photo tile, no « Ajouter »', async () => {
+    await renderWithProviders(<VisualEditor labels={labels} portrait={null} {...actions()} />)
+
+    expect(screen.getByRole('button', { name: 'Choisir une couverture verticale' })).toBeTruthy() // témoin
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 })
 

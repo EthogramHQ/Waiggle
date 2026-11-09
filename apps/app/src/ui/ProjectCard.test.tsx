@@ -16,6 +16,7 @@
 import { layout } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Linking, Platform, StyleSheet } from 'react-native'
+import { CATEGORY_ICONS } from '../projects/categories'
 import { SummaryCard } from '../projects/SummaryCard'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
@@ -364,3 +365,165 @@ describe('SummaryCard, the feed card of a project summary', () => {
     expect(readAs(total(49))).not.toBeNull()
   })
 })
+
+// --- R6a : la catégorie sur la carte ------------------------------------------------------------
+// Scénario « La catégorie sur les cartes et la page » : la catégorie principale, en étiquette de
+// verre en haut à gauche de la photo, avec son icône ; sans photo, au-dessus du titre ; un projet
+// d'avant R6a n'a pas de catégorie, donc pas d'étiquette. Relecture du plan (ui-I5) : l'étiquette
+// est hors du lien de la carte, mais lue dans sa description (`aria-describedby` sur le web,
+// `accessibilityHint` sur téléphone) ; elle laisse passer le toucher vers la carte
+// (`pointerEvents: 'none'`) ; avec `overlay`, la pastille passe dessous, dans la même colonne.
+// Interface attendue (plan R6a, découpage, ligne U2) : `category?: { label: string; icon: IconName }`.
+
+const science = {
+  label: fr.t(($) => $.project.category.science),
+  icon: CATEGORY_ICONS.science,
+}
+const categoryDescription = plain(fr.t(($) => $.card.category, { category: science.label }))
+const photo = {
+  source: { uri: 'https://api.example/cafes.webp' },
+  label: 'Une tasse de café sur un carnet',
+}
+
+type TreeNode = {
+  props: Record<string, unknown>
+  parent: TreeNode | null
+  children: (TreeNode | string)[]
+}
+
+/** Le texte d'un élément et de ses enfants, mis bout à bout. */
+const textOf = (node: TreeNode | string): string =>
+  typeof node === 'string' ? node : node.children.map(textOf).join('')
+
+/** Tous les éléments de l'arbre rendu, dans l'ordre de lecture (parcours en profondeur). */
+const allNodes = (): TreeNode[] => {
+  const found: TreeNode[] = []
+  const visit = (node: TreeNode | string) => {
+    if (typeof node === 'string') return
+    found.push(node)
+    for (const child of node.children) visit(child)
+  }
+  visit(screen.root as unknown as TreeNode)
+  return found
+}
+
+/** L'étiquette dessinée : le texte « Sciences et espace », lu ou caché aux lecteurs d'écran. */
+const categoryLabel = () =>
+  screen.getByText(science.label, { includeHiddenElements: true }) as unknown as TreeNode
+
+/** Les ancêtres d'un élément, du plus proche au plus lointain, lui compris. */
+const lineage = (node: TreeNode): TreeNode[] => {
+  const chain: TreeNode[] = []
+  for (let current: TreeNode | null = node; current; current = current.parent) chain.push(current)
+  return chain
+}
+
+describe('ProjectCard, its category (R6a)', () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  it('keeps the card link named by the title and describes it with the category', async () => {
+    // Sur téléphone : l'indice du lien, lu après son nom.
+    const { rerender } = await renderWithProviders(
+      <ProjectCard {...card} image={photo} category={science} onPress={() => {}} />,
+    )
+    expect(projectLink()).toBeTruthy()
+    expect(plain(String(projectLink().props.accessibilityHint ?? ''))).toContain(
+      categoryDescription,
+    )
+
+    // Sur le web : `aria-describedby` désigne (entre autres, l'accroche) le texte de la catégorie.
+    jest.replaceProperty(Platform, 'OS', 'web')
+    await rerender(<ProjectCard {...card} image={photo} category={science} onPress={() => {}} />)
+    const ids = String(projectLink().props['aria-describedby'] ?? '').split(/\s+/)
+    const described = allNodes()
+      .filter(
+        (node) => typeof node.props.nativeID === 'string' && ids.includes(node.props.nativeID),
+      )
+      .map((node) => plain(textOf(node)))
+    expect(described).toContain(categoryDescription)
+    // Le nom du lien reste le titre seul.
+    expect(screen.getByRole('link', { name: card.title })).toBeTruthy()
+  })
+
+  it('draws the category on the photo, outside the card link', async () => {
+    await renderWithProviders(
+      <ProjectCard {...card} image={photo} category={science} onPress={() => {}} />,
+    )
+
+    expect(insideControl(categoryLabel())).toBe(false)
+  })
+
+  it('lets a tap on the category label open the project', async () => {
+    await renderWithProviders(
+      <ProjectCard {...card} image={photo} category={science} onPress={() => {}} />,
+    )
+
+    // L'étiquette est posée sur la carte, hors du lien : le doigt la traverse vers la carte
+    // (`pointerEvents` « none » sur l'étiquette ou sur la vue qui la porte).
+    const chain = lineage(categoryLabel())
+    expect(chain.some((node) => node.props.pointerEvents === 'none')).toBe(true)
+    expect(chain.some((node) => ['link', 'button'].includes(String(roleOf(node.props))))).toBe(
+      false,
+    )
+  })
+
+  it('draws the category above the title without a photo', async () => {
+    await renderWithProviders(<ProjectCard {...card} category={science} onPress={() => {}} />)
+
+    const nodes = allNodes()
+    const label = nodes.indexOf(categoryLabel())
+    const title = nodes.indexOf(
+      screen.getByText(card.title, { includeHiddenElements: true }) as unknown as TreeNode,
+    )
+    expect(label).toBeGreaterThanOrEqual(0)
+    expect(title).toBeGreaterThan(label)
+  })
+
+  it('keeps the follow chip after the category, in the same column', async () => {
+    await renderWithProviders(
+      <ProjectCard
+        {...card}
+        image={photo}
+        category={science}
+        onPress={() => {}}
+        overlay={chip(() => {})}
+      />,
+    )
+
+    const label = categoryLabel()
+    const followChip = screen.getByRole('switch', { name: follow }) as unknown as TreeNode
+    const nodes = allNodes()
+    expect(nodes.indexOf(followChip)).toBeGreaterThan(nodes.indexOf(label))
+    // La colonne : le plus proche ancêtre commun aux deux, qui ne contient ni le lien de la carte
+    // ni son titre (l'étiquette et la pastille sont rangées ensemble, l'une sous l'autre).
+    const labelChain = lineage(label)
+    const column = lineage(followChip).find((node) => labelChain.includes(node))
+    expect(column).toBeDefined()
+    const inColumn = (column ? allNodesUnder(column) : []).map((node) => node.props)
+    expect(inColumn.some((props) => roleOf(props) === 'link')).toBe(false)
+  })
+
+  it('shows no category for a project published before R6a', async () => {
+    await renderWithProviders(<ProjectCard {...card} image={photo} onPress={() => {}} />)
+
+    expect(projectLink()).toBeTruthy() // témoin
+    expect(screen.queryByText(science.label, { includeHiddenElements: true })).toBeNull()
+    expect(projectLink().props.accessibilityHint ?? '').not.toContain(categoryDescription)
+  })
+})
+
+/** Les éléments sous un élément donné (lui compris). */
+const allNodesUnder = (root: TreeNode): TreeNode[] => {
+  const found: TreeNode[] = []
+  const visit = (node: TreeNode | string) => {
+    if (typeof node === 'string') return
+    found.push(node)
+    for (const child of node.children) visit(child)
+  }
+  visit(root)
+  return found
+}

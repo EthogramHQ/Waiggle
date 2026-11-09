@@ -422,38 +422,204 @@ export const fr = {
       'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
   },
   project: {
-    new: {
-      title: 'Nouveau projet',
-      subtitle: 'Tu pourras tout modifier ensuite.',
-      submit: 'Publier',
-    },
-    edit: {
-      title: 'Modifier le projet',
-      submit: 'Enregistrer',
-    },
-    fields: {
+    // R6a : la feuille de publication et de modification (planches R6-*). Les textes marqués
+    // « juridique » viennent de la relecture du plan (8/11/2026) et remplacent ceux des planches.
+    // Les blocs `new`, `edit`, `fields`, `visuals` et `preview` disparaîtront avec l'ancien écran.
+    form: {
+      newTitle: 'Nouveau projet',
+      newIntro: 'Montre à tes proches ce que tu construis. Tu pourras tout modifier ensuite.',
+      editTitle: 'Modifier le projet',
+      publish: 'Publier',
+      save: 'Enregistrer',
+      cancel: 'Annuler',
+      // juridique (jur-J3) : vrai aussi après un changement de photo, déjà enregistré.
+      unchanged: 'Rien à enregistrer pour l’instant.',
+      // Les photos.
+      photos: 'Photos',
+      photosCount: '{{count}} / {{max}}',
+      photosCountSpoken_one: '{{count}} photo sur {{max}}',
+      photosCountSpoken_other: '{{count}} photos sur {{max}}',
+      photosList: 'Les photos du projet, dans l’ordre',
+      addPhotos: 'Ajouter',
+      addPhotosLabel: 'Ajouter des photos',
+      photosRules: 'JPEG, PNG ou WebP, 5 Mo au plus.',
+      // juridique (jur-S1, R6a) : le droit à l'image et les droits sur la photo.
+      photosConsent:
+        'Ne publie la photo d’une personne qu’avec son accord, et seulement des images que tu as le droit de partager.',
+      photosOrder:
+        'La première sert de couverture : fais glisser une photo, ou utilise « Déplacer », pour changer l’ordre.',
+      // juridique (jur-J4) : en modification seulement.
+      photosSaved: 'Les photos s’enregistrent tout de suite.',
+      // Un 404 en retirant une photo (design, R6a) : elle a déjà été retirée ailleurs.
+      photoGone: 'Cette photo a déjà été retirée.',
+      dropZone: 'Glisse tes images ici, ou',
+      dropZoneChoose: 'choisis-les',
+      cover: 'Couverture',
+      // Le nom d'une tuile, lu par les lecteurs d'écran.
+      photoTile: 'Photo {{number}}',
+      photoTileCover: 'Photo {{number}}, couverture',
+      photoTileDescribed: 'Photo {{number}} : {{description}}',
+      photoTileCoverDescribed: 'Photo {{number}}, couverture : {{description}}',
+      photoUploading: 'Envoi de la photo {{number}}',
+      photoFailed: 'La photo {{number}} n’a pas pu être ajoutée : {{reason}}',
+      photoTooLarge: 'elle dépasse 5 Mo.',
+      photoWrongType: 'ce format n’est pas accepté.',
+      photoTooMany: 'il y a déjà 6 photos.',
+      // Plusieurs photos choisies d'un coup, au-delà des places qui restent : pickVisuals garde les
+      // premières, et la feuille le dit (décision de la session, R6a).
+      photosCut_one: 'Seule {{count}} photo a été ajoutée : un projet en garde {{max}} au plus.',
+      photosCut_other:
+        'Seules les {{count}} premières photos ont été ajoutées : un projet en garde {{max}} au plus.',
+      photoUploadError: 'l’envoi a échoué.',
+      movePhoto: 'Déplacer la photo {{number}}',
+      movePhotoEarlier: 'Avancer',
+      movePhotoLater: 'Reculer',
+      makeCover: 'Mettre en couverture',
+      photoMoved: 'Photo déplacée en place {{place}}.',
+      removePhoto: 'Retirer la photo {{number}}',
+      photoDescription: 'Description de la photo {{number}}, facultative',
+      // juridique (jur-J10).
+      photoDescriptionHint:
+        'Lue à voix haute par les lecteurs d’écran, pour chaque personne qui voit le projet. Ne nomme personne sans son accord.',
+      describeFailed: 'La description n’a pas pu être enregistrée. Réessaie.',
+      // juridique (jur-J11) : une photo échoue après la création du projet.
+      uploadFailed:
+        'Le projet est enregistré, mais certaines photos n’ont pas pu être envoyées. Ajoute-les à nouveau ici.',
+      // Le titre, la phrase, la description, le lien.
       title: 'Titre',
-      pitch: 'Le pitch, en une phrase',
+      oneLine: 'En une phrase',
       description: 'Description',
       descriptionHint: 'Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…).',
-      status: 'Où en est-il ?',
-      public: 'Public',
-      publicHint:
-        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
-      demoUrl: 'Lien de démo (facultatif)',
+      demoUrl: 'Lien de la démo, facultatif',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
-      demoUrlOk: 'C’est bon : un site public en https.',
-      recipe: 'Ajouter la recette',
-      recipeHint: 'Outils, temps passé, prompts clés : facultatif',
-      tools: 'Outils et modèles utilisés',
-      toolsLimit: '{{max}} au plus',
-      toolsPlaceholder: 'Ajouter un outil',
-      timeSpent: 'Temps passé',
-      prompts: 'Prompts clés (facultatif)',
-      promptsHint: '{{max}} au plus. Ils sont affichés tels quels.',
+      demoValid: 'Lien valide',
+      // juridique (jur-J16) : la forme seulement, le site n'est jamais ouvert.
+      demoNotChecked: '{{appName}} n’ouvre pas ce site et ne vérifie pas son contenu.',
+      stage: 'Où en est le projet ?',
+      // Catégorie et outils.
+      category: 'Catégorie',
+      categoryRule: 'Une principale, et une seconde si tu veux.',
+      secondary: 'Seconde, facultative',
+      chooseCategory: 'Choisis une catégorie',
+      categoryRank1: '{{category}}, catégorie principale',
+      categoryRank2: '{{category}}, catégorie seconde',
+      categoryPromoted: '{{category}} devient la catégorie principale.',
+      categoryReplaced: '{{category}} remplace {{previous}} en catégorie seconde.',
+      categoriesAndTools: 'Catégorie et outils',
+      ok: 'OK',
+      tools: 'Outils',
+      toolsCount: '{{count}} / {{max}}',
+      toolsCountSpoken_one: '{{count}} outil choisi sur {{max}}',
+      toolsCountSpoken_other: '{{count}} outils choisis sur {{max}}',
+      toolsChosen: 'Outils choisis',
+      toolSearch: 'Chercher un outil',
+      toolSuggestions: 'Outils déjà utilisés',
+      toolUses_one: '{{count}} projet',
+      toolUses_other: '{{count}} projets',
+      toolSuggestion_one: '{{name}}, {{count}} projet',
+      toolSuggestion_other: '{{name}}, {{count}} projets',
+      addTool: 'Ajouter « {{name}} »',
+      addToolButton: 'Ajouter un outil',
+      removeTool: 'Retirer {{name}}',
+      // « Commencé en » et « Facile à refaire ? ».
+      startedOn: 'Commencé en',
+      month: 'Mois',
+      year: 'Année',
+      clear: 'Effacer',
+      difficulty: 'Facile à refaire ?',
+      // Les prompts.
+      promptCounter: '{{count, number}} / {{max, number}}',
+      promptCounterSpoken_one: '{{count, number}} caractère sur {{max, number}}',
+      promptCounterSpoken_other: '{{count, number}} caractères sur {{max, number}}',
+      promptHint: 'Retire ce qui est personnel : noms, adresses, mots de passe.',
+      invisibleRemoved_one: '{{count}} caractère invisible a été retiré.',
+      invisibleRemoved_other: '{{count}} caractères invisibles ont été retirés.',
+      keyFound: 'Clé : {{masked}}',
+      // juridique (jur-J12).
+      keyWarning:
+        'Une clé d’API est collée ici. Les membres qui liront ce prompt pourraient s’en servir à tes frais.',
+      keyRevoke:
+        'Si elle a déjà été visible, la retirer ne suffit pas : désactive-la chez son fournisseur.',
+      removeKey: 'Retirer la clé',
+      removeKeyNamed: 'Retirer la clé {{masked}}',
+      keyRemoved: '[clé retirée]',
+      otherPrompts: 'Les autres prompts',
       prompt: 'Prompt {{number}}',
       addPrompt: 'Ajouter un prompt',
       removePrompt: 'Retirer le prompt {{number}}',
+      // Qui peut le voir.
+      audience: 'Qui peut le voir ?',
+      members: 'Membres de {{appName}}',
+      membersHint: 'Toute personne qui a un compte.',
+      private: 'Privé',
+      // juridique (jur-J6).
+      privateHint: 'Un brouillon : aucun autre membre ne le voit.',
+      audienceMembers:
+        'Les membres de {{appName}} verront ce projet, et tes abonnés le trouveront dans leur fil.',
+      audienceMembersEdit:
+        'Les membres de {{appName}} voient ce projet, et tes abonnés le retrouvent dans leur fil.',
+      // juridique (jur-J6) : un nouveau projet privé.
+      audiencePrivateNew:
+        'Aucun autre membre ne le verra. Tu pourras le montrer aux membres quand tu voudras.',
+      audiencePrivate:
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient visible des membres.',
+      // L'aperçu de la carte (ordinateur).
+      preview: 'Aperçu dans le fil',
+      previewHint: 'Il suit ce que tu écris.',
+      previewLight:
+        'La lumière autour de la carte vient de ta première photo. Change-la, elle change aussi.',
+      previewUntitled: 'Ton projet',
+      previewNoPitch: 'Ta phrase apparaîtra ici.',
+      // Supprimer, abandonner.
+      deleteZone: 'Supprimer ce projet',
+      // juridique (jur-J7).
+      deleteOwner: 'Aucun autre membre ne peut modifier ni supprimer ce projet.',
+      deleteError: 'Le projet n’a pas pu être supprimé. Réessaie.',
+      abandonNew: 'Abandonner ce projet ?',
+      // juridique (jur-J2).
+      abandonNewBody:
+        'Rien n’a encore été envoyé : ce que tu as écrit et les photos choisies seront perdus.',
+      abandonEdit: 'Abandonner les changements ?',
+      abandonEditBody:
+        'Tes changements seront perdus. Les photos, elles, sont déjà enregistrées : elles restent comme tu les as laissées.',
+      keepEditing: 'Continuer',
+      abandon: 'Abandonner',
+      // Après l'envoi.
+      published: 'Projet publié',
+      // juridique (jur-J6).
+      draftSaved: 'Brouillon enregistré. Aucun autre membre ne le voit.',
+      saved: 'Modifications enregistrées.',
+      deleted: 'Projet supprimé.',
+    },
+    // R6a : les catégories, dans l'ordre de la feuille (codes de `PROJECT_CATEGORIES`).
+    category: {
+      'home-garden': 'Maison et jardin',
+      cooking: 'Cuisine',
+      family: 'Famille et enfants',
+      learning: 'Apprendre',
+      games: 'Jeux',
+      art: 'Art et dessin',
+      music: 'Musique',
+      'photo-video': 'Photo et vidéo',
+      'health-sport': 'Santé et sport',
+      travel: 'Voyages',
+      money: 'Argent et budget',
+      work: 'Travail',
+      code: 'Code et outils',
+      animals: 'Animaux',
+      science: 'Sciences et espace',
+      other: 'Autre',
+    },
+    // R6a : « Facile à refaire ? ». La couleur de la pastille n'est jamais seule : le texte dit tout.
+    difficulty: {
+      easy: 'À la portée de tous',
+      medium: 'Il faut s’accrocher',
+      hard: 'Pour les initiés',
+    },
+    fields: {
+      demoUrl: 'Lien de démo (facultatif)',
+      demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
+      demoUrlOk: 'C’est bon : un site public en https.',
     },
     status: {
       idea: 'Idée',
@@ -462,31 +628,10 @@ export const fr = {
       done: 'Terminé',
       paused: 'En pause',
     },
-    timeSpent: {
-      unknown: 'Non précisé',
-      hour: 'Moins d’une heure',
-      evening: 'Une soirée',
-      weekend: 'Un week-end',
-      weeks: 'Quelques semaines',
-      months: 'Plusieurs mois',
-    },
     preview: {
-      title: 'Aperçu dans le fil',
       now: 'à l’instant',
-      untitled: 'Ton projet',
-      noPitch: 'Ton pitch apparaîtra ici.',
     },
     visuals: {
-      gallery: 'Photos',
-      galleryHintNew:
-        '{{max}} au plus. La première sert de couverture. Elles partent à la publication.',
-      galleryHintEdit:
-        '{{max}} au plus. La première sert de couverture. Chaque changement s’enregistre tout de suite.',
-      cover: 'Couverture',
-      add: 'Ajouter une photo',
-      earlier: 'Avancer la photo {{number}}',
-      later: 'Reculer la photo {{number}}',
-      makeCover: 'Mettre la photo {{number}} en couverture',
       remove: 'Retirer la photo {{number}}',
       portrait: 'Couverture verticale (téléphone)',
       portraitHint:
@@ -497,8 +642,6 @@ export const fr = {
       photo: 'Photo {{number}} sur {{total}}',
       portraitLabel: 'Couverture verticale',
       preparing: 'Préparation de la photo…',
-      uploadFailed:
-        'Le projet est publié, mais certaines photos n’ont pas pu être envoyées. Ajoute-les à nouveau ici.',
     },
     notes: {
       title: 'Journal',
@@ -507,7 +650,7 @@ export const fr = {
       field: 'Ta note',
       hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
       hintPrivate:
-        'Ce projet est privé : personne d’autre que toi ne voit ses notes. Si tu le rends public, elles seront visibles de tous les membres.',
+        'Ce projet est privé : aucun autre membre ne voit ses notes. S’il redevient visible des membres, tous les membres les verront.',
       submit: 'Publier la note',
       required: 'Écris ta note avant de la publier.',
       hintAnnounce:
@@ -564,6 +707,9 @@ export const fr = {
         encoded: 'Il contient un long bloc codé, illisible tel quel.',
         secret:
           'Il parle d’informations à garder pour soi (mot de passe, clé, code, données bancaires…).',
+        // R6a, juridique (jur-J12) : une clé d'API reconnue dans le texte, auteur compris.
+        apiKey:
+          'Il contient ce qui ressemble à une clé d’API : quelqu’un pourrait s’en servir aux frais de son propriétaire.',
       },
     },
     comments: {
@@ -610,13 +756,12 @@ export const fr = {
       hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
       // Les légendes réduites d'une fenêtre basse (R5b) : seulement qui lira.
       hintShort: 'Tous les membres connectés liront ton commentaire.',
-      hintPrivateShort: 'Ce projet est privé : personne d’autre que toi ne lira ce commentaire.',
+      hintPrivateShort: 'Ce projet est privé : aucun autre membre ne lira ce commentaire.',
       replyHintShort: 'Tous les membres connectés liront ta réponse.',
-      replyHintPrivateShort:
-        'Ce projet est privé : personne d’autre que toi ne lira cette réponse.',
+      replyHintPrivateShort: 'Ce projet est privé : aucun autre membre ne lira cette réponse.',
       editHintShort: 'Tous les membres connectés liront la nouvelle version.',
       hintPrivate:
-        'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient public, tous les membres le liront.',
+        'Ce projet est privé : aucun autre membre ne lira ce commentaire. S’il devient visible des membres, tous les membres le liront.',
       about: '{{name}} : {{text}}',
       published: 'Commentaire publié.',
       error: 'Le commentaire n’a pas pu être publié. Réessaie.',
@@ -625,7 +770,7 @@ export const fr = {
       replyHint:
         'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
-        'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient public, tous les membres la liront.',
+        'Ce projet est privé : aucun autre membre ne lira cette réponse. S’il devient visible des membres, tous les membres la liront.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
       replyGone: 'Ce fil n’accepte plus de réponse.',
       replyPublished: 'Réponse publiée.',
@@ -680,21 +825,29 @@ export const fr = {
       // R5b (D4, jur-P9) : l'auteur ne lit pas non plus les commentaires ni les réactions des autres
       // sur son projet privé (`sees` des commentaires, `reactions/load.ts`).
       privateBanner:
-        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
+        'Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient visible des membres.',
       external: '{{host}}, un site hors de {{appName}}',
       description: 'Description',
       tryDemo: 'Tester la démo',
       noDemo: 'Pas encore de démo',
       recipe: 'La recette',
       tools: 'Outils et modèles',
-      timeSpent: 'Temps passé',
       prompts: 'Prompts clés',
+      // R6a : « La recette » montre le mois de début et la difficulté (le temps passé a disparu).
+      startedOn: 'Commencé en {{month}}',
+      difficulty: 'Facile à refaire : {{level}}',
+      // La catégorie à côté du statut (« Sciences et espace · Apprendre »).
+      categories: '{{primary}} · {{secondary}}',
       edit: 'Modifier',
       delete: 'Supprimer',
       deleteTitle: 'Supprimer « {{title}} » ?',
+      // juridique (jur-J9) : « notes » tant que le journal s'appelle ainsi ; R7 dira « mises à jour ».
       deleteConfirm:
-        'Le projet, sa description, sa recette, ses photos et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
-      deleteConfirmButton: 'Supprimer le projet',
+        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
+      // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
+      deleteConfirmRemoved:
+        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
+      deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
       notFound:
@@ -714,7 +867,7 @@ export const fr = {
       tooManyTools: '{{max}} outils au plus.',
       toolTooLong: 'Chaque outil doit faire au plus {{max}} caractères.',
       tooManyPrompts: '{{max}} prompts au plus.',
-      promptTooLong: 'Chaque prompt doit faire au plus {{max}} caractères.',
+      promptTooLong: 'Chaque prompt doit faire au plus {{max, number}} caractères.',
       invalidCharacters:
         'Certains caractères ne sont pas autorisés (caractères invisibles ou de contrôle).',
     },
@@ -845,6 +998,9 @@ export const fr = {
       prompt: 'Prompt',
       tools: 'Outils',
       demoUrl: 'Lien de démo',
+      // R6a : la description d'une photo ; la copie dit de quelle photo il s'agit (jur-J13).
+      photoDescription: 'Description d’une photo',
+      photoDescriptionNumbered: 'Description de la photo {{n}}',
       body: 'Texte',
     },
     images: {
@@ -1046,7 +1202,7 @@ export const fr = {
     projectCount_other: '{{count}} projets',
     /** Au plafond de la liste (PROJECT_LIST_MAX) : « 50 projets ou plus ». */
     projectCountMore: '{{max}} projets ou plus',
-    empty: 'Pas encore de projet public.',
+    empty: 'Pas encore de projet visible des membres.',
     emptyMine: 'Tu n’as encore rien publié.',
     private: 'Privé',
     notFoundTitle: 'Ce membre est introuvable',
@@ -1234,6 +1390,8 @@ export const fr = {
   gallery: {
     label: 'Photos du projet',
     photoOf: 'Photo {{index}} sur {{count}}',
+    // R6a : une photo décrite est lue par sa description, avec sa place (ui-M2).
+    photoDescribed: '{{description}}, photo {{index}} sur {{count}}',
     count: '{{index}} sur {{count}}',
     previous: 'Photo précédente',
     next: 'Photo suivante',
@@ -1516,6 +1674,8 @@ export const fr = {
   card: {
     reactions_one: '{{count}} réaction',
     reactions_other: '{{count}} réactions',
+    // R6a : la catégorie de la carte, lue dans la description du lien (ui-I5).
+    category: 'Catégorie : {{category}}',
   },
   follow: {
     follow: 'Suivre',
@@ -1626,5 +1786,8 @@ export const fr = {
     // Tranche R2.
     alreadyVerified: 'Cette adresse est déjà vérifiée : connecte-toi.',
     network: 'Impossible de joindre {{appName}}. Vérifie ta connexion et réessaie.',
+    // Tranche R6a.
+    categoryRequired: 'Choisis d’abord une catégorie principale.',
+    sameCategory: 'La seconde catégorie doit être différente de la principale.',
   },
 } as const

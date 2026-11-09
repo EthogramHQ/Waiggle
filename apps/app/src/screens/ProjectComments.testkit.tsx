@@ -290,6 +290,8 @@ export const pressKey = async (element: Host, key: string, target: unknown) => {
   const called = new Set<unknown>()
   let layer: Host | null = null
   await act(async () => {
+    // D'abord le document, à la descente : la fenêtre (Dialog) y note une Échap enfoncée chez elle.
+    for (const listener of pageListeners.get('keydown') ?? []) listener(nativeEvent)
     for (let node: Host | null = element; node && !stopped; node = node.parent) {
       // Un champ reçoit la touche par onKeyPress (react-native-web), les vues par onKeyDown.
       for (const name of node === element ? ['onKeyPress', 'onKeyDown'] : ['onKeyDown']) {
@@ -304,6 +306,57 @@ export const pressKey = async (element: Host, key: string, target: unknown) => {
   })
   const top = layer as Host | null
   if (key === 'Escape' && top) await act(async () => top.props.onRequestClose())
+}
+
+type PageListener = (event: { key: string; preventDefault: () => void }) => void
+
+/** Les écouteurs posés sur le faux document à la descente (`capture`), par type d'événement. */
+const pageListeners = new Map<string, PageListener[]>()
+
+/**
+ * Prête un faux document du navigateur, le temps d'un test « web » : il garde les écouteurs posés
+ * à la descente (`pressKey` leur envoie la touche, comme le navigateur), et toute autre propriété
+ * existe et ne fait rien (ThemeProvider écrit dans <html> et <body>). Sans lui, la fenêtre de
+ * confirmation ne voit jamais l'Échap enfoncée et ne se ferme pas (ui-B3). À appeler avant de
+ * dessiner l'écran ; rend la fonction qui le retire.
+ */
+export const lendPage = () => {
+  pageListeners.clear()
+  const node = (extra: Record<string, unknown> = {}): object =>
+    new Proxy(
+      { style: { setProperty: () => {}, removeProperty: () => {} }, ...extra },
+      {
+        get(target: Record<string | symbol, unknown>, key) {
+          if (key === 'then') return undefined
+          if (!(key in target)) {
+            target[key] =
+              key === 'documentElement' || key === 'body' || key === 'head'
+                ? node()
+                : () => undefined
+          }
+          return target[key]
+        },
+      },
+    )
+  const page = node({
+    visibilityState: 'visible',
+    hidden: false,
+    activeElement: null,
+    addEventListener: (type: string, listener: PageListener, capture?: boolean) => {
+      if (capture === true) pageListeners.set(type, [...(pageListeners.get(type) ?? []), listener])
+    },
+    removeEventListener: (type: string, listener: PageListener) => {
+      pageListeners.set(
+        type,
+        (pageListeners.get(type) ?? []).filter((kept) => kept !== listener),
+      )
+    },
+  })
+  Object.defineProperty(globalThis, 'document', { value: page, configurable: true })
+  return () => {
+    pageListeners.clear()
+    Reflect.deleteProperty(globalThis, 'document')
+  }
 }
 
 /** Ce que la feuille lit d'une touche venue de son panneau, et d'une touche venue d'ailleurs. */

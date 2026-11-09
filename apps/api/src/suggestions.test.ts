@@ -376,9 +376,15 @@ describe('who is suggested', () => {
     await act.decide(zoe, suspension)
     // Témoin : la suspension refuse bien à Léa de publier.
     later()
-    expect((await send('POST', '/v1/projects', lea, { title: 'Non', pitch: 'Non.' })).status).toBe(
-      403,
-    )
+    expect(
+      (
+        await send('POST', '/v1/projects', lea, {
+          title: 'Non',
+          primaryCategory: 'other',
+          pitch: 'Non.',
+        })
+      ).status,
+    ).toBe(403)
 
     // Max lit exactement la même liste, et le même Explorer : rien ne trahit la suspension.
     expect(await (await suggestionsRaw(max)).text()).toBe(before)

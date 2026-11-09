@@ -2,9 +2,9 @@
 // couverture verticale, en retirer une. L'ordre de la galerie se change avec le projet
 // (PATCH /v1/projects/:id, champ visualOrder). Seul l'auteur touche à ses visuels.
 import { createRoute, z } from '@hono/zod-openapi'
-import { Project, VISUAL_MAX_BYTES, VISUALS_MAX, VisualSlot } from '@ruche/contracts'
+import { Project, VISUAL_MAX_BYTES, VISUALS_MAX, VisualSlot, VisualUpdate } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
@@ -67,6 +67,33 @@ const deleteVisualRoute = createRoute({
   },
 })
 
+const describeVisualRoute = createRoute({
+  method: 'patch',
+  path: '/v1/projects/{id}/visuals/{visualId}',
+  summary: 'Describe a photo of my project',
+  description:
+    'Sets the description of a photo (250 characters at most, read aloud by screen readers). ' +
+    'An empty text clears it. Answers: 200 with the project; 400 for an invalid text; 401 without ' +
+    'a session; 403 for someone else’s public project; 404 for an unknown, private or blocked ' +
+    'project, or a photo that is not in this project; 409 `removed` when the moderation removed my ' +
+    'project (the photo can then still be removed, but no longer described); 413 for a body too ' +
+    'large; 429 when too many changes were made.',
+  request: {
+    params: z.object({ id: z.string(), visualId: z.string() }),
+    body: { required: true, content: { 'application/json': { schema: VisualUpdate } } },
+  },
+  responses: {
+    200: projectResponse('The project with the described photo.'),
+    400: errorResponse('Invalid data.'),
+    401: errorResponse('Not signed in.'),
+    403: errorResponse('Someone else’s project.'),
+    404: errorResponse('No such project or photo.'),
+    409: errorResponse('My project, removed by the moderation (`removed`).'),
+    413: errorResponse('Body too large.'),
+    429: errorResponse('Too many changes.'),
+  },
+})
+
 type Deps = { db: Database; storage: FileStorage; limiter: RateLimiter; publicApiUrl: string }
 
 export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
@@ -116,6 +143,17 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       onError: (c) => c.json(errorBody(languageOf(c), 'payload_too_large'), 413),
     }),
   )
+
+  // Retirer ou décrire une photo : le même quota, « modifications d'un projet », compté AVANT de
+  // lire le corps et de chercher le projet (sec-A1) : chaque demande compte, mal formée ou visant un
+  // projet inconnu. Un garde enregistré avant la route passe avant la vérification du corps.
+  app.on(['DELETE', 'PATCH'], '/v1/projects/:id/visuals/:visualId', async (c, next) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
+    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    await next()
+  })
 
   app.openapi(uploadVisualRoute, async (c) => {
     const user = c.get('user')
@@ -230,11 +268,8 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
   app.openapi(deleteVisualRoute, async (c) => {
     const user = c.get('user')
     if (!user) return unauthorized(c)
-    // Le quota d'abord, puis le projet (audit de sécurité du 25/10/2026, C7) : chaque demande
-    // compte, même celle qui vise un projet inconnu ou celui d'un autre, et le serveur ne lit pas
-    // le projet pour un membre qui a déjà dépassé son quota.
-    const decision = await limiter.hit(memberCounterKeys(user.id).projectChange, changeRule)
-    if (!decision.allowed) return tooMany(c, decision.retryAfterSeconds)
+    // Le quota a déjà été compté par le garde ci-dessus, avant la recherche du projet (audit de
+    // sécurité du 25/10/2026, C7) : chaque demande compte, même celle qui vise un projet inconnu.
     const { id, visualId } = c.req.valid('param')
     const access = await ownProject(id, user.id)
     if (access === 'not_found') return notFound(c)
@@ -250,6 +285,52 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       .returning({ storageKey: schema.projectMedia.storageKey })
     if (!removed) return notFound(c)
     await storage.delete(removed.storageKey)
+
+    const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
+    if (!project) return notFound(c)
+    return c.json(project, 200)
+  })
+
+  app.openapi(describeVisualRoute, async (c) => {
+    const user = c.get('user')
+    if (!user) return unauthorized(c)
+    // Le quota est compté par le garde plus haut, le corps vérifié par Zod avant d'arriver ici.
+    const { id, visualId } = c.req.valid('param')
+    const { description } = c.req.valid('json')
+
+    // Mêmes réponses que la suppression d'une photo (sec-B1) : 404 identique pour un projet
+    // inconnu, privé ou retiré d'un autre, ou caché par un blocage ; 403 pour un projet public d'un
+    // autre ; 409 « removed » pour son propre projet retiré.
+    const access = await projectAccess(db, id, user.id)
+    if (access === 'not_found') return notFound(c)
+    if (access === 'forbidden') return forbidden(c)
+    if (access === 'removed') return c.json(errorBody(languageOf(c), 'removed'), 409)
+    // Un identifiant mal formé ne désigne aucune photo (et ferait échouer la requête SQL).
+    if (!z.uuid().safeParse(visualId).success) return notFound(c)
+
+    // Une seule écriture, gardée DANS la requête (sec-A2) : la photo est de ce projet, et ce projet
+    // est à ce membre et pas retiré. La garde lue plus haut date d'un instant avant : la modération
+    // a pu retirer le projet entre-temps ; la condition « exists » est revérifiée au moment même de
+    // l'écriture. « returning » rend la ligne écrite ; aucune ligne, c'est qu'une condition n'est
+    // plus vraie. (Les colonnes sont qualifiées par leur table : « id » existe dans les deux.)
+    const written = await db
+      .update(schema.projectMedia)
+      .set({ description })
+      .where(
+        and(
+          eq(schema.projectMedia.id, visualId),
+          eq(schema.projectMedia.projectId, id),
+          sql`exists (select 1 from project where project.id = ${id} and project.author_id = ${user.id} and project.removed_at is null)`,
+        ),
+      )
+      .returning({ id: schema.projectMedia.id })
+    if (written.length === 0) {
+      // Photo inconnue ou d'un autre projet (404), ou projet retiré/supprimé depuis la garde : on
+      // relit les droits pour répondre comme les autres routes.
+      const again = await projectAccess(db, id, user.id)
+      if (again === 'removed') return c.json(errorBody(languageOf(c), 'removed'), 409)
+      return notFound(c)
+    }
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) return notFound(c)

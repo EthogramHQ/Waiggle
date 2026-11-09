@@ -3,29 +3,74 @@
 // aussi aux tests de retrouver chaque choix par son nom : getByRole('radio', { name: 'Testable' }).
 // Au clavier (web), comme tout groupe de boutons radio (et comme Segmented) : Tab n'arrive que sur
 // un choix, la barre d'espace le coche, et les flèches passent au choix voisin en le cochant.
-import { borders, layout, radii, space } from '@ruche/brand'
-import { useRef } from 'react'
+// R6a (« Facile à refaire ? ») : un choix peut porter un rond de couleur devant son texte (`dot`),
+// et une question facultative se vide par « Effacer » (`clearLabel`).
+import { borders, type ColorName, layout, radii, space } from '@ruche/brand'
+import { type ReactNode, type RefObject, useRef } from 'react'
 import { Platform, Pressable, View } from 'react-native'
+import { focusWithoutScroll } from './focus'
 import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
 import { Text } from './Text'
+import { TextLink } from './TextLink'
 import { useTheme } from './theme/ThemeProvider'
 
-type Option<T extends string> = { value: T; label: string; icon?: IconName }
+type Option<T extends string> = {
+  value: T
+  label: string
+  icon?: IconName
+  /**
+   * R6a : un rond de couleur devant le texte, par son rôle dans la marque (« success » vert,
+   * « amber » jaune, « danger » rouge pour « Facile à refaire ? »). Décoratif : la couleur n'est
+   * jamais seule, le texte dit tout, et le rond est caché aux lecteurs d'écran.
+   */
+  dot?: ColorName
+}
 
 // <T extends string> : un composant « générique ». T est le type des valeurs possibles
 // ('idea' | 'building' | …) : TypeScript vérifie que les options et la valeur choisie concordent.
-type Props<T extends string> = {
+// Les props se lisent en deux cas : sans « Effacer », `onChange` ne reçoit jamais null, et une
+// fonction qui ne prend qu'une valeur (`setStatus`) suffit ; avec « Effacer », elle doit accepter
+// null. `NoInfer<T>` : T se déduit des options et de la valeur, jamais de la fonction, qui le
+// reçoit tel quel.
+type Base<T extends string> = {
   label: string
   options: Option<T>[]
   /** Le choix coché ; null : aucun encore (une question à laquelle il faut répondre soi-même). */
   value: T | null
-  onChange: (value: T) => void
+  /**
+   * R6a, correction C9 : reçoit l'entrée du groupe, son seul arrêt de Tab (le choix coché, sinon le
+   * premier). Pour une fenêtre qui s'ouvre sur sa première question (`Dialog initialFocusRef`, le
+   * retrait de la modération).
+   */
+  entryRef?: RefObject<View | null>
 }
+type WithoutClear<T extends string> = Base<T> & {
+  clearLabel?: undefined
+  onChange: (value: NoInfer<T>) => void
+}
+type WithClear<T extends string> = Base<T> & {
+  /**
+   * R6a : le libellé d'un bouton qui vide la réponse (« Effacer »), pour une question facultative.
+   * Il n'est montré que quand un choix est coché : sans rien à effacer, il disparaît, et le focus
+   * passe au groupe. Facultatif ici aussi : un écran peut le donner selon le cas
+   * (`{...(optional ? { clearLabel } : null)}`), avec une seule fonction qui accepte null.
+   */
+  clearLabel?: string
+  /** Le choix touché, ou null quand « Effacer » vide la réponse. */
+  onChange: (value: NoInfer<T> | null) => void
+}
+type Props<T extends string> = WithoutClear<T> | WithClear<T>
 
 type KeyEvent = { key: string; preventDefault: () => void }
 
-export function Choices<T extends string>({ label, options, value, onChange }: Props<T>) {
+// Deux « surcharges » (overloads) : deux façons d'appeler le même composant. TypeScript essaie la
+// première, puis la seconde ; chacune donne son type au paramètre d'une fonction écrite sur place
+// (`onChange={(next) => …}`), ce qu'une simple union ne sait pas faire.
+export function Choices<T extends string>(props: WithoutClear<T>): ReactNode
+export function Choices<T extends string>(props: WithClear<T>): ReactNode
+export function Choices<T extends string>(props: Props<T>) {
+  const { label, options, value, onChange, clearLabel, entryRef } = props
   const { colors } = useTheme()
   // Les choix, pour y poser le focus quand une flèche passe au voisin.
   const refs = useRef<(View | null)[]>([])
@@ -65,11 +110,47 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
     }
   }
 
+  // « Effacer » : la réponse est vidée, puis le focus va au premier choix, le seul arrêt de Tab d'un
+  // groupe où rien n'est coché. Sans cela, le bouton qui disparaît emporterait le focus avec lui
+  // (il retomberait en haut de la page) ; sans défilement, la page reste où elle est.
+  const clear = () => {
+    // `props.clearLabel` dit à TypeScript que cette `onChange`-là accepte null (le bouton n'existe
+    // qu'avec un `clearLabel`).
+    if (props.clearLabel !== undefined) props.onChange(null)
+    focusWithoutScroll(refs.current[0])
+  }
+
+  const caption = (
+    <Text variant="caption" weight={600} tone="muted">
+      {label}
+    </Text>
+  )
+
   return (
     <View style={{ gap: space.sm }}>
-      <Text variant="caption" weight={600} tone="muted">
-        {label}
-      </Text>
+      {clearLabel === undefined ? (
+        caption
+      ) : (
+        // La question à gauche, « Effacer » à droite, sur une rangée toujours haute de 44 points :
+        // quand le bouton paraît ou disparaît, les choix dessous ne bougent pas.
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            // Avec flexWrap, une ligne seule resterait collée en haut des 44 points : centrée.
+            alignContent: 'center',
+            justifyContent: 'space-between',
+            columnGap: space.md,
+            minHeight: layout.touchTarget,
+          }}
+        >
+          <View style={{ flexShrink: 1, maxWidth: '100%' }}>{caption}</View>
+          {checkedIndex === -1 ? null : (
+            <TextLink role="button" label={clearLabel} tone="accent" onPress={clear} />
+          )}
+        </View>
+      )}
       <View
         accessibilityRole="radiogroup"
         accessibilityLabel={label}
@@ -82,6 +163,7 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
               key={option.value}
               ref={(node) => {
                 refs.current[index] = node
+                if (entryRef && index === tabStop) entryRef.current = node
               }}
               accessibilityRole="radio"
               accessibilityLabel={option.label}
@@ -112,13 +194,36 @@ export function Choices<T extends string>({ label, options, value, onChange }: P
               {option.icon ? (
                 <Icon name={option.icon} size={18} tone={checked ? 'onHoney' : 'muted'} />
               ) : null}
-              <Text
-                variant="callout"
-                weight={checked ? 700 : 500}
-                tone={checked ? 'onHoney' : 'default'}
-              >
-                {option.label}
-              </Text>
+              {option.dot ? (
+                // Le rond de couleur, caché aux lecteurs d'écran (iOS, Android, web) : le texte dit
+                // déjà tout. Coché, sur le miel, il est cerclé d'encre, sinon le jaune s'y perdrait
+                // (contrastPairs, `colors.ts`).
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                  style={{
+                    width: layout.choiceDot,
+                    height: layout.choiceDot,
+                    // Le rond garde sa taille quand le texte passe à la ligne.
+                    flexShrink: 0,
+                    borderRadius: radii.pill,
+                    borderWidth: borders.strong,
+                    borderColor: checked ? colors.onHoney : colors[option.dot],
+                    backgroundColor: colors[option.dot],
+                  }}
+                />
+              ) : null}
+              {/* Le texte rétrécit et passe à la ligne à côté du rond (texte agrandi à 200 %). */}
+              <View style={{ flexShrink: 1 }}>
+                <Text
+                  variant="callout"
+                  weight={checked ? 700 : 500}
+                  tone={checked ? 'onHoney' : 'default'}
+                >
+                  {option.label}
+                </Text>
+              </View>
             </Pressable>
           )
         })}

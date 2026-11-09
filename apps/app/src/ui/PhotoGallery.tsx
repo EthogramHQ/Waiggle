@@ -9,7 +9,9 @@
 // Pour le lecteur d'écran, la galerie est un élément « réglable », comme un curseur : il l'entend
 // « Photos du projet, Photo 2 sur 3 », et passe d'une photo à l'autre sans glisser (balayer vers le
 // haut ou le bas sur iOS, les flèches sur le web). `onIndexChange` prévient la page de la photo
-// montrée : elle en donne la couleur à la lumière d'ambiance (`Screen thumbhash`).
+// montrée : elle en donne la couleur à la lumière d'ambiance (`Screen thumbhash`). Depuis R6a, une
+// photo décrite par son auteur est lue par sa description, avec sa place (« Le ciel de ce soir,
+// photo 1 sur 3 ») ; « 1 sur 3 » reste affiché à côté pour l'œil.
 //
 // `overlay` : une couche posée sur la galerie, pour les boutons de verre (`CoverControls`) et ce qui
 // se pose à cheval sur son bas (`CoverStraddle`, la capsule sur ordinateur), tous deux dans
@@ -60,6 +62,12 @@ export type GalleryPhoto = {
   source: ImageSource | null
   /** Le résumé flou (ThumbHash), affiché le temps que la photo arrive. */
   thumbhash?: string | null
+  /**
+   * R6a : la description écrite par l'auteur (`ProjectVisual.description`), lue par les lecteurs
+   * d'écran à la place de « Photo 1 sur 3 ». Du texte brut, lu tel quel : jamais du Markdown, ni un
+   * texte à remplir (sec-M3). Absente, null ou vide : la photo n'est pas décrite.
+   */
+  description?: string | null
 }
 
 type Props = {
@@ -95,6 +103,10 @@ const DOT = space.sm - space.xxs
 const DOT_ACTIVE = space.lg
 
 type KeyEvent = { key: string; preventDefault: () => void }
+
+/** La description d'une photo, si elle en a une (des blancs seuls ne décrivent rien). */
+const describedBy = (photo: GalleryPhoto | undefined): string | null =>
+  photo?.description?.trim() ? photo.description : null
 
 export function PhotoGallery({
   photos,
@@ -242,8 +254,25 @@ export function PhotoGallery({
     [edge, insets.top],
   )
 
+  /**
+   * Ce que le lecteur d'écran dit de la photo de rang `rank` : sa description et sa place
+   * (« Le ciel de ce soir, photo 1 sur 3 », ui-M2), ou « Photo 2 sur 3 » sans description. La
+   * description passe en paramètre de `t` : i18next la recopie telle quelle, sans y chercher de
+   * `{{…}}` ; et le nom lu n'est jamais du Markdown ni du HTML (des astérisques restent des
+   * astérisques).
+   */
+  const spokenPhoto = (rank: number) => {
+    const description = describedBy(photos[rank])
+    return description
+      ? t(($) => $.gallery.photoDescribed, { description, index: rank + 1, count })
+      : t(($) => $.gallery.photoOf, { index: rank + 1, count })
+  }
+
   const label = t(($) => $.gallery.label)
-  const valueText = t(($) => $.gallery.photoOf, { index: index + 1, count })
+  const valueText = spokenPhoto(index)
+  // Une seule photo décrite : son nom est sa description (le texte de remplacement d'une image),
+  // sans « photo 1 sur 1 » ; pas décrite, « Photos du projet » comme avant.
+  const single = count === 1 ? describedBy(photos[0]) : null
   // Ce que le lecteur d'écran entend : à plusieurs photos, un élément réglable et sa valeur ; à une
   // seule, une image nommée ; sans photo (la lumière miel), un décor, que la page titre déjà.
   const reader = several
@@ -269,7 +298,11 @@ export function PhotoGallery({
         ...keys,
       }
     : count === 1
-      ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label }
+      ? {
+          accessible: true,
+          accessibilityRole: 'image' as const,
+          accessibilityLabel: single ?? label,
+        }
       : {
           accessibilityElementsHidden: true,
           importantForAccessibility: 'no-hide-descendants' as const,
@@ -293,7 +326,10 @@ export function PhotoGallery({
             image={{
               source: photo.source,
               thumbhash: photo.thumbhash ?? null,
-              label: t(($) => $.gallery.photoOf, { index: rank + 1, count }),
+              // Le nom de chaque photo, comme la valeur de la galerie. Une photo seule décrite :
+              // la galerie porte déjà sa description, l'image n'a pas de nom à elle (sinon le
+              // navigateur expose aussi « …, photo 1 sur 1 », vu dans `--explore`).
+              label: single ? '' : spokenPhoto(rank),
             }}
           />
         </View>

@@ -175,6 +175,7 @@ const tryPublish = (cookie: string) => {
   later()
   return act.send('POST', '/v1/projects', cookie, {
     title: 'Un nouveau projet',
+    primaryCategory: 'other',
     pitch: 'Pour voir si je peux encore publier.',
   })
 }
@@ -444,6 +445,7 @@ describe('a suspended account', () => {
   it('refuses a valid publication too, with a message that says so', async () => {
     const res = await act.send('POST', '/v1/projects', karim, {
       title: 'Un nouveau projet',
+      primaryCategory: 'other',
       pitch: 'Pour voir si je peux encore publier.',
     })
     expect(res.status).toBe(403)
@@ -608,7 +610,11 @@ describe('the end of a suspension', () => {
     karim = await act.signInAgain(KARIM)
     expect((await act.me(karim)).suspension).not.toBeNull()
     await expectError(
-      await act.send('POST', '/v1/projects', karim, { title: 'Avant', pitch: 'Encore suspendu.' }),
+      await act.send('POST', '/v1/projects', karim, {
+        title: 'Avant',
+        primaryCategory: 'other',
+        pitch: 'Encore suspendu.',
+      }),
       403,
       'suspended',
     )
@@ -617,6 +623,7 @@ describe('the end of a suspension', () => {
     expect((await act.me(karim)).suspension).toBeNull()
     const res = await act.send('POST', '/v1/projects', karim, {
       title: 'Après',
+      primaryCategory: 'other',
       pitch: 'La suspension est finie.',
     })
     expect(res.status).toBe(201)

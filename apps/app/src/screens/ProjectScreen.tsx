@@ -1,7 +1,8 @@
 // Page d'un projet (R5a, planches « Projet », « Projet-Desktop » et « Projet-Suite ») : sa galerie de
 // photos, son en-tête (statut, titre, dates, auteur, pitch), ses actions (« Tester la démo »,
-// « Suivre ce projet » ou, pour l'auteur, « Modifier »), les réactions, sa « recette » (outils,
-// temps passé), sa description, le prompt de départ, son journal et ses commentaires.
+// « Suivre ce projet » ou, pour l'auteur, « Modifier »), les réactions, sa « recette » (mois de
+// début, difficulté, outils), sa description, le prompt de départ, son journal et ses commentaires.
+// R6a : « Supprimer » est dans le menu « … » de l'auteur (projects/DeleteProjectDialog.tsx).
 // Ce fichier assemble des pièces faites ailleurs, sans écrire de style :
 // - la galerie (ui/PhotoGallery.tsx), qui grandit depuis la carte touchée (ui/coverTransition.tsx) ;
 // - l'en-tête et les actions (projects/ProjectHeader.tsx, projects/ProjectActions.tsx) ;
@@ -43,8 +44,9 @@ import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
-import { deleteProject } from '../projects/api'
-import { useForgetProject, useProject } from '../projects/hooks'
+import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
+import { useProject } from '../projects/hooks'
+import { startedMonth } from '../projects/month'
 import { ProjectActions } from '../projects/ProjectActions'
 import { ProjectHeader } from '../projects/ProjectHeader'
 import { useReaction } from '../reactions/api'
@@ -55,8 +57,8 @@ import { Columns } from '../ui/Columns'
 import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
 import { Dialog } from '../ui/Dialog'
+import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
 import type { Focusable } from '../ui/focus'
-import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
 import { NoteComposer } from '../ui/NoteComposer'
@@ -68,6 +70,7 @@ import { CoverControls, CoverSheet, CoverStraddle } from '../ui/ProjectCover'
 import { PromptBlock } from '../ui/PromptBlock'
 import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { ReactionFan } from '../ui/ReactionFan'
+import { RecipeFact } from '../ui/RecipeFact'
 import { RelativeTime } from '../ui/RelativeTime'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
@@ -129,7 +132,7 @@ export function ProjectScreen({ id }: { id: string }) {
 }
 
 function ProjectView({ project }: { project: Project }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const toast = useToast()
   // La carte qui devient la page : le titre reçoit le focus quand la photo est posée, et « Retour »
@@ -150,7 +153,6 @@ function ProjectView({ project }: { project: Project }) {
   const openOutside = useOpenOutside()
   // « Tester la démo » passe par la page de sortie, qui apprend de quel projet vient le lien (R5a).
   const openDemo = useOpenDemo()
-  const forgetProject = useForgetProject()
   const toSource = useMediaSources()
   const { sizeClass, columns } = useLayout()
   // large : tablette et ordinateur (barre du haut, Retour hors de la photo) ; columns : les deux
@@ -159,19 +161,17 @@ function ProjectView({ project }: { project: Project }) {
   // La photo montrée par la galerie : la lumière d'ambiance prend sa couleur.
   const [photoIndex, setPhotoIndex] = useState(0)
   // L'éventail des réactions (appui long sur la capsule), la feuille « Partager », la fenêtre qui
-  // confirme la suppression.
+  // confirme la suppression (ouverte depuis le menu « … », dont `menuRef` est le bouton).
   const [fanOpen, setFanOpen] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const menuRef = useRef<Focusable>(null)
 
   // Arrivé par un lien direct, il n'y a pas de page précédente : le retour mène à l'accueil. La
   // page se replie d'abord dans sa carte (ou s'efface), puis on la quitte.
   const goBack = useGoBack('/')
   const back = () => coverTarget.leave(goBack)
   const reaction = useReaction(project.id)
-  const { timeSpent } = project
   // « Me reconnecter », à côté de « Ta session a expiré » (tranche 6c).
   const signInAgain = useSignInAgain()
   // Un compte suspendu (tranche 7c) lit tout, mais ne modifie plus, ne réagit plus et n'écrit plus
@@ -201,17 +201,16 @@ function ProjectView({ project }: { project: Project }) {
   // plus : tous deux voient les nombres seuls.
   const readOnly = project.isMine || reactions.every((item) => item.locked)
 
-  const onDelete = async () => {
-    setBusy(true)
-    const result = await deleteProject(project.id)
-    setBusy(false)
-    if (!result.ok) {
-      setConfirming(false)
-      setError(t(($) => $.errors[result.error]))
-      return
-    }
-    forgetProject(project.id) // le projet n'existe plus : on l'oublie aussi dans le cache
-    router.replace('/')
+  // R6a : supprimé (la fenêtre a déjà rangé le cache), il arrive sur « Mes projets » avec « Projet
+  // supprimé. » (choix 7 du scénario). `dismissTo` : la pile revient jusqu'à « Moi » ou la remplace,
+  // jamais un retour vers la page d'un projet qui n'existe plus (relecture du plan, ui-M3).
+  const onDeleted = () => {
+    setConfirming(false)
+    toast.show(
+      t(($) => $.project.form.deleted),
+      { icon: 'check-circle' },
+    )
+    router.dismissTo('/me')
   }
 
   const edit = () => router.push({ pathname: '/projects/[id]/edit', params: { id: project.id } })
@@ -242,33 +241,50 @@ function ProjectView({ project }: { project: Project }) {
   // tous les autres. Ni « Partager » ni « Copier le lien », qui promettraient le contraire
   // (« seuls les membres pourront l'ouvrir » ; décision de Louis du 2/11/2026).
   const shareable = !project.removal
-  // Le menu « … » : copier le lien, puis signaler (un autre membre) ou modifier (l'auteur, sauf
-  // projet retiré par la modération ou compte suspendu : l'API refuserait).
+  // Le menu « … » : copier le lien, puis signaler (un autre membre) ou, pour l'auteur, modifier
+  // (sauf projet retiré par la modération ou compte suspendu : l'API refuserait) et supprimer.
+  // R6a (relecture du plan, jur-J1) : « Supprimer » y est pour **tout** auteur, même d'un projet
+  // retiré ou pendant une suspension ; c'est son seul geste alors, et le menu se dessine pour lui.
+  // En rouge et en dernier : l'action qui ne se défait pas, loin du doigt qui cherche « Modifier ».
   const menuItems: ActionMenuItem[] = [
     ...(shareable
       ? [{ label: t(($) => $.share.copy), icon: 'link' as const, onPress: () => void copyLink() }]
       : []),
     ...(project.isMine
-      ? project.removal || suspended
-        ? []
-        : [{ label: t(($) => $.project.page.edit), icon: 'pencil-simple' as const, onPress: edit }]
+      ? [
+          ...(project.removal || suspended
+            ? []
+            : [
+                {
+                  label: t(($) => $.project.page.edit),
+                  icon: 'pencil-simple' as const,
+                  onPress: edit,
+                },
+              ]),
+          {
+            label: t(($) => $.project.page.delete),
+            icon: 'trash' as const,
+            tone: 'danger' as const,
+            onPress: () => setConfirming(true),
+          },
+        ]
       : [{ label: t(($) => $.report.project), icon: 'flag' as const, onPress: report }]),
   ]
   // Partager et « … » : posés sur la photo (téléphone) ou en haut de la page (tablette, ordinateur).
-  // Un menu sans action (l'auteur d'un projet retiré) ne se dessine pas : il s'ouvrirait sur rien.
-  const pageActions =
-    shareable || menuItems.length > 0 ? (
-      <>
-        {shareable ? (
-          <IconButton
-            icon="share-network"
-            label={t(($) => $.share.action)}
-            onPress={() => setSharing(true)}
-          />
-        ) : null}
-        {menuItems.length > 0 ? <ActionMenu variant="glass" items={menuItems} /> : null}
-      </>
-    ) : null
+  // Le menu a toujours au moins une action (signaler, ou supprimer pour l'auteur). `menuRef` : le
+  // bouton « … », qui reprend le focus quand la fenêtre de suppression se ferme sans rien supprimer.
+  const pageActions = (
+    <>
+      {shareable ? (
+        <IconButton
+          icon="share-network"
+          label={t(($) => $.share.action)}
+          onPress={() => setSharing(true)}
+        />
+      ) : null}
+      <ActionMenu variant="glass" items={menuItems} ref={menuRef} />
+    </>
+  )
 
   // La capsule des réactions (un autre membre). Sur un compte suspendu, l'éventail ne s'ouvre pas :
   // il ne pourrait y poser aucune réaction nouvelle (rien n'est décidé pour lui, U3). Sans
@@ -312,6 +328,8 @@ function ProjectView({ project }: { project: Project }) {
           key: visual.id,
           source: toSource(visual.url),
           thumbhash: visual.thumbhash,
+          // R6a : une photo décrite est lue par sa description (texte brut, jamais du Markdown).
+          description: visual.description,
         }))}
         // Sans photo, la lumière miel seule (sans `title`) : le titre est déjà juste à côté ou
         // dessous, dans l'en-tête ; écrit aussi sur la lumière, il se lisait deux fois à l'œil.
@@ -354,13 +372,37 @@ function ProjectView({ project }: { project: Project }) {
   // et comment contester.
   const removal = project.removal ? <RemovalNotice {...removalBanner(project.removal, t)} /> : null
 
-  // La recette : les outils et le temps passé (jusqu'à R6). Les prompts ont leur propre bloc.
+  // La recette (R6a) : quand l'auteur les a donnés, le mois où il a commencé (« Commencé en
+  // septembre 2026 », écrit par Intl dans la langue de l'appli) et la difficulté (« Facile à
+  // refaire : À la portée de tous », avec le rond de couleur de la feuille de publication) ; puis
+  // les outils. Le temps passé a disparu. Elle se montre dès qu'une de ces trois choses est là,
+  // même sans outils. Les prompts ont leur propre bloc.
+  const started = project.startedOn ? startedMonth(project.startedOn, i18n.language) : null
+  const difficulty = project.difficulty
   const recipe =
-    project.tools.length > 0 || timeSpent ? (
+    started || difficulty || project.tools.length > 0 ? (
       <Surface variant="grouped" padding="xl" gap="lg">
         <Text variant="heading" heading={2}>
           {t(($) => $.project.page.recipe)}
         </Text>
+        {started || difficulty ? (
+          <Stack gap="sm">
+            {started ? (
+              <RecipeFact
+                icon="calendar-blank"
+                label={t(($) => $.project.page.startedOn, { month: started })}
+              />
+            ) : null}
+            {difficulty ? (
+              <RecipeFact
+                dot={DIFFICULTY_DOTS[difficulty]}
+                label={t(($) => $.project.page.difficulty, {
+                  level: t(($) => $.project.difficulty[difficulty]),
+                })}
+              />
+            ) : null}
+          </Stack>
+        ) : null}
         {project.tools.length > 0 ? (
           <Stack gap="sm">
             <Text variant="caption" weight={600} tone="muted">
@@ -377,17 +419,6 @@ function ProjectView({ project }: { project: Project }) {
                 />
               ))}
             </Stack>
-          </Stack>
-        ) : null}
-        {timeSpent ? (
-          <Stack gap="sm">
-            <Text variant="caption" weight={600} tone="muted">
-              {t(($) => $.project.page.timeSpent)}
-            </Text>
-            <Row gap="sm">
-              <Icon name="clock" size={20} tone="amber" />
-              <Text weight={600}>{t(($) => $.project.timeSpent[timeSpent])}</Text>
-            </Row>
           </Stack>
         ) : null}
       </Surface>
@@ -421,49 +452,35 @@ function ProjectView({ project }: { project: Project }) {
     </Row>
   )
 
-  // « Supprimer » garde sa place d'aujourd'hui, après les commentaires, jusqu'à R6 ; « Modifier »
-  // est monté dans les actions, sous le titre.
+  // R6a : plus de bouton rouge en bas de la page ; « Supprimer » est dans le menu « … » de l'auteur,
+  // et ouvre cette fenêtre (vignette, garde de double tape, une seule suppression, échec lu dedans).
   const deletion = project.isMine ? (
-    <Stack gap="md">
-      {error ? <Notice message={error} /> : null}
-      <Row>
-        <Button
-          label={t(($) => $.project.page.delete)}
-          variant="danger"
-          icon="trash"
-          onPress={() => setConfirming(true)}
-        />
-      </Row>
-      {/* Supprimer est définitif : une fenêtre demande confirmation, avec le titre du projet.
-          guardTaps : la fenêtre s'ouvre sous le doigt qui vient de toucher « Supprimer » ; une
-          seconde tape trop rapide n'y décide rien (design 7b). */}
-      <Dialog
-        visible={confirming}
-        guardTaps
-        title={t(($) => $.project.page.deleteTitle, { title: project.title })}
-        message={t(($) => $.project.page.deleteConfirm)}
-        onDismiss={() => setConfirming(false)}
-      >
-        <Button
-          label={t(($) => $.project.page.deleteConfirmButton)}
-          variant="confirm"
-          onPress={() => void onDelete()}
-          loading={busy}
-        />
-        <Button
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => setConfirming(false)}
-        />
-      </Dialog>
-    </Stack>
+    <DeleteProjectDialog
+      project={{
+        id: project.id,
+        title: project.title,
+        cover: project.visuals[0]
+          ? {
+              source: toSource(project.visuals[0].url),
+              thumbhash: project.visuals[0].thumbhash,
+              label: project.title,
+            }
+          : null,
+        removed: Boolean(project.removal),
+      }}
+      visible={confirming}
+      onCancel={() => setConfirming(false)}
+      onDeleted={onDeleted}
+      opener={menuRef}
+    />
   ) : null
 
   // Les couches de la page, montées dès l'arrivée, fermées : l'éventail lit au montage s'il doit
   // montrer son aide (rien ne pousse ses lignes à l'ouverture), la feuille rend le focus à
-  // « Partager » quand elle se ferme.
+  // « Partager » quand elle se ferme ; la fenêtre de suppression (l'auteur), qui couvre l'écran.
   const layers = (
     <>
+      {deletion}
       {capsule && !suspended ? (
         <ReactionFan
           open={fanOpen}
@@ -498,11 +515,9 @@ function ProjectView({ project }: { project: Project }) {
         // « Retour » écrit en toutes lettres, d'où qu'on arrive (ui-11).
         backLabel={t(($) => $.project.page.back)}
         topAction={
-          pageActions ? (
-            <Row gap="sm" align="center">
-              {pageActions}
-            </Row>
-          ) : undefined
+          <Row gap="sm" align="center">
+            {pageActions}
+          </Row>
         }
         thumbhash={thumbhash}
         pageTitle={project.title}
@@ -542,12 +557,7 @@ function ProjectView({ project }: { project: Project }) {
                     {faded(journal)}
                   </>
                 ),
-                side: (
-                  <>
-                    {faded(comments)}
-                    {faded(deletion)}
-                  </>
-                ),
+                side: <>{faded(comments)}</>,
               },
               ...(reportLink ? [{ main: faded(reportLink), side: null, continues: true }] : []),
             ]}
@@ -565,7 +575,6 @@ function ProjectView({ project }: { project: Project }) {
             {faded(journal)}
             {faded(comments)}
             {faded(reportLink)}
-            {faded(deletion)}
           </>
         )}
         {layers}
@@ -583,10 +592,9 @@ function ProjectView({ project }: { project: Project }) {
       {faded(description)}
       {faded(prompt)}
       {faded(journal)}
-      {/* La conversation vient après le projet ; « Signaler » et « Supprimer » ferment la page. */}
+      {/* La conversation vient après le projet ; « Signaler » ferme la page. */}
       {faded(comments)}
       {faded(reportLink)}
-      {faded(deletion)}
     </>
   )
   return (
@@ -650,6 +658,8 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
   const router = useRouter()
   const notesHandle = useRef<NoteListHandle>(null)
   const focusAfterClose = useRef<number | null>(null)
+  // « Annuler » de la fenêtre de suppression d'une note reçoit le focus à l'ouverture (H3).
+  const cancelDeleteRef = useRef<Focusable>(null)
 
   // Arrivé du formulaire après un changement de statut (?announce=testable) : le champ s'ouvre avec
   // une note toute prête (« Le projet passe en « Testable ». »). Seulement pour l'auteur, et
@@ -836,6 +846,7 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
         guardTaps
         title={t(($) => $.project.notes.deleteTitle)}
         message={t(($) => $.project.notes.deleteBody)}
+        initialFocusRef={cancelDeleteRef}
         // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
         onDismiss={() => {
           if (!removing) setDeleting(null)
@@ -864,6 +875,7 @@ function Journal({ project, suspended }: { project: Project; suspended: boolean 
           loading={removing}
         />
         <Button
+          ref={cancelDeleteRef}
           label={t(($) => $.common.cancel)}
           variant="secondary"
           onPress={() => setDeleting(null)}

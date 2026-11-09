@@ -1,4 +1,5 @@
-// L'en-tête de la page d'un projet (R5a, planche « Projet ») : le statut, le titre, la ligne de dates
+// L'en-tête de la page d'un projet (R5a, planche « Projet ») : le statut et, à côté, la catégorie
+// (R6a : « Cuisine · Famille et enfants »), le titre, la ligne de dates
 // (« Publié le 3 oct. · Mis à jour hier » ; « Créé le … » pour un projet privé), l'auteur et sa
 // pastille « Suivre », puis le pitch. La page (ProjectScreen) le pose dans sa feuille sur téléphone,
 // dans la colonne de droite sur ordinateur.
@@ -18,13 +19,16 @@ import { useMember } from '../members/api'
 import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { AuthorLine, type AuthorLineProps } from '../ui/AuthorLine'
+import { CategoryLine } from '../ui/CategoryLine'
 import type { Focusable } from '../ui/focus'
+import type { IconName } from '../ui/Icon'
 import { MetaLine } from '../ui/MetaLine'
 import { RelativeTime } from '../ui/RelativeTime'
 import { Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
+import { categoryOption } from './categories'
 import { changedAfterCreation } from './format'
 
 /** Ce que l'en-tête montre du projet. */
@@ -39,6 +43,8 @@ export type HeaderProject = Pick<
   | 'isMine'
   | 'createdAt'
   | 'updatedAt'
+  | 'primaryCategory'
+  | 'secondaryCategory'
 >
 
 /**
@@ -128,6 +134,29 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
   }
 }
 
+/**
+ * Ce que dit la ligne de la catégorie : « Cuisine · Famille et enfants » (un seul texte, lu d'un
+ * trait), ou la principale seule, avec l'icône de la principale. Un projet publié avant R6a n'a
+ * pas de catégorie : rien (décision de Louis du 8/11/2026), pas même une place vide.
+ */
+const categoryLine = (
+  t: ReturnType<typeof useTranslation>['t'],
+  project: Pick<HeaderProject, 'primaryCategory' | 'secondaryCategory'>,
+): { label: string; icon: IconName } | null => {
+  if (!project.primaryCategory) return null
+  const primary = categoryOption(t, project.primaryCategory)
+  const secondary = project.secondaryCategory ? categoryOption(t, project.secondaryCategory) : null
+  return {
+    icon: primary.icon,
+    label: secondary
+      ? t(($) => $.project.page.categories, {
+          primary: primary.label,
+          secondary: secondary.label,
+        })
+      : primary.label,
+  }
+}
+
 type ViewProps = {
   project: HeaderProject
   /** La ligne de l'auteur (voir `useAuthorLine`). */
@@ -145,12 +174,18 @@ export function ProjectHeaderView({ project, author, titleRef, now }: ViewProps)
   const updated = changedAfterCreation(project.createdAt, project.updatedAt)
   // La date complète, lue par le lecteur d'écran : « le 12 octobre à 08:00 ».
   const onFull = (full: string) => t(($) => $.dates.onDate, { date: full })
+  const category = categoryLine(t, project)
   return (
     <Stack gap="md">
-      <StatusPill
-        label={t(($) => $.project.status[project.status])}
-        strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
-      />
+      {/* Le statut, puis la catégorie sur la même rangée (elle passe dessous si la place manque) :
+          lus dans cet ordre, avant le titre. */}
+      <Stack direction="row" wrap align="center" gap="sm">
+        <StatusPill
+          label={t(($) => $.project.status[project.status])}
+          strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
+        />
+        {category ? <CategoryLine {...category} /> : null}
+      </Stack>
       <Stack gap="xs">
         <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
           {project.title}

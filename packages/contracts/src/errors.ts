@@ -36,6 +36,10 @@ export const ErrorCode = z.enum([
   'cannot_suspend_admin',
   // Tranche R2 : corriger l'adresse d'un compte déjà vérifié (il suffit de se connecter).
   'already_verified',
+  // Tranche R6a : une seconde catégorie sans principale (projet d'avant R6a), ou égale à la
+  // principale déjà enregistrée.
+  'category_required',
+  'same_category',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

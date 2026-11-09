@@ -146,6 +146,16 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: false,
   },
+  // La description d'une photo (R6a) : du texte libre, dans la même table que l'image.
+  {
+    field: 'photoDescription',
+    object: 'project',
+    table: 'project_media',
+    column: 'description',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
   // Le journal et les commentaires.
   {
     field: 'body',
@@ -220,7 +230,12 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     visibility: 'public ou privé, une liste fermée par Zod',
     tool_slugs:
       'les étiquettes tirées de project.tools (minuscules, tirets), déjà au registre : elles suivent ses changements',
-    time_spent: 'une durée choisie dans une liste fermée par Zod (TimeSpent)',
+    time_spent:
+      'ancienne durée choisie dans une liste fermée : plus lue ni écrite depuis R6a, la colonne part en R6b',
+    primary_category: 'une catégorie choisie dans une liste fermée par Zod (ProjectCategory)',
+    secondary_category: 'une catégorie choisie dans une liste fermée par Zod (ProjectCategory)',
+    difficulty: 'un niveau choisi dans une liste fermée par Zod (ProjectDifficulty)',
+    started_on: 'un mois « AAAA-MM » vérifié par Zod (StartedMonth), jamais un texte libre',
     created_at: 'date',
     updated_at: 'date',
     published_at: 'date',

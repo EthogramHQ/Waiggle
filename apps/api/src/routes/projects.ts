@@ -154,7 +154,12 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       visibility,
       demoUrl: input.demoUrl ?? null,
       ...withSlugs(input.tools ?? []),
-      timeSpent: input.timeSpent ?? null,
+      // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
+      // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
+      primaryCategory: input.primaryCategory,
+      secondaryCategory: input.secondaryCategory ?? null,
+      difficulty: input.difficulty ?? null,
+      startedOn: input.startedOn ?? null,
       prompts: input.prompts ?? [],
       // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
       // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
@@ -204,8 +209,14 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
       ...(changes.tools !== undefined && withSlugs(changes.tools)),
-      ...(changes.timeSpent !== undefined && { timeSpent: changes.timeSpent }),
       ...(changes.prompts !== undefined && { prompts: changes.prompts }),
+      // R6a : la principale ne se remet jamais à nul (le contrat l'interdit) ; les trois autres, si.
+      ...(changes.primaryCategory !== undefined && { primaryCategory: changes.primaryCategory }),
+      ...(changes.secondaryCategory !== undefined && {
+        secondaryCategory: changes.secondaryCategory,
+      }),
+      ...(changes.difficulty !== undefined && { difficulty: changes.difficulty }),
+      ...(changes.startedOn !== undefined && { startedOn: changes.startedOn }),
     }
     // Tout dans une transaction : si le nouvel ordre des photos est refusé, rien n'est enregistré,
     // pas même le titre envoyé avec lui.
@@ -213,7 +224,11 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
       // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
       const [locked] = await tx
-        .select({ removedAt: schema.project.removedAt })
+        .select({
+          removedAt: schema.project.removedAt,
+          primaryCategory: schema.project.primaryCategory,
+          secondaryCategory: schema.project.secondaryCategory,
+        })
         .from(schema.project)
         .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
         .for('update')
@@ -224,6 +239,20 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
       if (!locked) return 'gone' as const
       if (locked.removedAt !== null) return 'removed' as const
+      // Les catégories qui resteront après la modification : celle du corps, sinon celle déjà
+      // enregistrée (lue sous le verrou, donc sûre). Le contrat ne peut comparer que ce que le corps
+      // contient ; ici on compare avec l'enregistré (sec-M2). Seule une modification qui touche une
+      // catégorie est contrôlée : passer en « Privé » un ancien projet sans catégorie reste permis.
+      if (changes.primaryCategory !== undefined || changes.secondaryCategory !== undefined) {
+        const primary = changes.primaryCategory ?? locked.primaryCategory
+        const second =
+          changes.secondaryCategory !== undefined
+            ? changes.secondaryCategory
+            : locked.secondaryCategory
+        // Une seconde sans principale (ancien projet sans catégorie, rien dans le corps).
+        if (second !== null && primary === null) return 'category_required' as const
+        if (second !== null && second === primary) return 'same_category' as const
+      }
       if (changes.visualOrder !== undefined) {
         const gallery = await tx
           .select({ id: schema.projectMedia.id })
@@ -257,6 +286,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     })
     if (outcome === 'gone') return notFound(c)
     if (outcome === 'removed') return removed(c)
+    if (outcome === 'category_required') {
+      return c.json(errorBody(languageOf(c), 'category_required'), 400)
+    }
+    if (outcome === 'same_category') return c.json(errorBody(languageOf(c), 'same_category'), 400)
     if (outcome === 'invalid_order') return c.json(errorBody(languageOf(c), 'validation'), 400)
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)

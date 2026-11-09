@@ -4,24 +4,30 @@ import { ErrorCode } from './errors'
 import {
   cleanPrompt,
   DemoUrl,
+  PHOTO_DESCRIPTION_MAX,
+  PROJECT_CATEGORIES,
   Project,
   ProjectInput,
   ProjectSummary,
   ProjectUpdate,
   ProjectVisual,
   publicHttpsUrl,
+  StartedMonth,
+  startedMonthMax,
   Thumbhash,
   VisualSlot,
+  VisualUpdate,
 } from './projects'
 import { NO_REACTIONS } from './reactions'
 
 const valid = {
   title: 'Mon agent de recettes',
   pitch: 'Il propose un menu avec ce qu’il y a au frigo.',
+  primaryCategory: 'cooking',
 }
 
 describe('ProjectInput', () => {
-  it('only needs a title and a pitch', () => {
+  it('only needs a title, a pitch and a category', () => {
     expect(ProjectInput.parse(valid)).toEqual(valid)
   })
 
@@ -43,12 +49,12 @@ describe('ProjectInput', () => {
     )
   })
 
-  it('only accepts the known statuses, visibilities and time spans', () => {
+  it('only accepts the known statuses, visibilities and difficulties', () => {
     expect(ProjectInput.safeParse({ ...valid, status: 'testable' }).success).toBe(true)
     expect(ProjectInput.safeParse({ ...valid, status: 'abandonné' }).success).toBe(false)
     expect(ProjectInput.safeParse({ ...valid, visibility: 'friends' }).success).toBe(false)
-    expect(ProjectInput.safeParse({ ...valid, timeSpent: 'weekend' }).success).toBe(true)
-    expect(ProjectInput.safeParse({ ...valid, timeSpent: '3h' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, difficulty: 'medium' }).success).toBe(true)
+    expect(ProjectInput.safeParse({ ...valid, difficulty: 'facile' }).success).toBe(false)
   })
 
   it('removes duplicate tools and empty prompts, within their limits', () => {
@@ -156,6 +162,7 @@ const visual = {
   height: 900,
   // Le ThumbHash d'une vraie image : une vingtaine d'octets, écrits en base64.
   thumbhash: '3OcRJYB4d3h/iIeHeEh3eIhw+j3A', // gitleaks:allow (un résumé d'image, pas une clé)
+  description: null,
 }
 
 describe('Thumbhash', () => {
@@ -200,8 +207,11 @@ describe('Project with its visuals', () => {
     visibility: 'public',
     demoUrl: null,
     tools: [],
-    timeSpent: null,
     prompts: [],
+    primaryCategory: null,
+    secondaryCategory: null,
+    difficulty: null,
+    startedOn: null,
     isMine: true,
     isFollowed: false,
     followerCount: 0,
@@ -381,5 +391,194 @@ describe('publicHttpsUrl on a phone', () => {
     )
 
     expect(publicHttpsUrl('https://\u0430pple.com/')).toBeNull()
+  })
+})
+
+// --- Tranche R6a : cat\u00e9gories, \u00ab Commenc\u00e9 en \u00bb, \u00ab Facile \u00e0 refaire ? \u00bb et descriptions des photos ---
+// Sc\u00e9nario : docs/scenarios/refonte.md, section R6a. Le contrat est la premi\u00e8re barri\u00e8re : ce qu'il
+// refuse n'atteint jamais la base, ni l'API, ni l'appli.
+
+describe('the categories of a project (R6a)', () => {
+  it('lists the sixteen categories in the order of the board, \u00ab other \u00bb last', () => {
+    expect(PROJECT_CATEGORIES).toEqual([
+      'home-garden',
+      'cooking',
+      'family',
+      'learning',
+      'games',
+      'art',
+      'music',
+      'photo-video',
+      'health-sport',
+      'travel',
+      'money',
+      'work',
+      'code',
+      'animals',
+      'science',
+      'other',
+    ])
+  })
+
+  it('needs a primary category at creation, and only a known one', () => {
+    const { primaryCategory: _, ...withoutCategory } = valid
+    expect(ProjectInput.safeParse(withoutCategory).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, primaryCategory: null }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'jardinage' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, secondaryCategory: 'robots' }).success).toBe(false)
+    // \u00ab Autre \u00bb ne demande aucun texte.
+    expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'other' }).success).toBe(true)
+  })
+
+  it('accepts a second category, or none', () => {
+    expect(
+      ProjectInput.parse({ ...valid, primaryCategory: 'science', secondaryCategory: 'learning' }),
+    ).toMatchObject({ primaryCategory: 'science', secondaryCategory: 'learning' })
+    expect(ProjectInput.safeParse({ ...valid, secondaryCategory: null }).success).toBe(true)
+    expect(ProjectUpdate.safeParse({ secondaryCategory: null }).success).toBe(true)
+  })
+
+  it('refuses a second category equal to the primary, at creation as in an update', () => {
+    const creation = ProjectInput.safeParse({
+      ...valid,
+      primaryCategory: 'cooking',
+      secondaryCategory: 'cooking',
+    })
+    const update = ProjectUpdate.safeParse({
+      primaryCategory: 'science',
+      secondaryCategory: 'science',
+    })
+
+    expect(creation.success).toBe(false)
+    expect(update.success).toBe(false)
+    // L'erreur vise le champ de la seconde : c'est lui que l'appli montre.
+    expect(creation.error?.issues[0]?.path).toEqual(['secondaryCategory'])
+    expect(update.error?.issues[0]?.path).toEqual(['secondaryCategory'])
+  })
+
+  it('never lets an update set the primary category back to nothing', () => {
+    expect(ProjectUpdate.safeParse({ primaryCategory: null }).success).toBe(false)
+    // Changer de principale, elle, reste permis.
+    expect(ProjectUpdate.parse({ primaryCategory: 'games' })).toEqual({ primaryCategory: 'games' })
+  })
+})
+
+describe('the time spent is gone (R6a)', () => {
+  it('refuses timeSpent, at creation as in an update, as an unknown field', () => {
+    // strictObject : une appli d'avant R6a qui l'enverrait encore re\u00e7oit un refus net (sec-M4).
+    expect(ProjectInput.safeParse({ ...valid, timeSpent: 'week' }).success).toBe(false)
+    expect(ProjectUpdate.safeParse({ timeSpent: 'week' }).success).toBe(false)
+    expect(ProjectUpdate.safeParse({ timeSpent: null }).success).toBe(false)
+  })
+})
+
+describe('\u00ab Facile \u00e0 refaire ? \u00bb (R6a)', () => {
+  it('accepts the three levels, or none', () => {
+    for (const difficulty of ['easy', 'medium', 'hard', null]) {
+      expect(ProjectUpdate.safeParse({ difficulty }).success).toBe(true)
+    }
+    expect(ProjectUpdate.safeParse({ difficulty: 'expert' }).success).toBe(false)
+  })
+})
+
+describe('\u00ab Commenc\u00e9 en \u00bb (R6a)', () => {
+  // Une heure fig\u00e9e : le mois en cours ne d\u00e9pend plus du jour o\u00f9 l'on lance les tests. Seule Date
+  // est simul\u00e9e (les minuteurs restent r\u00e9els).
+  afterEach(() => vi.useRealTimers())
+  const at = (iso: string) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(iso))
+  }
+
+  it('accepts January 2000 and the current month, refuses December 1999 and the next month', () => {
+    at('2026-11-15T12:00:00Z')
+
+    expect(StartedMonth.safeParse('2000-01').success).toBe(true)
+    expect(StartedMonth.safeParse('2026-03').success).toBe(true)
+    expect(StartedMonth.safeParse('2026-11').success).toBe(true)
+    expect(StartedMonth.safeParse('1999-12').success).toBe(false)
+    expect(StartedMonth.safeParse('2026-12').success).toBe(false)
+    expect(StartedMonth.safeParse('2027-01').success).toBe(false)
+  })
+
+  it('refuses a started month with non-ASCII digits, a one-digit month, month 00 or 13, or a full date', () => {
+    at('2026-11-15T12:00:00Z')
+    // Des chiffres d'autres \u00e9critures : pleine chasse (\u00ab \uff12 \u00bb) et arabes orientaux (\u00ab \u0662 \u00bb). Une
+    // regex `\d` sans pr\u00e9caution peut les laisser passer selon le moteur.
+    const fullWidth = '\uff12\uff10\uff12\uff16-\uff10\uff13'
+    const arabicIndic = `${String.fromCodePoint(0x0662, 0x0660, 0x0662, 0x0666)}-03`
+
+    for (const month of [
+      fullWidth,
+      arabicIndic,
+      '2026-3',
+      '2026-00',
+      '2026-13',
+      '2026-03-01',
+      '2026-03-01T00:00:00Z',
+      '03-2026',
+      ' 2026-03',
+      '',
+    ]) {
+      expect(StartedMonth.safeParse(month).success, month).toBe(false)
+    }
+  })
+
+  it('accepts the month already begun in Kiritimati (2026-11-30T10:00Z \u2192 \u00ab 2026-12 \u00bb) and refuses it a minute earlier', () => {
+    // \u00c0 10 h UTC le 30 novembre, il est minuit le 1er d\u00e9cembre \u00e0 Kiritimati (UTC+14) : un membre
+    // l\u00e0-bas voit d\u00e9j\u00e0 d\u00e9cembre sur son calendrier.
+    at('2026-11-30T10:00:00Z')
+    expect(startedMonthMax(new Date())).toBe('2026-12')
+    expect(StartedMonth.safeParse('2026-12').success).toBe(true)
+    expect(ProjectUpdate.safeParse({ startedOn: '2026-12' }).success).toBe(true)
+
+    at('2026-11-30T09:59:00Z')
+    expect(startedMonthMax(new Date())).toBe('2026-11')
+    expect(StartedMonth.safeParse('2026-12').success).toBe(false)
+    expect(ProjectUpdate.safeParse({ startedOn: '2026-12' }).success).toBe(false)
+  })
+
+  it('lets an update clear the month, and a creation leave it out', () => {
+    at('2026-11-15T12:00:00Z')
+    expect(ProjectUpdate.parse({ startedOn: null })).toEqual({ startedOn: null })
+    expect(ProjectInput.parse(valid)).not.toHaveProperty('startedOn')
+  })
+})
+
+describe('the description of a photo (R6a)', () => {
+  // Les invisibles s'\u00e9crivent par leur num\u00e9ro : \u00e9crits tels quels, ils dispara\u00eetraient \u00e0 la lecture.
+  const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b)
+  const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e)
+
+  it('accepts 250 characters, emoji counted as one, and refuses 251', () => {
+    expect(PHOTO_DESCRIPTION_MAX).toBe(250)
+    expect(VisualUpdate.safeParse({ description: '\u00e9'.repeat(250) }).success).toBe(true)
+    expect(VisualUpdate.safeParse({ description: '\ud83d\udc1d'.repeat(250) }).success).toBe(true)
+    expect(VisualUpdate.safeParse({ description: '\u00e9'.repeat(251) }).success).toBe(false)
+  })
+
+  it('refuses invisible characters', () => {
+    for (const invisible of [ZERO_WIDTH_SPACE, RIGHT_TO_LEFT_OVERRIDE]) {
+      expect(VisualUpdate.safeParse({ description: `Le frigo${invisible} ouvert` }).success).toBe(
+        false,
+      )
+    }
+  })
+
+  it('turns an empty description into \u00ab no description \u00bb', () => {
+    expect(VisualUpdate.parse({ description: '' })).toEqual({ description: null })
+    expect(VisualUpdate.parse({ description: '   ' })).toEqual({ description: null })
+    expect(VisualUpdate.parse({ description: null })).toEqual({ description: null })
+    expect(VisualUpdate.parse({ description: '  Le frigo ouvert  ' })).toEqual({
+      description: 'Le frigo ouvert',
+    })
+  })
+
+  it('accepts the description alone, nothing else about the photo', () => {
+    expect(VisualUpdate.safeParse({}).success).toBe(false)
+    expect(VisualUpdate.safeParse({ description: 'Le frigo', position: 0 }).success).toBe(false)
+    expect(VisualUpdate.safeParse({ description: 'Le frigo', slot: 'portrait' }).success).toBe(
+      false,
+    )
   })
 })

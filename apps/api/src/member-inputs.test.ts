@@ -15,9 +15,9 @@
 //
 // Inès écrit tout (profil, projet, note, commentaire), Malik signale, puis Inès bloque Malik ; Zoé,
 // une troisième, lit encore tout.
-import { ReportSnapshot } from '@ruche/contracts'
+import { Project, ReportSnapshot } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq, getTableName, is } from 'drizzle-orm'
+import { asc, eq, getTableName, is } from 'drizzle-orm'
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -99,6 +99,57 @@ describe('the register of member inputs', () => {
     )
 
     expect(wrong).toEqual([])
+  })
+
+  // Tranche R6a (plan, « API ») : la catégorie principale et la seconde, la difficulté et le mois
+  // de début d'un projet sont des listes fermées (gardées par le contrat), pas des saisies libres ;
+  // la description d'une photo est un texte libre du membre : au registre, copiée dans un
+  // signalement (`photoDescription`) et dans l'export de son auteur. Ces tests échouent tant que la
+  // migration n'existe pas, puis tant qu'une colonne n'est pas classée comme il faut.
+  // `time_spent` n'est pas retiré ici : la migration 0015 ne fait qu'ajouter (sec-A6, décision de
+  // Louis du 8/11/2026), la colonne part en R6b.
+  const SLICE_R6A = {
+    project: ['primary_category', 'secondary_category', 'difficulty', 'started_on'],
+    project_media: ['description'],
+  }
+
+  it('reads the columns of slice R6a', () => {
+    for (const [table, columns] of Object.entries(SLICE_R6A)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the categories, the difficulty and the started month as closed lists, with a reason', () => {
+    const entry = NOT_MEMBER_INPUTS.project
+    // Une raison écrite, d'au moins 10 caractères (règle 19) ; jamais toute la table (« * »).
+    const reason = (column: string) =>
+      entry === undefined || entry === '*' ? '' : (entry[column] ?? '').trim()
+    const wrong = SLICE_R6A.project
+      .filter(
+        (column) =>
+          inRegister('project', column) ||
+          !notAnInput('project', column) ||
+          reason(column).length < 10,
+      )
+      .map((column) => `project.${column}`)
+
+    expect(wrong).toEqual([])
+  })
+
+  it('counts the description of a photo as a text of the project, copied and exported', () => {
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'project',
+        table: 'project_media',
+        column: 'description',
+        field: 'photoDescription',
+        kind: 'text',
+        snapshot: true,
+        export: true,
+      }),
+    )
+    expect(notAnInput('project_media', 'description')).toBe(false)
   })
 
   it('classes every column of every table', () => {
@@ -203,6 +254,8 @@ const WITNESSES: Record<string, string> = {
   'project.project.prompts': 'Prompt témoin, unique.',
   'project.project.tools': 'OutilProjetTémoin',
   'project.project.demo_url': 'https://demo-temoin.dev/app',
+  // R6a : la description d'une photo, écrite par PATCH /v1/projects/{id}/visuals/{visualId}.
+  'project.project_media.description': 'Légende de photo témoin, unique.',
   'note.project_note.body': 'Note témoin, unique.',
   'comment.project_comment.body': 'Commentaire témoin, unique.',
   'report.content_report.details': 'Précision témoin, unique.',
@@ -282,6 +335,8 @@ describe('every field of the register', () => {
       demoUrl: WITNESSES['project.project.demo_url'],
     })
     projectId = project.id
+    // Les identifiants des photos, dans l'ordre de la page, relus après chaque envoi.
+    let visualIds: string[] = []
     for (const color of ['#7a9e3b', '#3b7a9e']) {
       later()
       const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
@@ -290,7 +345,17 @@ describe('every field of the register', () => {
         body: visualForm(await jpegImage(800, 600, color), 'gallery'),
       })
       expect(res.status).toBe(201)
+      visualIds = Project.parse(await res.json()).visuals.map((visual) => visual.id)
     }
+    // R6a : Inès décrit sa première photo (la seconde reste sans description).
+    later()
+    const described = await act.send(
+      'PATCH',
+      `/v1/projects/${projectId}/visuals/${visualIds[0] ?? ''}`,
+      ines,
+      { description: WITNESSES['project.project_media.description'] },
+    )
+    expect(described.status).toBe(200)
     later()
     const note = await act.send('POST', `/v1/projects/${projectId}/notes`, ines, {
       body: WITNESSES['note.project_note.body'],
@@ -379,6 +444,26 @@ describe('every field of the register', () => {
       .map((e) => e.value)
       .sort()
     expect(imageValues).toEqual(media.map((m) => m.key).sort())
+  })
+
+  // jur-J13 (R6a) : la copie dit quelle photo est décrite. Sa description suit, dans la copie,
+  // l'entrée de l'image qu'elle décrit (décision de la session du 9/11/2026, forme `{ field, value }`
+  // du contrat inchangée) ; une photo sans description n'en a pas.
+  it('puts the description of a photo right after the key of that photo in the copy', async () => {
+    await reportEverything()
+
+    const media = await ctx.db
+      .select({ key: schema.projectMedia.storageKey })
+      .from(schema.projectMedia)
+      .where(eq(schema.projectMedia.projectId, projectId))
+      .orderBy(asc(schema.projectMedia.position))
+    const project = await snapshotOf('project')
+    const images = project.filter((e) => ['cover', 'photo', 'photoDescription'].includes(e.field))
+    expect(images).toEqual([
+      { field: 'cover', value: media[0]?.key },
+      { field: 'photoDescription', value: WITNESSES['project.project_media.description'] },
+      { field: 'photo', value: media[1]?.key },
+    ])
   })
 
   it("puts every field in its author's export, never in the export of who reports", async () => {

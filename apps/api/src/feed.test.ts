@@ -26,7 +26,7 @@ import {
   TagPage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -87,6 +87,7 @@ const publish = async (cookie: string, body: object = {}, { wait = true } = {}) 
   if (wait) later()
   const res = await send('POST', '/v1/projects', cookie, {
     title: 'Un projet',
+    primaryCategory: 'other',
     pitch: 'Un pitch.',
     ...body,
   })
@@ -164,18 +165,20 @@ describe('the « following » feed', () => {
     })
   })
 
-  it('shows the public projects of the members followed, newest first, and nobody else’s', async () => {
+  it('shows the public projects of the members followed and one’s own, newest first, and nobody else’s', async () => {
     const first = await publish(lea, { title: 'Premier' })
     const second = await publish(lea, { title: 'Second' })
     await publish(zoe, { title: 'De Zoé' }) // Max ne suit pas Zoé
-    await publish(max, { title: 'De Max' }) // ni lui-même
+    // R6a (décision de Louis du 8/11/2026) : ses propres projets entrent dans son fil.
+    const own = await publish(max, { title: 'De Max' })
     await followMember(leaId, max)
 
     const page = await readFollowing(max)
 
     expect(page.followsAnyone).toBe(true)
-    expect(ids(page)).toEqual([second.id, first.id])
-    expect(page.items[0]).toMatchObject({
+    expect(ids(page)).toEqual([own.id, second.id, first.id])
+    // Le premier élément est désormais le sien : on regarde le premier projet de Léa.
+    expect(page.items[1]).toMatchObject({
       kind: 'project',
       project: { title: 'Second', author: { id: leaId, name: 'Léa' } },
     })
@@ -529,9 +532,10 @@ describe('the notes of followed projects in the « following » feed', () => {
     const v2 = await postNote(lea, recipes.id)
 
     expect(keys(await readFollowing(max))).toEqual([noteKey(v2)])
-    // Zoé ne suit rien ; Léa ne peut pas suivre son propre projet : leurs fils restent vides.
+    // Zoé ne suit rien : son fil reste vide. Léa ne peut pas suivre son propre projet : son fil
+    // montre le projet lui-même (R6a, ses propres projets), jamais les notes qu'elle y écrit.
     expect((await readFollowing(zoe)).items).toEqual([])
-    expect((await readFollowing(lea)).items).toEqual([])
+    expect(keys(await readFollowing(lea))).toEqual([projectKey(recipes)])
   })
 
   it('stops showing the notes of a project no longer followed', async () => {
@@ -923,5 +927,257 @@ describe('the reaction total of each project (R4)', () => {
     expect(four).toEqual(one)
     // Une requête groupée des totaux par liste lue (six listes), quel que soit le nombre de cartes.
     expect(one.reactions).toBe(6)
+  })
+})
+
+// --- Tranche R6a : ses propres projets dans son fil « Abonnements » ---
+// Scénario : docs/scenarios/refonte.md, « R6a », « Publier et la danse » : « ses propres projets
+// visibles des membres entrent dans son propre fil, à leur date, sans jamais compter dans les
+// nouveautés » (décision de Louis du 8/11/2026). Après « Publier », la danse de l'abeille file vers
+// la nouvelle carte, en tête du fil : il faut donc que le fil la contienne.
+//
+// Plan (section « API ») : le morceau « nouveaux projets » du fil prend les projets des membres
+// suivis **ou** ceux du lecteur ; rien d'autre ne change. Donc :
+// - ses projets privés et ses projets retirés par la modération n'y sont jamais, comme pour ceux des
+//   autres ;
+// - ses notes n'y viennent pas : seules les notes des projets suivis entrent dans le fil, et l'on ne
+//   suit pas son propre projet ;
+// - `followsAnyone` parle toujours de ses abonnements : publier ne fait suivre personne.
+// Les nouveautés se comptent dans l'appli (feed/api.ts) ; l'API, elle, garantit que la carte porte
+// son auteur, le lecteur lui-même : c'est ce qui permet à l'appli de la laisser hors du compte
+// (HomeScreen.news.test.tsx).
+//
+// Ici Max est le lecteur qui publie ; il suit Léa, et ne suit pas Zoé.
+
+describe('one’s own projects in the « following » feed (R6a)', () => {
+  let maxId: string
+
+  beforeEach(async () => {
+    maxId = (await me(max)).id
+  })
+
+  it('shows my projects visible to the members among those of the members I follow, at their date', async () => {
+    await followMember(leaId, max)
+    const fromLea = await publish(lea, { title: 'Le carnet de Léa' })
+    const mine = await publish(max, { title: 'Mon agent de recettes' })
+    const newer = await publish(lea, { title: 'Le tri des photos' })
+
+    const page = await readFollowing(max)
+
+    // À sa date : entre les deux projets de Léa, pas en tête parce qu'il est à lui.
+    expect(ids(page)).toEqual([newer.id, mine.id, fromLea.id])
+    expect(page.items[1]).toMatchObject({
+      kind: 'project',
+      project: { id: mine.id, title: 'Mon agent de recettes', author: { id: maxId, name: 'Max' } },
+    })
+    // Sa date est celle de sa publication, la même que dans « Découvrir ».
+    expect(atOf(page, mine.id)).toBe(atOf(await readDiscover(zoe), mine.id))
+    expect(page.nextCursor).toBeNull()
+  })
+
+  it('shows my projects even when I follow nobody, and still says that I follow nobody', async () => {
+    const mine = await publish(max, { title: 'Mon agent de recettes' })
+    await publish(lea, { title: 'De Léa, que Max ne suit pas' })
+
+    const page = await readFollowing(max)
+
+    expect(ids(page)).toEqual([mine.id])
+    // Publier ne fait suivre personne : l'appli garde son invitation à suivre des proches.
+    expect(page.followsAnyone).toBe(false)
+    expect(page.lastReadAt).toBeNull()
+    expect(page.nextCursor).toBeNull()
+  })
+
+  it('reads the new projects of the feed through the author index, my own included (sec-S1)', async () => {
+    // « in (suivis union all moi) » doit rester une jointure sur l'index (author_id, published_at),
+    // pas une lecture de toute la table project : on le lit dans le plan, après `analyze` (les
+    // statistiques de PostgreSQL). 500 autres membres, que Max ne suit pas, ont 20 projets chacun,
+    // tous plus récents que ceux de Léa et de Max : lire le fil par date seulement (index
+    // project_public_published_idx) les parcourrait tous ; l'index d'auteur n'en lit que ceux des
+    // deux auteurs voulus. Avec trois auteurs seulement, PostgreSQL préfère le parcours par date.
+    await followMember(leaId, max)
+    await publish(lea, { title: 'Le carnet de Léa' })
+    await publish(max, { title: 'Mon agent de recettes' })
+    await ctx.db.execute(sql`
+      insert into "user" (id, name, email)
+      select 'filler-' || a, 'Membre ' || a, 'filler-' || a || '@example.test'
+      from generate_series(1, 500) as a`)
+    await ctx.db.execute(sql`
+      insert into project (id, author_id, title, pitch, visibility, published_at)
+      select gen_random_uuid(), 'filler-' || (n % 500 + 1), 'Lot ' || n, 'Résumé', 'public',
+             timestamp '2100-01-01' - make_interval(mins => n)
+      from generate_series(1, 10000) as n`)
+    await ctx.db.execute(sql`analyze project`)
+
+    const queries = await explainQueries(ctx.db, () => readFollowing(max))
+
+    // La requête des lignes du fil : la seule qui mêle projets et notes (le mot 'note' en dur).
+    const feedQuery = queries.find(
+      (q) => q.sql.includes('member_follow') && q.sql.includes("'note'"),
+    )
+    expect(feedQuery).toBeDefined()
+    // Les deux index qui commencent par l'auteur conviennent (PostgreSQL choisit entre eux selon
+    // ses statistiques) ; le parcours par date seul, non. Les deux projets des deux auteurs
+    // (Léa, suivie, et Max, le lecteur : la branche « union all ») sortent.
+    expect(feedQuery?.plan).toMatch(/project_author_(published|created)_idx/)
+    expect(feedQuery?.plan).not.toContain('project_public_published_idx')
+    expect(feedQuery?.plan).toContain('rows=2.00')
+  })
+
+  it('never shows my private projects, not even to me', async () => {
+    const shown = await publish(max, { title: 'Visible des membres' })
+    await publish(max, { title: 'Mon brouillon', visibility: 'private' })
+
+    expect(ids(await readFollowing(max))).toEqual([shown.id])
+  })
+
+  it('drops my project gone private, and brings it back at its first date when it is visible again', async () => {
+    const older = await publish(max, { title: 'Plus ancien' })
+    const newer = await publish(max, { title: 'Plus récent' })
+    const before = await readFollowing(max)
+    expect(ids(before)).toEqual([newer.id, older.id]) // témoin
+    const firstDate = atOf(before, older.id)
+
+    await setVisibility(max, older.id, 'private')
+    expect(ids(await readFollowing(max))).toEqual([newer.id])
+
+    await setVisibility(max, older.id, 'public')
+    const after = await readFollowing(max)
+    // Repasser « Membres de Waiggle » ne le fait pas remonter : il reprend sa place et sa date.
+    expect(ids(after)).toEqual([newer.id, older.id])
+    expect(atOf(after, older.id)).toBe(firstDate)
+  })
+
+  it('puts my private draft made visible later at the top, dated from that moment', async () => {
+    const draft = await publish(max, { title: 'Mon brouillon', visibility: 'private' })
+    const published = await publish(max, { title: 'Publié tout de suite' })
+
+    await setVisibility(max, draft.id, 'public')
+
+    const page = await readFollowing(max)
+    expect(ids(page)).toEqual([draft.id, published.id])
+    expect(Date.parse(atOf(page, draft.id) ?? '')).toBeGreaterThan(
+      Date.parse(atOf(page, published.id) ?? ''),
+    )
+  })
+
+  it('never shows my project removed by the moderation, not even to me', async () => {
+    const kept = await publish(max, { title: 'Projet gardé' })
+    const removed = await publish(max, { title: 'Projet retiré' })
+    expect(ids(await readFollowing(max))).toEqual([removed.id, kept.id]) // témoin
+
+    // Zoé est administratrice (rôle posé en base) ; un retrait répond à un signalement ouvert :
+    // Léa signale, puis Zoé retire.
+    const act = activity(ctx)
+    await act.makeAdmin((await me(zoe)).id)
+    later()
+    await act.report(lea, { kind: 'project', id: removed.id })
+    later()
+    await act.decide(zoe, {
+      action: 'remove',
+      target: { kind: 'project', id: removed.id },
+      ground: 'rules',
+      explanation: 'Ce projet ne respecte pas les règles.',
+    })
+
+    const page = await readFollowing(max)
+    expect(ids(page)).toEqual([kept.id])
+    // Rien du projet retiré, pas même son titre.
+    expect(JSON.stringify(page)).not.toContain('Projet retiré')
+  })
+
+  it('brings my projects, never the notes I write on them', async () => {
+    const mine = await publish(max, { title: 'Mon agent de recettes' })
+    await postNote(max, mine.id, 'v2 : mode hors ligne')
+
+    // On ne suit pas son propre projet : ses notes restent sur sa page, le fil montre le projet.
+    expect(keys(await readFollowing(max))).toEqual([projectKey(mine)])
+  })
+
+  it('shows my projects in my feed only, never in the feed of a member who does not follow me', async () => {
+    await followMember(leaId, max) // Max suit Léa ; Léa ne suit pas Max
+    const mine = await publish(max, { title: 'Mon agent de recettes' })
+    const fromLea = await publish(lea, { title: 'Le carnet de Léa' })
+    expect(ids(await readFollowing(max))).toEqual([fromLea.id, mine.id]) // témoin
+
+    expect(ids(await readFollowing(lea))).toEqual([fromLea.id]) // le sien, pas celui de Max
+    expect((await readFollowing(zoe)).items).toEqual([])
+  })
+
+  it('gives my card in the feed my own identifier as author, so the app leaves it out of the news', async () => {
+    await followMember(leaId, max)
+    await publish(lea, { title: 'Le carnet de Léa' })
+    // Max lit son fil jusqu'au premier élément, comme l'appli après l'avoir affiché.
+    const read = await readFollowing(max)
+    const upTo = read.items[0]?.at
+    expect((await send('PUT', '/v1/feed/read', max, { upTo })).status).toBe(204)
+
+    // Puis il publie : sa carte arrive en tête, plus récente que la dernière lecture.
+    const mine = await publish(max, { title: 'Mon agent de recettes' })
+    const page = await readFollowing(max)
+
+    expect(ids(page)[0]).toBe(mine.id)
+    expect(Date.parse(page.items[0]?.at ?? '')).toBeGreaterThan(Date.parse(upTo ?? ''))
+    // Ce qui permet à l'appli de ne pas la compter : son auteur est le lecteur lui-même.
+    expect(page.items[0]?.project.author.id).toBe(maxId)
+    // Publier ne marque pas le fil lu : la date de lecture reste celle que l'appli a envoyée.
+    expect(page.lastReadAt).toBe(upTo)
+  })
+
+  it('gives my projects and those of the members I follow page by page, without gaps or repeats', async () => {
+    // 24 projets qui alternent, deux heures d'écart chacun : 12 de Léa, 12 de Max (sous la limite
+    // de 20 par jour et par membre). La limite de la première page tombe au milieu des deux.
+    await followMember(leaId, max)
+    const published: string[] = []
+    for (let i = 0; i < 12; i++) {
+      published.push((await publish(lea, { title: `Léa ${i}` })).id)
+      published.push((await publish(max, { title: `Max ${i}` })).id)
+    }
+
+    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
+
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, 4])
+    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, true])
+    expect(pages.flatMap(ids)).toEqual([...published].reverse())
+  })
+
+  it('loses none of my projects and repeats none when they share an instant with those followed', async () => {
+    // 21 projets au même instant (la fausse horloge n'avance plus) : 11 de Léa, 10 de Max.
+    await followMember(leaId, max)
+    later()
+    const published: string[] = []
+    for (let i = 0; i < 11; i++) {
+      published.push((await publish(lea, { title: `Léa ${i}` }, { wait: false })).id)
+    }
+    for (let i = 0; i < 10; i++) {
+      published.push((await publish(max, { title: `Max ${i}` }, { wait: false })).id)
+    }
+
+    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
+
+    // Condition du test : tous portent bien la même date.
+    expect(new Set(pages.flatMap((page) => page.items.map((item) => item.at))).size).toBe(1)
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, 1])
+    const seen = pages.flatMap(ids)
+    expect(new Set(seen).size).toBe(seen.length) // aucun doublon
+    expect([...seen].sort()).toEqual([...published].sort()) // aucun oubli
+  })
+
+  it('reads my projects and those followed in a constant number of queries', async () => {
+    await followMember(leaId, max)
+    const count = async () => (await explainQueries(ctx.db, () => readFollowing(max))).length
+
+    await publish(lea, { title: 'Léa 1' })
+    await publish(max, { title: 'Max 1' })
+    const two = await count()
+    for (let i = 2; i <= 5; i++) {
+      await publish(lea, { title: `Léa ${i}` })
+      await publish(max, { title: `Max ${i}` })
+    }
+    const ten = await count()
+
+    // Témoin : les cinq projets de Max sont bien lus avec ceux de Léa.
+    expect(ids(await readFollowing(max))).toHaveLength(10)
+    expect(ten).toBe(two)
   })
 })

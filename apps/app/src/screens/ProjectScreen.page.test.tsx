@@ -5,22 +5,25 @@
 // donne un fichier entier à un seul processus, alors que plusieurs fichiers tournent en parallèle.
 // L'API est remplacée par de faux appels ; les aides et données communes sont dans
 // ProjectScreen.testkit.tsx.
-import { fireEvent, screen } from '@testing-library/react-native'
+import type { Project } from '@ruche/contracts'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ApiError } from '../api/errors'
 import { useFollow } from '../follows/api'
 import { deleteProject, getProject } from '../projects/api'
 import { passTapGuard } from '../testing/dialog'
 import { visited } from '../testing/navigation'
-import { projectWithPhotos, recipesProject } from '../testing/projects'
+import { legacyProject, projectWithPhotos, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders, setDesktopWindow } from '../testing/render'
 import { fr } from '../testing/text'
 import { ProjectScreen } from './ProjectScreen'
 import {
+  dialogTitled,
   id,
   mockPush,
   mockReplace,
   mockScreenProps,
   mockToggle,
+  readingOrder,
   resetProjectScreenMocks,
   signInAgain,
 } from './ProjectScreen.testkit'
@@ -63,6 +66,8 @@ jest.mock('../mentions/api', () => ({ useMentionable: () => [] }))
 jest.mock('../ui/clipboard', () => ({ copyText: jest.fn() }))
 // Les paramètres de l'adresse de la page (?announce=testable), choisis par chaque test.
 let mockParams: Record<string, string | undefined> = {}
+// R6a (ui-M3) : après une suppression, `dismissTo('/me')` est permis (jamais un retour vers la page).
+const mockDismissTo = jest.fn()
 // RF (ui-1) : la page est-elle affichée ? Sur le web, la page quittée reste montée, cachée ; le
 // retour la rend affichée de nouveau. `useIsFocused` et `useFocusEffect` suivent ce drapeau, relu
 // à chaque rendu (le test redessine après l'avoir changé).
@@ -71,7 +76,12 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react')
   return {
     usePathname: () => '/page/actuelle',
-    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockReplace,
+      dismissTo: mockDismissTo,
+      back: jest.fn(),
+    }),
     useLocalSearchParams: () => mockParams,
     useIsFocused: () => mockFocused,
     useFocusEffect: (effect: () => undefined | (() => void)) => {
@@ -97,7 +107,30 @@ beforeEach(() => {
   resetProjectScreenMocks()
   mockParams = {}
   mockFocused = true
+  mockDismissTo.mockReset()
 })
+
+// --- R6a : supprimer depuis le menu « … », la recette, la catégorie ---
+
+/** Ouvre le menu « … » de la page (« Plus d'actions »). */
+const openMenu = async () =>
+  fireEvent.press(await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
+/** Le titre de la fenêtre de suppression : « Supprimer « Mon agent de recettes » ? ». */
+const deleteTitle = fr.t(($) => $.project.page.deleteTitle, { title: recipesProject.title })
+/** « Supprimer », touché dans le menu « … » de l'auteur. */
+const askToDelete = async () => {
+  await openMenu()
+  await fireEvent.press(screen.getByRole('menuitem', { name: 'Supprimer' }))
+}
+/** Le contenu de la fenêtre de suppression. */
+const deleteWindow = () => dialogTitled(deleteTitle)
+/** Le texte tel que l'écran le montre : les espaces insécables de fr.ts lus comme des espaces. */
+const shown = (text: string) => text.replace(/\s+/g, ' ')
+/** « Commencé en septembre 2026 ». */
+const startedOn = (month: string) => shown(fr.t(($) => $.project.page.startedOn, { month }))
+/** « Facile à refaire : À la portée de tous ». */
+const difficultyOf = (level: NonNullable<Project['difficulty']>) =>
+  shown(fr.t(($) => $.project.page.difficulty, { level: fr.t(($) => $.project.difficulty[level]) }))
 
 describe('ProjectScreen', () => {
   it('shows the project with its recipe', async () => {
@@ -109,7 +142,9 @@ describe('ProjectScreen', () => {
     expect(screen.getByText('Testable')).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Comment ça marche' })).toBeTruthy() // la description
     expect(screen.getByText('Claude Code')).toBeTruthy()
-    expect(screen.getByText('Un week-end')).toBeTruthy()
+    // R6a : « La recette » montre le mois de début et la difficulté ; le temps passé a disparu.
+    expect(screen.getByText(startedOn('septembre 2026'))).toBeTruthy()
+    expect(screen.getByText(difficultyOf('easy'))).toBeTruthy()
     expect(screen.getByText('Propose trois recettes avec : {ingrédients}')).toBeTruthy()
   })
 
@@ -180,30 +215,77 @@ describe('ProjectScreen', () => {
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Supprimer' })).toBeNull()
+    // R6a : ni dans le menu « … » non plus (témoin : le menu s'ouvre, avec « Signaler »).
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Signaler ce projet' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Supprimer' })).toBeNull()
+  })
+
+  // R6a (scénario « Supprimer », planche `R6-Supprimer`) : « Supprimer » passe dans le menu « … »
+  // de l'auteur ; le gros bouton rouge de la page disparaît.
+  it('offers Delete in the « … » menu of the author, and no delete button on the page', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.queryByRole('button', { name: 'Supprimer' })).toBeNull()
+    await openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Modifier' })).toBeTruthy() // témoin
+    expect(screen.getByRole('menuitem', { name: 'Supprimer' })).toBeTruthy()
   })
 
   it('deletes nothing when the author changes their mind', async () => {
     await renderWithProviders(<ProjectScreen id={recipesProject.id} />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
+    await askToDelete()
     await passTapGuard()
-    await fireEvent.press(screen.getByRole('button', { name: 'Annuler' }))
+    await fireEvent.press(deleteWindow().getByRole('button', { name: 'Annuler' }))
 
     expect(deleteProject).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: 'Supprimer le projet' })).toBeNull()
+    expect(screen.queryByRole('header', { name: deleteTitle })).toBeNull()
   })
 
-  it('deletes the project once the author confirms, then goes home', async () => {
+  it('asks with the title and what disappears, before deleting', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await askToDelete()
+
+    expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.project.page.deleteConfirm))).toBeTruthy()
+    expect(deleteProject).not.toHaveBeenCalled() // il faut d'abord confirmer
+  })
+
+  // Choix 7 du scénario et relecture du plan ui-M3 : après la suppression, « Mes projets », jamais
+  // un retour vers la page supprimée.
+  it('deletes the project once the author confirms, then goes to « Mes projets »', async () => {
     jest.mocked(deleteProject).mockResolvedValue({ ok: true, data: null })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await fireEvent.press(await screen.findByRole('button', { name: 'Supprimer' }))
-    expect(deleteProject).not.toHaveBeenCalled() // il faut d'abord confirmer
+    await askToDelete()
     await passTapGuard()
-    await fireEvent.press(screen.getByRole('button', { name: 'Supprimer le projet' }))
+    await fireEvent.press(deleteWindow().getByRole('button', { name: 'Supprimer' }))
 
     expect(deleteProject).toHaveBeenCalledWith(id)
-    expect(mockReplace).toHaveBeenCalledWith('/')
+    await waitFor(() =>
+      expect(
+        visited(mockPush, mockReplace, mockDismissTo).some((href) => href.startsWith('/me')),
+      ).toBe(true),
+    )
+    expect(visited(mockPush, mockReplace, mockDismissTo)).not.toContain(`/projects/${id}`)
+  })
+
+  it('deletes once on a double tap, the window staying open while it deletes', async () => {
+    // La suppression reste en cours : la fenêtre est occupée (`busy`) et ne se ferme pas.
+    jest.mocked(deleteProject).mockReturnValue(new Promise(() => {}))
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await askToDelete()
+    await passTapGuard()
+    const confirm = deleteWindow().getByRole('button', { name: 'Supprimer' })
+    await fireEvent.press(confirm)
+    await fireEvent.press(confirm)
+
+    expect(deleteProject).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
   })
 
   it('says the project cannot be found, without telling whether it is private', async () => {
@@ -388,5 +470,80 @@ describe('following a project from its page', () => {
       'Ta session a expiré. Reconnecte-toi pour continuer.',
     )
     await signInAgain()
+  })
+})
+
+// R6a (scénario « Commencé en » et « Facile à refaire ? », « La catégorie sur les cartes et la
+// page ») : la recette montre le mois de début et la difficulté quand l'auteur les a donnés, plus
+// le temps passé ; la catégorie est à côté du statut, la seconde après un point.
+describe('the recipe and the category of a project (R6a)', () => {
+  it('shows neither the month nor the difficulty when the author gave none, and no time spent', async () => {
+    jest
+      .mocked(getProject)
+      .mockResolvedValue({ ...recipesProject, startedOn: null, difficulty: null })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la recette est là, avec ses outils.
+    expect(await screen.findByRole('header', { name: 'La recette' })).toBeTruthy()
+    expect(screen.queryByText(/^Commencé en/)).toBeNull()
+    expect(screen.queryByText(/^Facile à refaire/)).toBeNull()
+    expect(screen.queryByText(/Temps passé/)).toBeNull()
+  })
+
+  it('shows the recipe with only a month and a difficulty, without tools', async () => {
+    jest.mocked(getProject).mockResolvedValue({
+      ...recipesProject,
+      tools: [],
+      startedOn: '2026-03',
+      difficulty: 'medium',
+    })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    expect(await screen.findByRole('header', { name: 'La recette' })).toBeTruthy()
+    expect(screen.getByText(startedOn('mars 2026'))).toBeTruthy()
+    expect(screen.getByText(difficultyOf('medium'))).toBeTruthy()
+  })
+
+  it('shows the category next to the status, the second after a dot', async () => {
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    const title = await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    const categories = screen.getByText(
+      shown(
+        fr.t(($) => $.project.page.categories, {
+          primary: fr.t(($) => $.project.category.cooking),
+          secondary: fr.t(($) => $.project.category.family),
+        }),
+      ),
+    )
+    // À côté du statut, avant le titre (comme le statut aujourd'hui).
+    const [status, category, heading] = readingOrder(
+      screen.getByText('Testable'),
+      categories,
+      title,
+    )
+    expect(status).toBeGreaterThanOrEqual(0)
+    expect(category).toBeGreaterThan(status ?? -1)
+    expect(heading).toBeGreaterThan(category ?? -1)
+  })
+
+  it('shows the primary category alone when there is no second', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...recipesProject, secondaryCategory: null })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getByText(fr.t(($) => $.project.category.cooking))).toBeTruthy()
+    expect(screen.queryByText(/ · /)).toBeNull()
+  })
+
+  it('shows no category for a project published before categories', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...legacyProject, title: recipesProject.title })
+    await renderWithProviders(<ProjectScreen id={id} />)
+
+    // Témoin : la page et son statut sont là.
+    await screen.findByRole('header', { name: 'Mon agent de recettes' })
+    expect(screen.getByText('Testable')).toBeTruthy()
+    expect(screen.queryByText(fr.t(($) => $.project.category.cooking))).toBeNull()
+    expect(screen.queryByText(/ · /)).toBeNull()
   })
 })

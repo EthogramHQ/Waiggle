@@ -738,6 +738,76 @@ const launchProject = {
   ],
   notes: recipesNotes.slice(2),
 }
+// Tranche R6a, la feuille de modification (planches `R6-Modifier`, `R6-Publier-Suite`) : un projet
+// de Léa à trois photos décrites, deux catégories, « Commencé en » et « Facile à refaire ? », et un
+// prompt de départ où traîne une clé d'API (l'encadré « Clé : … » et « Retirer la clé »). La clé
+// est écrite en morceaux : un faux, mais à la forme connue, que l'analyse des secrets de GitHub
+// prendrait pour un vrai si elle était d'un seul tenant.
+const fakeApiKey = ['sk', '-proj-', 'Qm7Lr2Xv9TkB4sWn8JcY', '3pHd6FaZ1uE5gNoa91f'].join('')
+const skyProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000e1',
+  title: 'Le ciel de ce soir',
+  pitch: 'Les planètes et les constellations visibles ce soir, depuis ton jardin.',
+  description:
+    'Il lit la météo et la position des planètes, puis dit quoi regarder et à quelle heure.\n\n- **Jupiter** au sud-est\n- la *Grande Ourse* au nord',
+  status: 'building',
+  visibility: 'public',
+  demoUrl: 'https://ciel-du-soir.fr',
+  tools: [
+    { label: 'Claude', slug: 'claude' },
+    { label: 'Stellarium', slug: 'stellarium' },
+  ],
+  primaryCategory: 'science',
+  secondaryCategory: 'learning',
+  difficulty: 'medium',
+  startedOn: '2026-03',
+  visuals: [
+    photo(
+      'e1a2b3c4-0000-4000-8000-0000000000e1',
+      1600,
+      900,
+      'La Lune au-dessus du toit, en croissant.',
+    ),
+    photo(
+      'e2b3c4d5-0000-4000-8000-0000000000e2',
+      1200,
+      1600,
+      'Jupiter et ses quatre lunes, vues à la lunette.',
+    ),
+    photo(
+      'e3c4d5e6-0000-4000-8000-0000000000e3',
+      1600,
+      1200,
+      'L’écran du projet : la carte du ciel à 22 h.',
+    ),
+  ],
+  portraitCover: null,
+  prompts: [
+    `Tu es un guide d’astronomie pour débutants. Avec la météo de ma ville et l’heure, dis-moi les trois choses à regarder ce soir. Ma clé pour l’API météo : ${fakeApiKey}`,
+    'Explique en deux phrases pourquoi Jupiter brille plus que les étoiles.',
+  ],
+  followerCount: 4,
+  notes: [],
+}
+// Un projet de Léa publié avant R6a, jamais modifié depuis : sans catégorie (la ligne « Catégorie »
+// dit « Choisis une catégorie »), sans mois ni difficulté.
+const oldProject = {
+  ...recipesProject,
+  id: '00000000-0000-4000-8000-0000000000e2',
+  title: 'Mon tri de factures',
+  pitch: 'Il range les factures du mois par fournisseur et prépare le récapitulatif.',
+  status: 'done',
+  tools: [{ label: 'ChatGPT', slug: 'chatgpt' }],
+  primaryCategory: null,
+  secondaryCategory: null,
+  difficulty: null,
+  startedOn: null,
+  visuals: [],
+  portraitCover: null,
+  prompts: [],
+  notes: [],
+}
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
 // `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
 // utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
@@ -1340,6 +1410,26 @@ const fakeApi = (
     // R5a : la page projet à trois photos et trois prompts (les pages de captures : la session).
     if (pathname === `/v1/projects/${launchProject.id}`) {
       return json(200, withExtras(launchProject))
+    }
+    // R6a : la feuille de modification (trois photos décrites, une clé dans le prompt) et un projet
+    // d'avant R6a, sans catégorie. Les pages de captures qui les ouvrent : la session.
+    if (pathname === `/v1/projects/${skyProject.id}`) return json(200, withExtras(skyProject))
+    if (pathname === `/v1/projects/${oldProject.id}`) return json(200, withExtras(oldProject))
+    // R6a : décrire une photo (PATCH …/visuals/{id}) rend le projet, la description posée.
+    const described = pathname.match(/^\/v1\/projects\/([^/]+)\/visuals\/([^/]+)$/)
+    if (described && method === 'PATCH') {
+      const { description } = JSON.parse(route.request().postData() ?? '{}')
+      const known = [skyProject, oldProject, photosProject].find((p) => p.id === described[1])
+      if (!known) return json(404, { error: { code: 'not_found', message: '' } })
+      return json(
+        200,
+        withExtras({
+          ...known,
+          visuals: known.visuals.map((v) =>
+            v.id === described[2] ? { ...v, description: description || null } : v,
+          ),
+        }),
+      )
     }
     // R4 : la page du projet de chaque carte du fil et de chaque proche suggéré (relecture design,
     // A7 : « Ce projet est introuvable » au toucher d'une carte).
@@ -2150,6 +2240,43 @@ const pages = [
     path: `/projects/${photosProject.id}/edit`,
     signedIn: true,
     fullPage: true,
+  },
+  // R6a : la seconde feuille « Catégorie et outils », une catégorie cochée.
+  {
+    name: 'publier-categorie',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
+      await page.getByRole('checkbox', { name: /^Sciences et espace/ }).click()
+    },
+  },
+  // R6a : un titre tapé, puis « Annuler » : « Abandonner ce projet ? » par-dessus la feuille. (Pas
+  // Échap : en CI, la touche pouvait arriver avant que la feuille l'écoute, et rien ne s'ouvrait.)
+  {
+    name: 'publier-abandon',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      const title = page.getByLabel('Titre', { exact: true })
+      await title.fill('Le ciel de ce soir')
+      await page.getByRole('button', { name: 'Annuler', exact: true }).first().click()
+      await page.getByText('Abandonner ce projet ?').waitFor()
+    },
+  },
+  // R6a : « Supprimer » du menu « … » de l'auteur ouvre la fenêtre (vignette, badge corbeille).
+  {
+    name: 'supprimer-projet',
+    path: project,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Plus d’actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Supprimer', exact: true }).click()
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: 'Supprimer', exact: true })
+        .waitFor()
+    },
   },
   // La page d'un membre (la sienne : avec un brouillon privé), et celle d'une étiquette, pleine
   // puis vide.

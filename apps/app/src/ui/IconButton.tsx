@@ -21,8 +21,12 @@ type Props = {
    * prend un, de verre, que sous le doigt ou quand ce qu'il ouvre est ouvert (`expanded`).
    */
   variant?: 'glass' | 'plain' | 'honey' | 'bare'
-  /** regular : 44 points ; large : 64 (jeton `layout.fab`), sans l'enfoncement du bouton flottant. */
-  size?: 'regular' | 'large'
+  /**
+   * regular : 44 points ; large : 64 (jeton `layout.fab`), sans l'enfoncement du bouton flottant ;
+   * small (R6a) : un petit rond dessiné de 28 points (`layout.chipControl`), posé sur une vignette où
+   * deux ronds de 44 couvriraient la photo, au centre d'une zone à toucher qui garde ses 44 points.
+   */
+  size?: 'regular' | 'large' | 'small'
   /**
    * Le bouton rond flottant (« + », publier un projet, Miel 2) : 64 points (jeton `layout.fab`),
    * et il s'enfonce davantage sous le doigt (`pressScaleFab`, 0,92 au lieu de 0,96) : plus petit
@@ -90,6 +94,7 @@ export function IconButton({
   // Le grand rond (« large ») et le bouton flottant ont le diamètre du jeton `layout.fab`.
   const big = fab || size === 'large'
   const diameter = big ? layout.fab : layout.touchTarget
+  const small = size === 'small'
 
   const looks: Record<NonNullable<Props['variant']>, { box: ViewStyle; tone: IconTone }> = {
     glass: {
@@ -149,7 +154,8 @@ export function IconButton({
             alignItems: 'center',
             justifyContent: 'center',
           },
-          look.box,
+          // Petit : la zone de 44 points reste transparente, le rond se dessine dedans (plus bas).
+          !small && look.box,
           // Le disque de `bare` : le verre se voit sur la feuille comme sur le gris de ses cartes.
           variant === 'bare' && (pressed || expanded === true) && looks.glass.box,
           inactiveHoney && { backgroundColor: colors.honeyDisabled, boxShadow: 'none' },
@@ -157,7 +163,26 @@ export function IconButton({
         ]}
       >
         {/* La roue remplace l'icône dans le même rond : le bouton ne change pas de taille. */}
-        {loading ? (
+        {small ? (
+          <View
+            style={[
+              {
+                width: layout.chipControl,
+                height: layout.chipControl,
+                borderRadius: radii.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              look.box,
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            ) : (
+              <Icon name={icon} size={16} tone={look.tone} />
+            )}
+          </View>
+        ) : loading ? (
           <ActivityIndicator color={colors.textMuted} />
         ) : (
           <Icon name={icon} size={big ? 28 : 22} tone={inactiveHoney ? 'disabled' : look.tone} />
