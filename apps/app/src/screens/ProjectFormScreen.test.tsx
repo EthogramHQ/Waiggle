@@ -36,6 +36,7 @@ import {
   forgetFocus,
   type Host,
   hostsOf,
+  layerAround,
   mockNav,
   mockPick,
   mockServer,
@@ -45,7 +46,6 @@ import {
   openNewForm,
   openNewSheet,
   picked,
-  pressEscape,
   resetAll,
   root,
   secondaryRow,
@@ -292,7 +292,9 @@ describe('ProjectFormScreen, the category', () => {
     await fireEvent.press(categoryBox('learning'))
     forgetFocus()
 
-    await pressEscape(categoryBox('learning'))
+    // Échap relâchée (ou le Retour d'Android) arrive à la couche de la seconde feuille : sous Jest
+    // (natif), la feuille n'écoute pas la touche enfoncée, réservée au web (R6a, U5c).
+    await act(() => layerAround(TEXT.categoriesAndTools).props.onRequestClose())
 
     // Seule la seconde feuille se ferme : la première reste, sans demander d'abandon.
     await waitFor(() => expect(screen.queryByLabelText(TEXT.categoriesAndTools)).toBeNull())
