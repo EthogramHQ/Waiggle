@@ -1107,6 +1107,7 @@ export const en: Translation = {
         sparkle: 'Sparkle',
         heart: 'Heart',
       },
+      otherDetail: 'Always last · {{projects}}',
     },
   },
   suspension: {

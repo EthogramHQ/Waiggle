@@ -1287,6 +1287,11 @@ export const fr = {
         sparkle: 'Étincelle',
         heart: 'Cœur',
       },
+      /**
+       * R6b (U9) : sous « Autre », dans l'onglet « Catégories », pourquoi une catégorie créée se
+       * place avant elle ; `projects` est le texte de `projects` (« 2 projets »).
+       */
+      otherDetail: 'Toujours en dernier · {{projects}}',
     },
   },
   // Le compte suspendu, tel que son membre le lit (tranche 7c, article 17 du DSA) : la mesure, sa

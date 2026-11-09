@@ -4,7 +4,8 @@
 // - les lectures : les « Autre » à vérifier, le catalogue (avec sa recherche), les projets à ranger,
 //   le journal « Changements récents », et ce que changera un rattachement (`impact`) ;
 // - les décisions sur un « Autre » qui ne passent pas par la feuille d'un outil : « Rattacher à un
-//   outil » et « Laisser hors du catalogue » ; et « Ranger » un projet dans une catégorie.
+//   outil » et « Laisser hors du catalogue » ; « Ranger » un projet dans une catégorie, et créer
+//   une catégorie.
 // Les écritures d'un outil (admettre un « Autre », créer, modifier) sont dans `tools/api.ts`, avec
 // la page d'un outil qui s'en sert aussi.
 //
@@ -14,7 +15,9 @@
 import {
   AdminCatalogueToolsPage,
   CatalogueChangesPage,
+  Category,
   type CategoryCode,
+  type CategoryCreate,
   PendingToolsPage,
   ToolImpact,
   UncategorizedPage,
@@ -23,6 +26,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useCallback } from 'react'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, type ApiResult } from '../api/errors'
+import { categoriesQueryKey } from '../categories/api'
 import { toolPageQueryKey, toolsQueryKey } from '../tools/api'
 import { moderationQueryKey } from './api'
 
@@ -170,6 +174,12 @@ const jsonPost = (body: unknown): RequestInit => ({
 })
 
 /**
+ * Ce qu'une écriture a changé, au-delà du journal (toujours relu) : les outils des membres et leurs
+ * pages (`tools`), le catalogue d'administration (`catalogue`), les catégories (`categories`).
+ */
+type CatalogueTouched = { tools?: boolean; catalogue?: boolean; categories?: boolean }
+
+/**
  * Hook : de quoi dire aux autres listes que le catalogue a changé. Le journal est relu tout de suite
  * (il est en bas de la page, sous les cartes : une ligne de plus ne fait rien bouger sous le doigt) ;
  * la liste des outils des membres et les pages d'outil sont marquées périmées. Les listes de
@@ -179,13 +189,18 @@ const jsonPost = (body: unknown): RequestInit => ({
 export const useCatalogueRefresh = () => {
   const queryClient = useQueryClient()
   const changed = useCallback(
-    ({ tools = false, catalogue = false }: { tools?: boolean; catalogue?: boolean } = {}) => {
+    ({ tools = false, catalogue = false, categories = false }: CatalogueTouched = {}) => {
       void queryClient.invalidateQueries({ queryKey: catalogueChangesKey })
       if (catalogue) void queryClient.invalidateQueries({ queryKey: adminToolsKey })
       if (tools) {
         void queryClient.invalidateQueries({ queryKey: toolsQueryKey })
         void queryClient.invalidateQueries({ queryKey: toolPageQueryKey })
       }
+      // Les catégories (leurs noms, leur ordre et leur nombre de projets), dans toutes les langues
+      // à la fois : la clé sans langue les désigne toutes (`categoriesQueryKey()`). Les écrans qui
+      // les affichent (feuille de publication, filtres d'Explorer, onglet « Catégories ») les
+      // relisent ; celles des autres langues le seront à leur prochain affichage.
+      if (categories) void queryClient.invalidateQueries({ queryKey: categoriesQueryKey() })
     },
     [queryClient],
   )
@@ -205,17 +220,17 @@ export const useCatalogueRefresh = () => {
  * La réponse n'est pas lue (204, ou l'outil du catalogue pour un rattachement) : l'écran sait déjà
  * ce qu'il a décidé.
  */
-const useDecision = <Args extends unknown[]>(
+const useDecision = <Args extends unknown[], T = null>(
   scope: string,
-  send: (...args: Args) => Promise<ApiResult<null>>,
-  touchesTools: boolean,
+  send: (...args: Args) => Promise<ApiResult<T>>,
+  touches: CatalogueTouched,
 ) => {
   const { changed } = useCatalogueRefresh()
   const mutation = useMutation({
     mutationFn: (args: Args) => send(...args),
     scope: { id: scope },
     onSuccess: (result) => {
-      if (result.ok) changed({ tools: touchesTools, catalogue: touchesTools })
+      if (result.ok) changed(touches)
     },
   })
   const { mutateAsync } = mutation
@@ -232,7 +247,7 @@ export const useMergeTool = () => {
   const { write, pending } = useDecision(
     'tool-merge',
     (slug: string, into: string) => requestWithoutBody(toolPath(slug, 'merge'), jsonPost({ into })),
-    true,
+    { tools: true, catalogue: true },
   )
   return { merge: write, pending }
 }
@@ -246,7 +261,7 @@ export const useDismissTool = () => {
   const { write, pending } = useDecision(
     'tool-dismiss',
     (slug: string) => requestWithoutBody(toolPath(slug, 'dismiss'), { method: 'POST' }),
-    true,
+    { tools: true, catalogue: true },
   )
   return { dismiss: write, pending }
 }
@@ -254,6 +269,8 @@ export const useDismissTool = () => {
 /**
  * Hook : `recategorize(projectId, category)` range un projet classé « Autre » dans une catégorie
  * (POST /v1/moderation/projects/{id}/category, 204). Son propre projet : 403 `own_project`.
+ * Le nombre de projets de « Autre » et de la catégorie choisie change : les catégories sont relues
+ * (l'onglet « Catégories », les filtres d'Explorer et de la recherche montrent ces nombres).
  */
 export const useRecategorize = () => {
   const { write, pending } = useDecision(
@@ -263,7 +280,22 @@ export const useRecategorize = () => {
         `/v1/moderation/projects/${encodeURIComponent(projectId)}/category`,
         jsonPost({ category }),
       ),
-    false,
+    { categories: true },
   )
   return { recategorize: write, pending }
+}
+
+/**
+ * Hook : `create(values)` crée une catégorie (POST /v1/moderation/categories, 201 : la catégorie,
+ * nommée dans la langue de la demande). Deux catégories ne portent pas le même nom : 409
+ * `category_name_taken`. La liste des catégories est relue dans toutes les langues : la nouvelle y
+ * prend sa place, juste avant « Autre », partout dans l'appli.
+ */
+export const useCreateCategory = () => {
+  const { write, pending } = useDecision(
+    'category-create',
+    (values: CategoryCreate) => request('/v1/moderation/categories', jsonPost(values), Category),
+    { categories: true },
+  )
+  return { create: write, pending }
 }
