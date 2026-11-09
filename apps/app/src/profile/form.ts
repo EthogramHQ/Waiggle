@@ -4,10 +4,17 @@
 import { ProfileUpdate } from '@ruche/contracts'
 
 /**
- * Le formulaire tel qu'affiché : les outils sont un seul texte, séparés par des virgules. Le pseudo
- * est facultatif ici : absent ou inchangé, il n'est pas envoyé.
+ * Le formulaire tel qu'affiché. Les outils, depuis R6b, sont la liste des pastilles choisies dans le
+ * catalogue (`ToolField`) : une liste de noms, dans l'ordre. Un seul texte séparé par des virgules
+ * (le champ d'avant R6b) reste accepté et découpé par `parseTools`. Le pseudo est facultatif ici :
+ * absent ou inchangé, il n'est pas envoyé.
  */
-export type ProfileForm = { name: string; bio: string; tools: string; handle?: string }
+export type ProfileForm = {
+  name: string
+  bio: string
+  tools: readonly string[] | string
+  handle?: string
+}
 
 export type ProfileFormErrors = {
   name?: 'nameRequired' | 'nameTooLong' | 'invalidCharacters'
@@ -56,7 +63,9 @@ export const toProfileUpdate = (
     name: form.name,
     ...(handleTouched ? { handle: form.handle } : null),
     bio: form.bio,
-    favoriteTools: parseTools(form.tools),
+    // Les pastilles telles quelles ; le schéma retire les espaces du bord et les doublons (« Chat
+    // GPT » et « ChatGPT » repliés pareil, comme l'API).
+    favoriteTools: typeof form.tools === 'string' ? parseTools(form.tools) : [...form.tools],
   })
   if (parsed.success) {
     // Nettoyé, le pseudo peut redevenir l'actuel (« @Lea ») : on ne l'envoie pas.

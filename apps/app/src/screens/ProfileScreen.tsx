@@ -25,13 +25,11 @@ import type { ApiErrorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
-import {
-  type ProfileForm as FormValues,
-  type ProfileFormErrors,
-  parseTools,
-  toProfileUpdate,
-} from '../profile/form'
+import { type ProfileFormErrors, toProfileUpdate } from '../profile/form'
 import { useMe, useSetMe } from '../profile/hooks'
+import { useTools } from '../tools/api'
+import { useToolLabels } from '../tools/labels'
+import { isCatalogueName, matchTools } from '../tools/match'
 import { AvatarCover } from '../ui/AvatarCover'
 import { Button } from '../ui/Button'
 import { focusAndReveal } from '../ui/focus'
@@ -42,9 +40,10 @@ import { Screen } from '../ui/Screen'
 import { Sheet } from '../ui/Sheet'
 import { Row, Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
-import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
+import { ToolField } from '../ui/ToolField'
+import { TAP_GUARD_MS } from '../ui/tapGuard'
 import { useCalmMotion } from '../ui/theme/motion'
 import { LoadErrorScreen, LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
@@ -78,6 +77,7 @@ export function ProfileScreen() {
 function LockedProfile({ me }: { me: Me }) {
   const { t } = useTranslation()
   const toSource = useMediaSources()
+  const tools = usePreviewTools(me.favoriteTools)
   const sheet = useRouteSheet('/settings')
   const title = t(($) => $.profile.title)
   return (
@@ -93,8 +93,7 @@ function LockedProfile({ me }: { me: Me }) {
           avatar={toSource(me.avatarUrl)}
           bio={me.bio}
           toolsTitle={t(($) => $.member.favoriteTools)}
-          // De simples pastilles : le profil ne connaît que le nom des outils, pas leur étiquette.
-          tools={me.favoriteTools.map((tool) => ({ label: tool }))}
+          tools={tools}
           heading={2}
         />
       </Sheet>
@@ -102,7 +101,33 @@ function LockedProfile({ me }: { me: Me }) {
   )
 }
 
+/**
+ * Hook : les pastilles des outils favoris, comme sur la page du membre (`MemberScreen`). De simples
+ * pastilles, sans lien : le profil ne connaît que les noms. Un nom absent du catalogue est marqué
+ * « Autre » (`Tag inCatalogue={false}`), une fois le catalogue lu ; avant, ou s'il ne se lit pas,
+ * aucune marque (on ne sait pas encore).
+ */
+function usePreviewTools(names: readonly string[]) {
+  const catalogue = useTools().data?.tools
+  return names.map((name) =>
+    catalogue !== undefined && !isCatalogueName(catalogue, name)
+      ? { label: name, inCatalogue: false }
+      : { label: name },
+  )
+}
+
 type Message = { text: string; ok: boolean } | null
+
+/** Ce que le membre a tapé ou choisi, champ par champ (les outils : les pastilles, dans l'ordre). */
+type Typed = { name: string; handle: string; bio: string; tools: string[] }
+
+/** Le même formulaire, à la lettre près : une seconde tape sur « Enregistrer » n'y changerait rien. */
+const sameForm = (a: Typed, b: Typed) =>
+  a.name === b.name &&
+  a.handle === b.handle &&
+  a.bio === b.bio &&
+  a.tools.length === b.tools.length &&
+  a.tools.every((tool, index) => tool === b.tools[index])
 
 function ProfileForm({ me }: { me: Me }) {
   const { t } = useTranslation()
@@ -114,18 +139,34 @@ function ProfileForm({ me }: { me: Me }) {
   const [name, setName] = useState(me.name)
   const [handle, setHandle] = useState(me.handle)
   const [bio, setBio] = useState(me.bio)
-  const [tools, setTools] = useState(me.favoriteTools.join(', '))
+  // R6b : les outils sont les pastilles choisies dans le catalogue, plus un texte à virgules.
+  const [tools, setTools] = useState<string[]>(me.favoriteTools)
   const [errors, setErrors] = useState<ProfileFormErrors>({})
   const [message, setMessage] = useState<Message>(null)
   const [busy, setBusy] = useState<'save' | 'avatar' | null>(null)
 
+  // Le catalogue des outils (GET /v1/tools, en cache) : ce qui se tape dans le champ des outils y
+  // est cherché par nom et par alias, sans accents ni majuscules (`matchTools`).
+  const catalogue = useTools().data?.tools
+  const [toolQuery, setToolQuery] = useState('')
+  const toolMatch = matchTools(catalogue ?? [], toolQuery, tools)
+  // Le profil se lit par tous les membres : l'aide d'un « Autre » est celle d'un projet public.
+  const toolLabels = useToolLabels('public')
+  const previewTools = usePreviewTools(tools)
+
   // Ce que le membre a tapé en dernier, lu au retour de l'API. useRef garde une valeur sans
   // redessiner l'écran : après l'attente, onSave lit ici le texte d'à présent, alors que name,
   // handle… lui donneraient celui du moment de l'envoi.
-  const typed = useRef<FormValues>({ name, handle, bio, tools })
+  const typed = useRef<Typed>({ name, handle, bio, tools })
   // Un envoi à la fois : Entrée tapée deux fois, ou Entrée puis « Enregistrer », n'envoie qu'une
   // fois (l'état busy, lui, n'est à jour qu'au dessin suivant).
   const saving = useRef(false)
+  // La garde contre la double tape (R6b, reste de R5b) : la réponse peut arriver avant la seconde
+  // tape (10 ms, la seconde à 60 ms), et `saving` est alors déjà retombé. On retient donc la
+  // dernière tape : quand, et le formulaire qu'elle a envoyé. Une tape moins de TAP_GUARD_MS après,
+  // sur le même formulaire, est la seconde moitié d'une double tape : ignorée. Un formulaire retouché
+  // entre-temps (une bio, un pseudo) part tout de suite : c'est un nouvel envoi voulu.
+  const lastSave = useRef<{ at: number; form: Typed } | null>(null)
   // Les champs, dans l'ordre de la feuille : un refus amène le premier en erreur dans l'écran, avec
   // le focus. Sinon, l'erreur d'un champ du bas (les outils) restait sous le pied collé, et le focus
   // sur « Enregistrer » (relecture de design R2, comme la feuille de suppression).
@@ -146,11 +187,11 @@ function ProfileForm({ me }: { me: Me }) {
    * s'efface (le membre est en train de corriger ; on revérifie au prochain envoi).
    */
   const edit =
-    <K extends keyof ProfileFormErrors & keyof FormValues>(
+    <K extends keyof ProfileFormErrors & keyof Typed>(
       field: K,
-      setValue: (value: string) => void,
+      setValue: (value: Typed[K]) => void,
     ) =>
-    (value: string) => {
+    (value: Typed[K]) => {
       typed.current = { ...typed.current, [field]: value }
       setValue(value)
       setErrors((previous) => {
@@ -167,6 +208,11 @@ function ProfileForm({ me }: { me: Me }) {
     // rétrécissait). La réponse le remplace (relecture de l'interface, C9 ; charte, 6c).
     // Le formulaire tel qu'envoyé, pour savoir au retour ce qui a changé entre-temps.
     const sent = typed.current
+    // Date.now() ici, dans un geste, jamais au dessin : la page pré-rendue n'en dépend pas.
+    const now = Date.now()
+    const last = lastSave.current
+    if (last && now - last.at < TAP_GUARD_MS && sameForm(last.form, sent)) return
+    lastSave.current = { at: now, form: sent }
     // On vérifie avant d'envoyer : le membre voit tout de suite ce qui ne va pas.
     // me.handle : le pseudo enregistré. Retapé tel quel, il n'est pas envoyé (ce n'est pas un
     // changement, et il ne compte pas dans la limite de changements par jour).
@@ -212,7 +258,7 @@ function ProfileForm({ me }: { me: Me }) {
       setHandle(result.data.handle)
     }
     if (typed.current.tools === sent.tools) {
-      const cleaned = result.data.favoriteTools.join(', ')
+      const cleaned = result.data.favoriteTools
       typed.current = { ...typed.current, tools: cleaned }
       setTools(cleaned)
     }
@@ -338,7 +384,7 @@ function ProfileForm({ me }: { me: Me }) {
                 avatar={avatar}
                 bio={bio.trim()}
                 toolsTitle={t(($) => $.member.favoriteTools)}
-                tools={parseTools(tools).map((tool) => ({ label: tool }))}
+                tools={previewTools}
                 heading={3}
               />
             </Stack>
@@ -414,13 +460,21 @@ function ProfileForm({ me }: { me: Me }) {
             error={bioError}
           />
         </FieldGroup>
-        <TagInput
+        {/* R6b : le même champ que les outils d'un projet. Les noms du catalogue se proposent
+            (nom ou alias), un nom absent s'ajoute « comme autre outil », marqué ; 10 au plus, le
+            compteur le dit, et à la limite rien ne se propose plus. Ce qui est tapé sans être
+            choisi n'est pas enregistré : seules les pastilles comptent. */}
+        <ToolField
           label={t(($) => $.profile.fields.tools)}
-          values={parseTools(tools)}
-          onChange={(list) => edit('tools', setTools)(list.join(', '))}
-          placeholder={t(($) => $.profile.fields.toolsPlaceholder)}
-          removeLabel={(item) => t(($) => $.common.remove, { item })}
-          limit={t(($) => $.profile.fields.toolsLimit, { max: FAVORITE_TOOLS_MAX })}
+          values={tools}
+          onChange={edit('tools', setTools)}
+          suggestions={toolMatch.suggestions}
+          onQuery={setToolQuery}
+          limit={FAVORITE_TOOLS_MAX}
+          labels={toolLabels}
+          known={toolMatch.known}
+          catalogueReady={catalogue !== undefined}
+          isOther={(tool) => catalogue !== undefined && !isCatalogueName(catalogue, tool)}
           error={toolsError || undefined}
           inputRef={inputs.tools}
         />
