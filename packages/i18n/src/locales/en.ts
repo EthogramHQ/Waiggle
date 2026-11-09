@@ -1708,5 +1708,6 @@ export const en: Translation = {
     toolNameTaken: 'This name is already a catalogue tool, or another of its names.',
     categoryNameTaken: 'A category already has this name.',
     tooManyOtherTools: 'You’ve added a lot of other tools today. Try again tomorrow.',
+    ownProject: 'This is your project: change its category from its page.',
   },
 }

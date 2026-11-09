@@ -2036,5 +2036,6 @@ export const fr = {
     toolNameTaken: 'Ce nom est déjà celui d’un outil du catalogue, ou un autre de ses noms.',
     categoryNameTaken: 'Une catégorie porte déjà ce nom.',
     tooManyOtherTools: 'Tu as ajouté beaucoup d’autres outils aujourd’hui. Réessaie demain.',
+    ownProject: 'C’est ton projet : sa catégorie se change depuis sa page.',
   },
 } as const

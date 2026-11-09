@@ -106,7 +106,7 @@ export const ToolSiteUrl = z
   .refine(
     (value) => {
       const url = publicHttpsUrl(value)
-      return url !== null && url.search === '' && url.hash === '' && !value.includes('?')
+      return url !== null && url.search === '' && url.hash === '' && !/[?#]/.test(value)
     },
     { message: 'must have no query string and no fragment' },
   )

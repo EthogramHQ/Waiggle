@@ -36,6 +36,12 @@ const errorMessages = {
   // Tranche R6a : les catégories d'un projet.
   category_required: 'categoryRequired',
   same_category: 'sameCategory',
+  // Tranche R6b : le catalogue des outils et les catégories en base.
+  unknown_category: 'unknownCategory',
+  tool_name_taken: 'toolNameTaken',
+  category_name_taken: 'categoryNameTaken',
+  too_many_other_tools: 'tooManyOtherTools',
+  own_project: 'ownProject',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 
