@@ -172,6 +172,14 @@ type Props = {
    */
   floating?: ReactNode
   /**
+   * Une couche posée par-dessus tout l'écran, barre du haut comprise (la danse de publication du
+   * Fil, R6a). Elle se dessine elle-même en `absoluteFill` et laisse passer le toucher ; son repère
+   * est celui de l'écran, dont le coin haut gauche est celui de la fenêtre (une page de la pile
+   * prend toute la fenêtre, la barre d'onglets flotte dessus). Elle lit le canal du défilement
+   * (`ScreenScrollContext`), comme le contenu.
+   */
+  overlay?: ReactNode
+  /**
    * Le nom du bouton du haut (avec `onBack`), quand il diffère de « Retour » ou doit se lire en
    * entier (la page d'un projet, R5a). Sur ordinateur et tablette, l'icône et ce texte dans une
    * pilule de verre ; sur téléphone, l'icône seule, nommée par ce texte. Sans lui, l'icône seule
@@ -204,6 +212,7 @@ export function Screen({
   scene,
   footer,
   floating,
+  overlay,
   backLabel,
 }: Props) {
   const { t } = useTranslation()
@@ -607,6 +616,8 @@ export function Screen({
                 {floating}
               </ScreenFloating>
             ) : null}
+            {/* La couche du dessus (R6a), après tout le reste : dessinée au-dessus de la page. */}
+            {overlay}
           </View>
         </ScreenScrollContext.Provider>
       </ScreenAmbient>

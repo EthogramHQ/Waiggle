@@ -7,6 +7,14 @@ export const feedItemId = (item: FeedItem) =>
   item.kind === 'note' ? item.note.id : item.project.id
 
 /**
+ * Le premier élément qui n'est pas du membre lui-même (R6a : ses projets entrent dans son fil, et
+ * une note a pour auteur celui de son projet). C'est jusqu'à lui que le fil est marqué lu
+ * (`useMarkFeedRead`) ; `undefined` si la liste n'a que les siens.
+ */
+export const firstOfOthers = (items: readonly FeedItem[] | undefined, viewerId: string) =>
+  items?.find((item) => item.project.author.id !== viewerId)
+
+/**
  * Où poser « Tu es à jour » dans le fil (R4, F-Fil5) : le rang du premier élément déjà vu, celui
  * dont la date ne dépasse pas la dernière lecture (`at ≤ readBefore`). La sphère se pose juste
  * avant lui, donc en tête si c'est le premier.
