@@ -37,6 +37,8 @@ import { ModerationCategoriesScreen } from './ModerationCategoriesScreen'
 import { lendContains, lendPage, watchFocus } from './ProjectComments.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// La langue du téléphone en français : sur le web aussi, la page s'écrit en français.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 // `apiFetch` joint sur mobile le cookie gardé par Better Auth : ici, aucun.
 jest.mock('../accounts/auth-client', () => ({
   authClient: { getCookie: jest.fn().mockResolvedValue(null) },
