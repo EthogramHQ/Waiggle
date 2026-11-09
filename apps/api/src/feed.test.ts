@@ -23,7 +23,7 @@ import {
   Project,
   ProjectNote,
   SearchResults,
-  TagPage,
+  ToolPage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, sql } from 'drizzle-orm'
@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { explainQueries } from './testing/explain'
+import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
 let ctx: TestContext
 let lea: string // cookies de session
@@ -759,6 +760,14 @@ describe('the « discover » feed and unverified authors (R4, W4)', () => {
 // étiquette, la page d'un membre.
 
 describe('the reaction total of each project (R4)', () => {
+  // R6b : la page d'un outil n'existe que pour un outil du catalogue (un « Autre » répond 404).
+  // On remplace le catalogue semé par le seul outil que ces tests citent, Mistral : les projets
+  // publiés avec « Mistral » y sont rattachés, et sa page (/v1/tags/mistral) les liste.
+  beforeEach(async () => {
+    await clearCatalogue(ctx.db)
+    await addCatalogueTool(ctx.db, { name: 'Mistral', family: 'assistant' })
+  })
+
   const react = async (projectId: string, kind: string, cookie: string) =>
     expect((await send('PUT', `/v1/projects/${projectId}/reactions/${kind}`, cookie)).status).toBe(
       204,
@@ -785,7 +794,7 @@ describe('the reaction total of each project (R4)', () => {
       testers: (await readDiscover(cookie, { testers: 'true' })).items.map((item) => item.project),
       search: SearchResults.parse(await get(`/v1/search?${new URLSearchParams({ q: words })}`))
         .projects.items,
-      tag: TagPage.parse(await get(`/v1/tags/${tag}`)).projects,
+      tag: ToolPage.parse(await get(`/v1/tags/${tag}`)).projects,
       member: Member.parse(await get(`/v1/members/${memberId}`)).projects,
     }
   }
@@ -1179,5 +1188,233 @@ describe('one’s own projects in the « following » feed (R6a)', () => {
     // Témoin : les cinq projets de Max sont bien lus avec ceux de Léa.
     expect(ids(await readFollowing(max))).toHaveLength(10)
     expect(ten).toBe(two)
+  })
+})
+
+// --- Tranche R6b : « Découvrir » filtré par catégorie ---
+// Scénario : docs/scenarios/refonte.md, « R6b », « Les catégories en filtre », Explorer : une
+// pastille de catégorie ne garde, dans « Récents », que les projets classés dans cette catégorie,
+// en principale ou en seconde, page après page. Plan, section « API » (B2b) : GET
+// /v1/feed/discover?category= (DiscoverQuery du contrat), même curseur `(date, id)` que sans filtre.
+//
+// Le curseur ne porte pas le filtre : l'appli renvoie `category` avec chaque page, comme `testers`.
+// Ce qui ne change pas : jamais un projet privé (même pour son auteur), retiré, d'un membre bloqué
+// ou d'un auteur jamais vérifié. Les projets d'avant R6a, sans catégorie, ne sortent que sans filtre
+// (scénario, « La recherche » ; même règle ici : un filtre ne garde que ce qui y est rangé).
+
+describe('the « discover » feed filtered by a category (R6b)', () => {
+  let act: ReturnType<typeof activity>
+  let louis: string
+
+  beforeEach(async () => {
+    act = activity(ctx)
+    // Louis, administrateur (rôle posé en base), retire les projets signalés.
+    louis = await ctx.verifiedMember({
+      name: 'Louis',
+      email: 'louis@example.com',
+      password: 'louis-long-password',
+    })
+    await act.makeAdmin((await me(louis)).id)
+  })
+
+  /** Retire un projet : Max le signale, Louis décide (un retrait répond à un signalement ouvert). */
+  const remove = async (projectId: string) => {
+    later()
+    await act.report(max, { kind: 'project', id: projectId })
+    later()
+    await act.decide(louis, {
+      action: 'remove',
+      target: { kind: 'project', id: projectId },
+      ground: 'rules',
+      explanation: 'Ce projet ne respecte pas les règles.',
+    })
+  }
+
+  /**
+   * Range un projet public de Léa directement en base, deux heures après ce qui précède : pour en
+   * poser 45 sans la limite de 20 publications par jour, ou un projet d'avant R6a (catégorie
+   * nulle), que la publication ne permet plus.
+   */
+  const insertProject = async (
+    title: string,
+    categories: { primaryCategory: string | null; secondaryCategory?: string | null },
+  ) => {
+    later()
+    const at = new Date()
+    const id = randomUUID()
+    await ctx.db.insert(schema.project).values({
+      id,
+      authorId: leaId,
+      title,
+      pitch: 'Un pitch.',
+      description: '',
+      status: 'idea',
+      visibility: 'public',
+      tools: [],
+      toolSlugs: [],
+      primaryCategory: categories.primaryCategory,
+      secondaryCategory: categories.secondaryCategory ?? null,
+      createdAt: at,
+      updatedAt: at,
+      publishedAt: at,
+    })
+    return id
+  }
+
+  it('keeps only the projects of the category, in first or in second place, newest first', async () => {
+    const chatiere = await publish(lea, { title: 'Chatière', primaryCategory: 'animals' })
+    const croquettes = await publish(max, {
+      title: 'Croquettes',
+      primaryCategory: 'cooking',
+      secondaryCategory: 'animals',
+    })
+    const recettes = await publish(zoe, { title: 'Carnet de recettes', primaryCategory: 'cooking' })
+    const esquisse = await publish(lea, { title: 'Esquisse', primaryCategory: 'art' })
+
+    expect(ids(await readDiscover(zoe, { category: 'animals' }))).toEqual([
+      croquettes.id,
+      chatiere.id,
+    ])
+    expect(ids(await readDiscover(zoe, { category: 'cooking' }))).toEqual([
+      recettes.id,
+      croquettes.id,
+    ])
+    expect(ids(await readDiscover(zoe, { category: 'art' }))).toEqual([esquisse.id])
+    // Témoin : sans filtre, les quatre.
+    expect(ids(await readDiscover(zoe))).toEqual([
+      esquisse.id,
+      recettes.id,
+      croquettes.id,
+      chatiere.id,
+    ])
+  })
+
+  it('gives an empty last page for a category without any visible project', async () => {
+    await publish(lea, { title: 'Chatière', primaryCategory: 'animals' })
+    await publish(max, {
+      title: 'Voyage en brouillon',
+      primaryCategory: 'travel',
+      visibility: 'private',
+    })
+
+    // « travel » est une catégorie connue, sans projet visible : une page vide, pas une erreur.
+    const page = await readDiscover(zoe, { category: 'travel' })
+
+    expect(page.items).toEqual([])
+    expect(page.nextCursor).toBeNull()
+  })
+
+  it('never shows a private or a removed project in a category, not even to its author', async () => {
+    const shown = await publish(lea, { title: 'Chatière', primaryCategory: 'animals' })
+    await publish(lea, {
+      title: 'Brouillon',
+      primaryCategory: 'cooking',
+      secondaryCategory: 'animals',
+      visibility: 'private',
+    })
+    const removed = await publish(lea, { title: 'Retiré', primaryCategory: 'animals' })
+    await publish(zoe, { title: 'Carnet de recettes', primaryCategory: 'cooking' })
+    // Témoin : avant le retrait, le projet est bien dans la catégorie.
+    expect(ids(await readDiscover(max, { category: 'animals' }))).toEqual([removed.id, shown.id])
+
+    await remove(removed.id)
+
+    for (const cookie of [lea, max]) {
+      expect(ids(await readDiscover(cookie, { category: 'animals' }))).toEqual([shown.id])
+    }
+  })
+
+  it('leaves out the projects without a category, from before R6a, once a category is chosen', async () => {
+    const old = await insertProject('Ancien carnet', { primaryCategory: null })
+    const recent = await publish(lea, { title: 'Carnet récent', primaryCategory: 'other' })
+
+    // Témoin : sans filtre, le projet d'avant R6a est là.
+    expect(ids(await readDiscover(max))).toEqual([recent.id, old])
+    // Avec un filtre, même « Autre », il n'y est jamais.
+    expect(ids(await readDiscover(max, { category: 'other' }))).toEqual([recent.id])
+    expect(ids(await readDiscover(max, { category: 'animals' }))).toEqual([])
+  })
+
+  it('leaves out the projects of a blocked member, in both directions', async () => {
+    const fromLea = await publish(lea, { title: 'De Léa', primaryCategory: 'animals' })
+    const fromZoe = await publish(zoe, { title: 'De Zoé', primaryCategory: 'animals' })
+    const fromMax = await publish(max, { title: 'De Max', primaryCategory: 'animals' })
+    await publish(lea, { title: 'Carnet de recettes', primaryCategory: 'cooking' })
+    later()
+    await act.block((await me(zoe)).id, max)
+
+    // Max a bloqué Zoé : ni lui ne voit ses projets, ni elle les siens.
+    expect(ids(await readDiscover(max, { category: 'animals' }))).toEqual([fromMax.id, fromLea.id])
+    expect(ids(await readDiscover(zoe, { category: 'animals' }))).toEqual([fromZoe.id, fromLea.id])
+    // Léa, elle, ne voit aucune différence.
+    expect(ids(await readDiscover(lea, { category: 'animals' }))).toEqual([
+      fromMax.id,
+      fromZoe.id,
+      fromLea.id,
+    ])
+  })
+
+  it('keeps the category from page to page, without gaps or repeats', async () => {
+    // 45 projets : un sur trois en « Animaux », un sur trois en « Cuisine » avec « Animaux » en
+    // seconde, un sur trois en « Cuisine » seulement. Le filtre « Animaux » en garde 30.
+    const animals: string[] = []
+    for (let i = 0; i < 45; i++) {
+      const id = await insertProject(`Projet ${i}`, {
+        primaryCategory: i % 3 === 0 ? 'animals' : 'cooking',
+        secondaryCategory: i % 3 === 1 ? 'animals' : null,
+      })
+      if (i % 3 !== 2) animals.push(id)
+    }
+
+    const pages = await readAllPages((cursor) =>
+      readDiscover(
+        max,
+        cursor === undefined ? { category: 'animals' } : { category: 'animals', cursor },
+      ),
+    )
+
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, 10])
+    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, true])
+    expect(pages.flatMap(ids)).toEqual([...animals].reverse())
+  })
+
+  it('combines the category with « looking for testers »', async () => {
+    const demo = 'https://demo.example.com'
+    const wanted = await publish(lea, {
+      title: 'Chatière testable',
+      status: 'testable',
+      demoUrl: demo,
+      primaryCategory: 'animals',
+    })
+    await publish(lea, {
+      title: 'Recettes testables',
+      status: 'testable',
+      demoUrl: demo,
+      primaryCategory: 'cooking',
+    })
+    await publish(max, {
+      title: 'Croquettes en idée',
+      status: 'idea',
+      demoUrl: demo,
+      primaryCategory: 'animals',
+    })
+
+    expect(ids(await readDiscover(zoe, { testers: 'true', category: 'animals' }))).toEqual([
+      wanted.id,
+    ])
+  })
+
+  it('refuses a malformed category code', async () => {
+    // Le contrat (CategoryCode) n'admet que des minuscules, des chiffres et des tirets, 40 au plus :
+    // un nom affiché, un espace, un chemin ou un code trop long ne vont jamais jusqu'à la base.
+    for (const category of ['Cuisine', 'cuisine du monde', '../admin', 'a'.repeat(41), '']) {
+      const res = await send('GET', discoverPath({ category }), max)
+      expect(res.status, category).toBe(400)
+      expect(ErrorResponse.parse(await res.json()).error.code).toBe('validation')
+    }
+    // Témoin : un code bien formé est accepté (ce refus passe dès le contrat, avant le code).
+    expect((await send('GET', discoverPath({ category: 'animals' }), max)).status).toBe(200)
+    // Et sans session, le filtre ne change rien : 401.
+    expect((await send('GET', discoverPath({ category: 'animals' }), null)).status).toBe(401)
   })
 })
