@@ -4,6 +4,7 @@
 // le bouton filtre. Une pastille de 44 points de haut, avec son icône et un chevron qui dit qu'une
 // liste s'ouvre.
 import { borders, layout, radii, space } from '@ruche/brand'
+import type { Ref } from 'react'
 import { Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
 import { Text } from './Text'
@@ -17,12 +18,15 @@ type Props = {
   /** L'icône de la catégorie choisie, ou celle de « Toutes » (les formes). */
   icon: IconName
   onPress: () => void
+  /** Le bouton, pour lui rendre le focus quand la feuille qu'il a ouverte se ferme (R6b). */
+  ref?: Ref<View>
 }
 
-export function FilterButton({ label, spokenLabel, icon, onPress }: Props) {
+export function FilterButton({ label, spokenLabel, icon, onPress, ref }: Props) {
   const { colors } = useTheme()
   return (
     <Pressable
+      ref={ref}
       accessibilityRole="button"
       accessibilityLabel={spokenLabel}
       onPress={onPress}
