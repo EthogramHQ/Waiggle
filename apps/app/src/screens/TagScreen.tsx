@@ -32,6 +32,7 @@ import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
 import { type ToolPageFilters, useAdminTool, useEditTool, useToolPage } from '../tools/api'
+import { useProjectsOrNone } from '../tools/labels'
 import { Button } from '../ui/Button'
 import { FilterButton } from '../ui/FilterButton'
 import { FilterPills } from '../ui/FilterPills'
@@ -454,10 +455,12 @@ function ToolHeaderOf({
   onSite: () => void
 }) {
   const { t } = useTranslation()
+  // « Aucun projet pour l'instant » à zéro, pas « 0 projet » (ui-S1 de R6b).
+  const projects = useProjectsOrNone()
   return (
     <ToolHeader
       name={tool.name}
-      projects={t(($) => $.tools.projects, { count: tool.projectCount })}
+      projects={projects(tool.projectCount)}
       family={t(($) => $.tools.family[tool.family])}
       description={tool.description}
       disclaimer={t(($) => $.tool.disclaimer)}

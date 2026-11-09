@@ -154,4 +154,35 @@ describe('IconGrid', () => {
       jest.restoreAllMocks()
     }
   })
+
+  // R6b (ui-C2) : une catégorie sans icône dit « Choisis une icône. » sous la grille, et le groupe
+  // se déclare invalide (web) et cite la phrase ; sans erreur, ni phrase ni état.
+  it('shows its error under the grid and marks the group invalid on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const message = fr.t(($) => $.moderation.categories.iconRequired)
+      await renderWithProviders(
+        <IconGrid label={LABEL} icons={three} value={null} onChange={() => {}} error={message} />,
+      )
+      expect(screen.getByText(message)).toBeTruthy()
+      const group = screen.getByLabelText(LABEL, { exact: true })
+      expect(group.props['aria-invalid']).toBe(true)
+      expect(group.props['aria-describedby']).toBeTruthy()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('has no error text and no invalid state without an error', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <IconGrid label={LABEL} icons={three} value={null} onChange={() => {}} />,
+      )
+      expect(screen.queryByText(fr.t(($) => $.moderation.categories.iconRequired))).toBeNull()
+      expect(screen.getByLabelText(LABEL, { exact: true }).props['aria-invalid']).toBeUndefined()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })

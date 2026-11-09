@@ -36,6 +36,50 @@ describe('Choices', () => {
     expect(style.maxWidth).toBe('100%')
     expect(style.flexShrink).toBe(1)
   })
+
+  // R6b (ui-C2) : une réponse qui manque (« Choisis une famille. ») s'écrit sous les choix, et le
+  // groupe se déclare invalide (web) en citant la phrase ; sans erreur, ni phrase ni état.
+  it('shows its error under the choices and marks the group invalid on the web', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      const message = fr.t(($) => $.moderation.catalogue.familyRequired)
+      await renderWithProviders(
+        <Choices
+          label="Famille"
+          options={[{ value: 'a', label: 'Assistant' }]}
+          value={null}
+          onChange={jest.fn()}
+          error={message}
+        />,
+      )
+      expect(screen.getByText(message)).toBeTruthy()
+      const group = screen.getByLabelText('Famille', { exact: true })
+      expect(group.props['aria-invalid']).toBe(true)
+      expect(group.props['aria-describedby']).toBeTruthy()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
+
+  it('has no error text and no invalid state without an error', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    try {
+      await renderWithProviders(
+        <Choices
+          label="Famille"
+          options={[{ value: 'a', label: 'Assistant' }]}
+          value={null}
+          onChange={jest.fn()}
+        />,
+      )
+      expect(screen.queryByText(fr.t(($) => $.moderation.catalogue.familyRequired))).toBeNull()
+      expect(
+        screen.getByLabelText('Famille', { exact: true }).props['aria-invalid'],
+      ).toBeUndefined()
+    } finally {
+      jest.restoreAllMocks()
+    }
+  })
 })
 
 /** Un nœud de l'arbre rendu, le peu qu'on en lit (RNTL 14 n'exporte pas ce type). */
