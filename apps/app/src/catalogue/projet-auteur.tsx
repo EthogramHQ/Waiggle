@@ -19,6 +19,7 @@ import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
 import { useNameOf } from '../useNameOf'
+import { sampleCategory } from './categories-exemples'
 
 const fr = {
   title: 'En-tête et actions d’un projet',
@@ -27,6 +28,7 @@ const fr = {
   other: 'Vu par un autre membre (touche « Suivre » et « Suivre ce projet »)',
   mine: 'Vu par l’auteur',
   private: 'Projet privé, vu par l’auteur (une seule catégorie)',
+  linked: 'La catégorie est un lien (vers Explorer filtré sur elle), comme sur la page',
   legacy: 'Projet publié avant les catégories (R6a) : rien à côté du statut',
   lineTitle: 'La ligne de l’auteur, ses autres états',
   unknown: 'Pas encore lue : ni pastille ni pseudo, leur place est gardée',
@@ -50,6 +52,7 @@ const en: typeof fr = {
   other: 'Seen by another member (tap “Follow” and “Follow this project”)',
   mine: 'Seen by the author',
   private: 'Private project, seen by the author (a single category)',
+  linked: 'The category is a link (to Explore filtered on it), as on the page',
   legacy: 'Project published before categories (R6a): nothing beside the status',
   lineTitle: 'The author line, its other states',
   unknown: 'Not read yet: no chip, no handle, their place is kept',
@@ -105,6 +108,9 @@ export function ProjectPartsCatalogue() {
             </Example>
             <Example caption={`${l.mine} — ${l[scheme]}`}>
               <Parts l={l} project={{ ...sample(l), isMine: true }} />
+            </Example>
+            <Example caption={`${l.linked} — ${l[scheme]}`}>
+              <Parts l={l} project={sample(l)} onOpenCategory={noop} />
             </Example>
             <Example caption={`${l.private} — ${l[scheme]}`}>
               <Parts
@@ -194,16 +200,35 @@ function Parts({
   project,
   author,
   onToggleFollow = noop,
+  onOpenCategory,
 }: {
   l: Labels
   project: Project
   author?: AuthorLineProps
+  /** Donné, la catégorie de l'en-tête est un lien (la page l'envoie vers Explorer filtré). */
+  onOpenCategory?: () => void
   onToggleFollow?: (shown: boolean) => void
 }) {
   const line = useLine(l)
+  const { i18n } = useTranslation()
+  // Les catégories du projet d'exemple, tirées des catégories de test (le catalogue ne lit pas l'API).
+  const categories = {
+    primary: project.primaryCategory
+      ? sampleCategory(i18n.language, project.primaryCategory)
+      : undefined,
+    secondary: project.secondaryCategory
+      ? sampleCategory(i18n.language, project.secondaryCategory)
+      : undefined,
+  }
   return (
     <Stack gap="lg">
-      <ProjectHeaderView project={project} author={author ?? line} now={NOW} />
+      <ProjectHeaderView
+        project={project}
+        categories={categories}
+        onOpenCategory={onOpenCategory}
+        author={author ?? line}
+        now={NOW}
+      />
       <ProjectActionsView
         project={project}
         onOpenDemo={noop}

@@ -88,8 +88,8 @@ type Props = {
    */
   overlay?: ReactNode
   /**
-   * R6a : la catégorie principale du projet, son nom traduit et son icône (`categoryOption` de
-   * `projects/categories.ts`) ; absente pour un projet d'avant R6a.
+   * R6a : la catégorie principale du projet, son nom traduit et son icône (`optionOf` de
+   * `projects/categories.ts`, lue de l'API) ; absente pour un projet d'avant R6a.
    */
   category?: { label: string; icon: IconName }
   /**

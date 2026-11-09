@@ -3,8 +3,8 @@
 // telle qu'elle paraîtra, qui suit la frappe, puis « Qui peut le voir ? ».
 import { useTranslation } from 'react-i18next'
 import { useMe } from '../profile/hooks'
-import { categoryOption } from '../projects/categories'
 import { demoUrlLooksValid, type ProjectForm } from '../projects/form'
+import { useCategory } from '../projects/useCategory'
 import { CardPreview } from '../ui/CardPreview'
 import type { PhotoTile } from '../ui/PhotoTiles'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -27,7 +27,8 @@ type Props = {
 export function ProjectFormPreview({ form, cover, change }: Props) {
   const { t } = useTranslation()
   const me = useMe()
-  const category = form.primaryCategory ? categoryOption(t, form.primaryCategory) : null
+  // Pas encore lue, ou en panne : l'aperçu n'a pas d'étiquette de catégorie, il reste dessiné.
+  const category = useCategory(form.primaryCategory)
   // « Tester » dès que le lien est valide, comme sur la carte publiée (design-C5, décision de Louis
   // du 9/11/2026) : seulement dessiné (`tryIt` sans `onPress`). Un vrai lien resterait atteignable
   // au clavier d'une tablette (le web, lui, rend tout l'aperçu `inert`) dans un aperçu caché aux

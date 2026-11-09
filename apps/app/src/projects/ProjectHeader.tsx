@@ -28,7 +28,7 @@ import { Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
-import { type CategoryOption, categoryOption } from './categories'
+import type { CategoryOption } from './categories'
 import { changedAfterCreation } from './format'
 import { useCategory } from './useCategory'
 
@@ -160,14 +160,13 @@ const categoryLine = (
 /**
  * Les catégories du projet telles que l'API les nomme (R6b) : `undefined` pour la principale = pas
  * d'étiquette (chargement, panne, code inconnu, projet d'avant R6a). Lues par `ProjectHeader` ;
- * le catalogue donne les siennes, ou rien : il retombe alors sur les noms de départ (`categoryOption`,
- * `@deprecated`, retirée par U3b).
+ * le catalogue donne les siennes, ou rien : sans liste, aucune catégorie n'est affichée.
  */
 export type HeaderCategories = { primary?: CategoryOption; secondary?: CategoryOption }
 
 type ViewProps = {
   project: HeaderProject
-  /** Les catégories lues de l'API ; absentes (catalogue seul), les noms de départ de R6a. */
+  /** Les catégories lues de l'API ; absentes, aucune catégorie n'est affichée. */
   categories?: HeaderCategories | undefined
   /** Toucher la catégorie : Explorer filtré sur son code (donné par `ProjectHeader`). */
   onOpenCategory?: (() => void) | undefined
@@ -193,12 +192,8 @@ export function ProjectHeaderView({
   const updated = changedAfterCreation(project.createdAt, project.updatedAt)
   // La date complète, lue par le lecteur d'écran : « le 12 octobre à 08:00 ».
   const onFull = (full: string) => t(($) => $.dates.onDate, { date: full })
-  // Sans `categories` (le catalogue), les noms de départ ; la page, elle, passe toujours les siens.
-  const shown = categories ?? {
-    primary: project.primaryCategory ? categoryOption(t, project.primaryCategory) : undefined,
-    secondary: project.secondaryCategory ? categoryOption(t, project.secondaryCategory) : undefined,
-  }
-  const category = categoryLine(t, shown.primary, shown.secondary)
+  // Sans `categories`, pas d'étiquette : jamais un nom inventé.
+  const category = categoryLine(t, categories?.primary, categories?.secondary)
   return (
     <Stack gap="md">
       {/* Le statut, puis la catégorie sur la même rangée (elle passe dessous si la place manque) :

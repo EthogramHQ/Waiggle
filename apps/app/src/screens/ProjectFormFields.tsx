@@ -28,13 +28,13 @@ import {
 } from '@ruche/contracts'
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { categoryOption } from '../projects/categories'
 import {
   demoUrlLooksValid,
   type ProjectAudience,
   type ProjectForm,
   type ProjectFormErrors,
 } from '../projects/form'
+import { useCategory } from '../projects/useCategory'
 import type { PhotoActions } from '../projects/usePhotoTiles'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
@@ -205,10 +205,10 @@ export function ProjectFormFields({
   const categoryLabel = t(($) => $.project.form.category)
   const secondaryLabel = t(($) => $.project.form.secondary)
   const toolsLabel = t(($) => $.project.form.tools)
-  const primaryName = form.primaryCategory ? categoryOption(t, form.primaryCategory).label : null
-  const secondaryName = form.secondaryCategory
-    ? categoryOption(t, form.secondaryCategory).label
-    : null
+  // Les noms viennent de l'API (`useCategory`) ; pendant la lecture ou en panne, la catégorie n'est
+  // pas nommée (null) : la ligne dit « Choisir une catégorie » et le formulaire reste utilisable.
+  const primaryName = useCategory(form.primaryCategory)?.label ?? null
+  const secondaryName = useCategory(form.secondaryCategory)?.label ?? null
   const categoryError = errors.primaryCategory ? t(($) => $.project.form.chooseCategory) : undefined
   // Sans catégorie, la ligne dit quoi faire ; en erreur, la phrase passe en rouge sous le libellé
   // (et décrit la ligne), sans être écrite deux fois.

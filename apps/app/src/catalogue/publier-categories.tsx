@@ -6,10 +6,10 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
-import { PROJECT_CATEGORIES, type ProjectCategory } from '@ruche/contracts'
+import type { ProjectCategory } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { categoryOption } from '../projects/categories'
+import { categoryOptions } from '../projects/categories'
 import { CategoryPicker } from '../ui/CategoryPicker'
 import { FollowButton } from '../ui/FollowButton'
 import { MonthField } from '../ui/MonthField'
@@ -19,6 +19,7 @@ import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
+import { sampleCategories, sampleCategory } from './categories-exemples'
 
 const fr = {
   title: 'Publier : catégories, mois et cartes',
@@ -105,8 +106,7 @@ const useSampleTexts = () => {
     format.format(new Date(Date.UTC(2000, index, 1))),
   )
   return {
-    // R6b : les catégories de départ, tant que ces exemples n'ont pas les catégories de l'API.
-    options: PROJECT_CATEGORIES.map((value) => categoryOption(t, value)),
+    options: categoryOptions(sampleCategories(i18n.language)),
     picker: {
       label: t(($) => $.project.form.category),
       hint: t(($) => $.project.form.categoryRule),
@@ -128,11 +128,11 @@ const useSampleTexts = () => {
 }
 
 export function PublishCategoriesCatalogue() {
-  const { i18n, t } = useTranslation()
+  const { i18n } = useTranslation()
   const l = i18n.language === 'en' ? en : fr
   const texts = useSampleTexts()
-  const science = categoryOption(t, 'science')
-  const cooking = categoryOption(t, 'cooking')
+  const science = sampleCategory(i18n.language, 'science')
+  const cooking = sampleCategory(i18n.language, 'cooking')
   const schemes = ['day', 'night'] as const
   const pick = (primary: Choice['primary'], secondary: Choice['secondary']) => (
     <CategoryPicker
