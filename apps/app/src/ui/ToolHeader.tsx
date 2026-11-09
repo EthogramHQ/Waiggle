@@ -31,7 +31,10 @@ type Props = {
   family: string
   /** Sa description dans la langue du visiteur ; `null` : l'outil n'en a pas, rien ne s'affiche. */
   description: string | null
-  /** « Description écrite par Waiggle, sans lien avec l'éditeur de l'outil » (jur-T7). */
+  /**
+   * « Description écrite par Waiggle, sans lien avec l'éditeur de l'outil » (jur-T7), sous la
+   * description ; sans description, elle ne s'affiche pas.
+   */
   disclaimer: string
   /**
    * Son site : l'hôte à afficher (« lovable.dev ») et l'ouverture, qui passe par la page de sortie
@@ -69,16 +72,20 @@ export function ToolHeader({
           {`${projects} · ${family}`}
         </Text>
         {description === null ? null : (
-          <View style={{ maxWidth: readableWidth, alignSelf: 'stretch' }}>
-            <Text tone="secondary">{description}</Text>
-          </View>
+          <>
+            <View style={{ maxWidth: readableWidth, alignSelf: 'stretch' }}>
+              <Text tone="secondary">{description}</Text>
+            </View>
+            {/* Qui a écrit la description : en discret, mais toujours sous elle (relecture
+                juridique). Sans description, rien : la phrase parlerait d'un texte absent
+                (relectures de R6b, juridique S6). */}
+            <View style={{ maxWidth: readableWidth, alignSelf: 'stretch' }}>
+              <Text variant="caption" tone="muted">
+                {disclaimer}
+              </Text>
+            </View>
+          </>
         )}
-        {/* Qui a écrit la description : en discret, mais toujours là (relecture juridique). */}
-        <View style={{ maxWidth: readableWidth, alignSelf: 'stretch' }}>
-          <Text variant="caption" tone="muted">
-            {disclaimer}
-          </Text>
-        </View>
       </Stack>
       {site === null ? null : (
         // À gauche, à la largeur de son contenu : le lien ne s'étire pas sur la page.

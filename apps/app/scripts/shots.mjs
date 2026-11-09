@@ -931,9 +931,13 @@ const toolDescriptions = {
   chatgpt: 'Un assistant conversationnel qui répond, rédige et explique.',
   python: 'Un langage de programmation répandu, pour les scripts comme les applications.',
   'home-assistant': 'Pilote les objets connectés de la maison depuis un seul endroit.',
+  // La capture `etiquette` (relectures de R6b) : une description et un site, comme au catalogue.
+  'claude-code':
+    'Assistant de programmation qui travaille dans le terminal, sur le code d’un projet.',
 }
 const toolSites = {
   lovable: 'https://lovable.dev/',
+  'claude-code': 'https://claude.com/product/claude-code',
   python: 'https://www.python.org/',
   'home-assistant': 'https://www.home-assistant.io/',
 }

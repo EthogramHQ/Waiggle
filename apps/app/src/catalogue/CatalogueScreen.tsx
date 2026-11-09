@@ -105,6 +105,7 @@ import { AdminGesturesCatalogue } from './outils-gestes'
 import { ToolPageSheetsCatalogue } from './outils-page'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
+import { ProjectCategoryCatalogue } from './projet-categorie'
 import { ProjectFrameCatalogue } from './projet-ecran'
 import { FanCatalogue } from './projet-eventail'
 import { GalleryCatalogue } from './projet-galerie'
@@ -880,6 +881,9 @@ export function CatalogueScreen() {
       <ProjectFrameCatalogue />
       <GalleryCatalogue />
       <ProjectPartsCatalogue />
+      {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
+          son issue (projet-categorie.tsx). */}
+      <ProjectCategoryCatalogue />
       {/* Tranche R6a, la feuille de publication (publier-*.tsx). */}
       <PublishPhotosCatalogue />
       <PublishToolsPreviewCatalogue />
