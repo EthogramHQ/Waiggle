@@ -516,14 +516,20 @@ function Bee({ progress, geometry }: { progress: SharedValue<number>; geometry: 
       angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
     }
     const appear = Math.min(1, p / APPEAR)
+    const size = (0.6 + 0.4 * appear) * (1 - phase.settle / 2)
+    // Vers la gauche, l'abeille se retourne (son reflet) au lieu de voler sur le dos : son reflet
+    // vole naturellement vers 180° + TILT, d'où l'angle. Le changement se fait quand le vol est
+    // vertical, là où les deux poses sont le reflet l'une de l'autre.
+    const leftward = Math.cos((angle * Math.PI) / 180) < 0
     return {
       opacity: appear * (1 - phase.settle),
       transform: [
         // Le point d'attache sur (x, y), puis la rotation et l'échelle autour de lui.
         { translateX: x - anchorLeft + pivotX },
         { translateY: y - anchorTop + pivotY },
-        { rotate: `${angle + TILT}deg` },
-        { scale: (0.6 + 0.4 * appear) * (1 - phase.settle / 2) },
+        { rotate: `${leftward ? angle - 180 - TILT : angle + TILT}deg` },
+        { scaleX: leftward ? -size : size },
+        { scaleY: size },
         { translateX: -pivotX },
         { translateY: -pivotY },
       ],
