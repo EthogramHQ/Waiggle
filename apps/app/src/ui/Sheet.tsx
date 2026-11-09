@@ -281,6 +281,17 @@ const ASIDE_GAP = space.xxl
 /** La largeur de fenêtre qu'il faut pour poser la colonne à côté du panneau. */
 const ASIDE_ROOM = layout.formWidth + ASIDE_GAP + ASIDE_WIDTH + 2 * PANEL_MARGIN
 
+/**
+ * Hook : vrai si une feuille ouverte maintenant poserait sa colonne `aside` à côté du contenu
+ * (ordinateur, fenêtre assez large). L'écran y lit où mettre ce qu'il range dans la colonne (la
+ * feuille de publication, R6a : « Qui peut le voir ? »), pour que rien ne disparaisse entre deux.
+ */
+export const useSheetAside = (): boolean => {
+  const { sizeClass } = useLayout()
+  const window = useWindowDimensions()
+  return sizeClass !== 'compact' && window.width >= ASIDE_ROOM
+}
+
 // Le glisser vers le bas (téléphone, D1). Le doigt doit d'abord descendre de quelques points pour
 // que la feuille le suive : une tape sur « Fermer », un peu tremblée, reste une tape. Au lâcher, la
 // feuille se ferme si elle a assez descendu, ou si le doigt filait vers le bas ; sinon elle remonte.
@@ -328,6 +339,7 @@ export function Sheet({
   const { sizeClass } = useLayout()
   const window = useWindowDimensions()
   const phone = sizeClass === 'compact'
+  const besideRoom = useSheetAside()
   // « Réduire les animations » : la feuille de téléphone paraît par un fondu, au lieu de monter du
   // bas de l'écran (un grand déplacement).
   const calm = useCalmMotion()
@@ -673,7 +685,7 @@ export function Sheet({
           <SheetPanel
             {...panel}
             // La colonne d'à côté, seulement si la fenêtre a la place de la poser.
-            {...(aside !== undefined && !phone && window.width >= ASIDE_ROOM ? { aside } : null)}
+            {...(aside !== undefined && besideRoom ? { aside } : null)}
             onClose={requestClose}
             busy={busy}
             layout={phone ? 'phone' : 'desktop'}
