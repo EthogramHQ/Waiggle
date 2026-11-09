@@ -16,6 +16,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import type { ApiResult } from '../api/errors'
 import type { PickedImage } from '../media/pick'
 import { labelOf } from '../testing/arrivedFocus'
+import { categoryList, categoryName as seedName } from '../testing/categories'
 import { leaMe } from '../testing/fixtures'
 import { pathOf } from '../testing/navigation'
 import { photo, recipesProject } from '../testing/projects'
@@ -27,9 +28,12 @@ import { ProjectFormScreen } from './ProjectFormScreen'
 
 // --- Les textes ---
 
-/** Le nom d'une catégorie (« Sciences et espace »). */
-export const categoryName = (code: Project['primaryCategory'] & string) =>
-  fr.t(($) => $.project.category[code])
+/**
+ * Le nom d'une catégorie (« Sciences et espace »). R6b : les noms viennent de l'API
+ * (GET /v1/categories, servi par le faux serveur ci-dessous avec `categoryList`), plus des
+ * traductions : on les lit dans les mêmes données.
+ */
+export const categoryName = (code: Project['primaryCategory'] & string) => seedName(code)
 
 export const TEXT = {
   newTitle: fr.t(($) => $.project.form.newTitle),
@@ -119,9 +123,12 @@ const uploadedUri = (body: unknown): string | undefined => {
 const applyChanges = (project: Project, body: Record<string, unknown>): Project => {
   const next = { ...project, ...body } as Project & { visualOrder?: string[] }
   if (Array.isArray(body.tools)) {
+    // R6b : le faux serveur ne connaît pas le catalogue ; chaque outil y est rangé comme l'API
+    // range un nom du catalogue (une page, un lien).
     next.tools = (body.tools as string[]).map((label) => ({
       label,
       slug: label.toLowerCase().replace(/\s+/g, '-'),
+      inCatalogue: true,
     }))
   }
   if (Array.isArray(body.visualOrder)) {
@@ -175,7 +182,9 @@ export const mockServer = {
     if (forced) return forced.answer(sent)
 
     if (method === 'GET' && path === '/v1/me') return ok(await this.me)
-    if (method === 'GET' && path === '/v1/tools') return ok({ tools: [] })
+    // R6b : le catalogue des outils (vide) et les seize catégories de départ.
+    if (method === 'GET' && path === '/v1/tools') return ok({ tools: [], others: [] })
+    if (method === 'GET' && path === '/v1/categories') return ok(categoryList('fr'))
     if (method === 'POST' && path === '/v1/projects') {
       const created = applyChanges(
         { ...recipesProject, id: NEW_ID, visuals: [], portraitCover: null, prompts: [] },
