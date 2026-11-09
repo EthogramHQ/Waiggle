@@ -33,7 +33,7 @@ import {
   type UncategorizedProject,
 } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { type ApiErrorKey, errorKey } from '../api/errors'
@@ -52,7 +52,7 @@ import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { FeedEnd } from '../ui/FeedEnd'
-import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import type { Focusable } from '../ui/focus'
 import { IconGrid } from '../ui/IconGrid'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { LiveStatus } from '../ui/LiveStatus'
@@ -152,20 +152,21 @@ function AdminCategories() {
   // - après un rangement, le résultat de la carte : le bouton qui a ouvert la feuille n'existe plus ;
   // - sans décision, le bouton qui l'a ouverte (sur le web, la feuille ne le connaît pas toujours :
   //   un bouton touché du doigt n'a pas forcément eu le focus).
-  // L'effet de l'écran passe après celui de la feuille qui se ferme (les effets d'un enfant passent
-  // d'abord) : il a le dernier mot.
+  // La feuille pose elle-même le focus à cette place (`returnFocusTo`) : à la fermeture, puis encore
+  // à la fin de son fondu de sortie, pendant lequel le piège à focus du Modal du web le ramène en
+  // elle. Posé par un effet de l'écran à la seule fermeture, il était repris par ce piège, puis
+  // rendu par la feuille au bouton de même nom de la carte voisine (R6b, u9f).
   const [lastDecided, setLastDecided] = useState<string | null>(null)
   const resultRef = useRef<Focusable | null>(null)
   const openers = useRef(new Map<string, Focusable | null>())
   const decidedInSheet = useRef(false)
   const focusAfterClose = useRef<string | null>(null)
-  const [focusTick, setFocusTick] = useState(0)
-  useEffect(() => {
-    if (focusTick === 0) return
+  /** La place du focus à la fermeture, lue par la feuille ; null : son ouvreur. */
+  const closedFocus = () => {
     const target = focusAfterClose.current
-    focusAfterClose.current = null
-    focusWithoutScroll(target === RESULT ? resultRef.current : openers.current.get(target ?? ''))
-  }, [focusTick])
+    if (target === null) return null
+    return target === RESULT ? resultRef.current : (openers.current.get(target) ?? null)
+  }
 
   // --- « Ranger dans une catégorie » : la feuille du choix. `filing` reste rempli pendant le fondu
   // de fermeture, pour que son titre ne change pas sous les yeux ; `filingOpen` dit si elle est
@@ -199,7 +200,6 @@ function AdminCategories() {
     if (!filing) return
     focusAfterClose.current = decidedInSheet.current ? RESULT : filing.project.id
     decidedInSheet.current = false
-    setFocusTick((count) => count + 1)
   }
 
   /** Changer d'onglet est le geste qui range les cartes décidées : la liste est relue. */
@@ -344,6 +344,7 @@ function AdminCategories() {
         deciding={deciding}
         onFiled={onFiled}
         onClose={closeFiling}
+        returnFocusTo={closedFocus}
       />
       <CreateSheet
         open={createOpen}
@@ -386,6 +387,7 @@ function FileSheet({
   deciding,
   onFiled,
   onClose,
+  returnFocusTo,
 }: {
   open: boolean
   project: UncategorizedProject | null
@@ -395,6 +397,8 @@ function FileSheet({
   /** Le rangement a réussi, dans la catégorie de ce code. */
   onFiled: (code: CategoryCode) => void
   onClose: () => void
+  /** Où va le focus à la fermeture (le résultat de la carte rangée, ou son bouton) : voir `Sheet`. */
+  returnFocusTo: () => unknown
 }) {
   const { t } = useTranslation()
   const { recategorize } = useRecategorize()
@@ -451,6 +455,7 @@ function FileSheet({
         onClose={onClose}
         closeGuard={chosen !== null ? requestClose : undefined}
         busy={saving}
+        returnFocusTo={returnFocusTo}
         compact
         notice={problem ? { message: t(($) => $.errors[problem]), tone: 'error' } : null}
         action={{
