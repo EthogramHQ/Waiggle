@@ -21,9 +21,18 @@
 // - Échap ne la ferme que si la touche a été enfoncée pendant qu'elle était ouverte : la touche
 //   relâchée d'une Échap qui fermait autre chose (la feuille d'où vient la fenêtre) n'est pas un
 //   geste pour elle.
+//
+// Correction après les relectures de R6a (ui-B2, ui-C1) :
+// - sur le web, le voile n'est plus un arrêt de Tab : c'était un `<div tabindex=0>` sans rôle ni
+//   nom, grand comme l'écran, où Entrée fermait la fenêtre. Il n'est plus focalisable du tout (voir
+//   plus bas) ; le clic dessus ferme toujours ;
+// - `initialFocusRef` : le bouton qui reçoit le focus à l'ouverture (« Continuer », le geste qui ne
+//   perd rien), posé par la fenêtre une fois son contenu monté, au lieu d'être relancé par l'écran
+//   à chaque image.
 import { borders, layout, space } from '@ruche/brand'
-import { type ReactNode, useEffect, useId, useRef } from 'react'
+import { type ReactNode, type RefObject, useEffect, useId, useRef } from 'react'
 import { Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from './focus'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -79,7 +88,45 @@ type Props = {
    * alerte dans la fenêtre, au-dessus des boutons, lue dès qu'elle paraît. La fenêtre reste ouverte.
    */
   error?: string | undefined
+  /**
+   * Le contrôle qui reçoit le focus à l'ouverture (un bouton de la fenêtre). Sans lui, le premier
+   * bouton le reçoit sur le web (le piège à focus du Modal) ; sur téléphone, le lecteur d'écran
+   * part du titre.
+   */
+  initialFocusRef?: RefObject<Focusable | null>
 }
+
+/**
+ * Pose le focus sur `target` quand le contenu de la fenêtre paraît. Rendu **dans** la fenêtre :
+ * sur le web, le Modal monte son contenu quelques images après `visible`, et la `ref` du bouton
+ * n'existe qu'alors. Sur le web, on attend encore une image : le piège à focus du Modal (un parent,
+ * dont l'effet passe après celui-ci) retient d'abord qui avait le focus avant l'ouverture, pour le
+ * lui rendre à la fermeture ; focaliser plus tôt lui ferait retenir le bouton de la fenêtre.
+ */
+function FocusOnShow({ target }: { target: RefObject<Focusable | null> }) {
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      moveReaderTo(target.current)
+      return
+    }
+    const frame = requestAnimationFrame(() => focusWithoutScroll(target.current))
+    return () => cancelAnimationFrame(frame)
+  }, [target])
+  return null
+}
+
+/**
+ * Les propriétés du voile sur le web : caché aux lecteurs d'écran, et hors du focus. Un `Pressable`
+ * de react-native-web reçoit toujours un `tabindex` (0, ou -1) : même à -1, le piège à focus du
+ * Modal, qui essaie `focus()` sur chaque élément de la fenêtre, le choisissait à l'ouverture ou en
+ * bouclant (mesuré : la fenêtre de suppression s'ouvrait le focus sur le voile). Sur le web, le voile
+ * est donc une simple vue, qui ferme au clic (`onClick`, que react-native-web transmet au `<div>`
+ * mais que les types de React Native ignorent, d'où l'objet).
+ */
+const webScrim = (onPress: (() => void) | undefined): object => ({
+  'aria-hidden': true,
+  onClick: onPress,
+})
 
 /** Le nombre de lignes du texte rappelé : de quoi le reconnaître, sans pousser les boutons loin. */
 const QUOTE_LINES = 3
@@ -148,6 +195,7 @@ export function Dialog({
   onClosed,
   busy = false,
   error,
+  initialFocusRef,
 }: Props) {
   const { colors } = useTheme()
   const tapsAllowed = useTapsAllowed(visible, guardTaps)
@@ -168,6 +216,8 @@ export function Dialog({
     if (Platform.OS === 'web' && !pressedHere) return
     onDismiss()
   }
+  // Le voile ferme comme « Annuler », sauf pendant la garde et pendant l'action.
+  const closeByScrim = tapsAllowed && !busy ? onDismiss : undefined
 
   // Sur le web, react-native-web pose ces propriétés sur la boîte de dialogue elle-même
   // (`role="dialog"`, `aria-modal`) : le lecteur d'écran annonce « Supprimer « … » ?, boîte de
@@ -203,13 +253,23 @@ export function Dialog({
           {/* Toucher le voile ferme la fenêtre, comme « Annuler ». Il est posé dans la zone qui
               défile, sous la fenêtre : il suit le défilement et couvre toute la hauteur. Pendant la
               garde, la seconde tape d'une double tape qui tombe à côté ne la referme pas ; pendant
-              une action (`busy`), aucune tape ne la referme. */}
-          <Pressable
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-            onPress={tapsAllowed && !busy ? onDismiss : undefined}
-            style={{ position: 'absolute', inset: 0 }}
-          />
+              une action (`busy`), aucune tape ne la referme. Caché aux lecteurs d'écran, et jamais
+              focalisable sur le web (`webScrim`) : le clavier a « Annuler » et Échap. */}
+          {Platform.OS === 'web' ? (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              {...webScrim(closeByScrim)}
+              style={{ position: 'absolute', inset: 0 }}
+            />
+          ) : (
+            <Pressable
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              onPress={closeByScrim}
+              style={{ position: 'absolute', inset: 0 }}
+            />
+          )}
           <View
             accessibilityViewIsModal // les lecteurs d'écran restent dans la fenêtre
             style={{ width: '100%', maxWidth: layout.formWidth - 120 }}
@@ -259,6 +319,7 @@ export function Dialog({
               <View style={{ gap: space.md, pointerEvents: tapsAllowed ? 'auto' : 'none' }}>
                 {children}
               </View>
+              {initialFocusRef ? <FocusOnShow target={initialFocusRef} /> : null}
             </Surface>
           </View>
         </ScrollView>

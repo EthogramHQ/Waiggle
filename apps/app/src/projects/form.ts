@@ -231,3 +231,67 @@ export function toProjectChanges(
   if (initial) return { ok: true, changes: changedFields(initial, form) }
   return { ok: true, changes: parsed.data }
 }
+
+/**
+ * Ce que la feuille dit au-dessus des champs (un seul message à la fois), sorti de l'écran après
+ * les relectures (ui-C6). Par ordre de priorité :
+ * - `message` : le message général de l'envoi (champs à corriger, erreur de l'API) ;
+ * - `photosCut` : des photos en trop, laissées de côté ;
+ * - `describeFailed` : la description d'une photo n'a pas pu s'enregistrer ;
+ * - `photoProblem` : une photo n'a pas pu partir (ou être retirée) ;
+ * - `portraitProblem` : de même pour la couverture verticale ;
+ * - `uploadFailed` : arrivé en modification juste après une publication dont des photos manquent ;
+ * - `preparing` : à la création, une photo se prépare encore (« Publier » attend) ;
+ * - `unchanged` : en modification, rien à enregistrer.
+ */
+export type FormNoticeKind =
+  | 'message'
+  | 'photosCut'
+  | 'describeFailed'
+  | 'photoProblem'
+  | 'portraitProblem'
+  | 'uploadFailed'
+  | 'preparing'
+  | 'unchanged'
+
+/** Ce dont dépend le choix : chaque problème en cours, et l'état du formulaire. */
+export type FormNoticeState = {
+  message: boolean
+  photosCut: boolean
+  /** Le problème des photos : la description, ou un autre (envoi, retrait). */
+  photoProblem: 'describeFailed' | 'other' | null
+  portraitProblem: boolean
+  uploadFailed: boolean
+  editing: boolean
+  preparing: boolean
+  dirty: boolean
+}
+
+/** Le message à montrer, ou `null` : la feuille ne dit rien. */
+export const formNoticeKind = (state: FormNoticeState): FormNoticeKind | null => {
+  if (state.message) return 'message'
+  if (state.photosCut) return 'photosCut'
+  if (state.photoProblem === 'describeFailed') return 'describeFailed'
+  if (state.photoProblem) return 'photoProblem'
+  if (state.portraitProblem) return 'portraitProblem'
+  if (state.uploadFailed && state.editing) return 'uploadFailed'
+  if (!state.editing && state.preparing) return 'preparing'
+  if (state.editing && !state.dirty) return 'unchanged'
+  return null
+}
+
+/**
+ * Le ton de chaque message : une erreur (en alerte), ou une information ; `polite` : annoncée
+ * sans interrompre (elle suit un état, pas un geste raté).
+ */
+export const FORM_NOTICE_TONES: Record<FormNoticeKind, { tone: 'error' | 'info'; polite?: true }> =
+  {
+    message: { tone: 'error' },
+    photosCut: { tone: 'error' },
+    describeFailed: { tone: 'error' },
+    photoProblem: { tone: 'error' },
+    portraitProblem: { tone: 'error' },
+    uploadFailed: { tone: 'info' },
+    preparing: { tone: 'info', polite: true },
+    unchanged: { tone: 'info', polite: true },
+  }

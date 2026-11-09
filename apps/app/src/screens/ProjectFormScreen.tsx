@@ -13,8 +13,11 @@
 // - la fenêtre « Abandonner ce projet ? », demandée par toute fermeture quand quelque chose a été
 //   écrit, y compris le retour du navigateur (`useLeaveGuard`).
 // Le profil est lu avant le formulaire : un compte suspendu ne tape jamais un texte qui se perdrait.
-import type { Project, ProjectInput } from '@ruche/contracts'
-import { useQueryClient } from '@tanstack/react-query'
+//
+// Après les relectures (ui-C6), l'envoi et ses issues vivent dans `projects/useSubmitProject.ts`,
+// le choix du message de la feuille dans `projects/form.ts` (`formNoticeKind`), l'aperçu de
+// l'ordinateur dans `ProjectFormPreview.tsx` et les photos dans `ProjectPhotoFields.tsx`.
+import type { Project } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -24,25 +27,24 @@ import { nextAfterSignIn } from '../navigation/signInAgain'
 import { type HeldAction, useLeaveGuard } from '../navigation/useLeaveGuard'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { useMe } from '../profile/hooks'
-import { createProject, updateProject } from '../projects/api'
-import { categoryOption } from '../projects/categories'
 import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
 import {
   emptyProjectForm,
+  FORM_NOTICE_TONES,
+  type FormNoticeKind,
   formFromProject,
+  formNoticeKind,
   isDirty,
   type ProjectForm,
   type ProjectFormErrors,
   toProjectChanges,
 } from '../projects/form'
-import { useProject, useSetProject } from '../projects/hooks'
+import { useProject } from '../projects/hooks'
 import { usePhotoTiles } from '../projects/usePhotoTiles'
 import { usePortraitCover } from '../projects/usePortraitCover'
+import { useSubmitProject } from '../projects/useSubmitProject'
 import { Button } from '../ui/Button'
-import { CardPreview } from '../ui/CardPreview'
-import { Dialog } from '../ui/Dialog'
 import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
-import { ProjectCard } from '../ui/ProjectCard'
 import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
@@ -51,16 +53,17 @@ import { Text } from '../ui/Text'
 import { useCalmMotion } from '../ui/theme/motion'
 import { useToast } from '../ui/theme/toast'
 import { HomeScreen } from './HomeScreen'
+import { ProjectAbandonDialog } from './ProjectAbandonDialog'
+import { audienceSentence } from './ProjectAudienceChoice'
 import { ProjectCategorySheet } from './ProjectCategorySheet'
 import {
-  audienceSentence,
   type CategoriesOpener,
   type ChangeField,
   firstFieldWithError,
-  ProjectAudienceChoice,
   ProjectFormFields,
   useProjectFieldRefs,
 } from './ProjectFormFields'
+import { ProjectFormPreview } from './ProjectFormPreview'
 
 type ScreenProps = {
   id?: string | undefined
@@ -218,8 +221,6 @@ function ProjectFormView({
   const router = useRouter()
   const toast = useToast()
   const calm = useCalmMotion()
-  const queryClient = useQueryClient()
-  const setProject = useSetProject()
   const beside = useSheetAside()
   const projectId = project?.id
   const editing = projectId !== undefined
@@ -228,9 +229,6 @@ function ProjectFormView({
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<ProjectFormErrors>({})
   const [message, setMessage] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  // Une `ref` en plus de l'état : deux tapes dans la même image voient toutes deux l'ancien `busy`.
-  const sending = useRef(false)
   const photos = usePhotoTiles(projectId)
   // La couverture verticale du téléphone, à côté des photos, avec les mêmes deux modes.
   const portrait = usePortraitCover(projectId)
@@ -273,6 +271,15 @@ function ProjectFormView({
     held.current = action
     setAsking(true)
   })
+  // L'envoi et ses issues (le fil qui danse, le brouillon, les photos qui manquent).
+  const submit = useSubmitProject({
+    projectId,
+    initial,
+    flushPhotos: photos.flushPending,
+    flushPortrait: portrait.flush,
+    release: guard.release,
+  })
+  const busy = submit.busy
   const leave = () => {
     // En modification, la description d'une photo tapée part même si l'on ferme tout de suite
     // (ui-I12) : l'envoi continue après la fermeture, rien n'attend.
@@ -296,29 +303,6 @@ function ProjectFormView({
     if (action) guard.proceed(action)
     else leave()
   }
-  // Le focus va d'abord à « Continuer », le geste qui ne perd rien (ui-B3).
-  const keepRef = useRef<Focusable>(null)
-  useEffect(() => {
-    if (!asking) return
-    focusWithoutScroll(keepRef.current)
-    moveReaderTo(keepRef.current)
-    // Sur le web, la fenêtre monte son contenu quelques images plus tard, puis son piège à focus
-    // le pose sur son voile (mesuré dans le navigateur : un `div` vide). On le reprend à chaque
-    // image, jusqu'à ce qu'il tienne deux images de suite sur « Continuer » (une demi-seconde au plus).
-    let frame = 0
-    let held = 0
-    const step = (left: number) => {
-      const node = keepRef.current as unknown
-      if (typeof document !== 'undefined' && node && document.activeElement === node) held += 1
-      else {
-        held = 0
-        focusWithoutScroll(node)
-      }
-      if (held < 2 && left > 0) frame = requestAnimationFrame(() => step(left - 1))
-    }
-    frame = requestAnimationFrame(() => step(30))
-    return () => cancelAnimationFrame(frame)
-  }, [asking])
 
   // --- Changer un champ ---
   const update = (patch: Partial<ProjectForm>) => {
@@ -336,7 +320,7 @@ function ProjectFormView({
 
   // --- Envoyer ---
   const onSubmit = async () => {
-    if (sending.current) return
+    if (submit.inFlight()) return
     setMessage(null)
     photos.clearNotices()
     portrait.clearProblem()
@@ -352,55 +336,9 @@ function ProjectFormView({
       return
     }
     setErrors({})
-    sending.current = true
-    setBusy(true)
-    const result = projectId
-      ? await updateProject(projectId, checked.changes)
-      : // Sans projet, toProjectChanges(form) rend un ProjectInput complet (sa surcharge).
-        await createProject(checked.changes as ProjectInput)
-    if (!result.ok) {
-      sending.current = false
-      setBusy(false)
-      setMessage(t(($) => $.errors[result.error]))
-      return
-    }
-    setProject(result.data) // la page du projet s'affichera sans nouvelle requête
-    const id = result.data.id
-    if (!projectId) {
-      // Le fil la montre tout de suite (plan, U5a) ; puis les photos partent, dans l'ordre.
-      void queryClient.invalidateQueries({ queryKey: ['feed'] })
-      const { failed } = await photos.flushPending(id)
-      // La couverture verticale ensuite ; un échec compte comme une photo qui n'est pas partie.
-      const portraitSent = await portrait.flush(id)
-      await guard.release()
-      if (failed + portraitSent.failed > 0) {
-        // Ni danse ni « Projet publié » : la modification dit quelles photos manquent (jur-J11).
-        router.replace({ pathname: '/projects/[id]/edit', params: { id, photos: 'failed' } })
-      } else if (form.audience === 'private') {
-        toast.show(
-          t(($) => $.project.form.draftSaved),
-          { icon: 'check-circle' },
-        )
-        router.replace({ pathname: '/projects/[id]', params: { id } })
-      } else {
-        // Le fil, au-dessus duquel la feuille était ouverte : il danse (HomeScreen, `published`).
-        router.dismissTo({ pathname: '/', params: { published: id } })
-      }
-      return
-    }
-    await photos.flushPending(projectId)
-    await guard.release()
-    // Un nouveau statut d'un projet visible des membres : la page propose une note toute prête.
-    const announce = result.data.status !== initial.status && result.data.visibility === 'public'
-    toast.show(
-      t(($) => $.project.form.saved),
-      { icon: 'check-circle' },
-    )
-    // dismissTo : retour à la page du projet dessous (ou à sa place), jamais une seconde copie.
-    router.dismissTo({
-      pathname: '/projects/[id]',
-      params: announce ? { id, announce: result.data.status } : { id },
-    })
+    // La feuille reste ouverte sur un échec de l'API, qui se lit au-dessus des champs.
+    const failed = await submit.send(form, checked.changes)
+    if (failed) setMessage(t(($) => $.errors[failed]))
   }
 
   const onDeleted = () => {
@@ -414,28 +352,35 @@ function ProjectFormView({
   }
 
   // --- Ce que la feuille dit au-dessus des champs (un seul message à la fois) ---
-  // Recopié dans une constante : le sélecteur de `t` ne garde pas le rétrécissement de `null`.
+  // Le choix est une fonction pure (`formNoticeKind`, testée seule) ; ici, son texte. Recopiés dans
+  // des constantes : le sélecteur de `t` ne garde pas le rétrécissement de `null` d'une propriété.
+  const cut = photos.cut
+  const photoError = photos.problem === 'describeFailed' ? null : photos.problem
   const portraitProblem = portrait.problem
-  const photoNotice = photos.cut
-    ? t(($) => $.project.form.photosCut, photos.cut)
-    : photos.problem === 'describeFailed'
-      ? t(($) => $.project.form.describeFailed)
-      : photos.problem
-        ? t(($) => $.errors[photos.problem as Exclude<typeof photos.problem, 'describeFailed'>])
-        : portraitProblem
-          ? t(($) => $.errors[portraitProblem])
-          : null
-  const notice: SheetNotice | null = message
-    ? { message, tone: 'error' }
-    : photoNotice
-      ? { message: photoNotice, tone: 'error' }
-      : uploadFailed && editing
-        ? { message: t(($) => $.project.form.uploadFailed), tone: 'info' }
-        : !editing && preparing
-          ? { message: t(($) => $.project.visuals.preparing), tone: 'info', polite: true }
-          : editing && !dirty
-            ? { message: t(($) => $.project.form.unchanged), tone: 'info', polite: true }
-            : null
+  const noticeTexts: Record<FormNoticeKind, () => string> = {
+    message: () => message ?? '',
+    photosCut: () => (cut ? t(($) => $.project.form.photosCut, cut) : ''),
+    describeFailed: () => t(($) => $.project.form.describeFailed),
+    photoProblem: () => (photoError ? t(($) => $.errors[photoError]) : ''),
+    portraitProblem: () => (portraitProblem ? t(($) => $.errors[portraitProblem]) : ''),
+    uploadFailed: () => t(($) => $.project.form.uploadFailed),
+    preparing: () => t(($) => $.project.visuals.preparing),
+    unchanged: () => t(($) => $.project.form.unchanged),
+  }
+  const noticeKind = formNoticeKind({
+    message: Boolean(message),
+    photosCut: Boolean(cut),
+    photoProblem:
+      photos.problem === 'describeFailed' ? 'describeFailed' : photoError ? 'other' : null,
+    portraitProblem: Boolean(portraitProblem),
+    uploadFailed,
+    editing,
+    preparing,
+    dirty,
+  })
+  const notice: SheetNotice | null = noticeKind
+    ? { message: noticeTexts[noticeKind](), ...FORM_NOTICE_TONES[noticeKind] }
+    : null
 
   const cover = photos.tiles[0]?.image ?? null
   const sentence = (
@@ -467,7 +412,7 @@ function ProjectFormView({
         onClose={requestClose}
         {...(beside
           ? {
-              aside: <FormPreview form={form} cover={cover} change={change} />,
+              aside: <ProjectFormPreview form={form} cover={cover} change={change} />,
               footerNote: sentence,
             }
           : null)}
@@ -527,25 +472,12 @@ function ProjectFormView({
         onClose={() => setCategoriesOpen(false)}
         returnFocusRef={fieldRefs[categoriesFrom]}
       />
-      <Dialog
+      <ProjectAbandonDialog
         visible={asking}
-        title={editing ? t(($) => $.project.form.abandonEdit) : t(($) => $.project.form.abandonNew)}
-        message={
-          editing
-            ? t(($) => $.project.form.abandonEditBody)
-            : t(($) => $.project.form.abandonNewBody)
-        }
-        guardTaps
-        onDismiss={() => setAsking(false)}
-      >
-        <Button
-          ref={keepRef}
-          label={t(($) => $.project.form.keepEditing)}
-          variant="secondary"
-          onPress={() => setAsking(false)}
-        />
-        <Button label={t(($) => $.project.form.abandon)} variant="danger" onPress={abandon} />
-      </Dialog>
+        editing={editing}
+        onKeep={() => setAsking(false)}
+        onAbandon={abandon}
+      />
       {project ? (
         <DeleteProjectDialog
           project={{
@@ -561,58 +493,5 @@ function ProjectFormView({
         />
       ) : null}
     </>
-  )
-}
-
-/**
- * La colonne de l'ordinateur : l'aperçu de la carte du fil, qui suit la frappe (caché aux lecteurs
- * d'écran et au clavier par `CardPreview` : il ne fait que répéter les champs), puis « Qui peut le
- * voir ? ».
- */
-function FormPreview({
-  form,
-  cover,
-  change,
-}: {
-  form: ProjectForm
-  cover: ReturnType<typeof usePhotoTiles>['tiles'][number]['image'] | null
-  change: ChangeField
-}) {
-  const { t } = useTranslation()
-  const me = useMe()
-  const category = form.primaryCategory ? categoryOption(t, form.primaryCategory) : null
-  // Sans « Tester » : sur la carte, c'est un lien, qui resterait atteignable au clavier d'une
-  // tablette (le web, lui, rend tout l'aperçu `inert`) dans un aperçu caché aux lecteurs d'écran.
-  return (
-    <Stack gap="xl">
-      <Stack gap="lg">
-        <Stack gap="xs">
-          <Text variant="headline" heading={2}>
-            {t(($) => $.project.form.preview)}
-          </Text>
-          <Text variant="callout" tone="secondary">
-            {t(($) => $.project.form.previewHint)}
-          </Text>
-        </Stack>
-        <CardPreview image={cover}>
-          <ProjectCard
-            title={form.title.trim() || t(($) => $.project.form.previewUntitled)}
-            pitch={form.pitch.trim() || t(($) => $.project.form.previewNoPitch)}
-            author={{ name: me.data?.name ?? '', avatar: null }}
-            image={cover}
-            when={t(($) => $.project.preview.now)}
-            status={{
-              label: t(($) => $.project.status[form.status]),
-              strong: form.status === 'testable',
-            }}
-            {...(category ? { category: { label: category.label, icon: category.icon } } : null)}
-          />
-        </CardPreview>
-        <Text variant="caption" tone="muted">
-          {t(($) => $.project.form.previewLight)}
-        </Text>
-      </Stack>
-      <ProjectAudienceChoice audience={form.audience} change={change} />
-    </Stack>
   )
 }
