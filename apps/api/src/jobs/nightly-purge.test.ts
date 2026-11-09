@@ -12,6 +12,7 @@
 // tout ce qui est « encore valide » dans le test. Et une date mal comparée selon le fuseau de la
 // connexion déconnecterait des membres : un test fixe le fuseau à Paris.
 import { randomUUID } from 'node:crypto'
+import { foldTool, toolSlug } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -419,5 +420,109 @@ describe('the reports and decisions of the moderation', () => {
       .from(schema.project)
       .where(eq(schema.project.id, meteo.id))
     expect(row?.removalId).toBe(removal)
+  })
+})
+
+// ─── Tranche R6b : les « Autre » orphelins et le journal du catalogue ─────────────────────────────
+// Décision 5 de la session (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
+// sa dernière référence ; la purge de nuit est le filet qui rattrape ce qui aurait échappé (une
+// panne entre deux écritures, une suppression faite en SQL). Le journal « Changements récents »
+// (catalogue_change) est effacé au bout d'un an. Les lignes sont écrites en SQL brut : les tables
+// n'existent pas encore dans le schéma typé quand ces tests sont écrits, et un « Autre » orphelin ne
+// peut pas naître par l'API.
+describe('the « other » tools and the catalogue journal (R6b)', () => {
+  /** Une date ISO, liée comme texte puis lue en UTC (voir code-api.md : dates en SQL brut). */
+  const utc = (date: Date) => sql`${date.toISOString()}::timestamptz at time zone 'UTC'`
+
+  /** Un outil posé en base : un « Autre » (sans famille) ou un outil du catalogue. */
+  const insertTool = async (name: string, status: 'catalogue' | 'other') => {
+    const id = randomUUID()
+    await ctx.db.execute(
+      sql`insert into tool (id, slug, name, folded, status, family, created_at) values (${id}, ${toolSlug(name)}, ${name}, ${foldTool(name)}, ${status}, ${status === 'catalogue' ? 'assistant' : null}, ${utc(START)})`,
+    )
+    return id
+  }
+
+  const toolNames = async () =>
+    (await rows<{ name: string }>(sql`select name from tool order by name`)).map(({ name }) => name)
+
+  const catalogueCount = async () =>
+    (
+      await rows<{ n: number }>(sql`select count(*)::int as n from tool where status = 'catalogue'`)
+    )[0]?.n
+
+  it('purges orphan « other » tools at night', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const orphan = await insertTool('Zorblax Orphelin', 'other')
+    const cited = await insertTool('Zorblax Cité', 'other')
+    await insertTool('Zorblax Studio', 'catalogue')
+    await ctx.db.execute(
+      sql`insert into project_tool (project_id, tool_id, position, label) values (${meteo.id}, ${cited}, 0, 'Zorblax Cité')`,
+    )
+    const catalogue = await catalogueCount()
+
+    await nightlyPurge(ctx.db, at(START, HOUR))
+
+    const left = await toolNames()
+    expect(left).not.toContain('Zorblax Orphelin')
+    expect(left).toContain('Zorblax Cité')
+    // Un outil du catalogue n'est jamais purgé, même quand aucun projet ne le cite.
+    expect(left).toContain('Zorblax Studio')
+    expect(await catalogueCount()).toBe(catalogue)
+    expect(await rows(sql`select 1 from tool where id = ${orphan}`)).toEqual([])
+  })
+
+  it('deletes an other tool that no project and no profile cites any more', async () => {
+    const favourite = await insertTool('Zorblax Favori', 'other')
+    await ctx.db.execute(
+      sql`insert into profile_tool (user_id, tool_id, position, label) values (${inesId}, ${favourite}, 0, 'Zorblax Favori')`,
+    )
+
+    // Cité par le profil d'Inès seulement : gardé.
+    await nightlyPurge(ctx.db, at(START, HOUR))
+    expect(await toolNames()).toContain('Zorblax Favori')
+
+    // Le profil ne le cite plus (une suppression faite hors de l'API) : la nuit suivante l'efface.
+    await ctx.db.execute(sql`delete from profile_tool where tool_id = ${favourite}`)
+    await nightlyPurge(ctx.db, at(START, DAY + HOUR))
+    expect(await toolNames()).not.toContain('Zorblax Favori')
+  })
+
+  it('keeps no author on an other tool', async () => {
+    // Décision 5 : tool.created_by est toujours nul pour un « Autre », même créé par un membre.
+    await act.publish(ines, 'Mon trieur de photos', { tools: ['Teachable Machine'] })
+
+    const authors = () =>
+      rows<{ created_by: string | null }>(
+        sql`select created_by from tool where folded = 'teachablemachine'`,
+      )
+    expect(await authors()).toEqual([{ created_by: null }])
+
+    // La purge le garde (il est cité), toujours sans auteur.
+    await nightlyPurge(ctx.db, at(START, HOUR))
+    expect(await authors()).toEqual([{ created_by: null }])
+  })
+
+  it('deletes the catalogue journal lines older than a year', async () => {
+    const insertChange = async (createdAt: Date) => {
+      const id = randomUUID()
+      await ctx.db.execute(
+        sql`insert into catalogue_change (id, action, merged_name, created_at) values (${id}, 'tool_merge', 'Chat GPT', ${utc(createdAt)})`,
+      )
+      return id
+    }
+    const old = await insertChange(START)
+    const recent = await insertChange(at(START, 2 * DAY))
+    const changeIds = async () =>
+      (await rows<{ id: string }>(sql`select id from catalogue_change`)).map(({ id }) => id).sort()
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    expect(await changeIds()).toEqual([old, recent].sort())
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    expect(await changeIds()).toEqual([recent])
+
+    await nightlyPurge(ctx.db, at(START, 367 * DAY + HOUR))
+    expect(await changeIds()).toEqual([])
   })
 })
