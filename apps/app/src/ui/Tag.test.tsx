@@ -1,9 +1,10 @@
 // Tests de l'étiquette d'un outil (refonte, tranche R3, « Outils populaires » et « Tous les
-// outils ») : avec un nombre, elle l'affiche et son nom lu devient « Claude, 41 projets publics »
+// outils ») : avec un nombre, elle l'affiche et son nom lu devient « Claude, 41 projets »
 // (`tools.withCount` et le pluriel `tools.projects`) ; le nombre affiché reste hors du nom lu
 // (relecture de l'interface, « À noter »). Sans nombre, rien ne change : le libellé seul.
 // Puis (R6a) l'étiquette à icône : la catégorie d'un projet, sur sa carte (« Sciences et espace »).
-import { screen } from '@testing-library/react-native'
+// Puis (R6b) l'étiquette d'un « Autre », en texte simple, sans lien.
+import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -22,11 +23,12 @@ const spoken = (label: string, count: number) =>
 
 describe('Tag with a count', () => {
   it('composes the spoken name from the translations (witness)', () => {
-    expect(spoken('Claude', 41)).toBe('Claude, 41 projets publics')
-    expect(spoken('Claude', 1)).toBe('Claude, 1 projet public')
+    // R6b (choix 1 de la session) : « projets », plus « projets publics ».
+    expect(spoken('Claude', 41)).toBe('Claude, 41 projets')
+    expect(spoken('Claude', 1)).toBe('Claude, 1 projet')
   })
 
-  it('shows the number and reads « Claude, 41 projets publics » as a link', async () => {
+  it('shows the number and reads « Claude, 41 projets » as a link', async () => {
     await renderWithProviders(<Tag label="Claude" count={41} onPress={() => {}} />)
 
     expect(screen.getByText('41')).toBeTruthy()
@@ -57,7 +59,7 @@ describe('Tag with a count', () => {
     expect(name).toContain('Claude')
     expect(name).toContain('41')
     // Un vrai pluriel anglais, pas le français : le nom lu change de langue avec l'appli.
-    expect(name).not.toContain('projets publics')
+    expect(name).not.toContain('projets')
   })
 })
 
@@ -151,5 +153,52 @@ describe('Tag of a category (R6a, C2)', () => {
 
     expect(screen.getByRole('link', { name: science })).toBeTruthy()
     expect(familyOf(science)).not.toMatch(/mono/i)
+  })
+})
+
+// R6b (scénario « Où les outils s'affichent » ; relecture du plan, point 15) : un outil du catalogue
+// est une étiquette qui mène à sa page ; un « Autre » (`inCatalogue={false}`) est écrit en texte
+// simple, sans lien, tant qu'il n'est pas entré au catalogue, et un lecteur d'écran lit « Teachable
+// Machine, autre outil, pas encore dans le catalogue » (`tool.otherSpoken`), sur un élément qui a un
+// rôle (pas un simple texte perdu dans la rangée).
+describe('Tag of an other tool (R6b)', () => {
+  const SPOKEN = fr.t(($) => $.tool.otherSpoken, { name: 'Teachable Machine' })
+
+  it('composes the spoken name from the translations (witness)', () => {
+    expect(SPOKEN).toBe('Teachable Machine, autre outil, pas encore dans le catalogue')
+  })
+
+  it('reads an other tool by its full name with a role, and is not a link', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <Tag label="Teachable Machine" inCatalogue={false} onPress={onPress} />,
+    )
+
+    expect(screen.queryByRole('link')).toBeNull()
+    const pill = screen.getByLabelText(SPOKEN)
+    const role = pill.props.accessibilityRole ?? pill.props.role
+    expect(typeof role).toBe('string')
+    expect(role).not.toBe('link')
+    expect(role).not.toBe('button')
+    // Le nom tel qu'il a été tapé reste écrit.
+    expect(screen.getByText('Teachable Machine')).toBeTruthy()
+    // Rien ne mène à une page qui n'existe pas.
+    await fireEvent.press(pill)
+    expect(onPress).not.toHaveBeenCalled()
+  })
+
+  it('reads an other tool by its full name without onPress too', async () => {
+    await renderWithProviders(<Tag label="Teachable Machine" inCatalogue={false} />)
+
+    expect(screen.getByLabelText(SPOKEN)).toBeTruthy()
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  it('stays a link named by its label for a catalogue tool (witness)', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(<Tag label="Claude" inCatalogue onPress={onPress} />)
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Claude' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 })
