@@ -65,8 +65,9 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
-import { focusWithoutScroll } from './focus'
+import { focusTarget, focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
+import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './modalLayers'
 import { Notice, type NoticeAction } from './Notice'
 import { SheetHeader } from './SheetHeader'
 import { Surface } from './Surface'
@@ -251,6 +252,21 @@ type WebDocument = {
   ) => void
 }
 
+// Le peu de `window` qu'écoute la feuille : le focus qui arrive dans une couche du dessus.
+type FocusEventLike = { target?: unknown; stopImmediatePropagation?: () => void }
+type WebWindow = {
+  addEventListener?: (
+    type: string,
+    listener: (event: FocusEventLike) => void,
+    capture: boolean,
+  ) => void
+  removeEventListener?: (
+    type: string,
+    listener: (event: FocusEventLike) => void,
+    capture: boolean,
+  ) => void
+}
+
 // Le peu du navigateur dont Tab a besoin : les éléments de la feuille qu'on peut atteindre, dans
 // l'ordre du document. (Les types de React Native ne décrivent pas la page web.)
 type WebElement = {
@@ -309,24 +325,85 @@ const reachableOpener = (node: unknown, name: string | null): unknown => {
   return same ?? node
 }
 
+// Une feuille ouverte par son adresse (un lien, la barre d'adresse, « Publier » d'un e-mail) n'a
+// pas d'ouvreur : à l'ouverture, le focus était sur la page elle-même (`body`). À la fermeture, on
+// le rendait à `body`, c'est-à-dire nulle part : Tab repartait du haut (contre-visite du design R6a,
+// S2). Le focus va alors au titre principal de la page qui reste, sinon à son premier repère
+// (le contenu, l'en-tête, la navigation), sans faire défiler la page.
+type PageElement = FoundElement & {
+  closest?: (selector: string) => unknown
+}
+const LANDINGS = [
+  'h1, [role="heading"][aria-level="1"]',
+  'main, [role="main"], header, [role="banner"], nav, [role="navigation"]',
+]
+/** Ce qui n'est pas « la page qui reste » : une couche (la feuille qui part), un contenu caché. */
+const NOT_THE_PAGE = '[aria-modal="true"], [inert], [aria-hidden="true"]'
+
+/** L'élément est-il la page elle-même (personne n'avait le focus avant la feuille) ? */
+const isPageItself = (node: unknown): boolean => {
+  const page = (globalThis as { document?: { body?: unknown; documentElement?: unknown } }).document
+  return node == null || node === page?.body || node === page?.documentElement
+}
+
+/** Le titre principal de la page qui reste, sinon son premier repère ; null s'il n'y en a pas. */
+const pageLanding = (): unknown => {
+  const page = (
+    globalThis as {
+      document?: { querySelectorAll?: (selector: string) => ArrayLike<unknown> | undefined }
+    }
+  ).document
+  for (const selector of LANDINGS) {
+    const list = page?.querySelectorAll?.(selector)
+    if (!list) continue
+    const found = Array.from(list).find((element) => {
+      const candidate = element as PageElement
+      return (candidate.getClientRects?.().length ?? 0) > 0 && !candidate.closest?.(NOT_THE_PAGE)
+    })
+    if (found) return found
+  }
+  return null
+}
+
+/** Pose le focus sur la place d'arrivée de la page (rendue focalisable, hors de Tab). */
+const focusPageLanding = (): boolean => {
+  const landing = pageLanding()
+  return landing ? focusWithoutScroll(focusTarget(landing)) : false
+}
+
+/**
+ * Rend le focus à la fermeture : à l'ouvreur (retrouvé par son nom s'il a été redessiné), ou, sans
+ * ouvreur, au titre de la page qui reste.
+ */
+const giveFocusBack = (back: unknown, name: string | null): void => {
+  if (isPageItself(back)) focusPageLanding()
+  else focusWithoutScroll(reachableOpener(back, name))
+}
+
 /**
  * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
  * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
  * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
  * page d'avant reparaisse : quelques essais rapprochés, qui s'arrêtent dès que le focus est quelque
- * part (la page d'arrivée l'a pris : on ne le lui reprend pas).
+ * part (la page d'arrivée l'a pris : on ne le lui reprend pas). Sans ouvreur (feuille ouverte par
+ * son adresse), ou si l'ouvreur n'est jamais revenu, le titre de la page qui reste.
  */
 const RESTORE_TRIES = 8
 const RESTORE_EVERY_MS = 100
 const restoreAfterUnmount = (back: unknown, name: string | null, left = RESTORE_TRIES): void => {
   setTimeout(() => {
     if (!focusLost()) return
-    const target = reachableOpener(back, name)
-    if ((target as FoundElement | null)?.isConnected === false && left > 1) {
-      restoreAfterUnmount(back, name, left - 1)
-      return
+    if (!isPageItself(back)) {
+      const target = reachableOpener(back, name)
+      if ((target as FoundElement | null)?.isConnected !== false) {
+        focusWithoutScroll(target)
+        return
+      }
     }
-    focusWithoutScroll(target)
+    // Le dernier essai, ou une feuille sans ouvreur : la page qui reste, si elle est déjà là.
+    const lastTry = left <= 1
+    if ((isPageItself(back) || lastTry) && focusPageLanding()) return
+    if (!lastTry) restoreAfterUnmount(back, name, left - 1)
   }, RESTORE_EVERY_MS)
 }
 
@@ -418,8 +495,12 @@ export function Sheet({
   // L'élément qui avait le focus avant l'ouverture (le bouton d'origine) : il le retrouve à la
   // fermeture, sans faire défiler la page.
   const opener = useRef<unknown>(null)
-  // Le même, gardé jusqu'à la fin du fondu de sortie (voir `onDismiss`, plus bas).
-  const returnTo = useRef<unknown>(null)
+  // Le même, gardé jusqu'à la fin du fondu de sortie (voir `onDismiss`, plus bas) ; dans une boîte,
+  // car il peut être vide (la page elle-même : voir `giveFocusBack`) alors que la feuille a été
+  // fermée.
+  const returnTo = useRef<{ node: unknown } | null>(null)
+  // La feuille a-t-elle été ouverte ? Seule une vraie fermeture rend le focus.
+  const shown = useRef(false)
   // Son nom, pour le retrouver s'il a été redessiné entre-temps (voir `reachableOpener`).
   const openerName = useRef<string | null>(null)
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
@@ -445,6 +526,33 @@ export function Sheet({
     }
   }, [open, sheetId])
 
+  // Sur le web, la feuille ouverte entre aussi dans la pile des couches modales (`modalLayers`), avec
+  // les fenêtres de confirmation, et laisse son focus à une couche ouverte par-dessus elle (R6a,
+  // contre-visite du design, N1). Le piège à focus du Modal de react-native-web ramène dans la
+  // feuille tout focus posé hors d'elle, tant qu'elle est la couche active ; or la fenêtre ouverte
+  // dessus (« Supprimer ce projet ? ») ne devient active qu'à la fin de son fondu. Entre-temps, son
+  // « Annuler » perdait le focus au profit de la feuille, puis la fenêtre l'envoyait sur son premier
+  // bouton, « Supprimer ». On écoute donc le focus sur `window`, à la descente : le navigateur nous
+  // appelle avant les pièges, posés sur le document. Un focus arrivé dans une couche du dessus qui
+  // s'ouvre encore ne leur est pas transmis (`stopImmediatePropagation`) : il reste où il est. Une
+  // fois la couche du dessus active, on laisse tout passer : c'est son piège qui décide (il retient
+  // le dernier élément focalisé pour faire boucler Maj+Tab).
+  useEffect(() => {
+    if (!open || Platform.OS !== 'web') return
+    const closeLayer = openModalLayer(sheetId, (node) => sameLayer(panelRef.current, node))
+    const page = globalThis as unknown as WebWindow
+    const guard = (event: FocusEventLike) => {
+      if (inLayerAbove(sheetId, event.target) && layerStillOpening(event.target)) {
+        event.stopImmediatePropagation?.()
+      }
+    }
+    page.addEventListener?.('focus', guard, true)
+    return () => {
+      closeLayer()
+      page.removeEventListener?.('focus', guard, true)
+    }
+  }, [open, sheetId])
+
   // Toute demande de fermeture passe ici : pendant une action qui ne s'arrête plus (`busy`), elle
   // est refusée, quelle que soit la voie (« Fermer », Échap, voile, retour Android, glisser) ;
   // `busy` l'emporte même sur `closeGuard` (R6a, ui-I3). Une feuille couverte par une autre ne se
@@ -460,21 +568,26 @@ export function Sheet({
   // attendu (`initialFocusRef`, le champ d'un commentaire), sinon sur « Fermer », le premier
   // élément de la feuille ; à la fermeture, on le rend. Le Modal de react-native-web pose d'abord
   // le focus sur le premier élément (son effet passe avant celui-ci) : le nôtre arrive ensuite, au
-  // bon endroit, toujours dans la feuille.
+  // bon endroit, toujours dans la feuille. Sans ouvreur (ouverte par son adresse), le focus va au
+  // titre de la page qui reste (`giveFocusBack`).
   useEffect(() => {
     escapeHandled.current = false
     if (Platform.OS !== 'web') return
     if (open) {
+      shown.current = true
       opener.current = activeElement()
       openerName.current = nameOf(opener.current)
       const wanted = initialFocusRef?.current
       if (!wanted || !focusWithoutScroll(wanted)) focusWithoutScroll(closeRef.current)
       return
     }
+    // Une feuille jamais ouverte n'a rien à rendre (montée fermée, elle ne prend pas le focus).
+    if (!shown.current) return
+    shown.current = false
     const back = opener.current
     opener.current = null
-    returnTo.current = back
-    if (back) focusWithoutScroll(reachableOpener(back, openerName.current))
+    returnTo.current = { node: back }
+    giveFocusBack(back, openerName.current)
   }, [open, initialFocusRef])
 
   // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
@@ -499,7 +612,7 @@ export function Sheet({
           onDismiss: () => {
             const back = returnTo.current
             returnTo.current = null
-            if (back && focusLost()) focusWithoutScroll(reachableOpener(back, openerName.current))
+            if (back && focusLost()) giveFocusBack(back.node, openerName.current)
           },
         }
       : null

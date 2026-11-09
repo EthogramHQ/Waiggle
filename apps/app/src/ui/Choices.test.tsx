@@ -182,3 +182,43 @@ describe('Choices with dots and a clear button (R6a)', () => {
     }
   })
 })
+
+// R6a, correction C9 (S1 de la contre-visite du design) : une fenêtre à champs obligatoires (le
+// retrait de la modération) s'ouvre sur son premier champ, le groupe « Fondement ». `entryRef`
+// désigne le seul arrêt de Tab du groupe : le choix coché, sinon le premier.
+describe('Choices, the entry of the group (R6a, C9)', () => {
+  const options = [
+    { value: 'illegal', label: 'La loi' },
+    { value: 'rules', label: 'Les règles' },
+  ] as const
+
+  it('points entryRef at the first choice when none is checked', async () => {
+    const entry = createRef<View>()
+    await renderWithProviders(
+      <Choices
+        label="Fondement"
+        options={[...options]}
+        value={null}
+        onChange={jest.fn()}
+        entryRef={entry}
+      />,
+    )
+
+    expect(labelOf(entry.current)).toBe('La loi')
+  })
+
+  it('points entryRef at the checked choice', async () => {
+    const entry = createRef<View>()
+    await renderWithProviders(
+      <Choices
+        label="Fondement"
+        options={[...options]}
+        value="rules"
+        onChange={jest.fn()}
+        entryRef={entry}
+      />,
+    )
+
+    expect(labelOf(entry.current)).toBe('Les règles')
+  })
+})

@@ -29,10 +29,19 @@
 // - `initialFocusRef` : le bouton qui reçoit le focus à l'ouverture (« Continuer », le geste qui ne
 //   perd rien), posé par la fenêtre une fois son contenu monté, au lieu d'être relancé par l'écran
 //   à chaque image.
+//
+// Correction après la contre-visite du design (R6a, N1) : ouverte depuis une feuille (« Supprimer
+// ce projet ? » dans « Modifier »), la fenêtre finissait avec le focus sur « Supprimer ». Deux
+// Modal, deux pièges à focus : celui de la feuille reprenait le focus posé sur « Annuler » pendant le
+// fondu, puis celui de la fenêtre, devenu actif, l'envoyait sur son premier bouton. Sur le web, la
+// fenêtre entre donc dans la pile des couches ouvertes (`modalLayers`, que la feuille lit pour lui
+// laisser ce focus), et, son ouverture finie (`onShow`), repose le focus sur `initialFocusRef` s'il
+// n'est plus chez elle.
 import { borders, layout, space } from '@ruche/brand'
 import { type ReactNode, type RefObject, useEffect, useId, useRef } from 'react'
 import { Modal, Platform, Pressable, ScrollView, View } from 'react-native'
-import { type Focusable, focusWithoutScroll, moveReaderTo } from './focus'
+import { type Focusable, focusWithoutScroll, holdsFocus, moveReaderTo } from './focus'
+import { openModalLayer, sameLayer } from './modalLayers'
 import { Notice } from './Notice'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -204,6 +213,29 @@ export function Dialog({
   // pour son nom et sa description (web).
   const titleId = useId()
   const messageId = useId()
+  // La fenêtre elle-même (sa boîte) : la pile des couches y cherche les éléments qui reçoivent le
+  // focus, et l'ouverture finie vérifie que le focus y est encore.
+  const boxRef = useRef<View>(null)
+  const layerId = useId()
+
+  // Sur le web, ouverte, la fenêtre est une couche de la pile (voir `modalLayers`) : une feuille
+  // ouverte dessous ne lui reprend pas le focus pendant son fondu d'ouverture.
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'web') return
+    return openModalLayer(layerId, (node) => sameLayer(boxRef.current, node))
+  }, [visible, layerId])
+
+  // L'ouverture finie (web : fin du fondu ; le Modal devient alors la couche active et son piège à
+  // focus se met au travail), le focus revient sur le contrôle attendu s'il a quitté la fenêtre. Un
+  // focus déjà déplacé dans la fenêtre (Tab pendant le fondu) est gardé.
+  const onShow =
+    Platform.OS === 'web' && initialFocusRef
+      ? {
+          onShow: () => {
+            if (!holdsFocus(boxRef.current)) focusWithoutScroll(initialFocusRef.current)
+          },
+        }
+      : null
   const paragraphs = typeof message === 'string' ? [message] : message
   // Une phrase ou deux, centrées sous le titre ; plusieurs paragraphes, à gauche.
   const align = paragraphs.length > 1 ? 'left' : 'center'
@@ -232,6 +264,7 @@ export function Dialog({
       transparent
       animationType="fade"
       onRequestClose={onRequestClose}
+      {...onShow}
       {...(onClosed ? { onDismiss: onClosed } : null)}
       {...named}
     >
@@ -271,6 +304,7 @@ export function Dialog({
             />
           )}
           <View
+            ref={boxRef}
             accessibilityViewIsModal // les lecteurs d'écran restent dans la fenêtre
             style={{ width: '100%', maxWidth: layout.formWidth - 120 }}
           >

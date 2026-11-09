@@ -6,7 +6,7 @@
 // R6a (« Facile à refaire ? ») : un choix peut porter un rond de couleur devant son texte (`dot`),
 // et une question facultative se vide par « Effacer » (`clearLabel`).
 import { borders, type ColorName, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, type RefObject, useRef } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
 import { Icon, type IconName } from './Icon'
@@ -38,6 +38,12 @@ type Base<T extends string> = {
   options: Option<T>[]
   /** Le choix coché ; null : aucun encore (une question à laquelle il faut répondre soi-même). */
   value: T | null
+  /**
+   * R6a, correction C9 : reçoit l'entrée du groupe, son seul arrêt de Tab (le choix coché, sinon le
+   * premier). Pour une fenêtre qui s'ouvre sur sa première question (`Dialog initialFocusRef`, le
+   * retrait de la modération).
+   */
+  entryRef?: RefObject<View | null>
 }
 type WithoutClear<T extends string> = Base<T> & {
   clearLabel?: undefined
@@ -64,7 +70,7 @@ type KeyEvent = { key: string; preventDefault: () => void }
 export function Choices<T extends string>(props: WithoutClear<T>): ReactNode
 export function Choices<T extends string>(props: WithClear<T>): ReactNode
 export function Choices<T extends string>(props: Props<T>) {
-  const { label, options, value, onChange, clearLabel } = props
+  const { label, options, value, onChange, clearLabel, entryRef } = props
   const { colors } = useTheme()
   // Les choix, pour y poser le focus quand une flèche passe au voisin.
   const refs = useRef<(View | null)[]>([])
@@ -157,6 +163,7 @@ export function Choices<T extends string>(props: Props<T>) {
               key={option.value}
               ref={(node) => {
                 refs.current[index] = node
+                if (entryRef && index === tabStop) entryRef.current = node
               }}
               accessibilityRole="radio"
               accessibilityLabel={option.label}

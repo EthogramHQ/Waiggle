@@ -1,6 +1,9 @@
-// Le focus d'ouverture de la fenêtre « Retirer » de la modération (R6a, correction C8, H3) : retirer
-// un contenu ne se défait pas d'une touche, la fenêtre s'ouvre sur « Annuler ». Mêmes simulations
-// que ModerationScreen.test.tsx, en plus court.
+// Le focus d'ouverture de la fenêtre « Retirer » de la modération (R6a, correction C8, H3, puis C9).
+// C8 l'ouvrait sur « Annuler ». La contre-visite du design (S1) a montré que cela ne protège de
+// rien ici : « Retirer » reste inactif tant que le fondement et l'explication manquent, et
+// « Annuler » coûtait un Tab de plus, entendu avant le formulaire. Une fenêtre à champs obligatoires
+// s'ouvre donc sur son premier champ : le groupe « Fondement », par son premier choix. Mêmes
+// simulations que ModerationScreen.test.tsx, en plus court.
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import {
   useDecide,
@@ -19,6 +22,7 @@ import {
 } from '../testing/moderation'
 import { watchOpeningFocus } from '../testing/openingFocus'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { ModerationScreen } from './ModerationScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -87,7 +91,7 @@ afterEach(() => {
 })
 
 describe('the « Retirer » window opening focus', () => {
-  it('opens on « Annuler », not on a choice or on « Retirer »', async () => {
+  it('opens on the first choice of « Fondement », not on « Annuler » or « Retirer »', async () => {
     await renderWithProviders(<ModerationScreen />)
     await screen.findByText(firstTextOf(scamCommentItem))
     const focused = watchOpeningFocus()
@@ -97,6 +101,6 @@ describe('the « Retirer » window opening focus', () => {
     if (!card) throw new Error('no card')
     await fireEvent.press(within(card).getByRole('button', { name: 'Retirer' }))
 
-    await waitFor(() => expect(focused()).toBe('Annuler'))
+    await waitFor(() => expect(focused()).toBe(fr.t(($) => $.moderation.grounds.illegal)))
   })
 })
