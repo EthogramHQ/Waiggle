@@ -51,6 +51,7 @@ import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
+import { DiscardDialog } from '../ui/DiscardDialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import type { Focusable } from '../ui/focus'
 import { IconGrid } from '../ui/IconGrid'
@@ -66,7 +67,6 @@ import { Text } from '../ui/Text'
 import { TextField, type TextFieldInput } from '../ui/TextField'
 import { UncategorizedCard } from '../ui/UncategorizedCard'
 import { CatalogueRecentChanges, listState } from './CatalogueRecentChanges'
-import { ProjectAbandonDialog } from './ProjectAbandonDialog'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -480,11 +480,10 @@ function FileSheet({
           />
         )}
       </Sheet>
-      <ProjectAbandonDialog
+      <DiscardDialog
         visible={asking}
-        editing
         onKeep={() => setAsking(false)}
-        onAbandon={() => {
+        onDiscard={() => {
           setAsking(false)
           onClose()
         }}
@@ -655,11 +654,10 @@ function CreateSheet({
           ) : null}
         </Stack>
       </Sheet>
-      <ProjectAbandonDialog
+      <DiscardDialog
         visible={asking}
-        editing
         onKeep={() => setAsking(false)}
-        onAbandon={() => {
+        onDiscard={() => {
           setAsking(false)
           onClose()
         }}

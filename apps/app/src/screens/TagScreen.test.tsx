@@ -259,8 +259,8 @@ const NAME_FIELD = fr.t(($) => $.moderation.catalogue.name)
 const SAVE = fr.t(($) => $.moderation.catalogue.save)
 const CANCEL = fr.t(($) => $.moderation.catalogue.cancel)
 const CLOSE = fr.t(($) => $.common.close)
-const ABANDON = fr.t(($) => $.project.form.abandonEdit)
-const KEEP_EDITING = fr.t(($) => $.project.form.keepEditing)
+const ABANDON = fr.t(($) => $.common.discardTitle)
+const KEEP_EDITING = fr.t(($) => $.common.keepEditing)
 /** « Cuisine, 2 projets » : une catégorie de la feuille, avec son nombre. */
 const withCount = (name: string, count: number) =>
   fr.t(($) => $.tool.categoryWithCount, {

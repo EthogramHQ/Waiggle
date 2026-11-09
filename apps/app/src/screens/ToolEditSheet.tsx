@@ -27,10 +27,10 @@ import { useTranslation } from 'react-i18next'
 import type { ApiErrorKey } from '../api/errors'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
+import { DiscardDialog } from '../ui/DiscardDialog'
 import { Sheet } from '../ui/Sheet'
 import { Stack } from '../ui/Stack'
 import { TextField, type TextFieldInput } from '../ui/TextField'
-import { ProjectAbandonDialog } from './ProjectAbandonDialog'
 
 /** Un champ de la feuille, tel que le contrat le nomme. */
 export type ToolEditField = keyof ToolAdmit
@@ -244,11 +244,10 @@ export function ToolEditSheet({ open, mode, initial, onSubmit, onClose, returnFo
           />
         </Stack>
       </Sheet>
-      <ProjectAbandonDialog
+      <DiscardDialog
         visible={asking}
-        editing
         onKeep={() => setAsking(false)}
-        onAbandon={() => {
+        onDiscard={() => {
           setAsking(false)
           onClose()
         }}
