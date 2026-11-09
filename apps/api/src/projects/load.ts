@@ -6,6 +6,8 @@ import {
   NO_REACTIONS,
   PROJECT_LIST_MAX,
   type Project,
+  ProjectCategory,
+  ProjectDifficulty,
   ProjectId,
   ProjectStatus,
   type ProjectSummary,
@@ -48,9 +50,8 @@ const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
   height: media.height,
   // Calculé par notre serveur ; vérifié quand même, comme tout ce qui sort de la base.
   thumbhash: Thumbhash.parse(media.thumbhash),
-  // R6a : provisoire (commit du contrat) ; la colonne `project_media.description` arrive avec le
-  // backend de la tranche, qui la lit ici.
-  description: null,
+  // R6a : la description de la photo, null si l'auteur n'en a pas écrit.
+  description: media.description,
 })
 
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
@@ -111,12 +112,13 @@ const toProjectBase = (
     slug: project.toolSlugs[i] ?? toolSlug(label),
   })),
   prompts: project.prompts,
-  // R6a : provisoire (commit du contrat) ; les colonnes arrivent avec le backend de la tranche, qui
-  // les lit ici. Le temps passé n'est plus renvoyé (sa colonne s'efface en R6b).
-  primaryCategory: null,
-  secondaryCategory: null,
-  difficulty: null,
-  startedOn: null,
+  // R6a : catégories, difficulté et mois de départ. Les listes fermées sont revérifiées à la
+  // lecture (comme `status`) ; null pour un projet d'avant R6a. Le temps passé n'est plus lu
+  // (sa colonne s'efface en R6b). Le mois sort tel quel : le contrat de sortie est souple (sec-M1).
+  primaryCategory: ProjectCategory.nullable().parse(project.primaryCategory),
+  secondaryCategory: ProjectCategory.nullable().parse(project.secondaryCategory),
+  difficulty: ProjectDifficulty.nullable().parse(project.difficulty),
+  startedOn: project.startedOn,
   // Les médias arrivent déjà triés par position : la galerie garde l'ordre choisi par l'auteur.
   visuals: media
     .filter((m) => m.projectId === project.id && m.slot === 'gallery')

@@ -243,6 +243,8 @@ export const createApp = ({
     if (/^\/v1\/projects\/[^/]+\/(notes|comments|reactions)(\/|$)/.test(c.req.path)) {
       return small(c, next)
     }
+    // La description d'une photo (R6a, sec-A3) : 250 caractères, la petite limite suffit.
+    if (/^\/v1\/projects\/[^/]+\/visuals\/[^/]+$/.test(c.req.path)) return small(c, next)
     if (c.req.path === '/v1/projects' || c.req.path.startsWith('/v1/projects/')) {
       return projects(c, next)
     }
