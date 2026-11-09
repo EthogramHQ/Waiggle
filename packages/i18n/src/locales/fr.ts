@@ -422,15 +422,6 @@ export const fr = {
       'Les membres connectés peuvent te trouver par ton nom ou ton pseudo, dans la recherche et après « @ » dans un commentaire.',
   },
   project: {
-    new: {
-      title: 'Nouveau projet',
-      subtitle: 'Tu pourras tout modifier ensuite.',
-      submit: 'Publier',
-    },
-    edit: {
-      title: 'Modifier le projet',
-      submit: 'Enregistrer',
-    },
     // R6a : la feuille de publication et de modification (planches R6-*). Les textes marqués
     // « juridique » viennent de la relecture du plan (8/11/2026) et remplacent ceux des planches.
     // Les blocs `new`, `edit`, `fields`, `visuals` et `preview` disparaîtront avec l'ancien écran.
@@ -620,27 +611,9 @@ export const fr = {
       hard: 'Pour les initiés',
     },
     fields: {
-      title: 'Titre',
-      pitch: 'Le pitch, en une phrase',
-      description: 'Description',
-      descriptionHint: 'Mise en forme Markdown : **gras**, *italique*, listes, [liens](https://…).',
-      status: 'Où en est-il ?',
-      public: 'Public',
-      publicHint:
-        'Visible par les membres connectés. Privé : aucun autre membre ne le voit. Il te sert de brouillon : les commentaires et les réactions des autres membres sont gardés, mais aucun membre, toi compris, ne les voit tant qu’il reste privé. Ils reviendront s’il redevient public.',
       demoUrl: 'Lien de démo (facultatif)',
       demoUrlHint: 'Une adresse https, par exemple https://monprojet.vercel.app',
       demoUrlOk: 'C’est bon : un site public en https.',
-      recipe: 'Ajouter la recette',
-      recipeHint: 'Outils, prompts clés : facultatif',
-      tools: 'Outils et modèles utilisés',
-      toolsLimit: '{{max}} au plus',
-      toolsPlaceholder: 'Ajouter un outil',
-      prompts: 'Prompts clés (facultatif)',
-      promptsHint: '{{max}} au plus. Ils sont affichés tels quels.',
-      prompt: 'Prompt {{number}}',
-      addPrompt: 'Ajouter un prompt',
-      removePrompt: 'Retirer le prompt {{number}}',
     },
     status: {
       idea: 'Idée',
@@ -650,22 +623,9 @@ export const fr = {
       paused: 'En pause',
     },
     preview: {
-      title: 'Aperçu dans le fil',
       now: 'à l’instant',
-      untitled: 'Ton projet',
-      noPitch: 'Ton pitch apparaîtra ici.',
     },
     visuals: {
-      gallery: 'Photos',
-      galleryHintNew:
-        '{{max}} au plus. La première sert de couverture. Elles partent à la publication.',
-      galleryHintEdit:
-        '{{max}} au plus. La première sert de couverture. Chaque changement s’enregistre tout de suite.',
-      cover: 'Couverture',
-      add: 'Ajouter une photo',
-      earlier: 'Avancer la photo {{number}}',
-      later: 'Reculer la photo {{number}}',
-      makeCover: 'Mettre la photo {{number}} en couverture',
       remove: 'Retirer la photo {{number}}',
       portrait: 'Couverture verticale (téléphone)',
       portraitHint:
@@ -676,8 +636,6 @@ export const fr = {
       photo: 'Photo {{number}} sur {{total}}',
       portraitLabel: 'Couverture verticale',
       preparing: 'Préparation de la photo…',
-      uploadFailed:
-        'Le projet est publié, mais certaines photos n’ont pas pu être envoyées. Ajoute-les à nouveau ici.',
     },
     notes: {
       title: 'Journal',

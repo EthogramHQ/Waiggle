@@ -355,15 +355,6 @@ export const en: Translation = {
       'Signed-in members can find you by your name or your handle, in the search and after “@” in a comment.',
   },
   project: {
-    new: {
-      title: 'New project',
-      subtitle: 'You can change everything later.',
-      submit: 'Publish',
-    },
-    edit: {
-      title: 'Edit the project',
-      submit: 'Save',
-    },
     form: {
       newTitle: 'New project',
       newIntro: 'Show your people what you are building. You can change everything later.',
@@ -525,27 +516,9 @@ export const en: Translation = {
       hard: 'For the experienced',
     },
     fields: {
-      title: 'Title',
-      pitch: 'The pitch, in one sentence',
-      description: 'Description',
-      descriptionHint: 'Markdown formatting: **bold**, *italic*, lists, [links](https://…).',
-      status: 'Where is it at?',
-      public: 'Public',
-      publicHint:
-        'Visible to signed-in members. Private: no other member can see it. It works as a draft: other members’ comments and reactions are kept, but no member, you included, can see them while it stays private. They come back if it becomes public again.',
       demoUrl: 'Demo link (optional)',
       demoUrlHint: 'An https address, for example https://myproject.vercel.app',
       demoUrlOk: 'Good: a public website over https.',
-      recipe: 'Add the recipe',
-      recipeHint: 'Tools, key prompts: optional',
-      tools: 'Tools and models used',
-      toolsLimit: '{{max}} at most',
-      toolsPlaceholder: 'Add a tool',
-      prompts: 'Key prompts (optional)',
-      promptsHint: '{{max}} at most. They are shown as they are.',
-      prompt: 'Prompt {{number}}',
-      addPrompt: 'Add a prompt',
-      removePrompt: 'Remove prompt {{number}}',
     },
     status: {
       idea: 'Idea',
@@ -555,22 +528,9 @@ export const en: Translation = {
       paused: 'On hold',
     },
     preview: {
-      title: 'Preview in the feed',
       now: 'just now',
-      untitled: 'Your project',
-      noPitch: 'Your pitch will show here.',
     },
     visuals: {
-      gallery: 'Photos',
-      galleryHintNew:
-        '{{max}} at most. The first one is the cover. They are sent when you publish.',
-      galleryHintEdit:
-        '{{max}} at most. The first one is the cover. Each change is saved right away.',
-      cover: 'Cover',
-      add: 'Add a photo',
-      earlier: 'Move photo {{number}} earlier',
-      later: 'Move photo {{number}} later',
-      makeCover: 'Make photo {{number}} the cover',
       remove: 'Remove photo {{number}}',
       portrait: 'Vertical cover (phone)',
       portraitHint:
@@ -581,8 +541,6 @@ export const en: Translation = {
       photo: 'Photo {{number}} of {{total}}',
       preparing: 'Preparing the photo…',
       portraitLabel: 'Vertical cover',
-      uploadFailed:
-        'The project is published, but some photos could not be sent. Add them again here.',
     },
     notes: {
       title: 'Journal',
