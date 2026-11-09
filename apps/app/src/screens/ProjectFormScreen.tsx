@@ -271,8 +271,8 @@ function ProjectFormView({
     // En modification, la description d'une photo tapée part même si l'on ferme tout de suite
     // (ui-I12) : l'envoi continue après la fermeture, rien n'attend.
     if (projectId) void photos.flushPending(projectId)
-    guard.release()
-    close()
+    // Sur le web, la fermeture attend que l'étape de plus de l'historique soit retirée.
+    void guard.release().then(close)
   }
   const requestClose = () => {
     if (busy) return
@@ -363,7 +363,7 @@ function ProjectFormView({
       // Le fil la montre tout de suite (plan, U5a) ; puis les photos partent, dans l'ordre.
       void queryClient.invalidateQueries({ queryKey: ['feed'] })
       const { failed } = await photos.flushPending(id)
-      guard.release()
+      await guard.release()
       if (failed > 0) {
         // Ni danse ni « Projet publié » : la modification dit quelles photos manquent (jur-J11).
         router.replace({ pathname: '/projects/[id]/edit', params: { id, photos: 'failed' } })
@@ -380,7 +380,7 @@ function ProjectFormView({
       return
     }
     await photos.flushPending(projectId)
-    guard.release()
+    await guard.release()
     // Un nouveau statut d'un projet visible des membres : la page propose une note toute prête.
     const announce = result.data.status !== initial.status && result.data.visibility === 'public'
     toast.show(
@@ -396,13 +396,12 @@ function ProjectFormView({
 
   const onDeleted = () => {
     setDeleting(false)
-    guard.release()
     toast.show(
       t(($) => $.project.form.deleted),
       { icon: 'check-circle' },
     )
     // « Mes projets », jamais un retour vers la page supprimée (ui-M3).
-    router.dismissTo('/me')
+    void guard.release().then(() => router.dismissTo('/me'))
   }
 
   // --- Ce que la feuille dit au-dessus des champs (un seul message à la fois) ---
