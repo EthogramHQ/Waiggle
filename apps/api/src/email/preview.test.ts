@@ -62,8 +62,9 @@ describe('emailPreviews', () => {
 
     expect(previews.map(({ file }) => file).sort()).toEqual(
       [...NOTIFICATIONS, ...SERVICE]
-        .sort()
-        .flatMap((name) => [`${name}.en.html`, `${name}.fr.html`]),
+        .flatMap((name) => [`${name}.en.html`, `${name}.fr.html`])
+        // Trié après les suffixes : « other-recap » est le début d'un autre nom.
+        .sort(),
     )
     for (const { file, email } of previews) {
       const [name, language] = file.split('.')
