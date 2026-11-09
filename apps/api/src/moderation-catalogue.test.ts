@@ -51,6 +51,7 @@ import {
   UncategorizedPage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { fill, resources } from '@ruche/i18n'
 import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memberCounterKeys } from './rate-limit'
@@ -566,6 +567,53 @@ describe('the pending tools', () => {
         .sort(),
     ).toEqual(second)
   })
+
+  // Décision de Louis du 9/11/2026 au soir (jur-J1) : un « Autre » des outils favoris d'un membre
+  // est relu comme celui d'un projet. Les profils montrés suivent la règle de la page d'un membre :
+  // un compte vérifié, qui existe encore (sans filtre de blocage, décision 1).
+  it("lists an « other » tool cited only by a member's favourite tools, with that member", async () => {
+    later()
+    await act.updateProfile(max, { favoriteTools: ['Zorblax Favori', 'Claude'] })
+    await publish(lea, 'Pluie', ['Make.com'])
+    const maxHandle = (await act.me(max)).handle
+
+    const page = await pending()
+
+    expect(page.items.map((item) => item.name)).toEqual(['Make.com', 'Zorblax Favori'])
+    const [make, favourite] = page.items
+    expect(favourite).toMatchObject({
+      projectCount: 0,
+      projects: [],
+      profileCount: 1,
+      profiles: [{ name: 'Max', handle: maxHandle }],
+    })
+    // Un « Autre » cité seulement par un projet ne compte aucun profil.
+    expect(make).toMatchObject({ projectCount: 1, profileCount: 0, profiles: [] })
+  })
+
+  it('never lists the favourite tools of a deleted or unverified account', async () => {
+    later()
+    await act.updateProfile(lea, { favoriteTools: ['Outil Partagé'] })
+    later()
+    await act.updateProfile(zoe, { favoriteTools: ['Outil Partagé', 'Outil de Zoé'] })
+    later()
+    await act.updateProfile(max, { favoriteTools: ['Outil Partagé', 'Outil de Max'] })
+    // Zoé n'est plus vérifiée ; Max a supprimé son compte.
+    await ctx.db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.id, zoeId))
+    later()
+    await act.deleteAccount(max, 'another-long-password')
+
+    const res = await act.send('GET', '/v1/moderation/tools/pending', louis)
+    const raw = await res.text()
+
+    expect(res.status).toBe(200)
+    const page = PendingToolsPage.parse(JSON.parse(raw))
+    expect(page.items.map((item) => item.name)).toEqual(['Outil Partagé'])
+    expect(page.items[0]).toMatchObject({ profileCount: 1, profiles: [{ name: 'Léa' }] })
+    for (const leak of ['"name":"Zoé"', '"name":"Max"', 'Outil de Zoé', 'Outil de Max']) {
+      expect(raw, leak).not.toContain(leak)
+    }
+  })
 })
 
 // ─── Admettre, créer, modifier ───────────────────────────────────────────────────────────────────
@@ -778,6 +826,39 @@ describe('searching and editing the catalogue', () => {
       )
     }
     expect(await journalInBase()).toEqual([])
+  })
+
+  it('answers 400, translated and never 500, when every address of a created, admitted or renamed tool is taken', async () => {
+    // Comme sec-B4 pour un « Autre » (tools.test.ts) : 51 outils de noms repliés différents ont
+    // déjà les adresses zorblax, zorblax-2… zorblax-51 (posés en base). Un outil nommé « Zorblax »
+    // ne trouve plus d'adresse : refusé, et rien n'est écrit, pas même une ligne du journal.
+    await ctx.db.execute(sql`
+      insert into tool (id, slug, name, folded, status, created_at)
+      select gen_random_uuid(), case when n = 1 then 'zorblax' else 'zorblax-' || n end,
+        'Zorblax ' || n, 'zorblaxtaken' || n, 'other', now()
+      from generate_series(1, 51) as n`)
+    await publish(lea, 'Mon chat', ['Teachable Machine'])
+    const machine = await pendingSlug('Teachable Machine')
+
+    const answers = [
+      await write('POST', '/v1/moderation/tools', louis, { ...teachable, name: 'Zorblax' }),
+      await write('POST', `/v1/moderation/tools/${machine}/admit`, louis, {
+        ...teachable,
+        name: 'Zorblax',
+      }),
+      await write('PATCH', '/v1/moderation/tools/mistral', louis, { name: 'Zorblax' }),
+    ]
+
+    for (const res of answers) {
+      expect(res.status).toBe(400)
+      expect(ErrorResponse.parse(await res.json()).error).toEqual({
+        code: 'validation',
+        message: fill(resources.fr.translation.errors.validation),
+      })
+    }
+    expect(await journalInBase()).toEqual([])
+    expect(await toolsFolded('zorblax')).toBe(0)
+    expect(await pendingSlug('Teachable Machine')).toBe(machine)
   })
 
   it('refuses to edit an « other » tool, to merge into an « other », and to merge a catalogue tool', async () => {

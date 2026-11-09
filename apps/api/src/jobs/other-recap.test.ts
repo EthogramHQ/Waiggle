@@ -289,6 +289,27 @@ describe('what the recap counts', () => {
     expect(louisRecap()).toContain(toolsLine(23))
   })
 
+  // Décision de Louis du 9/11/2026 au soir (jur-J1) : un « Autre » des outils favoris compte comme
+  // celui d'un projet, s'il est cité par un compte vérifié ; jamais par un compte non vérifié.
+  it('counts in the recap an « other » tool cited only by favourite tools', async () => {
+    later()
+    await act.updateProfile(lea, { favoriteTools: ['Outil Favori', 'Claude'] })
+    later()
+    await act.updateProfile(zoe, { favoriteTools: ['Outil de Zoé'] })
+    await ctx.db
+      .update(schema.user)
+      .set({ emailVerified: false })
+      .where(eq(schema.user.email, zoeAccount.email))
+    // Un projet de la semaine, classé « Cuisine », sans « Autre » : il ne compte pour rien.
+    await publish(max, 'Pluie', ['Claude'], { primaryCategory: 'cooking' })
+
+    await runAt(MONDAY_8H)
+
+    const text = louisRecap()
+    expect(text).toContain(toolsLine(1))
+    expect(text).not.toContain(fill(fr.otherRecap.projects_one, { count: '1' }))
+  })
+
   it('never mails an « other » whose only projects are private, removed or of a deleted account', async () => {
     const cooking = { primaryCategory: 'cooking' }
     await publish(lea, 'Carnet', ['Outil Privé'], { ...cooking, visibility: 'private' })
