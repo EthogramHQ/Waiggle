@@ -4,16 +4,28 @@
 // R4 : l'auteur mène à sa page, « Tester » à la démo par la page d'avertissement des liens externes
 // (`/out`, jamais directement), la date se dit par rapport à maintenant (« il y a 2 h »), et le
 // total des réactions s'affiche (« ✦ 49 »).
+// R6a : la catégorie principale du projet, en étiquette sur la carte (fil, Explorer, page d'un
+// membre, d'une étiquette) ; et la carte que vise la danse de publication (`PublishTarget`).
 import type { ProjectSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
-import type { ComponentProps, ReactNode } from 'react'
+import { type ComponentProps, createContext, type ReactNode, useCallback, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
 import { useOpenDemo } from '../navigation/links'
-import { useCoverSource } from '../ui/coverTransition'
+import { type Measurable, useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useLayout } from '../ui/theme/layout'
+import { categoryOption } from './categories'
+
+/**
+ * La carte que vise la danse de publication (R6a) : le projet tout juste publié, et la fonction qui
+ * reçoit la vue de sa photo (elle couvre toute la carte), pour la mesurer. L'accueil le fournit
+ * autour du fil ; la carte de ce projet, où qu'elle soit dans la liste, lui donne sa vue. Un
+ * contexte plutôt qu'une prop : la liste (feed/FeedList.tsx) n'a pas à savoir qu'une danse a lieu.
+ */
+export type PublishTarget = { id: string; onCover: (node: Measurable | null) => void }
+export const PublishTargetContext = createContext<PublishTarget | null>(null)
 
 type Props = {
   project: ProjectSummary
@@ -43,10 +55,26 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
   const { demoUrl } = project
   // La carte qui devient la page (R4) : la vue autour de la photo, et sa mesure au toucher.
   const cover = useCoverSource(project.id)
+  // La danse de publication vise-t-elle cette carte ? Sa vue va alors aux deux : la transition de
+  // page et la danse. Un `ref` en fonction (« callback ref ») : React l'appelle avec la vue posée,
+  // puis avec null quand elle part.
+  const target = useContext(PublishTargetContext)
+  const onTarget = target?.id === project.id ? target.onCover : null
+  const { ref: coverSource } = cover
+  const ownCoverRef = useCallback(
+    (node: Measurable | null) => {
+      coverSource(node)
+      onTarget?.(node)
+    },
+    [coverSource, onTarget],
+  )
+  // La catégorie principale ; un projet d'avant R6a n'en a pas : aucune étiquette.
+  const { primaryCategory } = project
   return (
     <ProjectCard
       title={project.title}
       pitch={project.pitch}
+      category={primaryCategory ? categoryOption(t, primaryCategory) : undefined}
       author={{
         name: project.author.name,
         avatar: toSource(project.author.avatarUrl),
@@ -79,7 +107,7 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
         cover.capture(() => router.push({ pathname: '/projects/[id]', params: { id: project.id } }))
       }
       overlay={overlay}
-      coverRef={coverRef ?? cover.ref}
+      coverRef={coverRef ?? ownCoverRef}
     />
   )
 }
