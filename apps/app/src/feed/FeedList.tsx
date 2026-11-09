@@ -10,6 +10,7 @@
 import type { FeedItem, ProjectSummary } from '@ruche/contracts'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
@@ -55,7 +56,9 @@ export function DiscoverFeed({
   const feed = useDiscoverFeed({ testers: false })
   const pages = feed.data?.pages ?? []
   const items = pages.flatMap((page) => page.items)
-  const news = useFeedNews('discover', items[0], false)
+  // R6a : ses propres projets ne comptent jamais comme nouveautés, ici comme dans son fil.
+  const viewerId = useSession().data?.user.id
+  const news = useFeedNews('discover', items[0], false, viewerId)
   // Les auteurs suivis, d'après chaque page lue (l'API le dit page par page, pour ses auteurs).
   // `?? []` : une page sans ce champ (un faux fil de test, une ancienne réponse) n'en suit aucun.
   const followed = new Set(pages.flatMap((page) => page.followedAuthorIds ?? []))
