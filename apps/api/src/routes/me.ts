@@ -39,7 +39,7 @@ import { reactionsOfMember } from '../reactions/load'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
-import { countNewOtherTools, resolveTools } from '../tools/resolve'
+import { countNewOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
 import { legacyToolColumns, replaceProfileTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -248,6 +248,10 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // Pris par un autre ou réservé : la même réponse, mot pour mot, pour ne pas dire lequel.
       if (error instanceof HandleTakenError) {
         return c.json(errorBody(languageOf(c), 'handle_taken'), 409)
+      }
+      // sec-B4 : plus d'adresse libre pour un nouvel « Autre » : refusé, rien n'est gardé.
+      if (error instanceof NoFreeToolSlugError) {
+        return c.json(errorBody(languageOf(c), 'validation'), 400)
       }
       throw error
     }

@@ -889,6 +889,20 @@ describe('leaving an « other » out of the catalogue', () => {
     expect(await toolsFolded('bidule')).toBe(1)
   })
 
+  it('lists in the pending tools an « other » named with 40 emoji, and lets the administrator dismiss it', async () => {
+    // Relecture de sécurité sec-A1 : chaque emoji devient « u1f916- » dans l'adresse. Sans borne, 40
+    // emoji donnaient 279 caractères, refusés par ToolSlug en sortie : « À vérifier » répondait 500
+    // à tous les administrateurs, et l'« Autre » ne pouvait plus être ni écarté ni rattaché.
+    const robots = String.fromCodePoint(0x1f916).repeat(40)
+    await publish(lea, 'Le robot', [robots])
+
+    const slug = await pendingSlug(robots)
+    const res = await write('POST', `/v1/moderation/tools/${slug}/dismiss`, louis)
+
+    expect(res.status).toBe(204)
+    expect((await pending()).items).toEqual([])
+  })
+
   it('answers 404 to dismiss a catalogue tool or an unknown one', async () => {
     await expectError(
       await write('POST', '/v1/moderation/tools/claude/dismiss', louis),

@@ -143,8 +143,10 @@ CREATE INDEX "project_primary_category_idx" ON "project" USING btree ("primary_c
 --> statement-breakpoint
 CREATE INDEX "project_secondary_category_idx" ON "project" USING btree ("secondary_category");
 --> statement-breakpoint
--- Deux fonctions temporaires qui refont en SQL le repli (foldTool) et l'adresse (toolSlug) du
--- contrat, pour les libellés déjà en base. Elles s'effacent à la fin de la bascule.
+-- Trois fonctions temporaires qui refont en SQL le repli (foldTool), l'adresse (toolSlug) du
+-- contrat et sa borne, pour les libellés déjà en base. Elles s'effacent à la fin de la bascule.
+-- Leur texte vient de `scripts/catalogue-sql.mjs` (foldFunctionsSql), que le test
+-- `catalogue-sql.test.ts` retrouve mot pour mot ici.
 CREATE FUNCTION pg_temp.r6b_fold(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
   SELECT CASE WHEN f.v <> '' THEN f.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '' ORDER BY c.n)
@@ -153,11 +155,23 @@ CREATE FUNCTION pg_temp.r6b_fold(label text) RETURNS text LANGUAGE sql IMMUTABLE
   FROM (SELECT regexp_replace(replace(replace(replace(replace(replace(replace(translate(lower(btrim(label)), 'àáâãäåçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝŸ’'::text, 'aaaaaaceeeeiiiinoooooouuuuyyaaaaaaceeeeiiiinoooooouuuuyy'''::text), 'œ'::text, 'oe'::text), 'Œ'::text, 'oe'::text), 'æ'::text, 'ae'::text), 'Æ'::text, 'ae'::text), 'ß'::text, 'ss'::text), 'ẞ'::text, 'ss'::text), '[\x20-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]', '', 'g') AS v) f
 $r6b$;
 --> statement-breakpoint
+-- La borne de l'adresse (sec-A1, `TOOL_SLUG_MAX` et `bound` du contrat) : au plus 120 caract\u00e8res
+-- (char_length compte des caract\u00e8res, pas des octets), coup\u00e9e sur un tiret, sans tiret final. On
+-- prend 121 caract\u00e8res, puis on retire le dernier tiret et ce qui le suit : si le 121\u1d49 \u00e9tait un
+-- tiret, les 120 premiers restent entiers. Un seul mot trop long, sans tiret : coup\u00e9 net \u00e0 120.
+CREATE FUNCTION pg_temp.r6b_bound(slug text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
+  SELECT CASE
+    WHEN char_length(slug) <= 120 THEN slug
+    WHEN strpos(left(slug, 121), '-') > 0 THEN regexp_replace(left(slug, 121), '-[^-]*$', '')
+    ELSE left(slug, 120)
+  END
+$r6b$;
+--> statement-breakpoint
 CREATE FUNCTION pg_temp.r6b_slug(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
-  SELECT CASE WHEN s.v <> '' THEN s.v ELSE (
+  SELECT pg_temp.r6b_bound(CASE WHEN s.v <> '' THEN s.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '-' ORDER BY c.n)
     FROM regexp_split_to_table(btrim(label), '') WITH ORDINALITY AS c(ch, n)
-  ) END
+  ) END)
   FROM (SELECT regexp_replace(regexp_replace(lower(regexp_replace(normalize(label, NFKD), '[\u0300-\u036f]', '', 'g')), '[^[:alnum:]]+', '-', 'g'), '^-+|-+$', '', 'g') AS v) s
 $r6b$;
 --> statement-breakpoint
@@ -199,22 +213,39 @@ UPDATE r6b_label l SET tool_id = COALESCE(
 -- Étape 3 : les libellés restants deviennent des « Autre », un seul par nom replié. DISTINCT ON garde,
 -- pour chaque nom, le libellé du plus ancien projet LISTÉ (un projet privé ne donne pas son nom,
 -- jur-T14), sinon du plus ancien ; l'outil prend la date de ce projet, pour compter « en attente
--- depuis plus d'une semaine ». Sans famille, sans auteur (created_by reste nul, sec-A5). L'adresse
--- reçoit un suffixe -2, -3… si elle existe déjà (un autre outil, ou un autre nom replié qui donne la
--- même adresse).
-INSERT INTO "tool" ("id", "slug", "name", "folded", "status", "family", "description_fr", "description_en", "site_url", "created_at", "created_by", "admitted_at")
-SELECT gen_random_uuid(),
-  CASE WHEN o.taken + o.rn > 1 THEN o.slug || '-' || (o.taken + o.rn) ELSE o.slug END,
-  o.name, o.folded, 'other', NULL, NULL, NULL, NULL, o.at, NULL, NULL
-FROM (
-  SELECT n.*, row_number() OVER (PARTITION BY n.slug ORDER BY n.folded) AS rn,
-    (SELECT count(*) FROM "tool" t WHERE t.slug = n.slug) AS taken
-  FROM (
+-- depuis plus d'une semaine ». Sans famille, sans auteur (created_by reste nul, sec-A5).
+--
+-- L'adresse : la première libre parmi « claude », « claude-2 », « claude-3 »… Un bloc DO est un petit
+-- programme PL/pgSQL que PostgreSQL exécute une fois : il crée les « Autre » UN PAR UN, si bien que
+-- l'adresse prise par l'un compte pour le suivant. Compter les adresses déjà prises (l'ancienne
+-- version) ne suffisait pas (relecture de sécurité sec-B3) : « Claude 2 » a l'adresse claude-2, et
+-- « Claude ✨ » (adresse claude, prise par le catalogue) recevait aussi claude-2 : 23505, migration
+-- arrêtée. Ici chaque suffixe est essayé jusqu'à ce qu'aucun outil ne le porte (NOT EXISTS, lu sur
+-- l'index unique de tool.slug) ; la boucle s'arrête toujours, les outils étant en nombre fini. Les
+-- noms passent par l'ordre de leur nom replié : le premier garde l'adresse sans suffixe.
+DO $r6b$
+DECLARE
+  o record;
+  candidate text;
+  n int;
+BEGIN
+  FOR o IN
     SELECT DISTINCT ON (l.folded) l.folded, l.label AS name, l.slug, l.at
     FROM r6b_label l WHERE l.tool_id IS NULL
     ORDER BY l.folded, l.listed DESC, l.at, l.kind, l.owner, l.pos
-  ) n
-) o;
+  LOOP
+    n := 1;
+    candidate := o.slug;
+    LOOP
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM "tool" t WHERE t.slug = candidate);
+      n := n + 1;
+      candidate := o.slug || '-' || n;
+    END LOOP;
+    INSERT INTO "tool" ("id", "slug", "name", "folded", "status", "family", "description_fr", "description_en", "site_url", "created_at", "created_by", "admitted_at")
+    VALUES (gen_random_uuid(), candidate, o.name, o.folded, 'other', NULL, NULL, NULL, NULL, o.at, NULL, NULL);
+  END LOOP;
+END
+$r6b$;
 --> statement-breakpoint
 -- Étape 4 : les libellés des « Autre » qu'on vient de créer prennent leur outil.
 UPDATE r6b_label l SET tool_id = t.id FROM "tool" t WHERE l.tool_id IS NULL AND t.folded = l.folded;
@@ -254,6 +285,8 @@ DROP TABLE r6b_label;
 DROP FUNCTION pg_temp.r6b_fold(text);
 --> statement-breakpoint
 DROP FUNCTION pg_temp.r6b_slug(text);
+--> statement-breakpoint
+DROP FUNCTION pg_temp.r6b_bound(text);
 --> statement-breakpoint
 -- jur-P1 : la colonne du temps passé est effacée.
 ALTER TABLE "project" DROP COLUMN "time_spent";

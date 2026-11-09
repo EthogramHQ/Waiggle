@@ -18,11 +18,14 @@ import {
   CategoryList,
   ErrorResponse,
   foldTool,
+  Member,
   OTHER_TOOLS_SHOWN,
   PROJECT_CATEGORIES,
+  Project,
   ToolList,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
+import { resources } from '@ruche/i18n'
 import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memberCounterKeys } from './rate-limit'
@@ -80,6 +83,14 @@ afterEach(async () => {
 
 /** Avance la fausse horloge (par défaut d'une seconde : deux gestes n'ont jamais la même date). */
 const later = (ms = SECOND) => vi.setSystemTime(Date.now() + ms)
+
+/** Le nombre d'outils de ce nom replié, en base. */
+const toolsFoldedCount = async (folded: string) => {
+  const result = (await ctx.db.execute(
+    sql`select count(*)::int as n from tool where folded = ${folded}`,
+  )) as unknown as { rows: { n: unknown }[] }
+  return Number(result.rows[0]?.n)
+}
 
 /** Publie un projet avec ses outils, une seconde après ce qui précède. */
 const publish = (cookie: string, title: string, tools: string[], body: object = {}) => {
@@ -357,6 +368,78 @@ describe('the « other » tools', () => {
     expect(await others(malik)).toEqual([])
     // Témoin : un autre membre le voit toujours.
     expect(await others(zoe)).toEqual(['Teachable Machine'])
+  })
+
+  it('gives an « other » the slug of the name this member typed, never the shared one', async () => {
+    // Relecture de sécurité sec-B2 : Malik tape « Zorblax » dans un projet privé ; l'« Autre »
+    // zorblax existe. Inès tape « Zorblax ✨ » : un autre nom replié, donc un autre « Autre », dont
+    // l'adresse partagée est zorblax-2. Si l'API la rendait, le « -2 » dirait à Inès, et à qui lit
+    // son projet ou son profil, qu'un autre membre a tapé « Zorblax » quelque part.
+    const sparkle = `Zorblax ${String.fromCodePoint(0x2728)}`
+    await publish(malik, 'Secret', ['Zorblax'], { visibility: 'private' })
+    const project = await publish(ines, 'Mon robot', [sparkle])
+    await act.updateProfile(ines, { favoriteTools: [sparkle] })
+    // Témoin : en base, l'adresse partagée porte bien le suffixe.
+    const shared = (await ctx.db.execute(
+      sql`select slug from tool where folded = ${foldTool(sparkle)}`,
+    )) as unknown as { rows: { slug: string }[] }
+    expect(shared.rows[0]?.slug).toBe('zorblax-2')
+
+    const expected = [{ label: sparkle, slug: 'zorblax', inCatalogue: false }]
+    // Le projet, lu par un autre membre, et par son auteure à la publication.
+    const read = Project.parse(
+      await (await act.send('GET', `/v1/projects/${project.id}`, zoe)).json(),
+    )
+    expect(read.tools).toEqual(expected)
+    expect(project.tools).toEqual(expected)
+    // Le profil public d'Inès, lu par un autre membre.
+    const page = Member.parse(await (await act.send('GET', `/v1/members/${inesId}`, zoe)).json())
+    expect(page.favoriteTools).toEqual(expected)
+    // Nulle part la réponse brute ne contient l'adresse partagée.
+    const raw = await (await act.send('GET', `/v1/projects/${project.id}`, malik)).text()
+    expect(raw).not.toContain('zorblax-2')
+  })
+
+  it('answers 400, translated and never 500, when every address of a new « other » is taken', async () => {
+    // Relecture de sécurité sec-B4 : 51 « Autre » de noms repliés différents ont déjà les adresses
+    // zorblax, zorblax-2… zorblax-51 (posés en base : par l'API, il faudrait deux jours de quota).
+    // Un 52ᵉ nom de même adresse ne trouve plus de place : la demande est refusée, rien n'est gardé.
+    await ctx.db.execute(sql`
+      insert into tool (id, slug, name, folded, status, created_at)
+      select gen_random_uuid(), case when n = 1 then 'zorblax' else 'zorblax-' || n end,
+        'Zorblax ' || n, 'zorblaxtaken' || n, 'other', now()
+      from generate_series(1, 51) as n`)
+    const sun = `Zorblax ${String.fromCodePoint(0x2600)}`
+    const send = (method: string, path: string, body: object) =>
+      ctx.request(path, {
+        method,
+        headers: { cookie: ines, 'content-type': 'application/json', 'accept-language': 'en' },
+        body: JSON.stringify(body),
+      })
+
+    const created = await send('POST', '/v1/projects', {
+      title: 'Soleil',
+      pitch: 'Un petit projet pour essayer.',
+      primaryCategory: 'other',
+      tools: [sun],
+    })
+    const project = await publish(ines, 'Mon robot', ['Claude'])
+    const edited = await send('PATCH', `/v1/projects/${project.id}`, { tools: [sun] })
+    const profile = await send('PATCH', '/v1/me', { favoriteTools: [sun] })
+
+    for (const res of [created, edited, profile]) {
+      expect(res.status).toBe(400)
+      expect(ErrorResponse.parse(await res.json()).error).toEqual({
+        code: 'validation',
+        message: resources.en.translation.errors.validation,
+      })
+    }
+    // Rien n'est gardé : ni le projet refusé, ni le nouvel outil, ni l'« Autre ».
+    const titles = (await ctx.db.execute(
+      sql`select title from project where author_id = ${inesId}`,
+    )) as unknown as { rows: { title: string }[] }
+    expect(titles.rows.map((row) => row.title)).toEqual(['Mon robot'])
+    expect(await toolsFoldedCount(foldTool(sun))).toBe(0)
   })
 
   it('shows 50 of 51 visible « other » tools, and a private one never takes a place', async () => {

@@ -9,6 +9,8 @@
 import { describe, expect, it } from 'vitest'
 import { CatalogueToolsQuery, ToolAdmit } from './moderation-catalogue'
 import { ToolPage, ToolPageQuery } from './projects'
+import { TOOL_SLUG_MAX, toolSlug } from './slug'
+import { ShortLabel } from './text'
 import {
   foldTool,
   OTHER_TOOLS_SHOWN,
@@ -91,6 +93,30 @@ describe('ToolSlug', () => {
   it('refuses spaces, double or edge dashes, and an empty slug', () => {
     for (const slug of ['', 'claude code', 'claude--code', '-claude', 'claude-', 'a?b', 'a#b']) {
       expect(ToolSlug.safeParse(slug).success, slug).toBe(false)
+    }
+  })
+
+  it('gives every ShortLabel(40) name a slug that ToolSlug accepts', () => {
+    // Relecture de sécurité sec-A1 : l'adresse d'un « Autre » est vérifiée EN SORTIE par ToolSlug ;
+    // une adresse trop longue faisait tomber en 500 la page « À vérifier » de tous les
+    // administrateurs. Les pires noms de 40 caractères : 40 emoji (chacun devient « u1f916- », 7
+    // caractères), 40 ligatures que NFKD déplie (« ﷺ » donne une phrase de 18 lettres, « ﷲ » un mot
+    // de 4 lettres sans espace), 40 lettres hors du plan de base (2 unités UTF-16 chacune).
+    const worst = [
+      String.fromCodePoint(0x1f916).repeat(40),
+      String.fromCodePoint(0xfdfa).repeat(40),
+      String.fromCodePoint(0xfdf2).repeat(40),
+      String.fromCodePoint(0x20000).repeat(40),
+      'a '.repeat(20).trim(),
+      `${'x'.repeat(39)}${String.fromCodePoint(0x1f916)}`,
+    ]
+    for (const name of worst) {
+      expect(ShortLabel(40).safeParse(name).success, name).toBe(true)
+      const slug = toolSlug(name)
+      expect(ToolSlug.safeParse(slug).success, slug).toBe(true)
+      expect(Array.from(slug).length, slug).toBeLessThanOrEqual(TOOL_SLUG_MAX)
+      // La place d'un suffixe (« -51 », la dernière adresse que l'API essaie) reste dans la borne.
+      expect(ToolSlug.safeParse(`${slug}-51`).success, slug).toBe(true)
     }
   })
 })

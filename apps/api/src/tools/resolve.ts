@@ -20,6 +20,32 @@ export type ResolvedTool = { tool: ToolRow; label: string | null }
 const SLUG_ATTEMPTS = 50
 
 /**
+ * Levée quand les 51 adresses d'un nouvel « Autre » sont toutes prises (relecture de sécurité
+ * sec-B4 : 52 noms repliés différents peuvent donner la même adresse, « Zorblax ☀ », « Zorblax ☁ »…).
+ * Ce n'est pas une panne du serveur : la route répond 400 `validation`, traduit, et la transaction
+ * annulée ne garde rien de la demande.
+ */
+export class NoFreeToolSlugError extends Error {
+  constructor() {
+    super('no free address for a new tool')
+    this.name = 'NoFreeToolSlugError'
+  }
+}
+
+/** Ce que rend une transaction refusée faute d'adresse libre (voir `noFreeToolSlug`). */
+export const NO_FREE_TOOL_SLUG = 'no_free_tool_slug' as const
+
+/**
+ * À passer au `.catch` d'une transaction qui appelle `resolveTools` : l'erreur « plus d'adresse
+ * libre » devient la valeur `NO_FREE_TOOL_SLUG`, que la route change en 400 ; toute autre erreur
+ * continue son chemin (500, journal).
+ */
+export const noFreeToolSlug = (error: unknown): typeof NO_FREE_TOOL_SLUG => {
+  if (error instanceof NoFreeToolSlugError) return NO_FREE_TOOL_SLUG
+  throw error
+}
+
+/**
  * Combien de noms de cette liste n'ont encore aucun outil, ni au catalogue, ni parmi les « Autre » :
  * autant de créations à compter dans le quota du jour AVANT d'écrire (sec-A5). C'est une lecture
  * seule : deux demandes simultanées peuvent compter un nom de trop (le sens sûr), jamais l'oublier
@@ -139,7 +165,7 @@ export const resolveTools = async (
       await load([entry.folded])
       if (found.has(entry.folded)) break
     }
-    if (!found.has(entry.folded)) throw new Error('no free address for a new tool')
+    if (!found.has(entry.folded)) throw new NoFreeToolSlugError()
   }
 
   const seen = new Set<string>()

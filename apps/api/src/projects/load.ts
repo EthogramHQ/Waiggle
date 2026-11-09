@@ -15,6 +15,7 @@ import {
   ProjectVisibility,
   type ProjectVisual,
   Thumbhash,
+  toolSlug,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
@@ -68,9 +69,12 @@ export const toolsOfProjects = async (
   for (const row of rows) {
     const inCatalogue = row.status === 'catalogue'
     const list = byProject.get(row.projectId) ?? []
+    const label = inCatalogue ? row.name : (row.label ?? row.name)
     list.push({
-      label: inCatalogue ? row.name : (row.label ?? row.name),
-      slug: row.slug,
+      label,
+      // Un « Autre » n'a pas de page : son adresse se tire du nom tapé ici, jamais de l'adresse
+      // partagée, dont le suffixe « -2 » dirait qu'un autre membre a tapé un nom voisin (sec-B2).
+      slug: inCatalogue ? row.slug : toolSlug(label),
       inCatalogue,
     })
     byProject.set(row.projectId, list)

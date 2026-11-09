@@ -1,5 +1,5 @@
 // Fabrique le SQL du catalogue des outils (tranche R6b) à partir de `catalogue/tools.json` : les
-// deux fonctions de repli que la migration 0016 utilise pour rattacher les anciennes étiquettes, puis
+// trois fonctions de repli que la migration 0016 utilise pour rattacher les anciennes étiquettes, puis
 // l'insertion des outils et de leurs alias. Le SQL de la migration n'est jamais écrit à la main :
 //
 //   node packages/db/scripts/catalogue-sql.mjs        (écrit le SQL sur la sortie standard)
@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { SEARCH_FOLD } from '../../contracts/src/fold.ts'
-import { toolSlug } from '../../contracts/src/slug.ts'
+import { TOOL_SLUG_MAX, toolSlug } from '../../contracts/src/slug.ts'
 
 /**
  * Écrit un texte comme littéral SQL : entre apostrophes, chaque apostrophe doublée. Rien d'autre à
@@ -39,8 +39,8 @@ export const foldTool = (name) => {
 }
 
 /**
- * Les deux fonctions « temporaires » (elles disparaissent avec la connexion, la migration les efface
- * aussi) qui refont en SQL ce que `foldTool` et `toolSlug` font en TypeScript, pour les libellés déjà
+ * Les trois fonctions « temporaires » (elles disparaissent avec la connexion, la migration les efface
+ * aussi) qui refont en SQL ce que `foldTool` et `toolSlug` (et sa borne) font en TypeScript, pour les libellés déjà
  * en base. Le texte du libellé n'est jamais collé dans le SQL : il arrive comme argument.
  * `translate` remplace chaque caractère de la liste « de » par celui de même rang dans la liste
  * « vers » ; `replace` s'occupe des lettres qui en donnent deux (œ, æ, ß).
@@ -56,6 +56,14 @@ export const foldFunctionsSql = () => {
   for (const [key, value] of double)
     folded = `replace(${folded}, ${literal(key)}::text, ${literal(value)}::text)`
   return [
+    // La borne de l'adresse (sec-A1, `TOOL_SLUG_MAX` du contrat) : avant `r6b_slug`, qui l'appelle.
+    `CREATE FUNCTION pg_temp.r6b_bound(slug text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
+  SELECT CASE
+    WHEN char_length(slug) <= ${TOOL_SLUG_MAX} THEN slug
+    WHEN strpos(left(slug, ${TOOL_SLUG_MAX + 1}), '-') > 0 THEN regexp_replace(left(slug, ${TOOL_SLUG_MAX + 1}), '-[^-]*$', '')
+    ELSE left(slug, ${TOOL_SLUG_MAX})
+  END
+$r6b$`,
     `CREATE FUNCTION pg_temp.r6b_fold(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
   SELECT CASE WHEN f.v <> '' THEN f.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '' ORDER BY c.n)
@@ -64,10 +72,10 @@ export const foldFunctionsSql = () => {
   FROM (SELECT regexp_replace(${folded}, '[\\x20-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\x7e]', '', 'g') AS v) f
 $r6b$`,
     `CREATE FUNCTION pg_temp.r6b_slug(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
-  SELECT CASE WHEN s.v <> '' THEN s.v ELSE (
+  SELECT pg_temp.r6b_bound(CASE WHEN s.v <> '' THEN s.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '-' ORDER BY c.n)
     FROM regexp_split_to_table(btrim(label), '') WITH ORDINALITY AS c(ch, n)
-  ) END
+  ) END)
   FROM (SELECT regexp_replace(regexp_replace(lower(regexp_replace(normalize(label, NFKD), '[\\u0300-\\u036f]', '', 'g')), '[^[:alnum:]]+', '-', 'g'), '^-+|-+$', '', 'g') AS v) s
 $r6b$`,
   ]
