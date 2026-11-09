@@ -143,8 +143,10 @@ CREATE INDEX "project_primary_category_idx" ON "project" USING btree ("primary_c
 --> statement-breakpoint
 CREATE INDEX "project_secondary_category_idx" ON "project" USING btree ("secondary_category");
 --> statement-breakpoint
--- Deux fonctions temporaires qui refont en SQL le repli (foldTool) et l'adresse (toolSlug) du
--- contrat, pour les libellés déjà en base. Elles s'effacent à la fin de la bascule.
+-- Trois fonctions temporaires qui refont en SQL le repli (foldTool), l'adresse (toolSlug) du
+-- contrat et sa borne, pour les libellés déjà en base. Elles s'effacent à la fin de la bascule.
+-- Leur texte vient de `scripts/catalogue-sql.mjs` (foldFunctionsSql), que le test
+-- `catalogue-sql.test.ts` retrouve mot pour mot ici.
 CREATE FUNCTION pg_temp.r6b_fold(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
   SELECT CASE WHEN f.v <> '' THEN f.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '' ORDER BY c.n)
@@ -153,11 +155,23 @@ CREATE FUNCTION pg_temp.r6b_fold(label text) RETURNS text LANGUAGE sql IMMUTABLE
   FROM (SELECT regexp_replace(replace(replace(replace(replace(replace(replace(translate(lower(btrim(label)), 'àáâãäåçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝŸ’'::text, 'aaaaaaceeeeiiiinoooooouuuuyyaaaaaaceeeeiiiinoooooouuuuyy'''::text), 'œ'::text, 'oe'::text), 'Œ'::text, 'oe'::text), 'æ'::text, 'ae'::text), 'Æ'::text, 'ae'::text), 'ß'::text, 'ss'::text), 'ẞ'::text, 'ss'::text), '[\x20-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]', '', 'g') AS v) f
 $r6b$;
 --> statement-breakpoint
+-- La borne de l'adresse (sec-A1, `TOOL_SLUG_MAX` et `bound` du contrat) : au plus 120 caract\u00e8res
+-- (char_length compte des caract\u00e8res, pas des octets), coup\u00e9e sur un tiret, sans tiret final. On
+-- prend 121 caract\u00e8res, puis on retire le dernier tiret et ce qui le suit : si le 121\u1d49 \u00e9tait un
+-- tiret, les 120 premiers restent entiers. Un seul mot trop long, sans tiret : coup\u00e9 net \u00e0 120.
+CREATE FUNCTION pg_temp.r6b_bound(slug text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
+  SELECT CASE
+    WHEN char_length(slug) <= 120 THEN slug
+    WHEN strpos(left(slug, 121), '-') > 0 THEN regexp_replace(left(slug, 121), '-[^-]*$', '')
+    ELSE left(slug, 120)
+  END
+$r6b$;
+--> statement-breakpoint
 CREATE FUNCTION pg_temp.r6b_slug(label text) RETURNS text LANGUAGE sql IMMUTABLE AS $r6b$
-  SELECT CASE WHEN s.v <> '' THEN s.v ELSE (
+  SELECT pg_temp.r6b_bound(CASE WHEN s.v <> '' THEN s.v ELSE (
     SELECT string_agg('u' || to_hex(ascii(c.ch)), '-' ORDER BY c.n)
     FROM regexp_split_to_table(btrim(label), '') WITH ORDINALITY AS c(ch, n)
-  ) END
+  ) END)
   FROM (SELECT regexp_replace(regexp_replace(lower(regexp_replace(normalize(label, NFKD), '[\u0300-\u036f]', '', 'g')), '[^[:alnum:]]+', '-', 'g'), '^-+|-+$', '', 'g') AS v) s
 $r6b$;
 --> statement-breakpoint
@@ -254,6 +268,8 @@ DROP TABLE r6b_label;
 DROP FUNCTION pg_temp.r6b_fold(text);
 --> statement-breakpoint
 DROP FUNCTION pg_temp.r6b_slug(text);
+--> statement-breakpoint
+DROP FUNCTION pg_temp.r6b_bound(text);
 --> statement-breakpoint
 -- jur-P1 : la colonne du temps passé est effacée.
 ALTER TABLE "project" DROP COLUMN "time_spent";
