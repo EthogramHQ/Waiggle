@@ -6,21 +6,26 @@
 // - « Ils cherchent des testeurs » : un carrousel des projets testables qui ont une démo ;
 // - « Outils populaires » : les dix outils les plus cités, et « Tous les outils » ;
 // - « Récents » : l'ancien fil « Découvrir », page par page, où chaque carte d'un auteur qu'on ne
-//   suit pas porte la pastille « Suivre Nora ».
-import type { ProjectSummary } from '@ruche/contracts'
-import { useRouter } from 'expo-router'
+//   suit pas porte la pastille « Suivre Nora ». R6b : sous son titre, une rangée de pastilles
+//   (« Toutes », puis chaque catégorie qui a des projets) le filtre ; le filtre vit dans l'adresse
+//   (`/explore?category=animals`), pour qu'on puisse la partager ou y revenir.
+import { CategoryCode, type ProjectSummary } from '@ruche/contracts'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { useMediaSources } from '../api/media'
+import { categoryOf, useCategories } from '../categories/api'
 import { useDiscoverFeed } from '../feed/api'
-import { DiscoverFeed } from '../feed/FeedList'
+import { type CardOverlay, DiscoverFeed } from '../feed/FeedList'
 import { useFollow } from '../follows/api'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo } from '../navigation/links'
+import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useTools } from '../tools/api'
 import { Carousel } from '../ui/Carousel'
+import { FilterPills } from '../ui/FilterPills'
 import { FollowButton } from '../ui/FollowButton'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
@@ -31,6 +36,7 @@ import { Tag } from '../ui/Tag'
 import { TesterCard } from '../ui/TesterCard'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
@@ -108,17 +114,136 @@ function MemberExplore({ userId }: { userId: string }) {
       ) : null}
       <Testers />
       <PopularTools />
-      <Stack gap="md">
-        <Text variant="heading" heading={2}>
-          {t(($) => $.explore.recent)}
-        </Text>
-        <DiscoverFeed
-          viewerId={userId}
-          overlay={chipOf}
-          errorMessage={t(($) => $.explore.recentError)}
-        />
-      </Stack>
+      <Recent viewerId={userId} overlay={chipOf} />
     </Screen>
+  )
+}
+
+/**
+ * Le filtre de « Récents » (R6b), tel que l'adresse le donne : `?category=animals`.
+ *
+ * - L'adresse n'est lue qu'une fois la page hydratée (`useHydrated`) : le pré-rendu du web ne la
+ *   connaît pas, et lire plus tôt ferait différer le premier affichage du HTML préparé.
+ * - Un code mal formé (`?category=Animaux !`) est ignoré, sans erreur : l'API le refuserait, et la
+ *   section tomberait en panne pour une adresse mal recopiée.
+ * - Un code bien formé que la base ne connaît pas (`?category=knitting`, une catégorie retirée) vaut
+ *   « Toutes » une fois les catégories lues (choix de la session, R6b) : on ne saurait pas quoi
+ *   écrire dans « Aucun projet dans « … » ».
+ * - Tant que les catégories se lisent, le filtre demandé s'applique déjà ; si elles ne se lisent
+ *   pas, il reste appliqué (la section le dit, et propose de le retirer).
+ *
+ * `ready` : le fil peut être lu (l'adresse est connue, et un code demandé est vérifié ou ne peut pas
+ * l'être), pour une seule lecture, déjà filtrée.
+ */
+const useCategoryFilter = () => {
+  const router = useRouter()
+  const hydrated = useHydrated()
+  const raw = firstParam(useLocalSearchParams<{ category?: string | string[] }>().category)
+  const categories = useCategories()
+  const list = categories.data?.categories
+  const asked = hydrated && raw !== undefined && CategoryCode.safeParse(raw).success ? raw : null
+  const unknown = asked !== null && list !== undefined && !list.some((one) => one.code === asked)
+  const category = unknown ? null : asked
+  // Un paramètre qui ne filtre rien (mal formé, ou inconnu de la base) quitte l'adresse : elle dit
+  // ce que montre la page. `setParams` remplace l'adresse, sans page de plus dans l'historique.
+  const stray = hydrated && raw !== undefined && category === null && (asked === null || unknown)
+  useEffect(() => {
+    if (stray) router.setParams({ category: undefined })
+  }, [stray, router])
+
+  return {
+    category,
+    categories,
+    ready: hydrated && (asked === null || !categories.isPending),
+    /** Toucher une pastille : l'adresse change, et la page la suit. Jamais `push` : un filtre n'est pas une page. */
+    choose: (code: string | null) => router.setParams({ category: code ?? undefined }),
+  }
+}
+
+/**
+ * « Récents » : son titre, la rangée des catégories, puis le fil « Découvrir », filtré par la
+ * catégorie choisie.
+ */
+function Recent({ viewerId, overlay }: { viewerId: string; overlay: CardOverlay }) {
+  const { t } = useTranslation()
+  const { category, categories, ready, choose } = useCategoryFilter()
+  const chosen = categoryOf(categories.data?.categories, category)
+  return (
+    <Stack gap="md">
+      <Text variant="heading" heading={2}>
+        {t(($) => $.explore.recent)}
+      </Text>
+      <RecentCategories categories={categories} category={category} onChange={choose} />
+      <DiscoverFeed
+        viewerId={viewerId}
+        overlay={overlay}
+        errorMessage={t(($) => $.explore.recentError)}
+        category={category}
+        ready={ready}
+        {...(category === null
+          ? null
+          : {
+              // Une catégorie sans projet se nomme ; sans son nom (catégories en panne), une
+              // phrase qui ne la nomme pas, plutôt que le code brut.
+              emptyMessage: chosen
+                ? t(($) => $.explore.categoryEmpty, { name: chosen.name })
+                : t(($) => $.tool.emptyFiltered),
+            })}
+      />
+    </Stack>
+  )
+}
+
+type RecentCategoriesProps = {
+  categories: ReturnType<typeof useCategories>
+  /** La catégorie choisie ; `null` : « Toutes ». */
+  category: string | null
+  onChange: (code: string | null) => void
+}
+
+/**
+ * La rangée des catégories de « Récents » : « Toutes », puis chaque catégorie qui a au moins un
+ * projet visible, avec son icône, dans l'ordre de la feuille de publication (celui de l'API). Sur
+ * téléphone, la rangée défile de côté ; sur ordinateur, elle passe à la ligne.
+ *
+ * Pendant la lecture des catégories, rien (la rangée arrive avec le fil, qui se lit en même temps).
+ * En panne, la section le dit, avec « Réessayer » ; si un filtre de l'adresse s'applique, un lien
+ * le retire : on ne reste jamais coincé dans une catégorie.
+ */
+function RecentCategories({ categories, category, onChange }: RecentCategoriesProps) {
+  const { t } = useTranslation()
+  const compact = useLayout().sizeClass === 'compact'
+  const list = categories.data?.categories
+  if (!list) {
+    if (!categories.isError) return null
+    return (
+      <Stack gap="sm">
+        <Notice
+          message={t(($) => $.explore.categoriesError)}
+          action={{ label: t(($) => $.common.retry), onPress: () => void categories.refetch() }}
+        />
+        {category === null ? null : (
+          <TextLink label={t(($) => $.tool.clearFilters)} onPress={() => onChange(null)} />
+        )}
+      </Stack>
+    )
+  }
+  // La catégorie choisie garde sa pastille même sans projet visible : elle reste cochée, et l'on
+  // voit pourquoi la liste est vide.
+  const options = list
+    .filter((one) => one.projectCount > 0 || one.code === category)
+    .map((one) => ({ value: one.code, label: one.name, icon: one.icon }))
+  // Aucune catégorie n'a de projet : une pastille « Toutes » seule ne filtrerait rien.
+  if (options.length === 0) return null
+  return (
+    <FilterPills
+      label={t(($) => $.explore.categoriesLabel)}
+      allLabel={t(($) => $.explore.allCategories)}
+      value={category}
+      options={options}
+      scroll={compact}
+      onChange={onChange}
+    />
   )
 }
 
@@ -251,7 +376,7 @@ function PopularTools() {
       {list.map((tool) => (
         <Tag
           key={tool.slug}
-          label={tool.label}
+          label={tool.name}
           // Le nombre sur ordinateur seulement : sur téléphone, la place va aux noms.
           count={compact ? undefined : tool.projectCount}
           onPress={() => router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })}

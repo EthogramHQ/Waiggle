@@ -24,17 +24,36 @@ export type FeedKind = 'following' | 'discover'
 
 /** Toutes les clés de cache des fils commencent par « feed » : on peut les invalider d'un coup. */
 export const feedQueryKey = ['feed'] as const
-const keyOf = (kind: FeedKind, testers: boolean) => ['feed', kind, testers] as const
+
+/**
+ * La clé de cache d'un fil. R6b : « Découvrir » filtré par une catégorie (Explorer) a la sienne, à
+ * la suite de celle du fil sans filtre : chaque filtre garde ses pages, et invalider le fil sans
+ * filtre relit aussi ses filtres (React Query compare le début des clés). Sans catégorie, la clé
+ * reste celle d'avant R6b. La catégorie y entre dans un objet, jamais en texte nu : une catégorie
+ * nommée « head » aurait sinon la clé de la tête du fil sans filtre (voir useFeedNews).
+ */
+const keyOf = (kind: FeedKind, testers: boolean, category: string | null = null) =>
+  category === null
+    ? (['feed', kind, testers] as const)
+    : (['feed', kind, testers, { category }] as const)
 
 /** Toutes les minutes, l'appli regarde s'il y a du nouveau en haut du fil. */
 const NEWS_INTERVAL_MS = 60_000
 
 // L'adresse d'une page. Le curseur est un texte opaque rendu par l'API avec la page précédente ;
-// URLSearchParams l'encode : il reste un paramètre, sans pouvoir changer le reste de l'adresse.
-const pathOf = (kind: FeedKind, testers: boolean, cursor?: string) => {
+// URLSearchParams l'encode : il reste un paramètre, sans pouvoir changer le reste de l'adresse. La
+// catégorie aussi (R6b) : un code mal formé n'arrive jamais ici (l'écran l'écarte), mais l'API le
+// refuserait de toute façon, sans qu'il puisse sortir de son paramètre.
+const pathOf = (
+  kind: FeedKind,
+  testers: boolean,
+  cursor?: string,
+  category: string | null = null,
+) => {
   const params = new URLSearchParams()
   if (cursor) params.set('cursor', cursor)
   if (kind === 'discover' && testers) params.set('testers', 'true')
+  if (kind === 'discover' && category !== null) params.set('category', category)
   const query = params.toString()
   return `/v1/feed/${kind}${query ? `?${query}` : ''}`
 }
@@ -46,12 +65,16 @@ export const getFollowingPage = async (cursor?: string): Promise<FollowingFeedPa
   return result.data
 }
 
-/** Une page du fil « Découvrir » (testers : seulement les projets qui cherchent des testeurs). */
+/**
+ * Une page du fil « Découvrir » (testers : seulement les projets qui cherchent des testeurs ;
+ * category, R6b : seulement ceux de cette catégorie, en principale ou en seconde).
+ */
 export const getDiscoverPage = async (
   testers: boolean,
   cursor?: string,
+  category: string | null = null,
 ): Promise<DiscoverFeedPage> => {
-  const result = await request(pathOf('discover', testers, cursor), {}, DiscoverFeedPage)
+  const result = await request(pathOf('discover', testers, cursor, category), {}, DiscoverFeedPage)
   if (!result.ok) throw new ApiError(result.error)
   return result.data
 }
@@ -69,11 +92,29 @@ export const useFollowingFeed = () =>
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
 
-/** Hook : le fil « Découvrir », avec ou sans le filtre des testeurs (un cache par choix). */
-export const useDiscoverFeed = ({ testers }: { testers: boolean }) =>
+/** Ce qu'on demande au fil « Découvrir ». */
+export type DiscoverOptions = {
+  /** Seulement les projets qui cherchent des testeurs (le carrousel d'Explorer). */
+  testers: boolean
+  /** R6b : seulement les projets de cette catégorie ; absente ou `null` : sans filtre. */
+  category?: string | null | undefined
+  /**
+   * R6b : faux tant que l'écran ne sait pas encore quel filtre demander (la page web pas encore
+   * hydratée ne connaît pas son adresse) : une seule lecture, déjà filtrée, plutôt qu'une lecture
+   * sans filtre aussitôt jetée. Vrai par défaut.
+   */
+  enabled?: boolean
+}
+
+/**
+ * Hook : le fil « Découvrir », avec ou sans le filtre des testeurs, et depuis R6b avec ou sans une
+ * catégorie (un cache par choix).
+ */
+export const useDiscoverFeed = ({ testers, category = null, enabled = true }: DiscoverOptions) =>
   useInfiniteQuery({
-    queryKey: keyOf('discover', testers),
-    queryFn: ({ pageParam }) => getDiscoverPage(testers, pageParam),
+    queryKey: keyOf('discover', testers, category ?? null),
+    queryFn: ({ pageParam }) => getDiscoverPage(testers, pageParam, category ?? null),
+    enabled,
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
@@ -88,18 +129,25 @@ export const useDiscoverFeed = ({ testers }: { testers: boolean }) =>
  * R6a (décision de Louis du 8/11/2026) : ses propres projets entrent dans son fil, mais ne sont
  * jamais une nouveauté pour lui, ni les notes sur ses projets (leur auteur est celui du projet).
  * `viewerId`, l'identifiant du membre connecté, les laisse hors du compte et des visages.
+ *
+ * R6b : `category`, celle du fil affiché (« Récents » filtré d'Explorer). La tête relue est celle du
+ * même fil filtré, dans son propre cache : comparée à la tête du fil sans filtre, la liste d'une
+ * catégorie (plus ancienne) aurait cru voir arriver tous les projets récents des autres catégories
+ * (« 2 nouveaux projets » annoncés quand seul le filtre change ; relecture du plan, ui-reviewer).
  */
 export const useFeedNews = (
   kind: FeedKind,
   first: FeedItem | undefined,
   testers = false,
   viewerId?: string,
+  category: string | null = null,
 ): FeedNews => {
   const queryClient = useQueryClient()
-  const shown = keyOf(kind, testers)
+  const shown = keyOf(kind, testers, category)
   const head = useQuery({
     queryKey: [...shown, 'head'],
-    queryFn: () => (kind === 'following' ? getFollowingPage() : getDiscoverPage(testers)),
+    queryFn: () =>
+      kind === 'following' ? getFollowingPage() : getDiscoverPage(testers, undefined, category),
     // Au départ, la première page du fil affiché fait l'affaire : pas de requête en double.
     initialData: () => queryClient.getQueryData<InfiniteData<FeedPage>>(shown)?.pages[0],
     initialDataUpdatedAt: () => queryClient.getQueryState(shown)?.dataUpdatedAt,
