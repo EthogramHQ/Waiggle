@@ -1353,7 +1353,7 @@ describe('the daily limit of new « other » tools (R6b, sec-A5)', () => {
   const names = (from: number, count: number) =>
     Array.from({ length: count }, (_, i) => `Outil maison ${from + i}`)
 
-  it('refuses the 31st new « other » tool of a member in a day with 429, counting even malformed requests', async () => {
+  it('refuses the 31st new « other » tool of a member in a day with 429, counting the creations undone with their project', async () => {
     expect(OTHER_TOOLS_PER_DAY).toBe(30)
     // Les créations se comptent avant l'écriture, et une création défaite compte quand même : 15
     // « Autre » créés, puis effacés avec leur projet (ils ne sont plus cités), comptent pour 15.

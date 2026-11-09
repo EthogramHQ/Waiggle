@@ -3,6 +3,11 @@
 // tous différents ferait grossir la table `tool` sans fin. Chaque création compte, même si elle est
 // défaite ensuite (un projet effacé ne rend rien) ; un outil du catalogue ou un « Autre » qui
 // existe déjà n'est pas une création.
+//
+// Ce quota compte APRÈS la validation par Zod, par construction : il compte des noms nouveaux, et
+// il faut des noms validés pour savoir lesquels le sont. Une demande mal formée ne crée rien, n'est
+// donc pas comptée ici ; ce sont les quotas d'écriture des routes (créer, modifier un projet) qui
+// comptent toute demande (relecture de sécurité S1).
 import { OTHER_TOOLS_PER_DAY } from '@ruche/contracts'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 
