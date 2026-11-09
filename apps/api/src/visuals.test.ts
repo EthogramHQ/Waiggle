@@ -683,6 +683,27 @@ describe('describing a photo (R6a)', () => {
     expect(await storedDescriptions()).toEqual([])
   })
 
+  it('still lets me remove a photo of my project removed by the moderation, while describing it answers 409', async () => {
+    // sec-A1 : la règle 7a (je peux toujours retirer ce qui est à moi) vaut pour le DELETE, pas pour
+    // le PATCH. La description publique du PATCH doit le dire elle-même, sans renvoyer au DELETE.
+    const { projectId, visualId } = await projectWithPhoto()
+    await ctx.db
+      .update(schema.project)
+      .set({ removedAt: new Date() })
+      .where(eq(schema.project.id, projectId))
+
+    expect((await describePhoto(projectId, visualId, { description: 'Le frigo' })).status).toBe(409)
+    const doc = (await (await ctx.request('/openapi.json')).json()) as {
+      paths: Record<string, Record<string, { description?: string }>>
+    }
+    const patch = doc.paths['/v1/projects/{id}/visuals/{visualId}']?.patch?.description ?? ''
+    expect(patch).toContain('409')
+    expect(patch).not.toMatch(/removal of a photo/i)
+
+    const res = await sendJson('DELETE', `/v1/projects/${projectId}/visuals/${visualId}`, lea)
+    expect(res.status).toBe(200)
+  })
+
   it('answers « not found » to a malformed photo identifier and to a photo of another project reached through mine', async () => {
     const mine = await projectWithPhoto()
     const maxs = await projectWithPhoto('public', max)

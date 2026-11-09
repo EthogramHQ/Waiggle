@@ -60,8 +60,11 @@ export const explainQueries = async (
   for (const { sql, params } of recorded) {
     // begin, commit, savepoint… n'ont pas de plan ; et PGlite lit lui-même le catalogue des types
     // (pg_catalog) à la première requête : ce n'est pas une requête de l'appli.
-    if (!/^\s*(select|with|insert|update|delete)\b/i.test(sql) || /pg_catalog\./.test(sql)) continue
-    const analyze = /^\s*(select|with)\b/i.test(sql) ? 'analyze, ' : ''
+    // Les parenthèses de tête : Drizzle écrit une union comme « (select …) union all (select …) »
+    // (le fil « Abonnements »), qu'on ne doit pas laisser passer sans plan.
+    if (!/^[\s(]*(select|with|insert|update|delete)\b/i.test(sql) || /pg_catalog\./.test(sql))
+      continue
+    const analyze = /^[\s(]*(select|with)\b/i.test(sql) ? 'analyze, ' : ''
     const { rows } = await client.query(`explain (${analyze}costs off) ${sql}`, params)
     const plan = (rows as { 'QUERY PLAN': string }[]).map((row) => row['QUERY PLAN']).join('\n')
     explained.push({ sql, params, plan })

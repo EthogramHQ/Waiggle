@@ -26,7 +26,7 @@ import {
   TagPage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -986,6 +986,42 @@ describe('one’s own projects in the « following » feed (R6a)', () => {
     expect(page.followsAnyone).toBe(false)
     expect(page.lastReadAt).toBeNull()
     expect(page.nextCursor).toBeNull()
+  })
+
+  it('reads the new projects of the feed through the author index, my own included (sec-S1)', async () => {
+    // « in (suivis union all moi) » doit rester une jointure sur l'index (author_id, published_at),
+    // pas une lecture de toute la table project : on le lit dans le plan, après `analyze` (les
+    // statistiques de PostgreSQL). 500 autres membres, que Max ne suit pas, ont 20 projets chacun,
+    // tous plus récents que ceux de Léa et de Max : lire le fil par date seulement (index
+    // project_public_published_idx) les parcourrait tous ; l'index d'auteur n'en lit que ceux des
+    // deux auteurs voulus. Avec trois auteurs seulement, PostgreSQL préfère le parcours par date.
+    await followMember(leaId, max)
+    await publish(lea, { title: 'Le carnet de Léa' })
+    await publish(max, { title: 'Mon agent de recettes' })
+    await ctx.db.execute(sql`
+      insert into "user" (id, name, email)
+      select 'filler-' || a, 'Membre ' || a, 'filler-' || a || '@example.test'
+      from generate_series(1, 500) as a`)
+    await ctx.db.execute(sql`
+      insert into project (id, author_id, title, pitch, visibility, published_at)
+      select gen_random_uuid(), 'filler-' || (n % 500 + 1), 'Lot ' || n, 'Résumé', 'public',
+             timestamp '2100-01-01' - make_interval(mins => n)
+      from generate_series(1, 10000) as n`)
+    await ctx.db.execute(sql`analyze project`)
+
+    const queries = await explainQueries(ctx.db, () => readFollowing(max))
+
+    // La requête des lignes du fil : la seule qui mêle projets et notes (le mot 'note' en dur).
+    const feedQuery = queries.find(
+      (q) => q.sql.includes('member_follow') && q.sql.includes("'note'"),
+    )
+    expect(feedQuery).toBeDefined()
+    // Les deux index qui commencent par l'auteur conviennent (PostgreSQL choisit entre eux selon
+    // ses statistiques) ; le parcours par date seul, non. Les deux projets des deux auteurs
+    // (Léa, suivie, et Max, le lecteur : la branche « union all ») sortent.
+    expect(feedQuery?.plan).toMatch(/project_author_(published|created)_idx/)
+    expect(feedQuery?.plan).not.toContain('project_public_published_idx')
+    expect(feedQuery?.plan).toContain('rows=2.00')
   })
 
   it('never shows my private projects, not even to me', async () => {

@@ -73,7 +73,11 @@ const describeVisualRoute = createRoute({
   summary: 'Describe a photo of my project',
   description:
     'Sets the description of a photo (250 characters at most, read aloud by screen readers). ' +
-    'An empty text clears it. Same answers as the removal of a photo.',
+    'An empty text clears it. Answers: 200 with the project; 400 for an invalid text; 401 without ' +
+    'a session; 403 for someone else’s public project; 404 for an unknown, private or blocked ' +
+    'project, or a photo that is not in this project; 409 `removed` when the moderation removed my ' +
+    'project (the photo can then still be removed, but no longer described); 413 for a body too ' +
+    'large; 429 when too many changes were made.',
   request: {
     params: z.object({ id: z.string(), visualId: z.string() }),
     body: { required: true, content: { 'application/json': { schema: VisualUpdate } } },
