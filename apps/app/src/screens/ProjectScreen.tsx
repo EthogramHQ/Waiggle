@@ -413,6 +413,8 @@ function ProjectView({ project }: { project: Project }) {
                 <Tag
                   key={tool.slug}
                   label={tool.label}
+                  // R6b : un « Autre » n'a pas de page ; `Tag` l'affiche en texte simple, sans lien.
+                  inCatalogue={tool.inCatalogue}
                   onPress={() =>
                     router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } })
                   }
