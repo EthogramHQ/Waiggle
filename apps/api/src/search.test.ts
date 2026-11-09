@@ -691,7 +691,10 @@ describe('the members found', () => {
     await insertMembers([{ name: 'Zora', handle: 'zora' }])
     expect(names(await search(malik, 'zo'))).toEqual(['Zoé'])
     expect(names(await search(malik, 'in'))).toEqual([])
-    // Les projets et les outils, eux, se trouvent dès 2 caractères.
+    // Les projets et les outils, eux, se trouvent dès 2 caractères. Le groupe Outils ne rend que le
+    // catalogue (R6b) : Zotero y est ajouté, sinon il serait un « Autre », jamais trouvé.
+    await setUpCatalogue()
+    await addCatalogueTool(ctx.db, { name: 'Zotero', family: 'automation' })
     await publish(ines, 'Zoom arrière', { tools: ['Zotero'] })
     const results = await search(malik, 'zo')
     expect(titles(results)).toEqual(['Zoom arrière'])
