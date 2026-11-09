@@ -346,14 +346,17 @@ describe('the « other » tools', () => {
     expect(await others(malik)).toEqual(['Teachable Machine'])
   })
 
-  it('keeps the « other » tools of a blocked member, as the administration pages do', async () => {
-    // Décision 1 de la session : « others » suit la règle des pages d'administration (projets
-    // listés d'un auteur vérifié), sans filtre de blocage. Le nom seul ne montre pas le projet.
+  it('hides the « other » tools only cited by a blocked member, from that member only', async () => {
+    // « others » suit le blocage, comme les fils (décision de la conversation 1 du 9/11 : la
+    // décision 1, sans filtre de blocage, ne vaut que pour les pages d'administration). Un nom
+    // cité seulement par un membre bloqué trahirait sa présence à qui l'a bloqué.
     await publish(ines, 'Un', ['Teachable Machine'])
     later()
     await act.block(inesId, malik)
 
-    expect(await others(malik)).toEqual(['Teachable Machine'])
+    expect(await others(malik)).toEqual([])
+    // Témoin : un autre membre le voit toujours.
+    expect(await others(zoe)).toEqual(['Teachable Machine'])
   })
 
   it('shows 50 of 51 visible « other » tools, and a private one never takes a place', async () => {
