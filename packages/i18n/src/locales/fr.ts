@@ -1466,6 +1466,11 @@ export const fr = {
     // R6b : le filtre par catégorie, sur le groupe Projets.
     allCategories: 'Toutes les catégories',
     categoryChosen: 'Catégorie : {{name}}',
+    /** Une catégorie de l'adresse dont le nom n'est pas encore lu : jamais « Toutes les catégories ». */
+    category: 'Catégorie',
+    /** L'onglet « Projets » vidé par la catégorie choisie, et de quoi la retirer. */
+    categoryEmpty: 'Aucun projet trouvé dans cette catégorie.',
+    clearCategory: 'Chercher dans toutes les catégories',
   },
   // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
   tools: {

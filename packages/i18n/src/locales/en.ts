@@ -1232,6 +1232,9 @@ export const en: Translation = {
     projectWithStatus: '{{title}}, {{status}}',
     allCategories: 'All categories',
     categoryChosen: 'Category: {{name}}',
+    category: 'Category',
+    categoryEmpty: 'No project found in this category.',
+    clearCategory: 'Search all categories',
   },
   tools: {
     title: 'Tools',

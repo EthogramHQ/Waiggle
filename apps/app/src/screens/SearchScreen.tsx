@@ -303,7 +303,7 @@ export function SearchScreen() {
     ? chosen.name
     : category === null
       ? t(($) => $.search.allCategories)
-      : t(($) => $.tool.categoryLabel)
+      : t(($) => $.search.category)
   // Rien trouvé dans cette catégorie, alors que l'onglet « Projets » est choisi : la liste serait
   // vide, sans un mot ; on le dit, avec de quoi retirer le filtre.
   const projectsFilteredOut =
@@ -451,8 +451,8 @@ export function SearchScreen() {
         {projectsFilteredOut ? (
           <StateMessage
             kind="empty"
-            message={t(($) => $.tool.emptyFiltered)}
-            actions={[{ label: t(($) => $.tool.clearFilters), onPress: () => chooseAll() }]}
+            message={t(($) => $.search.categoryEmpty)}
+            actions={[{ label: t(($) => $.search.clearCategory), onPress: () => chooseAll() }]}
           />
         ) : null}
 

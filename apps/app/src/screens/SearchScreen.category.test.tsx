@@ -193,9 +193,9 @@ describe('SearchScreen, the category filter, beyond the order (R6b)', () => {
     await renderWithProviders(<SearchScreen />)
 
     await fireEvent.press(await screen.findByRole('radio', { name: /^Projets/ }))
-    expect(screen.getByText(fr.t(($) => $.tool.emptyFiltered))).toBeTruthy()
+    expect(screen.getByText(fr.t(($) => $.search.categoryEmpty))).toBeTruthy()
     jest.mocked(focusWithoutScroll).mockClear()
-    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.tool.clearFilters) }))
+    await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.search.clearCategory) }))
 
     expect(mockParams).toEqual({ q: 'carn' })
     expect(await screen.findByText('Carnet')).toBeTruthy()
