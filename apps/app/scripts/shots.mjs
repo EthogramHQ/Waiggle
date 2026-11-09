@@ -39,6 +39,7 @@ import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { fr } from '../../../packages/i18n/src/locales/fr.ts'
 import { blockedPageOf, blockedSam } from '../src/testing/blocks.ts'
+import { categoryList } from '../src/testing/categories.ts'
 import {
   leaEmailPreferences,
   malformedToken,
@@ -314,13 +315,6 @@ const fromOthers = [
   },
   { ...longProject, id: '1a2b3c4d-0000-4000-8000-000000000004', author: ines },
 ]
-// La page d'une étiquette : deux projets différents qui la portent, de deux membres (photosProject
-// et recipesProject sont le même projet, l'un avec photos : la page montrait deux fois le même).
-const claudeCode = {
-  slug: 'claude-code',
-  label: 'Claude Code',
-  projects: [summaryOf(fromOthers[0]), summaryOf(recipesProject)],
-}
 // R4 : le total des réactions de chaque carte (« ✦ 49 »), varié : un grand, aucun (la carte ne
 // montre alors rien), un petit, un moyen.
 const feedTotals = [49, 0, 3, 12]
@@ -809,18 +803,41 @@ const oldProject = {
   notes: [],
 }
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
-// `R3-Recherche`. Les outils de tous les projets publics (GET /v1/tools), du plus utilisé au moins
-// utilisé : « Outils populaires » en prend les premiers, « Tous les outils » les retrie par nom.
-const toolList = [
-  { slug: 'claude', label: 'Claude', projectCount: 41 },
-  { slug: 'chatgpt', label: 'ChatGPT', projectCount: 38 },
-  { slug: 'lovable', label: 'Lovable', projectCount: 34 },
-  { slug: 'python', label: 'Python', projectCount: 22 },
-  { slug: 'mistral', label: 'Mistral', projectCount: 12 },
-  { slug: 'home-assistant', label: 'Home Assistant', projectCount: 9 },
-  { slug: 'notion', label: 'Notion', projectCount: 7 },
-  { slug: 'glide', label: 'Glide', projectCount: 6 },
-]
+// `R3-Recherche`. R6b : le catalogue normé (GET /v1/tools, planche `R3-Outils`), du plus utilisé
+// au moins utilisé : « Outils populaires » et « Les plus utilisés » en prennent les premiers, « De A
+// à Z » les retrie par nom. Toutes les familles, des autres noms (alias), un outil sans projet
+// (Zapier), et Lovable à 60 projets pour « Afficher la suite » sur sa page.
+const catalogueTools = [
+  { slug: 'claude', name: 'Claude', family: 'assistant', aliases: [], projectCount: 41 },
+  { slug: 'lovable', name: 'Lovable', family: 'no-code', aliases: [], projectCount: 60 },
+  {
+    slug: 'chatgpt',
+    name: 'ChatGPT',
+    family: 'assistant',
+    aliases: ['Chat GPT'],
+    projectCount: 38,
+  },
+  { slug: 'python', name: 'Python', family: 'development', aliases: [], projectCount: 22 },
+  { slug: 'mistral', name: 'Mistral', family: 'assistant', aliases: ['Le Chat'], projectCount: 12 },
+  { slug: 'midjourney', name: 'Midjourney', family: 'creation', aliases: [], projectCount: 10 },
+  {
+    slug: 'home-assistant',
+    name: 'Home Assistant',
+    family: 'smart-home',
+    aliases: ['HASS'],
+    projectCount: 9,
+  },
+  { slug: 'notion', name: 'Notion', family: 'no-code', aliases: [], projectCount: 7 },
+  { slug: 'glide', name: 'Glide', family: 'no-code', aliases: [], projectCount: 6 },
+  { slug: 'make', name: 'Make', family: 'automation', aliases: ['Make.com'], projectCount: 4 },
+  { slug: 'arduino', name: 'Arduino', family: 'hardware', aliases: [], projectCount: 3 },
+  { slug: 'claude-code', name: 'Claude Code', family: 'development', aliases: [], projectCount: 2 },
+  { slug: 'zapier', name: 'Zapier', family: 'automation', aliases: [], projectCount: 0 },
+].sort((a, b) => b.projectCount - a.projectCount)
+// Les « Autre » des projets visibles (« Pas encore dans le catalogue ») : deux noms tapés par des
+// membres, en texte simple.
+const otherTools = [{ name: 'Teachable Machine' }, { name: 'Ma boîte à musique' }]
+const toolList = { tools: catalogueTools, others: otherTools }
 // La recherche « carn » (GET /v1/search?q=carn) : deux projets (celui de Léa, testable, trouvé par
 // son titre ; celui de Tante Odile, trouvé dans sa description, avec l'extrait), un membre et un
 // outil. Les planches nomment Léa « Léa Moreau » ; son identifiant reste le sien (pas de pastille
@@ -857,8 +874,141 @@ const searchResultsOf = {
   carn: {
     projects: { items: [coffeeProject, biscotteProject], more: false },
     members: { items: [camille], more: false },
-    tools: { items: [toolList.find((t) => t.slug === 'notion')], more: false },
+    tools: { items: [catalogueTools.find((t) => t.slug === 'notion')], more: false },
   },
+}
+// R6b : la page d'un outil (GET /v1/tags/{slug}, planches `R6-Outil` et `R6-Outil-Desktop`). Les
+// projets de Lovable : 60, de quatre membres (pas Léa), aux titres, statuts et catégories variés, du
+// plus récent au plus ancien ; 50 par page, puis « Afficher la suite ». Un projet est classé
+// « Autre » et cite un autre outil (« Teachable Machine », pas encore au catalogue).
+const toolDescriptions = {
+  claude: 'Un assistant qui répond, résume et écrit à partir de ce qu’on lui demande.',
+  lovable: 'Construit une application web à partir d’une description écrite.',
+  chatgpt: 'Un assistant conversationnel qui répond, rédige et explique.',
+  python: 'Un langage de programmation répandu, pour les scripts comme les applications.',
+  'home-assistant': 'Pilote les objets connectés de la maison depuis un seul endroit.',
+}
+const toolSites = {
+  lovable: 'https://lovable.dev/',
+  python: 'https://www.python.org/',
+  'home-assistant': 'https://www.home-assistant.io/',
+}
+// Les anciennes adresses d'étiquettes rattachées au catalogue (`/tags/chat-gpt` → `/tags/chatgpt`).
+const toolRedirects = { 'chat-gpt': 'chatgpt', hass: 'home-assistant' }
+const toolTitles = [
+  'Le potager qui s’arrose seul',
+  'Quiz des capitales',
+  'Carnet de randonnées',
+  'Le budget des vacances',
+  'Mon herbier numérique',
+  'Les devoirs de Jules',
+  'Agenda du club de foot',
+  'Recettes de grand-mère',
+  'Le traducteur de menus',
+  'Suivi des croquettes',
+  'La playlist du dimanche',
+  'Mes plantes et la météo',
+]
+const toolStatuses = ['testable', 'done', 'building', 'testable', 'idea']
+const toolCategories = [
+  ['cooking', null],
+  ['home-garden', 'science'],
+  ['animals', null],
+  ['learning', 'family'],
+  ['games', null],
+  ['travel', 'money'],
+]
+const toolAuthors = [ines, max, odile, hugo]
+const toolProjectOf = (slug, index) => {
+  const [primaryCategory, secondaryCategory] = toolCategories[index % toolCategories.length]
+  const round = Math.floor(index / toolTitles.length)
+  const title = toolTitles[index % toolTitles.length]
+  return {
+    ...summaryOf(recipesProject),
+    id: `7b6e5d4c-${String(index).padStart(4, '0')}-4000-8000-${catalogueTools
+      .findIndex((t) => t.slug === slug)
+      .toString(16)
+      .padStart(4, '0')}00000000`,
+    author: toolAuthors[index % toolAuthors.length],
+    title: round === 0 ? title : `${title} (${round + 1})`,
+    status: toolStatuses[index % toolStatuses.length],
+    primaryCategory,
+    secondaryCategory,
+    tools: [
+      { label: catalogueTools.find((t) => t.slug === slug)?.name ?? slug, slug, inCatalogue: true },
+    ],
+  }
+}
+// Le projet classé « Autre », qui cite aussi un « Autre » (texte simple, sans lien).
+const otherCategoryProject = {
+  ...summaryOf(recipesProject),
+  id: '7b6e5d4c-9999-4000-8000-000000000001',
+  author: max,
+  title: 'La machine à reconnaître les oiseaux',
+  pitch: 'Une caméra au jardin dit quel oiseau passe.',
+  status: 'testable',
+  primaryCategory: 'other',
+  secondaryCategory: null,
+  tools: [
+    { label: 'Lovable', slug: 'lovable', inCatalogue: true },
+    { label: 'Teachable Machine', slug: 'teachable-machine', inCatalogue: false },
+  ],
+}
+/** Tous les projets d'un outil (le plus récent d'abord) ; Lovable : 60, dont celui classé « Autre ». */
+const toolProjects = (tool) => {
+  const count = Math.min(tool.projectCount, 60)
+  const projects = Array.from({ length: count }, (_, index) => toolProjectOf(tool.slug, index))
+  if (tool.slug === 'lovable') projects[1] = otherCategoryProject
+  return projects
+}
+/**
+ * La réponse de GET /v1/tags/{slug}?status=&category=&cursor= : l'outil, les catégories de ses
+ * projets (avec le filtre du statut, sans celui de la catégorie), 50 projets, la page suivante. Un
+ * « Autre » ou un nom inconnu : null (404 `not_found`).
+ */
+const toolPageOf = (requested, params) => {
+  const slug = toolRedirects[requested] ?? requested
+  const tool = catalogueTools.find((t) => t.slug === slug)
+  if (!tool) return null
+  const status = params.get('status')
+  const category = params.get('category')
+  const byStatus = toolProjects(tool).filter((p) => !status || p.status === status)
+  const counts = new Map()
+  for (const project of byStatus) {
+    for (const code of [project.primaryCategory, project.secondaryCategory]) {
+      if (code) counts.set(code, (counts.get(code) ?? 0) + 1)
+    }
+  }
+  const shown = byStatus.filter(
+    (p) => !category || p.primaryCategory === category || p.secondaryCategory === category,
+  )
+  const start = params.get('cursor') === 'page-2' ? 50 : 0
+  return {
+    tool: {
+      slug: tool.slug,
+      name: tool.name,
+      family: tool.family,
+      description: toolDescriptions[tool.slug] ?? null,
+      siteUrl: toolSites[tool.slug] ?? null,
+      projectCount: tool.projectCount,
+    },
+    categories: [...counts].map(([code, projectCount]) => ({ code, projectCount })),
+    projects: shown.slice(start, start + 50),
+    nextCursor: start === 0 && shown.length > 50 ? 'page-2' : null,
+  }
+}
+// Les nombres de GET /v1/categories : vraisemblables, « Autre » compris (un projet à ranger).
+const categoryCounts = {
+  cooking: 14,
+  'home-garden': 11,
+  animals: 9,
+  learning: 8,
+  games: 6,
+  travel: 5,
+  science: 4,
+  family: 4,
+  money: 3,
+  other: 1,
 }
 // Aucun résultat (« carnaval ») : les trois groupes, vides.
 const emptySearchResults = {
@@ -1483,7 +1633,20 @@ const fakeApi = (
     // « Suspendre » (/suspend?member=) la lit, et devient « Lever » pour Karim.
     if (pathname === `/v1/members/${samMember.id}`) return json(200, moderatedPage(samPage, admin))
     if (pathname === `/v1/members/${karim.id}`) return json(200, moderatedPage(karimPage, admin))
-    if (pathname === '/v1/tags/claude-code') return json(200, claudeCode)
+    // R6b : la page d'un outil du catalogue, filtrée par `?status=` et `?category=` ; un « Autre » ou
+    // un nom inconnu répond 404, comme l'API.
+    if (pathname.startsWith('/v1/tags/')) {
+      const page = toolPageOf(
+        decodeURIComponent(pathname.slice('/v1/tags/'.length)),
+        url.searchParams,
+      )
+      return page ? json(200, page) : json(404, { error: { code: 'not_found', message: '' } })
+    }
+    // R6b : les catégories, dans l'ordre de la feuille, avec le nombre de projets visibles.
+    if (pathname === '/v1/categories') {
+      const english = (route.request().headers()['accept-language'] ?? '').startsWith('en')
+      return json(200, categoryList(english ? 'en' : 'fr', categoryCounts))
+    }
     if (pathname === '/v1/feed/following') return json(200, followingFeed(feed))
     // « Marquer le fil lu » (R4) : l'appli l'envoie quand la première page s'affiche. La page
     // garde la date lue au début de la visite, donc la capture ne change pas : 204, rien de gardé.
@@ -1588,7 +1751,7 @@ const fakeApi = (
     // recherche, 5 au plus, comme l'API.
     // Tranche R3 : la liste des outils d'Explorer, et la recherche par mots. « carn » trouve deux
     // projets, un membre et un outil ; tout autre texte (« carnaval ») ne trouve rien.
-    if (pathname === '/v1/tools') return json(200, { tools: toolList })
+    if (pathname === '/v1/tools') return json(200, toolList)
     if (pathname === '/v1/search') {
       const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
       // « quota » : le quota de recherches est dépassé (page `recherche-429`).
