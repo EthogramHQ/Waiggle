@@ -332,7 +332,7 @@ export const createApp = ({
   app.route('/', projectRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', visualRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', memberRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', tagRoutes({ db, publicApiUrl }))
+  app.route('/', tagRoutes({ db, limiter, publicApiUrl }))
   // La recherche par mots et la liste des outils (tranche R3).
   app.route('/', searchRoutes({ db, limiter, publicApiUrl }))
   app.route('/', toolRoutes({ db, limiter }))
