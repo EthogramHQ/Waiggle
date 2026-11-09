@@ -32,8 +32,16 @@ const TEXT = {
   category: fr.t(($) => $.project.form.category),
   ok: fr.t(($) => $.project.form.ok),
   tools: fr.t(($) => $.project.form.tools),
+  // Le nom lu d'une suggestion reprend la ligne affichée (ui-C3) : « Claude, Assistant IA · 41
+  // projets » ; tous les outils de ce test sont de la famille « assistant ».
   suggestion: (name: string, count: number) =>
-    fr.t(($) => $.project.form.toolSuggestion, { name, count }),
+    fr.t(($) => $.tools.withCount, {
+      label: name,
+      projects: fr.t(($) => $.tools.detail, {
+        family: fr.t(($) => $.tools.family.assistant),
+        projects: fr.t(($) => $.tools.projects, { count }),
+      }),
+    }),
   add: (name: string) => fr.t(($) => $.project.form.addTool, { name }),
   addOther: (name: string) => fr.t(($) => $.project.form.addOtherTool, { name }),
   otherSpoken: (name: string) => fr.t(($) => $.tool.otherSpoken, { name }),
