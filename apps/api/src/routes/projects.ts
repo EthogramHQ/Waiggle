@@ -12,7 +12,12 @@ import { categoriesExist } from '../projects/categories'
 import { loadVisibleProject, mediaKeysOf, projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { chargeOtherTools } from '../tools/quota'
-import { countNewOtherTools, resolveTools } from '../tools/resolve'
+import {
+  countNewOtherTools,
+  NO_FREE_TOOL_SLUG,
+  noFreeToolSlug,
+  resolveTools,
+} from '../tools/resolve'
 import { dropOrphanOthers, legacyToolColumns, replaceProjectTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -169,33 +174,37 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
     // Une transaction : le projet, ses outils et les « Autre » créés pour lui s'écrivent ensemble,
     // ou pas du tout.
-    const created = await db.transaction(async (tx) => {
-      const resolved = await resolveTools(tx, toolNames)
-      await tx.insert(schema.project).values({
-        id,
-        authorId: user.id,
-        title: input.title,
-        pitch: input.pitch,
-        description: input.description ?? '',
-        status: input.status ?? 'idea',
-        visibility,
-        demoUrl: input.demoUrl ?? null,
-        // Les anciennes colonnes de texte restent écrites jusqu'en R7 (retour possible à R6a).
-        ...legacyToolColumns(resolved.tools),
-        // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
-        // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
-        primaryCategory: input.primaryCategory,
-        secondaryCategory: input.secondaryCategory ?? null,
-        difficulty: input.difficulty ?? null,
-        startedOn: input.startedOn ?? null,
-        prompts: input.prompts ?? [],
-        // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
-        // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
-        publishedAt: visibility === 'public' ? new Date() : null,
+    const created = await db
+      .transaction(async (tx) => {
+        const resolved = await resolveTools(tx, toolNames)
+        await tx.insert(schema.project).values({
+          id,
+          authorId: user.id,
+          title: input.title,
+          pitch: input.pitch,
+          description: input.description ?? '',
+          status: input.status ?? 'idea',
+          visibility,
+          demoUrl: input.demoUrl ?? null,
+          // Les anciennes colonnes de texte restent écrites jusqu'en R7 (retour possible à R6a).
+          ...legacyToolColumns(resolved.tools),
+          // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
+          // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
+          primaryCategory: input.primaryCategory,
+          secondaryCategory: input.secondaryCategory ?? null,
+          difficulty: input.difficulty ?? null,
+          startedOn: input.startedOn ?? null,
+          prompts: input.prompts ?? [],
+          // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
+          // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
+          publishedAt: visibility === 'public' ? new Date() : null,
+        })
+        await replaceProjectTools(tx, id, resolved.tools)
+        return resolved.created
       })
-      await replaceProjectTools(tx, id, resolved.tools)
-      return resolved.created
-    })
+      .catch(noFreeToolSlug)
+    // sec-B4 : plus d'adresse libre pour un nouvel « Autre » : la demande est refusée, rien n'est écrit.
+    if (created === NO_FREE_TOOL_SLUG) return c.json(errorBody(languageOf(c), 'validation'), 400)
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (created > counted) await chargeOtherTools(limiter, user.id, created - counted)
 
@@ -258,83 +267,88 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // pas même le titre envoyé avec lui.
     // Combien de nouveaux « Autre » la transaction a vraiment créés (rempli dans la transaction).
     let createdHere = 0
-    const outcome = await db.transaction(async (tx) => {
-      // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
-      // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
-      const [locked] = await tx
-        .select({
-          removedAt: schema.project.removedAt,
-          primaryCategory: schema.project.primaryCategory,
-          secondaryCategory: schema.project.secondaryCategory,
-        })
-        .from(schema.project)
-        .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
-        .for('update')
-      // La garde (projectAccess) a lu le projet AVANT cette transaction : la modération a pu le
-      // retirer, ou son auteur le supprimer, entre-temps. On relit donc son état ici, sous le
-      // verrou. PostgreSQL travaille en READ COMMITTED : un « SELECT … FOR UPDATE » qui a dû attendre
-      // la fin d'une autre écriture sur la ligne rend sa version la plus récente, déjà validée.
-      // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
-      if (!locked) return 'gone' as const
-      if (locked.removedAt !== null) return 'removed' as const
-      // Les catégories qui resteront après la modification : celle du corps, sinon celle déjà
-      // enregistrée (lue sous le verrou, donc sûre). Le contrat ne peut comparer que ce que le corps
-      // contient ; ici on compare avec l'enregistré (sec-M2). Seule une modification qui touche une
-      // catégorie est contrôlée : passer en « Privé » un ancien projet sans catégorie reste permis.
-      if (changes.primaryCategory !== undefined || changes.secondaryCategory !== undefined) {
-        // Un code bien formé mais inconnu : 400 `unknown_category` (la clé étrangère le refuserait aussi).
-        if (!(await categoriesExist(tx, [changes.primaryCategory, changes.secondaryCategory]))) {
-          return 'unknown_category' as const
-        }
-        const primary = changes.primaryCategory ?? locked.primaryCategory
-        const second =
-          changes.secondaryCategory !== undefined
-            ? changes.secondaryCategory
-            : locked.secondaryCategory
-        // Une seconde sans principale (ancien projet sans catégorie, rien dans le corps).
-        if (second !== null && primary === null) return 'category_required' as const
-        if (second !== null && second === primary) return 'same_category' as const
-      }
-      if (changes.visualOrder !== undefined) {
-        const gallery = await tx
-          .select({ id: schema.projectMedia.id })
-          .from(schema.projectMedia)
-          .where(
-            and(eq(schema.projectMedia.projectId, id), eq(schema.projectMedia.slot, 'gallery')),
-          )
-        // Exactement les photos de la galerie, chacune une fois (le contrat a déjà vérifié
-        // qu'aucune n'apparaît deux fois) : ni une de moins, ni une d'ailleurs.
-        const current = new Set(gallery.map((m) => m.id))
-        const order = changes.visualOrder
-        if (order.length !== current.size || !order.every((visualId) => current.has(visualId))) {
-          return 'invalid_order' as const
-        }
-        for (const [position, visualId] of order.entries()) {
-          await tx
-            .update(schema.projectMedia)
-            .set({ position })
-            .where(and(eq(schema.projectMedia.id, visualId), eq(schema.projectMedia.projectId, id)))
-        }
-      }
-      // Les outils : reliés au catalogue, écrits dans project_tool, anciennes colonnes comprises.
-      let toolColumns: ReturnType<typeof legacyToolColumns> | undefined
-      if (changes.tools !== undefined) {
-        const resolved = await resolveTools(tx, changes.tools)
-        createdHere = resolved.created
-        toolColumns = legacyToolColumns(resolved.tools)
-        await replaceProjectTools(tx, id, resolved.tools)
-      }
-      const fullSet = { ...set, ...toolColumns }
-      if (Object.keys(fullSet).length > 0) {
-        // Double précaution : la condition « dont l'auteur est le membre » est répétée dans la
-        // requête, même si ownProject l'a déjà vérifiée (au cas où le code changerait un jour).
-        await tx
-          .update(schema.project)
-          .set(fullSet)
+    const outcome = await db
+      .transaction(async (tx) => {
+        // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
+        // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
+        const [locked] = await tx
+          .select({
+            removedAt: schema.project.removedAt,
+            primaryCategory: schema.project.primaryCategory,
+            secondaryCategory: schema.project.secondaryCategory,
+          })
+          .from(schema.project)
           .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
-      }
-      return 'ok' as const
-    })
+          .for('update')
+        // La garde (projectAccess) a lu le projet AVANT cette transaction : la modération a pu le
+        // retirer, ou son auteur le supprimer, entre-temps. On relit donc son état ici, sous le
+        // verrou. PostgreSQL travaille en READ COMMITTED : un « SELECT … FOR UPDATE » qui a dû attendre
+        // la fin d'une autre écriture sur la ligne rend sa version la plus récente, déjà validée.
+        // Ce qui est lu ici ne peut donc plus changer avant la fin de la transaction.
+        if (!locked) return 'gone' as const
+        if (locked.removedAt !== null) return 'removed' as const
+        // Les catégories qui resteront après la modification : celle du corps, sinon celle déjà
+        // enregistrée (lue sous le verrou, donc sûre). Le contrat ne peut comparer que ce que le corps
+        // contient ; ici on compare avec l'enregistré (sec-M2). Seule une modification qui touche une
+        // catégorie est contrôlée : passer en « Privé » un ancien projet sans catégorie reste permis.
+        if (changes.primaryCategory !== undefined || changes.secondaryCategory !== undefined) {
+          // Un code bien formé mais inconnu : 400 `unknown_category` (la clé étrangère le refuserait aussi).
+          if (!(await categoriesExist(tx, [changes.primaryCategory, changes.secondaryCategory]))) {
+            return 'unknown_category' as const
+          }
+          const primary = changes.primaryCategory ?? locked.primaryCategory
+          const second =
+            changes.secondaryCategory !== undefined
+              ? changes.secondaryCategory
+              : locked.secondaryCategory
+          // Une seconde sans principale (ancien projet sans catégorie, rien dans le corps).
+          if (second !== null && primary === null) return 'category_required' as const
+          if (second !== null && second === primary) return 'same_category' as const
+        }
+        if (changes.visualOrder !== undefined) {
+          const gallery = await tx
+            .select({ id: schema.projectMedia.id })
+            .from(schema.projectMedia)
+            .where(
+              and(eq(schema.projectMedia.projectId, id), eq(schema.projectMedia.slot, 'gallery')),
+            )
+          // Exactement les photos de la galerie, chacune une fois (le contrat a déjà vérifié
+          // qu'aucune n'apparaît deux fois) : ni une de moins, ni une d'ailleurs.
+          const current = new Set(gallery.map((m) => m.id))
+          const order = changes.visualOrder
+          if (order.length !== current.size || !order.every((visualId) => current.has(visualId))) {
+            return 'invalid_order' as const
+          }
+          for (const [position, visualId] of order.entries()) {
+            await tx
+              .update(schema.projectMedia)
+              .set({ position })
+              .where(
+                and(eq(schema.projectMedia.id, visualId), eq(schema.projectMedia.projectId, id)),
+              )
+          }
+        }
+        // Les outils : reliés au catalogue, écrits dans project_tool, anciennes colonnes comprises.
+        let toolColumns: ReturnType<typeof legacyToolColumns> | undefined
+        if (changes.tools !== undefined) {
+          const resolved = await resolveTools(tx, changes.tools)
+          createdHere = resolved.created
+          toolColumns = legacyToolColumns(resolved.tools)
+          await replaceProjectTools(tx, id, resolved.tools)
+        }
+        const fullSet = { ...set, ...toolColumns }
+        if (Object.keys(fullSet).length > 0) {
+          // Double précaution : la condition « dont l'auteur est le membre » est répétée dans la
+          // requête, même si ownProject l'a déjà vérifiée (au cas où le code changerait un jour).
+          await tx
+            .update(schema.project)
+            .set(fullSet)
+            .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
+        }
+        return 'ok' as const
+      })
+      .catch(noFreeToolSlug)
+    if (outcome === NO_FREE_TOOL_SLUG) return c.json(errorBody(languageOf(c), 'validation'), 400)
     // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
     if (createdHere > counted) await chargeOtherTools(limiter, user.id, createdHere - counted)
     if (outcome === 'gone') return notFound(c)
