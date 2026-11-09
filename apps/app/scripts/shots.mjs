@@ -2414,6 +2414,39 @@ const pages = [
       await page.getByRole('checkbox', { name: /^Sciences et espace/ }).click()
     },
   },
+  // R6b : « Autre » cochée (son aide sous les cases) et un nom absent du catalogue, ajouté comme
+  // autre outil (sa pastille marquée, l'aide sous le champ).
+  {
+    name: 'publier-categorie-autre',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
+      await page.getByRole('checkbox', { name: /^Autre/ }).click()
+      await page.getByRole('combobox', { name: 'Outils' }).fill('Teachable Machine')
+      await page.getByRole('option', { name: /comme autre outil/ }).click()
+    },
+  },
+  // R6b : les catégories en panne (GET /v1/categories en 500) : le message et « Réessayer » à leur
+  // place, les outils toujours là.
+  {
+    name: 'publier-categorie-erreur',
+    path: '/projects/new',
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/v1/categories',
+        (route) =>
+          route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'internal', message: '' } }),
+          }),
+      )
+      await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
+      await page.getByRole('button', { name: 'Réessayer' }).first().waitFor({ timeout: 15_000 })
+    },
+  },
   // R6a : un titre tapé, puis « Annuler » : « Abandonner ce projet ? » par-dessus la feuille. (Pas
   // Échap : en CI, la touche pouvait arriver avant que la feuille l'écoute, et rien ne s'ouvrait.)
   {

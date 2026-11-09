@@ -6,10 +6,10 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs personnes y
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes des composants viennent de l'appli.
-import type { ProjectCategory } from '@ruche/contracts'
+import { PROJECT_CATEGORIES, type ProjectCategory } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { categoryOption, categoryOptions } from '../projects/categories'
+import { categoryOption } from '../projects/categories'
 import { CategoryPicker } from '../ui/CategoryPicker'
 import { FollowButton } from '../ui/FollowButton'
 import { MonthField } from '../ui/MonthField'
@@ -105,7 +105,8 @@ const useSampleTexts = () => {
     format.format(new Date(Date.UTC(2000, index, 1))),
   )
   return {
-    options: categoryOptions(t),
+    // R6b : les catégories de départ, tant que ces exemples n'ont pas les catégories de l'API.
+    options: PROJECT_CATEGORIES.map((value) => categoryOption(t, value)),
     picker: {
       label: t(($) => $.project.form.category),
       hint: t(($) => $.project.form.categoryRule),
