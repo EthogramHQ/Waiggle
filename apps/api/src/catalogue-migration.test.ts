@@ -13,7 +13,13 @@
 // d'après ne sont pas celles du schéma typé.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CATEGORY_ICON_CHOICES, foldTool, PROJECT_CATEGORIES, toolSlug } from '@ruche/contracts'
+import {
+  CATEGORY_ICON_CHOICES,
+  foldTool,
+  PROJECT_CATEGORIES,
+  ToolSlug,
+  toolSlug,
+} from '@ruche/contracts'
 import { type Database, defaultMigrationsFolder } from '@ruche/db'
 import { createTestPgliteDb } from '@ruche/db/pglite'
 import { type SQL, sql } from 'drizzle-orm'
@@ -108,6 +114,16 @@ const PROJECTS = {
     visibility: 'public',
     createdAt: '2026-01-10T10:00:00.000Z',
     tools: [] as string[],
+  },
+  // sec-B3 : « Claude 2 » a l'adresse claude-2 ; « Claude ✨ » a l'adresse claude, prise par le
+  // catalogue, et son premier suffixe libre semblait claude-2 : deux fois la même adresse, et la
+  // migration s'arrêtait (23505). sec-A1 : 40 emoji, une adresse qui dépassait 200 caractères.
+  collide: {
+    id: '00000000-0000-4000-8000-000000000007',
+    author: 'max',
+    visibility: 'public',
+    createdAt: '2026-01-12T10:00:00.000Z',
+    tools: ['Claude 2', `Claude ${SPARKLE}`, String.fromCodePoint(0x1f916).repeat(40)],
   },
 }
 const FAVOURITES = { lea: ['Cursor', 'Mon robot maison'], max: ['claude code', 'CHAT GPT'] }
@@ -338,6 +354,23 @@ describe('the switch of the former tool labels (migration 0016)', () => {
     expect(await rows(sql`select id from project`)).toHaveLength(
       Object.keys(PROJECTS).length + (aliasCase ? 1 : 0),
     )
+  })
+
+  it('gives « Claude 2 » and « Claude ✨ » two different addresses, and 40 emoji a bounded one', async () => {
+    const tools = await allTools()
+    const linked = await projectTools(PROJECTS.collide.id)
+    const [two, sparkle, robots] = PROJECTS.collide.tools.map((label, i) =>
+      tools.find((t) => t.id === linked[i]?.tool_id && t.folded === foldTool(label)),
+    )
+
+    expect(two).toMatchObject({ status: 'other', slug: 'claude-2' })
+    expect(sparkle?.status).toBe('other')
+    expect(sparkle?.slug).not.toBe(two?.slug)
+    expect(sparkle?.slug).toMatch(/^claude-\d+$/)
+    // Les adresses restent uniques, et chacune passe ToolSlug, que l'API vérifie en sortie.
+    expect(new Set(tools.map((t) => t.slug)).size).toBe(tools.length)
+    expect(robots?.slug).toBe(toolSlug(PROJECTS.collide.tools[2] ?? ''))
+    for (const tool of tools) expect(ToolSlug.safeParse(tool.slug).success, tool.slug).toBe(true)
   })
 
   it('keeps the former tool columns as they were, and drops time_spent', async () => {

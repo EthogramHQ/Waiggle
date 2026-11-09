@@ -213,22 +213,39 @@ UPDATE r6b_label l SET tool_id = COALESCE(
 -- Étape 3 : les libellés restants deviennent des « Autre », un seul par nom replié. DISTINCT ON garde,
 -- pour chaque nom, le libellé du plus ancien projet LISTÉ (un projet privé ne donne pas son nom,
 -- jur-T14), sinon du plus ancien ; l'outil prend la date de ce projet, pour compter « en attente
--- depuis plus d'une semaine ». Sans famille, sans auteur (created_by reste nul, sec-A5). L'adresse
--- reçoit un suffixe -2, -3… si elle existe déjà (un autre outil, ou un autre nom replié qui donne la
--- même adresse).
-INSERT INTO "tool" ("id", "slug", "name", "folded", "status", "family", "description_fr", "description_en", "site_url", "created_at", "created_by", "admitted_at")
-SELECT gen_random_uuid(),
-  CASE WHEN o.taken + o.rn > 1 THEN o.slug || '-' || (o.taken + o.rn) ELSE o.slug END,
-  o.name, o.folded, 'other', NULL, NULL, NULL, NULL, o.at, NULL, NULL
-FROM (
-  SELECT n.*, row_number() OVER (PARTITION BY n.slug ORDER BY n.folded) AS rn,
-    (SELECT count(*) FROM "tool" t WHERE t.slug = n.slug) AS taken
-  FROM (
+-- depuis plus d'une semaine ». Sans famille, sans auteur (created_by reste nul, sec-A5).
+--
+-- L'adresse : la première libre parmi « claude », « claude-2 », « claude-3 »… Un bloc DO est un petit
+-- programme PL/pgSQL que PostgreSQL exécute une fois : il crée les « Autre » UN PAR UN, si bien que
+-- l'adresse prise par l'un compte pour le suivant. Compter les adresses déjà prises (l'ancienne
+-- version) ne suffisait pas (relecture de sécurité sec-B3) : « Claude 2 » a l'adresse claude-2, et
+-- « Claude ✨ » (adresse claude, prise par le catalogue) recevait aussi claude-2 : 23505, migration
+-- arrêtée. Ici chaque suffixe est essayé jusqu'à ce qu'aucun outil ne le porte (NOT EXISTS, lu sur
+-- l'index unique de tool.slug) ; la boucle s'arrête toujours, les outils étant en nombre fini. Les
+-- noms passent par l'ordre de leur nom replié : le premier garde l'adresse sans suffixe.
+DO $r6b$
+DECLARE
+  o record;
+  candidate text;
+  n int;
+BEGIN
+  FOR o IN
     SELECT DISTINCT ON (l.folded) l.folded, l.label AS name, l.slug, l.at
     FROM r6b_label l WHERE l.tool_id IS NULL
     ORDER BY l.folded, l.listed DESC, l.at, l.kind, l.owner, l.pos
-  ) n
-) o;
+  LOOP
+    n := 1;
+    candidate := o.slug;
+    LOOP
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM "tool" t WHERE t.slug = candidate);
+      n := n + 1;
+      candidate := o.slug || '-' || n;
+    END LOOP;
+    INSERT INTO "tool" ("id", "slug", "name", "folded", "status", "family", "description_fr", "description_en", "site_url", "created_at", "created_by", "admitted_at")
+    VALUES (gen_random_uuid(), candidate, o.name, o.folded, 'other', NULL, NULL, NULL, NULL, o.at, NULL, NULL);
+  END LOOP;
+END
+$r6b$;
 --> statement-breakpoint
 -- Étape 4 : les libellés des « Autre » qu'on vient de créer prennent leur outil.
 UPDATE r6b_label l SET tool_id = t.id FROM "tool" t WHERE l.tool_id IS NULL AND t.folded = l.folded;
