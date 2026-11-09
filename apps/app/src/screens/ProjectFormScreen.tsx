@@ -22,8 +22,8 @@ import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
-import { errorKey } from '../api/errors'
-import { nextAfterSignIn } from '../navigation/signInAgain'
+import { type ApiErrorKey, errorKey } from '../api/errors'
+import { nextAfterSignIn, useSignInAgain } from '../navigation/signInAgain'
 import { type HeldAction, useLeaveGuard } from '../navigation/useLeaveGuard'
 import { useRouteSheet } from '../navigation/useRouteSheet'
 import { useMe } from '../profile/hooks'
@@ -49,6 +49,7 @@ import { Sheet, type SheetNotice, useSheetAside } from '../ui/Sheet'
 import { SkeletonList } from '../ui/Skeleton'
 import { Stack } from '../ui/Stack'
 import { type StateKind, StateMessage } from '../ui/StateMessage'
+import { SuspensionBanner } from '../ui/SuspensionBanner'
 import { Text } from '../ui/Text'
 import { useCalmMotion } from '../ui/theme/motion'
 import { useToast } from '../ui/theme/toast'
@@ -159,12 +160,31 @@ function ProjectFormSheet({
   if (!session) return signedOut(false)
   if (!me.data) return me.error ? failed(me.error, () => void me.refetch()) : loading
   if (me.data.suspension) {
-    return stateSheet({
-      kind: 'signedOut',
-      title: t(($) => $.suspension.formTitle),
-      message: t(($) => $.suspension.formBody),
-      actions: id ? [seeProject(id)] : [{ label: t(($) => $.states.back), onPress: sheet.close }],
-    })
+    // La feuille couvre la page, et avec elle le bandeau de la barre du haut (sur téléphone, il est
+    // caché ; sur ordinateur, derrière la fenêtre, hors de portée d'un lecteur d'écran). Elle pose
+    // donc le sien, replié, à la place du titre « Nouveau projet » : la date de fin, et « Détails »
+    // qui mène au recours (jur-C1, décision de Louis du 9/11/2026). Un seul titre, celui de l'état,
+    // et pas de mascotte : rien qui sourie à une mesure de modération.
+    return (
+      <Sheet
+        open={sheet.open}
+        title={t(($) => $.suspension.formTitle)}
+        heading={1}
+        onClose={sheet.close}
+      >
+        <Stack gap="lg">
+          <SuspensionBanner suspension={me.data.suspension} initiallyOpen={false} />
+          <StateMessage
+            kind="signedOut"
+            picture={null}
+            message={t(($) => $.suspension.formBody)}
+            actions={
+              id ? [seeProject(id)] : [{ label: t(($) => $.states.back), onPress: sheet.close }]
+            }
+          />
+        </Stack>
+      </Sheet>
+    )
   }
   if (!id) {
     return <ProjectFormView initial={emptyProjectForm} open={sheet.open} close={sheet.close} />
@@ -229,6 +249,10 @@ function ProjectFormView({
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<ProjectFormErrors>({})
   const [message, setMessage] = useState<string | null>(null)
+  // L'envoi refusé faute de session (401) : réessayer n'y fera rien, le message porte « Me
+  // reconnecter » (décision de Louis du 9/11/2026, après la relecture de design).
+  const [signInNeeded, setSignInNeeded] = useState(false)
+  const signInAgain = useSignInAgain()
   const photos = usePhotoTiles(projectId)
   // La couverture verticale du téléphone, à côté des photos, avec les mêmes deux modes.
   const portrait = usePortraitCover(projectId)
@@ -322,6 +346,7 @@ function ProjectFormView({
   const onSubmit = async () => {
     if (submit.inFlight()) return
     setMessage(null)
+    setSignInNeeded(false)
     photos.clearNotices()
     portrait.clearProblem()
     const checked = projectId ? toProjectChanges(form, initial) : toProjectChanges(form)
@@ -338,7 +363,10 @@ function ProjectFormView({
     setErrors({})
     // La feuille reste ouverte sur un échec de l'API, qui se lit au-dessus des champs.
     const failed = await submit.send(form, checked.changes)
-    if (failed) setMessage(t(($) => $.errors[failed]))
+    if (failed) {
+      setMessage(t(($) => $.errors[failed]))
+      setSignInNeeded(failed === 'unauthorized')
+    }
   }
 
   const onDeleted = () => {
@@ -357,12 +385,19 @@ function ProjectFormView({
   const cut = photos.cut
   const photoError = photos.problem === 'describeFailed' ? null : photos.problem
   const portraitProblem = portrait.problem
+  // Une photo déjà retirée (404 en la retirant) a sa phrase ; les autres échecs, celle de l'API.
+  const problemText = (problem: ApiErrorKey | 'photoGone' | null) =>
+    problem === 'photoGone'
+      ? t(($) => $.project.form.photoGone)
+      : problem
+        ? t(($) => $.errors[problem])
+        : ''
   const noticeTexts: Record<FormNoticeKind, () => string> = {
     message: () => message ?? '',
     photosCut: () => (cut ? t(($) => $.project.form.photosCut, cut) : ''),
     describeFailed: () => t(($) => $.project.form.describeFailed),
-    photoProblem: () => (photoError ? t(($) => $.errors[photoError]) : ''),
-    portraitProblem: () => (portraitProblem ? t(($) => $.errors[portraitProblem]) : ''),
+    photoProblem: () => problemText(photoError),
+    portraitProblem: () => problemText(portraitProblem),
     uploadFailed: () => t(($) => $.project.form.uploadFailed),
     preparing: () => t(($) => $.project.visuals.preparing),
     unchanged: () => t(($) => $.project.form.unchanged),
@@ -379,13 +414,17 @@ function ProjectFormView({
     dirty,
   })
   const notice: SheetNotice | null = noticeKind
-    ? { message: noticeTexts[noticeKind](), ...FORM_NOTICE_TONES[noticeKind] }
+    ? {
+        message: noticeTexts[noticeKind](),
+        ...FORM_NOTICE_TONES[noticeKind],
+        ...(noticeKind === 'message' && signInNeeded ? { action: signInAgain() } : null),
+      }
     : null
 
   const cover = photos.tiles[0]?.image ?? null
   const sentence = (
     <Text variant="callout" tone="secondary">
-      {audienceSentence(t, form.audience, editing)}
+      {audienceSentence(t, form.audience, editing ? initial.audience : null)}
     </Text>
   )
 
@@ -444,6 +483,7 @@ function ProjectFormView({
           fieldRefs={fieldRefs}
           savedPrompts={project?.prompts}
           withAudience={!beside}
+          {...(editing ? { savedAudience: initial.audience } : null)}
         />
         {project ? (
           // La zone rouge, en dernier : supprimer, et qui le peut (jur-J7).

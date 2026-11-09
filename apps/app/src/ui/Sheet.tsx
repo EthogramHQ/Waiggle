@@ -67,7 +67,7 @@ import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
 import { focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
-import { Notice } from './Notice'
+import { Notice, type NoticeAction } from './Notice'
 import { SheetHeader } from './SheetHeader'
 import { Surface } from './Surface'
 import { type SheetReveal, useSheetReveal } from './sheetReveal'
@@ -202,6 +202,11 @@ export type SheetNotice = {
   message: string
   tone?: 'error' | 'info' | 'success'
   polite?: boolean
+  /**
+   * Un lien après le message, dans le même cadre (« Me reconnecter » après « Connecte-toi pour
+   * continuer. », R6a) : un échec qui ne se règle pas en réessayant a son issue (`Notice action`).
+   */
+  action?: NoticeAction | undefined
 }
 
 type Props = Omit<
@@ -866,6 +871,7 @@ export function SheetPanel({
         message={notice.message}
         tone={notice.tone ?? 'error'}
         polite={notice.polite ?? false}
+        action={notice.action}
       />
     </View>
   ) : null

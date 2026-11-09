@@ -12,15 +12,23 @@ type T = ReturnType<typeof useTranslation>['t']
 
 /**
  * La phrase qui dit qui verra le projet, sous « Qui peut le voir ? » (ou au pied de la feuille sur
- * ordinateur). Un nouveau projet parle au futur ; un projet modifié, au présent.
+ * ordinateur). `saved` est l'audience enregistrée du projet modifié, `null` pour un nouveau projet.
+ * Ce qui n'est pas encore enregistré parle au futur (un nouveau projet, ou un choix différent de
+ * l'enregistré) ; ce qui l'est déjà, au présent. Un projet privé passé sur « Membres » ne dit donc
+ * pas « voient » avant d'être enregistré (jur-C3, décision de Louis du 9/11/2026).
  */
-export const audienceSentence = (t: T, audience: ProjectAudience, editing: boolean): string => {
+export const audienceSentence = (
+  t: T,
+  audience: ProjectAudience,
+  saved: ProjectAudience | null,
+): string => {
+  const already = saved === audience
   if (audience === 'private') {
-    return editing
+    return already
       ? t(($) => $.project.form.audiencePrivate)
       : t(($) => $.project.form.audiencePrivateNew)
   }
-  return editing
+  return already
     ? t(($) => $.project.form.audienceMembersEdit)
     : t(($) => $.project.form.audienceMembers)
 }

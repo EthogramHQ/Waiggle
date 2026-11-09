@@ -53,7 +53,8 @@ export function usePortraitCover(projectId?: string) {
     writingRef.current = value
     setWritingState(value)
   }
-  const [problem, setProblem] = useState<ApiErrorKey | null>(null)
+  // `photoGone` : la couverture à retirer n'existe plus sur le serveur (404), comme pour une photo.
+  const [problem, setProblem] = useState<ApiErrorKey | 'photoGone' | null>(null)
   /** Le choix en cours (galerie ouverte, puis préparation), que `flush` attend. */
   const picking = useRef<Promise<void> | null>(null)
 
@@ -66,14 +67,15 @@ export function usePortraitCover(projectId?: string) {
     if (current) setProject({ ...current, portraitCover })
   }
 
-  const write = async (id: string, call: () => Promise<ApiResult<Project>>) => {
+  /** Une écriture ; `removing` : un 404 veut dire que la couverture était déjà retirée. */
+  const write = async (id: string, call: () => Promise<ApiResult<Project>>, removing = false) => {
     setWriting(true)
     const result = await safely(call)
     setWriting(false)
     if (result.ok) {
       keepPortrait(id, result.data.portraitCover)
     } else {
-      setProblem(result.error)
+      setProblem(removing && result.error === 'notFound' ? 'photoGone' : result.error)
       // Le cache dit de nouveau la vérité (une couverture retirée au toucher revient).
       void queryClient.invalidateQueries({ queryKey: projectQueryKey(id) })
     }
@@ -117,7 +119,7 @@ export function usePortraitCover(projectId?: string) {
     const visualId = saved.id
     // Au toucher : la couverture part de l'écran tout de suite, le serveur suit.
     keepPortrait(projectId, null)
-    void write(projectId, () => deleteVisual(projectId, visualId))
+    void write(projectId, () => deleteVisual(projectId, visualId), true)
   }
 
   const flushing = useRef<Promise<FlushResult> | null>(null)
@@ -168,7 +170,7 @@ export function usePortraitCover(projectId?: string) {
     /** L'image choisie se prépare encore sur l'appareil : « Publier » attend. */
     preparing,
     flush,
-    /** Une écriture a échoué : la clé du message (`errors.*`). */
+    /** Une écriture a échoué : la clé du message (`errors.*`), ou `photoGone`. */
     problem,
     clearProblem: () => setProblem(null),
   }

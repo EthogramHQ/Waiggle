@@ -68,9 +68,11 @@ type Props = {
   /**
    * « Tester ↗ », s'il y a une démo : un lien vers un site externe, posé à côté du lien de la carte
    * (même quand la carte en est un), jamais dedans. `label` est le texte affiché (« Tester ») ; le
-   * nom lu ajoute le projet (« Tester Carnet de cafés »).
+   * nom lu ajoute le projet (« Tester Carnet de cafés »). Sans `onPress` : la pastille est
+   * seulement dessinée, ni lien ni arrêt de Tab (l'aperçu de la feuille de publication, R6a,
+   * design-C5).
    */
-  tryIt?: { label: string; onPress: () => void }
+  tryIt?: { label: string; onPress?: (() => void) | undefined }
   /** Une pastille de plus, à côté du statut (« Privé »). */
   badge?: string
   /** Le total des réactions (« ✦ 49 », lu « 49 réactions ») ; rien à 0. */
@@ -188,7 +190,7 @@ export function ProjectCard({
       })
     : undefined
   const openAuthor = author.onPress ? guard(author.onPress) : undefined
-  const test = tryIt ? guard(tryIt.onPress) : undefined
+  const test = tryIt?.onPress ? guard(tryIt.onPress) : undefined
   // L'accroche décrit le lien de la carte sur le web (lue après son nom) : useId donne le même
   // identifiant au pré-rendu et dans le navigateur.
   const pitchId = useId()
@@ -397,10 +399,9 @@ export function ProjectCard({
   // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
   // la planche du fil. Son nom lu, « Tester Carnet de cafés » (plusieurs cartes, plusieurs
   // « Tester »), et son avertissement de site externe viennent d'elle.
-  const tester =
-    tryIt && test ? (
-      <TestLink title={title} label={tryIt.label} onPress={test} size="compact" />
-    ) : null
+  const tester = tryIt ? (
+    <TestLink title={title} label={tryIt.label} onPress={test} size="compact" />
+  ) : null
 
   // --- La rangée du bas : « Tester », le statut, la pastille, le total -------------------------
   const bottomRow = (

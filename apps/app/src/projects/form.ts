@@ -6,6 +6,7 @@
 // « Commencé en » et « Qui peut le voir ? » (`audience`). Tout ce fichier est pur : pas d'écran,
 // pas de réseau, donc facile à tester.
 import {
+  DemoUrl,
   type Project,
   type ProjectCategory,
   type ProjectDifficulty,
@@ -84,6 +85,16 @@ export type ProjectFormErrors = {
 const demoUrlOf = (form: ProjectForm) => {
   const demoUrl = form.demoUrl.trim()
   return demoUrl === '' ? null : demoUrl
+}
+
+/**
+ * Le lien de démo a la forme que l'API acceptera (le schéma `DemoUrl` du contrat) : la feuille
+ * coche « Lien valide », et l'aperçu de la carte montre « Tester » (R6a, design-C5). Le site
+ * lui-même n'est jamais ouvert (jur-J16).
+ */
+export const demoUrlLooksValid = (form: ProjectForm): boolean => {
+  const demoUrl = form.demoUrl.trim()
+  return demoUrl !== '' && DemoUrl.safeParse(demoUrl).success
 }
 
 /** Deux listes de textes égales, élément par élément. */

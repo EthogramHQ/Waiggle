@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next'
 import { useMe } from '../profile/hooks'
 import { categoryOption } from '../projects/categories'
-import type { ProjectForm } from '../projects/form'
+import { demoUrlLooksValid, type ProjectForm } from '../projects/form'
 import { CardPreview } from '../ui/CardPreview'
 import type { PhotoTile } from '../ui/PhotoTiles'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -28,8 +28,11 @@ export function ProjectFormPreview({ form, cover, change }: Props) {
   const { t } = useTranslation()
   const me = useMe()
   const category = form.primaryCategory ? categoryOption(t, form.primaryCategory) : null
-  // Sans « Tester » : sur la carte, c'est un lien, qui resterait atteignable au clavier d'une
-  // tablette (le web, lui, rend tout l'aperçu `inert`) dans un aperçu caché aux lecteurs d'écran.
+  // « Tester » dès que le lien est valide, comme sur la carte publiée (design-C5, décision de Louis
+  // du 9/11/2026) : seulement dessiné (`tryIt` sans `onPress`). Un vrai lien resterait atteignable
+  // au clavier d'une tablette (le web, lui, rend tout l'aperçu `inert`) dans un aperçu caché aux
+  // lecteurs d'écran.
+  const tryIt = demoUrlLooksValid(form) ? { label: t(($) => $.explore.test) } : null
   return (
     <Stack gap="xl">
       <Stack gap="lg">
@@ -53,6 +56,7 @@ export function ProjectFormPreview({ form, cover, change }: Props) {
               strong: form.status === 'testable',
             }}
             {...(category ? { category: { label: category.label, icon: category.icon } } : null)}
+            {...(tryIt ? { tryIt } : null)}
           />
         </CardPreview>
         <Text variant="caption" tone="muted">
