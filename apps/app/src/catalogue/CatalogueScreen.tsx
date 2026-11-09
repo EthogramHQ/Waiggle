@@ -95,6 +95,7 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { AdminCardsCatalogue } from './outils-administration'
 import { ToolFieldCatalogue } from './outils-champ'
 import { ToolHeaderCatalogue } from './outils-entete'
 import { ToolTagsCatalogue } from './outils-etiquettes'
@@ -863,6 +864,7 @@ export function CatalogueScreen() {
       <ToolFiltersCatalogue />
       <ToolFieldCatalogue />
       <ToolHeaderCatalogue />
+      <AdminCardsCatalogue />
       <SearchCatalogue />
       {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
           l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
