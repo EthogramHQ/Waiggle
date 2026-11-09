@@ -55,6 +55,22 @@ export const uploadVisual = async (
   return request(`${projectPath(id)}/visuals`, { method: 'POST', body: form }, Project)
 }
 
+/**
+ * Écrit la description d'une photo (PATCH /v1/projects/:id/visuals/:visualId, R6a). Une description
+ * vide ou faite d'espaces s'envoie `null` : effacer la description, c'est vider le champ. Renvoie le
+ * projet à jour.
+ */
+export const updateVisual = (
+  id: string,
+  visualId: string,
+  description: string | null,
+): Promise<ApiResult<Project>> =>
+  request(
+    `${projectPath(id)}/visuals/${encodeURIComponent(visualId)}`,
+    json('PATCH', { description: description?.trim() ? description : null }),
+    Project,
+  )
+
 /** Retire une photo du projet (galerie ou couverture verticale). Renvoie le projet à jour. */
 export const deleteVisual = (id: string, visualId: string): Promise<ApiResult<Project>> =>
   request(
