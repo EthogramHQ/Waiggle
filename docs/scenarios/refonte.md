@@ -1566,7 +1566,13 @@ Hors de R6b, et où ça va :
 - Alors la dernière proposition dit « Ajouter « Teachable Machine » comme autre outil »
 - Quand il la touche
 - Alors une pastille « Teachable Machine » s'ajoute, marquée « Autre », et une ligne dit « Les
-  autres outils sont vérifiés chaque semaine avant d'entrer au catalogue. »
+  autres outils sont relus par les administrateurs : ils peuvent les ajouter au catalogue, ou les
+  rattacher à un outil qui y est déjà. »
+- Et pour un projet privé, la ligne dit « Projet privé : ce nom n'est montré à personne et n'est
+  pas relu. S'il entre au catalogue grâce à un autre projet, le tien suivra. »
+- Et tant que le catalogue n'est pas chargé (ou en panne), la ligne dit seulement « Ajouter
+  « Teachable Machine » », sans marque « Autre »
+- Et sur son projet, un « Autre » garde le nom tel que ce membre l'a tapé
 - Et un nom qui correspond à un outil du catalogue ou à un alias (« chat gpt ») ne crée jamais un
   « Autre » : c'est l'outil du catalogue qui est choisi
 - Et deux membres qui tapent le même autre outil, aux accents et majuscules près, ajoutent le même
@@ -1584,8 +1590,8 @@ Hors de R6b, et où ça va :
 ### Tous les outils (planche `R3-Outils`)
 
 - Étant donné Explorer, « Tous les outils »
-- Alors la page « Outils » dit « Les outils d'IA, de développement et de projets numériques que les
-  membres utilisent. », puis un champ « Chercher un outil » et des pastilles de familles (Tous, et
+- Alors la page « Outils » dit « Le catalogue des outils d'IA, de développement et de projets
+  numériques. », puis un champ « Chercher un outil » et des pastilles de familles (Tous, et
   chaque famille)
 - Et « Les plus utilisés » : les dix outils qui comptent le plus de projets, avec leur lettre, leur
   famille et « 41 projets »
@@ -1594,8 +1600,9 @@ Hors de R6b, et où ça va :
 - Et le champ et les pastilles filtrent les deux listes ; sans résultat, « Aucun outil ne
   correspond. »
 - Et « Pas encore dans le catalogue » : les autres outils des projets qu'il peut voir, en texte
-  simple, avec « Des outils ajoutés par les membres avec « Autre ». Ils sont vérifiés chaque semaine
-  avant d'entrer au catalogue. »
+  simple, avec « Des outils ajoutés par les membres avec « Autre ». Les administrateurs les relisent
+  et peuvent les ajouter au catalogue. » ; jamais un « Autre » cité seulement par des projets privés
+  ou retirés, ni un « Autre » écarté
 - Et le nombre de projets d'un outil ne compte que ceux que ce membre peut voir
 
 ### La page d'un outil (F-Et1 à F-Et3, planches `R6-Outil`, `R6-Outil-Desktop`)
@@ -1611,7 +1618,11 @@ Hors de R6b, et où ça va :
   colonnes sur téléphone, quatre sur ordinateur
 - Quand il touche « Testables », puis « Cuisine »
 - Alors seuls les projets testables classés « Cuisine » (en principale ou en seconde) restent
-- Et l'adresse de la page garde les filtres (`/tags/lovable?statut=testable&categorie=cooking`)
+- Et l'adresse de la page garde les filtres (`/tags/lovable?status=testable&category=cooking` :
+  paramètres d'adresse en anglais, règle du design)
+- Et sous la description : « Description écrite par Waiggle, sans lien avec l'éditeur de l'outil. »
+- Et choisir une catégorie dans la feuille l'applique tout de suite, ferme la feuille et rend le
+  focus au bouton ; la feuille n'a que « Fermer » ; le Retour du navigateur quitte la page
 - Et sans projet pour ces filtres : « Aucun projet ici pour l'instant. » avec « Voir tous les
   projets », qui retire les filtres
 - Et au-delà de 50 projets, « Afficher la suite » ajoute les 50 suivants
@@ -1631,7 +1642,7 @@ Hors de R6b, et où ça va :
 - Quand il touche « Animaux »
 - Alors « Récents » ne montre que les projets classés « Animaux » (en principale ou en seconde),
   page après page
-- Et l'adresse garde le filtre (`/explore?categorie=animals`)
+- Et l'adresse garde le filtre (`/explore?category=animals`)
 - Et sans projet : « Aucun projet dans « Animaux » pour l'instant. »
 
 **La page d'un projet**
@@ -1643,7 +1654,7 @@ Hors de R6b, et où ça va :
 - Alors un bouton « Toutes les catégories » ouvre la feuille des catégories
 - Quand il choisit « Cuisine »
 - Alors le groupe Projets ne garde que les projets classés « Cuisine », et le bouton dit « Cuisine »
-- Et l'adresse garde le filtre (`/search?q=carn&categorie=cooking`)
+- Et l'adresse garde le filtre (`/search?q=carn&category=cooking`)
 - Et les projets d'avant R6a, sans catégorie, ne sortent que sans filtre
 
 ### Le récap des « Autre » aux administrateurs (planche `R6-Email-Autre`)
@@ -1652,36 +1663,50 @@ Hors de R6b, et où ça va :
 - Quand des membres ont choisi « Autre » dans les sept derniers jours, pour un outil ou pour une
   catégorie
 - Alors chaque administrateur en fonction, à l'adresse vérifiée et non suspendu, reçoit dans sa
-  langue « Les « Autre » de la semaine : 3 outils, 2 projets à ranger »
-- Et l'e-mail liste les autres outils apparus dans la semaine (nom, projet, auteur et pseudo), avec
-  « Ajouter au catalogue », puis les projets classés « Autre » dans la semaine (titre, auteur,
-  accroche), avec « Ranger dans une catégorie »
-- Et une ligne dit combien attendent depuis plus longtemps (« Et 4 autres en attente depuis plus
-  d'une semaine. »)
-- Et seuls les projets que les membres peuvent voir y figurent : jamais un projet privé, retiré, ni
+  langue « Les « Autre » de la semaine sur Waiggle »
+- Et l'e-mail ne donne **que des nombres et des liens** (« 3 autres outils à vérifier », « 2 projets
+  à ranger dans une catégorie », « Et 4 autres en attente depuis plus d'une semaine. »), avec « Voir
+  les outils » et « Voir les projets à ranger » : ni nom d'outil, ni titre, ni auteur, ni accroche
+  (relecture juridique jur-T1, comme l'alerte de modération de 7a ; la planche montrait des listes)
+- Et seuls comptent les projets que les membres peuvent voir : jamais un projet privé, retiré, ni
   d'un compte supprimé
-- Et sans aucun « Autre » dans la semaine, rien n'est envoyé
+- Et sans aucun « Autre » dans la semaine, rien n'est envoyé ; un même lundi, jamais deux fois
 - Et l'e-mail a sa version texte, et aucune image distante
 
 ### Ranger les « Autre » (pages de Modération, réservées aux administrateurs)
 
-**Les outils** (`/moderation/outils`, lien « Ajouter au catalogue » de l'e-mail)
+**Les outils** (`/moderation/tools`, lien « Voir les outils » de l'e-mail ; « Outils » et
+« Catégories » s'ouvrent depuis la Modération, sous ses onglets)
 - Étant donné un administrateur sur « Outils » de la Modération, onglet « À vérifier »
-- Alors il voit chaque autre outil, du plus récent au plus ancien, avec ses projets (titre, auteur)
-  et son nombre de projets
+- Alors il voit chaque autre outil cité par au moins un projet visible des membres, du plus récent
+  au plus ancien, avec ces projets (titre, auteur) et leur nombre ; jamais un projet privé ou retiré
 - Quand il touche « Ajouter au catalogue »
 - Alors un formulaire, prérempli du nom, demande la famille, la description en français et en
   anglais (160 caractères chacune) et le site (facultatif, `https://`)
 - Et une fois ajouté, l'outil a sa page, devient une étiquette partout, et quitte « À vérifier »
+- Et le formulaire guide : « Une phrase neutre : ce que fait l'outil. Ni prix, ni superlatif, ni
+  promesse, ni avis. » et « L'adresse du site officiel, sans lien d'affiliation ni paramètre de
+  suivi. » (une adresse avec `?` ou `#` est refusée)
 - Quand il touche plutôt « Rattacher à un outil » et choisit « Make » dans le catalogue
+- Alors une fenêtre demande « Rattacher « Make.com » à Make ? », dit combien de projets et de
+  profils changeront, projets privés compris, que le nom deviendra un autre nom de Make, et que
+  cela ne s'annule pas dans l'appli
+- Quand il confirme
 - Alors chaque projet et chaque profil qui citaient cet autre outil citent l'outil du catalogue
   (sans doublon), et le nom tapé devient un alias de cet outil
+- Quand il touche plutôt « Laisser hors du catalogue » (un nom injurieux, ou qui n'est pas un outil)
+- Alors l'autre outil quitte « À vérifier », la liste « Pas encore dans le catalogue » et le récap ;
+  il reste en texte simple sur les projets qui le citent (un contenu à signaler passe par
+  « Signaler »)
+- Et une carte décidée reste à sa place, son résultat à la place de ses boutons
 - Et l'onglet « Catalogue » cherche un outil, le modifie, ou en ajoute un nouveau
 - Et chaque ajout, rattachement ou modification entre dans « Changements récents », en bas de la page (qui, quand, quoi)
 
-**Les catégories** (`/moderation/categories`, lien « Ranger dans une catégorie » de l'e-mail)
+**Les catégories** (`/moderation/categories`, lien « Voir les projets à ranger » de l'e-mail)
 - Étant donné un administrateur sur « Catégories » de la Modération, onglet « À ranger »
-- Alors il voit les projets visibles classés « Autre », du plus ancien au plus récent
+- Alors il voit les projets visibles des membres classés « Autre », du plus ancien au plus récent ;
+  jamais un projet que son auteur a remis en « Autre » après un rangement (le choix du membre
+  l'emporte)
 - Quand il touche « Ranger dans une catégorie » et choisit « Animaux »
 - Alors « Autre » est remplacée par « Animaux » à sa place (principale ou seconde) ; si le projet
   avait déjà « Animaux », « Autre » est simplement retirée
@@ -1696,7 +1721,17 @@ Hors de R6b, et où ça va :
 **Les gardes**
 - Ces pages et leurs adresses répondent à tout autre visiteur comme une adresse qui n'existe pas,
   comme le reste de la Modération
-- L'auteur d'un projet rangé le voit dans sa nouvelle catégorie ; il en sera prévenu en R8
+- Un administrateur ne range pas son propre projet, comme il ne décide pas d'un signalement qui le
+  concerne (7c)
+- Sous la catégorie « Autre » de la feuille de publication (projet non privé) : « Les
+  administrateurs pourront ranger ton projet dans une catégorie qui lui va. Tu pourras la modifier
+  comme le reste du projet. »
+- L'auteur d'un projet rangé le voit dans sa nouvelle catégorie ; il en sera prévenu en R8 ;
+  l'export de ses données liste les changements de catégorie de ses projets, sans nommer
+  l'administrateur
+- « Changements récents » et les autres outils que plus rien ne cite s'effacent : le journal après
+  un an, les autres outils orphelins chaque nuit ; un autre outil ne garde pas qui l'a tapé
+- Un membre crée au plus 30 autres outils par jour
 
 ### La bascule des étiquettes existantes
 
@@ -1750,8 +1785,8 @@ Pris par la session, à revoir par Louis au bilan :
 3. **« Tous les outils »** montre tout le catalogue (« Les plus utilisés », puis « De A à Z »), et
    les autres outils en texte simple.
 4. **Le récap** part le lundi à 8 h, une heure avant celui des membres, et seulement s'il a quelque
-   chose à dire ; il ne porte **pas de vignettes** (la planche en montre) : moins de données
-   personnelles dans une boîte mail.
+   chose à dire ; il ne porte que des nombres et des liens (la planche montre des listes et des
+   vignettes) : rien d'un membre ne part dans une boîte mail (relecture juridique, jur-T1, option A).
 5. **Ranger un projet** ne prévient pas son auteur avant R8 ; « Changements récents » le garde. Ces
    gestes ont leur propre journal, pas l'historique des signalements (fait pour les contenus signalés).
 6. **Les anciennes colonnes** de texte des outils restent jusqu'en R7, pour qu'un retour à R6a
@@ -1759,3 +1794,12 @@ Pris par la session, à revoir par Louis au bilan :
 7. **Une catégorie créée** se place juste avant « Autre » ; on ne la renomme ni ne la supprime en
    R6b.
 8. **Le filtre par catégorie** de la recherche ne vise que le groupe Projets.
+9. **Après la relecture du plan** (sécurité, juridique, interface ; tout retenu) : les textes du
+   juridique pour l'aide des « Autre », le formulaire d'un outil, la confirmation de « Rattacher »
+   et la catégorie « Autre » ; « Laisser hors du catalogue » ajouté ; un « Autre » garde sur un
+   projet le nom tapé par son auteur ; les adresses en anglais (`?status=`, `?category=`,
+   `/moderation/tools`).
+10. **Les feuilles** : celle des catégories applique le choix tout de suite et n'a que « Fermer » ;
+    celles de l'administration demandent « Abandonner les changements ? » si on les ferme
+    modifiées (Échap, voile, « Annuler »), refusent de se fermer pendant l'écriture, et le Retour du
+    navigateur quitte la page, comme pour les commentaires et le partage.
