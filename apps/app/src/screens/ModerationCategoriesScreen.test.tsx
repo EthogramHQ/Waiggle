@@ -305,7 +305,8 @@ describe('the categories tab', () => {
 
   it('creates « Jardinage » with an icon chosen in a grid, and shows it just before « Autre »', async () => {
     await openCreate()
-    expect(screen.getByLabelText(CREATE_TITLE)).toBeTruthy()
+    // Le titre de la feuille répète le libellé du bouton de la page : on vise son en-tête.
+    expect(screen.getByRole('header', { name: CREATE_TITLE })).toBeTruthy()
     // L'aide de la relecture juridique (jur-T15) : une catégorie décrit un sujet, jamais une personne.
     expect(screen.getByText(containing(t(($) => $.moderation.categories.createHint)))).toBeTruthy()
 
