@@ -29,6 +29,21 @@ import {
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// R6b : les noms des catégories viennent de GET /v1/categories ; on répond avec la liste de départ,
+// les autres lectures passent par le vrai client.
+jest.mock('../api/client', () => {
+  const actual: typeof import('../api/client') = jest.requireActual('../api/client')
+  const { categoryList }: typeof import('../testing/categories') =
+    jest.requireActual('../testing/categories')
+  return {
+    ...actual,
+    request: jest.fn((...args: Parameters<typeof actual.request>) =>
+      String(args[0]).startsWith('/v1/categories')
+        ? Promise.resolve({ ok: true, data: categoryList('fr') })
+        : actual.request(...args),
+    ),
+  }
+})
 // Les images de l'API voyagent avec la session (api/media.ts) : ici, l'adresse suffit.
 jest.mock('../api/media', () => ({
   useMediaSources: () => (url: string | null | undefined) => (url ? { uri: url } : null),

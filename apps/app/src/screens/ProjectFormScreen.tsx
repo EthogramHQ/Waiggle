@@ -506,6 +506,7 @@ function ProjectFormView({
         primary={form.primaryCategory}
         secondary={form.secondaryCategory}
         tools={form.tools}
+        visibility={form.audience === 'private' ? 'private' : 'public'}
         onChange={({ primary, secondary, tools }) =>
           update({ primaryCategory: primary, secondaryCategory: secondary, tools })
         }

@@ -11,6 +11,7 @@ import {
   ProjectId,
   ProjectStatus,
   type ProjectSummary,
+  type ProjectTool,
   ProjectVisibility,
   type ProjectVisual,
   Thumbhash,
@@ -40,6 +41,46 @@ export const selectMedia = async (db: Reader, projectIds: string[]): Promise<Med
         .from(schema.projectMedia)
         .where(inArray(schema.projectMedia.projectId, projectIds))
         .orderBy(asc(schema.projectMedia.position), asc(schema.projectMedia.createdAt))
+
+/**
+ * Les outils de ces projets, par projet, dans l'ordre choisi par l'auteur (R6b) : une seule requête
+ * pour toute la liste. Elle lit `project_tool` par le début de sa clé primaire (project_id) et joint
+ * `tool` par sa clé primaire. Un outil du catalogue s'affiche sous son nom ; un « Autre », sous le nom
+ * que l'auteur de CE projet a tapé (sec-B8), sans page (`inCatalogue` faux).
+ */
+export const toolsOfProjects = async (
+  db: Reader,
+  projectIds: string[],
+): Promise<Map<string, ProjectTool[]>> => {
+  const byProject = new Map<string, ProjectTool[]>()
+  if (projectIds.length === 0) return byProject
+  const rows = await db
+    .select({
+      projectId: schema.projectTool.projectId,
+      label: schema.projectTool.label,
+      name: schema.tool.name,
+      slug: schema.tool.slug,
+      status: schema.tool.status,
+    })
+    .from(schema.projectTool)
+    .innerJoin(schema.tool, eq(schema.tool.id, schema.projectTool.toolId))
+    .where(inArray(schema.projectTool.projectId, projectIds))
+    .orderBy(asc(schema.projectTool.projectId), asc(schema.projectTool.position))
+  for (const row of rows) {
+    const inCatalogue = row.status === 'catalogue'
+    const list = byProject.get(row.projectId) ?? []
+    const label = inCatalogue ? row.name : (row.label ?? row.name)
+    list.push({
+      label,
+      // Un « Autre » n'a pas de page : son adresse se tire du nom tapé ici, jamais de l'adresse
+      // partagée, dont le suffixe « -2 » dirait qu'un autre membre a tapé un nom voisin (sec-B2).
+      slug: inCatalogue ? row.slug : toolSlug(label),
+      inCatalogue,
+    })
+    byProject.set(row.projectId, list)
+  }
+  return byProject
+}
 
 /** Un média tel que l'API le renvoie (contrat `ProjectVisual`). */
 const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
@@ -90,6 +131,7 @@ export const visibleTo = projectVisibleTo
 const toProjectBase = (
   { project, authorName, authorAvatarKey }: ProjectRow,
   media: MediaRow[],
+  tools: ProjectTool[],
   viewerId: string,
   publicApiUrl: string,
 ): ProjectBase => ({
@@ -107,10 +149,8 @@ const toProjectBase = (
   status: ProjectStatus.parse(project.status),
   visibility: ProjectVisibility.parse(project.visibility),
   demoUrl: project.demoUrl,
-  tools: project.tools.map((label, i) => ({
-    label,
-    slug: project.toolSlugs[i] ?? toolSlug(label),
-  })),
+  // R6b : lus par `project_tool` (toolsOfProjects) ; les anciennes colonnes ne sont plus lues.
+  tools,
   prompts: project.prompts,
   // R6a : catégories, difficulté et mois de départ. Les listes fermées sont revérifiées à la
   // lecture (comme `status`) ; null pour un projet d'avant R6a. Le temps passé n'est plus lu
@@ -152,7 +192,7 @@ const toProjects = async (
   // Le retrait d'un projet ne se lit que par son auteur.
   const removalIdOf = ({ project }: ProjectRow) =>
     project.removedAt !== null && project.authorId === viewerId ? project.removalId : null
-  const [follows, journals, reactions, commentCounts, removals] = await Promise.all([
+  const [follows, journals, reactions, commentCounts, removals, tools] = await Promise.all([
     projectFollowStates(
       db,
       rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
@@ -162,11 +202,12 @@ const toProjects = async (
     reactionStatesOf(db, ids, viewerId),
     commentCountsOf(db, ids),
     removalsOf(db, rows.map(removalIdOf)),
+    toolsOfProjects(db, ids),
   ])
   return rows.map((row) => {
     const removalId = removalIdOf(row)
     return {
-      ...toProjectBase(row, media, viewerId, publicApiUrl),
+      ...toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
       ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
       notes: journals.get(row.project.id) ?? [],
       reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
@@ -274,9 +315,16 @@ export const rowsToSummaries = async (
   publicApiUrl: string,
 ): Promise<ProjectSummary[]> => {
   const ids = rows.map((row) => row.project.id)
-  const [media, totals] = await Promise.all([selectMedia(db, ids), reactionTotalsOf(db, ids)])
+  const [media, totals, tools] = await Promise.all([
+    selectMedia(db, ids),
+    reactionTotalsOf(db, ids),
+    toolsOfProjects(db, ids),
+  ])
   return rows.map((row) =>
-    toSummary(toProjectBase(row, media, viewerId, publicApiUrl), totals.get(row.project.id) ?? 0),
+    toSummary(
+      toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
+      totals.get(row.project.id) ?? 0,
+    ),
   )
 }
 
@@ -315,20 +363,4 @@ export const isVisualVisibleTo = async (db: Database, storageKey: string, viewer
     .innerJoin(schema.project, eq(schema.project.id, schema.projectMedia.projectId))
     .where(and(eq(schema.projectMedia.storageKey, storageKey), visibleTo(viewerId)))
   return row !== undefined
-}
-
-/**
- * Les outils et leurs étiquettes, sans doublon d'étiquette (« Claude Code » et « claude-code »
- * sont le même outil : on garde le premier nom tapé).
- */
-export const withSlugs = (labels: string[]) => {
-  const tools: string[] = []
-  const toolSlugs: string[] = []
-  for (const label of labels) {
-    const slug = toolSlug(label)
-    if (toolSlugs.includes(slug)) continue
-    tools.push(label)
-    toolSlugs.push(slug)
-  }
-  return { tools, toolSlugs }
 }

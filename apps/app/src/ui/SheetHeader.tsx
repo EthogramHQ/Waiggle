@@ -122,8 +122,9 @@ export function SheetHeader({
         variant="headline"
         align={cancel ? 'center' : 'left'}
         heading={level}
-        // Sur sa ligne à lui (stacked), le titre prend les lignes qu'il lui faut : rien ne se coupe.
-        {...(layout === 'stacked' ? null : { numberOfLines: 2 })}
+        // Jamais coupé par « … » (des-C6 de R6b) : le titre nomme l'objet de la décision (« Ranger
+        // « La cabane à oiseaux » »), il passe à la ligne autant qu'il faut, à côté des boutons
+        // comme sur sa ligne à lui (stacked).
         {...(titleId ? { nativeID: titleId } : null)}
       >
         {title}

@@ -26,6 +26,18 @@ export const AccountExport = z
      * redevient libre ; null s'il n'en a pas. Le pseudo actuel est dans `user.handle`.
      */
     formerHandle: z.object({ handle: z.string(), reservedUntil: z.iso.datetime() }).nullable(),
+    /**
+     * R6b : les changements de catégorie faits par un administrateur sur ses projets (« ranger un
+     * projet »), des plus anciens aux plus récents, sans nommer l'administrateur (jur-T4).
+     */
+    categoryChanges: z.array(
+      z.object({
+        projectId: ProjectId,
+        from: z.string(),
+        to: z.string(),
+        at: z.iso.datetime(),
+      }),
+    ),
     /** Toutes les notes publiées sur ses projets, des plus anciennes aux plus récentes. */
     notes: z.array(
       z.object({

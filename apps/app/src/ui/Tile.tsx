@@ -1,5 +1,6 @@
 // Les tuiles (Miel 2, tranche R1) : de petites cartes de 150 sur 200 points, rangées en rangée qui
-// défile (les projets d'une ruche, d'un outil).
+// défile (les projets d'une ruche). Depuis R6b, elles servent aussi dans la mosaïque de la page
+// d'un outil (`TileMosaic`) : là, une tuile prend la largeur de sa colonne, plus 150 points fixes.
 // - ProjectTile : un projet, en miel, en crème ou en encre ; sa photo s'il en a une, son titre et
 //   son auteur. C'est un lien vers sa page, nommé par son titre, comme la carte d'un projet.
 // - AddTile : la tuile « + Ajouter », en pointillés de miel, au bout de la rangée ; un bouton (ou un
@@ -7,7 +8,7 @@
 // Toutes deux s'enfoncent sous le doigt (jeton `pressScale`), comme les boutons.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
 import { Image } from 'expo-image'
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode, type Ref, useContext } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Icon } from './Icon'
@@ -17,8 +18,24 @@ import { Text, type TextTone } from './Text'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 
-/** La taille d'une tuile, en points : sa largeur, et sa hauteur au moins (le texte agrandi l'allonge). */
-const TILE = { width: 150, height: 200 }
+/**
+ * La taille d'une tuile, en points : sa largeur dans une rangée qui défile, et sa hauteur au moins
+ * (le texte agrandi l'allonge). `tall` : la hauteur des rangées hautes d'une mosaïque.
+ */
+const TILE = { width: 150, height: 200, tall: 240 }
+
+/**
+ * Où vit une tuile. Seule, dans une rangée qui défile, elle garde ses 150 points de large. Dans une
+ * case de mosaïque (`TileMosaic`), elle prend la largeur de sa colonne et la hauteur de sa rangée,
+ * au moins `minHeight` : la mosaïque alterne des rangées hautes et basses, comme la planche.
+ */
+export type TileCell = { minHeight: number } | null
+
+/** Le contexte d'une case de mosaïque ; `null` hors d'une mosaïque. */
+export const TileCellContext = createContext<TileCell>(null)
+
+/** Les deux hauteurs des rangées d'une mosaïque : haute, puis basse, en alternance. */
+export const mosaicRowHeights = [TILE.tall, TILE.height] as const
 
 /** Les teintes d'une tuile de projet : le miel vif, la crème (le miel doux) ou l'encre. */
 export type TileVariant = 'honey' | 'cream' | 'ink'
@@ -34,18 +51,24 @@ function TileFrame({
   onPress,
   style,
   children,
+  frameRef,
 }: {
   label: string
   role: 'button' | 'link'
   onPress: () => void
   style: object
   children: ReactNode
+  frameRef?: Ref<View> | undefined
 }) {
   const scale = useSharedValue(1)
   const pressed = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  // Dans une mosaïque, la tuile remplit sa case (la largeur de sa colonne, la hauteur de sa rangée) :
+  // la vue qui s'enfonce et le cadre touchable s'étirent tous deux.
+  const cell = useContext(TileCellContext)
   return (
-    <Animated.View style={pressed}>
+    <Animated.View style={[pressed, cell ? { flexGrow: 1 } : null]}>
       <Pressable
+        ref={frameRef}
         accessibilityRole={role}
         accessibilityLabel={label}
         // Un lien s'ouvre avec Entrée sur le web (react-native-web ne le fait que pour un bouton).
@@ -58,8 +81,9 @@ function TileFrame({
           scale.value = spring(1)
         }}
         style={{
-          width: TILE.width,
-          minHeight: TILE.height,
+          ...(cell
+            ? { width: '100%', flexGrow: 1, minHeight: cell.minHeight }
+            : { width: TILE.width, minHeight: TILE.height }),
           borderRadius: radii.tile,
           overflow: 'hidden',
           ...style,
@@ -80,6 +104,11 @@ type ProjectTileProps = {
   variant?: TileVariant
   /** La photo de couverture ; sans elle, le titre prend la place, en plus grand. */
   image?: CoverImage | null
+  /**
+   * Le lien de la tuile, pour y poser le focus (R6b : la première tuile arrivée par « Afficher la
+   * suite », quand le bouton disparaît).
+   */
+  ref?: Ref<View>
 }
 
 export function ProjectTile({
@@ -88,6 +117,7 @@ export function ProjectTile({
   onPress,
   variant = 'honey',
   image = null,
+  ref,
 }: ProjectTileProps) {
   const { colors } = useTheme()
   // Chaque teinte a son fond et ses deux couleurs de texte, toutes mesurées dans contrastPairs :
@@ -104,6 +134,7 @@ export function ProjectTile({
       label={title}
       role="link"
       onPress={onPress}
+      frameRef={ref}
       style={{ backgroundColor: look.background, padding: space.sm, gap: space.sm }}
     >
       {image ? (

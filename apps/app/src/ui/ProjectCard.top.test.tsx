@@ -6,7 +6,7 @@
 import { space } from '@ruche/brand'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet, type ViewStyle } from 'react-native'
-import { CATEGORY_ICONS } from '../projects/categories'
+import { categoryName } from '../testing/categories'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { FollowButton } from './FollowButton'
@@ -25,7 +25,8 @@ const card = {
   when: 'il y a 3 h',
   status: { label: 'Testable', strong: true },
   image: { source: { uri: 'https://api.example/ciel.webp' }, label: 'Le ciel au crépuscule' },
-  category: { label: fr.t(($) => $.project.category.science), icon: CATEGORY_ICONS.science },
+  // R6b : nom et icône de la catégorie, venus de l'API (catégories de départ des tests).
+  category: { label: categoryName('science'), icon: 'planet' as const },
 }
 
 /** Le premier ancêtre (lui compris) qui répond à `test`. */

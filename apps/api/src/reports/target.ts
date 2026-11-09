@@ -24,6 +24,8 @@ import { type Blocks, blocksOf } from '../blocks/visibility'
 import { sees, viewerOf } from '../comments/load'
 import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
+import { favoriteToolsOf } from '../profile/tools'
+import { toolsOfProjects } from '../projects/load'
 import { projectVisibleTo } from '../projects/visibility'
 
 const p = schema.project
@@ -132,12 +134,14 @@ const loadVisible = async (
           pitch: p.pitch,
           description: p.description,
           prompts: p.prompts,
-          tools: p.tools,
           demoUrl: p.demoUrl,
         })
         .from(p)
         .where(and(eq(p.id, target.id), projectVisibleTo(viewerId)))
       if (!row) return null
+      // R6b : les outils par project_tool (le nom tapé par l'auteur pour un « Autre »), plus par
+      // l'ancienne colonne `project.tools`.
+      const tools = (await toolsOfProjects(db, [target.id])).get(target.id) ?? []
       // Les images du projet, dans l'ordre de la page (index project_media_project_idx : projet,
       // emplacement, position). Seule leur clé est lue : aucun fichier n'est copié.
       const media = await db
@@ -155,7 +159,7 @@ const loadVisible = async (
         { field: 'pitch', value: row.pitch },
         ...filled('description', row.description),
         ...row.prompts.flatMap((prompt) => filled('prompt', prompt)),
-        ...filled('tools', oneLine(row.tools)),
+        ...filled('tools', oneLine(tools.map((tool) => tool.label))),
         ...filled('demoUrl', row.demoUrl),
         // Chaque image, suivie de sa description si elle en a une (R6a, jur-J13) : la modération
         // sait ainsi quelle photo est décrite.
@@ -246,7 +250,6 @@ const loadVisible = async (
           name: schema.user.name,
           handle: schema.memberHandle.handle,
           bio: schema.profile.bio,
-          favoriteTools: schema.profile.favoriteTools,
           avatarKey: schema.profile.avatarKey,
         })
         .from(schema.user)
@@ -260,6 +263,8 @@ const loadVisible = async (
       if (blocks.ofMe.has(row.id) && !blocks.byMe.has(row.id)) return null
       const handle = row.handle ?? (await ensureHandle(db, row.id))
       if (handle === null) return null
+      // R6b : ses outils favoris, par profile_tool, avec le nom qu'il a tapé pour un « Autre ».
+      const favoriteTools = (await favoriteToolsOf(db, row.id)).map((tool) => tool.label)
       return {
         authorId: row.id,
         projectId: null,
@@ -268,7 +273,7 @@ const loadVisible = async (
           { field: 'name', value: row.name },
           { field: 'handle', value: handle },
           ...filled('bio', row.bio),
-          ...filled('favoriteTools', oneLine(row.favoriteTools ?? [])),
+          ...filled('favoriteTools', oneLine(favoriteTools)),
           ...filled('avatar', row.avatarKey),
         ],
       }

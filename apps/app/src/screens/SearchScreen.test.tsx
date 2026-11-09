@@ -4,13 +4,21 @@
 // nombre ; le surlignage ; l'annonce polie du nombre de résultats ; « rien trouvé », le quota, et
 // « Annuler ». Le hook de l'API (search/api.ts, useSearch) est remplacé par un faux, qui ne répond
 // qu'à partir de 2 caractères, comme le vrai.
+//
+// R6b (scénario « Les catégories en filtre », « La recherche ») : sur « Tout » et « Projets », un
+// bouton « Toutes les catégories » ouvre la feuille des catégories ; choisir « Cuisine » filtre le
+// groupe Projets, le bouton dit « Cuisine » (lu « Catégorie : Cuisine »), et l'adresse garde le
+// filtre (`/search?q=carn&category=cooking`). Les catégories viennent de GET /v1/categories, servi
+// par un faux réseau (`api/client`). L'écran passe la catégorie à `useSearch` en second argument.
 import { appName } from '@ruche/brand'
-import type { SearchMember, SearchProject, SearchResults, ToolCount } from '@ruche/contracts'
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import type { CatalogueTool, SearchMember, SearchProject, SearchResults } from '@ruche/contracts'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { Dimensions } from 'react-native'
+import { request } from '../api/client'
 import { ApiError } from '../api/errors'
 import { getMe } from '../profile/api'
 import { useSearch } from '../search/api'
+import { categoryList, categoryName } from '../testing/categories'
 import { leaMe } from '../testing/fixtures'
 import { pathOf } from '../testing/navigation'
 import { draftProject, recipesProject, summaryOf } from '../testing/projects'
@@ -28,6 +36,8 @@ jest.mock('../api/media', () => ({
 jest.mock('../navigation/TopNav', () => ({ TopNav: () => null }))
 jest.mock('../notifications/api', () => ({ useUnreadCount: () => 0 }))
 jest.mock('../search/api', () => ({ useSearch: jest.fn() }))
+// R6b : le faux réseau, pour GET /v1/categories.
+jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
 // Le cadre de page, tel quel, mais dont le test lit les propriétés : le titre de l'onglet du
 // navigateur (`pageTitle`) ne doit jamais contenir le texte cherché (relecture de sécurité, sec-A8).
 const mockScreenProps: Record<string, unknown>[] = []
@@ -48,20 +58,37 @@ const mockNavigate = jest.fn()
 const mockDismissTo = jest.fn()
 const mockBack = jest.fn()
 const mockSetParams = jest.fn()
-let mockParams: { q?: string | string[] } = {}
-jest.mock('expo-router', () => ({
-  usePathname: () => '/search',
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    navigate: mockNavigate,
-    dismissTo: mockDismissTo,
-    back: mockBack,
-    canGoBack: () => true,
-    setParams: mockSetParams,
-  }),
-  useLocalSearchParams: () => mockParams,
-}))
+let mockParams: { q?: string | string[]; category?: string } = {}
+/**
+ * R6b : une adresse « vivante » pour les tests du filtre : `setParams` y écrit, et l'écran qui la
+ * lit se redessine, comme avec le vrai routeur. Les tests d'avant R6b gardent une adresse figée.
+ */
+const mockLive = { on: false, listeners: new Set<() => void>() }
+jest.mock('expo-router', () => {
+  const { useSyncExternalStore } = require('react')
+  return {
+    usePathname: () => '/search',
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockReplace,
+      navigate: mockNavigate,
+      dismissTo: mockDismissTo,
+      back: mockBack,
+      canGoBack: () => true,
+      setParams: mockSetParams,
+    }),
+    useLocalSearchParams: () =>
+      useSyncExternalStore(
+        (listener: () => void) => {
+          mockLive.listeners.add(listener)
+          return () => {
+            mockLive.listeners.delete(listener)
+          }
+        },
+        () => mockParams,
+      ),
+  }
+})
 
 // --- Des résultats ---
 
@@ -86,7 +113,14 @@ const camille: SearchMember = {
   avatarUrl: null,
   followerCount: 12,
 }
-const carnivore: ToolCount = { slug: 'carnivore-ai', label: 'Carnivore AI', projectCount: 7 }
+// R6b : un outil du catalogue (son nom, sa famille, ses alias), plus une étiquette libre.
+const carnivore: CatalogueTool = {
+  slug: 'carnivore-ai',
+  name: 'Carnivore AI',
+  family: 'assistant',
+  aliases: [],
+  projectCount: 7,
+}
 
 /** La réponse de l'API pour « carn » : 3 projets, 1 membre, 1 outil. */
 const carnResults: SearchResults = {
@@ -143,6 +177,23 @@ beforeEach(() => {
     mock.mockReset()
   mockScreenProps.length = 0
   mockParams = { q: 'carn' }
+  mockLive.on = false
+  // R6b : l'adresse vivante, quand un test l'allume.
+  mockSetParams.mockImplementation((next: Record<string, string | undefined>) => {
+    if (!mockLive.on) return
+    const merged: Record<string, string> = {}
+    for (const [key, value] of Object.entries({ ...mockParams, ...next }))
+      if (typeof value === 'string' && value !== '') merged[key] = value
+    mockParams = merged
+    for (const listener of mockLive.listeners) listener()
+  })
+  jest
+    .mocked(request)
+    .mockReset()
+    .mockImplementation((async (path: string) =>
+      path.startsWith('/v1/categories')
+        ? { ok: true, data: categoryList('fr', { cooking: 3, animals: 1 }) }
+        : { ok: false, error: 'internal' }) as typeof request)
   jest.mocked(useSearch).mockReset()
   mockAnswer(answered(carnResults))
 })
@@ -618,5 +669,104 @@ describe('SearchScreen, the pictures of the rows (ui-reviewer C6)', () => {
     // Décoratives : cachées des lecteurs d'écran, on les cherche quand même.
     expect(screen.getByText('CC', { includeHiddenElements: true })).toBeTruthy()
     expect(screen.getByText('C', { includeHiddenElements: true })).toBeTruthy()
+  })
+})
+
+// R6b : le filtre par catégorie, sur le groupe Projets (scénario « La recherche »).
+describe('SearchScreen, the category filter (R6b)', () => {
+  const ALL = fr.t(($) => $.search.allCategories)
+  const COOKING = categoryName('cooking')
+  const chosen = (name: string) => fr.t(($) => $.search.categoryChosen, { name })
+  /** La pastille d'une catégorie dans la feuille : son nom, puis peut-être son nombre. */
+  const pillName = (name: string) => new RegExp(`^${name}(,|$)`)
+
+  /** La catégorie que l'écran passe à `useSearch` à chaque appel (second argument). */
+  const searchedCategories = () =>
+    jest.mocked(useSearch).mock.calls.map((call) => {
+      const second = (call as unknown[])[1]
+      if (typeof second === 'string') return second
+      if (second && typeof second === 'object' && 'category' in second)
+        return (second as { category?: string | null }).category ?? null
+      return null
+    })
+
+  beforeEach(() => {
+    mockLive.on = true
+    // L'API filtre le groupe Projets : avec « Cuisine », seul « Carnet de cafés » reste.
+    jest.mocked(useSearch).mockImplementation(((q: string, category?: unknown) => {
+      if (q.trim().length < 2) return queryResult({})
+      const code =
+        typeof category === 'string'
+          ? category
+          : (category as { category?: string } | undefined)?.category
+      return code === 'cooking'
+        ? answered({ ...carnResults, projects: { items: [cafes], more: false } })
+        : answered(carnResults)
+    }) as typeof useSearch)
+  })
+
+  it('offers « Toutes les catégories » on « Tout » and « Projets », never on « Membres »', async () => {
+    await renderSearch()
+
+    expect(await screen.findByRole('button', { name: ALL })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('radio', { name: tabName('projects', 3) }))
+    expect(screen.getByRole('button', { name: ALL })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('radio', { name: tabName('members', 1) }))
+
+    // Témoin : l'onglet Membres est là.
+    expect(screen.getByText('Camille Carnot')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: ALL })).toBeNull()
+  })
+
+  it('opens the sheet of the categories, whose names come from the API', async () => {
+    await renderSearch()
+
+    await fireEvent.press(await screen.findByRole('button', { name: ALL }))
+
+    expect(await screen.findByRole('radio', { name: pillName(COOKING) })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: pillName(categoryName('animals')) })).toBeTruthy()
+  })
+
+  it('keeps only the projects of « Cuisine » once chosen, closes the sheet, and the button says « Cuisine »', async () => {
+    await renderSearch()
+
+    await fireEvent.press(await screen.findByRole('button', { name: ALL }))
+    await fireEvent.press(await screen.findByRole('radio', { name: pillName(COOKING) }))
+
+    // Choisir applique et ferme : plus de pastille de catégorie à l'écran.
+    expect(screen.queryByRole('radio', { name: pillName(COOKING) })).toBeNull()
+    const button = await screen.findByRole('button', { name: chosen(COOKING) })
+    expect(within(button).getByText(COOKING)).toBeTruthy()
+    expect(searchedCategories().at(-1)).toBe('cooking')
+    expect(screen.getByText('Carnet de cafés')).toBeTruthy()
+    expect(screen.queryByText('Le carnet de jardin')).toBeNull()
+  })
+
+  it('writes the category into the address, without a new page in the history', async () => {
+    await renderSearch()
+
+    await fireEvent.press(await screen.findByRole('button', { name: ALL }))
+    await fireEvent.press(await screen.findByRole('radio', { name: pillName(COOKING) }))
+
+    expect(mockSetParams).toHaveBeenCalledWith(expect.objectContaining({ category: 'cooking' }))
+    expect(mockParams).toEqual({ q: 'carn', category: 'cooking' })
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('reads the category from the address (/search?q=carn&category=cooking)', async () => {
+    mockParams = { q: 'carn', category: 'cooking' }
+    await renderSearch()
+
+    expect(await screen.findByRole('button', { name: chosen(COOKING) })).toBeTruthy()
+    expect(searchedCategories().at(-1)).toBe('cooking')
+    expect(screen.queryByText('Le carnet de jardin')).toBeNull()
+  })
+
+  it('searches without a category by default (witness)', async () => {
+    await renderSearch()
+
+    expect(await screen.findByRole('button', { name: ALL })).toBeTruthy()
+    expect(searchedCategories().every((category) => category === null)).toBe(true)
   })
 })

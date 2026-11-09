@@ -118,6 +118,19 @@ const icons = [
   // R6a : la poignée d'une tuile de photo, et « Commencé en ».
   'dots-six-vertical',
   'calendar-blank',
+  // R6b : les icônes qu'un administrateur peut donner à une catégorie nouvelle
+  // (CATEGORY_ICON_CHOICES de @ruche/contracts ; house, chat-circle, camera, lightbulb, sparkle et
+  // heart y sont déjà).
+  'flower',
+  'tree',
+  'bicycle',
+  'car',
+  'book-open',
+  'microphone',
+  't-shirt',
+  'baby',
+  'globe',
+  'robot',
   // Versions pleines (onglet actif, réaction choisie)
   'house-fill',
   'compass-fill',

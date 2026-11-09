@@ -10,6 +10,8 @@ import {
   moderationAlertEmail,
   type NotificationLinks,
   newEmailVerificationEmail,
+  type OtherRecapData,
+  otherRecapEmail,
   passwordChangedEmail,
   type RecapData,
   recapEmail,
@@ -236,6 +238,8 @@ describe('the contact address in the footer', () => {
       explanation: 'Repeated insults.',
       afterReport: false,
     }),
+    // R6b : le récap des « Autre » aux administrateurs.
+    otherRecapEmail('fr', otherRecapData()),
   ]
 
   it('is written in every e-mail, as text and never as a link', () => {
@@ -280,6 +284,145 @@ describe('moderationAlertEmail', () => {
     const hrefs = [...email.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
     expect(hrefs).toContain(url)
     for (const href of hrefs) expect(href.startsWith('https://waiggle.com/'), href).toBe(true)
+  })
+})
+
+// ─── Tranche R6b : le récap des « Autre » aux administrateurs ───────────────────────────────────
+// Relecture juridique jur-T1, option A (plan R6b, décision 4) : des nombres et deux liens, rien de
+// plus. Les données de l'e-mail n'ont aucune place pour un texte de membre (nom d'outil, titre,
+// accroche, auteur) : le seul texte libre est le nom de l'administrateur qui le reçoit, désarmé
+// comme dans les autres e-mails. Ni image distante, ni lien de désinscription (un e-mail de
+// service aux administrateurs, comme l'alerte de modération).
+const OTHER_TOOLS_URL = 'https://waiggle.com/moderation/tools'
+const OTHER_CATEGORIES_URL = 'https://waiggle.com/moderation/categories'
+
+function otherRecapData(overrides: Partial<OtherRecapData> = {}): OtherRecapData {
+  return {
+    name: 'Louis',
+    tools: 3,
+    projects: 2,
+    older: 4,
+    toolsUrl: OTHER_TOOLS_URL,
+    projectsUrl: OTHER_CATEGORIES_URL,
+    ...overrides,
+  }
+}
+
+describe('otherRecapEmail', () => {
+  const hrefsOf = (html: string) => [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '')
+
+  it('gives the numbers of other tools and of projects to sort, with a button to each page', () => {
+    const email = otherRecapEmail('fr', otherRecapData())
+
+    expect(email.subject).toBe(fill(fr.otherRecap.subject))
+    expect(email.subject).toContain(appName)
+    expect(email.text).toContain('Bonjour Louis')
+    expect(email.text).toContain(fill(fr.otherRecap.tools_other, { count: '3' }))
+    expect(email.text).toContain(fill(fr.otherRecap.projects_other, { count: '2' }))
+    expect(email.text).toContain(fill(fr.otherRecap.older_other, { count: '4' }))
+    expect(email.text).toContain(fill(fr.otherRecap.reason))
+    expect(email.text).toContain(OTHER_TOOLS_URL)
+    expect(email.text).toContain(OTHER_CATEGORIES_URL)
+    expect(email.html).toContain(`>${fill(fr.otherRecap.toolsButton)}</a>`)
+    expect(email.html).toContain(`>${fill(fr.otherRecap.projectsButton)}</a>`)
+    expect(email.html).toContain(fill(fr.otherRecap.heading))
+  })
+
+  it('speaks in the singular, and in English for an English-speaking administrator', () => {
+    const one = otherRecapEmail('fr', otherRecapData({ tools: 1, projects: 1, older: 1 })).text
+    expect(one).toContain(fill(fr.otherRecap.tools_one, { count: '1' }))
+    expect(one).toContain(fill(fr.otherRecap.projects_one, { count: '1' }))
+    expect(one).toContain(fill(fr.otherRecap.older_one, { count: '1' }))
+
+    const english = otherRecapEmail('en', otherRecapData())
+    expect(english.subject).toBe(fill(en.otherRecap.subject))
+    expect(english.text).toContain(fill(en.otherRecap.tools_other, { count: '3' }))
+    expect(english.text).toContain(fill(en.otherRecap.projects_other, { count: '2' }))
+    expect(english.text).toContain(fill(en.otherRecap.older_other, { count: '4' }))
+    expect(english.html).toContain(`>${fill(en.otherRecap.toolsButton)}</a>`)
+  })
+
+  it('writes no line for a number that is zero', () => {
+    const email = otherRecapEmail('fr', otherRecapData({ tools: 0, projects: 2, older: 0 }))
+
+    expect(email.text).toContain(fill(fr.otherRecap.projects_other, { count: '2' }))
+    for (const zero of [
+      fill(fr.otherRecap.tools_other, { count: '0' }),
+      fill(fr.otherRecap.tools_one, { count: '0' }),
+      fill(fr.otherRecap.older_other, { count: '0' }),
+      fill(fr.otherRecap.older_one, { count: '0' }),
+    ]) {
+      expect(email.text, zero).not.toContain(zero)
+      expect(email.html, zero).not.toContain(zero)
+    }
+  })
+
+  it('shows no button to a page whose number is zero', () => {
+    // Relecture du design (e-mail) : « Voir les outils » sous un seul projet à ranger et aucun outil
+    // menait à une page vide. Chaque bouton n'apparaît que si son nombre dépasse zéro.
+    const projectsOnly = otherRecapEmail('fr', otherRecapData({ tools: 0, projects: 2, older: 0 }))
+    expect(projectsOnly.html).not.toContain(`>${fill(fr.otherRecap.toolsButton)}</a>`)
+    expect(hrefsOf(projectsOnly.html)).not.toContain(OTHER_TOOLS_URL)
+    expect(projectsOnly.text).not.toContain(OTHER_TOOLS_URL)
+    // Témoin : le bouton des projets, lui, est là.
+    expect(projectsOnly.html).toContain(`>${fill(fr.otherRecap.projectsButton)}</a>`)
+    expect(projectsOnly.text).toContain(OTHER_CATEGORIES_URL)
+
+    const toolsOnly = otherRecapEmail('fr', otherRecapData({ tools: 1, projects: 0, older: 0 }))
+    expect(toolsOnly.html).toContain(`>${fill(fr.otherRecap.toolsButton)}</a>`)
+    expect(toolsOnly.html).not.toContain(`>${fill(fr.otherRecap.projectsButton)}</a>`)
+    expect(toolsOnly.text).not.toContain(OTHER_CATEGORIES_URL)
+  })
+
+  it('has a text version, and no remote image, no unsubscribe link and no extra header', () => {
+    for (const language of ['fr', 'en'] as const) {
+      const email = otherRecapEmail(language, otherRecapData())
+
+      expect(email.text.trim().length).toBeGreaterThan(0)
+      expect(email.text).not.toMatch(/<[a-z]/i)
+      expect(email.html).not.toMatch(/<img|background=|url\(|unsubscribe/i)
+      expect(email.html).not.toMatch(/src="https?:/i)
+      expect(email.headers).toBeUndefined()
+    }
+  })
+
+  it('links to the two moderation pages only', () => {
+    const email = otherRecapEmail('fr', otherRecapData())
+
+    expect([...new Set(hrefsOf(email.html))].sort()).toEqual(
+      [OTHER_CATEGORIES_URL, OTHER_TOOLS_URL].sort(),
+    )
+  })
+
+  it('neutralises HTML and turns an address into « [lien] » in the name of the administrator', () => {
+    const french = otherRecapEmail(
+      'fr',
+      otherRecapData({ name: '<img src=x onerror=alert(1)> va sur pirate-outil.example' }),
+    )
+    const english = otherRecapEmail('en', otherRecapData({ name: 'Visit pirate-outil.example' }))
+
+    expect(french.html).not.toContain('<img')
+    expect(french.html).toContain('&lt;img')
+    for (const part of [french.text, french.html, english.text, english.html]) {
+      expect(part).not.toContain('pirate-outil.example')
+    }
+    expect(french.text).toContain('[lien]')
+    expect(english.text).toContain('[link]')
+    expect(hrefsOf(french.html).every((href) => href.startsWith('https://waiggle.com/'))).toBe(true)
+  })
+
+  // Adresse-E1 : un nom de 88 caractères sans espace faisait défiler la carte à 320 px ; la
+  // salutation se coupe désormais n'importe où, dans cet e-mail comme dans les autres.
+  it('breaks a long name without spaces in the greeting', () => {
+    const name = `Malik${'o'.repeat(83)}`
+    for (const email of [
+      otherRecapEmail('fr', otherRecapData({ name })),
+      verificationEmail('en', { name, url: 'https://api.waiggle.com/verify' }),
+    ]) {
+      expect(email.html).toMatch(
+        new RegExp(`<p style="[^"]*overflow-wrap:anywhere[^"]*">[^<]*${name}`),
+      )
+    }
   })
 })
 

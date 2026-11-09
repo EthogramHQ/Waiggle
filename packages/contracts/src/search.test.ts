@@ -17,8 +17,6 @@ import {
   SearchQuery,
   SearchResults,
   searchWords,
-  TOOL_LIST_MAX,
-  ToolList,
 } from './search'
 
 // Un numéro Unicode « à ignorer par défaut », écrit par son numéro : tapé tel quel, il serait
@@ -207,7 +205,7 @@ describe('SearchResults', () => {
     pitch: 'Chaque café goûté, noté.',
     status: 'testable',
     visibility: 'public',
-    tools: [{ label: 'Claude Code', slug: 'claude-code' }],
+    tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
     cover: null,
     demoUrl: null,
     portraitCover: null,
@@ -225,7 +223,8 @@ describe('SearchResults', () => {
     avatarUrl: null,
     followerCount: 12,
   }
-  const tool = { slug: 'notion', label: 'Notion', projectCount: 7 }
+  // R6b : un outil du catalogue (nom, famille, alias), plus un libellé tapé.
+  const tool = { slug: 'notion', name: 'Notion', family: 'no-code', aliases: [], projectCount: 7 }
   const empty = { items: [], more: false }
 
   it('always carries the three groups, even empty', () => {
@@ -272,7 +271,7 @@ describe('SearchResults', () => {
     expect(SearchMember.safeParse({ ...member, followerCount: -1 }).success).toBe(false)
   })
 
-  it('gives a found tool with its number of public projects', () => {
+  it('gives a found catalogue tool with its family and its number of projects', () => {
     expect(
       SearchResults.parse({
         projects: empty,
@@ -280,20 +279,5 @@ describe('SearchResults', () => {
         tools: { items: [tool], more: false },
       }).tools.items,
     ).toEqual([tool])
-  })
-})
-
-describe('ToolList', () => {
-  it('lists 500 tools at most', () => {
-    const tools = Array.from({ length: TOOL_LIST_MAX }, (_, i) => ({
-      slug: `tool-${i}`,
-      label: `Tool ${i}`,
-      projectCount: 1,
-    }))
-    expect(ToolList.safeParse({ tools }).success).toBe(true)
-    expect(
-      ToolList.safeParse({ tools: [...tools, { slug: 'extra', label: 'Extra', projectCount: 1 }] })
-        .success,
-    ).toBe(false)
   })
 })

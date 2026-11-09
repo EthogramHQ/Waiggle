@@ -5,17 +5,22 @@ import {
   Comment,
   DiscoverFeedPage,
   ErrorResponse,
+  foldTool,
   Me,
   Member,
+  OTHER_TOOLS_PER_DAY,
+  PROJECT_TOOLS_MAX,
   Project,
   ProjectNote,
   type ProjectSummary,
   SearchResults,
   startedMonthMax,
-  TagPage,
+  ToolPage,
+  toolSlug,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { sql } from 'drizzle-orm'
+import { fill, resources } from '@ruche/i18n'
+import { eq, type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
@@ -95,10 +100,11 @@ describe('publishing a project', () => {
     expect(project).toMatchObject({
       status: 'testable',
       demoUrl: 'https://recettes.example.com/', // enregistrée sous sa forme standard
-      // « claude-code » est la même étiquette que « Claude Code » : gardée une seule fois.
+      // « claude-code » est le même outil que « Claude Code » : gardé une seule fois. R6b :
+      // « Éclair 2.0 » n'est pas au catalogue, il devient un « Autre » (texte simple, sans page).
       tools: [
-        { label: 'Claude Code', slug: 'claude-code' },
-        { label: 'Éclair 2.0', slug: 'eclair-2-0' },
+        { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+        { label: 'Éclair 2.0', slug: 'eclair-2-0', inCatalogue: false },
       ],
       prompts: ['Propose trois recettes avec : {ingrédients}'],
     })
@@ -964,28 +970,9 @@ describe('a project published before R6a, without category', () => {
     expect(second.status).toBe(400)
     expect(await readProject(id)).toMatchObject({ visibility: 'private', secondaryCategory: null })
   })
-
-  it('never returns timeSpent, even for a project created before', async () => {
-    // La colonne reste en R6a (sec-A6 : effacée en R6b) ; ce qu'elle contient ne sort plus.
-    const old = await publishBeforeR6a({ ...recipes, tools: ['Claude'] })
-    await ctx.db.execute(sql`update project set time_spent = 'week' where id = ${old.id}`)
-    const leaId = Me.parse(await (await send('GET', '/v1/me', lea)).json()).id
-
-    for (const path of [
-      `/v1/projects/${old.id}`,
-      '/v1/feed/discover',
-      `/v1/members/${leaId}`,
-      '/v1/tags/claude',
-      '/v1/me/export',
-    ]) {
-      const res = await send('GET', path, path === '/v1/me/export' ? lea : max)
-      expect(res.status, path).toBe(200)
-      const raw = await res.text()
-      expect(raw, path).toContain(old.id)
-      expect(raw, path).not.toContain('timeSpent')
-      expect(raw, path).not.toContain('"week"')
-    }
-  })
+  // R6b : le test « never returns timeSpent » (qui écrivait time_spent en SQL brut) est retiré, la
+  // colonne n'existe plus (jur-P1) ; son absence est vérifiée par catalogue-migration.test.ts, et
+  // le refus de timeSpent reste plus haut.
 })
 
 describe('the lists carry the categories (R6a)', () => {
@@ -1009,7 +996,7 @@ describe('the lists carry the categories (R6a)', () => {
       item.kind === 'project' ? [item.project] : [],
     )
     const profile = Member.parse(await get(`/v1/members/${leaId}`)).projects
-    const tag = TagPage.parse(await get('/v1/tags/claude')).projects
+    const tag = ToolPage.parse(await get('/v1/tags/claude')).projects
     const search = SearchResults.parse(
       await get(`/v1/search?${new URLSearchParams({ q: 'télescope' })}`),
     ).projects.items
@@ -1030,11 +1017,410 @@ describe('the lists carry the categories (R6a)', () => {
   it('gives no category to the card of an old project', async () => {
     const old = await publishBeforeR6a({ ...recipes, tools: ['Claude'] })
 
-    const tag = TagPage.parse(await (await send('GET', '/v1/tags/claude', max)).json()).projects
+    const tag = ToolPage.parse(await (await send('GET', '/v1/tags/claude', max)).json()).projects
 
     expect(tag.find((card) => card.id === old.id)).toMatchObject({
       primaryCategory: null,
       secondaryCategory: null,
     })
+  })
+})
+
+// --- Tranche R6b : les outils d'un projet passent par le catalogue ---
+// Scénario : docs/scenarios/refonte.md, section R6b (« Choisir ses outils », « Où les outils
+// s'affichent ») ; relecture du plan : sec-A3, sec-A5, sec-B8 et les décisions 5 et 6 de la
+// session. Un nom tapé est rattaché à l'outil du catalogue qui porte ce nom ou cet alias (sans
+// accents, majuscules, espaces ni ponctuation : `foldTool`) ; sinon il devient un « Autre »,
+// partagé par tous ceux qui le tapent, et chaque projet garde le nom tel que son auteur l'a tapé.
+//
+// Les tables du catalogue (tool, tool_alias, project_tool, category) sont lues en SQL brut : elles
+// n'existent pas encore dans le schéma typé quand ces tests sont écrits. On compte sur les outils
+// que le scénario cite (« Claude », « ChatGPT », « Cursor ») : ils sont semés par la migration.
+
+/** Une requête SQL brute ; on précise nous-mêmes la forme du résultat. */
+const rows = async <T>(query: SQL) =>
+  ((await ctx.db.execute(query)) as unknown as { rows: T[] }).rows
+
+type ToolRow = {
+  slug: string
+  name: string
+  folded: string
+  status: string
+  family: string | null
+  created_by: string | null
+}
+
+/** Les outils qui ne sont pas au catalogue (« Autre »), par nom replié. */
+const otherTools = () =>
+  rows<ToolRow>(
+    sql`select slug, name, folded, status, family, created_by from tool where status <> 'catalogue' order by folded`,
+  )
+
+/** Les outils d'un projet tels que la base les range : dans l'ordre choisi, avec le nom tapé. */
+const toolsOf = (projectId: string) =>
+  rows<{ name: string; label: string | null; status: string }>(
+    sql`select t.name, pt.label, t.status from project_tool pt join tool t on t.id = pt.tool_id where pt.project_id = ${projectId} order by pt.position`,
+  )
+
+/** Les anciennes colonnes de texte, encore écrites jusqu'en R7 (retour possible à R6a). */
+const legacyColumns = async (projectId: string) =>
+  (
+    await ctx.db
+      .select({ tools: schema.project.tools, toolSlugs: schema.project.toolSlugs })
+      .from(schema.project)
+      .where(eq(schema.project.id, projectId))
+  )[0]
+
+const patchTools = (id: string, tools: string[], cookie = lea) =>
+  send('PATCH', `/v1/projects/${id}`, cookie, { tools })
+
+describe('choosing the tools of a project in the catalogue (R6b)', () => {
+  it('links a catalogue name, whatever its case, spaces and accents, to the catalogue tool', async () => {
+    const project = await publish({ ...recipes, tools: ['claude', 'CHAT GPT'] })
+
+    const expected = [
+      { label: 'Claude', slug: 'claude', inCatalogue: true },
+      { label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true },
+    ]
+    expect(project.tools).toEqual(expected)
+    expect((await readProject(project.id, max)).tools).toEqual(expected)
+    // Un outil du catalogue ne garde pas de nom tapé : son nom est celui du catalogue.
+    expect(await toolsOf(project.id)).toEqual([
+      { name: 'Claude', label: null, status: 'catalogue' },
+      { name: 'ChatGPT', label: null, status: 'catalogue' },
+    ])
+    // Aucun « Autre » n'a été créé.
+    expect(await otherTools()).toEqual([])
+  })
+
+  it('links an alias to its catalogue tool, never creating an « other »', async () => {
+    // Un autre nom de Claude, posé ici pour ne pas dépendre de la liste des alias du catalogue.
+    await ctx.db.execute(
+      sql`insert into tool_alias (folded, tool_id) select 'claudeai', id from tool where folded = 'claude' and status = 'catalogue' on conflict do nothing`,
+    )
+    expect(
+      await rows<{ name: string }>(
+        sql`select t.name from tool_alias a join tool t on t.id = a.tool_id where a.folded = 'claudeai'`,
+      ),
+    ).toEqual([{ name: 'Claude' }])
+
+    const project = await publish({ ...recipes, tools: ['Claude A.I.'] })
+
+    expect(project.tools).toEqual([{ label: 'Claude', slug: 'claude', inCatalogue: true }])
+    expect(await otherTools()).toEqual([])
+  })
+
+  it('creates an « other » for an unknown name, shown as plain text under the name typed', async () => {
+    const project = await publish({ ...recipes, tools: ['Teachable Machine', 'Claude'] })
+
+    expect(project.tools).toEqual([
+      { label: 'Teachable Machine', slug: 'teachable-machine', inCatalogue: false },
+      { label: 'Claude', slug: 'claude', inCatalogue: true },
+    ])
+    expect((await readProject(project.id, max)).tools).toEqual(project.tools)
+    // Un « Autre » n'a ni famille ni auteur (décision 5 : created_by toujours nul).
+    expect(await otherTools()).toEqual([
+      {
+        slug: 'teachable-machine',
+        name: 'Teachable Machine',
+        folded: 'teachablemachine',
+        status: 'other',
+        family: null,
+        created_by: null,
+      },
+    ])
+    expect(await toolsOf(project.id)).toEqual([
+      { name: 'Teachable Machine', label: 'Teachable Machine', status: 'other' },
+      { name: 'Claude', label: null, status: 'catalogue' },
+    ])
+  })
+
+  it('adds the same « other » for two members who type it differently, each keeping the name he typed', async () => {
+    const mine = await publish({ ...recipes, tools: ['Teachable Machine'] })
+    const his = await publish(
+      { ...recipes, title: 'Projet de Max', tools: ['TEACHABLE machine'] },
+      max,
+    )
+
+    // Un seul « Autre », au nom du premier qui l'a tapé.
+    expect((await otherTools()).map(({ name, folded }) => ({ name, folded }))).toEqual([
+      { name: 'Teachable Machine', folded: 'teachablemachine' },
+    ])
+    // sec-B8 : sur le projet de Max, le nom tel que Max l'a tapé, jamais l'écriture de Léa.
+    expect((await readProject(his.id, lea)).tools).toEqual([
+      { label: 'TEACHABLE machine', slug: 'teachable-machine', inCatalogue: false },
+    ])
+    expect((await readProject(mine.id, max)).tools).toEqual([
+      { label: 'Teachable Machine', slug: 'teachable-machine', inCatalogue: false },
+    ])
+  })
+
+  it('keeps the tools in the order chosen, each tool once', async () => {
+    const project = await publish({
+      ...recipes,
+      tools: ['Teachable Machine', 'cursor', 'Claude', 'teachable-machine', 'CLAUDE'],
+    })
+
+    expect(project.tools.map((tool) => tool.label)).toEqual([
+      'Teachable Machine',
+      'Cursor',
+      'Claude',
+    ])
+    expect((await toolsOf(project.id)).map((tool) => tool.name)).toEqual([
+      'Teachable Machine',
+      'Cursor',
+      'Claude',
+    ])
+  })
+
+  it('accepts 15 tools and refuses a 16th, at creation as in an update', async () => {
+    const fifteen = Array.from({ length: PROJECT_TOOLS_MAX }, (_, i) => `Outil maison ${i + 1}`)
+    const project = await publish({ ...recipes, tools: fifteen })
+    expect(await toolsOf(project.id)).toHaveLength(15)
+
+    const creation = await send('POST', '/v1/projects', lea, {
+      ...recipes,
+      tools: [...fifteen, 'Claude'],
+    })
+    const update = await patchTools(project.id, [...fifteen, 'Claude'])
+
+    expect([creation.status, update.status]).toEqual([400, 400])
+    expect(await toolsOf(project.id)).toHaveLength(15)
+    expect(await ctx.db.select().from(schema.project)).toHaveLength(1)
+  })
+
+  it('replaces the tools in an update, and keeps them when the update does not mention them', async () => {
+    const { id } = await publish({ ...recipes, tools: ['Claude', 'Teachable Machine'] })
+
+    expect((await send('PATCH', `/v1/projects/${id}`, lea, { status: 'done' })).status).toBe(200)
+    expect((await toolsOf(id)).map((tool) => tool.name)).toEqual(['Claude', 'Teachable Machine'])
+
+    const res = await patchTools(id, ['Cursor', 'claude'])
+
+    expect(res.status).toBe(200)
+    expect(Project.parse(await res.json()).tools).toEqual([
+      { label: 'Cursor', slug: 'cursor', inCatalogue: true },
+      { label: 'Claude', slug: 'claude', inCatalogue: true },
+    ])
+    expect((await toolsOf(id)).map((tool) => tool.name)).toEqual(['Cursor', 'Claude'])
+  })
+
+  it('still writes the former tool columns, with the names and slugs found in the catalogue', async () => {
+    // Décision du plan : tools et tool_slugs restent écrits jusqu'en R7, pour qu'un retour à R6a
+    // retrouve les outils ; ils ne sont plus lus.
+    const { id } = await publish({ ...recipes, tools: ['chat gpt', 'Teachable Machine'] })
+
+    expect(await legacyColumns(id)).toEqual({
+      tools: ['ChatGPT', 'Teachable Machine'],
+      toolSlugs: ['chatgpt', 'teachable-machine'],
+    })
+
+    expect((await patchTools(id, ['CURSOR'])).status).toBe(200)
+    expect(await legacyColumns(id)).toEqual({ tools: ['Cursor'], toolSlugs: ['cursor'] })
+  })
+
+  it('gives the suffix -2 to an « other » whose slug is already taken by a different folded name', async () => {
+    // « Zorblax ✨ » et « Zorblax » ne sont pas le même outil (l'emoji compte dans le nom replié),
+    // mais leur identifiant d'adresse serait le même : le second prend « zorblax-2 » (sec-A3).
+    const sparkle = String.fromCodePoint(0x2728)
+    // Témoin du contrat : deux noms repliés différents, un même identifiant d'adresse.
+    expect(foldTool(`Zorblax ${sparkle}`)).not.toBe(foldTool('Zorblax'))
+    expect(toolSlug(`Zorblax ${sparkle}`)).toBe(toolSlug('Zorblax'))
+    const plain = await publish({ ...recipes, tools: ['Zorblax'] })
+    const fancy = await publish({ ...recipes, title: 'Le second', tools: [`Zorblax ${sparkle}`] })
+
+    expect(plain.tools).toEqual([{ label: 'Zorblax', slug: 'zorblax', inCatalogue: false }])
+    expect(fancy.tools).toEqual([
+      // sec-B2 : la réponse donne le slug du nom tapé, jamais le suffixe partagé, qui dirait
+      // qu'un autre membre a déjà tapé « Zorblax » ; la base garde bien les deux adresses.
+      { label: `Zorblax ${sparkle}`, slug: 'zorblax', inCatalogue: false },
+    ])
+    expect((await otherTools()).map((tool) => tool.slug).sort()).toEqual(['zorblax', 'zorblax-2'])
+  })
+})
+
+describe('the categories of a project are read in the base (R6b)', () => {
+  /** Une demande dans une langue donnée, pour lire le message traduit. */
+  const ask = (method: string, path: string, body: object, language: string) =>
+    ctx.request(path, {
+      method,
+      headers: { cookie: lea, 'content-type': 'application/json', 'accept-language': language },
+      body: JSON.stringify(body),
+    })
+
+  it('refuses an unknown category code with a translated 400 unknown_category', async () => {
+    // Depuis R6b, le contrat accepte tout code bien formé : c'est l'API qui le cherche en base.
+    const creation = await ask(
+      'POST',
+      '/v1/projects',
+      { ...recipes, primaryCategory: 'jardinage' },
+      'fr',
+    )
+
+    expect(creation.status).toBe(400)
+    expect((await errorOf(creation)).error).toEqual({
+      code: 'unknown_category',
+      message: fill(resources.fr.translation.errors.unknownCategory),
+    })
+    expect(await ctx.db.select().from(schema.project)).toHaveLength(0)
+
+    const { id } = await publish()
+    const update = await ask(
+      'PATCH',
+      `/v1/projects/${id}`,
+      { secondaryCategory: 'jardinage' },
+      'en',
+    )
+
+    expect(update.status).toBe(400)
+    expect((await errorOf(update)).error).toEqual({
+      code: 'unknown_category',
+      message: fill(resources.en.translation.errors.unknownCategory),
+    })
+    expect((await readProject(id)).secondaryCategory).toBeNull()
+  })
+
+  it('accepts a category created in the base after the sixteen of R6a', async () => {
+    // Comme si un administrateur l'avait créée : la catégorie existe, le projet peut la prendre.
+    const createdAt = new Date().toISOString()
+    await ctx.db.execute(
+      sql`insert into category (code, name_fr, name_en, icon, position, created_at) values ('jardinage', 'Jardinage', 'Gardening', 'flower', (select max(position) + 1 from category), ${createdAt}::timestamptz at time zone 'UTC')`,
+    )
+
+    const project = await publish({ ...recipes, primaryCategory: 'jardinage' })
+    const res = await send('PATCH', `/v1/projects/${project.id}`, lea, {
+      primaryCategory: 'cooking',
+      secondaryCategory: 'jardinage',
+    })
+
+    expect(project.primaryCategory).toBe('jardinage')
+    expect(res.status).toBe(200)
+    expect(await readProject(project.id, max)).toMatchObject({
+      primaryCategory: 'cooking',
+      secondaryCategory: 'jardinage',
+    })
+  })
+})
+
+// Décision 5 de la session (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
+// sa dernière référence (projet, profil, compte) ; la purge de nuit n'est qu'un filet.
+describe('an « other » tool lives as long as something cites it (R6b)', () => {
+  it('deletes an « other » tool when the last project or profile citing it drops it', async () => {
+    const first = await publish({ ...recipes, tools: ['Teachable Machine'] })
+    const second = await publish({
+      ...recipes,
+      title: 'Le second',
+      tools: ['Teachable Machine', 'Claude'],
+    })
+
+    expect((await patchTools(first.id, [])).status).toBe(200)
+    // Le second projet le cite encore : il reste.
+    expect((await otherTools()).map((tool) => tool.name)).toEqual(['Teachable Machine'])
+
+    expect((await send('DELETE', `/v1/projects/${second.id}`, lea)).status).toBe(204)
+    expect(await otherTools()).toEqual([])
+    // Un outil du catalogue, lui, ne s'efface jamais, même quand plus rien ne le cite.
+    expect(
+      await rows(sql`select 1 from tool where folded = 'claude' and status = 'catalogue'`),
+    ).toHaveLength(1)
+  })
+
+  it("keeps an « other » tool cited by another member's project when one project drops it", async () => {
+    const mine = await publish({ ...recipes, tools: ['Teachable Machine'] })
+    const his = await publish(
+      { ...recipes, title: 'Projet de Max', tools: ['teachable machine'] },
+      max,
+    )
+
+    expect((await send('DELETE', `/v1/projects/${mine.id}`, lea)).status).toBe(204)
+
+    expect((await otherTools()).map((tool) => tool.folded)).toEqual(['teachablemachine'])
+    expect((await readProject(his.id, max)).tools).toEqual([
+      { label: 'teachable machine', slug: 'teachable-machine', inCatalogue: false },
+    ])
+  })
+})
+
+describe('the daily limit of new « other » tools (R6b, sec-A5)', () => {
+  // Une fausse horloge, pour passer au lendemain. Seule Date est remplacée (voir feed.test.ts).
+  beforeEach(() => {
+    const now = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const names = (from: number, count: number) =>
+    Array.from({ length: count }, (_, i) => `Outil maison ${from + i}`)
+
+  it('refuses the 31st new « other » tool of a member in a day with 429, counting the creations undone with their project', async () => {
+    expect(OTHER_TOOLS_PER_DAY).toBe(30)
+    // Les créations se comptent avant l'écriture, et une création défaite compte quand même : 15
+    // « Autre » créés, puis effacés avec leur projet (ils ne sont plus cités), comptent pour 15.
+    // Sans cela, publier et effacer en boucle gonflerait la base sans fin.
+    const first = await publish({ ...recipes, tools: names(1, 15) })
+    expect((await send('DELETE', `/v1/projects/${first.id}`, lea)).status).toBe(204)
+    expect(await otherTools()).toEqual([])
+    // Les mêmes noms, recréés : 30 créations aujourd'hui.
+    await publish({ ...recipes, title: 'Le second', tools: names(1, 15) })
+    // Témoin : un outil du catalogue et un « Autre » qui existe déjà ne sont pas des créations.
+    const third = await publish({
+      ...recipes,
+      title: 'Le troisième',
+      tools: ['Claude', 'Outil maison 1'],
+    })
+
+    const res = await patchTools(third.id, ['Claude', 'Outil maison 1', 'Outil maison 31'])
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('retry-after')).toBeTruthy()
+    expect((await errorOf(res)).error).toEqual({
+      code: 'too_many_other_tools',
+      message: fill(resources.fr.translation.errors.tooManyOtherTools),
+    })
+    // Rien de la demande n'est gardé : ni l'outil, ni le changement du projet.
+    expect((await readProject(third.id)).tools.map((tool) => tool.label)).toEqual([
+      'Claude',
+      'Outil maison 1',
+    ])
+    expect((await otherTools()).map((tool) => tool.name)).not.toContain('Outil maison 31')
+
+    // Chaque membre a sa limite : Max crée le sien.
+    const his = await publish(
+      { ...recipes, title: 'Projet de Max', tools: ['Outil maison 31'] },
+      max,
+    )
+    expect(his.tools).toEqual([
+      { label: 'Outil maison 31', slug: 'outil-maison-31', inCatalogue: false },
+    ])
+    // Le lendemain, Léa en crée de nouveau.
+    vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000 + 60 * 1000)
+    expect((await patchTools(third.id, ['Claude', 'Outil maison 32'])).status).toBe(200)
+  })
+
+  // Relecture de sécurité sec-B1 (décision de Louis du 9/11/2026 au soir) : le quota épuisé, un nom
+  // hors du catalogue est refusé qu'un autre membre l'ait déjà tapé ou non. Sinon le 429 dirait
+  // « personne n'a jamais tapé ce nom », et le 200 « quelqu'un l'a tapé » (projet privé compris).
+  it('answers 429 the same way for a new and an already typed « other » name once the quota is spent', async () => {
+    // Max tape « Zorblax Secret » sur un projet privé : un « Autre » que Léa ne voit nulle part.
+    await publish(
+      { ...recipes, title: 'Carnet de Max', visibility: 'private', tools: ['Zorblax Secret'] },
+      max,
+    )
+    await publish({ ...recipes, tools: names(1, 15) })
+    const project = await publish({ ...recipes, title: 'Le second', tools: names(16, 15) })
+
+    const typed = await patchTools(project.id, ['Zorblax Secret'])
+    const fresh = await patchTools(project.id, ['Zorblax Inédit'])
+
+    for (const res of [typed, fresh]) {
+      expect(res.status).toBe(429)
+      expect(res.headers.get('retry-after')).toBeTruthy()
+    }
+    expect(await typed.text()).toBe(await fresh.text())
+    // Témoin : un nom du catalogue passe, et ses propres « Autre » déjà cités aussi.
+    expect((await patchTools(project.id, ['Claude', 'Outil maison 1'])).status).toBe(200)
   })
 })

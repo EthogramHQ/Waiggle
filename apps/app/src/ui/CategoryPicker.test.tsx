@@ -15,11 +15,11 @@
 //   choisie (`project.form.categoryRank1`, `categoryRank2`) ;
 // - les annonces viennent des traductions (`project.form.categoryPromoted`, `categoryReplaced`) ;
 // - `nextCategories(current, value)`, pure et exportée : le choix qui suit un toucher.
-import { PROJECT_CATEGORIES, type ProjectCategory } from '@ruche/contracts'
+import type { ProjectCategory } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { AccessibilityInfo, Platform } from 'react-native'
-import { CATEGORY_ICONS } from '../projects/categories'
+import { categoryList, categoryName } from '../testing/categories'
 import { renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
 import { CategoryPicker, nextCategories } from './CategoryPicker'
@@ -30,11 +30,13 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 /** Les blancs de la typographie française (insécables, fines) ramenés à des espaces. */
 const plain = (text: string) => text.replace(/\s+/g, ' ')
 
-const name = (value: ProjectCategory) => fr.t(($) => $.project.category[value])
-const options = PROJECT_CATEGORIES.map((value) => ({
-  value,
-  label: name(value),
-  icon: CATEGORY_ICONS[value],
+// R6b : les noms et les icônes des catégories viennent de l'API (GET /v1/categories), plus des
+// traductions ; les choix du test sont ceux des seize catégories de départ, dans leur ordre.
+const name = (value: ProjectCategory) => categoryName(value)
+const options = categoryList('fr').categories.map((category) => ({
+  value: category.code,
+  label: category.name,
+  icon: category.icon,
 }))
 const rankLabels = {
   primary: (category: string) => fr.t(($) => $.project.form.categoryRank1, { category }),

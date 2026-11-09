@@ -1,8 +1,9 @@
 // Tests d'intégration de la tranche 2 : le profil, la langue et l'avatar.
 // Scénarios : docs/scenarios/phase-1.md, tranche 2.
-import { ErrorResponse, Me } from '@ruche/contracts'
+import { ErrorResponse, FAVORITE_TOOLS_MAX, Me, Member } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
+import { eq, type SQL, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -166,6 +167,171 @@ describe('completing my profile', () => {
     const data = (await res.json()) as { user: Me }
 
     expect(data.user).toMatchObject({ bio: 'Ma bio', favoriteTools: ['Claude'] })
+  })
+})
+
+// --- Tranche R6b : les outils favoris se choisissent dans le catalogue ---
+// Scénario : docs/scenarios/refonte.md, section R6b (« Choisir ses outils » : « le profil n'a plus
+// de champ de texte séparé par des virgules… 10 au plus ») ; décisions 5, 6 et 14 de la session.
+// Comme pour un projet : un nom du catalogue ou d'un alias est rattaché à l'outil, un autre nom
+// devient un « Autre » partagé, et chaque membre garde le nom tel qu'il l'a tapé. Les tables du
+// catalogue (tool, profile_tool) sont lues en SQL brut : elles n'existent pas encore dans le
+// schéma typé quand ces tests sont écrits.
+describe('my favourite tools, chosen in the catalogue (R6b)', () => {
+  const max = { name: 'Max', email: 'max@example.com', password: 'another-long-password' }
+
+  /** Une requête SQL brute ; on précise nous-mêmes la forme du résultat. */
+  const rows = async <T>(query: SQL) =>
+    ((await ctx.db.execute(query)) as unknown as { rows: T[] }).rows
+
+  /** Les favoris d'un membre tels que la base les range : dans l'ordre choisi, avec le nom tapé. */
+  const favouritesOf = (userId: string) =>
+    rows<{ name: string; label: string | null; status: string }>(
+      sql`select t.name, pt.label, t.status from profile_tool pt join tool t on t.id = pt.tool_id where pt.user_id = ${userId} order by pt.position`,
+    )
+
+  /** Les noms des « Autre » encore en base. */
+  const otherNames = async () =>
+    (
+      await rows<{ name: string }>(
+        sql`select name from tool where status <> 'catalogue' order by folded`,
+      )
+    ).map(({ name }) => name)
+
+  const patchAs = (who: string, body: unknown) =>
+    ctx.request('/v1/me', {
+      method: 'PATCH',
+      headers: { cookie: who, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  const meOf = async (who: string) =>
+    Me.parse(await (await ctx.request('/v1/me', { headers: { cookie: who } })).json())
+
+  it('links each favourite tool to the catalogue or to a shared « other », in the order chosen', async () => {
+    const res = await patchMe({ favoriteTools: ['chat gpt', 'Teachable Machine', 'claude'] })
+
+    expect(res.status).toBe(200)
+    const me = await getMe()
+    expect(me.favoriteTools).toEqual(['ChatGPT', 'Teachable Machine', 'Claude'])
+    expect(await favouritesOf(me.id)).toEqual([
+      { name: 'ChatGPT', label: null, status: 'catalogue' },
+      { name: 'Teachable Machine', label: 'Teachable Machine', status: 'other' },
+      { name: 'Claude', label: null, status: 'catalogue' },
+    ])
+    // Sur la page du membre : un outil du catalogue mène à sa page, un « Autre » non.
+    const page = Member.parse(
+      await (await ctx.request(`/v1/members/${me.id}`, { headers: { cookie } })).json(),
+    )
+    expect(page.favoriteTools).toEqual([
+      { label: 'ChatGPT', slug: 'chatgpt', inCatalogue: true },
+      { label: 'Teachable Machine', slug: 'teachable-machine', inCatalogue: false },
+      { label: 'Claude', slug: 'claude', inCatalogue: true },
+    ])
+  })
+
+  it('treats « Chat GPT » and « ChatGPT » as the same favourite tool', async () => {
+    expect((await patchMe({ favoriteTools: ['Chat GPT', 'ChatGPT', 'chatgpt'] })).status).toBe(200)
+
+    const me = await getMe()
+    expect(me.favoriteTools).toEqual(['ChatGPT'])
+    expect(await favouritesOf(me.id)).toHaveLength(1)
+  })
+
+  it('keeps 10 favourite tools at most', async () => {
+    const ten = Array.from({ length: FAVORITE_TOOLS_MAX }, (_, i) => `Outil maison ${i + 1}`)
+    expect((await patchMe({ favoriteTools: ten })).status).toBe(200)
+    const { id } = await getMe()
+    expect(await favouritesOf(id)).toHaveLength(10)
+
+    const res = await patchMe({ favoriteTools: [...ten, 'Claude'] })
+
+    expect(res.status).toBe(400)
+    expect((await getMe()).favoriteTools).toEqual(ten)
+    expect(await favouritesOf(id)).toHaveLength(10)
+  })
+
+  it('replaces the favourite tools, and keeps them when a change does not mention them', async () => {
+    await patchMe({ favoriteTools: ['Claude', 'Cursor'] })
+    const { id } = await getMe()
+
+    expect((await patchMe({ bio: 'Je bricole.' })).status).toBe(200)
+    expect((await favouritesOf(id)).map(({ name }) => name)).toEqual(['Claude', 'Cursor'])
+
+    expect((await patchMe({ favoriteTools: ['cursor'] })).status).toBe(200)
+    expect((await favouritesOf(id)).map(({ name }) => name)).toEqual(['Cursor'])
+    expect((await getMe()).favoriteTools).toEqual(['Cursor'])
+  })
+
+  it('still writes the former column of favourite tools, with the names found in the catalogue', async () => {
+    // Décision du plan : profile.favorite_tools reste écrite jusqu'en R7 (retour possible à R6a).
+    await patchMe({ favoriteTools: ['chat gpt', 'Teachable Machine'] })
+    const { id } = await getMe()
+
+    const [row] = await ctx.db
+      .select({ favoriteTools: schema.profile.favoriteTools })
+      .from(schema.profile)
+      .where(eq(schema.profile.userId, id))
+    expect(row?.favoriteTools).toEqual(['ChatGPT', 'Teachable Machine'])
+  })
+
+  it('keeps for each member the name he typed for a shared « other »', async () => {
+    const maxCookie = await ctx.verifiedMember(max)
+    await patchMe({ favoriteTools: ['Teachable Machine'] })
+    expect((await patchAs(maxCookie, { favoriteTools: ['TEACHABLE machine'] })).status).toBe(200)
+
+    // Un seul « Autre » en base ; chacun lit son écriture (sec-B8).
+    expect(await otherNames()).toEqual(['Teachable Machine'])
+    expect((await meOf(maxCookie)).favoriteTools).toEqual(['TEACHABLE machine'])
+    expect((await getMe()).favoriteTools).toEqual(['Teachable Machine'])
+  })
+
+  it('deletes an « other » tool when the last project or profile citing it drops it', async () => {
+    await patchMe({ favoriteTools: ['Teachable Machine'] })
+    const created = await ctx.request('/v1/projects', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Mon trieur de photos',
+        pitch: 'Il range les photos de famille.',
+        primaryCategory: 'photo-video',
+        tools: ['teachable machine'],
+      }),
+    })
+    expect(created.status).toBe(201)
+    const { id } = (await created.json()) as { id: string }
+
+    // Le projet l'abandonne : le profil le cite encore, il reste.
+    const dropped = await ctx.request(`/v1/projects/${id}`, {
+      method: 'PATCH',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ tools: [] }),
+    })
+    expect(dropped.status).toBe(200)
+    expect(await otherNames()).toEqual(['Teachable Machine'])
+
+    // Le profil l'abandonne aussi : plus rien ne le cite, il disparaît.
+    expect((await patchMe({ favoriteTools: ['Claude'] })).status).toBe(200)
+    expect(await otherNames()).toEqual([])
+  })
+
+  it('deletes my « other » tools with my account, and keeps those another member cites', async () => {
+    // Décision 14 de la session : les « Autre » orphelins du compte supprimé sont effacés, les
+    // partagés gardés (sans auteur, de toute façon).
+    const maxCookie = await ctx.verifiedMember(max)
+    await patchMe({ favoriteTools: ['Mon robot maison', 'Teachable Machine'] })
+    await patchAs(maxCookie, { favoriteTools: ['teachable machine'] })
+    expect(await otherNames()).toEqual(['Mon robot maison', 'Teachable Machine'])
+
+    const res = await ctx.request('/api/auth/delete-user', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: lea.password }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(await otherNames()).toEqual(['Teachable Machine'])
+    expect((await meOf(maxCookie)).favoriteTools).toEqual(['teachable machine'])
   })
 })
 

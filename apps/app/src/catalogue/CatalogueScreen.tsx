@@ -68,6 +68,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
+import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
 import { CommentCardCatalogue } from './commentaires-carte'
 import { CommentComposerCatalogue } from './commentaires-composer'
@@ -95,8 +96,16 @@ import { MaterialsCatalogue } from './matieres'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
+import { AdminCardsCatalogue } from './outils-administration'
+import { ToolFieldCatalogue } from './outils-champ'
+import { ToolHeaderCatalogue } from './outils-entete'
+import { ToolTagsCatalogue } from './outils-etiquettes'
+import { ToolFiltersCatalogue } from './outils-filtres'
+import { AdminGesturesCatalogue } from './outils-gestes'
+import { ToolPageSheetsCatalogue } from './outils-page'
 import { ProjectPartsCatalogue } from './projet-auteur'
 import { CapsuleCatalogue } from './projet-capsule'
+import { ProjectCategoryCatalogue } from './projet-categorie'
 import { ProjectFrameCatalogue } from './projet-ecran'
 import { FanCatalogue } from './projet-eventail'
 import { GalleryCatalogue } from './projet-galerie'
@@ -855,6 +864,14 @@ export function CatalogueScreen() {
       <FeedCatalogue />
       <ExploreCatalogue />
       <ToolsCatalogue />
+      <InvalidChoicesCatalogue />
+      <ToolTagsCatalogue />
+      <ToolFiltersCatalogue />
+      <ToolFieldCatalogue />
+      <ToolHeaderCatalogue />
+      <AdminCardsCatalogue />
+      <AdminGesturesCatalogue />
+      <ToolPageSheetsCatalogue />
       <SearchCatalogue />
       {/* Tranche R5a, la page projet : le socle (prudence, dépliant, paire de boutons ; cadre de
           l'écran et place flottante), puis les pièces dans l'ordre de la page : galerie, en-tête et
@@ -864,6 +881,9 @@ export function CatalogueScreen() {
       <ProjectFrameCatalogue />
       <GalleryCatalogue />
       <ProjectPartsCatalogue />
+      {/* Relectures de R6b : catégorie en lien, abonnés à la place d'un bouton, liste vide et
+          son issue (projet-categorie.tsx). */}
+      <ProjectCategoryCatalogue />
       {/* Tranche R6a, la feuille de publication (publier-*.tsx). */}
       <PublishPhotosCatalogue />
       <PublishToolsPreviewCatalogue />

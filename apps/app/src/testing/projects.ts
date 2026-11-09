@@ -20,8 +20,8 @@ export const recipesProject: Project = {
   visibility: 'public',
   demoUrl: 'https://recettes.example.com',
   tools: [
-    { label: 'Claude Code', slug: 'claude-code' },
-    { label: 'Cursor', slug: 'cursor' },
+    { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+    { label: 'Cursor', slug: 'cursor', inCatalogue: true },
   ],
   prompts: ['Propose trois recettes avec : {ingrédients}'],
   // R6a : les catégories, la difficulté et le mois de début (le temps passé a disparu).
@@ -123,8 +123,8 @@ export const leaPage: Member = {
   avatarUrl: null,
   bio: 'Je bricole des agents pour la maison.',
   favoriteTools: [
-    { label: 'Claude Code', slug: 'claude-code' },
-    { label: 'Python', slug: 'python' },
+    { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+    { label: 'Python', slug: 'python', inCatalogue: true },
   ],
   isMe: false,
   isBlocked: false,

@@ -11,7 +11,6 @@ import {
   ProjectSummary,
   ProjectUpdate,
   ProjectVisual,
-  publicHttpsUrl,
   StartedMonth,
   startedMonthMax,
   Thumbhash,
@@ -19,6 +18,7 @@ import {
   VisualUpdate,
 } from './projects'
 import { NO_REACTIONS } from './reactions'
+import { publicHttpsUrl } from './url'
 
 const valid = {
   title: 'Mon agent de recettes',
@@ -420,12 +420,15 @@ describe('the categories of a project (R6a)', () => {
     ])
   })
 
-  it('needs a primary category at creation, and only a known one', () => {
+  // R6b : le contrat accepte tout code bien formé (une catégorie peut être créée) ; l'API refuse un
+  // code qui n'est pas en base (api/projects.test.ts).
+  it('needs a primary category at creation, and only a well-formed code', () => {
     const { primaryCategory: _, ...withoutCategory } = valid
     expect(ProjectInput.safeParse(withoutCategory).success).toBe(false)
     expect(ProjectInput.safeParse({ ...valid, primaryCategory: null }).success).toBe(false)
-    expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'jardinage' }).success).toBe(false)
-    expect(ProjectInput.safeParse({ ...valid, secondaryCategory: 'robots' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'Jardinage !' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, secondaryCategory: '' }).success).toBe(false)
+    expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'jardinage' }).success).toBe(true)
     // \u00ab Autre \u00bb ne demande aucun texte.
     expect(ProjectInput.safeParse({ ...valid, primaryCategory: 'other' }).success).toBe(true)
   })

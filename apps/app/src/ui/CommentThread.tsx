@@ -19,6 +19,7 @@ import { borders, layout, space } from '@ruche/brand'
 import { Children, isValidElement, type ReactNode } from 'react'
 import { View, type ViewStyle } from 'react-native'
 import { useLargeText } from './textScale'
+import { useLayout } from './theme/layout'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
@@ -42,6 +43,33 @@ const TRUNK = CARD_PADDING + AVATAR.root / 2 - borders.thread / 2
 const INDENT = AVATAR.root + space.sm
 /** L'arrondi du coude. */
 const ELBOW_RADIUS = space.md
+/**
+ * Le plus petit retrait pour un trait placé à `trunk` : le coude entier (son arrondi), puis l'écart
+ * d'avant la photo de la réponse, posée à `CARD_PADDING` du bord de sa carte.
+ */
+const indentFor = (trunk: number) => trunk + ELBOW_RADIUS + space.xs - CARD_PADDING
+/**
+ * Sous cette largeur d'écran, le retrait se resserre (R6b, restes de R5b) : à 320 points, les
+ * réponses ne gardaient que 19 caractères par ligne. Le seuil des écrans étroits, le même que la
+ * photo du champ de réponse (CommentComposer) : un jeton, `layout.breakpoints.narrow`.
+ */
+const NARROW_BELOW = layout.breakpoints.narrow
+/**
+ * Les mises en page du fil. `trunk` : où descend le trait, depuis le bord du fil ; `indent` : le
+ * retrait des réponses ; `fromPhoto` : le trait part-il de sous la photo de la racine ?
+ * - `normal` : les réponses alignées sur le nom de la racine ;
+ * - `narrow` (écran étroit) : le trait reste sous la photo de la racine, le retrait ne garde que la
+ *   place du coude (33 points au lieu de 44) ;
+ * - `large` (texte très agrandi) : le texte de la racine passe sous sa photo, le trait ne part plus
+ *   que du bas de la carte ; il peut donc longer le bord du fil, et le retrait tombe à 12 points. À
+ *   320 points et 200 %, la seule largeur de l'écran ne laisse de toute façon qu'une quinzaine de
+ *   caractères par ligne, à la racine comme aux réponses : chaque point rendu au texte compte.
+ */
+const SHAPES = {
+  normal: { trunk: TRUNK, indent: INDENT, fromPhoto: true },
+  narrow: { trunk: TRUNK, indent: indentFor(TRUNK), fromPhoto: true },
+  large: { trunk: space.xs, indent: indentFor(space.xs), fromPhoto: false },
+} as const
 /**
  * Entre la racine et sa première réponse, puis entre deux réponses. Le même écart qu'entre deux fils,
  * celui que « Répondre » laisse dépasser sous sa carte : les zones de 44 points se touchent sans se
@@ -106,6 +134,10 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
   const ink = colors.line
   // Très agrandi, le texte de la carte passe sous la photo (CommentCard) : le trait n'y descend plus.
   const { large, probe } = useLargeText()
+  // La largeur de la fenêtre, 0 avant l'hydratation (web) : le pré-rendu garde le retrait normal.
+  const { width } = useLayout()
+  const shape = SHAPES[large ? 'large' : width > 0 && width < NARROW_BELOW ? 'narrow' : 'normal']
+  const { trunk, indent } = shape
 
   return (
     <View {...(listItem ? { role: 'listitem' as const } : null)} style={{ gap: GAP.first }}>
@@ -113,11 +145,11 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
       {/* zIndex: 0 fait de chaque bloc sa propre pile : le trait (zIndex -1) passe sous la carte,
           mais reste au-dessus du fond de la page. */}
       <View style={{ zIndex: 0 }}>
-        {hasReplies && !large ? (
+        {hasReplies && shape.fromPhoto ? (
           // Le départ du trait : de sous la photo de la racine jusqu'au bas de sa carte.
           <Line
             style={{
-              left: TRUNK,
+              left: trunk,
               top: TRUNK_START,
               bottom: 0,
               width: borders.thread,
@@ -128,7 +160,7 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
         {root}
       </View>
       {hasReplies ? (
-        <View accessibilityRole="list" style={{ marginLeft: INDENT, gap: GAP.between }}>
+        <View accessibilityRole="list" style={{ marginLeft: indent, gap: GAP.between }}>
           {items.map((reply, index) => {
             const last = index === items.length - 1
             // L'écart au-dessus de cette réponse, que son morceau de trait franchit.
@@ -146,7 +178,7 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
                     réponse suivie d'une autre croise le trait qui continue, sur quelques points. */}
                 <Line
                   style={{
-                    left: TRUNK - INDENT,
+                    left: trunk - indent,
                     top: -above,
                     width: borders.thread,
                     backgroundColor: ink,
@@ -156,9 +188,9 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
                 {/* Le coude : un quart d'arrondi, du trait vertical jusqu'au bord de la photo. */}
                 <Line
                   style={{
-                    left: TRUNK - INDENT,
+                    left: trunk - indent,
                     top: ELBOW_END + 1 - ELBOW_RADIUS,
-                    width: INDENT + CARD_PADDING - TRUNK - space.xs,
+                    width: indent + CARD_PADDING - trunk - space.xs,
                     height: ELBOW_RADIUS,
                     borderLeftWidth: borders.thread,
                     borderBottomWidth: borders.thread,
@@ -172,7 +204,7 @@ export function CommentThread({ root, replies, footer, listItem = true }: Props)
           })}
         </View>
       ) : null}
-      {hasFooter ? <View style={{ marginLeft: INDENT }}>{footer}</View> : null}
+      {hasFooter ? <View style={{ marginLeft: indent }}>{footer}</View> : null}
     </View>
   )
 }

@@ -3,7 +3,7 @@
 // Paris, une seule à la fois, même si l'API tournait un jour sur plusieurs serveurs.
 //
 // Il ne fait qu'appeler les tâches (weekly-recap.ts, mention-emails.ts, moderation-alert.ts,
-// nightly-purge.ts), qui
+// nightly-purge.ts, other-recap.ts), qui
 // contiennent toutes les règles et se testent sans lui. Il ne démarre qu'avec un vrai PostgreSQL
 // (DATABASE_URL) : en développement, en test et pendant le parcours local (PGlite), aucune tâche
 // automatique ne tourne.
@@ -23,6 +23,7 @@ import { describeError } from '../log'
 import { mentionEmails } from './mention-emails'
 import { moderationAlert } from './moderation-alert'
 import { nightlyPurge } from './nightly-purge'
+import { otherRecap } from './other-recap'
 import type { JobDeps } from './shared'
 import { weeklyRecap } from './weekly-recap'
 
@@ -30,7 +31,7 @@ const TIME_ZONE = 'Europe/Paris'
 const SEVEN_DAYS = 7 * 24 * 60 * 60
 
 type Task = {
-  name: 'weekly-recap' | 'mention-emails' | 'moderation-alert' | 'nightly-purge'
+  name: 'weekly-recap' | 'mention-emails' | 'moderation-alert' | 'nightly-purge' | 'other-recap'
   /** Quand : une expression « cron » (minute, heure, jour du mois, mois, jour de la semaine). */
   cron: string
   /** Combien de secondes une exécution peut durer avant d'être déclarée perdue. */
@@ -74,6 +75,17 @@ const tasks: Task[] = [
     run: moderationAlert,
   },
   {
+    // Le lundi à 8 h (tranche R6b), une heure avant le récap des membres : le récap des « Autre »
+    // aux administrateurs. Manqué, il part une fois au redémarrage ; les six jours entre deux
+    // récaps d'un même administrateur empêchent tout doublon (other-recap.ts).
+    name: 'other-recap',
+    cron: '0 8 * * 1',
+    expireInSeconds: 60 * 60,
+    missed: 'once',
+    sendsEmails: true,
+    run: otherRecap,
+  },
+  {
     // Chaque nuit à 3 h.
     name: 'nightly-purge',
     cron: '0 3 * * *',
@@ -95,7 +107,7 @@ type SchedulerOptions = {
 }
 
 /**
- * Démarre pg-boss et ses quatre planifications. Lève une erreur si le démarrage échoue : index.ts
+ * Démarre pg-boss et ses cinq planifications. Lève une erreur si le démarrage échoue : index.ts
  * la note dans les journaux et l'API continue sans tâches.
  */
 export const startScheduler = async ({

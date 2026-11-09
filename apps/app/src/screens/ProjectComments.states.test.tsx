@@ -501,6 +501,70 @@ describe('where the focus goes after « Réessayer »', () => {
       phone()
     }
   })
+
+  // R6b (restes de R5b) : dans une feuille sans champ, la liste relue vide n'a ni carte ni champ où
+  // poser le focus. Le titre de la page est hors de la fenêtre `aria-modal` : c'est le titre de la
+  // feuille, « Commentaires 1 », qui le prend. Le titre de la page n'a pas d'identifiant ; celui de la
+  // feuille en a un (il nomme la fenêtre) : c'est ce qui les distingue ici.
+  /** « Réessayer » dans la feuille ouverte, la relecture rendant une liste vide ; où va le focus. */
+  const retryToAnEmptySheet = () => {
+    const reload = pendingReload()
+    mockFailure(reload.refetch)
+    return {
+      press: async () => {
+        // Témoin : la feuille n'a pas de champ, et elle offre « Réessayer ».
+        expect(queryCommentField()).toBeNull()
+        const focus = watchFocus({ current: probe.current })
+        await fireEvent.press(sheet().getByRole('button', { name: 'Réessayer' }))
+        await reload.answer(() => mockComments([]))
+        return focus
+      },
+    }
+  }
+
+  const sheetTitle = () => {
+    const title = sheet().getByRole('header', { name: 'Commentaires, 1 commentaire' })
+    expect(title.props.nativeID).toEqual(expect.any(String))
+    return title
+  }
+
+  it('goes to the title of the sheet when a suspended member retries to an empty list', async () => {
+    jest.mocked(getMe).mockResolvedValue({ ...suspendedMe, id: 'u4', name: 'Malik' })
+    const retry = retryToAnEmptySheet()
+    await renderComments(counted(1))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Voir le commentaire' }))
+    await waitFor(() => expect(sheet().getByText(suspendedNote())).toBeTruthy())
+
+    const focus = await retry.press()
+    try {
+      await waitFor(() =>
+        expect(focus.last()).toMatchObject({
+          accessibilityRole: 'header',
+          nativeID: sheetTitle().props.nativeID,
+        }),
+      )
+    } finally {
+      focus.restore()
+    }
+  })
+
+  it('goes to the title of the sheet on a removed project retried to an empty list', async () => {
+    const retry = retryToAnEmptySheet()
+    await renderComments(removedProject(1))
+    await fireEvent.press(screen.getByRole('button', { name: 'Voir le commentaire' }))
+
+    const focus = await retry.press()
+    try {
+      await waitFor(() =>
+        expect(focus.last()).toMatchObject({
+          accessibilityRole: 'header',
+          nativeID: sheetTitle().props.nativeID,
+        }),
+      )
+    } finally {
+      focus.restore()
+    }
+  })
 })
 
 describe('deleting the last comment, with no field to fall back on', () => {

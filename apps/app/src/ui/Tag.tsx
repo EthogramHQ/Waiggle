@@ -35,9 +35,24 @@ type Props = {
    * dans l'aperçu de la feuille de publication.
    */
   kind?: 'tool' | 'category'
+  /**
+   * R6b : l'outil est-il entré au catalogue ? Par défaut oui. Un « Autre » (`false`), cité par un
+   * membre mais pas encore au catalogue, n'a pas de page : c'est un texte simple, jamais un lien,
+   * même avec `onPress` (qui est alors ignoré). Un lecteur d'écran le lit en entier : « Teachable
+   * Machine, autre outil, pas encore dans le catalogue ».
+   */
+  inCatalogue?: boolean
 }
 
-export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool' }: Props) {
+export function Tag({
+  label,
+  onPress,
+  onGlass = false,
+  count,
+  icon,
+  kind = 'tool',
+  inCatalogue = true,
+}: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
   // Le nom lu : le libellé seul, ou le libellé et son nombre au pluriel de la langue de l'appli.
@@ -59,18 +74,36 @@ export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool
     borderWidth: borders.hairline,
     backgroundColor: onGlass ? colors.glass : colors.surface,
     borderColor: onGlass ? colors.glassBorder : colors.outline,
+    // Relectures de R6b (design C2, interface C4) : un « Autre » n'a pas de page, il ne ressemble
+    // donc pas à une pastille qu'on touche. Un contour en tirets, sans fond plein (comme un mois pas
+    // encore arrivé dans MonthField : la forme dit « pas comme les autres », pas la couleur seule).
+    // Sur une photo, le verre reste, pour que le nom se lise. Son nom, qu'aucune page ne permet de
+    // relire, passe à la ligne : les coins deviennent ceux d'un panneau, dont la courbe ne passe
+    // pas sur les lettres, et un peu d'air en haut et en bas.
+    ...(inCatalogue
+      ? null
+      : {
+          borderStyle: 'dashed' as const,
+          borderWidth: borders.strong,
+          borderRadius: radii.panel,
+          paddingVertical: space.xs,
+          backgroundColor: onGlass ? colors.glass : 'transparent',
+        }),
   }
+  // Un outil du catalogue tient sur une ligne, abrégé par « … » : la pastille garde sa forme, et
+  // sa page redit son nom entier. Un « Autre » passe à la ligne, et coupe au besoin un nom sans
+  // espace (« gpt-4o-mini-2024-… ») : il n'a aucune page où le relire. Le nom complet reste lu
+  // par les lecteurs d'écran (accessibilityLabel).
+  const lines = inCatalogue ? { numberOfLines: 1 } : { breakAnywhere: true }
   const name =
-    // Un nom très long tient sur une ligne, abrégé par « … » : la pastille garde sa forme. Le nom
-    // complet reste lu par les lecteurs d'écran (accessibilityLabel) et présent dans la page.
     // Le rôle `mono` (Miel 2) : les noms d'outils et de modèles en police à chasse fixe ; une
     // catégorie, en police de texte, à la même taille et en demi-gras.
     kind === 'category' ? (
-      <Text variant="caption" weight={600} numberOfLines={1}>
+      <Text variant="caption" weight={600} {...lines}>
         {label}
       </Text>
     ) : (
-      <Text variant="mono" numberOfLines={1}>
+      <Text variant="mono" {...lines}>
         {label}
       </Text>
     )
@@ -83,7 +116,12 @@ export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool
       // entier. Chiffres de même largeur (tabular) : deux étiquettes voisines gardent leurs nombres
       // alignés.
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%' }}>
-        {icon === undefined ? null : <Icon name={icon} size={18} />}
+        {icon === undefined ? null : (
+          // flexShrink 0 : sur le web, un `<svg>` rétrécirait avec la rangée.
+          <View style={{ flexShrink: 0 }}>
+            <Icon name={icon} size={18} />
+          </View>
+        )}
         <View style={{ flexShrink: 1 }}>{name}</View>
         {count === undefined ? null : (
           <Text variant="mono" tone="muted" tabular>
@@ -101,22 +139,34 @@ export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool
     minHeight: layout.touchTarget,
     justifyContent: 'center',
   }
-  if (!onPress) {
-    // Une simple pastille avec un nombre se lit d'un bloc, par son nom complet. Un nom sans rôle
-    // serait ignoré sur le web : « texte » sur téléphone, image sur le web (comme l'Avatar), le
-    // seul rôle qui y fait lire le nom d'un bloc non touchable.
+  if (!onPress || !inCatalogue) {
+    // Une simple pastille avec un nombre, ou un « Autre », se lit d'un bloc, par son nom complet.
+    // Un nom sans rôle serait ignoré sur le web : « texte » sur téléphone, image sur le web (comme
+    // l'Avatar), le seul rôle qui y fait lire le nom d'un bloc non touchable.
+    const readAs = inCatalogue
+      ? count === undefined
+        ? null
+        : spoken
+      : t(($) => $.tool.otherSpoken, { name: label })
     const counted =
-      count === undefined
+      readAs === null
         ? null
         : {
             accessible: true,
-            accessibilityLabel: spoken,
+            accessibilityLabel: readAs,
             ...(Platform.OS === 'web'
               ? { role: 'img' as const }
               : { accessibilityRole: 'text' as const }),
           }
     return (
-      <View style={frame} {...counted}>
+      <View
+        style={frame}
+        {...counted}
+        // Un « Autre » refuse le toucher (comme un vrai texte) : même si l'écran a donné un
+        // `onPress`, rien ne s'ouvre. Les outils de test, qui remontent du nœud touché jusqu'aux
+        // props de `Tag`, s'arrêtent ici.
+        {...(inCatalogue ? null : { onStartShouldSetResponder: () => false })}
+      >
         <View style={box}>{content}</View>
       </View>
     )

@@ -31,7 +31,13 @@ export type RateLimiter = {
  * `clock` donne l'heure actuelle en millisecondes. Par défaut l'horloge réelle (Date.now) ;
  * les tests en passent une qu'ils font avancer eux-mêmes.
  */
-export const createRateLimiter = (db: Database, clock: () => number = Date.now): RateLimiter => ({
+export const createRateLimiter = (
+  db: Database,
+  // `() => Date.now()` et non `Date.now` : la fonction est cherchée à chaque appel, si bien qu'une
+  // fausse horloge posée par un test APRÈS la création du limiteur est bien suivie (R6b : le test du
+  // quota des « Autre » passe au lendemain).
+  clock: () => number = () => Date.now(),
+): RateLimiter => ({
   async hit(key, { windowMs, max }) {
     // Une erreur de programmation, pas une demande d'un membre : on le dit fort.
     if (windowMs > RATE_WINDOW_MAX_MS) throw new Error('Rate window longer than one day')
@@ -140,6 +146,8 @@ export const memberCounterKeys = (userId: string) => ({
   searchDay: `search-day:${userId}`,
   // La liste des outils (tranche R3) : 600 lectures par heure, calculée à chaque appel.
   toolsHour: `tools-hour:${userId}`,
+  // Les nouveaux « Autre » (R6b, sec-A5) : 30 créations par jour, projets et profil ensemble.
+  otherTools: `other-tools:${userId}`,
   // Marquer son fil lu (R4) : 600 par heure, une fois par ouverture du fil dans l'appli.
   feedReadHour: `feed-read-hour:${userId}`,
   // Lire « Proches à suivre » (R4) : 600 par heure.

@@ -9,8 +9,10 @@
 // Le composant ne garde aucun texte : l'écran (`useCommentDraft`) le lui donne, décide de la légende
 // et du bandeau. Il garde ce qui se règle ici, repris de `NoteComposer` :
 // - rien ne part d'un champ vide, fait d'espaces ou trop long ; un double toucher n'envoie qu'une fois ;
-// - pendant l'envoi, le texte est figé (ce qui part est ce qu'on voit), le bouton est annoncé occupé,
-//   et la croix attend (« Annuler » mentirait : le commentaire part quand même) ;
+// - pendant l'envoi, le champ reste modifiable (R6b : `editable={false}` fermait le clavier sur
+//   iOS) : ce qu'on tape alors reste dans le champ, et seul le texte parti s'en efface à la réponse
+//   (`useCommentDraft`) ; la flèche, annoncée occupée, refuse un second envoi, et la croix attend
+//   (« Annuler » mentirait : le commentaire part quand même) ;
 // - l'erreur reste affichée pendant un nouvel envoi : elle disparaîtrait au moment où l'on touche
 //   « Réessayer », et la rangée sauterait sous le doigt dans la colonne ;
 // - le focus ne se perd jamais : un contrôle qui disparaît ou devient inactif le rend au champ.
@@ -83,8 +85,11 @@ const PHOTO_SIZE = 36
  */
 const FIELD_BASIS = PHOTO_SIZE + space.sm + 180 + 2 * space.lg
 
-/** La fenêtre la plus étroite qui garde la photo en mode réponse (décision 20). */
-const REPLY_PHOTO_FROM = 360
+/**
+ * La fenêtre la plus étroite qui garde la photo en mode réponse (décision 20) : le seuil des écrans
+ * étroits, partagé avec le fil des commentaires (`layout.breakpoints.narrow`).
+ */
+const REPLY_PHOTO_FROM = layout.breakpoints.narrow
 
 /** La place gardée à l'extrait, à côté du nom : en dessous, il passe à la ligne, le nom reste entier. */
 const EXCERPT_MIN = 64
@@ -242,7 +247,6 @@ export function CommentComposer({
     invalid: over > 0,
     describedElsewhere,
     autoCapitalize: 'sentences',
-    editable: !pending,
     suggestions,
     suggestionsFor,
     suggestionsLabel: t(($) => $.mentions.suggestions),

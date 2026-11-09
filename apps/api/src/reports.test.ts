@@ -670,7 +670,7 @@ describe('the full copy of a report', () => {
         { field: 'description', value: 'Une description de vélo.' },
         { field: 'prompt', value: 'Premier prompt' },
         { field: 'prompt', value: 'Second prompt' },
-        { field: 'tools', value: 'Mistral, Cursor' },
+        { field: 'tools', value: 'Le Chat, Cursor' },
         { field: 'demoUrl', value: 'https://velo.dev/' },
       ]),
     )

@@ -3,21 +3,20 @@
 // n'est écrit : ni le mot cherché, ni un historique. Chaque groupe ne montre que ce que le membre
 // verrait ailleurs (projets privés des autres, retirés, comptes non vérifiés, blocages).
 import {
+  CatalogueTool,
   SEARCH_GROUP_MAX,
   SEARCH_OTHERS_FROM,
   type SearchMember,
   type SearchProject,
-  type ToolCount,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, inArray, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { notBlockedWith } from '../blocks/visibility'
 import { memberFollowerCounts } from '../follows/load'
 import { mediaUrl } from '../profile/me'
 import { loadSummaries } from '../projects/load'
-import { projectVisibleTo, verifiedAuthor } from '../projects/visibility'
-import { searchTools } from '../tools/load'
+import { listedVerifiedProjectFor, projectVisibleTo, verifiedAuthor } from '../projects/visibility'
 import { excerptOf } from './excerpt'
 import { contains, foldSql } from './fold'
 
@@ -47,6 +46,15 @@ const searchable = (viewerId: string) =>
   and(projectVisibleTo(viewerId), isNull(p.removedAt), verifiedAuthor())
 
 /**
+ * R6b : « le projet est de cette catégorie, en place principale OU seconde » ; sans catégorie
+ * demandée, aucune condition. Le code est un paramètre lié (jamais collé dans le SQL). Un projet
+ * sans catégorie (d'avant R6a) n'en a aucune : il sort dès qu'un filtre est choisi. Chaque
+ * colonne a son index (project_primary_category_idx, project_secondary_category_idx).
+ */
+const inCategory = (category: string | undefined) =>
+  category ? or(eq(p.primaryCategory, category), eq(p.secondaryCategory, category)) : undefined
+
+/**
  * Les identifiants des projets trouvés, dans l'ordre de la recherche, 21 au plus (sec-A5), et pour
  * chacun : les mots sont-ils tous dans le titre ou le pitch (sinon, l'extrait vient de la
  * description). En SQL :
@@ -67,7 +75,12 @@ const searchable = (viewerId: string) =>
  * par l'index partiel project_public_published_idx pour les publics et project_author_created_idx
  * pour ceux du membre. C'est ce que mesure la relecture sec-B3, avec la limite de 2 secondes.
  */
-const findProjectIds = async (db: Executor, viewerId: string, words: string[]) => {
+const findProjectIds = async (
+  db: Executor,
+  viewerId: string,
+  words: string[],
+  category: string | undefined,
+) => {
   const [title, pitch, description] = [
     col('folded_title'),
     col('folded_pitch'),
@@ -80,7 +93,7 @@ const findProjectIds = async (db: Executor, viewerId: string, words: string[]) =
         ${foldSql(p.pitch)} as folded_pitch,
         ${foldSql(p.description)} as folded_description
       from ${p}
-      where ${searchable(viewerId)}
+      where ${and(searchable(viewerId), inCategory(category))}
     )
     select id, coalesce(${everyWordIn(words, [title])}, false) as in_title,
       coalesce(${everyWordIn(words, [title, pitch])}, false) as in_header
@@ -105,8 +118,9 @@ const findProjects = async (
   db: Executor,
   viewerId: string,
   words: string[],
+  category: string | undefined,
 ): Promise<FoundProjects> => {
-  const found = await findProjectIds(db, viewerId, words)
+  const found = await findProjectIds(db, viewerId, words, category)
   const shown = found.slice(0, SEARCH_GROUP_MAX)
   const needExcerpt = shown.filter((row) => !row.in_header).map((row) => row.id)
   const descriptions =
@@ -132,12 +146,14 @@ const projectGroup = async (
   db: Database,
   found: FoundProjects,
   viewerId: string,
+  category: string | undefined,
   publicApiUrl: string,
 ): Promise<Group<SearchProject>> => {
   if (found.ids.length === 0) return { items: [], more: false }
   const loaded = await loadSummaries(
     db,
-    and(inArray(p.id, found.ids), searchable(viewerId)),
+    // La catégorie est redite : un projet recatégorisé entre les deux lectures ne sort pas.
+    and(inArray(p.id, found.ids), searchable(viewerId), inCategory(category)),
     viewerId,
     publicApiUrl,
   )
@@ -223,6 +239,73 @@ const searchMembers = async (
   }
 }
 
+const ToolRow = z.object({
+  slug: z.string(),
+  name: z.string(),
+  family: z.string(),
+  aliases: z.string(),
+  project_count: z.number().int(),
+})
+
+/**
+ * Le groupe « Outils » (R6b) : les outils DU CATALOGUE (jamais un « Autre » ni un écarté) dont le
+ * nom ou l'un des alias contient chaque mot. Un outil se trouve même sans projet (nombre à zéro).
+ * En SQL :
+ *   with candidate as materialized (
+ *     select tool.id, slug, name, family, <replié>(name) as folded_name,
+ *            coalesce((select string_agg(folded, ' ') from tool_alias where tool_id = tool.id), '')
+ *              as folded_aliases
+ *     from tool where status = 'catalogue'
+ *   )
+ *   select …, (select count(*) from project_tool join project … where project_tool.tool_id =
+ *              candidate.id and <projet listé pour le visiteur, auteur vérifié>) as project_count
+ *   from candidate where <chaque mot dans folded_name ou folded_aliases>
+ *   order by project_count desc, name, slug limit 21
+ * Le catalogue entier (une centaine de lignes, index tool_status_created_idx) est replié une fois ;
+ * les alias se lisent par tool_alias_tool_idx ; le nombre de projets de chaque outil trouvé (20 au
+ * plus, plus un) se lit par project_tool_tool_idx puis la clé primaire de project : jamais plus de
+ * 21 outils comptés, quel que soit le nombre de projets. Les alias sont déjà repliés en base
+ * (foldTool) : on les rend tels quels ; sans espace, ils se séparent par un espace.
+ */
+const searchTools = async (
+  db: Executor,
+  viewerId: string,
+  words: string[],
+): Promise<Group<CatalogueTool>> => {
+  const pt = schema.projectTool
+  const result = await db.execute(sql`
+    with candidate as materialized (
+      select ${schema.tool.id} as id, ${schema.tool.slug} as slug, ${schema.tool.name} as name,
+        ${schema.tool.family} as family, ${foldSql(schema.tool.name)} as folded_name,
+        coalesce((select string_agg(${schema.toolAlias.folded}, ' ' order by ${schema.toolAlias.folded})
+          from ${schema.toolAlias} where ${schema.toolAlias.toolId} = ${schema.tool.id}), '') as folded_aliases
+      from ${schema.tool}
+      where ${schema.tool.status} = 'catalogue'
+    )
+    select slug, name, family, folded_aliases as aliases, (
+      select count(*)::int from ${pt}
+      inner join ${p} on ${p.id} = ${pt.projectId}
+      where ${pt.toolId} = candidate.id and ${listedVerifiedProjectFor(viewerId)}
+    ) as project_count
+    from candidate
+    where ${everyWordIn(words, [col('folded_name'), col('folded_aliases')])}
+    order by project_count desc, name, slug
+    limit ${SEARCH_GROUP_MAX + 1}`)
+  const rows = z.object({ rows: z.array(ToolRow) }).parse(result).rows
+  return {
+    items: rows.slice(0, SEARCH_GROUP_MAX).map((row) =>
+      CatalogueTool.parse({
+        slug: row.slug,
+        name: row.name,
+        family: row.family,
+        aliases: row.aliases === '' ? [] : row.aliases.split(' '),
+        projectCount: row.project_count,
+      }),
+    ),
+    more: rows.length > SEARCH_GROUP_MAX,
+  }
+}
+
 /**
  * La recherche entière. `words` vient de `searchWords` (contrat) : repliés, sans doublon, 1 à 5.
  * Les trois groupes se lisent dans une transaction dont chaque requête est arrêtée après 2
@@ -237,19 +320,25 @@ export const search = async (
   db: Database,
   viewerId: string,
   words: string[],
+  category: string | undefined,
   publicApiUrl: string,
 ): Promise<{
   projects: Group<SearchProject>
   members: Group<SearchMember>
-  tools: Group<ToolCount>
+  tools: Group<CatalogueTool>
 }> => {
   const { found, members, tools } = await db.transaction(async (tx) => {
     await tx.execute(sql`set local statement_timeout = '2s'`)
     return {
-      found: await findProjects(tx, viewerId, words),
+      found: await findProjects(tx, viewerId, words, category),
       members: await searchMembers(tx, viewerId, words, publicApiUrl),
+      // Les outils ne suivent pas le filtre de catégorie : il ne vaut que pour le groupe Projets.
       tools: await searchTools(tx, viewerId, words),
     }
   })
-  return { projects: await projectGroup(db, found, viewerId, publicApiUrl), members, tools }
+  return {
+    projects: await projectGroup(db, found, viewerId, category, publicApiUrl),
+    members,
+    tools,
+  }
 }

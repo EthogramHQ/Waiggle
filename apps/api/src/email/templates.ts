@@ -127,6 +127,11 @@ type Layout = {
   /** Le bouton ; absent d'un e-mail qui ne demande aucun geste (l'adresse changée, jur-R6). */
   button?: Link
   /**
+   * D'autres boutons, sous le premier, de la même forme (R6b : le récap des « Autre » mène à deux
+   * pages, « Outils » et « Catégories »).
+   */
+  moreButtons?: Link[]
+  /**
    * Des paragraphes au corps normal sous le bouton : une consigne qui compte trop pour une petite
    * note grise (« Ce n'est pas toi ? », des-E4).
    */
@@ -158,12 +163,14 @@ const render = ({
   items = [],
   after = [],
   button,
+  moreButtons = [],
   closing = [],
   notes,
   reason,
   links = [],
   footer,
 }: Layout) => {
+  const buttons = [...(button ? [button] : []), ...moreButtons]
   // Le texte brut : chaque lien écrit en entier sous son libellé, pour les messageries sans HTML ;
   // un extrait en citation (« > », l'usage des e-mails), sous sa ligne.
   const textItems = items.flatMap(({ line, excerpt }) =>
@@ -178,7 +185,7 @@ const render = ({
     ...(highlight === undefined ? [] : [highlight, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
     ...after.flatMap((p) => [plain(p), '']),
-    ...(button ? [button.textLabel ?? button.label, button.url, ''] : []),
+    ...buttons.flatMap((link) => [link.textLabel ?? link.label, link.url, '']),
     ...closing.flatMap((p) => [plain(p), '']),
     ...notes.flatMap((note) => [note, '']),
     '—',
@@ -235,11 +242,17 @@ const render = ({
   // Le bouton est un lien en `inline-block` : quand son libellé passe sur deux lignes (320 px), le
   // fond et le jeu intérieur entourent les deux lignes, au lieu que chaque ligne garde son propre
   // fond et que les deux se chevauchent (relecture de design de R2, B3).
-  const htmlButton = button
-    ? `<p style="margin:28px 0">
-      <a href="${escapeHtml(button.url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(button.label)}</a>
-    </p>`
-    : ''
+  // Plusieurs boutons : l'un sous l'autre, 12 px entre eux (assez pour toucher l'un sans l'autre).
+  const htmlButton = buttons
+    .map(
+      (
+        link,
+        i,
+      ) => `<p style="margin:${i === 0 ? 28 : 12}px 0 ${i === buttons.length - 1 ? 28 : 0}px">
+      <a href="${escapeHtml(link.url)}" style="display:inline-block;max-width:100%;box-sizing:border-box;text-align:center;line-height:1.3;background:${c.honey};color:${c.onHoney};text-decoration:none;padding:14px 22px;border-radius:${radii.pill}px;font-weight:bold">${escapeHtml(link.label)}</a>
+    </p>`,
+    )
+    .join('\n    ')
   const html = `<!doctype html>
 <html lang="${language}"><head>
 <meta charset="utf-8">
@@ -249,7 +262,7 @@ const render = ({
 <div class="page" style="padding:24px;background:${c.surfaceGrouped};font-family:Arial,sans-serif;color:${c.text}">
   <div class="card" style="max-width:520px;margin:0 auto;background:${c.surface};border:1px solid ${c.groupBorder};border-radius:${radii.group}px;padding:28px">
     ${top}
-    ${p(greeting, 'font-size:16px')}
+    ${p(greeting, 'font-size:16px;overflow-wrap:anywhere;word-break:break-word')}
     ${paragraphs
       .map((value) =>
         typeof value === 'string'
@@ -645,6 +658,59 @@ export const moderationAlertEmail = (
       button: { label: fill(t.moderationAlert.button), url },
       notes: [],
       reason: fill(t.moderationAlert.reason),
+      footer: fill(t.footer),
+    }),
+  }
+}
+
+// ─── Le récap des « Autre » aux administrateurs (tranche R6b) ───────────────────────────────────
+
+export type OtherRecapData = {
+  /** Le nom de l'administrateur qui le reçoit (la salutation), le seul texte libre de l'e-mail. */
+  name: string
+  /** Les « Autre » apparus dans les sept jours, cités par un projet visible des membres. */
+  tools: number
+  /** Les projets visibles classés « Autre », publiés dans les sept jours. */
+  projects: number
+  /** Ceux, outils et projets ensemble, qui attendent depuis plus d'une semaine. */
+  older: number
+  /** Les deux pages de l'appli : « Outils » et « Catégories » de la Modération. */
+  toolsUrl: string
+  projectsUrl: string
+}
+
+/**
+ * Le récap du lundi (relecture juridique jur-T1, option A) : des nombres et deux boutons, rien de
+ * plus. Aucun nom d'outil, titre, accroche ni auteur ne part chez l'envoyeur d'e-mails : les
+ * données ne leur laissent aucune place. Un nombre nul n'a pas de ligne. Un e-mail de service aux
+ * administrateurs, comme l'alerte de modération : ni lien de désinscription, ni en-tête de liste.
+ */
+export const otherRecapEmail = (language: Language, data: OtherRecapData): EmailContent => {
+  const t = resources[language].translation.email
+  const r = t.otherRecap
+  const lines = [
+    data.tools > 0 ? counted(r.tools_one, r.tools_other, data.tools) : null,
+    data.projects > 0 ? counted(r.projects_one, r.projects_other, data.projects) : null,
+  ].filter((line): line is string => line !== null)
+  // Un bouton par page qui a quelque chose à montrer (relecture du design) : sans outil, « Voir les
+  // outils » menait à une page vide. L'e-mail ne part que si l'un des deux nombres dépasse zéro
+  // (`jobs/other-recap.ts`) : il garde donc toujours au moins un bouton.
+  const [button, ...moreButtons] = [
+    data.tools > 0 ? { label: fill(r.toolsButton), url: data.toolsUrl } : null,
+    data.projects > 0 ? { label: fill(r.projectsButton), url: data.projectsUrl } : null,
+  ].filter((link) => link !== null)
+  return {
+    subject: fill(r.subject),
+    ...render({
+      language,
+      heading: fill(r.heading),
+      greeting: fill(t.greeting, { name: defangLinks(data.name, linkPlaceholder(language)) }),
+      paragraphs: lines,
+      after: data.older > 0 ? [counted(r.older_one, r.older_other, data.older)] : [],
+      ...(button && { button }),
+      moreButtons,
+      notes: [],
+      reason: fill(r.reason),
       footer: fill(t.footer),
     }),
   }

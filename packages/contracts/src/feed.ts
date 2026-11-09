@@ -3,6 +3,7 @@
 // ancien, grâce à un curseur : un marque-page rendu avec chaque page, qu'on renvoie pour obtenir
 // la suivante. Le curseur note la date et l'identifiant du dernier élément (un projet ou une note).
 import { z } from 'zod'
+import { CategoryCode } from './categories'
 import { ProjectNote } from './notes'
 import { ProjectSummary } from './projects'
 
@@ -25,7 +26,11 @@ export type FeedQuery = z.infer<typeof FeedQuery>
  * Les paramètres d'adresse du fil « Découvrir ». `testers=true` ne garde que les projets qui
  * cherchent des testeurs : au statut « testable », avec un lien de démo.
  */
-export const DiscoverQuery = FeedQuery.extend({ testers: z.enum(['true', 'false']).optional() })
+export const DiscoverQuery = FeedQuery.extend({
+  testers: z.enum(['true', 'false']).optional(),
+  /** R6b : seulement les projets de cette catégorie, en principale ou en seconde (Explorer). */
+  category: CategoryCode.optional(),
+})
 export type DiscoverQuery = z.infer<typeof DiscoverQuery>
 
 /**

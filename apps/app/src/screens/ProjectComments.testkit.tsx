@@ -6,6 +6,7 @@
 //
 // Tout se retrouve par son rôle et son nom (ce que lit un lecteur d'écran), jamais par son style.
 import type { Comment } from '@ruche/contracts'
+import { nameOf } from '@ruche/i18n'
 import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { commentOf, maxComment, zoeComment } from '../testing/comments'
 import { focusAndReveal, focusWithoutScroll } from '../ui/focus'
@@ -63,11 +64,11 @@ export const sixThreads: Comment[] = Array.from({ length: 6 }, (_, index) =>
 
 // --- L'aperçu ---
 
-/** Le nom d'une carte compacte de l'aperçu : « Commentaire de Max : Super idée… » (ui-B7). */
+/** Le nom d'une carte compacte de l'aperçu : « Commentaire de Max : Super idée… », « Commentaire d’Inès : … » (ui-B7). */
 export const lineOf = (name: string, start: string) =>
   // `\s` : le « : » français a une espace insécable devant et une espace après ; `previewNames` et le
   // suivi du focus lisent le nom brut, sans la normalisation des requêtes par rôle.
-  new RegExp(`^Commentaire de ${name}\\s:\\s${escapeRegExp(start)}`)
+  new RegExp(`^Commentaire ${nameOf('fr', name)}\\s:\\s${escapeRegExp(start)}`)
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -75,7 +76,7 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 export const previewLines = () => {
   const layer = sheetLayer()
   return screen
-    .queryAllByRole('button', { name: /^Commentaire de / })
+    .queryAllByRole('button', { name: /^Commentaire d(?:e |’)/ })
     .filter((line) => !layer || !isInside(line, layer))
 }
 
@@ -223,7 +224,7 @@ export const cardOf = (text: string, scope: Pick<typeof screen, 'getByText'> = s
 
 /** Le bouton « … » d'une carte, nommé « Actions du commentaire de … ». */
 export const menuButtonOf = (card: ReturnType<typeof within>) =>
-  card.getByRole('button', { name: /^Actions du commentaire de / })
+  card.getByRole('button', { name: /^Actions du commentaire d(?:e |’)/ })
 
 /** Ouvre le menu « … » de la carte de ce texte et rend les noms de ses entrées. */
 export const openMenuOf = async (text: string) => {

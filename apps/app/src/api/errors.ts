@@ -32,6 +32,13 @@ export type ApiErrorKey =
   | 'passwordRequired'
   | 'wrongPassword'
   | 'cannotSuspendAdmin'
+  // Tranche R6b : le catalogue des outils et les catégories, écrits par un administrateur.
+  | 'toolNameTaken'
+  | 'categoryNameTaken'
+  | 'unknownCategory'
+  | 'ownProject'
+  // Tranche R6b : le 31e nouvel « autre outil » d'un membre dans la journée (429).
+  | 'tooManyOtherTools'
   | 'internal'
   | 'network'
 
@@ -64,9 +71,11 @@ export const errorKeyForStatus = (status: number): ApiErrorKey => byStatus[statu
 
 /**
  * Les statuts partagés par plusieurs refus : pour eux seuls, on lit le code du corps. Un 429 sans
- * corps JSON (un serveur placé devant l'API) reste « trop de demandes ».
+ * corps JSON (un serveur placé devant l'API) reste « trop de demandes ». Le 400 y entre en R6b :
+ * une catégorie qui n'existe plus (`unknown_category`) a son propre message, distinct d'une demande
+ * mal formée ; un 400 sans corps lisible reste « validation ».
  */
-export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([403, 409, 422, 429])
+export const AMBIGUOUS_STATUSES: ReadonlySet<number> = new Set([400, 403, 409, 422, 429])
 
 // Code du corps (« handle_taken ») → message, pour les refus qu'un statut seul ne distingue pas.
 // Partial : seuls quelques codes sont listés ; les autres retombent sur le statut.
@@ -90,6 +99,15 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   password_required: 'passwordRequired',
   wrong_password: 'wrongPassword',
   cannot_suspend_admin: 'cannotSuspendAdmin',
+  // Tranche R6b : deux 409 (un nom d'outil ou de catégorie déjà pris), un 400 (une catégorie qui
+  // n'existe pas ou plus) et un 403 (un administrateur qui range son propre projet).
+  tool_name_taken: 'toolNameTaken',
+  category_name_taken: 'categoryNameTaken',
+  unknown_category: 'unknownCategory',
+  own_project: 'ownProject',
+  // Et un 429 : trop de nouveaux « autres outils » aujourd'hui (projets et profil ensemble). Il a
+  // son propre message (réessayer demain), comme le 6e changement de pseudo du jour.
+  too_many_other_tools: 'tooManyOtherTools',
 }
 
 /**

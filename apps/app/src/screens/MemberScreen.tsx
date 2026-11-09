@@ -276,6 +276,9 @@ function MemberView({ member }: { member: Member }) {
         tools={member.favoriteTools.map((tool) => ({
           label: tool.label,
           onPress: () => router.push({ pathname: '/tags/[slug]', params: { slug: tool.slug } }),
+          // R6b : un « autre outil », absent du catalogue, est une pastille marquée, sans lien
+          // (`Tag inCatalogue={false}` ignore alors `onPress`).
+          inCatalogue: tool.inCatalogue,
         }))}
         action={
           member.isMe ? (

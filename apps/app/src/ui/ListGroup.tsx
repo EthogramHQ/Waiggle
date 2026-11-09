@@ -164,6 +164,27 @@ export function ListGroup({ title, footer, children, radio = false }: GroupProps
   )
 }
 
+/**
+ * Une case de contenu libre dans un groupe, à la place d'une ligne (R6b, relecture ui-C5) : des
+ * pastilles, un paragraphe. Elle reprend les marges d'une ligne (`ListRow`), pour que son contenu
+ * s'aligne sur les noms des lignes voisines et sur le titre du groupe ; l'écran n'écrit ainsi
+ * aucune marge. Sur une rangée de pastilles qui passe à la ligne, `wrap` les pose côte à côte, à
+ * l'écart des pastilles (`space.sm`).
+ */
+export function ListBlock({ children, wrap = false }: { children: ReactNode; wrap?: boolean }) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: space.lg,
+        paddingVertical: space.md,
+        ...(wrap ? { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm } : null),
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
 // Les propriétés d'une ligne : une base commune, et `detailAlert` réservé aux lignes qui s'y
 // prêtent (le type « ou bien… ou bien… » ci-dessous refuse les autres dès la compilation).
 type RowProps = RowBase &

@@ -22,13 +22,28 @@
 // Après un choix, le champ se vide et la liste se ferme ; elle revient à la frappe suivante. Après
 // le retrait d'un outil, le focus va à la croix de la pastille suivante, sinon de la précédente,
 // sinon au champ de recherche : il ne retombe jamais en haut de la page.
+//
+// Depuis R6b (« Choisir ses outils »), les suggestions viennent du catalogue des outils
+// (`tools/match.ts`) : chacune montre sa lettre, sa famille et son nombre de projets (« Claude ·
+// Assistant IA · 41 projets »). Un nom absent du catalogue s'ajoute comme « autre outil » (« Ajouter
+// « Teachable Machine » comme autre outil »), et sa pastille est marquée « Autre », avec une ligne
+// d'aide sous le champ (les administrateurs relisent ces noms). Deux règles évitent de mentir :
+// - tant que le catalogue n'est pas lu (`catalogueReady` faux : chargement ou panne), on ne sait pas
+//   ce qui est un « Autre » : la ligne reste neutre (« Ajouter « X » ») et aucune pastille n'est
+//   marquée ;
+// - un nom que le catalogue connaît, même par un alias (`known` : « chat gpt » pour ChatGPT), n'offre
+//   jamais la ligne « autre outil » : c'est l'outil du catalogue qu'on choisit.
+// Deux noms sont le même outil une fois « repliés » (`foldTool` du contrat, comme l'API) : « Chat
+// GPT » et « ChatGPT », « Écrivain » et « ecrivain ».
 import { borders, layout, radii, space, textStyles } from '@ruche/brand'
-import { TOOL_MAX_LENGTH } from '@ruche/contracts'
-import { useEffect, useId, useRef, useState } from 'react'
+import { foldTool, TOOL_MAX_LENGTH } from '@ruche/contracts'
+import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import { Platform, Pressable, TextInput, View } from 'react-native'
-import { comboboxLinks, describedBy } from './aria'
+import { comboboxLinks, describedBy, invalid } from './aria'
 import { focusWithoutScroll } from './focus'
+import { hiddenFrame } from './HiddenHeading'
 import { Icon } from './Icon'
+import { InitialTile } from './InitialTile'
 import { usePill } from './SearchField'
 import { Text } from './Text'
 import { useTapGuard } from './tapGuard'
@@ -36,8 +51,13 @@ import { placeholderCopy } from './theme/document'
 import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
-/** Un outil proposé : son nom, et le nombre de projets qui le citent déjà. */
-export type ToolSuggestion = { name: string; uses: number }
+/**
+ * Un outil proposé : son nom, le nombre de projets qui le citent déjà, et sa famille. Le champ ne
+ * lit pas la famille : il la passe telle quelle à `labels.detail`. `matchTools` y met le code du
+ * catalogue (« assistant »), que l'écran traduit dans `detail` ; `null` ou absente quand on ne la
+ * connaît pas.
+ */
+export type ToolSuggestion = { name: string; uses: number; family?: string | null }
 
 /** Les textes du champ, tirés des traductions par l'écran. */
 export type ToolFieldLabels = {
@@ -51,12 +71,32 @@ export type ToolFieldLabels = {
   counter: (count: number, max: number) => { shown: string; spoken: string }
   /** Le nombre de projets affiché sous un nom (« 41 projets »). */
   uses: (count: number) => string
-  /** Le nom lu d'une suggestion (« Claude, 41 projets »). */
-  suggestion: (name: string, count: number) => string
+  /**
+   * Le nom lu d'une suggestion (« Claude, 41 projets »). Quand l'écran donne `detail`, le champ lui
+   * passe aussi la ligne affichée sous le nom (« Assistant IA · Aucun projet pour l'instant ») : le
+   * nom lu doit dire ce qui se voit, famille comprise (relecture ui-C3 de R6b ; « Claude, 0 projet »
+   * contredisait la ligne). Un écran qui l'ignore garde le nom d'avant.
+   */
+  suggestion: (name: string, count: number, detail?: string) => string
   /** Le choix qui ajoute un nom nouveau (« Ajouter « Teachable Machine » »). */
   add: (name: string) => string
   /** Le nom de la croix d'une pastille (« Retirer Claude »). */
   remove: (name: string) => string
+  // R6b. Facultatifs : un écran qui ne les donne pas garde le champ d'avant (nombre seul, ligne
+  // « Ajouter » neutre, aucune marque « Autre »).
+  /**
+   * Sous le nom d'une suggestion : sa famille et son nombre de projets (« Assistant IA · 41
+   * projets ») ; `family` est le code de `ToolSuggestion.family`, ou null. Absent : `uses`.
+   */
+  detail?: (family: string | null, count: number) => string
+  /** La ligne qui ajoute un nom absent du catalogue (« Ajouter « X » comme autre outil »). */
+  addOther?: (name: string) => string
+  /** La marque d'une pastille « Autre », affichée (« Autre »). */
+  otherBadge?: string
+  /** Le nom lu d'une pastille « Autre » (« Teachable Machine, autre outil, pas encore dans le catalogue »). */
+  otherSpoken?: (name: string) => string
+  /** La ligne d'aide sous le champ, dès qu'un « Autre » est choisi (relu par les administrateurs). */
+  otherHint?: string
 }
 
 type Props = {
@@ -77,14 +117,38 @@ type Props = {
    * (une capture ne tape pas). Absent : un champ vide, liste fermée jusqu'au focus.
    */
   initialText?: string
+  // R6b : le catalogue des outils (voir l'en-tête du fichier).
+  /** Le texte tapé est un outil du catalogue, par son nom ou un alias : pas de ligne « autre outil ». */
+  known?: boolean
+  /**
+   * Le catalogue est lu. Faux (par défaut : chargement, panne) : ligne « Ajouter « X » » neutre, et
+   * aucune pastille marquée « Autre ».
+   */
+  catalogueReady?: boolean
+  /** Ce nom choisi est-il un « Autre » (absent du catalogue) ? Lu seulement catalogue lu. */
+  isOther?: (name: string) => boolean
+  /**
+   * Faux : seuls les outils du catalogue se choisissent, aucune ligne « Ajouter » (« Rattacher à un
+   * outil » de l'administration). Vrai par défaut.
+   */
+  allowOther?: boolean
+  /** L'erreur du champ, affichée dessous et lue avec lui (« 10 outils au plus »). */
+  error?: string | undefined
+  /** La saisie, pour que l'écran y pose le focus (le premier champ en erreur). */
+  inputRef?: Ref<TextInput>
 }
 
-/** Un choix de la liste : un outil proposé, ou le nom tapé, à ajouter tel quel. */
-type Option = { kind: 'suggestion'; tool: ToolSuggestion } | { kind: 'add'; name: string }
+/**
+ * Un choix de la liste : un outil proposé, ou le nom tapé, à ajouter tel quel (`other` : comme
+ * « autre outil », le catalogue étant lu ; sinon la ligne neutre).
+ */
+type Option =
+  | { kind: 'suggestion'; tool: ToolSuggestion }
+  | { kind: 'add'; name: string; other: boolean }
 
-// Les majuscules ne comptent pas : « claude » et « Claude » sont le même outil (comme
-// `uniqueIgnoringCase` du contrat, qui les dédoublonne à l'enregistrement).
-const same = (name: string) => name.toLowerCase()
+// Le repli du contrat : « Chat GPT », « chatgpt » et « ChatGPT » sont le même outil, comme pour
+// l'API, qui les dédoublonne à l'enregistrement (`uniqueTools`).
+const same = foldTool
 
 // Le rôle « listbox » (une liste de choix) manque aux types de React Native, qui ne connaissent que
 // « list » ; react-native-web le transmet tel quel au navigateur.
@@ -112,14 +176,24 @@ export function ToolField({
   limit,
   labels,
   initialText = '',
+  known = false,
+  catalogueReady = false,
+  isOther,
+  allowOther = true,
+  error,
+  inputRef,
 }: Props) {
   const { colors } = useTheme()
   const body = textStyles.body
   const input = useRef<TextInput>(null)
-  // useId : des identifiants stables, pour relier le champ à sa liste, à son choix actif et à son
-  // compteur (web).
+  // La même saisie, partagée avec l'écran qui l'a demandée (inputRef), comme TextField.
+  useImperativeHandle(inputRef, () => input.current as TextInput)
+  // useId : des identifiants stables, pour relier le champ à sa liste, à son choix actif, à son
+  // compteur, à son erreur et à son aide (web).
   const listId = useId()
   const counterId = useId()
+  const errorId = useId()
+  const hintId = useId()
   const [text, setText] = useState(initialText)
   const [focused, setFocused] = useState(false)
   // La liste est-elle demandée : au focus et à la frappe ; plus après un choix, Échap, Tab ou la
@@ -143,19 +217,34 @@ export function ToolField({
   const query = text.trim()
   const full = values.length >= limit
   const chosen = new Set(values.map(same))
+  // Un « Autre » ne se marque que catalogue lu : avant, on ne sait pas (rien n'est marqué).
+  const otherOf = (name: string) => catalogueReady && isOther?.(name) === true
+  const hasOther = values.some(otherOf)
+  const hint = hasOther ? labels.otherHint : undefined
   const options: Option[] = full
     ? []
     : [
         ...suggestions
           .filter((tool) => !chosen.has(same(tool.name)))
           .map((tool): Option => ({ kind: 'suggestion', tool })),
-        // Le nom tapé, seulement s'il n'est ni proposé ni déjà choisi.
-        ...(query !== '' &&
+        // Le nom tapé, seulement si on peut ajouter un nom libre, et s'il n'est ni connu du
+        // catalogue (même par un alias), ni proposé, ni déjà choisi.
+        ...(allowOther &&
+        query !== '' &&
+        !known &&
         !chosen.has(same(query)) &&
         !suggestions.some((tool) => same(tool.name) === same(query))
-          ? [{ kind: 'add', name: query } as const]
+          ? [{ kind: 'add', name: query, other: catalogueReady } as const]
           : []),
       ]
+  const addLabel = (option: { name: string; other: boolean }) =>
+    option.other && labels.addOther ? labels.addOther(option.name) : labels.add(option.name)
+  // Ce qui décrit le champ (web : aria-describedby, plusieurs identifiants séparés d'une espace ;
+  // téléphone : l'indice lu après le nom) : le compteur, l'erreur, l'aide des « Autre ».
+  const described = [counterId, error ? errorId : null, hint ? hintId : null]
+    .filter(Boolean)
+    .join(' ')
+  const spokenHint = [error, hint].filter(Boolean).join(' ')
   const open = wanted && options.length > 0
   // Le choix en surbrillance : celui des flèches pour cette recherche ; sinon le premier, dès qu'on
   // a tapé (Entrée le prend). Champ vide, rien n'est en surbrillance avant une flèche : Entrée
@@ -333,6 +422,14 @@ export function ToolField({
             >
               <Chip
                 name={name}
+                other={
+                  otherOf(name)
+                    ? {
+                        badge: labels.otherBadge,
+                        spoken: labels.otherSpoken ? labels.otherSpoken(name) : name,
+                      }
+                    : null
+                }
                 removeLabel={labels.remove(name)}
                 onRemove={guard(() => remove(index))}
                 removeRef={(node) => {
@@ -352,7 +449,8 @@ export function ToolField({
         focusable={false}
         {...NOT_A_TAB_STOP}
         onPress={() => input.current?.focus()}
-        style={pill}
+        // En erreur, la bordure le dit aussi (hors focus, où l'anneau du focus passe avant).
+        style={error && !focused ? { ...pill, borderColor: colors.dangerBorder } : pill}
       >
         <Icon name="magnifying-glass" size={20} tone="muted" />
         <View
@@ -377,7 +475,10 @@ export function ToolField({
             role="combobox"
             aria-expanded={open}
             {...comboboxLinks(listId, open, activeIndex >= 0 ? optionId(activeIndex) : undefined)}
-            {...describedBy(counterId)}
+            {...describedBy(described)}
+            {...invalid(Boolean(error))}
+            // Sur téléphone, l'erreur et l'aide sont lues après le nom (aria-describedby n'y existe pas).
+            accessibilityHint={Platform.OS === 'web' ? undefined : spokenHint || undefined}
             value={text}
             onChangeText={change}
             // À la limite, le champ refuse la saisie : le compteur dit pourquoi (« 15 / 15 »).
@@ -451,6 +552,13 @@ export function ToolField({
             {options.map((option, index) => {
               const selected = index === activeIndex
               const name = option.kind === 'add' ? option.name : option.tool.name
+              // La ligne sous le nom d'une suggestion, affichée et reprise dans son nom lu.
+              const detail =
+                option.kind === 'add'
+                  ? undefined
+                  : labels.detail
+                    ? labels.detail(option.tool.family ?? null, option.tool.uses)
+                    : labels.uses(option.tool.uses)
               return (
                 <Pressable
                   key={`${option.kind}-${same(name)}`}
@@ -458,8 +566,12 @@ export function ToolField({
                   role="option"
                   accessibilityLabel={
                     option.kind === 'add'
-                      ? labels.add(option.name)
-                      : labels.suggestion(option.tool.name, option.tool.uses)
+                      ? addLabel(option)
+                      : labels.suggestion(
+                          option.tool.name,
+                          option.tool.uses,
+                          labels.detail ? detail : undefined,
+                        )
                   }
                   aria-selected={selected}
                   // Pas un arrêt de Tab : on choisit au toucher, ou au clavier depuis le champ.
@@ -486,20 +598,35 @@ export function ToolField({
                       : null),
                   })}
                 >
+                  {/* La lettre de l'outil, comme sur « Tous les outils » (décorative : le nom suit). */}
+                  {/* Sur la ligne en surbrillance (même miel doux que la tuile), un fin contour garde
+                      la tuile visible ; la marge négative compense ce contour : rien ne bouge. */}
+                  {option.kind === 'suggestion' ? (
+                    <View
+                      style={{
+                        margin: -borders.hairline,
+                        borderWidth: borders.hairline,
+                        borderRadius: radii.code,
+                        borderColor: selected ? colors.outline : 'transparent',
+                      }}
+                    >
+                      <InitialTile name={option.tool.name} />
+                    </View>
+                  ) : null}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     {option.kind === 'add' ? (
                       <Text variant="callout" weight={600} breakAnywhere>
-                        {labels.add(option.name)}
+                        {addLabel(option)}
                       </Text>
                     ) : (
                       <>
-                        {/* Le nom en police à chasse fixe, comme les pastilles d'outils ; le nombre
-                            de projets dessous, plus discret. */}
+                        {/* Le nom en police à chasse fixe, comme les pastilles d'outils ; dessous,
+                            plus discrets, sa famille et son nombre de projets. */}
                         <Text variant="mono" breakAnywhere>
                           {option.tool.name}
                         </Text>
                         <Text variant="caption" tone="muted" tabular>
-                          {labels.uses(option.tool.uses)}
+                          {detail}
                         </Text>
                       </>
                     )}
@@ -511,18 +638,59 @@ export function ToolField({
           </View>
         </View>
       ) : null}
+
+      {/* L'erreur, sous le champ (et sous la liste quand elle est ouverte). La région existe
+          toujours, même vide : un lecteur d'écran ne suit que les régions déjà présentes ; une
+          erreur qui arrive (après « Enregistrer ») est lue aussitôt. */}
+      <View aria-live="polite">
+        {error ? (
+          <View
+            nativeID={errorId}
+            style={{
+              flexDirection: 'row',
+              gap: space.xs,
+              alignItems: 'center',
+              paddingHorizontal: space.sm,
+            }}
+          >
+            <Icon name="warning-circle" size={16} tone="danger" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="caption" tone="danger">
+                {error}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {/* L'aide des « Autre », dès qu'il y en a un : ces noms sont relus par les administrateurs.
+          Elle décrit le champ (aria-describedby), et ne s'annonce pas à chaque outil ajouté. */}
+      {hint ? (
+        <View nativeID={hintId} style={{ paddingHorizontal: space.sm }}>
+          <Text variant="caption" tone="muted">
+            {hint}
+          </Text>
+        </View>
+      ) : null}
     </View>
   )
 }
 
-/** Une pastille d'outil choisi, avec sa croix « Retirer Claude ». */
+/**
+ * Une pastille d'outil choisi, avec sa croix « Retirer Claude ». Un « Autre » porte en plus sa
+ * marque (« Autre ») ; son nom et sa marque sont lus ensemble, en entier (« Teachable Machine,
+ * autre outil, pas encore dans le catalogue »), plutôt que « Teachable Machine Autre ».
+ */
 function Chip({
   name,
+  other,
   removeLabel,
   onRemove,
   removeRef,
 }: {
   name: string
+  /** Un « Autre » : sa marque affichée (absente : rien d'affiché) et son nom lu. */
+  other: { badge: string | undefined; spoken: string } | null
   removeLabel: string
   onRemove: () => void
   removeRef: (node: View | null) => void
@@ -542,11 +710,15 @@ function Chip({
         backgroundColor: colors.surface,
       }}
     >
-      <View style={{ flexShrink: 1, minWidth: 0, paddingVertical: space.xs }}>
-        <Text variant="mono" breakAnywhere>
-          {name}
-        </Text>
-      </View>
+      {other ? (
+        <OtherName name={name} badge={other.badge} spoken={other.spoken} />
+      ) : (
+        <View style={{ flexShrink: 1, minWidth: 0, paddingVertical: space.xs }}>
+          <Text variant="mono" breakAnywhere>
+            {name}
+          </Text>
+        </View>
+      )}
       <Pressable
         ref={removeRef}
         accessibilityRole="button"
@@ -576,6 +748,85 @@ function Chip({
           <Icon name="x" size={14} tone="muted" />
         </View>
       </Pressable>
+    </View>
+  )
+}
+
+/**
+ * Le nom d'un « Autre » et sa marque « Autre » (sur le miel doux des pastilles de statut). Lus d'un
+ * seul tenant, par leur phrase entière (`spoken`), comme le total des réactions de `ProjectCard` :
+ * - sur le web, un texte sans rôle n'est pas lu par son nom : ce qui est dessiné est caché au lecteur
+ *   d'écran, et la phrase est écrite à côté, cachée à l'œil (`hiddenFrame`) ;
+ * - sur téléphone, VoiceOver et TalkBack lisent le nom donné au bloc (rôle « texte »).
+ */
+function OtherName({
+  name,
+  badge,
+  spoken,
+}: {
+  name: string
+  badge: string | undefined
+  spoken: string
+}) {
+  const drawn = (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: space.xs,
+        flexShrink: 1,
+        minWidth: 0,
+        paddingVertical: space.xs,
+      }}
+    >
+      <View style={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
+        <Text variant="mono" breakAnywhere>
+          {name}
+        </Text>
+      </View>
+      {badge ? <OtherBadge text={badge} /> : null}
+    </View>
+  )
+  if (Platform.OS === 'web') {
+    return (
+      <>
+        <View aria-hidden style={{ flexShrink: 1, minWidth: 0 }}>
+          {drawn}
+        </View>
+        <View style={hiddenFrame}>
+          <Text>{spoken}</Text>
+        </View>
+      </>
+    )
+  }
+  return (
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={spoken}
+      style={{ flexShrink: 1, minWidth: 0 }}
+    >
+      {drawn}
+    </View>
+  )
+}
+
+/** La marque « Autre » : un petit texte brun sur le miel doux (couple statusText / honeySoft). */
+function OtherBadge({ text }: { text: string }) {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        flexShrink: 0,
+        paddingHorizontal: space.xs,
+        borderRadius: radii.pill,
+        backgroundColor: colors.honeySoft,
+      }}
+    >
+      <Text variant="caption" weight={600} tone="status">
+        {text}
+      </Text>
     </View>
   )
 }

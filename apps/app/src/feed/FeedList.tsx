@@ -42,11 +42,20 @@ export type CardOverlay = (
  * d'Explorer). Le choix « Cherchent des testeurs » a quitté ce fil en R3 : ces projets ont leur
  * carrousel en tête d'Explorer. La suite ne se charge que sur demande, par « Afficher la suite »
  * (relecture juridique de R3, jur-J7 : pas de fil sans fin qui se charge tout seul).
+ *
+ * R6b : `category` filtre le fil (les pastilles d'Explorer, au-dessus). Changer de filtre change
+ * toute la liste, sans que rien n'arrive : la liste repart de zéro pour chaque filtre (une `key`),
+ * sans cartes qui tombent en place ni focus rendu à une « première carte arrivée », et les
+ * nouveautés comparent la tête du même fil filtré (voir useFeedNews).
  */
 export function DiscoverFeed({
   viewerId,
   overlay,
   errorMessage,
+  category = null,
+  ready = true,
+  emptyMessage,
+  emptyAction,
 }: {
   /**
    * L'identifiant du membre connecté : R6a, ses propres projets ne comptent jamais comme
@@ -57,12 +66,26 @@ export function DiscoverFeed({
   overlay?: CardOverlay
   /** Le message d'une section en panne (voir FeedError, `section`) : ce fil n'est qu'une section. */
   errorMessage?: string
+  /** R6b : seulement les projets de cette catégorie (son code) ; `null` : tous. */
+  category?: string | null
+  /**
+   * R6b : faux tant que l'écran ne sait pas encore quel filtre demander (voir useDiscoverFeed,
+   * `enabled`) : le fil attend, en squelette, au lieu de lire sans filtre pour rien.
+   */
+  ready?: boolean
+  /**
+   * Le message d'un fil vide, s'il n'est pas celui de « Découvrir » (« Aucun projet public pour
+   * l'instant. ») : celui d'une catégorie sans projet, nommée par l'écran.
+   */
+  emptyMessage?: string
+  /** R6b (des-C4) : l'issue d'un fil vide, sous son message (« Voir tous les projets »). */
+  emptyAction?: { label: string; onPress: () => void } | undefined
 }) {
   const { t } = useTranslation()
-  const feed = useDiscoverFeed({ testers: false })
+  const feed = useDiscoverFeed({ testers: false, category, enabled: ready })
   const pages = feed.data?.pages ?? []
   const items = pages.flatMap((page) => page.items)
-  const news = useFeedNews('discover', items[0], false, viewerId)
+  const news = useFeedNews('discover', items[0], false, viewerId, category)
   // Les auteurs suivis, d'après chaque page lue (l'API le dit page par page, pour ses auteurs).
   // `?? []` : une page sans ce champ (un faux fil de test, une ancienne réponse) n'en suit aucun.
   const followed = new Set(pages.flatMap((page) => page.followedAuthorIds ?? []))
@@ -75,6 +98,10 @@ export function DiscoverFeed({
     )
   ) : (
     <FeedList
+      // Une liste neuve par filtre : sa mémoire des cartes déjà vues (useArrivals) est celle de ce
+      // filtre. Sans elle, revenir à « Toutes », déjà lue, ferait tomber toutes ses cartes comme
+      // des nouveautés. « ~ » ne peut pas être dans un code de catégorie.
+      key={category ?? '~'}
       feed={feed}
       items={items}
       news={
@@ -84,7 +111,8 @@ export function DiscoverFeed({
           caption={t(($) => $.feed.discoverCaption)}
         />
       }
-      empty={t(($) => $.feed.discoverEmpty)}
+      empty={emptyMessage ?? t(($) => $.feed.discoverEmpty)}
+      emptyAction={emptyAction}
       overlay={overlay ? (project) => overlay(project, followed) : undefined}
     />
   )
@@ -156,6 +184,8 @@ type FeedListProps = {
   | {
       /** Le message d'un fil vide (Explorer, sans « Tu es à jour »). */
       empty: string
+      /** L'issue d'un fil vide, sous son message (voir ProjectGrid). */
+      emptyAction?: { label: string; onPress: () => void } | undefined
       upToDate?: never
     }
   | {
@@ -171,6 +201,7 @@ type FeedListProps = {
         hideMascot?: boolean
       }
       empty?: never
+      emptyAction?: never
     }
 )
 
@@ -203,7 +234,16 @@ const useArrivals = (items: readonly FeedItem[]): ReadonlySet<string> => {
  * Les cartes d'un fil, le bouton des nouveautés au-dessus, « Tu es à jour » à sa place, et la fin du
  * fil en dessous.
  */
-export function FeedList({ feed, items, news, empty, overlay, upToDate, columns }: FeedListProps) {
+export function FeedList({
+  feed,
+  items,
+  news,
+  empty,
+  emptyAction,
+  overlay,
+  upToDate,
+  columns,
+}: FeedListProps) {
   const { t } = useTranslation()
   // La lumière suit la carte du milieu de l'écran (R4). Ce hook s'appelle ici, dans un enfant de
   // Screen, jamais dans le corps de l'écran : la lumière d'ambiance est fournie par Screen
@@ -277,7 +317,7 @@ export function FeedList({ feed, items, news, empty, overlay, upToDate, columns 
           {sphereAt !== null ? segment(items.slice(sphereAt), cardOf, columns) : null}
         </>
       ) : (
-        <ProjectGrid empty={empty} {...(columns ? { columns } : null)}>
+        <ProjectGrid empty={empty} emptyAction={emptyAction} {...(columns ? { columns } : null)}>
           {items.map(cardOf)}
         </ProjectGrid>
       )}

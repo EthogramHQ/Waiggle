@@ -8,10 +8,11 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
-import { ListGroup, ListRow } from '../ui/ListGroup'
+import { ListBlock, ListGroup, ListRow } from '../ui/ListGroup'
 import { SearchLink } from '../ui/SearchLink'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
+import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
 
@@ -22,6 +23,7 @@ const fr = {
   search: 'Lien vers la recherche',
   tiles: 'Tuiles à l’initiale (miel, crème)',
   rows: 'Lignes de « Tous les outils » (dont un nom long)',
+  block: 'ListBlock : des pastilles dans un groupe, aux marges d’une ligne',
   day: 'jour',
   night: 'nuit',
 }
@@ -33,6 +35,7 @@ const en: typeof fr = {
   search: 'Link to the search',
   tiles: 'Initial tiles (honey, cream)',
   rows: '“All tools” rows (one with a long name)',
+  block: 'ListBlock: tags inside a group, with the margins of a row',
   day: 'day',
   night: 'night',
 }
@@ -92,6 +95,15 @@ export function ToolsCatalogue() {
                     />
                   )
                 })}
+              </ListGroup>
+            </Example>
+            <Example caption={`${l.block} — ${l[scheme]}`}>
+              <ListGroup title={t(($) => $.tools.others)} footer={t(($) => $.tools.othersHint)}>
+                <ListBlock wrap>
+                  {['Teachable Machine', 'Lobe', 'Mon assistant maison'].map((name) => (
+                    <Tag key={name} label={name} inCatalogue={false} />
+                  ))}
+                </ListBlock>
               </ListGroup>
             </Example>
           </Stack>

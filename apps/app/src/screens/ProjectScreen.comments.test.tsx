@@ -290,7 +290,7 @@ describe('the comments of a project', () => {
     await renderPage('en')
 
     expect(await screen.findAllByRole('link', { name: 'See Inès’s page' })).toHaveLength(1)
-    expect(screen.getByRole('button', { name: /^Comment by Inès: Thanks!/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Inès’s comment: Thanks!/ })).toBeTruthy()
   })
 
   it('says in the sheet when a comment was edited', async () => {

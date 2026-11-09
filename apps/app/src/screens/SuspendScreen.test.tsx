@@ -22,6 +22,7 @@ import {
   REMOVALS_BEFORE_PASSWORD,
   SUSPENSIONS_BEFORE_PASSWORD,
 } from '@ruche/contracts'
+import { nameOf } from '@ruche/i18n'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { getMember } from '../members/api'
 import { useDecide } from '../moderation/api'
@@ -100,8 +101,8 @@ beforeEach(() => {
   mockBack.mockReset()
 })
 
-const suspendTitle = fr.t(($) => $.moderation.suspend.title, { name: 'Léa' })
-const liftTitle = fr.t(($) => $.moderation.lift.title, { name: 'Léa' })
+const suspendTitle = fr.t(($) => $.moderation.suspend.title, { nameOf: nameOf('fr', 'Léa') })
+const liftTitle = fr.t(($) => $.moderation.lift.title, { nameOf: nameOf('fr', 'Léa') })
 const confirmSuspend = () =>
   screen.getByRole('button', { name: fr.t(($) => $.moderation.suspend.confirm) })
 const confirmPassword = () =>

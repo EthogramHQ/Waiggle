@@ -21,6 +21,9 @@ const SERVICE = [
   'existing-account',
   'moderation-alert',
   'new-email',
+  // R6b : le récap hebdomadaire des « Autre » aux administrateurs.
+  'other-recap-one-project',
+  'other-recap',
   // R2 : le mot de passe oublié et « Ton mot de passe a changé », deux e-mails de sécurité.
   'password-changed',
   'reset-password',
@@ -59,8 +62,9 @@ describe('emailPreviews', () => {
 
     expect(previews.map(({ file }) => file).sort()).toEqual(
       [...NOTIFICATIONS, ...SERVICE]
-        .sort()
-        .flatMap((name) => [`${name}.en.html`, `${name}.fr.html`]),
+        .flatMap((name) => [`${name}.en.html`, `${name}.fr.html`])
+        // Trié après les suffixes : « other-recap » est le début d'un autre nom.
+        .sort(),
     )
     for (const { file, email } of previews) {
       const [name, language] = file.split('.')

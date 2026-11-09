@@ -1,6 +1,7 @@
 // Toutes les tables de Waiggle. Chaque domaine a son fichier, ré-exporté ici.
 export * from './auth'
 export * from './blocks'
+export * from './categories'
 export * from './comments'
 export * from './email'
 export * from './feed'
@@ -13,3 +14,4 @@ export * from './profile'
 export * from './projects'
 export * from './rate-limit'
 export * from './reactions'
+export * from './tools'

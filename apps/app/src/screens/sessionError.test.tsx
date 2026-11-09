@@ -16,7 +16,7 @@ import { useSession } from '../accounts/api'
 import { request } from '../api/client'
 import { useBlock, useBlockedMembers, useUnblock } from '../blocks/api'
 import { useFollow } from '../follows/api'
-import { getMember, getTag } from '../members/api'
+import { getMember } from '../members/api'
 import {
   useDecide,
   useDecisionHistory,
@@ -97,19 +97,15 @@ jest.mock('../blocks/api', () => ({
   useUnblock: jest.fn(),
   useBlockedMembers: jest.fn(),
 }))
-// Les membres et les étiquettes : un vrai React Query autour de fausses lectures, comme dans
-// MemberScreen.test.tsx, SuspendScreen.test.tsx et TagScreen.test.tsx.
+// Les membres : un vrai React Query autour de fausses lectures, comme dans
+// MemberScreen.test.tsx et SuspendScreen.test.tsx.
 jest.mock('../members/api', () => {
   const { useQuery } = jest.requireActual('@tanstack/react-query')
   const getMember = jest.fn()
-  const getTag = jest.fn()
   return {
     getMember,
     useMember: (id: string, enabled = true) =>
       useQuery({ queryKey: ['member', id], queryFn: () => getMember(id), enabled }),
-    getTag,
-    useTag: (slug: string, enabled = true) =>
-      useQuery({ queryKey: ['tag', slug], queryFn: () => getTag(slug), enabled }),
   }
 })
 jest.mock('../notifications/api', () => ({
@@ -212,7 +208,6 @@ beforeEach(() => {
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
   jest.mocked(getProject).mockReset().mockImplementation(never)
   jest.mocked(getMember).mockReset().mockImplementation(never)
-  jest.mocked(getTag).mockReset().mockImplementation(never)
   jest.mocked(getReportTarget).mockReset().mockImplementation(never)
   jest
     .mocked(useFollow)
@@ -296,7 +291,7 @@ describe('a session that cannot be read', () => {
     await fireEvent.press(screen.getByRole('button', { name: fr.t(($) => $.common.retry) }))
     expect(refetch).toHaveBeenCalledTimes(1)
     // Relecture de sécurité (PR #62, S1) : sans session lue, aucune donnée réservée n'est demandée.
-    for (const read of [request, getMe, getProject, getMember, getTag, getReportTarget]) {
+    for (const read of [request, getMe, getProject, getMember, getReportTarget]) {
       expect(read).not.toHaveBeenCalled()
     }
   })

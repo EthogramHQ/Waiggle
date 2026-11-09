@@ -16,8 +16,8 @@
 import { layout } from '@ruche/brand'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Linking, Platform, StyleSheet } from 'react-native'
-import { CATEGORY_ICONS } from '../projects/categories'
 import { SummaryCard } from '../projects/SummaryCard'
+import { categoryName } from '../testing/categories'
 import { recipesProject, summaryOf } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -375,9 +375,11 @@ describe('SummaryCard, the feed card of a project summary', () => {
 // (`pointerEvents: 'none'`) ; avec `overlay`, la pastille passe dessous, dans la même colonne.
 // Interface attendue (plan R6a, découpage, ligne U2) : `category?: { label: string; icon: IconName }`.
 
+// R6b : le nom et l'icône d'une catégorie viennent de l'API (GET /v1/categories) ; la carte reçoit
+// toujours `{ label, icon }`, ici tirés des catégories de départ des tests.
 const science = {
-  label: fr.t(($) => $.project.category.science),
-  icon: CATEGORY_ICONS.science,
+  label: categoryName('science'),
+  icon: 'planet' as const,
 }
 const categoryDescription = plain(fr.t(($) => $.card.category, { category: science.label }))
 const photo = {

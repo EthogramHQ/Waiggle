@@ -515,7 +515,11 @@ function FanRow({
         // Le contour du focus clavier (commun, app/+html.tsx) suit l'arrondi de la ligne.
         style={styles.rowFrame}
       >
-        <Surface variant="glass" radius="tile" padding="none">
+        {/* Feuille « sheet » (opaque de jour, presque de nuit), posée au centre : le verre « glass »,
+            et même « panel », laissait passer la teinte du bouton miel « Tester la démo » dessous,
+            sur téléphone, et la ligne « Utile » semblait à moitié choisie (relecture R5a, A11).
+            Seule la ligne choisie (`mine`) est miel. */}
+        <Surface variant="sheet" centered radius="tile" padding="none">
           <View style={styles.row}>
             {disk}
             <View style={styles.names}>

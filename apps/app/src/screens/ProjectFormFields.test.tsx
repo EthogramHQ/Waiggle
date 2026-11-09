@@ -3,15 +3,28 @@
 // la ligne, et chacune ouvre la seconde feuille en disant d'où), le lien de démo (« Lien valide »
 // lu avec ce qui n'est pas vérifié), la description de la photo choisie et la phrase d'audience.
 // La feuille entière (envoi, abandon, seconde feuille) est testée par `ProjectFormScreen.test.tsx`.
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { useState } from 'react'
+import { request } from '../api/client'
 import { emptyProjectForm, type ProjectForm, type ProjectFormErrors } from '../projects/form'
+import { categoryList } from '../testing/categories'
 import { renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
 import type { PhotoTile } from '../ui/PhotoTiles'
 import { type CategoriesOpener, ProjectFormFields, useProjectFieldRefs } from './ProjectFormFields'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// R6b : les noms des catégories viennent de l'API (GET /v1/categories), simulée ici en français.
+jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
+beforeEach(() => {
+  jest
+    .mocked(request)
+    .mockImplementation(async (path) =>
+      String(path).startsWith('/v1/categories')
+        ? { ok: true, data: categoryList('fr') }
+        : { ok: false, error: 'notFound' },
+    )
+})
 
 const TEXT = {
   chooseCategory: fr.t(($) => $.project.form.chooseCategory),
@@ -92,7 +105,10 @@ describe('ProjectFormFields, the category, second and tools rows', () => {
       />,
     )
 
-    expect(row(/^Catégorie/).props.accessibilityLabel).toBe('Catégorie, Sciences et espace')
+    // Les noms arrivent avec la liste des catégories, lue une fois l'écran monté.
+    await waitFor(() =>
+      expect(row(/^Catégorie/).props.accessibilityLabel).toBe('Catégorie, Sciences et espace'),
+    )
     expect(row(/^Seconde/).props.accessibilityLabel).toBe('Seconde, facultative, Apprendre')
     expect(row(/^Outils/).props.accessibilityLabel).toBe('Outils, Claude, Expo')
   })

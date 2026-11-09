@@ -48,6 +48,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -65,7 +66,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button } from './Button'
 import { CountedTitle } from './CountedTitle'
-import { focusTarget, focusWithoutScroll } from './focus'
+import { type Focusable, focusTarget, focusWithoutScroll } from './focus'
 import { IconButton } from './IconButton'
 import { inLayerAbove, layerStillOpening, openModalLayer, sameLayer } from './modalLayers'
 import { Notice, type NoticeAction } from './Notice'
@@ -75,6 +76,7 @@ import { type SheetReveal, useSheetReveal } from './sheetReveal'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { holdPageTaps, useTapsAllowed } from './tapGuard'
+import { useHydrated } from './theme/hydration'
 import { useLayout } from './theme/layout'
 import { spring, useCalmMotion } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
@@ -167,6 +169,12 @@ type PanelProps = {
    */
   revealRef?: Ref<SheetReveal>
   /**
+   * Le titre de la feuille, pour y poser le focus quand rien d'autre n'est là (la liste relue est
+   * vide, la feuille n'a pas de champ : R6b). Pas de la tête à action (téléphone, `action`) : seules
+   * les feuilles à titre simple ou à nombre (« Commentaires 6 ») la reçoivent.
+   */
+  titleRef?: Ref<Focusable>
+  /**
    * L'action de la feuille (« Publier », « Enregistrer », « OK », R6a) : dans la tête sur téléphone,
    * à droite ; au pied sur ordinateur, en dernier. Voir `SheetAction`.
    */
@@ -226,6 +234,13 @@ type Props = Omit<
    * de `onClose`, qui ne part plus que de l'écran (après « Abandonner »). Sans lui, `onClose`.
    */
   closeGuard?: () => void
+  /**
+   * Web : l'élément qui reçoit le focus à la fermeture, à la place de l'ouvreur, lu au moment de
+   * fermer (R6b, u8f). Pour un ouvreur parti avec ce que la feuille a décidé : la carte décidée
+   * montre son résultat à la place de ses boutons ; retrouvé par son nom, l'ouvreur aurait été le
+   * bouton de même nom de la carte voisine. Rien (null) : l'ouvreur, comme sans cette prop.
+   */
+  returnFocusTo?: () => unknown
 }
 
 type KeyEvent = {
@@ -381,6 +396,39 @@ const giveFocusBack = (back: unknown, name: string | null): void => {
 }
 
 /**
+ * Rend le focus à la fermeture : à la place choisie par l'écran (`returnFocusTo`) s'il en donne une,
+ * sinon comme `giveFocusBack`. Elle sert deux fois : à la fermeture, puis à la fin du fondu de sortie
+ * si le focus s'est perdu entre-temps (voir `onDismiss` dans `Sheet`).
+ */
+const giveFocusTo = (chosen: unknown, back: unknown, name: string | null): void => {
+  if (chosen && focusWithoutScroll(chosen)) return
+  giveFocusBack(back, name)
+}
+
+/**
+ * Cache aux pièges à focus des couches qui se ferment le focus que la feuille rend à sa fermeture
+ * (R6b, U2, des-C5). Pendant les fondus de sortie, le piège de chaque Modal de react-native-web
+ * reste actif : celui d'une fenêtre fermée en même temps que la feuille (« Rattacher » confirmé)
+ * ramenait chez lui le focus posé sur le résultat de la carte (« Rattacher », puis « Annuler »), et le
+ * résultat ne l'avait qu'à la fin du fondu ; un lecteur d'écran lisait « Annuler » entre les deux.
+ * On écoute donc le focus sur `window`, à la descente : le navigateur nous appelle avant les pièges,
+ * posés sur le document (comme l'écoute des couches du dessus, plus bas). Un focus qui arrive sur
+ * l'une des places données (`given` : celle choisie par l'écran, l'ouvreur) ne leur est pas
+ * transmis, et il y reste ; tout autre focus passe. Rend de quoi retirer l'écoute (fin du fondu,
+ * réouverture, disparition), ou null s'il n'y a rien à garder (hors du web).
+ */
+const keepFocusGiven = (given: readonly unknown[]): (() => void) | null => {
+  const page = globalThis as unknown as WebWindow
+  const targets: unknown[] = given.filter((node) => node != null)
+  if (Platform.OS !== 'web' || targets.length === 0 || !page.addEventListener) return null
+  const keep = (event: FocusEventLike) => {
+    if (targets.includes(event.target)) event.stopImmediatePropagation?.()
+  }
+  page.addEventListener('focus', keep, true)
+  return () => page.removeEventListener?.('focus', keep, true)
+}
+
+/**
  * Une feuille de téléphone qui a son adresse disparaît avec sa page, sans passer par « fermée » :
  * l'effet de fermeture ne tourne pas, et le focus restait sur `body`. Après le démontage, on rend
  * donc le focus à l'ouvreur (retrouvé par son nom si la barre a été redessinée), le temps que la
@@ -473,6 +521,56 @@ const openSheets: string[] = []
 /** La feuille `id` est-elle celle du dessus (ou la seule) ? */
 const onTop = (id: string) => openSheets.length === 0 || openSheets[openSheets.length - 1] === id
 
+// Le clavier à l'écran d'un navigateur de téléphone (R6b, U15). `window.visualViewport` est la zone
+// que le membre voit réellement : quand le clavier s'ouvre, elle rétrécit (sa `height`) et peut se
+// décaler (`offsetTop`) si le navigateur fait défiler la page pour amener le champ en vue. Selon le
+// navigateur, la fenêtre « de mise en page » (celle où une couche `position: fixed` se calcule) suit
+// ou non : la méta `interactive-widget=resizes-content` (`app/+html.tsx`) le demande à Chrome, mais
+// Safari sur iPhone l'ignore. Sans cette mesure, la feuille gardait toute la hauteur de la fenêtre
+// de mise en page, et son pied (le champ « Écrire un commentaire ») restait sous le clavier. La
+// feuille prend donc la hauteur du `visualViewport`, seulement quand il est plus court que la
+// fenêtre : clavier fermé, ou navigateur qui redimensionne déjà la page, rien ne change.
+// Rien sur iOS et Android natifs (React Native gère le clavier : `KeyboardAvoidingView`), et rien
+// avant `useHydrated()` : le pré-rendu ne connaît pas le navigateur.
+type VisualViewportLike = {
+  height: number
+  offsetTop: number
+  addEventListener: (type: 'resize' | 'scroll', listener: () => void) => void
+  removeEventListener: (type: 'resize' | 'scroll', listener: () => void) => void
+}
+/** La zone visible quand le clavier la rétrécit : sa hauteur et son décalage ; sinon null. */
+type VisibleArea = { height: number; top: number }
+
+/** Hook : la zone visible de la page web, tant qu'elle est plus courte que la fenêtre ; sinon null. */
+const useVisibleArea = (): VisibleArea | null => {
+  const hydrated = useHydrated()
+  const [measured, setMeasured] = useState<VisibleArea | null>(null)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !hydrated) return
+    const viewport = (globalThis as { visualViewport?: VisualViewportLike }).visualViewport
+    if (!viewport) return
+    // La fenêtre de mise en page : `innerHeight` (celle de `useWindowDimensions` ne convient pas,
+    // react-native-web la lit lui-même dans `visualViewport` : elle rétrécit avec le clavier, et
+    // la comparaison ne verrait jamais d'écart). Un point d'écart (arrondis) n'est pas un clavier.
+    const read = () => {
+      const layoutHeight = (globalThis as { innerHeight?: number }).innerHeight ?? 0
+      setMeasured(
+        viewport.height < layoutHeight - 1
+          ? { height: viewport.height, top: viewport.offsetTop }
+          : null,
+      )
+    }
+    read()
+    viewport.addEventListener('resize', read)
+    viewport.addEventListener('scroll', read)
+    return () => {
+      viewport.removeEventListener('resize', read)
+      viewport.removeEventListener('scroll', read)
+    }
+  }, [hydrated])
+  return measured
+}
+
 export function Sheet({
   open,
   onClose,
@@ -480,6 +578,7 @@ export function Sheet({
   aside,
   busy = false,
   initialFocusRef,
+  returnFocusTo,
   ...panel
 }: Props) {
   const { colors } = useTheme()
@@ -487,6 +586,8 @@ export function Sheet({
   const window = useWindowDimensions()
   const phone = sizeClass === 'compact'
   const besideRoom = useSheetAside()
+  // Le clavier à l'écran du web : la zone visible, quand il la rétrécit (voir `useVisibleArea`).
+  const visible = useVisibleArea()
   // « Réduire les animations » : la feuille de téléphone paraît par un fondu, au lieu de monter du
   // bas de l'écran (un grand déplacement).
   const calm = useCalmMotion()
@@ -503,6 +604,13 @@ export function Sheet({
   const shown = useRef(false)
   // Son nom, pour le retrouver s'il a été redessiné entre-temps (voir `reachableOpener`).
   const openerName = useRef<string | null>(null)
+  // La place choisie par l'écran (`returnFocusTo`), la dernière reçue : la fin du fondu la relit
+  // après que l'écran a été redessiné.
+  const returnFocusRef = useRef(returnFocusTo)
+  returnFocusRef.current = returnFocusTo
+  // L'écoute qui cache aux pièges le focus rendu à la fermeture (voir `keepFocusGiven`) : de quoi la
+  // retirer, à la fin du fondu de sortie.
+  const keptFocus = useRef<(() => void) | null>(null)
   // useId : un identifiant stable entre le serveur et le navigateur, pour nommer la feuille par son
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
   const sheetId = useId()
@@ -587,8 +695,27 @@ export function Sheet({
     const back = opener.current
     opener.current = null
     returnTo.current = { node: back }
-    giveFocusBack(back, openerName.current)
+    const chosen = returnFocusRef.current?.()
+    // Le focus que la feuille va poser, caché aux pièges des couches qui se ferment (voir
+    // `keepFocusGiven`), jusqu'à la fin de son fondu.
+    keptFocus.current?.()
+    keptFocus.current = keepFocusGiven([chosen, back])
+    giveFocusTo(chosen, back, openerName.current)
   }, [open, initialFocusRef])
+
+  // Rouverte, la feuille ne cache plus rien ; démontée, elle retire son écoute.
+  useEffect(() => {
+    if (!open) return
+    keptFocus.current?.()
+    keptFocus.current = null
+  }, [open])
+  useEffect(
+    () => () => {
+      keptFocus.current?.()
+      keptFocus.current = null
+    },
+    [],
+  )
 
   // Démontée encore ouverte (la page de la feuille se ferme, sur téléphone) : voir
   // `restoreAfterUnmount`. `opener` n'est plein que tant que la feuille est ouverte.
@@ -605,14 +732,22 @@ export function Sheet({
   // disparaissant, elle le laissait parfois sur la page (`body`), où la feuille de dessous le
   // reprenait par sa tête au lieu de la ligne touchée (« Catégorie », R6a, ui-I10). À la fin
   // (`onDismiss`), on le rend donc encore au bouton d'origine, seulement s'il s'est perdu : un focus
-  // posé ailleurs entre-temps (la page d'arrivée) est gardé.
+  // posé ailleurs entre-temps (la page d'arrivée) est gardé. Pendant ce fondu, le piège à focus du
+  // Modal est encore actif : il ramène dans la feuille tout focus posé hors d'elle, celui de la
+  // fermeture compris. La place choisie par l'écran (`returnFocusTo`) passe donc aussi ici, sinon
+  // le bouton retrouvé par son nom l'emportait (R6b, u8f : celui de la carte voisine).
   const onDismiss =
     Platform.OS === 'web'
       ? {
           onDismiss: () => {
+            // Le fondu est fini, les pièges de la feuille aussi : le focus n'a plus à leur être caché.
+            keptFocus.current?.()
+            keptFocus.current = null
             const back = returnTo.current
             returnTo.current = null
-            if (back && focusLost()) giveFocusBack(back.node, openerName.current)
+            if (back && focusLost()) {
+              giveFocusTo(returnFocusRef.current?.(), back.node, openerName.current)
+            }
           },
         }
       : null
@@ -843,7 +978,22 @@ export function Sheet({
           (relecture juridique jur-15, WCAG 2.4.11). Android redimensionne la fenêtre de lui-même,
           le web aussi. */}
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center' }}
+        style={{
+          flex: 1,
+          backgroundColor: colors.scrim,
+          justifyContent: 'center',
+          // Clavier à l'écran sur le web : la couche prend la zone visible (pas de `flex: 0`, dont
+          // la base web est nulle) ; son pied reste au-dessus du clavier.
+          ...(visible
+            ? {
+                flexGrow: 0,
+                flexShrink: 0,
+                flexBasis: 'auto',
+                height: visible.height,
+                marginTop: visible.top,
+              }
+            : null),
+        }}
         enabled={Platform.OS === 'ios'}
         {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : null)}
       >
@@ -886,7 +1036,7 @@ export function Sheet({
             onClose={requestClose}
             busy={busy}
             layout={phone ? 'phone' : 'desktop'}
-            maxHeight={window.height - 2 * PANEL_MARGIN}
+            maxHeight={(visible?.height ?? window.height) - 2 * PANEL_MARGIN}
             closeRef={closeRef}
             panelRef={panelRef}
             keys={keys}
@@ -936,6 +1086,7 @@ export function SheetPanel({
   titleCount,
   dragHandlers,
   revealRef,
+  titleRef,
   action,
   cancelLabel,
   footerNote,
@@ -999,10 +1150,16 @@ export function SheetPanel({
       separator="space"
       level={heading}
       nativeID={titleId}
+      {...(titleRef ? { focusRef: titleRef } : null)}
       {...(compact ? null : { variant: 'title2' as const })}
     />
   ) : (
-    <Text variant={compact ? 'heading' : 'title2'} heading={heading} nativeID={titleId}>
+    <Text
+      variant={compact ? 'heading' : 'title2'}
+      heading={heading}
+      nativeID={titleId}
+      {...(titleRef ? { focusRef: titleRef } : null)}
+    >
       {title}
     </Text>
   )

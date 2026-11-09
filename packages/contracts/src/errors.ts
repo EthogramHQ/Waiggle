@@ -40,6 +40,13 @@ export const ErrorCode = z.enum([
   // principale déjà enregistrée.
   'category_required',
   'same_category',
+  // Tranche R6b : une catégorie qui n'est pas en base ; un nom d'outil ou de catégorie déjà pris ;
+  // trop d'« Autre » créés en un jour ; un administrateur qui range son propre projet.
+  'unknown_category',
+  'tool_name_taken',
+  'category_name_taken',
+  'too_many_other_tools',
+  'own_project',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

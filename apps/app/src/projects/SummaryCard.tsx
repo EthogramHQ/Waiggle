@@ -16,7 +16,7 @@ import { type Measurable, useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
 import { useLayout } from '../ui/theme/layout'
-import { categoryOption } from './categories'
+import { useCategory } from './useCategory'
 
 /**
  * La carte que vise la danse de publication (R6a) : le projet tout juste publié, et la fonction qui
@@ -68,13 +68,14 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
     },
     [coverSource, onTarget],
   )
-  // La catégorie principale ; un projet d'avant R6a n'en a pas : aucune étiquette.
-  const { primaryCategory } = project
+  // La catégorie principale, nommée par l'API (R6b) ; aucune étiquette pour un projet d'avant R6a,
+  // pendant le chargement ou la panne des catégories, ni pour un code inconnu : jamais le code brut.
+  const category = useCategory(project.primaryCategory)
   return (
     <ProjectCard
       title={project.title}
       pitch={project.pitch}
-      category={primaryCategory ? categoryOption(t, primaryCategory) : undefined}
+      category={category}
       author={{
         name: project.author.name,
         avatar: toSource(project.author.avatarUrl),

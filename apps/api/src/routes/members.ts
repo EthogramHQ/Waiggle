@@ -18,7 +18,8 @@ import { ensureHandle } from '../handles/claim'
 import { currentHandleOf } from '../handles/load'
 import { searchMentionable } from '../mentions/search'
 import { mediaUrl } from '../profile/me'
-import { loadSummaries, visibleTo, withSlugs } from '../projects/load'
+import { favoriteToolsOf } from '../profile/tools'
+import { loadSummaries, visibleTo } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { isActiveAdmin } from '../reports/admin'
 import { loadActiveSuspension } from '../suspension/load'
@@ -197,7 +198,6 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
         name: schema.user.name,
         handle: schema.memberHandle.handle,
         bio: schema.profile.bio,
-        favoriteTools: schema.profile.favoriteTools,
         avatarKey: schema.profile.avatarKey,
         // Tranche 7b : le visiteur l'a-t-il bloqué ? `exists` sur la clé primaire de member_block.
         isBlocked: sql<boolean>`exists (select 1 from ${schema.memberBlock}
@@ -254,13 +254,14 @@ export const memberRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       publicApiUrl,
     )
     const follow = await memberFollowState(db, id, viewer.id)
-    const { tools, toolSlugs } = withSlugs(row.favoriteTools ?? [])
+    // R6b : ses outils favoris, lus par profile_tool (le nom tapé pour un « Autre », `inCatalogue`).
+    const favoriteTools = await favoriteToolsOf(db, id)
     // Member.parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
     return c.json(
       Member.parse({
         ...header,
         bio: row.bio ?? '',
-        favoriteTools: tools.map((label, i) => ({ label, slug: toolSlugs[i] ?? label })),
+        favoriteTools,
         isBlocked: false,
         ...follow,
         projects,

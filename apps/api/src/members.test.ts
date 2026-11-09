@@ -1,6 +1,6 @@
 // Tests d'intégration de la tranche 3b-2 : la page d'un membre et la page d'une étiquette.
 // Scénarios : docs/scenarios/phase-1.md, « Précisions (tranche 3b-2) ». Deux membres : Léa et Max.
-import { ErrorResponse, Me, Member, PROJECT_LIST_MAX, Project, TagPage } from '@ruche/contracts'
+import { ErrorResponse, Me, Member, PROJECT_LIST_MAX, Project } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -62,14 +62,6 @@ const readMember = async (id: string, cookie: string) => {
   return Member.parse(await res.json())
 }
 
-const tagPage = (slug: string, cookie: string | null) =>
-  send('GET', `/v1/tags/${encodeURIComponent(slug)}`, cookie)
-const readTag = async (slug: string, cookie: string) => {
-  const res = await tagPage(slug, cookie)
-  expect(res.status).toBe(200)
-  return TagPage.parse(await res.json())
-}
-
 const expectNotFound = async (res: Response) => {
   expect(res.status).toBe(404)
   expect(ErrorResponse.parse(await res.json()).error.code).toBe('not_found')
@@ -128,13 +120,15 @@ describe('the page of a member', () => {
       avatarUrl: null,
       bio: 'Je bricole des agents.',
       favoriteTools: [
-        { label: 'Claude Code', slug: 'claude-code' },
-        { label: 'Cursor', slug: 'cursor' },
+        { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+        { label: 'Cursor', slug: 'cursor', inCatalogue: true },
       ],
       isMe: false,
     })
     expect(page.projects.map((project) => project.id)).toEqual([second.id, first.id])
-    expect(page.projects[0]?.tools).toEqual([{ label: 'Claude Code', slug: 'claude-code' }])
+    expect(page.projects[0]?.tools).toEqual([
+      { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
+    ])
   })
 
   it('also shows her private projects to the member herself', async () => {
@@ -230,72 +224,5 @@ describe('the page of a member', () => {
     for (const id of ["x' or '1'='1", '../me', 'a'.repeat(65), 'é']) {
       await expectNotFound(await memberPage(id, max))
     }
-  })
-})
-
-describe('the page of a tag', () => {
-  it('is only shown to signed-in members', async () => {
-    expect((await tagPage('claude-code', null)).status).toBe(401)
-  })
-
-  it('gathers the public projects of every member made with this tool, newest first', async () => {
-    const first = await publish(lea, { title: 'De Léa', tools: ['Claude Code'] })
-    const second = await publish(max, { title: 'De Max', tools: ['claude code', 'Cursor'] })
-    await publish(max, { title: 'Sans', tools: ['Cursor'] })
-
-    const page = await readTag('claude-code', lea)
-
-    expect(page.slug).toBe('claude-code')
-    expect(page.label).toBe('claude code') // le nom tapé sur le plus récent
-    expect(page.projects.map((project) => project.id)).toEqual([second.id, first.id])
-  })
-
-  it('leads « Claude Code », « claude code » and « CLAUDE-CODE » to the same page', async () => {
-    const project = await publish(lea, { title: 'De Léa', tools: ['Claude Code'] })
-
-    for (const asked of ['Claude Code', 'claude code', 'CLAUDE-CODE']) {
-      const page = await readTag(asked, max)
-      expect(page.slug).toBe('claude-code')
-      expect(page.projects.map((p) => p.id)).toEqual([project.id])
-    }
-  })
-
-  it('never shows a private project, not even to its author', async () => {
-    await publish(lea, { title: 'Brouillon', tools: ['Claude Code'], visibility: 'private' })
-
-    expect((await readTag('claude-code', lea)).projects).toEqual([])
-    expect((await readTag('claude-code', max)).projects).toEqual([])
-  })
-
-  it('looks the same for an unknown tag and a tag carried only by private projects', async () => {
-    await publish(lea, { title: 'Brouillon', tools: ['Secret'], visibility: 'private' })
-
-    expect(await readTag('secret', max)).toEqual({ slug: 'secret', label: null, projects: [] })
-    expect(await readTag('inconnu', max)).toEqual({ slug: 'inconnu', label: null, projects: [] })
-  })
-
-  it('lists at most 50 projects, newest first', async () => {
-    await insertProjects(PROJECT_LIST_MAX + 1, 'Claude', 'claude')
-
-    const page = await readTag('claude', max)
-
-    expect(page.projects).toHaveLength(PROJECT_LIST_MAX)
-    expect(page.projects[0]?.title).toBe(`Projet ${PROJECT_LIST_MAX}`)
-  })
-
-  it('never lets a private project take one of the 50 places, nor give the tag its name', async () => {
-    await insertProjects(PROJECT_LIST_MAX, 'Claude', 'claude')
-    await insertNewerDraft('Claude', 'claude')
-
-    const page = await readTag('claude', lea)
-
-    expect(page.projects).toHaveLength(PROJECT_LIST_MAX)
-    expect(page.projects.every((project) => project.visibility === 'public')).toBe(true)
-    expect(page.label).toBe('Claude') // pas « Claude (privé) », le nom du brouillon
-  })
-
-  it('refuses an absurdly long tag, or one that gives no tag at all', async () => {
-    expect((await tagPage('a'.repeat(201), max)).status).toBe(400)
-    expect((await tagPage('   ', max)).status).toBe(400)
   })
 })

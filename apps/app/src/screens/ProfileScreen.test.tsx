@@ -1,5 +1,6 @@
 // Tests de l'écran « Mon profil ». L'API (profile/api) est remplacée par de faux appels.
-import { act, fireEvent, screen, within } from '@testing-library/react-native'
+import { FAVORITE_TOOLS_MAX, type ToolList } from '@ruche/contracts'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { request } from '../api/client'
 import { getMe, pickAvatar, updateProfile, uploadAvatar } from '../profile/api'
 import { leaMe, suspendedMe } from '../testing/fixtures'
@@ -43,9 +44,38 @@ jest.mock('expo-router', () => ({
 
 let session: ReturnType<typeof mockSession>
 
+/**
+ * Le catalogue des outils (R6b), tel que GET /v1/tools le rend : les favoris du profil s'y
+ * choisissent. « Chat GPT » est un autre nom (alias) de ChatGPT.
+ */
+const catalogue: ToolList = {
+  tools: [
+    { slug: 'claude', name: 'Claude', family: 'assistant', aliases: [], projectCount: 41 },
+    {
+      slug: 'chatgpt',
+      name: 'ChatGPT',
+      family: 'assistant',
+      aliases: ['Chat GPT'],
+      projectCount: 20,
+    },
+    { slug: 'cursor', name: 'Cursor', family: 'development', aliases: [], projectCount: 7 },
+    { slug: 'lovable', name: 'Lovable', family: 'no-code', aliases: [], projectCount: 9 },
+  ],
+  others: [],
+}
+
+/** Le champ des outils favoris : une liste à choix (combobox), nommée « Outils favoris ». */
+const toolField = () => screen.getByRole('combobox', { name: fr.t(($) => $.profile.fields.tools) })
+
 beforeEach(() => {
-  // Aucune lecture réseau attendue : une requête égarée reçoit « introuvable », jamais le réseau.
-  jest.mocked(request).mockReset().mockResolvedValue({ ok: false, error: 'notFound' })
+  // Une seule lecture réseau attendue (R6b) : le catalogue des outils, GET /v1/tools. Une requête
+  // égarée reçoit « introuvable », jamais le réseau.
+  jest
+    .mocked(request)
+    .mockReset()
+    .mockImplementation(async (path: string) =>
+      path === '/v1/tools' ? { ok: true, data: catalogue } : { ok: false, error: 'notFound' },
+    )
   mockPush.mockReset()
   session = mockSession({ user: { name: 'Léa' } })
   jest.mocked(getMe).mockReset().mockResolvedValue(leaMe)
@@ -89,13 +119,15 @@ describe('ProfileScreen', () => {
 
     await fireEvent.changeText(screen.getByLabelText('Bio'), 'Nouvelle bio')
     await fireEvent.press(screen.getByRole('button', { name: 'Retirer Cursor' }))
-    await fireEvent.changeText(screen.getByLabelText('Outils favoris'), ' Midjourney , ')
+    // R6b : les favoris se choisissent dans le catalogue, comme les outils d'un projet.
+    await fireEvent.changeText(toolField(), 'lova')
+    await fireEvent.press(screen.getByRole('option', { name: /^Lovable, / }))
     await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
 
     expect(updateProfile).toHaveBeenCalledWith({
       name: 'Léa',
       bio: 'Nouvelle bio',
-      favoriteTools: ['Claude', 'Midjourney'],
+      favoriteTools: ['Claude', 'Lovable'],
     })
     expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
     // Le nom est aussi dans la session (affiché sur l'accueil) : elle doit être relue.
@@ -519,5 +551,128 @@ describe('ProfileScreen, the message above « Enregistrer »', () => {
     await act(async () => answer({ ok: false, error: 'internal' }))
     expect(await screen.findByText(fr.t(($) => $.errors.internal))).toBeTruthy()
     expect(screen.queryByText('Profil enregistré.')).toBeNull()
+  })
+})
+
+// --- Tranche R6b : les outils favoris se choisissent dans le catalogue (docs/scenarios/refonte.md,
+// « Choisir ses outils ») ---
+//
+// Le profil n'a plus de champ de texte séparé par des virgules (décision de Louis du 9/11/2026) : le
+// même champ que la feuille d'un projet (`ToolField`), qui propose les outils du catalogue (nom ou
+// autre nom, sans accents ni majuscules), et ajoute un nom absent « comme autre outil » ; 10 au plus.
+describe('ProfileScreen, favourite tools from the catalogue (R6b)', () => {
+  const addOther = (name: string) => fr.t(($) => $.project.form.addOtherTool, { name })
+
+  it('offers the catalogue tools as favourites and adds the touched one as a chip', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(toolField(), 'lova')
+    await fireEvent.press(await screen.findByRole('option', { name: /^Lovable, / }))
+
+    expect(screen.getByRole('button', { name: 'Retirer Lovable' })).toBeTruthy()
+    // Le catalogue a été lu (GET /v1/tools).
+    expect(jest.mocked(request).mock.calls.map(([path]) => path)).toContain('/v1/tools')
+  })
+
+  it('adds a name absent from the catalogue as an other tool, and saves it', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: true, data: leaMe })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(toolField(), 'Teachable Machine')
+    await fireEvent.press(
+      await screen.findByRole('option', { name: addOther('Teachable Machine') }),
+    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(jest.mocked(updateProfile).mock.calls[0]?.[0]).toMatchObject({
+      favoriteTools: ['Claude', 'Cursor', 'Teachable Machine'],
+    })
+  })
+
+  it('chooses the catalogue tool when another name of it is typed, never an other tool', async () => {
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(toolField(), 'chat gpt')
+
+    expect(await screen.findByRole('option', { name: /^ChatGPT, / })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: addOther('chat gpt') })).toBeNull()
+  })
+
+  it('saves no tool that was only typed: no list split by commas any more', async () => {
+    jest.mocked(updateProfile).mockResolvedValue({ ok: true, data: leaMe })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    // Témoin : c'est bien le champ à choix (une combobox), plus un champ de texte libre.
+    await fireEvent.changeText(toolField(), 'Midjourney, Lovable')
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(jest.mocked(updateProfile).mock.calls[0]?.[0]).toMatchObject({
+      favoriteTools: ['Claude', 'Cursor'],
+    })
+  })
+
+  it('proposes nothing more once 10 favourite tools are chosen', async () => {
+    const ten = Array.from({ length: FAVORITE_TOOLS_MAX }, (_, index) => `Outil ${index + 1}`)
+    jest.mocked(getMe).mockResolvedValue({ ...leaMe, favoriteTools: ten })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    expect(
+      screen.getByText(fr.t(($) => $.project.form.toolsCount, { count: 10, max: 10 })),
+    ).toBeTruthy()
+    await fireEvent.changeText(toolField(), 'lova')
+    await act(async () => {})
+
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+  })
+
+  it('still proposes a tool with 9 favourites chosen (witness of the limit)', async () => {
+    const nine = Array.from({ length: FAVORITE_TOOLS_MAX - 1 }, (_, index) => `Outil ${index + 1}`)
+    jest.mocked(getMe).mockResolvedValue({ ...leaMe, favoriteTools: nine })
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.changeText(toolField(), 'lova')
+
+    expect(await screen.findByRole('option', { name: /^Lovable, / })).toBeTruthy()
+  })
+})
+
+// --- Tranche R6b, restes de R5b (« fais tout », Louis, 8/11/2026) : la feuille du profil ---
+describe('ProfileScreen, leftovers of R5b', () => {
+  /** Attend `ms` vraies millisecondes, dans `act` (les réponses arrivent pendant ce temps). */
+  const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+
+  it('saves once when « Enregistrer » is pressed twice 60 ms apart and the API answers in 10 ms', async () => {
+    jest.mocked(updateProfile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ ok: true, data: leaMe }), 10)
+        }),
+    )
+    await renderWithProviders(<ProfileScreen />)
+    await screen.findByDisplayValue('Léa')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    await wait(60)
+    await fireEvent.press(screen.getByRole('button', { name: 'Enregistrer' }))
+    await wait(60)
+
+    expect(await screen.findByText('Profil enregistré.')).toBeTruthy()
+    expect(updateProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an error with « Réessayer » when the profile cannot load, then the profile after a retry', async () => {
+    jest.mocked(getMe).mockRejectedValueOnce(new Error('réseau coupé'))
+    await renderWithProviders(<ProfileScreen />)
+
+    await fireEvent.press(await screen.findByRole('button', { name: fr.t(($) => $.common.retry) }))
+
+    expect(await screen.findByDisplayValue('Léa')).toBeTruthy()
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
   })
 })

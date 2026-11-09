@@ -8,6 +8,13 @@
 // Trois membres : Inès (autrice, pseudo ines_morel), Malik (qui cherche, pseudo malik) et Zoé
 // (pseudo zoe). Louis, administrateur, sert aux retraits et aux suspensions. Le temps est maîtrisé
 // par le test, comme dans mentions.test.ts : les quotas se vérifient sans attendre.
+//
+// R6b (docs/scenarios/refonte.md, « R6b ») : le groupe Outils ne rend plus les étiquettes tapées
+// sur les projets, mais les outils du catalogue (CatalogueTool : nom, famille, alias, nombre de
+// projets que le membre peut voir), trouvés par leur nom ou l'un de leurs alias, jamais un « Autre ».
+// Et `category` ne garde, dans le groupe Projets, que ceux de cette catégorie (principale ou
+// seconde) ; les membres et les outils ne changent pas. Les tests qui touchent aux outils
+// remplacent le catalogue semé par un petit catalogue connu (testing/tool-catalogue.ts).
 import { randomUUID } from 'node:crypto'
 import { ErrorResponse, SEARCH_GROUP_MAX, SearchResults, toolSlug } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -18,6 +25,7 @@ import { SEARCH_WAIT_MS, SEARCHES_WAITING, SEARCHES_WAITING_PER_MEMBER } from '.
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { explainQueries } from './testing/explain'
+import { addCatalogueTool, clearCatalogue, type TestTool } from './testing/tool-catalogue'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -78,12 +86,41 @@ const searchRaw = (cookie: string | null, params: Record<string, string> | strin
     cookie,
   )
 
-/** Les résultats d'une recherche qui doit réussir, vérifiés par le contrat. */
-const search = async (cookie: string, q: string) => {
-  const res = await searchRaw(cookie, { q })
+/**
+ * Les résultats d'une recherche qui doit réussir, vérifiés par le contrat. `category` (R6b) : le
+ * filtre de catégorie du groupe Projets.
+ */
+const search = async (cookie: string, q: string, category?: string) => {
+  const res = await searchRaw(cookie, { q, ...(category !== undefined && { category }) })
   expect(res.status, `search « ${q} »`).toBe(200)
   return SearchResults.parse(await res.json())
 }
+
+/**
+ * Le catalogue des tests d'outils (R6b), à la place du catalogue semé : des noms dont chaque mot
+ * est connu, et deux alias (« HASS » pour Home Assistant, « Le Chat » pour Mistral) qui ne
+ * ressemblent pas au nom de leur outil.
+ */
+const CATALOGUE: TestTool[] = [
+  { name: 'Claude', family: 'assistant' },
+  { name: 'Claude Code', family: 'development' },
+  { name: 'Cursor', family: 'development' },
+  { name: 'Mistral', family: 'assistant', aliases: ['Le Chat'] },
+  { name: 'Ollama', family: 'development' },
+  { name: 'Home Assistant', family: 'smart-home', aliases: ['HASS'] },
+  { name: 'Zapier', family: 'automation' },
+]
+const setUpCatalogue = async () => {
+  await clearCatalogue(ctx.db)
+  for (const tool of CATALOGUE) await addCatalogueTool(ctx.db, tool)
+}
+
+/** Les outils trouvés, sans leurs alias (le contrat ne fixe pas comment ils s'écrivent). */
+const toolsFound = (results: SearchResults) =>
+  results.tools.items.map(({ aliases: _, ...tool }) => tool)
+/** Le nombre de projets d'un outil trouvé, tel que ce membre le lit ; undefined s'il manque. */
+const countOf = (results: SearchResults, slug: string) =>
+  results.tools.items.find((tool) => tool.slug === slug)?.projectCount
 
 /** Les titres des projets trouvés, les noms des membres, les étiquettes des outils. */
 const titles = (results: SearchResults) => results.projects.items.map((p) => p.title)
@@ -108,7 +145,14 @@ const publish = (cookie: string, title: string, body: object = {}) => {
  */
 const insertProjects = async (
   authorId: string,
-  projects: { title: string; tools?: string[]; visibility?: 'public' | 'private' }[],
+  projects: {
+    title: string
+    tools?: string[]
+    visibility?: 'public' | 'private'
+    // R6b : null (ou absent), un projet d'avant R6a, sans catégorie.
+    primaryCategory?: string | null
+    secondaryCategory?: string | null
+  }[],
 ) => {
   const start = Date.now()
   await ctx.db.insert(schema.project).values(
@@ -124,6 +168,8 @@ const insertProjects = async (
         visibility: p.visibility ?? 'public',
         tools: p.tools ?? [],
         toolSlugs: (p.tools ?? []).map(toolSlug),
+        primaryCategory: p.primaryCategory ?? null,
+        secondaryCategory: p.secondaryCategory ?? null,
         createdAt: at,
         updatedAt: at,
         publishedAt: p.visibility === 'private' ? null : at,
@@ -353,6 +399,8 @@ describe('the matching', () => {
 
 describe('the projects found', () => {
   it('gives the summary of each project, with its author, status and visibility', async () => {
+    // R6b : « Claude Code » est au catalogue, l'outil du projet est donc une étiquette.
+    await setUpCatalogue()
     const carnet = await publish(ines, 'Carnet de cafés', {
       status: 'testable',
       tools: ['Claude Code'],
@@ -366,7 +414,7 @@ describe('the projects found', () => {
       author: { id: inesId, name: 'Inès Morel' },
       status: 'testable',
       visibility: 'public',
-      tools: [{ label: 'Claude Code', slug: 'claude-code' }],
+      tools: [{ label: 'Claude Code', slug: 'claude-code', inCatalogue: true }],
       excerpt: null,
     })
   })
@@ -497,6 +545,116 @@ describe('the projects found', () => {
   })
 })
 
+// ─── Le filtre de catégorie (R6b) ─────────────────────────────────────────────────────────────────
+// Scénario : « R6b », « Les catégories en filtre », « La recherche » : le groupe Projets ne garde
+// que les projets classés dans la catégorie choisie, en principale ou en seconde ; les projets
+// d'avant R6a, sans catégorie, ne sortent que sans filtre. Les membres ne changent pas (les outils :
+// « finds the tools whatever the category chosen for the projects », plus bas).
+
+describe('the projects found in a category (R6b)', () => {
+  it('keeps only the projects of the category, in first or in second place', async () => {
+    await publish(ines, 'Carnet de cafés', { primaryCategory: 'cooking' })
+    await publish(zoe, 'Carnet de chats', {
+      primaryCategory: 'animals',
+      secondaryCategory: 'cooking',
+    })
+    await publish(ines, 'Carnet de notes', { primaryCategory: 'work' })
+
+    expect(titles(await search(malik, 'carnet', 'cooking'))).toEqual([
+      'Carnet de chats',
+      'Carnet de cafés',
+    ])
+    expect(titles(await search(malik, 'carnet', 'animals'))).toEqual(['Carnet de chats'])
+    // Une catégorie connue, sans projet : un groupe vide, pas une erreur.
+    expect((await search(malik, 'carnet', 'travel')).projects).toEqual({ items: [], more: false })
+    // Témoin : sans filtre, les trois.
+    expect(titles(await search(malik, 'carnet'))).toHaveLength(3)
+  })
+
+  it('filters only the projects: the members are found as without a filter', async () => {
+    await publish(ines, 'Carnet d’Inès', { primaryCategory: 'work' })
+
+    const results = await search(malik, 'ines', 'cooking')
+
+    expect(names(results)).toEqual(['Inès Morel'])
+    expect(titles(results)).toEqual([])
+    // Témoin : sans filtre, son projet est trouvé.
+    expect(titles(await search(malik, 'ines'))).toEqual(['Carnet d’Inès'])
+  })
+
+  it('never finds in a category a private project of another member nor a removed one, and finds mine', async () => {
+    await publish(ines, 'Carnet secret', { primaryCategory: 'cooking', visibility: 'private' })
+    await publish(malik, 'Carnet à moi', {
+      primaryCategory: 'animals',
+      secondaryCategory: 'cooking',
+      visibility: 'private',
+    })
+    const removed = await publish(ines, 'Carnet retiré', { primaryCategory: 'cooking' })
+    await publish(ines, 'Carnet de cafés', { primaryCategory: 'cooking' })
+    await publish(zoe, 'Carnet de notes', { primaryCategory: 'work' })
+    // Témoin : avant le retrait, il est trouvé dans la catégorie.
+    expect(titles(await search(zoe, 'carnet', 'cooking'))).toContain('Carnet retiré')
+    await remove(removed.id)
+
+    // L'ordre n'est pas la règle ici (voir « never finds a private project… » plus haut).
+    expect(titles(await search(malik, 'carnet', 'cooking')).sort()).toEqual(
+      ['Carnet de cafés', 'Carnet à moi'].sort(),
+    )
+    expect(titles(await search(ines, 'carnet', 'cooking')).sort()).toEqual(
+      ['Carnet de cafés', 'Carnet secret'].sort(),
+    )
+  })
+
+  it('leaves out the projects without a category, from before R6a, once a category is chosen', async () => {
+    await insertProjects(inesId, [{ title: 'Ancien carnet' }])
+    await publish(ines, 'Carnet récent', { primaryCategory: 'other' })
+
+    // Témoin : sans filtre, le projet d'avant R6a est trouvé.
+    expect(titles(await search(malik, 'carnet'))).toEqual(['Carnet récent', 'Ancien carnet'])
+    // Avec un filtre, même « Autre », jamais.
+    expect(titles(await search(malik, 'carnet', 'other'))).toEqual(['Carnet récent'])
+    expect(titles(await search(malik, 'carnet', 'cooking'))).toEqual([])
+  })
+
+  it('says more only when a 21st visible project of the category exists', async () => {
+    await insertProjects(
+      inesId,
+      Array.from({ length: SEARCH_GROUP_MAX }, (_, i) => ({
+        title: `Carnet ${i + 1}`,
+        primaryCategory: 'cooking',
+      })),
+    )
+    // D'autres catégories, et un privé de la catégorie (invisible pour Malik) : ils ne comptent pas.
+    later(SEARCH_GROUP_MAX * SECOND)
+    await insertProjects(inesId, [
+      { title: 'Carnet de notes', primaryCategory: 'work' },
+      { title: 'Carnet de chats', primaryCategory: 'animals', secondaryCategory: 'work' },
+      { title: 'Carnet privé', primaryCategory: 'cooking', visibility: 'private' },
+    ])
+
+    const twenty = await search(malik, 'carnet', 'cooking')
+    expect(twenty.projects.items).toHaveLength(SEARCH_GROUP_MAX)
+    expect(twenty.projects.more).toBe(false)
+
+    later(10 * SECOND)
+    await insertProjects(inesId, [
+      { title: 'Carnet 21', primaryCategory: 'animals', secondaryCategory: 'cooking' },
+    ])
+    const more = await search(malik, 'carnet', 'cooking')
+    expect(more.projects.items).toHaveLength(SEARCH_GROUP_MAX)
+    expect(more.projects.more).toBe(true)
+  })
+
+  it('refuses a malformed category code', async () => {
+    // Le contrat (CategoryCode) : minuscules, chiffres et tirets, 40 au plus.
+    for (const category of ['Cuisine', 'cuisine du monde', '../admin', 'a'.repeat(41), '']) {
+      await expectError(await searchRaw(malik, { q: 'carnet', category }), 400, 'validation')
+    }
+    // Témoin : un code bien formé est accepté (ce refus passe dès le contrat, avant le code).
+    expect((await searchRaw(malik, { q: 'carnet', category: 'cooking' })).status).toBe(200)
+  })
+})
+
 /** « email = … » sur la table des comptes (une condition Drizzle, écrite ici pour un seul test). */
 const eqEmail = (email: string) => eq(schema.user.email, email)
 
@@ -533,7 +691,10 @@ describe('the members found', () => {
     await insertMembers([{ name: 'Zora', handle: 'zora' }])
     expect(names(await search(malik, 'zo'))).toEqual(['Zoé'])
     expect(names(await search(malik, 'in'))).toEqual([])
-    // Les projets et les outils, eux, se trouvent dès 2 caractères.
+    // Les projets et les outils, eux, se trouvent dès 2 caractères. Le groupe Outils ne rend que le
+    // catalogue (R6b) : Zotero y est ajouté, sinon il serait un « Autre », jamais trouvé.
+    await setUpCatalogue()
+    await addCatalogueTool(ctx.db, { name: 'Zotero', family: 'automation' })
     await publish(ines, 'Zoom arrière', { tools: ['Zotero'] })
     const results = await search(malik, 'zo')
     expect(titles(results)).toEqual(['Zoom arrière'])
@@ -618,58 +779,83 @@ describe('the members found', () => {
 
 // ─── Les outils ───────────────────────────────────────────────────────────────────────────────────
 
+// R6b : le groupe Outils lit le catalogue (plan, B2b : `tool.name` et les alias repliés, catalogue
+// seulement, `projectCount` visible). Un outil du catalogue se trouve donc même sans projet, compté
+// à zéro, comme dans « Tous les outils » ; un « Autre » ne se trouve jamais.
+
 describe('the tools found', () => {
-  it('gives each tool once, with its number of public projects and its latest label', async () => {
+  beforeEach(setUpCatalogue)
+
+  it('gives each catalogue tool once, with its name, its family and its number of visible projects', async () => {
     await publish(ines, 'Un', { tools: ['claude code'] })
     await publish(zoe, 'Deux', { tools: ['Claude Code', 'Cursor'] })
-    await publish(ines, 'Trois', { tools: ['Claude Code'] })
+    await publish(ines, 'Trois', { tools: ['CLAUDE CODE'] })
     await publish(ines, 'Brouillon', { tools: ['Claude Code'], visibility: 'private' })
 
-    const results = await search(malik, 'claude')
-
-    expect(results.tools).toEqual({
-      items: [{ slug: 'claude-code', label: 'Claude Code', projectCount: 3 }],
-      more: false,
-    })
-    // Le libellé est celui du projet public le plus récent qui le cite.
-    await publish(zoe, 'Quatre', { tools: ['CLAUDE CODE'] })
-    expect((await search(malik, 'claude')).tools.items[0]?.label).toBe('CLAUDE CODE')
-  })
-
-  it('does not find a tool by a label typed only on a private project', async () => {
-    const draft = await publish(ines, 'Brouillon', { tools: ['Zapier'], visibility: 'private' })
-
-    expect(slugs(await search(malik, 'zapier'))).toEqual([])
-    // Même pour son autrice : les outils sont ceux des projets publics.
-    expect(slugs(await search(ines, 'zapier'))).toEqual([])
-
-    // Témoin : public, le projet fait apparaître l'outil.
-    later()
-    await act.setVisibility(draft.id, ines, 'public')
-    expect((await search(malik, 'zapier')).tools.items).toEqual([
-      { slug: 'zapier', label: 'Zapier', projectCount: 1 },
+    // « claude code » : seul Claude Code a les deux mots (Claude n'a pas « code »). Son nom est
+    // celui du catalogue, quelle que soit l'écriture des projets ; le brouillon d'Inès ne compte pas.
+    expect(await search(malik, 'claude code')).toMatchObject({ tools: { more: false } })
+    expect(toolsFound(await search(malik, 'claude code'))).toEqual([
+      { slug: 'claude-code', name: 'Claude Code', family: 'development', projectCount: 3 },
     ])
   })
 
-  it('finds a tool by its slug as well as by its label, every word needed', async () => {
-    await publish(ines, 'Un', { tools: ['Home Assistant', 'Claude Code'] })
+  it('finds a catalogue tool without any visible project, and counts no private project of another member', async () => {
+    const draft = await publish(ines, 'Brouillon', { tools: ['Zapier'], visibility: 'private' })
 
-    expect(slugs(await search(malik, 'home-assist'))).toEqual(['home-assistant'])
+    expect(toolsFound(await search(malik, 'zapier'))).toEqual([
+      { slug: 'zapier', name: 'Zapier', family: 'automation', projectCount: 0 },
+    ])
+
+    // Témoin : public, le projet compte.
+    later()
+    await act.setVisibility(draft.id, ines, 'public')
+    expect(countOf(await search(malik, 'zapier'), 'zapier')).toBe(1)
+  })
+
+  it('never finds an « other » tool, even cited by a public project', async () => {
+    await publish(ines, 'Carnet de machines', { tools: ['Teachable Machine'] })
+
+    for (const cookie of [malik, ines]) {
+      expect(slugs(await search(cookie, 'teachable'))).toEqual([])
+      expect(slugs(await search(cookie, 'teachable machine'))).toEqual([])
+    }
+    // Témoin : le projet le cite bien, en « Autre » (texte simple, sans page).
+    const [found] = (await search(malik, 'carnet')).projects.items
+    expect(found?.tools).toEqual([
+      expect.objectContaining({ label: 'Teachable Machine', inCatalogue: false }),
+    ])
+  })
+
+  it('finds a catalogue tool by its name or by one of its aliases, accents and case aside, every word needed', async () => {
+    // Les alias ne ressemblent pas au nom : seul l'alias peut les trouver.
+    expect(slugs(await search(malik, 'hass'))).toEqual(['home-assistant'])
+    expect(slugs(await search(malik, 'LÉ CHAT'))).toEqual(['mistral'])
     expect(slugs(await search(malik, 'home assistant'))).toEqual(['home-assistant'])
+    // Chaque mot doit y être : aucun outil n'a « home » et « claude ».
     expect(slugs(await search(malik, 'home claude'))).toEqual([])
   })
 
-  it('says more only when a 21st tool exists', async () => {
-    await insertProjects(inesId, [
-      { title: 'Un', tools: Array.from({ length: 15 }, (_, i) => `Outil ${i + 1}`) },
-      { title: 'Deux', tools: Array.from({ length: 5 }, (_, i) => `Outil ${i + 16}`) },
+  it('finds the tools whatever the category chosen for the projects', async () => {
+    await publish(ines, 'Un', { tools: ['Mistral'], primaryCategory: 'cooking' })
+
+    // Le filtre ne vaut que pour le groupe Projets : l'outil reste, avec tous ses projets visibles.
+    expect(toolsFound(await search(malik, 'mistral', 'animals'))).toEqual([
+      { slug: 'mistral', name: 'Mistral', family: 'assistant', projectCount: 1 },
     ])
+  })
+
+  it('says more only when a 21st tool exists', async () => {
+    await clearCatalogue(ctx.db)
+    for (let i = 1; i <= SEARCH_GROUP_MAX; i++) {
+      await addCatalogueTool(ctx.db, { name: `Outil ${i}`, family: 'hardware' })
+    }
 
     const twenty = await search(malik, 'outil')
     expect(twenty.tools.items).toHaveLength(SEARCH_GROUP_MAX)
     expect(twenty.tools.more).toBe(false)
 
-    await insertProjects(inesId, [{ title: 'Trois', tools: ['Outil 21'] }])
+    await addCatalogueTool(ctx.db, { name: 'Outil 21', family: 'hardware' })
     const more = await search(malik, 'outil')
     expect(more.tools.items).toHaveLength(SEARCH_GROUP_MAX)
     expect(more.tools.more).toBe(true)
@@ -685,8 +871,12 @@ describe('a block', () => {
     ['Malik blocked Inès', () => act.block(inesId, malik)],
   ] as const
 
+  // R6b : les outils sont ceux du catalogue ; le blocage ne les cache pas, il retire les projets de
+  // l'autre de leurs nombres.
+  beforeEach(setUpCatalogue)
+
   describe.each(DIRECTIONS)('when %s', (_, blockNow) => {
-    it('hides a blocked member, its projects and their tools, in both directions', async () => {
+    it('hides a blocked member and its projects, and takes them out of the tool counts, in both directions', async () => {
       await publish(ines, 'Carnet de cafés', { tools: ['Mistral'] })
       await publish(malik, 'Carnet de Malik', { tools: ['Ollama'] })
       await publish(zoe, 'Carnet de Zoé', { tools: ['Claude'] })
@@ -697,20 +887,21 @@ describe('a block', () => {
       later()
       await blockNow()
 
-      // Pour Malik : ni Inès, ni son projet, ni son outil ; Zoé et les siens restent.
+      // Pour Malik : ni Inès, ni son projet ; son outil reste (catalogue), sans son projet ; Zoé et
+      // les siens restent.
       const forMalik = await search(malik, 'carnet')
       expect(titles(forMalik).sort()).toEqual(['Carnet de Malik', 'Carnet de Zoé'])
       expect(names(await search(malik, 'ines'))).toEqual([])
-      expect(slugs(await search(malik, 'mistral'))).toEqual([])
-      expect(slugs(await search(malik, 'claude'))).toEqual(['claude'])
+      expect(countOf(await search(malik, 'mistral'), 'mistral')).toBe(0)
+      expect(countOf(await search(malik, 'claude'), 'claude')).toBe(1)
       // Pour Inès, pareil dans l'autre sens.
       const forInes = await search(ines, 'carnet')
       expect(titles(forInes).sort()).toEqual(['Carnet de Zoé', 'Carnet de cafés'])
       expect(names(await search(ines, 'malik'))).toEqual([])
-      expect(slugs(await search(ines, 'ollama'))).toEqual([])
+      expect(countOf(await search(ines, 'ollama'), 'ollama')).toBe(0)
       // Zoé, elle, ne voit aucune différence.
       expect(titles(await search(zoe, 'carnet'))).toHaveLength(3)
-      expect(slugs(await search(zoe, 'mistral'))).toEqual(['mistral'])
+      expect(countOf(await search(zoe, 'mistral'), 'mistral')).toBe(1)
     })
 
     it('takes the projects of the other one out of the tool counts', async () => {
@@ -719,8 +910,8 @@ describe('a block', () => {
       later()
       await blockNow()
 
-      expect((await search(malik, 'claude')).tools.items).toEqual([
-        { slug: 'claude-code', label: 'Claude Code', projectCount: 1 },
+      expect(toolsFound(await search(malik, 'claude code'))).toEqual([
+        { slug: 'claude-code', name: 'Claude Code', family: 'development', projectCount: 1 },
       ])
     })
   })

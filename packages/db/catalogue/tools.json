@@ -1,0 +1,1330 @@
+[
+  {
+    "name": "Claude",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel qui répond par écrit, résume, rédige et aide à réfléchir.",
+    "descriptionEn": "Conversational assistant that answers in writing, summarises, drafts and helps think things through.",
+    "siteUrl": "https://claude.ai",
+    "aliases": ["Claude AI"]
+  },
+  {
+    "name": "ChatGPT",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel qui répond aux questions, rédige des textes et aide à programmer.",
+    "descriptionEn": "Conversational assistant that answers questions, writes texts and helps with programming.",
+    "siteUrl": "https://chatgpt.com",
+    "aliases": ["GPT"]
+  },
+  {
+    "name": "Gemini",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de Google, qui comprend le texte, les images et le son.",
+    "descriptionEn": "Google’s conversational assistant, which works with text, images and sound.",
+    "siteUrl": "https://gemini.google.com",
+    "aliases": ["Bard"]
+  },
+  {
+    "name": "Copilot",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de Microsoft, intégré à Windows et aux applications de bureau.",
+    "descriptionEn": "Microsoft’s conversational assistant, built into Windows and office applications.",
+    "siteUrl": "https://copilot.microsoft.com",
+    "aliases": ["Microsoft Copilot", "Bing Chat"]
+  },
+  {
+    "name": "Le Chat",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de Mistral AI, qui répond en français comme en anglais.",
+    "descriptionEn": "Mistral AI’s conversational assistant, which answers in French as well as English.",
+    "siteUrl": "https://chat.mistral.ai",
+    "aliases": ["Mistral"]
+  },
+  {
+    "name": "Perplexity",
+    "family": "assistant",
+    "descriptionFr": "Moteur de réponses qui cherche sur le web et cite ses sources.",
+    "descriptionEn": "Answer engine that searches the web and cites its sources.",
+    "siteUrl": "https://www.perplexity.ai",
+    "aliases": []
+  },
+  {
+    "name": "Grok",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de xAI, lié au réseau social X.",
+    "descriptionEn": "xAI’s conversational assistant, linked to the X social network.",
+    "siteUrl": "https://grok.com",
+    "aliases": []
+  },
+  {
+    "name": "DeepSeek",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel et modèles de langage du laboratoire DeepSeek.",
+    "descriptionEn": "Conversational assistant and language models from the DeepSeek lab.",
+    "siteUrl": "https://www.deepseek.com",
+    "aliases": []
+  },
+  {
+    "name": "Meta AI",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de Meta, présent dans ses messageries et réseaux.",
+    "descriptionEn": "Meta’s conversational assistant, found in its messaging apps and social networks.",
+    "siteUrl": "https://www.meta.ai",
+    "aliases": []
+  },
+  {
+    "name": "Pi",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel pensé pour la discussion au quotidien.",
+    "descriptionEn": "Conversational assistant designed for everyday chat.",
+    "siteUrl": "https://pi.ai",
+    "aliases": []
+  },
+  {
+    "name": "Poe",
+    "family": "assistant",
+    "descriptionFr": "Application qui réunit plusieurs assistants d’IA au même endroit.",
+    "descriptionEn": "Application that brings several AI assistants together in one place.",
+    "siteUrl": "https://poe.com",
+    "aliases": []
+  },
+  {
+    "name": "Kimi",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel de Moonshot AI, capable de lire de longs documents.",
+    "descriptionEn": "Moonshot AI’s conversational assistant, able to read long documents.",
+    "siteUrl": "https://www.kimi.com",
+    "aliases": []
+  },
+  {
+    "name": "Qwen",
+    "family": "assistant",
+    "descriptionFr": "Famille de modèles de langage et assistant conversationnel d’Alibaba.",
+    "descriptionEn": "Family of language models and conversational assistant from Alibaba.",
+    "siteUrl": null,
+    "aliases": ["Tongyi Qianwen"]
+  },
+  {
+    "name": "HuggingChat",
+    "family": "assistant",
+    "descriptionFr": "Assistant conversationnel qui fait tourner des modèles ouverts hébergés par Hugging Face.",
+    "descriptionEn": "Conversational assistant running open models hosted by Hugging Face.",
+    "siteUrl": "https://huggingface.co/chat",
+    "aliases": []
+  },
+  {
+    "name": "NotebookLM",
+    "family": "assistant",
+    "descriptionFr": "Outil de Google qui répond aux questions à partir des documents que l’on y dépose.",
+    "descriptionEn": "Google tool that answers questions from the documents you add to it.",
+    "siteUrl": "https://notebooklm.google.com",
+    "aliases": []
+  },
+  {
+    "name": "Character.AI",
+    "family": "assistant",
+    "descriptionFr": "Application où l’on discute avec des personnages imaginés par l’IA.",
+    "descriptionEn": "Application for chatting with characters imagined by AI.",
+    "siteUrl": "https://character.ai",
+    "aliases": []
+  },
+  {
+    "name": "Replika",
+    "family": "assistant",
+    "descriptionFr": "Application de compagnon virtuel avec qui l’on échange par écrit ou à la voix.",
+    "descriptionEn": "Virtual companion application you talk to in writing or by voice.",
+    "siteUrl": "https://replika.com",
+    "aliases": []
+  },
+  {
+    "name": "You.com",
+    "family": "assistant",
+    "descriptionFr": "Moteur de recherche qui complète ses résultats par des réponses d’un assistant.",
+    "descriptionEn": "Search engine that adds answers from an assistant to its results.",
+    "siteUrl": "https://you.com",
+    "aliases": []
+  },
+  {
+    "name": "Phind",
+    "family": "assistant",
+    "descriptionFr": "Moteur de recherche conçu pour les questions de programmation.",
+    "descriptionEn": "Search engine designed for programming questions.",
+    "siteUrl": "https://www.phind.com",
+    "aliases": []
+  },
+  {
+    "name": "Siri",
+    "family": "assistant",
+    "descriptionFr": "Assistant vocal des appareils Apple.",
+    "descriptionEn": "Voice assistant of Apple devices.",
+    "siteUrl": "https://www.apple.com/siri/",
+    "aliases": []
+  },
+  {
+    "name": "Google Assistant",
+    "family": "assistant",
+    "descriptionFr": "Assistant vocal de Google, présent sur les téléphones et les enceintes.",
+    "descriptionEn": "Google’s voice assistant, found on phones and speakers.",
+    "siteUrl": "https://assistant.google.com",
+    "aliases": []
+  },
+  {
+    "name": "Midjourney",
+    "family": "creation",
+    "descriptionFr": "Outil qui crée des images à partir d’une description écrite.",
+    "descriptionEn": "Tool that creates images from a written description.",
+    "siteUrl": "https://www.midjourney.com",
+    "aliases": []
+  },
+  {
+    "name": "DALL-E",
+    "family": "creation",
+    "descriptionFr": "Modèle qui crée des images à partir d’une description écrite.",
+    "descriptionEn": "Model that creates images from a written description.",
+    "siteUrl": "https://openai.com/dall-e-3",
+    "aliases": ["DALL·E"]
+  },
+  {
+    "name": "Stable Diffusion",
+    "family": "creation",
+    "descriptionFr": "Modèle d’images dont les poids sont diffusés, que l’on peut faire tourner chez soi.",
+    "descriptionEn": "Image model whose weights are published, which can be run at home.",
+    "siteUrl": "https://stability.ai",
+    "aliases": ["SDXL"]
+  },
+  {
+    "name": "Flux",
+    "family": "creation",
+    "descriptionFr": "Famille de modèles qui créent des images à partir d’une description écrite.",
+    "descriptionEn": "Family of models that create images from a written description.",
+    "siteUrl": "https://bfl.ai",
+    "aliases": ["FLUX.1"]
+  },
+  {
+    "name": "Leonardo AI",
+    "family": "creation",
+    "descriptionFr": "Plateforme de création d’images et de visuels à partir de descriptions.",
+    "descriptionEn": "Platform for creating images and visuals from descriptions.",
+    "siteUrl": "https://leonardo.ai",
+    "aliases": ["Leonardo"]
+  },
+  {
+    "name": "Adobe Firefly",
+    "family": "creation",
+    "descriptionFr": "Outils d’Adobe pour créer et retoucher des images à partir d’une description.",
+    "descriptionEn": "Adobe tools for creating and editing images from a description.",
+    "siteUrl": "https://firefly.adobe.com",
+    "aliases": ["Firefly"]
+  },
+  {
+    "name": "Ideogram",
+    "family": "creation",
+    "descriptionFr": "Outil de création d’images, qui sait aussi y écrire du texte.",
+    "descriptionEn": "Image creation tool that can also render text in pictures.",
+    "siteUrl": "https://ideogram.ai",
+    "aliases": []
+  },
+  {
+    "name": "Canva",
+    "family": "creation",
+    "descriptionFr": "Outil en ligne pour composer des affiches, des présentations et des visuels.",
+    "descriptionEn": "Online tool for making posters, presentations and visuals.",
+    "siteUrl": "https://www.canva.com",
+    "aliases": []
+  },
+  {
+    "name": "Figma",
+    "family": "creation",
+    "descriptionFr": "Outil en ligne pour dessiner des maquettes d’interfaces, à plusieurs.",
+    "descriptionEn": "Online tool for drawing interface mock-ups, together with others.",
+    "siteUrl": "https://www.figma.com",
+    "aliases": []
+  },
+  {
+    "name": "Runway",
+    "family": "creation",
+    "descriptionFr": "Outils de création et de montage de vidéos à l’aide de l’IA.",
+    "descriptionEn": "Tools for creating and editing video with the help of AI.",
+    "siteUrl": "https://runwayml.com",
+    "aliases": ["Runway ML"]
+  },
+  {
+    "name": "Sora",
+    "family": "creation",
+    "descriptionFr": "Modèle qui crée de courtes vidéos à partir d’une description écrite.",
+    "descriptionEn": "Model that creates short videos from a written description.",
+    "siteUrl": "https://sora.com",
+    "aliases": []
+  },
+  {
+    "name": "Pika",
+    "family": "creation",
+    "descriptionFr": "Outil qui crée et anime des vidéos à partir de texte ou d’images.",
+    "descriptionEn": "Tool that creates and animates videos from text or images.",
+    "siteUrl": "https://pika.art",
+    "aliases": []
+  },
+  {
+    "name": "Kling",
+    "family": "creation",
+    "descriptionFr": "Modèle qui crée des vidéos à partir de texte ou d’images.",
+    "descriptionEn": "Model that creates videos from text or images.",
+    "siteUrl": "https://klingai.com",
+    "aliases": ["Kling AI"]
+  },
+  {
+    "name": "Luma Dream Machine",
+    "family": "creation",
+    "descriptionFr": "Outil de Luma qui crée des vidéos à partir de texte ou d’images.",
+    "descriptionEn": "Luma tool that creates videos from text or images.",
+    "siteUrl": "https://lumalabs.ai",
+    "aliases": ["Dream Machine"]
+  },
+  {
+    "name": "Suno",
+    "family": "creation",
+    "descriptionFr": "Outil qui compose des chansons, paroles comprises, à partir d’une description.",
+    "descriptionEn": "Tool that composes songs, lyrics included, from a description.",
+    "siteUrl": "https://suno.com",
+    "aliases": []
+  },
+  {
+    "name": "Udio",
+    "family": "creation",
+    "descriptionFr": "Outil qui crée des morceaux de musique à partir d’une description écrite.",
+    "descriptionEn": "Tool that creates pieces of music from a written description.",
+    "siteUrl": "https://www.udio.com",
+    "aliases": []
+  },
+  {
+    "name": "ElevenLabs",
+    "family": "creation",
+    "descriptionFr": "Outils de synthèse vocale : lire un texte à voix haute ou reproduire une voix.",
+    "descriptionEn": "Speech synthesis tools: read a text aloud or reproduce a voice.",
+    "siteUrl": "https://elevenlabs.io",
+    "aliases": []
+  },
+  {
+    "name": "Whisper",
+    "family": "creation",
+    "descriptionFr": "Modèle qui transcrit la parole en texte, dans de nombreuses langues.",
+    "descriptionEn": "Model that transcribes speech into text, in many languages.",
+    "siteUrl": null,
+    "aliases": []
+  },
+  {
+    "name": "HeyGen",
+    "family": "creation",
+    "descriptionFr": "Outil qui crée des vidéos présentées par un avatar à partir d’un texte.",
+    "descriptionEn": "Tool that creates videos hosted by an avatar from a text.",
+    "siteUrl": "https://www.heygen.com",
+    "aliases": []
+  },
+  {
+    "name": "Synthesia",
+    "family": "creation",
+    "descriptionFr": "Outil qui crée des vidéos présentées par un avatar à partir d’un texte.",
+    "descriptionEn": "Tool that creates videos hosted by an avatar from a text.",
+    "siteUrl": "https://www.synthesia.io",
+    "aliases": []
+  },
+  {
+    "name": "Descript",
+    "family": "creation",
+    "descriptionFr": "Outil de montage de vidéos et de sons qui se fait à partir de leur transcription.",
+    "descriptionEn": "Video and audio editing tool that works from their transcript.",
+    "siteUrl": "https://www.descript.com",
+    "aliases": []
+  },
+  {
+    "name": "CapCut",
+    "family": "creation",
+    "descriptionFr": "Application de montage vidéo pour téléphone et ordinateur.",
+    "descriptionEn": "Video editing application for phone and computer.",
+    "siteUrl": "https://www.capcut.com",
+    "aliases": []
+  },
+  {
+    "name": "DaVinci Resolve",
+    "family": "creation",
+    "descriptionFr": "Logiciel de montage vidéo, d’étalonnage et de mixage sonore.",
+    "descriptionEn": "Software for video editing, colour grading and sound mixing.",
+    "siteUrl": "https://www.blackmagicdesign.com/products/davinciresolve",
+    "aliases": ["Resolve"]
+  },
+  {
+    "name": "Blender",
+    "family": "creation",
+    "descriptionFr": "Logiciel libre de modélisation, d’animation et de rendu en trois dimensions.",
+    "descriptionEn": "Open-source software for 3D modelling, animation and rendering.",
+    "siteUrl": "https://www.blender.org",
+    "aliases": []
+  },
+  {
+    "name": "Photoshop",
+    "family": "creation",
+    "descriptionFr": "Logiciel de retouche et de création d’images.",
+    "descriptionEn": "Software for editing and creating images.",
+    "siteUrl": "https://www.adobe.com/products/photoshop.html",
+    "aliases": ["Adobe Photoshop"]
+  },
+  {
+    "name": "Krita",
+    "family": "creation",
+    "descriptionFr": "Logiciel libre de peinture et de dessin numériques.",
+    "descriptionEn": "Open-source software for digital painting and drawing.",
+    "siteUrl": "https://krita.org",
+    "aliases": []
+  },
+  {
+    "name": "GIMP",
+    "family": "creation",
+    "descriptionFr": "Logiciel libre de retouche d’images.",
+    "descriptionEn": "Open-source software for image editing.",
+    "siteUrl": "https://www.gimp.org",
+    "aliases": []
+  },
+  {
+    "name": "Procreate",
+    "family": "creation",
+    "descriptionFr": "Application de dessin pour iPad.",
+    "descriptionEn": "Drawing application for iPad.",
+    "siteUrl": "https://procreate.com",
+    "aliases": []
+  },
+  {
+    "name": "Audacity",
+    "family": "creation",
+    "descriptionFr": "Logiciel libre d’enregistrement et de montage sonore.",
+    "descriptionEn": "Open-source software for recording and editing sound.",
+    "siteUrl": "https://www.audacityteam.org",
+    "aliases": []
+  },
+  {
+    "name": "Krea",
+    "family": "creation",
+    "descriptionFr": "Outil de création d’images et de vidéos, avec un rendu qui se met à jour pendant que l’on dessine.",
+    "descriptionEn": "Tool for creating images and videos, with a preview that updates as you draw.",
+    "siteUrl": "https://www.krea.ai",
+    "aliases": ["Krea AI"]
+  },
+  {
+    "name": "Gamma",
+    "family": "creation",
+    "descriptionFr": "Outil qui compose des présentations et des pages à partir d’un texte.",
+    "descriptionEn": "Tool that builds presentations and pages from a text.",
+    "siteUrl": "https://gamma.app",
+    "aliases": []
+  },
+  {
+    "name": "Lovable",
+    "family": "no-code",
+    "descriptionFr": "Outil qui crée une application web à partir d’une conversation.",
+    "descriptionEn": "Tool that builds a web application from a conversation.",
+    "siteUrl": "https://lovable.dev",
+    "aliases": []
+  },
+  {
+    "name": "Bolt",
+    "family": "no-code",
+    "descriptionFr": "Outil qui crée et publie une application web à partir d’une description.",
+    "descriptionEn": "Tool that builds and publishes a web application from a description.",
+    "siteUrl": "https://bolt.new",
+    "aliases": ["Bolt.new"]
+  },
+  {
+    "name": "v0",
+    "family": "no-code",
+    "descriptionFr": "Outil de Vercel qui crée des interfaces web à partir d’une description.",
+    "descriptionEn": "Vercel tool that creates web interfaces from a description.",
+    "siteUrl": "https://v0.app",
+    "aliases": ["v0.dev"]
+  },
+  {
+    "name": "Replit",
+    "family": "no-code",
+    "descriptionFr": "Éditeur de code en ligne, avec un assistant qui aide à créer des applications.",
+    "descriptionEn": "Online code editor with an assistant that helps build applications.",
+    "siteUrl": "https://replit.com",
+    "aliases": []
+  },
+  {
+    "name": "Base44",
+    "family": "no-code",
+    "descriptionFr": "Outil qui crée une application à partir d’une description écrite.",
+    "descriptionEn": "Tool that builds an application from a written description.",
+    "siteUrl": "https://base44.com",
+    "aliases": []
+  },
+  {
+    "name": "Google AI Studio",
+    "family": "no-code",
+    "descriptionFr": "Espace de Google pour essayer ses modèles et en tirer de petites applications.",
+    "descriptionEn": "Google workspace for trying its models and turning them into small applications.",
+    "siteUrl": "https://aistudio.google.com",
+    "aliases": ["AI Studio"]
+  },
+  {
+    "name": "Bubble",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour construire des applications web sans écrire de code.",
+    "descriptionEn": "Visual tool for building web applications without writing code.",
+    "siteUrl": "https://bubble.io",
+    "aliases": []
+  },
+  {
+    "name": "Glide",
+    "family": "no-code",
+    "descriptionFr": "Outil qui transforme un tableur en application mobile ou web.",
+    "descriptionEn": "Tool that turns a spreadsheet into a mobile or web application.",
+    "siteUrl": "https://www.glideapps.com",
+    "aliases": []
+  },
+  {
+    "name": "Softr",
+    "family": "no-code",
+    "descriptionFr": "Outil qui construit des portails et des applications à partir de tableaux de données.",
+    "descriptionEn": "Tool that builds portals and applications from data tables.",
+    "siteUrl": "https://www.softr.io",
+    "aliases": []
+  },
+  {
+    "name": "Adalo",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour construire des applications mobiles sans écrire de code.",
+    "descriptionEn": "Visual tool for building mobile applications without writing code.",
+    "siteUrl": "https://www.adalo.com",
+    "aliases": []
+  },
+  {
+    "name": "Airtable",
+    "family": "no-code",
+    "descriptionFr": "Base de données en ligne qui se présente comme un tableur et sert à bâtir de petites applications.",
+    "descriptionEn": "Online database presented like a spreadsheet, used to build small applications.",
+    "siteUrl": "https://airtable.com",
+    "aliases": []
+  },
+  {
+    "name": "Notion",
+    "family": "no-code",
+    "descriptionFr": "Espace de notes, de documents et de bases de données qui s’organise à la carte.",
+    "descriptionEn": "Workspace for notes, documents and databases that you arrange as you like.",
+    "siteUrl": "https://www.notion.com",
+    "aliases": []
+  },
+  {
+    "name": "Webflow",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour dessiner et publier des sites web.",
+    "descriptionEn": "Visual tool for designing and publishing websites.",
+    "siteUrl": "https://webflow.com",
+    "aliases": []
+  },
+  {
+    "name": "Wix",
+    "family": "no-code",
+    "descriptionFr": "Outil en ligne pour créer et publier des sites web.",
+    "descriptionEn": "Online tool for creating and publishing websites.",
+    "siteUrl": "https://www.wix.com",
+    "aliases": []
+  },
+  {
+    "name": "Framer",
+    "family": "no-code",
+    "descriptionFr": "Outil visuel pour dessiner et publier des sites web.",
+    "descriptionEn": "Visual tool for designing and publishing websites.",
+    "siteUrl": "https://www.framer.com",
+    "aliases": []
+  },
+  {
+    "name": "Carrd",
+    "family": "no-code",
+    "descriptionFr": "Outil pour créer des pages web d’une seule page.",
+    "descriptionEn": "Tool for creating single-page websites.",
+    "siteUrl": "https://carrd.co",
+    "aliases": []
+  },
+  {
+    "name": "Squarespace",
+    "family": "no-code",
+    "descriptionFr": "Outil en ligne pour créer des sites web et des boutiques.",
+    "descriptionEn": "Online tool for creating websites and shops.",
+    "siteUrl": "https://www.squarespace.com",
+    "aliases": []
+  },
+  {
+    "name": "WordPress",
+    "family": "no-code",
+    "descriptionFr": "Logiciel libre pour créer et gérer des sites web et des blogs.",
+    "descriptionEn": "Open-source software for creating and managing websites and blogs.",
+    "siteUrl": "https://wordpress.org",
+    "aliases": ["WP"]
+  },
+  {
+    "name": "Google Sheets",
+    "family": "no-code",
+    "descriptionFr": "Tableur en ligne de Google, qui se partage et se modifie à plusieurs.",
+    "descriptionEn": "Google’s online spreadsheet, which can be shared and edited together.",
+    "siteUrl": "https://workspace.google.com/products/sheets/",
+    "aliases": ["Google Sheet", "Sheets"]
+  },
+  {
+    "name": "Typeform",
+    "family": "no-code",
+    "descriptionFr": "Outil pour créer des questionnaires et des formulaires en ligne.",
+    "descriptionEn": "Tool for creating online surveys and forms.",
+    "siteUrl": "https://www.typeform.com",
+    "aliases": []
+  },
+  {
+    "name": "Tally",
+    "family": "no-code",
+    "descriptionFr": "Outil pour créer des formulaires en ligne.",
+    "descriptionEn": "Tool for creating online forms.",
+    "siteUrl": "https://tally.so",
+    "aliases": []
+  },
+  {
+    "name": "Coda",
+    "family": "no-code",
+    "descriptionFr": "Documents en ligne qui contiennent des tableaux et de petites applications.",
+    "descriptionEn": "Online documents that contain tables and small applications.",
+    "siteUrl": "https://coda.io",
+    "aliases": []
+  },
+  {
+    "name": "Scratch",
+    "family": "no-code",
+    "descriptionFr": "Langage visuel à base de blocs pour créer des histoires, des jeux et des animations.",
+    "descriptionEn": "Visual block-based language for creating stories, games and animations.",
+    "siteUrl": "https://scratch.mit.edu",
+    "aliases": []
+  },
+  {
+    "name": "Obsidian",
+    "family": "no-code",
+    "descriptionFr": "Application de prise de notes qui relie des fichiers texte entre eux.",
+    "descriptionEn": "Note-taking application that links text files together.",
+    "siteUrl": "https://obsidian.md",
+    "aliases": []
+  },
+  {
+    "name": "Claude Code",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation qui travaille dans le terminal, sur le code d’un projet.",
+    "descriptionEn": "Programming assistant that works in the terminal, on a project’s code.",
+    "siteUrl": "https://www.anthropic.com/claude-code",
+    "aliases": []
+  },
+  {
+    "name": "Cursor",
+    "family": "development",
+    "descriptionFr": "Éditeur de code qui intègre un assistant d’IA.",
+    "descriptionEn": "Code editor with a built-in AI assistant.",
+    "siteUrl": "https://cursor.com",
+    "aliases": []
+  },
+  {
+    "name": "GitHub Copilot",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation qui propose du code dans l’éditeur.",
+    "descriptionEn": "Programming assistant that suggests code inside the editor.",
+    "siteUrl": "https://github.com/features/copilot",
+    "aliases": []
+  },
+  {
+    "name": "Windsurf",
+    "family": "development",
+    "descriptionFr": "Éditeur de code qui intègre un assistant d’IA.",
+    "descriptionEn": "Code editor with a built-in AI assistant.",
+    "siteUrl": "https://windsurf.com",
+    "aliases": []
+  },
+  {
+    "name": "Codex",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation d’OpenAI, qui travaille sur le code d’un projet.",
+    "descriptionEn": "OpenAI’s programming assistant, which works on a project’s code.",
+    "siteUrl": "https://openai.com/codex/",
+    "aliases": ["OpenAI Codex"]
+  },
+  {
+    "name": "Gemini CLI",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation de Google, qui s’utilise dans le terminal.",
+    "descriptionEn": "Google’s programming assistant, used in the terminal.",
+    "siteUrl": "https://github.com/google-gemini/gemini-cli",
+    "aliases": []
+  },
+  {
+    "name": "Aider",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation qui modifie le code depuis le terminal.",
+    "descriptionEn": "Programming assistant that edits code from the terminal.",
+    "siteUrl": "https://aider.chat",
+    "aliases": []
+  },
+  {
+    "name": "Cline",
+    "family": "development",
+    "descriptionFr": "Assistant de programmation qui s’ajoute à l’éditeur de code.",
+    "descriptionEn": "Programming assistant that adds to the code editor.",
+    "siteUrl": "https://cline.bot",
+    "aliases": []
+  },
+  {
+    "name": "Zed",
+    "family": "development",
+    "descriptionFr": "Éditeur de code rapide, qui se travaille aussi à plusieurs.",
+    "descriptionEn": "Fast code editor that can also be used together with others.",
+    "siteUrl": "https://zed.dev",
+    "aliases": []
+  },
+  {
+    "name": "Visual Studio Code",
+    "family": "development",
+    "descriptionFr": "Éditeur de code qui se complète par des extensions.",
+    "descriptionEn": "Code editor extended through plug-ins.",
+    "siteUrl": "https://code.visualstudio.com",
+    "aliases": ["VS Code"]
+  },
+  {
+    "name": "JetBrains",
+    "family": "development",
+    "descriptionFr": "Famille d’éditeurs de code, comme IntelliJ IDEA et PyCharm.",
+    "descriptionEn": "Family of code editors, such as IntelliJ IDEA and PyCharm.",
+    "siteUrl": "https://www.jetbrains.com",
+    "aliases": ["IntelliJ", "PyCharm"]
+  },
+  {
+    "name": "Git",
+    "family": "development",
+    "descriptionFr": "Logiciel qui garde l’historique des modifications d’un code.",
+    "descriptionEn": "Software that keeps the history of changes made to code.",
+    "siteUrl": "https://git-scm.com",
+    "aliases": []
+  },
+  {
+    "name": "GitHub",
+    "family": "development",
+    "descriptionFr": "Site où l’on héberge du code et où l’on collabore autour.",
+    "descriptionEn": "Site for hosting code and collaborating on it.",
+    "siteUrl": "https://github.com",
+    "aliases": []
+  },
+  {
+    "name": "GitLab",
+    "family": "development",
+    "descriptionFr": "Plateforme pour héberger du code et automatiser sa publication.",
+    "descriptionEn": "Platform for hosting code and automating its release.",
+    "siteUrl": "https://about.gitlab.com",
+    "aliases": []
+  },
+  {
+    "name": "Docker",
+    "family": "development",
+    "descriptionFr": "Outil qui emballe une application et ce dont elle a besoin pour la lancer partout.",
+    "descriptionEn": "Tool that packages an application with what it needs so it can run anywhere.",
+    "siteUrl": "https://www.docker.com",
+    "aliases": []
+  },
+  {
+    "name": "Python",
+    "family": "development",
+    "descriptionFr": "Langage de programmation courant en données, en IA et en automatisation.",
+    "descriptionEn": "Programming language widely used in data, AI and automation.",
+    "siteUrl": "https://www.python.org",
+    "aliases": []
+  },
+  {
+    "name": "JavaScript",
+    "family": "development",
+    "descriptionFr": "Langage de programmation des pages web, utilisé aussi sur les serveurs.",
+    "descriptionEn": "Programming language of web pages, also used on servers.",
+    "siteUrl": "https://developer.mozilla.org/docs/Web/JavaScript",
+    "aliases": ["JS"]
+  },
+  {
+    "name": "TypeScript",
+    "family": "development",
+    "descriptionFr": "Langage qui ajoute des types à JavaScript pour repérer des erreurs plus tôt.",
+    "descriptionEn": "Language that adds types to JavaScript to catch mistakes earlier.",
+    "siteUrl": "https://www.typescriptlang.org",
+    "aliases": ["TS"]
+  },
+  {
+    "name": "Node.js",
+    "family": "development",
+    "descriptionFr": "Environnement qui exécute du JavaScript en dehors du navigateur.",
+    "descriptionEn": "Environment that runs JavaScript outside the browser.",
+    "siteUrl": "https://nodejs.org",
+    "aliases": ["Node"]
+  },
+  {
+    "name": "React",
+    "family": "development",
+    "descriptionFr": "Bibliothèque JavaScript pour construire des interfaces.",
+    "descriptionEn": "JavaScript library for building interfaces.",
+    "siteUrl": "https://react.dev",
+    "aliases": ["ReactJS"]
+  },
+  {
+    "name": "Next.js",
+    "family": "development",
+    "descriptionFr": "Cadre de travail pour construire des sites et des applications avec React.",
+    "descriptionEn": "Framework for building websites and applications with React.",
+    "siteUrl": "https://nextjs.org",
+    "aliases": []
+  },
+  {
+    "name": "Vue",
+    "family": "development",
+    "descriptionFr": "Cadre de travail JavaScript pour construire des interfaces web.",
+    "descriptionEn": "JavaScript framework for building web interfaces.",
+    "siteUrl": "https://vuejs.org",
+    "aliases": ["Vue.js"]
+  },
+  {
+    "name": "Svelte",
+    "family": "development",
+    "descriptionFr": "Cadre de travail qui transforme des composants en code web léger.",
+    "descriptionEn": "Framework that turns components into lightweight web code.",
+    "siteUrl": "https://svelte.dev",
+    "aliases": ["SvelteKit"]
+  },
+  {
+    "name": "Rust",
+    "family": "development",
+    "descriptionFr": "Langage de programmation compilé, conçu pour la fiabilité.",
+    "descriptionEn": "Compiled programming language designed for reliability.",
+    "siteUrl": "https://www.rust-lang.org",
+    "aliases": []
+  },
+  {
+    "name": "Go",
+    "family": "development",
+    "descriptionFr": "Langage de programmation compilé, simple à lire.",
+    "descriptionEn": "Compiled programming language that is simple to read.",
+    "siteUrl": "https://go.dev",
+    "aliases": ["Golang"]
+  },
+  {
+    "name": "Supabase",
+    "family": "development",
+    "descriptionFr": "Service de base de données, de comptes et de stockage pour applications.",
+    "descriptionEn": "Database, accounts and storage service for applications.",
+    "siteUrl": "https://supabase.com",
+    "aliases": []
+  },
+  {
+    "name": "Firebase",
+    "family": "development",
+    "descriptionFr": "Services de Google pour les applications : données, comptes, hébergement.",
+    "descriptionEn": "Google services for applications: data, accounts, hosting.",
+    "siteUrl": "https://firebase.google.com",
+    "aliases": []
+  },
+  {
+    "name": "Vercel",
+    "family": "development",
+    "descriptionFr": "Service qui héberge et publie des sites et des applications web.",
+    "descriptionEn": "Service that hosts and publishes websites and web applications.",
+    "siteUrl": "https://vercel.com",
+    "aliases": []
+  },
+  {
+    "name": "Netlify",
+    "family": "development",
+    "descriptionFr": "Service qui héberge et publie des sites web.",
+    "descriptionEn": "Service that hosts and publishes websites.",
+    "siteUrl": "https://www.netlify.com",
+    "aliases": []
+  },
+  {
+    "name": "Cloudflare",
+    "family": "development",
+    "descriptionFr": "Services de réseau et d’hébergement pour sites et applications.",
+    "descriptionEn": "Network and hosting services for websites and applications.",
+    "siteUrl": "https://www.cloudflare.com",
+    "aliases": []
+  },
+  {
+    "name": "Hugging Face",
+    "family": "development",
+    "descriptionFr": "Site où l’on partage des modèles d’IA, des jeux de données et de petites démos.",
+    "descriptionEn": "Site for sharing AI models, datasets and small demos.",
+    "siteUrl": "https://huggingface.co",
+    "aliases": ["HF"]
+  },
+  {
+    "name": "Ollama",
+    "family": "development",
+    "descriptionFr": "Outil qui fait tourner des modèles de langage sur son propre ordinateur.",
+    "descriptionEn": "Tool that runs language models on your own computer.",
+    "siteUrl": "https://ollama.com",
+    "aliases": []
+  },
+  {
+    "name": "LM Studio",
+    "family": "development",
+    "descriptionFr": "Application qui télécharge et fait tourner des modèles de langage sur son ordinateur.",
+    "descriptionEn": "Application that downloads and runs language models on your computer.",
+    "siteUrl": "https://lmstudio.ai",
+    "aliases": []
+  },
+  {
+    "name": "Expo",
+    "family": "development",
+    "descriptionFr": "Outils pour construire des applications mobiles avec React Native.",
+    "descriptionEn": "Tools for building mobile applications with React Native.",
+    "siteUrl": "https://expo.dev",
+    "aliases": []
+  },
+  {
+    "name": "Flutter",
+    "family": "development",
+    "descriptionFr": "Cadre de travail de Google pour construire des applications pour plusieurs appareils.",
+    "descriptionEn": "Google framework for building applications for several devices.",
+    "siteUrl": "https://flutter.dev",
+    "aliases": []
+  },
+  {
+    "name": "Jupyter",
+    "family": "development",
+    "descriptionFr": "Carnets qui mêlent code, résultats et explications.",
+    "descriptionEn": "Notebooks that mix code, results and explanations.",
+    "siteUrl": "https://jupyter.org",
+    "aliases": ["Jupyter Notebook"]
+  },
+  {
+    "name": "Google Colab",
+    "family": "development",
+    "descriptionFr": "Carnets Jupyter hébergés par Google, qui tournent dans le navigateur.",
+    "descriptionEn": "Jupyter notebooks hosted by Google, running in the browser.",
+    "siteUrl": "https://colab.research.google.com",
+    "aliases": ["Colab"]
+  },
+  {
+    "name": "PostgreSQL",
+    "family": "development",
+    "descriptionFr": "Système de gestion de bases de données libre.",
+    "descriptionEn": "Open-source database management system.",
+    "siteUrl": "https://www.postgresql.org",
+    "aliases": ["Postgres"]
+  },
+  {
+    "name": "SQLite",
+    "family": "development",
+    "descriptionFr": "Base de données qui tient dans un simple fichier.",
+    "descriptionEn": "Database that fits in a single file.",
+    "siteUrl": "https://www.sqlite.org",
+    "aliases": []
+  },
+  {
+    "name": "Model Context Protocol",
+    "family": "development",
+    "descriptionFr": "Protocole ouvert qui relie des assistants d’IA à des outils et à des données.",
+    "descriptionEn": "Open protocol that connects AI assistants to tools and data.",
+    "siteUrl": "https://modelcontextprotocol.io",
+    "aliases": ["MCP"]
+  },
+  {
+    "name": "LangChain",
+    "family": "development",
+    "descriptionFr": "Bibliothèque pour assembler des programmes qui utilisent des modèles de langage.",
+    "descriptionEn": "Library for assembling programs that use language models.",
+    "siteUrl": "https://www.langchain.com",
+    "aliases": []
+  },
+  {
+    "name": "Streamlit",
+    "family": "development",
+    "descriptionFr": "Bibliothèque Python qui transforme un script en petite application web.",
+    "descriptionEn": "Python library that turns a script into a small web application.",
+    "siteUrl": "https://streamlit.io",
+    "aliases": []
+  },
+  {
+    "name": "Gradio",
+    "family": "development",
+    "descriptionFr": "Bibliothèque Python pour créer une interface web autour d’un modèle.",
+    "descriptionEn": "Python library for creating a web interface around a model.",
+    "siteUrl": "https://www.gradio.app",
+    "aliases": []
+  },
+  {
+    "name": "Zapier",
+    "family": "automation",
+    "descriptionFr": "Service qui relie des applications entre elles et enchaîne des tâches automatiques.",
+    "descriptionEn": "Service that connects applications together and chains automatic tasks.",
+    "siteUrl": "https://zapier.com",
+    "aliases": []
+  },
+  {
+    "name": "Make",
+    "family": "automation",
+    "descriptionFr": "Service qui relie des applications entre elles par des scénarios visuels.",
+    "descriptionEn": "Service that connects applications together through visual scenarios.",
+    "siteUrl": "https://www.make.com",
+    "aliases": ["Integromat"]
+  },
+  {
+    "name": "n8n",
+    "family": "automation",
+    "descriptionFr": "Outil d’automatisation à base de blocs, que l’on peut héberger soi-même.",
+    "descriptionEn": "Block-based automation tool that can be self-hosted.",
+    "siteUrl": "https://n8n.io",
+    "aliases": []
+  },
+  {
+    "name": "IFTTT",
+    "family": "automation",
+    "descriptionFr": "Service qui déclenche une action quand un événement se produit dans une autre application.",
+    "descriptionEn": "Service that triggers an action when something happens in another application.",
+    "siteUrl": "https://ifttt.com",
+    "aliases": ["If This Then That"]
+  },
+  {
+    "name": "Power Automate",
+    "family": "automation",
+    "descriptionFr": "Outil de Microsoft pour automatiser des tâches entre ses applications et d’autres.",
+    "descriptionEn": "Microsoft tool for automating tasks between its applications and others.",
+    "siteUrl": "https://www.microsoft.com/power-platform/products/power-automate",
+    "aliases": ["Microsoft Power Automate"]
+  },
+  {
+    "name": "Raccourcis",
+    "family": "automation",
+    "descriptionFr": "Application d’Apple qui enchaîne des actions sur iPhone, iPad et Mac.",
+    "descriptionEn": "Apple application that chains actions on iPhone, iPad and Mac.",
+    "siteUrl": "https://support.apple.com/guide/shortcuts/welcome/ios",
+    "aliases": ["Apple Shortcuts", "Shortcuts"]
+  },
+  {
+    "name": "Tasker",
+    "family": "automation",
+    "descriptionFr": "Application Android qui automatise des actions selon des conditions.",
+    "descriptionEn": "Android application that automates actions according to conditions.",
+    "siteUrl": "https://tasker.joaoapps.com",
+    "aliases": []
+  },
+  {
+    "name": "Pipedream",
+    "family": "automation",
+    "descriptionFr": "Service qui relie des applications, avec la possibilité d’écrire du code.",
+    "descriptionEn": "Service that connects applications, with the option to write code.",
+    "siteUrl": "https://pipedream.com",
+    "aliases": []
+  },
+  {
+    "name": "Activepieces",
+    "family": "automation",
+    "descriptionFr": "Outil d’automatisation à base de blocs, que l’on peut héberger soi-même.",
+    "descriptionEn": "Block-based automation tool that can be self-hosted.",
+    "siteUrl": "https://www.activepieces.com",
+    "aliases": []
+  },
+  {
+    "name": "Node-RED",
+    "family": "automation",
+    "descriptionFr": "Outil visuel qui relie des appareils et des services par des flux.",
+    "descriptionEn": "Visual tool that connects devices and services through flows.",
+    "siteUrl": "https://nodered.org",
+    "aliases": []
+  },
+  {
+    "name": "GitHub Actions",
+    "family": "automation",
+    "descriptionFr": "Automatisation de GitHub : tests, publication et tâches planifiées.",
+    "descriptionEn": "GitHub automation: tests, releases and scheduled tasks.",
+    "siteUrl": "https://github.com/features/actions",
+    "aliases": []
+  },
+  {
+    "name": "Google Apps Script",
+    "family": "automation",
+    "descriptionFr": "Langage pour automatiser Google Sheets, Gmail et les autres services de Google.",
+    "descriptionEn": "Language for automating Google Sheets, Gmail and other Google services.",
+    "siteUrl": "https://developers.google.com/apps-script",
+    "aliases": ["Apps Script"]
+  },
+  {
+    "name": "Home Assistant",
+    "family": "smart-home",
+    "descriptionFr": "Logiciel libre qui réunit et pilote les appareils connectés de la maison.",
+    "descriptionEn": "Open-source software that brings together and controls the home’s connected devices.",
+    "siteUrl": "https://www.home-assistant.io",
+    "aliases": []
+  },
+  {
+    "name": "Alexa",
+    "family": "smart-home",
+    "descriptionFr": "Assistant vocal d’Amazon, présent sur ses enceintes connectées.",
+    "descriptionEn": "Amazon’s voice assistant, found on its connected speakers.",
+    "siteUrl": null,
+    "aliases": ["Amazon Alexa"]
+  },
+  {
+    "name": "Google Home",
+    "family": "smart-home",
+    "descriptionFr": "Application et appareils de Google pour piloter la maison connectée.",
+    "descriptionEn": "Google application and devices for controlling the connected home.",
+    "siteUrl": "https://home.google.com",
+    "aliases": []
+  },
+  {
+    "name": "Apple Home",
+    "family": "smart-home",
+    "descriptionFr": "Application d’Apple pour piloter les appareils connectés de la maison.",
+    "descriptionEn": "Apple application for controlling the home’s connected devices.",
+    "siteUrl": "https://www.apple.com/home-app/",
+    "aliases": ["HomeKit"]
+  },
+  {
+    "name": "SmartThings",
+    "family": "smart-home",
+    "descriptionFr": "Application de Samsung pour piloter des appareils connectés de plusieurs marques.",
+    "descriptionEn": "Samsung application for controlling connected devices from several brands.",
+    "siteUrl": "https://www.smartthings.com",
+    "aliases": []
+  },
+  {
+    "name": "Zigbee",
+    "family": "smart-home",
+    "descriptionFr": "Protocole radio à basse consommation pour les capteurs et ampoules connectés.",
+    "descriptionEn": "Low-power radio protocol for connected sensors and light bulbs.",
+    "siteUrl": "https://csa-iot.org/all-solutions/zigbee/",
+    "aliases": []
+  },
+  {
+    "name": "Matter",
+    "family": "smart-home",
+    "descriptionFr": "Norme qui permet à des appareils connectés de marques différentes de se comprendre.",
+    "descriptionEn": "Standard that lets connected devices from different brands understand each other.",
+    "siteUrl": "https://csa-iot.org/all-solutions/matter/",
+    "aliases": []
+  },
+  {
+    "name": "Philips Hue",
+    "family": "smart-home",
+    "descriptionFr": "Ampoules et éclairages connectés pilotables depuis une application.",
+    "descriptionEn": "Connected bulbs and lighting controllable from an application.",
+    "siteUrl": "https://www.philips-hue.com",
+    "aliases": ["Hue"]
+  },
+  {
+    "name": "openHAB",
+    "family": "smart-home",
+    "descriptionFr": "Logiciel libre qui relie et pilote des appareils connectés de marques différentes.",
+    "descriptionEn": "Open-source software that connects and controls connected devices from different brands.",
+    "siteUrl": "https://www.openhab.org",
+    "aliases": []
+  },
+  {
+    "name": "Jeedom",
+    "family": "smart-home",
+    "descriptionFr": "Logiciel de domotique qui s’installe chez soi.",
+    "descriptionEn": "Home automation software installed at home.",
+    "siteUrl": "https://www.jeedom.com",
+    "aliases": []
+  },
+  {
+    "name": "Tuya",
+    "family": "smart-home",
+    "descriptionFr": "Plateforme dont l’application pilote de nombreux appareils connectés.",
+    "descriptionEn": "Platform whose application controls many connected devices.",
+    "siteUrl": "https://www.tuya.com",
+    "aliases": ["Smart Life"]
+  },
+  {
+    "name": "Shelly",
+    "family": "smart-home",
+    "descriptionFr": "Modules connectés qui rendent des interrupteurs et des prises pilotables.",
+    "descriptionEn": "Connected modules that make switches and sockets controllable.",
+    "siteUrl": "https://www.shelly.com",
+    "aliases": []
+  },
+  {
+    "name": "Sonoff",
+    "family": "smart-home",
+    "descriptionFr": "Interrupteurs, prises et capteurs connectés.",
+    "descriptionEn": "Connected switches, sockets and sensors.",
+    "siteUrl": "https://sonoff.tech",
+    "aliases": []
+  },
+  {
+    "name": "Zigbee2MQTT",
+    "family": "smart-home",
+    "descriptionFr": "Logiciel libre qui relie des appareils Zigbee à un serveur MQTT.",
+    "descriptionEn": "Open-source software that connects Zigbee devices to an MQTT server.",
+    "siteUrl": "https://www.zigbee2mqtt.io",
+    "aliases": []
+  },
+  {
+    "name": "ESPHome",
+    "family": "smart-home",
+    "descriptionFr": "Outil qui programme des cartes ESP à partir d’un fichier de configuration.",
+    "descriptionEn": "Tool that programs ESP boards from a configuration file.",
+    "siteUrl": "https://esphome.io",
+    "aliases": []
+  },
+  {
+    "name": "MQTT",
+    "family": "smart-home",
+    "descriptionFr": "Protocole léger d’échange de messages entre des objets connectés.",
+    "descriptionEn": "Lightweight protocol for exchanging messages between connected objects.",
+    "siteUrl": "https://mqtt.org",
+    "aliases": []
+  },
+  {
+    "name": "Tasmota",
+    "family": "smart-home",
+    "descriptionFr": "Logiciel libre qui remplace celui de nombreuses prises et ampoules connectées.",
+    "descriptionEn": "Open-source software that replaces the firmware of many connected sockets and bulbs.",
+    "siteUrl": "https://tasmota.github.io/docs/",
+    "aliases": []
+  },
+  {
+    "name": "Arduino",
+    "family": "hardware",
+    "descriptionFr": "Cartes électroniques programmables et logiciel pour les piloter.",
+    "descriptionEn": "Programmable electronic boards and software to control them.",
+    "siteUrl": "https://www.arduino.cc",
+    "aliases": []
+  },
+  {
+    "name": "Raspberry Pi",
+    "family": "hardware",
+    "descriptionFr": "Petit ordinateur sur une carte, utilisé pour des projets et des objets connectés.",
+    "descriptionEn": "Small single-board computer used for projects and connected objects.",
+    "siteUrl": "https://www.raspberrypi.com",
+    "aliases": ["RPi"]
+  },
+  {
+    "name": "Raspberry Pi Pico",
+    "family": "hardware",
+    "descriptionFr": "Petite carte à microcontrôleur de Raspberry Pi.",
+    "descriptionEn": "Small microcontroller board from Raspberry Pi.",
+    "siteUrl": "https://www.raspberrypi.com/products/raspberry-pi-pico/",
+    "aliases": ["Pico"]
+  },
+  {
+    "name": "ESP32",
+    "family": "hardware",
+    "descriptionFr": "Puce avec Wi-Fi et Bluetooth, courante dans les objets connectés faits maison.",
+    "descriptionEn": "Chip with Wi-Fi and Bluetooth, common in home-made connected objects.",
+    "siteUrl": "https://www.espressif.com/en/products/socs/esp32",
+    "aliases": []
+  },
+  {
+    "name": "micro:bit",
+    "family": "hardware",
+    "descriptionFr": "Petite carte programmable conçue pour apprendre l’électronique et le code.",
+    "descriptionEn": "Small programmable board designed for learning electronics and code.",
+    "siteUrl": "https://microbit.org",
+    "aliases": []
+  },
+  {
+    "name": "M5Stack",
+    "family": "hardware",
+    "descriptionFr": "Modules électroniques à assembler, avec écran et capteurs.",
+    "descriptionEn": "Electronic modules to assemble, with screen and sensors.",
+    "siteUrl": "https://m5stack.com",
+    "aliases": []
+  },
+  {
+    "name": "Adafruit",
+    "family": "hardware",
+    "descriptionFr": "Cartes, capteurs et tutoriels pour la fabrication électronique.",
+    "descriptionEn": "Boards, sensors and tutorials for electronics making.",
+    "siteUrl": "https://www.adafruit.com",
+    "aliases": []
+  },
+  {
+    "name": "Flipper Zero",
+    "family": "hardware",
+    "descriptionFr": "Petit appareil portable pour explorer des signaux radio et des protocoles.",
+    "descriptionEn": "Small portable device for exploring radio signals and protocols.",
+    "siteUrl": "https://flipperzero.one",
+    "aliases": []
+  },
+  {
+    "name": "Meshtastic",
+    "family": "hardware",
+    "descriptionFr": "Logiciel libre pour envoyer des messages par radio, sans réseau mobile.",
+    "descriptionEn": "Open-source software for sending messages by radio, without a mobile network.",
+    "siteUrl": "https://meshtastic.org",
+    "aliases": []
+  },
+  {
+    "name": "PlatformIO",
+    "family": "hardware",
+    "descriptionFr": "Environnement de développement pour programmer des cartes électroniques.",
+    "descriptionEn": "Development environment for programming electronic boards.",
+    "siteUrl": "https://platformio.org",
+    "aliases": []
+  },
+  {
+    "name": "KiCad",
+    "family": "hardware",
+    "descriptionFr": "Logiciel libre pour dessiner des schémas et des circuits imprimés.",
+    "descriptionEn": "Open-source software for drawing schematics and printed circuit boards.",
+    "siteUrl": "https://www.kicad.org",
+    "aliases": []
+  },
+  {
+    "name": "Tinkercad",
+    "family": "hardware",
+    "descriptionFr": "Outil en ligne pour modéliser en trois dimensions et simuler des circuits.",
+    "descriptionEn": "Online tool for 3D modelling and simulating circuits.",
+    "siteUrl": "https://www.tinkercad.com",
+    "aliases": []
+  },
+  {
+    "name": "Fusion",
+    "family": "hardware",
+    "descriptionFr": "Logiciel de conception en trois dimensions pour la fabrication.",
+    "descriptionEn": "Software for 3D design aimed at manufacturing.",
+    "siteUrl": "https://www.autodesk.com/products/fusion-360/overview",
+    "aliases": ["Fusion 360"]
+  },
+  {
+    "name": "OpenSCAD",
+    "family": "hardware",
+    "descriptionFr": "Logiciel libre qui décrit des objets en trois dimensions par du code.",
+    "descriptionEn": "Open-source software that describes 3D objects through code.",
+    "siteUrl": "https://openscad.org",
+    "aliases": []
+  },
+  {
+    "name": "Bambu Lab",
+    "family": "hardware",
+    "descriptionFr": "Imprimantes en trois dimensions et logiciel pour les piloter.",
+    "descriptionEn": "3D printers and software to control them.",
+    "siteUrl": "https://bambulab.com",
+    "aliases": []
+  },
+  {
+    "name": "Prusa",
+    "family": "hardware",
+    "descriptionFr": "Imprimantes en trois dimensions et logiciel de découpe pour les préparer.",
+    "descriptionEn": "3D printers and slicing software to prepare prints.",
+    "siteUrl": "https://www.prusa3d.com",
+    "aliases": ["Prusa Research"]
+  },
+  {
+    "name": "Thingiverse",
+    "family": "hardware",
+    "descriptionFr": "Site où l’on partage des modèles à imprimer en trois dimensions.",
+    "descriptionEn": "Site for sharing models to 3D print.",
+    "siteUrl": "https://www.thingiverse.com",
+    "aliases": []
+  },
+  {
+    "name": "Jetson Nano",
+    "family": "hardware",
+    "descriptionFr": "Petit ordinateur sur une carte, pensé pour faire tourner de l’IA.",
+    "descriptionEn": "Small single-board computer designed to run AI.",
+    "siteUrl": "https://developer.nvidia.com/embedded/jetson-nano",
+    "aliases": ["NVIDIA Jetson"]
+  }
+]

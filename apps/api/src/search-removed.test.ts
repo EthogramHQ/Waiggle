@@ -2,10 +2,15 @@
 // (GET /v1/search), même pour son auteur, ni de la liste des outils (GET /v1/tools). Le retrait suit
 // ici un signalement, comme en vrai : une décision sans signalement ouvert est refusée (409), ce que
 // les tests « removed » de search.test.ts et tools.test.ts ne font pas (voir le rapport de R3, BE).
+//
+// R6b : les outils sont ceux du catalogue. Un outil du catalogue reste trouvé et listé après le
+// retrait, mais le projet retiré ne compte plus dans son nombre ; le filtre de catégorie de la
+// recherche ne le rend pas non plus. Le test pose son propre catalogue (Lovable seul).
 import { SearchResults, ToolList } from '@ruche/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { addCatalogueTool, clearCatalogue } from './testing/tool-catalogue'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -34,6 +39,8 @@ beforeEach(async () => {
     password: 'louis-long-password',
   })
   await act.makeAdmin((await act.me(louis)).id)
+  await clearCatalogue(ctx.db)
+  await addCatalogueTool(ctx.db, { name: 'Lovable', family: 'no-code' })
 })
 
 afterEach(async () => {
@@ -56,8 +63,10 @@ const reportAndRemove = async (projectId: string) => {
   })
 }
 
-const search = async (cookie: string, q: string) => {
-  const res = await act.send('GET', `/v1/search?${new URLSearchParams({ q })}`, cookie)
+/** `category` (R6b) : le filtre de catégorie du groupe Projets. */
+const search = async (cookie: string, q: string, category?: string) => {
+  const params = new URLSearchParams({ q, ...(category !== undefined && { category }) })
+  const res = await act.send('GET', `/v1/search?${params}`, cookie)
   expect(res.status).toBe(200)
   return SearchResults.parse(await res.json())
 }
@@ -68,19 +77,37 @@ const tools = async (cookie: string) => {
   return ToolList.parse(await res.json()).tools
 }
 
+/** Les outils, par slug et nombre de projets (les alias et la famille ne sont pas la règle ici). */
+const counts = (list: { slug: string; projectCount: number }[]) =>
+  list.map(({ slug, projectCount }) => ({ slug, projectCount }))
+
 describe('a project removed after a report', () => {
-  it('leaves the search, even for its author, and the list of tools', async () => {
+  it('leaves the search, even for its author and in its category, and the tool counts', async () => {
     later()
-    const carnet = await act.publish(ines, 'Carnet de cafés', { tools: ['Lovable'] })
-    // Témoin : avant le retrait, le projet et son outil sont trouvés.
+    const carnet = await act.publish(ines, 'Carnet de cafés', {
+      tools: ['Lovable'],
+      primaryCategory: 'cooking',
+    })
+    // Témoin : avant le retrait, le projet est trouvé, avec et sans filtre, et son outil le compte.
     expect((await search(malik, 'carnet')).projects.items.map((p) => p.id)).toEqual([carnet.id])
-    expect((await tools(malik)).map((t) => t.slug)).toEqual(['lovable'])
+    expect((await search(malik, 'carnet', 'cooking')).projects.items.map((p) => p.id)).toEqual([
+      carnet.id,
+    ])
+    expect(counts((await search(malik, 'lovable')).tools.items)).toEqual([
+      { slug: 'lovable', projectCount: 1 },
+    ])
+    expect(counts(await tools(malik))).toEqual([{ slug: 'lovable', projectCount: 1 }])
 
     await reportAndRemove(carnet.id)
 
-    expect((await search(malik, 'carnet')).projects.items).toEqual([])
-    expect((await search(ines, 'carnet')).projects.items).toEqual([])
-    expect((await search(malik, 'lovable')).tools.items).toEqual([])
-    expect(await tools(malik)).toEqual([])
+    for (const cookie of [malik, ines]) {
+      expect((await search(cookie, 'carnet')).projects.items).toEqual([])
+      expect((await search(cookie, 'carnet', 'cooking')).projects.items).toEqual([])
+    }
+    // L'outil reste au catalogue, sans le projet retiré.
+    expect(counts((await search(malik, 'lovable')).tools.items)).toEqual([
+      { slug: 'lovable', projectCount: 0 },
+    ])
+    expect(counts(await tools(malik))).toEqual([{ slug: 'lovable', projectCount: 0 }])
   })
 })

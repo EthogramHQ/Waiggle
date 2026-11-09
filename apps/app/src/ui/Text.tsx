@@ -2,6 +2,7 @@
 // la couleur à partir des jetons de @ruche/brand. Un écran dit ce qu'est le texte (un titre de
 // projet, une légende) et pas à quoi il ressemble : pour changer tous les titres, on change le jeton.
 import {
+  borders,
   type FontFamily,
   type FontWeight,
   maxHeadingScale,
@@ -48,6 +49,25 @@ export type TextTone = Tone | 'onHoneyTile' | 'onInk'
 // coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
 // Native : on la déclare donc ici, une fois.
 const breakAnywhereStyle = (Platform.OS === 'web' ? { overflowWrap: 'anywhere' } : {}) as TextStyle
+
+/**
+ * La place d'un anneau de focus autour d'un lien (prop `focusRoom`) : le contour, son écart et le
+ * halo qui l'entoure, soit `haloSpread` de `theme/document.ts` (4 fois `borders.focus`).
+ */
+const FOCUS_ROOM = 4 * borders.focus
+/**
+ * Le style de `focusRoom` (web). La largeur maximale s'élargit de la même place, des deux côtés :
+ * react-native-web plafonne un texte replié à `100 %`, et sans cela la marge intérieure prendrait sur
+ * la ligne (le texte se couperait autrement que déplié). `calc` manque aux types de React Native.
+ */
+const focusRoomWebStyle = (readable: boolean) =>
+  ({
+    paddingTop: FOCUS_ROOM,
+    paddingHorizontal: FOCUS_ROOM,
+    marginTop: -FOCUS_ROOM,
+    marginHorizontal: -FOCUS_ROOM,
+    maxWidth: readable ? readableWidth + 2 * FOCUS_ROOM : `calc(100% + ${2 * FOCUS_ROOM}px)`,
+  }) as TextStyle
 
 const toneColor = {
   default: 'text',
@@ -198,6 +218,16 @@ export type TextProps = {
   /** Une ligne de longueur confortable (readableWidth), même sur un grand écran. */
   readable?: boolean
   /**
+   * Un texte replié (`numberOfLines` de plus d'une ligne) qui contient des liens : sur le web, la
+   * place de leur anneau de focus en haut et sur les côtés (R6b, restes de R5b). Replié, le texte
+   * rogne ce qui dépasse sa boîte (`overflow: clip` de react-native-web) : l'anneau d'une pastille de
+   * mention en tête de texte était coupé. Le texte reçoit une marge intérieure de cette place, que
+   * rattrape une marge extérieure négative : rien ne bouge, mais le rognage passe plus loin. Pas en
+   * bas : la ligne d'après le pli se verrait dans cette marge (le texte se déplie de toute façon
+   * quand le focus atteint une pastille de la dernière ligne, `ReadMore`).
+   */
+  focusRoom?: boolean
+  /**
    * Fait du texte un titre, de ce niveau (voir `headingLevel` plus bas) : 1 pour le titre de la
    * page, 2 pour ses sections, 3 et 4 en dessous (les titres écrits par les membres).
    */
@@ -257,6 +287,7 @@ export function Text({
   maxScale: maxScaleProp,
   breakAnywhere = false,
   readable = false,
+  focusRoom = false,
   heading,
   focusRef,
   wholeWords,
@@ -302,6 +333,9 @@ export function Text({
         ...(underline ? { textDecorationLine: 'underline' as const } : null),
         ...(breakAnywhere ? breakAnywhereStyle : null),
         ...(readable ? { maxWidth: readableWidth } : null),
+        ...(focusRoom && Platform.OS === 'web' && (rest.numberOfLines ?? 0) > 1
+          ? focusRoomWebStyle(readable)
+          : null),
         ...(giant && Platform.OS === 'web' ? giantWebStyle(variant, children) : null),
         ...(bigTitle && Platform.OS === 'web' ? bigTitleWebStyle(variant) : null),
         // Après la formule des grands titres, qu'elle reprend en y ajoutant son plafond.
