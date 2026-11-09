@@ -1677,7 +1677,7 @@ Hors de R6b, et où ça va :
 - Alors chaque projet et chaque profil qui citaient cet autre outil citent l'outil du catalogue
   (sans doublon), et le nom tapé devient un alias de cet outil
 - Et l'onglet « Catalogue » cherche un outil, le modifie, ou en ajoute un nouveau
-- Et chaque ajout, rattachement ou modification entre dans l'historique des décisions
+- Et chaque ajout, rattachement ou modification entre dans « Changements récents », en bas de la page (qui, quand, quoi)
 
 **Les catégories** (`/moderation/categories`, lien « Ranger dans une catégorie » de l'e-mail)
 - Étant donné un administrateur sur « Catégories » de la Modération, onglet « À ranger »
@@ -1691,7 +1691,7 @@ Hors de R6b, et où ça va :
 - Alors elle apparaît partout (feuille de publication, filtres), juste avant « Autre » (décision de
   Louis du 9/11/2026 : tout dans l'appli)
 - Et deux catégories ne peuvent pas porter le même nom
-- Et chaque rangement ou création entre dans l'historique des décisions
+- Et chaque rangement ou création entre dans « Changements récents », en bas de la page
 
 **Les gardes**
 - Ces pages et leurs adresses répondent à tout autre visiteur comme une adresse qui n'existe pas,
@@ -1752,7 +1752,8 @@ Pris par la session, à revoir par Louis au bilan :
 4. **Le récap** part le lundi à 8 h, une heure avant celui des membres, et seulement s'il a quelque
    chose à dire ; il ne porte **pas de vignettes** (la planche en montre) : moins de données
    personnelles dans une boîte mail.
-5. **Ranger un projet** ne prévient pas son auteur avant R8 ; l'historique des décisions le garde.
+5. **Ranger un projet** ne prévient pas son auteur avant R8 ; « Changements récents » le garde. Ces
+   gestes ont leur propre journal, pas l'historique des signalements (fait pour les contenus signalés).
 6. **Les anciennes colonnes** de texte des outils restent jusqu'en R7, pour qu'un retour à R6a
    reste possible ; `time_spent` est effacée.
 7. **Une catégorie créée** se place juste avant « Autre » ; on ne la renomme ni ne la supprime en
