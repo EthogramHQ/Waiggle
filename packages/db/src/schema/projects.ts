@@ -3,6 +3,7 @@
 import { sql } from 'drizzle-orm'
 import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { category } from './categories'
 import { moderationDecision } from './moderation'
 
 export const project = pgTable(
@@ -26,13 +27,16 @@ export const project = pgTable(
     // (« claude-code »), qui sert à retrouver tous les projets faits avec un outil.
     tools: text('tools').array().default(sql`'{}'::text[]`).notNull(),
     toolSlugs: text('tool_slugs').array().default(sql`'{}'::text[]`).notNull(),
-    // Ancienne colonne « temps passé » (R6a) : plus lue ni écrite par l'API. Son DROP COLUMN part
-    // en R6b, pour qu'un retour à l'image d'avant le déploiement démarre encore (sec-A6).
-    timeSpent: text('time_spent'), // null : non renseigné
-    // R6a : la catégorie du projet, un code de @ruche/contracts (ProjectCategory). Null pour un
-    // projet d'avant R6a, qui n'en avait pas ; la seconde est facultative.
-    primaryCategory: text('primary_category'),
-    secondaryCategory: text('secondary_category'),
+    // La colonne « temps passé » de R6a a disparu avec la migration 0016 (relecture juridique jur-P1).
+    // R6a : la catégorie du projet. Depuis R6b, un code de la table `category` : la clé étrangère
+    // refuse un code inconnu, et `on update cascade` suivrait un éventuel changement de code.
+    // Null pour un projet d'avant R6a, qui n'en avait pas ; la seconde est facultative.
+    primaryCategory: text('primary_category').references(() => category.code, {
+      onUpdate: 'cascade',
+    }),
+    secondaryCategory: text('secondary_category').references(() => category.code, {
+      onUpdate: 'cascade',
+    }),
     // « Facile à refaire ? » : easy, medium ou hard ; null : non renseigné.
     difficulty: text('difficulty'),
     // Le mois où le projet a commencé, écrit « AAAA-MM » (texte, vérifié par Zod) ; null : non renseigné.
@@ -72,6 +76,10 @@ export const project = pgTable(
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
       .where(sql`${t.visibility} = 'public'`),
     index('project_author_published_idx').on(t.authorId, t.publishedAt),
+    // Les filtres par catégorie (principale ou seconde) et les nombres de projets par catégorie ;
+    // ils servent aussi aux vérifications de la clé étrangère quand une catégorie change de code.
+    index('project_primary_category_idx').on(t.primaryCategory),
+    index('project_secondary_category_idx').on(t.secondaryCategory),
   ],
 )
 

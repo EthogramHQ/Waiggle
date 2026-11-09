@@ -34,6 +34,10 @@ export const adminMember = pgTable('admin_member', {
   // Le dernier e-mail d'alerte « signalements en attente » envoyé à cet administrateur (au plus un
   // par heure) ; null : jamais.
   alertedAt: timestamp('alerted_at'),
+  // R6b : le dernier récapitulatif « outils et catégories à ranger » envoyé à cet administrateur
+  // (au plus un tous les six jours). La date est notée avant l'envoi, par un `update … returning`
+  // atomique : deux exécutions de la tâche n'envoient qu'un e-mail. Null : jamais.
+  otherRecapAt: timestamp('other_recap_at'),
 })
 
 /**
