@@ -20,6 +20,11 @@
 import { useNavigation } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
+import { listenBeforeRouter, listenPopState, type PopEvent } from './backRelay'
+
+// Le relais de `popstate` vit dans `backRelay.ts` (posé par `index.ts` avant Expo Router) ; les
+// tests le posent sur un faux navigateur par ce nom.
+export { listenBeforeRouter }
 
 /** L'action de navigation arrêtée (un retour), à rejouer si le membre abandonne. */
 export type HeldAction = { type: string }
@@ -51,7 +56,6 @@ type BrowserWindow = {
   location: { readonly href: string }
 }
 type UnloadEvent = { preventDefault: () => void; returnValue?: unknown }
-type PopEvent = { stopImmediatePropagation: () => void }
 
 /** Le retour arrêté sur le web : le même que celui d'un bouton « Retour » de l'appli. */
 const BROWSER_BACK: HeldAction = { type: 'GO_BACK' }
@@ -71,41 +75,6 @@ const browserWindow = (): BrowserWindow | null => {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null
   const page = window as unknown as Partial<BrowserWindow>
   return page.history && page.location ? (page as BrowserWindow) : null
-}
-
-// --- Entendre `popstate` avant Expo Router ---
-// Sur la fenêtre elle-même, Chromium appelle les écouteurs dans l'ordre où ils ont été posés, « à la
-// capture » ou non (mesuré en R6a, U5e) : un écouteur posé à l'ouverture de la feuille passerait
-// après celui d'Expo Router, posé au démarrage, qui remettrait la pile avant qu'on ait rien dit. Le
-// module pose donc un relais dès son chargement, avec l'appli et avant le premier effet d'Expo
-// Router ; la feuille ouverte s'y inscrit.
-let relayWindow: BrowserWindow | null = null
-const popHandlers = new Set<(event: PopEvent) => void>()
-const relayPopState = (event: PopEvent) => {
-  for (const handler of [...popHandlers]) handler(event)
-}
-
-/** Pose le relais de `popstate` sur cette fenêtre (au chargement du module ; les tests, sur un faux). */
-export const listenBeforeRouter = (page: BrowserWindow) => {
-  if (relayWindow === page) return
-  relayWindow?.removeEventListener('popstate', relayPopState, true)
-  relayWindow = page
-  page.addEventListener('popstate', relayPopState, true)
-}
-
-const loadedIn = browserWindow()
-if (loadedIn) listenBeforeRouter(loadedIn)
-
-/** Écoute `popstate` par le relais s'il est posé sur cette fenêtre, sinon directement (plus tard). */
-const listenPopState = (page: BrowserWindow, handler: (event: PopEvent) => void) => {
-  if (relayWindow === page) {
-    popHandlers.add(handler)
-    return () => {
-      popHandlers.delete(handler)
-    }
-  }
-  page.addEventListener('popstate', handler, true)
-  return () => page.removeEventListener('popstate', handler, true)
 }
 
 const isMarked = (state: unknown) =>
