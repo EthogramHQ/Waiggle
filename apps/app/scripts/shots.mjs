@@ -234,6 +234,7 @@ const longProject = {
     {
       label: 'gpt-4o-mini-2024-07-18-instruct-previews',
       slug: 'gpt-4o-mini-2024-07-18-instruct-previews',
+      inCatalogue: false,
     },
     { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
   ],
@@ -323,6 +324,35 @@ const feedItems = fromOthers.map((p, i) => ({
   at: new Date(Date.UTC(2026, 9, 19 - i, 9)).toISOString(),
   project: { ...summaryOf(p), reactionTotal: feedTotals[i] ?? 0 },
 }))
+// Explorer (R6b), « Récents » : le fil des autres, plus un projet rangé dans « Animaux », pour que
+// le filtre `/explore?category=animals` montre une carte. Seul « Découvrir » le reçoit : le fil des
+// abonnements et ses captures restent tels quels.
+const discoverItems = [
+  ...feedItems,
+  {
+    kind: 'project',
+    at: new Date(Date.UTC(2026, 9, 14, 9)).toISOString(),
+    project: {
+      ...summaryOf(recipesProject),
+      id: '1a2b3c4d-0000-4000-8000-000000000005',
+      author: ines,
+      title: 'Le carnet des croquettes',
+      pitch: 'Il note les repas du chat et prévient quand le sac est presque vide.',
+      status: 'testable',
+      primaryCategory: 'animals',
+      secondaryCategory: null,
+      reactionTotal: 7,
+    },
+  },
+]
+/** « Récents » filtré par une catégorie (`?category=`), principale ou secondaire, comme l'API. */
+const discoverOf = (category) =>
+  category
+    ? discoverItems.filter(
+        ({ project }) =>
+          project.primaryCategory === category || project.secondaryCategory === category,
+      )
+    : discoverItems
 // Explorer (R3), « Ils cherchent des testeurs » : la première page du fil « Découvrir » filtré
 // (?testers=true), des projets testables qui ont tous une démo (`demoUrl`, que le résumé porte
 // depuis R3), de plusieurs membres et aux titres variés, assez pour que le carrousel dépasse.
@@ -830,6 +860,7 @@ const catalogueTools = [
   { slug: 'notion', name: 'Notion', family: 'no-code', aliases: [], projectCount: 7 },
   { slug: 'glide', name: 'Glide', family: 'no-code', aliases: [], projectCount: 6 },
   { slug: 'make', name: 'Make', family: 'automation', aliases: ['Make.com'], projectCount: 4 },
+  { slug: 'cursor', name: 'Cursor', family: 'development', aliases: [], projectCount: 5 },
   { slug: 'arduino', name: 'Arduino', family: 'hardware', aliases: [], projectCount: 3 },
   { slug: 'claude-code', name: 'Claude Code', family: 'development', aliases: [], projectCount: 2 },
   { slug: 'zapier', name: 'Zapier', family: 'automation', aliases: [], projectCount: 0 },
@@ -1667,7 +1698,11 @@ const fakeApi = (
     if (pathname === '/v1/feed/discover') {
       if (url.searchParams.get('testers') === 'true')
         return json(200, { items: testerItems, nextCursor: null, followedAuthorIds: [] })
-      return json(200, { items: feedItems, nextCursor: null, followedAuthorIds: [max.id] })
+      return json(200, {
+        items: discoverOf(url.searchParams.get('category')),
+        nextCursor: null,
+        followedAuthorIds: [max.id],
+      })
     }
     // Les notifications (tranche 6b) : le nombre de la cloche, la liste en deux pages, « vu ».
     if (pathname === '/v1/notifications/unread') {
@@ -1972,6 +2007,15 @@ const pages = [
   // R3-Explorer-Nuit).
   { name: 'explorer', path: '/explore', signedIn: true },
   { name: 'explorer-nuit', path: '/explore', signedIn: true, fullPage: true },
+  // R6b : « Récents » filtré par la pastille « Animaux » (une carte), puis une catégorie sans projet
+  // dans ce fil : le message vide traduit, avec le nom de la catégorie.
+  { name: 'explorer-filtre', path: '/explore?category=animals', signedIn: true, fullPage: true },
+  {
+    name: 'explorer-categorie-vide',
+    path: '/explore?category=travel',
+    signedIn: true,
+    fullPage: true,
+  },
   // « Tous les outils » (R3) : de A à Z, chacun avec sa tuile et son nombre de projets publics.
   { name: 'outils', path: '/tools', signedIn: true, fullPage: true },
   // Le bout du fil (R1) : « Tu es à jour » sur le miel vif, sous la dernière carte.
