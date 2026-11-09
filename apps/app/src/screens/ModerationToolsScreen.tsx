@@ -51,9 +51,9 @@ import { useToolLabels } from '../tools/labels'
 import { isCatalogueName, matchTools } from '../tools/match'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
+import { DiscardDialog } from '../ui/DiscardDialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import type { Focusable } from '../ui/focus'
-import { Notice } from '../ui/Notice'
 import { PendingToolCard, type PendingToolOutcome } from '../ui/PendingToolCard'
 import { Screen } from '../ui/Screen'
 import { SearchField } from '../ui/SearchField'
@@ -64,7 +64,6 @@ import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { ToolField } from '../ui/ToolField'
 import { CatalogueRecentChanges, listState } from './CatalogueRecentChanges'
-import { ProjectAbandonDialog } from './ProjectAbandonDialog'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -163,9 +162,13 @@ function AdminTools() {
 
   // Les cartes décidées, gardées à leur place jusqu'au changement d'onglet.
   const [decided, setDecided] = useState<Decided[]>([])
-  // La panne de la dernière décision en un geste (« Laisser hors »), en tête de page : elle reste
-  // jusqu'à la réponse de la décision suivante (charte du design : rien ne saute sous le doigt).
-  const [failure, setFailure] = useState<string | null>(null)
+  // La panne de la dernière décision en un geste (« Laisser hors »), dans sa carte, au-dessus de ses
+  // boutons (correction U1, des-B1 : en tête de page, elle tombait hors de l'écran du téléphone).
+  // Elle reste jusqu'à la réponse de la décision suivante (charte du design : rien ne saute sous le
+  // doigt). `slug` : la carte qui la montre.
+  const [failure, setFailure] = useState<{ slug: string; message: string } | null>(null)
+  // La carte dont « Laisser hors » est en route : son bouton tourne jusqu'à la réponse.
+  const [dismissing, setDismissing] = useState<string | null>(null)
   // Une écriture sur un « Autre » est en route : un ref, lu au moment de l'appui, sans attendre que
   // l'écran se redessine (la seconde tape d'une double tape arrive avant).
   const deciding = useRef(false)
@@ -284,15 +287,17 @@ function AdminTools() {
   const onDismiss = async (tool: PendingTool, index: number) => {
     if (busy()) return
     deciding.current = true
+    setDismissing(tool.slug)
     const result = await dismiss(tool.slug)
     deciding.current = false
+    setDismissing(null)
     // Déjà décidé ailleurs (un autre administrateur) : l'API ne le connaît plus, la carte le dit
     // quand même hors de la liste, comme si on venait de le faire.
     if (result.ok || result.error === 'notFound') {
       setFailure(null)
       settle(tool, index, { kind: 'dismissed' })
     } else {
-      setFailure(t(($) => $.errors[result.error]))
+      setFailure({ slug: tool.slug, message: t(($) => $.errors[result.error]) })
     }
   }
   const onMerged = (target: string) => {
@@ -354,6 +359,8 @@ function AdminTools() {
               resultRef={tool.slug === lastDecided ? resultRef : undefined}
               admitRef={openerRef(`${tool.slug}:admit`)}
               mergeRef={openerRef(`${tool.slug}:merge`)}
+              dismissing={dismissing === tool.slug}
+              error={failure?.slug === tool.slug ? failure.message : null}
             />
           ))}
         </Stack>
@@ -443,12 +450,13 @@ function AdminTools() {
       onBack={back}
       title={t(($) => $.moderation.catalogue.title)}
       subtitle={t(($) => $.moderation.catalogue.subtitle)}
-      notice={failure ? <Notice message={failure} /> : undefined}
     >
       <Stack gap="xl">
         <Stack gap="lg">
           <Segmented<Tab>
-            label={t(($) => $.moderation.catalogue.title)}
+            // Le groupe dit ce qu'il choisit (« Liste affichée », comme la file de la Modération),
+            // pas le titre de la page, que le lecteur d'écran vient de lire (ui-S3).
+            label={t(($) => $.moderation.list)}
             options={[
               { value: 'pending', label: t(($) => $.moderation.catalogue.tabPending) },
               { value: 'catalogue', label: t(($) => $.moderation.catalogue.tabCatalogue) },
@@ -689,11 +697,10 @@ function MergeSheet({
           disabled={saving}
         />
       </Dialog>
-      <ProjectAbandonDialog
+      <DiscardDialog
         visible={asking}
-        editing
         onKeep={() => setAsking(false)}
-        onAbandon={() => {
+        onDiscard={() => {
           setAsking(false)
           onClose()
         }}

@@ -23,6 +23,7 @@ import { View } from 'react-native'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
 import { DecidedZone } from './DecidedZone'
+import { Notice } from './Notice'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
 import { useTapGuard } from './tapGuard'
@@ -58,6 +59,19 @@ type Props = {
    */
   admitRef?: Ref<View> | undefined
   mergeRef?: Ref<View> | undefined
+  /**
+   * Facultatif : « Laisser hors du catalogue » est en route vers le serveur (correction U1, des-B1).
+   * Le bouton touché tourne (`loading`) : il ignore une seconde tape, garde le focus du clavier, et
+   * le lecteur d'écran le dit occupé. Sans cela, rien ne bougeait sous le doigt pendant l'écriture.
+   */
+  dismissing?: boolean | undefined
+  /**
+   * Facultatif : le refus de la dernière décision prise sur cette carte, déjà traduit (une panne).
+   * Il se lit dans la carte, au-dessus de ses boutons, qui restent pour réessayer, comme sur les
+   * cartes de signalement (`ReportCard`). En tête de page, il tombait hors de l'écran du téléphone
+   * (915 px au-dessus du bouton touché). Une carte décidée ne le montre plus : son résultat suffit.
+   */
+  error?: string | null | undefined
 }
 
 export function PendingToolCard({
@@ -70,6 +84,8 @@ export function PendingToolCard({
   resultRef,
   admitRef,
   mergeRef,
+  dismissing = false,
+  error,
 }: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
@@ -140,6 +156,10 @@ export function PendingToolCard({
           resultRef={resultRef}
           actions={
             <View style={{ gap: space.sm }}>
+              {/* Une panne : le message reste au-dessus des boutons jusqu'à la réponse de l'essai
+                  suivant (l'écran le garde jusque-là), pour que les boutons ne sautent pas deux
+                  fois. Une alerte, lue dès qu'elle paraît ; le focus reste sur le bouton touché. */}
+              {error ? <Notice message={error} /> : null}
               {/* Les boutons passent à la ligne quand la place manque (téléphone, texte agrandi) ;
                 l'écart garde chacun à distance de son voisin. Aucun en miel : la page en répète un
                 par carte, et la seule action miel d'un écran est ailleurs. */}
@@ -172,6 +192,7 @@ export function PendingToolCard({
                   onPress={dismissGuard(onDismiss)}
                   variant="secondary"
                   size="compact"
+                  loading={dismissing}
                   // L'aide de ce bouton s'ajoute au nom de la carte : « Make.com. Pour un nom qui
                   // n'est pas un outil… ».
                   describedById={`${descriptionId} ${hintId}`}
