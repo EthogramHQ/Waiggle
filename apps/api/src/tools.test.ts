@@ -18,8 +18,10 @@ import {
   CategoryList,
   ErrorResponse,
   foldTool,
+  Member,
   OTHER_TOOLS_SHOWN,
   PROJECT_CATEGORIES,
+  Project,
   ToolList,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -357,6 +359,36 @@ describe('the « other » tools', () => {
     expect(await others(malik)).toEqual([])
     // Témoin : un autre membre le voit toujours.
     expect(await others(zoe)).toEqual(['Teachable Machine'])
+  })
+
+  it('gives an « other » the slug of the name this member typed, never the shared one', async () => {
+    // Relecture de sécurité sec-B2 : Malik tape « Zorblax » dans un projet privé ; l'« Autre »
+    // zorblax existe. Inès tape « Zorblax ✨ » : un autre nom replié, donc un autre « Autre », dont
+    // l'adresse partagée est zorblax-2. Si l'API la rendait, le « -2 » dirait à Inès, et à qui lit
+    // son projet ou son profil, qu'un autre membre a tapé « Zorblax » quelque part.
+    const sparkle = `Zorblax ${String.fromCodePoint(0x2728)}`
+    await publish(malik, 'Secret', ['Zorblax'], { visibility: 'private' })
+    const project = await publish(ines, 'Mon robot', [sparkle])
+    await act.updateProfile(ines, { favoriteTools: [sparkle] })
+    // Témoin : en base, l'adresse partagée porte bien le suffixe.
+    const shared = (await ctx.db.execute(
+      sql`select slug from tool where folded = ${foldTool(sparkle)}`,
+    )) as unknown as { rows: { slug: string }[] }
+    expect(shared.rows[0]?.slug).toBe('zorblax-2')
+
+    const expected = [{ label: sparkle, slug: 'zorblax', inCatalogue: false }]
+    // Le projet, lu par un autre membre, et par son auteure à la publication.
+    const read = Project.parse(
+      await (await act.send('GET', `/v1/projects/${project.id}`, zoe)).json(),
+    )
+    expect(read.tools).toEqual(expected)
+    expect(project.tools).toEqual(expected)
+    // Le profil public d'Inès, lu par un autre membre.
+    const page = Member.parse(await (await act.send('GET', `/v1/members/${inesId}`, zoe)).json())
+    expect(page.favoriteTools).toEqual(expected)
+    // Nulle part la réponse brute ne contient l'adresse partagée.
+    const raw = await (await act.send('GET', `/v1/projects/${project.id}`, malik)).text()
+    expect(raw).not.toContain('zorblax-2')
   })
 
   it('shows 50 of 51 visible « other » tools, and a private one never takes a place', async () => {

@@ -1,7 +1,7 @@
 // Les outils favoris d'un membre (tranche R6b), lus par `profile_tool` joint à `tool` : le profil
 // public, « Mon profil », l'export et la copie d'un signalement partent tous d'ici. L'ancienne colonne
 // `profile.favorite_tools` n'est plus lue (elle reste écrite jusqu'en R7).
-import type { ProjectTool } from '@ruche/contracts'
+import { type ProjectTool, toolSlug } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { asc, eq } from 'drizzle-orm'
 
@@ -27,10 +27,9 @@ export const favoriteToolsOf = async (
     .orderBy(asc(schema.profileTool.position))
   return rows.map((row) => {
     const inCatalogue = row.status === 'catalogue'
-    return {
-      label: inCatalogue ? row.name : (row.label ?? row.name),
-      slug: row.slug,
-      inCatalogue,
-    }
+    const label = inCatalogue ? row.name : (row.label ?? row.name)
+    // Un « Autre » : l'adresse du nom tapé par ce membre, jamais l'adresse partagée et son suffixe
+    // (sec-B2, comme `projects/load.ts`).
+    return { label, slug: inCatalogue ? row.slug : toolSlug(label), inCatalogue }
   })
 }
