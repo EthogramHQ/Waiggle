@@ -37,7 +37,7 @@ export const openModalLayer = (id: string, contains: (node: unknown) => boolean)
 type WebNode = {
   parentElement?: WebNode | null
   contains?: (node: unknown) => boolean
-  closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null
+  querySelector?: (selector: string) => { getAttribute?: (name: string) => string | null } | null
 }
 
 /**
@@ -59,10 +59,13 @@ export const sameLayer = (inner: unknown, node: unknown): boolean =>
 /**
  * La couche de `node` est-elle encore inactive, son fondu d'ouverture pas fini ? react-native-web ne
  * donne le rôle `dialog` à la boîte d'un Modal (`aria-modal`) qu'une fois active, quand son propre
- * piège à focus se met au travail. Sans page web, on la tient pour inactive.
+ * piège à focus se met au travail. On lit la boîte de **toute la couche**, pas un ancêtre de
+ * `node` : les deux bornes du piège, que Tab atteint en sortant du dernier bouton, sont à côté de
+ * la boîte, pas dedans (lues comme « encore inactives », elles ne faisaient plus boucler Tab). Sans
+ * page web, on la tient pour inactive.
  */
 export const layerStillOpening = (node: unknown): boolean =>
-  (node as WebNode | null)?.closest?.('[aria-modal="true"]')?.getAttribute?.('role') !== 'dialog'
+  layerRootOf(node)?.querySelector?.('[aria-modal="true"]')?.getAttribute?.('role') !== 'dialog'
 
 /** `node` est-il dans une couche ouverte après la couche `id`, donc par-dessus elle ? */
 export const inLayerAbove = (id: string, node: unknown): boolean => {

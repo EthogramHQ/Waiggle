@@ -107,13 +107,23 @@ const lendWindowListeners = () => {
   }
 }
 
-/** Un élément d'une couche du dessus : `role` est celui de sa boîte (`dialog` une fois active). */
-const elementOfLayer = (role: string | null) => ({
-  closest: (selector: string) =>
-    selector.includes('aria-modal')
-      ? { getAttribute: (name: string) => (name === 'role' ? role : null) }
-      : null,
-})
+/**
+ * Une couche posée dans `<body>` (la place d'un Modal) : sa boîte (`aria-modal`), dont `role` vaut
+ * `dialog` une fois active, et, à côté de la boîte, une borne du piège à focus (où Tab arrive en
+ * sortant du dernier bouton). Rend un élément de la boîte et la borne.
+ */
+const layerOf = (role: string | null) => {
+  const body = (globalThis as { document?: { body?: unknown } }).document?.body
+  const root = {
+    parentElement: body,
+    querySelector: (selector: string) =>
+      selector.includes('aria-modal')
+        ? { getAttribute: (name: string) => (name === 'role' ? role : null) }
+        : null,
+  }
+  return { inBox: { parentElement: root }, bracket: { parentElement: root } }
+}
+const elementOfLayer = (role: string | null) => layerOf(role).inBox
 
 const Page = () => {
   const [open, setOpen] = useState(true)
@@ -167,6 +177,18 @@ describe('Sheet, the focus of a layer opened above it (web, N1)', () => {
     closeLayer = openModalLayer('above', (node) => node === cancel)
 
     expect(focusOn(cancel).stopImmediatePropagation).not.toHaveBeenCalled()
+  })
+
+  // Mesuré dans le navigateur après la première version de C9 : Tab, depuis le dernier bouton de la
+  // fenêtre active, arrivait sur la borne du piège, à côté de sa boîte ; lue comme « encore
+  // inactive », elle était arrêtée, et Tab ne bouclait plus (Annuler → borne → page).
+  it('lets Tab reach the trap bounds of the active layer above, beside its box', async () => {
+    const focusOn = lendWindowListeners()
+    await renderWithProviders(<Page />)
+    const active = layerOf('dialog')
+    closeLayer = openModalLayer('above', (node) => node === active.inBox || node === active.bracket)
+
+    expect(focusOn(active.bracket).stopImmediatePropagation).not.toHaveBeenCalled()
   })
 
   it('stops listening once closed', async () => {
