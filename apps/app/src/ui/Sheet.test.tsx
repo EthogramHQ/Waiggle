@@ -1288,12 +1288,15 @@ describe('the sheet and the on-screen keyboard of a phone browser (R6b, U15)', (
   }
   const setViewport = (value: object | undefined) => {
     Object.defineProperty(globalThis, 'visualViewport', { value, configurable: true })
+    // La fenêtre de mise en page, que le clavier de Safari ne rétrécit pas.
+    Object.defineProperty(globalThis, 'innerHeight', { value: 844, configurable: true })
   }
   const layer = () => StyleSheet.flatten(screen.getByTestId('keyboard-avoiding').props.style)
 
   afterEach(() => {
     jest.restoreAllMocks()
     Reflect.deleteProperty(globalThis, 'visualViewport')
+    Reflect.deleteProperty(globalThis, 'innerHeight')
     Reflect.deleteProperty(globalThis, 'document')
   })
 

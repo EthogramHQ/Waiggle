@@ -502,14 +502,24 @@ type VisualViewportLike = {
 type VisibleArea = { height: number; top: number }
 
 /** Hook : la zone visible de la page web, tant qu'elle est plus courte que la fenêtre ; sinon null. */
-const useVisibleArea = (windowHeight: number): VisibleArea | null => {
+const useVisibleArea = (): VisibleArea | null => {
   const hydrated = useHydrated()
   const [measured, setMeasured] = useState<VisibleArea | null>(null)
   useEffect(() => {
     if (Platform.OS !== 'web' || !hydrated) return
     const viewport = (globalThis as { visualViewport?: VisualViewportLike }).visualViewport
     if (!viewport) return
-    const read = () => setMeasured({ height: viewport.height, top: viewport.offsetTop })
+    // La fenêtre de mise en page : `innerHeight` (celle de `useWindowDimensions` ne convient pas,
+    // react-native-web la lit lui-même dans `visualViewport` : elle rétrécit avec le clavier, et
+    // la comparaison ne verrait jamais d'écart). Un point d'écart (arrondis) n'est pas un clavier.
+    const read = () => {
+      const layoutHeight = (globalThis as { innerHeight?: number }).innerHeight ?? 0
+      setMeasured(
+        viewport.height < layoutHeight - 1
+          ? { height: viewport.height, top: viewport.offsetTop }
+          : null,
+      )
+    }
     read()
     viewport.addEventListener('resize', read)
     viewport.addEventListener('scroll', read)
@@ -518,8 +528,7 @@ const useVisibleArea = (windowHeight: number): VisibleArea | null => {
       viewport.removeEventListener('scroll', read)
     }
   }, [hydrated])
-  // Un point d'écart (arrondis du navigateur) n'est pas un clavier.
-  return measured && measured.height < windowHeight - 1 ? measured : null
+  return measured
 }
 
 export function Sheet({
@@ -537,7 +546,7 @@ export function Sheet({
   const phone = sizeClass === 'compact'
   const besideRoom = useSheetAside()
   // Le clavier à l'écran du web : la zone visible, quand il la rétrécit (voir `useVisibleArea`).
-  const visible = useVisibleArea(window.height)
+  const visible = useVisibleArea()
   // « Réduire les animations » : la feuille de téléphone paraît par un fondu, au lieu de monter du
   // bas de l'écran (un grand déplacement).
   const calm = useCalmMotion()
