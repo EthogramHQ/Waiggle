@@ -39,7 +39,8 @@ const fr = {
   other: 'Un « Autre » choisi : sa marque, et l’aide sous le champ',
   loading: 'Catalogue en chargement ou en panne : ligne neutre, aucune marque',
   error: 'Une erreur sous le champ (profil : 10 outils au plus)',
-  catalogueOnly: 'Outils du catalogue seulement (« Rattacher à un outil ») : « Teach » tapé',
+  catalogueOnly:
+    'Outils du catalogue seulement (« Rattacher à un outil ») : « clau » tapé, aucune ligne « Ajouter »',
   day: 'jour',
   night: 'nuit',
 }
@@ -54,7 +55,7 @@ const en: typeof fr = {
   other: 'An “Other” chosen: its mark, and the hint under the field',
   loading: 'Catalogue loading or failed: neutral row, no mark',
   error: 'An error under the field (profile: 10 tools at most)',
-  catalogueOnly: 'Catalogue tools only (“Link to a tool”): “Teach” typed',
+  catalogueOnly: 'Catalogue tools only (“Link to a tool”): “clau” typed, no “Add” row',
   day: 'day',
   night: 'night',
 }
@@ -197,7 +198,7 @@ export function ToolFieldCatalogue() {
               })}
             </Example>
             <Example caption={`${l.catalogueOnly} — ${l[scheme]}`}>
-              {fixed({ typed: 'Teach', allowOther: false, limit: 1 })}
+              {fixed({ typed: 'clau', allowOther: false, limit: 1 })}
             </Example>
           </Stack>
         </ThemeProvider>

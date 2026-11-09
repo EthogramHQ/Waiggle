@@ -582,7 +582,20 @@ export function ToolField({
                   })}
                 >
                   {/* La lettre de l'outil, comme sur « Tous les outils » (décorative : le nom suit). */}
-                  {option.kind === 'suggestion' ? <InitialTile name={option.tool.name} /> : null}
+                  {/* Sur la ligne en surbrillance (même miel doux que la tuile), un fin contour garde
+                      la tuile visible ; la marge négative compense ce contour : rien ne bouge. */}
+                  {option.kind === 'suggestion' ? (
+                    <View
+                      style={{
+                        margin: -borders.hairline,
+                        borderWidth: borders.hairline,
+                        borderRadius: radii.code,
+                        borderColor: selected ? colors.outline : 'transparent',
+                      }}
+                    >
+                      <InitialTile name={option.tool.name} />
+                    </View>
+                  ) : null}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     {option.kind === 'add' ? (
                       <Text variant="callout" weight={600} breakAnywhere>
