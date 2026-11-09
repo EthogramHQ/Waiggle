@@ -6,9 +6,10 @@
 //
 // L'icône est un décor (Icon la cache aux lecteurs d'écran) : le texte dit tout, lu tel quel. Le
 // texte passe à la ligne au lieu de sortir de la colonne (320 points, texte à 200 %).
-import { space } from '@ruche/brand'
-import { View } from 'react-native'
+import { layout, space } from '@ruche/brand'
+import { Pressable, View } from 'react-native'
 import { Icon, type IconName } from './Icon'
+import { enterActivates } from './keyboard'
 import { STATUS_PILL_HEIGHT } from './StatusPill'
 import { Text } from './Text'
 
@@ -17,10 +18,12 @@ type Props = {
   label: string
   /** L'icône de la catégorie principale (`categoryOption`, projects/categories.ts). */
   icon: IconName
+  /** R6b : donné, la ligne devient un lien (vers Explorer filtré sur la catégorie). */
+  onPress?: () => void
 }
 
-export function CategoryLine({ label, icon }: Props) {
-  return (
+export function CategoryLine({ label, icon, onPress }: Props) {
+  const line = (
     <View
       style={{
         flexDirection: 'row',
@@ -42,5 +45,24 @@ export function CategoryLine({ label, icon }: Props) {
         </Text>
       </View>
     </View>
+  )
+  if (!onPress) return line
+  // R6b : touchée, la catégorie mène à Explorer filtré. Un lien nommé par le texte de la ligne, dans
+  // une zone de 44 points (la ligne, elle, n'en fait que 36) ; Entrée l'ouvre sur le web.
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      {...enterActivates(onPress)}
+      onPress={onPress}
+      style={{
+        minHeight: layout.touchTarget,
+        justifyContent: 'center',
+        maxWidth: '100%',
+        flexShrink: 1,
+      }}
+    >
+      {line}
+    </Pressable>
   )
 }
