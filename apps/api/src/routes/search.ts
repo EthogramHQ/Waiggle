@@ -45,7 +45,9 @@ const searchRoute = createRoute({
     'Every word of `q` (accents and capitals ignored, one-letter words and repeats dropped, five ' +
     'at most) must appear. Projects: title, pitch or description, the viewer’s own private ones ' +
     'included, never a removed one. Members: name or current handle; with words shorter than 3 ' +
-    'characters, only the members the viewer follows. Tools: label or tag, from public projects. ' +
+    'characters, only the members the viewer follows. Tools: name or alias of a catalogue tool ' +
+    '(never an « other »), counted over the public projects the viewer can see. `category` keeps ' +
+    'only the projects of that category (first or second place); tools and members ignore it. ' +
     'Twenty per group at most, `more` when there were more.',
   request: { query: SearchQuery },
   responses: {
@@ -98,7 +100,8 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if ((c.req.queries('q') ?? []).length !== 1) {
       return c.json(errorBody(languageOf(c), 'validation'), 400)
     }
-    const words = searchWords(c.req.valid('query').q)
+    const { q, category } = c.req.valid('query')
+    const words = searchWords(q)
     // Une place de recherche (relecture C1, search/slots.ts) : une recherche déjà en cours pour
     // ce membre, ou trois pour toute l'API, et la demande attend dans une courte file, jusqu'à
     // une seconde (SEARCH_WAIT_MS). Faute de place à temps, file pleine ou demande abandonnée par
@@ -110,7 +113,7 @@ export const searchRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
     }
     try {
-      const results = await search(db, user.id, words, publicApiUrl)
+      const results = await search(db, user.id, words, category, publicApiUrl)
       // .parse ne garde que les champs du contrat : rien d'autre ne peut sortir d'ici.
       return c.json(SearchResults.parse(results), 200)
     } catch (error) {

@@ -11,7 +11,7 @@ import {
   PROJECT_NOTES_SHOWN,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { followedAmong, followsAnyone } from '../follows/load'
@@ -270,17 +270,29 @@ export const loadFollowingFeed = async (
  * Le fil « Découvrir » : tous les projets publics, ceux du visiteur compris (jamais de note).
  * `testers` : seulement ceux qui cherchent des testeurs (au statut « testable », avec un lien de
  * démo). L'index partiel project_public_published_idx est déjà rangé dans l'ordre du fil.
+ *
+ * R6b, `category` : seulement les projets de cette catégorie, en place principale OU seconde. Un
+ * projet sans catégorie (d'avant R6a) n'en a aucune : il disparaît dès qu'on filtre. Le code
+ * arrive validé (CategoryCode) et entre dans la requête comme un paramètre lié, jamais collé. Les
+ * deux colonnes ont chacune leur index (project_primary_category_idx, project_secondary_category_idx) :
+ * PostgreSQL peut les combiner (« BitmapOr ») ou, pour une catégorie très courante, lire l'index
+ * partiel du fil dans l'ordre et filtrer au passage ; le filtre ne change donc ni la forme du
+ * curseur ni le nombre de requêtes (toujours quatre, comme sans filtre).
  */
 export const loadDiscoverFeed = async (
   db: Database,
   viewerId: string,
   cursor: CursorContent | null,
   testers: boolean,
+  category: string | undefined,
   publicApiUrl: string,
 ): Promise<DiscoverFeedPage> => {
   const page = await loadPage(
     db,
-    testers ? and(eq(t.status, 'testable'), isNotNull(t.demoUrl)) : undefined,
+    and(
+      testers ? and(eq(t.status, 'testable'), isNotNull(t.demoUrl)) : undefined,
+      category ? or(eq(t.primaryCategory, category), eq(t.secondaryCategory, category)) : undefined,
+    ),
     cursor,
     viewerId,
     publicApiUrl,
