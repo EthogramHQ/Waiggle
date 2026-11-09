@@ -28,6 +28,7 @@ import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { moderationRoutes } from './routes/moderation'
+import { moderationCatalogueRoutes } from './routes/moderation-catalogue'
 import { noteRoutes } from './routes/notes'
 import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
@@ -352,6 +353,8 @@ export const createApp = ({
   // Signaler (tout membre) et modérer (administrateurs seulement, tranche 7a).
   app.route('/', reportRoutes({ db, limiter }))
   app.route('/', moderationRoutes({ db, limiter, auth, mailer }))
+  // L'administration du catalogue des outils et des catégories (tranche R6b).
+  app.route('/', moderationCatalogueRoutes({ db, limiter }))
   app.route('/', mediaRoutes({ db, storage }))
 
   // La documentation de l'API, générée à partir des routes déclarées, servie en JSON.

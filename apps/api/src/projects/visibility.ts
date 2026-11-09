@@ -37,6 +37,15 @@ export const listedProjectFor = (viewerId: string) =>
 export const verifiedAuthor = () =>
   sql`(select verified_author.email_verified from ${schema.user} verified_author where verified_author.id = ${sql.raw('"project"."author_id"')}) is true`
 
+/**
+ * Un projet que les membres peuvent voir, sans filtre de blocage (tranche R6b, décision 1 :
+ * sec-A1, jur-T2) : les pages d'administration du catalogue (« À vérifier », « À ranger », le
+ * journal) et le récap des « Autre ». Un administrateur voit tout ce que voient les membres, même
+ * d'un membre qui l'a bloqué (sinon bloquer l'administrateur ferait échapper au rangement), mais
+ * jamais un projet privé ou retiré.
+ */
+export const listedVerifiedProject = () => and(listedProject(), verifiedAuthor())
+
 /** Un projet listé pour ce visiteur, dont l'auteur est vérifié (outils, étiquettes, recherche). */
 export const listedVerifiedProjectFor = (viewerId: string) =>
   and(listedProjectFor(viewerId), verifiedAuthor())
