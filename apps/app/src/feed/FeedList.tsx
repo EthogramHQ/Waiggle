@@ -10,7 +10,6 @@
 import type { FeedItem, ProjectSummary } from '@ruche/contracts'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSession } from '../accounts/api'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { FeedNoteCard } from '../notes/FeedNoteCard'
@@ -45,9 +44,16 @@ export type CardOverlay = (
  * (relecture juridique de R3, jur-J7 : pas de fil sans fin qui se charge tout seul).
  */
 export function DiscoverFeed({
+  viewerId,
   overlay,
   errorMessage,
 }: {
+  /**
+   * L'identifiant du membre connecté : R6a, ses propres projets ne comptent jamais comme
+   * nouveautés, ici comme dans son fil. Donné par l'écran, qui n'affiche ce fil qu'à un membre
+   * (correction C2, ui-C3 : lu ici par `useSession`, il manquait pendant une lecture de la session).
+   */
+  viewerId: string
   overlay?: CardOverlay
   /** Le message d'une section en panne (voir FeedError, `section`) : ce fil n'est qu'une section. */
   errorMessage?: string
@@ -56,8 +62,6 @@ export function DiscoverFeed({
   const feed = useDiscoverFeed({ testers: false })
   const pages = feed.data?.pages ?? []
   const items = pages.flatMap((page) => page.items)
-  // R6a : ses propres projets ne comptent jamais comme nouveautés, ici comme dans son fil.
-  const viewerId = useSession().data?.user.id
   const news = useFeedNews('discover', items[0], false, viewerId)
   // Les auteurs suivis, d'après chaque page lue (l'API le dit page par page, pour ses auteurs).
   // `?? []` : une page sans ce champ (un faux fil de test, une ancienne réponse) n'en suit aucun.

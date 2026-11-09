@@ -112,7 +112,11 @@ function MemberExplore({ userId }: { userId: string }) {
         <Text variant="heading" heading={2}>
           {t(($) => $.explore.recent)}
         </Text>
-        <DiscoverFeed overlay={chipOf} errorMessage={t(($) => $.explore.recentError)} />
+        <DiscoverFeed
+          viewerId={userId}
+          overlay={chipOf}
+          errorMessage={t(($) => $.explore.recentError)}
+        />
       </Stack>
     </Screen>
   )

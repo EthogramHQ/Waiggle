@@ -562,3 +562,44 @@ describe('ExploreScreen, when the sections cannot load', () => {
     expect(recent.refetch).toHaveBeenCalledTimes(1)
   })
 })
+
+// Correction C2 de R6a (relecture de l'interface, ui-C3) : les nouveautés de « Récents » ne comptent
+// jamais les projets du membre lui-même (décision de Louis du 8/11/2026, comme dans son fil). Le
+// calcul (`useFeedNews`) a ses tests dans feed/api ; ici, l'écran lui donne bien l'identifiant du
+// membre connecté, et ne calcule rien tant qu'il n'y a pas de membre (visiteur, session en lecture).
+describe('ExploreScreen, the news of « Récents » and the member’s own projects', () => {
+  /** Les appels des nouveautés de « Récents » (le fil « discover »), avec le membre donné. */
+  const recentNewsViewers = () =>
+    jest
+      .mocked(useFeedNews)
+      .mock.calls.filter(([kind]) => kind === 'discover')
+      .map((call) => call[3])
+
+  it('hands the member’s id to the news of « Récents », so her projects never count', async () => {
+    await renderExplore()
+
+    // « Récents » contient un projet de Léa (fromLea) : sans son identifiant, il compterait.
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    const viewers = recentNewsViewers()
+    expect(viewers.length).toBeGreaterThan(0)
+    expect(new Set(viewers)).toEqual(new Set(['u1']))
+  })
+
+  it('computes no news of « Récents » for a visitor', async () => {
+    mockSession(null)
+    await renderExplore()
+
+    // Témoin : la page réservée aux membres, avec « Me connecter ».
+    expect(linkOrButton(/Me connecter/)).toBeTruthy()
+    expect(recentNewsViewers()).toEqual([])
+  })
+
+  it('computes no news of « Récents » while the session is being read', async () => {
+    mockSession(null, true)
+    await renderExplore()
+
+    // Témoin : ni la page ni « Récents » ne sont dessinés pendant la lecture de la session.
+    expect(screen.queryByText(fr.t(($) => $.explore.recent))).toBeNull()
+    expect(recentNewsViewers()).toEqual([])
+  })
+})
