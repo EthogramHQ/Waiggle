@@ -12,7 +12,7 @@
 // Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs agents travaillent
 // en même temps sur le catalogue. Ses exemples (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
-import { layout, radii, space } from '@ruche/brand'
+import { appName, layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
@@ -55,7 +55,7 @@ const fr = {
   categoryHint: 'Une principale, et une seconde si tu veux.',
   body: 'Les photos, le titre, « En une phrase », la description et le lien viennent ici.',
   status: 'Où en est le projet ? Testable.',
-  audience: 'Les membres de Waiggle verront ce projet, et tes abonnés le trouveront dans leur fil.',
+  audience: `Les membres de ${appName} verront ce projet, et tes abonnés le trouveront dans leur fil.`,
   unchanged: 'Rien à enregistrer pour l’instant.',
   failed: 'Impossible de publier pour l’instant. Réessaie dans un moment.',
   preview: 'Aperçu dans le fil',
@@ -95,7 +95,7 @@ const en: typeof fr = {
   categoryHint: 'A main one, and a second one if you like.',
   body: 'The photos, the title, “In one sentence”, the description and the link go here.',
   status: 'Where is the project at? Ready to try.',
-  audience: 'Waiggle members will see this project, and your followers will find it in their feed.',
+  audience: `${appName} members will see this project, and your followers will find it in their feed.`,
   unchanged: 'Nothing to save for now.',
   failed: 'Can’t publish right now. Try again in a moment.',
   preview: 'Preview in the feed',

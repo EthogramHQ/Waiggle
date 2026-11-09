@@ -29,7 +29,11 @@ export function RecipeFact({ label, icon, dot }: Props) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
       {icon ? (
-        <Icon name={icon} size={ICON_SIZE} tone="muted" />
+        // Dans une boîte qui ne rétrécit pas : sans elle, l'icône se réduit quand la phrase est longue
+        // (colonne étroite, texte à 200 %), alors que le rond, lui, garde sa taille.
+        <View style={{ flexShrink: 0 }}>
+          <Icon name={icon} size={ICON_SIZE} tone="muted" />
+        </View>
       ) : dot ? (
         // Le rond, caché aux lecteurs d'écran (iOS, Android, web). Il est centré dans une boîte
         // de la largeur d'une icône : les phrases de la recette commencent toutes au même bord.
