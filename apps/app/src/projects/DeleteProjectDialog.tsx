@@ -33,6 +33,7 @@ import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import type { CoverImage } from '../ui/ProjectCover'
 import { ProjectThumb } from '../ui/ProjectThumb'
+import { Row } from '../ui/Stack'
 import { deleteProject } from './api'
 import { projectQueryKey } from './hooks'
 
@@ -137,7 +138,13 @@ export function DeleteProjectDialog({
       visible={visible}
       guardTaps
       busy={busy}
-      illustration={<ProjectThumb image={project.cover} badge="trash" />}
+      // La vignette, centrée au-dessus du titre centré. Dans une rangée : la vignette se range seule
+      // à gauche (`alignSelf`, pour les états rangés à gauche), la rangée, elle, suit la fenêtre.
+      illustration={
+        <Row>
+          <ProjectThumb image={project.cover} badge="trash" />
+        </Row>
+      }
       title={t(($) => $.project.page.deleteTitle, { title: project.title })}
       message={
         project.removed
