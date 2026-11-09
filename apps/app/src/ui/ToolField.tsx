@@ -52,9 +52,10 @@ import { fontName } from './theme/fonts'
 import { useTheme } from './theme/ThemeProvider'
 
 /**
- * Un outil proposé : son nom, le nombre de projets qui le citent déjà, et sa famille (le code du
- * catalogue, « assistant », que `labels.detail` traduit ; `null` ou absente quand on ne la connaît
- * pas : seul le nombre s'affiche alors).
+ * Un outil proposé : son nom, le nombre de projets qui le citent déjà, et sa famille. Le champ ne
+ * lit pas la famille : il la passe telle quelle à `labels.detail`. `matchTools` y met le code du
+ * catalogue (« assistant »), que l'écran traduit dans `detail` ; `null` ou absente quand on ne la
+ * connaît pas.
  */
 export type ToolSuggestion = { name: string; uses: number; family?: string | null }
 
