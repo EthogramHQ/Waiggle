@@ -1,7 +1,8 @@
 // La carte d'un « Autre » à vérifier (tranche R6b, page « Outils » de la Modération, onglet « À
-// vérifier ») : le nom tapé par les membres (« Make.com »), combien de projets le citent (« Cité par
-// 3 projets »), jusqu'à cinq de ces projets (titre et auteur, chacun ouvre sa page), puis les trois
-// décisions : « Ajouter au catalogue », « Rattacher à un outil », « Laisser hors du catalogue ».
+// vérifier ») : le nom tapé par les membres (« Make.com »), combien de projets et de profils le
+// citent (« Cité par 3 projets et 2 profils »), jusqu'à cinq de ces projets (titre et auteur, chacun
+// ouvre sa page), jusqu'à cinq des membres qui l'ont dans leurs outils favoris (« Profil d’Inès
+// Moreau », depuis la décision de Louis du 9/11/2026 au soir, jur-J1), puis les trois décisions : « Ajouter au catalogue », « Rattacher à un outil », « Laisser hors du catalogue ».
 //
 // La carte écrit elle-même ses textes à partir de ce que l'API donne (`PendingTool`) ; l'écran lui
 // dit seulement ce qui s'est passé (`outcome`) et ce que fait chaque geste. Les écritures restent à
@@ -20,6 +21,7 @@ import type { PendingTool } from '@ruche/contracts'
 import { type Ref, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
+import { useNameOf } from '../useNameOf'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
 import { DecidedZone } from './DecidedZone'
@@ -89,6 +91,8 @@ export function PendingToolCard({
 }: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
+  // « Profil d’Inès », « Profil de Léa », « Inès’s profile » : le lien du nom suit la langue.
+  const nameOf = useNameOf()
   // Une garde par bouton (charte, R5b) : la seconde tape d'une double tape sur « Laisser hors »
   // n'écrit pas deux fois, celle sur « Ajouter » n'ouvre pas deux feuilles. Une garde commune aux
   // liens des projets : la seconde tape n'ouvre pas, à côté, la page d'un autre projet.
@@ -123,7 +127,7 @@ export function PendingToolCard({
         {tool.name}
       </Text>
       <Text variant="callout" tone="secondary">
-        {t(($) => $.moderation.catalogue.pendingProjects, { count: tool.projectCount })}
+        {countOf(tool, t)}
       </Text>
 
       {/* Le reste de la carte, à l'écart habituel sous le nombre (l'écart de la carte, plus fin,
@@ -131,24 +135,44 @@ export function PendingToolCard({
       <View style={{ gap: space.md, marginTop: space.md - space.xxs }}>
         {/* Les projets qui le citent (cinq au plus) : une liste de liens, chacun vers sa page. Le nom
           lu est la ligne affichée (« Le tri des factures, par Hugo Lefèvre » : « par » ne s’élide jamais). Rangés à gauche,
-          jamais plus larges que la carte : un titre long passe à la ligne dans son lien. */}
-        <View role="list" style={{ gap: space.xxs }}>
-          {tool.projects.map((project) => (
-            <View
-              key={project.id}
-              role="listitem"
-              style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
-            >
-              <TextLink
-                label={t(($) => $.moderation.catalogue.projectBy, {
-                  title: project.title,
-                  author: project.author.name,
-                })}
-                onPress={linkGuard(() => onOpenProject(project.id))}
-              />
-            </View>
-          ))}
-        </View>
+          jamais plus larges que la carte : un titre long passe à la ligne dans son lien. Aucun
+          projet (un « Autre » des seuls profils) : pas de liste vide, qu'un lecteur dirait « liste,
+          0 élément ». */}
+        {tool.projects.length > 0 ? (
+          <View role="list" style={{ gap: space.xxs }}>
+            {tool.projects.map((project) => (
+              <View
+                key={project.id}
+                role="listitem"
+                style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
+              >
+                <TextLink
+                  label={t(($) => $.moderation.catalogue.projectBy, {
+                    title: project.title,
+                    author: project.author.name,
+                  })}
+                  onPress={linkGuard(() => onOpenProject(project.id))}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Les membres qui l'ont mis dans leurs outils favoris (cinq au plus, décision de Louis du
+          9/11/2026 au soir, jur-J1) : « Profil d’Inès Moreau ». En texte simple : l'appli n'ouvre
+          la page d'un membre que par son identifiant, que la carte ne reçoit pas (`NamedMember` :
+          un nom et un pseudo). Une liste à part, sous celle des projets, du même écart. */}
+        {tool.profiles.length > 0 ? (
+          <View role="list" style={{ gap: space.xxs }}>
+            {profilesOf(tool).map(({ member, key }) => (
+              <View key={key} role="listitem" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
+                <Text variant="callout">
+                  {t(($) => $.moderation.catalogue.profileOf, { nameOf: nameOf(member.name) })}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Les décisions, ou leur résultat à la même place, au moins aussi haut (DecidedZone). */}
         <DecidedZone
@@ -211,6 +235,35 @@ export function PendingToolCard({
       <ActionDescription id={descriptionId} text={tool.name} />
     </View>
   )
+}
+
+/**
+ * Les membres de la carte, chacun avec sa clé React. Un pseudo est unique ; sans pseudo, deux
+ * membres peuvent porter le même nom : le rang complète alors la clé (la liste vient de l'API et
+ * ne change pas d'ordre).
+ */
+const profilesOf = (tool: PendingTool) =>
+  tool.profiles.map((member, rank) => ({
+    member,
+    key: member.handle === null ? `${rank}:${member.name}` : `@${member.handle}`,
+  }))
+
+/**
+ * Le nombre sous le nom : « Cité par 3 projets », « Cité par 2 profils », ou les deux, « Cité par
+ * 3 projets et 2 profils ». Le contrat garantit que l'un des deux au moins est positif.
+ */
+const countOf = (tool: PendingTool, t: ReturnType<typeof useTranslation>['t']): string => {
+  const { projectCount, profileCount } = tool
+  if (profileCount === 0) {
+    return t(($) => $.moderation.catalogue.pendingProjects, { count: projectCount })
+  }
+  if (projectCount === 0) {
+    return t(($) => $.moderation.catalogue.pendingProfiles, { count: profileCount })
+  }
+  return t(($) => $.moderation.catalogue.pendingBoth, {
+    projects: t(($) => $.moderation.catalogue.mergeProjects, { count: projectCount }),
+    profiles: t(($) => $.moderation.catalogue.mergeProfiles, { count: profileCount }),
+  })
 }
 
 /** La phrase du résultat d'une décision (« Rattaché à Make. »). */

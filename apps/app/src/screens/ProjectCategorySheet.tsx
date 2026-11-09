@@ -127,6 +127,7 @@ function Choosing({
       <Categories
         primary={primary}
         secondary={secondary}
+        visibility={visibility}
         onChange={(choice) => onChange({ ...choice, tools })}
       />
       <Tools
@@ -150,8 +151,9 @@ type Choice = Pick<CategoriesAndTools, 'primary' | 'secondary'>
 function Categories({
   primary,
   secondary,
+  visibility,
   onChange,
-}: Choice & { onChange: (choice: Choice) => void }) {
+}: Choice & Pick<Props, 'visibility'> & { onChange: (choice: Choice) => void }) {
   const { t } = useTranslation()
   const query = useCategories()
   const list = query.data?.categories
@@ -194,8 +196,9 @@ function Categories({
           />
           {/* Sous « Autre », choisie en principale ou en seconde : les administrateurs pourront
               ranger le projet dans une catégorie qui lui va (jur-T4). Elle suit les cases, que le
-              lecteur d'écran lit juste avant. */}
-          {hasOther(list, primary, secondary) ? (
+              lecteur d'écran lit juste avant. Pas pour un projet privé : personne d'autre ne le
+              voit, l'administration ne le range jamais (relecture juridique jur-J2). */}
+          {visibility !== 'private' && hasOther(list, primary, secondary) ? (
             <Text variant="caption" tone="muted">
               {t(($) => $.project.form.otherCategoryHint)}
             </Text>

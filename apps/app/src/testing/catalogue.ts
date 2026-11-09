@@ -39,6 +39,8 @@ export const makeComPending: PendingTool = {
       author: { name: 'Yann Le Gall', handle: null },
     },
   ],
+  profileCount: 0,
+  profiles: [],
 }
 
 /** « Teachable Machine », cité par 1 projet : il entre au catalogue. */
@@ -54,6 +56,8 @@ export const teachablePending: PendingTool = {
       author: { name: 'Hugo Lefèvre', handle: 'hugo' },
     },
   ],
+  profileCount: 0,
+  profiles: [],
 }
 
 /**
@@ -92,7 +96,58 @@ export const sunoPending: PendingTool = {
       author: { name: 'Paul Roux', handle: 'paul' },
     },
   ],
+  profileCount: 0,
+  profiles: [],
 }
+
+/**
+ * « Napkin AI », cité par 2 profils et par aucun projet visible : un « Autre » des seuls outils
+ * favoris (décision de Louis du 9/11/2026 au soir, jur-J1). Sa carte dit « Cité par 2 profils ».
+ */
+export const napkinPending: PendingTool = {
+  slug: 'napkin-ai',
+  name: 'Napkin AI',
+  createdAt: '2026-11-05T15:20:00.000Z',
+  projectCount: 0,
+  projects: [],
+  profileCount: 2,
+  profiles: [
+    { name: 'Inès Moreau', handle: 'ines' },
+    { name: 'Yann Le Gall', handle: null },
+  ],
+}
+
+/** « Gamma App », cité par 2 projets et 3 profils : « Cité par 2 projets et 3 profils ». */
+export const gammaPending: PendingTool = {
+  slug: 'gamma-app',
+  name: 'Gamma App',
+  createdAt: '2026-11-04T08:30:00.000Z',
+  projectCount: 2,
+  projects: [
+    {
+      id: catalogueId(36),
+      title: 'Les diapos du club photo',
+      author: { name: 'Samuel Petit', handle: 'sam' },
+    },
+    {
+      id: catalogueId(37),
+      title: 'L’exposé sur les volcans',
+      author: { name: 'Nora Benali', handle: 'nora' },
+    },
+  ],
+  profileCount: 3,
+  profiles: [
+    { name: 'Hugo Lefèvre', handle: 'hugo' },
+    { name: 'Élodie Martin', handle: 'elodie' },
+    { name: 'Paul Roux', handle: 'paul' },
+  ],
+}
+
+/**
+ * Les « Autre » cités par des profils, pour les captures (`shots.mjs`) : à la suite de
+ * `pendingTools`, que les tests d'écran gardent tel quel.
+ */
+export const pendingToolsWithProfiles = [napkinPending, gammaPending]
 
 /** Les trois autres outils de la page « À vérifier », du plus récent au plus ancien. */
 export const pendingTools = [makeComPending, teachablePending, sunoPending]

@@ -85,8 +85,11 @@ const PHOTO_SIZE = 36
  */
 const FIELD_BASIS = PHOTO_SIZE + space.sm + 180 + 2 * space.lg
 
-/** La fenêtre la plus étroite qui garde la photo en mode réponse (décision 20). */
-const REPLY_PHOTO_FROM = 360
+/**
+ * La fenêtre la plus étroite qui garde la photo en mode réponse (décision 20) : le seuil des écrans
+ * étroits, partagé avec le fil des commentaires (`layout.breakpoints.narrow`).
+ */
+const REPLY_PHOTO_FROM = layout.breakpoints.narrow
 
 /** La place gardée à l'extrait, à côté du nom : en dessous, il passe à la ligne, le nom reste entier. */
 const EXCERPT_MIN = 64

@@ -50,10 +50,10 @@ const ELBOW_RADIUS = space.md
 const indentFor = (trunk: number) => trunk + ELBOW_RADIUS + space.xs - CARD_PADDING
 /**
  * Sous cette largeur d'écran, le retrait se resserre (R6b, restes de R5b) : à 320 points, les
- * réponses ne gardaient que 19 caractères par ligne. Le même seuil que la photo du champ
- * (`REPLY_PHOTO_FROM` de CommentComposer).
+ * réponses ne gardaient que 19 caractères par ligne. Le seuil des écrans étroits, le même que la
+ * photo du champ de réponse (CommentComposer) : un jeton, `layout.breakpoints.narrow`.
  */
-const NARROW_BELOW = 360
+const NARROW_BELOW = layout.breakpoints.narrow
 /**
  * Les mises en page du fil. `trunk` : où descend le trait, depuis le bord du fil ; `indent` : le
  * retrait des réponses ; `fromPhoto` : le trait part-il de sous la photo de la racine ?

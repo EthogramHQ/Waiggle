@@ -39,7 +39,12 @@ export const useToolLabels = (visibility: ProjectVisibility): ToolFieldLabels =>
       spoken: t(($) => $.project.form.toolsCountSpoken, { count, max }),
     }),
     uses: (count) => t(($) => $.project.form.toolUses, { count }),
-    suggestion: (name, count) => t(($) => $.project.form.toolSuggestion, { name, count }),
+    // Le nom lu dit la ligne affichée : « Claude, Assistant IA · 41 projets », comme les lignes de
+    // « Tous les outils » (`tools.withCount`, ui-C3) ; sans elle, le nombre seul.
+    suggestion: (name, count, detail) =>
+      detail === undefined
+        ? t(($) => $.project.form.toolSuggestion, { name, count })
+        : t(($) => $.tools.withCount, { label: name, projects: detail }),
     add: (name) => t(($) => $.project.form.addTool, { name }),
     remove: (name) => t(($) => $.project.form.removeTool, { name }),
     detail: (family, count) => {

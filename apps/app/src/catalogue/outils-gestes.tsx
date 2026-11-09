@@ -63,6 +63,8 @@ const makeCom: PendingTool = {
       author: { name: 'Inès Moreau', handle: 'ines' },
     },
   ],
+  profileCount: 0,
+  profiles: [],
 }
 
 const noop = () => {}
