@@ -31,7 +31,13 @@ export const renderWithProviders = async (
   // retry: false : en test, une requête qui échoue ne doit pas être retentée trois fois.
   const queryClient = new QueryClient({
     // gcTime: Infinity : pas de minuterie de nettoyage du cache, qui empêcherait Jest de s'arrêter.
-    defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } },
+    // Les écritures (mutations) aussi : une écriture finie est oubliée au bout de 5 minutes par
+    // une minuterie, qui gardait Jest ouvert jusque-là après un test qui écrit par les vrais hooks
+    // (« Jest did not exit… », pages « Outils » et « Catégories » de la Modération, R6b, u9f).
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false, gcTime: Infinity },
+    },
   })
   // wrapper : tout ce qui entoure l'écran. Passé ainsi (et non écrit autour de `ui`), il reste en
   // place quand un test redessine l'écran avec d'autres données (rerender).

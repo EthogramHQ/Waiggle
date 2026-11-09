@@ -1,7 +1,6 @@
 // « Changements récents », en bas des pages « Outils » et « Catégories » de la Modération (tranche
 // R6b) : le journal du catalogue, du plus récent au plus ancien (qui a changé quoi, et quand). Une
-// seule copie pour les deux pages (charte du design : un composant dès la deuxième copie) ; la page
-// « Outils » garde pour l'instant la sienne, en attendant d'y passer (voir le rapport de U9).
+// seule copie pour les deux pages (charte du design : un composant dès la deuxième copie).
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import type { useCatalogueChanges } from '../moderation/catalogue-api'

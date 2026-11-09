@@ -50,7 +50,6 @@ import { changesOf, initialOf } from '../tools/edit'
 import { useToolLabels } from '../tools/labels'
 import { isCatalogueName, matchTools } from '../tools/match'
 import { Button } from '../ui/Button'
-import { CatalogueChangeRow } from '../ui/CatalogueChangeRow'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd } from '../ui/FeedEnd'
 import type { Focusable } from '../ui/focus'
@@ -64,6 +63,7 @@ import { Stack } from '../ui/Stack'
 import { StateMessage } from '../ui/StateMessage'
 import { Text } from '../ui/Text'
 import { ToolField } from '../ui/ToolField'
+import { CatalogueRecentChanges, listState } from './CatalogueRecentChanges'
 import { ProjectAbandonDialog } from './ProjectAbandonDialog'
 import {
   LoadErrorScreen,
@@ -458,7 +458,7 @@ function AdminTools() {
           />
           {tab === 'pending' ? pendingContent : catalogueContent}
         </Stack>
-        <RecentChanges changes={changes} />
+        <CatalogueRecentChanges changes={changes} />
       </Stack>
 
       <ToolEditSheet
@@ -480,20 +480,6 @@ function AdminTools() {
     </Screen>
   )
 }
-
-/** L'état du bas d'une liste par pages : chargement de la suite, panne, suite à demander, ou fin. */
-const listState = (list: {
-  isFetchingNextPage: boolean
-  isFetchNextPageError: boolean
-  hasNextPage: boolean
-}) =>
-  list.isFetchingNextPage
-    ? ('loading' as const)
-    : list.isFetchNextPageError
-      ? ('error' as const)
-      : list.hasNextPage
-        ? ('more' as const)
-        : ('end' as const)
 
 /**
  * Une ligne du catalogue : le nom de l'outil, sa famille et son nombre de projets, et « Modifier ».
@@ -529,54 +515,6 @@ function CatalogueToolRow({ tool, onEdit }: { tool: AdminCatalogueTool; onEdit: 
         describedById={nameId}
         hint={tool.name}
       />
-    </Stack>
-  )
-}
-
-/** « Changements récents », en bas de la page : le journal du catalogue, du plus récent au plus ancien. */
-function RecentChanges({ changes }: { changes: ReturnType<typeof useCatalogueChanges> }) {
-  const { t } = useTranslation()
-  const items = changes.data?.pages.flatMap((page) => page.items) ?? []
-  return (
-    <Stack gap="md">
-      <Text variant="heading" heading={2}>
-        {t(($) => $.moderation.catalogue.changes)}
-      </Text>
-      {changes.isError && !changes.data ? (
-        <Notice
-          message={t(($) => $.errors[errorKey(changes.error)])}
-          action={{
-            label: t(($) => $.common.retry),
-            role: 'button',
-            onPress: () => void changes.refetch({ cancelRefetch: false }),
-          }}
-        />
-      ) : !changes.data ? (
-        <StateMessage kind="loading" message={t(($) => $.common.loading)} />
-      ) : items.length === 0 ? (
-        <Text variant="callout" tone="secondary">
-          {t(($) => $.moderation.catalogue.changesEmpty)}
-        </Text>
-      ) : (
-        <Stack gap="md">
-          <Stack gap="md" accessibilityRole="list">
-            {items.map((change) => (
-              <CatalogueChangeRow key={change.id} change={change} />
-            ))}
-          </Stack>
-          {changes.hasNextPage || changes.isFetchNextPageError ? (
-            <FeedEnd
-              state={listState(changes)}
-              moreLabel={t(($) => $.moderation.more)}
-              errorLabel={t(($) => $.moderation.moreError)}
-              retryLabel={t(($) => $.common.retry)}
-              onMore={() => {
-                if (!changes.isFetchingNextPage) void changes.fetchNextPage()
-              }}
-            />
-          ) : null}
-        </Stack>
-      )}
     </Stack>
   )
 }

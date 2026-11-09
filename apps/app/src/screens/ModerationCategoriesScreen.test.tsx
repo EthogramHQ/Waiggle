@@ -288,6 +288,62 @@ describe('filing a project', () => {
         restoreContains()
       }
     })
+
+    // R6b, u9f : dans le navigateur, la feuille garde le focus pendant son fondu de sortie (le piège
+    // du Modal reste actif) ; le résultat posé par l'écran à la fermeture y était ramené (une vue de
+    // la feuille, sans nom), puis, à la fin du fondu, la feuille trouvait le focus perdu et le
+    // rendait par son nom au premier bouton « Ranger dans une catégorie » de la page : celui de la
+    // carte voisine. Attendu : le résultat de la carte rangée, qui dit « Rangé dans Animaux. ».
+    it('keeps the focus on the result of the filed card at the end of the fade, not on the next card’s button of the same name', async () => {
+      await openCategories()
+      const page = globalThis.document as unknown as Record<string, unknown>
+      const named = (name: string) => name === 'aria-label'
+      // Le bouton touché : il a le focus à l'ouverture, et quitte la page avec le rangement.
+      const touched = { isConnected: true, getAttribute: (n: string) => (named(n) ? FILE : null) }
+      // Le bouton de même nom de la carte voisine, tel que le navigateur le trouve par son nom ; une
+      // vue de même classe que `probe`, pour que `watchFocus` voie son focus.
+      const neighbour = Object.assign(
+        Object.create(Object.getPrototypeOf(probe.current) as object) as object,
+        {
+          props: { accessibilityLabel: FILE },
+          getAttribute: (n: string) => (named(n) ? FILE : null),
+          getClientRects: () => ({ length: 1 }),
+        },
+      )
+      page.querySelectorAll = (selector: string) => (selector.includes('button') ? [neighbour] : [])
+      page.activeElement = touched
+      await fireEvent.press(card(BIRDHOUSE).getByRole('button', { name: FILE }))
+      const filing = sheet(sortTitle(BIRDHOUSE))
+      page.activeElement = null
+      // La fin du fondu de sortie : le Modal de react-native-web appelle `onDismiss`.
+      const fadeEnd = layerOf(screen.getByLabelText(sortTitle(BIRDHOUSE))).props as {
+        onDismiss?: () => void
+      }
+      expect(fadeEnd.onDismiss).toBeInstanceOf(Function)
+      const restoreContains = lendContains(probe)
+      const focus = watchFocus(probe)
+      try {
+        await fireEvent.press(filing.getByLabelText('Animaux'))
+        touched.isConnected = false
+        await fireEvent.press(filing.getByRole('button', { name: FILE_ACTION }))
+        await waitFor(() => expect(screen.queryByLabelText(sortTitle(BIRDHOUSE))).toBeNull())
+        await act(() => fadeEnd.onDismiss?.())
+
+        // Le dernier focus : le résultat de la carte rangée (son message, `role="status"`), qui
+        // dit où le projet est rangé ; jamais le bouton de la carte voisine.
+        const result = card(BIRDHOUSE).getByRole('status')
+        expect(result).toHaveTextContent(filedInto('Animaux'))
+        expect(spokenName(focus.last() as never)).not.toBe(FILE)
+        expect(focus.last()).toMatchObject({ role: 'status' })
+        // La vue focalisée est bien ce résultat : elle porte le même contenu (le même objet), donc
+        // son texte, « Rangé dans Animaux. ».
+        const focusedContent = (focus.last() as { children?: unknown } | null)?.children
+        expect(focusedContent === result.props.children).toBe(true)
+      } finally {
+        focus.restore()
+        restoreContains()
+      }
+    })
   })
 })
 
