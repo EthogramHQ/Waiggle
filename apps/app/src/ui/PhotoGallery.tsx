@@ -326,7 +326,10 @@ export function PhotoGallery({
             image={{
               source: photo.source,
               thumbhash: photo.thumbhash ?? null,
-              label: spokenPhoto(rank),
+              // Le nom de chaque photo, comme la valeur de la galerie. Une photo seule décrite :
+              // la galerie porte déjà sa description, l'image n'a pas de nom à elle (sinon le
+              // navigateur expose aussi « …, photo 1 sur 1 », vu dans `--explore`).
+              label: single ? '' : spokenPhoto(rank),
             }}
           />
         </View>
