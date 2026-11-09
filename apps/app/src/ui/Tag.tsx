@@ -35,9 +35,24 @@ type Props = {
    * dans l'aperçu de la feuille de publication.
    */
   kind?: 'tool' | 'category'
+  /**
+   * R6b : l'outil est-il entré au catalogue ? Par défaut oui. Un « Autre » (`false`), cité par un
+   * membre mais pas encore au catalogue, n'a pas de page : c'est un texte simple, jamais un lien,
+   * même avec `onPress` (qui est alors ignoré). Un lecteur d'écran le lit en entier : « Teachable
+   * Machine, autre outil, pas encore dans le catalogue ».
+   */
+  inCatalogue?: boolean
 }
 
-export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool' }: Props) {
+export function Tag({
+  label,
+  onPress,
+  onGlass = false,
+  count,
+  icon,
+  kind = 'tool',
+  inCatalogue = true,
+}: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
   // Le nom lu : le libellé seul, ou le libellé et son nombre au pluriel de la langue de l'appli.
@@ -101,22 +116,34 @@ export function Tag({ label, onPress, onGlass = false, count, icon, kind = 'tool
     minHeight: layout.touchTarget,
     justifyContent: 'center',
   }
-  if (!onPress) {
-    // Une simple pastille avec un nombre se lit d'un bloc, par son nom complet. Un nom sans rôle
-    // serait ignoré sur le web : « texte » sur téléphone, image sur le web (comme l'Avatar), le
-    // seul rôle qui y fait lire le nom d'un bloc non touchable.
+  if (!onPress || !inCatalogue) {
+    // Une simple pastille avec un nombre, ou un « Autre », se lit d'un bloc, par son nom complet.
+    // Un nom sans rôle serait ignoré sur le web : « texte » sur téléphone, image sur le web (comme
+    // l'Avatar), le seul rôle qui y fait lire le nom d'un bloc non touchable.
+    const readAs = inCatalogue
+      ? count === undefined
+        ? null
+        : spoken
+      : t(($) => $.tool.otherSpoken, { name: label })
     const counted =
-      count === undefined
+      readAs === null
         ? null
         : {
             accessible: true,
-            accessibilityLabel: spoken,
+            accessibilityLabel: readAs,
             ...(Platform.OS === 'web'
               ? { role: 'img' as const }
               : { accessibilityRole: 'text' as const }),
           }
     return (
-      <View style={frame} {...counted}>
+      <View
+        style={frame}
+        {...counted}
+        // Un « Autre » refuse le toucher (comme un vrai texte) : même si l'écran a donné un
+        // `onPress`, rien ne s'ouvre. Les outils de test, qui remontent du nœud touché jusqu'aux
+        // props de `Tag`, s'arrêtent ici.
+        {...(inCatalogue ? null : { onStartShouldSetResponder: () => false })}
+      >
         <View style={box}>{content}</View>
       </View>
     )
