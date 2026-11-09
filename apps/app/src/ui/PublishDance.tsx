@@ -20,7 +20,7 @@
 // logo.generated.ts ; les tailles et les durées, des jetons de @ruche/brand
 // (`layout.publishDance`, `durations`).
 import { durations, layout } from '@ruche/brand'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { type LayoutChangeEvent, StyleSheet, useWindowDimensions, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -33,6 +33,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, G, Path } from 'react-native-svg'
+import type { Measurable } from './coverTransition'
 import { bee, beeAnchor, beeViewBox, trailPoints } from './logo.generated'
 import { useHydrated } from './theme/hydration'
 import { useCalmMotion } from './theme/motion'
@@ -236,6 +237,37 @@ const FLIGHT_DROPS = [
 
 type Target = { x: number; y: number }
 
+/**
+ * Les instants où la vue visée (`aim`) est mesurée pendant la danse : tout de suite, une fois le fil
+ * remonté en haut (un déplacement, `durations.medium`), et à la fin du huit, juste avant le vol.
+ * L'abeille suit la dernière mesure.
+ */
+const MEASURE_AT = [0, durations.medium, DANCE]
+
+/**
+ * Hook : le coin haut gauche de la vue visée, mesuré dans la fenêtre aux instants de `MEASURE_AT`,
+ * tant que la danse joue (`active`) ; `null` sans vue, ou avant la première mesure. Une vue cachée
+ * répond un cadre vide : le point reste celui d'avant.
+ */
+const useAimedPoint = (
+  aim: RefObject<Measurable | null> | undefined,
+  active: boolean,
+): Target | null => {
+  const [point, setPoint] = useState<Target | null>(null)
+  useEffect(() => {
+    if (!aim || !active) return
+    const measure = () =>
+      aim.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) setPoint({ x, y })
+      })
+    const timers = MEASURE_AT.map((at) => setTimeout(measure, at))
+    return () => {
+      for (const timer of timers) clearTimeout(timer)
+    }
+  }, [aim, active])
+  return aim ? point : null
+}
+
 type Props = {
   /** Vrai : la danse joue (une fois) ; faux : rien n'est dessiné, et la danse attend. */
   playing: boolean
@@ -246,6 +278,13 @@ type Props = {
    * sur place, au centre du huit.
    */
   target: Target | null
+  /**
+   * Correction C2 de R6a : la vue à viser (la photo de la nouvelle carte), que la danse mesure
+   * elle-même dans la fenêtre (`measureInWindow`) pendant le huit, aux instants de `MEASURE_AT`.
+   * Elle l'emporte sur `target` dès sa première mesure. Le repère : la danse doit couvrir la fenêtre
+   * depuis son coin haut gauche (`Screen overlay`), sinon le point mesuré tomberait à côté.
+   */
+  aim?: RefObject<Measurable | null>
   /** Appelé une fois par danse, à sa fin ; tout de suite avec « Réduire les animations ». */
   onDone(): void
   /**
@@ -261,11 +300,20 @@ type Props = {
   moment?: number
 }
 
-export function PublishDance({ playing, target, onDone, calm: forcedCalm, moment }: Props) {
+export function PublishDance({
+  playing,
+  target: given,
+  aim,
+  onDone,
+  calm: forcedCalm,
+  moment,
+}: Props) {
   const { colors } = useTheme()
   const systemCalm = useCalmMotion()
   const calm = forcedCalm ?? systemCalm
   const progress = useSharedValue(moment ?? 0)
+  const measured = useAimedPoint(aim, playing && !calm && moment === undefined)
+  const target = measured ?? given
 
   // Le dernier `onDone` reçu, lu à la fin : un écran qui passe une nouvelle fonction à chaque
   // rendu ne relance pas la danse.

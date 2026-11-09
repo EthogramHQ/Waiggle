@@ -142,4 +142,35 @@ describe('PublishDance', () => {
     expect(onDone).not.toHaveBeenCalled()
     expect(kept).toHaveBeenCalledTimes(1) // témoin : la danse restée montée a fini
   })
+
+  // Correction C2 de R6a (relecture de l'interface, ui-C2) : la carte visée, la danse la mesure
+  // elle-même (`aim`), et l'écran n'a plus à lire les durées de la danse pour la mesurer.
+  it('flies to the view it aims at, measured in the window during the dance', async () => {
+    jest.spyOn(motion, 'useCalmMotion').mockReturnValue(false)
+    // La carte, d'abord en bas de l'écran ; le fil remonté, elle passe plus haut.
+    let frame = [40, 700, 300, 200]
+    const measureInWindow = jest.fn(
+      (callback: (x: number, y: number, width: number, height: number) => void) =>
+        callback(frame[0] ?? 0, frame[1] ?? 0, frame[2] ?? 0, frame[3] ?? 0),
+    )
+    const aim = { current: { measureInWindow } }
+    await renderWithProviders(<Stage playing target={null} aim={aim} onDone={jest.fn()} />)
+
+    /** Le point d'arrivée du vol : la fin du chemin `M… Q… x y` de la traînée. */
+    const landing = () => {
+      const stage = screen.getByTestId('stage') as unknown as Host
+      const flight = hostsOf(stage)
+        .map((node) => node.props.d)
+        .find((d): d is string => typeof d === 'string' && d.includes('Q'))
+      return flight?.trim().split(/\s+/).slice(-2).join(' ')
+    }
+    await act(() => jest.advanceTimersByTime(0))
+    expect(landing()).toBe('40.0 700.0')
+
+    frame = [40, 180, 300, 200]
+    await act(() => jest.advanceTimersByTime(LONG_AFTER))
+    // Mesurée de nouveau pendant le huit : l'abeille suit la carte remontée.
+    expect(measureInWindow.mock.calls.length).toBeGreaterThan(1)
+    expect(landing()).toBe('40.0 180.0')
+  })
 })
