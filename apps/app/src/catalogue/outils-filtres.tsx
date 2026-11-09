@@ -31,6 +31,8 @@ const fr = {
   checked: 'Une catégorie cochée',
   counts: 'Avec leur nombre (la feuille des catégories), lu « Cuisine, 3 projets »',
   groups: 'Le statut, puis les catégories, séparés par un trait (page d’un outil, ordinateur)',
+  groupsNarrow:
+    'Les deux groupes à 390 points : les catégories passent entières à la ligne, sans trait en tête',
   scroll:
     'Bande qui défile (scroll, 320 points ici, un téléphone) : la pastille cochée, la dernière, se montre en entier',
   narrow:
@@ -68,6 +70,7 @@ const en: typeof fr = {
   checked: 'A category checked',
   counts: 'With their count (the category sheet), read “Cooking, 3 projects”',
   groups: 'The status, then the categories, split by a line (a tool page, computer)',
+  groupsNarrow: 'Both groups at 390 points: the categories wrap as a whole, with no leading line',
   scroll:
     'Scrolling strip (scroll, 320 points here, a phone): the checked pill, the last one, shows in full',
   narrow:
@@ -208,6 +211,16 @@ export function ToolFiltersCatalogue() {
                   },
                 ]}
               />
+            </Example>
+            <Example caption={`${l.groupsNarrow} — ${l[scheme]}`}>
+              <Frame width={390}>
+                <FilterPills
+                  {...status}
+                  groups={[
+                    { label: categoryLabel, allLabel: all, value: null, options, onChange: noop },
+                  ]}
+                />
+              </Frame>
             </Example>
             <Example caption={`${l.scroll} — ${l[scheme]}`}>
               <Frame width={320}>

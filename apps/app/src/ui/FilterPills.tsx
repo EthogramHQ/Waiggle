@@ -16,7 +16,7 @@
 //   puis les catégories, sur ordinateur). Chacun reste un groupe de radios à part, avec son nom, sa
 //   valeur et son propre arrêt de Tab.
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -84,8 +84,18 @@ type Place = { x: number; width: number }
 
 type KeyEvent = { key: string; preventDefault: () => void }
 
-/** Montre une place de la bande (glissé si `animated`), ce que la bande décide seule. */
-type Reveal = (place: Place | undefined, animated: boolean) => void
+/**
+ * Demande à la bande de montrer une pastille (glissé si `animated`). La place est donnée par une
+ * fonction, relue à chaque mesure : le navigateur peut mesurer une pastille avant son groupe, et
+ * une place calculée trop tôt oublierait le début du groupe (la pastille finirait rognée au bord).
+ */
+type Reveal = (place: () => Place | undefined, animated: boolean) => void
+
+/**
+ * La largeur en dessous de laquelle un groupe posé après un autre passe à la ligne entier, plutôt
+ * que de se serrer à côté du premier (sur ordinateur, les catégories à côté du statut).
+ */
+const GROUP_MIN_WIDTH = 280
 
 /**
  * Un groupe de pastilles. Dans la bande qui défile, il mesure sa place et celle de ses pastilles,
@@ -124,7 +134,7 @@ function PillGroup<T extends string>({
   // rendu, rien n'est encore mesuré : ce sont les mesures (plus bas) qui la montrent, sans glisser.
   // biome-ignore lint/correctness/useExhaustiveDependencies: seule la pastille cochée décide ; `placeOf` ne lit que des refs.
   useEffect(() => {
-    reveal?.(placeOf(tabStop), true)
+    reveal?.(() => placeOf(tabStop), true)
   }, [tabStop])
 
   // Sur le web seulement : la barre d'espace coche (react-native-web ne la fait réagir que sur les
@@ -165,6 +175,7 @@ function PillGroup<T extends string>({
         reveal
           ? (event: LayoutChangeEvent) => {
               groupX.current = event.nativeEvent.layout.x
+              reveal(() => placeOf(tabStop), false)
             }
           : undefined
       }
@@ -197,7 +208,7 @@ function PillGroup<T extends string>({
                 ? (event: LayoutChangeEvent) => {
                     const { x, width } = event.nativeEvent.layout
                     places.current[index] = { x, width }
-                    if (index === tabStop) reveal(placeOf(index), false)
+                    if (index === tabStop) reveal(() => placeOf(index), false)
                   }
                 : undefined
             }
@@ -242,7 +253,10 @@ function PillGroup<T extends string>({
   )
 }
 
-/** Le trait entre deux groupes : décoratif, caché aux lecteurs d'écran. */
+/**
+ * Le trait entre deux groupes, de la hauteur d'une ligne de pastilles : décoratif, caché aux
+ * lecteurs d'écran.
+ */
 function Divider() {
   const { colors } = useTheme()
   return (
@@ -252,11 +266,40 @@ function Divider() {
       aria-hidden
       style={{
         width: borders.hairline,
-        alignSelf: 'stretch',
+        height: layout.touchTarget - 2 * space.sm,
         marginVertical: space.sm,
+        alignSelf: 'flex-start',
+        flexShrink: 0,
         backgroundColor: colors.lineStrong,
       }}
     />
+  )
+}
+
+/**
+ * Un groupe posé après un autre, hors de la bande : le trait puis ses pastilles. Il prend la place
+ * qui reste à côté du groupe d'avant (ses pastilles y passent à la ligne) ; sous
+ * `GROUP_MIN_WIDTH`, il passe entier à la ligne, et son trait part : il serait en tête de ligne.
+ */
+function NextGroup({ group }: { group: FilterPillGroup }) {
+  const [lineStart, setLineStart] = useState(false)
+  return (
+    <View
+      onLayout={(event: LayoutChangeEvent) => setLineStart(event.nativeEvent.layout.x < 1)}
+      style={{
+        flexDirection: 'row',
+        gap: space.lg,
+        flexGrow: 1,
+        flexBasis: 0,
+        minWidth: GROUP_MIN_WIDTH,
+        maxWidth: '100%',
+      }}
+    >
+      {/* En tête de ligne, ni trait ni air : les pastilles s'alignent sur celles du dessus. Le
+          retirer ne fait pas changer de ligne : c'est `minWidth` qui en décide, pas le contenu. */}
+      {lineStart ? null : <Divider />}
+      <PillGroup group={group} reveal={null} />
+    </View>
   )
 }
 
@@ -276,11 +319,16 @@ export function FilterPills<T extends string>({
   const scroller = useRef<ScrollView>(null)
   const viewport = useRef(0)
   const offset = useRef(0)
-  // La dernière place demandée, montrée à nouveau quand la bande se mesure.
-  const wanted = useRef<Place | undefined>(undefined)
+  // La dernière pastille demandée, montrée à nouveau quand la bande se mesure.
+  const wanted = useRef<(() => Place | undefined) | null>(null)
   const reveal: Reveal = (place, animated) => {
-    if (place) wanted.current = place
-    const target = scrollToShow(place, viewport.current, offset.current)
+    wanted.current = place
+    // L'air laissé au bord : celui de l'anneau (la bande déborde de `space.sm`), plus un peu ; la
+    // pastille montrée reste ainsi dans la colonne.
+    // (La pastille est élargie de `space.sm` de chaque côté ; `scrollToShow` ajoute son air.)
+    const shown = place()
+    const padded = shown && { x: shown.x - space.sm, width: shown.width + 2 * space.sm }
+    const target = scrollToShow(padded, viewport.current, offset.current)
     if (target !== null) scroller.current?.scrollTo({ x: target, animated: animated && !calm })
   }
 
@@ -288,12 +336,6 @@ export function FilterPills<T extends string>({
   // pour lui le type précis de ses valeurs).
   const own: FilterPillGroup<T> = { label, allLabel, value, options, onChange }
   const every: FilterPillGroup[] = [own, ...groups]
-  const content = every.flatMap((group, index) => {
-    const pills = (
-      <PillGroup key={`group-${group.label}`} group={group} reveal={scroll ? reveal : null} />
-    )
-    return index === 0 ? [pills] : [<Divider key={`divider-${group.label}`} />, pills]
-  })
 
   if (!scroll) {
     return (
@@ -306,10 +348,22 @@ export function FilterPills<T extends string>({
           maxWidth: '100%',
         }}
       >
-        {content}
+        {every.map((group, index) =>
+          index === 0 ? (
+            <PillGroup key={`group-${group.label}`} group={group} reveal={null} />
+          ) : (
+            <NextGroup key={`group-${group.label}`} group={group} />
+          ),
+        )}
       </View>
     )
   }
+  // Dans la bande, groupes et traits sont côte à côte, enfants directs de la bande : chaque groupe
+  // y mesure sa place sans intermédiaire.
+  const content = every.flatMap((group, index) => {
+    const pills = <PillGroup key={`group-${group.label}`} group={group} reveal={reveal} />
+    return index === 0 ? [pills] : [<Divider key={`divider-${group.label}`} />, pills]
+  })
   return (
     <ScrollView
       ref={scroller}
@@ -317,7 +371,7 @@ export function FilterPills<T extends string>({
       showsHorizontalScrollIndicator={false}
       onLayout={(event: LayoutChangeEvent) => {
         viewport.current = event.nativeEvent.layout.width
-        reveal(wanted.current, false)
+        if (wanted.current) reveal(wanted.current, false)
       }}
       onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
         offset.current = event.nativeEvent.contentOffset.x
