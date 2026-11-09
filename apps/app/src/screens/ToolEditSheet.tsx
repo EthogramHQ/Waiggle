@@ -51,6 +51,11 @@ type Props = {
   onSubmit: (values: ToolAdmit) => Promise<ToolEditResult>
   /** La feuille se ferme : fermée sans changement, abandonnée, ou après une écriture réussie. */
   onClose: () => void
+  /**
+   * Web : où va le focus quand la feuille se ferme, à la place du bouton qui l'a ouverte (voir
+   * `Sheet`). Après « Ajouter au catalogue », ce bouton n'existe plus : le résultat de la carte.
+   */
+  returnFocusTo?: () => unknown
 }
 
 /** Ce qui est tapé : du texte partout (le site vide vaut « pas de site »), la famille ou rien. */
@@ -80,7 +85,7 @@ const sameValues = (a: Values, b: Values) =>
 /** Le problème montré : la clé du message, et les champs en erreur (aucun : au pied seulement). */
 type Problem = { error: ApiErrorKey; fields: ToolEditField[] }
 
-export function ToolEditSheet({ open, mode, initial, onSubmit, onClose }: Props) {
+export function ToolEditSheet({ open, mode, initial, onSubmit, onClose, returnFocusTo }: Props) {
   const { t } = useTranslation()
   const [values, setValues] = useState(() => valuesOf(initial))
   const [start, setStart] = useState(() => valuesOf(initial))
@@ -163,6 +168,7 @@ export function ToolEditSheet({ open, mode, initial, onSubmit, onClose }: Props)
         open={open}
         title={title}
         onClose={onClose}
+        {...(returnFocusTo ? { returnFocusTo } : null)}
         closeGuard={dirty ? requestClose : undefined}
         busy={saving}
         initialFocusRef={nameRef}

@@ -439,6 +439,53 @@ describe('deciding on an other tool', () => {
         restoreContains()
       }
     })
+
+    // R6b, u8f : dans le navigateur, la feuille garde le focus pendant son fondu de sortie (le piège
+    // du Modal reste actif) ; le résultat posé par l'écran à la fermeture y était ramené, puis, à la
+    // fin du fondu, la feuille trouvait le focus perdu et le rendait par son nom au premier bouton
+    // « Ajouter au catalogue » de la page : celui de la carte voisine.
+    it('keeps the focus on the result of the decided card at the end of the fade, not on the next card’s button of the same name', async () => {
+      await openTools()
+      const page = globalThis.document as unknown as Record<string, unknown>
+      const named = (name: string) => name === 'aria-label'
+      // Le bouton touché : il a le focus à l'ouverture, et quitte la page avec la décision.
+      const touched = { isConnected: true, getAttribute: (n: string) => (named(n) ? ADMIT : null) }
+      // Le bouton de même nom de la carte voisine, tel que le navigateur le trouve par son nom ; une
+      // vue de même classe que `probe`, pour que `watchFocus` voie son focus.
+      const neighbour = Object.assign(
+        Object.create(Object.getPrototypeOf(probe.current) as object) as object,
+        {
+          props: { accessibilityLabel: ADMIT },
+          getAttribute: (n: string) => (named(n) ? ADMIT : null),
+          getClientRects: () => ({ length: 1 }),
+        },
+      )
+      page.querySelectorAll = (selector: string) => (selector.includes('button') ? [neighbour] : [])
+      page.activeElement = touched
+      await fireEvent.press(card('Teachable Machine').getByRole('button', { name: ADMIT }))
+      await screen.findByLabelText(NAME)
+      page.activeElement = null
+      // La fin du fondu de sortie : le Modal de react-native-web appelle `onDismiss`.
+      const fadeEnd = layerOf(screen.getByLabelText(NAME)).props as { onDismiss?: () => void }
+      expect(fadeEnd.onDismiss).toBeInstanceOf(Function)
+      const restoreContains = lendContains(probe)
+      const focus = watchFocus(probe)
+      try {
+        await fillAdmit()
+        touched.isConnected = false
+        await fireEvent.press(screen.getByRole('button', { name: SAVE }))
+        await waitFor(() => expect(formOpen()).toBe(false))
+        await act(() => fadeEnd.onDismiss?.())
+
+        expect(card('Teachable Machine').getByText(ADMITTED)).toBeTruthy()
+        // Le dernier focus : le résultat de la carte décidée (son message, `role="status"`).
+        expect(focus.last()).toMatchObject({ role: 'status' })
+        expect(spokenName(focus.last() as never)).not.toBe(ADMIT)
+      } finally {
+        focus.restore()
+        restoreContains()
+      }
+    })
   })
 })
 
