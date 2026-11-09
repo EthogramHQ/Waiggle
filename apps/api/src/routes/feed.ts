@@ -139,6 +139,7 @@ export const feedRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
       viewer.id,
       cursor,
       query.testers === 'true',
+      query.category,
       publicApiUrl,
     )
     return c.json(DiscoverFeedPage.parse(page), 200)
