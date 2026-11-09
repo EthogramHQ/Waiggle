@@ -63,6 +63,7 @@ import { DecisionCard } from '../ui/DecisionCard'
 import { Dialog } from '../ui/Dialog'
 import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
 import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Notice } from '../ui/Notice'
 import { ReportCard, type ReportCardAction } from '../ui/ReportCard'
 import { Screen } from '../ui/Screen'
@@ -611,6 +612,36 @@ function AdminModeration() {
         onChange={changeTab}
         handle={tabsRef}
       />
+
+      {/* R6b : les pages du catalogue, sous les onglets (relecture du plan, point 15). Chaque
+          ligne est un vrai lien (`href`, un `<a>` sur le web), et dit ce qu'on trouve derrière :
+          la précision se voit sous le nom, et se lit après lui (`hint`). */}
+      <ListGroup>
+        <ListRow
+          label={t(($) => $.moderation.toolsLink)}
+          icon="wrench"
+          detail={t(($) => $.moderation.toolsLinkHint)}
+          hint={t(($) => $.moderation.toolsLinkHint)}
+          trailing="chevron"
+          href="/moderation/tools"
+          onPress={(event) => {
+            event?.preventDefault?.()
+            router.push('/moderation/tools')
+          }}
+        />
+        <ListRow
+          label={t(($) => $.moderation.categoriesLink)}
+          icon="shapes"
+          detail={t(($) => $.moderation.categoriesLinkHint)}
+          hint={t(($) => $.moderation.categoriesLinkHint)}
+          trailing="chevron"
+          href="/moderation/categories"
+          onPress={(event) => {
+            event?.preventDefault?.()
+            router.push('/moderation/categories')
+          }}
+        />
+      </ListGroup>
 
       {/* Le filtre de l'historique, sous les onglets : qui il vise, et comment l'enlever. */}
       {tab === 'history' && memberFilter && history.data ? (

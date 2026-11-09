@@ -33,9 +33,22 @@ type Props = {
    * du choix (le bouton qui l'a ouverte n'existe plus).
    */
   resultRef?: Ref<View | null> | undefined
+  /**
+   * Facultatif : le bouton « Ranger dans une catégorie », pour que l'écran lui rende le focus quand
+   * la feuille se ferme sans décision (sur le web, un bouton touché du doigt n'a pas forcément eu
+   * le focus : la feuille ne le connaît pas toujours).
+   */
+  fileRef?: Ref<View> | undefined
 }
 
-export function UncategorizedCard({ project, filedInto, onFile, onOpenProject, resultRef }: Props) {
+export function UncategorizedCard({
+  project,
+  filedInto,
+  onFile,
+  onOpenProject,
+  resultRef,
+  fileRef,
+}: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
   // Une garde par contrôle (charte, R5b) : la seconde tape n'ouvre ni deux pages ni deux feuilles.
@@ -79,6 +92,7 @@ export function UncategorizedCard({ project, filedInto, onFile, onOpenProject, r
           // Rangé à gauche : le bouton garde sa largeur, au lieu de s'étirer sur toute la carte.
           <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
             <Button
+              ref={fileRef}
               label={t(($) => $.moderation.categories.sort)}
               onPress={fileGuard(onFile)}
               variant="secondary"
