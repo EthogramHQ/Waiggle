@@ -9,7 +9,9 @@
 // - les inscriptions jamais vérifiées au bout de 30 jours (décision de Louis du 20/10/2026), sauf
 //   un compte qui a déjà reçu un pseudo (un ancien membre : voir plus bas) ;
 // - les signalements et les décisions de modération arrivés au terme de leur durée de garde
-//   (tranche 7a, reports/retention.ts).
+//   (tranche 7a, reports/retention.ts) ;
+// - les « Autre » (noms d'outils tapés par des membres) que plus rien ne cite, et les lignes du
+//   journal du catalogue de plus d'un an (tranche R6b).
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
@@ -25,6 +27,7 @@ import { utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
+import { dropOrphanOthers } from '../tools/write'
 
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
@@ -91,6 +94,17 @@ export const nightlyPurge = async (db: Database, now: Date) => {
   await closeSuspensionsOfDeparted(db, now)
   // Les signalements et les décisions de modération (tranche 7a) : reports/retention.ts.
   const moderation = await purgeModeration(db, now)
+  // R6b (sec-A5, jur-T6) : les « Autre » que plus aucun projet ni profil ne cite. L'API les efface
+  // déjà dans la transaction qui retire leur dernière référence ; ceci est le filet (une panne entre
+  // deux écritures, une suppression de compte, une ligne effacée à la main). Un outil du catalogue
+  // ne s'efface jamais ici.
+  const otherTools = await dropOrphanOthers(db)
+  // Le journal « Changements récents » ne se garde pas plus d'un an. Lecture par l'index
+  // `catalogue_change_created_idx` (date décroissante : la plage « avant telle date » en est la fin).
+  const catalogueChanges = await db
+    .delete(schema.catalogueChange)
+    .where(sql`${schema.catalogueChange.createdAt} < ${utc(new Date(now.getTime() - 365 * DAY))}`)
+    .returning({ id: schema.catalogueChange.id })
 
   const purged = {
     sessions: sessions.length,
@@ -99,6 +113,8 @@ export const nightlyPurge = async (db: Database, now: Date) => {
     apiRateLimits: apiRateLimits.length,
     handles,
     unverifiedAccounts: unverifiedAccounts.length,
+    otherTools,
+    catalogueChanges: catalogueChanges.length,
     ...moderation,
   }
   console.log('Nightly purge', purged)

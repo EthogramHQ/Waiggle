@@ -31,6 +31,7 @@ import { mediaKeysOf } from '../projects/load'
 import { createRateLimiter, deleteAddressCounters, deleteMemberCounters } from '../rate-limit'
 import { voidReportsOfDepartedAuthors } from '../reports/queue'
 import { closeSuspensionsOfDeparted } from '../suspension/load'
+import { dropOrphanOthers } from '../tools/write'
 import { createEmailChange } from './change-email'
 import { createPasswordFlows, forgetResetLinks, RESET_LINK_LIFETIME_SECONDS } from './password'
 import { authSchemaOptions } from './schema-options'
@@ -306,6 +307,17 @@ export const createAuth = ({
           await forgetResetLinks(db, user.id)
           await deleteAddressCounters(db, secret, user.email)
           await sweepOrphanComments(db)
+          // R6b (sec-A5) : les « Autre » que ses projets et son profil étaient seuls à citer. Les
+          // lignes de project_tool et profile_tool sont parties avec le compte (cascade) ; la purge
+          // de nuit rattrape une panne ici.
+          try {
+            await dropOrphanOthers(db)
+          } catch (error) {
+            console.error(
+              'Other tools not swept after deletion',
+              describeError(error, { method: 'POST', path: '/api/auth/delete-user' }),
+            )
+          }
           // Les signalements qui visaient ses contenus ou son profil (tranche 7a, règle 16) : la
           // base a déjà remis leur target_author_id à null ; les ouverts et les classés passent à
           // « sans objet » (effacés 30 jours plus tard), ceux suivis d'un retrait restent un an. Ici,

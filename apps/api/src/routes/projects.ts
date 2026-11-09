@@ -8,8 +8,12 @@ import type { Context } from 'hono'
 import { requireUser } from '../auth/session'
 import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
-import { loadVisibleProject, mediaKeysOf, projectAccess, withSlugs } from '../projects/load'
+import { categoriesExist } from '../projects/categories'
+import { loadVisibleProject, mediaKeysOf, projectAccess } from '../projects/load'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
+import { chargeOtherTools } from '../tools/quota'
+import { countNewOtherTools, resolveTools } from '../tools/resolve'
+import { dropOrphanOthers, legacyToolColumns, replaceProjectTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -32,9 +36,11 @@ const createProjectRoute = createRoute({
   request: { body: { required: true, content: { 'application/json': { schema: ProjectInput } } } },
   responses: {
     201: projectResponse('The new project.'),
-    400: errorResponse('Invalid data.'),
+    400: errorResponse('Invalid data, or a category that does not exist (`unknown_category`).'),
     401: errorResponse('Not signed in.'),
-    429: errorResponse('Too many projects today.'),
+    429: errorResponse(
+      'Too many projects today, or too many new tools today (`too_many_other_tools`).',
+    ),
   },
 })
 
@@ -69,7 +75,7 @@ const updateProjectRoute = createRoute({
     403: errorResponse('Someone else’s project.'),
     404: errorResponse('No such project.'),
     409: errorResponse('My project, removed by the moderation (`removed`).'),
-    429: errorResponse('Too many changes.'),
+    429: errorResponse('Too many changes, or too many new tools today (`too_many_other_tools`).'),
   },
 })
 
@@ -105,6 +111,14 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     c.header('Retry-After', String(retryAfterSeconds))
     return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
   }
+
+  // 429 « too_many_other_tools » (R6b, sec-A5) : 30 nouveaux « Autre » par membre et par jour.
+  const tooManyOtherTools = (c: Context<AppEnv>, retryAfterSeconds: number) => {
+    c.header('Retry-After', String(retryAfterSeconds))
+    return c.json(errorBody(languageOf(c), 'too_many_other_tools'), 429)
+  }
+  const unknownCategory = (c: Context<AppEnv>) =>
+    c.json(errorBody(languageOf(c), 'unknown_category'), 400)
 
   // 409 « removed » (tranche 7a, règle 4 de la relecture du plan) : son projet retiré par la
   // modération ne se modifie plus tant qu'il n'est pas rétabli ; il peut encore le supprimer. Seul
@@ -144,27 +158,46 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // envoyée par l'appli. Les valeurs absentes prennent leur valeur par défaut.
     const id = crypto.randomUUID()
     const visibility = input.visibility ?? 'public'
-    await db.insert(schema.project).values({
-      id,
-      authorId: user.id,
-      title: input.title,
-      pitch: input.pitch,
-      description: input.description ?? '',
-      status: input.status ?? 'idea',
-      visibility,
-      demoUrl: input.demoUrl ?? null,
-      ...withSlugs(input.tools ?? []),
-      // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
-      // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
-      primaryCategory: input.primaryCategory,
-      secondaryCategory: input.secondaryCategory ?? null,
-      difficulty: input.difficulty ?? null,
-      startedOn: input.startedOn ?? null,
-      prompts: input.prompts ?? [],
-      // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
-      // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
-      publishedAt: visibility === 'public' ? new Date() : null,
+    const toolNames = input.tools ?? []
+    // Le contrat accepte tout code de catégorie bien formé : la table `category` dit s'il existe.
+    if (!(await categoriesExist(db, [input.primaryCategory, input.secondaryCategory]))) {
+      return unknownCategory(c)
+    }
+    // Les nouveaux « Autre » se comptent AVANT d'écrire : trop nombreux, rien n'est gardé.
+    const counted = await countNewOtherTools(db, toolNames)
+    const retryAfter = await chargeOtherTools(limiter, user.id, counted)
+    if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
+    // Une transaction : le projet, ses outils et les « Autre » créés pour lui s'écrivent ensemble,
+    // ou pas du tout.
+    const created = await db.transaction(async (tx) => {
+      const resolved = await resolveTools(tx, toolNames)
+      await tx.insert(schema.project).values({
+        id,
+        authorId: user.id,
+        title: input.title,
+        pitch: input.pitch,
+        description: input.description ?? '',
+        status: input.status ?? 'idea',
+        visibility,
+        demoUrl: input.demoUrl ?? null,
+        // Les anciennes colonnes de texte restent écrites jusqu'en R7 (retour possible à R6a).
+        ...legacyToolColumns(resolved.tools),
+        // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
+        // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
+        primaryCategory: input.primaryCategory,
+        secondaryCategory: input.secondaryCategory ?? null,
+        difficulty: input.difficulty ?? null,
+        startedOn: input.startedOn ?? null,
+        prompts: input.prompts ?? [],
+        // La date de publication (sa date dans les fils), prise à l'horloge de JavaScript : publié
+        // tout de suite, c'est maintenant ; brouillon privé, elle attendra qu'il devienne public.
+        publishedAt: visibility === 'public' ? new Date() : null,
+      })
+      await replaceProjectTools(tx, id, resolved.tools)
+      return resolved.created
     })
+    // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
+    if (created > counted) await chargeOtherTools(limiter, user.id, created - counted)
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) throw new Error('project not found right after its creation')
@@ -194,6 +227,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
 
     // On n'écrit que les champs envoyés (même astuce que pour le profil).
     const changes = c.req.valid('json')
+    // Les nouveaux « Autre » se comptent AVANT d'écrire (sec-A5) : trop nombreux, rien n'est gardé.
+    const counted = changes.tools === undefined ? 0 : await countNewOtherTools(db, changes.tools)
+    const retryAfter = await chargeOtherTools(limiter, user.id, counted)
+    if (retryAfter !== null) return tooManyOtherTools(c, retryAfter)
     const set = {
       ...(changes.title !== undefined && { title: changes.title }),
       ...(changes.pitch !== undefined && { pitch: changes.pitch }),
@@ -208,7 +245,6 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         publishedAt: sql`coalesce(${schema.project.publishedAt}, ${sql.param(new Date(), schema.project.publishedAt)}::timestamp)`,
       }),
       ...(changes.demoUrl !== undefined && { demoUrl: changes.demoUrl }),
-      ...(changes.tools !== undefined && withSlugs(changes.tools)),
       ...(changes.prompts !== undefined && { prompts: changes.prompts }),
       // R6a : la principale ne se remet jamais à nul (le contrat l'interdit) ; les trois autres, si.
       ...(changes.primaryCategory !== undefined && { primaryCategory: changes.primaryCategory }),
@@ -220,6 +256,8 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     }
     // Tout dans une transaction : si le nouvel ordre des photos est refusé, rien n'est enregistré,
     // pas même le titre envoyé avec lui.
+    // Combien de nouveaux « Autre » la transaction a vraiment créés (rempli dans la transaction).
+    let createdHere = 0
     const outcome = await db.transaction(async (tx) => {
       // Le verrou sur le projet (FOR UPDATE) fait patienter un envoi de photo simultané : l'ordre
       // est vérifié sur la galerie telle qu'elle est vraiment, pas telle qu'elle était un instant avant.
@@ -244,6 +282,10 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       // contient ; ici on compare avec l'enregistré (sec-M2). Seule une modification qui touche une
       // catégorie est contrôlée : passer en « Privé » un ancien projet sans catégorie reste permis.
       if (changes.primaryCategory !== undefined || changes.secondaryCategory !== undefined) {
+        // Un code bien formé mais inconnu : 400 `unknown_category` (la clé étrangère le refuserait aussi).
+        if (!(await categoriesExist(tx, [changes.primaryCategory, changes.secondaryCategory]))) {
+          return 'unknown_category' as const
+        }
         const primary = changes.primaryCategory ?? locked.primaryCategory
         const second =
           changes.secondaryCategory !== undefined
@@ -274,18 +316,30 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             .where(and(eq(schema.projectMedia.id, visualId), eq(schema.projectMedia.projectId, id)))
         }
       }
-      if (Object.keys(set).length > 0) {
+      // Les outils : reliés au catalogue, écrits dans project_tool, anciennes colonnes comprises.
+      let toolColumns: ReturnType<typeof legacyToolColumns> | undefined
+      if (changes.tools !== undefined) {
+        const resolved = await resolveTools(tx, changes.tools)
+        createdHere = resolved.created
+        toolColumns = legacyToolColumns(resolved.tools)
+        await replaceProjectTools(tx, id, resolved.tools)
+      }
+      const fullSet = { ...set, ...toolColumns }
+      if (Object.keys(fullSet).length > 0) {
         // Double précaution : la condition « dont l'auteur est le membre » est répétée dans la
         // requête, même si ownProject l'a déjà vérifiée (au cas où le code changerait un jour).
         await tx
           .update(schema.project)
-          .set(set)
+          .set(fullSet)
           .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
       }
       return 'ok' as const
     })
+    // Une création de plus que celles comptées (un nom effacé entre-temps) : comptée après coup.
+    if (createdHere > counted) await chargeOtherTools(limiter, user.id, createdHere - counted)
     if (outcome === 'gone') return notFound(c)
     if (outcome === 'removed') return removed(c)
+    if (outcome === 'unknown_category') return unknownCategory(c)
     if (outcome === 'category_required') {
       return c.json(errorBody(languageOf(c), 'category_required'), 400)
     }
@@ -319,9 +373,19 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
         .for('update')
       const found = await mediaKeysOf(tx, [id])
+      // Les outils du projet, notés avant que leurs lignes ne disparaissent avec lui : un « Autre »
+      // qu'il était seul à citer s'efface dans cette transaction (décision 5, sec-A5).
+      const toolIds = await tx
+        .select({ id: schema.projectTool.toolId })
+        .from(schema.projectTool)
+        .where(eq(schema.projectTool.projectId, id))
       await tx
         .delete(schema.project)
         .where(and(eq(schema.project.id, id), eq(schema.project.authorId, user.id)))
+      await dropOrphanOthers(
+        tx,
+        toolIds.map((row) => row.id),
+      )
       return found
     })
     for (const key of keys) await storage.delete(key)
