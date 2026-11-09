@@ -1105,7 +1105,7 @@ try {
 
   step('La page de Léa : Sam n’y voit plus le projet, Léa le voit, marqué « Privé »')
   await open(sam.page, `${appUrl}/members/${me.id}`)
-  await sam.page.getByText('Pas encore de projet public.').waitFor()
+  await sam.page.getByText('Pas encore de projet visible des membres.').waitFor()
   console.log('  ok : la page de Léa ne montre aucun projet à Sam')
   await open(lea.page, `${appUrl}/members/${me.id}`)
   await byRole(lea.page, 'link', 'Mon agent de recettes').waitFor()

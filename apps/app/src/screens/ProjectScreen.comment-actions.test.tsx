@@ -490,7 +490,7 @@ describe('the comments, after the reviews', () => {
 
     await fireEvent.press(sheet().getByRole('button', { name: 'Répondre' }))
 
-    expect(sheet().getByText(/personne d’autre que toi ne lira cette réponse/)).toBeTruthy()
+    expect(sheet().getByText(/aucun autre membre ne lira cette réponse/)).toBeTruthy()
   })
 
   it('offers no retry when the comments could not load because the session expired', async () => {

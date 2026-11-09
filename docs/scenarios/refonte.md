@@ -1489,8 +1489,8 @@ Hors de R6a, et où ça va :
 2. **Une troisième catégorie** remplace la seconde, plutôt qu'un refus.
 3. **La clé d'API** prévient sans bloquer la publication ; l'API ne la refuse pas.
 4. **L'aperçu de la carte** : sur ordinateur seulement.
-5. **Un projet privé** ne danse pas : la feuille se ferme sur sa page, « Brouillon enregistré. Toi
-   seul le vois. »
+5. **Un projet privé** ne danse pas : la feuille se ferme sur sa page, « Brouillon enregistré. Aucun
+   autre membre ne le voit. »
 6. **Les photos en modification** s'enregistrent tout de suite, comme aujourd'hui ; « Enregistrer »
    vaut pour le reste.
 7. **Après une suppression** : « Mes projets », avec « Projet supprimé. »

@@ -2,7 +2,7 @@
 // « Supprimer « … » ? » (projects/DeleteProjectDialog.tsx) dans ses états :
 // - normale, avec la vignette de la première photo et son badge de corbeille ;
 // - un projet retiré par la modération (sans photo : la lumière miel), dont le message dit que la
-//   décision et la copie du signalement restent gardées un an ;
+//   décision et la copie du signalement restent gardées jusqu’à un an après la décision ;
 // - pendant l'envoi : « Supprimer » tourne trois secondes, « Annuler » attend, ni Échap ni le voile
 //   ne la ferment, puis l'échec s'affiche ;
 // - l'échec tout de suite, lu en alerte dans la fenêtre restée ouverte.

@@ -80,7 +80,7 @@ const fr = {
   error: 'Mot de passe incorrect.',
   expired: 'Ta session a expiré. Reconnecte-toi pour continuer.',
   signIn: 'Me reconnecter',
-  info: 'Ce projet est privé : personne d’autre que toi ne le voit.',
+  info: 'Ce projet est privé : aucun autre membre ne le voit.',
   success: 'Note publiée.',
 }
 

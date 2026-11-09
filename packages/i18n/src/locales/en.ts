@@ -371,8 +371,11 @@ export const en: Translation = {
       addPhotos: 'Add',
       addPhotosLabel: 'Add photos',
       photosRules: 'JPEG, PNG or WebP, 5 MB at most.',
-      photosOrder: 'The first one is the cover: drag a photo to change the order.',
+      photosConsent:
+        'Only post a photo of someone with their consent, and only images you have the right to share.',
+      photosOrder: 'The first one is the cover: drag a photo, or use “Move”, to change the order.',
       photosSaved: 'Photos are saved right away.',
+      photoGone: 'This photo has already been removed.',
       dropZone: 'Drop your images here, or',
       dropZoneChoose: 'choose them',
       cover: 'Cover',
@@ -641,12 +644,12 @@ export const en: Translation = {
       addShort: 'Comment',
       hint: 'Every signed-in member will read your comment. The project’s author can hide it.',
       hintShort: 'Every signed-in member will read your comment.',
-      hintPrivateShort: 'This project is private: nobody but you will read this comment.',
+      hintPrivateShort: 'This project is private: no other member will read this comment.',
       replyHintShort: 'Every signed-in member will read your reply.',
-      replyHintPrivateShort: 'This project is private: nobody but you will read this reply.',
+      replyHintPrivateShort: 'This project is private: no other member will read this reply.',
       editHintShort: 'Every signed-in member will read the new version.',
       hintPrivate:
-        'This project is private: nobody but you will read this comment. If it becomes visible to members, every member will read it.',
+        'This project is private: no other member will read this comment. If it becomes visible to members, every member will read it.',
       about: '{{name}}: {{text}}',
       published: 'Comment posted.',
       error: 'The comment could not be posted. Try again.',
@@ -655,7 +658,7 @@ export const en: Translation = {
       replyHint:
         'Your reply will show at the end of this thread. Every signed-in member will read it; the project’s author can hide it.',
       replyHintPrivate:
-        'This project is private: nobody but you will read this reply. If it becomes visible to members, every member will read it.',
+        'This project is private: no other member will read this reply. If it becomes visible to members, every member will read it.',
       replyError: 'The reply could not be posted. Try again.',
       replyGone: 'This thread no longer takes replies.',
       replyPublished: 'Reply posted.',
@@ -719,7 +722,7 @@ export const en: Translation = {
       deleteConfirm:
         'The project, its description, its photos, its prompts and its notes disappear right away, along with the comments and reactions of other members. There is no going back.',
       deleteConfirmRemoved:
-        'The project, its description, its photos, its prompts and its notes disappear right away, along with the comments and reactions of other members. The moderation decision and the copy of the report are kept for a year. There is no going back.',
+        'The project, its description, its photos, its prompts and its notes disappear right away, along with the comments and reactions of other members. The moderation decision and the copy of the report are kept for up to a year after the decision. There is no going back.',
       deleteConfirmButton: 'Delete',
       notFoundTitle: 'This project cannot be found',
       notFound: 'It may have been deleted, it may not be visible to you, or the link is wrong.',
@@ -1014,7 +1017,7 @@ export const en: Translation = {
     projectCount_one: '{{count}} project',
     projectCount_other: '{{count}} projects',
     projectCountMore: '{{max}} or more projects',
-    empty: 'No public project yet.',
+    empty: 'No project visible to members yet.',
     emptyMine: 'You have not published anything yet.',
     private: 'Private',
     notFoundTitle: 'This member cannot be found',

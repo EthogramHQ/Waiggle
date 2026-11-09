@@ -292,7 +292,7 @@ describe('a project removed by the moderation, seen by its author', () => {
     expect(screen.queryByRole('menuitem', { name: 'Copier le lien' })).toBeNull()
     await fireEvent.press(screen.getByRole('menuitem', { name: 'Supprimer' }))
 
-    // La fenêtre dit que la décision et la copie du signalement restent gardées un an.
+    // La fenêtre dit que la décision et la copie du signalement restent gardées jusqu’à un an après la décision.
     expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
     expect(screen.getByText(fr.t(($) => $.project.page.deleteConfirmRemoved))).toBeTruthy()
     expect(screen.queryByText(fr.t(($) => $.project.page.deleteConfirm))).toBeNull()

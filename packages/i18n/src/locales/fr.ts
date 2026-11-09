@@ -443,9 +443,15 @@ export const fr = {
       addPhotos: 'Ajouter',
       addPhotosLabel: 'Ajouter des photos',
       photosRules: 'JPEG, PNG ou WebP, 5 Mo au plus.',
-      photosOrder: 'La première sert de couverture : fais glisser une photo pour changer l’ordre.',
+      // juridique (jur-S1, R6a) : le droit à l'image et les droits sur la photo.
+      photosConsent:
+        'Ne publie la photo d’une personne qu’avec son accord, et seulement des images que tu as le droit de partager.',
+      photosOrder:
+        'La première sert de couverture : fais glisser une photo, ou utilise « Déplacer », pour changer l’ordre.',
       // juridique (jur-J4) : en modification seulement.
       photosSaved: 'Les photos s’enregistrent tout de suite.',
+      // Un 404 en retirant une photo (design, R6a) : elle a déjà été retirée ailleurs.
+      photoGone: 'Cette photo a déjà été retirée.',
       dropZone: 'Glisse tes images ici, ou',
       dropZoneChoose: 'choisis-les',
       cover: 'Couverture',
@@ -750,13 +756,12 @@ export const fr = {
       hint: 'Tous les membres connectés liront ton commentaire. La personne qui a publié le projet peut le masquer.',
       // Les légendes réduites d'une fenêtre basse (R5b) : seulement qui lira.
       hintShort: 'Tous les membres connectés liront ton commentaire.',
-      hintPrivateShort: 'Ce projet est privé : personne d’autre que toi ne lira ce commentaire.',
+      hintPrivateShort: 'Ce projet est privé : aucun autre membre ne lira ce commentaire.',
       replyHintShort: 'Tous les membres connectés liront ta réponse.',
-      replyHintPrivateShort:
-        'Ce projet est privé : personne d’autre que toi ne lira cette réponse.',
+      replyHintPrivateShort: 'Ce projet est privé : aucun autre membre ne lira cette réponse.',
       editHintShort: 'Tous les membres connectés liront la nouvelle version.',
       hintPrivate:
-        'Ce projet est privé : personne d’autre que toi ne lira ce commentaire. S’il devient visible des membres, tous les membres le liront.',
+        'Ce projet est privé : aucun autre membre ne lira ce commentaire. S’il devient visible des membres, tous les membres le liront.',
       about: '{{name}} : {{text}}',
       published: 'Commentaire publié.',
       error: 'Le commentaire n’a pas pu être publié. Réessaie.',
@@ -765,7 +770,7 @@ export const fr = {
       replyHint:
         'Ta réponse s’affichera au bout de ce fil. Tous les membres connectés la liront ; la personne qui a publié le projet peut la masquer.',
       replyHintPrivate:
-        'Ce projet est privé : personne d’autre que toi ne lira cette réponse. S’il devient visible des membres, tous les membres la liront.',
+        'Ce projet est privé : aucun autre membre ne lira cette réponse. S’il devient visible des membres, tous les membres la liront.',
       replyError: 'La réponse n’a pas pu être publiée. Réessaie.',
       replyGone: 'Ce fil n’accepte plus de réponse.',
       replyPublished: 'Réponse publiée.',
@@ -841,7 +846,7 @@ export const fr = {
         'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
       // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
       deleteConfirmRemoved:
-        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées un an. Impossible de revenir en arrière.',
+        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
@@ -1197,7 +1202,7 @@ export const fr = {
     projectCount_other: '{{count}} projets',
     /** Au plafond de la liste (PROJECT_LIST_MAX) : « 50 projets ou plus ». */
     projectCountMore: '{{max}} projets ou plus',
-    empty: 'Pas encore de projet public.',
+    empty: 'Pas encore de projet visible des membres.',
     emptyMine: 'Tu n’as encore rien publié.',
     private: 'Privé',
     notFoundTitle: 'Ce membre est introuvable',
