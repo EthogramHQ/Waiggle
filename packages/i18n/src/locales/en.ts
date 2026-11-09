@@ -21,6 +21,10 @@ export const en: Translation = {
     hidePassword: 'Hide password',
     crashedTitle: 'Something went wrong',
     loadingApp: '{{appName}} is starting…',
+    discardTitle: 'Discard the changes?',
+    discardBody: 'What you wrote in this sheet will be lost.',
+    keepEditing: 'Keep editing',
+    discard: 'Discard',
   },
   brand: {
     logoAlt: '{{appName}} logo',

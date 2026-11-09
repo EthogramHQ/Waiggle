@@ -31,6 +31,11 @@ export const fr = {
     crashedTitle: 'Un problème est survenu',
     /** Le nom du logo animé pendant le lancement de l'appli (lu par les lecteurs d'écran). */
     loadingApp: '{{appName}} se lance…',
+    /** La fenêtre qui protège une feuille d'administration modifiée (R6b, ui-C1). */
+    discardTitle: 'Abandonner les changements ?',
+    discardBody: 'Ce que tu as écrit dans cette feuille sera perdu.',
+    keepEditing: 'Continuer',
+    discard: 'Abandonner',
   },
   /** Les signes de la marque, tels que les lecteurs d'écran les lisent. */
   brand: {

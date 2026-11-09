@@ -1520,7 +1520,7 @@ seule sont listés à la fin, pour son bilan).
 
 R6b remplace les étiquettes libres des outils par un **catalogue normé** (planches `R3-Outils`,
 `R6-Publier-Outils`, `R6-Outil`, `R6-Outil-Desktop`, `R6-Email-Autre` ; décisions F-Nav5, F-Et1 à
-F-Et3 et « Les catégories »), avec un choix « Autre » vérifié chaque semaine par les
+F-Et3 et « Les catégories »), avec un choix « Autre » relu par les
 administrateurs ; elle redessine la page d'un outil, fait des catégories un filtre dans Explorer et
 dans la recherche, donne aux administrateurs de quoi ranger les « Autre » et créer une catégorie,
 efface la colonne du temps passé, et reprend les restes de R5b.
