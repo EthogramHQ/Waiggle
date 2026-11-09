@@ -1231,7 +1231,9 @@ describe('choosing the tools of a project in the catalogue (R6b)', () => {
 
     expect(plain.tools).toEqual([{ label: 'Zorblax', slug: 'zorblax', inCatalogue: false }])
     expect(fancy.tools).toEqual([
-      { label: `Zorblax ${sparkle}`, slug: 'zorblax-2', inCatalogue: false },
+      // sec-B2 : la réponse donne le slug du nom tapé, jamais le suffixe partagé, qui dirait
+      // qu'un autre membre a déjà tapé « Zorblax » ; la base garde bien les deux adresses.
+      { label: `Zorblax ${sparkle}`, slug: 'zorblax', inCatalogue: false },
     ])
     expect((await otherTools()).map((tool) => tool.slug).sort()).toEqual(['zorblax', 'zorblax-2'])
   })
