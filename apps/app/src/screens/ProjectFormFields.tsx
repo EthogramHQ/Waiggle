@@ -9,9 +9,12 @@
 // le formulaire, ses erreurs, les photos (`usePhotoTiles`) et l'envoi, et passe ici de quoi les
 // montrer et les changer. Sur ordinateur, l'écran peut poser « Qui peut le voir ? » dans la colonne
 // de l'aperçu et la phrase au pied de la feuille (`withAudience={false}`, puis `ProjectAudienceChoice` et
-// `audienceSentence`).
+// `audienceSentence`). La section des photos vit dans `ProjectPhotoFields.tsx` (relectures, ui-C6).
+//
+// Corrections après les relectures de R6a : « Lien valide » suit le schéma du contrat (`DemoUrl`,
+// longueur comprise : sec-A2) ; les outils d'une ligne se lient selon la langue (`Intl.ListFormat`).
 import {
-  PHOTO_DESCRIPTION_MAX,
+  DemoUrl,
   PROJECT_DESCRIPTION_MAX,
   PROJECT_PITCH_MAX,
   PROJECT_PROMPT_MAX_LENGTH,
@@ -20,33 +23,34 @@ import {
   PROJECT_TOOLS_MAX,
   ProjectDifficulty,
   ProjectStatus,
-  publicHttpsUrl,
   STARTED_MONTH_FLOOR,
   startedMonthMax,
   TOOL_MAX_LENGTH,
-  VISUALS_MAX,
 } from '@ruche/contracts'
 import { type RefObject, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { categoryOption, DIFFICULTY_DOTS } from '../projects/categories'
-import type { ProjectAudience, ProjectForm, ProjectFormErrors } from '../projects/form'
+import { categoryOption } from '../projects/categories'
+import type { ProjectForm, ProjectFormErrors } from '../projects/form'
 import type { PhotoActions } from '../projects/usePhotoTiles'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { Disclosure } from '../ui/Disclosure'
+import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { ListGroup, ListRow } from '../ui/ListGroup'
 import { MonthField } from '../ui/MonthField'
-import { type PhotoTile, PhotoTiles, type PhotoTilesLabels } from '../ui/PhotoTiles'
+import type { PhotoTile } from '../ui/PhotoTiles'
 import { PromptField, type PromptFieldLabels } from '../ui/PromptField'
-import { Row, Stack } from '../ui/Stack'
+import { Stack } from '../ui/Stack'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField, type TextFieldInput } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
-import { VisualEditor, type VisualEditorLabels, type VisualTile } from '../ui/VisualEditor'
-
-// La fonction `t` de react-i18next, pour les textes calculés hors du rendu.
-type T = ReturnType<typeof useTranslation>['t']
+import { audienceSentence, ProjectAudienceChoice } from './ProjectAudienceChoice'
+import {
+  type PhotoDescriptions,
+  type PortraitCover,
+  ProjectPhotoFields,
+} from './ProjectPhotoFields'
 
 /** Les champs où l'écran peut poser le focus (le premier en erreur, après un « Publier » refusé). */
 export type ProjectFieldName =
@@ -102,30 +106,6 @@ export const firstFieldWithError = (errors: ProjectFormErrors): ProjectFieldName
 /** La ligne qui ouvre « Catégorie et outils » : le focus y revient à la fermeture. */
 export type CategoriesOpener = 'category' | 'secondary' | 'tools'
 
-/**
- * La description des photos : celle de la tuile choisie s'écrit sous les tuiles. L'écran branche
- * ici ce que rend `usePhotoTiles` (`selectedKey`, `select`, `descriptionOf`, `describe`) ; `onLeave`
- * part quand le champ perd le focus (en modification, l'écran enregistre alors : `flushPending`).
- */
-export type PhotoDescriptions = {
-  selectedKey: string | null
-  onSelect: (key: string) => void
-  textOf: (key: string) => string
-  onChange: (key: string, text: string) => void
-  onLeave: (key: string) => void
-}
-
-/**
- * La couverture verticale, sous les photos : l'écran branche ici ce que rend `usePortraitCover`
- * (`tile`, `onPick`, `onRemove`, `busy`).
- */
-export type PortraitCover = {
-  tile: VisualTile | null
-  onPick: () => void
-  onRemove: () => void
-  busy?: boolean
-}
-
 /** Change un champ du formulaire : `change('title')('Le ciel de ce soir')`. */
 export type ChangeField = <K extends keyof ProjectForm>(key: K) => (value: ProjectForm[K]) => void
 
@@ -175,55 +155,16 @@ const LIMITS: Partial<Record<ErrorKey, number>> = {
 
 /** Le compteur d'une description longue n'apparaît qu'à l'approche de sa limite. */
 const DESCRIPTION_COUNT_FROM = PROJECT_DESCRIPTION_MAX - 1_000
-const PHOTO_DESCRIPTION_COUNT_FROM = PHOTO_DESCRIPTION_MAX - 50
 
 /**
- * La phrase qui dit qui verra le projet, sous « Qui peut le voir ? » (ou au pied de la feuille sur
- * ordinateur). Un nouveau projet parle au futur ; un projet modifié, au présent.
+ * Les outils d'une ligne, liés selon la langue : « Claude, Expo » ici, « Claude、Expo » en japonais.
+ * `narrow` : une simple liste, sans « et » (la ligne n'est pas une phrase). Repli sur la virgule là
+ * où le moteur JavaScript n'a pas `Intl.ListFormat` (certains téléphones).
  */
-export const audienceSentence = (t: T, audience: ProjectAudience, editing: boolean): string => {
-  if (audience === 'private') {
-    return editing
-      ? t(($) => $.project.form.audiencePrivate)
-      : t(($) => $.project.form.audiencePrivateNew)
-  }
-  return editing
-    ? t(($) => $.project.form.audienceMembersEdit)
-    : t(($) => $.project.form.audienceMembers)
-}
-
-/** « Qui peut le voir ? » : les membres, ou personne d'autre (un brouillon). */
-export function ProjectAudienceChoice({
-  audience,
-  change,
-}: {
-  audience: ProjectAudience
-  change: ChangeField
-}) {
-  const { t } = useTranslation()
-  const choose = change('audience')
-  const membersHint = t(($) => $.project.form.membersHint)
-  const privateHint = t(($) => $.project.form.privateHint)
-  // Le nom lu d'un choix est son libellé ; l'aide affichée dessous lui est liée (`hint`).
-  return (
-    <ListGroup title={t(($) => $.project.form.audience)} radio>
-      <ListRow
-        label={t(($) => $.project.form.members)}
-        detail={membersHint}
-        hint={membersHint}
-        selected={audience === 'members'}
-        onPress={() => choose('members')}
-      />
-      <ListRow
-        label={t(($) => $.project.form.private)}
-        detail={privateHint}
-        hint={privateHint}
-        selected={audience === 'private'}
-        onPress={() => choose('private')}
-      />
-    </ListGroup>
-  )
-}
+const toolList = (language: string, tools: readonly string[]): string =>
+  typeof Intl.ListFormat === 'function'
+    ? new Intl.ListFormat(language, { type: 'conjunction', style: 'narrow' }).format(tools)
+    : tools.join(', ')
 
 export function ProjectFormFields({
   form,
@@ -245,57 +186,11 @@ export function ProjectFormFields({
   const errorText = (key: ErrorKey | undefined) =>
     key ? t(($) => $.project.errors[key], { max: LIMITS[key] }) : undefined
 
-  // --- Les photos ---
-  const kept = tiles.filter((tile) => tile.state !== 'failed').length
-  const selectedIndex = tiles.findIndex((tile) => tile.key === descriptions.selectedKey)
-  const selected = selectedIndex === -1 ? null : tiles[selectedIndex]
-  // Le nom d'une tuile reprend la description de sa photo, en texte simple (sec-M3).
-  const tileName = (number: number, cover: boolean) => {
-    const key = tiles[number - 1]?.key
-    const description = key ? descriptions.textOf(key).trim() : ''
-    if (description === '') {
-      return cover
-        ? t(($) => $.project.form.photoTileCover, { number })
-        : t(($) => $.project.form.photoTile, { number })
-    }
-    return cover
-      ? t(($) => $.project.form.photoTileCoverDescribed, { number, description })
-      : t(($) => $.project.form.photoTileDescribed, { number, description })
-  }
-  const tileLabels: PhotoTilesLabels = {
-    list: t(($) => $.project.form.photosList),
-    add: t(($) => $.project.form.addPhotos),
-    addLabel: t(($) => $.project.form.addPhotosLabel),
-    dropZone: t(($) => $.project.form.dropZone),
-    dropZoneChoose: t(($) => $.project.form.dropZoneChoose),
-    cover: t(($) => $.project.form.cover),
-    tile: tileName,
-    uploading: (number) => t(($) => $.project.form.photoUploading, { number }),
-    failed: (number, reason) => t(($) => $.project.form.photoFailed, { number, reason }),
-    move: (number) => t(($) => $.project.form.movePhoto, { number }),
-    makeCover: t(($) => $.project.form.makeCover),
-    earlier: t(($) => $.project.form.movePhotoEarlier),
-    later: t(($) => $.project.form.movePhotoLater),
-    moved: (place) => t(($) => $.project.form.photoMoved, { place }),
-    remove: (number) => t(($) => $.project.form.removePhoto, { number }),
-  }
-  const portraitLabels: VisualEditorLabels = {
-    portrait: t(($) => $.project.visuals.portrait),
-    portraitHint: t(($) => $.project.visuals.portraitHint),
-    choosePortrait: t(($) => $.project.visuals.choosePortrait),
-    replacePortrait: t(($) => $.project.visuals.replacePortrait),
-    removePortrait: t(($) => $.project.visuals.removePortrait),
-  }
-  // Les règles des photos ; en modification, chaque geste s'enregistre tout de suite (jur-J4).
-  const photoRules = [
-    t(($) => $.project.form.photosRules),
-    t(($) => $.project.form.photosOrder),
-    ...(editing ? [t(($) => $.project.form.photosSaved)] : []),
-  ].join(' ')
-
   // --- Le lien : sa forme est vérifiée pendant la frappe, le site n'est jamais ouvert (jur-J16) ---
+  // Par le schéma du contrat, celui de l'API : « Lien valide » ne promet rien que l'envoi refuse
+  // (une adresse au-delà de DEMO_URL_MAX_LENGTH était cochée, puis refusée : sec-A2).
   const demoUrl = form.demoUrl.trim()
-  const demoOk = demoUrl !== '' && publicHttpsUrl(demoUrl) !== null
+  const demoOk = demoUrl !== '' && DemoUrl.safeParse(demoUrl).success
 
   // --- Les catégories et les outils (les lignes qui ouvrent la seconde feuille) ---
   const categoryLabel = t(($) => $.project.form.category)
@@ -311,7 +206,9 @@ export function ProjectFormFields({
   const categoryValue =
     primaryName ?? (categoryError ? null : t(($) => $.project.form.chooseCategory))
   const toolsValue =
-    form.tools.length > 0 ? form.tools.join(', ') : t(($) => $.project.form.addToolButton)
+    form.tools.length > 0
+      ? toolList(i18n.language, form.tools)
+      : t(($) => $.project.form.addToolButton)
   // Le nom lu d'une ligne dit aussi sa valeur : un bouton cache le texte qu'il contient.
   const spoken = (label: string, value: string | null) => (value ? `${label}, ${value}` : label)
 
@@ -375,62 +272,14 @@ export function ProjectFormFields({
   return (
     <Stack gap="xxl">
       {/* Les photos, la description de la photo choisie (facultative), puis la couverture verticale. */}
-      <Stack gap="sm">
-        <Row justify="between" align="center">
-          <Text variant="headline" heading={2}>
-            {t(($) => $.project.form.photos)}
-          </Text>
-          <Text
-            variant="caption"
-            tone="muted"
-            tabular
-            accessibilityLabel={t(($) => $.project.form.photosCountSpoken, {
-              count: kept,
-              max: VISUALS_MAX,
-            })}
-          >
-            {t(($) => $.project.form.photosCount, { count: kept, max: VISUALS_MAX })}
-          </Text>
-        </Row>
-        <PhotoTiles
-          tiles={tiles}
-          max={VISUALS_MAX}
-          labels={tileLabels}
-          selectedKey={descriptions.selectedKey}
-          onSelect={descriptions.onSelect}
-          onAdd={photos.onAdd}
-          onDropFiles={photos.onDropFiles}
-          onMove={photos.onMove}
-          onRemove={photos.onRemove}
-          busy={photosBusy}
-        />
-        <Text variant="caption" tone="muted">
-          {photoRules}
-        </Text>
-        {selected ? (
-          <TextField
-            key={selected.key}
-            label={t(($) => $.project.form.photoDescription, { number: selectedIndex + 1 })}
-            value={descriptions.textOf(selected.key)}
-            onChangeText={(text) => descriptions.onChange(selected.key, text)}
-            onBlur={() => descriptions.onLeave(selected.key)}
-            autoCapitalize="sentences"
-            hint={t(($) => $.project.form.photoDescriptionHint)}
-            limit={PHOTO_DESCRIPTION_MAX}
-            countFrom={PHOTO_DESCRIPTION_COUNT_FROM}
-          />
-        ) : null}
-        {/* La couverture verticale du téléphone, facultative : sous les photos, dans leur section. */}
-        {portrait ? (
-          <VisualEditor
-            labels={portraitLabels}
-            portrait={portrait.tile}
-            onPickPortrait={portrait.onPick}
-            onRemovePortrait={portrait.onRemove}
-            busy={photosBusy || Boolean(portrait.busy)}
-          />
-        ) : null}
-      </Stack>
+      <ProjectPhotoFields
+        tiles={tiles}
+        photos={photos}
+        descriptions={descriptions}
+        portrait={portrait}
+        busy={photosBusy}
+        editing={editing}
+      />
 
       <FieldGroup>
         <TextField

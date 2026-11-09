@@ -1,7 +1,7 @@
 // Une ligne de « La recette » d'un projet (R6a) : « Commencé en septembre 2026 », « Facile à
 // refaire : À la portée de tous ». Devant la phrase, une petite icône (le calendrier) ou un rond de
 // couleur (vert, jaune ou rouge pour la difficulté, les mêmes que les choix de « Facile à refaire ? »
-// dans la feuille de publication : `DIFFICULTY_DOTS`, `Choices`).
+// dans la feuille de publication : `ui/difficultyDots.ts`, `Choices`).
 //
 // Le dessin n'est qu'un repère pour l'œil : il est caché aux lecteurs d'écran, et la phrase dit tout
 // (la couleur n'est jamais seule à porter le sens). La phrase passe à la ligne à côté du dessin quand
