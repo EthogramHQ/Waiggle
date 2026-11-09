@@ -1174,12 +1174,20 @@ export const fr = {
       /** Sous le nom d'un autre outil : son nombre de projets visibles des membres. */
       pendingProjects_one: 'Cité par {{count}} projet',
       pendingProjects_other: 'Cité par {{count}} projets',
+      /** Un autre outil des seuls outils favoris : « Cité par 2 profils » (jur-J1). */
+      pendingProfiles_one: 'Cité par {{count}} profil',
+      pendingProfiles_other: 'Cité par {{count}} profils',
+      /** Les deux à la fois, avec mergeProjects_* et mergeProfiles_* : « Cité par 3 projets et 2 profils ». */
+      pendingBoth: 'Cité par {{projects}} et {{profiles}}',
+      /** Un membre sur la carte d'un autre outil, qui l'a dans ses outils favoris. */
+      profileOf: 'Profil {{nameOf}}',
       /** Un projet sur la carte d'un autre outil : « Quel papillon ?, de Hugo Lefèvre ». */
       projectBy: '{{title}}, par {{author}}',
       admit: 'Ajouter au catalogue',
       merge: 'Rattacher à un outil',
       dismiss: 'Laisser hors du catalogue',
-      dismissHint: 'Pour un nom qui n’est pas un outil. Il reste sur ses projets, en texte simple.',
+      dismissHint:
+        'Pour un nom qui n’est pas un outil. Il reste sur ses projets et profils, en texte simple.',
       /** Le résultat d'une carte décidée, à la place de ses boutons. */
       admitted: 'Ajouté au catalogue.',
       merged: 'Rattaché à {{target}}.',

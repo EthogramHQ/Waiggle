@@ -28,17 +28,22 @@ const ListedProject = z.object({ id: ProjectId, title: z.string(), author: Named
 
 /**
  * Un « Autre » à vérifier (onglet « À vérifier ») : son nom partagé, sa date, ses projets visibles
- * des membres (5 au plus) et leur nombre. Un « Autre » cité seulement par des projets privés ou
- * retirés n'apparaît pas.
+ * des membres (5 au plus) et leur nombre, et les membres qui l'ont mis dans leurs outils favoris
+ * (5 au plus, comptes vérifiés et non supprimés) et leur nombre (décision de Louis du 9/11/2026 au
+ * soir, relecture jur-J1). Un « Autre » cité seulement par des projets privés ou retirés, et par
+ * aucun profil, n'apparaît pas : l'un des deux nombres au moins est positif.
  */
 export const PendingTool = z
   .object({
     slug: ToolSlug,
     name: z.string(),
     createdAt: z.iso.datetime(),
-    projectCount: z.int().positive(),
+    projectCount: z.int().nonnegative(),
     projects: z.array(ListedProject).max(PENDING_TOOL_PROJECTS_SHOWN),
+    profileCount: z.int().nonnegative(),
+    profiles: z.array(NamedMember).max(PENDING_TOOL_PROJECTS_SHOWN),
   })
+  .refine((tool) => tool.projectCount + tool.profileCount > 0)
   .meta({ id: 'PendingTool' })
 export type PendingTool = z.infer<typeof PendingTool>
 

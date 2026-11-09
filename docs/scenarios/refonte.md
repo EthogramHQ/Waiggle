@@ -1660,16 +1660,16 @@ Hors de R6b, et où ça va :
 ### Le récap des « Autre » aux administrateurs (planche `R6-Email-Autre`)
 
 - Étant donné un lundi à 8 h (heure de Paris)
-- Quand des membres ont choisi « Autre » dans les sept derniers jours, pour un outil ou pour une
-  catégorie
+- Quand des membres ont choisi « Autre » dans les sept derniers jours, pour un outil (d'un projet
+  ou de leurs outils favoris) ou pour une catégorie
 - Alors chaque administrateur en fonction, à l'adresse vérifiée et non suspendu, reçoit dans sa
   langue « Les « Autre » de la semaine sur Waiggle »
 - Et l'e-mail ne donne **que des nombres et des liens** (« 3 autres outils à vérifier », « 2 projets
   à ranger dans une catégorie », « Et 4 autres en attente depuis plus d'une semaine. »), avec « Voir
   les outils » et « Voir les projets à ranger » : ni nom d'outil, ni titre, ni auteur, ni accroche
   (relecture juridique jur-T1, comme l'alerte de modération de 7a ; la planche montrait des listes)
-- Et seuls comptent les projets que les membres peuvent voir : jamais un projet privé, retiré, ni
-  d'un compte supprimé
+- Et seuls comptent les projets que les membres peuvent voir et les profils des comptes vérifiés :
+  jamais un projet privé, retiré, ni d'un compte supprimé
 - Et sans aucun « Autre » dans la semaine, rien n'est envoyé ; un même lundi, jamais deux fois
 - Et l'e-mail a sa version texte, et aucune image distante
 
@@ -1678,8 +1678,11 @@ Hors de R6b, et où ça va :
 **Les outils** (`/moderation/tools`, lien « Voir les outils » de l'e-mail ; « Outils » et
 « Catégories » s'ouvrent depuis la Modération, sous ses onglets)
 - Étant donné un administrateur sur « Outils » de la Modération, onglet « À vérifier »
-- Alors il voit chaque autre outil cité par au moins un projet visible des membres, du plus récent
-  au plus ancien, avec ces projets (titre, auteur) et leur nombre ; jamais un projet privé ou retiré
+- Alors il voit chaque autre outil cité par au moins un projet visible des membres ou par les outils
+  favoris d'un membre, du plus récent au plus ancien, avec ces projets (titre, auteur), ces membres
+  (nom, pseudo) et leurs nombres ; jamais un projet privé ou retiré, ni le profil d'un compte
+  supprimé ou non vérifié (décision de Louis du 9/11/2026 au soir : un « Autre » du profil est relu
+  comme celui d'un projet)
 - Quand il touche « Ajouter au catalogue »
 - Alors un formulaire, prérempli du nom, demande la famille, la description en français et en
   anglais (160 caractères chacune) et le site (facultatif, `https://`)
@@ -1696,7 +1699,7 @@ Hors de R6b, et où ça va :
   (sans doublon), et le nom tapé devient un alias de cet outil
 - Quand il touche plutôt « Laisser hors du catalogue » (un nom injurieux, ou qui n'est pas un outil)
 - Alors l'autre outil quitte « À vérifier », la liste « Pas encore dans le catalogue » et le récap ;
-  il reste en texte simple sur les projets qui le citent (un contenu à signaler passe par
+  il reste en texte simple sur les projets et les profils qui le citent (un contenu à signaler passe par
   « Signaler »)
 - Et une carte décidée reste à sa place, son résultat à la place de ses boutons
 - Et l'onglet « Catalogue » cherche un outil, le modifie, ou en ajoute un nouveau
