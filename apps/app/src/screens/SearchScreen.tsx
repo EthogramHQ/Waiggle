@@ -17,7 +17,15 @@
 //
 // Le texte cherché n'est jamais interprété : il s'affiche tel quel, en texte simple, et jamais dans
 // le titre de la page ou de l'onglet du navigateur (relecture de sécurité, sec-A8).
+//
+// R6b (scénario « Les catégories en filtre », « La recherche ») : sur « Tout » et « Projets », un
+// bouton « Toutes les catégories » ouvre la feuille des catégories (CategoryFilterSheet, la même que
+// sur la page d'un outil). Choisir « Cuisine » ne garde, dans le groupe Projets, que les projets de
+// cette catégorie ; le bouton dit alors « Cuisine ». La catégorie vit dans l'adresse, comme le
+// texte, et pour la même raison remplacée sans nouvelle page d'historique
+// (`/search?q=carn&category=cooking`).
 import {
+  CategoryCode,
   SEARCH_OTHERS_FROM,
   SEARCH_QUERY_MAX,
   SearchQuery,
@@ -30,11 +38,14 @@ import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
+import { useCategories } from '../categories/api'
 import { firstParam } from '../navigation/params'
 import { TopNav } from '../navigation/TopNav'
 import { useSearch } from '../search/api'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
+import { FilterButton } from '../ui/FilterButton'
+import { type Focusable, focusWithoutScroll } from '../ui/focus'
 import { HighlightedText } from '../ui/HighlightedText'
 import { InitialTile, tileVariantOf } from '../ui/InitialTile'
 import { ListGroup, ListRow, type PressEvent } from '../ui/ListGroup'
@@ -47,6 +58,7 @@ import { StateMessage } from '../ui/StateMessage'
 import { StatusPill } from '../ui/StatusPill'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
+import { type CategoryFilterChoice, CategoryFilterSheet } from './CategoryFilterSheet'
 import { LoadingScreen, SessionErrorScreen, SignedOutScreen } from './states'
 
 /** Le temps sans frappe après lequel la recherche part : une demande par mot, pas une par lettre. */
@@ -66,8 +78,13 @@ export function SearchScreen() {
   // L'adresse n'est lue qu'une fois la page hydratée : la page web est pré-rendue sans connaître
   // l'adresse complète, et lire `q` plus tôt ferait un écart entre le pré-rendu et le navigateur.
   const hydrated = useHydrated()
-  const fromAddress = firstParam(useLocalSearchParams<{ q?: string | string[] }>().q) ?? ''
+  const params = useLocalSearchParams<{ q?: string | string[]; category?: string | string[] }>()
+  const fromAddress = firstParam(params.q) ?? ''
   const address = hydrated ? fromAddress : ''
+  // R6b : la catégorie, lue de l'adresse elle aussi après l'hydratation, et vérifiée par le schéma
+  // du contrat : un code mal formé (`?category=Cuisine!`) est ignoré, comme s'il n'y était pas.
+  const fromCategory = CategoryCode.safeParse(firstParam(params.category))
+  const category = hydrated && fromCategory.success ? fromCategory.data : null
 
   // Ce qui est dans le champ (téléphone, largeur moyenne), ou ce que la barre du haut a écrit dans
   // l'adresse (ordinateur). Ce qu'on tape fait foi : l'adresse revient un instant plus tard (son
@@ -110,8 +127,27 @@ export function SearchScreen() {
   // Le texte demandé à l'API : sans les blancs autour, et coupé à 80 caractères (au-delà, l'API
   // refuserait tout ; on cherche plutôt le début).
   const searched = query.trim().slice(0, SEARCH_QUERY_MAX)
-  const search = useSearch(searched)
+  // La catégorie part en second argument, seulement s'il y en a une : sans filtre, la demande reste
+  // exactement celle d'avant R6b (`useSearch('carn')`, sans second argument).
+  const searchArgs: [string, string?] = category === null ? [searched] : [searched, category]
+  const search = useSearch(...searchArgs)
   const [tab, setTab] = useState<Tab>('all')
+
+  // R6b : les noms et les icônes des catégories viennent de l'API (GET /v1/categories).
+  const categories = useCategories()
+  // La feuille des catégories : choisir applique, ferme, et rend le focus au bouton qui l'a ouverte
+  // (une fois la feuille fermée : avant, elle garde le focus chez elle).
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const categoryButton = useRef<Focusable>(null)
+  const focusButton = useRef(false)
+  // Un choix déjà fait pendant que la feuille se ferme (son fondu de sortie) : une deuxième tape,
+  // même sur une autre pastille, ne change plus rien. Remis à zéro à chaque ouverture.
+  const chose = useRef(false)
+  useEffect(() => {
+    if (sheetOpen || !focusButton.current) return
+    focusButton.current = false
+    focusWithoutScroll(categoryButton.current)
+  }, [sheetOpen])
 
   // « Réessayer » : React Query remet une lecture en erreur sans données « en attente », et
   // l'erreur disparaît pendant la nouvelle tentative ; on la garde affichée (et le focus sur le
@@ -246,6 +282,62 @@ export function SearchScreen() {
   const shows = (group: keyof SearchResults) =>
     (tab === 'all' || tab === group) && groups !== null && groups[group].count > 0
 
+  // --- R6b : le filtre par catégorie, qui ne vise que le groupe Projets (scénario, décision 8).
+  // Les catégories proposées : celles qui ont au moins un projet que le membre peut voir, dans
+  // l'ordre de la feuille de publication, plus celle de l'adresse si elle n'en a plus (pour pouvoir
+  // la voir cochée). Sans nombre : celui de l'API compte tous les projets de la catégorie, pas ceux
+  // que la recherche trouve, et le montrer ici tromperait. Une catégorie dont le nom n'est pas lu ne
+  // s'affiche pas : jamais le code brut.
+  const list = categories.data?.categories ?? []
+  const choices: CategoryFilterChoice[] = list
+    .filter((one) => one.projectCount > 0 || one.code === category)
+    .map((one) => ({ code: one.code, name: one.name, icon: one.icon }))
+  const chosen = list.find((one) => one.code === category)
+  // Le bouton se montre sur « Tout » et « Projets », jamais « Membres » ni « Outils », dès qu'il y a
+  // des résultats. Une catégorie déjà choisie le garde aussi quand rien n'est trouvé, pendant la
+  // lecture ou après une panne (les onglets ont alors disparu) : c'est par lui qu'on la retire.
+  const filterShown = found ? tab === 'all' || tab === 'projects' : category !== null && !tooShort
+  // Une catégorie dans l'adresse dont le nom n'est pas (encore) lu : le bouton dit « Catégorie »,
+  // jamais « Toutes les catégories », qui mentirait sur le filtre appliqué.
+  const filterLabel = chosen
+    ? chosen.name
+    : category === null
+      ? t(($) => $.search.allCategories)
+      : t(($) => $.tool.categoryLabel)
+  // Rien trouvé dans cette catégorie, alors que l'onglet « Projets » est choisi : la liste serait
+  // vide, sans un mot ; on le dit, avec de quoi retirer le filtre.
+  const projectsFilteredOut =
+    category !== null &&
+    found &&
+    tab === 'projects' &&
+    groups !== null &&
+    groups.projects.count === 0
+
+  const openSheet = () => {
+    chose.current = false
+    setSheetOpen(true)
+  }
+  const closeSheet = () => {
+    focusButton.current = true
+    setSheetOpen(false)
+  }
+  // Choisir écrit la catégorie dans l'adresse (remplacée, sans nouvelle page d'historique : le
+  // Retour du navigateur quitte la recherche), puis ferme la feuille. La lecture repart d'elle-même :
+  // la catégorie lue de l'adresse change la clé de `useSearch`.
+  const chooseCategory = (code: string | null) => {
+    if (chose.current) return
+    chose.current = true
+    if (code !== category) router.setParams({ category: code ?? undefined })
+    closeSheet()
+  }
+  // « Voir tous les projets », sous un onglet Projets vidé par le filtre : la catégorie part de
+  // l'adresse ; le focus va au bouton du filtre, qui dit maintenant « Toutes les catégories »
+  // (le message qui portait le bouton touché disparaît).
+  const chooseAll = () => {
+    router.setParams({ category: undefined })
+    focusWithoutScroll(categoryButton.current)
+  }
+
   return (
     <Screen
       title={t(($) => $.search.title)}
@@ -266,6 +358,18 @@ export function SearchScreen() {
               { value: 'all', label: t(($) => $.search.tabs.all) },
               ...GROUPS.map((group) => ({ value: group, ...tabLabel(group) })),
             ]}
+          />
+        ) : null}
+
+        {filterShown ? (
+          <FilterButton
+            ref={categoryButton}
+            label={filterLabel}
+            spokenLabel={
+              chosen ? t(($) => $.search.categoryChosen, { name: chosen.name }) : filterLabel
+            }
+            icon={chosen ? chosen.icon : 'squares-four'}
+            onPress={openSheet}
           />
         ) : null}
 
@@ -344,6 +448,14 @@ export function SearchScreen() {
           </ListGroup>
         ) : null}
 
+        {projectsFilteredOut ? (
+          <StateMessage
+            kind="empty"
+            message={t(($) => $.tool.emptyFiltered)}
+            actions={[{ label: t(($) => $.tool.clearFilters), onPress: () => chooseAll() }]}
+          />
+        ) : null}
+
         {data && shows('members') ? (
           <ListGroup title={t(($) => $.search.tabs.members)}>
             {data.members.items.map((member) => {
@@ -388,13 +500,15 @@ export function SearchScreen() {
               return (
                 <ListRow
                   key={tool.slug}
-                  label={tool.label}
-                  title={<HighlightedText text={tool.label} words={words} weight={600} />}
+                  // R6b : un outil du catalogue, nommé par son nom normé (« ChatGPT »), même quand
+                  // c'est un de ses alias (« Chat GPT ») qui a correspondu.
+                  label={tool.name}
+                  title={<HighlightedText text={tool.name} words={words} weight={600} />}
                   // La tuile à l'initiale, comme dans « Tous les outils » (ToolsScreen) : même outil,
                   // même teinte d'une page à l'autre.
-                  leading={<InitialTile name={tool.label} variant={tileVariantOf(tool.slug)} />}
+                  leading={<InitialTile name={tool.name} variant={tileVariantOf(tool.slug)} />}
                   detail={projects}
-                  spokenLabel={t(($) => $.tools.withCount, { label: tool.label, projects })}
+                  spokenLabel={t(($) => $.tools.withCount, { label: tool.name, projects })}
                   trailing="chevron"
                   href={path}
                   onPress={(event) => open(event, path)}
@@ -404,6 +518,13 @@ export function SearchScreen() {
           </ListGroup>
         ) : null}
       </Stack>
+      <CategoryFilterSheet
+        open={sheetOpen}
+        categories={choices}
+        value={category}
+        onChange={chooseCategory}
+        onClose={closeSheet}
+      />
     </Screen>
   )
 }
