@@ -16,7 +16,7 @@ import { Text } from './Text'
 type Props = {
   /** Le texte déjà traduit : « Sciences et espace · Apprendre », ou la principale seule. */
   label: string
-  /** L'icône de la catégorie principale (`categoryOption`, projects/categories.ts). */
+  /** L'icône de la catégorie principale (`optionOf`, projects/categories.ts). */
   icon: IconName
   /** R6b : donné, la ligne devient un lien (vers Explorer filtré sur la catégorie). */
   onPress?: () => void

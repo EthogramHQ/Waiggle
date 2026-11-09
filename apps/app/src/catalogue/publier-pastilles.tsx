@@ -11,7 +11,6 @@ import type { ProjectDifficulty } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
-import { categoryOption } from '../projects/categories'
 import { Choices } from '../ui/Choices'
 import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
 import { ProjectCover } from '../ui/ProjectCover'
@@ -20,6 +19,7 @@ import { Surface } from '../ui/Surface'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { ThemeProvider } from '../ui/theme/ThemeProvider'
+import { sampleCategory } from './categories-exemples'
 
 const fr = {
   title: 'Publier : les pastilles',
@@ -72,8 +72,8 @@ export function PublishPillsCatalogue() {
   const options = useDifficultyOptions()
   const question = t(($) => $.project.form.difficulty)
   const clear = t(($) => $.project.form.clear)
-  const science = categoryOption(t, 'science')
-  const cooking = categoryOption(t, 'cooking')
+  const science = sampleCategory(i18n.language, 'science')
+  const cooking = sampleCategory(i18n.language, 'cooking')
   const schemes = ['day', 'night'] as const
   return (
     <Stack gap="lg">
