@@ -221,6 +221,27 @@ const open = async (page, url) => {
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
   await page.waitForTimeout(800) // comme site-check.mjs : le temps de l'hydratation
 }
+/**
+ * R6a : la catégorie (obligatoire pour publier) se choisit dans la seconde feuille « Catégorie et
+ * outils », ouverte par la ligne « Catégorie », puis « OK ».
+ */
+const chooseCategory = async (page, category) => {
+  await page.getByRole('button', { name: /^Catégorie(?! et outils)/ }).click()
+  await page.getByRole('checkbox', { name: new RegExp(`^${category}`) }).click()
+  await byRole(page, 'button', 'OK').click()
+}
+/**
+ * R6a : « Publier » d'un projet visible des membres ramène au fil avec `?published=<id>` (la danse
+ * de l'abeille, puis « Projet publié »), et l'adresse est nettoyée ensuite : on lit l'identifiant au
+ * passage.
+ */
+const publishToFeed = async (page) => {
+  await Promise.all([
+    page.waitForURL((url) => url.searchParams.has('published')),
+    byRole(page, 'button', 'Publier').last().click(), // le premier est celui de la barre du haut
+  ])
+  return new URL(page.url()).searchParams.get('published')
+}
 /** Touche un bouton qui ouvre le choix d'un fichier, et donne ce fichier. */
 const pick = async (page, button, file) => {
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), button.click()])
@@ -523,14 +544,13 @@ try {
   step('Léa publie un projet avec trois photos et une couverture verticale')
   await open(lea.page, `${appUrl}/projects/new`)
   await lea.page.getByLabel('Titre').fill('Mon agent de recettes')
-  await lea.page
-    .getByLabel('Le pitch, en une phrase')
-    .fill('Il propose un dîner avec ce qui reste.')
+  await lea.page.getByLabel('En une phrase').fill('Il propose un dîner avec ce qui reste.')
   // Un lien de démo : la carte du fil de Sam portera « Tester » (R4).
-  await lea.page.getByLabel('Lien de démo (facultatif)').fill('https://example.com/recettes')
+  await lea.page.getByLabel('Lien de la démo, facultatif').fill('https://example.com/recettes')
+  await chooseCategory(lea.page, 'Cuisine')
   // Chaque photo est d'abord réduite sur l'appareil : comme une personne, on attend de voir sa
   // vignette (et son bouton « Retirer ») avant de passer à la suivante, puis de publier.
-  const add = byRole(lea.page, 'button', 'Ajouter une photo')
+  const add = byRole(lea.page, 'button', 'Ajouter des photos')
   const colors = { rouge: [200, 40, 40], vert: [40, 160, 60], bleu: [40, 80, 200] }
   for (const [n, [name, color]] of Object.entries(colors).entries()) {
     await pick(lea.page, add, image(name, 1200, 800, color))
@@ -542,9 +562,8 @@ try {
     image('portrait', 600, 1000, [120, 60, 160]),
   )
   await byRole(lea.page, 'button', 'Retirer la couverture verticale').waitFor()
-  await byRole(lea.page, 'button', 'Publier').last().click() // le premier est celui de la barre du haut
-  await lea.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
-  const projectId = lea.page.url().split('/').at(-1)
+  const projectId = await publishToFeed(lea.page)
+  await lea.page.getByText('Projet publié').waitFor()
   let project = await readProject(lea, projectId)
   expectEqual('photos de la galerie', project.visuals.length, 3)
   expectEqual('couverture verticale', project.portraitCover !== null, true)
@@ -552,9 +571,11 @@ try {
   const [red, green, blue] = project.visuals.map((visual) => visual.id)
 
   step('Léa met la troisième photo en couverture, puis retire la deuxième')
+  await open(lea.page, `${appUrl}/projects/${projectId}`)
   await byRole(lea.page, 'button', 'Modifier').click()
   await lea.page.waitForURL(/\/edit$/)
-  await byRole(lea.page, 'button', 'Mettre la photo 3 en couverture').click()
+  await byRole(lea.page, 'button', 'Déplacer la photo 3').click()
+  await byRole(lea.page, 'menuitem', 'Mettre en couverture').click()
   await waitFor('nouvelle couverture', async () => {
     project = await readProject(lea, projectId)
     return project.visuals[0].id === blue
@@ -701,9 +722,9 @@ try {
   const samProject = 'Le carnet de l’Élève'
   await open(sam.page, `${appUrl}/projects/new`)
   await sam.page.getByLabel('Titre').fill(samProject)
-  await sam.page.getByLabel('Le pitch, en une phrase').fill('Il range mes essais de prompts.')
-  await byRole(sam.page, 'button', 'Publier').last().click()
-  await sam.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
+  await sam.page.getByLabel('En une phrase').fill('Il range mes essais de prompts.')
+  await chooseCategory(sam.page, 'Code et outils')
+  await publishToFeed(sam.page)
   await signUp(malik, 'Malik')
   /**
    * R3 : « Découvrir » est devenu « Récents », dans l'onglet Explorer. On attend le projet de Léa
@@ -1062,7 +1083,7 @@ try {
 
   step('Léa passe le projet en privé : la photo devient introuvable, même pour qui a l’adresse')
   await open(lea.page, `${appUrl}/projects/${projectId}/edit`)
-  await byRole(lea.page, 'switch', 'Public').click()
+  await byRole(lea.page, 'radio', 'Privé').click()
   await byRole(lea.page, 'button', 'Enregistrer').last().click()
   await lea.page.waitForURL(/\/projects\/[0-9a-f-]{36}$/)
   expectEqual('visibilité', (await readProject(lea, projectId)).visibility, 'private')
@@ -1093,9 +1114,10 @@ try {
 
   step('Léa supprime le projet : ses photos disparaissent du disque')
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await byRole(lea.page, 'button', 'Supprimer').click()
-  await byRole(lea.page, 'button', 'Supprimer le projet').click()
-  await lea.page.waitForURL((url) => !url.pathname.startsWith('/projects/'))
+  await byRole(lea.page, 'button', 'Plus d’actions').click()
+  await byRole(lea.page, 'menuitem', 'Supprimer').click()
+  await byRole(lea.page.getByRole('dialog'), 'button', 'Supprimer').click()
+  await lea.page.waitForURL((url) => url.pathname === '/me')
   expectEqual('photo, pour Léa', await statusFor(lea, photoUrl), 404)
   await expectMedia('après la suppression du projet', { avatars: 1, visuals: 0 })
 
