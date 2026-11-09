@@ -106,6 +106,8 @@ export function Comments({ project }: { project: Project }) {
   const inputRef = useRef<TextFieldInput>(null)
   const openButton = useRef<Focusable>(null)
   const titleRef = useRef<Focusable>(null)
+  // Le titre de la feuille : le titre de la section est hors de sa fenêtre `aria-modal`.
+  const sheetTitleRef = useRef<Focusable>(null)
   const sheetReveal = useRef<SheetReveal>(null)
   const cards = useRef<CommentCards>(new Map())
   const previewCards = useRef<CommentCards>(new Map())
@@ -371,7 +373,13 @@ export function Comments({ project }: { project: Project }) {
       whole || sheetOpen
         ? focusFirstCard(cards.current, ids)
         : lines.some((line) => previewCards.current.get(line.comment.id)?.focusCard())
-    if (!focused) focusLost()
+    if (focused) return
+    // Une feuille sans champ (membre suspendu, projet retiré) devant une liste vide : ni carte ni
+    // champ, mais son titre est dans la fenêtre ; sinon le focus resterait sur le bouton disparu.
+    if (sheetOpen && !inputRef.current) {
+      focusWithoutScroll(sheetTitleRef.current)
+      moveReaderTo(sheetTitleRef.current)
+    } else focusLost()
   })
 
   // La première page manque : on le dit, sans toucher au reste de la page. 401 : réessayer ne
@@ -507,6 +515,7 @@ export function Comments({ project }: { project: Project }) {
           titleCount={{ count, spoken: t(($) => $.project.comments.spokenCount, { count }) }}
           {...(openOnField ? { initialFocusRef: inputRef } : null)}
           revealRef={sheetReveal}
+          titleRef={sheetTitleRef}
           // Une feuille couvre le bandeau de la suspension : elle redit pourquoi il n'y a pas de champ.
           footer={
             suspended ? (

@@ -45,6 +45,7 @@ import { Screen } from '../ui/Screen'
 import { Text } from '../ui/Text'
 import { TextField } from '../ui/TextField'
 import { useHydrated } from '../ui/theme/hydration'
+import { useNameOf } from '../useNameOf'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -65,6 +66,7 @@ type Props = {
 
 export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
   const { t } = useTranslation()
+  const nameOf = useNameOf()
   const { state, session, retry } = useMemberSession()
   // L'adresse n'est connue que dans le navigateur : la page pré-rendue en reste au chargement.
   const hydrated = useHydrated()
@@ -90,8 +92,8 @@ export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
       <NotFoundState
         title={
           moderation.suspension
-            ? t(($) => $.moderation.lift.title, { name: member.data.name })
-            : t(($) => $.moderation.suspend.title, { name: member.data.name })
+            ? t(($) => $.moderation.lift.title, { nameOf: nameOf(member.data.name) })
+            : t(($) => $.moderation.suspend.title, { nameOf: nameOf(member.data.name) })
         }
         message={t(($) => $.moderation.blockedTarget)}
       />
@@ -114,7 +116,7 @@ export function SuspendScreen({ memberId, fromKind, fromId }: Props) {
       if (member.data.isBlocked && !member.data.isMe && !moderation.isAdmin) return blocked
       return (
         <NotFoundState
-          title={t(($) => $.moderation.suspend.title, { name: member.data.name })}
+          title={t(($) => $.moderation.suspend.title, { nameOf: nameOf(member.data.name) })}
           message={
             member.data.isMe
               ? t(($) => $.moderation.suspend.notAllowedSelf)
@@ -155,6 +157,7 @@ function DecisionForm({
   onDone: () => void
 }) {
   const { t, i18n } = useTranslation()
+  const nameOf = useNameOf()
   const back = useGoBack({ pathname: '/members/[id]', params: { id: member.id } })
   const signInAgain = useSignInAgain()
   const { decide } = useDecide()
@@ -248,8 +251,8 @@ function DecisionForm({
       onBack={back}
       title={
         suspending
-          ? t(($) => $.moderation.suspend.title, { name: member.name })
-          : t(($) => $.moderation.lift.title, { name: member.name })
+          ? t(($) => $.moderation.suspend.title, { nameOf: nameOf(member.name) })
+          : t(($) => $.moderation.lift.title, { nameOf: nameOf(member.name) })
       }
       subtitle={t(($) => $.member.handle, { handle: member.handle })}
     >
@@ -377,6 +380,7 @@ function DecisionForm({
 /** La décision prise : le message reçoit le focus (le bouton touché a disparu), et une issue. */
 function DoneState({ mode, name, memberId }: { mode: Mode; name: string; memberId: string }) {
   const { t } = useTranslation()
+  const nameOf = useNameOf()
   const back = useGoBack({ pathname: '/members/[id]', params: { id: memberId } })
   const doneRef = useRef<Focusable>(null)
   useEffect(() => {
@@ -388,8 +392,8 @@ function DoneState({ mode, name, memberId }: { mode: Mode; name: string; memberI
       onBack={back}
       title={
         mode === 'suspend'
-          ? t(($) => $.moderation.suspend.title, { name })
-          : t(($) => $.moderation.lift.title, { name })
+          ? t(($) => $.moderation.suspend.title, { nameOf: nameOf(name) })
+          : t(($) => $.moderation.lift.title, { nameOf: nameOf(name) })
       }
     >
       <Notice
