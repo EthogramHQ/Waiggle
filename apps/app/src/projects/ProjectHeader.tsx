@@ -28,8 +28,9 @@ import { Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
-import { categoryOption } from './categories'
+import { type CategoryOption, categoryOption } from './categories'
 import { changedAfterCreation } from './format'
+import { useCategory } from './useCategory'
 
 /** Ce que l'en-tête montre du projet. */
 export type HeaderProject = Pick<
@@ -141,11 +142,10 @@ export function useAuthorLine(project: HeaderProject): AuthorLineProps {
  */
 const categoryLine = (
   t: ReturnType<typeof useTranslation>['t'],
-  project: Pick<HeaderProject, 'primaryCategory' | 'secondaryCategory'>,
+  primary: CategoryOption | undefined,
+  secondary: CategoryOption | undefined,
 ): { label: string; icon: IconName } | null => {
-  if (!project.primaryCategory) return null
-  const primary = categoryOption(t, project.primaryCategory)
-  const secondary = project.secondaryCategory ? categoryOption(t, project.secondaryCategory) : null
+  if (!primary) return null
   return {
     icon: primary.icon,
     label: secondary
@@ -157,8 +157,20 @@ const categoryLine = (
   }
 }
 
+/**
+ * Les catégories du projet telles que l'API les nomme (R6b) : `undefined` pour la principale = pas
+ * d'étiquette (chargement, panne, code inconnu, projet d'avant R6a). Lues par `ProjectHeader` ;
+ * le catalogue donne les siennes, ou rien : il retombe alors sur les noms de départ (`categoryOption`,
+ * `@deprecated`, retirée par U3b).
+ */
+export type HeaderCategories = { primary?: CategoryOption; secondary?: CategoryOption }
+
 type ViewProps = {
   project: HeaderProject
+  /** Les catégories lues de l'API ; absentes (catalogue seul), les noms de départ de R6a. */
+  categories?: HeaderCategories | undefined
+  /** Toucher la catégorie : Explorer filtré sur son code (donné par `ProjectHeader`). */
+  onOpenCategory?: (() => void) | undefined
   /** La ligne de l'auteur (voir `useAuthorLine`). */
   author: AuthorLineProps
   /** Pour poser le focus sur le titre à l'arrivée de la page (la carte qui devient la page). */
@@ -168,13 +180,25 @@ type ViewProps = {
 }
 
 /** L'en-tête dessiné, sans aucune lecture : ce que montrent la page et le catalogue. */
-export function ProjectHeaderView({ project, author, titleRef, now }: ViewProps) {
+export function ProjectHeaderView({
+  project,
+  categories,
+  onOpenCategory,
+  author,
+  titleRef,
+  now,
+}: ViewProps) {
   const { t } = useTranslation()
   const priv = project.visibility === 'private'
   const updated = changedAfterCreation(project.createdAt, project.updatedAt)
   // La date complète, lue par le lecteur d'écran : « le 12 octobre à 08:00 ».
   const onFull = (full: string) => t(($) => $.dates.onDate, { date: full })
-  const category = categoryLine(t, project)
+  // Sans `categories` (le catalogue), les noms de départ ; la page, elle, passe toujours les siens.
+  const shown = categories ?? {
+    primary: project.primaryCategory ? categoryOption(t, project.primaryCategory) : undefined,
+    secondary: project.secondaryCategory ? categoryOption(t, project.secondaryCategory) : undefined,
+  }
+  const category = categoryLine(t, shown.primary, shown.secondary)
   return (
     <Stack gap="md">
       {/* Le statut, puis la catégorie sur la même rangée (elle passe dessous si la place manque) :
@@ -184,7 +208,7 @@ export function ProjectHeaderView({ project, author, titleRef, now }: ViewProps)
           label={t(($) => $.project.status[project.status])}
           strong={project.status === 'testable'} // « Testable » en miel plein : on appelle au test
         />
-        {category ? <CategoryLine {...category} /> : null}
+        {category ? <CategoryLine {...category} onPress={onOpenCategory} /> : null}
       </Stack>
       <Stack gap="xs">
         <Text variant="title2" heading={1} breakAnywhere focusRef={titleRef}>
@@ -226,10 +250,28 @@ export function ProjectHeaderView({ project, author, titleRef, now }: ViewProps)
   )
 }
 
-type Props = Omit<ViewProps, 'author'>
+type Props = Omit<ViewProps, 'author' | 'categories' | 'onOpenCategory'>
 
-/** L'en-tête de la page d'un projet, avec la ligne de l'auteur qu'il lit lui-même. */
+/**
+ * L'en-tête de la page d'un projet, avec la ligne de l'auteur et les catégories qu'il lit lui-même.
+ * La catégorie principale est un lien vers Explorer filtré sur elle (`/explore?category=<code>`).
+ */
 export function ProjectHeader(props: Props) {
+  const router = useRouter()
   const author = useAuthorLine(props.project)
-  return <ProjectHeaderView {...props} author={author} />
+  const { primaryCategory, secondaryCategory } = props.project
+  const primary = useCategory(primaryCategory)
+  const secondary = useCategory(secondaryCategory)
+  return (
+    <ProjectHeaderView
+      {...props}
+      author={author}
+      categories={{ primary, secondary }}
+      onOpenCategory={
+        primaryCategory
+          ? () => router.push({ pathname: '/explore', params: { category: primaryCategory } })
+          : undefined
+      }
+    />
+  )
 }
