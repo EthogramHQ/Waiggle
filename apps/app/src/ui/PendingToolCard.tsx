@@ -51,6 +51,13 @@ type Props = {
    * fermeture. Sans feuille (« Laisser hors »), la carte le fait seule (DecidedZone).
    */
   resultRef?: Ref<View | null> | undefined
+  /**
+   * Facultatifs : les boutons « Ajouter au catalogue » et « Rattacher à un outil », pour que l'écran
+   * leur rende le focus quand leur feuille se ferme sans décision (sur le web, la feuille ne le
+   * retrouve pas toujours seule : personne n'avait le focus si l'on a touché le bouton du doigt).
+   */
+  admitRef?: Ref<View> | undefined
+  mergeRef?: Ref<View> | undefined
 }
 
 export function PendingToolCard({
@@ -61,6 +68,8 @@ export function PendingToolCard({
   onDismiss,
   onOpenProject,
   resultRef,
+  admitRef,
+  mergeRef,
 }: Props) {
   const { colors, shadows } = useTheme()
   const { t } = useTranslation()
@@ -80,7 +89,7 @@ export function PendingToolCard({
   return (
     <View
       style={{
-        gap: space.md,
+        gap: space.xxs,
         padding: space.lg,
         backgroundColor: colors.surface,
         borderRadius: radii.group,
@@ -91,87 +100,93 @@ export function PendingToolCard({
     >
       {/* Le nom tel que les membres l'ont tapé, puis leur nombre : de quoi juger d'un coup d'œil
           si c'est un vrai outil. Le nom se coupe n'importe où plutôt que de déborder (un nom sans
-          espace, « MonSuperOutilQuiFaitTout »). */}
-      <View style={{ gap: space.xxs }}>
-        <Text variant="headline" breakAnywhere>
-          {tool.name}
-        </Text>
-        <Text variant="callout" tone="secondary">
-          {t(($) => $.moderation.catalogue.pendingProjects, { count: tool.projectCount })}
-        </Text>
-      </View>
+          espace, « MonSuperOutilQuiFaitTout »). Tous deux posés à même la carte, sans vue autour :
+          le nom, son nombre, ses projets et ses boutons sont dans le même bloc, celui qu'un lecteur
+          (ou un test, `cardOf`) retrouve en remontant depuis le nom. */}
+      <Text variant="headline" breakAnywhere>
+        {tool.name}
+      </Text>
+      <Text variant="callout" tone="secondary">
+        {t(($) => $.moderation.catalogue.pendingProjects, { count: tool.projectCount })}
+      </Text>
 
-      {/* Les projets qui le citent (cinq au plus) : une liste de liens, chacun vers sa page. Le nom
+      {/* Le reste de la carte, à l'écart habituel sous le nombre (l'écart de la carte, plus fin,
+          ne sert qu'entre le nom et son nombre). */}
+      <View style={{ gap: space.md, marginTop: space.md - space.xxs }}>
+        {/* Les projets qui le citent (cinq au plus) : une liste de liens, chacun vers sa page. Le nom
           lu est la ligne affichée (« Le tri des factures, par Hugo Lefèvre » : « par » ne s’élide jamais). Rangés à gauche,
           jamais plus larges que la carte : un titre long passe à la ligne dans son lien. */}
-      <View role="list" style={{ gap: space.xxs }}>
-        {tool.projects.map((project) => (
-          <View
-            key={project.id}
-            role="listitem"
-            style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
-          >
-            <TextLink
-              label={t(($) => $.moderation.catalogue.projectBy, {
-                title: project.title,
-                author: project.author.name,
-              })}
-              onPress={linkGuard(() => onOpenProject(project.id))}
-            />
-          </View>
-        ))}
-      </View>
-
-      {/* Les décisions, ou leur résultat à la même place, au moins aussi haut (DecidedZone). */}
-      <DecidedZone
-        result={outcome ? resultOf(outcome, t) : null}
-        resultRef={resultRef}
-        actions={
-          <View style={{ gap: space.sm }}>
-            {/* Les boutons passent à la ligne quand la place manque (téléphone, texte agrandi) ;
-                l'écart garde chacun à distance de son voisin. Aucun en miel : la page en répète un
-                par carte, et la seule action miel d'un écran est ailleurs. */}
+        <View role="list" style={{ gap: space.xxs }}>
+          {tool.projects.map((project) => (
             <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: space.md,
-              }}
+              key={project.id}
+              role="listitem"
+              style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
             >
-              <Button
-                label={t(($) => $.moderation.catalogue.admit)}
-                onPress={admitGuard(onAdmit)}
-                variant="secondary"
-                size="compact"
-                {...describes}
-              />
-              <Button
-                label={t(($) => $.moderation.catalogue.merge)}
-                onPress={mergeGuard(onMerge)}
-                variant="secondary"
-                size="compact"
-                {...describes}
-              />
-              <Button
-                label={t(($) => $.moderation.catalogue.dismiss)}
-                onPress={dismissGuard(onDismiss)}
-                variant="secondary"
-                size="compact"
-                // L'aide de ce bouton s'ajoute au nom de la carte : « Make.com. Pour un nom qui
-                // n'est pas un outil… ».
-                describedById={`${descriptionId} ${hintId}`}
-                hint={`${tool.name}. ${dismissHint}`}
+              <TextLink
+                label={t(($) => $.moderation.catalogue.projectBy, {
+                  title: project.title,
+                  author: project.author.name,
+                })}
+                onPress={linkGuard(() => onOpenProject(project.id))}
               />
             </View>
-            {/* Ce que veut dire « Laisser hors » : le geste écrit sans fenêtre de confirmation, la
+          ))}
+        </View>
+
+        {/* Les décisions, ou leur résultat à la même place, au moins aussi haut (DecidedZone). */}
+        <DecidedZone
+          result={outcome ? resultOf(outcome, t) : null}
+          resultRef={resultRef}
+          actions={
+            <View style={{ gap: space.sm }}>
+              {/* Les boutons passent à la ligne quand la place manque (téléphone, texte agrandi) ;
+                l'écart garde chacun à distance de son voisin. Aucun en miel : la page en répète un
+                par carte, et la seule action miel d'un écran est ailleurs. */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: space.md,
+                }}
+              >
+                <Button
+                  ref={admitRef}
+                  label={t(($) => $.moderation.catalogue.admit)}
+                  onPress={admitGuard(onAdmit)}
+                  variant="secondary"
+                  size="compact"
+                  {...describes}
+                />
+                <Button
+                  ref={mergeRef}
+                  label={t(($) => $.moderation.catalogue.merge)}
+                  onPress={mergeGuard(onMerge)}
+                  variant="secondary"
+                  size="compact"
+                  {...describes}
+                />
+                <Button
+                  label={t(($) => $.moderation.catalogue.dismiss)}
+                  onPress={dismissGuard(onDismiss)}
+                  variant="secondary"
+                  size="compact"
+                  // L'aide de ce bouton s'ajoute au nom de la carte : « Make.com. Pour un nom qui
+                  // n'est pas un outil… ».
+                  describedById={`${descriptionId} ${hintId}`}
+                  hint={`${tool.name}. ${dismissHint}`}
+                />
+              </View>
+              {/* Ce que veut dire « Laisser hors » : le geste écrit sans fenêtre de confirmation, la
                 phrase se lit donc avant de toucher. */}
-            <Text variant="caption" tone="muted" nativeID={hintId}>
-              {dismissHint}
-            </Text>
-          </View>
-        }
-      />
+              <Text variant="caption" tone="muted" nativeID={hintId}>
+                {dismissHint}
+              </Text>
+            </View>
+          }
+        />
+      </View>
       <ActionDescription id={descriptionId} text={tool.name} />
     </View>
   )

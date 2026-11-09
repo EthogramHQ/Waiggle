@@ -40,6 +40,8 @@ import { ModerationToolsScreen } from './ModerationToolsScreen'
 import { lendContains, lendPage, watchFocus } from './ProjectComments.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
+// La langue du téléphone en français : sur le web aussi, la page s'écrit en français.
+jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'fr-FR' }] }))
 // `apiFetch` joint sur mobile le cookie gardé par Better Auth : ici, aucun.
 jest.mock('../accounts/auth-client', () => ({
   authClient: { getCookie: jest.fn().mockResolvedValue(null) },
@@ -172,13 +174,13 @@ describe('who sees the tools page', () => {
       'Suno Studio',
     ])
     expect(card('Make.com').getByText('Cité par 3 projets')).toBeTruthy()
-    expect(pressableIn(card('Make.com'), 'Le tri des factures, de Hugo Lefèvre')).toBeTruthy()
+    expect(pressableIn(card('Make.com'), 'Le tri des factures, par Hugo Lefèvre')).toBeTruthy()
   })
 
   it('opens a project of a card', async () => {
     await openTools()
 
-    await fireEvent.press(pressableIn(card('Make.com'), 'Le tri des factures, de Hugo Lefèvre'))
+    await fireEvent.press(pressableIn(card('Make.com'), 'Le tri des factures, par Hugo Lefèvre'))
 
     const opened = [...mockPush.mock.calls, ...mockNavigate.mock.calls].map(([href]) =>
       pathOf(href),
@@ -243,7 +245,8 @@ describe('deciding on an other tool', () => {
 
   it('admits an other tool with the filled form, and the card says it', async () => {
     await openAdmit()
-    expect(screen.getByLabelText(ADMIT_TITLE)).toBeTruthy()
+    // Le titre de la feuille répète le libellé des boutons des cartes : on vise son en-tête.
+    expect(screen.getByRole('header', { name: ADMIT_TITLE })).toBeTruthy()
     // Le nom est prérempli : celui que les membres ont tapé.
     expect(screen.getByLabelText(NAME)).toHaveDisplayValue('Teachable Machine')
 

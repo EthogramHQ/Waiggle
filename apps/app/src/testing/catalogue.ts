@@ -131,7 +131,9 @@ export const adminToolOf = (tool: CatalogueTool): AdminCatalogueTool => ({
   family: tool.family,
   descriptionFr: `${tool.name} relie des applications entre elles.`,
   descriptionEn: `${tool.name} connects applications together.`,
-  siteUrl: `https://${tool.slug}.example/`,
+  // Un domaine que `ToolSiteUrl` accepte (`.example` est un suffixe réservé, refusé par le
+  // contrat : la feuille refusait alors d'enregistrer un outil qu'on ne faisait que renommer).
+  siteUrl: `https://${tool.slug}.com/`,
   aliases: tool.aliases,
   projectCount: tool.projectCount,
 })
