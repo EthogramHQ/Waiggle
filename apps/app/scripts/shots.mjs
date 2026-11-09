@@ -2251,14 +2251,16 @@ const pages = [
       await page.getByRole('checkbox', { name: /^Sciences et espace/ }).click()
     },
   },
-  // R6a : un titre tapé, puis Échap : « Abandonner ce projet ? » par-dessus la feuille.
+  // R6a : un titre tapé, puis « Annuler » : « Abandonner ce projet ? » par-dessus la feuille. (Pas
+  // Échap : en CI, la touche pouvait arriver avant que la feuille l'écoute, et rien ne s'ouvrait.)
   {
     name: 'publier-abandon',
     path: '/projects/new',
     signedIn: true,
     prepare: async (page) => {
-      await page.getByLabel('Titre', { exact: true }).fill('Le ciel de ce soir')
-      await page.keyboard.press('Escape')
+      const title = page.getByLabel('Titre', { exact: true })
+      await title.fill('Le ciel de ce soir')
+      await page.getByRole('button', { name: 'Annuler', exact: true }).first().click()
       await page.getByText('Abandonner ce projet ?').waitFor()
     },
   },
