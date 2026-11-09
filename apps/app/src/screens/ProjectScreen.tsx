@@ -328,6 +328,8 @@ function ProjectView({ project }: { project: Project }) {
           key: visual.id,
           source: toSource(visual.url),
           thumbhash: visual.thumbhash,
+          // R6a : une photo décrite est lue par sa description (texte brut, jamais du Markdown).
+          description: visual.description,
         }))}
         // Sans photo, la lumière miel seule (sans `title`) : le titre est déjà juste à côté ou
         // dessous, dans l'en-tête ; écrit aussi sur la lumière, il se lisait deux fois à l'œil.
