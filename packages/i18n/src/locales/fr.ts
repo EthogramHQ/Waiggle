@@ -1239,6 +1239,8 @@ export const fr = {
         'Les projets classés « Autre », et les catégories. Chaque changement entre dans « Changements récents ».',
       tabUncategorized: 'À ranger',
       tabCategories: 'Catégories',
+      /** Le nom du groupe d'onglets (ui-S3) : il dit le choix, pas le titre de la page. */
+      tabsLabel: 'Liste à afficher',
       emptyUncategorized: 'Aucun projet à ranger.',
       sort: 'Ranger dans une catégorie',
       sortTitle: 'Ranger « {{title}} »',

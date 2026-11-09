@@ -1059,6 +1059,8 @@ export const en: Translation = {
         'Projects filed under “Other”, and the categories. Every change goes into “Recent changes”.',
       tabUncategorized: 'To sort',
       tabCategories: 'Categories',
+      /** The tab group's name (ui-S3): it says the choice, not the page title. */
+      tabsLabel: 'List to show',
       emptyUncategorized: 'No project to sort.',
       sort: 'Sort into a category',
       sortTitle: 'Sort “{{title}}”',

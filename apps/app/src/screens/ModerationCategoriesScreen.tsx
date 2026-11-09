@@ -49,6 +49,7 @@ import {
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
 import { useMe } from '../profile/hooks'
+import { useProjectsOrNone } from '../tools/labels'
 import { Button } from '../ui/Button'
 import { Choices } from '../ui/Choices'
 import { FeedEnd } from '../ui/FeedEnd'
@@ -320,7 +321,7 @@ function AdminCategories() {
       <Stack gap="xl">
         <Stack gap="lg">
           <Segmented<Tab>
-            label={t(($) => $.moderation.categories.title)}
+            label={t(($) => $.moderation.categories.tabsLabel)}
             options={[
               {
                 value: 'uncategorized',
@@ -361,7 +362,8 @@ function AdminCategories() {
  */
 function CategoryRow({ category }: { category: Category }) {
   const { t } = useTranslation()
-  const projects = t(($) => $.moderation.categories.projects, { count: category.projectCount })
+  // « 2 projets », ou « Aucun projet pour l'instant » pour une catégorie neuve (ui-S1 de R6b).
+  const projects = useProjectsOrNone()(category.projectCount)
   return (
     <ListRow
       icon={category.icon}
@@ -577,6 +579,21 @@ function CreateSheet({
   }
 
   const invalid = (field: DraftField) => problem?.fields.includes(field) ?? false
+  // La phrase de chaque champ qui manque, sous lui (des-C3, ui-C2) : elle part dès qu'il est
+  // rempli. Un nom refusé pour une autre raison (déjà pris) n'a pas de phrase ici : la notice du
+  // pied la dit.
+  const nameFrError =
+    invalid('nameFr') && draft.nameFr.trim() === ''
+      ? t(($) => $.moderation.categories.nameFrRequired)
+      : undefined
+  const nameEnError =
+    invalid('nameEn') && draft.nameEn.trim() === ''
+      ? t(($) => $.moderation.categories.nameEnRequired)
+      : undefined
+  const iconError =
+    invalid('icon') && draft.icon === null
+      ? t(($) => $.moderation.categories.iconRequired)
+      : undefined
   const previewName = draft.nameFr.trim()
 
   return (
@@ -608,16 +625,18 @@ function CreateSheet({
         }
       >
         <Stack gap="lg">
-          <Text variant="callout" tone="secondary">
-            {t(($) => $.moderation.categories.createHint)}
-          </Text>
+          {/* La règle du sujet (jur-T15) est l'aide du champ : le lecteur d'écran la lit avec lui, et
+              elle reste sous l'erreur. */}
           <TextField
             label={t(($) => $.moderation.categories.nameFr)}
             value={draft.nameFr}
             onChangeText={(text) => change('nameFr', text)}
             inputRef={nameRef}
+            hint={t(($) => $.moderation.categories.createHint)}
+            keepHint
             limit={CATEGORY_NAME_MAX}
             showCount
+            error={nameFrError}
             invalid={invalid('nameFr')}
           />
           <TextField
@@ -626,6 +645,7 @@ function CreateSheet({
             onChangeText={(text) => change('nameEn', text)}
             limit={CATEGORY_NAME_MAX}
             showCount
+            error={nameEnError}
             invalid={invalid('nameEn')}
           />
           <IconGrid
@@ -635,6 +655,7 @@ function CreateSheet({
               label: t(($) => $.moderation.categories.iconName[name]),
             }))}
             value={draft.icon}
+            error={iconError}
             onChange={(name) => {
               // La grille ne propose que les icônes du contrat : le nom en est une.
               const icon = CATEGORY_ICON_CHOICES.find((one) => one === name)

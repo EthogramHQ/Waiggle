@@ -68,6 +68,7 @@ import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
+import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
 import { CommentCardCatalogue } from './commentaires-carte'
 import { CommentComposerCatalogue } from './commentaires-composer'
@@ -861,6 +862,7 @@ export function CatalogueScreen() {
       <FeedCatalogue />
       <ExploreCatalogue />
       <ToolsCatalogue />
+      <InvalidChoicesCatalogue />
       <ToolTagsCatalogue />
       <ToolFiltersCatalogue />
       <ToolFieldCatalogue />

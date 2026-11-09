@@ -7,6 +7,18 @@ import { useTranslation } from 'react-i18next'
 import type { ToolFieldLabels } from '../ui/ToolField'
 
 /**
+ * Hook : le nombre de projets d'un outil ou d'une catégorie, dit comme partout : « 41 projets », ou
+ * « Aucun projet pour l'instant » à zéro (« 0 projet » serait faux en français, ui-S1 de R6b). Un
+ * seul endroit pour la page d'un outil et pour les catégories de la modération ; le texte des
+ * catégories (« Sous le nom d'une catégorie ») reste le même au-dessus de zéro.
+ */
+export const useProjectsOrNone = () => {
+  const { t } = useTranslation()
+  return (count: number) =>
+    count === 0 ? t(($) => $.tools.noProjects) : t(($) => $.tools.projects, { count })
+}
+
+/**
  * Hook : les textes du champ des outils. Sous un nom proposé, sa famille et son nombre de projets
  * (« Assistant IA · 41 projets », ou « Aucun projet pour l'instant » : « 0 projet » serait faux en
  * français). `ToolSuggestion.family` porte le code de la famille (« assistant »), traduit ici.
@@ -17,8 +29,7 @@ import type { ToolFieldLabels } from '../ui/ToolField'
  */
 export const useToolLabels = (visibility: ProjectVisibility): ToolFieldLabels => {
   const { t } = useTranslation()
-  const projects = (count: number) =>
-    count === 0 ? t(($) => $.tools.noProjects) : t(($) => $.tools.projects, { count })
+  const projects = useProjectsOrNone()
   return {
     search: t(($) => $.project.form.toolSearch),
     suggestions: t(($) => $.project.form.toolSuggestions),

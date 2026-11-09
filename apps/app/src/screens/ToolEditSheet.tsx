@@ -209,6 +209,11 @@ export function ToolEditSheet({ open, mode, initial, onSubmit, onClose, returnFo
             }))}
             value={values.family}
             onChange={(family) => change('family', family)}
+            error={
+              invalid('family') && values.family === null
+                ? t(($) => $.moderation.catalogue.familyRequired)
+                : undefined
+            }
           />
           <TextField
             label={t(($) => $.moderation.catalogue.descriptionFr)}

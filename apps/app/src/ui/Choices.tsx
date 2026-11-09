@@ -6,8 +6,10 @@
 // R6a (« Facile à refaire ? ») : un choix peut porter un rond de couleur devant son texte (`dot`),
 // et une question facultative se vide par « Effacer » (`clearLabel`).
 import { borders, type ColorName, layout, radii, space } from '@ruche/brand'
-import { type ReactNode, type RefObject, useRef } from 'react'
+import { type ReactNode, type RefObject, useId, useRef } from 'react'
 import { Platform, Pressable, View } from 'react-native'
+import { describedBy, invalid } from './aria'
+import { FieldError } from './FieldError'
 import { focusWithoutScroll } from './focus'
 import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
@@ -44,6 +46,11 @@ type Base<T extends string> = {
    * retrait de la modération).
    */
   entryRef?: RefObject<View | null>
+  /**
+   * R6b : l'état invalide. Une réponse manque (« Choisis une famille. ») : la phrase s'affiche sous
+   * les choix, et le groupe porte `aria-invalid` (web) et cite la phrase dans `aria-describedby`.
+   */
+  error?: string | undefined
 }
 type WithoutClear<T extends string> = Base<T> & {
   clearLabel?: undefined
@@ -70,8 +77,10 @@ type KeyEvent = { key: string; preventDefault: () => void }
 export function Choices<T extends string>(props: WithoutClear<T>): ReactNode
 export function Choices<T extends string>(props: WithClear<T>): ReactNode
 export function Choices<T extends string>(props: Props<T>) {
-  const { label, options, value, onChange, clearLabel, entryRef } = props
+  const { label, options, value, onChange, clearLabel, entryRef, error } = props
   const { colors } = useTheme()
+  // Relie la phrase d'erreur au groupe (aria-describedby) ; stable au pré-rendu web.
+  const errorId = useId()
   // Les choix, pour y poser le focus quand une flèche passe au voisin.
   const refs = useRef<(View | null)[]>([])
   // Le seul choix que Tab atteint (« tabIndex itinérant ») : le choix coché, ou le premier quand
@@ -154,6 +163,8 @@ export function Choices<T extends string>(props: Props<T>) {
       <View
         accessibilityRole="radiogroup"
         accessibilityLabel={label}
+        {...invalid(Boolean(error))}
+        {...describedBy(error ? errorId : undefined)}
         style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}
       >
         {options.map((option, index) => {
@@ -228,6 +239,7 @@ export function Choices<T extends string>(props: Props<T>) {
           )
         })}
       </View>
+      <FieldError id={errorId} message={error} />
     </View>
   )
 }
