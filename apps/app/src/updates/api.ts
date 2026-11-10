@@ -34,11 +34,10 @@ type UpdatesCache = InfiniteData<ProjectUpdatePage, string | undefined>
  * Pourquoi la dernière demande a échoué, quand réessayer ne servirait à rien :
  * - limited : la limite du jour est atteinte (10 mises à jour par jour, 429) ;
  * - expired : la session a expiré (401) ;
- * - photos : une photo n'est plus en attente (400 `invalid_photos`) ;
- * - photosFull : le projet a ses 100 photos de mises à jour (409 `update_photos_full`).
+ * - invalidPhotos : une photo n'est plus en attente (400 `invalid_photos`).
  * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
  */
-export type UpdateFailure = 'limited' | 'expired' | 'photos' | 'photosFull'
+export type UpdateFailure = 'limited' | 'expired' | 'invalidPhotos'
 
 const reasonOf = (error: unknown): UpdateFailure | undefined => {
   if (!error) return undefined
@@ -48,9 +47,7 @@ const reasonOf = (error: unknown): UpdateFailure | undefined => {
     case 'unauthorized':
       return 'expired'
     case 'invalidPhotos':
-      return 'photos'
-    case 'updatePhotosFull':
-      return 'photosFull'
+      return 'invalidPhotos'
     default:
       return undefined
   }
@@ -143,7 +140,7 @@ const refresh = (queryClient: ReturnType<typeof useQueryClient>, projectId: stri
 
 /**
  * Hook : publier une mise à jour. `publish` renvoie vrai si elle est publiée (la feuille se ferme),
- * faux sinon (la feuille reste ouverte, `state.error` devient vrai). La nouvelle se range en tête de
+ * faux sinon (la feuille reste ouverte, `error` devient vrai). La nouvelle se range en tête de
  * la frise et dans le projet en cache, sans attendre la relecture.
  */
 export const usePublishUpdate = (projectId: string) => {
@@ -177,11 +174,9 @@ export const usePublishUpdate = (projectId: string) => {
   )
   return {
     publish,
-    state: {
-      pending: mutation.isPending,
-      error: mutation.isError,
-      reason: reasonOf(mutation.error),
-    },
+    pending: mutation.isPending,
+    error: mutation.isError,
+    reason: reasonOf(mutation.error),
   }
 }
 
@@ -248,6 +243,7 @@ export const useDeleteUpdate = (projectId: string) => {
   )
   return {
     remove,
+    pending: mutation.isPending,
     error: mutation.isError,
     reason: reasonOf(mutation.error),
   }
