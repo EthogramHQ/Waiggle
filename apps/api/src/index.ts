@@ -114,6 +114,7 @@ if (env.databaseUrl) {
       appUrl: env.appUrl,
       apiUrl: env.publicApiUrl,
       secret: env.authSecret,
+      storage,
     },
     emailJobs: env.emailJobs,
   })

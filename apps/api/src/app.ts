@@ -36,6 +36,7 @@ import { reportRoutes } from './routes/reports'
 import { searchRoutes } from './routes/search'
 import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
+import { testerRoutes } from './routes/testers'
 import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
 import { updateRoutes } from './routes/updates'
@@ -341,6 +342,8 @@ export const createApp = ({
   // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
   app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
   app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl }))
+  // Rejoindre et quitter les testeurs d'un projet (tranche R7a).
+  app.route('/', testerRoutes({ db, limiter }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
