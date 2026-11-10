@@ -5,6 +5,7 @@ import { Platform } from 'react-native'
 import { authClient } from '../accounts/auth-client'
 import { apiUrl } from '../config'
 import { AMBIGUOUS_STATUSES, type ApiResult, errorKeyFor } from './errors'
+import { reloadIfNewVersion } from './newVersion'
 
 /**
  * Envoie une requête à l'API avec la session du membre.
@@ -41,7 +42,10 @@ export const request = async <T>(
   const sent = await send(path, init)
   if (!sent.ok) return sent
   const parsed = schema.safeParse(await sent.data.json().catch(() => null))
-  return parsed.success ? { ok: true, data: parsed.data } : { ok: false, error: 'internal' }
+  if (parsed.success) return { ok: true, data: parsed.data }
+  // Un onglet d'avant un déploiement : la page se recharge sur la nouvelle appli (api/newVersion.ts).
+  void reloadIfNewVersion()
+  return { ok: false, error: 'internal' }
 }
 
 /** Pour les requêtes dont la réponse n'a pas de contenu (une suppression répond « 204 »). */

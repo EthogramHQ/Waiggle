@@ -28,8 +28,12 @@ RUN pnpm install --offline --frozen-lockfile --filter @ruche/app...
 # ARG : un réglage passé à « docker build » ; ENV : une variable visible par les commandes.
 ARG APP_DOMAIN=localhost
 ARG API_DOMAIN=api.localhost
+# Le commit construit : l'appli le compare à celui de l'API pour se recharger après un déploiement
+# (apps/app/src/api/newVersion.ts). « local » hors de la CI : jamais de rechargement.
+ARG APP_VERSION=local
 ENV EXPO_PUBLIC_APP_URL=https://${APP_DOMAIN} \
     EXPO_PUBLIC_API_URL=https://${API_DOMAIN} \
+    EXPO_PUBLIC_APP_VERSION=${APP_VERSION} \
     EXPO_NO_TELEMETRY=1 \
     CI=1
 RUN pnpm --filter @ruche/app build
