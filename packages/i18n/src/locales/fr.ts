@@ -2035,9 +2035,6 @@ export const fr = {
     newProjects_one: '{{count}} nouveau projet',
     newProjects_other: '{{count}} nouveaux projets',
     newProjectsMany: '{{max}} nouveaux projets ou plus',
-    newNotes_one: '{{count}} nouvelle note',
-    newNotes_other: '{{count}} nouvelles notes',
-    newNotesMany: '{{max}} nouvelles notes ou plus',
     // R7a : « 2 mises à jour » ; « nouveautés » quand il y a aussi de nouveaux projets.
     newUpdates_one: '{{count}} mise à jour',
     newUpdates_other: '{{count}} mises à jour',

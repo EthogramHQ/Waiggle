@@ -2,9 +2,11 @@
 // même quand leurs tests remplacent les requêtes (feed/api.ts) par de faux résultats.
 import type { FeedItem } from '@ruche/contracts'
 
-/** L'identifiant d'un élément du fil : celui du projet, ou celui de la note. */
-export const feedItemId = (item: FeedItem) =>
-  item.kind === 'note' ? item.note.id : item.project.id
+/**
+ * L'identifiant d'un élément du fil : celui de son projet. Depuis R7a, un projet n'y paraît qu'une
+ * fois (à son événement le plus récent, publication ou mise à jour) : l'id du projet suffit.
+ */
+export const feedItemId = (item: FeedItem) => item.project.id
 
 /**
  * Le premier élément qui n'est pas du membre lui-même (R6a : ses projets entrent dans son fil, et
