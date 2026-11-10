@@ -20,8 +20,14 @@
 // - ordinateur : le miel couvre toute la page, la barre de navigation en haut, la scène (`hero`) à
 //   gauche, la feuille en carte à droite (comme la maquette de la connexion sur ordinateur). Sans
 //   `hero`, le décor passe en tête de la carte.
-import { honeyLight, layout, radii, type Scheme, space } from '@ruche/brand'
-import { type ReactNode, useState } from 'react'
+//
+// Sur ordinateur, la carte est centrée en hauteur : si elle grandit par le bas (une ligne qui
+// arrive avec la réponse de l'API), elle se recentre et tout ce qu'elle porte remonte, sous la
+// souris. Un contenu qui sait ce qui peut encore s'ajouter à la fin de la carte en fait garder la
+// place **sous** la carte, sur le miel, invisible (`useHoldUnderCard`, correction du 10/11 après
+// R7a, page de sortie) : la carte se centre avec cette place, et ce qui arrive la reprend.
+import { honeyLight, layout, radii, type Scheme, type Space, space } from '@ruche/brand'
+import { createContext, type ReactNode, useContext, useLayoutEffect, useState } from 'react'
 import { type LayoutChangeEvent, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
@@ -33,6 +39,36 @@ import { useTheme } from './theme/ThemeProvider'
 const BAND = 300
 /** De combien la feuille remonte sur la bande : son arrondi laisse voir le miel dans ses coins. */
 const OVERLAP = radii.ambiance
+/** La marge intérieure de la carte (ordinateur) et l'écart entre ses blocs. */
+const CARD_PADDING: Space = 'xxl'
+const CARD_GAP: Space = 'xl'
+
+/**
+ * Le canal par lequel le contenu de la carte confie à l'ambiance la place à garder sous elle. Un
+ * contexte React transmet une valeur à tous les composants qu'il entoure, sans la passer de main en
+ * main ; ici, la fonction qui pose (ou retire) la place. Il n'existe que dans la mise en page en
+ * carte : sur téléphone, la feuille descend jusqu'en bas et ne se recentre jamais.
+ */
+const HoldUnderCard = createContext<((hold: ReactNode | null) => void) | null>(null)
+
+/**
+ * Fait garder sous la carte (ordinateur seulement) la place de ce qui peut encore s'ajouter à la
+ * fin de la carte : `hold` est un gabarit de même forme, que l'ambiance pose sous la carte, à la
+ * largeur du contenu et après le même écart que les autres blocs, invisible et caché aux lecteurs
+ * d'écran. `null` : plus de place gardée (ce qui l'attendait est arrivé). Le gabarit doit être un
+ * élément stable (une constante du module), et ne rien contenir qu'on atteigne au clavier.
+ *
+ * La place est posée avant que le navigateur dessine (`useLayoutEffect`) : la ligne qui arrive et
+ * la place qui part changent dans la même image, la carte ne bouge pas.
+ */
+export function useHoldUnderCard(hold: ReactNode | null) {
+  const setHold = useContext(HoldUnderCard)
+  useLayoutEffect(() => {
+    if (!setHold) return
+    setHold(hold)
+    return () => setHold(null)
+  }, [setHold, hold])
+}
 
 type Props = {
   /** Le contenu de l'écran : il est posé sur la feuille claire. */
@@ -74,6 +110,8 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   const [band, setBand] = useState(BAND)
   const onBandLayout = (event: LayoutChangeEvent) => setBand(event.nativeEvent.layout.height)
   const decor = scene ? <Decor>{scene}</Decor> : null
+  // La place gardée sous la carte, confiée par son contenu (voir useHoldUnderCard).
+  const [hold, setHold] = useState<ReactNode | null>(null)
 
   if (card) {
     // RF (relecture design, n° 6) : la barre se pose où la posent les autres pages (ScreenTopBar :
@@ -115,12 +153,37 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
           }}
         >
           <View style={{ width: layout.formWidth - 80 }}>
-            <Surface variant="plain" radius="ambiance" padding="xxl" gap="xl" shadow="card">
+            <Surface
+              variant="plain"
+              radius="ambiance"
+              padding={CARD_PADDING}
+              gap={CARD_GAP}
+              shadow="card"
+            >
               {/* Pas de bande de miel ici : le décor passe en tête de la carte, sauf si la scène
                   de gauche le montre déjà (l'accueil). */}
               {hero ? null : decor}
-              {children}
+              <HoldUnderCard.Provider value={setHold}>{children}</HoldUnderCard.Provider>
             </Surface>
+            {hold ? (
+              // La place gardée : centrée avec la carte, elle n'en change pas l'allure (le miel
+              // reste visible dessous). À la largeur du contenu de la carte et après le même écart
+              // que ses blocs : ce qui arrive y prend exactement la hauteur qu'elle libère.
+              <View
+                testID="card-hold"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                aria-hidden
+                pointerEvents="none"
+                style={{
+                  opacity: 0,
+                  paddingTop: space[CARD_GAP],
+                  paddingHorizontal: space[CARD_PADDING],
+                }}
+              >
+                {hold}
+              </View>
+            ) : null}
           </View>
           {hero ? <View style={{ flex: 1, minWidth: 0 }}>{hero}</View> : null}
         </View>
