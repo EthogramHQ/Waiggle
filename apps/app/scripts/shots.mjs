@@ -3382,10 +3382,12 @@ async function layoutReport() {
       }
       current?.push(line)
     }
+    // Une image se nomme « <page>-<largeur>.png ». Comparaison de chaînes, pas d'expression
+    // régulière construite avec les noms donnés à --only (CodeQL : injection d'expression).
+    const imageOf = (name, page) =>
+      name.startsWith(`${page}-`) && /^\d+\.png$/.test(name.slice(page.length + 1))
     for (const name of readdirSync(dir)) {
-      if (only.some((page) => new RegExp(`^${page}-\\d+\\.png$`).test(name))) {
-        rmSync(join(dir, name), { force: true })
-      }
+      if (only.some((page) => imageOf(name, page))) rmSync(join(dir, name), { force: true })
     }
   } else {
     rmSync(dir, { recursive: true, force: true })
