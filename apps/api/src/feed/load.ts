@@ -1,26 +1,27 @@
 // Lecture des deux fils de l'accueil (tranche 4) : « Abonnements » et « Découvrir ». Ils montrent
 // les nouveaux projets publics, du plus récent au plus ancien, par pages de 20, et se lisent avec
-// un curseur (cursor.ts : pourquoi un curseur plutôt qu'un numéro de page). « Abonnements » y mêle
-// les notes des projets suivis (tranche 4b).
+// un curseur (cursor.ts : pourquoi un curseur plutôt qu'un numéro de page). Depuis R7a,
+// « Abonnements » fait remonter un projet suivi, ou d'un membre suivi, à sa dernière mise à jour :
+// chaque projet n'y paraît qu'une fois, à son événement le plus récent (sa publication ou sa
+// dernière mise à jour). Les notes du Journal (tranche 4b) n'y sont plus.
 import {
   type DiscoverFeedPage,
   FEED_PAGE_SIZE,
   type FeedItem,
   type FeedPage,
   type FollowingFeedPage,
-  PROJECT_NOTES_SHOWN,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, ne, or, type SQL, sql } from 'drizzle-orm'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { after, type CursorContent, encodeCursor } from '../cursor'
 import { followedAmong, followsAnyone } from '../follows/load'
-import { toNote } from '../notes/load'
 import { rowsToSummaries, selectProjects } from '../projects/load'
 import { listedProjectFor, listedVerifiedProjectFor } from '../projects/visibility'
+import { hasReadableLines, updateOnCards } from '../updates/load'
 
 const t = schema.project
-const n = schema.projectNote
+const u = schema.projectUpdate
 
 /**
  * Une page du fil « Découvrir » : les projets publics qui remplissent `where`, après le curseur
@@ -79,45 +80,76 @@ const loadPage = async (
 
 /**
  * Une ligne du fil « Abonnements », avant d'être complétée : de quelle sorte d'élément il s'agit,
- * sa date et son identifiant (ceux du curseur), le projet concerné, et le texte d'une note (null
- * pour un nouveau projet).
+ * sa date (celle du curseur), le projet concerné (l'identifiant du curseur : un projet n'est jamais
+ * deux fois dans le fil), et la mise à jour qui le fait remonter (null pour une publication).
  */
 type Entry = {
   kind: FeedItem['kind']
   at: Date
-  id: string
   projectId: string
-  body: string | null
+  updateId: string | null
 }
 
 /**
- * Les lignes d'une page du fil « Abonnements », après le curseur : les nouveaux projets des membres
- * suivis ET les notes des projets suivis, mêlés dans un seul ordre (date desc, identifiant desc).
- * Une seule requête, en trois morceaux.
+ * « Le projet en cours a une mise à jour qui compte sur une carte, plus récente que sa
+ * publication » : alors son événement le plus récent n'est plus sa publication. Les mêmes règles
+ * que la carte (updateOnCards : pas retirée ; hasReadableLines : au moins une ligne lisible).
  *
- * 1. Les nouveaux projets publics des membres suivis, comme en 4a : author_id in (select member_id
- *    from member_follow where follower_id = $viewer). La clé primaire de member_follow donne les
+ * En SQL : (select 1 from project_update where project_update.project_id = project.id
+ *   and removed_at is null and <lignes lisibles> and created_at > project.published_at limit 1)
+ *   is not null
+ * Une recherche dans l'index project_update_project_created_idx (project_id, created_at desc) par
+ * projet lu. La forme « (select 1 … limit 1) is not null » plutôt que « exists » : dans un « or »,
+ * PostgreSQL pourrait faire d'un exists une lecture de toute la table (pièges de code-api.md). Les
+ * noms de colonnes sont écrits en toutes lettres (sql.raw, du texte fixe) : dans un « select » sur
+ * la seule table project, Drizzle écrirait « id » sans sa table, qui serait alors celui de
+ * project_update.
+ */
+const raisedByAnUpdate = () =>
+  sql`(select 1 from ${u}
+    where ${sql.raw('project_update.project_id')} = ${sql.raw('project.id')}
+      and ${updateOnCards()} and ${hasReadableLines()}
+      and ${sql.raw('project_update.created_at')} > ${sql.raw('project.published_at')}
+    limit 1) is not null`
+
+/**
+ * Les lignes d'une page du fil « Abonnements », après le curseur : chaque projet une seule fois, à
+ * son événement le plus récent, dans un seul ordre (date desc, identifiant du projet desc). Une
+ * seule requête, en trois morceaux, qui ne se recouvrent jamais :
+ *
+ * 1. Les publications : les projets publics des membres suivis et ceux du lecteur, à leur
+ *    published_at, comme en 4a et R6a ; author_id in (select member_id from member_follow where
+ *    follower_id = $viewer union all select $viewer). La clé primaire de member_follow donne les
  *    membres suivis, l'index (author_id, published_at) de project les projets de chacun. Au plus
- *    21, les plus récents après le curseur.
+ *    21, les plus récents après le curseur. Sauf le projet d'un membre suivi qu'une mise à jour plus
+ *    récente fait remonter (raisedByAnUpdate) : il est dans le morceau 2. Ses propres projets
+ *    restent toujours à leur publication : ses mises à jour ne les font pas remonter (plan R7a).
  *
- * 2. Les notes des projets publics suivis. Pour chaque projet suivi (la clé primaire de
- *    project_follow, qui commence par follower_id), encore public (la clé primaire de project), une
- *    sous-requête « lateral » (voir notes/load.ts) prend ses 21 notes les plus récentes après le
- *    curseur, dans l'index project_note_project_created_idx, et s'arrête là. Puis on garde les 21
- *    plus récentes de toutes. Sans « lateral », PostgreSQL lirait toutes les notes de chaque projet
- *    suivi après le curseur, même s'il y en a des milliers, pour n'en garder que 21.
+ * 2. Les mises à jour : les projets publics que le lecteur suit (la clé primaire de project_follow,
+ *    qui commence par follower_id), ou dont il suit l'auteur (member_follow, puis l'index d'auteur
+ *    de project), sauf les siens. « union » (sans « all ») retire les doublons : un projet suivi
+ *    dont on suit aussi l'auteur ne vient qu'une fois. Pour chacun, une sous-requête « lateral »
+ *    prend sa dernière mise à jour qui compte sur une carte (voir latestUpdatesOf, updates/load.ts),
+ *    dans l'index project_update_project_created_idx, sans trier. Le projet n'est gardé que si
+ *    cette mise à jour est son événement le plus récent : plus récente que sa publication, ou un
+ *    projet suivi dont on ne suit pas l'auteur (sa publication n'est pas dans le fil). Puis le
+ *    curseur, et les 21 plus récents.
  *
- * 3. « union all » met les deux listes bout à bout, en une seule (« all » : sans chercher les
- *    doublons, inutile ici puisqu'un projet et une note ne sont jamais la même ligne). Les deux
- *    morceaux doivent donner les mêmes colonnes, dans le même ordre : d'où `kind` ('project' ou
- *    'note', écrit en dur dans chaque morceau) et `body` (null pour un projet). Le tout est trié
- *    une dernière fois et coupé à 21 : les 21 premiers de l'ensemble sont forcément parmi les 21
- *    premiers de chaque morceau, d'où la limite de 21 dans chacun.
+ * 3. « union all » met les deux listes bout à bout (« all » : sans chercher les doublons, il n'y en
+ *    a pas, les deux conditions sont contraires). Les deux morceaux donnent les mêmes colonnes, dans
+ *    le même ordre : `kind` ('project' ou 'update', écrit en dur) et `update_id` (null pour une
+ *    publication). Le tout est trié une dernière fois et coupé à 21 : les 21 premiers de l'ensemble
+ *    sont forcément parmi les 21 premiers de chaque morceau.
  *
- * Le curseur est commun aux deux sortes d'éléments : { at, id } du dernier élément de la page,
- * projet ou note. Un projet est daté par published_at, une note par created_at, et tous deux sont
- * rangés par (date desc, identifiant desc) : « après le curseur » a donc le même sens dans les deux
- * morceaux, et des ex aequo de deux sortes au même instant sont départagés par leur identifiant.
+ * Le curseur est `(at, project_id)` du dernier élément de la page. Un projet n'ayant qu'une ligne,
+ * à une seule date, « après le curseur » ne peut ni le répéter ni le perdre d'une page à l'autre, et
+ * des ex aequo au même instant sont départagés par l'identifiant du projet. La condition du curseur
+ * s'applique APRÈS le choix de l'événement le plus récent : sinon un projet déjà montré en haut, à
+ * sa mise à jour, reviendrait plus bas à sa publication.
+ *
+ * Le prix : le morceau 2 lit la dernière mise à jour de chaque projet suivi et de chaque projet des
+ * membres suivis (une recherche d'index chacun), avant de garder les 21 plus récents. C'est
+ * proportionnel à ce que le lecteur suit, pas à la taille de la base (noté dans « À surveiller »).
  */
 const selectFollowingEntries = (
   db: Database,
@@ -134,11 +166,11 @@ const selectFollowingEntries = (
       // sql<…>`…` : une valeur écrite en SQL, dont on donne le type à TypeScript. .as() la nomme.
       kind: sql<FeedItem['kind']>`'project'`.as('kind'),
       // published_at n'est jamais null ici (la condition l'exige) : on le dit à TypeScript, pour
-      // que la colonne ait le même type que la date d'une note. mapWith la lit comme la colonne.
+      // que la colonne ait le même type que la date d'une mise à jour. mapWith la lit comme la
+      // colonne.
       at: sql<Date>`${t.publishedAt}`.mapWith(t.publishedAt).as('at'),
-      id: t.id,
       projectId: sql<string>`${t.id}`.as('project_id'),
-      body: sql<string | null>`null::text`.as('body'),
+      updateId: sql<string | null>`null::uuid`.as('update_id'),
     })
     .from(t)
     .where(
@@ -148,68 +180,75 @@ const selectFollowingEntries = (
         listedProjectFor(viewerId),
         isNotNull(t.publishedAt),
         inArray(t.authorId, followedMembers),
+        // Sa publication est son dernier événement : un des siens, ou aucune mise à jour plus
+        // récente (sinon il est dans le morceau des mises à jour).
+        or(eq(t.authorId, viewerId), sql`not ${raisedByAnUpdate()}`),
         cursor ? after(cursor, t.publishedAt, t.id) : undefined,
       ),
     )
     .orderBy(desc(t.publishedAt), desc(t.id))
+    // Un de plus que la page : s'il existe, il reste une suite (et il ouvrira la page suivante).
     .limit(FEED_PAGE_SIZE + 1)
 
-  const f = schema.projectFollow
-  // Les 21 notes d'un projet suivi qui suivent le curseur. f.projectId : le projet de la ligne en
-  // cours de project_follow, que « lateral » permet de lire depuis la sous-requête.
-  const recentNotes = db
-    .select({ id: n.id, body: n.body, createdAt: n.createdAt })
-    .from(n)
+  // La dernière mise à jour du projet en cours qui compte sur une carte. eq(u.projectId, t.id) :
+  // « lateral » permet à la sous-requête de lire la ligne en cours de project.
+  const latest = db
+    .select({ id: u.id, createdAt: u.createdAt })
+    .from(u)
+    .where(and(eq(u.projectId, t.id), updateOnCards(), hasReadableLines()))
+    .orderBy(desc(u.createdAt), desc(u.id))
+    .limit(1)
+    .as('latest')
+  // Les projets que le lecteur suit, et ceux des membres qu'il suit. Le nom « authored » distingue
+  // la table project de la sous-requête de celle de la requête principale.
+  const followedProjects = sql`(select project_id from project_follow where follower_id = ${viewerId}
+    union select authored.id from project authored
+      where authored.author_id in (select member_id from member_follow where follower_id = ${viewerId}))`
+  // « Le lecteur suit l'auteur du projet en cours » : une recherche dans la clé primaire de
+  // member_follow (follower_id, member_id).
+  const authorFollowed = sql`(select 1 from member_follow
+    where follower_id = ${viewerId} and member_id = ${sql.raw('project.author_id')}) is not null`
+  const updates = db
+    .select({
+      kind: sql<FeedItem['kind']>`'update'`.as('kind'),
+      at: sql<Date>`${latest.createdAt}`.mapWith(u.createdAt).as('at'),
+      projectId: sql<string>`${t.id}`.as('project_id'),
+      updateId: sql<string | null>`${latest.id}`.as('update_id'),
+    })
+    .from(t)
+    .crossJoinLateral(latest)
     .where(
       and(
-        eq(n.projectId, f.projectId),
-        cursor ? after(cursor, n.createdAt, n.id) : undefined,
-        // Une note retirée par la modération n'arrive jamais dans le fil (tranche 7a) : un abonné
-        // ne peut pas être l'auteur du projet, qui seul la lit encore (on ne suit pas ses projets).
-        isNull(n.removedAt),
-        // Seulement parmi les 20 notes les plus récentes du projet, celles de son journal : une note
-        // lisible par les abonnés doit toujours être visible, et supprimable, par son auteur. On
-        // compte les notes plus récentes que celle-ci (« newer ») : moins de 20, elle est au journal.
-        // Les notes retirées ne comptent pas, comme dans le journal que lisent les autres
-        // (notes/load.ts) : elles n'y prennent pas de place.
-        sql`(select count(*) from ${n} as newer where newer.project_id = ${n.projectId} and newer.removed_at is null and (newer.created_at, newer.id) > (${n.createdAt}, ${n.id})) < ${PROJECT_NOTES_SHOWN}`,
+        inArray(t.id, followedProjects),
+        // Ses propres projets ne remontent pas par leurs mises à jour ; un projet privé, retiré ou
+        // d'un membre bloqué avec lui ne remonte jamais (listedProjectFor).
+        ne(t.authorId, viewerId),
+        listedProjectFor(viewerId),
+        // La mise à jour est son dernier événement : un projet suivi dont il ne suit pas l'auteur
+        // (sa publication n'est pas dans le fil), ou une mise à jour plus récente que la
+        // publication. Le contraire exact de la condition du morceau 1.
+        sql`(not ${authorFollowed} or ${sql.raw('project.published_at')} is null or ${latest.createdAt} > ${sql.raw('project.published_at')})`,
+        cursor ? after(cursor, latest.createdAt, t.id) : undefined,
       ),
     )
-    .orderBy(desc(n.createdAt), desc(n.id))
-    .limit(FEED_PAGE_SIZE + 1)
-    .as('recent_notes')
-  const notes = db
-    .select({
-      kind: sql<FeedItem['kind']>`'note'`.as('kind'),
-      at: recentNotes.createdAt,
-      id: recentNotes.id,
-      projectId: f.projectId,
-      body: recentNotes.body,
-    })
-    .from(f)
-    // Seulement les projets encore publics et pas retirés : un projet suivi devenu privé ne montre
-    // plus rien, pas même à son auteur (qui ne peut d'ailleurs pas suivre ses propres projets).
-    // Bloquer retire déjà les abonnements ; la condition le redit (tranche 7b), au cas où.
-    .innerJoin(t, and(eq(t.id, f.projectId), listedProjectFor(viewerId)))
-    .crossJoinLateral(recentNotes)
-    .where(eq(f.followerId, viewerId))
-    .orderBy(desc(recentNotes.createdAt), desc(recentNotes.id))
+    .orderBy(desc(latest.createdAt), desc(t.id))
     .limit(FEED_PAGE_SIZE + 1)
 
-  // L'ordre final porte sur les colonnes du résultat de l'union, nommées « at » et « id ».
-  return unionAll(newProjects, notes)
-    .orderBy(desc(sql.identifier('at')), desc(sql.identifier('id')))
+  // L'ordre final porte sur les colonnes du résultat de l'union, nommées « at » et « project_id ».
+  return unionAll(newProjects, updates)
+    .orderBy(desc(sql.identifier('at')), desc(sql.identifier('project_id')))
     .limit(FEED_PAGE_SIZE + 1)
 }
 
 /**
- * Le fil « Abonnements » : les nouveaux projets publics des membres que `viewerId` suit, et les
- * notes des projets publics qu'il suit. Suivre un membre fait venir ses nouveaux projets, pas les
- * notes de ses projets ; suivre un projet fait venir ses notes.
+ * Le fil « Abonnements » : les projets publics des membres que `viewerId` suit et les siens, à leur
+ * publication, et les projets publics qu'il suit, ou dont il suit l'auteur, à leur dernière mise à
+ * jour quand elle est plus récente. Suivre un membre fait venir ses nouveaux projets et leurs mises
+ * à jour ; suivre un projet fait venir ses mises à jour.
  *
  * Toujours le même nombre de requêtes, quelle que soit la page : les lignes (une requête), les
- * projets de ces lignes avec leur auteur (une), leurs médias pour les couvertures et le total de
- * leurs réactions (deux, rowsToSummaries), et deux petites requêtes pour followsAnyone.
+ * projets de ces lignes avec leur auteur (une), leurs médias, réactions, outils et dernières mises
+ * à jour (rowsToSummaries), et deux petites requêtes pour followsAnyone.
  *
  * Sans `lastReadAt` (R4) : la date de la dernière lecture est une trace d'activité, que seul
  * feed/state.ts lit (relecture juridique jur-J3) ; la route du fil l'ajoute à la page.
@@ -226,10 +265,9 @@ export const loadFollowingFeed = async (
   ])
   const page = entries.slice(0, FEED_PAGE_SIZE)
 
-  // Les projets de la page, lus en une requête (plusieurs notes d'un même projet n'en demandent
-  // qu'un : new Set retire les doublons). La condition « public » est redite : si un projet est
-  // devenu privé entre les deux requêtes, ses éléments sont laissés de côté.
-  const projectIds = [...new Set(page.map((entry) => entry.projectId))]
+  // Les projets de la page, lus en une requête. La condition « public » est redite : si un projet
+  // est devenu privé entre les deux requêtes, son élément est laissé de côté.
+  const projectIds = page.map((entry) => entry.projectId)
   const rows =
     projectIds.length === 0
       ? []
@@ -246,11 +284,12 @@ export const loadFollowingFeed = async (
     if (!project) return []
     const at = entry.at.toISOString()
     if (entry.kind === 'project') return [{ kind: 'project', at, project }]
-    // Une note : body n'est jamais null pour elle (la colonne l'interdit), mais TypeScript ne le
-    // sait pas ; une ligne sans texte est simplement laissée de côté.
-    if (entry.body === null) return []
-    const note = toNote({ id: entry.id, body: entry.body, createdAt: entry.at })
-    return [{ kind: 'note', at, note, project }]
+    // La version courte de la mise à jour est celle de la carte (la même règle, B4) : la carte et
+    // l'élément disent toujours la même chose. Si elle a changé entre les deux requêtes (supprimée,
+    // retirée), l'élément est laissé de côté plutôt que de montrer une date qui ne serait plus vraie.
+    const update = project.latestUpdate
+    if (update === null || update.id !== entry.updateId) return []
+    return [{ kind: 'update', at, update, project }]
   })
 
   // Le marque-page vient de la dernière ligne de la page, même si son élément a été laissé de côté
@@ -260,14 +299,15 @@ export const loadFollowingFeed = async (
     items,
     nextCursor:
       entries.length > FEED_PAGE_SIZE && last
-        ? encodeCursor({ at: last.at.toISOString(), id: last.id })
+        ? encodeCursor({ at: last.at.toISOString(), id: last.projectId })
         : null,
     followsAnyone: anyone,
   }
 }
 
 /**
- * Le fil « Découvrir » : tous les projets publics, ceux du visiteur compris (jamais de note).
+ * Le fil « Découvrir » : tous les projets publics, ceux du visiteur compris, dans l'ordre de leur
+ * publication (R7a : une mise à jour ne les fait pas remonter ; leur carte la porte seulement).
  * `testers` : seulement ceux qui cherchent des testeurs (au statut « testable », avec un lien de
  * démo). L'index partiel project_public_published_idx est déjà rangé dans l'ordre du fil.
  *

@@ -1586,6 +1586,32 @@ describe('the updates of followed and tested projects (R7a)', () => {
     expect(await unread(zoe)).toBe(0)
   })
 
+  // Scénario R7a, « Quitter » (décision de la session) : un projet dont l'auteur est suspendu ne
+  // prévient plus ses testeurs. Un compte suspendu ne publie plus rien (la garde de suspension) :
+  // c'est donc la mise à jour publiée avant la suspension qui disparaît, de la liste et de la cloche.
+  it('never notifies the testers of a project whose author is suspended', async () => {
+    const zoeId = (await me(zoe)).id
+    await act.makeAdmin((await me(sam)).id)
+    const meteo = await publish(ines)
+    await joinTesters(meteo.id, zoeId)
+    await openScreen(zoe)
+    const update = await postUpdate(meteo.id, ines)
+    expect(await updateKeys(zoe)).toEqual([`project_update:${update.id}`]) // témoin
+    expect(await unread(zoe)).toBe(1) // témoin
+
+    later()
+    await act.decide(sam, {
+      action: 'suspend',
+      memberId: inesId,
+      duration: '7d',
+      ground: 'rules',
+      explanation: 'Messages insultants répétés.',
+    })
+
+    expect(await updatesOf(zoe)).toEqual([])
+    expect(await unread(zoe)).toBe(0)
+  })
+
   it('never notifies about a project removed by the moderation', async () => {
     const samId = (await me(sam)).id
     await act.makeAdmin(samId)

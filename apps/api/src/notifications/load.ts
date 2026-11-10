@@ -3,14 +3,15 @@
 // et mentions qui existent. Une réaction retirée, un commentaire supprimé ou masqué, un projet
 // devenu privé, un compte supprimé font donc disparaître leur notification sans code de plus, et
 // rien n'est montré au-delà de 90 jours. Ce que le membre a déjà vu (seen_at) et la date de son
-// pseudo sont lus dans notification_state (state.ts).
+// pseudo sont lus dans notification_state (state.ts). R7a : les mises à jour des projets qu'il suit
+// ou qu'il teste s'y ajoutent, et remplacent les notes du Journal dans les sources de la modération.
 import {
   EXCERPT_MAX,
   NOTIFICATION_DAYS,
   NOTIFICATION_PAGE_SIZE,
   type Notification,
   RemovalGround,
-  ReportTargetKind,
+  StoredReportTargetKind,
   UNREAD_COUNT_MAX,
 } from '@ruche/contracts'
 import type { Database } from '@ruche/db'
@@ -24,6 +25,7 @@ import { afterReportSql, toRemoval } from '../removals/load'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
 // C'est sans risque ici, car chacun n'utilise l'autre que dans ses fonctions, jamais au chargement.
 import { activeSuspensionSql } from '../suspension/load'
+import { hasReadableLines, readLines, updateOnCards } from '../updates/load'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -101,11 +103,14 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  *  10. la fin de cette suspension, à sa date ou par une levée (tranche 7c) : le même index, sur
  *      user_id seul, puis un filtre sur ses quelques suspensions. Mesuré par EXPLAIN ANALYZE avec
  *      5 000 autres suspensions en base (26/10/2026) : une recherche d'index chacune, trois pages
- *      lues ; la jointure finale (account_suspension sus) passe par la clé primaire.
- * Les sources 7 à 10 ajoutent six colonnes : target_kind (la sorte de contenu), note_id (une note
- * retirée), decision_id (la décision de retrait, de suspension ou de levée), outcome (l'issue d'un
- * signalement), member_id (le membre visé par un signalement, pour le lien) et suspension_id (la
- * ligne account_suspension) ; null pour les six premières.
+ *      lues ; la jointure finale (account_suspension sus) passe par la clé primaire ;
+ *  11. les mises à jour des projets qu'il suit ou qu'il teste (R7a) : la clé primaire de
+ *      project_follow (follower_id, …) et celle de project_tester (member_id, …), puis
+ *      project_update_project_created_idx (project_id, created_at desc), voir projectUpdates.
+ * Les sources 7 à 11 ajoutent six colonnes : target_kind (la sorte de contenu), update_id (une mise
+ * à jour retirée, ou celle qui est annoncée), decision_id (la décision de retrait, de suspension ou
+ * de levée), outcome (l'issue d'un signalement), member_id (le membre visé par un signalement, pour
+ * le lien) et suspension_id (la ligne account_suspension) ; null pour les six premières.
  *
  * `now` (tranche 7c) : l'heure de l'API, pour dire si une suspension a pris fin (source 10). C'est
  * la règle unique de suspension/load.ts (activeSuspensionSql, S10), qui compare à cette heure et
@@ -136,38 +141,43 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
   // donnent les vingt colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
   // garde son index.
   return sql`
-    select u.*, null::text as target_kind, null::uuid as note_id, null::uuid as decision_id,
+    select u.*, null::text as target_kind, null::uuid as update_id, null::uuid as decision_id,
       null::text as outcome, null::text as member_id, null::uuid as suspension_id
     from (${socialSources(me, during)}) u
 
     union all
 
-    -- 7. Ses contenus retirés par la modération (tranche 7a) : ses projets, les notes de ses
-    --    projets, ses commentaires. Datés du retrait, et repérés par la décision (« removed:<id> »)
+    ${projectUpdates(me, during, now)}
+
+    union all
+
+    -- 7. Ses contenus retirés par la modération (tranche 7a) : ses projets, les mises à jour de ses
+    --    projets (R7a, à la place des notes), ses commentaires. Datés du retrait, et repérés par la
+    --    décision (« removed:<id> »)
     --    : rétabli, le contenu n'a plus de removed_at, et la notification disparaît d'elle-même.
     --    Un commentaire ne vient que d'un projet qu'il voit encore (règle 3 de la relecture du
     --    plan, comme la source 5) : sur un projet devenu privé ou retiré, rien, pas même le titre.
     --    Mais un blocage ne coupe jamais une notification de modération (tranche 7b, règle 9) :
     --    d'où listedProject(), sans visiteur, plutôt que visibleTo. Sur le projet d'un membre
     --    bloqué avec lui, la motivation reste, et le titre est vidé (loadDetailedRows).
-    --    Index : ses projets par project_author_created_idx (puis les notes de chacun par
-    --    project_note_project_created_idx) ; ses commentaires par project_comment_author_idx. Les
+    --    Index : ses projets par project_author_created_idx (puis les mises à jour de chacun par
+    --    project_update_project_created_idx) ; ses commentaires par project_comment_author_idx. Les
     --    contenus retirés sont rares : ces lectures écartent presque tout aussitôt.
     select 'removed', 'removed:' || x.removal_id, x.removed_at, x.project_id, x.comment_id,
       null, null, null, null, null, null, null, null, null,
-      x.target_kind, x.note_id, x.removal_id, null, null, null
+      x.target_kind, x.update_id, x.removal_id, null, null, null
     from (
       select 'project' as target_kind, project.id as project_id, null::uuid as comment_id,
-        null::uuid as note_id, project.removal_id, project.removed_at
+        null::uuid as update_id, project.removal_id, project.removed_at
       from project
       where project.author_id = ${me} and project.removed_at is not null
         and ${during('project.removed_at')}
       union all
-      select 'note', project.id, null, nt.id, nt.removal_id, nt.removed_at
+      select 'update', project.id, null, pu.id, pu.removal_id, pu.removed_at
       from project
-      join project_note nt on nt.project_id = project.id
-      where project.author_id = ${me} and nt.removed_at is not null
-        and ${during('nt.removed_at')}
+      join project_update pu on pu.project_id = project.id
+      where project.author_id = ${me} and pu.removed_at is not null
+        and ${during('pu.removed_at')}
       union all
       select 'comment', c.project_id, c.id, null, c.removal_id, c.removed_at
       from project_comment c
@@ -183,11 +193,14 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     -- 8. Ses signalements traités (tranche 7a) : la sorte de cible et l'issue, rien d'autre (règle
     --    2). Un signalement « sans objet » (void : la cible a disparu) ne prévient personne (règle
     --    29). Le lien se calcule ici, à la lecture : le projet de la cible, seulement si ce membre
-    --    la voit encore (projet visible, note ou commentaire ni retiré, ni supprimé, ni masqué pour
-    --    lui), et le membre visé, seulement si son compte existe encore. « case » ne lance que la
-    --    sous-requête de la sorte de cible : l'identifiant y est converti en uuid (« ::uuid »)
-    --    seulement pour un projet, une note ou un commentaire, dont l'identifiant est un uuid
-    --    (vérifié par POST /v1/reports) ; chacune passe par la clé primaire de sa table.
+    --    la voit encore (projet visible, mise à jour ou commentaire ni retiré, ni supprimé, ni
+    --    masqué pour lui), et le membre visé, seulement si son compte existe encore. « case » ne
+    --    lance que la sous-requête de la sorte de cible : l'identifiant y est converti en uuid
+    --    (« ::uuid ») seulement pour un projet, une mise à jour ou un commentaire, dont
+    --    l'identifiant est un uuid (vérifié par POST /v1/reports) ; chacune passe par la clé
+    --    primaire de sa table. R7a (relecture de sécurité B1) : un ancien signalement d'une note du
+    --    Journal (target_kind = 'note') n'a pas de branche : sa cible est effacée, le lien est null,
+    --    et la ligne reste lisible (StoredReportTargetKind, plus bas).
     --    Tranche 7b, règle 9 : la ligne reste malgré un blocage ; seul le lien vers un projet
     --    d'un membre bloqué avec lui disparaît (visibleTo le cache), comme pour un projet privé.
     --    Index : content_report_reporter_idx (ses signalements).
@@ -196,10 +209,10 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
         when 'project' then (
           select project.id from project
           where project.id = r.target_id::uuid and ${visibleTo(me)})
-        when 'note' then (
-          select project.id from project_note nt
-          join project on project.id = nt.project_id
-          where nt.id = r.target_id::uuid and nt.removed_at is null and ${visibleTo(me)})
+        when 'update' then (
+          select project.id from project_update pu
+          join project on project.id = pu.project_id
+          where pu.id = r.target_id::uuid and pu.removed_at is null and ${visibleTo(me)})
         when 'comment' then (
           select project.id from project_comment c
           join project on project.id = c.project_id
@@ -246,6 +259,74 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       and ${during('coalesce(s.lifted_at, s.ends_at)')}
   `
 }
+
+/**
+ * La source 11 (R7a) : une ligne par mise à jour d'un projet que `me` suit OU teste, avec les vingt
+ * colonnes (kind, key, at, project_id, … update_id …). La clé « project_update:<id> » est la même
+ * pour qui suit et pour qui teste : la notification ne dit jamais lequel des deux (relecture de
+ * sécurité A6).
+ *
+ * En SQL :
+ *   select 'project_update', 'project_update:' || project_update.id, project_update.created_at, …
+ *   from (
+ *     select sub.project_id, min(sub.created_at) as since from (
+ *       select project_id, created_at from project_follow where follower_id = $me
+ *       union all
+ *       select project_id, created_at from project_tester where member_id = $me
+ *     ) sub group by sub.project_id
+ *   ) mine
+ *   join project on project.id = mine.project_id
+ *   join project_update on project_update.project_id = mine.project_id
+ *     and project_update.created_at > mine.since
+ *   where <dans la fenêtre> and <les règles ci-dessous>
+ *
+ * - « mine » : les projets qu'il suit ou teste, UNE ligne par projet (« group by ») : un abonné qui
+ *   est aussi testeur ne reçoit qu'une notification par mise à jour, et la cloche (countUnread, qui
+ *   additionne les lignes sans regrouper) n'en compte qu'une. La clé primaire de project_follow
+ *   (follower_id, project_id) et celle de project_tester (member_id, project_id) les donnent.
+ * - « since », le plus ancien des deux gestes : seules les mises à jour publiées après
+ *   l'abonnement ou l'inscription comptent (décision de la session, sécurité S1), jamais celles
+ *   d'avant, qu'il n'a pas demandé à suivre.
+ * - Les mises à jour de chaque projet viennent de project_update_project_created_idx
+ *   (project_id, created_at desc), qui borne aussi la date (« > since », la fenêtre).
+ * - Pas retirée (updateOnCards : une mise à jour retirée ne prévient personne, B4), au moins une
+ *   ligne lisible (hasReadableLines : la liste ne pourrait pas la montrer, la cloche ne la compte
+ *   pas), pas sur son propre projet (aucune route ne le fait testeur de son projet, la condition le
+ *   redit), sur un projet listé pour lui (listedProjectFor : public, pas retiré, aucun blocage dans
+ *   un sens ou dans l'autre avec l'auteur, par les index de member_block).
+ * - Pas d'un auteur suspendu à l'heure `now` (scénario R7a, « Quitter ») : sa suspension active, s'il
+ *   en a une, est la seule ligne non close de account_suspension_open_idx (user_id) where
+ *   lifted_at is null, la règle unique de suspension/load.ts (activeSuspensionSql). « (select 1 …
+ *   limit 1) is null » : une recherche d'index par ligne, jamais une lecture de toute la table.
+ *   Levée la suspension, les mises à jour reviennent (calcul à la lecture, comme un déblocage).
+ * - Une mise à jour publiée pendant que le projet était privé est notifiée s'il redevient public
+ *   dans les 90 jours : calculée à la lecture, comme le reste (décision écrite au contrat, A6).
+ *
+ * Le nom de la table project_update est écrit sans alias : hasReadableLines le cite en toutes
+ * lettres. `during` : la fenêtre de dates (voir sources), `now` : l'heure de l'API.
+ */
+const projectUpdates = (me: string, during: (column: string) => SQL, now: Date): SQL => sql`
+    select 'project_update', 'project_update:' || project_update.id, project_update.created_at,
+      project.id, null, null, project.author_id, null, null, null, null, null, null, null,
+      null, project_update.id, null, null, null, null
+    from (
+      select sub.project_id, min(sub.created_at) as since
+      from (
+        select f.project_id, f.created_at from project_follow f where f.follower_id = ${me}
+        union all
+        select t.project_id, t.created_at from project_tester t where t.member_id = ${me}
+      ) sub
+      group by sub.project_id
+    ) mine
+    join project on project.id = mine.project_id
+    join project_update on project_update.project_id = mine.project_id
+      and project_update.created_at > mine.since
+    where ${during('project_update.created_at')}
+      and ${updateOnCards()} and ${hasReadableLines()}
+      and project.author_id <> ${me} and ${listedProjectFor(me)}
+      and (select 1 from account_suspension sus
+        where sus.user_id = project.author_id and ${activeSuspensionSql('sus', now)}
+        limit 1) is null`
 
 /**
  * Les six sources de la tranche 6b (réactions, abonnés, commentaires, masquages, pseudo), avec
@@ -379,9 +460,9 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
   `
 }
 
-/** Les six colonnes des sources de la modération (7 à 10), à reprendre dans chaque lecture. */
+/** Les six colonnes des sources 7 à 11, à reprendre dans chaque lecture. */
 const moderationColumns = sql.raw(
-  'target_kind, note_id, decision_id, outcome, member_id, suspension_id',
+  'target_kind, update_id, decision_id, outcome, member_id, suspension_id',
 )
 
 // ─── Le marque-page ─────────────────────────────────────────────────────────────────────────────
@@ -436,6 +517,7 @@ const ListRow = z.object({
     'report_handled',
     'suspended',
     'suspension_ended',
+    'project_update',
   ]),
   key: z.string(),
   at: z.string(),
@@ -456,11 +538,18 @@ const ListRow = z.object({
   author_avatar_key: z.string().nullable(),
   author_handle: z.string().nullable(),
   my_handle: z.string().nullable(),
-  // Tranche 7a : les sources de la modération.
-  target_kind: ReportTargetKind.nullable(),
+  // Tranche 7a : les sources de la modération. R7a (relecture de sécurité B1) : la sorte « telle
+  // que gardée en base », avec 'note' pour un ancien signalement d'une note du Journal : le schéma
+  // d'entrée (ReportTargetKind, sans 'note') ferait répondre 500 à toute la liste de ce membre.
+  target_kind: StoredReportTargetKind.nullable(),
   outcome: z.string().nullable(),
   member_id: z.string().nullable(),
-  note_body: z.string().nullable(),
+  // R7a : la mise à jour annoncée (source 11) ou retirée (source 7). `update_lines` est le jsonb
+  // tel qu'en base, relu sans confiance par readLines (relecture de sécurité A7).
+  update_id: z.string().nullable(),
+  update_title: z.string().nullable(),
+  update_version: z.string().nullable(),
+  update_lines: z.unknown(),
   ground: z.string().nullable(),
   explanation: z.string().nullable(),
   after_report: z.boolean().nullable(),
@@ -553,6 +642,30 @@ export const present = (
     case 'handle':
       if (row.my_handle === null) return null
       return { ...common, kind: 'handle', handle: row.my_handle }
+    case 'project_update': {
+      // R7a : le projet, son auteur, puis la mise à jour (titre, version, première ligne). Rien ne
+      // dit si le membre suit ou teste (A6). La source n'a gardé que des mises à jour qui ont une
+      // ligne lisible ; si elle a changé entre-temps, rien n'est montré.
+      const firstLine = readLines(row.update_lines)[0]
+      if (!project || !firstLine || row.update_id === null) return null
+      if (row.author_id === null || row.author_name === null) return null
+      return {
+        ...common,
+        kind: 'project_update',
+        project,
+        author: {
+          id: row.author_id,
+          name: row.author_name,
+          avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+        },
+        update: {
+          id: row.update_id,
+          title: row.update_title,
+          version: row.update_version,
+          firstLine,
+        },
+      }
+    }
     case 'removed': {
       // Le fondement, l'explication et « après un signalement », lus avec la décision ; jamais qui
       // a décidé ni qui a signalé (règle 14).
@@ -565,18 +678,27 @@ export const present = (
               createdAt: new Date(row.at),
               afterReport: row.after_report ?? false,
             })
-      if (!project || !removal || row.target_kind === null || row.target_kind === 'member') {
+      const targetKind = row.target_kind
+      if (
+        !project ||
+        !removal ||
+        (targetKind !== 'project' && targetKind !== 'update' && targetKind !== 'comment')
+      ) {
         return null
       }
-      // L'extrait d'une note ou d'un commentaire retiré : son texte actuel, que son auteur lit
-      // encore. Disparu entre-temps : plus de notification.
+      // L'extrait d'une mise à jour (sa première ligne lisible, R7a) ou d'un commentaire retiré :
+      // son texte actuel, que son auteur lit encore. Disparu entre-temps : plus de notification.
       const text =
-        row.target_kind === 'note' ? row.note_body : row.target_kind === 'comment' ? row.body : null
-      if (row.target_kind !== 'project' && text === null) return null
+        targetKind === 'update'
+          ? (readLines(row.update_lines)[0]?.text ?? null)
+          : targetKind === 'comment'
+            ? row.body
+            : null
+      if (targetKind !== 'project' && text === null) return null
       return {
         ...common,
         kind: 'removed',
-        targetKind: row.target_kind,
+        targetKind,
         project,
         excerpt: text === null ? null : excerptOf(text),
         ground: removal.ground,
@@ -646,7 +768,9 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
       c.id as comment_id, c.body,
       a.id as author_id, a.name as author_name, ap.avatar_key as author_avatar_key,
       ah.handle as author_handle, mh.handle as my_handle,
-      n.target_kind, n.outcome, n.member_id, nt.body as note_body,
+      n.target_kind, n.outcome, n.member_id,
+      pu.id as update_id, pu.title as update_title, pu.version as update_version,
+      pu.lines as update_lines,
       md.ground, md.explanation,
       -- Une suspension porte elle-même « après un signalement » (J2) ; un retrait le déduit des
       -- signalements de sa cible (afterReportSql). « case » ne lance que la branche utile.
@@ -672,8 +796,9 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join profile ap on ap.user_id = n.author_id
     left join member_handle ah on ah.user_id = n.author_id and ah.released_at is null
     left join member_handle mh on n.kind = 'handle' and mh.user_id = ${me} and mh.released_at is null
-    -- Tranche 7a : le texte d'une note retirée, et la décision d'un retrait (clés primaires).
-    left join project_note nt on nt.id = n.note_id
+    -- Tranche 7a : la décision d'un retrait. R7a : la mise à jour annoncée ou retirée, à la place
+    -- de la note (clés primaires).
+    left join project_update pu on pu.id = n.update_id
     left join moderation_decision md on md.id = n.decision_id
     -- Tranche 7c : la suspension d'une notification de suspension ou de fin (clé primaire).
     left join account_suspension sus on sus.id = n.suspension_id
