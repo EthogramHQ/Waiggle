@@ -654,6 +654,9 @@ export const en: Translation = {
       afterDescribed: 'After: {{description}}',
       compareValue: '{{value}}%',
       compareHint: 'Drag the handle, or use the arrow keys, to compare.',
+      // The timeline page (U4b): the link back to the project, and the browser tab's name.
+      ofProject: '{{title}}, by {{name}}',
+      pageTitle: 'Updates to “{{title}}”',
     },
     testers: {
       join: 'Join the testers',

@@ -2258,6 +2258,20 @@ const pages = [
   // La page d'un autre membre et son projet : les boutons « Suivre ».
   { name: 'membre-autre', path: '/members/max-id', signedIn: true, fullPage: true },
   { name: 'projet-autre', path: `/projects/${notMineProject.id}`, signedIn: true, fullPage: true },
+  // R7a (U4b) : la frise des mises à jour, vue par l'autrice (corbeilles) et par un autre membre
+  // (« Suivre ce projet », « Signaler »), chacune avec l'avant / après en tête.
+  {
+    name: 'projet-mises-a-jour',
+    path: `/projects/${recipesProject.id}/updates`,
+    signedIn: true,
+    fullPage: true,
+  },
+  {
+    name: 'projet-mises-a-jour-autre',
+    path: `/projects/${testedProject.id}/updates`,
+    signedIn: true,
+    fullPage: true,
+  },
   // Les commentaires d'un projet (R5b) : l'aperçu sous le projet, puis la feuille (sur téléphone) ou
   // la liste déroulée (sur ordinateur), ouverte par un clic une fois la page prête (prepare).
   {
