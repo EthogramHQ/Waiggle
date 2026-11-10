@@ -30,6 +30,9 @@ const fr = {
   dialogIntro:
     'DiscardDialog : « Abandonner les changements ? » d’une feuille d’administration où l’on a écrit. Le focus arrive sur « Continuer » ; les boutons ignorent les tapes juste après l’ouverture.',
   open: 'Ouvrir la fenêtre',
+  dialogUpdateIntro:
+    'La même fenêtre avec ses propres mots (props title et message, R7a) : « Abandonner cette mise à jour ? » de la feuille « Nouvelle mise à jour », qui efface aussi les photos déjà envoyées.',
+  openUpdate: 'Ouvrir la fenêtre d’une mise à jour',
   kept: 'Gardé : la feuille reste ouverte.',
   discarded: 'Abandonné : la feuille se ferme.',
 }
@@ -44,6 +47,9 @@ const en: typeof fr = {
   dialogIntro:
     'DiscardDialog: “Discard the changes?” of an administration sheet where something was written. Focus lands on “Keep editing”; the buttons ignore taps right after opening.',
   open: 'Open the window',
+  dialogUpdateIntro:
+    'The same window with its own words (title and message props, R7a): “Discard this update?” of the “New update” sheet, which also erases the photos already sent.',
+  openUpdate: 'Open the window of an update',
   kept: 'Kept: the sheet stays open.',
   discarded: 'Discarded: the sheet closes.',
 }
@@ -112,8 +118,11 @@ function LiveDismiss() {
   )
 }
 
-/** La fenêtre, ouverte par un bouton, et ce que chaque geste a donné. */
-function DiscardDemo({ l }: { l: typeof fr }) {
+/**
+ * La fenêtre, ouverte par un bouton, et ce que chaque geste a donné ; `title` et `message` : les
+ * mots d'une feuille qui a les siens (« Nouvelle mise à jour », R7a).
+ */
+function DiscardDemo({ l, title, message }: { l: typeof fr; title?: string; message?: string }) {
   const [open, setOpen] = useState(false)
   const [said, setSaid] = useState<string | null>(null)
   return (
@@ -122,6 +131,8 @@ function DiscardDemo({ l }: { l: typeof fr }) {
       {said ? <Text tone="secondary">{said}</Text> : null}
       <DiscardDialog
         visible={open}
+        {...(title ? { title } : null)}
+        {...(message ? { message } : null)}
         onKeep={() => {
           setOpen(false)
           setSaid(l.kept)
@@ -163,6 +174,12 @@ export function AdminGesturesCatalogue() {
       />
       <Text tone="secondary">{l.dialogIntro}</Text>
       <DiscardDemo l={l} />
+      <Text tone="secondary">{l.dialogUpdateIntro}</Text>
+      <DiscardDemo
+        l={{ ...l, open: l.openUpdate }}
+        title={t(($) => $.project.updates.discardTitle)}
+        message={t(($) => $.project.updates.discardBody)}
+      />
     </Stack>
   )
 }

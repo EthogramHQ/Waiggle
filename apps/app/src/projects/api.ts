@@ -1,6 +1,12 @@
 // Ce que l'appli peut faire avec les projets : les lire, les publier, les modifier, les supprimer.
 // Les écrans n'appellent que ces fonctions ; les tests les remplacent par de faux appels.
-import { Project, type ProjectChanges, type ProjectInput, type VisualSlot } from '@ruche/contracts'
+import {
+  Project,
+  type ProjectChanges,
+  type ProjectInput,
+  ProjectVisual,
+  type VisualSlot,
+} from '@ruche/contracts'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, type ApiResult } from '../api/errors'
 import { appendImage, type PickedImage, pickImage } from '../media/pick'
@@ -41,18 +47,36 @@ export const pickVisual = (slot: VisualSlot, onChosen?: () => void): Promise<Pic
   pickImage(slot === 'portrait' ? 'portrait' : 'free', onChosen)
 
 /**
- * Ajoute une photo au projet (POST /v1/projects/:id/visuals, formulaire multipart). Renvoie le
- * projet à jour, avec la nouvelle photo.
+ * Ajoute une photo au projet (POST /v1/projects/:id/visuals, formulaire multipart). Pour la galerie
+ * et la couverture verticale, renvoie le projet à jour, avec la nouvelle photo. Pour une mise à jour
+ * (`update`, R7a), renvoie la seule photo « en attente » : son identifiant sera cité par la mise à
+ * jour au moment de la publier, et le projet, lui, n'a pas changé.
+ *
+ * Deux « surcharges » (deux signatures pour une même fonction) : TypeScript choisit le type de la
+ * réponse d'après le `slot` écrit à l'appel.
  */
-export const uploadVisual = async (
+export async function uploadVisual(
+  id: string,
+  image: { uri: string },
+  slot: 'update',
+): Promise<ApiResult<ProjectVisual>>
+export async function uploadVisual(
+  id: string,
+  image: { uri: string },
+  slot: Exclude<VisualSlot, 'update'>,
+): Promise<ApiResult<Project>>
+export async function uploadVisual(
   id: string,
   image: { uri: string },
   slot: VisualSlot,
-): Promise<ApiResult<Project>> => {
+): Promise<ApiResult<Project> | ApiResult<ProjectVisual>> {
   const form = new FormData()
   await appendImage(form, 'visual', image)
   form.append('slot', slot)
-  return request(`${projectPath(id)}/visuals`, { method: 'POST', body: form }, Project)
+  const init = { method: 'POST', body: form }
+  return slot === 'update'
+    ? request(`${projectPath(id)}/visuals`, init, ProjectVisual)
+    : request(`${projectPath(id)}/visuals`, init, Project)
 }
 
 /**
@@ -70,6 +94,16 @@ export const updateVisual = (
     json('PATCH', { description: description?.trim() ? description : null }),
     Project,
   )
+
+/**
+ * Efface une photo en attente d'une mise à jour (DELETE /v1/projects/:id/visuals/:visualId, R7a) :
+ * retirée de la feuille, ou abandonnée avec elle. Le corps de la réponse ne sert pas : le projet n'a
+ * pas changé.
+ */
+export const deletePendingVisual = (id: string, visualId: string): Promise<ApiResult<null>> =>
+  requestWithoutBody(`${projectPath(id)}/visuals/${encodeURIComponent(visualId)}`, {
+    method: 'DELETE',
+  })
 
 /** Retire une photo du projet (galerie ou couverture verticale). Renvoie le projet à jour. */
 export const deleteVisual = (id: string, visualId: string): Promise<ApiResult<Project>> =>

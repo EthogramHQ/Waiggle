@@ -2,6 +2,8 @@
 // R6-Publier-Desktop) : une tuile par photo, dans l'ordre (la première sert de couverture et porte
 // le badge « Couverture »), puis la tuile « + Ajouter » en pointillés, ou, sur ordinateur, la zone
 // « Glisse tes images ici, ou choisis-les » où l'on dépose des fichiers.
+// La feuille « Nouvelle mise à jour » (R7a) reprend les mêmes tuiles sans couverture (`cover={false}`)
+// et avec des étiquettes par rang (`badges` : « Avant », « Après »).
 //
 // Chaque tuile a trois contrôles, côte à côte et jamais l'un dans l'autre (un bouton dans un bouton
 // n'est pas lu, et sur iOS VoiceOver n'atteint plus le second) :
@@ -107,6 +109,18 @@ type Props = {
   onRemove: (key: string) => void
   /** Une action de la feuille est en cours (l'envoi du projet) : les gestes attendent. */
   busy?: boolean
+  /**
+   * L'étiquette de chaque rang (R7a : « Avant », « Après » d'une mise à jour), montrée sur la tuile
+   * comme le badge « Couverture » et lue dans son nom (« Photo 1, Avant ») ; `null` ou absente : pas
+   * d'étiquette à ce rang. Elle suit le rang, pas la photo : une photo avancée en première place
+   * devient « Avant ». Les rangs comptent les photos en place ou en route, pas les refusées.
+   */
+  badges?: (string | null)[]
+  /**
+   * Vrai par défaut : la première photo est la couverture (badge, « Mettre en couverture »). Faux
+   * pour une mise à jour, qui n'a pas de couverture : ni l'un ni l'autre.
+   */
+  cover?: boolean
 }
 
 /**
@@ -187,6 +201,8 @@ export function PhotoTiles({
   onMove,
   onRemove,
   busy = false,
+  badges,
+  cover: hasCover = true,
 }: Props) {
   const { sizeClass } = useLayout()
   const { scale, probe } = useTextScale('M')
@@ -199,7 +215,13 @@ export function PhotoTiles({
   const full = kept.length >= max
   // Les places qu'on peut échanger : les photos en place (une photo en route n'a pas encore d'ordre).
   const movable = tiles.flatMap((tile, index) => (tile.state === 'ready' ? [index] : []))
-  const coverKey = kept[0]?.key ?? null
+  const coverKey = hasCover ? (kept[0]?.key ?? null) : null
+  /** L'étiquette d'une tuile : « Couverture » pour la couverture, sinon celle de son rang. */
+  const badgeOf = (key: string): string | null => {
+    if (key === coverKey) return labels.cover
+    const rank = kept.findIndex((one) => one.key === key)
+    return rank < 0 ? null : (badges?.[rank] ?? null)
+  }
   // Sur le web, à largeur d'ordinateur, la zone de dépôt garde la tuile « + Ajouter » et ajoute sa
   // phrase. Plus étroit, « Ajouter » et « choisis-les » feraient la même chose : la tuile seule
   // reste (elle reçoit encore des fichiers déposés, `fileHandlers`).
@@ -340,11 +362,16 @@ export function PhotoTiles({
               : [
                   ...(place > 0
                     ? [
-                        {
-                          label: labels.makeCover,
-                          icon: 'star' as const,
-                          onPress: () => move(tile.key, movable[0] ?? 0),
-                        },
+                        // Sans couverture (une mise à jour), avancer et reculer suffisent.
+                        ...(hasCover
+                          ? [
+                              {
+                                label: labels.makeCover,
+                                icon: 'star' as const,
+                                onPress: () => move(tile.key, movable[0] ?? 0),
+                              },
+                            ]
+                          : []),
                         {
                           label: labels.earlier,
                           icon: 'caret-left' as const,
@@ -368,6 +395,7 @@ export function PhotoTiles({
               tile={tile}
               number={index + 1}
               cover={cover}
+              badge={badgeOf(tile.key)}
               selected={tile.key === selectedKey}
               size={size}
               labels={labels}
@@ -407,6 +435,8 @@ type TileProps = {
   tile: PhotoTile
   number: number
   cover: boolean
+  /** L'étiquette posée en bas de la tuile (« Couverture », « Avant »…) ; null : aucune. */
+  badge: string | null
   selected: boolean
   size: { width: number; height: number }
   labels: PhotoTilesLabels
@@ -427,6 +457,7 @@ function Tile({
   tile,
   number,
   cover,
+  badge,
   selected,
   size,
   labels,
@@ -441,6 +472,13 @@ function Tile({
   moveRef,
 }: TileProps) {
   const { colors } = useTheme()
+  // Le nom lu : « Photo 1, couverture » (son propre texte), sinon « Photo 1, Avant » quand le rang a
+  // une étiquette. La virgule sépare deux textes traduits, comme dans les deux langues de l'appli.
+  const name = cover
+    ? labels.tile(number, true)
+    : badge
+      ? `${labels.tile(number, false)}, ${badge}`
+      : labels.tile(number, false)
   const failed = tile.state === 'failed'
   const uploading = tile.state === 'uploading'
   const reasonId = `photo-tile-reason-${tile.key}`
@@ -542,7 +580,7 @@ function Tile({
         <Pressable
           ref={tileRef}
           accessibilityRole="button"
-          accessibilityLabel={labels.tile(number, cover)}
+          accessibilityLabel={name}
           {...pressed(selected)}
           {...(failed ? describedBy(reasonId) : null)}
           {...(failed && Platform.OS !== 'web'
@@ -589,7 +627,9 @@ function Tile({
           />
         ) : null}
 
-        {cover ? (
+        {/* Le badge (« Couverture », « Avant », « Après ») : dessiné seulement, le nom de la tuile le
+            dit déjà. */}
+        {badge ? (
           <View
             pointerEvents="none"
             aria-hidden
@@ -608,7 +648,7 @@ function Tile({
             }}
           >
             <Text variant="caption" weight={700} maxScale={TILE_SCALE_MAX}>
-              {labels.cover}
+              {badge}
             </Text>
           </View>
         ) : null}
