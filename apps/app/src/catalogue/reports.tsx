@@ -7,7 +7,6 @@
 import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { CommentCard } from '../ui/CommentCard'
-import { NoteList } from '../ui/NoteList'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { ReportCard } from '../ui/ReportCard'
 import { Stack } from '../ui/Stack'
@@ -247,33 +246,6 @@ export function ReportSamples() {
         <CommentCard
           {...card}
           comment={comment({ id: 'placeholder', author: null, state: 'removed' })}
-        />
-      </Surface>
-      {/* Le journal : vu par un autre membre (un drapeau par note), puis par son auteur, avec une
-          note retirée. */}
-      <Text variant="caption" tone="muted">
-        {l.journalOther}
-      </Text>
-      <Surface variant="grouped" padding="xl" gap="lg">
-        <NoteList
-          notes={[
-            { id: 'n2', body: l.noteRecent, when: l.noteWhen },
-            { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-          ]}
-          onReport={() => {}}
-          reportLabel={l.reportNote}
-        />
-      </Surface>
-      <Text variant="caption" tone="muted">
-        {l.journalAuthor}
-      </Text>
-      <Surface variant="grouped" padding="xl" gap="lg">
-        <NoteList
-          notes={[
-            { id: 'n2', body: l.noteRecent, when: l.noteWhen, removed: byLaw },
-            { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-          ]}
-          onDelete={() => {}}
         />
       </Surface>
       {/* Tranche 7b : la carte de la file avec une copie en champs. Un projet signalé deux fois,
