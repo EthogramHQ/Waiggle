@@ -28,6 +28,7 @@ const fr = {
   untitled: 'Sans titre ni version : « Mise à jour »',
   third: 'Avant / après et une 3e photo, en petite tuile nommée',
   gallery: 'Sans avant / après : la galerie « Photos de la mise à jour »',
+  band: 'Dans la section de la page projet : l’avant / après en bande de 240 points (photoHeight="band")',
   trash: 'L’auteur : la corbeille, nommée par sa mise à jour',
   deleting: 'Pendant la suppression : la corbeille occupée',
   report: 'Un autre membre : « Signaler cette mise à jour »',
@@ -55,6 +56,7 @@ const en = {
   untitled: 'Neither title nor version: “Update”',
   third: 'Before / after and a 3rd photo, as a small named tile',
   gallery: 'No before / after: the gallery “Photos of the update”',
+  band: 'In the project page section: the before / after as a 240-point band (photoHeight="band")',
   trash: 'The author: the trash button, named after its update',
   deleting: 'While deleting: the trash button busy',
   report: 'Another member: “Report this update”',
@@ -167,6 +169,10 @@ export function UpdateEntryCatalogue() {
           now={NOW}
         />
       ),
+    },
+    {
+      caption: l.band,
+      entry: <UpdateEntry update={base} toSource={toSource} now={NOW} photoHeight="band" />,
     },
     {
       caption: l.gallery,
