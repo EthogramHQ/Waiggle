@@ -1354,8 +1354,9 @@ export function SheetPanel({
       style={{ flexShrink: 1 }}
       contentContainerStyle={{
         paddingHorizontal: space.xl,
-        // Avec la phrase en tête, le haut est réduit : elle reste près du titre et de son filet.
-        paddingTop: subtitleInContent ? space.xs : space.xl - space.sm,
+        // Avec la phrase en tête, le haut est réduit : elle reste près du titre, plus près de lui
+        // que du bloc suivant, sans coller au filet (relecture de design du 10/11).
+        paddingTop: subtitleInContent ? space.sm : space.xl - space.sm,
         // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
         // le dernier bloc et le bouton (décision de Louis du 2/11).
         paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
