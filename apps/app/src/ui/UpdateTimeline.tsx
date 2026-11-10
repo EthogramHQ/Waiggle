@@ -14,7 +14,7 @@
 //
 // Le composant ne parle jamais à l'API (règle des étages) : l'écran lui donne les mises à jour,
 // `toSource` (la fonction de `useMediaSources()`) et les gestes (supprimer, signaler, la suite).
-import { space, textStyles } from '@ruche/brand'
+import { space } from '@ruche/brand'
 import type { ProjectUpdate } from '@ruche/contracts'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -59,12 +59,16 @@ const RAIL = space.xl
 /** L'épaisseur du trait qui relie les ronds. */
 const TRAIL = 2
 /**
- * La hauteur du rond, pour qu'il tombe au milieu de la première ligne du titre (`headline` de
- * `UpdateEntry`). Avec une corbeille ou « Signaler », le titre descend pour se centrer sur le bouton
- * de 44 points (`space.sm`, voir `UpdateEntry`) : le rond descend avec lui.
+ * Ce qui précède la première ligne du titre dans `UpdateEntry` : avec une corbeille ou « Signaler »,
+ * le titre descend pour se centrer sur le bouton de 44 points (`space.sm`, voir `UpdateEntry`) ; le
+ * rond descend avec lui.
  */
-const dotTop = (withButton: boolean) =>
-  (withButton ? space.sm : 0) + (textStyles.headline.lineHeight - DOT) / 2
+const titleOffset = (withButton: boolean) => (withButton ? space.sm : 0)
+/**
+ * Un blanc insécable : le texte invisible qui donne à la case du rond la hauteur d'une ligne du
+ * titre. Écrit par son numéro (un caractère invisible dans le source ne se relit pas).
+ */
+const LINE_FILLER = String.fromCodePoint(0x00a0)
 
 export function UpdateTimeline({
   updates,
@@ -137,7 +141,8 @@ export function UpdateTimeline({
               style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.md }}
             >
               <Rail
-                dotTop={dotTop(withButton)}
+                offset={titleOffset(withButton)}
+                line="headline"
                 dot={index === 0 ? 'latest' : 'past'}
                 above={index > 0}
                 // Le trait continue sous la dernière mise à jour quand il en reste (il mène à
@@ -189,48 +194,75 @@ export function UpdateTimeline({
  * saute (l'ordre se lit dans la liste).
  */
 function Rail({
-  dotTop: top,
+  offset,
+  line,
   dot,
   above,
   below,
 }: {
-  dotTop: number
+  /** Ce qui précède la première ligne du texte d'en face (le titre descendu près d'un bouton). */
+  offset: number
+  /** Le rôle de texte de cette première ligne : la case du rond en prend la hauteur. */
+  line: 'headline' | 'body'
   dot: 'latest' | 'past'
   above: boolean
   below: boolean
 }) {
   const { colors } = useTheme()
-  const trail = {
-    position: 'absolute',
-    left: (RAIL - TRAIL) / 2,
-    width: TRAIL,
-    backgroundColor: colors.lineStrong,
-  } as const
+  // Un bout de trait ; caché (transparent) là où la frise commence ou s'arrête, pour que le rond
+  // garde sa place.
+  const segment = (shown: boolean, grow: boolean) => (
+    <View
+      style={{
+        width: TRAIL,
+        ...(grow ? { flexGrow: 1 } : { height: offset }),
+        backgroundColor: shown ? colors.lineStrong : 'transparent',
+      }}
+    />
+  )
   return (
     <View
       aria-hidden
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       pointerEvents="none"
-      style={{ width: RAIL, flexShrink: 0 }}
+      style={{ width: RAIL, flexShrink: 0, alignItems: 'center' }}
     >
-      {above ? <View style={{ ...trail, top: 0, height: top }} /> : null}
-      {below ? <View style={{ ...trail, top: top + DOT, bottom: 0 }} /> : null}
-      <View
-        style={{
-          position: 'absolute',
-          top,
-          left: (RAIL - DOT) / 2,
-          width: DOT,
-          height: DOT,
-          borderRadius: DOT / 2,
-          borderWidth: TRAIL,
-          // La plus récente : le point miel, cerclé du brun des contrôles choisis (le miel seul se
-          // perdrait sur une page claire). Les autres : un rond vide, du gris des bords de contrôle.
-          borderColor: dot === 'latest' ? colors.controlChecked : colors.controlBorder,
-          backgroundColor: dot === 'latest' ? colors.honey : 'transparent',
-        }}
-      />
+      {segment(above, false)}
+      {/* La case du rond : la hauteur d'une ligne du texte d'en face, donnée par un texte invisible
+          du même rôle. Avec le texte agrandi, la ligne grandit, et le rond reste en son milieu. */}
+      <View style={{ alignSelf: 'stretch' }}>
+        <View style={{ opacity: 0 }}>
+          <Text variant={line}>{LINE_FILLER}</Text>
+        </View>
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+          }}
+        >
+          {segment(above, true)}
+          <View
+            style={{
+              width: DOT,
+              height: DOT,
+              borderRadius: DOT / 2,
+              borderWidth: TRAIL,
+              // La plus récente : le point miel, cerclé du brun des contrôles choisis (le miel seul
+              // se perdrait sur une page claire). Les autres : un rond vide, du gris des bords de
+              // contrôle.
+              borderColor: dot === 'latest' ? colors.controlChecked : colors.controlBorder,
+              backgroundColor: dot === 'latest' ? colors.honey : 'transparent',
+            }}
+          />
+          {segment(below, true)}
+        </View>
+      </View>
+      {segment(below, true)}
     </View>
   )
 }
@@ -250,8 +282,6 @@ function FirstVersion({
   first: boolean
 }) {
   const { t } = useTranslation()
-  // Le rond au milieu de la ligne « Première version » (un texte courant, sans bouton à côté).
-  const top = (textStyles.body.lineHeight - DOT) / 2
   return (
     <View
       style={{
@@ -261,7 +291,8 @@ function FirstVersion({
         paddingBottom: space.md,
       }}
     >
-      <Rail dotTop={top} dot="past" above={!first} below={false} />
+      {/* Le rond au milieu de la ligne « Première version » (un texte courant, sans bouton). */}
+      <Rail offset={0} line="body" dot="past" above={!first} below={false} />
       <View style={{ flex: 1, minWidth: 0, gap: space.xxs }}>
         <Text weight={600} breakAnywhere>
           {t(($) => $.project.updates.firstVersion)}
