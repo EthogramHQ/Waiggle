@@ -9,6 +9,7 @@
 // (`isDirty`).
 import {
   type NewProjectUpdate,
+  UPDATE_LINE_MAX,
   UPDATE_LINES_MAX,
   UPDATE_PHOTOS_MAX,
   type UpdateFamily,
@@ -33,6 +34,8 @@ export type UpdateFormPhoto = { id: string | null; description: string | null; u
 export type UpdatePayloadResult =
   | { ok: true; payload: NewProjectUpdate }
   | { ok: false; error: 'required' | 'uploading' }
+  // Une ligne dépasse la limite du contrat : `lineId` nomme la première, pour la marquer.
+  | { ok: false; error: 'lineTooLong'; lineId: string }
 
 // Un compteur du module : chaque ligne reçoit un identifiant neuf, jamais son rang. React range
 // chaque champ sous cette clé ; retirer la deuxième ligne ne fait pas glisser la troisième dans sa
@@ -109,6 +112,8 @@ const optional = (text: string): string | null => {
 /**
  * Ce qu'on envoie à `POST …/updates`, ou pourquoi on ne peut pas encore :
  * - `required` : aucune ligne écrite (les lignes vides, ou faites d'espaces, sont ignorées) ;
+ * - `lineTooLong` : une ligne dépasse `UPDATE_LINE_MAX` (le champ laisse taper plus : le texte d'un
+ *   collage se voit en entier ; l'API refuserait avec un 400 que la feuille ne saurait pas expliquer) ;
  * - `uploading` : une photo s'envoie encore (son identifiant n'est pas connu).
  * Le titre et la version vides valent null ; « Avant / après » est coupé sous deux photos (le
  * contrat le refuserait, et l'API répondrait 400).
@@ -119,9 +124,13 @@ export const toPayload = (
 ): UpdatePayloadResult => {
   const lines = values.lines.flatMap((line) => {
     const text = line.text.trim()
-    return text === '' ? [] : [{ family: line.family, text }]
+    return text === '' ? [] : [{ id: line.id, family: line.family, text }]
   })
   if (lines.length === 0) return { ok: false, error: 'required' }
+  // `length` compte en unités UTF-16, comme le `max` de Zod côté API : la même ligne passe ou
+  // échoue des deux côtés.
+  const tooLong = lines.find((line) => line.text.length > UPDATE_LINE_MAX)
+  if (tooLong) return { ok: false, error: 'lineTooLong', lineId: tooLong.id }
   if (photos.some((photo) => photo.uploading || photo.id === null)) {
     return { ok: false, error: 'uploading' }
   }
@@ -133,7 +142,8 @@ export const toPayload = (
     payload: {
       title: optional(values.title),
       version: optional(values.version),
-      lines,
+      // Sans l'`id` du formulaire : le contrat d'une ligne est strict (famille et texte seulement).
+      lines: lines.map(({ family, text }) => ({ family, text })),
       photos: sent,
       beforeAfter: values.beforeAfter && sent.length >= 2,
     },

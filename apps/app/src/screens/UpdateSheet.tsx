@@ -18,7 +18,7 @@
 // Fermer une feuille où l'on a écrit (Échap, le voile, « Annuler », le Retour du navigateur)
 // demande « Abandonner cette mise à jour ? » ; « Abandonner » efface aussi les photos déjà envoyées
 // (`discardPending`). Une feuille sans changement, ou seulement préremplie, se ferme tout de suite.
-import { type Project, ProjectStatus, UPDATE_PHOTOS_MAX } from '@ruche/contracts'
+import { type Project, ProjectStatus, UPDATE_LINE_MAX, UPDATE_PHOTOS_MAX } from '@ruche/contracts'
 import { usePathname, useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -222,6 +222,8 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
   const [form, setForm] = useState(initial)
   // Le refus de publier sans ligne, posé sur la première ligne (qui reçoit le focus).
   const [linesError, setLinesError] = useState<string | null>(null)
+  // La ligne qui porte ce refus : celle qui est trop longue ; null (« rien d'écrit ») : la première.
+  const [linesErrorId, setLinesErrorId] = useState<string | null>(null)
   // Le message de la feuille : « Attends la fin de l'envoi des photos. », ou l'échec de l'envoi.
   const [message, setMessage] = useState<string | null>(null)
   const [signInNeeded, setSignInNeeded] = useState(false)
@@ -274,7 +276,10 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
   const change = (next: UpdateFormValues) => {
     setForm(next)
     // Une ligne écrite après un refus : le message de la première ligne s'en va.
-    if (linesError && toPayload(next, []).ok) setLinesError(null)
+    if (linesError && toPayload(next, []).ok) {
+      setLinesError(null)
+      setLinesErrorId(null)
+    }
   }
 
   // --- Publier ---
@@ -288,13 +293,20 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
       if (checked.error === 'required') {
         // Une nouvelle phrase à chaque refus : le champ reprend le focus (UpdateLinesField).
         setLinesError(null)
+        setLinesErrorId(null)
         setLinesError(t(($) => $.project.updates.required))
+      } else if (checked.error === 'lineTooLong') {
+        // Sur la ligne fautive, qui reçoit le focus ; rien n'est envoyé.
+        setLinesError(null)
+        setLinesErrorId(checked.lineId)
+        setLinesError(t(($) => $.project.updates.lineTooLong, { max: UPDATE_LINE_MAX }))
       } else {
         setMessage(t(($) => $.project.updates.photosUploading))
       }
       return
     }
     setLinesError(null)
+    setLinesErrorId(null)
     inFlight.current = true
     const published = await publish(checked.payload)
     inFlight.current = false
@@ -395,6 +407,7 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
           form={form}
           onChange={change}
           linesError={linesError}
+          linesErrorId={linesErrorId}
           photos={{
             tiles: photos.tiles,
             actions: photos.actions,

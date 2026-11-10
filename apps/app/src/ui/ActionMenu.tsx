@@ -507,11 +507,18 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
                 // Un choix dit s'il est le choix en cours : `aria-checked` sur le web (où
                 // react-native-web ignore accessibilityState), accessibilityState sur téléphone.
                 {...(choice
-                  ? {
-                      role: MENU_ITEM_RADIO,
-                      'aria-checked': item.checked === true,
-                      accessibilityState: { checked: item.checked === true },
-                    }
+                  ? Platform.OS === 'web'
+                    ? {
+                        role: MENU_ITEM_RADIO,
+                        'aria-checked': item.checked === true,
+                        accessibilityState: { checked: item.checked === true },
+                      }
+                    : {
+                        // Téléphone : `menuitemradio` n'existe pas dans React Native (un `role`
+                        // inconnu effacerait le rôle du choix) ; un `menuitem` qui dit s'il est choisi.
+                        accessibilityRole: 'menuitem' as const,
+                        accessibilityState: { checked: item.checked === true },
+                      }
                   : { accessibilityRole: 'menuitem' as const })}
                 onPress={() => onChoose(item)}
                 {...keys(index, item)}

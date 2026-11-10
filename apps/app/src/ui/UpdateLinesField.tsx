@@ -38,6 +38,11 @@ type Props = {
   onTextChange: (id: string, text: string) => void
   /** Le refus de publier, posé sur la première ligne ; chaque nouvelle valeur lui rend le focus. */
   error?: string | null | undefined
+  /**
+   * La ligne qui porte l'erreur (une ligne trop longue) ; absente : la première (« écris au moins
+   * un changement »).
+   */
+  errorLineId?: string | null | undefined
   /** Faux pendant l'envoi : rien ne change dans la liste. */
   editable?: boolean
 }
@@ -58,6 +63,7 @@ export function UpdateLinesField({
   onFamilyChange,
   onTextChange,
   error = null,
+  errorLineId = null,
   editable = true,
 }: Props) {
   const { t } = useTranslation()
@@ -107,9 +113,12 @@ export function UpdateLinesField({
     } else pending.current = null
   }, [lines])
 
-  // Chaque refus de publier pose le focus sur la première ligne. Pas au premier dessin : le focus
-  // ne bouge qu'après un geste (« Publier »).
+  // Chaque refus de publier pose le focus sur la ligne en erreur : la fautive si on la nomme (et
+  // qu'elle existe encore), sinon la première. Pas au premier dessin : le focus ne bouge qu'après
+  // un geste (« Publier »).
   const firstId = lines[0]?.id
+  const errorId =
+    errorLineId !== null && lines.some((line) => line.id === errorLineId) ? errorLineId : firstId
   const shown = useRef(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: seule une nouvelle erreur déplace le focus.
   useEffect(() => {
@@ -117,7 +126,7 @@ export function UpdateLinesField({
       shown.current = true
       return
     }
-    if (error && firstId) focusField(fields.current.get(firstId))
+    if (error && errorId) focusField(fields.current.get(errorId))
   }, [error])
 
   const remove = (id: string) => {
@@ -184,7 +193,7 @@ export function UpdateLinesField({
             onTextChange={(text) => onTextChange(line.id, text)}
             onRemove={total > 1 ? () => remove(line.id) : undefined}
             placeholder={t(($) => $.update.example[line.family])}
-            error={index === 0 && error ? error : undefined}
+            error={line.id === errorId && error ? error : undefined}
             inputRef={handleOf(line.id)}
             index={index}
             total={total}

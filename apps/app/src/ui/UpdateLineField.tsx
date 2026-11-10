@@ -16,7 +16,7 @@
 // doux tout entière quand on y écrit.
 
 import { layout, radii, space } from '@ruche/brand'
-import type { UpdateFamily } from '@ruche/contracts'
+import { UPDATE_LINE_MAX, type UpdateFamily } from '@ruche/contracts'
 import { type Ref, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, Pressable, type TextInput, View } from 'react-native'
@@ -27,8 +27,6 @@ import { TextField } from './TextField'
 import { useTheme } from './theme/ThemeProvider'
 import { UpdateFamilyBadge } from './UpdateFamilyBadge'
 
-/** Le nombre de caractères d'une ligne, au plus (le contrat de l'API dit la même chose). */
-export const UPDATE_LINE_MAX = 120
 /** Le compteur « 105 / 120 » apparaît sous le texte à partir de ce nombre de caractères. */
 const COUNT_FROM = 100
 

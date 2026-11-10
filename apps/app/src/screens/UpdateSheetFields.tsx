@@ -55,6 +55,8 @@ type Props = {
   onChange: (next: UpdateFormValues) => void
   /** Le refus de publier sans ligne, posé sur la première ligne. */
   linesError: string | null
+  /** La ligne qui porte ce refus (une ligne trop longue) ; absente : la première. */
+  linesErrorId?: string | null
   photos: UpdateSheetPhotos
   /** L'envoi est en cours : tout est en lecture seule. */
   busy: boolean
@@ -68,6 +70,7 @@ export function UpdateSheetFields({
   form,
   onChange,
   linesError,
+  linesErrorId = null,
   photos,
   busy,
   now,
@@ -156,6 +159,7 @@ export function UpdateSheetFields({
         onFamilyChange={(line, family) => onChange(setFamily(form, line, family))}
         onTextChange={(line, text) => onChange(setText(form, line, text))}
         error={linesError}
+        errorLineId={linesErrorId}
         editable={!busy}
       />
       <TextField
@@ -207,6 +211,14 @@ export function UpdateSheetFields({
             ? { badges: [t(($) => $.project.updates.before), t(($) => $.project.updates.after)] }
             : null)}
         />
+        {/* Les formats, puis le droit à l'image (jur-C1) : les mêmes phrases que la publication d'un
+            projet, sous les tuiles, même sans photo. */}
+        <Text variant="caption" tone="muted">
+          {t(($) => $.project.form.photosRules)}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {t(($) => $.project.form.photosConsent)}
+        </Text>
         {selected ? (
           <TextField
             key={selected.key}
@@ -214,6 +226,7 @@ export function UpdateSheetFields({
             value={photos.descriptionOf(selected.key)}
             onChangeText={(text) => photos.describe(selected.key, text)}
             autoCapitalize="sentences"
+            hint={t(($) => $.project.updates.photoDescriptionHint)}
             limit={PHOTO_DESCRIPTION_MAX}
             countFrom={PHOTO_DESCRIPTION_MAX - 50}
             editable={!busy}
