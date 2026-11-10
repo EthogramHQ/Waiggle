@@ -209,6 +209,12 @@ function UpdatesView({ project }: { project: Project }) {
     beforePhoto && afterPhoto ? (
       <BeforeAfter before={photoOf(beforePhoto)} after={photoOf(afterPhoto)} />
     ) : null
+  // Sur ordinateur, les deux colonnes restent pour toute la visite une fois montrées : supprimer la
+  // mise à jour de l'avant / après ne fait pas sauter la frise de la colonne de droite à toute la
+  // largeur, et la frise n'est pas remontée (elle perdrait la place du focus à rendre, mesuré à
+  // 1440 px : le focus finissait sur la page entière).
+  const hadHero = useRef(false)
+  if (hero) hadHero.current = true
   // Dans la frise, la mise à jour mise en avant garde ses autres photos, sans répéter la comparaison
   // (deux curseurs du même nom sur la page ne se distingueraient pas).
   const timelineUpdates = shown.map((update) =>
@@ -297,7 +303,7 @@ function UpdatesView({ project }: { project: Project }) {
       thumbhash={project.visuals[0]?.thumbhash ?? null}
     >
       {head}
-      {hero && columns ? (
+      {columns && (hero || hadHero.current) ? (
         <Columns main={hero} side={timeline} sideWidth="wide" />
       ) : (
         <>
