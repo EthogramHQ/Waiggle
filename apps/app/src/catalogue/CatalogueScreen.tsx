@@ -57,7 +57,7 @@ import { Tag } from '../ui/Tag'
 import { TagInput } from '../ui/TagInput'
 import { Text } from '../ui/Text'
 import { FieldGroup, TextField } from '../ui/TextField'
-import { TextLink } from '../ui/TextLink'
+import { TextLink, TextLinkShape } from '../ui/TextLink'
 import type { Appearance } from '../ui/theme/appearance'
 import { useTheme } from '../ui/theme/ThemeProvider'
 import { VisualEditor } from '../ui/VisualEditor'
@@ -440,6 +440,8 @@ export function CatalogueScreen() {
         <Row gap="sm" wrap>
           <TextLink label={l.createAccount} onPress={() => {}} />
           <TextLink label={l.cancel} onPress={() => {}} role="button" />
+          {/* L'allure seule d'un lien (gabarit d'une place gardée) : identique, sans rien à toucher. */}
+          <TextLinkShape label={l.createAccount} />
         </Row>
         <Button label={l.openDialog} variant="secondary" onPress={() => setDialog(true)} />
         <Dialog

@@ -14,7 +14,7 @@
 // hauteur de deux lignes de texte, mesurée sur un texte invisible (elle suit donc le texte agrandi).
 // La place reste ensuite acquise : si la ligne ne vient pas (projet introuvable, autre adresse), le
 // vide reste, plutôt que les boutons ne remontent sous le doigt.
-import { layout, space } from '@ruche/brand'
+import { space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
@@ -25,7 +25,7 @@ import { ButtonPair } from './ButtonPair'
 import { Callout } from './Callout'
 import { Stack } from './Stack'
 import { Text } from './Text'
-import { TextLink } from './TextLink'
+import { TextLink, TextLinkShape } from './TextLink'
 import { useTapsAllowed } from './tapGuard'
 
 /** La ligne « La démo de … » : sa phrase toute faite, et l'auteur dont la photo la précède. */
@@ -88,7 +88,7 @@ export function LeavingSheet({
   // place est donc gardée sous la carte, sur le miel ; elle y reste si la ligne ne vient pas (la
   // carte, déjà centrée avec elle, ne redescend pas). Sur téléphone, rien n'est gardé : la feuille
   // grandit vers le bas sans rien déplacer.
-  useHoldUnderCard(holdOrigin && !testers ? TESTERS_HOLD : null)
+  useHoldUnderCard(holdOrigin && !testers ? TestersHold : null)
   return (
     <>
       {/* align="stretch" : les textes prennent toute la largeur de la feuille, et un nom de site
@@ -199,29 +199,20 @@ function TestersLine({ testers }: { testers: LeavingTesters }) {
 /**
  * Le gabarit de la ligne des testeurs, pour garder sa place sous la carte sur ordinateur (voir
  * useHoldUnderCard dans ui/BrandAmbiance.tsx) : la même forme, invisible. Le lien n'y est que
- * dessiné, à la taille de `TextLink` (44 points de haut, libellé en gras) : aucun lien qu'on
- * atteindrait au clavier dans une place vide. Le nom de l'auteur n'est pas encore connu : une
- * espace insécable le remplace (un nom très long, qui passerait à la ligne, ferait encore bouger la
- * carte d'une demi-ligne ; les noms tiennent d'ordinaire sur la ligne).
+ * dessiné (`TextLinkShape`, l'allure même de `TextLink`) : aucun lien qu'on atteindrait au clavier
+ * dans une place vide. Le nom de l'auteur n'est pas encore connu : une espace insécable le remplace
+ * (un nom très long, qui passerait à la ligne, ferait encore bouger la carte d'une demi-ligne ; les
+ * noms tiennent d'ordinaire sur la ligne).
  */
 function TestersHold() {
   const { t } = useTranslation()
   return (
     <TestersShape
       lead={t(($) => $.project.testers.leavingLead, { name: BLANK })}
-      link={
-        <View style={{ minHeight: layout.touchTarget, justifyContent: 'center' }}>
-          <Text variant="callout" weight={700} underline>
-            {t(($) => $.project.testers.leavingLink)}
-          </Text>
-        </View>
-      }
+      link={<TextLinkShape label={t(($) => $.project.testers.leavingLink)} />}
     />
   )
 }
-
-/** Un élément stable (useHoldUnderCard le compare d'un dessin à l'autre). */
-const TESTERS_HOLD = <TestersHold />
 
 /** La ligne « La démo de … », ou sa place gardée, vide, tant qu'elle n'est pas là. */
 function OriginLine({ origin }: { origin: LeavingOrigin | null }) {

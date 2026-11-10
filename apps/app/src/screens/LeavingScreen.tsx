@@ -11,6 +11,7 @@
 // vrai projet à côté d'un site piégé.
 import { ProjectId, publicHttpsUrl } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
 import { useSession } from '../accounts/api'
@@ -118,6 +119,12 @@ function OpenableTarget({
   // venant d'elle, la ligne est là tout de suite, sans requête.
   const asks = projectId !== null
   const read = useProject(projectId ?? '', asks && Boolean(session))
+  // Ce qui peut encore arriver se décide à l'arrivée, une fois pour la visite (un état n'est
+  // initialisé qu'au premier dessin). En venant de la page du projet, sa lecture est déjà là : on
+  // sait tout de suite si les lignes viendront, et aucune place n'est gardée pour rien (sur
+  // ordinateur, une place gardée sous la carte faisait défiler la page dans une fenêtre basse).
+  // Par un lien direct, la réponse viendra plus tard : la place est gardée jusqu'à elle.
+  const [readAtArrival] = useState(() => read.data !== undefined)
   const mediaSource = useMediaSources(asks)
   // Une seule ouverture sur double tape : la seconde tape arrive avant que la page change.
   const guard = useTapGuard()
@@ -167,8 +174,8 @@ function OpenableTarget({
       origin={origin}
       testers={testers}
       // La place de la ligne est gardée dès qu'elle peut venir (ui-17) : « Ouvrir le site » ne
-      // bouge pas quand elle arrive.
-      holdOrigin={asks}
+      // bouge pas quand elle arrive. Lue avant l'arrivée, elle est déjà là, ou ne viendra pas.
+      holdOrigin={asks && !readAtArrival}
       onOpen={guard(() => void Linking.openURL(target.href))}
       onStay={onStay}
     />
