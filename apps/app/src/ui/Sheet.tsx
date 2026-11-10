@@ -1224,7 +1224,6 @@ export function SheetPanel({
           title={title}
           heading={heading}
           titleId={titleId}
-          subtitle={subtitle}
           {...(dragHandlers ? { dragHandlers } : null)}
           {...(cancelLabel
             ? {
@@ -1330,6 +1329,22 @@ export function SheetPanel({
   // Une feuille courte sur téléphone : la hauteur de son contenu (voir `compact`).
   const hug = compact && phone
 
+  // La phrase sous le titre, dans la tête à action (relecture du 10/11) : elle ouvre le contenu qui
+  // défile au lieu de rester dans la tête fixe. Dans la tête, elle grandissait avec le texte
+  // agrandi et mangeait la fenêtre (103 % de 320 × 568 à 200 % : plus de formulaire) ; ici, elle
+  // défile avec lui et la tête reste courte. Rangée comme le titre : centrée avec « Annuler », à
+  // gauche sans.
+  const subtitleInContent =
+    actionOnTop && subtitle ? (
+      // Plus de marge dessous que de marge dessus : la phrase se lit rattachée au titre (le filet
+      // de la tête, puis `paddingTop` réduit ci-dessous), à distance du bloc suivant.
+      <View style={{ marginBottom: space.sm }}>
+        <Text tone="secondary" align={cancelLabel ? 'center' : 'left'}>
+          {subtitle}
+        </Text>
+      </View>
+    ) : null
+
   // Le contenu, qui défile dans la feuille, le titre et le pied restant en place.
   // keyboardShouldPersistTaps : un bouton touché pendant que le clavier est ouvert agit du premier
   // coup.
@@ -1339,7 +1354,8 @@ export function SheetPanel({
       style={{ flexShrink: 1 }}
       contentContainerStyle={{
         paddingHorizontal: space.xl,
-        paddingTop: space.xl - space.sm,
+        // Avec la phrase en tête, le haut est réduit : elle reste près du titre et de son filet.
+        paddingTop: subtitleInContent ? space.xs : space.xl - space.sm,
         // Une feuille courte rapproche son contenu du bouton collé : moins de 32 points entre
         // le dernier bloc et le bouton (décision de Louis du 2/11).
         paddingBottom: pinned ? (compact ? space.lg : space.xl) : insets.bottom + space.xxl,
@@ -1347,6 +1363,7 @@ export function SheetPanel({
       }}
       keyboardShouldPersistTaps="handled"
     >
+      {subtitleInContent}
       {/* Une vue autour du contenu, pour y mesurer la place d'un élément à amener en vue. */}
       {revealRef ? (
         <View

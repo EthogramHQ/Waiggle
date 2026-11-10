@@ -817,7 +817,7 @@ describe('the update suggested after a change of status', () => {
     await openSheet(recipesProject, 'testable')
 
     expect(lineField(1, 1)).toHaveDisplayValue(announcedLine)
-    expect(screen.getAllByText(/Ton projet est passé en «\sTestable\s»\s: annonce-le/).length).toBe(
+    expect(screen.getAllByText(/Ton projet est passé en «\sTestable\s»\s: annonce.le/).length).toBe(
       1,
     )
     await publish()

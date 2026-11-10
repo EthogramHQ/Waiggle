@@ -700,7 +700,7 @@ export const fr = {
       // Le statut changé dans « Modifier » préremplit la feuille (comme le Journal avant).
       statusPrefill: 'Le projet passe en « {{status}} ».',
       hintAnnounce:
-        'Ton projet est passé en « {{status}} » : annonce-le à tes abonnés et à tes testeurs, ou touche Annuler.',
+        'Ton projet est passé en « {{status}} » : annonce‑le à tes abonnés et à tes testeurs, ou touche Annuler.',
       hintAnnouncePrivate:
         'Ton projet est passé en « {{status}} ». Il est privé : personne ne sera prévenu. Publie cette mise à jour pour la garder, ou touche Annuler.',
       required: 'Écris au moins un changement avant de publier.',

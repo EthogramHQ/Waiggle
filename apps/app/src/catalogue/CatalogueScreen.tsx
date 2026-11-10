@@ -377,19 +377,6 @@ export function CatalogueScreen() {
           cancel={{ label: l.cancel, onPress: () => {} }}
           action={{ label: l.publish, onPress: () => {} }}
         />
-        {/* Avec sa phrase d'introduction : sous la rangée « Annuler · titre · action », centrée comme
-            le titre ; sans « Annuler », à gauche. */}
-        <SheetHeader
-          title={l.newProject}
-          subtitle={l.newProjectIntro}
-          cancel={{ label: l.cancel, onPress: () => {} }}
-          action={{ label: l.publish, onPress: () => {} }}
-        />
-        <SheetHeader
-          title={l.newProject}
-          subtitle={l.newProjectIntro}
-          action={{ label: l.publish, onPress: () => {} }}
-        />
         {/* Un titre long passe sur deux lignes ; « Annuler » et l'action restent entiers. S'il n'y
             a pas la place (petit écran, grand texte), le titre passe sous les deux boutons. */}
         <SheetHeader
