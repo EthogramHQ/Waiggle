@@ -89,6 +89,12 @@ type Props = {
    * galerie ouvre l'écran (elle reprend les marges de `Screen`). Sans effet sur ordinateur.
    */
   bleed?: boolean
+  /**
+   * R7a : le nom lu de la galerie ; par défaut « Photos du projet ». La page projet en montre deux
+   * (celle du projet et celle de sa dernière mise à jour) : la seconde se nomme « Photos de la mise
+   * à jour », sinon le lecteur d'écran entendrait deux fois le même nom.
+   */
+  label?: string
 }
 
 /** Les styles du web que les types de React Native ne connaissent pas (aimantation CSS). */
@@ -115,6 +121,7 @@ export function PhotoGallery({
   title,
   height: shape,
   bleed = false,
+  label: named,
 }: Props) {
   const { t } = useTranslation()
   const { sizeClass, padding } = useLayout()
@@ -268,7 +275,7 @@ export function PhotoGallery({
       : t(($) => $.gallery.photoOf, { index: rank + 1, count })
   }
 
-  const label = t(($) => $.gallery.label)
+  const label = named ?? t(($) => $.gallery.label)
   const valueText = spokenPhoto(index)
   // Une seule photo décrite : son nom est sa description (le texte de remplacement d'une image),
   // sans « photo 1 sur 1 » ; pas décrite, « Photos du projet » comme avant.
