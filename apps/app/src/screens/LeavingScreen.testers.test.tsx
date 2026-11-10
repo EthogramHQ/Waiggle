@@ -7,6 +7,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Linking } from 'react-native'
 import { request, requestWithoutBody } from '../api/client'
 import { getProject } from '../projects/api'
+import { suspendedMe } from '../testing/fixtures'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { fr } from '../testing/text'
@@ -147,6 +148,29 @@ describe('the testers line of the page that leaves for a demo (R7a)', () => {
       expect(screen.queryByText(LEAD)).toBeNull()
     },
   )
+
+  it('says nothing of the testers to a suspended account, which cannot join', async () => {
+    // Le profil du membre dit qu'il est suspendu : la page ne l'invite pas à rejoindre.
+    jest
+      .mocked(request)
+      .mockImplementation(async (path) =>
+        String(path) === '/v1/me'
+          ? { ok: true, data: { ...suspendedMe, id: 'u3', name: 'Inès' } }
+          : { ok: false, error: { status: 404, code: 'not_found' } },
+      )
+    await renderWithProviders(<LeavingScreen url={url} project={id} />)
+
+    await settled()
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/v1/me', {}, expect.anything()))
+    // Témoin : la ligne « La démo de … » est là, le projet a bien été lu.
+    expect(
+      await screen.findByText(
+        fr.t(($) => $.leaving.from, { title: seenByInes.title, name: 'Léa' }),
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByText(LEAD)).toBeNull()
+    expect(screen.queryByRole('link', { name: LINK })).toBeNull()
+  })
 
   it('says nothing of the testers when the address is not the demo of the project', async () => {
     await renderWithProviders(

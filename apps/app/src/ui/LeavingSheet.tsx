@@ -15,7 +15,7 @@
 // La place reste ensuite acquise : si la ligne ne vient pas (projet introuvable, autre adresse), le
 // vide reste, plutôt que les boutons ne remontent sous le doigt.
 import { space } from '@ruche/brand'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { AvatarStack, type StackMember } from './AvatarStack'
@@ -24,10 +24,14 @@ import { ButtonPair } from './ButtonPair'
 import { Callout } from './Callout'
 import { Stack } from './Stack'
 import { Text } from './Text'
+import { TextLink } from './TextLink'
 import { useTapsAllowed } from './tapGuard'
 
 /** La ligne « La démo de … » : sa phrase toute faite, et l'auteur dont la photo la précède. */
 export type LeavingOrigin = { text: string; author: StackMember }
+
+/** La ligne des testeurs : le nom de l'auteur, et où mène le lien (la page du projet). */
+export type LeavingTesters = { name: string; onOpenProject: () => void }
 
 type Props = {
   /** Le nom du site (« carnet-cafes.vercel.app »), tel que l'adresse le donne. */
@@ -38,6 +42,12 @@ type Props = {
   origin: LeavingOrigin | null
   /** Une ligne peut encore arriver : sa place est gardée dès maintenant (voir l'en-tête). */
   holdOrigin?: boolean
+  /**
+   * La ligne des testeurs (R7a) : « Tu veux aider Léa ? », puis le lien « Rejoins les testeurs depuis
+   * la page du projet. » qui mène à cette page (`onOpenProject`). `null` ou absente : pas de ligne.
+   * L'écran décide quand elle a lieu d'être ; sa place est gardée comme celle de `origin`.
+   */
+  testers?: LeavingTesters | null
   onOpen: () => void
   onStay: () => void
 }
@@ -55,7 +65,15 @@ const hiddenFromReaders = {
 /** Une espace insécable : une ligne « vide » qui garde quand même sa hauteur. */
 const BLANK = String.fromCodePoint(0xa0)
 
-export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, onStay }: Props) {
+export function LeavingSheet({
+  host,
+  href,
+  origin,
+  holdOrigin = false,
+  testers = null,
+  onOpen,
+  onStay,
+}: Props) {
   const { t } = useTranslation()
   // RF (S1b) : la tape qui a ouvert cette page (un double clic sur « Tester ») ne doit pas ouvrir le
   // site dans la foulée. « Ouvrir le site » ignore les tapes pendant TAP_GUARD_MS après le montage,
@@ -89,6 +107,7 @@ export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, o
         </Text>
       </Stack>
       {origin || holdOrigin ? <OriginLine origin={origin} /> : null}
+      {testers || holdOrigin ? <TestersLine testers={testers} /> : null}
       <Callout
         icon="key"
         title={t(($) => $.leaving.warningTitle)}
@@ -109,10 +128,12 @@ export function LeavingSheet({ host, href, origin, holdOrigin = false, onOpen, o
   )
 }
 
-/** La ligne « La démo de … », ou sa place gardée, vide, tant qu'elle n'est pas là. */
-function OriginLine({ origin }: { origin: LeavingOrigin | null }) {
-  // La hauteur gardée : celle du texte invisible de deux lignes, mesurée une fois. Elle reste
-  // ensuite, que la ligne arrive (plus courte ou aussi haute) ou non.
+/**
+ * Une ligne dont la place est gardée : son contenu quand il est là, sinon un gabarit invisible de
+ * deux lignes de texte. La hauteur gardée est celle de ce gabarit, mesurée une fois ; elle reste
+ * ensuite, que le contenu arrive (plus court ou aussi haut) ou non.
+ */
+function HeldLine({ children }: { children: ReactNode | null }) {
   const [held, setHeld] = useState(0)
   const measure = (event: LayoutChangeEvent) => {
     const { height } = event.nativeEvent.layout
@@ -120,6 +141,44 @@ function OriginLine({ origin }: { origin: LeavingOrigin | null }) {
   }
   return (
     <View style={{ minHeight: held, justifyContent: 'center' }}>
+      {children ?? (
+        // Le gabarit de la place : deux lignes vides, invisibles et cachées aux lecteurs d'écran.
+        <View {...hiddenFromReaders} style={{ opacity: 0 }} onLayout={measure}>
+          <Text variant="callout">{`${BLANK}\n${BLANK}`}</Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
+/** La ligne des testeurs : la phrase, puis le lien vers la page du projet (qui seule inscrit). */
+function TestersLine({ testers }: { testers: LeavingTesters | null }) {
+  const { t } = useTranslation()
+  return (
+    <HeldLine>
+      {testers ? (
+        <Stack gap="xxs" align="stretch">
+          <Text variant="callout" tone="secondary">
+            {t(($) => $.project.testers.leavingLead, { name: testers.name })}
+          </Text>
+          {/* Un lien et non un bouton : il mène à la page du projet ; ouvrir la démo ne rend jamais
+              testeur, et ce lien non plus (l'inscription se fait depuis la page). */}
+          <View style={{ alignSelf: 'flex-start' }}>
+            <TextLink
+              label={t(($) => $.project.testers.leavingLink)}
+              onPress={testers.onOpenProject}
+            />
+          </View>
+        </Stack>
+      ) : null}
+    </HeldLine>
+  )
+}
+
+/** La ligne « La démo de … », ou sa place gardée, vide, tant qu'elle n'est pas là. */
+function OriginLine({ origin }: { origin: LeavingOrigin | null }) {
+  return (
+    <HeldLine>
       {origin ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
           {/* La photo de l'auteur, décor : la phrase le nomme déjà (une pile sans `label` est
@@ -135,12 +194,7 @@ function OriginLine({ origin }: { origin: LeavingOrigin | null }) {
             </Text>
           </View>
         </View>
-      ) : (
-        // Le gabarit de la place : deux lignes vides, invisibles et cachées aux lecteurs d'écran.
-        <View {...hiddenFromReaders} style={{ opacity: 0 }} onLayout={measure}>
-          <Text variant="callout">{`${BLANK}\n${BLANK}`}</Text>
-        </View>
-      )}
-    </View>
+      ) : null}
+    </HeldLine>
   )
 }

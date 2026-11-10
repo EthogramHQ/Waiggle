@@ -10,15 +10,17 @@
 // page (sec-B4) : sinon un lien fabriqué (`/out?url=piège&project=<vrai projet>`) ferait parler un
 // vrai projet à côté d'un site piégé.
 import { ProjectId, publicHttpsUrl } from '@ruche/contracts'
+import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { Linking } from 'react-native'
 import { useSession } from '../accounts/api'
 import { useMediaSources } from '../api/media'
+import { useSuspension } from '../moderation/suspension'
 import { useGoBack } from '../navigation/useGoBack'
 import { useProject } from '../projects/hooks'
 import { Button } from '../ui/Button'
 import { PortalRings } from '../ui/Illustrations'
-import { type LeavingOrigin, LeavingSheet } from '../ui/LeavingSheet'
+import { type LeavingOrigin, LeavingSheet, type LeavingTesters } from '../ui/LeavingSheet'
 import { Notice } from '../ui/Notice'
 import { Screen } from '../ui/Screen'
 import { useTapGuard } from '../ui/tapGuard'
@@ -119,6 +121,9 @@ function OpenableTarget({
   const mediaSource = useMediaSources(asks)
   // Une seule ouverture sur double tape : la seconde tape arrive avant que la page change.
   const guard = useTapGuard()
+  const router = useRouter()
+  // Le profil dit si le compte est suspendu (lu partout, sans requête de plus).
+  const { suspended } = useSuspension()
 
   // La ligne « La démo de … » : seulement si la démo du projet lu est exactement l'adresse de la
   // page, comparées après la même mise en forme (publicHttpsUrl : « RECETTES.example.com/ » et
@@ -136,11 +141,31 @@ function OpenableTarget({
         }
       : null
 
+  // La ligne des testeurs : seulement pour la démo d'un projet « Testable » (même règle que le
+  // bouton « Rejoindre les testeurs » de sa page), d'un autre membre, dont on n'est pas déjà
+  // testeur. Un compte suspendu n'a pas de quoi rejoindre : la page se tait. Rien ne s'inscrit
+  // d'ici : le lien mène à la page du projet, où se trouve le bouton.
+  const testers: LeavingTesters | null =
+    shown &&
+    sameDemo &&
+    shown.status === 'testable' &&
+    !shown.isMine &&
+    !shown.isTester &&
+    !suspended
+      ? {
+          name: shown.author.name,
+          onOpenProject: guard(() =>
+            router.push({ pathname: '/projects/[id]', params: { id: shown.id } }),
+          ),
+        }
+      : null
+
   return (
     <LeavingSheet
       host={target.host}
       href={target.href}
       origin={origin}
+      testers={testers}
       // La place de la ligne est gardée dès qu'elle peut venir (ui-17) : « Ouvrir le site » ne
       // bouge pas quand elle arrive.
       holdOrigin={asks}
