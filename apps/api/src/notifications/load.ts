@@ -147,7 +147,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
 
     union all
 
-    ${projectUpdates(me, during, now)}
+    ${projectUpdates(me, during)}
 
     union all
 
@@ -294,18 +294,18 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
  *   pas), pas sur son propre projet (aucune route ne le fait testeur de son projet, la condition le
  *   redit), sur un projet listé pour lui (listedProjectFor : public, pas retiré, aucun blocage dans
  *   un sens ou dans l'autre avec l'auteur, par les index de member_block).
- * - Pas d'un auteur suspendu à l'heure `now` (scénario R7a, « Quitter ») : sa suspension active, s'il
- *   en a une, est la seule ligne non close de account_suspension_open_idx (user_id) where
- *   lifted_at is null, la règle unique de suspension/load.ts (activeSuspensionSql). « (select 1 …
- *   limit 1) is null » : une recherche d'index par ligne, jamais une lecture de toute la table.
- *   Levée la suspension, les mises à jour reviennent (calcul à la lecture, comme un déblocage).
+ * - Aucun filtre sur la suspension de l'auteur (relecture de sécurité R7a, B1) : un compte suspendu
+ *   ne publie plus (la garde de suspension), son projet ne prévient donc plus personne. Filtrer à
+ *   la lecture effacerait les mises à jour d'avant la suspension de la cloche et du récap, alors
+ *   que la frise et le fil les montrent : la différence trahirait la suspension, qui ne se devine
+ *   nulle part (décision du 31/10/2026).
  * - Une mise à jour publiée pendant que le projet était privé est notifiée s'il redevient public
  *   dans les 90 jours : calculée à la lecture, comme le reste (décision écrite au contrat, A6).
  *
  * Le nom de la table project_update est écrit sans alias : hasReadableLines le cite en toutes
  * lettres. `during` : la fenêtre de dates (voir sources), `now` : l'heure de l'API.
  */
-const projectUpdates = (me: string, during: (column: string) => SQL, now: Date): SQL => sql`
+const projectUpdates = (me: string, during: (column: string) => SQL): SQL => sql`
     select 'project_update', 'project_update:' || project_update.id, project_update.created_at,
       project.id, null, null, project.author_id, null, null, null, null, null, null, null,
       null, project_update.id, null, null, null, null
@@ -323,10 +323,7 @@ const projectUpdates = (me: string, during: (column: string) => SQL, now: Date):
       and project_update.created_at > mine.since
     where ${during('project_update.created_at')}
       and ${updateOnCards()} and ${hasReadableLines()}
-      and project.author_id <> ${me} and ${listedProjectFor(me)}
-      and (select 1 from account_suspension sus
-        where sus.user_id = project.author_id and ${activeSuspensionSql('sus', now)}
-        limit 1) is null`
+      and project.author_id <> ${me} and ${listedProjectFor(me)}`
 
 /**
  * Les six sources de la tranche 6b (réactions, abonnés, commentaires, masquages, pseudo), avec

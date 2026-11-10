@@ -1586,10 +1586,11 @@ describe('the updates of followed and tested projects (R7a)', () => {
     expect(await unread(zoe)).toBe(0)
   })
 
-  // Scénario R7a, « Quitter » (décision de la session) : un projet dont l'auteur est suspendu ne
-  // prévient plus ses testeurs. Un compte suspendu ne publie plus rien (la garde de suspension) :
-  // c'est donc la mise à jour publiée avant la suspension qui disparaît, de la liste et de la cloche.
-  it('never notifies the testers of a project whose author is suspended', async () => {
+  // Scénario R7a, « Quitter » : un projet dont l'auteur est suspendu ne prévient plus ses testeurs,
+  // parce qu'un compte suspendu ne publie plus (la garde de suspension). La mise à jour d'avant la
+  // suspension reste, comme dans la frise et le fil : sinon sa disparition trahirait la suspension
+  // (relecture de sécurité R7a, B1 ; décision du 31/10/2026).
+  it('keeps the notification of an update published before the author was suspended', async () => {
     const zoeId = (await me(zoe)).id
     await act.makeAdmin((await me(sam)).id)
     const meteo = await publish(ines)
@@ -1608,8 +1609,8 @@ describe('the updates of followed and tested projects (R7a)', () => {
       explanation: 'Messages insultants répétés.',
     })
 
-    expect(await updatesOf(zoe)).toEqual([])
-    expect(await unread(zoe)).toBe(0)
+    expect(await updateKeys(zoe)).toEqual([`project_update:${update.id}`])
+    expect(await unread(zoe)).toBe(1)
   })
 
   it('never notifies about a project removed by the moderation', async () => {
