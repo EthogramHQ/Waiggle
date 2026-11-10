@@ -3,7 +3,7 @@
 // remplacé la tête ordinaire. Mise dans la tête fixe, elle grandissait avec le texte agrandi et
 // prenait 103 % d'une fenêtre de 320 × 568 à 200 % : elle ouvre donc le contenu qui défile.
 import { screen } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { renderWithProviders } from '../testing/render'
 import { Sheet } from './Sheet'
 import { Text } from './Text'
@@ -94,5 +94,86 @@ describe('the phone head of a sheet with an action', () => {
 
     expect(screen.queryByText(SUBTITLE)).toBeNull()
     expect(screen.getByText('Le titre de ton projet')).toBeTruthy()
+  })
+})
+
+// Relecture du 10/11 (S1) : la boîte de dialogue est nommée par son titre ; elle est aussi décrite
+// par la phrase, pour qu'un lecteur d'écran la lise à l'ouverture et non seulement en parcourant.
+describe('the description of the dialog on the web', () => {
+  type Props = Record<string, unknown>
+  // Un faux document : chaque propriété lue existe (les feuilles du web y posent des styles).
+  const fakeDocument = (): object => {
+    const node = (): object =>
+      new Proxy({ style: { setProperty: jest.fn(), removeProperty: jest.fn() } } as Props, {
+        get(target, key) {
+          if (key === 'then') return undefined
+          if (!(key in target)) {
+            target[key as string] =
+              key === 'documentElement' || key === 'body' || key === 'head'
+                ? node()
+                : jest.fn(() => undefined)
+          }
+          return target[key as string]
+        },
+      })
+    return node()
+  }
+  const layerProps = (): Props => {
+    const found = hostsOf(screen.root as unknown as Host).find(
+      (node) => typeof (node as unknown as { props: Props }).props.onRequestClose === 'function',
+    )
+    if (!found) throw new Error('no Modal layer')
+    return (found as unknown as { props: Props }).props
+  }
+  const withWeb = async (run: () => Promise<void>) => {
+    jest.replaceProperty(Platform, 'OS', 'web')
+    Object.defineProperty(globalThis, 'document', {
+      value: fakeDocument(),
+      configurable: true,
+    })
+    try {
+      await run()
+    } finally {
+      jest.restoreAllMocks()
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+  }
+
+  it('is described by the subtitle of a sheet with an action', async () => {
+    await withWeb(async () => {
+      await open('Annuler')
+
+      const subtitle = screen.getByText(SUBTITLE)
+      expect(layerProps()['aria-describedby']).toBe(subtitle.props.nativeID)
+      expect(subtitle.props.nativeID).toBeTruthy()
+    })
+  })
+
+  it('is described by the subtitle of a sheet without an action', async () => {
+    await withWeb(async () => {
+      await renderWithProviders(
+        <Sheet open title="Partager" subtitle={SUBTITLE} onClose={jest.fn()}>
+          <Text>Le lien</Text>
+        </Sheet>,
+      )
+
+      const subtitle = screen.getByText(SUBTITLE)
+      expect(layerProps()['aria-describedby']).toBe(subtitle.props.nativeID)
+      expect(subtitle.props.nativeID).toBeTruthy()
+    })
+  })
+
+  it('has no description without a subtitle (témoin)', async () => {
+    await withWeb(async () => {
+      await renderWithProviders(
+        <Sheet open title="Partager" onClose={jest.fn()}>
+          <Text>Le lien</Text>
+        </Sheet>,
+      )
+
+      expect(screen.getByText('Le lien')).toBeTruthy()
+      expect(layerProps()['aria-labelledby']).toBeTruthy()
+      expect(layerProps()['aria-describedby']).toBeUndefined()
+    })
   })
 })
