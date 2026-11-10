@@ -18,8 +18,8 @@ import {
   ReportReason,
   type ReportSnapshot,
   ReportSnapshotEntry,
-  ReportTarget,
   type SnapshotImage,
+  StoredReportTarget,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm'
@@ -29,8 +29,9 @@ import { after, type CursorContent, encodeCursor } from '../cursor'
 import { isoDate } from '../jobs/shared'
 import { utc } from '../notifications/load'
 import { activeSuspensionSql } from '../suspension/load'
+import { readLines } from '../updates/load'
 import { blockedByAdmin } from './decide'
-import { targetUuid } from './target'
+import { targetUuid, updateText } from './target'
 
 const r = schema.contentReport
 const d = schema.moderationDecision
@@ -42,8 +43,8 @@ const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 // ─── Classer « sans objet » ──────────────────────────────────────────────────────────────────────
 
 /**
- * Les signalements ouverts dont la cible n'existe plus (projet, note ou commentaire supprimé par
- * son auteur, compte supprimé) passent à « void », datés de `now` : la purge les efface 30 jours
+ * Les signalements ouverts dont la cible n'existe plus (projet, mise à jour ou commentaire supprimé
+ * par son auteur, compte supprimé, ancienne note du Journal) passent à « void », datés de `now` : la purge les efface 30 jours
  * plus tard. La personne qui a signalé n'est pas prévenue (règle 29).
  *
  * « not exists (select 1 …) » est vrai quand la sous-requête ne trouve rien. Chaque sous-requête
@@ -67,7 +68,8 @@ export const voidReportsOfGoneTargets = async (db: Database, now: Date) => {
         eq(r.status, 'open'),
         sql`case content_report.target_kind
           when 'project' then not exists (select 1 from project p where p.id = ${id})
-          when 'note' then not exists (select 1 from project_note n where n.id = ${id})
+          when 'update' then not exists (select 1 from project_update u where u.id = ${id})
+          when 'note' then true
           when 'comment' then not exists (
             select 1 from project_comment c where c.id = ${id} and c.deleted_at is null)
           else not exists (select 1 from "user" u where u.id = content_report.target_id)
@@ -174,13 +176,13 @@ export const loadQueuePage = async (
       details: r.details,
       // mapWith : la valeur se lit comme la colonne (du JSON rendu en objet).
       snapshot: sql<unknown>`case when ${newest} then ${r.snapshot} end`.mapWith(r.snapshot),
-      // Une copie d'avant 7b d'une note ou d'un commentaire ([{field:'text'}], tout leur texte)
+      // Une copie d'avant 7b d'un commentaire ([{field:'text'}], tout leur texte)
       // compte comme la copie 7b du même texte ([{field:'body'}]) : on la réécrit ainsi avant
       // l'empreinte (tranche 7c, S3). Pour un projet ou un profil, 7a n'en gardait qu'une partie :
       // la copie reste telle quelle, et diffère. `->` sur une copie mal formée rend null, sans
       // erreur ; jsonb_build_object écrit ses clés comme la copie rangée en base.
       snapshotHash: sql<string>`md5((case
-        when ${r.targetKind} in ('note', 'comment') and ${r.snapshot}->0->>'field' = 'text'
+        when ${r.targetKind} = 'comment' and ${r.snapshot}->0->>'field' = 'text'
           and ${r.snapshot}->1 is null
         then jsonb_build_array(jsonb_build_object('field', 'body', 'value', ${r.snapshot}->0->'value'))
         else ${r.snapshot} end)::text)`,
@@ -204,7 +206,8 @@ export const loadQueuePage = async (
   // sans donnée personnelle, et ne décale ni les nombres ni les dates des cartes voisines.
   const groupsByKey = new Map<string, z.infer<typeof Group>>()
   const targets = page.flatMap((g) => {
-    const parsed = ReportTarget.safeParse({ kind: g.target_kind, id: g.target_id })
+    // StoredReportTarget : une cible `note` d'avant R7a se lit encore, comme une cible disparue.
+    const parsed = StoredReportTarget.safeParse({ kind: g.target_kind, id: g.target_id })
     if (!parsed.success) {
       console.warn(`Moderation queue: report ${g.first_id} has an invalid target, left out`)
       return []
@@ -290,7 +293,7 @@ export const loadQueuePage = async (
   return { items, nextCursor }
 }
 
-const keyOf = (target: ReportTarget) => `${target.kind}:${target.id}`
+const keyOf = (target: StoredReportTarget) => `${target.kind}:${target.id}`
 
 // ─── Le rappel des décisions passées (tranche 7c) ────────────────────────────────────────────────
 
@@ -429,13 +432,15 @@ const readCopy = (value: unknown): ReportSnapshot => {
 /**
  * Les images des copies encore là : la même clé toujours affichée sur le projet (une photo ou la
  * couverture) ou comme photo de profil. Une clé est tirée au hasard à chaque envoi : une image
- * remplacée a une autre clé, et compte comme partie. Au plus deux requêtes pour la page, chacune
- * par l'index du propriétaire (project_media_project_idx, clé primaire de profile). Le résultat :
+ * remplacée a une autre clé, et compte comme partie. Au plus trois requêtes pour la page, chacune
+ * par l'index du propriétaire (project_media_project_idx, project_media_update_idx, clé primaire de
+ * profile). Les photos d'un projet sont celles de sa galerie et de sa couverture, jamais celles de
+ * ses mises à jour (relecture de sécurité A8). Le résultat :
  * « sorte:id|clé ».
  */
 const imagesStillThere = async (db: Database, copies: Map<string, ReportSnapshot>) => {
   const present = new Set<string>()
-  const withImages = (kind: ReportTarget['kind']) =>
+  const withImages = (kind: StoredReportTarget['kind']) =>
     [...copies.entries()]
       .filter(
         ([key, copy]) => key.startsWith(`${kind}:`) && copy.some((e) => isImageField(e.field)),
@@ -447,8 +452,17 @@ const imagesStillThere = async (db: Database, copies: Map<string, ReportSnapshot
     const rows = await db
       .select({ projectId: m.projectId, key: m.storageKey })
       .from(m)
-      .where(inArray(m.projectId, projects))
+      .where(and(inArray(m.projectId, projects), inArray(m.slot, ['gallery', 'portrait'])))
     for (const row of rows) present.add(`project:${row.projectId}|${row.key}`)
+  }
+  const updates = withImages('update')
+  if (updates.length > 0) {
+    const m = schema.projectMedia
+    const rows = await db
+      .select({ updateId: m.updateId, key: m.storageKey })
+      .from(m)
+      .where(inArray(m.updateId, updates))
+    for (const row of rows) present.add(`update:${row.updateId}|${row.key}`)
   }
   const members = withImages('member')
   if (members.length > 0) {
@@ -466,11 +480,14 @@ const imagesStillThere = async (db: Database, copies: Map<string, ReportSnapshot
  * L'état actuel de chaque cible : présente, retirée, ou disparue (absente de la Map). Une requête
  * par sorte, servie par la clé primaire de sa table (inArray : « id in (…) »).
  */
-const statesOf = async (db: Database, targets: ReportTarget[]) => {
+const statesOf = async (db: Database, targets: StoredReportTarget[]) => {
   const states = new Map<string, 'present' | 'removed'>()
-  const idsOf = (kind: ReportTarget['kind']) =>
+  const idsOf = (kind: StoredReportTarget['kind']) =>
     targets.filter((t) => t.kind === kind).map((t) => t.id)
-  const note = (kind: ReportTarget['kind'], rows: { id: string; removedAt: Date | null }[]) => {
+  const note = (
+    kind: StoredReportTarget['kind'],
+    rows: { id: string; removedAt: Date | null }[],
+  ) => {
     for (const row of rows) {
       states.set(`${kind}:${row.id}`, row.removedAt === null ? 'present' : 'removed')
     }
@@ -483,12 +500,13 @@ const statesOf = async (db: Database, targets: ReportTarget[]) => {
       await db.select({ id: p.id, removedAt: p.removedAt }).from(p).where(inArray(p.id, projects)),
     )
   }
-  const notes = idsOf('note')
-  if (notes.length > 0) {
-    const n = schema.projectNote
+  // Une cible `note` n'a plus d'état : elle reste absente de la Map, donc « disparue ».
+  const updates = idsOf('update')
+  if (updates.length > 0) {
+    const u = schema.projectUpdate
     note(
-      'note',
-      await db.select({ id: n.id, removedAt: n.removedAt }).from(n).where(inArray(n.id, notes)),
+      'update',
+      await db.select({ id: u.id, removedAt: u.removedAt }).from(u).where(inArray(u.id, updates)),
     )
   }
   const comments = idsOf('comment')
@@ -532,15 +550,15 @@ export const loadRemovedPage = async (
   cursor: CursorContent | null,
 ): Promise<RemovedPage> => {
   const p = schema.project
-  const n = schema.projectNote
+  const u = schema.projectUpdate
   const c = schema.projectComment
   const id = targetUuid('moderation_decision')
-  // L'auteur d'une note est celui de son projet : la table project, une seconde fois, sous un
-  // autre nom (« alias » np), pour ne pas la confondre avec celle du projet retiré.
-  const np = alias(schema.project, 'np')
+  // L'auteur d'une mise à jour est celui de son projet : la table project, une seconde fois, sous un
+  // autre nom (« alias » up), pour ne pas la confondre avec celle du projet retiré.
+  const up = alias(schema.project, 'up')
   const conditions: (SQL | undefined)[] = [
     eq(d.action, 'remove'),
-    or(isNotNull(p.id), isNotNull(n.id), isNotNull(c.id)),
+    or(isNotNull(p.id), isNotNull(u.id), isNotNull(c.id)),
   ]
   // « Après le curseur », dans l'ordre décroissant de la page (cursor.ts).
   if (cursor) conditions.push(after(cursor, d.createdAt, d.id))
@@ -556,10 +574,11 @@ export const loadRemovedPage = async (
       projectPitch: p.pitch,
       projectAuthorId: p.authorId,
       projectRemovedAt: p.removedAt,
-      noteBody: n.body,
-      noteProjectId: n.projectId,
-      noteAuthorId: np.authorId,
-      noteRemovedAt: n.removedAt,
+      updateTitle: u.title,
+      updateLines: u.lines,
+      updateProjectId: u.projectId,
+      updateAuthorId: up.authorId,
+      updateRemovedAt: u.removedAt,
       commentBody: c.body,
       commentProjectId: c.projectId,
       commentAuthorId: c.authorId,
@@ -570,8 +589,11 @@ export const loadRemovedPage = async (
       p,
       and(eq(d.targetKind, 'project'), sql`${p.id} = ${id}`, sql`${p.removalId} = ${d.id}`),
     )
-    .leftJoin(n, and(eq(d.targetKind, 'note'), sql`${n.id} = ${id}`, sql`${n.removalId} = ${d.id}`))
-    .leftJoin(np, eq(np.id, n.projectId))
+    .leftJoin(
+      u,
+      and(eq(d.targetKind, 'update'), sql`${u.id} = ${id}`, sql`${u.removalId} = ${d.id}`),
+    )
+    .leftJoin(up, eq(up.id, u.projectId))
     .leftJoin(
       c,
       and(eq(d.targetKind, 'comment'), sql`${c.id} = ${id}`, sql`${c.removalId} = ${d.id}`),
@@ -590,7 +612,7 @@ export const loadRemovedPage = async (
   // « Te concerne » (règle 17 de 7b, comme dans la file) : son contenu, ou celui d'un membre qu'il
   // a bloqué ; rétablir lui est alors refusé (decide.ts). Une requête pour toute la page.
   const authors = page.flatMap((row) =>
-    [row.projectAuthorId, row.noteAuthorId, row.commentAuthorId].filter(
+    [row.projectAuthorId, row.updateAuthorId, row.commentAuthorId].filter(
       (id): id is string => id !== null,
     ),
   )
@@ -599,7 +621,7 @@ export const loadRemovedPage = async (
     authorId !== null && (authorId === adminId || blocked.has(authorId))
 
   const items = page.flatMap((row): RemovedItem[] => {
-    const target = ReportTarget.safeParse({ kind: row.targetKind, id: row.targetId })
+    const target = StoredReportTarget.safeParse({ kind: row.targetKind, id: row.targetId })
     // safeParse plutôt que parse (tranche 7c) : un fondement inconnu en base écarte la ligne, pas
     // toute la page.
     const ground = RemovalGround.safeParse(row.ground)
@@ -616,14 +638,14 @@ export const loadRemovedPage = async (
         },
       ]
     }
-    if (row.noteBody !== null && row.noteRemovedAt !== null) {
+    if (row.updateLines !== null && row.updateRemovedAt !== null) {
       return [
         {
           ...base,
-          projectId: row.noteProjectId,
-          text: row.noteBody,
-          removedAt: row.noteRemovedAt.toISOString(),
-          concernsMe: concerns(row.noteAuthorId),
+          projectId: row.updateProjectId,
+          text: updateText(row.updateTitle, readLines(row.updateLines)),
+          removedAt: row.updateRemovedAt.toISOString(),
+          concernsMe: concerns(row.updateAuthorId),
         },
       ]
     }

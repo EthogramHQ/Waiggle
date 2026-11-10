@@ -1,5 +1,5 @@
-// Retrouver la cible d'un signalement (tranche 7a) : un projet, une note, un commentaire ou un
-// profil. Deux lectures :
+// Retrouver la cible d'un signalement (tranche 7a) : un projet, une mise à jour, un commentaire
+// ou un profil. Deux lectures :
 // - pour un membre qui signale (POST /v1/reports, GET /v1/reports/target) : seulement ce qu'il voit,
 //   avec les règles de visibilité des autres lectures (projects/visibility.ts, comments/load.ts) ;
 //   tout le reste, inconnu, privé, retiré, masqué, supprimé ou caché par un blocage, donne « rien »,
@@ -16,9 +16,10 @@ import type {
   ReportSnapshot,
   ReportTarget,
   ReportTargetPreview,
+  StoredReportTarget,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, eq, isNull, or, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm'
 
 import { type Blocks, blocksOf } from '../blocks/visibility'
 import { sees, viewerOf } from '../comments/load'
@@ -27,9 +28,10 @@ import { currentHandleOf } from '../handles/load'
 import { favoriteToolsOf } from '../profile/tools'
 import { toolsOfProjects } from '../projects/load'
 import { projectVisibleTo } from '../projects/visibility'
+import { photosOfUpdates, readLines, updateShownTo } from '../updates/load'
 
 const p = schema.project
-const n = schema.projectNote
+const u = schema.projectUpdate
 const c = schema.projectComment
 const m = schema.projectMedia
 
@@ -49,6 +51,13 @@ export type Reportable = {
 
 /** Le texte d'un projet : son titre, puis son pitch. */
 const projectText = (title: string, pitch: string) => `${title}\n\n${pitch}`
+
+/**
+ * Le texte d'une mise à jour sur la page « Signaler » et dans la liste des contenus retirés : son
+ * titre (s'il en a un), puis ses lignes, une par ligne de texte.
+ */
+export const updateText = (title: string | null, lines: { text: string }[]) =>
+  [...(title === null || title === '' ? [] : [title]), ...lines.map((line) => line.text)].join('\n')
 
 /** Une liste (outils) tient sur une ligne de la copie, séparée par « , » (contrat). */
 const oneLine = (values: string[]) => values.join(', ')
@@ -152,7 +161,9 @@ const loadVisible = async (
           description: m.description,
         })
         .from(m)
-        .where(eq(m.projectId, target.id))
+        // Seules les photos du projet (galerie, couverture verticale) : celles d'une mise à jour
+        // ou en attente (jamais publiées) n'entrent pas dans sa copie (relecture de sécurité A8).
+        .where(and(eq(m.projectId, target.id), inArray(m.slot, ['gallery', 'portrait'])))
         .orderBy(asc(m.slot), asc(m.position))
       const snapshot: ReportSnapshot = [
         { field: 'title', value: row.title },
@@ -175,25 +186,41 @@ const loadVisible = async (
         snapshot,
       }
     }
-    case 'note': {
-      // Une note se voit avec son projet ; retirée, seul l'auteur du projet (qui l'a écrite) la voit.
+    case 'update': {
+      // Une mise à jour se voit avec son projet (projectVisibleTo, blocages compris) ; retirée par la
+      // modération, seul l'auteur du projet (qui l'a écrite) la voit (updateShownTo, la règle unique
+      // des mises à jour). Clé primaire de project_update, puis clé primaire de project.
       const [row] = await db
-        .select({ authorId: p.authorId, projectId: n.projectId, body: n.body })
-        .from(n)
-        .innerJoin(p, eq(p.id, n.projectId))
+        .select({
+          authorId: p.authorId,
+          projectId: u.projectId,
+          title: u.title,
+          version: u.version,
+          lines: u.lines,
+        })
+        .from(u)
+        .innerJoin(p, eq(p.id, u.projectId))
         .where(
-          and(
-            eq(n.id, target.id),
-            projectVisibleTo(viewerId),
-            or(isNull(n.removedAt), eq(p.authorId, viewerId)),
-          ),
+          and(eq(u.id, target.id), projectVisibleTo(viewerId), updateShownTo(p.authorId, viewerId)),
         )
       if (!row) return null
+      const lines = readLines(row.lines)
+      // Ses photos rattachées, dans l'ordre (index project_media_update_idx) : une photo en attente
+      // n'a pas de mise à jour, elle n'y est donc jamais. Chacune est suivie de sa description.
+      const photos = (await photosOfUpdates(db, [target.id])).get(target.id) ?? []
       return {
         authorId: row.authorId,
         projectId: row.projectId,
-        text: row.body,
-        snapshot: [{ field: 'body', value: row.body }],
+        text: updateText(row.title, lines),
+        snapshot: [
+          ...filled('title', row.title),
+          ...filled('version', row.version),
+          ...lines.map((line) => ({ field: 'line' as const, value: line.text })),
+          ...photos.flatMap((photo) => [
+            { field: 'photo' as const, value: photo.storageKey },
+            ...filled('photoDescription', photo.description),
+          ]),
+        ],
       }
     }
     case 'comment': {
@@ -327,7 +354,7 @@ export type DecidableTarget = { authorId: string | null; removed: boolean }
  */
 export const loadDecidable = async (
   db: Pick<Database, 'select'>,
-  target: ReportTarget,
+  target: StoredReportTarget,
 ): Promise<DecidableTarget | null> => {
   switch (target.kind) {
     case 'project': {
@@ -337,14 +364,19 @@ export const loadDecidable = async (
         .where(eq(p.id, target.id))
       return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
     }
-    case 'note': {
+    case 'update': {
+      // L'auteur d'une mise à jour est celui de son projet.
       const [row] = await db
-        .select({ authorId: p.authorId, removedAt: n.removedAt })
-        .from(n)
-        .innerJoin(p, eq(p.id, n.projectId))
-        .where(eq(n.id, target.id))
+        .select({ authorId: p.authorId, removedAt: u.removedAt })
+        .from(u)
+        .innerJoin(p, eq(p.id, u.projectId))
+        .where(eq(u.id, target.id))
       return row ? { authorId: row.authorId, removed: row.removedAt !== null } : null
     }
+    case 'note':
+      // Une note du Journal n'existe plus (R7a, migration 0018) : un ancien signalement ou une
+      // ancienne décision la cite encore, et se lit comme une cible disparue (relecture B1).
+      return null
     case 'comment': {
       const [row] = await db
         .select({ authorId: c.authorId, removedAt: c.removedAt })
