@@ -67,7 +67,8 @@ const CARD_GAP: Space = 'xl'
  * navigateur peut faire défiler lui-même (pour montrer un élément qui prend le focus), et elle
  * aurait encore la hauteur du décor à parcourir ; `clip` rogne sans faire de cadre. React Native ne
  * connaît pas `clip` dans ses types, d'où la conversion ; sur téléphone, `hidden` fait le même
- * travail (pas de focus qui défile).
+ * travail (pas de focus qui défile). Safari 15 et plus ancien ignorent `clip` : la page y retrouve
+ * le léger défilement d'avant, sans autre dommage (rien ne se casse, rien ne se cache).
  */
 const clipToHoney = (): ViewStyle =>
   (Platform.OS === 'web' ? { overflow: 'clip' } : { overflow: 'hidden' }) as unknown as ViewStyle

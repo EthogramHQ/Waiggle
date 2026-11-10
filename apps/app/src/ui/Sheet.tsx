@@ -1155,7 +1155,9 @@ export function SheetPanel({
           role: 'dialog' as const,
           'aria-modal': true,
           'aria-labelledby': titleId,
-          ...(subtitle ? { 'aria-describedby': subtitleId } : null),
+          // La description, sur le web seulement : React Native n'en a pas pour une fenêtre (voir
+          // `named` dans Sheet).
+          ...(subtitle && Platform.OS === 'web' ? { 'aria-describedby': subtitleId } : null),
         }
       : null
   const close = closeLabel ?? t(($) => $.common.close)
