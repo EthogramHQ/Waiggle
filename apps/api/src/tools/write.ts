@@ -9,15 +9,8 @@ import type { ResolvedTool } from './resolve'
 // Une transaction en cours, ou la base : ce qu'il faut pour lire, écrire et effacer.
 type Writer = Pick<Database, 'select' | 'insert' | 'delete'>
 
-/**
- * Les anciennes colonnes `project.tools` et `project.tool_slugs` (et `profile.favorite_tools`), que
- * l'API écrit encore sans les lire : un retour à R6a retrouve ainsi les outils. Pour un « Autre », le
- * nom tapé par ce membre (son propre texte, jamais celui d'un autre) ; sinon le nom du catalogue.
- */
-export const legacyToolColumns = (resolved: readonly ResolvedTool[]) => ({
-  tools: resolved.map(({ tool, label }) => label ?? tool.name),
-  toolSlugs: resolved.map(({ tool }) => tool.slug),
-})
+// Les anciennes colonnes `project.tools`, `project.tool_slugs` et `profile.favorite_tools` ne sont
+// plus écrites : la migration 0018 (R7a) les efface, les outils vivent dans les liens du catalogue.
 
 /**
  * Efface les « Autre » de `ids` que plus aucun projet ni profil ne cite (tous les « Autre » si `ids`

@@ -5,6 +5,7 @@ import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'dri
 import { user } from './auth'
 import { category } from './categories'
 import { moderationDecision } from './moderation'
+import { projectUpdate } from './updates'
 
 export const project = pgTable(
   'project',
@@ -23,10 +24,8 @@ export const project = pgTable(
     status: text('status').default('idea').notNull(),
     visibility: text('visibility').default('public').notNull(),
     demoUrl: text('demo_url'), // null : pas de démo
-    // La recette : les outils tels que tapés (« Claude Code »), et leur version « étiquette »
-    // (« claude-code »), qui sert à retrouver tous les projets faits avec un outil.
-    tools: text('tools').array().default(sql`'{}'::text[]`).notNull(),
-    toolSlugs: text('tool_slugs').array().default(sql`'{}'::text[]`).notNull(),
+    // Les outils du projet vivent dans project_tool (R6b) ; les colonnes tools et tool_slugs (et
+    // leur index) sont effacées par la migration 0018 (R7a).
     // La colonne « temps passé » de R6a a disparu avec la migration 0016 (relecture juridique jur-P1).
     // R6a : la catégorie du projet. Depuis R6b, un code de la table `category` : la clé étrangère
     // refuse un code inconnu, et `on update cascade` suivrait un éventuel changement de code.
@@ -71,7 +70,6 @@ export const project = pgTable(
   // - le fil « Abonnements » : pour chaque membre suivi, ses projets rangés par date.
   (t) => [
     index('project_author_created_idx').on(t.authorId, t.createdAt),
-    index('project_tool_slugs_idx').using('gin', t.toolSlugs),
     index('project_public_published_idx')
       .on(t.publishedAt.desc().nullsFirst(), t.id.desc().nullsFirst())
       .where(sql`${t.visibility} = 'public'`),
@@ -98,10 +96,16 @@ export const projectMedia = pgTable(
       .references(() => project.id, { onDelete: 'cascade' }),
     // 'image' pour l'instant ; 'video' viendra avec sa propre tranche.
     kind: text('kind').default('image').notNull(),
-    // 'gallery' : une photo de la galerie ; 'portrait' : la couverture verticale.
+    // 'gallery' : une photo de la galerie ; 'portrait' : la couverture verticale ; 'update' (R7a) :
+    // une photo d'une mise à jour.
     slot: text('slot').notNull(),
-    // L'ordre dans la galerie (0 = la couverture). Toujours 0 pour la couverture verticale.
+    // L'ordre dans la galerie (0 = la couverture), ou dans une mise à jour (0 à 3 ; « Avant » = 0 et
+    // « Après » = 1 quand la mise à jour est un avant / après). Toujours 0 pour la couverture verticale.
     position: integer('position').notNull(),
+    // R7a : la mise à jour qui montre la photo. Une photo slot = 'update' sans update_id est « en
+    // attente » : téléversée, pas encore publiée (la purge de nuit l'efface après 24 h). onDelete:
+    // 'cascade' : supprimer la mise à jour efface ses lignes (l'API efface les fichiers avant).
+    updateId: uuid('update_id').references(() => projectUpdate.id, { onDelete: 'cascade' }),
     // « visuals/<uuid>.webp » : le nom du fichier, tiré au hasard par le serveur.
     storageKey: text('storage_key').notNull().unique(),
     width: integer('width').notNull(),
@@ -118,5 +122,12 @@ export const projectMedia = pgTable(
     uniqueIndex('project_media_one_portrait_idx')
       .on(t.projectId)
       .where(sql`${t.slot} = 'portrait'`),
+    // Les photos d'une mise à jour (les lire avec elle, les compter, les effacer en cascade).
+    index('project_media_update_idx').on(t.updateId),
+    // Index partiel : seulement les photos « en attente » (slot 'update', pas de mise à jour). Il
+    // sert à les compter par projet (quota) et à la purge de nuit, et reste minuscule.
+    index('project_media_pending_idx')
+      .on(t.projectId)
+      .where(sql`${t.slot} = 'update' and ${t.updateId} is null`),
   ],
 )

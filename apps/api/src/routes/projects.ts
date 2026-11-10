@@ -18,7 +18,7 @@ import {
   noFreeToolSlug,
   resolveTools,
 } from '../tools/resolve'
-import { dropOrphanOthers, legacyToolColumns, replaceProjectTools } from '../tools/write'
+import { dropOrphanOthers, replaceProjectTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -187,8 +187,8 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           status: input.status ?? 'idea',
           visibility,
           demoUrl: input.demoUrl ?? null,
-          // Les anciennes colonnes de texte restent écrites jusqu'en R7 (retour possible à R6a).
-          ...legacyToolColumns(resolved.tools),
+          // Les anciennes colonnes de texte (tools, tool_slugs) n'existent plus (migration 0018) :
+          // les outils ne s'écrivent que dans project_tool.
           // R6a : la catégorie principale est obligatoire (contrat) ; la seconde, le mois de départ et
           // la difficulté sont facultatifs. Le contrat a déjà refusé une seconde égale à la principale.
           primaryCategory: input.primaryCategory,
@@ -332,14 +332,12 @@ export const projectRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           }
         }
         // Les outils : reliés au catalogue, écrits dans project_tool, anciennes colonnes comprises.
-        let toolColumns: ReturnType<typeof legacyToolColumns> | undefined
         if (changes.tools !== undefined) {
           const resolved = await resolveTools(tx, changes.tools)
           createdHere = resolved.created
-          toolColumns = legacyToolColumns(resolved.tools)
           await replaceProjectTools(tx, id, resolved.tools)
         }
-        const fullSet = { ...set, ...toolColumns }
+        const fullSet = set
         if (Object.keys(fullSet).length > 0) {
           // Double précaution : la condition « dont l'auteur est le membre » est répétée dans la
           // requête, même si ownProject l'a déjà vérifiée (au cas où le code changerait un jour).
