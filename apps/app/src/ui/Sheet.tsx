@@ -1473,7 +1473,9 @@ export function SheetPanel({
             }}
           >
             {noticeBelow ? noticeNode : null}
-            {footer}
+            {/* Le pied libre d'un écran (« Quitter les testeurs ») : pendant la garde d'ouverture
+                il ne reçoit aucune tape. La même vue reste là ensuite (rien ne se remonte). */}
+            {footer ? <View pointerEvents={tapsAllowed ? 'auto' : 'none'}>{footer}</View> : null}
             {actionRow}
           </View>
         ) : null}
