@@ -60,7 +60,7 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   // Le lien de désinscription d'un e-mail : signé, sans session.
   'GET /v1/email/unsubscribe': ['public', 'allowed'],
   'POST /v1/email/unsubscribe': ['public', 'allowed'],
-  // Les projets, leurs notes, visuels, réactions et commentaires.
+  // Les projets, leurs mises à jour, testeurs, visuels, réactions et commentaires.
   'POST /v1/projects': ['own', 'refused'],
   'GET /v1/projects/:id': ['hidesBlocked', 'allowed'],
   'PATCH /v1/projects/:id': ['own', 'refused'],
@@ -70,8 +70,16 @@ const ROUTES: Record<string, readonly [RouteClass, DuringSuspension]> = {
   // Décrire une photo de son projet (R6a) : ne touche qu'à ce qui est à soi ; c'est écrire un
   // texte, refusé pendant une suspension comme les autres écritures du projet (POST …/visuals).
   'PATCH /v1/projects/:id/visuals/:visualId': ['own', 'refused'],
-  'POST /v1/projects/:id/notes': ['own', 'refused'],
-  'DELETE /v1/projects/:id/notes/:noteId': ['own', 'allowed'],
+  // R7a (relecture de sécurité A2) : les mises à jour remplacent les notes. Publier ne touche qu'à
+  // son projet, refusé pendant une suspension ; la frise montre les contenus d'un autre, cachée à
+  // un membre bloqué ; supprimer sa mise à jour reste permis. Rejoindre les testeurs est le geste
+  // d'un membre vers le projet d'un autre (404 en cas de blocage, comme suivre) ; les quitter
+  // reste permis, comme ne plus suivre.
+  'POST /v1/projects/:id/updates': ['own', 'refused'],
+  'GET /v1/projects/:id/updates': ['hidesBlocked', 'allowed'],
+  'DELETE /v1/projects/:id/updates/:updateId': ['own', 'allowed'],
+  'POST /v1/projects/:id/testers': ['hidesBlocked', 'refused'],
+  'DELETE /v1/projects/:id/testers': ['own', 'allowed'],
   'PUT /v1/projects/:id/reactions/:kind': ['hidesBlocked', 'refused'],
   'DELETE /v1/projects/:id/reactions/:kind': ['own', 'allowed'],
   'GET /v1/projects/:id/comments': ['hidesBlocked', 'allowed'],
@@ -153,6 +161,16 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   'GET /v1/projects/:id': {
     file: 'blocks-visibility.test.ts',
     test: 'answers the page of a project of the other one as an unknown project',
+  },
+  // R7a : les deux preuves sont dans les fichiers de TW-A1 (updates.test.ts, testers.test.ts), titres
+  // recopiés du plan (relecture de sécurité A12 et B2).
+  'GET /v1/projects/:id/updates': {
+    file: 'updates.test.ts',
+    test: 'refuses the updates of a private project of someone else like an unknown project',
+  },
+  'POST /v1/projects/:id/testers': {
+    file: 'testers.test.ts',
+    test: 'answers 404 to a blocked member who tries to become a tester, in both directions',
   },
   'PUT /v1/projects/:id/reactions/:kind': {
     file: 'blocks.test.ts',
