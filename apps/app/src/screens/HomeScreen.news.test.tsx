@@ -79,8 +79,8 @@ beforeEach(resetHomeMocks)
 
 describe('the news banner', () => {
   it('announces new items without moving the feed, and shows them when touched', async () => {
-    // R4 : des projets et des notes à la fois, d'où « nouveautés ».
-    mockNews({ count: 3, kinds: ['project', 'note'], authors: [nora] })
+    // R4 : des projets et des mises à jour (des notes avant R7a) à la fois, d'où « nouveautés ».
+    mockNews({ count: 3, kinds: ['project', 'update'], authors: [nora] })
     const following = mockFollowing()
     await renderMemberHome()
 
@@ -102,7 +102,7 @@ describe('the news banner', () => {
   })
 
   it('says « 20 or more » when a whole page of new items waits', async () => {
-    mockNews({ count: 20, more: true, kinds: ['project', 'note'], authors: [nora, sam] })
+    mockNews({ count: 20, more: true, kinds: ['project', 'update'], authors: [nora, sam] })
     await renderMemberHome()
 
     expect(screen.getByRole('button', { name: '20 nouveautés ou plus' })).toBeTruthy()
@@ -113,8 +113,8 @@ describe('the news banner', () => {
 
     // Le fil est bien là (sinon l'absence du bandeau ne prouverait rien)…
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
-    // … mais pas le bandeau (« nouveautés », « nouveaux projets », « nouvelles notes »).
-    expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
+    // … mais pas le bandeau (« nouveautés », « nouveaux projets », « mises à jour »).
+    expect(screen.queryByRole('button', { name: /nouve|mises? à jour/ })).toBeNull()
   })
 
   // R4 (F-Fil4) : le texte dit ce qui est arrivé ; les photos des auteurs sont dans le bouton,
@@ -130,13 +130,37 @@ describe('the news banner', () => {
     expect(within(banner).getByLabelText('Sam', { includeHiddenElements: true })).toBeTruthy()
   })
 
-  it('says « 1 nouvelle note » when only a note arrived', async () => {
-    mockNews({ count: 1, kinds: ['note'], authors: [nora] })
+  // R7a : un projet remonté par sa mise à jour se dit « mise à jour » (« 1 nouvelle note » avant).
+  it('says « 1 mise à jour » when only an update arrived', async () => {
+    mockNews({ count: 1, kinds: ['update'], authors: [nora] })
+    await renderMemberHome()
+
+    expect(screen.getByRole('button', { name: '1 mise à jour' })).toBeTruthy()
+  })
+
+  it('says « 2 mises à jour » when only updates arrived, with the photos of their authors', async () => {
+    mockNews({ count: 2, kinds: ['update'], authors: [nora, sam] })
+    await renderMemberHome()
+
+    const banner = screen.getByRole('button', { name: '2 mises à jour' })
+    expect(within(banner).getByLabelText('Nora', { includeHiddenElements: true })).toBeTruthy()
+    expect(within(banner).getByLabelText('Sam', { includeHiddenElements: true })).toBeTruthy()
+  })
+
+  it('says « 20 mises à jour ou plus » when a whole page of updates waits', async () => {
+    mockNews({ count: 20, more: true, kinds: ['update'], authors: [nora, sam] })
     await renderMemberHome()
 
     expect(
-      screen.getByRole('button', { name: fr.t(($) => $.feed.newNotes, { count: 1 }) }),
+      screen.getByRole('button', { name: fr.t(($) => $.feed.newUpdatesMany, { max: 20 }) }),
     ).toBeTruthy()
+  })
+
+  it('says « 3 nouveautés » when new projects and updates arrived together', async () => {
+    mockNews({ count: 3, kinds: ['update', 'project'], authors: [nora] })
+    await renderMemberHome()
+
+    expect(screen.getByRole('button', { name: '3 nouveautés' })).toBeTruthy()
   })
 
   it('says « 20 nouveaux projets ou plus » when a whole page of projects waits', async () => {
@@ -255,7 +279,7 @@ describe('the news button under the pinned top bar (RF, ui-5)', () => {
   }
 
   beforeEach(() => {
-    mockNews({ count: 3, kinds: ['project', 'note'], authors: [nora] })
+    mockNews({ count: 3, kinds: ['project', 'update'], authors: [nora] })
   })
 
   it('moves the one news button under the bar once the title « Fil » is under it', () =>
@@ -371,15 +395,16 @@ describe('one’s own items in the news (R6a)', () => {
     lea,
     october('21'),
   )
-  /** Une note de Léa, sur son propre projet : son auteur est celui du projet. */
-  const myNote = {
-    kind: 'note' as const,
+  /** R7a : une mise à jour de Léa, sur son propre projet, qui le fait remonter dans son fil. */
+  const myUpdate = {
+    kind: 'update' as const,
     at: october('22'),
-    note: {
+    update: {
       id: 'd2000000-0000-4000-8000-000000000001',
-      body: 'v2 : les constellations',
-      createdAt: october('22'),
-      removal: null,
+      at: october('22'),
+      version: 'v2',
+      firstLine: { family: 'new' as const, text: 'Les constellations' },
+      lineCount: 1,
     },
     project: myProject.project,
   }
@@ -428,18 +453,18 @@ describe('one’s own items in the news (R6a)', () => {
 
     // Témoin : le fil affiché est là.
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /nouve|mises? à jour/ })).toBeNull()
   })
 
-  it('never counts a note on my own project in the news', async () => {
-    await renderWithHead([myNote])
+  it('never counts an update of my own project in the news', async () => {
+    await renderWithHead([myUpdate])
 
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /nouve/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /nouve|mises? à jour/ })).toBeNull()
   })
 
   it('counts the new project of another member, without mine, and never shows my face', async () => {
-    await renderWithHead([fromNora, myNote, myProject])
+    await renderWithHead([fromNora, myUpdate, myProject])
 
     const banner = await screen.findByRole('button', {
       name: fr.t(($) => $.feed.newProjects, { count: 1 }),
