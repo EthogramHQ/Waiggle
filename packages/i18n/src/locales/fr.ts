@@ -770,6 +770,9 @@ export const fr = {
       afterDescribed: 'Après : {{description}}',
       compareValue: '{{value}} %',
       compareHint: 'Fais glisser la poignée, ou utilise les flèches du clavier, pour comparer.',
+      // La page de la frise (U4b) : le lien qui ramène au projet, et le nom de l'onglet.
+      ofProject: '{{title}}, par {{name}}',
+      pageTitle: 'Les mises à jour de « {{title}} »',
     },
     // R7a : les testeurs, des membres qui s'inscrivent pour aider l'auteur. Sans genre imposé
     // (décision de Louis du 10/11/2026, juridique T2) ; jamais le nombre pour un autre que l'auteur.
