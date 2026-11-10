@@ -157,6 +157,11 @@ type PanelProps = {
    */
   titleId?: string
   /**
+   * Pour Sheet, sur le web : l'identifiant de la phrase `subtitle`, que la couche du Modal cite dans
+   * `aria-describedby` (la boîte de dialogue est décrite par elle). Sans `subtitle`, sans effet.
+   */
+  subtitleId?: string
+  /**
    * Une feuille courte (« Partager », R5a) : sur téléphone, elle a la hauteur de son contenu, collée
    * en bas, au lieu de prendre toute la hauteur (des centaines de points vides entre le contenu et
    * le bouton), et son titre est plus petit, comme sur la planche. Elle défile quand même si le
@@ -233,6 +238,7 @@ type Props = Omit<
   | 'panelRef'
   | 'keys'
   | 'titleId'
+  | 'subtitleId'
   | 'dragHandlers'
   | 'tapsAllowed'
 > & {
@@ -637,6 +643,7 @@ export function Sheet({
   // titre (sur le web, c'est la couche du Modal qui porte ce nom : voir plus bas).
   const sheetId = useId()
   const titleId = `${sheetId}-title`
+  const subtitleId = `${sheetId}-subtitle`
   // La garde contre la double tape (celle de Dialog) : la feuille s'ouvre souvent sous le doigt qui
   // vient de toucher « Modifier » ou « Supprimer mon compte », et la seconde tape tombait sur le
   // voile, qui la refermait aussitôt (un retour arrière, pour une feuille qui a son adresse).
@@ -978,8 +985,18 @@ export function Sheet({
   // Sur le web, le Modal de react-native-web est déjà une boîte de dialogue modale (`role="dialog"`,
   // `aria-modal`), sans nom : on le nomme par le titre, et la feuille ne s'en déclare pas une
   // seconde à l'intérieur (deux dialogues imbriqués, dont l'extérieur sans nom : relecture C4). Les
-  // types de React Native ne connaissent pas cet attribut du web, d'où l'objet à part.
-  const named = Platform.OS === 'web' ? ({ 'aria-labelledby': titleId } as object) : null
+  // types de React Native ne connaissent pas cet attribut du web, d'où l'objet à part. La phrase
+  // sous le titre, s'il y en a une, la décrit (`aria-describedby`) : le lecteur d'écran la lit à
+  // l'ouverture, après le nom. Sur téléphone, React Native n'a aucun lien de description d'une
+  // fenêtre vers un texte (`accessibilityHint` ne vaut que pour un élément touchable) : la phrase
+  // y reste lue en parcourant la feuille.
+  const named =
+    Platform.OS === 'web'
+      ? ({
+          'aria-labelledby': titleId,
+          ...(panel.subtitle ? { 'aria-describedby': subtitleId } : null),
+        } as object)
+      : null
 
   return (
     // Modal : une couche au-dessus de tout l'écran. onRequestClose = retour Android ou Échap. Sur
@@ -1063,7 +1080,7 @@ export function Sheet({
             closeRef={closeRef}
             panelRef={panelRef}
             keys={keys}
-            {...(Platform.OS === 'web' ? { titleId } : null)}
+            {...(Platform.OS === 'web' ? { titleId, subtitleId } : null)}
             // Sur ordinateur, le panneau centré ne se glisse pas : « Fermer », Échap et le voile.
             {...(phone ? { dragHandlers: drag.panHandlers } : null)}
           />
@@ -1106,6 +1123,7 @@ export function SheetPanel({
   busy = false,
   tapsAllowed = true,
   titleId: givenTitleId,
+  subtitleId: givenSubtitleId,
   compact = false,
   titleCount,
   dragHandlers,
@@ -1125,13 +1143,22 @@ export function SheetPanel({
   const panelId = useId()
   const ownTitleId = `${panelId}-title`
   const titleId = givenTitleId ?? ownTitleId
+  // L'identifiant de la phrase sous le titre, qui décrit la boîte de dialogue.
+  const subtitleId = givenSubtitleId ?? `${panelId}-subtitle`
   // L'identifiant du message de la feuille : il décrit l'action grisée (« Rien à enregistrer pour
   // l'instant. »), qu'on peut encore atteindre par Tab (R6a, ui-B5).
   const noticeId = `${panelId}-notice`
   // La couche du Modal (web) est déjà la boîte de dialogue : la feuille n'en redéclare pas une.
   const dialog =
     givenTitleId === undefined
-      ? { role: 'dialog' as const, 'aria-modal': true, 'aria-labelledby': titleId }
+      ? {
+          role: 'dialog' as const,
+          'aria-modal': true,
+          'aria-labelledby': titleId,
+          // La description, sur le web seulement : React Native n'en a pas pour une fenêtre (voir
+          // `named` dans Sheet).
+          ...(subtitle && Platform.OS === 'web' ? { 'aria-describedby': subtitleId } : null),
+        }
       : null
   const close = closeLabel ?? t(($) => $.common.close)
   // La garde de double tape des boutons « Annuler » et de l'action (R7a) : une tape reçue avant la
@@ -1307,7 +1334,11 @@ export function SheetPanel({
           {/* Niveau 2 : la feuille s'ouvre par-dessus une page qui a déjà son titre ; niveau 1
               quand la feuille est toute la page. */}
           {titleNode}
-          {subtitle ? <Text tone="secondary">{subtitle}</Text> : null}
+          {subtitle ? (
+            <Text tone="secondary" nativeID={subtitleId}>
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
         {decoration ? (
           <View
@@ -1339,7 +1370,7 @@ export function SheetPanel({
       // Plus de marge dessous que de marge dessus : la phrase se lit rattachée au titre (le filet
       // de la tête, puis `paddingTop` réduit ci-dessous), à distance du bloc suivant.
       <View style={{ marginBottom: space.sm }}>
-        <Text tone="secondary" align={cancelLabel ? 'center' : 'left'}>
+        <Text tone="secondary" align={cancelLabel ? 'center' : 'left'} nativeID={subtitleId}>
           {subtitle}
         </Text>
       </View>

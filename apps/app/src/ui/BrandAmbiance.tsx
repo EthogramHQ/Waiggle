@@ -38,7 +38,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type LayoutChangeEvent, Platform, StyleSheet, View } from 'react-native'
+import { type LayoutChangeEvent, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import { Surface } from './Surface'
@@ -52,6 +52,26 @@ const OVERLAP = radii.ambiance
 /** La marge intérieure de la carte (ordinateur) et l'écart entre ses blocs. */
 const CARD_PADDING: Space = 'xxl'
 const CARD_GAP: Space = 'xl'
+
+/**
+ * Le miel rogne ce qui déborde de lui (relecture de design du 10/11, page de sortie). Un décor animé
+ * peut dépasser sa propre boîte : la lumière du portail tourne dans un carré de 560 points, dont
+ * l'encombrement, une fois tourné, va jusqu'à 790 points. Le navigateur compte ce qui dépasse, même
+ * tourné ou agrandi, dans la hauteur qu'on peut faire défiler : en fenêtre basse, la page défilait
+ * de 0 à 128 pixels de miel vide, et cette course respirait avec la lumière (une molette remontait
+ * « Ouvrir le site » de 80 à 140 pixels). Rogné au bord du miel, le décor ne compte plus : la page
+ * ne défile que si son contenu est vraiment plus haut que la fenêtre. Le bord du miel est le bas de
+ * la page, donc celui de la fenêtre quand rien ne défile : la lumière n'y est jamais coupée à vue.
+ *
+ * Sur le web, `overflow: clip` plutôt que `hidden` : une boîte en `hidden` reste un cadre que le
+ * navigateur peut faire défiler lui-même (pour montrer un élément qui prend le focus), et elle
+ * aurait encore la hauteur du décor à parcourir ; `clip` rogne sans faire de cadre. React Native ne
+ * connaît pas `clip` dans ses types, d'où la conversion ; sur téléphone, `hidden` fait le même
+ * travail (pas de focus qui défile). Safari 15 et plus ancien ignorent `clip` : la page y retrouve
+ * le léger défilement d'avant, sans autre dommage (rien ne se casse, rien ne se cache).
+ */
+const clipToHoney = (): ViewStyle =>
+  (Platform.OS === 'web' ? { overflow: 'clip' } : { overflow: 'hidden' }) as unknown as ViewStyle
 
 /** Ce que l'ambiance garde sous la carte : le composant qui dessine le gabarit, ou rien. */
 type Hold = ComponentType | null
@@ -144,16 +164,21 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
     const barLift = withBar ? space.huge - space.lg : 0
     return (
       <View
-        style={{
-          flexGrow: 1,
-          // Le miel couvre toute la fenêtre (le catalogue, lui, n'a pas de fenêtre à remplir).
-          minHeight: size ? undefined : window.height,
-          alignItems: 'center',
-          paddingTop: insets.top + space.huge - barLift,
-          paddingBottom: insets.bottom + space.huge,
-          paddingHorizontal: padding,
-          gap: space.xl,
-        }}
+        testID="brand-ambiance"
+        style={[
+          {
+            flexGrow: 1,
+            // Le miel couvre toute la fenêtre (le catalogue, lui, n'a pas de fenêtre à remplir).
+            minHeight: size ? undefined : window.height,
+            alignItems: 'center',
+            paddingTop: insets.top + space.huge - barLift,
+            paddingBottom: insets.bottom + space.huge,
+            paddingHorizontal: padding,
+            gap: space.xl,
+          },
+          // Le décor animé (la lumière du portail) ne fait pas défiler la page (voir clipToHoney).
+          clipToHoney(),
+        ]}
       >
         <HoneyGradient scheme={scheme} />
         {header === undefined ? null : (
@@ -204,7 +229,9 @@ export function BrandAmbiance({ children, header, scene, hero, size }: Props) {
   }
 
   return (
-    <View style={{ flexGrow: 1, alignSelf: 'stretch' }}>
+    // Rogné aussi sur téléphone, par la même règle : la lumière du portail, posée dans la bande,
+    // passe sous la feuille, et rien ne garantit qu'elle s'arrête avant le bas de la page.
+    <View testID="brand-ambiance" style={[{ flexGrow: 1, alignSelf: 'stretch' }, clipToHoney()]}>
       {/* La bande de miel : la barre de navigation en haut, puis le décor. Sans décor, elle reste
           vide et la feuille remonte plus haut, pour que le formulaire arrive vite. */}
       <View
