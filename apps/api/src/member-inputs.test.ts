@@ -747,7 +747,12 @@ describe('every field of the register', () => {
     const media = await ctx.db
       .select({ key: schema.projectMedia.storageKey })
       .from(schema.projectMedia)
-      .where(eq(schema.projectMedia.projectId, projectId))
+      .where(
+        and(
+          eq(schema.projectMedia.projectId, projectId),
+          inArray(schema.projectMedia.slot, ['gallery', 'portrait']),
+        ),
+      )
       .orderBy(asc(schema.projectMedia.position))
     const project = await snapshotOf('project')
     const images = project.filter((e) => ['cover', 'photo', 'photoDescription'].includes(e.field))
