@@ -23,6 +23,12 @@ import { UpdateLineField } from './UpdateLineField'
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 
+// RNTL 14 ne connaît l'état « coché » que pour `checkbox`, `radio` et `switch` : `toBeChecked`
+// lève une erreur sur `menuitemradio`. On lit ce que la vue dit aux lecteurs d'écran.
+type HostProps = { accessibilityState?: { checked?: boolean | 'mixed' }; 'aria-checked'?: boolean }
+const isChecked = (element: { props: HostProps }) =>
+  element.props.accessibilityState?.checked === true || element.props['aria-checked'] === true
+
 const familyName = (family: UpdateFamily) => fr.t(($) => $.update.family[family])
 const example = (family: UpdateFamily) => fr.t(($) => $.update.example[family])
 /** Le nom lu du champ : « Changement 2 sur 3, Réparé ». */
@@ -134,9 +140,9 @@ describe('UpdateLineField', () => {
 
     const choices = screen.getAllByRole('menuitemradio')
     expect(choices).toHaveLength(3)
-    expect(screen.getByRole('menuitemradio', { name: familyName('new') })).not.toBeChecked()
-    expect(screen.getByRole('menuitemradio', { name: familyName('fixed') })).toBeChecked()
-    expect(screen.getByRole('menuitemradio', { name: familyName('polish') })).not.toBeChecked()
+    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('new') }))).toBe(false)
+    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('fixed') }))).toBe(true)
+    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('polish') }))).toBe(false)
   })
 
   it('gives the line the family chosen in the menu', async () => {
