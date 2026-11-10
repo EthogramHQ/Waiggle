@@ -11,6 +11,12 @@
 // dossier du paquet @ruche/db par `readMigrationFiles` de Drizzle : chaque fichier y est découpé en
 // instructions SQL, qu'on exécute une par une. Tout est en SQL brut : les tables d'avant et
 // d'après ne sont pas celles du schéma typé.
+//
+// R7a (migration 0018) : les anciennes colonnes d'outils, gardées « jusqu'en R7 » pour un retour
+// possible à R6a, sont effacées, avec le Journal (table project_note). On applique donc d'abord
+// jusqu'à 0017, on note ce que la base contient alors, on y pose des notes et leurs signalements,
+// puis on applique 0018 et la suite : les liens au catalogue restent, les colonnes disparaissent,
+// et un signalement de note encore ouvert est classé « sans objet » (relecture juridique P7).
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -29,11 +35,34 @@ import { z } from 'zod'
 
 /** La dernière migration d'avant R6b : la base de production telle qu'elle est avant la bascule. */
 const BEFORE_R6B = '0015_r6a_publish'
+/** La dernière migration d'avant R7a : celle qui garde encore les anciennes colonnes d'outils. */
+const BEFORE_R7A = '0017_catalogue_llms'
 
 let db: Database
 let close: () => Promise<void>
-/** Le nombre de migrations appliquées après 0015 (0016 et les suivantes). */
+/** Le nombre de migrations appliquées après 0015, jusqu'à 0017 comprise (0016 et 0017). */
 let appliedAfter = 0
+/** Les migrations appliquées après 0017 (0018, l'effacement de R7a, et les suivantes). */
+let appliedR7a: string[] = []
+
+/** Ce que la base contenait à 0017, avant l'effacement : relu après 0018 pour comparer. */
+const at0017: {
+  project: { tools: string[]; tool_slugs: string[] } | undefined
+  favourites: string[] | undefined
+  projectTools: { project_id: string; tool_id: string; label: string | null; position: number }[]
+  profileTools: { user_id: string; tool_id: string; label: string | null; position: number }[]
+} = { project: undefined, favourites: undefined, projectTools: [], profileTools: [] }
+
+// Les notes et les signalements posés à 0017 (relecture juridique P7) : un signalement ouvert sur
+// une note, un autre déjà suivi d'un retrait, et un signalement ouvert sur un projet (témoin).
+const NOTE_ID = '00000000-0000-4000-8000-0000000000a1'
+const REPORTS = {
+  openOnNote: '00000000-0000-4000-8000-0000000000b1',
+  removedNote: '00000000-0000-4000-8000-0000000000b2',
+  openOnProject: '00000000-0000-4000-8000-0000000000b3',
+}
+const REPORTED_AT = '2026-03-01T10:00:00.000Z'
+const DECIDED_AT = '2026-03-02T10:00:00.000Z'
 /** Un alias du catalogue écrit autrement que le nom de son outil (« Chat GPT » ne compte pas). */
 let aliasCase: { alias: string; name: string } | null = null
 
@@ -193,10 +222,48 @@ beforeAll(async () => {
     )
   }
 
-  // La bascule : 0016 et ce qui suit.
-  const after = migrations.slice(cut)
+  // La bascule : 0016 et 0017.
+  const cut17 = journal.entries.findIndex((entry) => entry.tag === BEFORE_R7A) + 1
+  expect(cut17).toBe(18)
+  const after = migrations.slice(cut, cut17)
   appliedAfter = after.length
   await apply(after)
+
+  // L'état à 0017, noté avant l'effacement.
+  ;[at0017.project] = await rows<{ tools: string[]; tool_slugs: string[] }>(
+    sql`select tools, tool_slugs from project where id = ${PROJECTS.lea.id}`,
+  )
+  at0017.favourites = (
+    await rows<{ favorite_tools: string[] }>(
+      sql`select favorite_tools from profile where user_id = 'lea'`,
+    )
+  )[0]?.favorite_tools
+  at0017.projectTools = await rows(
+    sql`select project_id, tool_id, label, position from project_tool order by project_id, position`,
+  )
+  at0017.profileTools = await rows(
+    sql`select user_id, tool_id, label, position from profile_tool order by user_id, position`,
+  )
+
+  // Une note du Journal, et trois signalements de Max, comme en production avant R7a.
+  await db.execute(
+    sql`insert into project_note (id, project_id, body, created_at) values (${NOTE_ID}, ${PROJECTS.lea.id}, 'Une note du Journal', ${utc(REPORTED_AT)})`,
+  )
+  const snapshot = JSON.stringify([{ field: 'body', value: 'Une note du Journal' }])
+  for (const [id, kind, target, status] of [
+    [REPORTS.openOnNote, 'note', NOTE_ID, 'open'],
+    [REPORTS.removedNote, 'note', '00000000-0000-4000-8000-0000000000a2', 'removed'],
+    [REPORTS.openOnProject, 'project', PROJECTS.lea.id, 'open'],
+  ] as const) {
+    await db.execute(
+      sql`insert into content_report (id, reporter_id, target_kind, target_id, project_id, target_author_id, reason, snapshot, status, created_at, decided_at) values (${id}, 'max', ${kind}, ${target}, ${PROJECTS.lea.id}, 'lea', 'other', ${snapshot}::jsonb, ${status}, ${utc(REPORTED_AT)}, ${status === 'open' ? null : utc(DECIDED_AT)})`,
+    )
+  }
+
+  // R7a : 0018 et ce qui suit.
+  const r7a = migrations.slice(cut17)
+  appliedR7a = journal.entries.slice(cut17).map((entry) => entry.tag)
+  await apply(r7a)
 }, 60_000)
 
 afterAll(async () => {
@@ -373,17 +440,14 @@ describe('the switch of the former tool labels (migration 0016)', () => {
     for (const tool of tools) expect(ToolSlug.safeParse(tool.slug).success, tool.slug).toBe(true)
   })
 
-  it('keeps the former tool columns as they were, and drops time_spent', async () => {
-    const [lea] = await rows<{ tools: string[]; tool_slugs: string[] }>(
-      sql`select tools, tool_slugs from project where id = ${PROJECTS.lea.id}`,
-    )
-    const [profile] = await rows<{ favorite_tools: string[] }>(
-      sql`select favorite_tools from profile where user_id = 'lea'`,
-    )
-
-    // Décision du plan : les anciennes colonnes restent jusqu'en R7 (retour possible à R6a).
-    expect(lea).toEqual({ tools: PROJECTS.lea.tools, tool_slugs: PROJECTS.lea.tools.map(toolSlug) })
-    expect(profile?.favorite_tools).toEqual(FAVOURITES.lea)
+  it('keeps the former tool columns as they were until 0017, and drops time_spent', async () => {
+    // Décision du plan R6b : les anciennes colonnes restent jusqu'en R7 (retour possible à R6a).
+    // Elles sont lues à 0017, avant que 0018 ne les efface.
+    expect(at0017.project).toEqual({
+      tools: PROJECTS.lea.tools,
+      tool_slugs: PROJECTS.lea.tools.map(toolSlug),
+    })
+    expect(at0017.favourites).toEqual(FAVOURITES.lea)
     // jur-P1 : la colonne du temps passé est effacée.
     expect(
       await rows(
@@ -418,6 +482,90 @@ describe('the switch of the former tool labels (migration 0016)', () => {
         sql`update project set primary_category = 'jardinage' where id = ${PROJECTS.lea.id}`,
       ),
     ).rejects.toThrow()
+  })
+})
+
+describe('the erasing of the Journal and of the former tool columns (migration 0018, R7a)', () => {
+  /** Les colonnes d'une table, telles que PostgreSQL les décrit (information_schema). */
+  const columnsOf = async (table: string) =>
+    (
+      await rows<{ column_name: string; data_type: string }>(
+        sql`select column_name, data_type from information_schema.columns where table_schema = 'public' and table_name = ${table}`,
+      )
+    ).map(({ column_name, data_type }) => [column_name, data_type] as const)
+
+  it('applies a migration 0018 right after 0017, which creates the updates and the testers', async () => {
+    expect(appliedR7a[0]).toMatch(/^0018_/)
+    expect(Object.fromEntries(await columnsOf('project_update'))).toMatchObject({
+      project_id: 'uuid',
+      title: 'text',
+      version: 'text',
+      lines: 'jsonb',
+      before_after: 'boolean',
+    })
+    // L'identifiant d'un membre est un texte, comme user.id (relecture juridique N3).
+    expect(Object.fromEntries(await columnsOf('project_tester'))).toMatchObject({
+      member_id: 'text',
+      project_id: 'uuid',
+    })
+    expect(Object.fromEntries(await columnsOf('project_media'))).toMatchObject({
+      update_id: 'uuid',
+    })
+  })
+
+  it('drops project_note, project.tools, project.tool_slugs with its index, and profile.favorite_tools', async () => {
+    expect(appliedR7a[0]).toMatch(/^0018_/)
+    expect(
+      await rows(
+        sql`select table_name from information_schema.tables where table_schema = 'public' and table_name = 'project_note'`,
+      ),
+    ).toEqual([])
+    const projectColumns = (await columnsOf('project')).map(([name]) => name)
+    expect(projectColumns).not.toContain('tools')
+    expect(projectColumns).not.toContain('tool_slugs')
+    // Témoin : la table project est bien lue (son titre y est toujours).
+    expect(projectColumns).toContain('title')
+    expect(
+      await rows(sql`select indexname from pg_indexes where indexname = 'project_tool_slugs_idx'`),
+    ).toEqual([])
+    expect((await columnsOf('profile')).map(([name]) => name)).not.toContain('favorite_tools')
+  })
+
+  it('keeps every tool of every project and profile in the catalogue links', async () => {
+    // L'effacement ne touche pas aux liens de R6b : ce sont eux qui portent les outils.
+    expect(appliedR7a[0]).toMatch(/^0018_/)
+    expect(at0017.projectTools.length).toBeGreaterThan(0)
+    expect(
+      await rows(
+        sql`select project_id, tool_id, label, position from project_tool order by project_id, position`,
+      ),
+    ).toEqual(at0017.projectTools)
+    expect(
+      await rows(
+        sql`select user_id, tool_id, label, position from profile_tool order by user_id, position`,
+      ),
+    ).toEqual(at0017.profileTools)
+  })
+
+  it('voids the open reports on a journal note, with their decision date, and keeps the others as they were', async () => {
+    // Relecture juridique P7, décision de la session : la note n'existe plus, son signalement encore
+    // ouvert est « sans objet » (void), daté (decided_at = now()) pour que la purge l'efface 30
+    // jours plus tard. Un signalement déjà décidé garde sa décision ; un signalement ouvert sur un
+    // projet reste ouvert.
+    expect(appliedR7a[0]).toMatch(/^0018_/)
+    const reports = Object.fromEntries(
+      (
+        await rows<{ id: string; status: string; decided: boolean | null; same: boolean | null }>(
+          sql`select id, status, decided_at > ${utc(REPORTED_AT)} as decided, decided_at = ${utc(DECIDED_AT)} as same from content_report`,
+        )
+      ).map(({ id, ...rest }) => [id, rest]),
+    )
+
+    expect(reports).toEqual({
+      [REPORTS.openOnNote]: { status: 'void', decided: true, same: false },
+      [REPORTS.removedNote]: { status: 'removed', decided: true, same: true },
+      [REPORTS.openOnProject]: { status: 'open', decided: null, same: null },
+    })
   })
 })
 

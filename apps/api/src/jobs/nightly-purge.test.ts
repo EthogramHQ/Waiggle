@@ -1,5 +1,6 @@
 // Tests de la purge de nuit (tranche 6c, conformité n°4 : ne rien garder plus longtemps qu'il ne
-// sert). nightlyPurge(db, now) efface, chaque nuit à 3 h :
+// sert). nightlyPurge(db, now, storage) efface, chaque nuit à 3 h (R7a : aussi les photos de mise
+// à jour restées en attente plus de 24 heures, ligne et fichier, d'où le stockage) :
 // - les sessions expirées et les jetons de vérification expirés ;
 // - les compteurs anti-abus périmés : ceux de Better Auth (rate_limit, plus d'une heure) et les
 //   nôtres (api_rate_limit, plus de 25 heures : la plus longue fenêtre, 24 h, plus une marge) ;
@@ -83,7 +84,7 @@ describe('the nightly purge', () => {
     await ctx.db.execute(sql`set time zone 'Europe/Paris'`)
     const before = (await sessionIds()).length
 
-    const purged = await nightlyPurge(ctx.db, now)
+    const purged = await nightlyPurge(ctx.db, now, ctx.storage)
 
     const left = await sessionIds()
     expect(left).toContain('valid')
@@ -103,7 +104,7 @@ describe('the nightly purge', () => {
       )
     const before = (await ids()).length
 
-    const purged = await nightlyPurge(ctx.db, now)
+    const purged = await nightlyPurge(ctx.db, now, ctx.storage)
 
     const left = await ids()
     expect(left).toContain('valid')
@@ -131,7 +132,7 @@ describe('the nightly purge', () => {
       (await ctx.db.select({ id: schema.rateLimit.id }).from(schema.rateLimit)).map(({ id }) => id)
     const before = (await ids()).length
 
-    const purged = await nightlyPurge(ctx.db, now)
+    const purged = await nightlyPurge(ctx.db, now, ctx.storage)
 
     const left = await ids()
     expect(left).toContain('recent')
@@ -151,7 +152,7 @@ describe('the nightly purge', () => {
       )
     const before = (await keys()).length
 
-    const purged = await nightlyPurge(ctx.db, now)
+    const purged = await nightlyPurge(ctx.db, now, ctx.storage)
 
     const left = await keys()
     expect(left).toContain('recent')
@@ -167,8 +168,8 @@ describe('the nightly purge', () => {
       )
     expect(await handles()).toEqual([{ handle: 'ines' }, { handle: 'ines_morel' }])
 
-    expect((await nightlyPurge(ctx.db, at(START, 30 * DAY - MINUTE))).handles).toBe(0)
-    expect((await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))).handles).toBe(1)
+    expect((await nightlyPurge(ctx.db, at(START, 30 * DAY - MINUTE), ctx.storage)).handles).toBe(0)
+    expect((await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE), ctx.storage)).handles).toBe(1)
 
     expect(await handles()).toEqual([{ handle: 'ines' }])
   })
@@ -188,12 +189,14 @@ describe('sign-ups never verified', () => {
     const paulId = paulRow?.id ?? ''
 
     // 29 jours : encore gardé.
-    expect((await nightlyPurge(ctx.db, at(START, 29 * DAY))).unverifiedAccounts).toBe(0)
+    expect((await nightlyPurge(ctx.db, at(START, 29 * DAY), ctx.storage)).unverifiedAccounts).toBe(
+      0,
+    )
     expect(await userIds()).toContain(paulId)
 
     // 30 jours et une minute : effacé, avec sa façon de se connecter. Inès, vérifiée et inscrite
     // le même jour, reste.
-    const purged = await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))
+    const purged = await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE), ctx.storage)
 
     expect(purged.unverifiedAccounts).toBe(1)
     expect(await userIds()).toEqual([inesId])
@@ -211,7 +214,7 @@ describe('sign-ups never verified', () => {
     vi.setSystemTime(at(START, 20 * DAY))
     await ctx.signUp(paul)
 
-    await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))
+    await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE), ctx.storage)
 
     expect(await userIds()).toEqual([inesId])
   })
@@ -223,7 +226,7 @@ describe('sign-ups never verified', () => {
   it('keeps an unverified account that already has a handle (a former member)', async () => {
     await ctx.db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.id, inesId))
 
-    const purged = await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE))
+    const purged = await nightlyPurge(ctx.db, at(START, 30 * DAY + MINUTE), ctx.storage)
 
     expect(purged.unverifiedAccounts).toBe(0)
     expect(await userIds()).toEqual([inesId])
@@ -247,7 +250,7 @@ describe('the counters of Better Auth', () => {
       })),
     )
 
-    await nightlyPurge(ctx.db, now)
+    await nightlyPurge(ctx.db, now, ctx.storage)
 
     const left = (await ctx.db.select({ id: schema.rateLimit.id }).from(schema.rateLimit)).map(
       ({ id }) => id,
@@ -329,13 +332,48 @@ describe('the reports and decisions of the moderation', () => {
   it('erases a void report after 30 days, never the same night', async () => {
     const id = await insertReport({ status: 'void', decidedAt: START })
 
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({ [id]: 'void' })
-    await nightlyPurge(ctx.db, at(START, 29 * DAY))
+    await nightlyPurge(ctx.db, at(START, 29 * DAY), ctx.storage)
     expect(await reportStatuses()).toEqual({ [id]: 'void' })
 
-    await nightlyPurge(ctx.db, at(START, 30 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 30 * DAY + HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({})
+  })
+
+  // R7a (relecture juridique P7) : la migration 0018 efface les notes du Journal et classe « sans
+  // objet » leurs signalements encore ouverts, datés du jour de la migration. La purge les efface
+  // 30 jours plus tard, comme tout signalement sans objet ; une décision prise sur une note part au
+  // bout d'un an, sa note n'existant plus pour la retenir. Ces deux tests passent avant R7a : ils
+  // gardent la purge quand la table project_note aura disparu (reports/retention.ts la lit).
+  it('erases a report on a journal note voided by the migration, 30 days later', async () => {
+    const id = await insertReport({ targetKind: 'note', status: 'void', decidedAt: START })
+
+    await nightlyPurge(ctx.db, at(START, 29 * DAY), ctx.storage)
+    expect(await reportStatuses()).toEqual({ [id]: 'void' })
+
+    await nightlyPurge(ctx.db, at(START, 30 * DAY + HOUR), ctx.storage)
+    expect(await reportStatuses()).toEqual({})
+  })
+
+  it('erases a decision taken on a journal note one year later', async () => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id,
+      targetKind: 'note',
+      targetId: randomUUID(),
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+      adminId: null,
+      createdAt: START,
+    })
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR), ctx.storage)
+    expect(await decisionIds()).toEqual([id])
+
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR), ctx.storage)
+    expect(await decisionIds()).toEqual([])
   })
 
   it('voids the open or dismissed reports whose author is gone, and erases them 30 days later', async () => {
@@ -345,7 +383,7 @@ describe('the reports and decisions of the moderation', () => {
     const dismissed = await insertReport({ status: 'dismissed', decidedAt: START })
     const removed = await insertReport({ status: 'removed', decidedAt: START })
 
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
 
     expect(await reportStatuses()).toEqual({
       [open]: 'void',
@@ -353,7 +391,7 @@ describe('the reports and decisions of the moderation', () => {
       // Suivi d'un retrait : gardé tel quel, avec son texte, jusqu'au terme d'un an.
       [removed]: 'removed',
     })
-    await nightlyPurge(ctx.db, at(START, 31 * DAY + 2 * HOUR))
+    await nightlyPurge(ctx.db, at(START, 31 * DAY + 2 * HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({ [removed]: 'removed' })
   })
 
@@ -365,7 +403,7 @@ describe('the reports and decisions of the moderation', () => {
       targetAuthorId: inesId,
     })
 
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
 
     expect(await reportStatuses()).toEqual({ [id]: 'void' })
   })
@@ -383,12 +421,12 @@ describe('the reports and decisions of the moderation', () => {
     })
     await ctx.db.execute(sql`set time zone 'Europe/Paris'`)
 
-    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({ [dismissed]: 'dismissed', [removed]: 'removed' })
 
-    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({ [removed]: 'removed' })
-    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR), ctx.storage)
     expect(await reportStatuses()).toEqual({})
   })
 
@@ -397,10 +435,10 @@ describe('the reports and decisions of the moderation', () => {
     const removal = await insertDecision(meteo.id, 'remove', START)
     const restore = await insertDecision(meteo.id, 'restore', at(START, 200 * DAY))
 
-    await nightlyPurge(ctx.db, at(START, 366 * DAY))
+    await nightlyPurge(ctx.db, at(START, 366 * DAY), ctx.storage)
     expect((await decisionIds()).sort()).toEqual([removal, restore].sort())
 
-    await nightlyPurge(ctx.db, at(START, 566 * DAY))
+    await nightlyPurge(ctx.db, at(START, 566 * DAY), ctx.storage)
     expect(await decisionIds()).toEqual([])
   })
 
@@ -412,7 +450,7 @@ describe('the reports and decisions of the moderation', () => {
       .set({ removedAt: START, removalId: removal })
       .where(eq(schema.project.id, meteo.id))
 
-    await nightlyPurge(ctx.db, at(START, 2 * 365 * DAY))
+    await nightlyPurge(ctx.db, at(START, 2 * 365 * DAY), ctx.storage)
 
     expect(await decisionIds()).toEqual([removal])
     const [row] = await ctx.db
@@ -461,7 +499,7 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     )
     const catalogue = await catalogueCount()
 
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
 
     const left = await toolNames()
     expect(left).not.toContain('Zorblax Orphelin')
@@ -479,12 +517,12 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     )
 
     // Cité par le profil d'Inès seulement : gardé.
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
     expect(await toolNames()).toContain('Zorblax Favori')
 
     // Le profil ne le cite plus (une suppression faite hors de l'API) : la nuit suivante l'efface.
     await ctx.db.execute(sql`delete from profile_tool where tool_id = ${favourite}`)
-    await nightlyPurge(ctx.db, at(START, DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, DAY + HOUR), ctx.storage)
     expect(await toolNames()).not.toContain('Zorblax Favori')
   })
 
@@ -499,7 +537,7 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     expect(await authors()).toEqual([{ created_by: null }])
 
     // La purge le garde (il est cité), toujours sans auteur.
-    await nightlyPurge(ctx.db, at(START, HOUR))
+    await nightlyPurge(ctx.db, at(START, HOUR), ctx.storage)
     expect(await authors()).toEqual([{ created_by: null }])
   })
 
@@ -529,17 +567,17 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     const catalogue = await catalogueCount()
 
     // Moins d'un an : tout reste, même l'écarté que plus rien ne cite.
-    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR), ctx.storage)
     expect(await zorblax()).toEqual(['Zorblax Cité', 'Zorblax Laissé', 'Zorblax Récent'])
 
     // Un an après : l'écarté orphelin s'efface ; celui qu'un profil cite reste, le récent aussi.
-    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR), ctx.storage)
     expect(await zorblax()).toEqual(['Zorblax Cité', 'Zorblax Récent'])
     expect(await rows(sql`select 1 from tool where id = ${old}`)).toEqual([])
 
     // La dernière mention retirée (sa ligne du journal est partie la nuit d'avant) : il s'efface.
     await ctx.db.execute(sql`delete from profile_tool where tool_id = ${cited}`)
-    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 366 * DAY + HOUR), ctx.storage)
     expect(await zorblax()).toEqual(['Zorblax Récent'])
     // Le catalogue, lui, n'a rien perdu.
     expect(await catalogueCount()).toBe(catalogue)
@@ -558,13 +596,112 @@ describe('the « other » tools and the catalogue journal (R6b)', () => {
     const changeIds = async () =>
       (await rows<{ id: string }>(sql`select id from catalogue_change`)).map(({ id }) => id).sort()
 
-    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY - HOUR), ctx.storage)
     expect(await changeIds()).toEqual([old, recent].sort())
 
-    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 365 * DAY + HOUR), ctx.storage)
     expect(await changeIds()).toEqual([recent])
 
-    await nightlyPurge(ctx.db, at(START, 367 * DAY + HOUR))
+    await nightlyPurge(ctx.db, at(START, 367 * DAY + HOUR), ctx.storage)
     expect(await changeIds()).toEqual([])
+  })
+})
+
+// R7a (relecture de sécurité A5) : une photo envoyée pour une mise à jour pas encore publiée
+// (slot = 'update', sans update_id) est « en attente ». Au bout de 24 heures, la purge efface la
+// ligne, puis le fichier ; une photo rattachée à une mise à jour, ou de la galerie, ne part jamais
+// ici. La purge reçoit donc le stockage des fichiers en troisième argument.
+describe('the pending photos of an update (R7a)', () => {
+  /**
+   * Un projet d'Inès, posé directement en base : ces tests ne regardent que la purge, pas la
+   * réponse de l'API (dont la forme change avec R7a).
+   */
+  const insertProject = async () => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.project).values({
+      id,
+      authorId: inesId,
+      title: 'Mon carnet',
+      pitch: 'Un carnet de jardin.',
+      primaryCategory: 'other',
+      createdAt: START,
+      updatedAt: START,
+      publishedAt: START,
+    })
+    return { id }
+  }
+  /** Une photo du projet, posée directement en base avec son fichier, à la date voulue. */
+  const insertPhoto = async (projectId: string, slot: 'gallery' | 'update', createdAt: Date) => {
+    const id = randomUUID()
+    const storageKey = `visuals/${randomUUID()}.webp`
+    await ctx.storage.put(storageKey, new Uint8Array([1, 2, 3]))
+    await ctx.db.insert(schema.projectMedia).values({
+      id,
+      projectId,
+      slot,
+      position: 0,
+      storageKey,
+      width: 1200,
+      height: 800,
+      thumbhash: 'AAAA',
+      createdAt,
+    })
+    return { id, storageKey }
+  }
+  const photoIds = async () =>
+    (await ctx.db.select({ id: schema.projectMedia.id }).from(schema.projectMedia))
+      .map(({ id }) => id)
+      .sort()
+  const hasFile = (key: string) => ctx.storage.files.has(key)
+
+  it('erases a pending update photo after 24 hours, row and file', async () => {
+    const project = await insertProject()
+    const pending = await insertPhoto(project.id, 'update', START)
+
+    await nightlyPurge(ctx.db, at(START, DAY - MINUTE), ctx.storage)
+    expect(await photoIds()).toEqual([pending.id])
+    expect(hasFile(pending.storageKey)).toBe(true)
+
+    await nightlyPurge(ctx.db, at(START, DAY + MINUTE), ctx.storage)
+    expect(await photoIds()).toEqual([])
+    expect(hasFile(pending.storageKey)).toBe(false)
+  })
+
+  it('never erases a photo attached to an update, nor a gallery photo', async () => {
+    const project = await insertProject()
+    const gallery = await insertPhoto(project.id, 'gallery', START)
+    const attached = await insertPhoto(project.id, 'update', START)
+    // Une mise à jour publiée, qui cite la photo (SQL brut : la table naît avec la migration 0018).
+    const updateId = randomUUID()
+    await ctx.db.execute(
+      sql`insert into project_update (id, project_id, title, version, lines, before_after, created_at) values (${updateId}, ${project.id}, null, 'v1.1', ${JSON.stringify([{ family: 'new', text: 'Un mode sombre' }])}::jsonb, false, ${START.toISOString()}::timestamptz at time zone 'UTC')`,
+    )
+    await ctx.db.execute(
+      sql`update project_media set update_id = ${updateId} where id = ${attached.id}`,
+    )
+
+    await nightlyPurge(ctx.db, at(START, 30 * DAY), ctx.storage)
+
+    expect(await photoIds()).toEqual([gallery.id, attached.id].sort())
+    expect(hasFile(gallery.storageKey)).toBe(true)
+    expect(hasFile(attached.storageKey)).toBe(true)
+  })
+
+  it('keeps purging when one file cannot be erased', async () => {
+    const project = await insertProject()
+    const first = await insertPhoto(project.id, 'update', START)
+    const second = await insertPhoto(project.id, 'update', at(START, MINUTE))
+    // Le premier fichier effacé lève une erreur (un disque plein, un fichier verrouillé).
+    const erase = vi
+      .spyOn(ctx.storage, 'delete')
+      .mockRejectedValueOnce(new Error('the file cannot be erased'))
+
+    await expect(nightlyPurge(ctx.db, at(START, 2 * DAY), ctx.storage)).resolves.toBeDefined()
+
+    // Les deux lignes sont parties (la ligne d'abord, puis le fichier) ; le second fichier aussi,
+    // malgré l'échec du premier.
+    expect(await photoIds()).toEqual([])
+    expect(erase).toHaveBeenCalledTimes(2)
+    expect([first, second].filter(({ storageKey }) => hasFile(storageKey))).toHaveLength(1)
   })
 })

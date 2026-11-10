@@ -3,7 +3,7 @@
 import { ErrorResponse, FAVORITE_TOOLS_MAX, Me, Member } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
-import { eq, type SQL, sql } from 'drizzle-orm'
+import { type SQL, sql } from 'drizzle-orm'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestContext, type TestContext } from './testing/context'
@@ -263,16 +263,22 @@ describe('my favourite tools, chosen in the catalogue (R6b)', () => {
     expect((await getMe()).favoriteTools).toEqual(['Cursor'])
   })
 
-  it('still writes the former column of favourite tools, with the names found in the catalogue', async () => {
-    // Décision du plan : profile.favorite_tools reste écrite jusqu'en R7 (retour possible à R6a).
+  it('keeps the favourite tools only in the catalogue links, the former column being gone (R7a)', async () => {
+    // R6b gardait profile.favorite_tools écrite « jusqu'en R7 », pour un retour possible à R6a ;
+    // la migration 0018 (R7a) l'efface. Les outils favoris ne vivent plus que dans profile_tool.
     await patchMe({ favoriteTools: ['chat gpt', 'Teachable Machine'] })
     const { id } = await getMe()
 
-    const [row] = await ctx.db
-      .select({ favoriteTools: schema.profile.favoriteTools })
-      .from(schema.profile)
-      .where(eq(schema.profile.userId, id))
-    expect(row?.favoriteTools).toEqual(['ChatGPT', 'Teachable Machine'])
+    expect((await favouritesOf(id)).map(({ name }) => name)).toEqual([
+      'ChatGPT',
+      'Teachable Machine',
+    ])
+    // information_schema : le catalogue de PostgreSQL, qui décrit les tables et leurs colonnes.
+    expect(
+      await rows(
+        sql`select column_name from information_schema.columns where table_name = 'profile' and column_name = 'favorite_tools'`,
+      ),
+    ).toEqual([])
   })
 
   it('keeps for each member the name he typed for a shared « other »', async () => {

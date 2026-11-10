@@ -8,11 +8,12 @@ import {
   foldTool,
   Me,
   Member,
+  type NewProjectUpdate,
   OTHER_TOOLS_PER_DAY,
   PROJECT_TOOLS_MAX,
   Project,
-  ProjectNote,
   type ProjectSummary,
+  ProjectUpdate,
   SearchResults,
   startedMonthMax,
   ToolPage,
@@ -20,10 +21,11 @@ import {
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
-import { eq, type SQL, sql } from 'drizzle-orm'
+import { type SQL, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { jpegImage, visualForm } from './testing/images'
 
 let ctx: TestContext
 let lea: string // cookie de session de Léa
@@ -465,12 +467,78 @@ describe('my data and my account', () => {
   })
 })
 
-// --- Tranche 4b : les notes dans l'export ---
-// L'export donne toutes les notes publiées sur ses projets (privés compris, et au-delà des 20 du
-// journal), des plus anciennes aux plus récentes, et aucune note des autres membres.
-describe('my notes in my data', () => {
-  // Une fausse horloge, qu'on avance d'une minute entre deux notes : leurs dates sont distinctes,
-  // donc leur ordre est connu. Seule Date est remplacée (voir feed.test.ts).
+// --- R7a : les mises à jour dans l'export et sur la page du projet ---
+// Les mises à jour remplacent les notes du Journal, effacées avec lui (migration 0018). L'export
+// donne toutes celles publiées sur ses projets (privés compris, et au-delà des 20 d'une page de la
+// frise), des plus anciennes aux plus récentes, avec le titre du projet et les descriptions de leurs
+// photos ; aucune mise à jour des autres membres. La page d'un projet porte la dernière mise à jour
+// visible, leur nombre et la version (relecture de sécurité B4 : jamais celle d'une mise à jour
+// retirée, une seule règle « non retirée, ou l'auteur »).
+
+/** Une mise à jour publiée par Léa (une ligne « Nouveau » par défaut). */
+const postUpdate = async (
+  projectId: string,
+  body: Partial<NewProjectUpdate> = {},
+  cookie: string = lea,
+) => {
+  const res = await send('POST', `/v1/projects/${projectId}/updates`, cookie, {
+    title: null,
+    version: null,
+    lines: [{ family: 'new', text: 'Un mode sombre' }],
+    photos: [],
+    beforeAfter: false,
+    ...body,
+  })
+  expect(res.status).toBe(201)
+  return ProjectUpdate.parse(await res.json())
+}
+
+/** Les photos de mise à jour d'un projet, en attente ou rattachées, lues en base. */
+const updatePhotosOf = (projectId: string) =>
+  rows<{ id: string; storage_key: string }>(
+    sql`select id, storage_key from project_media where project_id = ${projectId} and slot = 'update'`,
+  )
+
+/**
+ * Envoie une photo « en attente » pour une mise à jour (POST …/visuals avec slot=update). Son
+ * identifiant est lu en base : le test ne dépend pas de la forme de la réponse.
+ */
+const uploadPending = async (projectId: string, cookie: string = lea) => {
+  const before = new Set((await updatePhotosOf(projectId)).map((photo) => photo.id))
+  const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+    method: 'POST',
+    headers: { cookie },
+    body: visualForm(await jpegImage(800, 600), 'update'),
+  })
+  expect(res.status).toBe(201)
+  const [photo, ...more] = (await updatePhotosOf(projectId)).filter((p) => !before.has(p.id))
+  expect(more).toEqual([])
+  if (!photo) throw new Error('no pending photo stored')
+  return photo
+}
+
+/** Un administrateur (Louis) retire une mise à jour signalée par Max. */
+const removeUpdate = async (updateId: string) => {
+  const act = activity(ctx)
+  const admin = await ctx.verifiedMember({
+    name: 'Louis',
+    email: 'louis@example.com',
+    password: 'louis-long-password',
+  })
+  await act.makeAdmin((await act.me(admin)).id)
+  const target = { kind: 'update', id: updateId } as const
+  await act.report(max, target)
+  await act.decide(admin, {
+    action: 'remove',
+    target,
+    ground: 'rules',
+    explanation: 'Une publicité déguisée.',
+  })
+}
+
+describe('my updates in my data (R7a)', () => {
+  // Une fausse horloge, qu'on avance entre deux mises à jour : leurs dates sont distinctes, donc
+  // leur ordre est connu. Seule Date est remplacée (voir feed.test.ts).
   beforeEach(() => {
     const now = Date.now()
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -480,79 +548,249 @@ describe('my notes in my data', () => {
     vi.useRealTimers()
   })
 
-  /** Publie une note, une minute après ce qui précède, et renvoie la note. */
-  const postNote = async (projectId: string, body: string, cookie = lea) => {
-    vi.setSystemTime(Date.now() + 60 * 1000)
-    const res = await send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
-    expect(res.status).toBe(201)
-    return ProjectNote.parse(await res.json())
-  }
+  /** Avance l'horloge (une minute par défaut) avant de publier. */
+  const later = (ms = 60 * 1000) => vi.setSystemTime(Date.now() + ms)
 
-  it('exports the notes of all my projects, private ones included, oldest first, and nobody else’s', async () => {
+  it('exports the updates of all my projects, private ones included, oldest first, and nobody else’s', async () => {
     const mine = await publish()
     const draft = await publish({ ...recipes, title: 'Mon brouillon', visibility: 'private' })
     const maxProject = await publish({ ...recipes, title: 'Projet de Max' }, max)
-    const first = await postNote(mine.id, 'Première version en ligne')
-    const secret = await postNote(draft.id, 'Une idée encore secrète')
-    await postNote(maxProject.id, 'Note de Max', max)
-    const last = await postNote(mine.id, 'v2 : mode hors ligne')
+    later()
+    const first = await postUpdate(mine.id, {
+      title: 'Première version',
+      version: 'v1.0',
+      lines: [
+        { family: 'new', text: 'Les menus de la semaine' },
+        { family: 'fixed', text: 'Les quantités pour deux' },
+      ],
+    })
+    later()
+    const secret = await postUpdate(draft.id, {
+      lines: [{ family: 'polish', text: 'Une idée encore secrète' }],
+    })
+    later()
+    await postUpdate(maxProject.id, { lines: [{ family: 'new', text: 'Mise à jour de Max' }] }, max)
 
     const raw = await (await send('GET', '/v1/me/export', lea)).text()
     const data = AccountExport.parse(JSON.parse(raw))
 
-    expect(data.notes).toEqual([
+    expect(data.updates).toEqual([
       {
         projectId: mine.id,
+        projectTitle: recipes.title,
         id: first.id,
-        body: first.body,
+        title: 'Première version',
+        version: 'v1.0',
+        lines: [
+          { family: 'new', text: 'Les menus de la semaine' },
+          { family: 'fixed', text: 'Les quantités pour deux' },
+        ],
+        beforeAfter: false,
+        photoDescriptions: [],
         createdAt: first.createdAt,
         removal: null,
       },
       {
         projectId: draft.id,
+        projectTitle: 'Mon brouillon',
         id: secret.id,
-        body: secret.body,
+        title: null,
+        version: null,
+        lines: [{ family: 'polish', text: 'Une idée encore secrète' }],
+        beforeAfter: false,
+        photoDescriptions: [],
         createdAt: secret.createdAt,
         removal: null,
       },
-      {
-        projectId: mine.id,
-        id: last.id,
-        body: last.body,
-        createdAt: last.createdAt,
-        removal: null,
-      },
     ])
-    expect(raw).not.toContain('Note de Max')
+    expect(raw).not.toContain('Mise à jour de Max')
+    expect(raw).not.toContain('Projet de Max')
   })
 
-  it('exports every note, beyond the 20 shown on the page of the project', async () => {
+  it('exports the descriptions of the photos of my updates, in their order', async () => {
     const { id } = await publish()
-    const bodies: string[] = []
-    for (let i = 1; i <= 22; i++) bodies.push((await postNote(id, `Note ${i}`)).body)
+    const before = await uploadPending(id)
+    const after = await uploadPending(id)
+    later()
+    await postUpdate(id, {
+      photos: [
+        { id: before.id, description: 'Le menu, avant' },
+        { id: after.id, description: null },
+      ],
+      beforeAfter: true,
+    })
 
     const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
 
-    expect(data.notes.map((note) => note.body)).toEqual(bodies)
+    expect(data.updates).toMatchObject([
+      { beforeAfter: true, photoDescriptions: ['Le menu, avant', null] },
+    ])
   })
 
-  it('does not export the notes of the projects I follow', async () => {
-    const followed = await publish({ ...recipes, title: 'Projet de Max' }, max)
+  it('exports every update, beyond the 20 shown on a page of the timeline', async () => {
+    const { id } = await publish()
+    const texts: string[] = []
+    // Trois heures entre deux mises à jour : jamais plus de 10 en 24 heures (le quota).
+    for (let i = 1; i <= 22; i++) {
+      later(3 * 60 * 60 * 1000)
+      const text = `Changement ${i}`
+      await postUpdate(id, { lines: [{ family: 'new', text }] })
+      texts.push(text)
+    }
+    // Une session dure 7 jours : 66 heures plus tard, Léa est toujours connectée.
+    const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
+
+    expect(data.updates.map((update) => update.lines[0]?.text)).toEqual(texts)
+  })
+
+  it('does not export the updates of the projects I follow or test', async () => {
+    const followed = await publish(
+      {
+        ...recipes,
+        title: 'Projet de Max',
+        status: 'testable',
+        demoUrl: 'https://example.com/demo',
+      },
+      max,
+    )
     expect((await send('POST', `/v1/projects/${followed.id}/follow`, lea)).status).toBe(204)
-    await postNote(followed.id, 'Note de Max', max)
+    expect((await send('POST', `/v1/projects/${followed.id}/testers`, lea)).status).toBe(204)
+    later()
+    await postUpdate(followed.id, { lines: [{ family: 'new', text: 'Mise à jour de Max' }] }, max)
 
     const raw = await (await send('GET', '/v1/me/export', lea)).text()
 
-    expect(AccountExport.parse(JSON.parse(raw)).notes).toEqual([])
-    expect(raw).not.toContain('Note de Max')
+    expect(AccountExport.parse(JSON.parse(raw)).updates).toEqual([])
+    expect(raw).not.toContain('Mise à jour de Max')
   })
 
-  it('exports no note for a member who never wrote one', async () => {
+  it('exports no update for a member who never wrote one', async () => {
     await publish()
 
     const data = AccountExport.parse(await (await send('GET', '/v1/me/export', lea)).json())
 
-    expect(data.notes).toEqual([])
+    expect(data.updates).toEqual([])
+  })
+})
+
+describe('the latest update, the count and the version of a project (R7a)', () => {
+  beforeEach(() => {
+    const now = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const later = () => vi.setSystemTime(Date.now() + 60 * 1000)
+  const readAs = async (id: string, cookie: string) => {
+    const res = await read(id, cookie)
+    expect(res.status).toBe(200)
+    const raw = await res.text()
+    return { raw, project: Project.parse(JSON.parse(raw)) }
+  }
+
+  it('gives no update, a count of zero and no version to a project without updates', async () => {
+    const { id } = await publish()
+
+    const { project } = await readAs(id, max)
+
+    expect(project).toMatchObject({ latestUpdate: null, updateCount: 0, version: null })
+  })
+
+  it('gives the latest update, the number of updates and the version of the latest one that has one', async () => {
+    const { id } = await publish()
+    later()
+    await postUpdate(id, { version: 'v1.0' })
+    later()
+    await postUpdate(id, { version: 'v1.1' })
+    later()
+    // La plus récente n'a pas de version : celle d'avant reste sous le titre.
+    const latest = await postUpdate(id, {
+      title: 'Le mode sombre',
+      lines: [{ family: 'polish', text: 'Des couleurs plus douces' }],
+    })
+
+    for (const cookie of [max, lea]) {
+      const { project } = await readAs(id, cookie)
+      expect(project.latestUpdate).toEqual(latest)
+      expect(project.updateCount).toBe(3)
+      expect(project.version).toBe('v1.1')
+    }
+  })
+
+  it('never shows the version of a removed update under the project title', async () => {
+    const { id } = await publish()
+    later()
+    const kept = await postUpdate(id, { version: 'v1.1' })
+    later()
+    const removed = await postUpdate(id, { version: 'v1.2' })
+    await removeUpdate(removed.id)
+
+    const { raw, project } = await readAs(id, max)
+
+    expect(project.version).toBe('v1.1')
+    expect(project.latestUpdate?.id).toBe(kept.id)
+    expect(project.updateCount).toBe(1)
+    expect(raw).not.toContain('v1.2')
+  })
+
+  it('shows the author his removed update with its removal and counts it for him, but never its version', async () => {
+    const { id } = await publish()
+    later()
+    await postUpdate(id, { version: 'v1.1' })
+    later()
+    const removed = await postUpdate(id, { version: 'v1.2' })
+    await removeUpdate(removed.id)
+
+    const { project } = await readAs(id, lea)
+
+    expect(project.latestUpdate?.id).toBe(removed.id)
+    expect(project.latestUpdate?.removal).toMatchObject({
+      ground: 'rules',
+      explanation: 'Une publicité déguisée.',
+    })
+    expect(project.updateCount).toBe(2)
+    // La version sous le titre suit les cartes : jamais celle d'une mise à jour retirée.
+    expect(project.version).toBe('v1.1')
+  })
+
+  it('never shows a removed update on a card, even to its author', async () => {
+    const { id } = await publish()
+    later()
+    const kept = await postUpdate(id, { version: 'v1.1' })
+    later()
+    const removed = await postUpdate(id, { version: 'v1.2' })
+    await removeUpdate(removed.id)
+
+    for (const cookie of [lea, max]) {
+      const res = await send('GET', '/v1/feed/discover', cookie)
+      expect(res.status).toBe(200)
+      const card = DiscoverFeedPage.parse(await res.json()).items.find(
+        (item) => item.project.id === id,
+      )?.project
+      expect(card?.latestUpdate).toMatchObject({ id: kept.id, version: 'v1.1' })
+      expect(card?.version).toBe('v1.1')
+    }
+  })
+})
+
+describe('erasing a project with its updates (R7a)', () => {
+  it('erases the files of update photos and pending photos with the project', async () => {
+    const { id } = await publish()
+    const attached = await uploadPending(id)
+    const pending = await uploadPending(id)
+    await postUpdate(id, { photos: [{ id: attached.id, description: null }] })
+    // Témoin : les deux fichiers sont bien dans le stockage avant la suppression.
+    expect(ctx.storage.files.has(attached.storage_key)).toBe(true)
+    expect(ctx.storage.files.has(pending.storage_key)).toBe(true)
+
+    expect((await send('DELETE', `/v1/projects/${id}`, lea)).status).toBe(204)
+
+    expect(ctx.storage.files.has(attached.storage_key)).toBe(false)
+    expect(ctx.storage.files.has(pending.storage_key)).toBe(false)
+    expect(await rows(sql`select id from project_update where project_id = ${id}`)).toEqual([])
   })
 })
 
@@ -1062,15 +1300,6 @@ const toolsOf = (projectId: string) =>
     sql`select t.name, pt.label, t.status from project_tool pt join tool t on t.id = pt.tool_id where pt.project_id = ${projectId} order by pt.position`,
   )
 
-/** Les anciennes colonnes de texte, encore écrites jusqu'en R7 (retour possible à R6a). */
-const legacyColumns = async (projectId: string) =>
-  (
-    await ctx.db
-      .select({ tools: schema.project.tools, toolSlugs: schema.project.toolSlugs })
-      .from(schema.project)
-      .where(eq(schema.project.id, projectId))
-  )[0]
-
 const patchTools = (id: string, tools: string[], cookie = lea) =>
   send('PATCH', `/v1/projects/${id}`, cookie, { tools })
 
@@ -1205,18 +1434,21 @@ describe('choosing the tools of a project in the catalogue (R6b)', () => {
     expect((await toolsOf(id)).map((tool) => tool.name)).toEqual(['Cursor', 'Claude'])
   })
 
-  it('still writes the former tool columns, with the names and slugs found in the catalogue', async () => {
-    // Décision du plan : tools et tool_slugs restent écrits jusqu'en R7, pour qu'un retour à R6a
-    // retrouve les outils ; ils ne sont plus lus.
+  it('keeps the tools only in the catalogue links, the former columns being gone (R7a)', async () => {
+    // R6b gardait project.tools et project.tool_slugs écrites « jusqu'en R7 », pour un retour
+    // possible à R6a ; la migration 0018 (R7a) les efface, avec leur index. Les outils ne vivent plus
+    // que dans project_tool.
     const { id } = await publish({ ...recipes, tools: ['chat gpt', 'Teachable Machine'] })
-
-    expect(await legacyColumns(id)).toEqual({
-      tools: ['ChatGPT', 'Teachable Machine'],
-      toolSlugs: ['chatgpt', 'teachable-machine'],
-    })
+    expect((await toolsOf(id)).map((tool) => tool.name)).toEqual(['ChatGPT', 'Teachable Machine'])
 
     expect((await patchTools(id, ['CURSOR'])).status).toBe(200)
-    expect(await legacyColumns(id)).toEqual({ tools: ['Cursor'], toolSlugs: ['cursor'] })
+    expect((await toolsOf(id)).map((tool) => tool.name)).toEqual(['Cursor'])
+    // information_schema : le catalogue de PostgreSQL, qui décrit les tables et leurs colonnes.
+    expect(
+      await rows(
+        sql`select column_name from information_schema.columns where table_name = 'project' and column_name in ('tools', 'tool_slugs')`,
+      ),
+    ).toEqual([])
   })
 
   it('gives the suffix -2 to an « other » whose slug is already taken by a different folded name', async () => {
