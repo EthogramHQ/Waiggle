@@ -88,6 +88,7 @@ import { FluidTopBarCatalogue } from './fluidite-barre'
 import { ScreenFadeCatalogue } from './fluidite-fondu'
 import { AmbientHostCatalogue } from './fluidite-lumiere'
 import { FormSamples } from './formulaire'
+import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
@@ -915,6 +916,8 @@ export function CatalogueScreen() {
       <UpdateLinesCatalogue />
       {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
       <UpdateEntryCatalogue />
+      {/* Tranche R7a, la frise des mises à jour et la ligne des dates d'un projet (frise.tsx). */}
+      <UpdateTimelineCatalogue />
       {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
       <UpdateSheetCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
