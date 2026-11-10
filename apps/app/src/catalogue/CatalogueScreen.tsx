@@ -80,6 +80,7 @@ import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
 import { ExploreCatalogue } from './explorer'
+import { UpdateSheetCatalogue } from './feuille-mise-a-jour'
 import { SheetsCatalogue } from './feuilles'
 import { FeedCatalogue } from './fil'
 import { FeedEndCatalogue } from './fin-de-fil'
@@ -914,6 +915,8 @@ export function CatalogueScreen() {
       <UpdateLinesCatalogue />
       {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
       <UpdateEntryCatalogue />
+      {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
+      <UpdateSheetCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
       <FluidTopBarCatalogue />
