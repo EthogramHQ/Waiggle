@@ -128,8 +128,9 @@ export function UpdateEntry({
             alignItems: 'baseline',
             columnGap: space.sm,
             rowGap: space.xxs,
-            // Le titre centré sur la corbeille, de 44 points, quand il tient sur une ligne.
-            paddingTop: space.sm,
+            // Le titre centré sur le bouton de 44 points (corbeille ou « Signaler ») quand il tient
+            // sur une ligne ; sans bouton, il commence en haut.
+            paddingTop: onDelete || onReport ? space.sm : 0,
           }}
         >
           <View
@@ -260,7 +261,7 @@ function LineText({ text, read }: { text: string; read: string }) {
   if (Platform.OS !== 'web') {
     return (
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text breakAnywhere accessibilityLabel={read}>
+        <Text breakAnywhere readable accessibilityLabel={read}>
           {text}
         </Text>
       </View>
@@ -269,7 +270,9 @@ function LineText({ text, read }: { text: string; read: string }) {
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
       <View aria-hidden>
-        <Text breakAnywhere>{text}</Text>
+        <Text breakAnywhere readable>
+          {text}
+        </Text>
       </View>
       <View style={hiddenFrame} pointerEvents="none">
         <Text>{read}</Text>
