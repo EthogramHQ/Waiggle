@@ -96,17 +96,51 @@ export function TextLink({
       {...(onBlur ? { onBlur } : null)}
       {...(onHoverIn ? { onHoverIn } : null)}
       {...(onHoverOut ? { onHoverOut } : null)}
-      // La zone à toucher fait au moins 44 points de côté, même autour d'un mot court. (hitSlop, qui
-      // agrandit la zone sans changer l'allure, est ignoré sur le web : on donne donc une vraie taille.)
       style={({ pressed }) => ({
-        minHeight: layout.touchTarget,
-        minWidth: layout.touchTarget,
-        justifyContent: 'center',
         // Sur le web, react-native-web interdit à toute vue de rétrécir (flexShrink 0) : sans ces
         // deux réglages, le lien garderait la largeur de son libellé entier et sortirait du cadre.
         ...(breakAnywhere ? { flexShrink: 1, maxWidth: '100%' as const } : null),
         opacity: disabled ? 0.55 : pressed ? 0.6 : 1,
       })}
+    >
+      {/* Son allure (taille, texte, flèche) est celle de TextLinkShape : une place gardée qui la
+          reprend a donc toujours la hauteur exacte du lien. */}
+      <TextLinkShape label={label} tone={tone} breakAnywhere={breakAnywhere} external={external} />
+    </Pressable>
+  )
+}
+
+type ShapeProps = {
+  label: string
+  tone?: Tone
+  breakAnywhere?: boolean
+  external?: boolean
+}
+
+/**
+ * L'allure d'un TextLink, seulement dessinée : le même cadre de 44 points, le même libellé en gras
+ * et souligné, la même flèche, mais rien qu'on touche ni qu'on atteigne au clavier (ni rôle, ni
+ * nom). TextLink se dessine avec elle ; un gabarit invisible qui garde la place d'un lien à venir
+ * la reprend (la ligne des testeurs de la page de sortie, ui/LeavingSheet.tsx) : si l'allure du
+ * lien change, la place gardée change avec elle.
+ */
+export function TextLinkShape({
+  label,
+  tone = 'default',
+  breakAnywhere = false,
+  external = false,
+}: ShapeProps) {
+  return (
+    <View
+      style={{
+        // La zone à toucher fait au moins 44 points de côté, même autour d'un mot court. (hitSlop,
+        // qui agrandit la zone sans changer l'allure, est ignoré sur le web : on donne donc une
+        // vraie taille.)
+        minHeight: layout.touchTarget,
+        minWidth: layout.touchTarget,
+        justifyContent: 'center',
+        ...(breakAnywhere ? { maxWidth: '100%' as const } : null),
+      }}
     >
       {external ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
@@ -123,6 +157,6 @@ export function TextLink({
           {label}
         </Text>
       )}
-    </Pressable>
+    </View>
   )
 }
