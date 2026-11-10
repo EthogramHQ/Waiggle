@@ -507,17 +507,27 @@ export function ProjectCard({
       {/* Les pastilles ne se touchent pas : le doigt passe au travers, vers la carte. */}
       {/* R7a, `badge` (Découvrir…) : le repère « Mis à jour » vient ici, à côté du statut ; la date
           de publication reste en haut, car Découvrir est rangé par elle (décision du 10/11/2026). */}
-      <View
-        pointerEvents="none"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, flexShrink: 1 }}
-      >
+      {/* R7a, des-A2 : le statut, les repères et le total des réactions sont chacun un enfant de la
+          rangée (et non un groupe qui passe à la ligne d'un bloc) : ils se rangent côte à côte tant
+          qu'il y a de la place, et la rangée ne compte plus trois lignes à 320 px. */}
+      <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
         <StatusPill label={status.label} strong={status.strong} />
-        {badge ? <StatusPill label={badge} /> : null}
-        {updated?.kind === 'badge' ? <StatusPill label={updated.label} /> : null}
-        {/* Le total des réactions est du même groupe que les pastilles : ils passent à la ligne
-            ensemble, et la rangée ne compte plus trois lignes à 320 px (R7a, des-A2). */}
-        {total}
       </View>
+      {badge ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={badge} />
+        </View>
+      ) : null}
+      {updated?.kind === 'badge' ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={updated.label} />
+        </View>
+      ) : null}
+      {total ? (
+        <View pointerEvents="none" style={{ flexShrink: 1 }}>
+          {total}
+        </View>
+      ) : null}
       {end}
     </View>
   )
