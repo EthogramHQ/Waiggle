@@ -106,8 +106,12 @@ const noopActions: PhotoActions = {
 const NOW = new Date('2026-11-10T09:00:00.000Z')
 const THREE_WEEKS_AGO = '2026-10-20T09:00:00.000Z'
 
-/** La hauteur d'une feuille de téléphone montrée dans la page (la feuille défile dedans). */
+/**
+ * La hauteur d'une feuille de téléphone montrée dans la page (la feuille défile dedans) ; plus haute
+ * avec des photos, pour que la capture montre les tuiles et l'interrupteur « Avant / après ».
+ */
 const PHONE_SHEET_HEIGHT = 620
+const PHONE_SHEET_HEIGHT_PHOTOS = 1180
 
 type SampleProps = {
   l: Labels
@@ -153,7 +157,7 @@ function Sample({
           ...(desktop
             ? { paddingVertical: space.xxxl }
             : {
-                height: PHONE_SHEET_HEIGHT,
+                height: photos > 0 ? PHONE_SHEET_HEIGHT_PHOTOS : PHONE_SHEET_HEIGHT,
                 maxWidth: layout.formWidth,
                 overflow: 'hidden' as const,
               }),
