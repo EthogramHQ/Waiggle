@@ -313,15 +313,20 @@ describe('the page « Les mises à jour »', () => {
   it('shows the page « Ce projet est introuvable » for a project one cannot see', async () => {
     mockServer.project = withUpdates
     const respond = mockServer.respond.bind(mockServer)
-    jest
+    const spy = jest
       .spyOn(mockServer, 'respond')
       .mockImplementation(async (path, init) =>
         path === `/v1/projects/${id}` ? { ok: false, error: 'notFound' } : respond(path, init),
       )
-    await renderWithProviders(<ProjectUpdatesScreen id={id} />)
+    try {
+      await renderWithProviders(<ProjectUpdatesScreen id={id} />)
 
-    expect(await screen.findByText(containing(T.notFound))).toBeTruthy()
-    expect(screen.queryByText(rocketUpdate.title ?? '')).toBeNull()
+      expect(await screen.findByText(containing(T.notFound))).toBeTruthy()
+      expect(screen.queryByText(rocketUpdate.title ?? '')).toBeNull()
+    } finally {
+      // `apps/app` n'a pas `restoreMocks` : sans cela, les tests suivants verraient « introuvable ».
+      spy.mockRestore()
+    }
   })
 
   it('says the updates could not load, and offers to try again', async () => {
