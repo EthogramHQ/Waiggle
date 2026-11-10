@@ -107,7 +107,7 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
 /** Les actions de la page, sur une carte comme la colonne de la page, dans l'un de leurs états. */
 function Actions({ project, suspended = false }: { project: ActionsProject; suspended?: boolean }) {
   return (
-    <Surface>
+    <Surface padding="lg">
       <ProjectActionsView
         project={project}
         onOpenDemo={noop}
@@ -165,12 +165,12 @@ export function TestersCatalogue() {
   const pair = wide ? 'row' : 'column'
   return (
     <Stack gap="lg">
-      <Text variant="headline" heading={2}>
+      <Text variant="heading" heading={2}>
         {l.title}
       </Text>
       <Text tone="secondary">{l.intro}</Text>
 
-      <Text variant="heading" heading={3}>
+      <Text variant="headline" heading={3}>
         {l.actionsTitle}
       </Text>
       {schemes.map((scheme) => (
@@ -200,7 +200,7 @@ export function TestersCatalogue() {
         </ThemeProvider>
       ))}
 
-      <Text variant="heading" heading={3}>
+      <Text variant="headline" heading={3}>
         {l.sheetsTitle}
       </Text>
       {schemes.map((scheme) => (
@@ -228,7 +228,7 @@ export function TestersCatalogue() {
         </ThemeProvider>
       ))}
 
-      <Text variant="heading" heading={3}>
+      <Text variant="headline" heading={3}>
         {l.statesTitle}
       </Text>
       <Stack direction={pair} gap="lg" wrap={wide}>
