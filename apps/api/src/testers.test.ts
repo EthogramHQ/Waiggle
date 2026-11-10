@@ -409,7 +409,9 @@ describe('limits against abuse', () => {
 
     // Même chose pour quitter, une heure plus tard : POST et DELETE partagent le même quota.
     later(61)
-    for (let i = 0; i < 60; i++) await expectDone(await quit(crypto.randomUUID(), ines))
+    for (let i = 0; i < 60; i++) {
+      await expectDone(await act.send('DELETE', testersPath(crypto.randomUUID()), ines))
+    }
     const res = await quit(project.id, ines)
     await expectError(res, 429, 'rate_limited')
     expect(res.headers.get('retry-after')).toBeTruthy()
