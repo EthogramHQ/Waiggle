@@ -86,8 +86,12 @@ export const memberCounterKeys = (userId: string) => ({
   visualUpload: `visual-upload:${userId}`,
   // Suivre et ne plus suivre, membres et projets ensemble (tranche 4).
   follow: `follow:${userId}`,
-  // Publier une note, tous ses projets ensemble (tranche 4b).
-  note: `note:${userId}`,
+  // Publier une mise à jour, tous ses projets ensemble (R7a ; elle remplace les notes de la
+  // tranche 4b). Une clé neuve : l'ancien compteur `note:` s'éteint seul.
+  update: `update:${userId}`,
+  // Rejoindre et quitter les testeurs d'un projet, tous projets ensemble (R7a, route de B2b). La
+  // clé est déclarée ici pour qu'elle parte avec le compte (deleteMemberCounters).
+  tester: `tester:${userId}`,
   // Poser et retirer une réaction, tous les projets ensemble (tranche 5).
   reaction: `reaction:${userId}`,
   // Publier et modifier un commentaire, tous les projets ensemble (tranche 5).

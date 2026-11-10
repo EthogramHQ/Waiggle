@@ -29,7 +29,6 @@ import { mediaRoutes } from './routes/media'
 import { memberRoutes } from './routes/members'
 import { moderationRoutes } from './routes/moderation'
 import { moderationCatalogueRoutes } from './routes/moderation-catalogue'
-import { noteRoutes } from './routes/notes'
 import { notificationRoutes } from './routes/notifications'
 import { projectRoutes } from './routes/projects'
 import { reactionRoutes } from './routes/reactions'
@@ -39,6 +38,7 @@ import { suggestionRoutes } from './routes/suggestions'
 import { tagRoutes } from './routes/tags'
 import { toolRoutes } from './routes/tools'
 import { UNVERIFIED_EMAIL_PATH, unverifiedEmailRoutes } from './routes/unverified-email'
+import { updateRoutes } from './routes/updates'
 import { visualRoutes } from './routes/visuals'
 import { sameOriginWrites } from './security/same-origin'
 import { suspensionGuard } from './suspension/guard'
@@ -239,9 +239,9 @@ export const createApp = ({
   app.use('/v1/*', (c, next) => {
     if (c.req.path === '/v1/me/avatar') return next()
     if (/^\/v1\/projects\/[^/]+\/visuals$/.test(c.req.path)) return next()
-    // Une note ou un commentaire pèse au plus 1 000 caractères, une réaction n'a pas de corps :
-    // la petite limite suffit largement.
-    if (/^\/v1\/projects\/[^/]+\/(notes|comments|reactions)(\/|$)/.test(c.req.path)) {
+    // Une mise à jour (16 Ko : cinq lignes, un titre, quatre photos citées) ou un commentaire pèse
+    // peu, une réaction ou une inscription de testeur n'a pas de corps : la petite limite suffit.
+    if (/^\/v1\/projects\/[^/]+\/(updates|testers|comments|reactions)(\/|$)/.test(c.req.path)) {
       return small(c, next)
     }
     // La description d'une photo (R6a, sec-A3) : 250 caractères, la petite limite suffit.
@@ -340,7 +340,7 @@ export const createApp = ({
   app.route('/', followRoutes({ db, limiter }))
   // Bloquer, débloquer, la liste « Membres bloqués » (tranche 7b).
   app.route('/', blockRoutes({ db, limiter, publicApiUrl }))
-  app.route('/', noteRoutes({ db, limiter }))
+  app.route('/', updateRoutes({ db, storage, limiter, publicApiUrl }))
   app.route('/', reactionRoutes({ db, limiter }))
   app.route('/', commentRoutes({ db, limiter, publicApiUrl }))
   app.route('/', feedRoutes({ db, limiter, publicApiUrl }))
