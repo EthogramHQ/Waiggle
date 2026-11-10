@@ -24,6 +24,13 @@ jest.mock('./focus', () => ({
   focusWithoutScroll: jest.fn(() => true),
 }))
 
+// RNTL 14 ne connaît l'état « coché » que pour `checkbox`, `radio` et `switch` : `toBeChecked`
+// lève une erreur sur `menuitemradio`. On lit donc ce que la vue dit aux lecteurs d'écran :
+// `accessibilityState.checked` sur téléphone, `aria-checked` sur le web.
+type HostProps = { accessibilityState?: { checked?: boolean | 'mixed' }; 'aria-checked'?: boolean }
+const isChecked = (element: { props: HostProps }) =>
+  element.props.accessibilityState?.checked === true || element.props['aria-checked'] === true
+
 const family = {
   new: fr.t(($) => $.update.family.new),
   fixed: fr.t(($) => $.update.family.fixed),
@@ -74,9 +81,9 @@ describe('a choice menu (R7a)', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
-    expect(screen.getByRole('menuitemradio', { name: family.fixed })).toBeChecked()
-    expect(screen.getByRole('menuitemradio', { name: family.new })).not.toBeChecked()
-    expect(screen.getByRole('menuitemradio', { name: family.polish })).not.toBeChecked()
+    expect(isChecked(screen.getByRole('menuitemradio', { name: family.fixed }))).toBe(true)
+    expect(isChecked(screen.getByRole('menuitemradio', { name: family.new }))).toBe(false)
+    expect(isChecked(screen.getByRole('menuitemradio', { name: family.polish }))).toBe(false)
     // Tous les choix sont des radios, même celui qui ne dit rien de `checked`.
     expect(screen.queryByRole('menuitem')).toBeNull()
   })
@@ -88,7 +95,7 @@ describe('a choice menu (R7a)', () => {
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
     expect(screen.getAllByRole('menuitemradio')).toHaveLength(3)
-    expect(screen.getByRole('menuitemradio', { name: family.fixed })).toBeChecked()
+    expect(isChecked(screen.getByRole('menuitemradio', { name: family.fixed }))).toBe(true)
   })
 
   it('keeps plain menu items when no item says checked (témoin)', async () => {
