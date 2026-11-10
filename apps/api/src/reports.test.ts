@@ -1,8 +1,14 @@
 // Tests d'intégration de la tranche 7a : signaler un contenu (POST /v1/reports). Scénario :
 // docs/scenarios/phase-1.md, « Tranche 7a — Signaler » ; règles 5 à 8 de la relecture du plan
-// (22/10/2026). Trois membres : Léa (l'autrice du projet « Météo », de ses notes et d'un
+// (22/10/2026). Trois membres : Léa (l'autrice du projet « Météo », de ses mises à jour et d'un
 // commentaire), Max (qui signale) et Zoé (une autre, qui signale aussi). Ce que l'administrateur
 // fait des signalements est testé dans moderation.test.ts.
+//
+// Tranche R7a : la mise à jour d'un projet (`update`) remplace la note du Journal, effacée. On la
+// signale comme une note : même règle de visibilité, sa copie porte son titre, sa version, ses
+// lignes et ses photos avec leur description (relecture de sécurité A8). La copie d'un projet ne
+// garde que ses photos à lui (galerie, portrait), jamais celles des mises à jour ni celles en
+// attente. Un ancien signalement de note ne peut plus être fait (B1).
 //
 // Ce que la route promet :
 // - un membre connecté signale un contenu qu'il voit, jamais le sien, une fois par contenu ;
@@ -17,8 +23,12 @@ import {
   CreatedReport,
   ErrorResponse,
   ModerationQueuePage,
+  type NewProjectUpdate,
   NotificationPage,
-  ProjectNote,
+  Project,
+  ProjectUpdate,
+  ProjectUpdatePage,
+  ProjectVisual,
   REPORTS_PER_DAY,
   ReportSnapshot,
   ReportTargetPreview,
@@ -28,6 +38,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
+import { jpegImage, visualForm } from './testing/images'
 
 let ctx: TestContext
 let act: ReturnType<typeof activity>
@@ -99,12 +110,80 @@ const expectSameNotFound = async (res: Response, reference: Response) => {
 /** La réponse de référence : un projet qui n'existe pas. */
 const unknownProject = () => postReport(max, target('project', UNKNOWN))
 
-const postNote = async (projectId: string, cookie: string, body: string) => {
+/**
+ * Publie une mise à jour (POST /v1/projects/{id}/updates) et la rend. Le corps est toujours
+ * complet, comme l'envoie l'appli : titre et version (null quand l'auteur les laisse vides), une à
+ * cinq lignes, les photos déjà envoyées « en attente », et l'avant / après.
+ */
+const postUpdate = async (
+  projectId: string,
+  cookie: string,
+  changes: Partial<NewProjectUpdate> = {},
+) => {
   later()
-  const res = await act.send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
+  const body: NewProjectUpdate = {
+    title: null,
+    version: null,
+    lines: [{ family: 'new', text: 'Un mode hors ligne' }],
+    photos: [],
+    beforeAfter: false,
+    ...changes,
+  }
+  const res = await act.send('POST', `/v1/projects/${projectId}/updates`, cookie, body)
   expect(res.status).toBe(201)
-  return ProjectNote.parse(await res.json())
+  return ProjectUpdate.parse(await res.json())
 }
+
+/** Une mise à jour dont la seule ligne est ce texte (pour la reconnaître dans une copie). */
+const postLine = (projectId: string, cookie: string, text: string) =>
+  postUpdate(projectId, cookie, { lines: [{ family: 'new', text }] })
+
+/** La clé de stockage d'une photo, lue en base (la réponse ne la donne jamais telle quelle). */
+const storageKeyOf = async (photoId: string) => {
+  const [row] = await ctx.db
+    .select({ key: schema.projectMedia.storageKey })
+    .from(schema.projectMedia)
+    .where(eq(schema.projectMedia.id, photoId))
+  if (!row) throw new Error(`no photo ${photoId}`)
+  return row.key
+}
+
+/**
+ * Envoie une photo « en attente » pour la prochaine mise à jour de ce projet (`slot=update`) : la
+ * route répond par la photo elle-même (ProjectVisual). Rend son identifiant et sa clé de stockage.
+ */
+const pendingPhoto = async (projectId: string, cookie: string, color = '#d9a441') => {
+  later()
+  const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+    method: 'POST',
+    headers: { cookie },
+    body: visualForm(await jpegImage(800, 600, color), 'update'),
+  })
+  expect(res.status).toBe(201)
+  const { id } = ProjectVisual.parse(await res.json())
+  return { id, key: await storageKeyOf(id) }
+}
+
+/** Ajoute une photo à la galerie du projet ; rend sa clé de stockage. */
+const galleryPhoto = async (projectId: string, cookie: string) => {
+  later()
+  const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+    method: 'POST',
+    headers: { cookie },
+    body: visualForm(await jpegImage(1200, 800, '#3b7a9e'), 'gallery'),
+  })
+  expect(res.status).toBe(201)
+  const visual = Project.parse(await res.json()).visuals.at(-1)
+  if (!visual) throw new Error('no gallery photo')
+  return storageKeyOf(visual.id)
+}
+
+/** Retire une mise à jour en base, comme la modération (removed_at posé). */
+const removeInBase = (updateId: string) =>
+  ctx.db
+    .update(schema.projectUpdate)
+    .set({ removedAt: new Date() })
+    .where(eq(schema.projectUpdate.id, updateId))
 
 /** Les signalements gardés en base, du plus ancien au plus récent. */
 const storedReports = () =>
@@ -150,14 +229,18 @@ describe('reporting a content', () => {
     expect(Object.keys((await res.json()) as object)).toEqual(['id'])
   })
 
-  it('reports a note, a comment, a reply and a profile, each with its project and author', async () => {
-    const note = await postNote(meteo.id, lea, 'v2 : mode hors ligne.')
+  it('reports an update, a comment, a reply and a profile, each with its project and author', async () => {
+    const update = await postUpdate(meteo.id, lea, {
+      title: 'Le mode hors ligne',
+      version: 'v2',
+      lines: [{ family: 'new', text: 'La météo se lit sans réseau' }],
+    })
     const root = await act.comment(meteo.id, zoe, 'Un commentaire de Zoé')
     later()
     const reply = await act.comment(meteo.id, lea, 'La réponse de Léa', root.id)
 
     for (const [kind, id] of [
-      ['note', note.id],
+      ['update', update.id],
       ['comment', root.id],
       ['comment', reply.id],
       ['member', leaId],
@@ -167,7 +250,8 @@ describe('reporting a content', () => {
 
     const rows = await storedReports()
     expect(rows.map((r) => [r.targetKind, r.targetId, r.projectId, r.targetAuthorId])).toEqual([
-      ['note', note.id, meteo.id, leaId],
+      // La mise à jour est rangée sous son projet, et son autrice est celle du projet.
+      ['update', update.id, meteo.id, leaId],
       ['comment', root.id, meteo.id, (await act.me(zoe)).id],
       ['comment', reply.id, meteo.id, leaId],
       // Un profil n'a pas de projet : pas de lien « Voir » vers un projet.
@@ -263,11 +347,26 @@ describe('the copy of the reported text', () => {
     expect(snapshot).toContain('La pluie de demain, quartier par quartier.')
   })
 
-  it('copies the text of a note and of a comment', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note très particulière')
+  it('copies the title, version and lines of an update, and the text of a comment', async () => {
+    const update = await postUpdate(meteo.id, lea, {
+      title: 'Un titre très particulier',
+      version: 'v9.9-particulière',
+      lines: [
+        { family: 'new', text: 'Une première ligne très particulière' },
+        { family: 'fixed', text: 'Une seconde ligne très particulière' },
+      ],
+    })
     const comment = await act.comment(meteo.id, zoe, 'Un commentaire très particulier')
 
-    expect(await snapshotOf(await report('note', note.id))).toContain('Une note très particulière')
+    const copy = await snapshotOf(await report('update', update.id))
+    for (const text of [
+      'Un titre très particulier',
+      'v9.9-particulière',
+      'Une première ligne très particulière',
+      'Une seconde ligne très particulière',
+    ]) {
+      expect(copy).toContain(text)
+    }
     expect(await snapshotOf(await report('comment', comment.id))).toContain(
       'Un commentaire très particulier',
     )
@@ -337,7 +436,7 @@ describe('a malformed target', () => {
   it('answers 400, never 500, for an id that does not fit its kind', async () => {
     for (const body of [
       target('project', 'pas-un-uuid'),
-      target('note', '42'),
+      target('update', '42'),
       target('comment', leaId),
       target('member', '../admin'),
       target('member', ''),
@@ -348,6 +447,24 @@ describe('a malformed target', () => {
       await expectError(await postReport(max, body), 400, 'validation')
     }
     expect(await storedReports()).toEqual([])
+  })
+
+  // Relecture de sécurité B1 (R7a) : la note n'existe plus. Ce qu'un membre envoie
+  // (ReportTargetKind) refuse `note`, même avec un identifiant bien formé ; seules les lignes déjà
+  // gardées en base la portent encore (StoredReportTargetKind).
+  it('refuses a new report on a journal note', async () => {
+    const noteId = randomUUID()
+    await expectError(await postReport(max, target('note', noteId)), 400, 'validation')
+    const preview = await act.send(
+      'GET',
+      `/v1/reports/target?${new URLSearchParams({ kind: 'note', id: noteId })}`,
+      max,
+    )
+    await expectError(preview, 400, 'validation')
+    expect(await storedReports()).toEqual([])
+    // Témoin : une mise à jour, elle, se signale.
+    const update = await postUpdate(meteo.id, lea)
+    expect((await postReport(max, target('update', update.id))).status).toBe(201)
   })
 })
 
@@ -379,21 +496,41 @@ describe('a content the member cannot see', () => {
     expect((await postReport(max, target('project', velo.id))).status).toBe(201)
   })
 
-  it('answers the same 404 for an unknown note, a note of a private project and a removed note', async () => {
+  // Relecture de sécurité A8 (R7a) : la même règle que pour la note d'avant (`target.ts`), la
+  // visibilité du projet, puis « non retirée, ou son auteur ». Un projet retiré par la modération
+  // ou un blocage, dans un sens ou dans l'autre, cachent aussi ses mises à jour.
+  it('refuses to report an update of a private, removed or blocked project like an unknown one', async () => {
     const draft = await act.publish(lea, 'Brouillon', { visibility: 'private' })
-    const secret = await postNote(draft.id, lea, 'Une idée encore secrète')
-    const removed = await postNote(meteo.id, lea, 'Une note retirée')
+    const secret = await postLine(draft.id, lea, 'Une idée encore secrète')
+    const velo = await act.publish(lea, 'Vélo')
+    const onRemovedProject = await postLine(velo.id, lea, 'Sur un projet bientôt retiré')
     await ctx.db
-      .update(schema.projectNote)
+      .update(schema.project)
       .set({ removedAt: new Date() })
-      .where(eq(schema.projectNote.id, removed.id))
+      .where(eq(schema.project.id, velo.id))
+    const removed = await postLine(meteo.id, lea, 'Une mise à jour retirée')
+    await removeInBase(removed.id)
 
-    for (const id of [UNKNOWN, secret.id, removed.id]) {
-      await expectSameNotFound(await postReport(max, target('note', id)), await unknownProject())
+    for (const id of [UNKNOWN, secret.id, onRemovedProject.id, removed.id]) {
+      await expectSameNotFound(await postReport(max, target('update', id)), await unknownProject())
     }
-    // Témoin : une note visible se signale.
-    const visible = await postNote(meteo.id, lea, 'Une note visible')
-    expect((await postReport(max, target('note', visible.id))).status).toBe(201)
+    // Le blocage, dans un sens puis dans l'autre : la mise à jour visible de Léa devient inconnue.
+    const visible = await postLine(meteo.id, lea, 'Une mise à jour visible')
+    for (const [blocked, cookie] of [
+      [leaId, max],
+      [maxId, lea],
+    ] as const) {
+      later()
+      await act.block(blocked, cookie)
+      await expectSameNotFound(
+        await postReport(max, target('update', visible.id)),
+        await unknownProject(),
+      )
+      await act.unblock(blocked, cookie)
+    }
+    expect(await storedReports()).toEqual([])
+    // Témoin : sans blocage, la mise à jour visible se signale.
+    expect((await postReport(max, target('update', visible.id))).status).toBe(201)
   })
 
   it('answers the same 404 for a comment unknown, hidden, deleted, removed or on a private project', async () => {
@@ -471,13 +608,13 @@ describe('a content the member cannot see', () => {
 })
 
 describe('reporting what one cannot report', () => {
-  it('refuses to report her own project, note, comment or profile', async () => {
-    const note = await postNote(meteo.id, lea, 'Ma note')
+  it('refuses to report her own project, update, comment or profile', async () => {
+    const update = await postLine(meteo.id, lea, 'Ma mise à jour')
     const comment = await act.comment(meteo.id, lea, 'Mon commentaire')
 
     for (const [kind, id] of [
       ['project', meteo.id],
-      ['note', note.id],
+      ['update', update.id],
       ['comment', comment.id],
       ['member', leaId],
     ] as const) {
@@ -540,7 +677,14 @@ describe('the preview of the target', () => {
   const unknownPreview = () => preview(max, 'project', UNKNOWN)
 
   it('gives the current text and the project of each kind of target', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note à lire')
+    const update = await postUpdate(meteo.id, lea, {
+      title: 'Un titre à lire',
+      version: 'v1.2',
+      lines: [
+        { family: 'new', text: 'Une ligne à lire' },
+        { family: 'polish', text: 'Une autre ligne à lire' },
+      ],
+    })
     const comment = await act.comment(meteo.id, lea, 'Un commentaire à lire')
     const { handle } = await act.me(lea)
     const author = { id: leaId, name: 'Léa', handle, isBlocked: false }
@@ -554,12 +698,17 @@ describe('the preview of the target', () => {
     expect((await readPreview(max, 'project', meteo.id)).text).toContain(
       'La pluie de demain, quartier par quartier.',
     )
-    expect(await readPreview(max, 'note', note.id)).toEqual({
-      target: { kind: 'note', id: note.id },
-      text: 'Une note à lire',
+    // Une mise à jour : son titre et ses lignes (contrat, ReportTargetPreview.text).
+    const updatePreview = await readPreview(max, 'update', update.id)
+    expect(updatePreview).toEqual({
+      target: { kind: 'update', id: update.id },
+      text: expect.any(String),
       projectId: meteo.id,
       author,
     })
+    for (const text of ['Un titre à lire', 'Une ligne à lire', 'Une autre ligne à lire']) {
+      expect(updatePreview.text).toContain(text)
+    }
     expect(await readPreview(max, 'comment', comment.id)).toEqual({
       target: { kind: 'comment', id: comment.id },
       text: 'Un commentaire à lire',
@@ -585,7 +734,9 @@ describe('the preview of the target', () => {
       .update(schema.project)
       .set({ removedAt: new Date() })
       .where(eq(schema.project.id, velo.id))
-    const secret = await postNote(draft.id, lea, 'Une idée encore secrète')
+    const secret = await postLine(draft.id, lea, 'Une idée encore secrète')
+    const removed = await postLine(meteo.id, lea, 'Une mise à jour retirée')
+    await removeInBase(removed.id)
     const hidden = await act.comment(meteo.id, zoe, 'Un commentaire masqué par Léa')
     await act.hide(meteo.id, hidden.id, lea)
     const deleted = await act.comment(meteo.id, zoe, 'Un commentaire supprimé')
@@ -594,8 +745,9 @@ describe('the preview of the target', () => {
     for (const [kind, id] of [
       ['project', draft.id],
       ['project', velo.id],
-      ['note', UNKNOWN],
-      ['note', secret.id],
+      ['update', UNKNOWN],
+      ['update', secret.id],
+      ['update', removed.id],
       ['comment', hidden.id],
       ['comment', deleted.id],
       ['member', 'no-such-member'],
@@ -625,11 +777,11 @@ describe('the preview of the target', () => {
   })
 
   it('refuses her own content, as the report does', async () => {
-    const note = await postNote(meteo.id, lea, 'Ma note')
+    const update = await postLine(meteo.id, lea, 'Ma mise à jour')
 
     for (const [kind, id] of [
       ['project', meteo.id],
-      ['note', note.id],
+      ['update', update.id],
       ['member', leaId],
     ] as const) {
       await expectError(await preview(lea, kind, id), 422, 'own_content')
@@ -691,14 +843,84 @@ describe('the full copy of a report', () => {
     )
   })
 
-  it('copies the body of a note and of a comment', async () => {
-    const note = await postNote(meteo.id, lea, 'Le texte de la note')
+  it('copies the body of a comment', async () => {
     const comment = await act.comment(meteo.id, lea, 'Le texte du commentaire')
 
-    expect(await copyOf('note', note.id)).toEqual([{ field: 'body', value: 'Le texte de la note' }])
     expect(await copyOf('comment', comment.id)).toEqual([
       { field: 'body', value: 'Le texte du commentaire' },
     ])
+  })
+
+  // Relecture de sécurité A8 (R7a), règle R12 : la copie d'une mise à jour, dans l'ordre de la page.
+  // Le titre, la version, une entrée `line` par ligne (son texte, tiré du jsonb), puis chaque photo
+  // rattachée (sa clé) suivie de sa description, quand elle en a une. Une photo encore en attente
+  // sur le même projet n'en fait pas partie : elle n'est pas publiée.
+  it('copies the title, version, lines, photos and photo descriptions of a reported update', async () => {
+    const before = await pendingPhoto(meteo.id, lea, '#1b2a4a')
+    const after = await pendingPhoto(meteo.id, lea, '#f2c14e')
+    const update = await postUpdate(meteo.id, lea, {
+      title: 'La carte des averses',
+      version: 'v1.2',
+      lines: [
+        { family: 'new', text: 'Une carte des averses heure par heure' },
+        { family: 'fixed', text: 'Le quartier du port ne disparaît plus' },
+      ],
+      photos: [
+        { id: before.id, description: 'La carte vide, avant' },
+        { id: after.id, description: null },
+      ],
+      beforeAfter: true,
+    })
+    const stillPending = await pendingPhoto(meteo.id, lea, '#9e3b7a')
+
+    const copy = await copyOf('update', update.id)
+
+    expect(copy).toEqual([
+      { field: 'title', value: 'La carte des averses' },
+      { field: 'version', value: 'v1.2' },
+      { field: 'line', value: 'Une carte des averses heure par heure' },
+      { field: 'line', value: 'Le quartier du port ne disparaît plus' },
+      { field: 'photo', value: before.key },
+      { field: 'photoDescription', value: 'La carte vide, avant' },
+      { field: 'photo', value: after.key },
+    ])
+    expect(JSON.stringify(copy)).not.toContain(stillPending.key)
+  })
+
+  it('copies only the lines of an update without title, version or photos', async () => {
+    const update = await postUpdate(meteo.id, lea, {
+      lines: [{ family: 'polish', text: 'Des icônes plus lisibles' }],
+    })
+
+    expect(await copyOf('update', update.id)).toEqual([
+      { field: 'line', value: 'Des icônes plus lisibles' },
+    ])
+  })
+
+  // A8, règle R12 : la copie d'un projet ne garde que ses photos à lui (galerie, portrait). Les
+  // photos d'une mise à jour, et celles encore en attente, n'y entrent pas, ni comme « cover » ni
+  // comme « photo ». La file (ses images encore là) lit la même règle.
+  it('never copies pending or update photos into the report of a project', async () => {
+    const galleryKey = await galleryPhoto(meteo.id, lea)
+    const attached = await pendingPhoto(meteo.id, lea, '#1b2a4a')
+    await postUpdate(meteo.id, lea, { photos: [{ id: attached.id, description: 'Une capture' }] })
+    const pending = await pendingPhoto(meteo.id, lea, '#f2c14e')
+
+    const copy = await copyOf('project', meteo.id)
+
+    expect(
+      copy.filter((entry) => ['cover', 'photo', 'photoDescription'].includes(entry.field)),
+    ).toEqual([{ field: 'cover', value: galleryKey }])
+    for (const key of [attached.key, pending.key]) {
+      expect(JSON.stringify(copy)).not.toContain(key)
+    }
+    // La file : une seule image, celle de la galerie, encore là.
+    await act.makeAdmin((await act.me(zoe)).id)
+    const res = await act.send('GET', '/v1/moderation/reports', zoe)
+    expect(res.status).toBe(200)
+    const [item] = ModerationQueuePage.parse(await res.json()).items
+    expect(item?.target).toEqual({ kind: 'project', id: meteo.id })
+    expect(item?.images).toEqual([{ field: 'cover', state: 'present' }])
   })
 
   // Règle 16 : les copies d'avant 7b, un texte seul, restent lisibles (champ `text`).
@@ -756,12 +978,25 @@ describe('reporting again', () => {
     // Et une seule fois : le second est ouvert.
     await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_reported')
   })
+
+  // R7a : une mise à jour ne se modifie pas (on la supprime, on en publie une autre) ; une fois
+  // classée, sa copie reste celle que la modération a lue.
+  it('refuses to report again an update the moderation already examined', async () => {
+    const update = await postLine(meteo.id, lea, 'Une mise à jour')
+    expect((await postReport(max, target('update', update.id))).status).toBe(201)
+    later()
+    await act.decide(zoe, { action: 'dismiss', target: { kind: 'update', id: update.id } })
+
+    await expectError(await postReport(max, target('update', update.id)), 409, 'already_examined')
+    expect((await storedReports()).map((r) => r.status)).toEqual(['dismissed'])
+  })
 })
 
 // Tranche 7c (S3, plan « File et copies ») : une copie d'avant 7b, un texte seul (`text`), compte
 // égale à une copie de 7b si ce texte est celui que 7a aurait copié de la même cible. Cela ne vaut
 // que pour une note ou un commentaire (7a en gardait tout le texte) ; pour un projet ou un profil,
-// 7a ne gardait qu'une partie (titre et pitch, nom et pseudo) : jamais égale.
+// 7a ne gardait qu'une partie (titre et pitch, nom et pseudo) : jamais égale. R7a : les notes sont
+// effacées, il ne reste que le commentaire ; une mise à jour n'a jamais eu de copie de 7a.
 describe('a copy written before slice 7b', () => {
   beforeEach(async () => {
     await act.makeAdmin((await act.me(zoe)).id)
@@ -769,7 +1004,7 @@ describe('a copy written before slice 7b', () => {
 
   /** Un signalement de Max tel que 7a l'écrivait : la copie est un texte seul. */
   const oldReport = async (
-    kind: 'project' | 'note' | 'comment' | 'member',
+    kind: 'project' | 'comment' | 'member',
     id: string,
     text: string,
     status: 'open' | 'dismissed',
@@ -791,15 +1026,12 @@ describe('a copy written before slice 7b', () => {
     })
   }
 
-  it('refuses to report again a comment or a note unchanged since a dismissal of slice 7a', async () => {
+  it('refuses to report again a comment unchanged since a dismissal of slice 7a', async () => {
     const comment = await act.comment(meteo.id, lea, 'Un commentaire')
-    const note = await postNote(meteo.id, lea, 'Une note')
     await oldReport('comment', comment.id, 'Un commentaire', 'dismissed')
-    await oldReport('note', note.id, 'Une note', 'dismissed')
 
     await expectError(await postReport(max, target('comment', comment.id)), 409, 'already_examined')
-    await expectError(await postReport(max, target('note', note.id)), 409, 'already_examined')
-    expect((await storedReports()).map((r) => r.status)).toEqual(['dismissed', 'dismissed'])
+    expect((await storedReports()).map((r) => r.status)).toEqual(['dismissed'])
   })
 
   it('accepts a new report of a comment changed since a dismissal of slice 7a', async () => {
@@ -865,7 +1097,7 @@ describe('reporting a blocked member', () => {
     act.send('GET', `/v1/reports/target?${new URLSearchParams({ kind, id })}`, cookie)
 
   it('answers 404 for a content of a member blocked either way, as for an unknown one', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note de Léa')
+    const update = await postLine(meteo.id, lea, 'Une mise à jour de Léa')
     const zoeProject = await act.publish(zoe, 'Recettes')
     const comment = await act.comment(zoeProject.id, lea, 'Un commentaire de Léa chez Zoé')
 
@@ -873,7 +1105,7 @@ describe('reporting a blocked member', () => {
       await blockNow()
       for (const [kind, id] of [
         ['project', meteo.id],
-        ['note', note.id],
+        ['update', update.id],
         ['comment', comment.id],
       ] as const) {
         await expectSameNotFound(await postReport(max, target(kind, id)), await unknownProject())
@@ -932,5 +1164,111 @@ describe('reporting a blocked member', () => {
     await block(maxId, lea)
 
     expect((await postReport(lea, target('comment', comment.id))).status).toBe(201)
+  })
+})
+
+// ─── R7a : retirer une mise à jour, ses photos avec elle ─────────────────────────────────────────
+
+// Plan R7a, « Modération et données » (le retrait d'une mise à jour retire aussi ses photos, par
+// isVisualVisibleTo) et relecture de sécurité A8. Zoé est l'administratrice ; Max a gardé
+// l'adresse des photos. Une photo retirée doit lui répondre exactement comme un fichier inconnu
+// (statut, type et corps) ; Léa, l'autrice, la voit toujours. Rétablie, elle se montre de nouveau.
+describe('removing an update', () => {
+  beforeEach(async () => {
+    await act.makeAdmin((await act.me(zoe)).id)
+  })
+
+  const open = (path: string, cookie: string) => ctx.request(path, { headers: { cookie } })
+  const timelineIds = async (cookie: string) => {
+    const res = await act.send('GET', `/v1/projects/${meteo.id}/updates`, cookie)
+    expect(res.status).toBe(200)
+    return ProjectUpdatePage.parse(await res.json()).items.map((item) => item.id)
+  }
+
+  it('hides the photos of an update as soon as the moderation removes it, and shows them again once restored', async () => {
+    const before = await pendingPhoto(meteo.id, lea, '#1b2a4a')
+    const after = await pendingPhoto(meteo.id, lea, '#f2c14e')
+    const update = await postUpdate(meteo.id, lea, {
+      lines: [{ family: 'new', text: 'Une publicité déguisée' }],
+      photos: [
+        { id: before.id, description: 'Avant' },
+        { id: after.id, description: 'Après' },
+      ],
+      beforeAfter: true,
+    })
+    const paths = update.photos.map((photo) => new URL(photo.url).pathname)
+    expect(paths).toHaveLength(2)
+    const unknown = `/media/visuals/${UNKNOWN}.webp`
+    // Témoin, avant le retrait : Max voit les photos et la mise à jour.
+    for (const path of paths) expect((await open(path, max)).status, path).toBe(200)
+    expect(await timelineIds(max)).toContain(update.id)
+
+    const target = { kind: 'update', id: update.id } as const
+    later()
+    await act.report(max, target)
+    later()
+    await act.decide(zoe, {
+      action: 'remove',
+      target,
+      ground: 'rules',
+      explanation: 'Une publicité déguisée en mise à jour.',
+    })
+
+    for (const path of paths) {
+      const res = await open(path, max)
+      const reference = await open(unknown, max)
+      expect(res.status, path).toBe(404)
+      expect(res.status, path).toBe(reference.status)
+      expect(res.headers.get('content-type'), path).toBe(reference.headers.get('content-type'))
+      expect(await res.text(), path).toBe(await reference.text())
+      // Léa, l'autrice, voit encore sa mise à jour retirée : ses photos aussi.
+      expect((await open(path, lea)).status, path).toBe(200)
+    }
+    expect(await timelineIds(max)).not.toContain(update.id)
+    expect(await timelineIds(lea)).toContain(update.id)
+
+    later()
+    await act.decide(zoe, { action: 'restore', target })
+
+    for (const path of paths) expect((await open(path, max)).status, path).toBe(200)
+    expect(await timelineIds(max)).toContain(update.id)
+  })
+
+  it('closes the open reports of the update and keeps the decision on it', async () => {
+    const update = await postLine(meteo.id, lea, 'Une mise à jour signalée deux fois')
+    const target = { kind: 'update', id: update.id } as const
+    later()
+    await act.report(max, target)
+    later()
+    await act.report(zoe, target, 'scam_spam')
+    later()
+    // Zoé a signalé elle aussi : une administratrice peut décider de ce qu'elle a signalé (seuls
+    // ses propres contenus lui sont refusés, règle 11).
+    const decision = await act.decide(zoe, {
+      action: 'remove',
+      target,
+      ground: 'rules',
+      explanation: 'Publicité.',
+    })
+
+    expect((await storedReports()).map((r) => [r.status, r.decisionId])).toEqual([
+      ['removed', decision.id],
+      ['removed', decision.id],
+    ])
+    const [decided] = await ctx.db.select().from(schema.moderationDecision)
+    expect(decided).toMatchObject({
+      id: decision.id,
+      targetKind: 'update',
+      targetId: update.id,
+      targetMemberId: leaId,
+    })
+    const [row] = await ctx.db
+      .select({
+        removedAt: schema.projectUpdate.removedAt,
+        removalId: schema.projectUpdate.removalId,
+      })
+      .from(schema.projectUpdate)
+      .where(eq(schema.projectUpdate.id, update.id))
+    expect(row).toEqual({ removedAt: new Date(Date.now()), removalId: decision.id })
   })
 })

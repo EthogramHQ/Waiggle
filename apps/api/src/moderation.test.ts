@@ -23,6 +23,11 @@
 //
 // PGlite n'a qu'une connexion : deux décisions « en même temps » y passent l'une après l'autre. Le
 // test de la règle 12 vérifie donc la seconde décision, pas la course elle-même.
+//
+// Tranche R7a : la mise à jour d'un projet (`update`) remplace la note du Journal, effacée. Un
+// ancien signalement de note, encore en base, est une cible disparue : la file le range « sans
+// objet », une décision sur lui répond comme pour une cible disparue, jamais 500 (relecture de
+// sécurité B1).
 import { randomUUID } from 'node:crypto'
 import {
   CommentPage,
@@ -31,9 +36,11 @@ import {
   MODERATION_PASSWORD_FAILURES_PER_DAY,
   type ModerationDecisionInput,
   ModerationQueuePage,
+  type NewProjectUpdate,
   NotificationPage,
   Project,
-  ProjectNote,
+  ProjectUpdate,
+  ProjectUpdatePage,
   REMOVALS_BEFORE_PASSWORD,
   RemovedPage,
   type ReportTarget,
@@ -42,6 +49,7 @@ import {
 import { schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { jpegImage, visualForm } from './testing/images'
@@ -152,11 +160,61 @@ const readComments = async (projectId: string, cookie: string) => {
   expect(res.status).toBe(200)
   return CommentPage.parse(await res.json())
 }
-const postNote = async (projectId: string, cookie: string, body: string) => {
+/** Le corps complet d'une mise à jour d'une seule ligne, sans titre, version ni photo. */
+const updateBody = (text: string, changes: Partial<NewProjectUpdate> = {}): NewProjectUpdate => ({
+  title: null,
+  version: null,
+  lines: [{ family: 'new', text }],
+  photos: [],
+  beforeAfter: false,
+  ...changes,
+})
+/** Publie une mise à jour (POST /v1/projects/{id}/updates) et la rend. */
+const postUpdate = async (
+  projectId: string,
+  cookie: string,
+  text: string,
+  changes: Partial<NewProjectUpdate> = {},
+) => {
   later()
-  const res = await act.send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
+  const res = await act.send(
+    'POST',
+    `/v1/projects/${projectId}/updates`,
+    cookie,
+    updateBody(text, changes),
+  )
   expect(res.status).toBe(201)
-  return ProjectNote.parse(await res.json())
+  return ProjectUpdate.parse(await res.json())
+}
+const readUpdates = async (projectId: string, cookie: string) => {
+  const res = await act.send('GET', `/v1/projects/${projectId}/updates`, cookie)
+  expect(res.status).toBe(200)
+  return ProjectUpdatePage.parse(await res.json())
+}
+const updateTarget = (id: string): ReportTarget => ({ kind: 'update', id })
+
+/**
+ * Un signalement d'une note du Journal, posé en base comme le laisse la tranche R7a : la table des
+ * notes n'existe plus, la ligne reste (relecture de sécurité B1). Max signale une note de Léa.
+ */
+const oldNoteReport = async (status: 'open' | 'removed' | 'dismissed' = 'open') => {
+  const noteId = randomUUID()
+  later()
+  await ctx.db.insert(schema.contentReport).values({
+    id: randomUUID(),
+    reporterId: maxId,
+    targetKind: 'note',
+    targetId: noteId,
+    projectId: meteo.id,
+    targetAuthorId: leaId,
+    reason: 'other',
+    details: null,
+    snapshot: [{ field: 'body', value: 'Une ancienne note du Journal' }],
+    status,
+    createdAt: new Date(Date.now()),
+    decidedAt: status === 'open' ? null : new Date(Date.now()),
+  })
+  return noteId
 }
 
 const expectError = async (res: Response, status: number, code: string) => {
@@ -255,10 +313,13 @@ describe('the administrator role', () => {
 
 describe('the queue', () => {
   it('groups the reports by target, oldest first, with the reasons counted and the details', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note signalée')
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour signalée', {
+      title: 'Le radar',
+      version: 'v2.0',
+    })
     await report(max, projectTarget(), 'scam_spam', 'Le lien mène à une page de paiement.')
     const first = nowIso()
-    await report(zoe, { kind: 'note', id: note.id }, 'other')
+    await report(zoe, updateTarget(update.id), 'other')
     await report(zoe, projectTarget(), 'scam_spam')
     await report(louis, projectTarget(), 'other', 'Vu aussi.')
     const last = nowIso()
@@ -267,7 +328,7 @@ describe('the queue', () => {
 
     expect(page.items.map((item) => item.target)).toEqual([
       projectTarget(),
-      { kind: 'note', id: note.id },
+      updateTarget(update.id),
     ])
     expect(page.items[0]).toEqual({
       target: projectTarget(),
@@ -295,12 +356,103 @@ describe('the queue', () => {
         canSuspend: true,
       },
     })
+    // R7a : la carte d'une mise à jour, rangée sous son projet, avec son titre, sa version et ses
+    // lignes ; son autrice est celle du projet.
     expect(page.items[1]).toMatchObject({
       projectId: meteo.id,
       count: 1,
-      snapshot: [{ field: 'body', value: 'Une note signalée' }],
+      snapshot: [
+        { field: 'title', value: 'Le radar' },
+        { field: 'version', value: 'v2.0' },
+        { field: 'line', value: 'Une mise à jour signalée' },
+      ],
+      images: [],
+      state: 'present',
+      authorRecord: expect.objectContaining({ memberId: leaId }),
     })
     expect(page.nextCursor).toBeNull()
+  })
+
+  // R7a : la carte d'une mise à jour montre ses photos (encore là, ou parties) comme celle d'un
+  // projet, sans jamais leur clé.
+  it('shows the photos of a reported update as images, never their keys', async () => {
+    later()
+    const sent = await ctx.request(`/v1/projects/${meteo.id}/visuals`, {
+      method: 'POST',
+      headers: { cookie: lea },
+      body: visualForm(await jpegImage(800, 600), 'update'),
+    })
+    expect(sent.status).toBe(201)
+    const photoId = z.object({ id: z.uuid() }).parse(await sent.json()).id
+    const update = await postUpdate(meteo.id, lea, 'Une capture', {
+      photos: [{ id: photoId, description: 'La nouvelle carte' }],
+    })
+    await report(max, updateTarget(update.id))
+
+    const res = await act.send('GET', '/v1/moderation/reports', louis)
+    const text = await res.clone().text()
+    const [item] = ModerationQueuePage.parse(await res.json()).items
+
+    expect(item?.images).toEqual([{ field: 'photo', state: 'present' }])
+    expect(item?.snapshot).toEqual([
+      { field: 'line', value: 'Une capture' },
+      { field: 'photoDescription', value: 'La nouvelle carte' },
+    ])
+    const [media] = await ctx.db
+      .select({ key: schema.projectMedia.storageKey })
+      .from(schema.projectMedia)
+      .where(eq(schema.projectMedia.id, photoId))
+    expect(text).not.toContain(media?.key ?? 'no key')
+  })
+
+  // B1 : la note n'existe plus ; son signalement encore ouvert est une cible disparue, rangée
+  // « sans objet » comme un commentaire supprimé aujourd'hui (la migration 0018 l'a fait pour les
+  // lignes d'alors ; celle-ci est posée après).
+  it('shows an open report on a journal note as void in the queue', async () => {
+    const noteId = await oldNoteReport('open')
+    await report(zoe, projectTarget())
+
+    const page = await readQueue()
+
+    expect(page.items.filter((item) => item.state === 'present').map((i) => i.target)).toEqual([
+      projectTarget(),
+    ])
+    const rows = await reportsInBase()
+    expect(rows.find((r) => r.targetId === noteId)?.status).toBe('void')
+  })
+})
+
+// B1 : une décision sur une note répond comme sur une cible disparue (une mise à jour inconnue),
+// jamais 500, et n'écrit rien.
+describe('a decision on a journal note', () => {
+  it('answers a decision on a journal note like a vanished target, never a 500', async () => {
+    const noteId = await oldNoteReport('open')
+    const gone = await postUpdate(meteo.id, lea, 'Une mise à jour bientôt supprimée')
+    await report(max, updateTarget(gone.id))
+    later()
+    const deleted = await act.send('DELETE', `/v1/projects/${meteo.id}/updates/${gone.id}`, lea)
+    expect(deleted.status).toBe(204)
+
+    const bodies = (target: { kind: string; id: string }) => [
+      { action: 'remove', target, ground: 'rules', explanation: 'Publicité.' },
+      { action: 'restore', target },
+      { action: 'dismiss', target },
+    ]
+    const onNote = bodies({ kind: 'note', id: noteId })
+    const onGone = bodies(updateTarget(gone.id))
+    for (const [i, body] of onNote.entries()) {
+      const res = await decideRaw(louis, body)
+      const reference = await decideRaw(louis, onGone[i])
+      expect(res.status, JSON.stringify(body)).not.toBe(500)
+      await expectSame(res, reference, JSON.stringify(body))
+    }
+    expect(await decisionsInBase()).toEqual([])
+    // Témoin : une décision sur une mise à jour présente est acceptée.
+    const kept = await postUpdate(meteo.id, lea, 'Une mise à jour qui reste')
+    await report(max, updateTarget(kept.id))
+    expect(
+      (await decideRaw(louis, { action: 'dismiss', target: updateTarget(kept.id) })).status,
+    ).toBe(201)
   })
 
   // Règle 14 : la file ne dit jamais qui a signalé.
@@ -471,28 +623,73 @@ describe('removing a project', () => {
   })
 })
 
-describe('removing a note', () => {
+describe('removing an update', () => {
   it('hides it from the others, and shows it to its author with the removal', async () => {
-    // Suivre le projet, pas son autrice : seules les notes des projets suivis arrivent dans le fil
-    // « Abonnements » (tranche 4) ; suivre un membre n'y fait venir que ses nouveaux projets.
+    // Zoé suit le projet : sa dernière mise à jour remonte dans son fil « Abonnements » (R7a).
     expect((await act.send('POST', `/v1/projects/${meteo.id}/follow`, zoe)).status).toBe(204)
-    const kept = await postNote(meteo.id, lea, 'Une note qui reste')
-    const note = await postNote(meteo.id, lea, 'Une note publicitaire')
-    await report(max, { kind: 'note', id: note.id })
-    await remove({ kind: 'note', id: note.id }, 'Publicité.')
+    const kept = await postUpdate(meteo.id, lea, 'Une mise à jour qui reste', { version: 'v1.1' })
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour publicitaire', {
+      version: 'v1.2',
+    })
+    // Témoin, avant le retrait : la plus récente est celle-ci, partout.
+    expect((await readProject(meteo.id, zoe)).latestUpdate?.id).toBe(update.id)
+    await report(max, updateTarget(update.id))
+    await remove(updateTarget(update.id), 'Publicité.')
 
-    expect((await readProject(meteo.id, zoe)).notes.map((n) => n.body)).toEqual([kept.body])
+    // Pour Zoé : la frise, la page du projet (dernière mise à jour, version, nombre) et son fil.
+    expect((await readUpdates(meteo.id, zoe)).items.map((u) => u.id)).toEqual([kept.id])
+    expect(await readProject(meteo.id, zoe)).toMatchObject({
+      latestUpdate: expect.objectContaining({ id: kept.id }),
+      version: 'v1.1',
+      updateCount: 1,
+    })
     const following = await (await act.send('GET', '/v1/feed/following', zoe)).text()
     expect(following).toContain(kept.id)
-    expect(following).not.toContain(note.id)
+    expect(following).not.toContain(update.id)
+    expect(following).not.toContain('Une mise à jour publicitaire')
 
-    const mine = (await readProject(meteo.id, lea)).notes.find((n) => n.id === note.id)
+    // Pour Léa, l'autrice : la mise à jour reste dans sa frise, avec le retrait.
+    const mine = (await readUpdates(meteo.id, lea)).items.find((u) => u.id === update.id)
     expect(mine?.removal).toEqual({
       ground: 'rules',
       explanation: 'Publicité.',
       at: nowIso(),
       afterReport: true,
     })
+    expect((await readUpdates(meteo.id, zoe)).items.every((u) => u.removal === null)).toBe(true)
+  })
+
+  it('shows it again to everyone once restored', async () => {
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour classée à tort')
+    await report(max, updateTarget(update.id))
+    await remove(updateTarget(update.id))
+    expect((await readRemoved()).items.map((item) => item.target)).toEqual([
+      updateTarget(update.id),
+    ])
+    later()
+
+    await act.decide(louis, { action: 'restore', target: updateTarget(update.id) })
+
+    expect((await readUpdates(meteo.id, zoe)).items.map((u) => u.id)).toEqual([update.id])
+    expect((await readUpdates(meteo.id, lea)).items[0]?.removal).toBeNull()
+    expect((await readRemoved()).items).toEqual([])
+  })
+
+  it('tells the author of the project that her update was removed', async () => {
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour publicitaire')
+    await report(max, updateTarget(update.id))
+    await remove(updateTarget(update.id))
+
+    const res = await act.send('GET', '/v1/notifications', lea)
+    expect(res.status).toBe(200)
+    const kinds = NotificationPage.parse(await res.json()).items.map((n) => n.kind)
+    expect(kinds).toContain('removed')
+    // Et Max, qui a signalé, apprend que son signalement est traité.
+    const maxRes = await act.send('GET', '/v1/notifications', max)
+    expect(maxRes.status).toBe(200)
+    expect(NotificationPage.parse(await maxRes.json()).items.map((n) => n.kind)).toContain(
+      'report_handled',
+    )
   })
 })
 
@@ -693,11 +890,13 @@ describe('restoring', () => {
 
 describe('the list of removed contents', () => {
   it('gives each removed content with its text, ground and explanation, newest first', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note publicitaire')
-    await report(max, { kind: 'note', id: note.id })
+    const update = await postUpdate(meteo.id, lea, 'Une ligne publicitaire', {
+      title: 'Une offre',
+    })
+    await report(max, updateTarget(update.id))
     await report(max, projectTarget())
-    await remove({ kind: 'note', id: note.id }, 'Publicité.')
-    const noteAt = nowIso()
+    await remove(updateTarget(update.id), 'Publicité.')
+    const updateAt = nowIso()
     await remove(projectTarget(), 'Arnaque.')
     const projectAt = nowIso()
 
@@ -716,15 +915,17 @@ describe('the list of removed contents', () => {
         concernsMe: false,
       },
       {
-        target: { kind: 'note', id: note.id },
+        target: updateTarget(update.id),
         projectId: meteo.id,
-        text: 'Une note publicitaire',
+        // Le titre et les lignes d'une mise à jour (contrat, RemovedItem.text).
+        text: expect.stringContaining('Une offre'),
         ground: 'rules',
         explanation: 'Publicité.',
-        removedAt: noteAt,
+        removedAt: updateAt,
         concernsMe: false,
       },
     ])
+    expect(page.items[1]?.text).toContain('Une ligne publicitaire')
     expect(text).not.toContain(maxId)
   })
 })
@@ -841,15 +1042,21 @@ describe('who is told', () => {
 
 // ─── Questions des test-writer (23/10/2026), règles 29 et 30 du plan ──────────────────────────────
 
-// Règle 30 : ajouter une note ou une photo à un projet retiré, c'est le modifier.
+// Règle 30 : ajouter une mise à jour (R7a, comme la note d'avant) ou une photo à un projet retiré,
+// c'est le modifier.
 describe('adding to a removed project', () => {
-  it('refuses a new note or a new photo while the project is removed', async () => {
+  it('refuses a new update or a new photo while the project is removed', async () => {
     await report(max, projectTarget())
     await remove(projectTarget())
 
     later()
     await expectError(
-      await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Une note de plus' }),
+      await act.send(
+        'POST',
+        `/v1/projects/${meteo.id}/updates`,
+        lea,
+        updateBody('Une mise à jour de plus'),
+      ),
       409,
       'removed',
     )
@@ -859,7 +1066,7 @@ describe('adding to a removed project', () => {
       body: visualForm(await jpegImage(1200, 800)),
     })
     await expectError(photo, 409, 'removed')
-    expect((await readProject(meteo.id, lea)).notes).toEqual([])
+    expect(await ctx.db.select().from(schema.projectUpdate)).toEqual([])
   })
 })
 
@@ -910,13 +1117,18 @@ describe('a removal that lands between the guard and the write', () => {
     expect([...ctx.storage.files.keys()].filter((key) => key.startsWith('visuals/'))).toEqual([])
   })
 
-  it('does not add a note', async () => {
+  it('does not add an update', async () => {
     const spy = removeBeforeNextTransaction(meteo.id)
     later()
-    const res = await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Une note' })
+    const res = await act.send(
+      'POST',
+      `/v1/projects/${meteo.id}/updates`,
+      lea,
+      updateBody('Une mise à jour'),
+    )
     expect(spy).toHaveBeenCalled()
     await expectError(res, 409, 'removed')
-    expect(await ctx.db.select().from(schema.projectNote)).toEqual([])
+    expect(await ctx.db.select().from(schema.projectUpdate)).toEqual([])
   })
 
   it('does not add a comment: removed for the author of the project, unknown for another', async () => {
@@ -1172,11 +1384,11 @@ describe('one decision at a time on a target', () => {
     expect((await readProject(meteo.id, zoe)).removal).toBeNull()
     expect((await reportsInBase()).map((r) => r.status)).toEqual(['dismissed'])
 
-    const note = await postNote(meteo.id, lea, 'Une note publicitaire')
-    await report(max, { kind: 'note', id: note.id })
-    await remove({ kind: 'note', id: note.id })
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour publicitaire')
+    await report(max, updateTarget(update.id))
+    await remove(updateTarget(update.id))
     await expectError(
-      await decideRaw(louis, { action: 'dismiss', target: { kind: 'note', id: note.id } }),
+      await decideRaw(louis, { action: 'dismiss', target: updateTarget(update.id) }),
       409,
       'already_decided',
     )
@@ -1437,7 +1649,7 @@ describe('the record of the author on a card', () => {
 // sans décaler les nombres ni les dates des cartes voisines, et la file répond toujours.
 describe('a broken row in the queue', () => {
   it('leaves out a report with an invalid target, and counts the others right', async () => {
-    const note = await postNote(meteo.id, lea, 'Une note signalée')
+    const update = await postUpdate(meteo.id, lea, 'Une mise à jour signalée')
     await report(max, projectTarget())
     const first = nowIso()
     // Deux lignes invalides, entre deux signalements valides : un identifiant qui n'est pas un
@@ -1463,14 +1675,14 @@ describe('a broken row in the queue', () => {
     }
     await report(zoe, projectTarget())
     const last = nowIso()
-    await report(zoe, { kind: 'note', id: note.id })
+    await report(zoe, updateTarget(update.id))
     const noteAt = nowIso()
 
     const page = await readQueue()
 
     expect(page.items.map((item) => item.target)).toEqual([
       projectTarget(),
-      { kind: 'note', id: note.id },
+      updateTarget(update.id),
     ])
     expect(page.items[0]).toMatchObject({
       count: 2,
