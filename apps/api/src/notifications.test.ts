@@ -12,6 +12,7 @@
 // d'aujourd'hui : une date écrite par la base elle-même (now() en SQL) au lieu de l'horloge de
 // l'API se verrait tout de suite (les jours et les 90 jours seraient faux). En juin, Paris est à
 // UTC+2 : 21 h 30 UTC, c'est 23 h 30 à Paris.
+import { randomUUID } from 'node:crypto'
 import {
   Comment,
   ErrorResponse,
@@ -20,8 +21,10 @@ import {
   type Notification,
   NotificationPage,
   Project,
+  ProjectUpdate,
   type ReportTarget,
   UnreadCount,
+  type UpdateLine,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, sql } from 'drizzle-orm'
@@ -1028,23 +1031,35 @@ describe('the notifications of the moderation', () => {
       expect(await ofKind(zoe, 'removed')).toEqual([])
     })
 
-    it('gives an excerpt of a removed note or comment', async () => {
+    // R7a : la mise à jour remplace la note ; son extrait est sa première ligne.
+    it('gives an excerpt of a removed update or comment', async () => {
       const meteo = await publish(ines)
       later()
-      const noteRes = await send('POST', `/v1/projects/${meteo.id}/notes`, ines, {
-        body: 'Une note publicitaire',
+      const updateRes = await send('POST', `/v1/projects/${meteo.id}/updates`, ines, {
+        title: 'Une offre',
+        version: null,
+        lines: [
+          { family: 'new', text: 'Une mise à jour publicitaire' },
+          { family: 'fixed', text: 'Une seconde ligne' },
+        ],
+        photos: [],
+        beforeAfter: false,
       })
-      expect(noteRes.status).toBe(201)
-      const note = (await noteRes.json()) as { id: string }
+      expect(updateRes.status).toBe(201)
+      const update = ProjectUpdate.parse(await updateRes.json())
       const published = await comment(meteo.id, malik, 'Un commentaire insultant')
-      await report(zoe, { kind: 'note', id: note.id })
+      await report(zoe, { kind: 'update', id: update.id })
       await report(zoe, { kind: 'comment', id: published.id })
 
-      await remove({ kind: 'note', id: note.id })
+      await remove({ kind: 'update', id: update.id })
       await remove({ kind: 'comment', id: published.id }, 'Insulte.')
 
       expect(await ofKind(ines, 'removed')).toMatchObject([
-        { targetKind: 'note', project: { id: meteo.id }, excerpt: 'Une note publicitaire' },
+        {
+          targetKind: 'update',
+          project: { id: meteo.id },
+          excerpt: 'Une mise à jour publicitaire',
+        },
       ])
       expect(await ofKind(malik, 'removed')).toMatchObject([
         {
@@ -1375,5 +1390,365 @@ describe('the notifications of the moderation', () => {
         { targetKind: 'comment', outcome: 'removed', link: null },
       ])
     })
+  })
+})
+
+// ─── Tranche R7a : les mises à jour des projets suivis ou testés ─────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, « R7a », « Les notifications » ; plan R7a, « Notifications »
+// et sa relecture (sécurité A6 et S1, décisions de la session). Inès publie Météo et ses mises à
+// jour ; Malik suit le projet, Zoé fait partie des testeurs, Sam ni l'un ni l'autre.
+//
+// Les testeurs s'inscrivent par POST /v1/projects/{id}/testers, écrit à part : ici l'inscription et
+// le départ sont posés en base (table project_tester), à l'heure de la fausse horloge. La date y
+// entre en texte ISO : PostgreSQL la lit selon le type de la colonne, sans l'heure locale de la
+// machine. Le retrait d'une mise à jour par la modération est posé en base aussi (removed_at).
+describe('the updates of followed and tested projects (R7a)', () => {
+  let act: ReturnType<typeof activity>
+
+  beforeEach(() => {
+    act = activity(ctx)
+  })
+
+  /** Publie une mise à jour, une seconde après ce qui précède, et la renvoie. */
+  const postUpdate = async (
+    projectId: string,
+    cookie: string,
+    {
+      title = null,
+      version = null,
+      lines = [{ family: 'new', text: 'La neige, quartier par quartier' }],
+    }: { title?: string | null; version?: string | null; lines?: UpdateLine[] } = {},
+  ) => {
+    later()
+    const res = await send('POST', `/v1/projects/${projectId}/updates`, cookie, {
+      title,
+      version,
+      lines,
+      photos: [],
+      beforeAfter: false,
+    })
+    expect(res.status).toBe(201)
+    return ProjectUpdate.parse(await res.json())
+  }
+
+  /** Rejoint les testeurs d'un projet (posé en base, voir plus haut), une seconde plus tard. */
+  const joinTesters = async (projectId: string, memberId: string) => {
+    later()
+    await ctx.db.execute(sql`
+      insert into project_tester (member_id, project_id, created_at)
+      values (${memberId}, ${projectId}, ${new Date().toISOString()})
+      on conflict do nothing`)
+  }
+  /** Quitte les testeurs (posé en base). */
+  const quitTesters = (projectId: string, memberId: string) =>
+    ctx.db.execute(sql`
+      delete from project_tester where member_id = ${memberId} and project_id = ${projectId}`)
+
+  /** La modération retire une mise à jour (posé en base, comme le fait une décision de retrait). */
+  const removeUpdate = (id: string) =>
+    ctx.db.execute(sql`update project_update set removed_at = created_at where id = ${id}`)
+
+  /** Les notifications de mises à jour de ce membre. */
+  const updatesOf = async (cookie: string) =>
+    (await notifications(cookie)).filter((n) => n.kind === 'project_update')
+  /** Leurs clés, dans l'ordre de la liste. */
+  const updateKeys = async (cookie: string) => (await updatesOf(cookie)).map((n) => n.id)
+
+  it('tells a follower of the project about an update, with its title, version and first line', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    const update = await postUpdate(meteo.id, ines, {
+      title: 'La neige',
+      version: 'v1.2',
+      lines: [
+        { family: 'new', text: 'La neige, quartier par quartier' },
+        { family: 'fixed', text: 'Les alertes arrivent à l’heure' },
+      ],
+    })
+
+    expect(await updatesOf(malik)).toEqual([
+      {
+        // Une clé par mise à jour, la même pour qui suit et pour qui teste.
+        id: `project_update:${update.id}`,
+        kind: 'project_update',
+        at: update.createdAt,
+        isNew: true,
+        project: { id: meteo.id, title: 'Météo' },
+        author: { id: inesId, name: 'Inès Morel', avatarUrl: null },
+        update: {
+          id: update.id,
+          title: 'La neige',
+          version: 'v1.2',
+          firstLine: { family: 'new', text: 'La neige, quartier par quartier' },
+        },
+      },
+    ])
+    // Sam ne suit ni ne teste Météo : rien pour lui.
+    expect(await updatesOf(sam)).toEqual([])
+  })
+
+  it('tells a tester about an update too', async () => {
+    const meteo = await publish(ines)
+    await joinTesters(meteo.id, (await me(zoe)).id)
+    const update = await postUpdate(meteo.id, ines)
+
+    expect(await updateKeys(zoe)).toEqual([`project_update:${update.id}`])
+  })
+
+  it('counts one unread notification for a follower who is also a tester', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await joinTesters(meteo.id, malikId)
+    await openScreen(malik) // celle du pseudo est vue
+
+    const update = await postUpdate(meteo.id, ines)
+
+    // Une seule ligne pour la mise à jour, dans la liste comme dans la cloche (le compteur additionne
+    // les lignes des sources sans les regrouper : la source ne doit en donner qu'une).
+    expect(await updateKeys(malik)).toEqual([`project_update:${update.id}`])
+    expect(await unread(malik)).toBe(1)
+  })
+
+  it('never tells in the notification whether I follow or test', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await joinTesters(meteo.id, (await me(zoe)).id)
+    await postUpdate(meteo.id, ines)
+
+    const [followed] = await updatesOf(malik)
+    const [tested] = await updatesOf(zoe)
+
+    expect(Object.keys(followed ?? {}).sort()).toEqual(
+      ['at', 'author', 'id', 'isNew', 'kind', 'project', 'update'].sort(),
+    )
+    // Rien ne distingue l'abonné du testeur : la même notification, au champ près.
+    expect(tested).toEqual(followed)
+  })
+
+  // Décision de la session (sécurité S1) : la source compare à la date de l'abonnement ou de
+  // l'inscription.
+  it('only tells about updates published after the follow or the sign-up as a tester', async () => {
+    const meteo = await publish(ines)
+    await postUpdate(meteo.id, ines, { lines: [{ family: 'new', text: 'Avant les abonnés' }] })
+    await follow('projects', meteo.id, malik)
+    await joinTesters(meteo.id, (await me(zoe)).id)
+
+    const after = await postUpdate(meteo.id, ines, {
+      lines: [{ family: 'fixed', text: 'Après les abonnés' }],
+    })
+
+    for (const [name, cookie] of [
+      ['Malik', malik],
+      ['Zoé', zoe],
+    ] as const) {
+      expect(await updateKeys(cookie), name).toEqual([`project_update:${after.id}`])
+    }
+  })
+
+  it('never notifies the author of the project about her own update', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    // Aucune route ne la fait testeuse de son propre projet : posé en base, pour vérifier que la
+    // source écarte l'auteur elle-même.
+    await joinTesters(meteo.id, inesId)
+
+    const update = await postUpdate(meteo.id, ines)
+
+    expect(await updatesOf(ines)).toEqual([])
+    expect(await updateKeys(malik)).toEqual([`project_update:${update.id}`]) // témoin
+  })
+
+  it('never notifies a tester of a project that became private', async () => {
+    const zoeId = (await me(zoe)).id
+    const meteo = await publish(ines)
+    await joinTesters(meteo.id, zoeId)
+    await openScreen(zoe)
+    await postUpdate(meteo.id, ines)
+    expect(await unread(zoe)).toBe(1) // témoin
+
+    await setVisibility(meteo.id, ines, 'private')
+
+    expect(await updatesOf(zoe)).toEqual([])
+    expect(await unread(zoe)).toBe(0)
+  })
+
+  it('stops notifying a tester once they quit', async () => {
+    const zoeId = (await me(zoe)).id
+    const meteo = await publish(ines)
+    await joinTesters(meteo.id, zoeId)
+    await openScreen(zoe)
+    await postUpdate(meteo.id, ines)
+    expect(await unread(zoe)).toBe(1) // témoin
+
+    await quitTesters(meteo.id, zoeId)
+
+    expect(await updatesOf(zoe)).toEqual([])
+    expect(await unread(zoe)).toBe(0)
+  })
+
+  it('never notifies about a project removed by the moderation', async () => {
+    const samId = (await me(sam)).id
+    await act.makeAdmin(samId)
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await postUpdate(meteo.id, ines)
+    expect(await updatesOf(malik)).toHaveLength(1) // témoin
+
+    later()
+    await act.report(zoe, { kind: 'project', id: meteo.id })
+    later()
+    await act.decide(sam, {
+      action: 'remove',
+      target: { kind: 'project', id: meteo.id },
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+    })
+
+    expect(await updatesOf(malik)).toEqual([])
+  })
+
+  it('never notifies a member blocked in either direction', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await joinTesters(meteo.id, malikId)
+    const followedAt = new Date()
+    const update = await postUpdate(meteo.id, ines)
+    expect(await updateKeys(malik)).toEqual([`project_update:${update.id}`]) // témoin
+
+    // Le blocage efface l'abonnement (et l'inscription de testeur) ; on les remet en base, datés
+    // d'avant la mise à jour, pour vérifier que la source filtre le blocage lui-même : un abonnement
+    // pendant un blocage n'arrive par aucune route.
+    const followAndTestAgain = async () => {
+      await ctx.db
+        .insert(schema.projectFollow)
+        .values({ followerId: malikId, projectId: meteo.id, createdAt: followedAt })
+        .onConflictDoNothing()
+      await ctx.db.execute(sql`
+        insert into project_tester (member_id, project_id, created_at)
+        values (${malikId}, ${meteo.id}, ${followedAt.toISOString()})
+        on conflict do nothing`)
+    }
+
+    later()
+    await act.block(inesId, malik) // Malik bloque Inès
+    await followAndTestAgain()
+    expect(await updatesOf(malik), 'Malik blocked Inès').toEqual([])
+
+    later()
+    await act.unblock(inesId, malik)
+    expect(await updateKeys(malik)).toEqual([`project_update:${update.id}`]) // témoin
+
+    later()
+    await act.block(malikId, ines) // Inès bloque Malik
+    await followAndTestAgain()
+    expect(await updatesOf(malik), 'Inès blocked Malik').toEqual([])
+  })
+
+  it('removes the notification once the update is deleted, or removed by the moderation', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await openScreen(malik)
+    const deleted = await postUpdate(meteo.id, ines, {
+      lines: [{ family: 'new', text: 'Publiée par erreur' }],
+    })
+    const removed = await postUpdate(meteo.id, ines, {
+      lines: [{ family: 'new', text: 'Retirée par la modération' }],
+    })
+    expect(await unread(malik)).toBe(2) // témoin
+
+    later()
+    const res = await send('DELETE', `/v1/projects/${meteo.id}/updates/${deleted.id}`, ines)
+    expect(res.status).toBe(204)
+    expect(await updateKeys(malik)).toEqual([`project_update:${removed.id}`])
+
+    await removeUpdate(removed.id)
+    expect(await updatesOf(malik)).toEqual([])
+    expect(await unread(malik)).toBe(0)
+  })
+
+  // Décision écrite au contrat (relecture de sécurité A6) : calculée à la lecture, une mise à jour
+  // publiée pendant que le projet était privé est notifiée s'il redevient public dans les 90 jours.
+  it('tells about an update written while the project was private, once it is public again', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    await setVisibility(meteo.id, ines, 'private')
+    const meanwhile = await postUpdate(meteo.id, ines)
+    expect(await updatesOf(malik)).toEqual([])
+
+    await setVisibility(meteo.id, ines, 'public')
+
+    expect(await updatesOf(malik)).toMatchObject([
+      { id: `project_update:${meanwhile.id}`, at: meanwhile.createdAt },
+    ])
+  })
+
+  it('shows an update for 90 days, then never again', async () => {
+    const meteo = await publish(ines)
+    await follow('projects', meteo.id, malik)
+    const update = await postUpdate(meteo.id, ines)
+
+    later(89 * DAY)
+    const malikAgain = await signInAgain(malikAccount)
+    expect(await updateKeys(malikAgain)).toEqual([`project_update:${update.id}`]) // témoin
+
+    later(2 * DAY)
+    expect(await updatesOf(malikAgain)).toEqual([])
+  })
+})
+
+// ─── R7a, relecture de sécurité B1 : les anciens signalements de notes ───────────────────────────
+// Les notes du Journal sont effacées avec R7a, mais les signalements qui les visaient restent en
+// base (target_kind = 'note'), en lecture seule. La liste et la cloche de qui a signalé doivent
+// toujours se lire : la notification « signalement traité » garde sa sorte, sans lien (la cible
+// n'existe plus). La ligne est posée en base, comme l'aurait laissée la tranche 7a.
+describe('an old report on a journal note (R7a, security B1)', () => {
+  /** Un signalement de note, traité (« retiré ») à la date donnée, fait par ce membre. */
+  const seedNoteReport = async (reporterId: string, decidedAt: Date) => {
+    const id = randomUUID()
+    await ctx.db.insert(schema.contentReport).values({
+      id,
+      reporterId,
+      targetKind: 'note',
+      targetId: randomUUID(),
+      projectId: randomUUID(),
+      targetAuthorId: null,
+      reason: 'other',
+      details: null,
+      snapshot: [{ field: 'body', value: 'Une note du Journal' }],
+      status: 'removed',
+      createdAt: new Date(decidedAt.getTime() - DAY),
+      decidedAt,
+      decisionId: null,
+    })
+    return id
+  }
+
+  it('still lists the outcome of a report made on a journal note, without a link', async () => {
+    const decidedAt = new Date(Date.now() - DAY) // hier
+    const id = await seedNoteReport(inesId, decidedAt)
+
+    const res = await send('GET', '/v1/notifications', ines)
+    expect(res.status).toBe(200)
+    const items = NotificationPage.parse(await res.json()).items
+
+    expect(items.filter((n) => n.kind === 'report_handled')).toEqual([
+      {
+        id: `report:${id}`,
+        kind: 'report_handled',
+        at: decidedAt.toISOString(),
+        isNew: true,
+        targetKind: 'note',
+        outcome: 'removed',
+        link: null,
+      },
+    ])
+  })
+
+  it('counts an old note report in the bell without failing', async () => {
+    await openScreen(ines) // celle du pseudo est vue
+    later(DAY)
+    await seedNoteReport(inesId, new Date(Date.now() - HOUR))
+
+    expect(await unread(ines)).toBe(1)
   })
 })

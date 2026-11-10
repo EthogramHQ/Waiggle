@@ -9,6 +9,7 @@
 //
 // Quatre membres : Inès (qui reçoit le récap), Malik, Zoé et Sam (qui commentent, répondent,
 // mentionnent, réagissent et suivent). La fausse horloge part d'un lundi fixe, loin d'aujourd'hui.
+import { randomUUID } from 'node:crypto'
 import { appName } from '@ruche/brand'
 import { NotificationPage } from '@ruche/contracts'
 import { schema } from '@ruche/db'
@@ -838,5 +839,241 @@ describe('the recap and blocks', () => {
     expect(recap.text).not.toContain(line('mention', 'Jardin'))
     expect(recap.text).not.toContain('Malik')
     expect(recap.html).not.toContain('Malik')
+  })
+})
+
+// ─── Tranche R7a : « Les projets que tu suis ou que tu testes » ──────────────────────────────────
+// Scénario : docs/scenarios/refonte.md, « R7a », « Les notifications » : le récap du lundi ajoute
+// chaque projet suivi ou testé mis à jour dans la semaine, son nombre de mises à jour et un lien
+// vers sa frise ; jamais le texte d'une mise à jour (relecture de sécurité A9, juridique P4). Les
+// 5 projets et « Et N autres projets » se comptent après le filtre de visibilité, relu à l'envoi.
+//
+// Ici Malik reçoit le récap : il suit des projets d'Inès, et fait partie des testeurs du Jardin de
+// Sam. Les testeurs s'inscrivent par une route écrite à part : l'inscription est posée en base
+// (table project_tester), la date en texte ISO, que PostgreSQL lit selon le type de la colonne.
+describe('the followed or tested projects of the recap (R7a)', () => {
+  let malikId: string
+
+  beforeEach(async () => {
+    malikId = (await act.me(malik)).id
+  })
+
+  const followProject = async (projectId: string, cookie: string) => {
+    later()
+    const res = await act.send('POST', `/v1/projects/${projectId}/follow`, cookie)
+    expect(res.status).toBe(204)
+  }
+
+  const joinTesters = async (projectId: string, memberId: string) => {
+    later()
+    await ctx.db.execute(sql`
+      insert into project_tester (member_id, project_id, created_at)
+      values (${memberId}, ${projectId}, ${new Date().toISOString()})`)
+  }
+
+  /** Publie une mise à jour (une ligne par défaut), une seconde après ce qui précède. */
+  const postUpdate = async (
+    projectId: string,
+    cookie: string,
+    body: { title?: string | null; version?: string | null; lines?: object[] } = {},
+  ) => {
+    later()
+    const res = await act.send('POST', `/v1/projects/${projectId}/updates`, cookie, {
+      title: null,
+      version: null,
+      lines: [{ family: 'new', text: 'Une nouveauté' }],
+      photos: [],
+      beforeAfter: false,
+      ...body,
+    })
+    expect(res.status).toBe(201)
+  }
+
+  /** La ligne d'un projet dans la partie : « « Météo » : 2 mises à jour ». */
+  const updatesLine = (
+    title: string,
+    count: number,
+    t: { recap: { updates_one: string; updates_other: string } } = fr,
+  ) =>
+    fill(count === 1 ? t.recap.updates_one : t.recap.updates_other, {
+      title,
+      count: String(count),
+    })
+  const updatesUrl = (projectId: string) => `${TEST_APP_URL}/projects/${projectId}/updates`
+
+  it('lists the projects I follow or test, with their number of updates and a link', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    const jardin = await act.publish(sam, 'Jardin')
+    await followProject(meteo.id, malik)
+    await joinTesters(jardin.id, malikId)
+    await postUpdate(meteo.id, ines)
+    await postUpdate(meteo.id, ines)
+    await postUpdate(jardin.id, sam)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    for (const part of [recap.text, recap.html]) {
+      expect(part).toContain(fill(fr.recap.updatesTitle))
+      expect(part).toContain(updatesLine('Météo', 2))
+      expect(part).toContain(updatesLine('Jardin', 1))
+    }
+    // Chaque projet mène à sa frise, une adresse fabriquée par le serveur.
+    expect(hrefsOf(recap.html)).toEqual(
+      expect.arrayContaining([updatesUrl(meteo.id), updatesUrl(jardin.id)]),
+    )
+    // Rien d'autre que ce qui est prévu (comme le test R1 plus haut) : la partie, la salutation,
+    // les textes du récap et du pied. C'est son premier récap : il est expliqué.
+    const expected = [
+      fill(fr.recap.intro),
+      fill(fr.recap.first),
+      fill(fr.recap.updatesTitle),
+      updatesLine('Météo', 2),
+      updatesLine('Jardin', 1),
+      fill(fr.recap.button),
+      fill(fr.recap.reason),
+      fr.recap.unsubscribe,
+      fr.manage,
+      fill(fr.footer),
+      fill(fr.greeting, { name: malikAccount.name }),
+      appName,
+    ].sort((a, b) => b.length - a.length)
+    let rest = recap.text.replace(/https?:\/\/\S+/g, ' ')
+    for (const part of expected) rest = rest.replaceAll(part, ' ')
+    expect(rest).toMatch(/^[\s\p{P}\p{S}]*$/u)
+  })
+
+  it('shows five updated projects at most, then « and N more projects »', async () => {
+    const titles = ['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six', 'Sept'].map(
+      (n) => `Projet ${n}`,
+    )
+    const projects = []
+    for (const title of titles) projects.push(await act.publish(ines, title))
+    for (const project of projects) await followProject(project.id, malik)
+    for (const project of projects) await postUpdate(project.id, ines)
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    const shown = titles.filter((title) => recap.text.includes(updatesLine(title, 1)))
+    expect(shown).toHaveLength(5)
+    // Le plus récent en tête de la partie, comme les autres lignes du récap.
+    expect(shown).toContain('Projet Sept')
+    expect(recap.text).toContain(fill(fr.recap.updatesMore_other, { count: '2' }))
+  })
+
+  // Relecture de sécurité du plan, A9.
+  it('never puts the text of an update in the recap', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    await followProject(meteo.id, malik)
+    await postUpdate(meteo.id, ines, {
+      title: 'ZZTITRE',
+      version: 'ZZVER',
+      lines: [{ family: 'new', text: 'ZZLIGNE' }],
+    })
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    expect(recap.text).toContain(updatesLine('Météo', 1)) // témoin : la partie est là
+    for (const part of [recap.subject, recap.text, recap.html]) {
+      for (const secret of ['ZZTITRE', 'ZZVER', 'ZZLIGNE']) {
+        expect(part, secret).not.toContain(secret)
+      }
+    }
+  })
+
+  // Relecture juridique du plan, P4 : la même règle, pour un membre qui lit l'anglais et teste le
+  // projet sans le suivre.
+  it('never puts an update’s title, version or lines in the recap', async () => {
+    await act.updateProfile(malik, { language: 'en' })
+    const jardin = await act.publish(sam, 'Garden')
+    await joinTesters(jardin.id, malikId)
+    await postUpdate(jardin.id, sam, {
+      title: 'Le titre caché',
+      version: 'v9.9.9',
+      lines: [
+        { family: 'new', text: 'Une première ligne cachée' },
+        { family: 'fixed', text: 'Une seconde ligne cachée' },
+      ],
+    })
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    expect(recap.text).toContain(fill(en.recap.updatesTitle))
+    expect(recap.text).toContain(updatesLine('Garden', 1, en))
+    for (const part of [recap.subject, recap.text, recap.html]) {
+      for (const secret of ['titre caché', 'v9.9.9', 'ligne cachée']) {
+        expect(part, secret).not.toContain(secret)
+      }
+    }
+  })
+
+  // Relecture de sécurité du plan, A9 : compté après le filtre, relu à l'envoi.
+  it('leaves out of the recap a project that became private before the sending', async () => {
+    const titles = ['Un', 'Deux', 'Trois', 'Quatre', 'Cinq'].map((n) => `Projet ${n}`)
+    const projects = []
+    for (const title of titles) projects.push(await act.publish(ines, title))
+    const secret = await act.publish(ines, 'Projet secret')
+    for (const project of [...projects, secret]) await followProject(project.id, malik)
+    for (const project of [...projects, secret]) await postUpdate(project.id, ines)
+    later()
+    await act.setVisibility(secret.id, ines, 'private')
+    later(HOUR)
+
+    await runRecap()
+
+    const recap = onlyRecapTo(malikAccount.email)
+    // Les cinq projets visibles, et rien de plus : ni le titre du projet devenu privé, ni
+    // « Et 1 autre projet ».
+    expect(titles.filter((title) => recap.text.includes(updatesLine(title, 1)))).toHaveLength(5)
+    for (const part of [recap.text, recap.html]) {
+      expect(part).not.toContain('Projet secret')
+      expect(part).not.toContain(secret.id)
+      expect(part).not.toContain(fill(fr.recap.updatesMore_one, { count: '1' }))
+    }
+  })
+})
+
+// ─── R7a, relecture de sécurité B1 : un ancien signalement de note ───────────────────────────────
+// Les notes du Journal sont effacées avec R7a, mais leurs signalements restent en base
+// (target_kind = 'note'), en lecture seule. Le récap lit les notifications du membre : un tel
+// signalement ne doit pas faire échouer le sien. La ligne est posée en base, comme l'aurait
+// laissée la tranche 7a.
+describe('an old report on a journal note (R7a, security B1)', () => {
+  it('sends the weekly recap of a member who once reported a journal note', async () => {
+    const meteo = await act.publish(ines, 'Météo')
+    later()
+    await act.comment(meteo.id, malik, 'Super idée.')
+    await ctx.db.insert(schema.contentReport).values({
+      id: randomUUID(),
+      reporterId: inesId,
+      targetKind: 'note',
+      targetId: randomUUID(),
+      projectId: randomUUID(),
+      targetAuthorId: null,
+      reason: 'other',
+      details: null,
+      snapshot: [{ field: 'body', value: 'Une note du Journal' }],
+      status: 'removed',
+      createdAt: new Date(Date.now() - 2 * DAY),
+      decidedAt: new Date(Date.now() - DAY), // hier
+      decisionId: null,
+    })
+    later(HOUR)
+    const logs = spyOnLogs()
+
+    await runRecap()
+
+    // Son récap part (le commentaire de Malik), et aucune erreur n'est notée.
+    expect(onlyRecapTo(inesAccount.email).text).toContain(line('comment', 'Météo'))
+    const [, , warn, error] = logs
+    expect(error?.mock.calls).toEqual([])
+    expect(warn?.mock.calls).toEqual([])
   })
 })
