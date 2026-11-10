@@ -15,16 +15,24 @@
 // - pour tout autre qu'un administrateur en fonction et non suspendu, la même réponse qu'une
 //   adresse qui n'existe pas (S16) ;
 // - la durée et l'origine se lisent sur la décision elle-même (S20) ;
+// - R7a : la mise à jour (`update`) remplace la note ; une décision d'avant sur une note reste
+//   lisible, sans lien, et la purge de nuit la traverse sans erreur (relecture de sécurité B1) ;
 // - la migration remplit `target_member_id` des décisions d'avant 7c (S13).
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DecisionHistoryPage, ErrorResponse, type ReportTarget } from '@ruche/contracts'
+import {
+  DecisionHistoryPage,
+  ErrorResponse,
+  ProjectUpdate,
+  type ReportTarget,
+} from '@ruche/contracts'
 import { defaultMigrationsFolder, schema } from '@ruche/db'
 import { createTestPgliteDb } from '@ruche/db/pglite'
 import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { purgeModeration } from './reports/retention'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 
@@ -43,6 +51,7 @@ let louisHandle: string
 let meteo: { id: string } // le projet public de Léa
 
 const SECOND = 1000
+const DAY = 24 * 60 * 60 * SECOND
 const START = new Date('2026-06-15T08:00:00.000Z')
 const LOUIS_PASSWORD = 'louis-long-password'
 const EXPLANATION = 'Des messages insultants, plusieurs fois.'
@@ -111,6 +120,23 @@ const decide = async (cookie: string, body: unknown) => {
   return res
 }
 
+/**
+ * Léa publie une mise à jour d'une ligne sur « Météo » (POST /v1/projects/{id}/updates, corps
+ * complet) ; rend son identifiant. R7a : la mise à jour remplace la note du Journal.
+ */
+const postUpdate = async (text: string) => {
+  later()
+  const res = await act.send('POST', `/v1/projects/${meteo.id}/updates`, lea, {
+    title: null,
+    version: null,
+    lines: [{ family: 'new', text }],
+    photos: [],
+    beforeAfter: false,
+  })
+  expect(res.status).toBe(201)
+  return ProjectUpdate.parse(await res.json()).id
+}
+
 const suspendBody = (memberId: string, extra: object = {}) => ({
   action: 'suspend',
   memberId,
@@ -139,11 +165,9 @@ describe('the history of decisions', () => {
     const removedAt = nowIso()
     await decide(louis, { action: 'restore', target: projectTarget() })
     const restoredAt = nowIso()
-    later()
-    const note = await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Une note' })
-    const noteId = z.object({ id: z.uuid() }).parse(await note.json()).id
-    await report({ kind: 'note', id: noteId })
-    await decide(louis, { action: 'dismiss', target: { kind: 'note', id: noteId } })
+    const updateId = await postUpdate('Une mise à jour')
+    await report({ kind: 'update', id: updateId })
+    await decide(louis, { action: 'dismiss', target: { kind: 'update', id: updateId } })
     const dismissedAt = nowIso()
     // La suspension part du signalement du profil de Léa (J2 : « après un signalement »).
     await report({ kind: 'member', id: leaId })
@@ -195,7 +219,8 @@ describe('the history of decisions', () => {
         action: 'dismiss',
         at: dismissedAt,
         admin,
-        target: { kind: 'note', id: noteId },
+        // R7a : une mise à jour, rangée sous son projet ; le membre visé est l'auteur du projet.
+        target: { kind: 'update', id: updateId },
         projectId: meteo.id,
         member,
         ...none,
@@ -316,31 +341,114 @@ describe('the history of decisions', () => {
   })
 
   it('keeps the line of a content deleted since, without its link, and of a member gone', async () => {
-    later()
-    const created = await act.send('POST', `/v1/projects/${meteo.id}/notes`, lea, { body: 'Note' })
-    const noteId = z.object({ id: z.uuid() }).parse(await created.json()).id
-    await report({ kind: 'note', id: noteId })
-    await decide(louis, { action: 'dismiss', target: { kind: 'note', id: noteId } })
+    const updateId = await postUpdate('Une mise à jour')
+    await report({ kind: 'update', id: updateId })
+    await decide(louis, { action: 'dismiss', target: { kind: 'update', id: updateId } })
     await report({ kind: 'member', id: zoeId })
     await decide(louis, { action: 'dismiss', target: { kind: 'member', id: zoeId } })
     later()
-    expect((await act.send('DELETE', `/v1/projects/${meteo.id}/notes/${noteId}`, lea)).status).toBe(
-      204,
-    )
+    const deleted = await act.send('DELETE', `/v1/projects/${meteo.id}/updates/${updateId}`, lea)
+    expect(deleted.status).toBe(204)
     await act.deleteAccount(zoe, 'zoe-long-pw-1')
 
-    const [zoeLine, noteLine] = (await readHistory()).items
+    const [zoeLine, updateLine] = (await readHistory()).items
 
     expect(zoeLine).toMatchObject({
       target: { kind: 'member', id: zoeId },
       projectId: null,
       member: null,
     })
-    expect(noteLine).toMatchObject({
-      target: { kind: 'note', id: noteId },
+    expect(updateLine).toMatchObject({
+      target: { kind: 'update', id: updateId },
       projectId: null,
       member: { id: leaId, name: 'Léa' },
     })
+  })
+
+  // Relecture de sécurité B1 (R7a) : une décision prise sur une note, avant l'effacement du Journal.
+  // La note n'existe plus : la ligne reste, sans lien (projectId null), avec le membre visé, son
+  // fondement et son explication ; le filtre sur ce membre la trouve aussi.
+  it('keeps the history of a decision taken on a journal note', async () => {
+    const noteId = randomUUID()
+    const decisionId = randomUUID()
+    later()
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: decisionId,
+      targetKind: 'note',
+      targetId: noteId,
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Une note publicitaire.',
+      adminId: louisId,
+      targetMemberId: leaId,
+      createdAt: new Date(Date.now()),
+    })
+
+    const res = await act.send('GET', '/v1/moderation/decisions', louis)
+    expect(res.status).toBe(200)
+    const page = DecisionHistoryPage.parse(await res.json())
+
+    expect(page.items).toEqual([
+      {
+        id: decisionId,
+        action: 'remove',
+        at: nowIso(),
+        admin: { id: louisId, name: 'Louis', handle: louisHandle },
+        target: { kind: 'note', id: noteId },
+        projectId: null,
+        member: { id: leaId, name: 'Léa', handle: leaHandle },
+        ground: 'rules',
+        explanation: 'Une note publicitaire.',
+        duration: null,
+        liftCause: null,
+        afterReport: false,
+      },
+    ])
+    expect((await readHistory({ member: leaId })).items.map((item) => item.id)).toEqual([
+      decisionId,
+    ])
+  })
+
+  // B1 : la purge de nuit (reports/retention.ts) lit les décisions et les signalements de toutes
+  // les sortes. Ceux d'une note la traversent sans erreur : le signalement sans objet part 30 jours
+  // après, la décision un an après (la note ne la cite plus comme son retrait).
+  it('purges the old reports and decisions of a journal note without failing', async () => {
+    const noteId = randomUUID()
+    const base = { targetKind: 'note', targetId: noteId }
+    await ctx.db.insert(schema.moderationDecision).values({
+      id: randomUUID(),
+      ...base,
+      action: 'remove',
+      ground: 'rules',
+      explanation: 'Une note publicitaire.',
+      adminId: louisId,
+      targetMemberId: leaId,
+      createdAt: new Date(Date.now()),
+    })
+    for (const status of ['open', 'removed'] as const) {
+      await ctx.db.insert(schema.contentReport).values({
+        id: randomUUID(),
+        reporterId: maxId,
+        ...base,
+        projectId: meteo.id,
+        targetAuthorId: leaId,
+        reason: 'other',
+        details: null,
+        snapshot: [{ field: 'body', value: 'Une ancienne note' }],
+        status,
+        createdAt: new Date(Date.now()),
+        decidedAt: status === 'open' ? null : new Date(Date.now()),
+      })
+    }
+
+    // Le soir même : le signalement ouvert devient « sans objet » (cible disparue), rien ne part.
+    const tonight = await purgeModeration(ctx.db, new Date(Date.now() + 60 * SECOND))
+    expect(tonight).toMatchObject({ voidedReports: 1, voidReports: 0, decisions: 0 })
+    // Un an et un jour plus tard : tout est parti.
+    const nextYear = await purgeModeration(ctx.db, new Date(Date.now() + 366 * DAY))
+    expect(nextYear).toMatchObject({ voidReports: 1, closedReports: 1, decisions: 1 })
+    expect(await ctx.db.select().from(schema.contentReport)).toEqual([])
+    expect(await ctx.db.select().from(schema.moderationDecision)).toEqual([])
   })
 
   it('never says who reported', async () => {
