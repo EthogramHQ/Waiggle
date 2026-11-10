@@ -233,7 +233,8 @@ describe('updates in the « following » feed on the home screen (R7a)', () => {
     mockFollowing({ items: [rocketOfLea] })
     await renderMemberHome()
 
-    expect(screen.getByText(/Un compte à rebours avant chaque question/, HIDDEN_TOO)).toBeTruthy()
+    // `^` : la description cachée du lien reprend la même ligne après « Nouveau : ».
+    expect(screen.getByText(/^Un compte à rebours avant chaque question/, HIDDEN_TOO)).toBeTruthy()
     expect(screen.getByText('et 2 autres changements', HIDDEN_TOO)).toBeTruthy()
     expect(screen.queryByText(recipesProject.pitch)).toBeNull()
   })
