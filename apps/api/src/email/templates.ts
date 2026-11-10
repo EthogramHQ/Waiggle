@@ -59,8 +59,18 @@ type Link = {
   textLabel?: string
 }
 
-/** Un élément d'une liste : une ligne, et éventuellement un extrait en dessous. */
-type Item = { line: string; excerpt?: string }
+/**
+ * Un élément d'une liste : une ligne, et éventuellement un extrait en dessous, ou un lien (R7a :
+ * la ligne d'un projet mène à ses mises à jour). L'adresse est toujours fabriquée par le serveur,
+ * jamais lue d'un champ écrit par un membre.
+ */
+type Item = { line: string; excerpt?: string; url?: string }
+
+/**
+ * Une partie de plus, avec son titre, sa liste et ses paragraphes (R7a : « Les projets que tu suis
+ * ou que tu testes » du récap), sous la liste principale et avant le bouton.
+ */
+type Section = { title: string; items: Item[]; after: Paragraph[] }
 
 /** Un morceau de paragraphe : du texte, en gras s'il faut le retenir (l'adresse de contact). */
 type Run = { text: string; bold?: boolean }
@@ -124,6 +134,8 @@ type Layout = {
   items?: Item[]
   /** Des paragraphes après la liste (« Et 2 autres », les nombres). */
   after?: Paragraph[]
+  /** D'autres parties, chacune avec son titre (R7a), après ces paragraphes. */
+  sections?: Section[]
   /** Le bouton ; absent d'un e-mail qui ne demande aucun geste (l'adresse changée, jur-R6). */
   button?: Link
   /**
@@ -162,6 +174,7 @@ const render = ({
   highlight,
   items = [],
   after = [],
+  sections = [],
   button,
   moreButtons = [],
   closing = [],
@@ -172,10 +185,21 @@ const render = ({
 }: Layout) => {
   const buttons = [...(button ? [button] : []), ...moreButtons]
   // Le texte brut : chaque lien écrit en entier sous son libellé, pour les messageries sans HTML ;
-  // un extrait en citation (« > », l'usage des e-mails), sous sa ligne.
-  const textItems = items.flatMap(({ line, excerpt }) =>
-    excerpt === undefined ? [`• ${line}`] : [`• ${line}`, `  > ${excerpt}`],
-  )
+  // un extrait en citation (« > », l'usage des e-mails), sous sa ligne ; l'adresse d'un élément
+  // lien en dessous, en retrait.
+  const textList = (list: Item[]) =>
+    list.flatMap(({ line, excerpt, url }) => [
+      `• ${line}`,
+      ...(excerpt === undefined ? [] : [`  > ${excerpt}`]),
+      ...(url === undefined ? [] : [`  ${url}`]),
+    ])
+  const textItems = textList(items)
+  const textSections = sections.flatMap((section) => [
+    section.title,
+    '',
+    ...(section.items.length > 0 ? [...textList(section.items), ''] : []),
+    ...section.after.flatMap((p) => [plain(p), '']),
+  ])
   // Le titre (heading) n'y est pas : il sert la hiérarchie visuelle du HTML, et l'objet de l'e-mail
   // dit déjà la même chose en tête du texte brut.
   const text = [
@@ -185,6 +209,7 @@ const render = ({
     ...(highlight === undefined ? [] : [highlight, '']),
     ...(textItems.length > 0 ? [...textItems, ''] : []),
     ...after.flatMap((p) => [plain(p), '']),
+    ...textSections,
     ...buttons.flatMap((link) => [link.textLabel ?? link.label, link.url, '']),
     ...closing.flatMap((p) => [plain(p), '']),
     ...notes.flatMap((note) => [note, '']),
@@ -205,19 +230,40 @@ const render = ({
     highlight === undefined
       ? ''
       : p(highlight, `${body};font-weight:bold;word-break:break-all;overflow-wrap:anywhere`)
-  const htmlItems =
-    items.length === 0
+  // Une ligne lien (R7a) : tout le texte de la ligne est le lien, souligné et de la couleur du
+  // texte (le couple texte / fond déjà vérifié), pour qu'on le touche sans viser un petit mot.
+  // L'adresse comme le texte sont échappés : un titre écrit par un membre reste du texte.
+  const htmlLine = (line: string, url: string | undefined) =>
+    url === undefined
+      ? escapeHtml(line)
+      : `<a href="${escapeHtml(url)}" style="color:${c.text};text-decoration:underline">${escapeHtml(line)}</a>`
+  const htmlList = (list: Item[]) =>
+    list.length === 0
       ? ''
-      : `<ul style="padding-left:20px;margin:16px 0">${items
+      : `<ul style="padding-left:20px;margin:16px 0">${list
           .map(
-            ({ line, excerpt }) =>
-              `<li style="font-size:16px;line-height:1.5;margin:0 0 10px">${escapeHtml(line)}${
+            ({ line, excerpt, url }) =>
+              // Un titre de projet d'un seul mot de 80 lettres se coupe n'importe où plutôt que de
+              // faire défiler l'e-mail à l'horizontale (adresse-E1, comme les paragraphes libres).
+              `<li style="font-size:16px;line-height:1.5;margin:0 0 10px;overflow-wrap:anywhere;word-break:break-word">${htmlLine(line, url)}${
                 excerpt === undefined
                   ? ''
                   : `<br><span style="display:inline-block;margin-top:4px;padding-left:10px;border-left:3px solid ${c.groupBorder};color:${c.textMuted}">${escapeHtml(excerpt)}</span>`
               }</li>`,
           )
           .join('')}</ul>`
+  const htmlItems = htmlList(items)
+  // Le titre d'une partie : en gras, au corps du texte, avec de l'air au-dessus pour la séparer de
+  // ce qui précède.
+  const htmlSections = sections
+    .map((section) =>
+      [
+        p(section.title, `${body};font-weight:bold;margin:24px 0 0`),
+        htmlList(section.items),
+        ...section.after.map((value) => p(value)),
+      ].join('\n    '),
+    )
+    .join('\n    ')
   const muted = `font-size:13px;color:${c.textMuted}`
   const small = `text-align:center;font-size:13px;line-height:1.5;color:${c.textMuted}`
   // Le haut de l'e-mail (relecture de design, 6c) : le nom de l'appli, en texte (aucune image), puis
@@ -273,6 +319,7 @@ const render = ({
     ${htmlHighlight}
     ${htmlItems}
     ${after.map((value) => p(value)).join('\n    ')}
+    ${htmlSections}
     ${htmlButton}
     ${closing.map((value) => p(value)).join('\n    ')}
     ${notes.map((note) => p(note, muted)).join('\n    ')}
@@ -568,6 +615,15 @@ export type RecapData = {
   first: boolean
   /** Le 3e récap de suite sans visite : on dit que c'est le dernier pour l'instant (R4). */
   last: boolean
+  /**
+   * R7a, « Les projets que tu suis ou que tu testes » : 5 projets au plus, le plus récemment mis à
+   * jour en tête ; leur titre, leur nombre de mises à jour de la semaine, et le lien vers leur
+   * frise, fabriqué par la tâche (jamais lu d'un champ de membre). Jamais le titre, la version ni
+   * les lignes d'une mise à jour (relecture de sécurité A9, juridique P4).
+   */
+  updates: { title: string; count: number; url: string }[]
+  /** Combien d'autres projets mis à jour ne sont pas montrés (« Et 2 autres projets »). */
+  updatesMore: number
   links: NotificationLinks
 }
 
@@ -613,6 +669,33 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
             ]
           : []),
       ],
+      // R7a : la partie des projets suivis ou testés, seulement s'il y en a un. Le titre du projet
+      // passe par le même filtre que les lignes (defangLinks), puis par l'échappement de render.
+      sections:
+        data.updates.length === 0
+          ? []
+          : [
+              {
+                title: fill(t.recap.updatesTitle),
+                items: data.updates.map((update) => ({
+                  line: fill(update.count === 1 ? t.recap.updates_one : t.recap.updates_other, {
+                    title: defangLinks(update.title, link),
+                    count: String(update.count),
+                  }),
+                  url: update.url,
+                })),
+                after:
+                  data.updatesMore > 0
+                    ? [
+                        counted(
+                          t.recap.updatesMore_one,
+                          t.recap.updatesMore_other,
+                          data.updatesMore,
+                        ),
+                      ]
+                    : [],
+              },
+            ],
       button: { label: fill(t.recap.button), url: data.links.button },
       notes: [],
       reason: fill(t.recap.reason),
