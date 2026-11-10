@@ -6,7 +6,11 @@
 // total des réactions s'affiche (« ✦ 49 »).
 // R6a : la catégorie principale du projet, en étiquette sur la carte (fil, Explorer, page d'un
 // membre, d'une étiquette) ; et la carte que vise la danse de publication (`PublishTarget`).
-import type { ProjectSummary } from '@ruche/contracts'
+// R7a : la dernière mise à jour du projet (`updated` de ProjectCard). Dans « Abonnements », un
+// projet remonté par sa mise à jour (la prop `update`, posée par la liste du fil) montre la carte
+// entière : « Mis à jour · v1.2 », sa première ligne, « et 2 autres changements » et sa date.
+// Ailleurs, une mise à jour de moins de `UPDATED_BADGE_DAYS` jours pose le repère seul.
+import { type ProjectSummary, UPDATED_BADGE_DAYS, type UpdateSummary } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,8 +19,46 @@ import { useOpenDemo } from '../navigation/links'
 import { type Measurable, useCoverSource } from '../ui/coverTransition'
 import { ProjectCard } from '../ui/ProjectCard'
 import { RelativeTime } from '../ui/RelativeTime'
+import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useCategory } from './useCategory'
+
+/** Une journée, en millisecondes. */
+const DAY_MS = 24 * 60 * 60 * 1000
+
+type CardUpdate = ComponentProps<typeof ProjectCard>['updated']
+
+/**
+ * Hook : ce que la carte montre de la dernière mise à jour. Avec `update` (l'élément du fil qui a
+ * fait remonter le projet), la carte entière ; sinon, le repère seul si `latestUpdate` a moins de
+ * `UPDATED_BADGE_DAYS` jours ; rien au-delà, ni pour un projet jamais mis à jour.
+ */
+const useUpdated = (project: ProjectSummary, update: UpdateSummary | undefined): CardUpdate => {
+  const { t } = useTranslation()
+  // Le repère compte depuis maintenant : sur le web, la page est pré-rendue sans connaître l'heure
+  // du visiteur ; on attend l'hydratation pour lire l'horloge (sinon React verrait un écart).
+  const hydrated = useHydrated()
+  /** « Mis à jour · v1.2 », ou « Mis à jour » seul pour une mise à jour sans version. */
+  const labelOf = (version: string | null) =>
+    version ? t(($) => $.feed.updated, { version }) : t(($) => $.feed.updatedPlain)
+  if (update) {
+    // « et 2 autres changements » : les lignes après la première ; rien pour une seule ligne.
+    const others = update.lineCount - 1
+    return {
+      kind: 'full',
+      label: labelOf(update.version),
+      line: update.firstLine,
+      more: others > 0 ? t(($) => $.feed.moreChanges, { count: others }) : null,
+      at: update.at,
+    }
+  }
+  const latest = project.latestUpdate
+  if (!latest || !hydrated) return undefined
+  const age = Date.now() - new Date(latest.at).getTime()
+  return age < UPDATED_BADGE_DAYS * DAY_MS
+    ? { kind: 'badge', label: labelOf(latest.version) }
+    : undefined
+}
 
 /**
  * La carte que vise la danse de publication (R6a) : le projet tout juste publié, et la fonction qui
@@ -41,9 +83,14 @@ type Props = {
    * ProjectCard : src/projects n'importe rien de react-native (règle de Biome, R5a ui-2).
    */
   coverRef?: ComponentProps<typeof ProjectCard>['coverRef']
+  /**
+   * R7a : la mise à jour qui a fait remonter le projet dans « Abonnements » (l'`update` de
+   * l'élément du fil, posée par feed/FeedList.tsx) ; absente ailleurs.
+   */
+  update?: UpdateSummary
 }
 
-export function SummaryCard({ project, at = project.createdAt, overlay, coverRef }: Props) {
+export function SummaryCard({ project, at = project.createdAt, overlay, coverRef, update }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const openDemo = useOpenDemo()
@@ -71,6 +118,7 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
   // La catégorie principale, nommée par l'API (R6b) ; aucune étiquette pour un projet d'avant R6a,
   // pendant le chargement ou la panne des catégories, ni pour un code inconnu : jamais le code brut.
   const category = useCategory(project.primaryCategory)
+  const updated = useUpdated(project, update)
   return (
     <ProjectCard
       title={project.title}
@@ -109,6 +157,7 @@ export function SummaryCard({ project, at = project.createdAt, overlay, coverRef
       }
       overlay={overlay}
       coverRef={coverRef ?? ownCoverRef}
+      updated={updated}
     />
   )
 }
