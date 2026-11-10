@@ -95,6 +95,7 @@ import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
 import { UpdateFamiliesCatalogue } from './mises-a-jour'
+import { UpdateEntryCatalogue } from './mises-a-jour-frise'
 import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
@@ -911,6 +912,8 @@ export function CatalogueScreen() {
       <BeforeAfterCatalogue />
       {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}
       <UpdateLinesCatalogue />
+      {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
+      <UpdateEntryCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
       <FluidTopBarCatalogue />
