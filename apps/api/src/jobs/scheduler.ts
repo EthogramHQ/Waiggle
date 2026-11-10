@@ -92,7 +92,11 @@ const tasks: Task[] = [
     expireInSeconds: 60 * 60,
     missed: 'once',
     sendsEmails: false,
-    run: (deps, now) => nightlyPurge(deps.db, now),
+    run: (deps, now) => {
+      // La purge efface aussi des fichiers : sans stockage, elle ne doit pas partir à moitié.
+      if (!deps.storage) throw new Error('The nightly purge needs the file storage')
+      return nightlyPurge(deps.db, now, deps.storage)
+    },
   },
 ]
 

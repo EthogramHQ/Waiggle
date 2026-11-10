@@ -62,7 +62,8 @@ export const reachableBy = (viewerId: string, memberId: string) =>
  * 2. Inès est-elle là pour lui ? relu sous le verrou : un blocage posé par Inès juste avant est vu ;
  * 3. la ligne du blocage, « on conflict do nothing » : bloquer deux fois ne change rien ;
  * 4. les abonnements retirés dans les deux sens : Malik ne suit plus Inès ni ses projets, Inès ne
- *    suit plus Malik ni ses projets. Ils ne reviennent pas au déblocage (scénario).
+ *    suit plus Malik ni ses projets. Ils ne reviennent pas au déblocage (scénario) ;
+ * 5. de même, les inscriptions de testeur de l'un sur les projets de l'autre (R7a).
  *
  * La date vient de l'horloge de JavaScript (`now`) : elle range la liste « Membres bloqués », et
  * les tests la maîtrisent ainsi.
@@ -109,6 +110,19 @@ export const blockMember = (
         or(
           and(eq(pf.followerId, blockerId), inArray(pf.projectId, projectsOf(blockedId))),
           and(eq(pf.followerId, blockedId), inArray(pf.projectId, projectsOf(blockerId))),
+        ),
+      )
+    // Les inscriptions de testeur sur les projets de l'autre, dans les deux sens (R7a, sécurité B2) :
+    // même forme que les abonnements aux projets, et elles ne reviennent pas au déblocage. Sans cela,
+    // un testeur bloqué continuerait d'être prévenu des mises à jour de l'auteur. La clé primaire
+    // (member_id, project_id) trouve les inscriptions de chacun.
+    const pt = schema.projectTester
+    await tx
+      .delete(pt)
+      .where(
+        or(
+          and(eq(pt.memberId, blockerId), inArray(pt.projectId, projectsOf(blockedId))),
+          and(eq(pt.memberId, blockedId), inArray(pt.projectId, projectsOf(blockerId))),
         ),
       )
     return true

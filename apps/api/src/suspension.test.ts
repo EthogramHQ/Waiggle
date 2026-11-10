@@ -935,12 +935,12 @@ describe('leaving during a suspension', () => {
     // La purge note ses nombres dans les journaux : on les tait le temps du test.
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     try {
-      await nightlyPurge(ctx.db, new Date(purgedAt))
+      await nightlyPurge(ctx.db, new Date(purgedAt), ctx.storage)
 
       expect(await suspensionRows()).toEqual([
         { user_id: null, ended: purgedAt, lift_decision_id: null },
       ])
-      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY))
+      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY), ctx.storage)
       expect(await suspensionRows()).toEqual([])
     } finally {
       log.mockRestore()
