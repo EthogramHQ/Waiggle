@@ -159,7 +159,9 @@ export function UpdateLineField({
         <TextField
           compact
           multiline
-          maxLines={4}
+          // De quoi lire 120 caractères en entier sur un téléphone ; à texte très agrandi, le
+          // texte défile au-delà.
+          maxLines={8}
           label={t(($) => $.project.updates.lineLabel, {
             number,
             total,
