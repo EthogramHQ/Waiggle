@@ -657,29 +657,6 @@ export const fr = {
       portraitLabel: 'Couverture verticale',
       preparing: 'Préparation de la photo…',
     },
-    notes: {
-      title: 'Journal',
-      empty: 'Pas encore de note.',
-      add: 'Publier une note',
-      field: 'Ta note',
-      hint: 'Ce qui a changé, ce que tu prépares, ce que tu cherches. Tes abonnés la verront dans leur fil.',
-      hintPrivate:
-        'Ce projet est privé : aucun autre membre ne voit ses notes. S’il redevient visible des membres, tous les membres les verront.',
-      submit: 'Publier la note',
-      required: 'Écris ta note avant de la publier.',
-      hintAnnounce:
-        'Ton projet est passé en « {{status}} » : annonce-le à tes abonnés, ou touche Annuler.',
-      limited: 'Tu as publié 30 notes aujourd’hui. La suivante pourra partir demain.',
-      published: 'Note publiée.',
-      deleted: 'Note supprimée.',
-      error: 'La note n’a pas pu être publiée. Réessaie.',
-      delete: 'Supprimer la note',
-      deleteTitle: 'Supprimer cette note ?',
-      deleteBody: 'Elle disparaîtra du journal et des fils de tes abonnés.',
-      confirmDelete: 'Supprimer',
-      deleteError: 'La note n’a pas pu être supprimée. Réessaie.',
-      statusPrefill: 'Le projet passe en « {{status}} ».',
-    },
     // R7a : les mises à jour, qui remplacent le Journal (scénario, « Publier une mise à jour »).
     updates: {
       title: 'Les mises à jour',
@@ -706,7 +683,6 @@ export const fr = {
       counterLabel_one: '{{count}} ligne sur {{max}}',
       counterLabel_other: '{{count}} lignes sur {{max}}',
       addLine: 'Ajouter une ligne',
-      removeLine: 'Retirer cette ligne',
       removeLineLabel: 'Retirer la ligne {{number}}',
       lineLabel: 'Changement {{number}} sur {{total}}, {{family}}',
       familyButton: 'Famille : {{family}}',
@@ -747,8 +723,6 @@ export const fr = {
       // « Abandonner » efface aussi les photos déjà envoyées (sécurité A11).
       discardTitle: 'Abandonner cette mise à jour ?',
       discardBody: 'Ce que tu as écrit et les photos ajoutées seront perdus.',
-      keepEditing: 'Continuer',
-      discard: 'Abandonner',
       // Une mise à jour : sans titre, sa version ; sans version non plus, ce mot.
       untitled: 'Mise à jour',
       photosLabel: 'Photos de la mise à jour',
@@ -769,7 +743,6 @@ export const fr = {
       more: 'Afficher la suite',
       moreError: 'La suite des mises à jour n’a pas pu se charger.',
       loadError: 'Les mises à jour n’ont pas pu se charger.',
-      loading: 'Chargement des mises à jour…',
       // L'avant / après (F-Pr7) : un curseur pour les lecteurs d'écran, sa valeur en pour cent.
       compare: 'Comparer avant et après',
       before: 'Avant',
@@ -1037,7 +1010,6 @@ export const fr = {
     title: 'Signaler',
     action: 'Signaler',
     project: 'Signaler ce projet',
-    note: 'Signaler cette note',
     update: 'Signaler cette mise à jour',
     member: 'Signaler ce profil',
     target: {
@@ -2036,8 +2008,6 @@ export const fr = {
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
     more: 'Afficher la suite',
     moreError: 'La suite du fil n’a pas pu se charger.',
-    noteLabel: 'Note {{nameOf}} sur {{title}}',
-    noteKicker: 'Note',
     news_one: '{{count}} nouveauté',
     news_other: '{{count}} nouveautés',
     newsMany: '{{max}} nouveautés ou plus',

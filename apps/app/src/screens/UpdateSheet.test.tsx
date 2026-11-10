@@ -242,8 +242,9 @@ const T = {
   expired: fr.t(($) => $.errors.unauthorized),
   invalidPhotos: fr.t(($) => $.errors.invalidPhotos),
   discardTitle: fr.t(($) => $.project.updates.discardTitle),
-  keepEditing: fr.t(($) => $.project.updates.keepEditing),
-  discard: fr.t(($) => $.project.updates.discard),
+  // Les boutons de la fenêtre « Abandonner » viennent de `common` (DiscardDialog).
+  keepEditing: fr.t(($) => $.common.keepEditing),
+  discard: fr.t(($) => $.common.discard),
   beforeAfter: fr.t(($) => $.project.updates.beforeAfterSwitch),
   notMine: fr.t(($) => $.states.notMineTitle),
   notFound: fr.t(($) => $.project.page.notFoundTitle),

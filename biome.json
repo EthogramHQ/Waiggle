@@ -41,6 +41,8 @@
         "apps/app/src/projects/**",
         "apps/app/src/suggestions/**",
         "apps/app/src/comments/**",
+        "apps/app/src/updates/**",
+        "apps/app/src/testers/**",
         "apps/app/app/**",
         "!**/*.test.tsx"
       ],

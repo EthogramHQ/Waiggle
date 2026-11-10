@@ -694,18 +694,6 @@ export function CatalogueScreen() {
         />
       </Section>
 
-      <Section title={l.notesSection}>
-        {/* Écrire une note : fermé, fermé juste après une publication, ouvert (vide, avec un texte,
-            en cours d'envoi, texte manquant, envoi refusé). */}
-        <NoteComposerSample l={l} open={false} />
-        <NoteComposerSample l={l} open={false} success={l.notePublished} />
-        <NoteComposerSample l={l} open value="" />
-        <NoteComposerSample l={l} open value={l.noteBody} />
-        <NoteComposerSample l={l} open value={l.noteBody} pending />
-        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
-        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
-      </Section>
-
       <Section title={l.notificationsSection}>
         {/* La cloche : sans nouveauté (pas de pastille), avec 3, puis au-delà de 9 (« 9+ »). Une
             pastille seule, hors de la cloche, pour voir ses formes. */}
@@ -787,6 +775,17 @@ export function CatalogueScreen() {
       <CommentThreadCatalogue />
       <CommentMentionsCatalogue />
       <CommentComposerCatalogue />
+      <Section title={l.noteComposerSection}>
+        {/* Le champ d'écriture que `CommentComposer` enveloppe : fermé, fermé juste après un envoi,
+            ouvert (vide, avec un texte, en cours d'envoi, texte manquant, envoi refusé). */}
+        <NoteComposerSample l={l} open={false} />
+        <NoteComposerSample l={l} open={false} success={l.notePublished} />
+        <NoteComposerSample l={l} open value="" />
+        <NoteComposerSample l={l} open value={l.noteBody} />
+        <NoteComposerSample l={l} open value={l.noteBody} pending />
+        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
+        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
+      </Section>
 
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />

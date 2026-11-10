@@ -34,7 +34,7 @@ const followingRoute = createRoute({
   responses: {
     200: {
       description:
-        'The new public projects of the members followed, and the notes of the public projects ' +
+        'The new public projects of the members followed, and the updates of the public projects ' +
         'followed, newest first.',
       content: { 'application/json': { schema: FollowingFeedPage } },
     },

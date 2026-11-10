@@ -1,17 +1,4 @@
-import { changedAfterCreation, hostOf, shortDate } from './format'
-
-describe('changedAfterCreation', () => {
-  const created = '2026-10-12T08:00:00.000Z'
-
-  it('ignores a change within the first minute', () => {
-    expect(changedAfterCreation(created, '2026-10-12T08:00:30.000Z')).toBe(false)
-    expect(changedAfterCreation(created, '2026-10-12T08:01:00.000Z')).toBe(false)
-  })
-
-  it('counts a change more than a minute later', () => {
-    expect(changedAfterCreation(created, '2026-10-12T08:01:01.000Z')).toBe(true)
-  })
-})
+import { hostOf, shortDate } from './format'
 
 describe('shortDate', () => {
   const now = new Date('2026-10-13T10:00:00Z')

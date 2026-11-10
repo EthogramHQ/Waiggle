@@ -173,7 +173,7 @@ describe('UpdateLineField', () => {
 
     expect(screen.getByLabelText(lineLabel(1, 1, 'fixed'))).toBeTruthy() // témoin
     expect(screen.queryByRole('button', { name: removeLabel(1) })).toBeNull()
-    expect(screen.queryByText(fr.t(($) => $.project.updates.removeLine))).toBeNull()
+    expect(screen.queryByText(removeLabel(1))).toBeNull()
   })
 
   // Scénario : « la première ligne dit « Écris au moins un changement avant de publier. » ».
