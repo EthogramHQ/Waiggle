@@ -250,7 +250,7 @@ export const resetProjectScreenMocks = () => {
   jest
     .mocked(useDeleteUpdate)
     .mockReset()
-    .mockReturnValue({ remove: mockRemoveUpdate, pending: false, error: false })
+    .mockReturnValue({ remove: mockRemoveUpdate, pending: false, error: false, reason: undefined })
   mockReact.mockReset()
   jest
     .mocked(useReaction)

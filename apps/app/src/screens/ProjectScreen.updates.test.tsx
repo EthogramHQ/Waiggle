@@ -422,7 +422,7 @@ describe('deleting an update from the project page', () => {
     mockRemoveUpdate.mockResolvedValue(false)
     jest
       .mocked(useDeleteUpdate)
-      .mockReturnValue({ remove: mockRemoveUpdate, pending: false, error: true })
+      .mockReturnValue({ remove: mockRemoveUpdate, pending: false, error: true, reason: undefined })
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await fireEvent.press(await deleteUpdateButton())

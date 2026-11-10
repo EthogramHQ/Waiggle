@@ -254,8 +254,15 @@ describe('reporting an update of the project', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByText(rocketUpdate.title ?? '')
-    await fireEvent.press(updateMenu())
-    await fireEvent.press(screen.getByRole('menuitem', { name: reportUpdate }))
+    // Un bouton direct (le drapeau d'`UpdateEntry`, API fixée en TW-1) ou une entrée de menu, comme
+    // l'accepte `UpdateEntry.test.tsx`.
+    const direct = screen.queryByRole('button', { name: reportUpdate })
+    if (direct) {
+      await fireEvent.press(direct)
+    } else {
+      await fireEvent.press(updateMenu())
+      await fireEvent.press(screen.getByRole('menuitem', { name: reportUpdate }))
+    }
 
     expect(reportsOpened(mockPush)).toEqual([
       expect.objectContaining({ kind: 'update', id: rocketUpdate.id }),

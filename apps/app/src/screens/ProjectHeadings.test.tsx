@@ -59,7 +59,9 @@ beforeEach(() => {
   jest.mocked(getProject).mockResolvedValue({ ...recipesProject, isMine: false })
   jest.mocked(useFollow).mockReturnValue({ toggle: jest.fn(), error: false, expired: false })
   jest.mocked(useReaction).mockReturnValue({ toggle: jest.fn(), error: false, expired: false })
-  jest.mocked(useDeleteUpdate).mockReturnValue({ remove: jest.fn(), pending: false, error: false })
+  jest
+    .mocked(useDeleteUpdate)
+    .mockReturnValue({ remove: jest.fn(), pending: false, error: false, reason: undefined })
   jest.mocked(usePostComment).mockReturnValue({ post: jest.fn(), pending: false, error: false })
   jest.mocked(useEditComment).mockReturnValue({ edit: jest.fn(), pending: false, error: false })
   jest.mocked(useDeleteComment).mockReturnValue({ remove: jest.fn(), error: false })

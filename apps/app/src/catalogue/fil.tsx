@@ -15,7 +15,6 @@ import { Greeting } from '../ui/Greeting'
 import { HoneySphere } from '../ui/HoneySphere'
 import { ListGroup } from '../ui/ListGroup'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
-import { NoteCard } from '../ui/NoteCard'
 import { ProjectCard } from '../ui/ProjectCard'
 import { ProjectGrid } from '../ui/ProjectGrid'
 import { PublishPrompt } from '../ui/PublishPrompt'
@@ -47,7 +46,6 @@ const fr = {
     'L’arrivée des nouvelles cartes (Arrival) et la grille qui étire la note à côté d’un projet : « Faire arriver » pose une carte en haut, qui tombe en place (en fondu avec « Réduire les animations ») ; les autres ne bougent pas',
   arrive: 'Faire arriver une carte',
   arrived: (n: number) => `Nouveau projet ${n}`,
-  noteBody: 'v2 : mode hors ligne, et les recettes se rangent par saison.',
   skeleton: 'Une carte du fil qui charge (SkeletonCard shape="feed")',
   dates: 'Dates relatives (RelativeTime) : à l’instant, il y a 3 h, hier, au-delà de 7 jours',
   datePhrase: 'Avec une phrase (prop phrase) : « bloqué le 12 oct. »',
@@ -98,7 +96,6 @@ const en: typeof fr = {
     'The arrival of new cards (Arrival) and the grid stretching the note beside a project: “Make one arrive” puts a card at the top, which drops into place (a fade with “Reduce motion”); the others stay still',
   arrive: 'Make a card arrive',
   arrived: (n: number) => `New project ${n}`,
-  noteBody: 'v2: offline mode, and recipes are sorted by season.',
   skeleton: 'A feed card loading (SkeletonCard shape="feed")',
   dates: 'Relative dates (RelativeTime): just now, 3 h ago, yesterday, beyond 7 days',
   datePhrase: 'With a phrase (phrase prop): “blocked on Oct 12”',
@@ -391,17 +388,6 @@ function Arrivals({ l }: { l: typeof fr }) {
               />
             </Arrival>
           )),
-          <Arrival key="note" arriving={false}>
-            <NoteCard
-              label={`${l.members[0]} : ${cafes}`}
-              project={cafes}
-              author={{ name: l.members[0] ?? '', avatar: null }}
-              body={l.noteBody}
-              when={<RelativeTime date={hoursAgo(2)} now={now} tone="secondary" />}
-              image={{ source: null, thumbhash: cafe, label: l.photo }}
-              onPress={noop}
-            />
-          </Arrival>,
           <Arrival key="project" arriving={false}>
             <ProjectCard
               title={cafes}
