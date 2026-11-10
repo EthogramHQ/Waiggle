@@ -145,6 +145,13 @@ type PanelProps = {
    */
   busy?: boolean
   /**
+   * Faux pendant la garde d'ouverture (R7a) : « Annuler » et l'action de la feuille ignorent alors
+   * toute tape, comme le voile. La seconde tape d'une double tape sur le bouton qui ouvre la feuille
+   * tombe sinon sur eux (« Quitter les testeurs », « Publier »). Sheet la donne ; sans elle (le
+   * catalogue), les boutons sont toujours actifs.
+   */
+  tapsAllowed?: boolean
+  /**
    * Pour Sheet, sur le web : l'identifiant du titre, déjà donné au nom de la couche (le Modal de
    * react-native-web est la boîte de dialogue). La feuille ne se déclare pas alors une seconde fois.
    */
@@ -1035,6 +1042,7 @@ export function Sheet({
             {...(aside !== undefined && besideRoom ? { aside } : null)}
             onClose={requestClose}
             busy={busy}
+            tapsAllowed={tapsAllowed}
             layout={phone ? 'phone' : 'desktop'}
             maxHeight={(visible?.height ?? window.height) - 2 * PANEL_MARGIN}
             closeRef={closeRef}
@@ -1081,6 +1089,7 @@ export function SheetPanel({
   panelRef,
   keys,
   busy = false,
+  tapsAllowed = true,
   titleId: givenTitleId,
   compact = false,
   titleCount,
@@ -1110,6 +1119,12 @@ export function SheetPanel({
       ? { role: 'dialog' as const, 'aria-modal': true, 'aria-labelledby': titleId }
       : null
   const close = closeLabel ?? t(($) => $.common.close)
+  // La garde de double tape des boutons « Annuler » et de l'action (R7a) : une tape reçue avant la
+  // fin de la garde d'ouverture n'appelle rien. Le bouton reste actif (ni grisé, ni retiré du Tab) :
+  // seul le geste trop tôt est ignoré.
+  const guarded = (press: () => void) => () => {
+    if (tapsAllowed) press()
+  }
   // Sur téléphone, l'action monte dans la tête (« Annuler », le titre, « Publier ») ; le message
   // d'un envoi se pose alors juste sous la tête, près du bouton touché (ui-B2).
   const actionOnTop = phone && action !== undefined
@@ -1199,7 +1214,7 @@ export function SheetPanel({
             ? {
                 cancel: {
                   label: cancelLabel,
-                  onPress: onClose,
+                  onPress: guarded(onClose),
                   disabled: busy,
                   ...(closeRef ? { ref: closeRef } : null),
                 },
@@ -1207,7 +1222,7 @@ export function SheetPanel({
             : null)}
           action={{
             label: action.label,
-            onPress: action.onPress,
+            onPress: guarded(action.onPress),
             loading: action.busy ?? false,
             disabled: action.disabled ?? false,
             ...reachable,
@@ -1240,7 +1255,7 @@ export function SheetPanel({
           <View style={{ position: 'absolute', left: 0 }}>
             <TextLink
               label={cancelLabel}
-              onPress={onClose}
+              onPress={guarded(onClose)}
               role="button"
               disabled={busy}
               {...(closeRef ? { ref: closeRef } : null)}
@@ -1354,12 +1369,17 @@ export function SheetPanel({
         </View>
       ) : null}
       {cancelLabel !== undefined ? (
-        <Button label={cancelLabel} variant="secondary" onPress={onClose} disabled={busy} />
+        <Button
+          label={cancelLabel}
+          variant="secondary"
+          onPress={guarded(onClose)}
+          disabled={busy}
+        />
       ) : null}
       {action ? (
         <Button
           label={action.label}
-          onPress={action.onPress}
+          onPress={guarded(action.onPress)}
           loading={action.busy ?? false}
           disabled={action.disabled ?? false}
           {...described}
