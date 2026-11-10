@@ -107,7 +107,13 @@ describe.each(DIRECTIONS)('the contents, when %s', (_, blockNow) => {
   it('hides the projects of the other one from the discovery feed and the tag pages', async () => {
     const velo = await act.publish(malik, 'Vélo', { tools: ['Mistral'] })
     later()
-    await act.send('POST', `/v1/projects/${meteo.id}/notes`, ines, { body: 'Une note de Météo' })
+    await act.send('POST', `/v1/projects/${meteo.id}/updates`, ines, {
+      title: null,
+      version: null,
+      lines: [{ family: 'new', text: 'Une mise à jour de Météo' }],
+      photos: [],
+      beforeAfter: false,
+    })
     await blockNow()
 
     for (const [cookie, hidden] of [

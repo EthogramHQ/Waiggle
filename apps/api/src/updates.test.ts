@@ -453,7 +453,9 @@ describe('what an update may contain', () => {
       expect(ErrorResponse.parse(await res.json()).error.code).toBe('validation')
     }
     expect(await storedUpdateCount()).toBe(0)
-    // Témoin : cinq lignes de 120 caractères passent.
+    // Témoin : cinq lignes de 120 caractères passent. Les dix refus ont compté contre le quota
+    // (10 par 24 h, chaque demande compte) : le témoin part le lendemain.
+    later(24 * 60 + 1)
     const five = Array.from({ length: 5 }, () => line('é'.repeat(120)))
     expect(
       (await postUpdate(project.id, jean, simple({ lines: five } as Partial<NewProjectUpdate>)))
