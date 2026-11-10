@@ -10,7 +10,7 @@ import {
   MODERATION_DECISIONS_PER_DAY,
   MODERATION_PASSWORD_FAILURES_PER_DAY,
   REMOVALS_BEFORE_PASSWORD,
-  type ReportTargetKind,
+  type StoredReportTargetKind,
   SUSPENSIONS_BEFORE_PASSWORD,
   type SuspensionDuration,
 } from '@ruche/contracts'
@@ -68,7 +68,7 @@ export const countDecision = (limiter: RateLimiter, adminId: string): Promise<Ra
 export const lockDecision = async (
   tx: Tx,
   adminId: string,
-  target: { kind: ReportTargetKind; id: string },
+  target: { kind: StoredReportTargetKind; id: string },
 ) => {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`moderation-admin:${adminId}`}, 0))`,

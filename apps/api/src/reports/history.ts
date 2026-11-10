@@ -8,7 +8,7 @@ import {
   MODERATION_PAGE_SIZE,
   ModerationAction,
   RemovalGround,
-  ReportTarget,
+  StoredReportTarget,
   SuspensionDuration,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
@@ -42,7 +42,7 @@ export const loadDecisionHistory = async (
   const member = alias(schema.user, 'member_user')
   const memberHandle = alias(schema.memberHandle, 'member_handle')
   const p = schema.project
-  const n = schema.projectNote
+  const u = schema.projectUpdate
   const c = schema.projectComment
   const id = targetUuid('moderation_decision')
 
@@ -70,7 +70,7 @@ export const loadDecisionHistory = async (
       memberName: member.name,
       memberHandle: memberHandle.handle,
       projectId: p.id,
-      noteProjectId: n.projectId,
+      updateProjectId: u.projectId,
       commentProjectId: c.projectId,
     })
     .from(d)
@@ -83,7 +83,7 @@ export const loadDecisionHistory = async (
       and(eq(memberHandle.userId, d.targetMemberId), isNull(memberHandle.releasedAt)),
     )
     .leftJoin(p, and(eq(d.targetKind, 'project'), sql`${p.id} = ${id}`))
-    .leftJoin(n, and(eq(d.targetKind, 'note'), sql`${n.id} = ${id}`))
+    .leftJoin(u, and(eq(d.targetKind, 'update'), sql`${u.id} = ${id}`))
     // Un commentaire supprimé alors qu'il avait des réponses (deleted_at) n'a plus de texte : pas
     // de lien vers lui.
     .leftJoin(c, and(eq(d.targetKind, 'comment'), sql`${c.id} = ${id}`, isNull(c.deletedAt)))
@@ -103,7 +103,7 @@ export const loadDecisionHistory = async (
   // sans donnée personnelle, au lieu de faire tomber tout l'historique.
   const items = page.flatMap((row): DecisionHistoryItem[] => {
     const action = ModerationAction.safeParse(row.action)
-    const target = ReportTarget.safeParse({ kind: row.targetKind, id: row.targetId })
+    const target = StoredReportTarget.safeParse({ kind: row.targetKind, id: row.targetId })
     const ground = RemovalGround.nullable().safeParse(row.ground)
     const duration = SuspensionDuration.nullable().safeParse(row.duration)
     const liftCause = LiftCause.nullable().safeParse(row.liftCause)
@@ -127,7 +127,7 @@ export const loadDecisionHistory = async (
             ? { id: row.adminId, name: row.adminName, handle: row.adminHandle }
             : null,
         target: target.data,
-        projectId: row.projectId ?? row.noteProjectId ?? row.commentProjectId ?? null,
+        projectId: row.projectId ?? row.updateProjectId ?? row.commentProjectId ?? null,
         member:
           row.memberId !== null && row.memberName !== null
             ? { id: row.memberId, name: row.memberName, handle: row.memberHandle }
