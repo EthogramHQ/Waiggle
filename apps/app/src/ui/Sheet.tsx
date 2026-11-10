@@ -1224,6 +1224,7 @@ export function SheetPanel({
           title={title}
           heading={heading}
           titleId={titleId}
+          subtitle={subtitle}
           {...(dragHandlers ? { dragHandlers } : null)}
           {...(cancelLabel
             ? {

@@ -49,8 +49,6 @@ export type UpdateSheetPhotos = {
 
 type Props = {
   project: UpdateSheetProject
-  /** La phrase qui dit pourquoi la feuille s'est ouverte (statut changé) ; null : rien. */
-  announce: string | null
   form: UpdateFormValues
   onChange: (next: UpdateFormValues) => void
   /** Le refus de publier sans ligne, posé sur la première ligne. */
@@ -66,7 +64,6 @@ type Props = {
 
 export function UpdateSheetFields({
   project,
-  announce,
   form,
   onChange,
   linesError,
@@ -137,10 +134,6 @@ export function UpdateSheetFields({
           )
         }
       />
-      {/* Arrivée depuis « Modifier » : pourquoi la feuille s'est ouverte, et qu'on peut l'ignorer.
-          Dans le contenu, sous le projet : la tête à action du téléphone n'a pas de place pour une
-          phrase sous le titre (`Sheet` n'y montre pas `subtitle`). */}
-      {announce ? <Text tone="secondary">{announce}</Text> : null}
       <TextField
         label={t(($) => $.project.updates.titleField)}
         value={form.title}

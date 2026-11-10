@@ -371,6 +371,8 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
         open={open}
         title={t(($) => $.project.updates.sheetTitle)}
         heading={1}
+        // Arrivée depuis « Modifier » : pourquoi la feuille s'est ouverte, et qu'on peut l'ignorer.
+        {...(announceText ? { subtitle: announceText } : null)}
         cancelLabel={t(($) => $.project.updates.cancel)}
         action={{
           // Jamais grisé : sans ligne écrite, la première ligne dit pourquoi (scénario).
@@ -403,7 +405,6 @@ function UpdateForm({ project, announce, open, close }: FormProps) {
             latestAt: project.latestUpdate?.createdAt ?? null,
             version: project.version,
           }}
-          announce={announceText}
           form={form}
           onChange={change}
           linesError={linesError}

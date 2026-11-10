@@ -40,7 +40,6 @@ const render = (tiles: PhotoTile[], selectedKey: string | null) =>
   renderWithProviders(
     <UpdateSheetFields
       project={{ title: 'Quiz de la fusée', image: null, latestAt: null, version: null }}
-      announce={null}
       form={form}
       onChange={() => {}}
       linesError={null}

@@ -46,6 +46,8 @@ type Props = {
   titleId?: string
   /** Pour Sheet : ce qui fait glisser la feuille vers le bas, posé autour du titre seul. */
   dragHandlers?: object
+  /** La phrase sous le titre (« Nouveau projet » : l'introduction), sous la rangée entière. */
+  subtitle?: string | undefined
 }
 
 // La place minimale à laisser au titre pour qu'il reste lisible (sur deux lignes au plus).
@@ -58,6 +60,7 @@ export function SheetHeader({
   heading: level = 1,
   titleId,
   dragHandlers,
+  subtitle,
 }: Props) {
   // La disposition dépend de la place : on mesure la barre et la largeur naturelle de chaque côté
   // (« Annuler », « Enregistrer »). onLayout donne la largeur réelle d'un élément une fois dessiné ;
@@ -132,6 +135,15 @@ export function SheetHeader({
     </View>
   )
 
+  // La phrase d'introduction, lue après le titre, sur toute la largeur de la tête et rangée comme
+  // le titre (centrée avec « Annuler », à gauche sans). Décision du 10/11 : la tête à action la
+  // montrait seulement dans la tête sans action de `Sheet`.
+  const subtitleText = subtitle ? (
+    <Text tone="secondary" align={cancel ? 'center' : 'left'}>
+      {subtitle}
+    </Text>
+  ) : null
+
   if (layout === 'stacked') {
     return (
       <View onLayout={measure('bar')} style={{ gap: space.sm }}>
@@ -149,19 +161,26 @@ export function SheetHeader({
           {actionButton}
         </View>
         {heading}
+        {subtitleText}
       </View>
     )
   }
   // minWidth: 0 autorise le titre à devenir plus étroit que son texte (il passe alors à la ligne).
   const sideStyle = { flexShrink: 0, minWidth: layout === 'centered' ? side : 0 }
   return (
-    <View
-      onLayout={measure('bar')}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}
-    >
-      {cancel ? <View style={{ ...sideStyle, alignItems: 'flex-start' }}>{cancelLink}</View> : null}
-      <View style={{ flex: 1, minWidth: 0 }}>{heading}</View>
-      <View style={{ ...sideStyle, alignItems: 'flex-end' }}>{actionButton}</View>
+    // La barre est mesurée sur la rangée seule : la phrase dessous ne change pas sa disposition.
+    <View style={{ gap: space.sm }}>
+      <View
+        onLayout={measure('bar')}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}
+      >
+        {cancel ? (
+          <View style={{ ...sideStyle, alignItems: 'flex-start' }}>{cancelLink}</View>
+        ) : null}
+        <View style={{ flex: 1, minWidth: 0 }}>{heading}</View>
+        <View style={{ ...sideStyle, alignItems: 'flex-end' }}>{actionButton}</View>
+      </View>
+      {subtitleText}
     </View>
   )
 }

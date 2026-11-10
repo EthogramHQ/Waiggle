@@ -167,6 +167,7 @@ function Sample({
           layout={desktop ? 'desktop' : 'phone'}
           title={t(($) => $.project.updates.sheetTitle)}
           heading={2}
+          {...(announce ? { subtitle: announce } : null)}
           cancelLabel={t(($) => $.project.updates.cancel)}
           action={{ label: t(($) => $.project.updates.publish), onPress: () => {}, busy }}
           onClose={() => {}}
@@ -182,7 +183,6 @@ function Sample({
               version: null,
               ...project,
             }}
-            announce={announce}
             form={form}
             onChange={setForm}
             linesError={linesError}
