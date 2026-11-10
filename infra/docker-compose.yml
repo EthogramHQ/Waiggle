@@ -136,6 +136,8 @@ services:
       args:
         APP_DOMAIN: ${APP_DOMAIN:-localhost}
         API_DOMAIN: ${API_DOMAIN:-api.localhost}
+        # Le même commit que l'API (APP_VERSION) : voir infra/web/Dockerfile.
+        APP_VERSION: ${RUCHE_VERSION:-local}
     restart: unless-stopped
     logging: *logging
     # Les seuls ports ouverts sur Internet : 80 (HTTP, qui renvoie vers HTTPS) et 443 (HTTPS,

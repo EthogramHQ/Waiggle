@@ -3,6 +3,11 @@
 import { Me } from '@ruche/contracts'
 import { leaMe } from '../testing/fixtures'
 import { apiFetch, request, requestWithoutBody } from './client'
+import { reloadIfNewVersion } from './newVersion'
+
+// La vérification de la version a ses propres tests (newVersion.test.ts) ; ici, on regarde seulement
+// quand le client la demande.
+jest.mock('./newVersion', () => ({ reloadIfNewVersion: jest.fn().mockResolvedValue(false) }))
 
 jest.mock('../accounts/auth-client', () => ({
   authClient: { getCookie: jest.fn().mockResolvedValue('ruche.session_token=abc') },
@@ -117,6 +122,17 @@ describe('request', () => {
     fetchMock.mockResolvedValue(json({ id: 'u1' }))
 
     expect(await request('/v1/me', {}, Me)).toEqual({ ok: false, error: 'internal' })
+  })
+
+  it('checks for a newer version of the app when an answer does not have the expected shape', async () => {
+    jest.mocked(reloadIfNewVersion).mockClear()
+    fetchMock.mockResolvedValue(json({ id: 'u1' }))
+    await request('/v1/me', {}, Me)
+    expect(reloadIfNewVersion).toHaveBeenCalledTimes(1)
+
+    fetchMock.mockResolvedValue(json(leaMe))
+    await request('/v1/me', {}, Me)
+    expect(reloadIfNewVersion).toHaveBeenCalledTimes(1) // une bonne réponse ne demande rien
   })
 })
 
