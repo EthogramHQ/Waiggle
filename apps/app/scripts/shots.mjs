@@ -12,12 +12,13 @@
 //   --list            affiche le nom et l'adresse de chaque page, puis s'arrête.
 //   --only a,b        seulement ces pages, par leur nom (voir --list) : pour les captures comme
 //                     pour --layout. Les captures des autres pages, déjà dans le dossier, restent.
-//   --out <dossier>   le dossier des captures (shots/ par défaut). Deux agents lancés en même
+//   --out <dossier>   le dossier des captures (shots/ par défaut). Deux lancements en même
 //                     temps, chacun avec son dossier, ne s'écrasent pas.
-//   --read            des captures faites pour être lues par un agent : à l'échelle 1 (au lieu de
+//   --read            des captures faites pour être lues une à une : à l'échelle 1 (au lieu de
 //                     2), et les pages longues coupées en tranches d'environ 1 600 pixels de haut
 //                     (nom-1, nom-2…), plus faciles à regarder qu'une image de 10 000 pixels.
-//   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/).
+//   --layout          mesure la mise en page à 9 largeurs (rapport dans <dossier>/layout/). Avec
+//                     --only, le rapport garde les sections et les images des autres pages.
 //   --shard i/n       seulement la part i sur n des captures (--shard 1/2 puis --shard 2/2) : la
 //                     CI les prend en deux tâches parallèles. Le travail k de la liste va à la
 //                     part (k % n) + 1 (voir shard.ts). Chaque part construit le site et vérifie
@@ -33,7 +34,7 @@
 //
 // Pas besoin de serveur d'API : les réponses de l'API sont simulées avec les mêmes données
 // d'exemple que les tests (src/testing/). Node lit ces fichiers TypeScript directement.
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { crc32, deflateSync } from 'node:zlib'
@@ -3305,10 +3306,10 @@ const settle = async (page) => {
 // --layout : au lieu des captures habituelles, chaque page est mesurée à neuf largeurs d'écran, du
 // petit téléphone au grand écran. Le rapport (<dossier>/layout/rapport.md) signale ce qui dépasse de la
 // largeur (défilement horizontal), les zones à toucher de moins de 44 points, et garde une capture
-// par largeur. C'est l'outil de l'agent de relecture du design ; il ne fait échouer aucune vérification,
+// par largeur. C'est l'outil de la relecture du design ; il ne fait échouer aucune vérification,
 // sauf une page restée en chargement ou en panne (le garde des captures, voir intendedUnfinished).
 // --explore <script.mjs> : l'appli tourne sur les mêmes données simulées, et le navigateur est confié
-// à un script écrit pour l'occasion (par l'agent de relecture du design, hors du dépôt). Il y clique,
+// à un script écrit pour l'occasion (par la relecture du design, hors du dépôt). Il y clique,
 // tape, appuie deux fois, navigue au clavier… pour vérifier le comportement des boutons et les cas
 // inhabituels, pas seulement l'allure. Le script exporte une fonction par défaut qui reçoit :
 // - base : l'adresse de l'appli ; paths : l'adresse de chaque page photographiée, par son nom ;
@@ -3365,7 +3366,30 @@ async function layoutReport() {
   const widths = [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920]
   claimOut()
   const dir = join(out, 'layout')
-  rmSync(dir, { recursive: true, force: true })
+  const reportPath = join(dir, 'rapport.md')
+  // Avec --only, on ne refait que les pages choisies : le rapport déjà là garde les sections des
+  // autres pages (une section commence par « ## <nom> (<adresse>) »), et seules les images des
+  // pages choisies sont effacées. Sans --only, on repart d'un dossier vide. Avant (R7a), le rapport
+  // était réécrit avec les seules pages choisies, et les mesures des autres se perdaient.
+  const kept = new Map()
+  if (only && existsSync(reportPath)) {
+    let current
+    for (const line of readFileSync(reportPath, 'utf8').split('\n')) {
+      const heading = line.match(/^## (\S+) \(/)
+      if (heading) {
+        current = only.includes(heading[1]) ? undefined : []
+        if (current) kept.set(heading[1], current)
+      }
+      current?.push(line)
+    }
+    for (const name of readdirSync(dir)) {
+      if (only.some((page) => new RegExp(`^${page}-\\d+\\.png$`).test(name))) {
+        rmSync(join(dir, name), { force: true })
+      }
+    }
+  } else {
+    rmSync(dir, { recursive: true, force: true })
+  }
   mkdirSync(dir, { recursive: true })
   const browser = await chromium.launch()
   // Le rapport de chaque page, rangé à sa place dans la liste : les pages finissent dans le
@@ -3513,13 +3537,16 @@ async function layoutReport() {
   } finally {
     await browser.close()
   }
+  // Les pages dans l'ordre de la liste : celles mesurées maintenant, et celles gardées du rapport
+  // d'avant (une page retirée de la liste disparaît du rapport). Une section gardée finit déjà par
+  // sa ligne vide.
   const lines = [
     '# Mise en page à plusieurs largeurs',
     '',
-    ...selected.flatMap((shot) => sections.get(shot)),
+    ...pages.flatMap((shot) => sections.get(shot) ?? kept.get(shot.name) ?? []),
   ]
-  writeFileSync(join(dir, 'rapport.md'), `${lines.join('\n')}\n`)
-  console.log(`Rapport de mise en page : ${join(dir, 'rapport.md')}`)
+  writeFileSync(reportPath, `${lines.join('\n').replace(/\n+$/, '')}\n`)
+  console.log(`Rapport de mise en page : ${reportPath}`)
   if (stuckPages.length > 0) console.error(`Pages bloquées :\n${stuckPages.join('\n')}`)
   if (unloadedPages.length > 0) console.error(`Pages non chargées :\n${unloadedPages.join('\n')}`)
   if (stuckPages.length > 0 || unloadedPages.length > 0) {
@@ -3547,7 +3574,7 @@ for (const name of readdirSync(out)) {
 // sont prises à l'échelle 2 : des tranches de 12 000 points faisaient 23 000 pixels de haut, et
 // sur ordinateur (2 880 pixels de large) les champs et les choix du catalogue sortaient en
 // blanc. On coupe donc au-delà de 6 000 points, soit 12 000 pixels (le catalogue : catalogue,
-// catalogue-2…). Avec --read, les tranches font environ 1 600 pixels, la hauteur qu'un agent lit
+// catalogue-2…). Avec --read, les tranches font environ 1 600 pixels, une hauteur qui se lit
 // confortablement, et sont numérotées dès la première (nom-1).
 const PART = read ? 1600 : 6000
 const scale = read ? 1 : 2
