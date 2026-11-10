@@ -5,8 +5,7 @@
 // supprimé : `project` vaut null) n'est jamais nommé, la phrase dit « un projet » (relecture du plan
 // sec-A1, jur-T2).
 //
-// L'interface attendue de `src/ui/CatalogueChangeRow.tsx` (fixée par la session au lancement de
-// R6b) : CatalogueChangeRow({ change: CatalogueChange }).
+// L'interface attendue de `src/ui/CatalogueChangeRow.tsx` (fixée au lancement de R6b) : CatalogueChangeRow({ change: CatalogueChange }).
 import type { CatalogueChange } from '@ruche/contracts'
 import { screen } from '@testing-library/react-native'
 import { admitChange, changeOf, mergeChange, recategorizeChange } from '../testing/catalogue'

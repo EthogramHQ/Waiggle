@@ -4,8 +4,8 @@
 // la feuille d'ordinateur avec son décor et sa colonne à côté (SheetPanel `decoration`, `aside`),
 // et (R5b) la feuille de téléphone dont le titre porte un nombre (`titleCount`), avec et sans
 // commentaire.
-// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs agents travaillent
-// en même temps sur le catalogue. Ses exemples (un outil de développement, absent de l'appli
+// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : le catalogue grossit à
+// chaque tranche. Ses exemples (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
 import { type ColorName, layout, palettes, radii, space } from '@ruche/brand'
 import { useTranslation } from 'react-i18next'

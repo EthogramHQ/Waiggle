@@ -17,7 +17,7 @@
 // (`error` : la raison, « elle dépasse 5 Mo. »). `PhotoTilesLabels`, que le découpage ne détaille
 // pas, est fixé ici (les clés `project.form.*`) : voir `labels` plus bas.
 //
-// Ce que Jest ne prouve pas (essai `--explore` de la session) : le glisser au doigt et à la souris,
+// Ce que Jest ne prouve pas (essai `--explore`) : le glisser au doigt et à la souris,
 // l'anneau miel, le badge à 200 % sur une tuile étroite (ui-M4).
 import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef, type ReactNode, useState } from 'react'

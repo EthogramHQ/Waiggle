@@ -1,4 +1,4 @@
-// Catalogue des composants de la page « Réglages » (tranche R2, ui-dev S1) : la carte du membre
+// Catalogue des composants de la page « Réglages » (tranche R2, S1) : la carte du membre
 // (MemberCard) dans ses trois états, la liste des rubriques avec leur aide (SettingsNav sur
 // téléphone) et la mise en page d'ordinateur (SettingsColumns). Fichier à part de
 // CatalogueScreen.tsx, qui l'importe en une ligne. Les textes d'exemple sont écrits ici en clair :

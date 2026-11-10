@@ -9,8 +9,8 @@
 // - sur ordinateur, les deux colonnes dans la feuille (le formulaire, l'aperçu) et le pied ;
 // - pour de vrai : une feuille qui en ouvre une autre (Échap ne ferme que celle du dessus, le focus
 //   revient à « Catégorie »), et `closeGuard` (la feuille ne se ferme qu'après la réponse).
-// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : plusieurs agents travaillent
-// en même temps sur le catalogue. Ses exemples (un outil de développement, absent de l'appli
+// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne : le catalogue grossit à
+// chaque tranche. Ses exemples (un outil de développement, absent de l'appli
 // publiée) sont écrits ici, en français et en anglais.
 import { appName, layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'

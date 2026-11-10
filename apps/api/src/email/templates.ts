@@ -374,7 +374,7 @@ export const existingAccountEmail = (
       // Le nom du compte existant : filtré comme dans verificationEmail (relecture de sécurité A2).
       greeting: fill(t.greeting, { name: defangLinks(name, linkPlaceholder(language)) }),
       // Chaque texte passe par fill : render() écrit les paragraphes tels quels, et le texte de R2
-      // contient {{appName}}, qui s'affichait brut (relecture de TW-1, R2).
+      // contient {{appName}}, qui s'affichait brut (relecture de R2).
       paragraphs: [fill(t.existingAccount.body)],
       button: { label: fill(t.existingAccount.button), url: signInUrl },
       notes: [fill(t.existingAccount.ignore)],

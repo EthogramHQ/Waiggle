@@ -3,7 +3,7 @@
 // (retrait, rétablissement, classement, suspension, levée), la cible avec un lien, le fondement et
 // l'explication. Jamais qui a signalé : le contrat n'a aucun champ pour cela.
 //
-// L'interface attendue de `src/ui/DecisionCard.tsx` (écrit par ui-dev) :
+// L'interface attendue de `src/ui/DecisionCard.tsx` :
 // - `decision: DecisionHistoryItem`, la décision telle que l'API la donne ; la carte écrit elle-même
 //   ses textes (`moderation.actions`, `decidedBy`, `memberLine`, `durationLine`…) ;
 // - `onView?: () => void`, le lien « Voir » vers la cible (choisi par l'écran, qui connaît les

@@ -1,4 +1,4 @@
-// Tests de l'avant / après (R7a, U2), en plus de ceux du test-writer (BeforeAfter.test.tsx) : le
+// Tests de l'avant / après (R7a, U2), en plus de ceux de BeforeAfter.test.tsx : le
 // nom donné par `label`, la place de départ (`initialValue`, pour le catalogue), les seules touches
 // du curseur retenues (les autres, Tab et Page suivante, passent), et le doigt : une tape pose le
 // trait où l'on a touché, un glissé de côté le déplace, un glissé vers le bas ne le bouge pas.
@@ -94,7 +94,7 @@ const touch = async (from: { x: number; y: number }, path: { x: number; y: numbe
   })
 }
 
-describe('BeforeAfter, beyond the test-writer', () => {
+describe('BeforeAfter gestures', () => {
   it('names the slider after `label` and starts at `initialValue`', async () => {
     await renderWithProviders(
       <BeforeAfter

@@ -4,7 +4,7 @@
 // Si le compte est déjà suspendu, la page devient « Lever la suspension » : la raison (plus tôt,
 // ou erreur, J10) et une explication.
 //
-// L'interface attendue (écrite par ui-dev) :
+// L'interface attendue :
 // - `src/screens/SuspendScreen.tsx` exporte `SuspendScreen`, de props
 //   `{ memberId: string; fromKind?: string; fromId?: string }` : la route d'une ligne
 //   `app/suspend.tsx` lit `?member=&fromKind=&fromId=` dans l'adresse (comme `app/report.tsx`).

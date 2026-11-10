@@ -1,5 +1,5 @@
-// Tests du champ des outils, en plus de ToolField.test.tsx (tranche R6a, décisions de la session,
-// non écrites par le test-writer) :
+// Tests du champ des outils, en plus de ToolField.test.tsx (tranche R6a, décisions prises en cours
+// de tranche) :
 // - champ vide, le focus ouvre la liste avec ce que l'écran propose (les outils les plus utilisés),
 //   sans rien mettre en surbrillance : Entrée n'ajoute pas un outil qu'on n'a pas demandé ;
 // - après le retrait d'un outil, le focus va à la croix de la pastille suivante, sinon de la

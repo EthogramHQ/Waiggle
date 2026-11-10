@@ -4,7 +4,7 @@
 // passe dessous. Ce fichier teste la place seule ; quand elle est fixe, et ce que Screen réserve,
 // c'est `Screen.pinned.test.tsx`.
 //
-// L'interface attendue (noms choisis au plan des tests, à suivre par l'ui-dev) :
+// L'interface attendue (noms choisis au plan des tests, que le composant doit suivre) :
 //   <ScreenTopBar belowBar={…} onHeight={(height) => …}>{header}</ScreenTopBar>
 // - `children` : la barre ;
 // - `belowBar` : ce qui se pose sous la barre (le bouton des nouveautés du Fil, ui-5) ;

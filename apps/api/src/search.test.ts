@@ -200,7 +200,7 @@ const insertMembers = async (members: { name: string; handle: string }[]) => {
 
 /** Louis retire un projet (POST /v1/moderation/decisions). */
 // Un retrait de la modération répond à un signalement ouvert (reports/decide.ts) : Zoé signale
-// d'abord, puis Louis retire. (Correction de la session, R3 : sans signalement, le retrait était
+// d'abord, puis Louis retire. (Correction de R3 : sans signalement, le retrait était
 // refusé en 409, une raison étrangère à la règle testée.)
 const remove = async (projectId: string) => {
   later()
@@ -429,7 +429,7 @@ describe('the projects found', () => {
     // L'ordre n'est pas la règle de ce test (voir « ranks… » plus bas) : la date de création d'un
     // projet jamais publié vient de la base (horloge réelle), celle d'une publication de la fausse
     // horloge du test, et leur ordre variait d'une machine à l'autre (rouge en CI le 31/10 ;
-    // correction de la session, R3). On vérifie donc l'ensemble, sans ordre.
+    // correction de R3). On vérifie donc l'ensemble, sans ordre.
     const found = results.projects.items.map((p) => [p.title, p.visibility])
     expect(found).toHaveLength(2)
     expect(found).toEqual(

@@ -3,7 +3,7 @@
 // jour, en supprimer une. Le réseau est remplacé (`api/client`) : on lit les demandes envoyées et on
 // choisit les réponses, et les vrais hooks rangent le résultat dans le cache de React Query.
 //
-// L'interface que ces tests fixent pour `updates/api.ts` (agent U0) :
+// L'interface que ces tests fixent pour `updates/api.ts` :
 // - `useProjectUpdates(projectId)` : un `useInfiniteQuery` (GET /v1/projects/{id}/updates, puis
 //   `?cursor=` pour la suite) ; ses pages sont des `ProjectUpdatePage` ;
 // - `usePublishUpdate(projectId)` → `{ publish(payload: NewProjectUpdate): Promise<boolean>,

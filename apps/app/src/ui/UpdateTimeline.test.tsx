@@ -8,7 +8,7 @@
 // interface A4) :
 // `UpdateTimeline({ updates: ProjectUpdate[]; publishedAt: string; toSource; onDelete?; deletingId?;
 // hasMore; onMore; loadingMore; moreError? })`.
-// Choix de TW-1, à confirmer par la session (le plan ne les fixait pas) :
+// Choix faits avec ces tests (R7a) :
 // - `toSource` : comme `UpdateEntry`, la fonction de `useMediaSources()`, passée à chaque mise à jour ;
 // - `onDelete?: (update: ProjectUpdate) => void` : la mise à jour dont on a touché la corbeille ;
 // - `moreError?: boolean` : la suite n'a pas pu se charger ; la frise garde ce qu'elle montre, dit
@@ -191,7 +191,7 @@ describe('UpdateTimeline', () => {
     expect(screen.queryByRole('button', { name: deleteLabel('Le mode nuit') })).toBeNull()
   })
 
-  // Plan R7a, « Précisions de TW-1 » (ajouté par U1d) : un autre membre signale une mise à jour
+  // Plan R7a, « Précisions » (ajouté par U1d) : un autre membre signale une mise à jour
   // depuis la frise ; le rappel reçoit celle dont il a touché le drapeau, et il n'a pas de corbeille.
   it('lets another member report the update they chose', async () => {
     const onReport = jest.fn()

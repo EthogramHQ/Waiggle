@@ -4,7 +4,7 @@
 // de l'API remet le projet tel qu'il était, et dit pourquoi quand réessayer ne servirait à rien
 // (200 testeurs, projet qui ne cherche plus de testeurs, session expirée, limite atteinte).
 //
-// L'interface attendue de `testers/api.ts` (agent U0), fixée par ces tests :
+// L'interface attendue de `testers/api.ts`, fixée par ces tests :
 // - `useBecomeTester(projectId)` → `{ join: () => Promise<boolean>, pending, error, reason? }` ;
 // - `useQuitTester(projectId)` → `{ quit: () => Promise<boolean>, pending, error, reason? }` ;
 // - `reason` : `'full'` (409 `testers_full`), `'notTestable'` (409 `not_testable`), `'expired'`

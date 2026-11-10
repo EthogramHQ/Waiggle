@@ -2,7 +2,7 @@
 // l'auteur, dont la pastille « Suivre » dit d'emblée si le membre qui regarde suit déjà l'auteur.
 // `Project.author` ne le dit pas : l'en-tête le lit par la page du membre (`useMember`, le même
 // hook que MemberScreen, sans changer l'API). Tant que la lecture n'a pas répondu, aucune pastille
-// (question de TW-3, tranchée par la session le 2/11 : pas de « Suivre » qui bascule).
+// (décision du 2/11 : pas de « Suivre » qui bascule).
 //
 // R6b (scénario « Les catégories en filtre », « La page d'un projet », relecture du plan,
 // décisions 15) : la catégorie à côté du statut, nommée par l'API (GET /v1/categories), est un lien

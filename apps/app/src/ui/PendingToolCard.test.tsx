@@ -4,7 +4,7 @@
 // « Rattacher à un outil », « Laisser hors du catalogue ». Une carte décidée garde sa place et
 // montre son résultat à la place de ses boutons (règle de la tranche 7a, relecture du plan ui-A).
 //
-// L'interface attendue de `src/ui/PendingToolCard.tsx` (fixée par la session au lancement de R6b) :
+// L'interface attendue de `src/ui/PendingToolCard.tsx` (fixée au lancement de R6b) :
 // PendingToolCard({ tool: PendingTool; outcome: { kind: 'admitted' } | { kind: 'merged'; target:
 // string } | { kind: 'dismissed' } | null; onAdmit(): void; onMerge(): void; onDismiss(): void;
 // onOpenProject(id: ProjectId): void }). La carte écrit ses textes elle-même

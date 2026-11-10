@@ -4,7 +4,7 @@
 // ancien, 50 par page. Une ancienne adresse rattachée mène à l'outil ; un « Autre » ou un nom
 // inconnu répond le même 404.
 // Scénario : docs/scenarios/refonte.md, « R6b », « La page d'un outil ». Règles du plan : décision 1
-// de la session (la page compte exactement ce que le lecteur voit, jur-T18), décision 2 (sec-A2 :
+// (la page compte exactement ce que le lecteur voit, jur-T18), décision 2 (sec-A2 :
 // un slug d'outil passe avant une ancienne adresse ; même 404), décision 12 (description par
 // langue, « xx » → français ; quota `toolsHour`).
 //

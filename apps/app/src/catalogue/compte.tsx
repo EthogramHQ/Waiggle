@@ -4,7 +4,7 @@
 // ouverte dans la page, en disposition téléphone et ordinateur, et la vraie Sheet par un bouton),
 // « Nouvel essai possible à… » (RetryAt bloqué, puis libéré de lui-même), et le pied collé d'un écran
 // (ScreenFooter, un et deux boutons). Fichier à part de CatalogueScreen.tsx, qui l'importe en une
-// ligne : plusieurs agents y travaillent en même temps. Ses exemples (un outil de développement,
+// ligne : le catalogue est partagé par toute l'interface. Ses exemples (un outil de développement,
 // absent de l'appli publiée) sont écrits ici, en français et en anglais, et passés en props : les
 // textes de la tranche arrivent par un autre commit.
 import { layout, radii, space } from '@ruche/brand'

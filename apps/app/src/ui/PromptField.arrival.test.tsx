@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (R6a, U3b) au champ d'un prompt : un texte reçu de l'écran (un
+// Tests ajoutés en R6a (U3b) au champ d'un prompt : un texte reçu de l'écran (un
 // brouillon rouvert) qui contient encore des caractères invisibles est nettoyé dès son arrivée, et
 // dit comme un collage. Le champ ne montre jamais un autre texte que celui qui sera publié.
 import { fireEvent, screen } from '@testing-library/react-native'

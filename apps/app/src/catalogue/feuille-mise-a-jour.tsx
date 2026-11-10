@@ -5,7 +5,7 @@
 // sur ordinateur ; puis la fenêtre « Abandonner cette mise à jour ? », pour de vrai.
 // Chaque exemple est vivant : on peut y écrire, ajouter ou retirer des lignes, allumer l'avant /
 // après ; rien ne part (les photos sont des images dessinées ici, sans API).
-// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne (posée par la session).
+// Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne.
 // Outil de développement : les exemples sont écrits ici ; les libellés viennent des traductions.
 import { layout, palettes, radii, space } from '@ruche/brand'
 import { type ReactNode, useState } from 'react'

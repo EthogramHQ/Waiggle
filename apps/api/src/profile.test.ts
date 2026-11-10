@@ -172,7 +172,7 @@ describe('completing my profile', () => {
 
 // --- Tranche R6b : les outils favoris se choisissent dans le catalogue ---
 // Scénario : docs/scenarios/refonte.md, section R6b (« Choisir ses outils » : « le profil n'a plus
-// de champ de texte séparé par des virgules… 10 au plus ») ; décisions 5, 6 et 14 de la session.
+// de champ de texte séparé par des virgules… 10 au plus ») ; décisions 5, 6 et 14 du plan.
 // Comme pour un projet : un nom du catalogue ou d'un alias est rattaché à l'outil, un autre nom
 // devient un « Autre » partagé, et chaque membre garde le nom tel qu'il l'a tapé. Les tables du
 // catalogue (tool, profile_tool) sont lues en SQL brut : elles n'existent pas encore dans le
@@ -322,7 +322,7 @@ describe('my favourite tools, chosen in the catalogue (R6b)', () => {
   })
 
   it('deletes my « other » tools with my account, and keeps those another member cites', async () => {
-    // Décision 14 de la session : les « Autre » orphelins du compte supprimé sont effacés, les
+    // Décision 14 du plan : les « Autre » orphelins du compte supprimé sont effacés, les
     // partagés gardés (sans auteur, de toute façon).
     const maxCookie = await ctx.verifiedMember(max)
     await patchMe({ favoriteTools: ['Mon robot maison', 'Teachable Machine'] })

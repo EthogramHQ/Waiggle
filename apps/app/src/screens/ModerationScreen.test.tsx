@@ -3,7 +3,7 @@
 // ou classe le signalement sans suite, et rétablit un contenu retiré. Pour tout autre membre, la
 // page n'existe pas.
 //
-// L'interface attendue de `src/moderation/api.ts` (écrit par ui-dev) :
+// L'interface attendue de `src/moderation/api.ts` :
 // - `useModerationQueue()` : la file (useInfiniteQuery, pages `ModerationQueuePage`) ;
 // - `useRemovedItems()` : les contenus retirés (useInfiniteQuery, pages `RemovedPage`) ;
 // - `useDecide()` : `{ decide }`, où `decide(input: ModerationDecisionInput)` rend un `ApiResult`

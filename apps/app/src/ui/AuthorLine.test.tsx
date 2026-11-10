@@ -1,7 +1,7 @@
 // Tests de la ligne de l'auteur d'un projet (R5a, AuthorLine) : un lien vers sa page (photo, nom,
 // pseudo) et, à côté, la pastille « Suivre » quand l'écran sait déjà si on le suit. Tant qu'il ne
 // le sait pas, aucune pastille : un « Suivre » qui deviendrait « Tu suis Léa » sous le doigt ferait
-// faire le geste inverse (question de TW-3, tranchée par la session le 2/11). La lecture elle-même
+// faire le geste inverse (décision du 2/11). La lecture elle-même
 // (la page du membre) est testée avec l'en-tête, dans projects/ProjectHeader.test.tsx.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { renderWithProviders } from '../testing/render'

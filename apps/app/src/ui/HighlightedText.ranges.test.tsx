@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (R3, ui-dev C3) : les positions surlignées, reportées du texte replié
+// Tests ajoutés en R3 (C3) : les positions surlignées, reportées du texte replié
 // vers le texte d'origine (emoji avant le mot, « œ » coupé en deux, mots qui se chevauchent), et le
 // cas d'un texte entièrement surligné, lu par un autre chemin que `getAllByText` : RNTL 14 n'y
 // garde que le texte le plus profond qui correspond (`matchDeepestOnly`), c'est-à-dire la partie

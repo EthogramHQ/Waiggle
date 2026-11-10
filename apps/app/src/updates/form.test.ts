@@ -208,7 +208,7 @@ describe('isDirty', () => {
     expect(isDirty(initial, initial, [uploading])).toBe(true)
   })
 
-  // Décision de la session (relecture B2) : une feuille préremplie par le changement de statut se
+  // Décision (relecture B2) : une feuille préremplie par le changement de statut se
   // ferme sur « Annuler » sans question ; on compare aux valeurs d'ouverture, pas à une feuille vide.
   it('compares with the values at opening, so a sheet prefilled by the status is not changed', () => {
     const prefilled: UpdateFormValues = {

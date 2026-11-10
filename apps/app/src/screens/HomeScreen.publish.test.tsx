@@ -263,7 +263,7 @@ describe('the feed after publishing a project (R6a)', () => {
     expect(screen.queryByText(published)).toBeNull()
   })
 
-  // Décision de la session (R6a, TW-A2) : l'API garde `followsAnyone: false` tant que le membre ne
+  // Décision (R6a) : l'API garde `followsAnyone: false` tant que le membre ne
   // suit personne, même quand son fil contient ses propres projets. Le premier lancement (les
   // proches à suivre) reste, sa carte vient dessous, et la danse la vise là aussi.
   it('shows the people to follow and the new card to a member who follows nobody, then « Projet publié »', async () => {

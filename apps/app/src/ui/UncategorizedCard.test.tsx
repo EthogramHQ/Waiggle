@@ -3,8 +3,7 @@
 // « Ranger dans une catégorie ». Une fois rangé, la carte garde sa place et dit dans quelle
 // catégorie, à la place du bouton (règle de la tranche 7a, relecture du plan ui-A).
 //
-// L'interface attendue de `src/ui/UncategorizedCard.tsx` (fixée par la session au lancement de
-// R6b) : UncategorizedCard({ project: UncategorizedProject; filedInto: string | null; onFile():
+// L'interface attendue de `src/ui/UncategorizedCard.tsx` (fixée au lancement de R6b) : UncategorizedCard({ project: UncategorizedProject; filedInto: string | null; onFile():
 // void; onOpenProject(): void }). `filedInto` : le nom de la catégorie où le projet vient d'être
 // rangé (« Animaux »), ou null tant qu'il ne l'est pas.
 import { fireEvent, screen } from '@testing-library/react-native'

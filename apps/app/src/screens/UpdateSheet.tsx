@@ -1,7 +1,7 @@
 // La feuille « Nouvelle mise à jour » (R7a, scénario « Publier une mise à jour », planche
 // R7-MAJ-Publier) : l'auteur raconte ce qui a changé dans son projet.
 //
-// La feuille a sa propre adresse, `/projects/<id>/update` (décision de la session : le Retour du
+// La feuille a sa propre adresse, `/projects/<id>/update` (décision de R7a : le Retour du
 // navigateur la ferme), posée sur la page du projet comme « Modifier » (`app/_layout.tsx`). Ouverte
 // sans page d'avant (une adresse tapée), elle dessine la page du projet dessous.
 //

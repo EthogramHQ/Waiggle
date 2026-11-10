@@ -149,7 +149,7 @@ describe('the « following » feed on the home screen', () => {
     // La règle (une seule action miel par écran), pas la couleur choisie pour « Réessayer » : au plus
     // un bouton au fond miel, et ce n'est pas lui. R3 : sur téléphone, l'action miel de l'écran
     // (« Publier ») est le « + » de la barre d'onglets, posée hors de HomeScreen ; l'écran lui-même
-    // n'en a donc plus aucune (test adapté par la session, F-Nav : la barre d'onglets).
+    // n'en a donc plus aucune (test adapté, F-Nav : la barre d'onglets).
     const honey = (element: ReturnType<typeof screen.getByRole>) =>
       StyleSheet.flatten(element.props.style)?.backgroundColor === palettes.day.honey
     const retry = screen.getByRole('button', { name: 'Réessayer' })

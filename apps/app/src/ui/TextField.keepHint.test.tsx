@@ -1,6 +1,6 @@
 // Tests de l'aide gardée sous l'erreur d'un champ (`keepHint`, tranche 7b) : sur la page
-// « Signaler », la phrase de bonne foi reste à lire quand « Dis-nous pourquoi » manque. À part de
-// components.test.tsx, que l'autre agent de la tranche peut modifier en même temps.
+// « Signaler », la phrase de bonne foi reste à lire quand « Dis-nous pourquoi » manque. Dans son propre fichier plutôt que dans
+// components.test.tsx, partagé par toute l'interface.
 import { screen } from '@testing-library/react-native'
 import { renderWithProviders } from '../testing/render'
 import { TextField } from './TextField'

@@ -354,7 +354,7 @@ describe('reporting a member from her page', () => {
 // --- Tranche 7b : bloquer un membre depuis sa page ---
 //
 // Scénario « Bloquer » : Malik choisit « Bloquer » dans le menu de la page d'Inès, lit ce qui va
-// changer, et confirme. Interface attendue de `src/blocks/api.ts` (écrit par ui-dev) :
+// changer, et confirme. Interface attendue de `src/blocks/api.ts` :
 // `useBlock()` → `{ block(memberId) }` et `useUnblock()` → `{ unblock(memberId) }`, qui rendent un
 // ApiResult et relisent la page du membre (['member', id]) une fois faits.
 
@@ -939,7 +939,7 @@ describe('sharing the page of a member', () => {
     expect(copyText).toHaveBeenCalledWith(leaUrl)
   })
 
-  // Décision de la session (R5a, questions de TW-3) : sur sa propre page aussi, à côté de la roue.
+  // Décision (R5a) : sur sa propre page aussi, à côté de la roue.
   it('offers « Partager » on one’s own page too, beside the settings', async () => {
     jest.mocked(getMember).mockResolvedValue({ ...leaPage, isMe: true })
     await renderWithProviders(<MemberScreen id="u1" />)
