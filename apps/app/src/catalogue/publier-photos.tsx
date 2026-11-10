@@ -8,7 +8,7 @@
 // travaillent en même temps. Ses libellés (un outil de développement, absent de l'appli publiée)
 // sont écrits ici, en français et en anglais ; les textes du composant viennent de l'appli.
 import { type ColorName, palettes } from '@ruche/brand'
-import { VISUALS_MAX } from '@ruche/contracts'
+import { UPDATE_PHOTOS_MAX, VISUALS_MAX } from '@ruche/contracts'
 import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ImageSource } from '../ui/image'
@@ -31,6 +31,9 @@ const fr = {
   failed: 'Une photo refusée : la raison sous sa tuile, les autres continuent',
   drop: 'Web, ordinateur : la zone de dépôt « Glisse tes images ici, ou choisis-les »',
   dropNote: '(sur téléphone et hors du web, la tuile « Ajouter » à la place)',
+  update:
+    'Une mise à jour en avant / après (cover={false}, badges) : « Avant » et « Après » sur les deux premières, aucune couverture, le menu sans « Mettre en couverture »',
+  updatePlain: 'Une mise à jour sans avant / après : ni badge ni couverture, une photo en route',
   portrait: 'La couverture verticale (VisualEditor), vide puis choisie',
   day: 'jour',
   night: 'nuit',
@@ -48,6 +51,9 @@ const en: typeof fr = {
   failed: 'A refused photo: the reason under its tile, the others go on',
   drop: 'Web, computer: the drop zone “Drag your images here, or choose them”',
   dropNote: '(on phones and outside the web, the “Add” tile instead)',
+  update:
+    'An update with a before / after (cover={false}, badges): “Before” and “After” on the first two, no cover, the menu without “Make cover”',
+  updatePlain: 'An update without before / after: no badge, no cover, one photo on its way',
   portrait: 'The vertical cover (VisualEditor), empty then chosen',
   day: 'day',
   night: 'night',
@@ -115,6 +121,13 @@ export function PublishPhotosCatalogue() {
   const l = i18n.language === 'en' ? en : fr
   const labels = usePhotoTilesLabels()
   const tooLarge = t(($) => $.project.form.photoTooLarge)
+  // La feuille « Nouvelle mise à jour » (R7a) : ses propres mots pour la liste et « Ajouter ».
+  const updateLabels: PhotoTilesLabels = {
+    ...labels,
+    list: t(($) => $.project.updates.photosLabel),
+    add: t(($) => $.project.updates.addPhotos),
+  }
+  const beforeAfter = [t(($) => $.project.updates.before), t(($) => $.project.updates.after)]
   const schemes = ['day', 'night'] as const
   const fixed = (tiles: PhotoTile[], selectedKey: string | null = null, drop = false) => (
     <PhotoTiles
@@ -157,6 +170,33 @@ export function PublishPhotosCatalogue() {
             </Example>
             <Example caption={`${l.drop} ${l.dropNote} — ${l[scheme]}`}>
               {fixed([photo(0), photo(1)], null, true)}
+            </Example>
+            <Example caption={`${l.update} — ${l[scheme]}`}>
+              <PhotoTiles
+                tiles={[photo(0), photo(1), photo(2)]}
+                max={UPDATE_PHOTOS_MAX}
+                labels={updateLabels}
+                selectedKey={null}
+                cover={false}
+                badges={beforeAfter}
+                onSelect={noop}
+                onAdd={noop}
+                onMove={noop}
+                onRemove={noop}
+              />
+            </Example>
+            <Example caption={`${l.updatePlain} — ${l[scheme]}`}>
+              <PhotoTiles
+                tiles={[photo(3), photo(4, 'uploading')]}
+                max={UPDATE_PHOTOS_MAX}
+                labels={updateLabels}
+                selectedKey={null}
+                cover={false}
+                onSelect={noop}
+                onAdd={noop}
+                onMove={noop}
+                onRemove={noop}
+              />
             </Example>
           </Stack>
         </ThemeProvider>

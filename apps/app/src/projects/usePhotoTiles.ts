@@ -14,7 +14,12 @@
 //   le dit la feuille (« Les photos s'enregistrent tout de suite »). Les photos enregistrées
 //   viennent du projet gardé en cache par React Query ; seules les photos en cours d'envoi, ou
 //   refusées, vivent dans l'état local.
-import { type Project, VISUALS_MAX } from '@ruche/contracts'
+// Un troisième, pour la feuille « Nouvelle mise à jour » (R7a) : `usePhotoTiles(id, { slot: 'update',
+// max: 4 })`. Chaque photo part tout de suite (`slot=update`) et devient une photo « en attente » du
+// serveur, qui rend son identifiant (pas le projet, qui ne change pas : le cache n'est pas touché).
+// La mise à jour citera ces identifiants en se publiant (`photos`). Retirer une photo l'efface du
+// serveur ; « Abandonner » efface toutes celles de la feuille (`discardPending`, relecture A11).
+import { type Project, UPDATE_PHOTOS_MAX, VISUALS_MAX } from '@ruche/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -22,7 +27,7 @@ import type { ApiErrorKey, ApiResult } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { type PickedImage, pickVisuals } from '../media/pick'
 import type { PhotoTile } from '../ui/PhotoTiles'
-import { deleteVisual, updateProject, updateVisual, uploadVisual } from './api'
+import { deletePendingVisual, deleteVisual, updateProject, updateVisual, uploadVisual } from './api'
 import { projectQueryKey, useProject, useSetProject } from './hooks'
 
 /** Les gestes que `PhotoTiles` attend (hors `onSelect`, que le hook rend à part : `select`). */
@@ -42,9 +47,30 @@ export type PhotosCut = { count: number; max: number }
 /** Ce que `flushPending` rend : combien de photos n'ont pas pu partir (0 : tout est enregistré). */
 export type FlushResult = { failed: number }
 
+/** Le réglage du hook : la galerie d'un projet (par défaut), ou les photos d'une mise à jour. */
+export type PhotoTilesOptions = {
+  slot?: 'gallery' | 'update'
+  /** Le nombre de photos au plus ; par défaut `VISUALS_MAX` (galerie) ou `UPDATE_PHOTOS_MAX`. */
+  max?: number
+}
+
+/**
+ * Une photo de la mise à jour, telle que la feuille la publie (la forme d'`UpdateFormPhoto`, plus la
+ * clé de sa tuile). `id` vaut null tant que l'envoi n'est pas fini ; une photo refusée n'y est pas.
+ */
+export type UpdatePhoto = {
+  key: string
+  id: string | null
+  /** La description tapée, sans les blancs autour ; null si elle est vide. */
+  description: string | null
+  uploading: boolean
+}
+
 /** Une photo qui n'est pas (encore) dans le projet du serveur. */
 type LocalPhoto = {
   key: string
+  /** Mise à jour : l'identifiant de la photo en attente, donné par le serveur à la fin de l'envoi. */
+  id?: string
   /** Ce qu'on dessine : l'adresse choisie, puis celle de l'image préparée. */
   uri: string
   state: PhotoTile['state']
@@ -61,7 +87,7 @@ const savedProject = (
 ): Project | undefined => queryClient.getQueryData<Project>(projectQueryKey(id))
 
 /** Un envoi ou une écriture qui lève (réseau coupé, fichier illisible) devient une erreur « network ». */
-const safely = async (call: () => Promise<ApiResult<Project>>): Promise<ApiResult<Project>> => {
+const safely = async <T>(call: () => Promise<ApiResult<T>>): Promise<ApiResult<T>> => {
   try {
     return await call()
   } catch {
@@ -69,7 +95,9 @@ const safely = async (call: () => Promise<ApiResult<Project>>): Promise<ApiResul
   }
 }
 
-export function usePhotoTiles(projectId?: string) {
+export function usePhotoTiles(projectId?: string, options: PhotoTilesOptions = {}) {
+  const forUpdate = options.slot === 'update'
+  const max = options.max ?? (forUpdate ? UPDATE_PHOTOS_MAX : VISUALS_MAX)
   const { t } = useTranslation()
   const toSource = useMediaSources()
   const queryClient = useQueryClient()
@@ -83,8 +111,9 @@ export function usePhotoTiles(projectId?: string) {
     const current = savedProject(queryClient, project.id)
     setWholeProject(current ? { ...project, portraitCover: current.portraitCover } : project)
   }
-  // En modification : le projet tel qu'il est dans le cache, tenu à jour après chaque geste.
-  const saved = useProject(projectId ?? '', Boolean(projectId)).data
+  // En modification : le projet tel qu'il est dans le cache, tenu à jour après chaque geste. Une
+  // mise à jour ne montre pas la galerie du projet : elle ne le lit pas.
+  const saved = useProject(projectId ?? '', Boolean(projectId) && !forUpdate).data
 
   // L'état est doublé d'une `ref` (une boîte qui garde sa valeur d'un affichage à l'autre, sans en
   // provoquer un) : les gestes asynchrones y lisent la valeur la plus récente, pas celle de
@@ -133,8 +162,13 @@ export function usePhotoTiles(projectId?: string) {
   }
   /** Les ajouts de photos en cours (choix puis préparation), que `flushPending` attend. */
   const adds = useRef(new Set<Promise<void>>())
+  /**
+   * Mise à jour : les photos retirées (ou abandonnées) pendant leur envoi. Le serveur ne les connaît
+   * pas encore ; dès qu'il rend leur identifiant, on les efface, pour ne rien laisser en attente.
+   */
+  const dropped = useRef(new Set<string>())
 
-  const savedPhotos = projectId ? (saved?.visuals ?? []) : []
+  const savedPhotos = projectId && !forUpdate ? (saved?.visuals ?? []) : []
   const total = savedPhotos.length + local.length
   const countRef = useRef(0)
   countRef.current = total
@@ -146,6 +180,8 @@ export function usePhotoTiles(projectId?: string) {
     if (error === 'payloadTooLarge') return t(($) => $.project.form.photoTooLarge)
     if (error === 'unsupportedMediaType') return t(($) => $.project.form.photoWrongType)
     if (error === 'tooManyVisuals') return t(($) => $.project.form.photoTooMany)
+    // Mise à jour : 100 photos de mises à jour par projet au plus (décision du 10/11/2026).
+    if (error === 'updatePhotosFull') return t(($) => $.project.updates.photosFull)
     return t(($) => $.project.form.photoUploadError)
   }
 
@@ -175,6 +211,26 @@ export function usePhotoTiles(projectId?: string) {
 
   // --- Ajouter ---
 
+  /**
+   * Mise à jour : efface une photo en attente. Un échec ne se dit pas : la photo n'est plus sur la
+   * feuille, la mise à jour ne la citera pas, et le serveur efface d'elle-même une photo en attente
+   * après 24 heures (ou la remplace par une cinquième, relecture A11).
+   */
+  const erase = (id: string, visualId: string) => safely(() => deletePendingVisual(id, visualId))
+
+  /** Mise à jour : envoie une photo en attente ; son identifiant reste sur la tuile. */
+  const uploadPending = (id: string, key: string, image: PickedImage) =>
+    enqueue(async () => {
+      const result = await safely(() => uploadVisual(id, image, 'update'))
+      if (dropped.current.delete(key)) {
+        // Retirée pendant l'envoi : le serveur l'a peut-être reçue, on l'efface aussitôt.
+        if (result.ok) await erase(id, result.data.id)
+        return
+      }
+      if (result.ok) patchLocal(key, { state: 'ready', id: result.data.id })
+      else patchLocal(key, { state: 'failed', reason: result.error })
+    })
+
   /** Envoie une photo au projet enregistré (modification) ; une échec reste sur sa tuile. */
   const uploadNow = (id: string, key: string, image: PickedImage) =>
     enqueue(async () => {
@@ -190,7 +246,7 @@ export function usePhotoTiles(projectId?: string) {
   /** Pose des tuiles pour des images choisies, en coupant au-delà des places libres. */
   const place = (images: PickedImage[], remaining: number): string[] => {
     const kept = images.slice(0, remaining)
-    setCut(images.length > kept.length ? { count: kept.length, max: VISUALS_MAX } : null)
+    setCut(images.length > kept.length ? { count: kept.length, max } : null)
     const added = kept.map((image) => ({
       key: newKey(),
       uri: image.uri,
@@ -206,6 +262,12 @@ export function usePhotoTiles(projectId?: string) {
       const image = images[index]
       if (!image) {
         removeLocal(key)
+      } else if (!localRef.current.some((one) => one.key === key)) {
+        // Retirée (ou abandonnée) pendant sa préparation : elle ne part pas.
+        return
+      } else if (projectId && forUpdate) {
+        patchLocal(key, { uri: image.uri, prepared: image })
+        void uploadPending(projectId, key, image)
       } else if (projectId) {
         patchLocal(key, { uri: image.uri, prepared: image })
         void uploadNow(projectId, key, image)
@@ -216,10 +278,11 @@ export function usePhotoTiles(projectId?: string) {
   }
 
   const add = async () => {
-    const remaining = VISUALS_MAX - countRef.current
+    const remaining = max - countRef.current
     if (remaining < 1) return
     let keys: string[] = []
     try {
+      // `gallery` aussi pour une mise à jour : plusieurs photos d'un coup, proportions gardées.
       const images = await pickVisuals('gallery', remaining, (chosen) => {
         keys = place(chosen, remaining)
       })
@@ -242,7 +305,7 @@ export function usePhotoTiles(projectId?: string) {
     const images = files
       .filter((file) => file.type.startsWith('image/'))
       .map((file) => ({ uri: URL.createObjectURL(file), width: 0, height: 0 }))
-    const remaining = VISUALS_MAX - countRef.current
+    const remaining = max - countRef.current
     if (images.length === 0 || remaining < 1) return
     prepared(place(images, remaining), images)
   }
@@ -261,7 +324,8 @@ export function usePhotoTiles(projectId?: string) {
       if (item !== undefined) copy.splice(to, 0, item)
       return copy
     }
-    if (!projectId) {
+    // Création et mise à jour : l'ordre vit sur l'appareil (une mise à jour l'envoie en se publiant).
+    if (!projectId || forUpdate) {
       if (from < localRef.current.length && to < localRef.current.length) {
         setLocal(reorder(localRef.current))
       }
@@ -286,8 +350,27 @@ export function usePhotoTiles(projectId?: string) {
     })
   }
 
+  /** Mise à jour : la photo quitte la feuille tout de suite ; le serveur l'efface ensuite. */
+  const forget = (id: string, one: LocalPhoto) => {
+    removeLocal(one.key)
+    const visualId = one.id
+    if (visualId) void enqueue(() => erase(id, visualId).then(() => undefined))
+    else if (one.state === 'uploading') dropped.current.add(one.key)
+  }
+
+  /** « Abandonner » la mise à jour : toutes ses photos en attente sont effacées du serveur. */
+  const discardPending = async () => {
+    if (!projectId || !forUpdate) return
+    for (const one of localRef.current) forget(projectId, one)
+    await queue.current
+  }
+
   const onRemove = (key: string) => {
     const mine = localRef.current.find((one) => one.key === key)
+    if (forUpdate) {
+      if (mine && projectId) forget(projectId, mine)
+      return
+    }
     if (mine || !projectId) {
       // Une photo qui n'est pas sur le serveur : on l'oublie, sauf si elle est en plein envoi.
       if (mine && (projectId ? mine.state !== 'uploading' : true)) removeLocal(key)
@@ -343,12 +426,20 @@ export function usePhotoTiles(projectId?: string) {
    * pas). Rend le nombre de photos qui n'ont pas pu partir.
    */
   const flushPending = (id: string): Promise<FlushResult> => {
+    // Mise à jour : les descriptions partent avec elle ; on attend seulement la fin des envois.
+    if (forUpdate) return settleUploads()
     if (projectId) return flushDescriptions(id)
     // Deux appels de suite (double tape) partagent le même envoi : jamais une photo en double.
     flushing.current ??= createPhotos(id).finally(() => {
       flushing.current = null
     })
     return flushing.current
+  }
+
+  const settleUploads = async (): Promise<FlushResult> => {
+    await Promise.allSettled([...adds.current])
+    await queue.current
+    return { failed: localRef.current.filter((one) => one.state === 'failed').length }
   }
 
   const flushDescriptions = async (id: string): Promise<FlushResult> => {
@@ -415,5 +506,26 @@ export function usePhotoTiles(projectId?: string) {
     },
     /** Des photos sont encore en préparation sur l'appareil : « Publier » peut attendre. */
     preparing: local.some((one) => one.state === 'uploading' && !one.prepared),
+    /**
+     * Mise à jour : les photos à publier, dans l'ordre des tuiles (pour `toPayload`) ; vide dans
+     * les autres modes. Une photo refusée n'y est pas.
+     */
+    photos: forUpdate
+      ? local
+          .filter((one) => one.state !== 'failed')
+          .map(
+            (one): UpdatePhoto => ({
+              key: one.key,
+              id: one.id ?? null,
+              description: drafts[one.key]?.trim() || null,
+              uploading: one.state === 'uploading',
+            }),
+          )
+      : [],
+    /**
+     * Mise à jour : « Abandonner » efface du serveur toutes les photos en attente de la feuille
+     * (celles en plein envoi, dès que le serveur les a). Rend la main quand tout est parti.
+     */
+    discardPending,
   }
 }
