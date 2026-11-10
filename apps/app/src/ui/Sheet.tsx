@@ -227,9 +227,23 @@ export type SheetNotice = {
 
 type Props = Omit<
   PanelProps,
-  'layout' | 'maxHeight' | 'closeRef' | 'panelRef' | 'keys' | 'titleId' | 'dragHandlers'
+  | 'layout'
+  | 'maxHeight'
+  | 'closeRef'
+  | 'panelRef'
+  | 'keys'
+  | 'titleId'
+  | 'dragHandlers'
+  | 'tapsAllowed'
 > & {
   open: boolean
+  /**
+   * Garde de double tape sur demande (R7a) : vrai, « Annuler », l'action et les boutons du pied
+   * ignorent une tape pendant `TAP_GUARD_MS` après l'ouverture (la feuille s'ouvre sous le doigt
+   * d'un bouton à action forte : « Quitter les testeurs », « Publier »). Faux (défaut), rien ne
+   * change. Le voile est toujours gardé.
+   */
+  guardTaps?: boolean
   /**
    * Où poser le focus à l'ouverture (le champ, pour « Écrire un commentaire ») ; sans lui, ou s'il
    * n'est pas encore là, « Fermer ». Sur le web, sans défilement ; sur téléphone, une fois la
@@ -584,6 +598,7 @@ export function Sheet({
   closeGuard,
   aside,
   busy = false,
+  guardTaps = false,
   initialFocusRef,
   returnFocusTo,
   ...panel
@@ -1042,7 +1057,7 @@ export function Sheet({
             {...(aside !== undefined && besideRoom ? { aside } : null)}
             onClose={requestClose}
             busy={busy}
-            tapsAllowed={tapsAllowed}
+            tapsAllowed={!guardTaps || tapsAllowed}
             layout={phone ? 'phone' : 'desktop'}
             maxHeight={(visible?.height ?? window.height) - 2 * PANEL_MARGIN}
             closeRef={closeRef}
