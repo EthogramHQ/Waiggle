@@ -1,6 +1,6 @@
 // Ce que la page « Modération » écrit d'un signalement, et où mène son lien « Voir ». Des fonctions
 // pures, à part des hooks de api.ts : les tests de l'écran remplacent api.ts sans perdre celles-ci.
-import type { ReportReason, ReportTarget } from '@ruche/contracts'
+import type { ReportReason, StoredReportTarget } from '@ruche/contracts'
 import type { Href } from 'expo-router'
 
 /**
@@ -22,7 +22,7 @@ export const reasonTextKey = {
  * contenu (un commentaire ou une note se lisent sur leur projet). Construit depuis la sorte et
  * l'identifiant, jamais depuis un texte écrit par un membre (règle 22 de la relecture du plan).
  */
-export const viewHref = (target: ReportTarget, projectId: string | null): Href => {
+export const viewHref = (target: StoredReportTarget, projectId: string | null): Href => {
   if (target.kind === 'member') return { pathname: '/members/[id]', params: { id: target.id } }
   // Pour un projet, son propre identifiant ; pour une note ou un commentaire, celui de son projet.
   const id = projectId ?? target.id
@@ -30,4 +30,4 @@ export const viewHref = (target: ReportTarget, projectId: string | null): Href =
 }
 
 /** Une clé stable pour une cible (« comment:c0d1… »), pour les listes et l'action en cours. */
-export const targetKey = (target: ReportTarget) => `${target.kind}:${target.id}`
+export const targetKey = (target: StoredReportTarget) => `${target.kind}:${target.id}`

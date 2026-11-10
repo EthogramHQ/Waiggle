@@ -61,6 +61,23 @@ export const presentNotification = (
         quote: null,
         target: projectRoute(notification.project.id),
       }
+    case 'project_update': {
+      // R7a : une mise à jour d'un projet qu'on suit ou qu'on teste. Le nom de l'auteur (déjà affiché
+      // sur la page du projet), le projet et la version s'il y en a une ; la première ligne de « Ce
+      // qui a changé » dessous ; au toucher, la frise des mises à jour du projet.
+      const { author, project, update } = notification
+      const name = author.name
+      const title = project.title
+      return {
+        icon: 'arrows-clockwise',
+        text: update.version
+          ? t(($) => $.notifications.projectUpdateVersion, { name, title, version: update.version })
+          : t(($) => $.notifications.projectUpdate, { name, title }),
+        detail: update.firstLine.text,
+        quote: null,
+        target: { pathname: '/projects/[id]/updates', params: { id: project.id } },
+      }
+    }
     case 'member_follows':
       // Sans nom, elle n'a rien à montrer de plus : elle ne mène nulle part.
       return {
