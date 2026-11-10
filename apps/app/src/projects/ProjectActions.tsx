@@ -281,6 +281,7 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
   const problem = showProblem && change.error ? (change.reason ?? 'failed') : null
 
   const openTesters = () => {
+    sending.current = false
     setShowProblem(false)
     setSheet({ mode: project.isTester ? 'member' : 'join', open: true })
   }
@@ -294,11 +295,14 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
     // `isTester` change dans le cache au toucher : le bouton de la page, sous la feuille, change
     // aussitôt ; la feuille, elle, garde son texte jusqu'à la réponse.
     const done = joining ? await become.join() : await quit.quit()
-    sending.current = false
     if (!done) {
+      sending.current = false
       setShowProblem(true)
       return
     }
+    // Accepté : `sending` reste levé jusqu'à la prochaine ouverture. La feuille part en fondu, sa
+    // confirmation encore sous le doigt : la seconde tape d'un double clic, après une réponse
+    // rapide, renvoyait sinon la demande (deux POST, vus dans le navigateur à 1280 px).
     // La feuille se ferme d'abord : une bulle posée pendant une feuille ouverte resterait cachée.
     closeTesters()
     toast.show(
