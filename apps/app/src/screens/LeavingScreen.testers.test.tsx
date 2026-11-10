@@ -153,10 +153,10 @@ describe('the testers line of the page that leaves for a demo (R7a)', () => {
     // Le profil du membre dit qu'il est suspendu : la page ne l'invite pas à rejoindre.
     jest
       .mocked(request)
-      .mockImplementation(async (path) =>
-        String(path) === '/v1/me'
-          ? { ok: true, data: { ...suspendedMe, id: 'u3', name: 'Inès' } }
-          : { ok: false, error: { status: 404, code: 'not_found' } },
+      .mockImplementation(async (path: string) =>
+        path === '/v1/me'
+          ? { ok: true as const, data: { ...suspendedMe, id: 'u3', name: 'Inès' } }
+          : { ok: false as const, error: 'notFound' as const },
       )
     await renderWithProviders(<LeavingScreen url={url} project={id} />)
 
