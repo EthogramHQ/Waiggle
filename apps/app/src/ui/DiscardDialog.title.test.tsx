@@ -39,7 +39,7 @@ describe('DiscardDialog with its own words (R7a)', () => {
   it('shows the title and message it is given', async () => {
     await showForUpdate()
 
-    expect(screen.getByRole('heading', { name: 'Abandonner cette mise à jour ?' })).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Abandonner cette mise à jour ?' })).toBeTruthy()
     expect(screen.getByText(UPDATE_BODY)).toBeTruthy()
     // Les textes communs laissent leur place.
     expect(screen.queryByText(fr.t(($) => $.common.discardTitle))).toBeNull()
