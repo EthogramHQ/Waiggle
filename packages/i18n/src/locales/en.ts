@@ -621,10 +621,13 @@ export const en: Translation = {
         'Your project is now “{{status}}”. It is private: nobody will be notified. Post this update to keep it, or touch Cancel.',
       required: 'Write at least one change before posting.',
       photosUploading: 'Wait until the photos have finished uploading.',
+      photoDescriptionHint:
+        'Read aloud by screen readers, for everyone who sees the update. Don’t name anyone without their consent.',
+      versionRead: 'version {{version}}',
       photosFull: 'This project has reached 100 update photos. Delete an old update to add more.',
       published: 'Update posted.',
       error: 'The update could not be posted. Try again.',
-      limited: 'You posted 10 updates today. The next one can go out tomorrow.',
+      limited: 'You posted 10 updates in 24 hours. The next one can go out a little later.',
       discardTitle: 'Discard this update?',
       discardBody: 'What you wrote and the photos you added will be lost.',
       keepEditing: 'Keep editing',
@@ -663,7 +666,7 @@ export const en: Translation = {
       joined: 'You test this project',
       joinTitle: 'Join the testers',
       joinBody:
-        'You help {{name}} improve “{{title}}”. You will receive their updates, and soon their calls for testing. {{name}} will see your name in their list of testers.',
+        'You help {{name}} improve “{{title}}”. You will receive their updates, and soon their calls for testing. {{name}} will see your name and photo in their list of testers.',
       confirm: 'Join the testers',
       cancel: 'Cancel',
       joinedToast: 'You are one of the testers of “{{title}}”.',

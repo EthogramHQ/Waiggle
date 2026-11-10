@@ -733,9 +733,15 @@ export const fr = {
       // Décision de Louis du 10/11/2026 (sécurité A10) : 100 photos de mises à jour par projet.
       photosFull:
         'Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour en ajouter.',
+      // juridique (relecture R7a, C1) : l'aide de la description d'une photo de mise à jour.
+      photoDescriptionHint:
+        'Lue à voix haute par les lecteurs d’écran, pour chaque personne qui voit la mise à jour. Ne nomme personne sans son accord.',
+      // Le nom lu de la version (relecture de l'interface, S1) : « version 1.2 », pas « v1.2 ».
+      versionRead: 'version {{version}}',
       published: 'Mise à jour publiée.',
       error: 'La mise à jour n’a pas pu être publiée. Réessaie.',
-      limited: 'Tu as publié 10 mises à jour aujourd’hui. La suivante pourra partir demain.',
+      limited:
+        'Tu as publié 10 mises à jour en 24 heures. La suivante pourra partir un peu plus tard.',
       // « Abandonner » efface aussi les photos déjà envoyées (sécurité A11).
       discardTitle: 'Abandonner cette mise à jour ?',
       discardBody: 'Ce que tu as écrit et les photos ajoutées seront perdus.',
@@ -768,7 +774,7 @@ export const fr = {
       after: 'Après',
       beforeDescribed: 'Avant : {{description}}',
       afterDescribed: 'Après : {{description}}',
-      compareValue: '{{value}} %',
+      compareValue: '{{value}} %',
       compareHint: 'Fais glisser la poignée, ou utilise les flèches du clavier, pour comparer.',
       // La page de la frise (U4b) : le lien qui ramène au projet, et le nom de l'onglet.
       ofProject: '{{title}}, par {{name}}',
@@ -781,7 +787,7 @@ export const fr = {
       joined: 'Tu testes ce projet',
       joinTitle: 'Rejoindre les testeurs',
       joinBody:
-        'Tu aides {{name}} à améliorer « {{title}} ». Tu recevras ses mises à jour, et bientôt ses appels à tester. {{name}} verra ton nom dans sa liste de testeurs.',
+        'Tu aides {{name}} à améliorer « {{title}} ». Tu recevras ses mises à jour, et bientôt ses appels à tester. {{name}} verra ton nom et ta photo dans sa liste de testeurs.',
       confirm: 'Rejoindre les testeurs',
       cancel: 'Annuler',
       joinedToast: 'Tu fais partie des testeurs de « {{title}} ».',
