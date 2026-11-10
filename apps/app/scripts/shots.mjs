@@ -205,22 +205,72 @@ const pendingEmail = (email) => async (page) => {
   await page.getByText(email, { exact: false }).first().waitFor()
 }
 const emailOf = { current: leaMe.email, changed: changeEmailShot.newEmail }
-// Les notes du journal (tranche 4b), de la plus récente à la plus ancienne. Une note, pour l'API
-// simulée : son identifiant, son texte, et le jour (d'octobre 2026) de sa publication.
-const note = (n, body, day) => ({
-  id: `0b1c2d3e-4f50-4a61-8b72-00000000000${n}`,
-  body,
+// R7a : les mises à jour, qui remplacent les notes du Journal, de la plus récente à la plus
+// ancienne. Une mise à jour, pour l'API simulée : son numéro, ce qu'elle dit, et le jour (d'octobre
+// 2026) de sa publication. Des titres et des familles variés : avec ou sans titre, avec ou sans
+// version, une avec deux photos en avant / après.
+const update = (
+  n,
+  { title = null, version = null, lines, photos = [], beforeAfter = false },
+  day,
+) => ({
+  id: `5e6f7a8b-9c0d-4e1f-8a2b-0000000000${String(n).padStart(2, '0')}`,
+  title,
+  version,
+  lines,
+  photos,
+  beforeAfter,
   createdAt: new Date(Date.UTC(2026, 9, day, 9)).toISOString(),
   // Le retrait par la modération (tranche 7a) : aucun par défaut.
   removal: null,
 })
-const recipesNotes = [
-  note(3, 'v2 : mode hors ligne. Les recettes se lisent même sans réseau, au fond du jardin.', 18),
-  note(2, 'Il propose maintenant un dessert quand il reste des fruits.', 15),
-  note(1, 'Première version en ligne : photographie ton frigo, il te dit quoi cuisiner.', 12),
+const line = (family, text) => ({ family, text })
+/** La version courte d'une mise à jour, comme sur une carte du fil (`UpdateSummary`). */
+const summaryOfUpdate = ({ id, createdAt, version, lines }) => ({
+  id,
+  at: createdAt,
+  version,
+  firstLine: lines[0],
+  lineCount: lines.length,
+})
+const recipesUpdates = [
+  update(
+    3,
+    {
+      title: 'Le mode hors ligne',
+      version: 'v1.2',
+      lines: [
+        line('new', 'Les recettes se lisent même sans réseau, au fond du jardin'),
+        line('fixed', 'Le minuteur ne s’arrête plus quand l’écran se met en veille'),
+        line('polish', 'Des photos de plats plus grandes'),
+      ],
+      photos: [
+        photo('5e6f7a8b-0000-4000-8000-0000000000a1', 1600, 900, 'Le frigo, avant la recette'),
+        photo('5e6f7a8b-0000-4000-8000-0000000000a2', 1600, 900, 'La tarte aux pommes proposée'),
+      ],
+      beforeAfter: true,
+    },
+    18,
+  ),
+  update(2, { version: 'v1.1', lines: [line('new', 'Un dessert quand il reste des fruits')] }, 15),
+  update(
+    1,
+    {
+      title: 'Première version en ligne',
+      lines: [line('new', 'Photographie ton frigo, il te dit quoi cuisiner')],
+    },
+    12,
+  ),
 ]
-// Le projet de Léa, vu par elle-même : son journal, avec « Supprimer » sur chaque note.
-const recipesShown = { ...recipesProject, notes: recipesNotes }
+// Le projet de Léa, vu par elle-même : la section « Les mises à jour », la corbeille sur chacune,
+// et « 4 testeurs » à côté de ses abonnés (le nombre, pour elle seule).
+const recipesShown = {
+  ...recipesProject,
+  latestUpdate: recipesUpdates[0],
+  updateCount: 3,
+  version: 'v1.2',
+  testerCount: 4,
+}
 // Une note de 1 000 caractères, et une adresse sans espace : rien ne doit déborder.
 const longNote = Array.from({ length: 20 }, () => 'Une note très longue, pour voir la coupure. ')
   .join('')
@@ -250,7 +300,23 @@ const longProject = {
     },
     { label: 'Claude Code', slug: 'claude-code', inCatalogue: true },
   ],
-  notes: [note(5, longNote, 17), note(4, urlNote, 16)],
+  latestUpdate: update(
+    5,
+    {
+      title: 'Un très long titre de mise à jour, pour voir où il se coupe bien'.slice(0, 60),
+      version: 'v2026.10.17-beta.12',
+      lines: [
+        line('new', longNote.slice(0, 120)),
+        line('fixed', urlNote.slice(0, 120)),
+        line('polish', longNote.slice(120, 240)),
+        line('new', longNote.slice(240, 360)),
+        line('fixed', longNote.slice(360, 480)),
+      ],
+    },
+    17,
+  ),
+  updateCount: 2,
+  version: 'v2026.10.17-beta.12',
 }
 // Le projet d'un autre membre (Max) : le bouton « Suivre ce projet », son journal (sans
 // « Supprimer »), et, ouvert en modification, l'état « Ce projet n'est pas à toi ».
@@ -260,7 +326,9 @@ const notMineProject = {
   author: { id: 'max-id', name: 'Max Durand', avatarUrl: null },
   isMine: false,
   followerCount: 2,
-  notes: recipesNotes.slice(1),
+  latestUpdate: recipesUpdates[1],
+  updateCount: 2,
+  version: 'v1.1',
 }
 // Un autre projet de Max, très commenté (tranche 5) : les fils, leurs réponses, les emplacements.
 const commentedProject = {
@@ -461,19 +529,45 @@ const moderatedPage = (page, admin) => ({
   ...page,
   moderation: admin ? (moderationOf[page.id] ?? null) : null,
 })
-// Le fil « Abonnements » mêle aux nouveaux projets les notes des projets suivis (tranche 4b) : une
-// note du tri des photos (avec sa couverture) tout en haut, une de l'agent de recettes (sans photo,
-// la lumière miel) plus bas. « Découvrir » ne montre jamais de note.
-const noteItem = (project, n, body, day) => ({
-  kind: 'note',
-  at: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
-  note: { ...note(n, body, day), createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString() },
-  project: { ...summaryOf(project), reactionTotal: feedTotals[fromOthers.indexOf(project)] ?? 0 },
-})
+// Le fil « Abonnements » (R7a) : la carte d'un projet suivi remonte à la date de sa mise à jour,
+// avec « Mis à jour · v2 », sa première ligne et « et 2 autres changements » (le tri des photos,
+// tout en haut) ; une autre plus bas, sans version ni autre ligne. « Découvrir » garde l'ordre de
+// publication.
+const updateItem = (project, n, content, day) => {
+  const raised = {
+    ...update(n, content, day),
+    createdAt: new Date(Date.UTC(2026, 9, day, 12)).toISOString(),
+  }
+  const summary = summaryOfUpdate(raised)
+  return {
+    kind: 'update',
+    at: raised.createdAt,
+    update: summary,
+    project: {
+      ...summaryOf(project),
+      reactionTotal: feedTotals[fromOthers.indexOf(project)] ?? 0,
+      latestUpdate: summary,
+      version: raised.version,
+    },
+  }
+}
+const photosUpdate = {
+  version: 'v2',
+  lines: [
+    line('new', 'Il reconnaît maintenant les visages de profil'),
+    line('fixed', 'Les photos de nuit ne sont plus rangées à part'),
+    line('polish', 'Des albums aux couleurs du lieu'),
+  ],
+}
 const followingItems = [
-  noteItem(fromOthers[0], 6, 'v2 : il reconnaît maintenant les visages de profil.', 19),
+  updateItem(fromOthers[0], 6, photosUpdate, 19),
   ...feedItems.slice(0, 2),
-  noteItem(fromOthers[1], 7, longNote, 17),
+  updateItem(
+    fromOthers[1],
+    7,
+    { title: 'Moins de clics', lines: [line('polish', longNote.slice(0, 120))] },
+    17,
+  ),
   ...feedItems.slice(2),
 ]
 // R4, « Proches à suivre » (GET /v1/suggestions/members) : cinq membres qui ont publié
@@ -545,14 +639,14 @@ const cardProjects = new Map([
   ...fromOthers.map((project) => [project.id, { ...project, isMine: false }]),
   ...suggestedMembers.map(({ latestProject: { cover, reactionTotal, ...summary } }) => [
     summary.id,
-    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [] },
   ]),
   // Les cartes d'« Ils cherchent des testeurs » (Explorer) : sans leur page, la carte menait à
   // « Ce projet est introuvable » (relecture design de RF, point 7). Même façon que les suggestions :
   // le projet de recettes, avec le titre, l'auteur, la démo et la photo de la carte.
   ...testerItems.map(({ project: { cover, reactionTotal, ...summary } }) => [
     summary.id,
-    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [], notes: [] },
+    { ...recipesProject, ...summary, isMine: false, visuals: cover ? [cover] : [] },
   ]),
 ])
 // R4, « Tu es à jour » : `lastReadAt` est la date retenue par le serveur, celle du premier élément
@@ -691,13 +785,21 @@ const removedProject = {
   title: 'Avis express',
   pitch: 'Il rédige des avis cinq étoiles pour les boutiques de ses amis.',
   removal: { ...removalAfterReport, explanation: 'Écrire de faux avis n’est pas permis ici.' },
-  notes: [
-    {
-      ...note(7, 'v2 : il publie les avis tout seul, sur plusieurs sites à la fois.', 19),
-      removal: { ...removalByLaw, explanation: 'Publier de faux avis est une pratique interdite.' },
-    },
-    note(6, 'Première version : il propose trois avis à recopier.', 14),
-  ],
+  latestUpdate: {
+    ...update(
+      8,
+      {
+        title: 'Les avis automatiques',
+        version: 'v2',
+        lines: [line('new', 'Il publie les avis tout seul, sur plusieurs sites à la fois')],
+      },
+      19,
+    ),
+    removal: { ...removalByLaw, explanation: 'Publier de faux avis est une pratique interdite.' },
+  },
+  updateCount: 2,
+  // La version d'une mise à jour retirée ne compte pas : celle d'avant.
+  version: 'v1',
 }
 // R5b (K5) : le même projet retiré, sans aucun commentaire : l'aperçu dit « emptyRemoved », sans
 // champ ni bouton (rien ne s'y ajoute).
@@ -772,7 +874,8 @@ const launchProject = {
     'Transforme ce plan en tableau : une ligne par séance, avec le jour, la durée, l’allure visée et un conseil court.',
     'Lis https://www.example.org/conseils-10-km et résume les cinq conseils les plus utiles pour un débutant, en une phrase chacun.',
   ],
-  notes: recipesNotes.slice(2),
+  latestUpdate: recipesUpdates[2],
+  updateCount: 1,
 }
 // Tranche R6a, la feuille de modification (planches `R6-Modifier`, `R6-Publier-Suite`) : un projet
 // de Léa à trois photos décrites, deux catégories, « Commencé en » et « Facile à refaire ? », et un
@@ -824,7 +927,6 @@ const skyProject = {
     'Explique en deux phrases pourquoi Jupiter brille plus que les étoiles.',
   ],
   followerCount: 4,
-  notes: [],
 }
 // Un projet de Léa publié avant R6a, jamais modifié depuis : sans catégorie (la ligne « Catégorie »
 // dit « Choisis une catégorie »), sans mois ni difficulté.
@@ -842,7 +944,6 @@ const oldProject = {
   visuals: [],
   portraitCover: null,
   prompts: [],
-  notes: [],
 }
 // Tranche R3 : Explorer et la recherche par mots, d'après les planches `R3-Explorer` et
 // `R3-Recherche`. R6b : le catalogue normé (GET /v1/tools, planche `R3-Outils`), du plus utilisé
@@ -1232,6 +1333,40 @@ const notified = (project) => ({ id: project.id, title: project.title })
 const commentIdOf = (n) => `00000000-0000-4000-8000-0000000006b${n}`
 const notificationPages = (choice) => {
   if (choice === 'none') return [[]]
+  if (choice === 'updates') {
+    return [
+      [
+        {
+          kind: 'project_update',
+          id: `project_update:${testedProject.latestUpdate.id}`,
+          at: hoursAgo(1),
+          isNew: true,
+          project: notified(testedProject),
+          author: testedProject.author,
+          update: {
+            id: testedProject.latestUpdate.id,
+            title: testedProject.latestUpdate.title,
+            version: 'v1.2',
+            firstLine: testedProject.latestUpdate.lines[0],
+          },
+        },
+        {
+          kind: 'project_update',
+          id: 'project_update:5e6f7a8b-9c0d-4e1f-8a2b-000000000009',
+          at: hoursAgo(28),
+          isNew: false,
+          project: notified(fromOthers[1]),
+          author: fromOthers[1].author,
+          update: {
+            id: '5e6f7a8b-9c0d-4e1f-8a2b-000000000009',
+            title: null,
+            version: null,
+            firstLine: line('fixed', 'Les rappels n’arrivent plus deux fois le dimanche'),
+          },
+        },
+      ],
+    ]
+  }
   // Tranche 7a : un signalement traité (retiré, puis classé), un commentaire et un projet de Léa
   // retirés. Les signalements traités ne nomment ni titre ni auteur ; le lien n'existe que si le
   // contenu est encore visible.
@@ -1378,6 +1513,39 @@ const notificationPages = (choice) => {
   ]
 }
 
+// R7a : la frise de chaque projet qui a des mises à jour, de la plus récente à la plus ancienne.
+const updatesOf = new Map([
+  [recipesProject.id, recipesUpdates],
+  [
+    longProject.id,
+    [longProject.latestUpdate, update(4, { lines: [line('fixed', urlNote.slice(0, 120))] }, 16)],
+  ],
+  [notMineProject.id, recipesUpdates.slice(1)],
+  [
+    removedProject.id,
+    [
+      removedProject.latestUpdate,
+      update(6, { version: 'v1', lines: [line('new', 'Il propose trois avis à recopier')] }, 14),
+    ],
+  ],
+  [fromOthers[0].id, [update(6, photosUpdate, 19)]],
+])
+// R7a : un projet « Testable » de Max, avec sa démo, dont Léa fait partie des testeurs (« Tu testes
+// ce projet », la feuille « Quitter les testeurs ») ; le nombre de testeurs ne lui est pas montré.
+const testedProject = {
+  ...notMineProject,
+  id: '00000000-0000-4000-8000-0000000000ee',
+  title: 'Décollage !',
+  pitch: 'Un quiz de l’espace pour les petits-enfants, avec un compte à rebours.',
+  status: 'testable',
+  demoUrl: 'https://decollage.example.org',
+  isTester: true,
+  latestUpdate: { ...recipesUpdates[0], title: 'Le décompte de la fusée' },
+  updateCount: 1,
+  version: 'v1.2',
+}
+cardProjects.set(testedProject.id, testedProject)
+updatesOf.set(testedProject.id, [testedProject.latestUpdate])
 // L'API simulée d'une page : une fonction appelée par Playwright pour chaque requête vers l'API.
 // Tout ce qu'elle retient (réactions, pseudo enregistré) vit dans ses propres variables, créées à
 // chaque appel de fakeApi : deux pages ne partagent jamais rien. `feed` choisit le fil de l'accueil.
@@ -1500,17 +1668,39 @@ const fakeApi = (
       return json(200, me)
     }
     if (pathname === '/v1/me') return json(200, me)
-    // Publier ou supprimer une note : l'API simulée accepte (les essais au clic, --explore, peuvent
-    // remplacer ces réponses par un refus).
-    if (/^\/v1\/projects\/[^/]+\/notes$/.test(pathname) && method === 'POST') {
-      const { body } = JSON.parse(route.request().postData() ?? '{}')
+    // R7a : publier ou supprimer une mise à jour, l'API simulée accepte (les essais au clic,
+    // --explore, peuvent remplacer ces réponses par un refus).
+    if (/^\/v1\/projects\/[^/]+\/updates$/.test(pathname) && method === 'POST') {
+      const body = JSON.parse(route.request().postData() ?? '{}')
       return json(201, {
         id: crypto.randomUUID(),
-        body,
+        title: body.title ?? null,
+        version: body.version ?? null,
+        lines: body.lines ?? [line('new', 'Une mise à jour')],
+        photos: [],
+        beforeAfter: false,
         createdAt: new Date(SHOT_NOW).toISOString(),
+        removal: null,
       })
     }
-    if (/^\/v1\/projects\/[^/]+\/notes\/[^/]+$/.test(pathname) && method === 'DELETE') {
+    if (/^\/v1\/projects\/[^/]+\/updates\/[^/]+$/.test(pathname) && method === 'DELETE') {
+      return route.fulfill({ status: 204, body: '' })
+    }
+    // La frise d'un projet (GET …/updates) : une seule page, « Première version » au bout.
+    const timeline = pathname.match(/^\/v1\/projects\/([^/]+)\/updates$/)
+    if (timeline && method === 'GET') {
+      return json(200, { items: updatesOf.get(timeline[1]) ?? [], nextCursor: null })
+    }
+    // Une photo pour une mise à jour (`slot=update`) : la photo en attente, pas le projet.
+    if (
+      /^\/v1\/projects\/[^/]+\/visuals$/.test(pathname) &&
+      method === 'POST' &&
+      /name="slot"\r?\n\r?\nupdate/.test(route.request().postData() ?? '')
+    ) {
+      return json(201, photo(crypto.randomUUID(), 1600, 900, null))
+    }
+    // Rejoindre les testeurs ou les quitter : toujours accepté (204).
+    if (/^\/v1\/projects\/[^/]+\/testers$/.test(pathname) && ['POST', 'DELETE'].includes(method)) {
       return route.fulfill({ status: 204, body: '' })
     }
     // Réagir (PUT) ou retirer sa réaction (DELETE) : les nombres changent pour la relecture qui suit.

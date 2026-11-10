@@ -49,8 +49,8 @@ import {
   resetProjectScreenMocks,
   seenByOther,
   signInAgain,
-  withNotes,
   withReactions,
+  withUpdates,
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -72,8 +72,12 @@ jest.mock('../members/api', () => ({
     isPending: false,
   }),
 }))
-// Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+// Les mises à jour (R7a, qui remplacent les notes) : de faux hooks, dont le test lit les appels.
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 // Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
@@ -220,7 +224,7 @@ const renderPage = (language?: 'en') =>
   )
 
 /** Le projet de Léa, avec ce nombre de commentaires, vu par Max. */
-const seenWithCount = (commentCount: number) => seenByOther({ ...withNotes, commentCount })
+const seenWithCount = (commentCount: number) => seenByOther({ ...withUpdates, commentCount })
 
 describe('the comments of a project', () => {
   it('shows the preview under its header: the first 3 lines, newest thread first, replies included', async () => {
@@ -273,7 +277,7 @@ describe('the comments of a project', () => {
     // seul (« Inès, Auteur » pour l'autrice du projet) : seul le lien du haut de la page garde
     // « Voir la page d’Inès ».
     const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
-    seenByOther({ ...withNotes, author: ines, commentCount: 1 })
+    seenByOther({ ...withUpdates, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
     await renderPage()
 
@@ -285,7 +289,7 @@ describe('the comments of a project', () => {
 
   it('writes the possessive and the preview line in English', async () => {
     const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
-    seenByOther({ ...withNotes, author: ines, commentCount: 1 })
+    seenByOther({ ...withUpdates, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
     await renderPage('en')
 

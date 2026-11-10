@@ -47,8 +47,12 @@ jest.mock('../members/api', () => ({
     isPending: false,
   }),
 }))
-// Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+// Les mises à jour (R7a, qui remplacent les notes) : de faux hooks, dont le test lit les appels.
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 // Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
