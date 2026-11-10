@@ -303,7 +303,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
  *   dans les 90 jours : calculée à la lecture, comme le reste (décision écrite au contrat, A6).
  *
  * Le nom de la table project_update est écrit sans alias : hasReadableLines le cite en toutes
- * lettres. `during` : la fenêtre de dates (voir sources), `now` : l'heure de l'API.
+ * lettres. `during` : la fenêtre de dates (voir sources).
  */
 const projectUpdates = (me: string, during: (column: string) => SQL): SQL => sql`
     select 'project_update', 'project_update:' || project_update.id, project_update.created_at,

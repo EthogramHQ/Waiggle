@@ -1891,8 +1891,9 @@ que l'auteur.
   des testeurs : ses mises à jour continueront d'arriver. »
 - Et un blocage, dans un sens ou dans l'autre, retire le testeur ; ses inscriptions ne reviennent
   pas au déblocage
-- Et un projet supprimé emporte ses testeurs ; un projet retiré, privé, ou dont l'auteur est
-  suspendu ne prévient plus ses testeurs
+- Et un projet supprimé emporte ses testeurs ; un projet retiré ou privé ne prévient plus ses
+  testeurs ; un auteur suspendu ne publie plus, donc ne prévient plus (ses mises à jour d'avant
+  restent dans Activité, comme dans la frise : la suspension ne se devine pas)
 
 **Ce que reçoit un testeur**
 - Les mises à jour du projet, dans Activité et dans le récap du lundi
