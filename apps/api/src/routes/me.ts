@@ -40,7 +40,7 @@ import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
 import { countChargedOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
-import { legacyToolColumns, replaceProfileTools } from '../tools/write'
+import { replaceProfileTools } from '../tools/write'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
 
@@ -224,21 +224,18 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
         // encore, sinon la mettre à jour (insert … on conflict do update).
         if (bio !== undefined || favoriteTools !== undefined) {
-          // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool ; l'ancienne
-          // colonne `favorite_tools` reste écrite (noms tapés) jusqu'en R7, sans être relue.
+          // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool seulement
+          // (l'ancienne colonne `favorite_tools` est effacée par la migration 0018).
           const resolved =
             favoriteTools === undefined ? undefined : await resolveTools(tx, favoriteTools)
-          const legacy = resolved && legacyToolColumns(resolved.tools).tools
-          await tx
+          // Sans bio envoyée, il ne reste rien à mettre à jour (Drizzle refuse un `set` vide) : la
+          // ligne n'est créée que si elle manque.
+          const profileInsert = tx
             .insert(schema.profile)
-            .values({ userId: user.id, bio: bio ?? '', favoriteTools: legacy ?? [] })
-            .onConflictDoUpdate({
-              target: schema.profile.userId,
-              set: {
-                ...(bio !== undefined && { bio }),
-                ...(legacy !== undefined && { favoriteTools: legacy }),
-              },
-            })
+            .values({ userId: user.id, bio: bio ?? '' })
+          await (bio === undefined
+            ? profileInsert.onConflictDoNothing()
+            : profileInsert.onConflictDoUpdate({ target: schema.profile.userId, set: { bio } }))
           if (resolved) {
             createdHere = resolved.created
             await replaceProfileTools(tx, user.id, resolved.tools)
