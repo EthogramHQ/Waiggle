@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface de la feuille (R5b), à côté de ceux de Sheet.test.tsx :
+// Tests ajoutés en R5b pour la feuille, à côté de ceux de Sheet.test.tsx :
 // - sur le web, un champ de react-native-web arrête la touche enfoncée avant la feuille
 //   (`stopPropagation`) : quand la liste des mentions s'y ferme sur Échap, la feuille ne voit que
 //   la touche relâchée, par le Modal. Elle relit alors la touche enfoncée, écoutée sur le document,

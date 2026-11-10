@@ -162,7 +162,7 @@ const PROOFS: Record<string, { file: string; test: string }> = {
     file: 'blocks-visibility.test.ts',
     test: 'answers the page of a project of the other one as an unknown project',
   },
-  // R7a : les deux preuves sont dans les fichiers de TW-A1 (updates.test.ts, testers.test.ts), titres
+  // R7a : les deux preuves sont dans les fichiers updates.test.ts et testers.test.ts, titres
   // recopiés du plan (relecture de sécurité A12 et B2).
   'GET /v1/projects/:id/updates': {
     file: 'updates.test.ts',
@@ -238,11 +238,11 @@ const PROOFS: Record<string, { file: string; test: string }> = {
   },
   'GET /v1/search': {
     file: 'search.test.ts',
-    // R6b (TW-A3) : le test a été réécrit pour les outils du catalogue, qui restent listés.
+    // R6b : le test a été réécrit pour les outils du catalogue, qui restent listés.
     test: 'hides a blocked member and its projects, and takes them out of the tool counts, in both directions',
   },
   'GET /v1/tools': {
-    // R6b (TW-A1) : le catalogue reste entier ; ce sont les nombres de projets qui changent.
+    // R6b : le catalogue reste entier ; ce sont les nombres de projets qui changent.
     file: 'tools.test.ts',
     test: 'leaves the projects of a blocked member out of the counts, in both directions',
   },

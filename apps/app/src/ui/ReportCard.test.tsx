@@ -1,6 +1,6 @@
-// Tests de la carte d'un signalement dans la file de modération (tranche 7a). À part de
-// components.test.tsx : ReportCard est écrit par un autre agent que CommentCard ; tant qu'il
-// manque, seul ce fichier échoue, et les autres tests des composants restent lisibles. Depuis R7a,
+// Tests de la carte d'un signalement dans la file de modération (tranche 7a). Dans son propre fichier plutôt que dans
+// components.test.tsx, partagé par toute l'interface ; tant que le composant manque, seul ce
+// fichier échoue, et les autres tests des composants restent lisibles. Depuis R7a,
 // la cible `update` (une mise à jour) remplace la note du Journal, effacé avec NoteList.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'

@@ -5,7 +5,7 @@
 // retomber sur toute la page (`body`) : il va à la première carte arrivée avec cette dernière page,
 // là où la lecture continue.
 //
-// L'interface attendue (nom choisi au plan des tests, à suivre par l'ui-dev) : la liste donne à
+// L'interface attendue (nom choisi au plan des tests, que le composant doit suivre) : la liste donne à
 // FeedEnd la vue de la première carte arrivée, `firstArrived` (une ref), et FeedEnd y pose le focus,
 // sans faire défiler la page (preventScroll).
 //

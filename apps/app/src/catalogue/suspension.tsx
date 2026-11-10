@@ -3,7 +3,7 @@
 // sans fin et sans signalement, une explication très longue), le bouton « Suivre » inactif d'un
 // membre suspendu qui vient de ne plus suivre, et l'en-tête d'un profil verrouillé (MemberHeader,
 // des outils sans lien). Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne :
-// plusieurs agents y travaillaient en même temps. Ses exemples (un outil de développement, absent
+// le catalogue est partagé par toute l'interface. Ses exemples (un outil de développement, absent
 // de l'appli publiée) sont écrits ici, en français et en anglais.
 import type { Suspension } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'

@@ -739,7 +739,7 @@ describe('every field of the register', () => {
   })
 
   // jur-J13 (R6a) : la copie dit quelle photo est décrite. Sa description suit, dans la copie,
-  // l'entrée de l'image qu'elle décrit (décision de la session du 9/11/2026, forme `{ field, value }`
+  // l'entrée de l'image qu'elle décrit (décision du 9/11/2026, forme `{ field, value }`
   // du contrat inchangée) ; une photo sans description n'en a pas.
   it('puts the description of a photo right after the key of that photo in the copy', async () => {
     await reportEverything()

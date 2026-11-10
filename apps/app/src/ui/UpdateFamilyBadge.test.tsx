@@ -2,7 +2,7 @@
 // une pastille ronde avec son icône, « Nouveau » (étincelle, ambre), « Réparé » (clé, vert),
 // « Plus joli » (palette, encre discrète). Elle est décorative : le nom de la famille est un texte
 // posé à côté par le composant parent (la ligne de la feuille, de la frise ou de la carte), qui la
-// fait lire « Nouveau : … » (décision de la session, interface B4). Lue seule, elle ne dirait que
+// fait lire « Nouveau : … » (décision, interface B4). Lue seule, elle ne dirait que
 // sa couleur : elle reste donc cachée aux lecteurs d'écran.
 //
 // L'interface attendue de `src/ui/UpdateFamilyBadge.tsx` (plan R7a, « Appli ») :

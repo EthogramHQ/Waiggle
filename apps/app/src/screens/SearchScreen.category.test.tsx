@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (R6b) au filtre par catégorie de la recherche, en plus de ceux de
+// Tests ajoutés en R6b au filtre par catégorie de la recherche, en plus de ceux de
 // SearchScreen.test.tsx : ce que l'écran fait de plus que la commande, chaque branchement prouvé en
 // cassant sa ligne. Le focus rendu au bouton quand la feuille se ferme ; un code mal formé dans
 // l'adresse, ignoré ; une catégorie choisie qui ne trouve rien, qu'on peut toujours retirer ; et

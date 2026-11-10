@@ -8,7 +8,7 @@
 // interface A3) :
 // `UpdateEntry({ update: ProjectUpdate; toSource; onDelete?; deleting?; onReport?; headingLevel?;
 // current?; compact? })`.
-// Choix de TW-1, à confirmer par la session (le plan ne les fixait pas) :
+// Choix faits avec ces tests (R7a) :
 // - `toSource: (url: string | null | undefined) => ImageSource | null` : la fonction que rend
 //   `useMediaSources()` (api/media.ts), donnée par l'écran ; un composant de `src/ui` ne parle
 //   jamais à l'API, il ne peut donc pas la lire lui-même ;

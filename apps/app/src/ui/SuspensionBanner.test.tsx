@@ -1,8 +1,8 @@
 // Tests du bandeau d'un compte suspendu (tranche 7c), tel que le membre suspendu le lit en haut de
 // chaque page : que son compte est suspendu, jusqu'à quand (date et heure de Paris, ou « jusqu'à
 // nouvel ordre »), après un signalement ou non, le fondement, l'explication, ce qu'il peut encore
-// faire, et comment contester (relecture juridique, J2, J3 et J4). À part de components.test.tsx,
-// partagé avec les autres agents de la tranche.
+// faire, et comment contester (relecture juridique, J2, J3 et J4). Dans son propre fichier plutôt que dans
+// components.test.tsx, partagé par toute l'interface.
 //
 // Le composant reçoit la suspension telle que l'API la donne (`Me.suspension`) et écrit lui-même
 // ses phrases : l'écran n'a qu'à le poser. Depuis la décision de Louis du 27/10/2026, il est replié

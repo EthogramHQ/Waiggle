@@ -5,7 +5,7 @@
 // - GET /v1/categories rend les catégories dans l'ordre de la feuille de publication, nommées dans
 //   la langue du visiteur, chacune avec son nombre de projets visibles.
 // Scénario : docs/scenarios/refonte.md, « R6b », « Le catalogue », « Tous les outils » et « Les
-// catégories en filtre ». Règles du plan : décision 1 de la session (visibilité, sec-A1, jur-T2),
+// catégories en filtre ». Règles du plan : décision 1 (visibilité, sec-A1, jur-T2),
 // décision 8 (un « Autre » écarté n'est plus listé), décision 12 (sec-B5 : 50 « Autre » au plus,
 // limite après la visibilité ; quota `toolsHour` partagé).
 //

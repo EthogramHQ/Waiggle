@@ -77,7 +77,7 @@ describe('HighlightedText', () => {
 
     // Le texte entier est surligné : `getAllByText` (RNTL 14) rend le nœud le plus profond qui dit
     // « Café », c'est-à-dire la partie surlignée elle-même ; le texte qui la porte est son parent.
-    // (Correction de la session, R3 : l'aide `whole` seule ne pouvait pas trouver ce parent.)
+    // (Correction de R3 : l'aide `whole` seule ne pouvait pas trouver ce parent.)
     const highlighted = whole('Café')
     expect(marks(highlighted.parent as Node)).toEqual(['Café'])
   })

@@ -1,6 +1,6 @@
 // Tests d'une liste de choix au clavier (tranche 7a) : sur le web, un choix (bouton radio) se coche
 // avec la barre d'espace. Sans cela, la page « Signaler » ne pouvait pas s'envoyer au clavier.
-// À part de components.test.tsx, partagé avec l'autre agent de la tranche.
+// Dans son propre fichier plutôt que dans components.test.tsx, partagé par toute l'interface.
 // R1 : en mode radio, le groupe entier se parcourt au clavier (flèches, un seul arrêt de Tab).
 import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'

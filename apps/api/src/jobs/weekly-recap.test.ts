@@ -683,7 +683,7 @@ describe('who receives the recap', () => {
   })
 })
 
-// Ajouté avec le backend (précision de la session du 21/10/2026) : les « nouveaux abonnements » du
+// Ajouté avec le backend (précision du 21/10/2026) : les « nouveaux abonnements » du
 // récap comptent les abonnés au compte du membre ET à ses projets.
 describe('the new follows of the recap', () => {
   it('counts the follows of the account and of the projects of the member', async () => {

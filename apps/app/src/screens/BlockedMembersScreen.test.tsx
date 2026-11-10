@@ -3,7 +3,7 @@
 // fenêtre lui rappelle que les abonnements retirés ne reviennent pas (règle 21 de la relecture du
 // plan, J10).
 //
-// L'interface attendue de `src/blocks/api.ts` (écrit par ui-dev) :
+// L'interface attendue de `src/blocks/api.ts` :
 // - `useBlockedMembers()` : la liste (useInfiniteQuery, pages `BlockedPage` de GET /v1/me/blocks) ;
 // - `useUnblock()` : `{ unblock }`, où `unblock(memberId)` rend un `ApiResult` (`{ ok: true }` ou
 //   `{ ok: false, error }`) et relit la liste une fois fait.

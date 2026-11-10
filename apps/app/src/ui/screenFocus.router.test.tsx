@@ -1,6 +1,6 @@
 // Tests du signal « la route devient affichée » quand expo-router dit si la page est affichée
 // (`useIsFocused`) sans donner sa clé (`useRoute`) : c'est ainsi que les tests des écrans et de la
-// barre (TW-2 de RF) simulent une page qui devient affichée. Le nombre compte alors les arrivées vues
+// barre (RF) simulent une page qui devient affichée. Le nombre compte alors les arrivées vues
 // par le composant lui-même.
 import { render, screen } from '@testing-library/react-native'
 import type { Context } from 'react'

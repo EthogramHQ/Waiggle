@@ -2,7 +2,7 @@
 // page montre ce qu'il signale (lu par l'API, jamais pris de l'adresse), propose les sept motifs et
 // une précision facultative, puis remercie. Chaque refus de l'API a son propre texte.
 //
-// L'interface attendue de `src/reports/api.ts` (écrit par ui-dev) :
+// L'interface attendue de `src/reports/api.ts` :
 // - `useReportTarget(target: ReportTarget | null)` : la lecture de la cible (React Query), par
 //   GET /v1/reports/target (règle 26 du plan), qui rend un `ReportTargetPreview` (`target`,
 //   `text` actuel, `projectId`) ; null quand l'adresse ne décrit aucune cible valable, et la page

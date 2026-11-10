@@ -1,5 +1,5 @@
 // Tests des décisions de Louis du 6/11/2026 sur les commentaires (après les tests de la tranche) et
-// de la précision de la session pour l'ordinateur :
+// de la précision du 6/11 pour l'ordinateur :
 // 1. après un envoi, l'annonce est seulement lue (`LiveStatus visible={false}`), sans encadré ;
 // 2. après une suppression, « supprimé » est seulement lu, et le focus va à la carte voisine ;
 // 3. un suspendu voit « Voir les N » dès un commentaire, jamais « Commenter », et lit la feuille ; à 0
@@ -312,7 +312,7 @@ describe('a suspended member (decision 3 of 6/11)', () => {
   })
 })
 
-// Précision de la session (6/11) : l'aperçu n'a que les visibles (jur-P4) ; sans bouton, un commentaire
+// Précision (6/11) : l'aperçu n'a que les visibles (jur-P4) ; sans bouton, un commentaire
 // masqué ou retiré serait inatteignable. La colonne montre donc d'emblée la liste complète.
 describe('the column of a wide screen, with no « Voir les N »', () => {
   let phone: () => void

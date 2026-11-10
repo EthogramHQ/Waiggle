@@ -6,7 +6,7 @@
 // Le texte de ces descriptions est écrit par nous sur les outils d'autres éditeurs : il reste
 // neutre (ni prix, ni « gratuit », ni superlatif, ni promesse, ni partenariat), et un site ne porte
 // aucun paramètre de suivi ou d'affiliation (relecture juridique jur-T7, corps du test recopié du
-// rapport ; décisions de la session, points 10 et 12).
+// rapport ; décisions du plan, points 10 et 12).
 //
 // Le contrat est lu par un chemin relatif : ce paquet ne dépend pas de @ruche/contracts (la base ne
 // sert que l'API), et ce test, hors de `src`, n'est lu que par Vitest.

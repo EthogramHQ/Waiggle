@@ -3,8 +3,8 @@
 // des dates, l'avant / après de la dernière mise à jour qui en a un, la frise par pages de 20 et
 // « Première version », la corbeille de l'auteur, et un projet qu'on ne peut pas voir.
 //
-// Ce que ces tests supposent de l'écran (plan R7a, U4b ; à corriger par la session si le code en
-// décide autrement) :
+// Ce que ces tests supposent de l'écran (plan R7a, U4b ; à corriger si le code en décide
+// autrement) :
 // - `ProjectUpdatesScreen({ id })`, monté par la route `app/projects/[id]/updates.tsx` ;
 // - le réseau passe par `api/client` (le faux serveur ci-dessous) : GET /v1/projects/{id}, GET
 //   …/updates (puis `?cursor=`), DELETE …/updates/{updateId} ; les vrais hooks de `updates/api`

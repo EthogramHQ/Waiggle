@@ -3,8 +3,8 @@
 // change »). Elle remplace le Journal (tranche 4b) et ses tests (`ProjectScreen.journal.test.tsx`,
 // `ProjectScreen.deleteFocus.notes.test.tsx`).
 //
-// Ce que ces tests supposent de l'écran (plan R7a, U4a ; à corriger par la session si le code en
-// décide autrement) :
+// Ce que ces tests supposent de l'écran (plan R7a, U4a ; à corriger si le code en décide
+// autrement) :
 // - la section montre `project.latestUpdate` en entier (`UpdateEntry`), puis « Voir les N mises à
 //   jour », qui mène à la frise (`/projects/<id>/updates`) ;
 // - « Publier une mise à jour » (section et menu « … ») mène à la feuille, qui a sa propre adresse

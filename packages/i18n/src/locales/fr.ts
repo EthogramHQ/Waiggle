@@ -471,7 +471,7 @@ export const fr = {
       photoWrongType: 'ce format n’est pas accepté.',
       photoTooMany: 'il y a déjà 6 photos.',
       // Plusieurs photos choisies d'un coup, au-delà des places qui restent : pickVisuals garde les
-      // premières, et la feuille le dit (décision de la session, R6a).
+      // premières, et la feuille le dit (décision de R6a).
       photosCut_one: 'Seule {{count}} photo a été ajoutée : un projet en garde {{max}} au plus.',
       photosCut_other:
         'Seules les {{count}} premières photos ont été ajoutées : un projet en garde {{max}} au plus.',
@@ -1051,7 +1051,7 @@ export const fr = {
     reasonRequired: 'Choisis un motif pour envoyer ton signalement.',
     alsoBlock: 'Bloquer aussi @{{handle}}',
     alsoBlockHint: 'Tu ne verras plus ses contenus, et @{{handle}} ne verra plus les tiens.',
-    // Ajouté par l'interface : la phrase de bonne foi seule, qui reste sous l'erreur « Dis-nous
+    // Ajouté après les tests : la phrase de bonne foi seule, qui reste sous l'erreur « Dis-nous
     // pourquoi… » (l'aide entière répéterait l'erreur, qui en est la première phrase).
     goodFaith:
       'En envoyant, tu confirmes que ton signalement est sincère et exact à ta connaissance.',
@@ -1100,7 +1100,7 @@ export const fr = {
       blockedWhen: 'Bloqué {{when}}',
       more: 'Afficher la suite',
       loadError: 'La liste n’a pas pu se charger.',
-      // Ajoutés par l'interface : le nom lu de « Débloquer » sur chaque ligne (toutes portent le
+      // Ajoutés après les tests : le nom lu de « Débloquer » sur chaque ligne (toutes portent le
       // même mot), et la suite ratée de la liste.
       unblockLabel: 'Débloquer @{{handle}}',
       // La précision d'une ligne : le pseudo, puis la date (blockedOn).
@@ -1188,9 +1188,9 @@ export const fr = {
     dismissed: 'Signalement classé sans suite.',
     removedDone: 'Contenu retiré.',
     restoredDone: 'Contenu rétabli.',
-    // Le bas de la liste (ajouté par l'interface, tranche 7a) : la suite a raté.
+    // Le bas de la liste (ajouté en tranche 7a) : la suite a raté.
     moreError: 'La suite de la liste n’a pas pu se charger.',
-    // Une copie longue se replie après trois champs (ajoutés par l'interface, corrections 7b).
+    // Une copie longue se replie après trois champs (ajoutés en corrections 7b).
     showAll: 'Afficher tout',
     showLess: 'Replier',
     // Tranche 7c : les précisions des membres, sous leur propre libellé (distinctes de la copie).
@@ -1472,7 +1472,7 @@ export const fr = {
     // À la place d'un formulaire de projet, et sur « Mon profil ».
     formBody: 'Tu ne peux pas publier ni modifier de projet pendant la suspension.',
     profileLocked: 'Ton profil ne peut pas être modifié pendant la suspension.',
-    // Le titre de la page qui remplace le formulaire de projet (ui-dev C, 7c) : le bandeau dit
+    // Le titre de la page qui remplace le formulaire de projet (C, 7c) : le bandeau dit
     // déjà « Ton compte est suspendu », le titre ne le répète pas.
     formTitle: 'Publication impossible pour l’instant',
   },
@@ -1632,7 +1632,7 @@ export const fr = {
   // R3 : « Tous les outils » (planche R3-Outils, sans le catalogue normé, qui vient en R6).
   tools: {
     // R6b : le catalogue (planche R3-Outils). « projets » sans « publics » : depuis R6a, un projet
-    // des membres de Waiggle n'est pas public (choix 1 de la session, scénario R6b).
+    // des membres de Waiggle n'est pas public (choix 1 du plan, scénario R6b).
     title: 'Outils',
     subtitle:
       'Le catalogue des outils d’IA, de développement et de projets numériques, et les projets des membres qui s’en servent.',
@@ -1988,7 +1988,7 @@ export const fr = {
         'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour et tes commentaires, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
-      // La salutation, sans le nom : l'e-mail ne cite que la décision (backend-dev 7c).
+      // La salutation, sans le nom : l'e-mail ne cite que la décision (7c).
       greeting: 'Bonjour,',
     },
   },

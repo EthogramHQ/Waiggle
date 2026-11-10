@@ -2,7 +2,7 @@
 // groupe, verre, panneau, feuille) de jour et de nuit côte à côte, la carte de projet avec son ombre
 // et son panneau sans ombre, une surface qui demande l'ombre d'une carte, et le focus au clavier
 // (contour miel et halo). Fichier à part de CatalogueScreen.tsx, qui l'importe en une ligne :
-// plusieurs agents y travaillaient en même temps. Ses exemples (un outil de développement, absent
+// le catalogue est partagé par toute l'interface. Ses exemples (un outil de développement, absent
 // de l'appli publiée) sont écrits ici, en français et en anglais.
 import { radii, type Scheme, space } from '@ruche/brand'
 import type { ReactNode } from 'react'

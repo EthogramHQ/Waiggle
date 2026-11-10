@@ -16,7 +16,7 @@
 // - `stickyHeader` (le formulaire de projet) garde son fond `sheet` opaque (ui-2) ;
 // - `toTop()` du canal de défilement remonte l'écran en haut, sans animation en calme (ui-5).
 //
-// « Dans le flux » se lit sans supposer comment l'ui-dev le fait : la barre est dans la zone qui
+// « Dans le flux » se lit sans supposer comment le composant le fait : la barre est dans la zone qui
 // défile, ou elle suit le défilement (son décalage vertical, `top`, `marginTop` ou `translateY` dans
 // le style de ses cadres, baisse d'autant que le contenu défile). ui-10 interdit en pratique de la
 // changer de place dans l'arbre : c'est la seconde façon qui est attendue.

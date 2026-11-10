@@ -26,7 +26,7 @@ type Props = {
   /**
    * Montrer « Proches à suivre ». Au premier lancement, la colonne principale les montre déjà (cinq
    * lignes) : la colonne de droite ne les répète pas et garde « Ils cherchent des testeurs » seule
-   * (décision de la session, conversation 2 de R4).
+   * (décision de R4).
    */
   withSuggestions: boolean
   /**

@@ -128,7 +128,7 @@ function MemberExplore({ userId }: { userId: string }) {
  * - Un code mal formé (`?category=Animaux !`) est ignoré, sans erreur : l'API le refuserait, et la
  *   section tomberait en panne pour une adresse mal recopiée.
  * - Un code bien formé que la base ne connaît pas (`?category=knitting`, une catégorie retirée) vaut
- *   « Toutes » une fois les catégories lues (choix de la session, R6b) : on ne saurait pas quoi
+ *   « Toutes » une fois les catégories lues (choix de R6b) : on ne saurait pas quoi
  *   écrire dans « Aucun projet dans « … » ».
  * - Tant que les catégories se lisent, le filtre demandé s'applique déjà ; si elles ne se lisent
  *   pas, il reste appliqué (la section le dit, et propose de le retirer).

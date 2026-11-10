@@ -1,7 +1,7 @@
 // Tests du menu « … » (ActionMenu, tranche 7b) : les actions secondaires d'une page (« Signaler ce
 // profil », « Bloquer ») derrière un seul bouton, au lieu d'un bouton chacune (décision de Louis du
-// 24/10/2026). À part de components.test.tsx : ActionMenu est écrit par un autre agent que
-// ReportCard ou ListGroup ; tant qu'il manque, seul ce fichier échoue (charte du pôle code, 7a).
+// 24/10/2026). Dans son propre fichier plutôt que dans components.test.tsx, partagé par toute l'interface ;
+// tant que le composant manque, seul ce fichier échoue.
 //
 // L'interface attendue de `src/ui/ActionMenu.tsx` :
 // - `items` : la liste des actions, `{ label, onPress, tone? }` (`tone: 'danger'` pour une action

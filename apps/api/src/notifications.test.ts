@@ -1395,7 +1395,7 @@ describe('the notifications of the moderation', () => {
 
 // ─── Tranche R7a : les mises à jour des projets suivis ou testés ─────────────────────────────────
 // Scénario : docs/scenarios/refonte.md, « R7a », « Les notifications » ; plan R7a, « Notifications »
-// et sa relecture (sécurité A6 et S1, décisions de la session). Inès publie Météo et ses mises à
+// et sa relecture (sécurité A6 et S1, décisions du plan). Inès publie Météo et ses mises à
 // jour ; Malik suit le projet, Zoé fait partie des testeurs, Sam ni l'un ni l'autre.
 //
 // Les testeurs s'inscrivent par POST /v1/projects/{id}/testers, écrit à part : ici l'inscription et
@@ -1525,7 +1525,7 @@ describe('the updates of followed and tested projects (R7a)', () => {
     expect(tested).toEqual(followed)
   })
 
-  // Décision de la session (sécurité S1) : la source compare à la date de l'abonnement ou de
+  // Décision (sécurité S1) : la source compare à la date de l'abonnement ou de
   // l'inscription.
   it('only tells about updates published after the follow or the sign-up as a tester', async () => {
     const meteo = await publish(ines)

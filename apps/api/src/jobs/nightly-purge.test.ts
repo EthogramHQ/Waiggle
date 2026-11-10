@@ -462,7 +462,7 @@ describe('the reports and decisions of the moderation', () => {
 })
 
 // ─── Tranche R6b : les « Autre » orphelins et le journal du catalogue ─────────────────────────────
-// Décision 5 de la session (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
+// Décision 5 du plan (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
 // sa dernière référence ; la purge de nuit est le filet qui rattrape ce qui aurait échappé (une
 // panne entre deux écritures, une suppression faite en SQL). Le journal « Changements récents »
 // (catalogue_change) est effacé au bout d'un an. Les lignes sont écrites en SQL brut : les tables
