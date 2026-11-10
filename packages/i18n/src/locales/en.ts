@@ -620,6 +620,7 @@ export const en: Translation = {
       hintAnnouncePrivate:
         'Your project is now “{{status}}”. It is private: nobody will be notified. Post this update to keep it, or touch Cancel.',
       required: 'Write at least one change before posting.',
+      lineTooLong: 'This line is over {{max}} characters: shorten it.',
       photosUploading: 'Wait until the photos have finished uploading.',
       photoDescriptionHint:
         'Read aloud by screen readers, for everyone who sees the update. Don’t name anyone without their consent.',

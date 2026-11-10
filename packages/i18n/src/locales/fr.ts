@@ -728,6 +728,8 @@ export const fr = {
       hintAnnouncePrivate:
         'Ton projet est passé en « {{status}} ». Il est privé : personne ne sera prévenu. Publie cette mise à jour pour la garder, ou touche Annuler.',
       required: 'Écris au moins un changement avant de publier.',
+      // Relecture de design R7a, C1 : une ligne au-delà de la limite, refusée avant l'envoi.
+      lineTooLong: 'Cette ligne dépasse {{max}} caractères : raccourcis-la.',
       // Interface A6 : « Publier » pendant qu'une photo s'envoie encore.
       photosUploading: 'Attends la fin de l’envoi des photos.',
       // Décision de Louis du 10/11/2026 (sécurité A10) : 100 photos de mises à jour par projet.
