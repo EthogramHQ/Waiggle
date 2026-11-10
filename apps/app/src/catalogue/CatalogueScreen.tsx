@@ -83,6 +83,7 @@ import { ExploreCatalogue } from './explorer'
 import { UpdateSheetCatalogue } from './feuille-mise-a-jour'
 import { SheetsCatalogue } from './feuilles'
 import { FeedCatalogue } from './fil'
+import { FeedUpdateCatalogue } from './fil-mise-a-jour'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FluidTopBarCatalogue } from './fluidite-barre'
 import { ScreenFadeCatalogue } from './fluidite-fondu'
@@ -918,6 +919,8 @@ export function CatalogueScreen() {
       <UpdateEntryCatalogue />
       {/* Tranche R7a, la frise des mises à jour et la ligne des dates d'un projet (frise.tsx). */}
       <UpdateTimelineCatalogue />
+      {/* Tranche R7a, la carte d'un projet mis à jour dans le fil (fil-mise-a-jour.tsx). */}
+      <FeedUpdateCatalogue />
       {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
       <UpdateSheetCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
