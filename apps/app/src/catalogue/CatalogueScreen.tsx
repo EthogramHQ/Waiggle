@@ -662,7 +662,7 @@ export function CatalogueScreen() {
         <NewItemsBanner
           count={1}
           more={false}
-          kinds={['note']}
+          kinds={['update']}
           authors={newsAuthors.slice(0, 1)}
           caption={l.feedCaption}
           onPress={() => {}}
@@ -670,7 +670,7 @@ export function CatalogueScreen() {
         <NewItemsBanner
           count={20}
           more
-          kinds={['project', 'note']}
+          kinds={['project', 'update']}
           authors={newsAuthors}
           caption={l.feedCaption}
           onPress={() => {}}
