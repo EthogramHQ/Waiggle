@@ -12,7 +12,7 @@ import { space } from '@ruche/brand'
 import { type RefObject, useEffect, useRef } from 'react'
 import { Platform, View } from 'react-native'
 import { Button } from './Button'
-import { focusTarget, holdsFocus } from './focus'
+import { focusTarget, holdsFocus, moveReaderTo } from './focus'
 import { Icon } from './Icon'
 import { Notice } from './Notice'
 import { Text } from './Text'
@@ -96,12 +96,19 @@ export function FeedEnd({
   const more = () => {
     if (asked.current) return
     asked.current = true
-    hadFocus.current = holdsFocus(button.current)
+    // Sur téléphone, il n'y a pas de focus du clavier à lire : qui a touché le bouton le lisait
+    // peut-être avec son lecteur d'écran, qui repartirait du haut de l'écran quand il disparaît.
+    hadFocus.current = Platform.OS !== 'web' || holdsFocus(button.current)
     onMore()
   }
   useEffect(() => {
     if (state !== 'end' || !hadFocus.current) return
     hadFocus.current = false
+    if (Platform.OS !== 'web') {
+      // Le lecteur d'écran va à la phrase de fin, sinon à la première carte arrivée (R7a, U4b).
+      moveReaderTo(end.current ?? firstArrived?.current ?? null)
+      return
+    }
     const target = end.current
       ? (end.current as unknown as { focus?: (options?: object) => void })
       : focusTarget(firstArrived?.current ?? null)
