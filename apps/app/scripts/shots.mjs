@@ -438,8 +438,16 @@ const feedItems = fromOthers.map((p, i) => ({
 // Explorer (R6b), « Récents » : le fil des autres, plus un projet rangé dans « Animaux », pour que
 // le filtre `/explore?category=animals` montre une carte. Seul « Découvrir » le reçoit : le fil des
 // abonnements et ses captures restent tels quels.
+// R7a, des-A2 : la première carte de « Récents » (49 réactions, la plus chargée) porte une mise à
+// jour de six jours (l'horloge des captures est au 20/10/2026) : le repère « Mis à jour » se voit sur
+// la page `explorer`, avec le statut et le total dans la même rangée.
+const recentUpdate = summaryOfUpdate(
+  update(20, { version: 'v1.3', lines: [line('new', 'Un nouvel écran de réglages')] }, 14),
+)
 const discoverItems = [
-  ...feedItems,
+  ...feedItems.map((item, i) =>
+    i === 0 ? { ...item, project: { ...item.project, latestUpdate: recentUpdate } } : item,
+  ),
   {
     kind: 'project',
     at: new Date(Date.UTC(2026, 9, 14, 9)).toISOString(),

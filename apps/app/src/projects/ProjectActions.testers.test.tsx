@@ -273,6 +273,23 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     await waitFor(() => expect(focusWentToJoined()).toBe(true))
   })
 
+  // ui-C5 : sur téléphone, `focusWithoutScroll` ne fait rien ; le lecteur d'écran est amené sur le
+  // bouton par `moveReaderTo`, sinon il repartirait du haut quand la feuille disparaît.
+  it('moves the screen reader to « Tu testes ce projet » after confirming (phone)', async () => {
+    await renderPage()
+    const pageButton = await openJoinSheet()
+    jest.mocked(moveReaderTo).mockClear()
+
+    await fireEvent.press(sheetConfirm(pageButton))
+
+    await screen.findByRole('button', { name: JOINED })
+    await waitFor(() =>
+      expect(jest.mocked(moveReaderTo).mock.calls.some(([node]) => labelOf(node) === JOINED)).toBe(
+        true,
+      ),
+    )
+  })
+
   it('sends one request on a double tap on « Rejoindre les testeurs » in the sheet', async () => {
     // La réponse se fait attendre : la seconde tape arrive pendant l'envoi.
     jest.mocked(requestWithoutBody).mockImplementation(() => new Promise(() => {}))
@@ -373,6 +390,21 @@ describe('« Tu testes ce projet » and « Quitter les testeurs » (R7a)', () =>
     ).toBeTruthy()
     expect(await screen.findByRole('button', { name: JOIN })).toBeTruthy()
     expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
+  })
+
+  it('moves the screen reader to « Rejoindre les testeurs » after quitting (phone)', async () => {
+    await renderPage(tester)
+    await openMemberSheet()
+    jest.mocked(moveReaderTo).mockClear()
+
+    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
+
+    await screen.findByRole('button', { name: JOIN })
+    await waitFor(() =>
+      expect(jest.mocked(moveReaderTo).mock.calls.some(([node]) => labelOf(node) === JOIN)).toBe(
+        true,
+      ),
+    )
   })
 
   it('does not quit on the second tap of a double tap on « Tu testes ce projet »', async () => {

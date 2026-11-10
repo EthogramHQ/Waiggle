@@ -77,6 +77,29 @@ describe('LeavingSheet, the line of the testers (R7a)', () => {
     expect(screen.getByRole('link', { name: LINK })).toBeTruthy()
   })
 
+  // R7a, relecture du design (C2) et du juridique : la ligne se pose sous les boutons, donc après
+  // l'avertissement de sécurité ; ainsi, son arrivée ne fait pas descendre « Ouvrir le site ».
+  it('puts the line after the warning and the buttons, in reading order', async () => {
+    await show({ name: 'Papi Jean', onOpenProject: jest.fn() })
+
+    type Tree = { children: (Tree | string)[] }
+    const order: unknown[] = []
+    const walk = (node: Tree) => {
+      order.push(node)
+      for (const child of node.children) if (typeof child !== 'string') walk(child)
+    }
+    walk(screen.root as unknown as Tree)
+    const place = (element: unknown) => order.indexOf(element)
+
+    const warning = screen.getByText(fr.t(($) => $.leaving.warningTitle))
+    const open = screen.getByRole('button', { name: fr.t(($) => $.leaving.open) })
+    const stay = screen.getByRole('button', { name: fr.t(($) => $.leaving.stay) })
+    const lead = screen.getByText(containing(LEAD))
+    expect(place(warning)).toBeLessThan(place(open))
+    expect(place(stay)).toBeLessThan(place(lead))
+    expect(place(open)).toBeLessThan(place(lead))
+  })
+
   it('says nothing of the testers without the line', async () => {
     await show(null)
 

@@ -471,26 +471,16 @@ export function ProjectCard({
   // R7a : la date de la mise à jour, au bout de la rangée du bas (planche R7-MAJ-Fil). Un texte,
   // hors du lien de la carte, lu après lui ; sa version complète se lit au lecteur d'écran.
   const changedAt = change ? <RelativeTime date={change.at} now={now} /> : null
-  // Le bout de la rangée, à droite (marge automatique) : le total, puis la date. Le doigt passe au
-  // travers, vers la carte.
-  const end =
-    total || changedAt ? (
-      <View
-        pointerEvents="none"
-        style={{
-          marginLeft: 'auto',
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          columnGap: space.md,
-          maxWidth: '100%',
-          flexShrink: 1,
-        }}
-      >
-        {total}
-        {changedAt}
-      </View>
-    ) : null
+  // Le bout de la rangée, à droite (marge automatique) : la date seule. Le total des réactions est
+  // rangé avec les pastilles (des-A2) ; le doigt passe au travers, vers la carte.
+  const end = changedAt ? (
+    <View
+      pointerEvents="none"
+      style={{ marginLeft: 'auto', alignItems: 'center', maxWidth: '100%', flexShrink: 1 }}
+    >
+      {changedAt}
+    </View>
+  ) : null
 
   // --- « Tester ↗ » ---------------------------------------------------------------------------
   // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
@@ -524,6 +514,9 @@ export function ProjectCard({
         <StatusPill label={status.label} strong={status.strong} />
         {badge ? <StatusPill label={badge} /> : null}
         {updated?.kind === 'badge' ? <StatusPill label={updated.label} /> : null}
+        {/* Le total des réactions est du même groupe que les pastilles : ils passent à la ligne
+            ensemble, et la rangée ne compte plus trois lignes à 320 px (R7a, des-A2). */}
+        {total}
       </View>
       {end}
     </View>

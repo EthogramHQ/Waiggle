@@ -31,7 +31,7 @@ import { ButtonPair } from '../ui/ButtonPair'
 import { Callout } from '../ui/Callout'
 import { FollowButton } from '../ui/FollowButton'
 import { FollowerCount } from '../ui/FollowerCount'
-import { type Focusable, focusWithoutScroll } from '../ui/focus'
+import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import type { NoticeAction } from '../ui/Notice'
 import { Row, Stack } from '../ui/Stack'
@@ -320,7 +320,9 @@ export function ProjectActions({ project, onOpenDemo, onEdit }: Props) {
   useEffect(() => {
     if (!focusTesters || sheet.open) return
     setFocusTesters(false)
-    focusWithoutScroll(testersRef.current)
+    // Sur téléphone, `focusWithoutScroll` ne fait rien (pas de clavier) : le lecteur d'écran est
+    // amené sur le bouton, sinon il repartirait du haut quand la feuille disparaît (R7a, ui-C5).
+    if (!focusWithoutScroll(testersRef.current)) moveReaderTo(testersRef.current)
   }, [focusTesters, sheet.open])
 
   // Ne plus suivre un projet qu'on teste ne fait pas quitter les testeurs : la bulle le dit

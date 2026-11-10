@@ -1,7 +1,7 @@
 // Ce que la page de sortie pose sur sa feuille claire (R5a, planches `R5a-Portail`) : « Tu quittes
 // Waiggle pour », le nom du site en gras et en entier, son adresse complète en petit, la ligne « La
 // démo de …, ajoutée par … » quand elle a lieu d'être, l'encadré de prudence, puis « Ouvrir le site ↗ »
-// (miel) et « Rester sur Waiggle ». L'écran (screens/LeavingScreen.tsx) décide de l'adresse, de la
+// (miel) et « Rester sur Waiggle », puis, sous les boutons, la ligne des testeurs. L'écran (screens/LeavingScreen.tsx) décide de l'adresse, de la
 // ligne et des gestes ; ce composant décide de leur place, de leur ordre et de leur allure.
 //
 // Pourquoi la ligne est discrète (relecture de sécurité du plan, sec-B5, risque accepté) : le titre
@@ -45,7 +45,8 @@ type Props = {
   /**
    * La ligne des testeurs (R7a) : « Tu veux aider Léa ? », puis le lien « Rejoins les testeurs depuis
    * la page du projet. » qui mène à cette page (`onOpenProject`). `null` ou absente : pas de ligne.
-   * L'écran décide quand elle a lieu d'être ; sa place est gardée comme celle de `origin`.
+   * L'écran décide quand elle a lieu d'être. Elle se pose sous les boutons, sans place gardée : sa
+   * venue ne déplace rien de ce qui la précède.
    */
   testers?: LeavingTesters | null
   onOpen: () => void
@@ -107,7 +108,6 @@ export function LeavingSheet({
         </Text>
       </Stack>
       {origin || holdOrigin ? <OriginLine origin={origin} /> : null}
-      {testers || holdOrigin ? <TestersLine testers={testers} /> : null}
       <Callout
         icon="key"
         title={t(($) => $.leaving.warningTitle)}
@@ -124,6 +124,10 @@ export function LeavingSheet({
         />
         <Button label={t(($) => $.leaving.stay)} variant="secondary" onPress={onStay} />
       </ButtonPair>
+      {/* Sous les boutons, donc après l'avertissement de sécurité (relecture juridique) : ce qui
+          arrive avec le projet ne pousse rien de ce qui est au-dessus, « Ouvrir le site » reste où
+          le doigt va le chercher (R7a, des-C2). Aucune place n'est gardée : rien ne la précède. */}
+      {testers ? <TestersLine testers={testers} /> : null}
     </>
   )
 }
@@ -152,26 +156,19 @@ function HeldLine({ children }: { children: ReactNode | null }) {
 }
 
 /** La ligne des testeurs : la phrase, puis le lien vers la page du projet (qui seule inscrit). */
-function TestersLine({ testers }: { testers: LeavingTesters | null }) {
+function TestersLine({ testers }: { testers: LeavingTesters }) {
   const { t } = useTranslation()
   return (
-    <HeldLine>
-      {testers ? (
-        <Stack gap="xxs" align="stretch">
-          <Text variant="callout" tone="secondary">
-            {t(($) => $.project.testers.leavingLead, { name: testers.name })}
-          </Text>
-          {/* Un lien et non un bouton : il mène à la page du projet ; ouvrir la démo ne rend jamais
-              testeur, et ce lien non plus (l'inscription se fait depuis la page). */}
-          <View style={{ alignSelf: 'flex-start' }}>
-            <TextLink
-              label={t(($) => $.project.testers.leavingLink)}
-              onPress={testers.onOpenProject}
-            />
-          </View>
-        </Stack>
-      ) : null}
-    </HeldLine>
+    <Stack gap="xxs" align="stretch">
+      <Text variant="callout" tone="secondary">
+        {t(($) => $.project.testers.leavingLead, { name: testers.name })}
+      </Text>
+      {/* Un lien et non un bouton : il mène à la page du projet ; ouvrir la démo ne rend jamais
+          testeur, et ce lien non plus (l'inscription se fait depuis la page). */}
+      <View style={{ alignSelf: 'flex-start' }}>
+        <TextLink label={t(($) => $.project.testers.leavingLink)} onPress={testers.onOpenProject} />
+      </View>
+    </Stack>
   )
 }
 
