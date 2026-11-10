@@ -5,10 +5,12 @@
 // d'une double tape tombait sur « Quitter les testeurs » (au pied sur téléphone, au centre sur
 // ordinateur) ou sur « Publier », et faisait une action que personne n'avait choisie.
 //
-// La règle (« API fixées au lancement ») : l'action, « Annuler » et les boutons du pied ignorent toute
-// tape pendant TAP_GUARD_MS (600 ms) après l'ouverture, comme le voile. Une tape vers 700 ms est un
-// geste à part, qui passe. Ces tests lisent seulement ce qui est appelé, jamais comment la garde est
-// posée (bouton inactif ou couche qui ne reçoit pas les tapes).
+// La règle (« API fixées au lancement », corrigée le 10/11) : avec `guardTaps` (faux par défaut),
+// l'action, « Annuler » et les boutons du pied ignorent toute tape pendant TAP_GUARD_MS (600 ms)
+// après l'ouverture, comme le voile. Une tape vers 700 ms est un geste à part, qui passe. Sans
+// `guardTaps`, rien ne change : une garde sans condition aurait changé toutes les autres feuilles.
+// Ces tests lisent seulement ce qui est appelé, jamais comment la garde est posée (bouton inactif ou
+// couche qui ne reçoit pas les tapes).
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
@@ -23,14 +25,19 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 /** Avancer la fausse horloge de `ms` millisecondes, dans un `act` (les minuteurs changent l'état). */
 const wait = (ms: number) => act(() => jest.advanceTimersByTime(ms))
 
-/** La feuille de publication : « Annuler », un titre, « Publier », et un bouton au pied. */
+/**
+ * La feuille de publication : « Annuler », un titre, « Publier », et un bouton au pied. Gardée par
+ * défaut (`guardTaps`), comme la posera « Nouvelle mise à jour » ; `guarded={false}` pour le témoin.
+ */
 function GuardedSheet({
   open = true,
+  guarded = true,
   onAction,
   onCancel,
   onFooter,
 }: {
   open?: boolean
+  guarded?: boolean
   onAction: jest.Mock
   onCancel: jest.Mock
   onFooter?: jest.Mock
@@ -38,6 +45,7 @@ function GuardedSheet({
   return (
     <Sheet
       open={open}
+      guardTaps={guarded}
       title="Nouvelle mise à jour"
       onClose={jest.fn()}
       closeGuard={onCancel}
@@ -66,6 +74,7 @@ function TesterPage({ onQuit }: { onQuit: jest.Mock }) {
       <Button label={joined} onPress={() => setOpen(true)} />
       <Sheet
         open={open}
+        guardTaps
         title={fr.t(($) => $.project.testers.memberTitle)}
         onClose={() => setOpen(false)}
         footer={<Button label={quit} onPress={onQuit} />}
@@ -89,6 +98,18 @@ describe('the buttons of a sheet, against a double tap (R7a)', () => {
     expect(onPress).not.toHaveBeenCalled()
 
     await wait(600)
+    await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  // Témoin : sans `guardTaps`, les autres feuilles de l'appli ne changent pas.
+  it('takes a tap on its action right after opening without guardTaps', async () => {
+    const onPress = jest.fn()
+    await renderWithProviders(
+      <GuardedSheet guarded={false} onAction={onPress} onCancel={jest.fn()} />,
+    )
+
+    await wait(100)
     await fireEvent.press(screen.getByRole('button', { name: 'Publier' }))
     expect(onPress).toHaveBeenCalledTimes(1)
   })
