@@ -36,6 +36,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { crc32, deflateSync } from 'node:zlib'
 import { chromium } from 'playwright'
 import { fr } from '../../../packages/i18n/src/locales/fr.ts'
 import { blockedPageOf, blockedSam } from '../src/testing/blocks.ts'
@@ -225,6 +226,36 @@ const update = (
   removal: null,
 })
 const line = (family, text) => ({ family, text })
+/** Le champ de la n-ième ligne (depuis 1) de la feuille « Nouvelle mise à jour » : « Changement 2 sur 3, … ». */
+const updateLine = (page, n) => page.getByLabel(new RegExp(`^Changement ${n} sur `))
+/**
+ * Une image PNG d'une seule couleur, fabriquée ici même (sans fichier ni dépendance) : une signature
+ * puis des « morceaux » (en-tête, pixels compressés, fin), chacun avec sa somme de contrôle CRC.
+ * Elle sert à choisir une vraie photo dans la feuille, que l'appli réduit avant de l'envoyer.
+ */
+const png = (width, height, [r, g, b]) => {
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const body = Buffer.concat([Buffer.from(type), data])
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header.set([8, 2, 0, 0, 0], 8) // 8 bits par couleur, en RVB, sans entrelacement
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3)])
+  for (let x = 0; x < width; x++) row.set([r, g, b], 1 + x * 3)
+  const pixels = deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', pixels),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
 /** La version courte d'une mise à jour, comme sur une carte du fil (`UpdateSummary`). */
 const summaryOfUpdate = ({ id, createdAt, version, lines }) => ({
   id,
@@ -559,9 +590,10 @@ const photosUpdate = {
     line('polish', 'Des albums aux couleurs du lieu'),
   ],
 }
+// Un projet ne paraît qu'une fois dans ce fil (l'API en rend un seul élément par projet, avec sa
+// dernière activité) : les deux projets mis à jour prennent la place de leur carte de publication.
 const followingItems = [
   updateItem(fromOthers[0], 6, photosUpdate, 19),
-  ...feedItems.slice(0, 2),
   updateItem(
     fromOthers[1],
     7,
@@ -1591,8 +1623,12 @@ const fakeApi = (
   // Ses réglages d'e-mail (tranche 6c), tels que le dernier PATCH les a laissés.
   let emailPreferences = structuredClone(leaEmailPreferences)
   // Le projet tel que l'API le donne, avec ses réactions et son nombre de commentaires.
+  // R7a : les testeurs de ce navigateur (POST / DELETE …/testers) : `isTester` suit le dernier geste,
+  // pour que la relecture qui suit la feuille rende l'état voulu et non celui d'avant.
+  const testers = new Map()
   const withExtras = (project) => ({
     ...project,
+    isTester: testers.has(project.id) ? testers.get(project.id) : project.isTester,
     reactions: reactions[project.id] ?? project.reactions,
     commentCount: (commentCountOf[project.id] ?? 0) + (added[project.id] ?? 0),
   })
@@ -1699,8 +1735,10 @@ const fakeApi = (
     ) {
       return json(201, photo(crypto.randomUUID(), 1600, 900, null))
     }
-    // Rejoindre les testeurs ou les quitter : toujours accepté (204).
-    if (/^\/v1\/projects\/[^/]+\/testers$/.test(pathname) && ['POST', 'DELETE'].includes(method)) {
+    // Rejoindre les testeurs ou les quitter : accepté (204), et l'état est gardé (`withExtras`).
+    const testersOf = pathname.match(/^\/v1\/projects\/([^/]+)\/testers$/)
+    if (testersOf && ['POST', 'DELETE'].includes(method)) {
+      testers.set(testersOf[1], method === 'POST')
       return route.fulfill({ status: 204, body: '' })
     }
     // Réagir (PUT) ou retirer sa réaction (DELETE) : les nombres changent pour la relecture qui suit.
@@ -1777,6 +1815,11 @@ const fakeApi = (
     }
     if (pathname === `/v1/projects/${commentedProject.id}`) {
       return json(200, withExtras(commentedProject))
+    }
+    // R7a : « Décollage ! » de Max, que Léa teste (`isTester`), avec son propre titre et sa seule mise
+    // à jour : sa page, sa frise et sa notification se répondent.
+    if (pathname === `/v1/projects/${testedProject.id}`) {
+      return json(200, withExtras(testedProject))
     }
     if (pathname === `/v1/projects/${threadsProject.id}`) {
       return json(200, withExtras(threadsProject))
@@ -2271,6 +2314,173 @@ const pages = [
     path: `/projects/${testedProject.id}/updates`,
     signedIn: true,
     fullPage: true,
+  },
+  // R7a (U7) : la section « Les mises à jour » de la page de l'autrice : la dernière mise à jour en
+  // entier, « Voir les 3 mises à jour » et « Publier une mise à jour ».
+  { name: 'projet-section-maj', path: project, signedIn: true, fullPage: true },
+  // R7a : le fil « Abonnements » (premier passage) : deux cartes de projets mis à jour (« Mis à jour
+  // · v2 », la première ligne, « et 2 autres changements »), chaque projet une seule fois.
+  { name: 'fil-mise-a-jour', path: '/', signedIn: true, fullPage: true },
+  // R7a : Activité, avec deux notifications « a publié une mise à jour de … » (une nouvelle, une lue).
+  {
+    name: 'activite-maj',
+    path: '/notifications',
+    signedIn: true,
+    notifications: 'updates',
+    fullPage: true,
+  },
+  // R7a : la feuille « Nouvelle mise à jour » de l'autrice, dans ses états : vide, remplie, cinq
+  // lignes (« Ajouter une ligne » disparaît), deux photos en avant / après, l'erreur « Écris au moins
+  // un changement », puis « Annuler » devant un texte écrit (« Abandonner cette mise à jour ? »).
+  { name: 'feuille-mise-a-jour', path: `${project}/update`, signedIn: true },
+  {
+    name: 'feuille-mise-a-jour-remplie',
+    path: `${project}/update`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByLabel(fr.project.updates.titleField).fill('Le décompte de la fusée')
+      await page.getByLabel(fr.project.updates.versionField).fill('v1.2')
+      await updateLine(page, 1).fill('Un compte à rebours de dix secondes avant le décollage')
+      await page.getByRole('button', { name: fr.project.updates.addLine }).click()
+      await page
+        .getByRole('button', { name: /^Famille : /, exact: false })
+        .nth(1)
+        .click()
+      await page.getByRole('menuitemradio', { name: fr.update.family.fixed }).click()
+      await updateLine(page, 2).fill('Le son ne se coupe plus quand on change d’onglet')
+    },
+  },
+  {
+    name: 'feuille-mise-a-jour-5-lignes',
+    path: `${project}/update`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await updateLine(page, 1).fill('Un compte à rebours de dix secondes')
+      for (const n of [2, 3, 4, 5]) {
+        await page.getByRole('button', { name: fr.project.updates.addLine }).click()
+        await updateLine(page, n).fill(`Le changement numéro ${n}`)
+      }
+      await page.getByText('5 / 5').first().waitFor()
+    },
+  },
+  {
+    name: 'feuille-mise-a-jour-avant-apres',
+    path: `${project}/update`,
+    signedIn: true,
+    fullPage: true,
+    prepare: async (page) => {
+      await updateLine(page, 1).fill('Le tableau de bord est plus clair')
+      for (const n of [1, 2]) {
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          page
+            .getByRole('button', {
+              // « Ajouter des photos » (téléphone) ou la zone « Glisse tes images ici, ou choisis-les ».
+              name: new RegExp(`^${fr.project.form.addPhotosLabel}|choisis-les`),
+            })
+            .first()
+            .click(),
+        ])
+        await chooser.setFiles({
+          name: `photo-${n}.png`,
+          mimeType: 'image/png',
+          buffer: png(1200, 800, n === 1 ? [200, 120, 60] : [60, 140, 200]),
+        })
+        await page.getByRole('button', { name: `Retirer la photo ${n}` }).waitFor()
+      }
+      await page.getByRole('switch', { name: fr.project.updates.beforeAfterSwitch }).click()
+    },
+  },
+  {
+    name: 'feuille-mise-a-jour-erreur',
+    path: `${project}/update`,
+    signedIn: true,
+    // La feuille ignore les tapes des 600 premières ms (`guardTaps`) : on attend plus que d'habitude.
+    wait: 1500,
+    prepare: async (page) => {
+      await page
+        .getByRole('button', { name: fr.project.updates.publish, exact: true })
+        .last()
+        .click()
+      await page.getByText(fr.project.updates.required).first().waitFor()
+    },
+  },
+  {
+    name: 'feuille-mise-a-jour-abandon',
+    path: `${project}/update`,
+    signedIn: true,
+    wait: 1500, // « Annuler » ignore les tapes des 600 premières ms de la feuille
+    prepare: async (page) => {
+      await updateLine(page, 1).fill('Un compte à rebours de dix secondes')
+      await page
+        .getByRole('button', { name: fr.project.updates.cancel, exact: true })
+        .first()
+        .click()
+      await page.getByText(fr.project.updates.discardTitle).waitFor()
+    },
+  },
+  // R7a : les testeurs. La feuille d'inscription (page de Décollage !, d'Inès, « Testable » avec sa
+  // démo), la feuille « Tu testes ce projet » (page de Max), la page une fois les testeurs quittés
+  // (le bouton redevient « Rejoindre les testeurs »), le refus « plus de nouveaux testeurs », et la
+  // page de sortie de la démo (la ligne « Tu veux aider Inès ? »).
+  {
+    name: 'testeur',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.join }).click()
+      await page.getByRole('heading', { name: fr.project.testers.joinTitle }).waitFor()
+    },
+  },
+  {
+    name: 'testeur-membre',
+    path: `/projects/${testedProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.joined }).click()
+      await page.getByRole('heading', { name: fr.project.testers.memberTitle }).waitFor()
+    },
+  },
+  {
+    name: 'testeur-quitte',
+    path: `/projects/${testedProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: fr.project.testers.joined }).click()
+      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+      await page.getByRole('button', { name: fr.project.testers.quit }).click()
+      await page.getByRole('button', { name: fr.project.testers.join }).waitFor()
+    },
+  },
+  {
+    name: 'testeur-complet',
+    path: `/projects/${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.route('**/v1/projects/*/testers', (route) =>
+        route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'testers_full', message: '' } }),
+        }),
+      )
+      await page.getByRole('button', { name: fr.project.testers.join }).click()
+      await page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: fr.project.testers.confirm })
+        .click()
+      await page.getByText(fr.project.testers.full).first().waitFor()
+    },
+  },
+  {
+    name: 'testeur-sortie',
+    path: `/out?url=${encodeURIComponent(launchProject.demoUrl)}&project=${launchProject.id}`,
+    signedIn: true,
+    prepare: async (page) => {
+      await page.getByRole('link', { name: fr.project.testers.leavingLink }).waitFor()
+    },
   },
   // Les commentaires d'un projet (R5b) : l'aperçu sous le projet, puis la feuille (sur téléphone) ou
   // la liste déroulée (sur ordinateur), ouverte par un clic une fois la page prête (prepare).
