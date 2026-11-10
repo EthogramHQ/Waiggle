@@ -3,12 +3,14 @@
 // (`mailer.sent`) qui garde les e-mails au lieu de les envoyer. On suit les scénarios de
 // docs/scenarios/phase-1.md, tranche 1.
 import { appName } from '@ruche/brand'
-import { AccountExport, ErrorResponse, Me } from '@ruche/contracts'
+import { AccountExport, ErrorResponse, Me, Project, ProjectUpdate } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { fill, resources } from '@ruche/i18n'
+import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activity } from './testing/activity'
 import { createTestContext, TEST_API_URL, type TestContext } from './testing/context'
+import { jpegImage, visualForm } from './testing/images'
 
 let ctx: TestContext
 
@@ -648,6 +650,71 @@ describe('reports and removals of an account', () => {
   const reports = () =>
     ctx.db.select().from(schema.contentReport).orderBy(schema.contentReport.createdAt)
 
+  // ─── R7a : les mises à jour et les testeurs ──────────────────────────────────────────────────
+
+  /** Envoie une demande et vérifie son statut. */
+  const sendExpecting = async (
+    status: number,
+    method: string,
+    path: string,
+    cookie: string,
+    body?: unknown,
+  ) => {
+    const res = await act.send(method, path, cookie, body)
+    expect(res.status).toBe(status)
+    return res
+  }
+
+  /** Un projet « Testable » avec une démo : on peut en rejoindre les testeurs. */
+  const TESTABLE = { status: 'testable', demoUrl: 'https://example.com/demo' }
+
+  /** Publie une mise à jour d'une ligne, avec ses photos en attente s'il y en a. */
+  const postUpdate = async (projectId: string, cookie: string, photoIds: string[] = []) =>
+    ProjectUpdate.parse(
+      await (
+        await sendExpecting(201, 'POST', `/v1/projects/${projectId}/updates`, cookie, {
+          title: null,
+          version: 'v1.1',
+          lines: [{ family: 'new', text: 'Un mode sombre' }],
+          photos: photoIds.map((id) => ({ id, description: null })),
+          beforeAfter: false,
+        })
+      ).json(),
+    )
+
+  /** Rejoint les testeurs d'un projet (POST …/testers, 204). */
+  const joinTesters = async (projectId: string, cookie: string) => {
+    await sendExpecting(204, 'POST', `/v1/projects/${projectId}/testers`, cookie)
+  }
+
+  /** Les photos de mise à jour d'un projet, lues en base (en attente ou rattachées). */
+  const updatePhotosOf = async (projectId: string) =>
+    (
+      (await ctx.db.execute(
+        sql`select id, storage_key from project_media where project_id = ${projectId} and slot = 'update'`,
+      )) as unknown as { rows: { id: string; storage_key: string }[] }
+    ).rows
+
+  /** Envoie une photo « en attente » (slot=update) ; son identifiant est lu en base. */
+  const uploadPending = async (projectId: string, cookie: string) => {
+    const before = new Set((await updatePhotosOf(projectId)).map((photo) => photo.id))
+    const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+      method: 'POST',
+      headers: { cookie },
+      body: visualForm(await jpegImage(800, 600), 'update'),
+    })
+    expect(res.status).toBe(201)
+    const [photo] = (await updatePhotosOf(projectId)).filter((p) => !before.has(p.id))
+    if (!photo) throw new Error('no pending photo stored')
+    return photo
+  }
+
+  /** Le nombre de testeurs que l'autrice lit sur la page de son projet. */
+  const testerCountOf = async (projectId: string, cookie: string) =>
+    Project.parse(
+      await (await sendExpecting(200, 'GET', `/v1/projects/${projectId}`, cookie)).json(),
+    ).testerCount
+
   describe('in the export', () => {
     it('lists the reports I made, oldest first, without the reported text', async () => {
       const meteo = await act.publish(leaCookie, 'Météo', {
@@ -806,18 +873,17 @@ describe('reports and removals of an account', () => {
       ])
     })
 
-    it('gives the removals of my projects, notes and comments, with ground and explanation', async () => {
+    it('gives the removals of my projects, updates and comments, with ground and explanation', async () => {
+      // R7a : les mises à jour remplacent les notes ; leur retrait est dans `updates[].removal`
+      // (relecture juridique P8).
       const meteo = await act.publish(leaCookie, 'Météo')
       const velo = await act.publish(zoe, 'Vélo')
-      const noteRes = await act.send('POST', `/v1/projects/${meteo.id}/notes`, leaCookie, {
-        body: 'Une note retirée',
-      })
-      const note = (await noteRes.json()) as { id: string }
+      const update = await postUpdate(meteo.id, leaCookie)
       const published = await act.comment(velo.id, leaCookie, 'Un commentaire retiré')
-      // Le projet en dernier : retiré, il cache ses notes aux autres membres, qui ne peuvent plus
-      // les signaler (404, règle 5).
+      // Le projet en dernier : retiré, il cache ses mises à jour aux autres membres, qui ne peuvent
+      // plus les signaler (404, règle 5).
       for (const target of [
-        { kind: 'note', id: note.id },
+        { kind: 'update', id: update.id },
         { kind: 'comment', id: published.id },
         { kind: 'project', id: meteo.id },
       ] as const) {
@@ -841,7 +907,9 @@ describe('reports and removals of an account', () => {
       expect(data.projects.find((p) => p.id === meteo.id)?.removal).toEqual(
         removal('rules', 'project'),
       )
-      expect(data.notes.find((n) => n.id === note.id)?.removal).toEqual(removal('rules', 'note'))
+      expect(data.updates.find((u) => u.id === update.id)?.removal).toEqual(
+        removal('rules', 'update'),
+      )
       expect(data.comments.find((c) => c.id === published.id)?.removal).toEqual(
         removal('illegal', 'comment'),
       )
@@ -849,6 +917,81 @@ describe('reports and removals of an account', () => {
       for (const leak of [louisId, maxId, 'Louis']) expect(raw, leak).not.toContain(leak)
       // Les signalements qui la visent n'y sont pas.
       expect(data.reports).toEqual([])
+    })
+
+    // R7a, relecture de sécurité B1 : un signalement fait sur une note du Journal, d'avant
+    // l'effacement des notes (migration 0018), reste dans la base avec target_kind = 'note'.
+    // L'export le relit avec StoredReportTargetKind, sans jamais répondre 500.
+    it('still exports a report made on a journal note before the notes were erased', async () => {
+      const DAY = 24 * 60 * 60 * 1000
+      await ctx.db.insert(schema.contentReport).values({
+        id: crypto.randomUUID(),
+        reporterId: maxId,
+        targetKind: 'note',
+        targetId: crypto.randomUUID(),
+        projectId: null,
+        targetAuthorId: null,
+        reason: 'other',
+        snapshot: [{ field: 'body', value: 'Une note du Journal' }],
+        status: 'removed',
+        createdAt: new Date(Date.now() - 2 * DAY),
+        decidedAt: new Date(Date.now() - DAY),
+      })
+
+      const { raw, data } = await exportOf(max)
+
+      expect(data.reports).toMatchObject([{ targetKind: 'note', outcome: 'removed' }])
+      // Sans le texte visé, comme pour tout signalement.
+      expect(raw).not.toContain('Une note du Journal')
+    })
+
+    // R7a, relecture de sécurité B3 et juridique P8 : l'inscription comme testeur est une donnée
+    // du membre ; le titre du projet n'y est donné que tant que le projet lui est visible (public,
+    // non retiré, aucun blocage). Sinon `title` vaut null : le titre actuel appartient à un autre.
+    it('exports the projects I test with their title and the date I joined', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      const since = new Date(Date.now()).toISOString()
+      await joinTesters(meteo.id, max)
+
+      expect((await exportOf(max)).data.testerOf).toEqual([
+        { projectId: meteo.id, title: 'Météo', since },
+      ])
+      // Ses testeurs ne sont pas les données de l'autrice.
+      expect((await exportOf(leaCookie)).data.testerOf).toEqual([])
+    })
+
+    it('never exports the title of a tested project that became private', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await joinTesters(meteo.id, max)
+      await act.send('PATCH', `/v1/projects/${meteo.id}`, leaCookie, { title: 'Secret' })
+      await act.setVisibility(meteo.id, leaCookie, 'private')
+
+      const { raw, data } = await exportOf(max)
+
+      expect(raw).not.toContain('Secret')
+      // L'inscription reste en base (le scénario la garde) : l'export la donne, sans titre.
+      expect(data.testerOf).toEqual([
+        { projectId: meteo.id, title: null, since: expect.any(String) },
+      ])
+    })
+
+    it('never exports the title of a tested project removed by the moderation', async () => {
+      const meteo = await act.publish(leaCookie, 'Secret', TESTABLE)
+      await joinTesters(meteo.id, max)
+      await act.report(zoe, { kind: 'project', id: meteo.id })
+      await act.decide(louis, {
+        action: 'remove',
+        target: { kind: 'project', id: meteo.id },
+        ground: 'rules',
+        explanation: 'Une arnaque.',
+      })
+
+      const { raw, data } = await exportOf(max)
+
+      expect(raw).not.toContain('Secret')
+      expect(data.testerOf).toEqual([
+        { projectId: meteo.id, title: null, since: expect.any(String) },
+      ])
     })
   })
 
@@ -913,6 +1056,65 @@ describe('reports and removals of an account', () => {
 
       expect(refused.status).not.toBe(200)
       expect((await reports()).map((r) => [r.status, r.targetAuthorId])).toEqual([['open', leaId]])
+    })
+
+    // R7a, relecture de sécurité A13 : les photos des mises à jour, publiées ou en attente, partent
+    // avec le compte (fichiers compris), comme ses mises à jour et ses inscriptions de testeur.
+    it('erases the files of update photos and pending photos with the account', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      const velo = await act.publish(zoe, 'Vélo', TESTABLE)
+      const attached = await uploadPending(meteo.id, leaCookie)
+      const pending = await uploadPending(meteo.id, leaCookie)
+      await postUpdate(meteo.id, leaCookie, [attached.id])
+      await joinTesters(velo.id, leaCookie)
+      // Témoins : les fichiers et les lignes existent avant la suppression.
+      expect(ctx.storage.files.has(attached.storage_key)).toBe(true)
+      expect(ctx.storage.files.has(pending.storage_key)).toBe(true)
+
+      await act.deleteAccount(leaCookie, lea.password)
+
+      expect(ctx.storage.files.has(attached.storage_key)).toBe(false)
+      expect(ctx.storage.files.has(pending.storage_key)).toBe(false)
+      expect(
+        (await ctx.db.execute(
+          sql`select id from project_update where project_id = ${meteo.id}`,
+        )) as unknown as { rows: unknown[] },
+      ).toMatchObject({ rows: [] })
+      expect(
+        (await ctx.db.execute(
+          sql`select project_id from project_tester where member_id = ${leaId}`,
+        )) as unknown as { rows: unknown[] },
+      ).toMatchObject({ rows: [] })
+    })
+
+    it('erases the tester rows of a deleted account from the author’s count', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo', TESTABLE)
+      await joinTesters(meteo.id, max)
+      expect(await testerCountOf(meteo.id, leaCookie)).toBe(1)
+
+      await act.deleteAccount(max, maxAccount.password)
+
+      expect(await testerCountOf(meteo.id, leaCookie)).toBe(0)
+    })
+
+    // R7a, relecture de sécurité A2 : les clés `update:` et `tester:` sont dans memberCounterKeys,
+    // et partent donc avec le compte (deleteMemberCounters).
+    it('removes the update and tester counters with the account', async () => {
+      const meteo = await act.publish(leaCookie, 'Météo')
+      const velo = await act.publish(zoe, 'Vélo', TESTABLE)
+      await postUpdate(meteo.id, leaCookie)
+      await joinTesters(velo.id, leaCookie)
+      const keys = async () =>
+        (await ctx.db.select({ key: schema.apiRateLimit.key }).from(schema.apiRateLimit))
+          .map(({ key }) => key)
+          .filter((key) => key === `update:${leaId}` || key === `tester:${leaId}`)
+          .sort()
+      // Témoin : les deux compteurs existent avant la suppression.
+      expect(await keys()).toEqual([`tester:${leaId}`, `update:${leaId}`])
+
+      await act.deleteAccount(leaCookie, lea.password)
+
+      expect(await keys()).toEqual([])
     })
 
     it('takes the administrator role with the account, and keeps his decisions without his name', async () => {

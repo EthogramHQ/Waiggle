@@ -11,7 +11,7 @@ import {
   ProfileUpdate,
   ReportOutcome,
   ReportReason,
-  ReportTargetKind,
+  StoredReportTargetKind,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq } from 'drizzle-orm'
@@ -29,19 +29,19 @@ import { currentHandle, formerHandleOf } from '../handles/load'
 import { processAvatar } from '../media/avatar'
 import type { FileStorage } from '../media/storage'
 import { mentionsOfComments } from '../mentions/load'
-import { notesOfAuthor } from '../notes/load'
 import { readSeenAt } from '../notifications/state'
 import { loadMe } from '../profile/me'
 import { loadProjectsOf } from '../projects/load'
-import { listedProject } from '../projects/visibility'
+import { listedProject, listedProjectFor } from '../projects/visibility'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import { reactionsOfMember } from '../reactions/load'
 import { dismissedSuggestionsOf } from '../suggestions/load'
 import { isSuspended, suspensionsOfMember } from '../suspension/load'
 import { chargeOtherTools } from '../tools/quota'
 import { countChargedOtherTools, NoFreeToolSlugError, resolveTools } from '../tools/resolve'
-import { legacyToolColumns, replaceProfileTools } from '../tools/write'
+import { replaceProfileTools } from '../tools/write'
 import type { AppEnv } from '../types'
+import { updatesOfAuthor } from '../updates/load'
 import { createRouter, errorResponse } from './router'
 
 // Règles anti-abus de ces routes (voir docs/scenarios/phase-1.md, tranche 2).
@@ -224,21 +224,18 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         // … la bio et les outils dans `profile`. « Upsert » : créer la ligne si elle n'existe pas
         // encore, sinon la mettre à jour (insert … on conflict do update).
         if (bio !== undefined || favoriteTools !== undefined) {
-          // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool ; l'ancienne
-          // colonne `favorite_tools` reste écrite (noms tapés) jusqu'en R7, sans être relue.
+          // Les outils favoris (R6b) : reliés au catalogue, écrits dans profile_tool seulement
+          // (l'ancienne colonne `favorite_tools` est effacée par la migration 0018).
           const resolved =
             favoriteTools === undefined ? undefined : await resolveTools(tx, favoriteTools)
-          const legacy = resolved && legacyToolColumns(resolved.tools).tools
-          await tx
+          // Sans bio envoyée, il ne reste rien à mettre à jour (Drizzle refuse un `set` vide) : la
+          // ligne n'est créée que si elle manque.
+          const profileInsert = tx
             .insert(schema.profile)
-            .values({ userId: user.id, bio: bio ?? '', favoriteTools: legacy ?? [] })
-            .onConflictDoUpdate({
-              target: schema.profile.userId,
-              set: {
-                ...(bio !== undefined && { bio }),
-                ...(legacy !== undefined && { favoriteTools: legacy }),
-              },
-            })
+            .values({ userId: user.id, bio: bio ?? '' })
+          await (bio === undefined
+            ? profileInsert.onConflictDoNothing()
+            : profileInsert.onConflictDoUpdate({ target: schema.profile.userId, set: { bio } }))
           if (resolved) {
             createdHere = resolved.created
             await replaceProfileTools(tx, user.id, resolved.tools)
@@ -362,9 +359,37 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Les rangements de catégorie faits par un administrateur sur ses projets (R6b, jur-T4), sans
     // nommer l'administrateur.
     const categoryChanges = await categoryChangesOf(db, user.id)
-    // Toutes les notes de ses projets, privés compris, et pas seulement les 20 du journal de chaque
-    // projet. Jamais celles des projets qu'il suit : elles appartiennent à leurs auteurs.
-    const notes = await notesOfAuthor(db, user.id)
+    // Toutes les mises à jour de ses projets (R7a), privés compris, retirées comprises (avec le
+    // retrait), et pas seulement la page de la frise. Jamais celles des projets qu'il suit ou teste :
+    // elles appartiennent à leurs auteurs.
+    const updates = await updatesOfAuthor(db, user.id)
+
+    // Les projets dont il est testeur (R7a), des plus anciennes inscriptions aux plus récentes :
+    // l'identifiant, la date, et le titre seulement si le projet lui est encore visible. Un projet
+    // devenu privé, retiré, ou d'un membre bloqué avec lui n'a plus de titre ici (le titre
+    // appartient à son auteur ; comme pour les abonnements, sécurité B3). Le `left join` garde la
+    // ligne d'inscription même quand sa condition de visibilité (`listedProjectFor`) échoue : le
+    // titre vaut alors null. La clé primaire (member_id, project_id) trouve ses inscriptions ; le
+    // tri se fait en mémoire (un export est rare, et ne concerne qu'un membre).
+    const testerOf = (
+      await db
+        .select({
+          projectId: schema.projectTester.projectId,
+          title: schema.project.title,
+          since: schema.projectTester.createdAt,
+        })
+        .from(schema.projectTester)
+        .leftJoin(
+          schema.project,
+          and(eq(schema.project.id, schema.projectTester.projectId), listedProjectFor(user.id)),
+        )
+        .where(eq(schema.projectTester.memberId, user.id))
+        .orderBy(asc(schema.projectTester.createdAt), asc(schema.projectTester.projectId))
+    ).map((row) => ({
+      projectId: row.projectId,
+      title: row.title,
+      since: row.since.toISOString(),
+    }))
 
     // Ce qu'il suit : l'identifiant et la date, rien de plus. Ses abonnés, eux, ne font pas partie
     // de ses données. Les deux requêtes partent de la clé primaire (follower_id, …).
@@ -431,7 +456,9 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
       .orderBy(asc(schema.contentReport.createdAt), asc(schema.contentReport.id))
     // .parse vérifie que chaque valeur lue est l'une de celles permises par le contrat.
     const reports = reportRows.map((row) => ({
-      targetKind: ReportTargetKind.parse(row.targetKind),
+      // Les signalements d'avant l'effacement des notes (R7a) gardent `note` : d'où le schéma
+      // « stocké », qui l'admet encore.
+      targetKind: StoredReportTargetKind.parse(row.targetKind),
       targetId: row.targetId,
       reason: ReportReason.parse(row.reason),
       details: row.details,
@@ -461,7 +488,8 @@ export const meRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         formerHandle,
         projects,
         categoryChanges,
-        notes,
+        updates,
+        testerOf,
         follows: { members: withDate(followedMembers), projects: withDate(followedProjects) },
         reactions,
         comments: comments.map((comment) => ({

@@ -131,6 +131,9 @@ const icons = [
   'baby',
   'globe',
   'robot',
+  // R7a : la famille « Plus joli » d'une mise à jour, et la poignée de l'avant / après.
+  'palette',
+  'arrows-left-right',
   // Versions pleines (onglet actif, réaction choisie)
   'house-fill',
   'compass-fill',

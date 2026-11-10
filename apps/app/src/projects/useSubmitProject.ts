@@ -9,7 +9,7 @@
 // - sinon, le fil d'où l'on venait, qui danse (`published`, HomeScreen).
 // Une modification enregistrée revient à la page du projet, avec une note toute prête quand le
 // statut d'un projet visible a changé (`announce`).
-import type { ProjectInput, ProjectUpdate } from '@ruche/contracts'
+import type { ProjectChanges, ProjectInput } from '@ruche/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
@@ -56,7 +56,7 @@ export function useSubmitProject({
    */
   const send = async (
     form: ProjectForm,
-    changes: ProjectInput | ProjectUpdate,
+    changes: ProjectInput | ProjectChanges,
   ): Promise<ApiErrorKey | null> => {
     sending.current = true
     setBusy(true)

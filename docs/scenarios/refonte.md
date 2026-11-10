@@ -3,10 +3,10 @@
 Statut : R1 **validé par Louis** le 28/10/2026 ; R2 **validé** le 29/10/2026.
 
 La refonte applique les maquettes et les décisions du 28/10/2026 (image de marque validée le
-27/10, décisions pour la refonte, maquettes du 27 au 28/10), en treize tranches : R1 les
+27/10, décisions pour la refonte, maquettes du 27 au 28/10), en quatorze tranches : R1 les
 fondations, R2 le compte, R3 la navigation et Explorer, R4 le fil, R5a la page projet, R5b les
-commentaires, R6a la feuille de publication, R6b les outils et les catégories, R7 les mises à
-jour, R8 les notifications, R9 la modération, R10 les Ruches, R11 la conformité, R12 les projets
+commentaires, R6a la feuille de publication, R6b les outils et les catégories, R7a les mises à
+jour et les testeurs, R7b le coin des testeurs, R8 les notifications, R9 la modération, R10 les Ruches, R11 la conformité, R12 les projets
 publics. Chaque tranche ajoute ici ses scénarios.
 Les scénarios de la phase 1 (`phase-1.md`) restent valables : la refonte change l'apparence et
 le mouvement, jamais une règle métier sans le dire.
@@ -1806,3 +1806,426 @@ Pris par la session, à revoir par Louis au bilan :
     celles de l'administration demandent « Abandonner les changements ? » si on les ferme
     modifiées (Échap, voile, « Annuler »), refusent de se fermer pendant l'écriture, et le Retour du
     navigateur quitte la page, comme pour les commentaires et le partage.
+
+---
+
+## R7a — Les mises à jour et les testeurs
+
+Statut : **validé par Louis** le 10/11/2026 (« tout me va », « ok pour le découpage »). Ses choix
+du 10/11 au matin : on crée les testeurs, qui s'inscrivent (« plus complets ») ; une mise à jour
+a un titre facultatif ; la carte du projet remonte dans « Abonnements » ; les notes du Journal
+déjà publiées sont effacées. R7 est coupée en deux : R7a ici, R7b (le coin des testeurs) juste
+après.
+
+R7a remplace la note du Journal par une **vraie mise à jour** (planches `R7-MAJ-Publier`,
+`R7-MAJ-Projet`, `R7-MAJ-Fil`, `R7-MAJ-Desktop` ; décisions « Les versions et les mises à jour »,
+F-Pr5, F-Pr7, et « Une mise à jour dans le fil ») : un titre et un numéro de version facultatifs,
+« Ce qui a changé » en cinq lignes au plus dans trois familles, des photos avec un avant / après, la
+frise des mises à jour, la carte qui remonte dans le fil avec « Mis à jour · v1.2 », et une
+notification aux abonnés du projet et à ses **testeurs**, des membres qui s'inscrivent pour
+aider l'auteur. Elle efface aussi les anciennes colonnes de texte des outils, gardées depuis R6b pour un retour en
+arrière devenu inutile.
+
+Les règles d'aujourd'hui ne changent pas, sauf celles que cette section nomme : seul l'auteur
+publie ou supprime une mise à jour ; ce que voit chacun (un projet privé d'un autre membre, retiré,
+ou d'un membre bloqué ne laisse voir aucune de ses mises à jour, nulle part) ; une mise à jour se
+signale et se retire comme une note aujourd'hui.
+
+Hors de R7a, et où ça va :
+- choisir, pour l'e-mail, « Dans le récap » ou « Jamais » pour les mises à jour suivies (F-N2) :
+  R8, avec les réglages par type ; en R7, elles suivent le réglage du récap ;
+- les notifications sur le téléphone (push) : après la refonte ;
+- modifier une mise à jour publiée : plus tard, si les membres le demandent (on la supprime et on
+  la republie) ;
+- les vidéos courtes : après la refonte (F-Pr7) ;
+- signaler une seule photo d'une mise à jour : R9, avec les parties d'un contenu (7d) ;
+- une mise à jour dans une ruche : R10 ;
+- le coin des testeurs (la liste pour l'auteur, les appels à tester, les retours privés,
+  « Réglé dans la v1.3 », le badge « Testeur ») : R7b, juste après ;
+- une conversation de groupe entre les testeurs d'un projet : plus tard (Louis, 10/11/2026 : « ça
+  me semble intéressant », à garder).
+
+### Les testeurs (demande de Louis du 10/11/2026 : « plus complets »)
+
+Un testeur n'est plus quelqu'un qui a seulement ouvert la démo : c'est un membre qui **s'inscrit**
+auprès de l'auteur pour l'aider. En R7a, il reçoit les mises à jour du projet ; en R7b, il aura
+sa place dans **le coin des testeurs**.
+
+Amendé au commit du contrat (décisions de Louis du 10/11/2026, après la relecture juridique du
+plan) : les textes ne supposent aucun genre, et ne donnent jamais un nombre de testeurs à un autre
+que l'auteur.
+
+**Rejoindre les testeurs**
+- Étant donné Inès sur la page de Décollage !, un projet « Testable » de Papi Jean, avec une démo
+- Alors sous « Tester la démo », à côté de « Suivre ce projet », un bouton « Rejoindre les
+  testeurs » (pas en miel : « Tester la démo » l'est)
+- Quand elle le touche
+- Alors une feuille « Rejoindre les testeurs » explique : « Tu aides Papi Jean à améliorer
+  « Décollage ! ». Tu recevras ses mises à jour, et bientôt ses appels à tester. Papi Jean verra ton
+  nom dans sa liste de testeurs. », avec « Rejoindre les testeurs » et « Annuler »
+- Quand elle confirme
+- Alors une bulle dit « Tu fais partie des testeurs de « Décollage ! ». », et le bouton devient
+  « Tu testes ce projet », qui reçoit le focus
+- Et sur la page de sortie d'une démo venue d'un projet « Testable », un membre qui n'est pas
+  testeur lit « Tu veux aider Papi Jean ? Rejoins les testeurs depuis la page du projet. », la
+  seconde phrase étant un lien vers la page du projet ; ouvrir la démo ne rend jamais testeur tout
+  seul
+- Et un projet qui n'est pas « Testable » ne propose pas « Rejoindre les testeurs » ; ses testeurs
+  gardent leur place quand le statut change, et gardent « Tu testes ce projet » pour pouvoir partir
+- Et un compte suspendu ne voit pas « Rejoindre les testeurs » (il peut toujours quitter)
+- Et l'auteur ne peut pas être testeur de son propre projet ; un membre bloqué par l'auteur, ou qui
+  l'a bloqué, ne voit pas le bouton
+- Et un projet compte 200 testeurs au plus ; au-delà, la feuille dit « Ce projet ne prend plus de
+  nouveaux testeurs. »
+- Et l'auteur voit « 12 testeurs » à côté de « 12 abonnés » sur la page de son projet (le nombre
+  seul en R7a ; la liste en R7b) ; les autres membres ne voient ni le nombre ni les noms
+
+**Quitter**
+- Quand Inès touche « Tu testes ce projet »
+- Alors une feuille « Tu testes ce projet » dit « Tu fais partie des testeurs de « Décollage ! ».
+  Tu reçois ses mises à jour. » et propose « Quitter les testeurs » et « Fermer »
+- Quand elle touche « Quitter les testeurs »
+- Alors elle ne fait plus partie des testeurs, le bouton redevient « Rejoindre les testeurs », et
+  une bulle dit « Tu ne fais plus partie des testeurs de « Décollage ! ». »
+- Et quand elle cesse de suivre un projet qu'elle teste, une bulle dit « Tu fais toujours partie
+  des testeurs : ses mises à jour continueront d'arriver. »
+- Et un blocage, dans un sens ou dans l'autre, retire le testeur ; ses inscriptions ne reviennent
+  pas au déblocage
+- Et un projet supprimé emporte ses testeurs ; un projet retiré ou privé ne prévient plus ses
+  testeurs ; un auteur suspendu ne publie plus, donc ne prévient plus (ses mises à jour d'avant
+  restent dans Activité, comme dans la frise : la suspension ne se devine pas)
+
+**Ce que reçoit un testeur**
+- Les mises à jour du projet, dans Activité et dans le récap du lundi
+- Et il en est prévenu une seule fois, même s'il suit aussi le projet
+
+### Publier une mise à jour (planche `R7-MAJ-Publier`)
+
+- Étant donné Papi Jean sur la page de son projet Décollage !
+- Alors la section « Les mises à jour » a un bouton « Publier une mise à jour », et le menu « … »
+  aussi
+- Quand il le touche
+- Alors une feuille « Nouvelle mise à jour » s'ouvre, avec « Annuler » à gauche et « Publier » à
+  droite
+- Et en haut, la vignette et le titre du projet, et « Dernière version : v1.2, il y a 3 semaines »
+  (sans version : « Dernière mise à jour : il y a 3 semaines » ; sans mise à jour : « Première
+  mise à jour »)
+- Et un champ « Titre, facultatif » (« Par exemple : Le décompte de la fusée »), 60 caractères au
+  plus
+- Et « Ce qui a changé », avec le compteur « 1 / 5 » à droite, et une première ligne vide de la
+  famille « Nouveau »
+- Et chaque ligne porte sa famille, une pastille ronde avec son icône, et son nom au-dessus du
+  texte : « Nouveau » (étincelle, ambre), « Réparé » (clé, vert), « Plus joli » (palette, encre
+  discrète)
+- Et chaque famille a son exemple dans le champ vide : « Par exemple : un mode nuit », « Par
+  exemple : la lune ne disparaît plus à minuit », « Par exemple : des étoiles qui scintillent »
+- Et une ligne fait 120 caractères au plus
+- Quand il touche la pastille d'une ligne
+- Alors un petit menu propose les trois familles ; la ligne prend celle qu'il choisit
+- Quand il touche « Ajouter une ligne »
+- Alors une ligne vide apparaît, de la famille « Nouveau », et le compteur dit « 2 / 5 »
+- Et à cinq lignes, « Ajouter une ligne » disparaît
+- Et chaque ligne a un bouton « Retirer cette ligne », sauf quand il n'en reste qu'une
+- Et sous la liste, l'aide « Une ligne par changement, 5 au plus. Pas besoin de tout dire. »
+- Et un champ d'une ligne « Numéro de version, facultatif », en Geist Mono, 20 caractères au plus
+  (« v1.3 »)
+- Et une partie « Photos » : « Ajouter » ouvre le choix d'images comme dans la feuille de
+  publication, 4 photos au plus, ré-encodées sans métadonnées, chacune avec sa description
+  facultative
+- Et un projet garde 100 photos de mises à jour au plus (décision de Louis du 10/11/2026) ;
+  au-delà, « Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour
+  en ajouter. »
+- Et dès deux photos, un interrupteur « Avant / après » : allumé, les deux premières portent les
+  étiquettes « Avant » et « Après »
+- Et en bas, « Tous les membres pourront la lire. Les abonnés et les testeurs de ce projet seront
+  prévenus. » (pour un projet privé : « Ce projet est privé : aucun autre membre ne voit cette mise
+  à jour, et personne n'est prévenu. S'il redevient visible des membres, tous la verront, et ses
+  abonnés et testeurs pourront la retrouver dans Activité. » ; textes de la relecture juridique)
+
+**Publier**
+- Quand il touche « Publier » avec au moins une ligne écrite
+- Alors la mise à jour est publiée, la feuille se ferme, une bulle dit « Mise à jour publiée. »
+- Et sous le titre du projet : « Publié le 12 sept. · Mis à jour à l'instant · v1.3 »
+- Et les lignes vides sont ignorées
+- Quand il touche « Publier » sans aucune ligne écrite
+- Alors « Publier » n'est jamais grisé : la première ligne dit « Écris au moins un changement
+  avant de publier. » et reçoit le focus
+- Et pendant l'envoi, « Publier » reste occupé et la feuille ne se ferme pas ; une seconde tape
+  n'envoie rien
+- Et en cas d'échec, « La mise à jour n'a pas pu être publiée. Réessaie. », rien n'est perdu
+- Et au-delà de 10 mises à jour par jour (tous projets confondus), « Tu as publié 10 mises à jour
+  aujourd'hui. La suivante pourra partir demain. »
+
+**Quitter sans publier** (repris de la liste « À reprendre » : le brouillon d'une note perdu)
+- Quand il touche « Annuler », Échap, le voile ou le Retour du navigateur, la feuille modifiée
+- Alors une fenêtre « Abandonner cette mise à jour ? » propose « Continuer » et « Abandonner » ;
+  « Abandonner » efface aussi les photos déjà envoyées
+- Et la feuille sans changement (ou seulement préremplie par le statut) se ferme tout de suite
+
+**Quand le statut change**
+- Étant donné Papi Jean qui passe son projet en « Testable » dans « Modifier »
+- Alors, comme aujourd'hui pour le Journal, la feuille « Nouvelle mise à jour » s'ouvre avec une
+  ligne « Nouveau » préremplie « Le projet passe en « Testable ». » et l'aide « Ton projet est passé
+  en « Testable » : annonce-le à tes abonnés et à tes testeurs, ou touche Annuler. »
+
+### Les mises à jour sur la page projet
+
+- Étant donné un projet qui a trois mises à jour
+- Alors sous le titre : « Publié le 12 sept. · Mis à jour il y a 2 jours · v1.2 » ; « Mis à
+  jour » suit la dernière mise à jour publiée, et non plus une modification du projet ; la version
+  est celle de la dernière mise à jour qui en a une, en Geist Mono, discrète
+- Et un projet sans mise à jour garde « Publié le 12 sept. », sans « Mis à jour »
+- Et la section « Les mises à jour » remplace le Journal : la dernière mise à jour en entier (son
+  titre, sa version, sa date, ses lignes avec leurs pastilles, ses photos), puis « Voir les
+  3 mises à jour »
+- Et un projet sans mise à jour ne montre pas la section aux autres membres ; son auteur y voit
+  « Pas encore de mise à jour. Raconte ce qui change : tes abonnés et tes testeurs seront
+  prévenus. » et « Publier une mise à jour »
+- Et sur ordinateur, la corbeille de l'auteur est au bord droit de chaque mise à jour (repris de
+  la liste « À reprendre » : à 1440 px, elle était à mi-carte)
+
+### La frise (planches `R7-MAJ-Projet`, `R7-MAJ-Desktop`)
+
+- Quand un membre touche « Voir les 3 mises à jour »
+- Alors la page « Les mises à jour » s'ouvre : Retour avec le titre et l'auteur du projet, et
+  « Suivre ce projet » en haut à droite
+- Et le grand titre « Les mises à jour », avec le nombre (« 3 ») dans une pastille
+- Et « Publié le 12 sept. · Mis à jour il y a 2 jours · v1.2 »
+- Et en haut, l'avant / après de la dernière mise à jour qui en a un
+- Et la frise, de la plus récente à la plus ancienne : un point miel pour la dernière, un rond
+  vide pour les autres, reliés par un trait ; pour chacune, son titre (sinon sa version, sinon
+  « Mise à jour »), sa version en Geist Mono, sa date relative à droite, ses lignes avec leurs
+  pastilles, et ses photos en petites tuiles
+- Et tout en bas, « Première version », à la date de publication du projet
+- Et la frise montre 20 mises à jour, puis « Afficher la suite »
+- Et sur ordinateur, l'avant / après à gauche et la frise à droite dans une carte, avec l'aide
+  « Fais glisser la poignée, ou utilise les flèches du clavier, pour comparer. »
+- Et l'auteur a une corbeille sur chaque mise à jour
+
+### L'avant / après (F-Pr7)
+
+- Étant donné une mise à jour avec l'avant / après
+- Alors les deux photos sont superposées, l'« Avant » à gauche et l'« Après » à droite d'un trait
+  blanc, avec les étiquettes « Avant » et « Après » en verre, et une poignée ronde au milieu
+- Quand le membre fait glisser la poignée, ou touche l'image
+- Alors le trait suit son doigt
+- Et la poignée est un curseur pour les lecteurs d'écran (« Comparer avant et après », sa valeur
+  en pour cent) ; les flèches du clavier la déplacent de 10 %, Début et Fin vont aux bords
+- Et sa zone à toucher fait 44 points au moins
+- Et chaque photo garde sa description pour les lecteurs d'écran
+- Et rien ne bouge sans le membre, avec ou sans « Réduire les animations »
+- Et les photos d'une mise à jour sans avant / après s'affichent dans un carrousel, comme celles de
+  la galerie (amendé au commit du contrat : l'appli n'a pas encore de vue en grand des photos)
+
+### Supprimer une mise à jour
+
+- Quand l'auteur touche la corbeille d'une mise à jour
+- Alors une fenêtre « Supprimer cette mise à jour ? », « Elle disparaîtra de la page du projet, du
+  fil et des notifications, avec ses photos. », « Annuler » et « Supprimer »
+- Et après, une bulle « Mise à jour supprimée. » ; « Mis à jour » et la version sous le titre
+  suivent la mise à jour précédente, ou disparaissent
+- Et pendant la suppression, « Supprimer » reste occupé et une seconde tape n'envoie rien
+
+### Dans le fil (planche `R7-MAJ-Fil`)
+
+- Étant donné Inès qui suit Décollage !, ou qui suit Papi Jean
+- Quand Papi Jean publie une mise à jour
+- Alors dans « Abonnements », la carte de Décollage ! remonte à la date de la mise à jour (le
+  projet n'apparaît qu'une fois, à son événement le plus récent)
+- Et elle porte « Mis à jour · v1.2 » à la place de la date de l'auteur (« Mis à jour » seul, sans
+  version)
+- Et la première ligne de « Ce qui a changé », avec sa pastille, remplace l'accroche, suivie de
+  « et 2 autres changements » s'il y en a
+- Et en bas de la carte, la date relative de la mise à jour
+- Et la petite carte « Note de Léa sur Carnet de cafés » disparaît
+- Et le bouton des nouveautés dit « 1 mise à jour », « 2 mises à jour », ou « 3 nouveautés » quand
+  il y a aussi de nouveaux projets, avec les photos des auteurs
+- Et dans « Découvrir », l'ordre reste celui de la publication ; la carte porte le repère « Mis à
+  jour · v1.2 » si sa dernière mise à jour a moins de 30 jours, sans changer d'accroche
+- Et pareil sur la page d'un outil, d'un membre, et dans les résultats de recherche
+
+### Les notifications
+
+- Étant donné Inès, abonnée ou testeuse de Décollage !
+- Quand Papi Jean publie une mise à jour
+- Alors la cloche s'allume, et Activité montre « Papi Jean a publié une mise à jour de
+  « Décollage ! » · v1.2 », avec sa première ligne ; la toucher ouvre la frise
+- Et seules les mises à jour publiées après l'abonnement ou l'inscription la font s'allumer
+- Et Inès n'est prévenue qu'une fois par mise à jour, même abonnée et testeuse
+- Et l'auteur n'est jamais prévenu de sa propre mise à jour
+- Et personne n'est prévenu d'un projet privé, d'un projet qu'il ne peut pas voir, ni par un
+  membre qu'il a bloqué ou qui l'a bloqué
+- Et une mise à jour supprimée ou retirée disparaît d'Activité
+- Et le récap du lundi ajoute « Les projets que tu suis ou que tu testes » : chaque projet mis à
+  jour dans la semaine, son nombre de mises à jour et un lien, pour qui reçoit le récap ; jamais le
+  texte d'une mise à jour
+
+### La modération
+
+- Une mise à jour se signale comme une note aujourd'hui (le menu de chaque mise à jour, pour un
+  autre membre que l'auteur), et se retire en entier, ses photos avec elle
+- Et les textes de la modération, des bandeaux et des notifications disent « mise à jour » là où
+  ils disaient « note »
+- Et la copie gardée d'un signalement porte le titre, la version et les lignes
+
+### Ce qui disparaît
+
+- **Les notes du Journal** : effacées le jour de la bascule (choix de Louis du 10/11/2026), avec
+  leur place dans le fil et dans Activité ; les décisions de modération qui en parlent gardent
+  leur copie
+- **Les anciennes colonnes de texte des outils** (`project.tools`, `project.tool_slugs`,
+  `profile.favorite_tools`) : effacées ; le catalogue de R6b est la seule source
+- Les textes qui disaient « notes » disent « mises à jour » : la fenêtre de suppression d'un projet
+  (« … ses photos, ses prompts et ses mises à jour disparaissent tout de suite … »), l'export des
+  données, le blocage, la suspension, la description du fil
+
+### Mes données
+
+- L'export de ses données contient ses mises à jour (titre, version, lignes et familles, dates,
+  descriptions des photos) et les projets dont on est testeur (titre, date d'inscription)
+- La suppression du compte efface ses mises à jour, leurs photos et ses inscriptions de testeur
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) : Inès devient testeuse de Décollage ! ; Papi Jean publie « Le décompte de la fusée » (v1.2, une ligne « Nouveau », une
+  « Réparé », deux photos en avant / après) ; Inès voit la cloche s'allumer, ouvre la frise,
+  compare avant / après au clavier, puis quitte les testeurs
+
+### Les choix de la session (10/11/2026), validés avec ce scénario
+
+1. **Les testeurs** : on s'inscrit (projet « Testable » seulement, 200 au plus) ; l'auteur voit
+   leur nombre en R7a, leur liste en R7b ; personne d'autre ne voit ni l'un ni l'autre. Les textes
+   (« Rejoindre les testeurs », « Tu testes ce projet ») ne supposent aucun genre.
+2. **Ce que reçoivent abonnés et testeurs** : Activité et le récap du lundi ; pas d'e-mail
+   immédiat (R8 réglera chaque type).
+3. **Le fil** : une mise à jour remonte la carte pour les abonnés du projet et de l'auteur, dans
+   « Abonnements » ; « Découvrir » garde l'ordre de publication, avec un repère pendant 30 jours.
+4. **« Mis à jour »** sous le titre suit la dernière mise à jour, plus une modification du projet.
+5. **Limites** : titre 60, ligne 120, version 20 caractères ; 5 lignes ; 4 photos ; 10 mises à
+   jour par jour et par membre (les notes : 30).
+6. **On ne modifie pas** une mise à jour publiée ; on la supprime.
+7. **Les photos d'une mise à jour** restent avec elle : elles n'entrent pas dans la galerie du
+   projet.
+
+---
+
+## R7b — Le coin des testeurs
+
+Statut : **validé par Louis** le 10/11/2026 (« tout me va », « ok pour le découpage »), à
+reprendre au début de R7b. R7b suit R7a, qui crée les mises à jour et l'inscription des testeurs.
+
+R7b donne aux testeurs inscrits en R7a **le coin des testeurs** du projet, un espace tenu par
+l'auteur : les appels à tester, et un fil privé de retours entre chaque testeur et l'auteur, relié
+aux mises à jour par « Réglé dans la v1.3 ».
+
+Hors de R7b, et où ça va :
+- **une conversation de groupe entre les testeurs d'un projet** : plus tard (Louis, 10/11/2026 :
+  « ça me semble intéressant », à garder) ;
+- des retours par e-mail, et prévenir par e-mail d'un nouveau message : R8, avec les réglages par
+  type (en R7b, Activité et le récap du lundi) ;
+- signaler une seule capture d'un retour : R9, avec les parties d'un contenu.
+
+### Le coin des testeurs (une page du projet, `/projects/<id>/testers`)
+
+- Étant donné Papi Jean, ou un testeur de Décollage !
+- Quand il touche « Le coin des testeurs » (le bouton « Tu testes ce projet » le devient, et l'auteur le
+  trouve sur la page du projet et dans le menu « … »)
+- Alors la page s'ouvre avec Retour, le titre du projet, et deux onglets : « Appels » et
+  « Retours »
+- Et un autre membre, ou un visiteur, qui ouvre l'adresse voit la page introuvable
+- Et l'auteur voit en haut « 12 testeurs » et la liste : photo, nom, date d'inscription, et pour
+  chacun le menu « … » avec « Retirer des testeurs »
+- Et un testeur voit « 12 testeurs », sans la liste : les testeurs ne se voient pas entre eux
+- Et « Quitter les testeurs » passe dans le menu « … » du coin
+
+### Les appels à tester (de l'auteur à tous ses testeurs)
+
+- Étant donné Papi Jean dans l'onglet « Appels »
+- Quand il touche « Lancer un appel »
+- Alors une feuille « Nouvel appel » : un texte de 500 caractères au plus (« Par exemple : essayez
+  le niveau 3 ce week-end, surtout sur téléphone »), et une photo facultative
+- Quand il touche « Envoyer »
+- Alors l'appel apparaît en tête de l'onglet, et chaque testeur est prévenu dans Activité
+  (« Papi Jean lance un appel à tester Décollage ! »)
+- Et les appels s'affichent du plus récent au plus ancien ; l'auteur peut supprimer chacun
+- Et 5 appels par jour et par projet au plus
+
+### Les retours (un fil privé entre chaque testeur et l'auteur)
+
+- Étant donné Inès dans l'onglet « Retours »
+- Alors elle voit son seul fil avec Papi Jean, et le bouton « Envoyer un retour »
+- Quand elle le touche
+- Alors une feuille « Ton retour » : « Ça a marché ? » (Oui · En partie · Non), « Sur quoi ? »
+  (Téléphone · Ordinateur · Tablette, facultatif), un texte de 1 000 caractères au plus (« Ce qui a
+  marché, ce qui a coincé, ce que tu as aimé »), et une capture d'écran facultative, ré-encodée
+  sans métadonnées
+- Et l'aide rappelle « Retire ce qui est personnel de ta capture. »
+- Quand elle touche « Envoyer »
+- Alors le retour apparaît dans son fil, et Papi Jean est prévenu dans Activité
+- Et seuls Inès et Papi Jean voient ce fil ; aucun autre testeur, aucun autre membre
+- Étant donné Papi Jean dans l'onglet « Retours »
+- Alors il voit un fil par testeur, le plus récent en tête, avec un point pour les retours non lus,
+  et les filtres « À traiter » et « Réglés »
+- Quand il ouvre le fil d'Inès et répond (1 000 caractères au plus)
+- Alors Inès est prévenue dans Activité ; elle peut répondre à son tour
+- Et chacun peut supprimer ses propres messages ; 30 messages par jour et par membre au plus, tous
+  projets confondus
+- Et un fil se lit comme une conversation : les messages de l'auteur à droite, ceux du testeur à
+  gauche, la date relative sous chacun
+
+### « Réglé dans la v1.3 » (le lien avec les mises à jour)
+
+- Étant donné Papi Jean qui lit un retour d'Inès
+- Quand il touche « Marquer comme réglé »
+- Alors le retour passe dans « Réglés », et Inès lit « Réglé » sous son retour
+- Et dans la feuille « Nouvelle mise à jour », quand le projet a des retours « À traiter », une
+  partie « Retours réglés » les propose ; ceux qu'il coche passent dans « Réglés » à la
+  publication, avec « Réglé dans la v1.3 » (ou « Réglé dans la mise à jour du 12 nov. »)
+- Et chaque testeur dont un retour est réglé est prévenu : « Papi Jean a réglé ton retour dans la
+  v1.3 de Décollage ! »
+
+### Le badge « Testeur »
+
+- Dans les commentaires de Décollage !, un testeur porte le badge « Testeur », à côté du nom, comme
+  le badge « Auteur »
+
+### Retirer et quitter
+
+- Quand Papi Jean retire Inès des testeurs (confirmation « Retirer Inès des testeurs ? Elle ne
+  verra plus le coin des testeurs ; ses retours te restent lisibles. »)
+- Alors Inès n'est plus testeuse, sans en être prévenue, et « Rejoindre les testeurs » ne lui est plus
+  proposé sur ce projet
+- Quand Inès quitte les testeurs
+- Alors son fil de retours reste lisible par Papi Jean, et redevient le sien si elle se réinscrit
+- Et un projet supprimé emporte son coin des testeurs ; un projet retiré, privé, ou dont l'auteur
+  est suspendu le ferme à tous, sauf à l'auteur pour la lecture
+
+### Ce que reçoit un testeur, en plus des mises à jour
+
+- Ses appels à tester, les réponses à ses retours, et « Réglé dans la v1.3 », dans Activité et dans
+  le récap du lundi
+
+### La modération
+
+- Un appel, un retour ou une réponse se signalent comme un commentaire (menu « … » du message) et
+  se retirent comme lui ; le testeur ou l'auteur qui signale le fait sans que l'autre le sache
+
+### Mes données
+
+- L'export de ses données contient ses appels, ses retours et ses réponses (textes, dates,
+  captures)
+- La suppression du compte les efface ; les fils de ses testeurs disparaissent avec son projet
+
+### Le parcours d'un membre
+
+- Le parcours (`journey`) : Inès, testeuse de Décollage !, envoie un retour (« En partie »,
+  Téléphone, « le score repart à zéro au niveau 3 ») ; Papi Jean lance un appel, répond au retour,
+  puis publie une mise à jour qui le règle ; Inès lit « Réglé dans la v1.3 » sous son retour, puis
+  quitte les testeurs
+
+### Les choix de la session (10/11/2026), validés avec ce scénario
+
+1. L'auteur voit la liste de ses testeurs, les testeurs seulement leur nombre.
+2. Un fil privé par testeur, pas de discussion de groupe (gardée pour plus tard).
+3. Un membre retiré par l'auteur ne peut pas se réinscrire.
+4. Badge « Testeur » dans les commentaires du projet.

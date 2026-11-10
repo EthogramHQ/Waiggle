@@ -38,9 +38,7 @@ import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
-import { NoteCard } from '../ui/NoteCard'
 import { NoteComposer } from '../ui/NoteComposer'
-import { NoteList } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
 import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -66,6 +64,7 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
+import { BeforeAfterCatalogue } from './avant-apres'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
 import { InvalidChoicesCatalogue } from './champs-invalides'
@@ -79,13 +78,16 @@ import { AccountCatalogue } from './compte'
 import { ControlsCatalogue } from './controles'
 import { EntryCatalogue } from './entrer'
 import { ExploreCatalogue } from './explorer'
+import { UpdateSheetCatalogue } from './feuille-mise-a-jour'
 import { SheetsCatalogue } from './feuilles'
 import { FeedCatalogue } from './fil'
+import { FeedUpdateCatalogue } from './fil-mise-a-jour'
 import { FeedEndCatalogue } from './fin-de-fil'
 import { FluidTopBarCatalogue } from './fluidite-barre'
 import { ScreenFadeCatalogue } from './fluidite-fondu'
 import { AmbientHostCatalogue } from './fluidite-lumiere'
 import { FormSamples } from './formulaire'
+import { UpdateTimelineCatalogue } from './frise'
 import { SafeguardsCatalogue } from './garde-fous'
 import { TokensCatalogue } from './jetons'
 import { labels } from './labels'
@@ -93,6 +95,9 @@ import { LightCatalogue } from './lumiere'
 import { BrandCatalogue } from './marque'
 import { MascotCatalogue } from './mascotte'
 import { MaterialsCatalogue } from './matieres'
+import { UpdateFamiliesCatalogue } from './mises-a-jour'
+import { UpdateEntryCatalogue } from './mises-a-jour-frise'
+import { UpdateLinesCatalogue } from './mises-a-jour-lignes'
 import { ModerationCatalogue } from './moderation'
 import { NavigationCatalogue } from './navigation'
 import { ToolsCatalogue } from './outils'
@@ -128,6 +133,7 @@ import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
+import { TestersCatalogue } from './testeurs'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -655,7 +661,7 @@ export function CatalogueScreen() {
         <NewItemsBanner
           count={1}
           more={false}
-          kinds={['note']}
+          kinds={['update']}
           authors={newsAuthors.slice(0, 1)}
           caption={l.feedCaption}
           onPress={() => {}}
@@ -663,7 +669,7 @@ export function CatalogueScreen() {
         <NewItemsBanner
           count={20}
           more
-          kinds={['project', 'note']}
+          kinds={['project', 'update']}
           authors={newsAuthors}
           caption={l.feedCaption}
           onPress={() => {}}
@@ -686,74 +692,6 @@ export function CatalogueScreen() {
           retryLabel={l.retry}
           onMore={() => {}}
         />
-      </Section>
-
-      <Section title={l.notesSection}>
-        {/* La note dans le fil, à côté d'une carte de projet : avec la couverture du projet, sans
-            couverture (la lumière miel), puis un texte long, coupé après quelques lignes. */}
-        <ProjectGrid empty={l.emptyList}>
-          <NoteCard
-            label={l.noteLabel}
-            project={l.sampleTitle}
-            author={{ name: 'Léa Moreau', avatar: null }}
-            body={l.noteBody}
-            when={l.noteWhen}
-            image={{ source: null, thumbhash: samples.cafe, label: l.samplePhoto }}
-            onPress={() => {}}
-          />
-          <ProjectCard
-            title={l.secondTitle}
-            pitch={l.secondPitch}
-            author={{ name: 'Max Durand', avatar: null }}
-            when={l.now}
-            status={{ label: l.statuses.testable, strong: true }}
-            image={{ source: null, thumbhash: samples.papillon, label: l.samplePhoto }}
-            onPress={() => {}}
-          />
-          <NoteCard
-            label={l.noteLabel}
-            project={l.sampleTitle}
-            author={{ name: 'Léa Moreau', avatar: null }}
-            body={l.noteLong}
-            when={l.noteWhen}
-            onPress={() => {}}
-          />
-        </ProjectGrid>
-        {/* Le journal, vu par l'auteur (un bouton « Supprimer » par note, une adresse longue qui se
-            coupe), puis par un autre membre, puis vide pour l'auteur. Sans note ni message : rien. */}
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList
-            notes={[
-              { id: 'n3', body: l.noteBody, when: l.noteWhen },
-              { id: 'n2', body: l.noteUrl, when: l.noteWhen },
-              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-            ]}
-            onDelete={() => {}}
-            deleteLabel={l.deleteNote}
-          />
-        </Surface>
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList
-            notes={[
-              { id: 'n2', body: l.noteLong, when: l.noteWhen },
-              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-            ]}
-          />
-        </Surface>
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList notes={[]} empty={l.journalEmpty} onDelete={() => {}} />
-        </Surface>
-        {/* Après une suppression : une confirmation discrète (role « status »). */}
-        <Notice tone="success" message={l.noteDeleted} polite />
-        {/* Écrire une note : fermé, fermé juste après une publication, ouvert (vide, avec un texte,
-            en cours d'envoi, texte manquant, envoi refusé). */}
-        <NoteComposerSample l={l} open={false} />
-        <NoteComposerSample l={l} open={false} success={l.notePublished} />
-        <NoteComposerSample l={l} open value="" />
-        <NoteComposerSample l={l} open value={l.noteBody} />
-        <NoteComposerSample l={l} open value={l.noteBody} pending />
-        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
-        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
       </Section>
 
       <Section title={l.notificationsSection}>
@@ -837,6 +775,17 @@ export function CatalogueScreen() {
       <CommentThreadCatalogue />
       <CommentMentionsCatalogue />
       <CommentComposerCatalogue />
+      <Section title={l.noteComposerSection}>
+        {/* Le champ d'écriture que `CommentComposer` enveloppe : fermé, fermé juste après un envoi,
+            ouvert (vide, avec un texte, en cours d'envoi, texte manquant, envoi refusé). */}
+        <NoteComposerSample l={l} open={false} />
+        <NoteComposerSample l={l} open={false} success={l.notePublished} />
+        <NoteComposerSample l={l} open value="" />
+        <NoteComposerSample l={l} open value={l.noteBody} />
+        <NoteComposerSample l={l} open value={l.noteBody} pending />
+        <NoteComposerSample l={l} open value="" fieldError={l.noteRequired} />
+        <NoteComposerSample l={l} open value={l.noteBody} error={l.noteError} />
+      </Section>
 
       {/* Tranche 7a : « Signaler », et ce que lit l'auteur d'un contenu retiré (reports.tsx). */}
       <ReportSamples />
@@ -899,6 +848,22 @@ export function CatalogueScreen() {
       <ShareCatalogue />
       <LeavingCatalogue />
       <NotFoundPortalCatalogue />
+      {/* Tranche R7a, les mises à jour d'un projet (mises-a-jour*.tsx). */}
+      <UpdateFamiliesCatalogue />
+      {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
+      <TestersCatalogue />
+      {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
+      <BeforeAfterCatalogue />
+      {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}
+      <UpdateLinesCatalogue />
+      {/* Tranche R7a, une mise à jour en entier, dans la frise du projet (mises-a-jour-frise.tsx). */}
+      <UpdateEntryCatalogue />
+      {/* Tranche R7a, la frise des mises à jour et la ligne des dates d'un projet (frise.tsx). */}
+      <UpdateTimelineCatalogue />
+      {/* Tranche R7a, la carte d'un projet mis à jour dans le fil (fil-mise-a-jour.tsx). */}
+      <FeedUpdateCatalogue />
+      {/* Tranche R7a, la feuille « Nouvelle mise à jour » (feuille-mise-a-jour.tsx). */}
+      <UpdateSheetCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
       <FluidTopBarCatalogue />

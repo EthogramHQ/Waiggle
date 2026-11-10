@@ -43,7 +43,16 @@ export type Tone =
  * nom de l'auteur sur une tuile de miel (un brun) et le texte posé sur une tuile d'encre (la couleur
  * du fond de page, qui s'y lit comme l'encre sur la page : le contraste est le même).
  */
-export type TextTone = Tone | 'onHoneyTile' | 'onInk'
+export type TextTone =
+  | Tone
+  | 'onHoneyTile'
+  | 'onInk'
+  // R7a : le nom d'une famille de mise à jour (« Nouveau », « Réparé », « Plus joli »), écrit dans
+  // la couleur de sa pastille (rôles `family<X>Text` de packages/brand, lisibles sur la crème d'une
+  // feuille, sur une carte et sur le fond miel doux d'une ligne choisie).
+  | 'familyNew'
+  | 'familyFixed'
+  | 'familyPolish'
 
 // Sur le web, un mot sans espace plus large que l'écran déborde ; « overflow-wrap: anywhere » le
 // coupe. Les téléphones le font déjà d'eux-mêmes. Cette propriété CSS manque aux types de React
@@ -83,6 +92,9 @@ const toneColor = {
   onBadge: 'onBadge',
   onHoneyTile: 'onHoneyTile',
   onInk: 'background',
+  familyNew: 'familyNewText',
+  familyFixed: 'familyFixedText',
+  familyPolish: 'familyPolishText',
 } as const satisfies Record<TextTone, string>
 
 /**

@@ -13,33 +13,41 @@ import {
   type ProjectSummary,
   type ProjectTool,
   ProjectVisibility,
-  type ProjectVisual,
-  Thumbhash,
   toolSlug,
+  type UpdateSummary,
 } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm'
 import { commentCountsOf } from '../comments/load'
 import { projectFollowStates } from '../follows/load'
-import { recentNotesOf } from '../notes/load'
 import { mediaUrl } from '../profile/me'
 import { reactionStatesOf, reactionTotalsOf } from '../reactions/load'
 import { removalsOf } from '../removals/load'
+import { latestUpdatesOf, updateCountsOf, updateSummariesOf } from '../updates/load'
+import { testerStatesOf } from './testers'
 import { projectVisibleTo } from './visibility'
-
-type MediaRow = typeof schema.projectMedia.$inferSelect
+import { type MediaRow, toVisual } from './visual'
 
 // Reader : la base, ou une transaction en cours (les deux savent faire « select »).
 type Reader = Pick<Database, 'select'>
 
-/** Les médias (photos de la galerie et couverture verticale) d'une liste de projets. */
+/**
+ * Les médias (photos de la galerie et couverture verticale) d'une liste de projets. Les photos des
+ * mises à jour (slot 'update', R7a) n'en font pas partie : elles peuvent être des centaines, ne sont
+ * jamais une couverture, et se lisent avec leur mise à jour (updates/load.ts). `ne` : « différent de ».
+ */
 export const selectMedia = async (db: Reader, projectIds: string[]): Promise<MediaRow[]> =>
   projectIds.length === 0
     ? []
     : db
         .select()
         .from(schema.projectMedia)
-        .where(inArray(schema.projectMedia.projectId, projectIds))
+        .where(
+          and(
+            inArray(schema.projectMedia.projectId, projectIds),
+            ne(schema.projectMedia.slot, 'update'),
+          ),
+        )
         .orderBy(asc(schema.projectMedia.position), asc(schema.projectMedia.createdAt))
 
 /**
@@ -82,19 +90,6 @@ export const toolsOfProjects = async (
   return byProject
 }
 
-/** Un média tel que l'API le renvoie (contrat `ProjectVisual`). */
-const toVisual = (media: MediaRow, publicApiUrl: string): ProjectVisual => ({
-  id: media.id,
-  kind: 'image',
-  url: mediaUrl(publicApiUrl, media.storageKey),
-  width: media.width,
-  height: media.height,
-  // Calculé par notre serveur ; vérifié quand même, comme tout ce qui sort de la base.
-  thumbhash: Thumbhash.parse(media.thumbhash),
-  // R6a : la description de la photo, null si l'auteur n'en a pas écrit.
-  description: media.description,
-})
-
 // Une requête de base : le projet, avec le nom et l'avatar de son auteur.
 // innerJoin : « avec son auteur » (il existe toujours) ; leftJoin : « avec son profil s'il en a un ».
 export const selectProjects = (db: Database) =>
@@ -111,13 +106,22 @@ export const selectProjects = (db: Database) =>
 type ProjectRow = Awaited<ReturnType<ReturnType<typeof selectProjects>['execute']>>[number]
 
 /**
- * Un projet sans son état d'abonnement, son journal, ses réactions ni ses commentaires : tout ce
- * qu'on sait d'une ligne de la base et de ses médias. Les listes (cartes) s'en contentent ; la page
- * d'un projet y ajoute le reste. Omit<A, B> : le type A, sans les champs nommés dans B.
+ * Un projet sans son état d'abonnement, ses mises à jour, ses testeurs, ses réactions ni ses
+ * commentaires : tout ce qu'on sait d'une ligne de la base et de ses médias. Les listes (cartes)
+ * s'en contentent ; la page d'un projet y ajoute le reste. Omit<A, B> : le type A, sans les champs
+ * nommés dans B.
  */
 type ProjectBase = Omit<
   Project,
-  keyof FollowState | 'notes' | 'reactions' | 'commentCount' | 'removal'
+  | keyof FollowState
+  | 'latestUpdate'
+  | 'updateCount'
+  | 'version'
+  | 'isTester'
+  | 'testerCount'
+  | 'reactions'
+  | 'commentCount'
+  | 'removal'
 >
 
 /**
@@ -174,12 +178,13 @@ const toProjectBase = (
 
 /**
  * Des lignes de la base, transformées en projets tels que l'API les renvoie (contrat `Project`),
- * avec leur état d'abonnement, leur journal, leurs réactions et leur nombre de commentaires :
- * quatre requêtes de plus pour tous (abonnés, notes, réactions, commentaires), quel que soit leur
- * nombre. Promise.all les lance en même temps. Une cinquième, seulement si l'un d'eux est un projet
- * retiré du membre qui regarde : l'explication du retrait (removals/load.ts). Un projet retiré
- * n'arrive ici que pour son auteur (visibleTo) ; la condition est redite, pour que `removal` ne
- * soit jamais rempli pour un autre.
+ * avec leur état d'abonnement, leurs mises à jour (la dernière avec ses photos, le nombre, la version),
+ * leurs testeurs, leurs réactions et leur nombre de commentaires : un nombre fixe de requêtes de plus
+ * pour tous (abonnés, dernière mise à jour et ses photos, nombre, version, testeurs, réactions,
+ * commentaires), quel que soit leur nombre. Promise.all les lance en même temps. Une de plus,
+ * seulement si l'un d'eux est un projet retiré du membre qui regarde : l'explication du retrait
+ * (removals/load.ts). Un projet retiré n'arrive ici que pour son auteur (visibleTo) ; la condition
+ * est redite, pour que `removal` ne soit jamais rempli pour un autre.
  */
 const toProjects = async (
   db: Database,
@@ -192,15 +197,19 @@ const toProjects = async (
   // Le retrait d'un projet ne se lit que par son auteur.
   const removalIdOf = ({ project }: ProjectRow) =>
     project.removedAt !== null && project.authorId === viewerId ? project.removalId : null
-  const [follows, journals, reactions, commentCounts, removals, tools] = await Promise.all([
-    projectFollowStates(
-      db,
-      rows.map(({ project }) => ({ id: project.id, authorId: project.authorId })),
-      viewerId,
-    ),
-    recentNotesOf(db, ids, viewerId),
-    reactionStatesOf(db, ids, viewerId),
-    commentCountsOf(db, ids),
+  const authors = rows.map(({ project }) => ({ id: project.id, authorId: project.authorId }))
+  const [follows, latestUpdates, updateCounts, versions, testers, reactions, commentCounts] =
+    await Promise.all([
+      projectFollowStates(db, authors, viewerId),
+      latestUpdatesOf(db, ids, viewerId, publicApiUrl),
+      updateCountsOf(db, authors, viewerId),
+      // La version sous le titre : celle de la dernière mise à jour NON retirée (B4), pour tous.
+      updateSummariesOf(db, ids),
+      testerStatesOf(db, authors, viewerId),
+      reactionStatesOf(db, ids, viewerId),
+      commentCountsOf(db, ids),
+    ])
+  const [removals, tools] = await Promise.all([
     removalsOf(db, rows.map(removalIdOf)),
     toolsOfProjects(db, ids),
   ])
@@ -209,7 +218,10 @@ const toProjects = async (
     return {
       ...toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
       ...(follows.get(row.project.id) ?? { isFollowed: false, followerCount: 0 }),
-      notes: journals.get(row.project.id) ?? [],
+      latestUpdate: latestUpdates.get(row.project.id) ?? null,
+      updateCount: updateCounts.get(row.project.id) ?? 0,
+      version: versions.get(row.project.id)?.version ?? null,
+      ...(testers.get(row.project.id) ?? { isTester: false, testerCount: null }),
       reactions: reactions.get(row.project.id) ?? NO_REACTIONS,
       commentCount: commentCounts.get(row.project.id) ?? 0,
       removal: (removalId && removals.get(removalId)) || null,
@@ -281,6 +293,7 @@ export const loadProjectsOf = async (
 const toSummary = (
   { visuals, ...project }: ProjectBase,
   reactionTotal: number,
+  update: { latest: UpdateSummary | null; version: string | null },
 ): ProjectSummary => ({
   id: project.id,
   author: project.author,
@@ -299,14 +312,18 @@ const toSummary = (
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
   reactionTotal,
+  // R7a : la dernière mise à jour non retirée et la version sous le titre (B4).
+  latestUpdate: update.latest,
+  version: update.version,
 })
 
 /**
  * Des lignes de la base en cartes de liste (contrat `ProjectSummary`), dans le même ordre. Toujours
- * deux requêtes de plus, quel que soit le nombre de cartes, lancées en même temps (Promise.all) :
- * les médias de toute la liste (pour les couvertures), et le total des réactions de toute la liste
- * (R4). Toute liste de cartes passe par ici : le fil, Découvrir, la recherche, une étiquette, la
- * page d'un membre ; aucune ne peut donc oublier le total.
+ * quatre requêtes de plus (deux pour les mises à jour), quel que soit le nombre de cartes, lancées en
+ * même temps (Promise.all) : les médias de toute la liste (pour les couvertures), le total des
+ * réactions (R4), les outils, et la dernière mise à jour et la version (R7a, updateSummariesOf).
+ * Toute liste de cartes passe par ici : le fil, Découvrir, la recherche, une étiquette, la page d'un
+ * membre ; aucune ne peut donc oublier le total ni la mise à jour.
  */
 export const rowsToSummaries = async (
   db: Database,
@@ -315,15 +332,17 @@ export const rowsToSummaries = async (
   publicApiUrl: string,
 ): Promise<ProjectSummary[]> => {
   const ids = rows.map((row) => row.project.id)
-  const [media, totals, tools] = await Promise.all([
+  const [media, totals, tools, updates] = await Promise.all([
     selectMedia(db, ids),
     reactionTotalsOf(db, ids),
     toolsOfProjects(db, ids),
+    updateSummariesOf(db, ids),
   ])
   return rows.map((row) =>
     toSummary(
       toProjectBase(row, media, tools.get(row.project.id) ?? [], viewerId, publicApiUrl),
       totals.get(row.project.id) ?? 0,
+      updates.get(row.project.id) ?? { latest: null, version: null },
     ),
   )
 }
@@ -349,18 +368,49 @@ export const loadSummaries = async (
  * Les clés des fichiers de ces projets, à lire AVANT de les supprimer : les lignes disparaissent
  * avec eux (cascade), et on ne saurait plus quels fichiers effacer.
  */
-export const mediaKeysOf = async (db: Reader, projectIds: string[]): Promise<string[]> =>
-  (await selectMedia(db, projectIds)).map((media) => media.storageKey)
+export const mediaKeysOf = async (db: Reader, projectIds: string[]): Promise<string[]> => {
+  if (projectIds.length === 0) return []
+  // Toutes les photos, celles des mises à jour (slot 'update', en attente ou publiées) comprises :
+  // elles partent aussi en cascade avec le projet. D'où une requête à part de `selectMedia`.
+  const rows = await db
+    .select({ storageKey: schema.projectMedia.storageKey })
+    .from(schema.projectMedia)
+    .where(inArray(schema.projectMedia.projectId, projectIds))
+  return rows.map((row) => row.storageKey)
+}
 
 /**
- * Un fichier de visuel, si `viewerId` voit le projet auquel il appartient ; sinon null (qu'il
- * n'existe pas ou que le projet soit privé : même réponse, pour ne rien révéler).
+ * Un fichier de visuel, si `viewerId` a le droit de le voir ; sinon false (qu'il n'existe pas, que
+ * le projet soit privé ou que la photo soit réservée : même réponse, pour ne rien révéler). Il faut
+ * voir le projet, ET (relecture de sécurité A4) :
+ * - une photo de la galerie ou la couverture verticale : rien de plus ;
+ * - une photo d'une mise à jour publiée et pas retirée : rien de plus ;
+ * - une photo en attente (pas encore publiée) ou d'une mise à jour retirée : l'auteur seul, sans
+ *   exception, administrateur compris.
+ *
+ * En SQL : select … from project_media inner join project on … left join project_update on
+ * project_update.id = project_media.update_id where storage_key = $1 and <projet visible> and
+ * (slot <> 'update' or (update_id is not null and removed_at is null) or author_id = $viewer).
+ * La clé unique de storage_key trouve la photo ; le projet et la mise à jour, par leur clé primaire.
+ * « left join » : une photo de la galerie n'a pas de mise à jour, et doit rester dans le résultat.
  */
 export const isVisualVisibleTo = async (db: Database, storageKey: string, viewerId: string) => {
+  const m = schema.projectMedia
   const [row] = await db
-    .select({ id: schema.projectMedia.id })
-    .from(schema.projectMedia)
-    .innerJoin(schema.project, eq(schema.project.id, schema.projectMedia.projectId))
-    .where(and(eq(schema.projectMedia.storageKey, storageKey), visibleTo(viewerId)))
+    .select({ id: m.id })
+    .from(m)
+    .innerJoin(schema.project, eq(schema.project.id, m.projectId))
+    .leftJoin(schema.projectUpdate, eq(schema.projectUpdate.id, m.updateId))
+    .where(
+      and(
+        eq(m.storageKey, storageKey),
+        visibleTo(viewerId),
+        or(
+          ne(m.slot, 'update'),
+          and(isNotNull(m.updateId), isNull(schema.projectUpdate.removedAt)),
+          eq(schema.project.authorId, viewerId),
+        ),
+      ),
+    )
   return row !== undefined
 }

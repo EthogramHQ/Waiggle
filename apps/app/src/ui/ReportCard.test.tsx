@@ -1,6 +1,7 @@
 // Tests de la carte d'un signalement dans la file de modération (tranche 7a). À part de
-// components.test.tsx : ReportCard est écrit par un autre agent que CommentCard et NoteList ; tant
-// qu'il manque, seul ce fichier échoue, et les autres tests des composants restent lisibles.
+// components.test.tsx : ReportCard est écrit par un autre agent que CommentCard ; tant qu'il
+// manque, seul ce fichier échoue, et les autres tests des composants restent lisibles. Depuis R7a,
+// la cible `update` (une mise à jour) remplace la note du Journal, effacé avec NoteList.
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
@@ -504,5 +505,37 @@ describe('ReportCard', () => {
       expect(screen.getByText(record.label)).toBeTruthy() // témoin
       expect(screen.queryByRole('button', { name: record.label })).toBeNull()
     })
+  })
+
+  // R7a : une mise à jour signalée remplace la note du Journal. Sa copie porte le titre, la
+  // version et chaque ligne de « Ce qui a changé » (scénario, « La modération »), chacune avec son
+  // libellé (`moderation.fields`). La carte reste générique : témoin, il passe dès le
+  // contrat ; l'écran de la file, qui fabrique ces champs, a ses propres tests.
+  it('shows the copy of a reported update: its title, its version and each line', async () => {
+    const update = [
+      { label: 'Titre', value: 'Le décompte de la fusée' },
+      { label: fr.t(($) => $.moderation.fields.version), value: 'v1.2' },
+      {
+        label: fr.t(($) => $.moderation.fields.line),
+        value: 'Un compte à rebours avant chaque question',
+      },
+      {
+        label: fr.t(($) => $.moderation.fields.line),
+        value: 'Le score ne repart plus à zéro au niveau 3',
+      },
+    ]
+    await renderWithProviders(
+      <ReportCard
+        {...card}
+        kind={fr.t(($) => $.moderation.kinds.update)}
+        snapshot={update}
+        onView={jest.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Mise à jour')).toBeTruthy()
+    for (const { value } of update) expect(screen.getByText(value)).toBeTruthy()
+    expect(screen.getByText('Version')).toBeTruthy()
+    expect(screen.getAllByText('Changement')).toHaveLength(2)
   })
 })

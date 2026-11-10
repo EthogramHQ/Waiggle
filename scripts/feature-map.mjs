@@ -108,11 +108,11 @@ const features = [
   // (/v1/members/{id}/follow) appartiennent à celle-ci.
   {
     id: 'suivre',
-    name: 'Suivre, le fil et les notes',
-    tranche: 'Tranches 4a et 4b',
+    name: 'Suivre, le fil, les mises à jour et les testeurs',
+    tranche: 'Tranches 4a, 4b et R7a',
     pages: null,
-    routes: /^\w+ \/v1\/(feed\/|(members|projects)\/\{id\}\/(follow$|notes))/,
-    tables: /^((member|project)_follow|project_note)$/,
+    routes: /^\w+ \/v1\/(feed\/|(members|projects)\/\{id\}\/(follow$|notes|updates|testers))/,
+    tables: /^((member|project)_follow|project_(note|update|tester))$/,
   },
   {
     id: 'membres',

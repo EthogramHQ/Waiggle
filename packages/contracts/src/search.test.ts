@@ -214,6 +214,8 @@ describe('SearchResults', () => {
     createdAt: '2026-10-12T09:00:00.000Z',
     updatedAt: '2026-10-12T09:00:00.000Z',
     reactionTotal: 0,
+    latestUpdate: null,
+    version: null,
     excerpt: null,
   }
   const member = {

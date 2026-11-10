@@ -23,16 +23,23 @@ type Props = {
   onKeep: () => void
   /** « Abandonner » : la feuille se ferme sans rien enregistrer. */
   onDiscard: () => void
+  /**
+   * Le titre, quand la feuille a le sien (« Abandonner cette mise à jour ? », R7a) ; par défaut
+   * `common.discardTitle`. L'écran le traduit : le composant ne connaît pas ses clés.
+   */
+  title?: string
+  /** Le texte sous le titre (les photos ajoutées seront perdues…) ; par défaut `common.discardBody`. */
+  message?: string
 }
 
-export function DiscardDialog({ visible, onKeep, onDiscard }: Props) {
+export function DiscardDialog({ visible, onKeep, onDiscard, title, message }: Props) {
   const { t } = useTranslation()
   const keepRef = useRef<Focusable>(null)
   return (
     <Dialog
       visible={visible}
-      title={t(($) => $.common.discardTitle)}
-      message={t(($) => $.common.discardBody)}
+      title={title ?? t(($) => $.common.discardTitle)}
+      message={message ?? t(($) => $.common.discardBody)}
       guardTaps
       onDismiss={onKeep}
       initialFocusRef={keepRef}

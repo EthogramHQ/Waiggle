@@ -4,21 +4,19 @@ import { ErrorCode } from './errors'
 import {
   cleanPrompt,
   DemoUrl,
-  PHOTO_DESCRIPTION_MAX,
   PROJECT_CATEGORIES,
   Project,
+  ProjectChanges,
   ProjectInput,
   ProjectSummary,
-  ProjectUpdate,
-  ProjectVisual,
   StartedMonth,
   startedMonthMax,
-  Thumbhash,
   VisualSlot,
   VisualUpdate,
 } from './projects'
 import { NO_REACTIONS } from './reactions'
 import { publicHttpsUrl } from './url'
+import { PHOTO_DESCRIPTION_MAX, ProjectVisual, Thumbhash } from './visuals'
 
 const valid = {
   title: 'Mon agent de recettes',
@@ -77,20 +75,20 @@ describe('ProjectInput', () => {
   })
 })
 
-describe('ProjectUpdate', () => {
+describe('ProjectChanges', () => {
   it('accepts a change of a single field, and removing the demo link', () => {
-    expect(ProjectUpdate.parse({ status: 'done' })).toEqual({ status: 'done' })
-    expect(ProjectUpdate.parse({ demoUrl: null })).toEqual({ demoUrl: null })
+    expect(ProjectChanges.parse({ status: 'done' })).toEqual({ status: 'done' })
+    expect(ProjectChanges.parse({ demoUrl: null })).toEqual({ demoUrl: null })
   })
 
   it('accepts a new order of the photos: at most six, each one once', () => {
     const ids = Array.from({ length: 7 }, () => crypto.randomUUID())
-    expect(ProjectUpdate.parse({ visualOrder: ids.slice(0, 6) })).toEqual({
+    expect(ProjectChanges.parse({ visualOrder: ids.slice(0, 6) })).toEqual({
       visualOrder: ids.slice(0, 6),
     })
-    expect(ProjectUpdate.safeParse({ visualOrder: ids }).success).toBe(false)
-    expect(ProjectUpdate.safeParse({ visualOrder: [ids[0], ids[0]] }).success).toBe(false)
-    expect(ProjectUpdate.safeParse({ visualOrder: ['../secrets'] }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ visualOrder: ids }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ visualOrder: [ids[0], ids[0]] }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ visualOrder: ['../secrets'] }).success).toBe(false)
   })
 })
 
@@ -115,7 +113,7 @@ describe('Prompts pasted with invisible characters', () => {
   })
 
   it('also cleans the prompts of a change', () => {
-    expect(ProjectUpdate.parse({ prompts: [`Fais${ZERO_WIDTH_SPACE} un plan`] })).toEqual({
+    expect(ProjectChanges.parse({ prompts: [`Fais${ZERO_WIDTH_SPACE} un plan`] })).toEqual({
       prompts: ['Fais un plan'],
     })
   })
@@ -215,7 +213,11 @@ describe('Project with its visuals', () => {
     isMine: true,
     isFollowed: false,
     followerCount: 0,
-    notes: [],
+    latestUpdate: null,
+    updateCount: 0,
+    version: null,
+    isTester: false,
+    testerCount: null,
     reactions: NO_REACTIONS,
     commentCount: 0,
     removal: null,
@@ -438,7 +440,7 @@ describe('the categories of a project (R6a)', () => {
       ProjectInput.parse({ ...valid, primaryCategory: 'science', secondaryCategory: 'learning' }),
     ).toMatchObject({ primaryCategory: 'science', secondaryCategory: 'learning' })
     expect(ProjectInput.safeParse({ ...valid, secondaryCategory: null }).success).toBe(true)
-    expect(ProjectUpdate.safeParse({ secondaryCategory: null }).success).toBe(true)
+    expect(ProjectChanges.safeParse({ secondaryCategory: null }).success).toBe(true)
   })
 
   it('refuses a second category equal to the primary, at creation as in an update', () => {
@@ -447,7 +449,7 @@ describe('the categories of a project (R6a)', () => {
       primaryCategory: 'cooking',
       secondaryCategory: 'cooking',
     })
-    const update = ProjectUpdate.safeParse({
+    const update = ProjectChanges.safeParse({
       primaryCategory: 'science',
       secondaryCategory: 'science',
     })
@@ -460,9 +462,9 @@ describe('the categories of a project (R6a)', () => {
   })
 
   it('never lets an update set the primary category back to nothing', () => {
-    expect(ProjectUpdate.safeParse({ primaryCategory: null }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ primaryCategory: null }).success).toBe(false)
     // Changer de principale, elle, reste permis.
-    expect(ProjectUpdate.parse({ primaryCategory: 'games' })).toEqual({ primaryCategory: 'games' })
+    expect(ProjectChanges.parse({ primaryCategory: 'games' })).toEqual({ primaryCategory: 'games' })
   })
 })
 
@@ -470,17 +472,17 @@ describe('the time spent is gone (R6a)', () => {
   it('refuses timeSpent, at creation as in an update, as an unknown field', () => {
     // strictObject : une appli d'avant R6a qui l'enverrait encore re\u00e7oit un refus net (sec-M4).
     expect(ProjectInput.safeParse({ ...valid, timeSpent: 'week' }).success).toBe(false)
-    expect(ProjectUpdate.safeParse({ timeSpent: 'week' }).success).toBe(false)
-    expect(ProjectUpdate.safeParse({ timeSpent: null }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ timeSpent: 'week' }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ timeSpent: null }).success).toBe(false)
   })
 })
 
 describe('\u00ab Facile \u00e0 refaire ? \u00bb (R6a)', () => {
   it('accepts the three levels, or none', () => {
     for (const difficulty of ['easy', 'medium', 'hard', null]) {
-      expect(ProjectUpdate.safeParse({ difficulty }).success).toBe(true)
+      expect(ProjectChanges.safeParse({ difficulty }).success).toBe(true)
     }
-    expect(ProjectUpdate.safeParse({ difficulty: 'expert' }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ difficulty: 'expert' }).success).toBe(false)
   })
 })
 
@@ -533,17 +535,17 @@ describe('\u00ab Commenc\u00e9 en \u00bb (R6a)', () => {
     at('2026-11-30T10:00:00Z')
     expect(startedMonthMax(new Date())).toBe('2026-12')
     expect(StartedMonth.safeParse('2026-12').success).toBe(true)
-    expect(ProjectUpdate.safeParse({ startedOn: '2026-12' }).success).toBe(true)
+    expect(ProjectChanges.safeParse({ startedOn: '2026-12' }).success).toBe(true)
 
     at('2026-11-30T09:59:00Z')
     expect(startedMonthMax(new Date())).toBe('2026-11')
     expect(StartedMonth.safeParse('2026-12').success).toBe(false)
-    expect(ProjectUpdate.safeParse({ startedOn: '2026-12' }).success).toBe(false)
+    expect(ProjectChanges.safeParse({ startedOn: '2026-12' }).success).toBe(false)
   })
 
   it('lets an update clear the month, and a creation leave it out', () => {
     at('2026-11-15T12:00:00Z')
-    expect(ProjectUpdate.parse({ startedOn: null })).toEqual({ startedOn: null })
+    expect(ProjectChanges.parse({ startedOn: null })).toEqual({ startedOn: null })
     expect(ProjectInput.parse(valid)).not.toHaveProperty('startedOn')
   })
 })

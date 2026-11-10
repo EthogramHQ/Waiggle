@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { View } from 'react-native'
 import { BrandAmbiance } from '../ui/BrandAmbiance'
 import { PortalRings } from '../ui/Illustrations'
-import { type LeavingOrigin, LeavingSheet } from '../ui/LeavingSheet'
+import { type LeavingOrigin, LeavingSheet, type LeavingTesters } from '../ui/LeavingSheet'
 import { Stack } from '../ui/Stack'
 import { Surface } from '../ui/Surface'
 import { Text } from '../ui/Text'
@@ -26,6 +26,7 @@ const fr = {
   without: 'Lien venu d’ailleurs : sans la ligne',
   with: 'Démo d’un projet : avec la ligne',
   holding: 'Projet en lecture : place gardée',
+  withTesters: 'Projet « Testable » : avec la ligne des testeurs',
   desktop: 'Ordinateur : le portail à gauche de la carte (`hero`)',
   day: 'jour',
   night: 'nuit',
@@ -39,6 +40,7 @@ const en: typeof fr = {
   without: 'Link from elsewhere: no line',
   with: 'A project’s demo: with the line',
   holding: 'Project being read: place kept',
+  withTesters: '“Testable” project: with the testers line',
   desktop: 'Computer: the portal left of the card (`hero`)',
   day: 'day',
   night: 'night',
@@ -78,9 +80,11 @@ function Example({ caption, children }: { caption: string; children: ReactNode }
 function Phone({
   origin,
   holdOrigin = false,
+  testers = null,
 }: {
   origin: LeavingOrigin | null
   holdOrigin?: boolean
+  testers?: LeavingTesters | null
 }) {
   return (
     <Frame width={390}>
@@ -90,6 +94,7 @@ function Phone({
           href={href}
           origin={origin}
           holdOrigin={holdOrigin}
+          testers={testers}
           onOpen={noop}
           onStay={noop}
         />
@@ -122,6 +127,9 @@ export function LeavingCatalogue() {
             </Example>
             <Example caption={`${l.with} — ${l[scheme]}`}>
               <Phone origin={origin} />
+            </Example>
+            <Example caption={`${l.withTesters} — ${l[scheme]}`}>
+              <Phone origin={origin} testers={{ name: 'Léa Moreau', onOpenProject: noop }} />
             </Example>
             {scheme === 'day' ? (
               <Example caption={`${l.holding} — ${l[scheme]}`}>

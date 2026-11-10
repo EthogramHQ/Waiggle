@@ -22,14 +22,12 @@ import { AuthorLine, type AuthorLineProps } from '../ui/AuthorLine'
 import { CategoryLine } from '../ui/CategoryLine'
 import type { Focusable } from '../ui/focus'
 import type { IconName } from '../ui/Icon'
-import { MetaLine } from '../ui/MetaLine'
-import { RelativeTime } from '../ui/RelativeTime'
+import { ProjectDatesLine } from '../ui/ProjectDatesLine'
 import { Stack } from '../ui/Stack'
 import { StatusPill } from '../ui/StatusPill'
 import { Text } from '../ui/Text'
 import { useNameOf } from '../useNameOf'
 import type { CategoryOption } from './categories'
-import { changedAfterCreation } from './format'
 import { useCategory } from './useCategory'
 
 /** Ce que l'en-tête montre du projet. */
@@ -43,7 +41,12 @@ export type HeaderProject = Pick<
   | 'visibility'
   | 'isMine'
   | 'createdAt'
+  // `updatedAt` ne compte plus pour « Mis à jour » (R7a), mais l'en-tête reste nourri du projet
+  // entier : la date et le nombre des mises à jour en font partie, comme la dernière et sa version.
   | 'updatedAt'
+  | 'latestUpdate'
+  | 'updateCount'
+  | 'version'
   | 'primaryCategory'
   | 'secondaryCategory'
 >
@@ -191,10 +194,6 @@ export function ProjectHeaderView({
   now,
 }: ViewProps) {
   const { t } = useTranslation()
-  const priv = project.visibility === 'private'
-  const updated = changedAfterCreation(project.createdAt, project.updatedAt)
-  // La date complète, lue par le lecteur d'écran : « le 12 octobre à 08:00 ».
-  const onFull = (full: string) => t(($) => $.dates.onDate, { date: full })
   // Sans `categories`, pas d'étiquette : jamais un nom inventé.
   const category = categoryLine(t, categories?.primary, categories?.secondary)
   return (
@@ -215,32 +214,16 @@ export function ProjectHeaderView({
           {project.title}
         </Text>
         {/* « Publié le 3 oct. » ou « Créé le 12 oct. » (privé : il n'est publié pour personne),
-            puis « Mis à jour hier » s'il a changé après sa création. On voit la date courte ; le
-            lecteur d'écran entend la date complète (RelativeTime et sa phrase, ui-16). */}
-        <MetaLine>
-          <RelativeTime
-            date={project.createdAt}
-            now={now}
-            phrase={({ afterVerb, full }) => ({
-              label: priv
-                ? t(($) => $.project.page.createdOn, { when: afterVerb })
-                : t(($) => $.project.page.publishedOn, { when: afterVerb }),
-              spoken: priv
-                ? t(($) => $.project.page.createdOn, { when: onFull(full) })
-                : t(($) => $.project.page.publishedOn, { when: onFull(full) }),
-            })}
-          />
-          {updated ? (
-            <RelativeTime
-              date={project.updatedAt}
-              now={now}
-              phrase={({ afterVerb, full }) => ({
-                label: t(($) => $.project.page.updatedWhen, { when: afterVerb }),
-                spoken: t(($) => $.project.page.updatedWhen, { when: onFull(full) }),
-              })}
-            />
-          ) : null}
-        </MetaLine>
+            puis « Mis à jour hier · v1.2 » d'après la dernière mise à jour publiée (R7a : plus
+            une simple modification du projet). La ligne est partagée avec la page de la frise
+            (`ProjectDatesLine`), pour que les deux disent toujours la même chose. */}
+        <ProjectDatesLine
+          createdAt={project.createdAt}
+          visibility={project.visibility}
+          latestUpdateAt={project.latestUpdate?.createdAt ?? null}
+          version={project.version}
+          now={now}
+        />
       </Stack>
       <AuthorLine {...author} />
       <Text variant="headline" tone="secondary" weight={400} readable>

@@ -11,6 +11,7 @@ import { Removal } from './removal'
 import { ReportExport } from './reports'
 import { DismissedSuggestionExport } from './suggestions'
 import { SuspensionExport } from './suspension'
+import { UpdateFamily } from './updates'
 
 /**
  * L'export des données d'un membre (droit d'accès du RGPD), renvoyé par GET /v1/me/export.
@@ -38,16 +39,34 @@ export const AccountExport = z
         at: z.iso.datetime(),
       }),
     ),
-    /** Toutes les notes publiées sur ses projets, des plus anciennes aux plus récentes. */
-    notes: z.array(
+    /**
+     * R7a : toutes les mises à jour publiées sur ses projets, des plus anciennes aux plus récentes,
+     * avec le titre du projet (le sien) et les descriptions de leurs photos. Remplace les notes,
+     * effacées avec le Journal.
+     */
+    updates: z.array(
       z.object({
         projectId: ProjectId,
+        projectTitle: z.string(),
         id: z.uuid(),
-        body: z.string(),
+        title: z.string().nullable(),
+        version: z.string().nullable(),
+        lines: z.array(z.object({ family: UpdateFamily, text: z.string() })),
+        beforeAfter: z.boolean(),
+        /** Les descriptions de ses photos, dans l'ordre (null : une photo sans description). */
+        photoDescriptions: z.array(z.string().nullable()),
         createdAt: z.iso.datetime(),
-        /** Le retrait par la modération (tranche 7a) ; null pour une note visible. */
+        /** Le retrait par la modération ; null pour une mise à jour visible. */
         removal: Removal.nullable(),
       }),
+    ),
+    /**
+     * R7a : les projets dont il est testeur, des plus anciennes inscriptions aux plus récentes.
+     * `title` vaut null quand le projet ne lui est plus visible (devenu privé, retiré, ou un
+     * blocage) : son titre actuel appartient à un autre (relecture de sécurité B3, juridique 8).
+     */
+    testerOf: z.array(
+      z.object({ projectId: ProjectId, title: z.string().nullable(), since: z.iso.datetime() }),
     ),
     /**
      * Ce que le membre suit : seulement l'identifiant et la date. Un projet suivi a pu devenir privé

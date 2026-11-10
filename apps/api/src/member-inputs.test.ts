@@ -10,14 +10,25 @@
 // - la couverture : chaque champ du registre, rempli d'une valeur témoin, se retrouve dans la copie
 //   d'un signalement et dans l'export de son auteur, jamais dans celui de qui signale ; une image
 //   n'y est que sa clé, jamais un fichier de plus (règle 15) ;
-// - le blocage : chaque objet du registre (profil, projet, note, commentaire) a sa lecture qui le
-//   cache à un membre bloqué.
+// - le blocage : chaque objet du registre (profil, projet, mise à jour, commentaire) a sa lecture
+//   qui le cache à un membre bloqué.
 //
-// Inès écrit tout (profil, projet, note, commentaire), Malik signale, puis Inès bloque Malik ; Zoé,
-// une troisième, lit encore tout.
-import { AccountExport, Project, ReportSnapshot } from '@ruche/contracts'
+// Inès écrit tout (profil, projet, mise à jour, commentaire), Malik signale, puis Inès bloque
+// Malik ; Zoé, une troisième, lit encore tout.
+//
+// Tranche R7a : la mise à jour d'un projet (`update` : titre, version, lignes, photos et leur
+// description) remplace la note du Journal ; la migration 0018 efface `project_note` et les
+// anciennes colonnes des outils (`project.tools`, `project.tool_slugs`, `profile.favorite_tools`),
+// que le registre ne doit plus nommer.
+import {
+  AccountExport,
+  Project,
+  ProjectUpdate,
+  ProjectVisual,
+  ReportSnapshot,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
-import { asc, eq, getTableName, is, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableName, inArray, is, sql } from 'drizzle-orm'
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -258,6 +269,131 @@ describe('the register of member inputs', () => {
     expect(wrong).toEqual([])
   })
 
+  // Tranche R7a (plan, « Le modèle de données » et « Modération et données ») : les mises à jour et
+  // les testeurs. Le titre, la version et les lignes d'une mise à jour sont des saisies (objet
+  // `update`, copiées et exportées) ; ses photos sont des lignes de project_media, au registre pour
+  // `update` comme pour `project` (relecture de sécurité A8). Le reste est écrit par l'API.
+  const SLICE_R7A = {
+    project_update: [
+      'id',
+      'project_id',
+      'title',
+      'version',
+      'lines',
+      'before_after',
+      'created_at',
+      'removed_at',
+      'removal_id',
+    ],
+    project_media: ['update_id'],
+    project_tester: ['member_id', 'project_id', 'created_at'],
+  }
+  /** Les colonnes de R7a qu'un membre écrit, et leur champ dans la copie. */
+  const R7A_INPUTS = [
+    ['title', 'title'],
+    ['version', 'version'],
+    ['lines', 'line'],
+  ] as const
+
+  it('reads the tables and columns of slice R7a', () => {
+    for (const [table, columns] of Object.entries(SLICE_R7A)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the title, version and lines of an update as inputs, copied and exported', () => {
+    for (const [column, field] of R7A_INPUTS) {
+      expect(MEMBER_INPUTS, column).toContainEqual(
+        expect.objectContaining({
+          object: 'update',
+          table: 'project_update',
+          column,
+          field,
+          snapshot: true,
+          export: true,
+        }),
+      )
+    }
+    // A8 : les photos d'une mise à jour et leur description, copiées avec elle.
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'update',
+        table: 'project_media',
+        column: 'storage_key',
+        field: 'photo',
+        kind: 'image',
+        snapshot: true,
+      }),
+    )
+    expect(MEMBER_INPUTS).toContainEqual(
+      expect.objectContaining({
+        object: 'update',
+        table: 'project_media',
+        column: 'description',
+        field: 'photoDescription',
+        kind: 'text',
+        snapshot: true,
+        export: true,
+      }),
+    )
+    // Le reste de R7a : « pas une saisie », avec sa raison.
+    const wrong = Object.entries(SLICE_R7A).flatMap(([table, columns]) =>
+      columns
+        .filter((column) => !(table === 'project_update' && R7A_INPUTS.some(([c]) => c === column)))
+        .filter((column) => inRegister(table, column) || !notAnInput(table, column))
+        .map((column) => `${table}.${column}`),
+    )
+    expect(wrong).toEqual([])
+    // A8 : l'emplacement d'une photo dit aussi « mise à jour ».
+    const media = NOT_MEMBER_INPUTS.project_media
+    expect(media === '*' ? '' : (media?.slot ?? '')).toContain('mise à jour')
+  })
+
+  // R7a, migration 0018 : le Journal et les anciennes colonnes des outils sont effacés. Le schéma
+  // de Drizzle ne les a plus, la base migrée non plus, et le registre ne les nomme plus.
+  it('no longer has the journal nor the former tool columns, in the schema, the base or the register', async () => {
+    const gone = [
+      ['project', 'tools'],
+      ['project', 'tool_slugs'],
+      ['profile', 'favorite_tools'],
+    ] as const
+    expect(tables.map((t) => t.name)).not.toContain('project_note')
+    for (const [table, column] of gone) {
+      expect(tables.find((t) => t.name === table)?.columns.map((c) => c.name)).not.toContain(column)
+    }
+
+    const ctx = await createTestContext()
+    try {
+      const { rows } = (await ctx.db.execute(
+        sql`select table_name, column_name from information_schema.columns
+            where table_schema = 'public'
+              and (table_name = 'project_note'
+                or (table_name = 'project' and column_name in ('tools', 'tool_slugs'))
+                or (table_name = 'profile' and column_name = 'favorite_tools'))`,
+      )) as unknown as { rows: unknown[] }
+      expect(rows).toEqual([])
+      // Témoin : la même requête trouve une colonne qui existe.
+      const witness = (await ctx.db.execute(
+        sql`select column_name from information_schema.columns
+            where table_schema = 'public' and table_name = 'project_update' and column_name = 'lines'`,
+      )) as unknown as { rows: unknown[] }
+      expect(witness.rows).toHaveLength(1)
+    } finally {
+      await ctx.close()
+    }
+
+    const named = [
+      ...MEMBER_INPUTS.map((input) => `${input.table}.${input.column}`),
+      ...Object.entries(NOT_MEMBER_INPUTS).flatMap(([table, entry]) =>
+        entry === '*' ? [`${table}.*`] : Object.keys(entry).map((column) => `${table}.${column}`),
+      ),
+    ]
+    expect(named.filter((name) => name.startsWith('project_note.'))).toEqual([])
+    for (const [table, column] of gone) expect(named).not.toContain(`${table}.${column}`)
+    expect(MEMBER_INPUTS.map((input) => input.object)).not.toContain('note')
+  })
+
   it('classes every column of every table', () => {
     const unclassified = tables.flatMap((table) =>
       table.columns
@@ -353,12 +489,10 @@ const WITNESSES: Record<string, string> = {
   'member.user.name': 'Inès Nomtémoin',
   'member.member_handle.handle': 'ines_temoin',
   'member.profile.bio': 'Biographie témoin, unique.',
-  'member.profile.favorite_tools': 'OutilFavoriTémoin',
   'project.project.title': 'Titre témoin',
   'project.project.pitch': 'Pitch témoin, unique.',
   'project.project.description': 'Description témoin, unique.',
   'project.project.prompts': 'Prompt témoin, unique.',
-  'project.project.tools': 'OutilProjetTémoin',
   // R6b : le nom tapé devient un « Autre » (tool.name) et reste sur le projet (project_tool.label),
   // comme sur le profil (profile_tool.label). Le nom d'un « Autre » rattaché, gardé au journal,
   // n'est ni copié ni exporté : son témoin ne sert qu'à prouver qu'il en a un.
@@ -369,7 +503,11 @@ const WITNESSES: Record<string, string> = {
   'project.project.demo_url': 'https://demo-temoin.dev/app',
   // R6a : la description d'une photo, écrite par PATCH /v1/projects/{id}/visuals/{visualId}.
   'project.project_media.description': 'Légende de photo témoin, unique.',
-  'note.project_note.body': 'Note témoin, unique.',
+  // R7a : la mise à jour (titre, version, lignes, et la description de sa photo).
+  'update.project_update.title': 'Titre de mise à jour témoin',
+  'update.project_update.version': 'v9-témoin',
+  'update.project_update.lines': 'Ligne de mise à jour témoin, unique.',
+  'update.project_media.description': 'Légende de mise à jour témoin, unique.',
   'comment.project_comment.body': 'Commentaire témoin, unique.',
   'report.content_report.details': 'Précision témoin, unique.',
 }
@@ -381,10 +519,10 @@ const witnessOf = (input: MemberInput) => {
 }
 
 /** L'objet du registre et la sorte de cible signalée qui le porte. */
-const REPORTED_AS: Partial<Record<InputObject, 'member' | 'project' | 'note' | 'comment'>> = {
+const REPORTED_AS: Partial<Record<InputObject, 'member' | 'project' | 'update' | 'comment'>> = {
   member: 'member',
   project: 'project',
-  note: 'note',
+  update: 'update',
   comment: 'comment',
 }
 
@@ -397,7 +535,10 @@ describe('every field of the register', () => {
   let inesId: string
   let projectId: string
   let zoeProjectId: string
-  let noteId: string
+  let updateId: string
+  /** La clé de la photo de la mise à jour, et celle d'une photo encore en attente. */
+  let updatePhotoKey: string
+  let pendingPhotoKey: string
   let commentId: string
   /** Les signalements de Malik, par sorte de cible. */
   const reportIds: Record<string, string> = {}
@@ -432,7 +573,7 @@ describe('every field of the register', () => {
       name: WITNESSES['member.user.name'],
       handle: WITNESSES['member.member_handle.handle'],
       bio: WITNESSES['member.profile.bio'],
-      favoriteTools: [WITNESSES['member.profile.favorite_tools']],
+      favoriteTools: [WITNESSES['member.profile_tool.label']],
     })
     const avatar = await ctx.request('/v1/me/avatar', {
       method: 'POST',
@@ -444,7 +585,7 @@ describe('every field of the register', () => {
       pitch: WITNESSES['project.project.pitch'],
       description: WITNESSES['project.project.description'],
       prompts: [WITNESSES['project.project.prompts']],
-      tools: [WITNESSES['project.project.tools']],
+      tools: [WITNESSES['project.project_tool.label']],
       demoUrl: WITNESSES['project.project.demo_url'],
     })
     projectId = project.id
@@ -469,12 +610,38 @@ describe('every field of the register', () => {
       { description: WITNESSES['project.project_media.description'] },
     )
     expect(described.status).toBe(200)
+    // R7a : deux photos envoyées « en attente » ; la première est citée par la mise à jour, avec sa
+    // description, la seconde reste en attente (jamais publiée : ni copiée, ni montrée).
+    const pending: { id: string; key: string }[] = []
+    for (const color of ['#9e3b7a', '#3b9e7a']) {
+      later()
+      const res = await ctx.request(`/v1/projects/${projectId}/visuals`, {
+        method: 'POST',
+        headers: { cookie: ines },
+        body: visualForm(await jpegImage(800, 600, color), 'update'),
+      })
+      expect(res.status).toBe(201)
+      const { id } = ProjectVisual.parse(await res.json())
+      const [row] = await ctx.db
+        .select({ key: schema.projectMedia.storageKey })
+        .from(schema.projectMedia)
+        .where(eq(schema.projectMedia.id, id))
+      pending.push({ id, key: row?.key ?? '' })
+    }
+    updatePhotoKey = pending[0]?.key ?? ''
+    pendingPhotoKey = pending[1]?.key ?? ''
     later()
-    const note = await act.send('POST', `/v1/projects/${projectId}/notes`, ines, {
-      body: WITNESSES['note.project_note.body'],
+    const update = await act.send('POST', `/v1/projects/${projectId}/updates`, ines, {
+      title: WITNESSES['update.project_update.title'],
+      version: WITNESSES['update.project_update.version'],
+      lines: [{ family: 'new', text: WITNESSES['update.project_update.lines'] }],
+      photos: [
+        { id: pending[0]?.id ?? '', description: WITNESSES['update.project_media.description'] },
+      ],
+      beforeAfter: false,
     })
-    expect(note.status).toBe(201)
-    noteId = ((await note.json()) as { id: string }).id
+    expect(update.status).toBe(201)
+    updateId = ProjectUpdate.parse(await update.json()).id
     // Le commentaire d'Inès est chez Zoé : le blocage le cache dans un fil qui n'est pas le sien.
     zoeProjectId = (await act.publish(zoe, 'Recettes')).id
     later()
@@ -488,9 +655,9 @@ describe('every field of the register', () => {
     vi.useRealTimers()
   })
 
-  /** Malik signale le profil, le projet, la note et le commentaire d'Inès. */
+  /** Malik signale le profil, le projet, la mise à jour et le commentaire d'Inès. */
   const reportEverything = async () => {
-    const targets = { member: inesId, project: projectId, note: noteId, comment: commentId }
+    const targets = { member: inesId, project: projectId, update: updateId, comment: commentId }
     for (const [kind, id] of Object.entries(targets)) {
       later()
       const report = await act.report(
@@ -546,10 +713,16 @@ describe('every field of the register', () => {
       .where(eq(schema.profile.userId, inesId))
     const member = await snapshotOf('member')
     expect(member.filter((e) => e.field === 'avatar').map((e) => e.value)).toEqual([profile?.key])
+    // A8 : la copie du projet ne garde que ses photos à lui (galerie, portrait).
     const media = await ctx.db
       .select({ key: schema.projectMedia.storageKey })
       .from(schema.projectMedia)
-      .where(eq(schema.projectMedia.projectId, projectId))
+      .where(
+        and(
+          eq(schema.projectMedia.projectId, projectId),
+          inArray(schema.projectMedia.slot, ['gallery', 'portrait']),
+        ),
+      )
     expect(media).toHaveLength(2)
     const project = await snapshotOf('project')
     const imageValues = project
@@ -557,6 +730,12 @@ describe('every field of the register', () => {
       .map((e) => e.value)
       .sort()
     expect(imageValues).toEqual(media.map((m) => m.key).sort())
+    // Et celle de la mise à jour, sa photo à elle ; la photo en attente n'est nulle part.
+    const update = await snapshotOf('update')
+    expect(update.filter((e) => e.field === 'photo').map((e) => e.value)).toEqual([updatePhotoKey])
+    for (const copy of [project, update, await snapshotOf('member')]) {
+      expect(JSON.stringify(copy)).not.toContain(pendingPhotoKey)
+    }
   })
 
   // jur-J13 (R6a) : la copie dit quelle photo est décrite. Sa description suit, dans la copie,
@@ -568,7 +747,12 @@ describe('every field of the register', () => {
     const media = await ctx.db
       .select({ key: schema.projectMedia.storageKey })
       .from(schema.projectMedia)
-      .where(eq(schema.projectMedia.projectId, projectId))
+      .where(
+        and(
+          eq(schema.projectMedia.projectId, projectId),
+          inArray(schema.projectMedia.slot, ['gallery', 'portrait']),
+        ),
+      )
       .orderBy(asc(schema.projectMedia.position))
     const project = await snapshotOf('project')
     const images = project.filter((e) => ['cover', 'photo', 'photoDescription'].includes(e.field))
@@ -609,7 +793,11 @@ describe('every field of the register', () => {
         `/v1/members/mentionable?${new URLSearchParams({ q: 'ines', projectId: zoeProjectId })}`,
       ],
       project: [`/v1/projects/${projectId}`, '/v1/feed/discover'],
-      note: [`/v1/projects/${projectId}`, '/v1/feed/discover'],
+      update: [
+        `/v1/projects/${projectId}`,
+        `/v1/projects/${projectId}/updates`,
+        '/v1/feed/discover',
+      ],
       comment: [`/v1/projects/${zoeProjectId}/comments`],
     }
     for (const object of new Set(MEMBER_INPUTS.map((i) => i.object))) {
@@ -638,8 +826,8 @@ describe('every field of the register', () => {
 // Décisions 6 et 14 du plan R6b : l'export et la copie d'un signalement lisent les outils dans
 // project_tool et profile_tool, avec le nom que CE membre a tapé pour un « Autre » (et le nom du
 // catalogue pour un outil du catalogue). Les anciennes colonnes (project.tools, profile.favorite_tools)
-// sont encore écrites jusqu'en R7, mais plus jamais lues : le test y met un texte qui ne doit sortir
-// nulle part. Zoé tape la première « TEACHABLE machine » : c'est le nom partagé de l'« Autre » ;
+// sont effacées par la migration 0018 (R7a) : le test qui affirme qu'elles n'existent plus est plus
+// haut, dans l'inventaire. Zoé tape la première « TEACHABLE machine » : c'est le nom partagé de l'« Autre » ;
 // Inès tape « teachable MACHINE », et c'est son écriture à elle qui la suit.
 describe('the tools of a member, read from the catalogue tables', () => {
   let ctx: TestContext
@@ -676,9 +864,6 @@ describe('the tools of a member, read from the catalogue tables', () => {
     vi.setSystemTime(Date.now() + 1000)
     await act.updateProfile(ines, { favoriteTools: ['claude', 'teachable MACHINE'] })
     await act.publish(ines, 'Mon chat qui parle', { tools: ['CLAUDE', 'teachable MACHINE'] })
-    // Les anciennes colonnes reçoivent un texte qui ne doit plus jamais être lu.
-    await ctx.db.execute(sql`update project set tools = array['AncienneColonne']`)
-    await ctx.db.execute(sql`update profile set favorite_tools = array['AncienneColonne']`)
   })
 
   afterEach(async () => {
@@ -699,9 +884,7 @@ describe('the tools of a member, read from the catalogue tables', () => {
         expect.objectContaining({ label: 'teachable MACHINE', inCatalogue: false }),
       ],
     ])
-    for (const leak of ['AncienneColonne', 'TEACHABLE machine']) {
-      expect(raw, leak).not.toContain(leak)
-    }
+    expect(raw).not.toContain('TEACHABLE machine')
   })
 
   it('copies the favourite tools of a reported profile from profile_tool', async () => {
@@ -718,7 +901,6 @@ describe('the tools of a member, read from the catalogue tables', () => {
 
     expect(copied).toContain('Claude')
     expect(copied).toContain('teachable MACHINE')
-    expect(copied).not.toContain('AncienneColonne')
     expect(copied).not.toContain('TEACHABLE machine')
   })
 })

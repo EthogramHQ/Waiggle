@@ -6,7 +6,7 @@
 // fichier où ils sont écrits, avant ses imports. Écrits ici, ils arriveraient trop tard, une fois
 // l'écran déjà chargé avec les vrais modules. Comme chaque fichier de test remplace les mêmes
 // modules, les faux hooks importés ici (useFollow, useComments…) sont bien les faux.
-import type { Comment, Project, ProjectNote } from '@ruche/contracts'
+import type { Comment, Project, UpdateFamily } from '@ruche/contracts'
 import { fireEvent, screen, within } from '@testing-library/react-native'
 import {
   useComments,
@@ -17,7 +17,6 @@ import {
 } from '../comments/api'
 import { webAppUrl } from '../config'
 import { useFollow } from '../follows/api'
-import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getMe } from '../profile/api'
 import { deleteProject, getProject } from '../projects/api'
 import { useReaction } from '../reactions/api'
@@ -25,7 +24,10 @@ import { leaMe } from '../testing/fixtures'
 import { visited } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
 import { mockSession } from '../testing/render'
+import { containing, fr } from '../testing/text'
+import { rocketUpdate } from '../testing/updates'
 import { copyText } from '../ui/clipboard'
+import { useDeleteUpdate } from '../updates/api'
 
 // Les fausses fonctions de la navigation et du cadre de page, lues par les jest.mock de chaque
 // fichier (un nom qui commence par « mock » y est permis : Jest le lit au moment de l'appel).
@@ -46,33 +48,54 @@ export const signInAgain = async () => {
   expect(visited(mockPush)).toContain('/sign-in?next=/page/actuelle')
 }
 
-export const mockPublish = jest.fn()
-export const mockRemove = jest.fn()
+// --- R7a : les mises à jour, qui remplacent le Journal ---
 
-/** Deux notes de Léa, telles que l'API les donne : de la plus récente à la plus ancienne. */
-export const v2: ProjectNote = {
-  id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
-  body: 'v2 : mode hors ligne',
-  createdAt: '2026-10-14T09:00:00.000Z',
-  removal: null,
+/** Le faux `remove` de `useDeleteUpdate` : le test lit ses appels et choisit sa réponse. */
+export const mockRemoveUpdate = jest.fn()
+
+/**
+ * Le projet de Léa avec trois mises à jour : la section « Les mises à jour » montre la dernière
+ * (« Le décompte de la fusée », v1.2, une ligne « Nouveau » et une « Réparé », deux photos en avant
+ * / après), puis « Voir les 3 mises à jour ».
+ */
+export const withUpdates: Project = {
+  ...recipesProject,
+  latestUpdate: rocketUpdate,
+  updateCount: 3,
+  version: 'v1.2',
 }
-export const firstVersion: ProjectNote = {
-  id: '1c2d3e4f-5061-4b72-9c83-d4e5f6071829',
-  body: 'Première version en ligne',
-  createdAt: '2026-10-12T09:00:00.000Z',
-  removal: null,
+
+/** Le bouton corbeille de la mise à jour de la fusée, nommé par son titre. */
+export const deleteUpdateName = fr.t(($) => $.project.updates.delete, {
+  title: rocketUpdate.title ?? '',
+})
+
+/** Le titre de la fenêtre de suppression d'une mise à jour. */
+export const deleteUpdateTitle = fr.t(($) => $.project.updates.deleteTitle)
+
+/** La corbeille de la mise à jour de la fusée, une fois la page affichée. */
+export const deleteUpdateButton = () => screen.findByRole('button', { name: deleteUpdateName })
+
+/**
+ * Une ligne de « Ce qui a changé » telle qu'elle se lit (interface B4) : « Nouveau : <texte> »,
+ * par un texte caché à l'œil ou par le nom de la ligne. Rend vrai si la page la lit ainsi.
+ */
+export const readsLine = (family: UpdateFamily, text: string) => {
+  const read = fr.t(($) => $.update.lineRead, {
+    family: fr.t(($) => $.update.family[family]),
+    text,
+  })
+  return (
+    screen.queryAllByText(containing(read)).length > 0 ||
+    screen.queryAllByLabelText(containing(read)).length > 0
+  )
 }
-export const withNotes = { ...recipesProject, notes: [v2, firstVersion] }
 
 /** Le projet de Léa, vu par Max. */
-export const seenByOther = (project = withNotes) => {
+export const seenByOther = (project: Project = withUpdates) => {
   mockSession({ user: { id: 'u2', name: 'Max' } })
   jest.mocked(getProject).mockResolvedValue({ ...project, isMine: false })
 }
-
-/** Les notes affichées, dans l'ordre de la page. */
-export const shownNotes = () =>
-  screen.getAllByText(/^(v2 : mode hors ligne|Première version en ligne)$/)
 
 /**
  * Le contenu de la fenêtre de confirmation qui porte ce titre : on remonte depuis le titre jusqu'au
@@ -84,21 +107,6 @@ export const dialogTitled = (title: string) => {
   while (node && within(node).queryAllByRole('button').length === 0) node = node.parent
   if (!node) throw new Error(`no dialog titled ${title}`)
   return within(node)
-}
-
-/** Le bouton « Supprimer la note » de la note numéro `index` (0 : la plus récente). */
-export const deleteButton = async (index: number) => {
-  const buttons = await screen.findAllByRole('button', { name: 'Supprimer la note' })
-  const button = buttons[index]
-  if (!button) throw new Error(`no delete button for note ${index}`)
-  return button
-}
-
-/** Ouvre le champ, écrit une note et la publie. */
-export const publishSomething = async () => {
-  await fireEvent.press(await screen.findByRole('button', { name: 'Publier une note' }))
-  await fireEvent.changeText(screen.getByLabelText('Ta note'), 'v2 : mode hors ligne')
-  await fireEvent.press(screen.getByRole('button', { name: 'Publier la note' }))
 }
 
 export const mockReact = jest.fn()
@@ -236,13 +244,13 @@ export const resetProjectScreenMocks = () => {
   mockPush.mockReset()
   mockReplace.mockReset()
   mockScreenProps.length = 0
-  mockPublish.mockReset().mockResolvedValue(true)
-  mockRemove.mockReset().mockResolvedValue(true)
+  // R7a : la page ne publie plus (la feuille « Nouvelle mise à jour » a sa propre adresse) ; elle
+  // supprime une mise à jour depuis sa corbeille.
+  mockRemoveUpdate.mockReset().mockResolvedValue(true)
   jest
-    .mocked(usePublishNote)
+    .mocked(useDeleteUpdate)
     .mockReset()
-    .mockReturnValue({ publish: mockPublish, pending: false, error: false })
-  jest.mocked(useDeleteNote).mockReset().mockReturnValue({ remove: mockRemove, error: false })
+    .mockReturnValue({ remove: mockRemoveUpdate, pending: false, error: false, reason: undefined })
   mockReact.mockReset()
   jest
     .mocked(useReaction)

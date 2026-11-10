@@ -6,7 +6,7 @@
 import type { MemberInputField } from '@ruche/contracts'
 
 /** L'objet qui porte le champ : ce qu'on signale et ce qu'un blocage cache. */
-export type InputObject = 'member' | 'project' | 'note' | 'comment' | 'report'
+export type InputObject = 'member' | 'project' | 'update' | 'comment' | 'report'
 
 /** La sorte de champ : un texte, une liste de textes, un lien, ou une image (une clé de stockage). */
 export type InputKind = 'text' | 'list' | 'link' | 'image'
@@ -55,17 +55,7 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: true,
   },
-  {
-    field: 'favoriteTools',
-    object: 'member',
-    table: 'profile',
-    column: 'favorite_tools',
-    kind: 'list',
-    snapshot: true,
-    export: true,
-  },
-  // R6b : le nom tapé pour chaque outil favori (`profile_tool.label`), qui remplace en lecture la
-  // colonne d'avant ci-dessus (gardée pour un retour à R6a).
+  // Le nom tapé pour chaque outil favori (`profile_tool.label`, R6b).
   {
     field: 'favoriteTools',
     object: 'member',
@@ -121,19 +111,9 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: true,
   },
-  {
-    field: 'tools',
-    object: 'project',
-    table: 'project',
-    column: 'tools',
-    kind: 'list',
-    snapshot: true,
-    export: true,
-  },
-  // R6b : les outils lus par le catalogue. Le nom d'un « Autre » est partagé (le premier tapé), le nom
+  // Les outils lus par le catalogue (R6b). Le nom d'un « Autre » est partagé (le premier tapé), le nom
   // tapé par l'auteur de CE projet est dans `project_tool.label` : l'un et l'autre sont des textes de
-  // membres, copiés au signalement et exportés sous le champ « tools ». Les colonnes d'avant
-  // (`project.tools`, plus haut) restent listées pour un retour à R6a, mais ne sont plus lues.
+  // membres, copiés au signalement et exportés sous le champ « tools ».
   {
     field: 'tools',
     object: 'project',
@@ -200,16 +180,56 @@ export const MEMBER_INPUTS: readonly MemberInput[] = [
     snapshot: true,
     export: true,
   },
-  // Le journal et les commentaires.
+  // Les mises à jour d'un projet (R7a) : le titre, la version et les lignes (texte tiré du jsonb
+  // `lines`), copiés au signalement et exportés. Leurs photos sont des lignes de `project_media`
+  // (emplacement « update ») : même colonne que celles du projet, rangée ici sous l'objet `update`,
+  // pour qu'un signalement de la mise à jour en copie la clé et la description.
   {
-    field: 'body',
-    object: 'note',
-    table: 'project_note',
-    column: 'body',
+    field: 'title',
+    object: 'update',
+    table: 'project_update',
+    column: 'title',
     kind: 'text',
     snapshot: true,
     export: true,
   },
+  {
+    field: 'version',
+    object: 'update',
+    table: 'project_update',
+    column: 'version',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  {
+    field: 'line',
+    object: 'update',
+    table: 'project_update',
+    column: 'lines',
+    kind: 'list',
+    snapshot: true,
+    export: true,
+  },
+  {
+    field: 'photo',
+    object: 'update',
+    table: 'project_media',
+    column: 'storage_key',
+    kind: 'image',
+    snapshot: true,
+    export: false,
+  },
+  {
+    field: 'photoDescription',
+    object: 'update',
+    table: 'project_media',
+    column: 'description',
+    kind: 'text',
+    snapshot: true,
+    export: true,
+  },
+  // Les commentaires.
   {
     field: 'body',
     object: 'comment',
@@ -272,8 +292,6 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     author_id: 'identifiant',
     status: 'une étape choisie dans une liste fermée par Zod (idée, en cours, testable…)',
     visibility: 'public ou privé, une liste fermée par Zod',
-    tool_slugs:
-      'les étiquettes tirées de project.tools (minuscules, tirets), déjà au registre : elles suivent ses changements',
     primary_category:
       'un code de la table category, vérifié par la base et par l’API (clé étrangère)',
     secondary_category:
@@ -290,21 +308,28 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
     id: 'identifiant',
     project_id: 'identifiant',
     kind: "la sorte de média, écrite par l'API ('image')",
-    slot: "l'emplacement (galerie ou couverture verticale), écrit par l'API",
+    slot: "l'emplacement (galerie, couverture verticale, ou photo d'une mise à jour), écrit par l'API",
     position: 'nombre',
     width: 'nombre',
     height: 'nombre',
     thumbhash:
       "l'aperçu flou calculé par l'API à partir de l'image, déjà au registre par sa clé (storage_key)",
     created_at: 'date',
+    update_id:
+      "la mise à jour qui porte la photo (null : photo du projet ou en attente), écrite par l'API",
   },
-  project_note: {
+  // R7a : le titre, la version et les lignes sont au registre (MEMBER_INPUTS) ; le reste est écrit
+  // par l'API.
+  project_update: {
     id: 'identifiant',
     project_id: 'identifiant',
+    before_after: 'booléen',
     created_at: 'date',
     removed_at: 'date',
     removal_id: 'identifiant',
   },
+  // L'inscription d'un membre aux testeurs d'un projet : deux identifiants et une date.
+  project_tester: '*',
   project_comment: {
     id: 'identifiant',
     project_id: 'identifiant',
@@ -412,7 +437,7 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
   content_report: {
     id: 'identifiant',
     reporter_id: 'identifiant',
-    target_kind: 'la sorte de cible, une liste fermée par Zod (ReportTargetKind)',
+    target_kind: 'la sorte de cible, une liste fermée par Zod (StoredReportTargetKind)',
     target_id: "l'identifiant de la cible (uuid, ou id d'un membre), vérifié par Zod",
     project_id: 'identifiant',
     target_author_id: 'identifiant',
@@ -426,7 +451,7 @@ export const NOT_MEMBER_INPUTS: Record<string, Record<string, string> | '*'> = {
   },
   moderation_decision: {
     id: 'identifiant',
-    target_kind: 'la sorte de cible, une liste fermée par Zod (ReportTargetKind)',
+    target_kind: 'la sorte de cible, une liste fermée par Zod (StoredReportTargetKind)',
     target_id: "l'identifiant de la cible (uuid, ou id d'un membre), vérifié par Zod",
     action: 'retirer, classer ou rétablir : une liste fermée par Zod',
     ground: 'le fondement du retrait, une liste fermée par Zod (RemovalGround)',

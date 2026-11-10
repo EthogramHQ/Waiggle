@@ -9,7 +9,11 @@
 //
 // Le retrait est noté sur le contenu lui-même (removed_at et removal_id) : ce sont les lectures
 // (projects/visibility.ts et les fichiers qui s'en servent) qui l'excluent pour les autres.
-import type { ModerationDecision, ModerationDecisionInput, ReportTarget } from '@ruche/contracts'
+import type {
+  ModerationDecision,
+  ModerationDecisionInput,
+  StoredReportTarget,
+} from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import {
@@ -44,7 +48,11 @@ class AlreadyDecided extends Error {}
  * modifiées : aucune, et une autre décision est passée avant (ou entre-temps). Chaque mise à jour
  * passe par la clé primaire de sa table.
  */
-const mark = async (tx: Tx, target: ReportTarget, removal: { at: Date; id: string } | null) => {
+const mark = async (
+  tx: Tx,
+  target: StoredReportTarget,
+  removal: { at: Date; id: string } | null,
+) => {
   const set = removal
     ? { removedAt: removal.at, removalId: removal.id }
     : { removedAt: null, removalId: null }
@@ -60,8 +68,10 @@ const mark = async (tx: Tx, target: ReportTarget, removal: { at: Date; id: strin
           .returning({ id: t.id })
       ).length
     }
-    case 'note': {
-      const t = schema.projectNote
+    case 'update': {
+      // Retirer une mise à jour la cache aux autres (updateShownTo) ; ses photos la suivent
+      // (isVisualVisibleTo lit project_update.removed_at). Rien d'autre à écrire.
+      const t = schema.projectUpdate
       const state = removal ? isNull(t.removedAt) : isNotNull(t.removedAt)
       return (
         await tx
@@ -82,6 +92,9 @@ const mark = async (tx: Tx, target: ReportTarget, removal: { at: Date; id: strin
           .returning({ id: t.id })
       ).length
     }
+    case 'note':
+      // Une ancienne note n'existe plus : loadDecidable l'a déjà rendue « introuvable ».
+      return 0
     case 'member':
       // Un profil ne se retire pas (vérifié plus haut) : rien à marquer.
       return 0

@@ -1,7 +1,7 @@
 // Les commentaires d'un projet (tranche 5) : les lire page par page, en publier un (ou répondre),
 // le modifier, le supprimer, et, pour l'auteur du projet, le masquer. Les écrans n'appellent que
 // les hooks ci-dessous ; les tests les remplacent.
-// Comme pour les notes (notes/api.ts), pas de mise à jour optimiste pour ce qui s'écrit : un
+// Pas de mise à jour optimiste pour ce qui s'écrit : un
 // commentaire n'apparaît qu'une fois l'API d'accord (elle peut le refuser : texte invalide, 60
 // commentaires par heure). La liste en cache change alors à la bonne place, sans tout relire : rien
 // ne bouge ailleurs sous les yeux du membre.

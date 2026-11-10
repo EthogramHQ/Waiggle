@@ -1,10 +1,18 @@
 // Outils de test pour retrouver un texte de l'appli à l'écran (tranche 7a), quelle que soit la façon
 // dont l'écran l'a découpé (un seul paragraphe, ou une ligne par phrase).
 import type { Removal } from '@ruche/contracts'
+import { Platform } from 'react-native'
 import { createI18n } from '../i18n'
 
 /** Les textes français de l'appli, tirés des mêmes traductions que les écrans. */
 export const fr = createI18n('fr')
+
+/**
+ * Le rôle d'un choix d'un menu à choix cochés (`ActionMenu`, R7a) : `menuitemradio` sur le web ;
+ * sur téléphone, React Native ne connaît pas ce rôle, le choix est un `menuitem` qui dit s'il est
+ * coché (relecture de l'interface R7a, C4).
+ */
+export const choiceRole = () => (Platform.OS === 'web' ? 'menuitemradio' : 'menuitem')
 
 /**
  * Une expression qui trouve ce texte n'importe où dans un texte plus long. getByText remplace tous

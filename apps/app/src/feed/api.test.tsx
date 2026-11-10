@@ -1,6 +1,6 @@
 // Tests du hook useFeedNews : combien de nouveautés au-dessus de ce que le membre voit, sans
 // jamais toucher au fil affiché. R4 (F-Fil4) : il dit aussi qui les a publiées (3 auteurs au plus,
-// chacun une fois) et de quelles sortes elles sont (projets, notes), pour le bouton des
+// chacun une fois) et de quelles sortes elles sont (projets, mises à jour), pour le bouton des
 // nouveautés.
 //
 // Et le hook useMarkFeedRead (R4, « Tu es à jour ») : quand la première page du fil s'affiche, il
@@ -32,6 +32,9 @@ const summary: ProjectSummary = {
   createdAt: '2026-10-19T08:00:00.000Z',
   updatedAt: '2026-10-19T08:00:00.000Z',
   reactionTotal: 0,
+  // R7a : la dernière mise à jour en version courte, et la version sous le titre.
+  latestUpdate: null,
+  version: null,
 }
 
 /** Un élément du fil, publié à l'heure donnée (« 09 » : 9 h). */
@@ -88,15 +91,19 @@ const projectBy = (n: number, hour: string, by: ProjectSummary['author']): FeedI
   project: { ...summary, id: `00000000-0000-4000-8000-00000000010${n}`, author: by },
 })
 
-/** Une note publiée à l'heure donnée, sur un projet de cet auteur. */
-const noteBy = (n: number, hour: string, by: ProjectSummary['author']): FeedItem => ({
-  kind: 'note',
+/**
+ * R7a : un projet de cet auteur, remonté par une mise à jour publiée à l'heure donnée (la note de
+ * 4b avant le Journal effacé).
+ */
+const updateBy = (n: number, hour: string, by: ProjectSummary['author']): FeedItem => ({
+  kind: 'update',
   at: `2026-10-19T${hour}:00:00.000Z`,
-  note: {
+  update: {
     id: `00000000-0000-4000-8000-00000000020${n}`,
-    body: 'Nouvelle version en ligne.',
-    createdAt: `2026-10-19T${hour}:00:00.000Z`,
-    removal: null,
+    at: `2026-10-19T${hour}:00:00.000Z`,
+    version: 'v2',
+    firstLine: { family: 'new', text: 'Nouvelle version en ligne.' },
+    lineCount: 1,
   },
   project: { ...summary, id: `00000000-0000-4000-8000-00000000030${n}`, author: by },
 })
@@ -109,7 +116,7 @@ describe('useFeedNews, who and what is new (R4)', () => {
     headIs([
       projectBy(5, '15', nora),
       projectBy(4, '14', sam),
-      noteBy(3, '13', nora),
+      updateBy(3, '13', nora),
       projectBy(2, '12', max),
       projectBy(1, '11', ines),
       first,
@@ -144,28 +151,46 @@ describe('useFeedNews, who and what is new (R4)', () => {
     expect(result.current.kinds).toEqual(['project'])
   })
 
-  it('says notes only when only notes arrived', async () => {
+  it('says updates only when only updates arrived', async () => {
     shown('following', false, [item(1, '09')])
-    headIs([noteBy(2, '10', nora), item(1, '09')])
+    headIs([updateBy(2, '10', nora), item(1, '09')])
 
     const { result } = await renderHook(() => useFeedNews('following', item(1, '09')), {
       wrapper,
     })
 
     await waitFor(() => expect(result.current.count).toBe(1))
-    expect(result.current.kinds).toEqual(['note'])
+    expect(result.current.kinds).toEqual(['update'])
   })
 
-  it('gives both kinds, each once, when projects and notes arrived', async () => {
+  it('gives both kinds, each once, when projects and updates arrived', async () => {
     shown('following', false, [item(1, '09')])
-    headIs([noteBy(4, '12', nora), projectBy(3, '11', sam), noteBy(2, '10', sam), item(1, '09')])
+    headIs([
+      updateBy(4, '12', nora),
+      projectBy(3, '11', sam),
+      updateBy(2, '10', sam),
+      item(1, '09'),
+    ])
 
     const { result } = await renderHook(() => useFeedNews('following', item(1, '09')), {
       wrapper,
     })
 
     await waitFor(() => expect(result.current.count).toBe(3))
-    expect([...result.current.kinds].sort()).toEqual(['note', 'project'])
+    expect([...result.current.kinds].sort()).toEqual(['project', 'update'])
+  })
+
+  // R7a : un projet affiché en premier remonte par sa mise à jour. Il garde son identifiant (celui
+  // du projet, `feedItemId`) : c'est sa date qui le place au-dessus de ce qui est affiché.
+  it('counts the update of the very project shown first, raised above it', async () => {
+    const first = projectBy(1, '09', nora)
+    shown('following', false, [first])
+    headIs([{ ...updateBy(1, '10', nora), project: first.project }])
+
+    const { result } = await renderHook(() => useFeedNews('following', first), { wrapper })
+
+    await waitFor(() => expect(result.current.count).toBe(1))
+    expect(result.current.kinds).toEqual(['update'])
   })
 
   it('names no one and no kind when nothing is new', async () => {
@@ -202,7 +227,7 @@ describe('useMarkFeedRead (R4)', () => {
   })
 
   it('sends PUT /v1/feed/read with the date of the first item, never the time of the device', async () => {
-    const first = noteBy(1, '09', nora)
+    const first = updateBy(1, '09', nora)
     await renderHook(() => useMarkFeedRead(first), { wrapper })
 
     await waitFor(() => expect(feedReads()).toHaveLength(1))

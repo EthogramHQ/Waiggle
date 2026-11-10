@@ -5,8 +5,9 @@
 // de 6 jours, moins de 3 récaps de suite sans visite, ou une visite depuis) :
 // 1. calculer ce qui est nouveau pour lui, comme l'écran des notifications (droits, masquage,
 //    projet privé) : ses commentaires, réponses et mentions non vus, ses réactions et ses nouveaux
-//    abonnés, depuis le plus récent de sa dernière visite de l'écran, du dernier récap et d'il y a
-//    7 jours ; sans ce qui est déjà parti dans un e-mail de mentions ;
+//    abonnés, et (R7a) les projets qu'il suit ou teste qui ont été mis à jour, depuis le plus récent
+//    de sa dernière visite de l'écran, du dernier récap et d'il y a 7 jours ; sans ce qui est déjà
+//    parti dans un e-mail de mentions ;
 // 2. rien de nouveau : aucun e-mail ;
 // 3. sinon, « prendre » l'envoi : une seule requête note la date d'envoi, si et seulement si les
 //    conditions tiennent encore à cet instant, et rend l'adresse. Aucune ligne rendue (désinscrit
@@ -126,6 +127,10 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
   const lines: DatedLine[] = []
   let reactions = 0
   let follows = 0
+  // R7a : les projets suivis ou testés mis à jour, par projet. Une Map garde l'ordre d'arrivée : les
+  // notifications viennent de la plus récente à la plus ancienne, le projet mis à jour le plus
+  // récemment est donc le premier. Seuls son titre et le nombre de ses mises à jour sont gardés.
+  const updated = new Map<string, { title: string; count: number }>()
   for (const { notification } of notifications) {
     switch (notification.kind) {
       case 'comment': {
@@ -149,13 +154,29 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
       case 'project_follows':
         follows += notification.count
         break
+      // R7a : une mise à jour d'un projet suivi ou testé compte pour son projet. La notification a
+      // déjà passé toutes les règles de la source (visibilité relue maintenant, blocage, retrait,
+      // date de l'abonnement) : les 5 projets et « Et N autres » se comptent après ce filtre (A9).
+      case 'project_update': {
+        const project = updated.get(notification.project.id)
+        if (project) project.count++
+        else updated.set(notification.project.id, { title: notification.project.title, count: 1 })
+        break
+      }
       // Un commentaire masqué ou le pseudo reçu : seulement dans l'appli.
       default:
         break
     }
   }
-  if (lines.length === 0 && reactions === 0 && follows === 0) return null
-  return { lines, reactions, follows }
+  // Le lien de chaque projet mène à sa frise : une adresse fabriquée ici, depuis l'adresse de
+  // l'appli et l'identifiant du projet (un uuid), jamais depuis un champ écrit par un membre.
+  const updates = [...updated].map(([projectId, { title, count }]) => ({
+    title,
+    count,
+    url: new URL(`/projects/${projectId}/updates`, deps.appUrl).toString(),
+  }))
+  if (lines.length === 0 && reactions === 0 && follows === 0 && updates.length === 0) return null
+  return { lines, reactions, follows, updates }
 }
 
 const Taken = z.object({
@@ -225,7 +246,14 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
   const lines = content.lines.filter((line) => !mailedBefore(line, taken.mention_sent_at))
   // Tout était déjà parti : rien n'est envoyé. La date du récap reste notée (cas rare, une course
   // entre les deux tâches) ; le récap suivant repart de là, sans rien perdre de nouveau.
-  if (lines.length === 0 && content.reactions === 0 && content.follows === 0) return false
+  if (
+    lines.length === 0 &&
+    content.reactions === 0 &&
+    content.follows === 0 &&
+    content.updates.length === 0
+  ) {
+    return false
+  }
   const language = languageOfMember(taken)
   await deps.mailer.send({
     to: taken.email,
@@ -237,6 +265,9 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
       follows: content.follows,
       first: member.recap_sent_at === null,
       last: taken.recap_unvisited >= RECAP_UNVISITED_MAX,
+      // 5 projets au plus, comme les lignes (RECAP_MAX_LINES), puis « Et N autres projets ».
+      updates: content.updates.slice(0, RECAP_MAX_LINES),
+      updatesMore: Math.max(0, content.updates.length - RECAP_MAX_LINES),
       links: linksFor(deps, member.id, 'recap'),
     }),
   })

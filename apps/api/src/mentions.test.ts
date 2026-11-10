@@ -293,11 +293,15 @@ describe('writing a mention', () => {
     })
   })
 
-  it('tells nobody about a « @ » in a note: mentions live in comments only', async () => {
+  it('tells nobody about a « @ » in an update: mentions live in comments only', async () => {
     const meteo = await publish(ines)
     later()
-    const res = await send('POST', `/v1/projects/${meteo.id}/notes`, ines, {
-      body: 'Merci @zoe pour l’idée.',
+    const res = await send('POST', `/v1/projects/${meteo.id}/updates`, ines, {
+      title: null,
+      version: null,
+      lines: [{ family: 'new', text: 'Merci @zoe pour l’idée.' }],
+      photos: [],
+      beforeAfter: false,
     })
     expect(res.status).toBe(201)
 

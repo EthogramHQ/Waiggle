@@ -16,6 +16,8 @@ import {
   ReportExport,
   ReportReason,
   ReportTarget,
+  StoredReportTarget,
+  StoredReportTargetKind,
 } from './reports'
 
 const projectId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
@@ -23,10 +25,10 @@ const commentId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
 const at = '2026-10-22T09:30:00.000Z'
 
 describe('ReportTarget', () => {
-  it('accepts the four kinds: a project, a note, a comment or a profile', () => {
+  it('accepts the four kinds: a project, an update, a comment or a profile', () => {
     for (const target of [
       { kind: 'project', id: projectId },
-      { kind: 'note', id: projectId },
+      { kind: 'update', id: projectId },
       { kind: 'comment', id: commentId },
       { kind: 'member', id: 'Xy3_member-id' },
     ]) {
@@ -44,6 +46,23 @@ describe('ReportTarget', () => {
 
   it('refuses an unknown kind', () => {
     expect(ReportTarget.safeParse({ kind: 'reaction', id: projectId }).success).toBe(false)
+  })
+
+  // R7a (relecture de sécurité B1) : les notes ont été effacées. Un membre ne peut plus en signaler
+  // une, mais les signalements et décisions d'avant restent lisibles.
+  it('refuses a new report on a journal note, yet reads an old one back', () => {
+    expect(ReportTarget.safeParse({ kind: 'note', id: projectId }).success).toBe(false)
+    expect(StoredReportTarget.parse({ kind: 'note', id: projectId })).toEqual({
+      kind: 'note',
+      id: projectId,
+    })
+    expect(StoredReportTargetKind.options).toEqual([
+      'project',
+      'update',
+      'comment',
+      'member',
+      'note',
+    ])
   })
 })
 

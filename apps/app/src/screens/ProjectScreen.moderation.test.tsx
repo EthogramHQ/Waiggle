@@ -21,18 +21,19 @@ import { reportsOpened } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr, missingSentences, removalSentences } from '../testing/text'
+import { rocketUpdate } from '../testing/updates'
 import { ProjectScreen } from './ProjectScreen'
 import {
-  deleteButton,
+  deleteUpdateButton,
+  deleteUpdateTitle,
   dialogTitled,
   type Element,
-  firstVersion,
   id,
   mockComments,
   mockPush,
   mockReact,
-  mockRemove,
   mockRemoveComment,
+  mockRemoveUpdate,
   mockReplace,
   mockScreenProps,
   mockToggle,
@@ -40,9 +41,8 @@ import {
   resetProjectScreenMocks,
   seenByOther,
   signInAgain,
-  v2,
-  withNotes,
   withReactions,
+  withUpdates,
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -64,8 +64,12 @@ jest.mock('../members/api', () => ({
     isPending: false,
   }),
 }))
-// Les notes (tranche 4b) : de faux hooks, dont le test lit les appels (publish, remove).
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+// Les mises à jour (R7a, qui remplacent les notes) : de faux hooks, dont le test lit les appels.
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 // Les réactions et les commentaires (tranche 5) : de faux hooks, dont le test lit les appels.
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
@@ -128,6 +132,9 @@ beforeEach(() => {
 // R6a : « Supprimer » du projet est dans le menu « … » de la page (« Plus d'actions »).
 const openMenu = async () =>
   fireEvent.press(await screen.findByRole('button', { name: fr.t(($) => $.actionMenu.label) }))
+/** R7a : « Publier une mise à jour » (section et menu « … ») et « Signaler cette mise à jour ». */
+const publishUpdate = fr.t(($) => $.project.updates.add)
+const reportUpdate = fr.t(($) => $.report.update)
 /** Le titre de la fenêtre de suppression : « Supprimer « Mon agent de recettes » ? ». */
 const deleteTitle = fr.t(($) => $.project.page.deleteTitle, { title: recipesProject.title })
 
@@ -169,7 +176,8 @@ const menusIn = (sheet: ReturnType<typeof commentsSheet>) =>
     .queryAllByRole('button', { name: /^Actions du commentaire de / })
     .map((menu) => String(menu.props.accessibilityLabel ?? menu.props['aria-label'] ?? ''))
 
-// --- Tranche 7a : signaler un projet ou une note, et ce que l'auteur lit d'un contenu retiré ---
+// --- Tranche 7a : signaler un projet ou une mise à jour (une note avant R7a), et ce que l'auteur
+// lit d'un contenu retiré ---
 
 // Tranche 7b (décision de Louis du 24/10/2026, « pas un bouton par entrée ») : « Signaler ce projet »
 // passe dans le menu « … » de la page (ActionMenu), un bouton « Plus d'actions » qui ouvre une
@@ -222,38 +230,55 @@ describe('reporting a project from its page', () => {
   })
 })
 
-describe('reporting a note from the journal', () => {
-  it('offers another member a « Signaler cette note » button per note', async () => {
+// R7a (scénario « La modération ») : une mise à jour se signale comme une note avant elle, par le
+// menu « … » de la mise à jour, pour un autre membre que l'auteur.
+describe('reporting an update of the project', () => {
+  /**
+   * Le menu de la mise à jour de la fusée : on remonte depuis son titre jusqu'au premier ensemble
+   * qui contient un bouton autre que « Voir les 3 mises à jour ».
+   */
+  const updateMenu = () => {
+    let node = screen.getByText(rocketUpdate.title ?? '').parent
+    const isMenu = (button: Element) =>
+      !String(button.props.accessibilityLabel ?? '').startsWith('Voir ')
+    while (node && within(node).queryAllByRole('button').filter(isMenu).length === 0) {
+      node = node.parent
+    }
+    const button = node ? within(node).queryAllByRole('button').filter(isMenu)[0] : undefined
+    if (!button) throw new Error('no menu around the update')
+    return button
+  }
+
+  it('offers another member « Signaler cette mise à jour » in the menu of the update', async () => {
     seenByOther()
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    const buttons = await screen.findAllByRole('button', { name: 'Signaler cette note' })
-    expect(buttons).toHaveLength(2)
-    const second = buttons[1]
-    if (!second) throw new Error('a report button per note is expected')
-    await fireEvent.press(second)
+    await screen.findByText(rocketUpdate.title ?? '')
+    // Un bouton direct (le drapeau d'`UpdateEntry`, API fixée en TW-1) ou une entrée de menu, comme
+    // l'accepte `UpdateEntry.test.tsx`.
+    const direct = screen.queryByRole('button', { name: reportUpdate })
+    if (direct) {
+      await fireEvent.press(direct)
+    } else {
+      await fireEvent.press(updateMenu())
+      await fireEvent.press(screen.getByRole('menuitem', { name: reportUpdate }))
+    }
 
     expect(reportsOpened(mockPush)).toEqual([
-      expect.objectContaining({ kind: 'note', id: firstVersion.id }),
+      expect.objectContaining({ kind: 'update', id: rocketUpdate.id }),
     ])
   })
 
-  it('says which note the button reports, by its text', async () => {
-    seenByOther()
+  it('never offers the author to report an update of the project', async () => {
+    jest.mocked(getProject).mockResolvedValue(withUpdates)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    const buttons = await screen.findAllByRole('button', { name: 'Signaler cette note' })
-    // Comme « Supprimer la note » : l'indice lu sur téléphone est le début de la note.
-    expect(buttons[0]).toHaveProp('accessibilityHint', expect.stringContaining('v2'))
-  })
-
-  it('never offers the author to report a note of the project', async () => {
-    jest.mocked(getProject).mockResolvedValue(withNotes)
-    await renderWithProviders(<ProjectScreen id={id} />)
-
-    // Témoin : l'auteur supprime ses notes ; il ne les signale pas.
-    expect(await screen.findAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: 'Signaler cette note' })).toBeNull()
+    // Témoin : l'auteur supprime sa mise à jour ; il ne la signale pas.
+    expect(await deleteUpdateButton()).toBeTruthy()
+    expect(screen.queryByRole('button', { name: reportUpdate })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: reportUpdate })).toBeNull()
+    await openMenu()
+    expect(screen.queryByRole('menuitem', { name: reportUpdate })).toBeNull()
   })
 })
 
@@ -311,18 +336,18 @@ describe('a project removed by the moderation, seen by its author', () => {
   })
 })
 
-describe('a note removed by the moderation, seen by the author of the project', () => {
-  it('keeps the note in the journal, with « Retiré par la modération » and why', async () => {
+describe('an update removed by the moderation, seen by the author of the project', () => {
+  it('keeps the update in its section, with « Retiré par la modération » and why', async () => {
     jest.mocked(getProject).mockResolvedValue({
-      ...recipesProject,
-      notes: [{ ...v2, removal: removalAfterReport }, firstVersion],
+      ...withUpdates,
+      latestUpdate: { ...rocketUpdate, removal: removalAfterReport },
     })
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    expect(await screen.findByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(await screen.findByText(rocketUpdate.title ?? '')).toBeTruthy()
     expect(screen.getAllByText(containing(fr.t(($) => $.removal.banner))).length).toBe(1)
     expect(missingSentences(removalSentences(removalAfterReport), screen)).toEqual([])
-    // L'autre note, visible, n'a pas de bandeau : un seul « Pour contester ».
+    // Le projet, lui, n'est pas retiré : un seul « Pour contester », celui de la mise à jour.
     expect(screen.getAllByText(containing(fr.t(($) => $.removal.contest)))).toHaveLength(1)
   })
 })
@@ -361,8 +386,8 @@ describe('a session that expired during two actions on the page', () => {
 // --- Tranche 7c : un compte suspendu (docs/scenarios/phase-1.md, « Un compte suspendu ») ---
 //
 // Le profil (GET /v1/me) dit si le compte est suspendu. Sur la page d'un projet, un membre suspendu
-// lit tout, mais ne modifie plus son projet, n'écrit plus de note, ne suit plus et ne réagit plus ;
-// il peut encore supprimer son projet et ses notes.
+// lit tout, mais ne modifie plus son projet, ne publie plus de mise à jour (une note avant R7a), ne
+// suit plus et ne réagit plus ; il peut encore supprimer son projet et ses mises à jour.
 describe('a project page seen by a suspended member', () => {
   beforeEach(() => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
@@ -374,21 +399,22 @@ describe('a project page seen by a suspended member', () => {
     expect(await screen.findByText(containing(fr.t(($) => $.suspension.title)))).toBeTruthy()
   })
 
-  it('offers the author neither to edit the project nor to write a note, but still to delete', async () => {
-    jest.mocked(getProject).mockResolvedValue(withNotes)
+  // R7a : « Publier une mise à jour » disparaît de la section et du menu ; la corbeille reste.
+  it('offers the author neither to edit the project nor to publish an update, but still to delete', async () => {
+    jest.mocked(getProject).mockResolvedValue(withUpdates)
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull())
-    expect(screen.queryByRole('button', { name: 'Publier une note' })).toBeNull()
-    expect(screen.queryByLabelText('Ta note')).toBeNull()
-    // Supprimer reste possible : chacune de ses notes, et le projet (R6a : par le menu « … », plus
+    expect(screen.queryByRole('button', { name: publishUpdate })).toBeNull()
+    // Supprimer reste possible : sa mise à jour, et le projet (R6a : par le menu « … », plus
     // par un bouton de la page ; voir « keeps Delete in the menu for a suspended author »).
-    expect(screen.getAllByRole('button', { name: 'Supprimer la note' })).toHaveLength(2)
+    expect(await deleteUpdateButton()).toBeTruthy()
     await openMenu()
     expect(screen.getByRole('menuitem', { name: 'Supprimer' })).toBeTruthy()
-    // Le journal reste lisible.
-    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: publishUpdate })).toBeNull()
+    // La mise à jour reste lisible.
+    expect(screen.getByText(rocketUpdate.title ?? '')).toBeTruthy()
   })
 
   // R6a (relecture du plan, jur-J1) : suspendu, l'auteur garde « Supprimer » au menu, sans
@@ -440,14 +466,14 @@ describe('a project page seen by a suspended member', () => {
   it('keeps every action for a member who is not suspended', async () => {
     // Témoin : Léa, pas suspendue, une fois son profil lu.
     jest.mocked(getMe).mockResolvedValue(leaMe)
-    jest.mocked(getProject).mockResolvedValue(withNotes)
+    jest.mocked(getProject).mockResolvedValue(withUpdates)
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     await act(async () => {})
     expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Publier une note' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: publishUpdate })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Écrire un commentaire' })).toBeTruthy()
     expect(screen.queryByText(containing(fr.t(($) => $.suspension.title)))).toBeNull()
   })
@@ -475,7 +501,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
   })
 
   it('lets her stop following a project she follows', async () => {
-    seenByOther({ ...withNotes, isFollowed: true })
+    seenByOther({ ...withUpdates, isFollowed: true })
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })
@@ -506,7 +532,7 @@ describe('a suspended member takes back what she gave, and gives nothing more', 
   // Relecture de design 7c : une fois le suivi retiré, l'interrupteur restait actif, et une seconde
   // tape envoyait un suivi que l'API refuse (403). Il reste à sa place, inactif.
   it('keeps « Follow this project » in place but inactive once she stopped following', async () => {
-    seenByOther({ ...withNotes, isFollowed: true })
+    seenByOther({ ...withUpdates, isFollowed: true })
     const { queryClient } = await renderWithProviders(<ProjectScreen id={id} />)
     // Le faux hook fait ce que fait le vrai au toucher : le projet n'est plus suivi, dans le cache.
     mockToggle.mockImplementation(() =>
@@ -578,17 +604,17 @@ describe('the windows of the project page, right after opening', () => {
     expect(screen.getByRole('header', { name: deleteTitle })).toBeTruthy()
   })
 
-  it('ignores a tap in the window to delete a note', async () => {
-    jest.mocked(getProject).mockResolvedValue(withNotes)
+  it('ignores a tap in the window to delete an update', async () => {
+    jest.mocked(getProject).mockResolvedValue(withUpdates)
     await renderWithProviders(<ProjectScreen id={id} />)
 
-    await fireEvent.press(await deleteButton(0))
+    await fireEvent.press(await deleteUpdateButton())
     await fireEvent.press(
-      dialogTitled('Supprimer cette note ?').getByRole('button', { name: 'Supprimer' }),
+      dialogTitled(deleteUpdateTitle).getByRole('button', { name: 'Supprimer' }),
     )
 
-    expect(mockRemove).not.toHaveBeenCalled()
-    expect(screen.getByRole('header', { name: 'Supprimer cette note ?' })).toBeTruthy()
+    expect(mockRemoveUpdate).not.toHaveBeenCalled()
+    expect(screen.getByRole('header', { name: deleteUpdateTitle })).toBeTruthy()
   })
 
   // R5b : « Supprimer » passe dans le menu « … » de chaque commentaire, dans la feuille (avant :

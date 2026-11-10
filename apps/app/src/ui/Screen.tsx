@@ -354,18 +354,22 @@ export function Screen({
   // La rangée du haut, hors du miel : le retour à gauche, l'action de la page à droite (R3, la roue
   // de « Moi » : avant, elle prenait une rangée sous le retour, 64 points plus bas). Sans action, le
   // retour seul, comme avant ; sans retour, l'action reste à droite.
+  // R7a (U4b) : une action en toutes lettres (« Suivre ce projet » de la frise) ne tient pas à côté du
+  // retour à 320 points et texte à 200 % : la rangée passe alors à la ligne, l'action reste à droite
+  // (`marginLeft: 'auto'`) et ne dépasse jamais la largeur de l'écran (`maxWidth`, `flexShrink`).
   const topRow =
     !brand && topAction ? (
       <View
         style={{
           flexDirection: 'row',
+          flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: backButton ? 'space-between' : 'flex-end',
           gap: space.sm,
         }}
       >
         {backButton}
-        {topAction}
+        <View style={{ marginLeft: 'auto', flexShrink: 1, maxWidth: '100%' }}>{topAction}</View>
       </View>
     ) : brand ? null : (
       backButton

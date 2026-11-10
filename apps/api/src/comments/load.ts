@@ -423,7 +423,7 @@ export const loadCommentPage = async (
   //       and <la réponse se montre> order by created_at, id limit 50
   //   ) shown
   //   where project_comment.id in (…)
-  // « lateral » (voir notes/load.ts) : pour chaque racine, l'index project_comment_root_created_idx
+  // « lateral » (voir latestUpdatesOf dans updates/load.ts) : pour chaque racine, l'index project_comment_root_created_idx
   // donne ses 50 premières réponses dans l'ordre, et PostgreSQL s'arrête là. Une racine sans
   // réponse ne donne aucune ligne.
   const repliesByRoot = new Map<string, CommentRow[]>()

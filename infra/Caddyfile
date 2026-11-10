@@ -86,6 +86,11 @@
 		#    infra/web/check-web.mjs fait échouer la construction tant qu'elle manque.
 		@project_edit path_regexp ^/projects/[^/.]+/edit$
 		rewrite @project_edit /projects/[id]/edit.html
+		# R7a : la feuille « Nouvelle mise à jour » et la frise des mises à jour.
+		@project_update path_regexp ^/projects/[^/.]+/update$
+		rewrite @project_update /projects/[id]/update.html
+		@project_updates path_regexp ^/projects/[^/.]+/updates$
+		rewrite @project_updates /projects/[id]/updates.html
 		@project path_regexp ^/projects/[^/.]+$
 		rewrite @project /projects/[id].html
 		@member path_regexp ^/members/[^/.]+$

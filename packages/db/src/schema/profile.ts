@@ -1,6 +1,5 @@
 // Le profil public d'un membre : bio, outils favoris, avatar.
 // Table séparée de `user` (gérée par Better Auth) : chacun ses colonnes, pas de mélange.
-import { sql } from 'drizzle-orm'
 import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
@@ -11,8 +10,8 @@ export const profile = pgTable('profile', {
     .primaryKey()
     .references(() => user.id, { onDelete: 'cascade' }),
   bio: text('bio').default('').notNull(),
-  // .array() : une colonne qui contient une liste de textes (type PostgreSQL text[]).
-  favoriteTools: text('favorite_tools').array().default(sql`'{}'::text[]`).notNull(),
+  // Les outils favoris ne sont plus ici : ils vivent dans profile_tool (R6b), et la colonne
+  // favorite_tools est effacée par la migration 0018 (R7a).
   // Nom du fichier de l'avatar dans le stockage (par ex. "3f2a….webp"), null s'il n'y en a pas.
   avatarKey: text('avatar_key'),
   updatedAt: timestamp('updated_at')

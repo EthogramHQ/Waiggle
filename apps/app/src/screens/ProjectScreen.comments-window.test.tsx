@@ -24,7 +24,7 @@ import {
   mockScreenProps,
   resetProjectScreenMocks,
   seenByOther,
-  withNotes,
+  withUpdates,
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -44,7 +44,11 @@ jest.mock('../members/api', () => ({
     isPending: false,
   }),
 }))
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
   useComments: jest.fn(),
@@ -113,7 +117,7 @@ const texts = fr.t(($) => $.project.comments, { returnObjects: true })
 
 describe('the caption of the comment field in a low window', () => {
   it('in a normal window, the whole sentence (témoin)', async () => {
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     windowOf(390, 844)
     await openOnPhone()
@@ -123,7 +127,7 @@ describe('the caption of the comment field in a low window', () => {
   })
 
   it('keeps the whole sentence at 600 points high, the lowest normal window', async () => {
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     windowOf(390, 600)
     await openOnPhone()
@@ -132,7 +136,7 @@ describe('the caption of the comment field in a low window', () => {
   })
 
   it('under 600 points high, only the sentence that says who will read', async () => {
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     windowOf(390, 599)
     await openOnPhone()
@@ -142,7 +146,7 @@ describe('the caption of the comment field in a low window', () => {
   })
 
   it('a reply in a low window has its short sentence', async () => {
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     windowOf(844, 390)
     await openOnPhone()
@@ -154,7 +158,7 @@ describe('the caption of the comment field in a low window', () => {
   })
 
   it('an edit in a low window has its short sentence', async () => {
-    seenByOther({ ...withNotes, commentCount: 1 })
+    seenByOther({ ...withUpdates, commentCount: 1 })
     mockComments([{ ...maxComment, isMine: true, replies: [] }])
     windowOf(844, 390)
     await openOnPhone()
@@ -166,7 +170,7 @@ describe('the caption of the comment field in a low window', () => {
   })
 
   it('the edit of a hidden comment keeps its whole sentence, even in a low window', async () => {
-    seenByOther({ ...withNotes, commentCount: 1 })
+    seenByOther({ ...withUpdates, commentCount: 1 })
     mockComments([{ ...maxComment, isMine: true, state: 'hidden', replies: [] }])
     windowOf(844, 390)
     await openOnPhone()
@@ -193,7 +197,7 @@ describe('the caption of the comment field in a low window', () => {
 
   it('in the column of a low window, the field scrolls with the page: the whole sentence', async () => {
     // La légende ne prend la place de rien : elle défile avec la page.
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     windowOf(1440, 500)
     await renderWithProviders(<ProjectScreen id={id} />)
@@ -216,7 +220,7 @@ describe('the banner of a reply', () => {
   it('on a computer, reminds the replied comment, whose card may be out of the window', async () => {
     const phone = setDesktopWindow()
     try {
-      seenByOther({ ...withNotes, commentCount: 2 })
+      seenByOther({ ...withUpdates, commentCount: 2 })
       mockComments([maxComment, zoeComment])
       await renderWithProviders(<ProjectScreen id={id} />)
       await screen.findByRole('header', { name: /^Commentaires/ })
@@ -232,7 +236,7 @@ describe('the banner of a reply', () => {
   })
 
   it('in the sheet of a phone, stays « Réponse à … » alone', async () => {
-    seenByOther({ ...withNotes, commentCount: 2 })
+    seenByOther({ ...withUpdates, commentCount: 2 })
     mockComments([maxComment, zoeComment])
     await openOnPhone()
 

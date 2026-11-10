@@ -399,8 +399,12 @@ describe('a suspended account', () => {
     later()
     await act.followMember(inesId, karim)
     later()
-    const note = await act.send('POST', `/v1/projects/${karimProject.id}/notes`, karim, {
-      body: 'Une note de suivi.',
+    const note = await act.send('POST', `/v1/projects/${karimProject.id}/updates`, karim, {
+      title: null,
+      version: null,
+      lines: [{ family: 'new', text: 'Une mise à jour de suivi.' }],
+      photos: [],
+      beforeAfter: false,
     })
     expect(note.status).toBe(201)
     karimNoteId = ((await note.json()) as { id: string }).id
@@ -419,7 +423,7 @@ describe('a suspended account', () => {
     ['PUT', `/v1/projects/${inesProject.id}/reactions/amazing`],
     ['POST', `/v1/members/${inesId}/follow`],
     ['POST', `/v1/projects/${inesProject.id}/follow`],
-    ['POST', `/v1/projects/${karimProject.id}/notes`],
+    ['POST', `/v1/projects/${karimProject.id}/updates`],
     ['POST', `/v1/projects/${karimProject.id}/visuals`],
     ['POST', '/v1/me/avatar'],
   ]
@@ -470,12 +474,12 @@ describe('a suspended account', () => {
     }
   })
 
-  it('still deletes its comments, reactions, follows, notes and projects', async () => {
+  it('still deletes its comments, reactions, follows, updates and projects', async () => {
     const gestures: [string, string][] = [
       ['DELETE', `/v1/projects/${inesProject.id}/comments/${karimComment.id}`],
       ['DELETE', `/v1/projects/${inesProject.id}/reactions/bravo`],
       ['DELETE', `/v1/members/${inesId}/follow`],
-      ['DELETE', `/v1/projects/${karimProject.id}/notes/${karimNoteId}`],
+      ['DELETE', `/v1/projects/${karimProject.id}/updates/${karimNoteId}`],
       ['DELETE', `/v1/projects/${karimProject.id}`],
     ]
     for (const [method, path] of gestures) {
@@ -931,12 +935,12 @@ describe('leaving during a suspension', () => {
     // La purge note ses nombres dans les journaux : on les tait le temps du test.
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     try {
-      await nightlyPurge(ctx.db, new Date(purgedAt))
+      await nightlyPurge(ctx.db, new Date(purgedAt), ctx.storage)
 
       expect(await suspensionRows()).toEqual([
         { user_id: null, ended: purgedAt, lift_decision_id: null },
       ])
-      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY))
+      await nightlyPurge(ctx.db, new Date(purgedAt + 366 * DAY), ctx.storage)
       expect(await suspensionRows()).toEqual([])
     } finally {
       log.mockRestore()

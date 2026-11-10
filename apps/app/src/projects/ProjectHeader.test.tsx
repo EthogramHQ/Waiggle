@@ -20,6 +20,7 @@ import { pathOf } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing } from '../testing/text'
+import { rocketUpdate } from '../testing/updates'
 import { ProjectHeader } from './ProjectHeader'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -194,13 +195,27 @@ describe('the dates under the title', () => {
     expect(screen.queryByText(/Mis à jour/)).toBeNull()
   })
 
-  it('adds « Mis à jour » after a later change', async () => {
+  // R7a : « Mis à jour » suit la dernière mise à jour publiée, plus une modification du projet.
+  it('adds « Mis à jour » after an update, and not after a change of the project', async () => {
+    await renderWithProviders(
+      <ProjectHeader
+        project={{ ...seenByMax, latestUpdate: rocketUpdate, updateCount: 1, version: 'v1.2' }}
+        now={now}
+      />,
+    )
+
+    expect(await screen.findByText('Publié le 12 oct.')).toBeTruthy()
+    expect(screen.getByText(containing('Mis à jour hier'))).toBeTruthy()
+    expect(screen.getByText(containing('v1.2'))).toBeTruthy()
+  })
+
+  it('says nothing of a change of the project without an update', async () => {
     await renderWithProviders(
       <ProjectHeader project={{ ...seenByMax, updatedAt: '2026-10-19T09:00:00.000Z' }} now={now} />,
     )
 
     expect(await screen.findByText('Publié le 12 oct.')).toBeTruthy()
-    expect(screen.getByText('Mis à jour hier')).toBeTruthy()
+    expect(screen.queryByText(/Mis à jour/)).toBeNull()
   })
 
   it('says « Créé » for a private project', async () => {

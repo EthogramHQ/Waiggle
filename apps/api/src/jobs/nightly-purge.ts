@@ -12,7 +12,8 @@
 //   (tranche 7a, reports/retention.ts) ;
 // - les « Autre » (noms d'outils tapés par des membres) que plus rien ne cite, et les lignes du
 //   journal du catalogue de plus d'un an (tranche R6b) ; les « Autre » laissés hors du catalogue
-//   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5).
+//   depuis plus d'un an, quand plus rien ne les cite (relecture juridique jur-J5) ;
+// - les photos de mise à jour restées « en attente » plus de 24 heures (R7a), ligne et fichier.
 // Elle clôt aussi les suspensions restées ouvertes d'un compte parti (tranche 7c), avant de purger.
 // Elle rend le nombre de lignes effacées de chaque sorte, et le note dans les journaux.
 //
@@ -24,6 +25,7 @@ import { type Database, schema } from '@ruche/db'
 import { and, eq, lt, sql } from 'drizzle-orm'
 import { AUTH_RATE_WINDOW_MAX_MS } from '../auth/auth'
 import { purgeExpiredHandles } from '../handles/claim'
+import type { FileStorage } from '../media/storage'
 import { utc } from '../notifications/load'
 import { RATE_WINDOW_MAX_MS } from '../rate-limit'
 import { purgeModeration } from '../reports/retention'
@@ -37,8 +39,10 @@ const DAY = 24 * HOUR
 // la suit d'elle-même.
 /** Nos compteurs : la plus longue fenêtre, plus une heure de marge. */
 const API_RATE_KEEP_MS = RATE_WINDOW_MAX_MS + HOUR
+/** Une photo téléversée pour une mise à jour jamais publiée : gardée 24 heures. */
+const PENDING_PHOTO_KEEP_MS = DAY
 
-export const nightlyPurge = async (db: Database, now: Date) => {
+export const nightlyPurge = async (db: Database, now: Date, storage: FileStorage) => {
   // Chaque « delete … returning » rend les lignes effacées : leur nombre est le résultat.
   // Les tables session et verification sont petites (une ligne par appareil connecté, par lien
   // envoyé) : une lecture complète, une fois par nuit, coûte peu. Un index sur expires_at le
@@ -113,7 +117,32 @@ export const nightlyPurge = async (db: Database, now: Date) => {
     .where(sql`${schema.catalogueChange.createdAt} < ${utc(new Date(now.getTime() - 365 * DAY))}`)
     .returning({ id: schema.catalogueChange.id })
 
+  // R7a (sécurité A5) : les photos « en attente » (slot 'update', jamais rattachées à une mise à
+  // jour) de plus de 24 heures : téléversées, mais la mise à jour n'a pas été publiée. La ligne
+  // s'efface d'abord (`returning` rend la clé du fichier), puis le fichier : une panne entre les deux
+  // laisse un fichier orphelin, jamais une ligne qui montre un fichier absent. Lecture par l'index
+  // partiel project_media_pending_idx (seulement ces photos). Une erreur d'effacement d'un fichier
+  // est notée avec sa clé, et la purge continue avec les suivants.
+  const pendingPhotos = await db
+    .delete(schema.projectMedia)
+    .where(
+      and(
+        eq(schema.projectMedia.slot, 'update'),
+        sql`${schema.projectMedia.updateId} is null`,
+        sql`${schema.projectMedia.createdAt} < ${utc(new Date(now.getTime() - PENDING_PHOTO_KEEP_MS))}`,
+      ),
+    )
+    .returning({ storageKey: schema.projectMedia.storageKey })
+  for (const { storageKey } of pendingPhotos) {
+    try {
+      await storage.delete(storageKey)
+    } catch (error) {
+      console.error('Nightly purge: a pending photo file could not be erased', storageKey, error)
+    }
+  }
+
   const purged = {
+    pendingPhotos: pendingPhotos.length,
     sessions: sessions.length,
     verifications: verifications.length,
     rateLimits: rateLimits.length,

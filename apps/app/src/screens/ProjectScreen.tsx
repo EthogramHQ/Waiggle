@@ -19,19 +19,14 @@
 //   actions et recette ; puis description, prompt, journal et « Signaler » | commentaires). Le
 //   clavier et le lecteur d'écran passent ainsi par « Suivre » et les réactions avant la
 //   description, au lieu de tout le contenu de gauche d'abord.
-// Le journal (tranche 4b) : les notes de l'auteur ; après un changement de statut, le formulaire le
-// ramène ici avec « ?announce=<statut> », et une note toute prête l'attend dans le champ.
+// « Les mises à jour » (R7a, projects/ProjectUpdatesSection.tsx) remplacent le journal des notes :
+// la dernière en entier, la frise, et la feuille « Nouvelle mise à jour » de l'auteur (aussi dans
+// son menu « … »). Après un changement de statut, le formulaire le ramène ici avec
+// « ?announce=<statut> », et la feuille s'ouvre, toute prête.
 // Un compte suspendu (tranche 7c) lit la page entière ; il ne garde que supprimer, ne plus suivre et
 // retirer ses réactions. Le bandeau qui le lui dit vient de la barre du haut (TopNav).
-import {
-  NoteText,
-  PROJECT_NOTE_MAX,
-  type Project,
-  ProjectStatus,
-  REACTION_KINDS,
-  type ReactionKind,
-} from '@ruche/contracts'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { type Project, REACTION_KINDS, type ReactionKind } from '@ruche/contracts'
+import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMemberSession } from '../accounts/session'
@@ -39,31 +34,25 @@ import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
 import { useSuspension } from '../moderation/suspension'
 import { useOpenDemo, useOpenOutside } from '../navigation/links'
-import { firstParam } from '../navigation/params'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
-import { type NoteFailure, useDeleteNote, usePublishNote } from '../notes/api'
 import { DeleteProjectDialog } from '../projects/DeleteProjectDialog'
 import { useProject } from '../projects/hooks'
 import { startedMonth } from '../projects/month'
 import { ProjectActions } from '../projects/ProjectActions'
 import { ProjectHeader } from '../projects/ProjectHeader'
+import { ProjectUpdatesSection, useUpdateSheet } from '../projects/ProjectUpdatesSection'
 import { useReaction } from '../reactions/api'
 import { removalBanner } from '../reports/removal'
 import { ActionMenu, type ActionMenuItem } from '../ui/ActionMenu'
-import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
 import { copyText } from '../ui/clipboard'
 import { CoverArrival, CoverFade, useCoverTarget } from '../ui/coverTransition'
-import { Dialog } from '../ui/Dialog'
 import { DIFFICULTY_DOTS } from '../ui/difficultyDots'
 import type { Focusable } from '../ui/focus'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
-import { NoteComposer } from '../ui/NoteComposer'
-import { NoteList, type NoteListHandle } from '../ui/NoteList'
-import { Notice } from '../ui/Notice'
 import { OwnReactions } from '../ui/OwnReactions'
 import { PhotoGallery } from '../ui/PhotoGallery'
 import { CoverControls, CoverSheet, CoverStraddle } from '../ui/ProjectCover'
@@ -71,7 +60,6 @@ import { PromptBlock } from '../ui/PromptBlock'
 import { ReactionCapsule } from '../ui/ReactionCapsule'
 import { ReactionFan } from '../ui/ReactionFan'
 import { RecipeFact } from '../ui/RecipeFact'
-import { RelativeTime } from '../ui/RelativeTime'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { Screen } from '../ui/Screen'
 import { ShareSheet } from '../ui/ShareSheet'
@@ -82,7 +70,6 @@ import { shareUrl } from '../ui/share'
 import { Tag } from '../ui/Tag'
 import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
-import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useToast } from '../ui/theme/toast'
 import { Comments } from './ProjectComments'
@@ -241,8 +228,14 @@ function ProjectView({ project }: { project: Project }) {
   // tous les autres. Ni « Partager » ni « Copier le lien », qui promettraient le contraire
   // (« seuls les membres pourront l'ouvrir » ; décision de Louis du 2/11/2026).
   const shareable = !project.removal
-  // Le menu « … » : copier le lien, puis signaler (un autre membre) ou, pour l'auteur, modifier
-  // (sauf projet retiré par la modération ou compte suspendu : l'API refuserait) et supprimer.
+  // R7a : la feuille « Nouvelle mise à jour » (sa propre adresse), ouverte par la section, par le
+  // menu « … », ou d'elle-même au retour de « Modifier » avec un nouveau statut (?announce=). Mêmes
+  // conditions que « Modifier » : l'API refuserait un projet retiré ou un compte suspendu.
+  const canPublish = project.isMine && !project.removal && !suspended
+  const updateSheet = useUpdateSheet(project.id, canPublish)
+  // Le menu « … » : copier le lien, puis signaler (un autre membre) ou, pour l'auteur, modifier et
+  // publier une mise à jour (sauf projet retiré par la modération ou compte suspendu : l'API
+  // refuserait) et supprimer.
   // R6a (relecture du plan, jur-J1) : « Supprimer » y est pour **tout** auteur, même d'un projet
   // retiré ou pendant une suspension ; c'est son seul geste alors, et le menu se dessine pour lui.
   // En rouge et en dernier : l'action qui ne se défait pas, loin du doigt qui cherche « Modifier ».
@@ -259,6 +252,12 @@ function ProjectView({ project }: { project: Project }) {
                   label: t(($) => $.project.page.edit),
                   icon: 'pencil-simple' as const,
                   onPress: edit,
+                },
+                {
+                  label: t(($) => $.project.updates.add),
+                  icon: 'megaphone-simple' as const,
+                  // Au retour de la feuille, le focus revient au bouton « … ».
+                  onPress: () => updateSheet.open(menuRef),
                 },
               ]),
           {
@@ -438,10 +437,12 @@ function ProjectView({ project }: { project: Project }) {
   // Le prompt de départ et les autres (repliés). Sans prompt, rien : pas même une place vide.
   const prompt = project.prompts.length > 0 ? <PromptBlock prompts={project.prompts} /> : null
 
-  // Le journal : pour un autre membre, seulement s'il y a des notes à lire.
+  // R7a : « Les mises à jour », à la place du journal des notes. Pour un autre membre, seulement
+  // s'il y a une mise à jour à lire (décidé ici : `faded` envelopperait sinon une place vide, qui
+  // ajouterait un écart à la colonne).
   const journal =
-    project.isMine || project.notes.length > 0 ? (
-      <Journal project={project} suspended={suspended} />
+    project.isMine || project.latestUpdate ? (
+      <ProjectUpdatesSection project={project} canPublish={canPublish} sheet={updateSheet} />
     ) : null
   // Les commentaires : pour tous ceux qui voient le projet, l'auteur compris.
   const comments = <Comments project={project} />
@@ -617,273 +618,5 @@ function ProjectView({ project }: { project: Project }) {
       {bleed ? <CoverSheet>{page}</CoverSheet> : page}
       {layers}
     </Screen>
-  )
-}
-
-/**
- * Le journal du projet : ses notes et, pour l'auteur, de quoi en publier ou en supprimer une. Un
- * composant à part : ses états (le texte en cours, la note à supprimer) ne redessinent pas toute la
- * page à chaque lettre tapée.
- */
-function Journal({ project, suspended }: { project: Project; suspended: boolean }) {
-  const { t } = useTranslation()
-  const publishNote = usePublishNote(project.id)
-  const deleteNote = useDeleteNote(project.id)
-  const signInAgain = useSignInAgain()
-  // Le champ « Ta note » : ouvert ou non, son texte, et le problème du texte s'il y en a un.
-  const [composing, setComposing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [draftError, setDraftError] = useState<string | undefined>()
-  // Le texte à jour, lu à la fin d'un envoi (la fonction en cours ne voit que l'ancien).
-  const latestDraft = useRef(draft)
-  const changeDraft = (text: string) => {
-    latestDraft.current = text
-    setDraft(text)
-    // Le texte a changé : l'ancien reproche (« Écris ta note… ») ne vaut plus.
-    setDraftError(undefined)
-  }
-  // La confirmation affichée : « Note publiée. » ou « Note supprimée. », jusqu'au geste suivant.
-  const [done, setDone] = useState<'published' | 'deleted' | null>(null)
-  // Le statut annoncé par le formulaire (?announce=) : l'aide du champ dit pourquoi il est ouvert.
-  const [announcing, setAnnouncing] = useState<ProjectStatus | null>(null)
-  // Deux appuis dans le même instant arrivent avant que le bouton ne passe en « en cours » : ce
-  // drapeau, posé au premier, fait ignorer le second (une seule note publiée).
-  const sending = useRef(false)
-  // La note dont on demande confirmation de la suppression, et sa place dans le journal.
-  const [deleting, setDeleting] = useState<{ id: string; index: number } | null>(null)
-  const [removing, setRemoving] = useState(false)
-  // Les erreurs de React Query restent jusqu'au prochain envoi : on ne les montre qu'après un envoi,
-  // et on les cache dès qu'on rouvre le champ ou une nouvelle confirmation.
-  const [showPublishError, setShowPublishError] = useState(false)
-  const [showDeleteError, setShowDeleteError] = useState(false)
-  // Une fois la note supprimée et la fenêtre refermée, le focus va sur la note qui a pris sa place.
-  const router = useRouter()
-  const notesHandle = useRef<NoteListHandle>(null)
-  const focusAfterClose = useRef<number | null>(null)
-  // « Annuler » de la fenêtre de suppression d'une note reçoit le focus à l'ouverture (H3).
-  const cancelDeleteRef = useRef<Focusable>(null)
-
-  // Arrivé du formulaire après un changement de statut (?announce=testable) : le champ s'ouvre avec
-  // une note toute prête (« Le projet passe en « Testable ». »). Seulement pour l'auteur, et
-  // seulement pour un vrai statut : une adresse fabriquée ne glisse rien dans son champ. L'adresse
-  // n'est connue que dans le navigateur : on attend d'y être (voir ui/theme/hydration.ts).
-  const announced = firstParam(useLocalSearchParams<{ announce?: string | string[] }>().announce)
-  const hydrated = useHydrated()
-  // Le statut déjà proposé : changer de langue ensuite ne réécrit pas le champ.
-  const proposed = useRef<string | null>(null)
-  useEffect(() => {
-    if (!hydrated || !project.isMine || proposed.current === announced) return
-    const status = ProjectStatus.safeParse(announced)
-    if (!status.success) return
-    proposed.current = status.data
-    const text = t(($) => $.project.notes.statusPrefill, {
-      status: t(($) => $.project.status[status.data]),
-    })
-    latestDraft.current = text
-    setDraft(text)
-    setAnnouncing(status.data)
-    setComposing(true)
-    setDone(null)
-    // On retire le paramètre de l'adresse : recharger la page ne rouvre pas le champ.
-    router.setParams?.({ announce: undefined })
-  }, [hydrated, project.isMine, announced, t, router])
-
-  const submit = async () => {
-    if (sending.current) return
-    // La même règle que l'API (packages/contracts) : un texte non vide, sans caractères invisibles.
-    const checked = NoteText.safeParse(draft)
-    if (!checked.success) {
-      setDraftError(
-        draft.trim() === ''
-          ? t(($) => $.project.notes.required)
-          : t(($) => $.project.errors.invalidCharacters),
-      )
-      return
-    }
-    setDraftError(undefined)
-    sending.current = true
-    setShowPublishError(true)
-    const sent = draft
-    const ok = await publishNote.publish(checked.data)
-    sending.current = false
-    // Refusée : le texte reste dans le champ, et l'erreur s'affiche (publishNote.error).
-    if (!ok) return
-    // Publiée. Si le texte a changé entre-temps, c'est une autre note qui commence : on la garde.
-    if (latestDraft.current !== sent) return
-    changeDraft('')
-    setComposing(false)
-    setAnnouncing(null)
-    setDone('published')
-  }
-
-  const confirmDelete = async () => {
-    if (!deleting || removing) return
-    setRemoving(true)
-    setShowDeleteError(true)
-    const ok = await deleteNote.remove(deleting.id)
-    setRemoving(false)
-    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!ok) return
-    // Supprimée : son bouton n'existe plus ; le focus ira sur sa voisine, une fois la fenêtre
-    // refermée. « Note supprimée. » le confirme.
-    focusAfterClose.current = deleting.index
-    setDone('deleted')
-    setDeleting(null)
-  }
-
-  // Le message d'un envoi refusé. 429 et 401 : « Réessaie » ne servirait à rien, on dit pourquoi.
-  const failure = (reason: NoteFailure | undefined, otherwise: string) =>
-    reason === 'limited'
-      ? t(($) => $.project.notes.limited)
-      : reason === 'expired'
-        ? t(($) => $.states.expired)
-        : otherwise
-  // Le lien « Me reconnecter » qui accompagne « Ta session a expiré » ; `before` referme ce qui
-  // doit l'être avant de partir (la fenêtre de confirmation).
-  const failureAction = (reason: NoteFailure | undefined, before?: () => void) =>
-    reason === 'expired' ? signInAgain(before) : undefined
-
-  const list = (
-    <NoteList
-      handle={notesHandle}
-      notes={project.notes.map((note) => ({
-        id: note.id,
-        body: note.body,
-        // « il y a 2 h », « hier » : une vue à la place du texte de la date (R4).
-        when: <RelativeTime date={note.createdAt} />,
-        // Une note retirée par la modération (tranche 7a) n'arrive qu'à l'auteur du projet : il
-        // lit pourquoi, au-dessus de son texte.
-        removed: note.removal ? removalBanner(note.removal, t) : undefined,
-      }))}
-      {...(project.isMine
-        ? {
-            onDelete: (id: string) => {
-              setShowDeleteError(false)
-              setDone(null)
-              setDeleting({ id, index: project.notes.findIndex((note) => note.id === id) })
-            },
-            deleteLabel: t(($) => $.project.notes.delete),
-            // RF (T11, T16) : le même état vide, public ou privé ; qui lira la note, c'est l'aide
-            // du champ qui le dit (`hintPrivate` sur un projet privé, jur-RF6).
-            empty: t(($) => $.project.notes.empty),
-          }
-        : {
-            // Un autre membre peut signaler chaque note (tranche 7a).
-            onReport: (id: string) =>
-              router.push({ pathname: '/report', params: { kind: 'note', id } }),
-            reportLabel: t(($) => $.report.note),
-          })}
-    />
-  )
-  const empty = project.notes.length === 0
-
-  return (
-    <Surface variant="grouped" padding="xl" gap="lg">
-      <Text variant="heading" heading={2}>
-        {t(($) => $.project.notes.title)}
-      </Text>
-      {/* Un journal vide : l'invitation d'abord, puis le bouton qui y répond. */}
-      {empty ? list : null}
-      {/* Un projet retiré par la modération ne reçoit plus de note (l'API refuserait, 409
-          `removed`) : le champ disparaît jusqu'à un rétablissement. Un compte suspendu n'en
-          publie pas non plus (tranche 7c) ; il peut encore supprimer les siennes. */}
-      {project.isMine && !project.removal && !suspended ? (
-        <NoteComposer
-          open={composing}
-          onOpen={() => {
-            setDone(null)
-            setShowPublishError(false)
-            setComposing(true)
-          }}
-          onCancel={() => {
-            setComposing(false)
-            setDraftError(undefined)
-            setShowPublishError(false)
-            setAnnouncing(null)
-          }}
-          value={draft}
-          onChangeText={changeDraft}
-          onSubmit={() => void submit()}
-          pending={publishNote.pending}
-          max={PROJECT_NOTE_MAX}
-          labels={{
-            open: t(($) => $.project.notes.add),
-            field: t(($) => $.project.notes.field),
-            // L'aide dit à qui ira la note : à personne d'autre (projet privé), aux abonnés après
-            // un changement de statut (et pourquoi le champ s'est ouvert tout seul), sinon l'usage.
-            hint:
-              project.visibility === 'private'
-                ? t(($) => $.project.notes.hintPrivate)
-                : announcing
-                  ? t(($) => $.project.notes.hintAnnounce, {
-                      status: t(($) => $.project.status[announcing]),
-                    })
-                  : t(($) => $.project.notes.hint),
-            submit: t(($) => $.project.notes.submit),
-            cancel: t(($) => $.common.cancel),
-          }}
-          fieldError={draftError}
-          error={
-            showPublishError && publishNote.error
-              ? failure(
-                  publishNote.reason,
-                  t(($) => $.project.notes.error),
-                )
-              : undefined
-          }
-          errorAction={
-            showPublishError && publishNote.error ? failureAction(publishNote.reason) : undefined
-          }
-          success={done === 'published' ? t(($) => $.project.notes.published) : undefined}
-        />
-      ) : null}
-      {/* Après une suppression : la confirmation, lue sans interrompre (role « status »). */}
-      {done === 'deleted' ? (
-        <Notice tone="success" message={t(($) => $.project.notes.deleted)} polite />
-      ) : null}
-      {empty ? null : list}
-      {/* Supprimer une note est définitif : une fenêtre demande confirmation. */}
-      <Dialog
-        visible={deleting !== null}
-        guardTaps
-        title={t(($) => $.project.notes.deleteTitle)}
-        message={t(($) => $.project.notes.deleteBody)}
-        initialFocusRef={cancelDeleteRef}
-        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-        onDismiss={() => {
-          if (!removing) setDeleting(null)
-        }}
-        onClosed={() => {
-          const index = focusAfterClose.current
-          focusAfterClose.current = null
-          // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
-          if (index !== null) requestAnimationFrame(() => notesHandle.current?.focusAt(index))
-        }}
-      >
-        {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer. */}
-        {showDeleteError && deleteNote.error ? (
-          <Notice
-            message={failure(
-              deleteNote.reason,
-              t(($) => $.project.notes.deleteError),
-            )}
-            action={failureAction(deleteNote.reason, () => setDeleting(null))}
-          />
-        ) : null}
-        <Button
-          label={t(($) => $.project.notes.confirmDelete)}
-          variant="confirm"
-          onPress={() => void confirmDelete()}
-          loading={removing}
-        />
-        <Button
-          ref={cancelDeleteRef}
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => setDeleting(null)}
-          disabled={removing}
-        />
-      </Dialog>
-    </Surface>
   )
 }

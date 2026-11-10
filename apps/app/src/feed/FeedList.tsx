@@ -12,7 +12,6 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
-import { FeedNoteCard } from '../notes/FeedNoteCard'
 import { SummaryCard } from '../projects/SummaryCard'
 import { Arrival } from '../ui/Arrival'
 import { FeedEnd, useFirstArrived } from '../ui/FeedEnd'
@@ -176,7 +175,7 @@ type FeedListProps = {
    * l'écran le pose ailleurs (le Fil sur ordinateur, à côté de son titre).
    */
   news?: ReactNode
-  /** Ce qui se pose sur la photo de la carte d'un projet (pas sur celle d'une note). */
+  /** Ce qui se pose sur la photo de la carte d'un projet. */
   overlay?: ((project: ProjectSummary) => ReactNode) | undefined
   /** Le nombre de colonnes de la grille, imposé par l'écran (voir ProjectGrid). */
   columns?: number | undefined
@@ -247,7 +246,7 @@ export function FeedList({
   const { t } = useTranslation()
   // La lumière suit la carte du milieu de l'écran (R4). Ce hook s'appelle ici, dans un enfant de
   // Screen, jamais dans le corps de l'écran : la lumière d'ambiance est fournie par Screen
-  // (relecture de l'interface, ui-B5). Le résumé flou d'une note est celui de son projet.
+  // (relecture de l'interface, ui-B5).
   const { cardRef } = useScrollLight(
     items.map((item) => ({ id: feedItemId(item), thumbhash: item.project.cover?.thumbhash })),
   )
@@ -269,13 +268,14 @@ export function FeedList({
         arriving={arrivals.has(id)}
         focusRef={id === firstArrivedId ? lastPage.ref : undefined}
       >
-        {/* Un nouveau projet : sa carte ; la note d'un projet suivi : une carte de note, plus
-            discrète, qui mène elle aussi au projet. */}
-        {item.kind === 'note' ? (
-          <FeedNoteCard note={item.note} project={item.project} />
-        ) : (
-          <SummaryCard project={item.project} at={item.at} overlay={overlay?.(item.project)} />
-        )}
+        {/* Un nouveau projet, ou un projet remonté par sa mise à jour (R7a) : la même carte, qui
+            montre « Mis à jour · v1.2 » quand elle reçoit la mise à jour. */}
+        <SummaryCard
+          project={item.project}
+          at={item.at}
+          overlay={overlay?.(item.project)}
+          {...(item.kind === 'update' ? { update: item.update } : null)}
+        />
       </Arrival>
     )
   }

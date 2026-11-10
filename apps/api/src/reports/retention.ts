@@ -99,7 +99,7 @@ export const purgeModeration = async (db: Database, now: Date) => {
         and not exists (
           select 1 from project p where p.id = ${id} and p.removal_id = moderation_decision.id)
         and not exists (
-          select 1 from project_note n where n.id = ${id} and n.removal_id = moderation_decision.id)
+          select 1 from project_update u where u.id = ${id} and u.removal_id = moderation_decision.id)
         and not exists (
           select 1 from project_comment c where c.id = ${id} and c.removal_id = moderation_decision.id)
         and not exists (

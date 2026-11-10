@@ -83,15 +83,4 @@ describe('the texts that use nameOf', () => {
       'See Inès’s page',
     )
   })
-
-  it('writes the label of a note in the feed in both languages', () => {
-    const params = (language: 'fr' | 'en') => ({
-      nameOf: nameOf(language, 'Inès'),
-      title: 'Météo',
-    })
-    expect(fill(resources.fr.translation.feed.noteLabel, params('fr'))).toBe(
-      'Note d’Inès sur Météo',
-    )
-    expect(fill(resources.en.translation.feed.noteLabel, params('en'))).toBe('Inès’s note on Météo')
-  })
 })

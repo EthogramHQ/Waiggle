@@ -632,18 +632,112 @@ try {
   expectEqual('avatar de Léa, pour Sam', await statusFor(sam, avatarUrl), 200)
   expectEqual('avatar de Léa, sans compte', await statusFor(visitor, avatarUrl), 404)
 
-  step('Sam suit le projet ; Léa publie une note, qui arrive dans le fil de Sam')
+  // R7a : les testeurs et les mises à jour. Sam suit le projet et devient testeur ; Léa publie une
+  // mise à jour (deux lignes, deux photos en avant / après) ; Sam voit la cloche, compare au clavier,
+  // puis quitte les testeurs.
+  step('Sam suit le projet, qui devient « Testable », et devient testeur')
   await open(sam.page, `${appUrl}/projects/${projectId}`)
   await byRole(sam.page, 'switch', 'Suivre ce projet').click()
   await byRole(sam.page, 'switch', 'Projet suivi', { checked: true }).waitFor()
+  // Le statut se change par l'API (le formulaire de modification est couvert plus haut) : « Rejoindre
+  // les testeurs » n'existe que pour un projet « Testable » qui a une démo.
+  const testable = await lea.request.patch(`${apiUrl}/v1/projects/${projectId}`, {
+    headers: { Origin: appUrl },
+    data: { status: 'testable' },
+  })
+  expectEqual('statut changé', testable.status(), 200)
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await byRole(sam.page, 'button', 'Rejoindre les testeurs').click()
+  await sam.page.getByRole('heading', { name: 'Rejoindre les testeurs', exact: true }).waitFor()
+  await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+  await byRole(sam.page.getByRole('dialog'), 'button', 'Rejoindre les testeurs').click()
+  await byRole(sam.page, 'button', 'Tu testes ce projet').waitFor()
+  await waitFor(
+    'inscription aux testeurs enregistrée',
+    async () => (await readProject(sam, projectId)).isTester === true,
+  )
+  console.log('  ok : Sam est testeur du projet de Léa')
+
+  step('Léa publie une mise à jour : deux lignes, deux photos en avant / après')
   await open(lea.page, `${appUrl}/projects/${projectId}`)
-  await byRole(lea.page, 'button', 'Publier une note').click()
-  await lea.page.getByLabel('Ta note').fill('Nouvelle version : il propose aussi un dessert.')
-  await byRole(lea.page, 'button', 'Publier la note').click()
-  await lea.page.getByText('Note publiée.').waitFor()
+  await byRole(lea.page, 'button', 'Publier une mise à jour').first().click()
+  await lea.page.waitForURL(/\/update$/)
+  await lea.page.getByLabel('Titre, facultatif').fill('Le dessert')
+  await lea.page.getByLabel('Numéro de version, facultatif').fill('v1.2')
+  await lea.page.getByLabel(/^Changement 1 sur /).fill('Il propose aussi un dessert')
+  await byRole(lea.page, 'button', 'Ajouter une ligne').click()
+  await lea.page.getByLabel(/^Changement 2 sur /).fill('Les quantités se calculent par personne')
+  // La famille de la deuxième ligne : « Réparé » (une des trois que propose le bouton rond).
+  await lea.page
+    .getByRole('button', { name: /^Famille : /, exact: false })
+    .nth(1)
+    .click()
+  await byRole(lea.page, 'menuitemradio', 'Réparé').click()
+  // Deux photos, une à une (comme pour le projet : on attend la vignette avant la suivante).
+  const addUpdatePhoto = lea.page.getByRole('button', { name: /^Ajouter des photos|choisis-les/ })
+  for (const [n, color] of [
+    [1, [200, 120, 60]],
+    [2, [60, 140, 200]],
+  ]) {
+    await pick(lea.page, addUpdatePhoto.first(), image(`maj-${n}`, 1200, 800, color))
+    await byRole(lea.page, 'button', `Retirer la photo ${n}`).waitFor()
+  }
+  // La vignette paraît dès le choix, avant la fin de l'envoi : « Publier » trop tôt répond
+  // « Attends la fin de l'envoi des photos. ». On attend que plus aucune ne s'envoie.
+  await waitFor('photos de la mise à jour envoyées', async () => {
+    const sending = lea.page.getByRole('progressbar', { name: /^Envoi de la photo/ })
+    return (await sending.count()) === 0
+  })
+  await byRole(lea.page, 'switch', 'Avant / après').click()
+  await byRole(lea.page, 'button', 'Publier', { exact: true }).last().click()
+  await lea.page.getByText('Mise à jour publiée.').waitFor()
+  await waitFor('mise à jour enregistrée', async () => {
+    const res = await lea.request.get(`${apiUrl}/v1/projects/${projectId}/updates`)
+    const { items } = await res.json()
+    return items.length === 1 && items[0].beforeAfter === true && items[0].photos.length === 2
+  })
+  console.log('  ok : la mise à jour de Léa est publiée, avec son avant / après')
+
+  step('Sam voit la cloche s’allumer, ouvre la frise et compare au clavier')
   await open(sam.page, `${appUrl}/`)
-  await byRole(sam.page, 'link', 'Note de Lea sur Mon agent de recettes').waitFor()
-  console.log('  ok : la note de Léa est dans le fil de Sam')
+  await byRole(sam.page, 'button', /^Notifications, \d+ nouvelles?$/)
+    .first()
+    .click()
+  await byRole(
+    sam.page,
+    'link',
+    /a publié une mise à jour de « Mon agent de recettes » · v1\.2/,
+  ).click()
+  await sam.page.waitForURL(`**/projects/${projectId}/updates`)
+  // Le curseur « Avant / après » : 50 au départ ; la flèche droite ajoute 10, Fin va au bout.
+  const compare = byRole(sam.page, 'slider', 'Comparer avant et après')
+  await compare.waitFor()
+  expectEqual('curseur au départ', await compare.getAttribute('aria-valuenow'), '50')
+  await compare.focus()
+  await sam.page.keyboard.press('ArrowRight')
+  await waitFor(
+    'curseur déplacé',
+    async () => (await compare.getAttribute('aria-valuenow')) === '60',
+  )
+  await sam.page.keyboard.press('End')
+  await waitFor(
+    'curseur au bout',
+    async () => (await compare.getAttribute('aria-valuenow')) === '100',
+  )
+  console.log('  ok : Sam a comparé l’avant et l’après au clavier')
+
+  step('Sam quitte les testeurs')
+  await open(sam.page, `${appUrl}/projects/${projectId}`)
+  await byRole(sam.page, 'button', 'Tu testes ce projet').click()
+  await sam.page.getByRole('heading', { name: 'Tu testes ce projet', exact: true }).waitFor()
+  await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
+  await byRole(sam.page.getByRole('dialog'), 'button', 'Quitter les testeurs').click()
+  await byRole(sam.page, 'button', 'Rejoindre les testeurs').waitFor()
+  await waitFor(
+    'départ des testeurs enregistré',
+    async () => (await readProject(sam, projectId)).isTester === false,
+  )
+  console.log('  ok : Sam a quitté les testeurs')
 
   step('Sam réagit « Waggle ! » et commente ; Léa répond, puis masque le commentaire de Sam')
   await open(sam.page, `${appUrl}/projects/${projectId}`)

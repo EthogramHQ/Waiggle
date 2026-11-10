@@ -82,7 +82,11 @@ jest.mock('../projects/api', () => ({
 }))
 // Les gestes d'une page de projet ou de membre : de faux hooks.
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
   useComments: jest.fn(),

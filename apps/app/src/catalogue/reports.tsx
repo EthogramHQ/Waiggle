@@ -7,7 +7,6 @@
 import type { CommentReply } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { CommentCard } from '../ui/CommentCard'
-import { NoteList } from '../ui/NoteList'
 import { RemovalNotice } from '../ui/RemovalNotice'
 import { ReportCard } from '../ui/ReportCard'
 import { Stack } from '../ui/Stack'
@@ -35,13 +34,6 @@ const fr = {
   report: 'Signaler',
   deleteComment: 'Supprimer le commentaire',
   deleteShort: 'Supprimer',
-  reportNote: 'Signaler cette note',
-  noteRecent: 'v2 : il publie les avis tout seul, sur plusieurs sites à la fois.',
-  noteOlder: 'Première version : il propose trois avis à recopier.',
-  noteWhen: '19 oct.',
-  noteOlderWhen: '14 oct.',
-  journalOther: 'Le journal vu par un autre membre : un drapeau par note.',
-  journalAuthor: 'Le journal vu par son auteur : la note retirée garde sa place, avec le bandeau.',
   // Tranche 7b : la copie d'un signalement champ par champ, ses images, et une copie qui a changé.
   copyCaption:
     'La file de modération (tranche 7b) : la copie champ par champ, l’état des images, une copie qui a changé.',
@@ -113,14 +105,6 @@ const en: typeof fr = {
   report: 'Report',
   deleteComment: 'Delete the comment',
   deleteShort: 'Delete',
-  reportNote: 'Report this note',
-  noteRecent: 'v2: it posts the reviews by itself, on several sites at once.',
-  noteOlder: 'First version: it suggests three reviews to copy.',
-  noteWhen: 'Oct 19',
-  noteOlderWhen: 'Oct 14',
-  journalOther: 'The journal seen by another member: a flag per note.',
-  journalAuthor:
-    'The journal seen by its author: the removed note keeps its place, with the banner.',
   copyCaption:
     'The moderation queue (slice 7b): the copy field by field, the state of the images, a copy that changed.',
   projectKind: 'Project',
@@ -247,33 +231,6 @@ export function ReportSamples() {
         <CommentCard
           {...card}
           comment={comment({ id: 'placeholder', author: null, state: 'removed' })}
-        />
-      </Surface>
-      {/* Le journal : vu par un autre membre (un drapeau par note), puis par son auteur, avec une
-          note retirée. */}
-      <Text variant="caption" tone="muted">
-        {l.journalOther}
-      </Text>
-      <Surface variant="grouped" padding="xl" gap="lg">
-        <NoteList
-          notes={[
-            { id: 'n2', body: l.noteRecent, when: l.noteWhen },
-            { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-          ]}
-          onReport={() => {}}
-          reportLabel={l.reportNote}
-        />
-      </Surface>
-      <Text variant="caption" tone="muted">
-        {l.journalAuthor}
-      </Text>
-      <Surface variant="grouped" padding="xl" gap="lg">
-        <NoteList
-          notes={[
-            { id: 'n2', body: l.noteRecent, when: l.noteWhen, removed: byLaw },
-            { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-          ]}
-          onDelete={() => {}}
         />
       </Surface>
       {/* Tranche 7b : la carte de la file avec une copie en champs. Un projet signalé deux fois,

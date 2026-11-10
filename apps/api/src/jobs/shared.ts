@@ -11,6 +11,7 @@ import type { Mailer } from '../email/mailer'
 import type { NotificationLinks } from '../email/templates'
 import { createUnsubscribeToken } from '../email/unsubscribe-token'
 import { describeError } from '../log'
+import type { FileStorage } from '../media/storage'
 
 export type JobDeps = {
   db: Database
@@ -21,6 +22,11 @@ export type JobDeps = {
   apiUrl: string
   /** BETTER_AUTH_SECRET : la clé des jetons de désinscription en est dérivée. */
   secret: string
+  /**
+   * Le stockage des fichiers (R7a) : la purge de nuit y efface les photos en attente. Les tâches
+   * d'e-mail n'en ont pas besoin, d'où le champ facultatif ; `index.ts` le donne toujours.
+   */
+  storage?: FileStorage
 }
 
 /** Les membres sont lus par lots de 100 : la mémoire et la durée d'une requête restent bornées. */

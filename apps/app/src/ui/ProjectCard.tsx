@@ -26,7 +26,19 @@
 //
 // Sur ordinateur, une carte qui est un lien s'incline vers la souris, avec un reflet sur sa photo
 // (`useTilt`, R4) ; elle se remet à plat avant que sa photo soit mesurée au toucher.
+//
+// R7a : un projet remonté par sa mise à jour (`updated`, planche R7-MAJ-Fil). Deux formes :
+// - `full`, dans « Abonnements » : la pastille « Mis à jour · v1.2 » à la place de la date de
+//   l'auteur ; la première ligne de « Ce qui a changé » (sa pastille de famille, puis son texte,
+//   coupé à deux lignes) à la place de l'accroche, puis « et 2 autres changements » dessous, dans
+//   un texte à part, jamais coupé (sinon le nombre tomberait dans « … ») ; et la date relative de la
+//   mise à jour en bas à droite, après le total des réactions, hors du lien. La famille, que la
+//   pastille ne dit qu'en couleur, est lue dans la description du lien (« Nouveau : Un compte à
+//   rebours… », relecture du plan, interface B4) ;
+// - `badge`, ailleurs (Découvrir, recherche, page d'un membre) : la pastille seule, dans la rangée
+//   du bas, à côté du statut ; la date de publication et l'accroche restent (décision du 10/11/2026).
 import { layout, pressScale, radii, space } from '@ruche/brand'
+import type { UpdateFamily } from '@ruche/contracts'
 import { type ReactNode, type Ref, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, Pressable, View, type ViewStyle } from 'react-native'
@@ -38,6 +50,7 @@ import type { ImageSource } from './image'
 import { enterActivates } from './keyboard'
 import { Pressed } from './Pressed'
 import { type CoverImage, ProjectCover } from './ProjectCover'
+import { RelativeTime } from './RelativeTime'
 import { StatusPill } from './StatusPill'
 import { Surface } from './Surface'
 import { Tag } from './Tag'
@@ -47,9 +60,29 @@ import { useTapGuard } from './tapGuard'
 import { spring } from './theme/motion'
 import { useTheme } from './theme/ThemeProvider'
 import { useTilt } from './tilt'
+import { UpdateFamilyBadge } from './UpdateFamilyBadge'
 
 /** La hauteur d'une carte du fil, en points (le squelette du fil prend la même : `Skeleton`). */
 export const PROJECT_CARD_HEIGHT = 476
+
+/**
+ * Ce que la carte montre d'une mise à jour (R7a), des textes déjà prêts (`SummaryCard`) :
+ * - `full` (« Abonnements ») : `label` (« Mis à jour · v1.2 ») à la place de la date de l'auteur,
+ *   `line` à la place de l'accroche, `more` (« et 2 autres changements », null pour une seule
+ *   ligne) dessous, et la date `at` (ISO du contrat) en bas à droite ;
+ * - `badge` (ailleurs) : `label` seul, dans la rangée du bas ; la date et l'accroche restent.
+ * Une union plutôt qu'un booléen à côté d'une ligne obligatoire (relecture du plan, interface A7) :
+ * TypeScript refuse une carte `badge` qui porterait une ligne, ou une `full` qui n'en aurait pas.
+ */
+export type ProjectCardUpdate =
+  | {
+      kind: 'full'
+      label: string
+      line: { family: UpdateFamily; text: string }
+      more: string | null
+      at: string
+    }
+  | { kind: 'badge'; label: string }
 
 type Props = {
   title: string
@@ -97,6 +130,13 @@ type Props = {
    * qui s'agrandit en page du projet (le mouvement de R4).
    */
   coverRef?: Ref<View>
+  /** R7a : le projet remonté par sa mise à jour (voir `ProjectCardUpdate`). */
+  updated?: ProjectCardUpdate
+  /**
+   * L'heure qu'il est, pour figer la date de la mise à jour (`updated.at`) : le catalogue et les
+   * captures ; l'horloge de l'appareil sinon (comme `RelativeTime`).
+   */
+  now?: Date
 }
 
 /** La marge entre le bord de la carte et le verre, puis celle du verre autour de son contenu. */
@@ -171,6 +211,8 @@ export function ProjectCard({
   overlay,
   category,
   coverRef,
+  updated,
+  now,
 }: Props) {
   const { t } = useTranslation()
   const { colors } = useTheme()
@@ -201,6 +243,30 @@ export function ProjectCard({
   const categoryDescription = category
     ? t(($) => $.card.category, { category: category.label })
     : null
+  // R7a : la mise à jour entière (`full`) remplace l'accroche ; recopiée dans une constante, que
+  // TypeScript garde rétrécie jusque dans le dessin.
+  const change = updated?.kind === 'full' ? updated : null
+  // Sa ligne décrit le lien à la place de l'accroche, avec sa famille (« Nouveau : Un compte à
+  // rebours… »), puis « et 2 autres changements » : la pastille de famille ne la dit qu'en couleur.
+  const changeId = useId()
+  const changeDescription = change
+    ? [
+        t(($) => $.update.lineRead, {
+          family: t(($) => $.update.family[change.line.family]),
+          text: change.line.text,
+        }),
+        change.more,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null
+  // Ce qui décrit le lien : sur le web, les textes que désigne `aria-describedby` (le navigateur
+  // les lit à la suite) ; sur téléphone, l'indice du lien. L'accroche, elle, est déjà un texte de
+  // la carte (son `nativeID`) : l'indice du téléphone ne la reprend pas, comme avant R7a.
+  const describedIds = [change ? changeId : pitchId, categoryDescription ? categoryId : null]
+    .filter(Boolean)
+    .join(' ')
+  const hint = [changeDescription, categoryDescription].filter(Boolean).join('. ')
   const hasPhoto = Boolean(image)
   // La colonne du haut de la photo : la catégorie (avec photo) et l'emplacement (« Suivre »).
   const topColumn = Boolean(overlay) || (hasPhoto && Boolean(category))
@@ -278,9 +344,13 @@ export function ProjectCard({
           <Text variant="title3" numberOfLines={2}>
             {title}
           </Text>
-          <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
-            {pitch}
-          </Text>
+          {change ? (
+            <UpdateChange line={change.line} more={change.more} />
+          ) : (
+            <Text variant="callout" tone="secondary" numberOfLines={2} nativeID={pitchId}>
+              {pitch}
+            </Text>
+          )}
         </View>
         {/* La place de la rangée du bas (« Tester », statut, total), posée par-dessus. */}
         <View style={{ height: measures.bottom }} />
@@ -294,8 +364,8 @@ export function ProjectCard({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={title}
-      {...describedBy(categoryDescription ? `${pitchId} ${categoryId}` : pitchId)}
-      {...(categoryDescription && !web ? { accessibilityHint: categoryDescription } : null)}
+      {...describedBy(describedIds)}
+      {...(hint && !web ? { accessibilityHint: hint } : null)}
       // Entrée ouvre le projet sur le web, comme un vrai lien (voir keyboard.ts).
       {...enterActivates(open)}
       onPress={open}
@@ -350,9 +420,14 @@ export function ProjectCard({
           who
         )}
       </View>
-      {/* La date, à droite (marge automatique), ou sous le nom quand la place manque. */}
-      <View style={{ marginLeft: 'auto' }}>
-        {typeof when === 'string' ? (
+      {/* La date, à droite (marge automatique), ou sous le nom quand la place manque. R7a : un
+          projet remonté par sa mise à jour y porte « Mis à jour · v1.2 » à la place (la date de la
+          mise à jour passe en bas) ; la pastille rétrécit et passe à la ligne plutôt que de
+          déborder, à 320 points et texte agrandi. */}
+      <View style={{ marginLeft: 'auto', flexShrink: 1, maxWidth: '100%' }}>
+        {change ? (
+          <StatusPill label={change.label} />
+        ) : typeof when === 'string' ? (
           <Text variant="caption" tone="muted">
             {when}
           </Text>
@@ -375,8 +450,7 @@ export function ProjectCard({
   )
   const total =
     reactionTotal > 0 ? (
-      // À droite de la rangée (marge automatique). Le doigt passe au travers, vers la carte.
-      <View pointerEvents="none" style={{ marginLeft: 'auto' }}>
+      <View>
         {web ? (
           // Sur le web, le nom d'un texte sans rôle n'est pas lu : le « 49 » dessiné est caché au
           // lecteur d'écran, et « 49 réactions » est écrit à côté, caché à l'œil (relecture ui-B3).
@@ -394,6 +468,19 @@ export function ProjectCard({
         )}
       </View>
     ) : null
+  // R7a : la date de la mise à jour, au bout de la rangée du bas (planche R7-MAJ-Fil). Un texte,
+  // hors du lien de la carte, lu après lui ; sa version complète se lit au lecteur d'écran.
+  const changedAt = change ? <RelativeTime date={change.at} now={now} /> : null
+  // Le bout de la rangée, à droite (marge automatique) : la date seule. Le total des réactions est
+  // rangé avec les pastilles (des-A2) ; le doigt passe au travers, vers la carte.
+  const end = changedAt ? (
+    <View
+      pointerEvents="none"
+      style={{ marginLeft: 'auto', alignItems: 'center', maxWidth: '100%', flexShrink: 1 }}
+    >
+      {changedAt}
+    </View>
+  ) : null
 
   // --- « Tester ↗ » ---------------------------------------------------------------------------
   // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
@@ -418,11 +505,30 @@ export function ProjectCard({
     >
       {tester}
       {/* Les pastilles ne se touchent pas : le doigt passe au travers, vers la carte. */}
-      <View pointerEvents="none" style={{ flexDirection: 'row', gap: space.sm }}>
+      {/* R7a, `badge` (Découvrir…) : le repère « Mis à jour » vient ici, à côté du statut ; la date
+          de publication reste en haut, car Découvrir est rangé par elle (décision du 10/11/2026). */}
+      {/* R7a, des-A2 : le statut, les repères et le total des réactions sont chacun un enfant de la
+          rangée (et non un groupe qui passe à la ligne d'un bloc) : ils se rangent côte à côte tant
+          qu'il y a de la place, et la rangée ne compte plus trois lignes à 320 px. */}
+      <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
         <StatusPill label={status.label} strong={status.strong} />
-        {badge ? <StatusPill label={badge} /> : null}
       </View>
-      {total}
+      {badge ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={badge} />
+        </View>
+      ) : null}
+      {updated?.kind === 'badge' ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={updated.label} />
+        </View>
+      ) : null}
+      {total ? (
+        <View pointerEvents="none" style={{ flexShrink: 1 }}>
+          {total}
+        </View>
+      ) : null}
+      {end}
     </View>
   )
 
@@ -477,16 +583,57 @@ export function ProjectCard({
             {overlay}
           </View>
         ) : null}
-        {categoryDescription ? (
+        {changeDescription || categoryDescription ? (
           // La description du lien, lue seulement par lui (`aria-describedby` lit aussi un texte
           // caché) : cachée à l'œil et au parcours du lecteur d'écran, qui ne l'entend pas deux fois.
           <View style={hiddenFrame} {...decorative}>
-            <Text variant="caption" nativeID={categoryId}>
-              {categoryDescription}
-            </Text>
+            {changeDescription ? (
+              <Text variant="caption" nativeID={changeId}>
+                {changeDescription}
+              </Text>
+            ) : null}
+            {categoryDescription ? (
+              <Text variant="caption" nativeID={categoryId}>
+                {categoryDescription}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </Animated.View>
     </Animated.View>
+  )
+}
+
+/**
+ * R7a : la première ligne d'une mise à jour, à la place de l'accroche : la pastille de sa famille,
+ * puis, dans une colonne à côté, son texte (coupé à deux lignes, comme l'accroche) et « et 2 autres
+ * changements » dessous. Ce dernier est un texte à part, sans limite de lignes : coupé avec la
+ * ligne, le nombre tomberait dans « … » (relecture du plan, interface A7). La colonne aligne les
+ * deux textes sur le même bord, après la pastille. Le tout est dans le lien de la carte, qui en
+ * porte la lecture (sa description) : rien ici n'est lu à part.
+ */
+function UpdateChange({
+  line,
+  more,
+}: {
+  line: { family: UpdateFamily; text: string }
+  more: string | null
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+      <UpdateFamilyBadge family={line.family} size="small" />
+      {/* La colonne prend la place qui reste (une base réelle, jamais `flex: 1`, et `minWidth: 0`
+          pour qu'un mot très long se coupe au lieu de pousser la carte). */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xs }}>
+        <Text variant="callout" tone="secondary" numberOfLines={2} breakAnywhere>
+          {line.text}
+        </Text>
+        {more ? (
+          <Text variant="caption" tone="muted" weight={700}>
+            {more}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   )
 }

@@ -20,8 +20,15 @@
 // peut poser le focus ailleurs (« Modifier » le pose dans le champ). Plusieurs « … » d'une liste
 // (un par commentaire) se distinguent par une description (`describedById`, `hint`), et l'écran
 // peut poser le focus sur le bouton par sa `ref`.
+//
+// R7a : le même menu sert aussi à choisir une valeur parmi quelques-unes (la famille d'une ligne
+// de mise à jour : « Nouveau », « Réparé », « Plus joli »). Dès qu'une action dit si elle est
+// choisie (`checked`), toutes deviennent des choix (`menuitemradio`) qui disent leur état, et la
+// choisie porte une coche. Le bouton « … » peut alors céder la place à un déclencheur à soi
+// (`renderTrigger` : la pastille colorée « Famille : Nouveau »), qui reçoit le focus à la
+// fermeture exactement comme « … ».
 import { borders, layout, radii, space } from '@ruche/brand'
-import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
+import { type ReactElement, type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
@@ -29,11 +36,12 @@ import {
   Modal,
   Platform,
   Pressable,
+  type Role,
   ScrollView,
   useWindowDimensions,
   View,
 } from 'react-native'
-import { focusWithoutScroll } from './focus'
+import { type Focusable, focusWithoutScroll } from './focus'
 import { Icon, type IconName } from './Icon'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
@@ -49,6 +57,22 @@ export type ActionMenuItem = {
   tone?: 'default' | 'danger'
   /** Une icône devant le libellé (facultatif) : le drapeau de « Signaler ». */
   icon?: IconName
+  /**
+   * R7a : vrai pour le choix en cours d'un menu de choix (la famille d'une ligne). Dès qu'une
+   * action du menu le porte (vrai ou faux), toutes deviennent des choix qui disent leur état ; une
+   * action sans `checked` y compte alors comme non choisie.
+   */
+  checked?: boolean
+}
+
+/** Ce que reçoit un déclencheur à soi (`renderTrigger`), à poser sur l'élément qu'on touche. */
+export type ActionMenuTriggerProps = {
+  /** Ouvre le menu. */
+  onPress: () => void
+  /** Vrai tant que le menu est ouvert : à dire par `accessibilityState.expanded` / `aria-expanded`. */
+  expanded: boolean
+  /** À poser sur l'élément touchable : le menu s'y aligne, et le focus y revient à la fermeture. */
+  ref: Ref<Focusable>
 }
 
 type Props = {
@@ -83,6 +107,13 @@ type Props = {
   icon?: IconName
   /** small : un petit rond posé sur une vignette, zone à toucher de 44 points (voir IconButton). */
   size?: 'regular' | 'small'
+  /**
+   * R7a : un déclencheur à soi à la place du bouton « … » (la pastille « Famille : Nouveau » d'une
+   * ligne de mise à jour). Il reçoit de quoi ouvrir le menu, son état et la `ref` à poser sur
+   * l'élément touchable. Il porte lui-même son nom ; `label` reste le nom du menu ouvert. `icon`,
+   * `variant`, `size`, `describedById` et `hint` ne servent qu'au bouton « … ».
+   */
+  renderTrigger?: (props: ActionMenuTriggerProps) => ReactElement
 }
 
 /** Donne `node` à une `ref` reçue, qu'elle soit une fonction ou un objet (`useRef`). */
@@ -102,6 +133,14 @@ const EDGE = space.lg
  * referme pas le menu : c'est la seconde tape d'une double tape, pas un geste pour le fermer.
  */
 const DOUBLE_TAP_MS = 500
+
+/**
+ * Le rôle d'un choix dans un menu de choix (R7a), celui de l'ARIA : react-native-web le pose tel
+ * quel sur la page, et le lecteur d'écran dit « Réparé, choisi, 2 sur 3 ». Les types de React
+ * Native ne listent pas ce rôle (ils s'arrêtent à `menuitem`) : on le leur fait accepter ici, une
+ * fois, plutôt que de prendre un autre rôle (`radio`) qui sortirait le choix du menu.
+ */
+const MENU_ITEM_RADIO = 'menuitemradio' as unknown as Role
 
 type Rect = { x: number; y: number; width: number; height: number }
 type KeyEvent = { key: string; shiftKey?: boolean; preventDefault: () => void }
@@ -155,6 +194,7 @@ export function ActionMenu({
   ref,
   icon = 'dots-three',
   size = 'regular',
+  renderTrigger,
 }: Props) {
   const { t } = useTranslation()
   const window = useWindowDimensions()
@@ -298,23 +338,31 @@ export function ActionMenu({
     return { left, top }
   })()
 
+  // Le déclencheur, « … » ou celui que donne l'écran : dans les deux cas, sa vue est rangée dans
+  // `trigger` (pour poser le menu et lui rendre le focus) et transmise à la `ref` reçue.
+  const triggerRef = (node: View | null) => {
+    trigger.current = node
+    assign(ref, node)
+  }
+
   return (
     <>
-      <IconButton
-        ref={(node: View | null) => {
-          trigger.current = node
-          assign(ref, node)
-        }}
-        icon={icon}
-        size={size}
-        label={label ?? t(($) => $.actionMenu.label)}
-        {...(describedById ? { describedBy: describedById } : null)}
-        {...(hint ? { hint } : null)}
-        variant={variant}
-        expanded={open}
-        hasMenu
-        onPress={show}
-      />
+      {renderTrigger ? (
+        renderTrigger({ onPress: show, expanded: open, ref: triggerRef })
+      ) : (
+        <IconButton
+          ref={triggerRef}
+          icon={icon}
+          size={size}
+          label={label ?? t(($) => $.actionMenu.label)}
+          {...(describedById ? { describedBy: describedById } : null)}
+          {...(hint ? { hint } : null)}
+          variant={variant}
+          expanded={open}
+          hasMenu
+          onPress={show}
+        />
+      )}
       <Modal
         visible={open}
         transparent
@@ -388,6 +436,8 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
   const { colors } = useTheme()
   const own = useRef<(View | null)[]>([])
   const refs = actions ?? own
+  // Un menu de choix (R7a) : dès qu'une action dit si elle est choisie, toutes sont des choix.
+  const choice = items.some((item) => item.checked !== undefined)
 
   // Les touches d'une action, sur le web. react-native-web ne choisit à l'Espace que les boutons ;
   // les flèches et Tab sont propres à un menu.
@@ -453,8 +503,23 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
                 ref={(node) => {
                   refs.current[index] = node
                 }}
-                accessibilityRole="menuitem"
                 accessibilityLabel={item.label}
+                // Un choix dit s'il est le choix en cours : `aria-checked` sur le web (où
+                // react-native-web ignore accessibilityState), accessibilityState sur téléphone.
+                {...(choice
+                  ? Platform.OS === 'web'
+                    ? {
+                        role: MENU_ITEM_RADIO,
+                        'aria-checked': item.checked === true,
+                        accessibilityState: { checked: item.checked === true },
+                      }
+                    : {
+                        // Téléphone : `menuitemradio` n'existe pas dans React Native (un `role`
+                        // inconnu effacerait le rôle du choix) ; un `menuitem` qui dit s'il est choisi.
+                        accessibilityRole: 'menuitem' as const,
+                        accessibilityState: { checked: item.checked === true },
+                      }
+                  : { accessibilityRole: 'menuitem' as const })}
                 onPress={() => onChoose(item)}
                 {...keys(index, item)}
                 // L'anneau de focus se dessine à l'intérieur de l'action : le menu rogne ce qui
@@ -478,16 +543,25 @@ export function ActionMenuList({ label, items, onChoose, onLeave, actions, maxHe
                     tone={item.tone === 'danger' ? 'danger' : 'secondary'}
                   />
                 ) : null}
-                {/* flexShrink : un libellé long, ou très agrandi, passe à la ligne. */}
-                <View style={{ flexShrink: 1 }}>
+                {/* flexShrink : un libellé long, ou très agrandi, passe à la ligne. flexGrow
+                    (menu de choix) : la coche est poussée au bord droit. */}
+                <View style={{ flexShrink: 1, ...(choice ? { flexGrow: 1 } : null) }}>
                   <Text
-                    weight={500}
+                    weight={item.checked === true ? 600 : 500}
                     tone={item.tone === 'danger' ? 'danger' : 'default'}
                     selectable={false}
                   >
                     {item.label}
                   </Text>
                 </View>
+                {/* Le choix en cours porte une coche au bout de la ligne : son état se voit
+                    autrement que par la graisse du libellé. Les autres gardent sa place vide, pour
+                    que les libellés restent alignés. */}
+                {choice ? (
+                  <View style={{ width: 20, flexShrink: 0 }}>
+                    {item.checked === true ? <Icon name="check" size={20} tone="default" /> : null}
+                  </View>
+                ) : null}
               </Pressable>
             </View>
           ))}

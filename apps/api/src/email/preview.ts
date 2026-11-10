@@ -68,9 +68,26 @@ const recap = (overrides: Partial<RecapData>): RecapData => ({
   follows: 1,
   first: false,
   last: false,
+  updates: [],
+  updatesMore: 0,
   links: linksFor('recap'),
   ...overrides,
 })
+
+// R7a, « Les projets que tu suis ou que tu testes ». Le lien est l'adresse réelle, la plus longue
+// possible (un identifiant de projet a toujours 36 caractères) ; un titre de la longueur maximale
+// (PROJECT_TITLE_MAX, 80), d'un seul mot, que la carte doit couper sans défiler à l'horizontale
+// (adresse-E1).
+const updatesOf = (id: string) => `${APP_URL}/projects/${id}/updates`
+const LONG_TITLE =
+  'Assistantdecuisinequiproposedesrecettesaveclesrestesdufrigoetlesproduitsdesaison'
+const updatedProjects: RecapData['updates'] = [
+  { title: 'Décollage !', count: 3, url: updatesOf('0b6f2a52-5d1e-4c43-9a51-1f0c3e2b7a10') },
+  { title: LONG_TITLE, count: 1, url: updatesOf('7d1c9e04-3b2a-4f68-8e15-a2c4d6b8f901') },
+  { title: 'Jardin', count: 2, url: updatesOf('c3e1a7f2-9b44-4d0e-8a6c-5f2b1d9e7a03') },
+  { title: 'Météo', count: 1, url: updatesOf('e8a4b2c6-1d3f-4e5a-9b7c-0f1e2d3c4b05') },
+  { title: 'Vélo', count: 1, url: updatesOf('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c06') },
+]
 
 const mentions: MentionData = {
   name: 'Inès Morel',
@@ -115,15 +132,30 @@ const LONG_EXPLANATION =
 /** Les variantes montrées : le nom du fichier (sans la langue) et l'e-mail rendu. */
 const variants: [string, (language: Language) => EmailContent][] = [
   ['recap-short', (language) => recapEmail(language, recap({}))],
+  // Le récap le plus long : cinq lignes et « Et 2 autres », les nombres, puis (R7a) les cinq
+  // projets suivis ou testés et « Et 2 autres projets ». La liste des variantes est fixée par
+  // preview.test.ts : la nouvelle partie entre dans celle-ci, et dans le premier récap (un seul
+  // projet, au singulier).
   [
     'recap-long',
     (language) =>
       recapEmail(
         language,
-        recap({ lines: manyLines.slice(0, 5), more: 2, reactions: 3, follows: 2 }),
+        recap({
+          lines: manyLines.slice(0, 5),
+          more: 2,
+          reactions: 3,
+          follows: 2,
+          updates: updatedProjects,
+          updatesMore: 2,
+        }),
       ),
   ],
-  ['recap-first', (language) => recapEmail(language, recap({ first: true }))],
+  [
+    'recap-first',
+    (language) =>
+      recapEmail(language, recap({ first: true, updates: updatedProjects.slice(3, 4) })),
+  ],
   ['recap-third-without-visit', (language) => recapEmail(language, recap({ last: true }))],
   ['mentions', (language) => mentionEmail(language, mentions)],
   // Les trois e-mails de service du changement d'adresse : ni publicité ni désinscription.

@@ -12,11 +12,11 @@ import {
   usePostComment,
 } from '../comments/api'
 import { useFollow } from '../follows/api'
-import { useDeleteNote, usePublishNote } from '../notes/api'
 import { getProject } from '../projects/api'
 import { useReaction } from '../reactions/api'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
+import { useDeleteUpdate } from '../updates/api'
 import { ProjectScreen } from './ProjectScreen'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -26,7 +26,11 @@ jest.mock('../api/media', () => ({
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../projects/api', () => ({ getProject: jest.fn(), deleteProject: jest.fn() }))
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
-jest.mock('../notes/api', () => ({ usePublishNote: jest.fn(), useDeleteNote: jest.fn() }))
+jest.mock('../updates/api', () => ({
+  useProjectUpdates: jest.fn(),
+  usePublishUpdate: jest.fn(),
+  useDeleteUpdate: jest.fn(),
+}))
 jest.mock('../reactions/api', () => ({ useReaction: jest.fn() }))
 jest.mock('../comments/api', () => ({
   useComments: jest.fn(),
@@ -55,8 +59,9 @@ beforeEach(() => {
   jest.mocked(getProject).mockResolvedValue({ ...recipesProject, isMine: false })
   jest.mocked(useFollow).mockReturnValue({ toggle: jest.fn(), error: false, expired: false })
   jest.mocked(useReaction).mockReturnValue({ toggle: jest.fn(), error: false, expired: false })
-  jest.mocked(usePublishNote).mockReturnValue({ publish: jest.fn(), pending: false, error: false })
-  jest.mocked(useDeleteNote).mockReturnValue({ remove: jest.fn(), error: false })
+  jest
+    .mocked(useDeleteUpdate)
+    .mockReturnValue({ remove: jest.fn(), pending: false, error: false, reason: undefined })
   jest.mocked(usePostComment).mockReturnValue({ post: jest.fn(), pending: false, error: false })
   jest.mocked(useEditComment).mockReturnValue({ edit: jest.fn(), pending: false, error: false })
   jest.mocked(useDeleteComment).mockReturnValue({ remove: jest.fn(), error: false })

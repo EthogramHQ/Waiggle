@@ -9,10 +9,10 @@ import {
   DemoUrl,
   type Project,
   type ProjectCategory,
+  type ProjectChanges,
   type ProjectDifficulty,
   ProjectInput,
   type ProjectStatus,
-  type ProjectUpdate,
 } from '@ruche/contracts'
 
 /**
@@ -128,9 +128,9 @@ export const isDirty = (initial: ProjectForm, form: ProjectForm): boolean =>
  * seconde déjà enregistrée, et ne peut pas deviner ce que le membre a voulu). Le temps passé n'existe
  * plus : il n'est jamais envoyé.
  */
-export const changedFields = (initial: ProjectForm, form: ProjectForm): ProjectUpdate => {
+export const changedFields = (initial: ProjectForm, form: ProjectForm): ProjectChanges => {
   const changed = changedKeys(initial, form)
-  const update: ProjectUpdate = {}
+  const update: ProjectChanges = {}
   if (changed.title) update.title = form.title
   if (changed.pitch) update.pitch = form.pitch
   if (changed.description) update.description = form.description
@@ -167,7 +167,7 @@ const onlyGoesPrivate = (initial: ProjectForm, form: ProjectForm) => {
 
 /**
  * Vérifie le formulaire avec le schéma du contrat. Sans `initial` (publier), rend un ProjectInput
- * prêt pour POST /v1/projects. Avec `initial` (modifier), rend un ProjectUpdate (le PATCH des seuls
+ * prêt pour POST /v1/projects. Avec `initial` (modifier), rend un ProjectChanges (le PATCH des seuls
  * champs changés), et accepte le passage en « Privé » d'un projet sans catégorie (jur-J8).
  */
 export function toProjectChanges(
@@ -176,11 +176,11 @@ export function toProjectChanges(
 export function toProjectChanges(
   form: ProjectForm,
   initial: ProjectForm,
-): { ok: true; changes: ProjectUpdate } | { ok: false; errors: ProjectFormErrors }
+): { ok: true; changes: ProjectChanges } | { ok: false; errors: ProjectFormErrors }
 export function toProjectChanges(
   form: ProjectForm,
   initial?: ProjectForm,
-): { ok: true; changes: ProjectUpdate } | { ok: false; errors: ProjectFormErrors } {
+): { ok: true; changes: ProjectChanges } | { ok: false; errors: ProjectFormErrors } {
   const waived = initial !== undefined && onlyGoesPrivate(initial, form)
   // Le schéma exige une catégorie : sans elle on valide avec une catégorie d'emprunt (jamais
   // envoyée), pour ne pas cacher les autres erreurs derrière celle-là.

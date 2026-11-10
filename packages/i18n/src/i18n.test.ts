@@ -84,7 +84,7 @@ describe('translations', () => {
       'project.form.audiencePrivate',
       'project.form.draftSaved',
       'project.page.privateBanner',
-      'project.notes.hintPrivate',
+      'project.updates.hintPrivate',
       'project.comments.hintPrivate',
       'project.comments.replyHintPrivate',
     ]
