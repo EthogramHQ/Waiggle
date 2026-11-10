@@ -2,9 +2,18 @@
 // couverture verticale, en retirer une. L'ordre de la galerie se change avec le projet
 // (PATCH /v1/projects/:id, champ visualOrder). Seul l'auteur touche à ses visuels.
 import { createRoute, z } from '@hono/zod-openapi'
-import { Project, VISUAL_MAX_BYTES, VISUALS_MAX, VisualSlot, VisualUpdate } from '@ruche/contracts'
+import {
+  Project,
+  ProjectVisual,
+  UPDATE_PHOTOS_MAX,
+  UPDATE_PHOTOS_PER_PROJECT_MAX,
+  VISUAL_MAX_BYTES,
+  VISUALS_MAX,
+  VisualSlot,
+  VisualUpdate,
+} from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, ne, or, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { requireUser } from '../auth/session'
@@ -12,6 +21,7 @@ import { errorBody, languageOf } from '../errors'
 import type { FileStorage } from '../media/storage'
 import { processVisual } from '../media/visual'
 import { loadVisibleProject, projectAccess } from '../projects/load'
+import { toVisual } from '../projects/visual'
 import { memberCounterKeys, type RateLimiter, type RateRule } from '../rate-limit'
 import type { AppEnv } from '../types'
 import { createRouter, errorResponse } from './router'
@@ -33,18 +43,23 @@ const uploadVisualRoute = createRoute({
   summary: 'Add a photo to my project',
   description:
     'multipart/form-data with a "visual" file (JPEG, PNG or WebP, 5 MB at most) and an optional ' +
-    '"slot": "gallery" (default, 6 photos at most) or "portrait" (the vertical cover, taller than ' +
-    'wide, replaces the previous one). The image is re-encoded to WebP, 1 600 px at most, without ' +
-    'metadata, and summarized as a ThumbHash.',
+    '"slot": "gallery" (default, 6 photos at most), "portrait" (the vertical cover, taller than ' +
+    'wide, replaces the previous one) or "update" (a photo for an update not yet published: 4 ' +
+    'pending photos at most, a fifth replaces the oldest; 100 update photos per project). The ' +
+    'image is re-encoded to WebP, 1 600 px at most, without metadata, and summarized as a ThumbHash.',
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    201: projectResponse('The project with its new photo.'),
+    201: {
+      description:
+        'The project with its new photo (`gallery`, `portrait`), or the pending photo itself (`update`).',
+      content: { 'application/json': { schema: z.union([Project, ProjectVisual]) } },
+    },
     400: errorResponse('No file, or an unknown slot.'),
     401: errorResponse('Not signed in.'),
     403: errorResponse('Someone else’s project.'),
     404: errorResponse('No such project.'),
     409: errorResponse(
-      'Six photos already (`too_many_visuals`), or my project removed by the moderation (`removed`).',
+      'Six photos already (`too_many_visuals`), 100 update photos already (`update_photos_full`), or my project removed by the moderation (`removed`).',
     ),
     413: errorResponse('File too large.'),
     415: errorResponse('Not a JPEG, PNG or WebP image, or a vertical cover wider than tall.'),
@@ -188,6 +203,7 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     // Une transaction (tout réussit, ou rien) qui VERROUILLE la ligne du projet (FOR UPDATE) :
     // deux envois simultanés passent l'un après l'autre. Sans ce verrou, ils compteraient tous
     // deux 5 photos et en ajouteraient chacun une : 7 au total.
+    const mediaId = crypto.randomUUID()
     let outcome:
       | { gone: true }
       | { gone: false; removed: true }
@@ -211,6 +227,8 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
             id: schema.projectMedia.id,
             position: schema.projectMedia.position,
             storageKey: schema.projectMedia.storageKey,
+            updateId: schema.projectMedia.updateId,
+            createdAt: schema.projectMedia.createdAt,
           })
           .from(schema.projectMedia)
           .where(
@@ -221,6 +239,25 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         if (slot.data === 'gallery' && existing.length >= VISUALS_MAX) {
           return { gone: false, removed: false, full: true }
         }
+        if (slot.data === 'update') {
+          // Les photos des mises à jour ne comptent pas dans les six de la galerie. Les « en attente »
+          // (pas encore rattachées) : quatre au plus ; une cinquième remplace la plus ancienne, ligne
+          // et fichier (relecture A11) : une feuille abandonnée avec quatre photos ne bloque pas la
+          // suivante pendant 24 h. Une photo déjà rattachée n'est jamais remplacée.
+          const pending = existing
+            .filter((photo) => photo.updateId === null)
+            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          const oldest = pending.length >= UPDATE_PHOTOS_MAX ? pending[0] : undefined
+          // Le plafond de stockage (décision de Louis du 10/11/2026, relecture A10) : 100 photos de
+          // mises à jour par projet, en attente comprises. Une remplacée libère sa place.
+          if (existing.length - (oldest ? 1 : 0) >= UPDATE_PHOTOS_PER_PROJECT_MAX) {
+            return { gone: false, removed: false, full: true }
+          }
+          if (oldest) {
+            await tx.delete(schema.projectMedia).where(eq(schema.projectMedia.id, oldest.id))
+            replacedKey = oldest.storageKey
+          }
+        }
         if (slot.data === 'portrait') {
           // Une seule couverture verticale : la nouvelle remplace l'ancienne.
           for (const old of existing) {
@@ -229,10 +266,12 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
           }
         }
         await tx.insert(schema.projectMedia).values({
-          id: crypto.randomUUID(),
+          id: mediaId,
           projectId: id,
           slot: slot.data,
-          // À la suite des photos existantes (0 pour la couverture verticale).
+          // À la suite des photos existantes (0 pour la couverture verticale, et pour une photo de
+          // mise à jour : sa place se pose à la publication, avec update_id).
+          // Sans update_id : une photo « en attente », jusqu'à ce qu'une mise à jour la cite.
           position:
             slot.data === 'gallery' ? Math.max(-1, ...existing.map((m) => m.position)) + 1 : 0,
           storageKey: key,
@@ -256,9 +295,21 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     }
     if (outcome.full) {
       await storage.delete(key)
-      return c.json(errorBody(languageOf(c), 'too_many_visuals'), 409)
+      const code = slot.data === 'update' ? 'update_photos_full' : 'too_many_visuals'
+      return c.json(errorBody(languageOf(c), code), 409)
     }
     if (outcome.replacedKey) await storage.delete(outcome.replacedKey)
+
+    // Une photo de mise à jour : on rend la photo elle-même (son identifiant sert à la publication),
+    // pas le projet, dont elle ne change rien.
+    if (slot.data === 'update') {
+      const [media] = await db
+        .select()
+        .from(schema.projectMedia)
+        .where(eq(schema.projectMedia.id, mediaId))
+      if (!media) return notFound(c)
+      return c.json(toVisual(media, publicApiUrl), 201)
+    }
 
     const project = await loadVisibleProject(db, id, user.id, publicApiUrl)
     if (!project) return notFound(c)
@@ -279,9 +330,17 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
     if (!z.uuid().safeParse(visualId).success) return notFound(c)
     // returning : la ligne supprimée, pour connaître le fichier à effacer ensuite. La condition
     // « de ce projet » empêche de viser la photo d'un autre projet avec son identifiant.
+    // R7a (relecture A4) : une photo déjà rattachée à une mise à jour ne s'efface pas ici (elle
+    // part avec sa mise à jour) ; la condition est DANS la requête, pas dans une lecture d'avant.
     const [removed] = await db
       .delete(schema.projectMedia)
-      .where(and(eq(schema.projectMedia.id, visualId), eq(schema.projectMedia.projectId, id)))
+      .where(
+        and(
+          eq(schema.projectMedia.id, visualId),
+          eq(schema.projectMedia.projectId, id),
+          or(ne(schema.projectMedia.slot, 'update'), isNull(schema.projectMedia.updateId)),
+        ),
+      )
       .returning({ storageKey: schema.projectMedia.storageKey })
     if (!removed) return notFound(c)
     await storage.delete(removed.storageKey)
@@ -320,6 +379,8 @@ export const visualRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) => {
         and(
           eq(schema.projectMedia.id, visualId),
           eq(schema.projectMedia.projectId, id),
+          // R7a : une photo rattachée à une mise à jour ne se décrit pas ici (A4).
+          or(ne(schema.projectMedia.slot, 'update'), isNull(schema.projectMedia.updateId)),
           sql`exists (select 1 from project where project.id = ${id} and project.author_id = ${user.id} and project.removed_at is null)`,
         ),
       )

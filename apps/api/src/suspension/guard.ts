@@ -39,6 +39,8 @@ export const ALLOWED_WRITES: ReadonlySet<string> = new Set([
   // R4 : lire son fil et écarter une suggestion ne touchent que ce qui est à lui, comme « vu ».
   'PUT /v1/feed/read',
   'PUT /v1/suggestions/members/:id/dismissed',
+  // R7a : supprimer sa mise à jour reste permis (ce qui défait ne punit pas, comme « Retirer »).
+  'DELETE /v1/projects/:id/updates/:updateId',
   'PATCH /v1/me/email-preferences',
   'PATCH /v1/me',
   'POST /v1/email/unsubscribe',
