@@ -17,7 +17,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { createRef } from 'react'
 import { Platform, StyleSheet, type TextInput } from 'react-native'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
+import { choiceRole, fr } from '../testing/text'
 import { UpdateLineField } from './UpdateLineField'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -138,11 +138,11 @@ describe('UpdateLineField', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: familyButton('fixed') }))
 
-    const choices = screen.getAllByRole('menuitemradio')
+    const choices = screen.getAllByRole(choiceRole())
     expect(choices).toHaveLength(3)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('new') }))).toBe(false)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('fixed') }))).toBe(true)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('polish') }))).toBe(false)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('new') }))).toBe(false)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('fixed') }))).toBe(true)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('polish') }))).toBe(false)
   })
 
   it('gives the line the family chosen in the menu', async () => {
@@ -150,11 +150,11 @@ describe('UpdateLineField', () => {
     await renderLine({ onFamilyChange })
 
     await fireEvent.press(screen.getByRole('button', { name: familyButton('fixed') }))
-    await fireEvent.press(screen.getByRole('menuitemradio', { name: familyName('polish') }))
+    await fireEvent.press(screen.getByRole(choiceRole(), { name: familyName('polish') }))
 
     expect(onFamilyChange).toHaveBeenCalledTimes(1)
     expect(onFamilyChange).toHaveBeenCalledWith('polish')
-    expect(screen.queryByRole('menuitemradio')).toBeNull() // le menu se ferme
+    expect(screen.queryByRole(choiceRole())).toBeNull() // le menu se ferme
   })
 
   // Relecture du plan, interface A1 : `it('names each remove button with its rank')`.

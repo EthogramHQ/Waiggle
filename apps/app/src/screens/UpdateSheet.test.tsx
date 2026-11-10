@@ -23,7 +23,7 @@ import { passTapGuard } from '../testing/dialog'
 import { leaMe, suspendedMe } from '../testing/fixtures'
 import { photo, recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
-import { containing, fr } from '../testing/text'
+import { choiceRole, containing, fr } from '../testing/text'
 import { rocketUpdate } from '../testing/updates'
 import { ToastProvider } from '../ui/theme/toast'
 import { UpdateSheet } from './UpdateSheet'
@@ -449,7 +449,7 @@ describe('the lines of « Ce qui a changé »', () => {
     await openSheet()
 
     await press(/^Famille\s:\sNouveau$/)
-    await fireEvent.press(screen.getByRole('menuitemradio', { name: family('fixed') }))
+    await fireEvent.press(screen.getByRole(choiceRole(), { name: family('fixed') }))
 
     expect(lineField(1, 1, 'fixed')).toBeTruthy()
   })
@@ -484,7 +484,7 @@ describe('publishing an update', () => {
     const [, second] = screen.getAllByRole('button', { name: /^Famille\s:\sNouveau$/ })
     if (!second) throw new Error('two family badges expected')
     await fireEvent.press(second)
-    await fireEvent.press(screen.getByRole('menuitemradio', { name: family('fixed') }))
+    await fireEvent.press(screen.getByRole(choiceRole(), { name: family('fixed') }))
     await fireEvent.changeText(lineField(2, 2, 'fixed'), 'Le score ne repart plus à zéro')
     await publish()
 

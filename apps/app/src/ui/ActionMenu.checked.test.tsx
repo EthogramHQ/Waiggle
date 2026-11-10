@@ -13,7 +13,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { AccessibilityInfo, Platform, Pressable } from 'react-native'
 import { labelOf } from '../testing/arrivedFocus'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
+import { choiceRole, fr } from '../testing/text'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { focusWithoutScroll } from './focus'
 
@@ -81,11 +81,18 @@ describe('a choice menu (R7a)', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
-    expect(isChecked(screen.getByRole('menuitemradio', { name: family.fixed }))).toBe(true)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: family.new }))).toBe(false)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: family.polish }))).toBe(false)
-    // Tous les choix sont des radios, même celui qui ne dit rien de `checked`.
-    expect(screen.queryByRole('menuitem')).toBeNull()
+    expect(isChecked(screen.getByRole(choiceRole(), { name: family.fixed }))).toBe(true)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: family.new }))).toBe(false)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: family.polish }))).toBe(false)
+    // Tous les choix disent s'ils sont cochés, même celui qui ne dit rien de `checked` (sur
+    // téléphone, le rôle d'un choix est `menuitem` : c'est son état qui en fait un choix).
+    const choices = screen.getAllByRole(choiceRole())
+    expect(choices).toHaveLength(3)
+    for (const choice of choices) {
+      const state = (choice.props as { accessibilityState?: { checked?: boolean } })
+        .accessibilityState
+      expect(typeof state?.checked).toBe('boolean')
+    }
   })
 
   it('says « checked » on the web too', async () => {
@@ -94,8 +101,8 @@ describe('a choice menu (R7a)', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
-    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: family.fixed }))).toBe(true)
+    expect(screen.getAllByRole(choiceRole())).toHaveLength(3)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: family.fixed }))).toBe(true)
   })
 
   it('keeps plain menu items when no item says checked (témoin)', async () => {
@@ -105,19 +112,23 @@ describe('a choice menu (R7a)', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
-    expect(screen.getByRole('menuitem', { name: 'Signaler cette mise à jour' })).toBeTruthy()
+    const item = screen.getByRole('menuitem', { name: 'Signaler cette mise à jour' })
+    // Une simple entrée ne dit rien d'un choix coché (ni rôle `menuitemradio` sur le web, ni état
+    // `checked` sur téléphone).
     expect(screen.queryByRole('menuitemradio')).toBeNull()
+    const state = (item.props as { accessibilityState?: { checked?: boolean } }).accessibilityState
+    expect(state?.checked).toBeUndefined()
   })
 
   it('chooses a family once and closes', async () => {
     await renderWithProviders(<ActionMenu items={families} />)
 
     await fireEvent.press(screen.getByRole('button', { name: dots }))
-    await fireEvent.press(screen.getByRole('menuitemradio', { name: family.polish }))
+    await fireEvent.press(screen.getByRole(choiceRole(), { name: family.polish }))
 
     await waitFor(() => expect(choose).toHaveBeenCalledWith('polish'))
     expect(choose).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('menuitemradio')).toBeNull()
+    expect(screen.queryByRole(choiceRole())).toBeNull()
   })
 })
 
@@ -135,7 +146,7 @@ describe('a menu opened by its own trigger (R7a)', () => {
 
     await fireEvent.press(badge())
 
-    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3)
+    expect(screen.getAllByRole(choiceRole())).toHaveLength(3)
     expect(screen.getByRole('button', { name: badgeName, expanded: true })).toBeTruthy()
   })
 
@@ -172,7 +183,7 @@ describe('a menu opened by its own trigger (R7a)', () => {
 
     const focused = jest.mocked(focusWithoutScroll).mock.calls.map(([node]) => labelOf(node))
     expect(focused.at(-1)).toBe(badgeName)
-    expect(screen.queryByRole('menuitemradio')).toBeNull()
+    expect(screen.queryByRole(choiceRole())).toBeNull()
   })
 })
 

@@ -8,7 +8,7 @@
 import { fireEvent, screen, within } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
+import { choiceRole, fr } from '../testing/text'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { iconPaths } from './icons.generated'
 
@@ -48,7 +48,7 @@ describe('the state of a choice menu (R7a)', () => {
       // lui que lisent VoiceOver et TalkBack (react-native-web, lui, pose `aria-checked` sur la page).
       const checkedOf = (name: string) =>
         (
-          screen.getByRole('menuitemradio', { name }).props as {
+          screen.getByRole(choiceRole(), { name }).props as {
             accessibilityState?: { checked?: boolean }
             'aria-checked'?: boolean
           }
@@ -64,13 +64,13 @@ describe('the state of a choice menu (R7a)', () => {
     await fireEvent.press(screen.getByRole('button', { name: dots }))
 
     const drawn = (name: string) =>
-      pathsUnder(screen.getByRole('menuitemradio', { name }) as unknown as Host)
+      pathsUnder(screen.getByRole(choiceRole(), { name }) as unknown as Host)
     expect(drawn(family.fixed)).toEqual(expect.arrayContaining(check))
     expect(drawn(family.new)).toEqual([])
     expect(drawn(family.polish)).toEqual([])
     // Le libellé reste lisible à côté de la coche.
     expect(
-      within(screen.getByRole('menuitemradio', { name: family.fixed })).getByText(family.fixed),
+      within(screen.getByRole(choiceRole(), { name: family.fixed })).getByText(family.fixed),
     ).toBeTruthy()
   })
 })

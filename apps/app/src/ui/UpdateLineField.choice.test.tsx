@@ -11,7 +11,7 @@ import type { UpdateFamily } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
-import { fr } from '../testing/text'
+import { choiceRole, fr } from '../testing/text'
 import { oneLine, UpdateLineField } from './UpdateLineField'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -49,9 +49,9 @@ describe('UpdateLineField, its families menu (U1c)', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: familyButton('fixed') }))
 
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('fixed') }))).toBe(true)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('new') }))).toBe(false)
-    expect(isChecked(screen.getByRole('menuitemradio', { name: familyName('polish') }))).toBe(false)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('fixed') }))).toBe(true)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('new') }))).toBe(false)
+    expect(isChecked(screen.getByRole(choiceRole(), { name: familyName('polish') }))).toBe(false)
   })
 
   it('tells nothing when the family already chosen is chosen again', async () => {
@@ -59,9 +59,9 @@ describe('UpdateLineField, its families menu (U1c)', () => {
     await renderLine({ onFamilyChange })
 
     await fireEvent.press(screen.getByRole('button', { name: familyButton('fixed') }))
-    await fireEvent.press(screen.getByRole('menuitemradio', { name: familyName('fixed') }))
+    await fireEvent.press(screen.getByRole(choiceRole(), { name: familyName('fixed') }))
 
-    expect(screen.queryByRole('menuitemradio')).toBeNull() // le menu s'est fermé (témoin)
+    expect(screen.queryByRole(choiceRole())).toBeNull() // le menu s'est fermé (témoin)
     expect(onFamilyChange).not.toHaveBeenCalled()
   })
 
