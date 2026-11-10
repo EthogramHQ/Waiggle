@@ -21,9 +21,10 @@ import {
   Me,
   Member,
   Project,
-  ProjectNote,
+  ProjectUpdate,
   SearchResults,
   ToolPage,
+  type UpdateLine,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, sql } from 'drizzle-orm'
@@ -191,7 +192,7 @@ describe('the « following » feed', () => {
     await publish(lea, { title: 'Un autre projet de Léa' })
     expect((await send('POST', `/v1/projects/${project.id}/follow`, max)).status).toBe(204)
 
-    // Suivre un projet fera venir ses notes (tranche 4b), pas les nouveaux projets de l'autrice.
+    // Suivre un projet fait venir ses mises à jour (R7a), pas les nouveaux projets de l'autrice.
     expect(await readFollowing(max)).toEqual({
       items: [],
       nextCursor: null,
@@ -460,92 +461,189 @@ describe('the API contract', () => {
   })
 })
 
-// --- Tranche 4b : les notes des projets suivis dans le fil « Abonnements » ---
-// Seuls les projets suivis apportent leurs notes : suivre un membre fait venir ses nouveaux
-// projets, pas ses notes. « Découvrir » ne montre que des projets, jamais de note.
+// --- Tranche R7a : les mises à jour dans le fil « Abonnements » ---
+// Scénario : docs/scenarios/refonte.md, « R7a », « Dans le fil ». La mise à jour remplace la note
+// de 4b : elle fait remonter la carte de son projet à sa date, pour qui suit le projet **ou** son
+// auteur, et le projet n'apparaît qu'une fois, à son événement le plus récent (sa publication ou
+// sa dernière mise à jour). « Découvrir » garde l'ordre de publication ; ses cartes portent
+// seulement la dernière mise à jour (`latestUpdate`), d'où l'appli tire le repère « Mis à jour ».
+// Relecture de sécurité du plan : B4 (une mise à jour retirée ne compte sur aucune carte, pas même
+// pour l'auteur) et A6 (un projet privé, retiré, ou d'un membre bloqué ne remonte jamais).
+//
+// Les mises à jour se publient par l'API (POST /v1/projects/{id}/updates). Leur retrait par la
+// modération est posé en base (la colonne removed_at de project_update, qu'une décision de retrait
+// remplit) : ces tests ne dépendent ainsi que de la route de publication, pas de la modération des
+// mises à jour, écrite à part.
 
 /** Suit un projet. */
 const followProject = async (id: string, cookie: string) =>
   expect((await send('POST', `/v1/projects/${id}/follow`, cookie)).status).toBe(204)
 
-/** Publie une note sur un projet, deux heures après ce qui précède, et renvoie la note. */
-const postNote = async (
+/**
+ * Publie une mise à jour et renvoie ce que l'API a répondu. Par défaut une seule ligne « Nouveau »,
+ * sans titre, sans version ni photo. Trois heures après ce qui précède (`wait`) : un membre publie
+ * 10 mises à jour par 24 heures au plus (UPDATES_PER_DAY), et deux heures en laisseraient passer 12.
+ */
+const postUpdate = async (
   cookie: string,
   projectId: string,
-  body = 'v2 : mode hors ligne',
-  { wait = true } = {},
+  {
+    lines = [{ family: 'new', text: 'Mode hors ligne' }],
+    version = null,
+    title = null,
+    wait = true,
+  }: { lines?: UpdateLine[]; version?: string | null; title?: string | null; wait?: boolean } = {},
 ) => {
-  if (wait) later()
-  const res = await send('POST', `/v1/projects/${projectId}/notes`, cookie, { body })
+  if (wait) later(3)
+  const res = await send('POST', `/v1/projects/${projectId}/updates`, cookie, {
+    title,
+    version,
+    lines,
+    photos: [],
+    beforeAfter: false,
+  })
   expect(res.status).toBe(201)
-  return ProjectNote.parse(await res.json())
+  return ProjectUpdate.parse(await res.json())
 }
 
+/** Supprime une mise à jour (la corbeille de l'auteur). */
+const deleteUpdate = async (cookie: string, projectId: string, updateId: string) =>
+  expect(
+    (await send('DELETE', `/v1/projects/${projectId}/updates/${updateId}`, cookie)).status,
+  ).toBe(204)
+
 /**
- * Ce qu'est chaque élément d'une page : « project:<id> » ou « note:<id> ». Un projet et ses notes
- * ont des identifiants distincts : on voit ainsi sans ambiguïté ce que contient le fil.
+ * La modération retire une mise à jour : posé en base, comme le fait une décision de retrait (la
+ * date du retrait importe peu ici, on reprend celle de la mise à jour).
+ */
+const removeUpdate = (id: string) =>
+  ctx.db.execute(sql`update project_update set removed_at = created_at where id = ${id}`)
+
+/**
+ * Ce qu'est chaque élément d'une page : « project:<id du projet> » pour un nouveau projet,
+ * « update:<id de la mise à jour> » pour un projet remonté par sa mise à jour. On voit ainsi sans
+ * ambiguïté ce que contient le fil, et par quelle mise à jour un projet remonte.
  */
 const keys = (page: FeedPage) =>
   page.items.map((item) =>
-    item.kind === 'note' ? `note:${item.note.id}` : `project:${item.project.id}`,
+    item.kind === 'update' ? `update:${item.update.id}` : `project:${item.project.id}`,
   )
-const noteKey = (note: ProjectNote) => `note:${note.id}`
+const updateKey = (update: ProjectUpdate) => `update:${update.id}`
 const projectKey = (project: Project) => `project:${project.id}`
 
-describe('the notes of followed projects in the « following » feed', () => {
-  it('brings the notes of a followed project among the new projects, newest first, dated from their publication', async () => {
-    const recipes = await publish(lea, { title: 'Mon agent de recettes' })
-    await followProject(recipes.id, max)
-    await followMember((await me(zoe)).id, max)
+/** La version courte d'une mise à jour, telle que la portent les cartes (UpdateSummary). */
+const summaryOf = (update: ProjectUpdate) => ({
+  id: update.id,
+  at: update.createdAt,
+  version: update.version,
+  firstLine: update.lines[0],
+  lineCount: update.lines.length,
+})
+
+describe('the updates in the « following » feed (R7a)', () => {
+  it('raises a followed project to the date of its update, among the new projects', async () => {
+    const zoeId = (await me(zoe)).id
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    await followProject(rocket.id, max)
+    await followMember(zoeId, max)
     const older = await publish(zoe, { title: 'Le carnet de jardin' })
-    const v2 = await postNote(lea, recipes.id, 'v2 : mode hors ligne')
+    const v12 = await postUpdate(lea, rocket.id, {
+      version: 'v1.2',
+      lines: [
+        { family: 'new', text: 'Le décompte de la fusée' },
+        { family: 'fixed', text: 'Le bouton Retour répond de nouveau' },
+        { family: 'polish', text: 'Des couleurs plus douces' },
+      ],
+    })
     const newer = await publish(zoe, { title: 'Le tri des photos' })
 
     const page = await readFollowing(max)
 
-    expect(keys(page)).toEqual([projectKey(newer), noteKey(v2), projectKey(older)])
-    // La note dit à quel projet elle appartient ; sa date est celle de sa publication.
+    expect(keys(page)).toEqual([projectKey(newer), updateKey(v12), projectKey(older)])
+    // La carte remonte à la date de la mise à jour, et porte sa version courte : la version, la
+    // première ligne et le nombre de lignes (« et 2 autres changements »).
+    const summary = {
+      id: v12.id,
+      at: v12.createdAt,
+      version: 'v1.2',
+      firstLine: { family: 'new', text: 'Le décompte de la fusée' },
+      lineCount: 3,
+    }
     expect(page.items[1]).toEqual({
-      kind: 'note',
-      at: v2.createdAt,
-      note: v2,
+      kind: 'update',
+      at: v12.createdAt,
+      update: summary,
       project: expect.objectContaining({
-        id: recipes.id,
-        title: 'Mon agent de recettes',
+        id: rocket.id,
+        title: 'Décollage !',
         author: expect.objectContaining({ id: leaId, name: 'Léa' }),
+        latestUpdate: summary,
+        version: 'v1.2',
       }),
     })
     expect(page.nextCursor).toBeNull()
   })
 
-  it('leaves out the notes of a project not followed, even when its author is followed', async () => {
-    const recipes = await publish(lea)
+  it('raises the project of a followed author too, once, at its update', async () => {
     await followMember(leaId, max)
-    await postNote(lea, recipes.id)
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    const other = await publish(lea, { title: 'Un autre projet de Léa' })
+    const v2 = await postUpdate(lea, rocket.id)
 
-    // Max suit Léa : il voit son nouveau projet, pas les notes de ce projet qu'il ne suit pas.
-    expect(keys(await readFollowing(max))).toEqual([projectKey(recipes)])
+    const page = await readFollowing(max)
+
+    // Le projet n'est plus à sa date de publication : une seule fois, à sa mise à jour.
+    expect(keys(page)).toEqual([updateKey(v2), projectKey(other)])
+    expect(page.items[0]?.at).toBe(v2.createdAt)
+
+    // Suivre aussi le projet ne le fait pas venir deux fois.
+    await followProject(rocket.id, max)
+    expect(keys(await readFollowing(max))).toEqual([updateKey(v2), projectKey(other)])
   })
 
-  it('shows the notes of a followed project to its followers only', async () => {
-    const recipes = await publish(lea)
-    await followProject(recipes.id, max)
-    const v2 = await postNote(lea, recipes.id)
+  it('shows a project once, at its latest update, however many updates it has', async () => {
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    await followProject(rocket.id, max)
+    await postUpdate(lea, rocket.id, {
+      version: 'v1.0',
+      lines: [{ family: 'new', text: 'Première version' }],
+    })
+    await postUpdate(lea, rocket.id, {
+      version: 'v1.1',
+      lines: [{ family: 'fixed', text: 'Le son revient' }],
+    })
+    const latest = await postUpdate(lea, rocket.id, {
+      lines: [{ family: 'polish', text: 'Une retouche sans numéro' }],
+    })
 
-    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)])
-    // Zoé ne suit rien : son fil reste vide. Léa ne peut pas suivre son propre projet : son fil
-    // montre le projet lui-même (R6a, ses propres projets), jamais les notes qu'elle y écrit.
+    const page = await readFollowing(max)
+
+    expect(keys(page)).toEqual([updateKey(latest)])
+    expect(page.items[0]).toMatchObject({
+      update: { id: latest.id, version: null },
+      // La version sous le titre est celle de la dernière mise à jour qui en a une.
+      project: { latestUpdate: { id: latest.id }, version: 'v1.1' },
+    })
+  })
+
+  it('raises a followed project for its followers only', async () => {
+    const rocket = await publish(lea)
+    await followProject(rocket.id, max)
+    const v2 = await postUpdate(lea, rocket.id)
+
+    expect(keys(await readFollowing(max))).toEqual([updateKey(v2)])
+    // Zoé ne suit rien : son fil reste vide. Léa voit son propre projet, une seule fois (R6a).
     expect((await readFollowing(zoe)).items).toEqual([])
-    expect(keys(await readFollowing(lea))).toEqual([projectKey(recipes)])
+    expect(ids(await readFollowing(lea))).toEqual([rocket.id])
   })
 
-  it('stops showing the notes of a project no longer followed', async () => {
-    const recipes = await publish(lea)
-    await followProject(recipes.id, max)
-    const v2 = await postNote(lea, recipes.id)
-    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)]) // témoin
+  it('stops raising a project no longer followed', async () => {
+    const rocket = await publish(lea)
+    await followProject(rocket.id, max)
+    const v2 = await postUpdate(lea, rocket.id)
+    expect(keys(await readFollowing(max))).toEqual([updateKey(v2)]) // témoin
 
-    expect((await send('DELETE', `/v1/projects/${recipes.id}/follow`, max)).status).toBe(204)
+    expect((await send('DELETE', `/v1/projects/${rocket.id}/follow`, max)).status).toBe(204)
 
     expect(await readFollowing(max)).toEqual({
       items: [],
@@ -555,26 +653,161 @@ describe('the notes of followed projects in the « following » feed', () => {
     })
   })
 
-  it('removes a deleted note from the feed', async () => {
-    const recipes = await publish(lea)
-    await followProject(recipes.id, max)
-    const kept = await postNote(lea, recipes.id, 'Première version en ligne')
-    const removed = await postNote(lea, recipes.id, 'Une note publiée par erreur')
-    expect(keys(await readFollowing(max))).toEqual([noteKey(removed), noteKey(kept)])
+  it('falls back to the previous update once the latest is deleted, then to the publication', async () => {
+    await followMember(leaId, max)
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    const kept = await postUpdate(lea, rocket.id, {
+      lines: [{ family: 'new', text: 'Première version en ligne' }],
+    })
+    const deleted = await postUpdate(lea, rocket.id, {
+      lines: [{ family: 'new', text: 'Une mise à jour publiée par erreur' }],
+    })
+    expect(keys(await readFollowing(max))).toEqual([updateKey(deleted)]) // témoin
 
-    const res = await send('DELETE', `/v1/projects/${recipes.id}/notes/${removed.id}`, lea)
-    expect(res.status).toBe(204)
+    await deleteUpdate(lea, rocket.id, deleted.id)
 
-    expect(keys(await readFollowing(max))).toEqual([noteKey(kept)])
+    const page = await readFollowing(max)
+    expect(keys(page)).toEqual([updateKey(kept)])
+    expect(page.items[0]?.at).toBe(kept.createdAt)
+    expect(JSON.stringify(page)).not.toContain('publiée par erreur')
+
+    // Sans mise à jour, le projet d'un auteur suivi revient à sa date de publication.
+    await deleteUpdate(lea, rocket.id, kept.id)
+    const last = await readFollowing(max)
+    expect(keys(last)).toEqual([projectKey(rocket)])
+    expect(last.items[0]?.at).toBe(atOf(await readDiscover(zoe), rocket.id))
+    expect(last.items[0]?.project.latestUpdate).toBeNull()
   })
 
-  it('drops the notes of a followed project gone private, and brings them back at their date', async () => {
-    const recipes = await publish(lea)
-    await followProject(recipes.id, max)
-    const v2 = await postNote(lea, recipes.id)
-    expect(keys(await readFollowing(max))).toEqual([noteKey(v2)]) // témoin
+  // Relecture de sécurité du plan, A6.
+  it('falls back to the previous update when the latest one is removed', async () => {
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    await followProject(rocket.id, max)
+    const previous = await postUpdate(lea, rocket.id, {
+      version: 'v1.1',
+      lines: [{ family: 'new', text: 'Le compte à rebours' }],
+    })
+    const removed = await postUpdate(lea, rocket.id, {
+      version: 'v1.2',
+      lines: [{ family: 'new', text: 'Une ligne retirée par la modération' }],
+    })
+    expect(keys(await readFollowing(max))).toEqual([updateKey(removed)]) // témoin
 
-    await setVisibility(lea, recipes.id, 'private')
+    await removeUpdate(removed.id)
+
+    const page = await readFollowing(max)
+    expect(keys(page)).toEqual([updateKey(previous)])
+    expect(page.items[0]).toMatchObject({
+      at: previous.createdAt,
+      update: summaryOf(previous),
+      project: { latestUpdate: summaryOf(previous), version: 'v1.1' },
+    })
+    expect(JSON.stringify(page)).not.toContain('retirée par la modération')
+  })
+
+  // Relecture de sécurité du plan, B4 : les cartes, pour tous, auteur compris.
+  it('never shows a removed update on a card, even to its author', async () => {
+    const rocket = await publish(lea, { title: 'Décollage !' })
+    await followProject(rocket.id, max)
+    const v11 = await postUpdate(lea, rocket.id, {
+      version: 'v1.1',
+      lines: [{ family: 'new', text: 'Le compte à rebours' }],
+    })
+    const v12 = await postUpdate(lea, rocket.id, {
+      version: 'v1.2',
+      lines: [{ family: 'new', text: 'Une ligne retirée par la modération' }],
+    })
+    await removeUpdate(v12.id)
+
+    for (const [name, cookie] of [
+      ['Léa', lea],
+      ['Max', max],
+      ['Zoé', zoe],
+    ] as const) {
+      const page = await readDiscover(cookie)
+      const card = page.items.find((item) => item.project.id === rocket.id)
+      expect(card?.project.latestUpdate, name).toEqual(summaryOf(v11))
+      expect(card?.project.version, name).toBe('v1.1')
+      const text = JSON.stringify(page)
+      expect(text, name).not.toContain(v12.id)
+      expect(text, name).not.toContain('v1.2')
+      expect(text, name).not.toContain('retirée par la modération')
+    }
+    // Et dans son propre fil, Léa voit sa carte avec la mise à jour précédente.
+    const own = await readFollowing(lea)
+    expect(own.items[0]?.project.latestUpdate).toEqual(summaryOf(v11))
+    expect(JSON.stringify(own)).not.toContain('v1.2')
+  })
+
+  // Relecture de sécurité du plan, A6 : les états cachés, dans le fil.
+  it('never raises a private, removed or blocked project in the following feed', async () => {
+    const act = activity(ctx)
+    const maxId = (await me(max)).id
+    await act.makeAdmin((await me(zoe)).id)
+    const hidden = await publish(lea, { title: 'Le projet caché' })
+    const removed = await publish(lea, { title: 'Le projet retiré' })
+    const blocked = await publish(lea, { title: 'Le projet du blocage' })
+    for (const project of [hidden, removed, blocked]) await followProject(project.id, max)
+    await postUpdate(lea, hidden.id, { lines: [{ family: 'new', text: 'Ligne du projet caché' }] })
+    await postUpdate(lea, removed.id, {
+      lines: [{ family: 'new', text: 'Ligne du projet retiré' }],
+    })
+    const kept = await postUpdate(lea, blocked.id, {
+      lines: [{ family: 'new', text: 'Ligne du projet du blocage' }],
+    })
+
+    // Le projet passe en privé ; l'autre est retiré par la modération (Zoé est administratrice).
+    await setVisibility(lea, hidden.id, 'private')
+    later()
+    await act.report(max, { kind: 'project', id: removed.id })
+    later()
+    await act.decide(zoe, {
+      action: 'remove',
+      target: { kind: 'project', id: removed.id },
+      ground: 'rules',
+      explanation: 'Ce projet ne respecte pas les règles.',
+    })
+
+    const page = await readFollowing(max)
+    expect(keys(page)).toEqual([updateKey(kept)]) // témoin : le troisième remonte
+    for (const leak of [hidden.id, removed.id, 'Ligne du projet caché', 'Ligne du projet retiré']) {
+      expect(JSON.stringify(page), leak).not.toContain(leak)
+    }
+
+    // Le blocage efface l'abonnement ; on le remet en base, pour vérifier que le fil filtre aussi
+    // le blocage lui-même (un abonnement pendant un blocage n'arrive par aucune route).
+    const followAgain = () =>
+      ctx.db
+        .insert(schema.projectFollow)
+        .values({ followerId: maxId, projectId: blocked.id, createdAt: new Date() })
+        .onConflictDoNothing()
+    const nothingFrom = async (who: string) => {
+      const after = await readFollowing(max)
+      expect(after.items, who).toEqual([])
+      for (const leak of [blocked.id, 'Ligne du projet du blocage']) {
+        expect(JSON.stringify(after), `${who}: ${leak}`).not.toContain(leak)
+      }
+    }
+
+    await act.block(leaId, max) // Max bloque Léa
+    await followAgain()
+    await nothingFrom('Max blocked Léa')
+
+    await act.unblock(leaId, max)
+    expect(keys(await readFollowing(max))).toEqual([updateKey(kept)]) // témoin
+
+    await act.block(maxId, lea) // Léa bloque Max
+    await followAgain()
+    await nothingFrom('Léa blocked Max')
+  })
+
+  it('drops a followed project gone private, and brings it back at the date of its update', async () => {
+    const rocket = await publish(lea)
+    await followProject(rocket.id, max)
+    const v2 = await postUpdate(lea, rocket.id)
+    expect(keys(await readFollowing(max))).toEqual([updateKey(v2)]) // témoin
+
+    await setVisibility(lea, rocket.id, 'private')
     // Comme s'il avait été supprimé : rien ne trahit qu'il existe encore (voir les tests 4a).
     expect(await readFollowing(max)).toEqual({
       items: [],
@@ -583,117 +816,118 @@ describe('the notes of followed projects in the « following » feed', () => {
       lastReadAt: null,
     })
 
-    await setVisibility(lea, recipes.id, 'public')
+    await setVisibility(lea, rocket.id, 'public')
     const after = await readFollowing(max)
-    expect(keys(after)).toEqual([noteKey(v2)])
-    // Elle reprend sa place, à sa date de publication : repasser public ne la fait pas remonter.
+    expect(keys(after)).toEqual([updateKey(v2)])
+    // Il reprend sa place, à la date de sa mise à jour : repasser public ne le fait pas remonter.
     expect(after.items[0]?.at).toBe(v2.createdAt)
   })
 
-  it('shows, once the project is public again, the notes written while it was private, at their own date', async () => {
-    const recipes = await publish(lea)
-    await followProject(recipes.id, max)
-    await setVisibility(lea, recipes.id, 'private')
-    const meanwhile = await postNote(lea, recipes.id, 'Écrite pendant que le projet était privé')
+  it('shows, once the project is public again, an update written while it was private, at its own date', async () => {
+    const rocket = await publish(lea)
+    await followProject(rocket.id, max)
+    await setVisibility(lea, rocket.id, 'private')
+    const meanwhile = await postUpdate(lea, rocket.id, {
+      lines: [{ family: 'new', text: 'Écrite pendant que le projet était privé' }],
+    })
     expect((await readFollowing(max)).items).toEqual([])
 
-    await setVisibility(lea, recipes.id, 'public')
+    await setVisibility(lea, rocket.id, 'public')
 
     const page = await readFollowing(max)
-    expect(keys(page)).toEqual([noteKey(meanwhile)])
+    expect(keys(page)).toEqual([updateKey(meanwhile)])
     expect(page.items[0]?.at).toBe(meanwhile.createdAt)
   })
 
-  it('takes the notes of a deleted account out of the feeds of her followers', async () => {
-    const recipes = await publish(lea)
+  it('takes the updates of a deleted account out of the feeds of her followers', async () => {
+    const rocket = await publish(lea)
     const garden = await publish(zoe, { title: 'Le carnet de jardin' })
-    await followProject(recipes.id, max)
+    await followProject(rocket.id, max)
     await followProject(garden.id, max)
-    const fromLea = await postNote(lea, recipes.id, 'Note de Léa')
-    const fromZoe = await postNote(zoe, garden.id, 'Note de Zoé')
-    expect(keys(await readFollowing(max))).toEqual([noteKey(fromZoe), noteKey(fromLea)]) // témoin
+    const fromLea = await postUpdate(lea, rocket.id, {
+      lines: [{ family: 'new', text: 'Mise à jour de Léa' }],
+    })
+    const fromZoe = await postUpdate(zoe, garden.id, {
+      lines: [{ family: 'new', text: 'Mise à jour de Zoé' }],
+    })
+    expect(keys(await readFollowing(max))).toEqual([updateKey(fromZoe), updateKey(fromLea)]) // témoin
 
     const res = await send('POST', '/api/auth/delete-user', lea, {
       password: leaAccount.password,
     })
     expect(res.status).toBe(200)
 
-    // Seule la note de Zoé reste : celles de Léa ont disparu avec son compte.
-    expect(keys(await readFollowing(max))).toEqual([noteKey(fromZoe)])
+    // Seul le projet de Zoé reste : celui de Léa est parti avec son compte.
+    expect(keys(await readFollowing(max))).toEqual([updateKey(fromZoe)])
   })
 })
 
-describe('the notes of a project beyond its journal', () => {
-  it('brings only the 20 latest notes of a project, those its author still sees and can delete', async () => {
-    // Une note lisible par les abonnés doit rester visible, et supprimable, par son auteur : le fil
-    // s'en tient donc aux notes du journal (les 20 plus récentes).
-    const recipes = await publish(lea, { title: 'Mon agent de recettes' })
-    await followProject(recipes.id, max)
-    const notes: ProjectNote[] = []
-    for (let i = 0; i < 21; i++) notes.push(await postNote(lea, recipes.id, `Note ${i}`))
-
-    const pages = await readAllPages((cursor) => readFollowing(max, cursor))
-    const seen = pages.flatMap(keys)
-
-    expect(seen).toHaveLength(20)
-    expect(seen).not.toContain(noteKey(notes[0] as ProjectNote)) // la plus ancienne
-    expect(seen[0]).toBe(noteKey(notes[20] as ProjectNote))
-  })
-})
-
-describe('notes in the « discover » feed', () => {
-  it('never shows a note, only projects', async () => {
-    const recipes = await publish(lea, { status: 'testable', demoUrl: 'https://demo.example.com' })
-    await followProject(recipes.id, max)
-    await postNote(lea, recipes.id)
+describe('the updates in the « discover » feed (R7a)', () => {
+  it('keeps the order of publication, with the latest update on the cards', async () => {
+    const rocket = await publish(lea, { status: 'testable', demoUrl: 'https://demo.example.com' })
+    await followProject(rocket.id, max)
     const garden = await publish(zoe, { title: 'Le carnet de jardin' })
-    await postNote(zoe, garden.id)
+    const v2 = await postUpdate(lea, rocket.id, { version: 'v2' })
 
     for (const cookie of [max, lea, zoe]) {
-      expect(keys(await readDiscover(cookie))).toEqual([projectKey(garden), projectKey(recipes)])
-      expect(keys(await readDiscover(cookie, { testers: 'true' }))).toEqual([projectKey(recipes)])
+      const page = await readDiscover(cookie)
+      // La mise à jour ne fait pas remonter le projet : « Découvrir » suit la publication.
+      expect(keys(page)).toEqual([projectKey(garden), projectKey(rocket)])
+      expect(page.items[1]?.at).toBe(atOf(page, rocket.id))
+      expect(page.items[1]?.project).toMatchObject({ latestUpdate: summaryOf(v2), version: 'v2' })
+      expect(page.items[0]?.project).toMatchObject({ latestUpdate: null, version: null })
+      expect(keys(await readDiscover(cookie, { testers: 'true' }))).toEqual([projectKey(rocket)])
     }
+    // Sa date dans « Découvrir » reste celle de sa publication, d'avant la mise à jour.
+    expect(Date.parse(atOf(await readDiscover(zoe), rocket.id) ?? '')).toBeLessThan(
+      Date.parse(v2.createdAt),
+    )
   })
 })
 
-describe('reading a feed of notes and projects page by page', () => {
-  it('gives 25 notes and 20 projects in pages of 20, in order, without gaps or repeats', async () => {
-    // Max suit Léa (ses 20 nouveaux projets) et deux projets de Zoé (25 notes en tout, réparties :
-    // le fil ne montre que les 20 dernières notes d'un même projet, celles de son journal). Les
-    // deux sortes alternent, deux heures d'écart chacune : sous les limites de 20 projets et 30
-    // notes par jour.
-    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
-    const birds = await publish(zoe, { title: 'Les oiseaux du jardin' })
-    await followProject(garden.id, max)
-    await followProject(birds.id, max)
+describe('reading a feed of updates and projects page by page (R7a)', () => {
+  it('gives updated projects and new projects in pages of 20, in order, without gaps or repeats', async () => {
+    // Max suit Léa et Zoé. Zoé publie d'abord 15 projets ; puis les nouveaux projets de Léa et les
+    // mises à jour de Zoé alternent (une par projet). Chaque projet de Zoé remonte à sa mise à
+    // jour : 30 éléments, un par projet, en pages de 20. Écarts de 2 h pour un projet et de 3 h pour
+    // une mise à jour : sous les limites de 20 projets et de 10 mises à jour par jour.
+    const zoeId = (await me(zoe)).id
     await followMember(leaId, max)
+    await followMember(zoeId, max)
+    const gardens: Project[] = []
+    for (let i = 0; i < 15; i++) gardens.push(await publish(zoe, { title: `Zoé ${i}` }))
     const published: string[] = []
-    for (let i = 0; i < 25; i++) {
-      const project = i % 2 === 0 ? garden : birds
-      published.push(noteKey(await postNote(zoe, project.id, `Note ${i}`)))
-      if (i < 20) published.push(projectKey(await publish(lea, { title: `Projet ${i}` })))
+    for (const [i, garden] of gardens.entries()) {
+      published.push(projectKey(await publish(lea, { title: `Léa ${i}` })))
+      const update = await postUpdate(zoe, garden.id, {
+        lines: [{ family: 'new', text: `Mise à jour ${i}` }],
+      })
+      published.push(updateKey(update))
     }
 
     const pages = await readAllPages((cursor) => readFollowing(max, cursor))
 
-    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, FEED_PAGE_SIZE, 5])
-    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, false, true])
+    expect(pages.map((page) => page.items.length)).toEqual([FEED_PAGE_SIZE, 10])
+    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, true])
     expect(pages.flatMap(keys)).toEqual([...published].reverse())
   })
 
-  it('loses nothing and repeats nothing when notes and projects share the same instant', async () => {
-    // 21 éléments au même instant (la fausse horloge n'avance plus) : 11 projets de Léa et 10 notes
-    // d'un projet de Zoé. La limite de la page tombe au milieu de ces ex aequo de deux sortes.
-    const garden = await publish(zoe, { title: 'Le carnet de jardin' })
-    await followProject(garden.id, max)
+  it('loses nothing and repeats nothing when updates and projects share the same instant', async () => {
+    // 21 éléments au même instant (la fausse horloge n'avance plus) : 11 projets de Léa et les
+    // mises à jour de 10 projets de Zoé. La limite de la page tombe au milieu de ces ex aequo de
+    // deux sortes ; le curseur les départage par l'identifiant du projet.
+    const zoeId = (await me(zoe)).id
     await followMember(leaId, max)
+    await followMember(zoeId, max)
+    const gardens: Project[] = []
+    for (let i = 0; i < 10; i++) gardens.push(await publish(zoe, { title: `Jardin ${i}` }))
     later()
     const published: string[] = []
     for (let i = 0; i < 11; i++) {
       published.push(projectKey(await publish(lea, { title: `Léa ${i}` }, { wait: false })))
     }
-    for (let i = 0; i < 10; i++) {
-      published.push(noteKey(await postNote(zoe, garden.id, `Note ${i}`, { wait: false })))
+    for (const garden of gardens) {
+      published.push(updateKey(await postUpdate(zoe, garden.id, { wait: false })))
     }
 
     const pages = await readAllPages((cursor) => readFollowing(max, cursor))
@@ -949,8 +1183,8 @@ describe('the reaction total of each project (R4)', () => {
 // suivis **ou** ceux du lecteur ; rien d'autre ne change. Donc :
 // - ses projets privés et ses projets retirés par la modération n'y sont jamais, comme pour ceux des
 //   autres ;
-// - ses notes n'y viennent pas : seules les notes des projets suivis entrent dans le fil, et l'on ne
-//   suit pas son propre projet ;
+// - ses mises à jour ne font pas remonter ses projets (R7a) : seuls les projets suivis, ou d'un
+//   auteur suivi, remontent ainsi, et l'on ne suit pas son propre projet ;
 // - `followsAnyone` parle toujours de ses abonnements : publier ne fait suivre personne.
 // Les nouveautés se comptent dans l'appli (feed/api.ts) ; l'API, elle, garantit que la carte porte
 // son auteur, le lecteur lui-même : c'est ce qui permet à l'appli de la laisser hors du compte
@@ -1020,9 +1254,10 @@ describe('one’s own projects in the « following » feed (R6a)', () => {
 
     const queries = await explainQueries(ctx.db, () => readFollowing(max))
 
-    // La requête des lignes du fil : la seule qui mêle projets et notes (le mot 'note' en dur).
+    // La requête des lignes du fil : la seule qui mêle les abonnements et les mises à jour (R7a :
+    // elle remplace celle qui mêlait projets et notes).
     const feedQuery = queries.find(
-      (q) => q.sql.includes('member_follow') && q.sql.includes("'note'"),
+      (q) => q.sql.includes('member_follow') && q.sql.includes('project_update'),
     )
     expect(feedQuery).toBeDefined()
     // Les deux index qui commencent par l'auteur conviennent (PostgreSQL choisit entre eux selon
@@ -1095,12 +1330,17 @@ describe('one’s own projects in the « following » feed (R6a)', () => {
     expect(JSON.stringify(page)).not.toContain('Projet retiré')
   })
 
-  it('brings my projects, never the notes I write on them', async () => {
+  it('keeps my project at its publication date: my own updates do not raise it in my feed', async () => {
     const mine = await publish(max, { title: 'Mon agent de recettes' })
-    await postNote(max, mine.id, 'v2 : mode hors ligne')
+    const update = await postUpdate(max, mine.id, { version: 'v2' })
 
-    // On ne suit pas son propre projet : ses notes restent sur sa page, le fil montre le projet.
-    expect(keys(await readFollowing(max))).toEqual([projectKey(mine)])
+    // R7a (plan, « Le fil Abonnements ») : ses propres projets entrent à leur date de publication ;
+    // seuls les projets suivis, ou d'un auteur suivi, remontent par leurs mises à jour. On ne suit
+    // pas son propre projet : sa carte reste à sa place, et porte seulement sa dernière mise à jour.
+    const page = await readFollowing(max)
+    expect(keys(page)).toEqual([projectKey(mine)])
+    expect(page.items[0]?.at).toBe(atOf(await readDiscover(zoe), mine.id))
+    expect(page.items[0]?.project).toMatchObject({ latestUpdate: summaryOf(update), version: 'v2' })
   })
 
   it('shows my projects in my feed only, never in the feed of a member who does not follow me', async () => {
