@@ -106,6 +106,8 @@ function ThemedChrome() {
           croire à toutes les pages qu'elles ont une page d'avant (relecture du plan, ui-I1). */}
       <Stack.Screen name="projects/new" options={sheetRoute} />
       <Stack.Screen name="projects/[id]/edit" options={sheetRoute} />
+      {/* R7a : la feuille « Nouvelle mise à jour », posée de même sur la page du projet. */}
+      <Stack.Screen name="projects/[id]/update" options={sheetRoute} />
     </Stack>
   )
   return (
