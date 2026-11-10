@@ -68,33 +68,29 @@ const expectNotFound = async (res: Response) => {
 }
 
 /**
- * Range directement dans la base `count` projets publics de Léa portant cette étiquette, du plus
- * ancien au plus récent : plus rapide que par l'API, et sans buter sur la limite de 20 par jour.
+ * Range directement dans la base `count` projets publics de Léa, du plus ancien au plus récent :
+ * plus rapide que par l'API, et sans buter sur la limite de 20 par jour.
  */
-const insertProjects = async (count: number, tool: string, slug: string) => {
+const insertProjects = async (count: number) => {
   for (let i = 0; i < count; i++) {
     await ctx.db.insert(schema.project).values({
       id: crypto.randomUUID(),
       authorId: leaId,
       title: `Projet ${i}`,
       pitch: 'Un pitch.',
-      tools: [tool],
-      toolSlugs: [slug],
       createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
     })
   }
 }
 
-/** Puis un brouillon privé de Léa, plus récent que tous ces projets, avec la même étiquette. */
-const insertNewerDraft = (tool: string, slug: string) =>
+/** Puis un brouillon privé de Léa, plus récent que tous ces projets. */
+const insertNewerDraft = () =>
   ctx.db.insert(schema.project).values({
     id: crypto.randomUUID(),
     authorId: leaId,
     title: 'Brouillon récent',
     pitch: 'Un pitch.',
     visibility: 'private',
-    tools: [`${tool} (privé)`],
-    toolSlugs: [slug],
     createdAt: new Date(Date.UTC(2026, 5, 1)),
   })
 
@@ -184,7 +180,7 @@ describe('the page of a member', () => {
   })
 
   it('lists at most 50 projects', async () => {
-    await insertProjects(PROJECT_LIST_MAX + 1, 'Claude', 'claude')
+    await insertProjects(PROJECT_LIST_MAX + 1)
 
     const page = await readMember(leaId, max)
 
@@ -193,8 +189,8 @@ describe('the page of a member', () => {
   })
 
   it('never lets a private project take one of the 50 places, nor hide a public one', async () => {
-    await insertProjects(PROJECT_LIST_MAX, 'Claude', 'claude')
-    await insertNewerDraft('Claude', 'claude')
+    await insertProjects(PROJECT_LIST_MAX)
+    await insertNewerDraft()
 
     const seenByMax = await readMember(leaId, max)
     expect(seenByMax.projects).toHaveLength(PROJECT_LIST_MAX)
