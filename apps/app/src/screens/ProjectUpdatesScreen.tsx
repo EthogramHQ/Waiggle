@@ -29,7 +29,6 @@ import type { Project, ProjectUpdate } from '@ruche/contracts'
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Platform } from 'react-native'
 import { useMemberSession } from '../accounts/session'
 import { errorKey } from '../api/errors'
 import { useMediaSources } from '../api/media'
@@ -38,16 +37,14 @@ import { useSuspension } from '../moderation/suspension'
 import { useSignInAgain } from '../navigation/signInAgain'
 import { TopNav } from '../navigation/TopNav'
 import { useGoBack } from '../navigation/useGoBack'
+import { DeleteUpdateDialog } from '../projects/DeleteUpdateDialog'
 import { useProject } from '../projects/hooks'
 import { BeforeAfter } from '../ui/BeforeAfter'
-import { Button } from '../ui/Button'
 import { Columns } from '../ui/Columns'
 import { CountedTitle } from '../ui/CountedTitle'
-import { Dialog } from '../ui/Dialog'
 import { FollowButton } from '../ui/FollowButton'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { LiveStatus } from '../ui/LiveStatus'
-import { Notice } from '../ui/Notice'
 import type { GalleryPhoto } from '../ui/PhotoGallery'
 import { ProjectDatesLine } from '../ui/ProjectDatesLine'
 import { Screen } from '../ui/Screen'
@@ -57,7 +54,7 @@ import { StateMessage } from '../ui/StateMessage'
 import { TextLink } from '../ui/TextLink'
 import { useLayout } from '../ui/theme/layout'
 import { UpdateTimeline } from '../ui/UpdateTimeline'
-import { type UpdateFailure, useDeleteUpdate, useProjectUpdates } from '../updates/api'
+import { useProjectUpdates } from '../updates/api'
 import {
   LoadErrorScreen,
   LoadingScreen,
@@ -97,7 +94,7 @@ export function ProjectUpdatesScreen({ id }: { id: string }) {
 }
 
 /** La mise à jour dont la fenêtre de confirmation demande la suppression. */
-type Deleting = { update: ProjectUpdate } | null
+type Deleting = ProjectUpdate | null
 
 function UpdatesView({ project }: { project: Project }) {
   const { t } = useTranslation()
@@ -106,13 +103,8 @@ function UpdatesView({ project }: { project: Project }) {
   const { columns } = useLayout()
   const back = useGoBack(`/projects/${project.id}`)
   const updates = useProjectUpdates(project.id)
-  const deletion = useDeleteUpdate(project.id)
-  const signInAgain = useSignInAgain()
-
   // Le titre de la page : où va le focus quand la dernière mise à jour est supprimée.
   const headingRef = useRef<Focusable>(null)
-  // « Annuler » reçoit le focus à l'ouverture de la fenêtre : le geste qui ne perd rien.
-  const cancelRef = useRef<Focusable>(null)
 
   const live = updates.data?.pages.flatMap((page) => page.items) ?? []
   // La frise figée pendant la fenêtre de confirmation (voir l'en-tête du fichier) ; null : la frise
@@ -127,19 +119,15 @@ function UpdatesView({ project }: { project: Project }) {
   // La mise à jour dont « Supprimer » a été touché : sa corbeille reste occupée jusqu'à ce que la
   // frise la perde (ou qu'on renonce). La frise s'en sert pour savoir où rendre le focus.
   const [attempted, setAttempted] = useState<string | null>(null)
-  const [removing, setRemoving] = useState(false)
-  // Le refus se montre après un envoi seulement, et disparaît à la réouverture.
-  const [showDeleteError, setShowDeleteError] = useState(false)
   // « Mise à jour supprimée. », lu poliment une fois la fenêtre fermée.
   const [announce, setAnnounce] = useState('')
   // La frise vient de perdre une mise à jour : s'il n'en reste aucune, le focus ira au titre.
   const [justDeleted, setJustDeleted] = useState(false)
 
   const openDelete = (update: ProjectUpdate) => {
-    setShowDeleteError(false)
     setAnnounce('')
     setFrozen(live)
-    setDeleting({ update })
+    setDeleting(update)
   }
 
   // La mise à jour que l'API vient de supprimer, en attendant que la fenêtre soit partie.
@@ -159,29 +147,6 @@ function UpdatesView({ project }: { project: Project }) {
     }
     setFrozen(null)
     setAttempted(null)
-  }
-
-  const closeDialog = () => {
-    setDeleting(null)
-    if (Platform.OS !== 'web') release()
-  }
-
-  const confirmDelete = async () => {
-    if (!deleting || removing) return
-    const { update } = deleting
-    setRemoving(true)
-    setAttempted(update.id)
-    setShowDeleteError(false)
-    const ok = await deletion.remove(update.id)
-    setRemoving(false)
-    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!ok) {
-      setShowDeleteError(true)
-      return
-    }
-    confirmed.current = update.id
-    setAnnounce(t(($) => $.project.updates.deleted))
-    closeDialog()
   }
 
   // La dernière mise à jour vient de partir : le focus va au titre de la page (la frise n'a plus
@@ -222,9 +187,6 @@ function UpdatesView({ project }: { project: Project }) {
       ? { ...update, beforeAfter: false, photos: update.photos.slice(2) }
       : update,
   )
-
-  const failure = (reason: UpdateFailure | undefined) =>
-    reason === 'expired' ? t(($) => $.states.expired) : t(($) => $.project.updates.deleteError)
 
   const head = (
     <Stack gap="xs">
@@ -290,8 +252,6 @@ function UpdatesView({ project }: { project: Project }) {
     <SkeletonList count={2} />
   )
 
-  const removed = deleting?.update.removal != null
-
   return (
     <Screen
       width="page"
@@ -313,58 +273,20 @@ function UpdatesView({ project }: { project: Project }) {
       )}
       <LiveStatus message={announce} visible={false} />
       {/* Supprimer une mise à jour est définitif : une fenêtre demande confirmation. */}
-      <Dialog
-        visible={deleting !== null}
-        guardTaps
-        title={t(($) => $.project.updates.deleteTitle)}
-        message={
-          removed
-            ? t(($) => $.project.updates.deleteBodyRemoved)
-            : t(($) => $.project.updates.deleteBody)
-        }
-        initialFocusRef={cancelRef}
-        busy={removing}
-        onDismiss={() => {
-          if (removing) return
-          setAttempted(null)
-          closeDialog()
+      <DeleteUpdateDialog
+        projectId={project.id}
+        update={deleting}
+        onAttempt={(update) => setAttempted(update.id)}
+        onDeleted={(update) => {
+          confirmed.current = update.id
+          setAnnounce(t(($) => $.project.updates.deleted))
         }}
-        // La fenêtre est partie (web) : la frise peut perdre la mise à jour supprimée, et donner le
-        // focus à la suivante sans que la fenêtre le lui reprenne.
-        onClosed={release}
-      >
-        {/* Refusée : le message reste dans la fenêtre, et « Supprimer » permet de réessayer ; une
-            session expirée propose de se reconnecter (la fenêtre se ferme d'abord). */}
-        {showDeleteError && deletion.error ? (
-          <Notice
-            message={failure(deletion.reason)}
-            action={
-              deletion.reason === 'expired'
-                ? signInAgain(() => {
-                    setAttempted(null)
-                    closeDialog()
-                  })
-                : undefined
-            }
-          />
-        ) : null}
-        <Button
-          label={t(($) => $.project.updates.confirmDelete)}
-          variant="confirm"
-          onPress={() => void confirmDelete()}
-          loading={removing}
-        />
-        <Button
-          ref={cancelRef}
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => {
-            setAttempted(null)
-            closeDialog()
-          }}
-          disabled={removing}
-        />
-      </Dialog>
+        onCancelled={() => setAttempted(null)}
+        onClose={() => setDeleting(null)}
+        // La fenêtre est partie : la frise peut perdre la mise à jour supprimée, et donner le focus
+        // à la suivante sans que la fenêtre le lui reprenne.
+        onGone={release}
+      />
     </Screen>
   )
 }

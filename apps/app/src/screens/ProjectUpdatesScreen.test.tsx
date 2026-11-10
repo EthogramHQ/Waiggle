@@ -15,8 +15,11 @@ import type { Project, ProjectUpdate } from '@ruche/contracts'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import type { ApiResult } from '../api/errors'
 import { useFollow } from '../follows/api'
+import { getMe } from '../profile/api'
+import { projectQueryKey } from '../projects/hooks'
 import { labelOf } from '../testing/arrivedFocus'
 import { passTapGuard } from '../testing/dialog'
+import { suspendedMe } from '../testing/fixtures'
 import { recipesProject } from '../testing/projects'
 import { mockSession, renderWithProviders } from '../testing/render'
 import { containing, fr } from '../testing/text'
@@ -457,5 +460,61 @@ describe('deleting an update from the timeline', () => {
     expect(screen.getByText('Mise à jour numéro 2')).toBeTruthy()
     expect(screen.queryByRole('button', { name: trashOf('Mise à jour numéro 2') })).toBeNull()
     expect(screen.queryByRole('button', { name: trashOf(rocketUpdate.title ?? '') })).toBeNull()
+  })
+})
+
+// Relecture de l'interface de R7a (C3) : la frise a sa propre pastille « Suivre ce projet », qui doit
+// suivre les mêmes règles que celle de la page du projet (tranche 7c, décision du 26/10/2026) : un
+// compte suspendu peut retirer un abonnement, jamais en ajouter ; une fois retiré, la pastille reste
+// à sa place, inactive.
+describe('« Suivre ce projet » on the timeline of a suspended member', () => {
+  const following = fr.t(($) => $.follow.projectFollowing)
+
+  beforeEach(() => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+  })
+  afterEach(() => {
+    // Comme le faux du haut du fichier : pas de profil.
+    jest.mocked(getMe).mockResolvedValue(null as never)
+  })
+
+  it('lets her stop following a project she follows', async () => {
+    seenByMax({ ...withUpdates, isFollowed: true })
+    await openPage()
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+
+    await fireEvent.press(screen.getByRole('switch', { name: following }))
+
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps it in place but inactive once she stopped following', async () => {
+    seenByMax({ ...withUpdates, isFollowed: true })
+    const { queryClient } = await openPage()
+    // Le faux hook fait ce que fait le vrai au toucher : le projet n'est plus suivi, dans le cache.
+    mockToggle.mockImplementation(() =>
+      queryClient.setQueryData<Project>(projectQueryKey(id), (project) =>
+        project ? { ...project, isFollowed: false } : project,
+      ),
+    )
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+
+    await fireEvent.press(screen.getByRole('switch', { name: following }))
+
+    const follow = await screen.findByRole('switch', { name: T.follow })
+    expect(follow).toBeDisabled()
+    await fireEvent.press(follow)
+    expect(mockToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers no pastille at all for a project she does not follow', async () => {
+    seenByMax()
+    await openPage()
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+
+    expect(screen.queryByRole('switch', { name: T.follow })).toBeNull()
   })
 })

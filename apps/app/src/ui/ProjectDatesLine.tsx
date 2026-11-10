@@ -11,7 +11,7 @@ import type { ProjectVisibility } from '@ruche/contracts'
 import { useTranslation } from 'react-i18next'
 import { MetaLine } from './MetaLine'
 import { RelativeTime } from './RelativeTime'
-import { Text } from './Text'
+import { VersionText } from './VersionText'
 
 type Props = {
   /** La date de création du projet, au format ISO du contrat. */
@@ -59,11 +59,7 @@ export function ProjectDatesLine({ createdAt, visibility, latestUpdateAt, versio
       ) : null}
       {/* La version, un texte à elle : elle seule prend la police à chasse fixe, à la taille des
           dates et dans leur gris (discrète). Jamais sans la mise à jour qui la porte. */}
-      {latestUpdateAt && version ? (
-        <Text variant="mono" tone="muted" breakAnywhere>
-          {version}
-        </Text>
-      ) : null}
+      {latestUpdateAt && version ? <VersionText version={version} tone="muted" /> : null}
     </MetaLine>
   )
 }

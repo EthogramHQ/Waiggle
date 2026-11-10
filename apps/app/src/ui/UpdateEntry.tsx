@@ -2,7 +2,8 @@
 // projet », « La frise », « Supprimer une mise à jour », planches R7-MAJ-Projet et R7-MAJ-Desktop) :
 // - en tête, son titre (sinon sa version, sinon « Mise à jour »), en titre de niveau 2 dans la frise
 //   ou 3 dans la section « Les mises à jour » de la page projet ; la version en Geist Mono à côté
-//   (jamais deux fois quand elle sert de titre) ; la date relative à droite ;
+//   (jamais deux fois quand elle sert de titre) ; la date relative à droite sur ordinateur, sous
+//   le titre (« v1.2 · dimanche », à gauche) sur téléphone ;
 // - au bord droit, la corbeille de l'auteur, nommée par sa mise à jour, ou « Signaler cette mise à
 //   jour » pour un autre membre ;
 // - le bandeau de retrait, pour l'auteur d'une mise à jour retirée par la modération ;
@@ -25,14 +26,16 @@ import type { Focusable } from './focus'
 import { hiddenFrame } from './HiddenHeading'
 import { IconButton } from './IconButton'
 import type { ImageSource } from './image'
+import { MetaLine } from './MetaLine'
 import { type GalleryPhoto, PhotoGallery } from './PhotoGallery'
-import { ProjectCover } from './ProjectCover'
+import { type CoverShape, ProjectCover } from './ProjectCover'
 import { RelativeTime } from './RelativeTime'
 import { RemovalNotice, type RemovedBanner } from './RemovalNotice'
 import { Stack } from './Stack'
 import { Text } from './Text'
 import { useLayout } from './theme/layout'
 import { UpdateFamilyBadge } from './UpdateFamilyBadge'
+import { VersionText } from './VersionText'
 
 type Props = {
   update: ProjectUpdate
@@ -57,6 +60,11 @@ type Props = {
   focusRef?: Ref<Focusable>
   /** L'heure qu'il est, pour figer la date relative (catalogue, tests). */
   now?: Date
+  /**
+   * La hauteur de la photo ou de l'avant / après (jetons `layout.cover`). Par défaut : une bande
+   * sur téléphone, `medium` ailleurs (la frise). La section de la page projet demande `band`.
+   */
+  photoHeight?: CoverShape
 }
 
 /** Une ligne de « Ce qui a changé » visible à droite de sa pastille, alignée sur sa première ligne. */
@@ -88,9 +96,11 @@ export function UpdateEntry({
   onReport,
   focusRef,
   now,
+  photoHeight: photoShape,
 }: Props) {
   const { t } = useTranslation()
   const { sizeClass } = useLayout()
+  const compact = sizeClass === 'compact'
   const titleId = `update-title-${useId().replace(/[^\w-]/g, '')}`
 
   // Le titre : celui de l'auteur, sinon sa version, sinon « Mise à jour ». La version ne se répète
@@ -111,21 +121,24 @@ export function UpdateEntry({
   // plan les perdait).
   const extras = comparison ? photos.slice(2) : []
   // La hauteur des photos : celle d'une bande sur téléphone, moyenne ailleurs (la galerie d'un projet
-  // est plus grande ; ici, la mise à jour se lit dans une page qui a déjà sa couverture).
-  const photoHeight = sizeClass === 'compact' ? 'band' : 'medium'
+  // est plus grande ; ici, la mise à jour se lit dans une page qui a déjà sa couverture), sauf si
+  // l'écran en demande une (la section de la page projet : une bande, même sur ordinateur).
+  const photoHeight = photoShape ?? (compact ? 'band' : 'medium')
 
   return (
     <View style={{ alignSelf: 'stretch', gap: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
-        {/* Le titre et la date passent à la ligne quand la place manque (texte agrandi, petit
-            téléphone) : la date reste à droite (`marginLeft: 'auto'`), sous le titre. */}
+        {/* Ordinateur : le titre et la date passent à la ligne quand la place manque (texte
+            agrandi) ; la date reste à droite (`marginLeft: 'auto'`). Téléphone : le titre seul sur
+            sa ligne, puis « v1.2 · dimanche » dessous, à gauche (à 320 et 390 points, la date
+            tombait seule à droite sur une deuxième ligne). */}
         <View
           style={{
             flex: 1,
             minWidth: 0,
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            alignItems: 'baseline',
+            flexDirection: compact ? 'column' : 'row',
+            flexWrap: compact ? 'nowrap' : 'wrap',
+            alignItems: compact ? 'stretch' : 'baseline',
             columnGap: space.sm,
             rowGap: space.xxs,
             // Le titre centré sur le bouton de 44 points (corbeille ou « Signaler ») quand il tient
@@ -155,15 +168,18 @@ export function UpdateEntry({
                 {title}
               </Text>
             </View>
-            {versionBeside ? (
-              <Text variant="mono" tone="secondary" breakAnywhere>
-                {versionBeside}
-              </Text>
-            ) : null}
+            {versionBeside && !compact ? <VersionText version={versionBeside} /> : null}
           </View>
-          <View style={{ marginLeft: 'auto' }}>
-            <RelativeTime date={update.createdAt} now={now} />
-          </View>
+          {compact ? (
+            <MetaLine>
+              {versionBeside ? <VersionText version={versionBeside} tone="muted" /> : null}
+              <RelativeTime date={update.createdAt} now={now} />
+            </MetaLine>
+          ) : (
+            <View style={{ marginLeft: 'auto' }}>
+              <RelativeTime date={update.createdAt} now={now} />
+            </View>
+          )}
         </View>
         {onDelete ? (
           <IconButton

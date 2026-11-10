@@ -64,6 +64,13 @@ const STEP = 10
 const TAP_SLOP = 8
 /** L'épaisseur du trait entre les deux photos. */
 const LINE = borders.hairline * 3
+/**
+ * La place qu'une étiquette demande sur sa photo, marge du bord comprise : l'étiquette (~70 points,
+ * « Avant », « Before », « Après ») plus `space.md` du bord et un souffle avant le trait.
+ */
+const TAG_ROOM = 96
+/** La largeur supposée de la zone tant qu'elle n'est pas mesurée : un petit téléphone (320 - marges). */
+const NARROW_ZONE = 288
 
 type KeyEvent = { key: string; preventDefault: () => void }
 
@@ -99,8 +106,12 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
   // mesuré : le pré-rendu et les tests ne lisent aucune largeur, et un geste n'y fait rien.
   const width = useRef(0)
   const zone = useRef<View>(null)
+  // Recopiée en état, pour dessiner la poignée et les étiquettes (0 : pas encore mesurée, on dessine
+  // alors en pourcentages, comme le pré-rendu).
+  const [frameWidth, setFrameWidth] = useState(0)
   const onLayout = (event: LayoutChangeEvent) => {
     width.current = event.nativeEvent.layout.width
+    setFrameWidth(event.nativeEvent.layout.width)
   }
   /** Sur le web, la largeur relue au début du geste (la fenêtre a pu changer depuis la mesure). */
   const measureNow = () => {
@@ -230,6 +241,21 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
   // dessinée.
   const beforeWidth: `${number}%` | 0 = value > 0 ? `${(100 / value) * 100}%` : 0
 
+  // Les étiquettes sont fixes (« Avant » à gauche, « Après » à droite) : quand le trait s'approche
+  // d'un bord, celle de ce côté n'a plus la place de tenir sur sa photo et se poserait sur l'autre.
+  // Elle se cache alors (c'est un dessin : le curseur dit déjà où est le trait). Tant que la largeur
+  // n'est pas mesurée, on compte un téléphone étroit.
+  const zoneWidth = frameWidth > 0 ? frameWidth : NARROW_ZONE
+  const showBefore = (zoneWidth * value) / 100 >= TAG_ROOM
+  const showAfter = (zoneWidth * (100 - value)) / 100 >= TAG_ROOM
+  // La poignée de 44 points reste entière dans le cadre : à 0 et à 100 %, son centre s'arrête à une
+  // demi-poignée du bord (le trait, lui, va jusqu'au bord). Non mesurée : en pourcentage.
+  const half = layout.touchTarget / 2
+  const handleCenter =
+    frameWidth > 0
+      ? Math.max(half, Math.min(frameWidth - half, (frameWidth * value) / 100))
+      : (`${value}%` as const)
+
   return (
     <View style={{ alignSelf: 'stretch', gap: space.sm }}>
       <View
@@ -326,8 +352,9 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
               justifyContent: 'space-between',
             }}
           >
-            <Tag text={t(($) => $.project.updates.before)} />
-            <Tag text={t(($) => $.project.updates.after)} />
+            {/* Une vue vide garde l'autre étiquette de son côté. */}
+            {showBefore ? <Tag text={t(($) => $.project.updates.before)} /> : <View />}
+            {showAfter ? <Tag text={t(($) => $.project.updates.after)} /> : <View />}
           </View>
           {/* La poignée ronde de 44 points, au milieu du trait : du verre, comme les boutons posés
               sur une photo. */}
@@ -336,11 +363,11 @@ export function BeforeAfter({ before, after, height: shape, label, initialValue 
             style={{
               position: 'absolute',
               top: '50%',
-              left: `${value}%`,
+              left: handleCenter,
               width: layout.touchTarget,
               height: layout.touchTarget,
-              marginTop: -layout.touchTarget / 2,
-              marginLeft: -layout.touchTarget / 2,
+              marginTop: -half,
+              marginLeft: -half,
               borderRadius: radii.pill,
               alignItems: 'center',
               justifyContent: 'center',

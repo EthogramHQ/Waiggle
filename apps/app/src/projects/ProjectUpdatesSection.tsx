@@ -19,9 +19,7 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaSources } from '../api/media'
 import { firstParam } from '../navigation/params'
-import { useSignInAgain } from '../navigation/signInAgain'
 import { Button } from '../ui/Button'
-import { Dialog } from '../ui/Dialog'
 import { type Focusable, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Notice } from '../ui/Notice'
 import { Row } from '../ui/Stack'
@@ -31,7 +29,7 @@ import { Text } from '../ui/Text'
 import { TextLink } from '../ui/TextLink'
 import { useHydrated } from '../ui/theme/hydration'
 import { UpdateEntry } from '../ui/UpdateEntry'
-import { type UpdateFailure, useDeleteUpdate } from '../updates/api'
+import { DeleteUpdateDialog } from './DeleteUpdateDialog'
 
 /**
  * Hook : ouvrir la feuille « Nouvelle mise à jour » et rendre le focus, à son retour, au contrôle
@@ -115,22 +113,12 @@ export function ProjectUpdatesSection({ project, canPublish, sheet }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const toSource = useMediaSources()
-  const signInAgain = useSignInAgain()
-  const deleteUpdate = useDeleteUpdate(project.id)
   const update = project.latestUpdate
 
   // La mise à jour dont on demande confirmation de la suppression (une à la fois).
   const [deleting, setDeleting] = useState<Project['latestUpdate']>(null)
-  const [removing, setRemoving] = useState(false)
-  // Deux appuis dans le même instant arrivent avant que « Supprimer » ne passe en « en cours » : ce
-  // drapeau, posé au premier, fait ignorer le second (une seule suppression envoyée).
-  const sending = useRef(false)
-  // Les erreurs de React Query restent jusqu'au prochain envoi : on ne les montre qu'après un envoi.
-  const [showDeleteError, setShowDeleteError] = useState(false)
   // « Mise à jour supprimée. », jusqu'au geste suivant.
   const [deleted, setDeleted] = useState(false)
-  // « Annuler » reçoit le focus à l'ouverture de la fenêtre (une suppression ne se défait pas).
-  const cancelRef = useRef<Focusable>(null)
   // Le titre de la mise à jour qui prend la place de la supprimée, s'il y en a une ; sinon le focus
   // va au titre de la section.
   const entryTitleRef = useRef<Focusable>(null)
@@ -139,30 +127,6 @@ export function ProjectUpdatesSection({ project, canPublish, sheet }: Props) {
 
   // Pour un autre membre : pas de section sans mise à jour à lire.
   if (!project.isMine && !update) return null
-
-  const confirmDelete = async () => {
-    if (!deleting || sending.current) return
-    sending.current = true
-    setRemoving(true)
-    setShowDeleteError(true)
-    const ok = await deleteUpdate.remove(deleting.id)
-    sending.current = false
-    setRemoving(false)
-    // Refusée : la fenêtre reste ouverte, avec le message ; « Supprimer » permet de réessayer.
-    if (!ok) return
-    // Supprimée : sa corbeille n'existe plus ; le focus ira à ce qui prend sa place, une fois la
-    // fenêtre refermée. « Mise à jour supprimée. » le confirme.
-    focusAfterClose.current = true
-    setDeleted(true)
-    setDeleting(null)
-  }
-
-  // Le message d'une suppression refusée : la session expirée se dit (« Réessaie » n'y ferait
-  // rien), avec « Me reconnecter », qui referme d'abord la fenêtre.
-  const failure = (reason: UpdateFailure | undefined) =>
-    reason === 'expired' ? t(($) => $.states.expired) : t(($) => $.project.updates.deleteError)
-
-  const removed = deleting?.removal ?? update?.removal ?? null
 
   return (
     <Surface variant="grouped" padding="xl" gap="lg">
@@ -174,15 +138,14 @@ export function ProjectUpdatesSection({ project, canPublish, sheet }: Props) {
           update={update}
           toSource={toSource}
           headingLevel={3}
+          photoHeight="band"
           focusRef={entryTitleRef}
           {...(project.isMine
             ? {
                 onDelete: () => {
-                  setShowDeleteError(false)
                   setDeleted(false)
                   setDeleting(update)
                 },
-                deleting: removing,
               }
             : {
                 onReport: () =>
@@ -227,23 +190,17 @@ export function ProjectUpdatesSection({ project, canPublish, sheet }: Props) {
         </Row>
       ) : null}
       {/* Supprimer une mise à jour est définitif : une fenêtre demande confirmation. */}
-      <Dialog
-        visible={deleting !== null}
-        guardTaps
-        title={t(($) => $.project.updates.deleteTitle)}
-        // Retirée par la modération : la décision et la copie du signalement restent gardées.
-        message={
-          removed
-            ? t(($) => $.project.updates.deleteBodyRemoved)
-            : t(($) => $.project.updates.deleteBody)
-        }
-        initialFocusRef={cancelRef}
-        busy={removing}
-        // Pendant la suppression, la fenêtre reste ouverte : la fermer perdrait le focus prévu après.
-        onDismiss={() => {
-          if (!removing) setDeleting(null)
+      <DeleteUpdateDialog
+        projectId={project.id}
+        update={deleting}
+        onDeleted={() => {
+          // Supprimée : sa corbeille n'existe plus ; le focus ira à ce qui prend sa place, une fois
+          // la fenêtre partie. « Mise à jour supprimée. » le confirme.
+          focusAfterClose.current = true
+          setDeleted(true)
         }}
-        onClosed={() => {
+        onClose={() => setDeleting(null)}
+        onGone={() => {
           if (!focusAfterClose.current) return
           focusAfterClose.current = false
           // Le temps que la fenêtre quitte la page : avant, elle garderait le focus pour elle.
@@ -253,29 +210,7 @@ export function ProjectUpdatesSection({ project, canPublish, sheet }: Props) {
             moveReaderTo(target)
           })
         }}
-      >
-        {showDeleteError && deleteUpdate.error ? (
-          <Notice
-            message={failure(deleteUpdate.reason)}
-            action={
-              deleteUpdate.reason === 'expired' ? signInAgain(() => setDeleting(null)) : undefined
-            }
-          />
-        ) : null}
-        <Button
-          label={t(($) => $.project.updates.confirmDelete)}
-          variant="confirm"
-          onPress={() => void confirmDelete()}
-          loading={removing}
-        />
-        <Button
-          ref={cancelRef}
-          label={t(($) => $.common.cancel)}
-          variant="secondary"
-          onPress={() => setDeleting(null)}
-          disabled={removing}
-        />
-      </Dialog>
+      />
     </Surface>
   )
 }
