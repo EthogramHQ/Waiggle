@@ -35,8 +35,8 @@
 //   mise à jour en bas à droite, après le total des réactions, hors du lien. La famille, que la
 //   pastille ne dit qu'en couleur, est lue dans la description du lien (« Nouveau : Un compte à
 //   rebours… », relecture du plan, interface B4) ;
-// - `badge`, ailleurs (Découvrir, recherche, page d'un membre) : la pastille seule, à la même place ;
-//   l'accroche reste.
+// - `badge`, ailleurs (Découvrir, recherche, page d'un membre) : la pastille seule, dans la rangée
+//   du bas, à côté du statut ; la date de publication et l'accroche restent (décision du 10/11/2026).
 import { layout, pressScale, radii, space } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import { type ReactNode, type Ref, useId, useState } from 'react'
@@ -70,7 +70,7 @@ export const PROJECT_CARD_HEIGHT = 476
  * - `full` (« Abonnements ») : `label` (« Mis à jour · v1.2 ») à la place de la date de l'auteur,
  *   `line` à la place de l'accroche, `more` (« et 2 autres changements », null pour une seule
  *   ligne) dessous, et la date `at` (ISO du contrat) en bas à droite ;
- * - `badge` (ailleurs) : `label` seul, à la même place ; l'accroche reste.
+ * - `badge` (ailleurs) : `label` seul, dans la rangée du bas ; la date et l'accroche restent.
  * Une union plutôt qu'un booléen à côté d'une ligne obligatoire (relecture du plan, interface A7) :
  * TypeScript refuse une carte `badge` qui porterait une ligne, ou une `full` qui n'en aurait pas.
  */
@@ -425,8 +425,8 @@ export function ProjectCard({
           mise à jour passe en bas) ; la pastille rétrécit et passe à la ligne plutôt que de
           déborder, à 320 points et texte agrandi. */}
       <View style={{ marginLeft: 'auto', flexShrink: 1, maxWidth: '100%' }}>
-        {updated ? (
-          <StatusPill label={updated.label} />
+        {change ? (
+          <StatusPill label={change.label} />
         ) : typeof when === 'string' ? (
           <Text variant="caption" tone="muted">
             {when}
@@ -515,9 +515,15 @@ export function ProjectCard({
     >
       {tester}
       {/* Les pastilles ne se touchent pas : le doigt passe au travers, vers la carte. */}
-      <View pointerEvents="none" style={{ flexDirection: 'row', gap: space.sm }}>
+      {/* R7a, `badge` (Découvrir…) : le repère « Mis à jour » vient ici, à côté du statut ; la date
+          de publication reste en haut, car Découvrir est rangé par elle (décision du 10/11/2026). */}
+      <View
+        pointerEvents="none"
+        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, flexShrink: 1 }}
+      >
         <StatusPill label={status.label} strong={status.strong} />
         {badge ? <StatusPill label={badge} /> : null}
+        {updated?.kind === 'badge' ? <StatusPill label={updated.label} /> : null}
       </View>
       {end}
     </View>

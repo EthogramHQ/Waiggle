@@ -207,6 +207,19 @@ describe('ProjectCard raised by an update (R7a)', () => {
     ).toBeNull()
   })
 
+  // Décision du 10/11/2026 : Découvrir est rangé par date de publication, elle reste à côté du repère.
+  it('keeps the publication date beside the mark with a badge, as in Discover', async () => {
+    await renderWithProviders(
+      <ProjectCard
+        {...card}
+        updated={{ kind: 'badge', label: fr.t(($) => $.feed.updatedPlain) }}
+        onPress={() => {}}
+      />,
+    )
+
+    expect(screen.getByText(card.when, { includeHiddenElements: true })).toBeTruthy()
+  })
+
   it('stays the same card without an update (témoin)', async () => {
     await renderWithProviders(<ProjectCard {...card} onPress={() => {}} />)
 
