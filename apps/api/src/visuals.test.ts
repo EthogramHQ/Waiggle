@@ -1,7 +1,14 @@
 // Tests d'intégration de la tranche 3b-1 : les visuels des projets (galerie et couverture
 // verticale), et les médias réservés aux membres. Scénarios : docs/scenarios/phase-1.md, tranche 3b-1.
 // Deux membres : Léa (l'autrice) et Max.
-import { AccountExport, ErrorResponse, Me, Project } from '@ruche/contracts'
+import {
+  AccountExport,
+  DiscoverFeedPage,
+  ErrorResponse,
+  Me,
+  Project,
+  ProjectUpdate,
+} from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { eq, sql } from 'drizzle-orm'
 import sharp from 'sharp'
@@ -857,5 +864,260 @@ describe('photo descriptions in my data (R6a, jur-J13)', () => {
       body: JSON.stringify({ password: leaAccount.password }),
     })
     expect(await storedDescriptions()).toEqual([])
+  })
+})
+
+// --- Tranche R7a : les photos des mises à jour ---
+// Une photo envoyée avec `slot=update` est « en attente » jusqu'à la publication de la mise à jour
+// qui la cite, puis lui est rattachée. Elle n'entre jamais dans la galerie. Scénario :
+// docs/scenarios/refonte.md, section R7a (« Publier une mise à jour », la partie « Photos ») ;
+// relecture de sécurité du plan : A4 (qui voit quelle photo), A11 (une cinquième photo en attente
+// remplace la plus ancienne) ; décision de Louis du 10/11/2026 : 100 photos de mises à jour par
+// projet au plus, en attente comprises (409 `update_photos_full`).
+// La colonne neuve `project_media.update_id` se lit en SQL brut, comme `description` plus haut.
+
+/** Les photos `update` d'un projet, de la base : identifiant, clé de stockage, mise à jour. */
+const updatePhotosOf = async (projectId: string) =>
+  (
+    (await ctx.db.execute(
+      sql`select id, storage_key, update_id from project_media
+          where project_id = ${projectId} and slot = 'update'`,
+    )) as unknown as { rows: { id: string; storage_key: string; update_id: string | null }[] }
+  ).rows
+
+/**
+ * Envoie une photo pour une mise à jour pas encore publiée, et la rend (identifiant, clé). La
+ * réponse de l'envoi n'est pas lue : la photo se retrouve en base, la seule ligne `update` du projet
+ * qui n'y était pas avant.
+ */
+const pendingPhoto = async (projectId: string, cookie = lea) => {
+  const known = new Set((await updatePhotosOf(projectId)).map((photo) => photo.id))
+  const res = await upload(projectId, visualForm(await jpegImage(800, 600), 'update'), cookie)
+  expect(res.status).toBe(201)
+  const added = (await updatePhotosOf(projectId)).filter((photo) => !known.has(photo.id))
+  expect(added).toHaveLength(1)
+  const [photo] = added
+  if (!photo) throw new Error('no pending photo')
+  return { id: photo.id, key: photo.storage_key }
+}
+
+/** Publie une mise à jour d'une ligne qui cite ces photos en attente. */
+const publishUpdateWith = async (projectId: string, photoIds: string[], cookie = lea) => {
+  const res = await sendJson('POST', `/v1/projects/${projectId}/updates`, cookie, {
+    title: null,
+    version: null,
+    lines: [{ family: 'new', text: 'Un mode nuit' }],
+    photos: photoIds.map((id) => ({ id, description: null })),
+    beforeAfter: false,
+  })
+  expect(res.status).toBe(201)
+  return ProjectUpdate.parse(await res.json())
+}
+
+/** Ouvre le fichier d'une clé de stockage (« visuals/<uuid>.webp »), avec ou sans session. */
+const openKey = (key: string, cookie: string | null) =>
+  ctx.request(`/media/${key}`, { headers: cookie ? { cookie } : {} })
+
+/** Le corps d'un 404 sur un fichier qui n'existe pas : la référence de « comme un inconnu ». */
+const unknownFileBody = async (cookie: string) => {
+  const res = await openKey(`visuals/${crypto.randomUUID()}.webp`, cookie)
+  expect(res.status).toBe(404)
+  return res.json()
+}
+
+describe('the photos of an update (R7a)', () => {
+  it('serves a pending update photo to its author only', async () => {
+    const project = await publish()
+    const photo = await pendingPhoto(project.id)
+    const expected = await unknownFileBody(max)
+
+    expect((await openKey(photo.key, lea)).status).toBe(200)
+    for (const [what, cookie] of [
+      ['another member', max],
+      ['a visitor', null],
+    ] as const) {
+      const res = await openKey(photo.key, cookie)
+      expect(res.status, what).toBe(404)
+      expect(await res.json(), what).toEqual(expected)
+    }
+  })
+
+  it('serves the photos of a published update to whoever sees the project', async () => {
+    const project = await publish()
+    const photo = await pendingPhoto(project.id)
+    await publishUpdateWith(project.id, [photo.id])
+    const act = activity(ctx)
+    const [leaId, maxId] = [await idOf(lea), await idOf(max)]
+
+    expect((await openKey(photo.key, max)).status).toBe(200)
+
+    await act.setVisibility(project.id, lea, 'private')
+    expect((await openKey(photo.key, max)).status).toBe(404)
+    await act.setVisibility(project.id, lea, 'public')
+    expect((await openKey(photo.key, max)).status).toBe(200) // témoin : de nouveau visible
+
+    await act.block(maxId, lea)
+    expect((await openKey(photo.key, max)).status).toBe(404)
+    await act.unblock(maxId, lea)
+    await act.block(leaId, max)
+    expect((await openKey(photo.key, max)).status).toBe(404)
+  })
+
+  it('serves the photos of a removed update to the author only', async () => {
+    const project = await publish()
+    const photo = await pendingPhoto(project.id)
+    const update = await publishUpdateWith(project.id, [photo.id])
+    const act = activity(ctx)
+    const louis = await ctx.verifiedMember({
+      name: 'Louis',
+      email: 'louis@example.com',
+      password: 'louis-long-password',
+    })
+    await act.makeAdmin(await idOf(louis))
+    await act.report(max, { kind: 'update', id: update.id })
+    await act.decide(louis, {
+      action: 'remove',
+      target: { kind: 'update', id: update.id },
+      ground: 'rules',
+      explanation: 'Cette mise à jour enfreint les règles de la communauté.',
+    })
+
+    expect((await openKey(photo.key, lea)).status).toBe(200)
+    expect((await openKey(photo.key, max)).status).toBe(404)
+    // L'administrateur qui l'a retirée la lit comme tout membre : pas d'exception.
+    expect((await openKey(photo.key, louis)).status).toBe(404)
+  })
+
+  it('never lists an update photo, pending or published, in the gallery, the cover or the cards', async () => {
+    const project = await publish()
+    const published = await pendingPhoto(project.id)
+    await publishUpdateWith(project.id, [published.id])
+    const pending = await pendingPhoto(project.id)
+
+    // Même sans aucune photo de galerie, aucune des deux ne devient la couverture.
+    const seen = await read(project.id, max)
+    expect(seen.visuals).toEqual([])
+    expect(seen.portraitCover).toBeNull()
+    const feed = await sendJson('GET', '/v1/feed/discover', max)
+    expect(feed.status).toBe(200)
+    const card = DiscoverFeedPage.parse(await feed.json()).items.find(
+      (item) => item.project.id === project.id,
+    )
+    expect(card?.project.cover).toBeNull()
+    expect(card?.project.portraitCover).toBeNull()
+    // L'export de l'auteur ne les compte pas non plus parmi les photos de la galerie.
+    const data = AccountExport.parse(await (await sendJson('GET', '/v1/me/export', lea)).json())
+    expect(data.projects[0]?.visuals).toEqual([])
+    expect(await updatePhotosOf(project.id)).toHaveLength(2) // témoin : elles existent bien
+    expect(storedVisuals()).toEqual(expect.arrayContaining([published.key, pending.key]))
+  })
+
+  it('does not count update photos in the six photos of the gallery, nor the other way round', async () => {
+    const project = await publish()
+    for (let i = 0; i < 6; i++) await addPhoto(project.id)
+
+    for (let i = 0; i < 4; i++) await pendingPhoto(project.id)
+
+    expect((await read(project.id)).visuals).toHaveLength(6)
+    expect(await updatePhotosOf(project.id)).toHaveLength(4)
+  })
+
+  it('refuses to remove or describe a photo attached to a published update', async () => {
+    const project = await publish()
+    const photo = await pendingPhoto(project.id)
+    const update = await publishUpdateWith(project.id, [photo.id])
+
+    const removal = await sendJson('DELETE', `/v1/projects/${project.id}/visuals/${photo.id}`, lea)
+    const description = await describePhoto(project.id, photo.id, { description: 'Autre chose' })
+
+    expect(removal.status).toBe(404)
+    expect(description.status).toBe(404)
+    // La ligne et le fichier restent, toujours rattachés, sans description.
+    expect(await updatePhotosOf(project.id)).toEqual([
+      { id: photo.id, storage_key: photo.key, update_id: update.id },
+    ])
+    expect(ctx.storage.files.has(photo.key)).toBe(true)
+    expect(await storedDescriptions()).toEqual([])
+  })
+
+  it('lets the author remove a pending photo, file included', async () => {
+    const project = await publish()
+    const photo = await pendingPhoto(project.id)
+
+    const res = await sendJson('DELETE', `/v1/projects/${project.id}/visuals/${photo.id}`, lea)
+
+    expect(res.status).toBe(200)
+    expect(ctx.storage.files.has(photo.key)).toBe(false)
+    expect(await updatePhotosOf(project.id)).toEqual([])
+  })
+
+  it('replaces the oldest pending photo when a fifth one is uploaded', async () => {
+    // Relecture A11 : une feuille abandonnée avec quatre photos ne bloque pas la suivante pendant
+    // 24 heures ; la plus ancienne en attente part, ligne et fichier.
+    const project = await publish()
+    const sent = []
+    for (let i = 0; i < 4; i++) sent.push(await pendingPhoto(project.id))
+    const [oldest] = sent
+
+    const res = await upload(project.id, visualForm(await jpegImage(800, 600), 'update'))
+
+    expect(res.status).toBe(201)
+    const left = await updatePhotosOf(project.id)
+    expect(left).toHaveLength(4)
+    expect(left.map((photo) => photo.id)).not.toContain(oldest?.id)
+    expect(ctx.storage.files.has(oldest?.key ?? '')).toBe(false)
+    // Les trois autres restent, et la nouvelle est là.
+    for (const kept of sent.slice(1)) expect(ctx.storage.files.has(kept.key)).toBe(true)
+    expect(storedVisuals()).toHaveLength(4)
+  })
+
+  it('never replaces a photo already attached to an update', async () => {
+    const project = await publish()
+    const attached = await pendingPhoto(project.id)
+    await publishUpdateWith(project.id, [attached.id])
+    for (let i = 0; i < 5; i++) await pendingPhoto(project.id)
+
+    // Cinq envois : quatre en attente au plus, et la photo publiée reste.
+    const photos = await updatePhotosOf(project.id)
+    expect(photos.filter((photo) => photo.update_id === null)).toHaveLength(4)
+    expect(photos.map((photo) => photo.id)).toContain(attached.id)
+    expect(ctx.storage.files.has(attached.key)).toBe(true)
+  })
+
+  it('refuses a 101st update photo on a project, pending ones included, and stores no file', async () => {
+    const project = await publish()
+    const update = await publishUpdateWith(project.id, [])
+    // 97 photos déjà rattachées, semées en base (sans fichier), puis 2 en attente envoyées : 99.
+    await ctx.db.execute(sql`
+      insert into project_media
+        (id, project_id, kind, slot, position, storage_key, width, height, thumbhash, update_id)
+      select gen_random_uuid(), ${project.id}::uuid, 'image', 'update', 0,
+             'visuals/' || gen_random_uuid() || '.webp', 800, 600, 'AAAA', ${update.id}::uuid
+      from generate_series(1, 97)`)
+    await pendingPhoto(project.id)
+    await pendingPhoto(project.id)
+    // Témoin : la centième passe.
+    await pendingPhoto(project.id)
+    expect(await updatePhotosOf(project.id)).toHaveLength(100)
+
+    const res = await upload(project.id, visualForm(await jpegImage(800, 600), 'update'))
+
+    expect(res.status).toBe(409)
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe('update_photos_full')
+    expect(await updatePhotosOf(project.id)).toHaveLength(100)
+    expect(storedVisuals()).toHaveLength(3)
+    // La galerie, elle, garde ses six places.
+    expect((await upload(project.id, visualForm(await photoWithGps()))).status).toBe(201)
+  })
+
+  it('refuses another member who sends an update photo, and keeps a private project hidden', async () => {
+    const visible = await publish('public')
+    const hidden = await publish('private')
+    const photo = await jpegImage(800, 600)
+
+    expect((await upload(visible.id, visualForm(photo, 'update'), max)).status).toBe(403)
+    expect((await upload(hidden.id, visualForm(photo, 'update'), max)).status).toBe(404)
+    expect(storedVisuals()).toHaveLength(0)
+    await pendingPhoto(visible.id) // témoin : l'autrice, elle, envoie
   })
 })
