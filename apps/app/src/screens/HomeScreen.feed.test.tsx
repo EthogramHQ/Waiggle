@@ -1,5 +1,6 @@
 // Tests de l'écran d'accueil (HomeScreen) : le fil « Abonnements » d'un membre (cartes, fil
-// vide, page suivante, erreurs) et les notes des projets suivis dans ce fil (tranche 4b).
+// vide, page suivante, erreurs) et, depuis R7a, les projets qui y remontent par leur mise à jour
+// (« Mis à jour · v1.2 », la première ligne de « Ce qui a changé »), à la place des notes de 4b.
 //
 // Avec Testing Library, on affiche l'écran en mémoire, puis on le manipule comme le ferait un
 // utilisateur (lire un texte, appuyer sur un bouton) ; on cherche les éléments par leur rôle et leur
@@ -186,49 +187,78 @@ describe('the « following » feed on the home screen', () => {
 // R3 : le fil « Découvrir » (tous, testeurs, vide, page suivante) se teste dans
 // ExploreScreen.test.tsx ; l'accueil ne le lit plus.
 
-// --- Tranche 4b : les notes des projets suivis dans « Abonnements » ---
+// --- R7a : un projet suivi remonte dans « Abonnements » par sa mise à jour ---
+// (La petite carte « Note de Léa sur … » de la tranche 4b a disparu avec le Journal.)
 
-/** Une note de Léa sur son agent de recettes, telle que le fil la donne. */
-const noteOfLea: FeedItem = {
-  kind: 'note',
-  at: '2026-10-14T09:00:00.000Z',
-  note: {
-    id: '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718',
-    body: 'v2 : mode hors ligne',
-    createdAt: '2026-10-14T09:00:00.000Z',
-    removal: null,
+/** « Le décompte de la fusée », la mise à jour de Léa sur son agent de recettes : trois lignes. */
+const rocketOfLea: FeedItem = {
+  kind: 'update',
+  at: '2026-10-19T09:00:00.000Z',
+  update: {
+    id: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    at: '2026-10-19T09:00:00.000Z',
+    version: 'v1.2',
+    firstLine: { family: 'new', text: 'Un compte à rebours avant chaque question' },
+    lineCount: 3,
   },
-  project: summaryOf(recipesProject),
+  project: {
+    ...summaryOf(recipesProject),
+    version: 'v1.2',
+    latestUpdate: {
+      id: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+      at: '2026-10-19T09:00:00.000Z',
+      version: 'v1.2',
+      firstLine: { family: 'new', text: 'Un compte à rebours avant chaque question' },
+      lineCount: 3,
+    },
+  },
 }
 
-describe('notes in the « following » feed on the home screen', () => {
-  it('shows the note of a followed project, named after its author and its project', async () => {
-    mockFollowing({ items: [noteOfLea, fromMax] })
+/** Le décor caché aux lecteurs d'écran compte aussi : la ligne peut y être lue autrement. */
+const HIDDEN_TOO = { includeHiddenElements: true }
+
+describe('updates in the « following » feed on the home screen (R7a)', () => {
+  it('shows the card of the project raised by its update, with « Mis à jour · v1.2 »', async () => {
+    mockFollowing({ items: [rocketOfLea, fromMax] })
     await renderMemberHome()
 
-    expect(screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' })).toBeTruthy()
-    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
+    // La carte est celle du projet, nommée par son titre, comme un nouveau projet.
+    expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByText('Mis à jour · v1.2', HIDDEN_TOO)).toBeTruthy()
     // Le projet qui suit dans le fil est toujours une carte de projet.
     expect(screen.getByRole('link', { name: 'Le tri des photos' })).toBeTruthy()
   })
 
-  it('elides « de » before an author whose name starts with a vowel (« Note d’Inès »)', async () => {
-    const ines = { id: 'u3', name: 'Inès', avatarUrl: null }
+  it('replaces the pitch with the first line of « Ce qui a changé », then « et 2 autres changements »', async () => {
+    mockFollowing({ items: [rocketOfLea] })
+    await renderMemberHome()
+
+    expect(screen.getByText(/Un compte à rebours avant chaque question/, HIDDEN_TOO)).toBeTruthy()
+    expect(screen.getByText('et 2 autres changements', HIDDEN_TOO)).toBeTruthy()
+    expect(screen.queryByText(recipesProject.pitch)).toBeNull()
+  })
+
+  it('says « Mis à jour » alone for an update without a version', async () => {
     mockFollowing({
-      items: [{ ...noteOfLea, project: { ...noteOfLea.project, author: ines } }],
+      items: [
+        {
+          ...rocketOfLea,
+          update: { ...rocketOfLea.update, version: null },
+          project: { ...rocketOfLea.project, version: null },
+        } as FeedItem,
+      ],
     })
     await renderMemberHome()
 
-    expect(screen.getByRole('link', { name: 'Note d’Inès sur Mon agent de recettes' })).toBeTruthy()
+    expect(screen.getByText('Mis à jour', HIDDEN_TOO)).toBeTruthy()
+    expect(screen.queryByText(/Mis à jour · /, HIDDEN_TOO)).toBeNull()
   })
 
-  it('opens the page of the project when the note is touched', async () => {
-    mockFollowing({ items: [noteOfLea] })
+  it('opens the page of the project when the card of an update is touched', async () => {
+    mockFollowing({ items: [rocketOfLea] })
     await renderMemberHome()
 
-    await fireEvent.press(
-      screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' }),
-    )
+    await fireEvent.press(screen.getByRole('link', { name: 'Mon agent de recettes' }))
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/projects/[id]',
@@ -236,11 +266,20 @@ describe('notes in the « following » feed on the home screen', () => {
     })
   })
 
-  it('shows a note and the new project it belongs to as two separate items', async () => {
-    mockFollowing({ items: [noteOfLea, fromLea] })
+  it('never shows the small note card any more', async () => {
+    mockFollowing({ items: [rocketOfLea] })
     await renderMemberHome()
 
-    expect(screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' })).toBeTruthy()
+    // Témoin : la carte du projet est là.
     expect(screen.getByRole('link', { name: 'Mon agent de recettes' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /^Note d/ })).toBeNull()
+  })
+
+  it('keeps the pitch and shows no update line on a new project of the feed', async () => {
+    mockFollowing({ items: [fromLea] })
+    await renderMemberHome()
+
+    expect(screen.getByText(recipesProject.pitch)).toBeTruthy()
+    expect(screen.queryByText(/autres? changements?/, HIDDEN_TOO)).toBeNull()
   })
 })

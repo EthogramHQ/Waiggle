@@ -22,9 +22,7 @@ import { ListGroup, ListRow } from './ListGroup'
 import { Markdown } from './Markdown'
 import { MemberHeader } from './MemberHeader'
 import { MentionField } from './MentionField'
-import { NoteCard } from './NoteCard'
 import { NoteComposer } from './NoteComposer'
-import { NoteList } from './NoteList'
 import { Notice, NoticeScope } from './Notice'
 import { NotificationCard } from './NotificationCard'
 import { Pressed } from './Pressed'
@@ -1115,103 +1113,9 @@ describe('fonts', () => {
 })
 
 // --- Tranche 4b : les notes d'un projet ---
-
-describe('NoteCard', () => {
-  const card = {
-    label: 'Note de Léa sur Mon agent de recettes',
-    project: 'Mon agent de recettes',
-    author: { name: 'Léa', avatar: null },
-    body: 'v2 : mode hors ligne',
-    when: '14 oct.',
-  }
-
-  it('is a link named after the note and its project, and opens it when touched', async () => {
-    const onPress = jest.fn()
-    await renderWithProviders(<NoteCard {...card} onPress={onPress} />)
-
-    await fireEvent.press(
-      screen.getByRole('link', { name: 'Note de Léa sur Mon agent de recettes' }),
-    )
-
-    expect(onPress).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows the note, its project, its author and its date', async () => {
-    await renderWithProviders(<NoteCard {...card} onPress={jest.fn()} />)
-
-    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
-    expect(screen.getByText('Mon agent de recettes')).toBeTruthy()
-    expect(screen.getByText('Léa')).toBeTruthy()
-    expect(screen.getByText('14 oct.')).toBeTruthy()
-  })
-
-  it('shows the text exactly as written, without formatting it', async () => {
-    // Une note est du texte brut : les astérisques et les balises restent des caractères.
-    const body = '**v2** : <b>hors ligne</b>\nEt plus rapide.'
-    await renderWithProviders(<NoteCard {...card} body={body} onPress={jest.fn()} />)
-
-    expect(screen.getByText(body)).toBeTruthy()
-  })
-})
-
-describe('NoteList', () => {
-  const notes = [
-    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
-    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
-  ]
-
-  it('shows each note with its date, in the order given', async () => {
-    await renderWithProviders(<NoteList notes={notes} />)
-
-    const shown = screen.getAllByText(/^(v2 : mode hors ligne|Première version en ligne)$/)
-    expect(shown).toHaveLength(2)
-    expect(shown[0]).toHaveTextContent('v2 : mode hors ligne')
-    expect(shown[1]).toHaveTextContent('Première version en ligne')
-    expect(screen.getByText('14 oct.')).toBeTruthy()
-    expect(screen.getByText('12 oct.')).toBeTruthy()
-  })
-
-  it('offers to delete each note when asked, and says which one', async () => {
-    const onDelete = jest.fn()
-    await renderWithProviders(
-      <NoteList notes={notes} onDelete={onDelete} deleteLabel="Supprimer la note" />,
-    )
-
-    const buttons = screen.getAllByRole('button', { name: 'Supprimer la note' })
-    expect(buttons).toHaveLength(2)
-    const second = buttons[1]
-    if (!second) throw new Error('a delete button per note is expected')
-    await fireEvent.press(second)
-
-    expect(onDelete).toHaveBeenCalledWith('n1')
-  })
-
-  it('offers no delete button without an action', async () => {
-    await renderWithProviders(<NoteList notes={notes} deleteLabel="Supprimer la note" />)
-
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  it('shows the text exactly as written, without formatting it', async () => {
-    const body = '**v2** : <b>hors ligne</b>'
-    await renderWithProviders(<NoteList notes={[{ id: 'n3', body, when: '15 oct.' }]} />)
-
-    expect(screen.getByText(body)).toBeTruthy()
-  })
-
-  it('says so when there is no note, if given a message', async () => {
-    await renderWithProviders(<NoteList notes={[]} empty="Pas encore de note." />)
-
-    expect(screen.getByText('Pas encore de note.')).toBeTruthy()
-  })
-
-  it('shows nothing at all when there is no note and no message', async () => {
-    await renderWithProviders(<NoteList notes={[]} />)
-
-    expect(screen.queryAllByText(/./)).toHaveLength(0)
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-})
+// R7a : NoteCard et NoteList sont partis avec le Journal ; les mises à jour qui les remplacent ont
+// leurs tests dans leurs propres fichiers (ui/UpdateEntry.test.tsx, ui/UpdateTimeline.test.tsx).
+// NoteComposer reste : CommentComposer s'en sert.
 
 describe('NoteComposer', () => {
   const labels = {
@@ -1939,70 +1843,6 @@ describe('Notice, polite with an action', () => {
 })
 
 // --- Tranche 7a : signaler, et ce qui est retiré par la modération ---
-
-/** Le bandeau que l'auteur lit sur son contenu retiré : un titre, puis les phrases données par l'écran. */
-const removedBanner = {
-  title: 'Retiré par la modération',
-  lines: [
-    'Il n’est plus visible que de toi, jusqu’à un éventuel rétablissement.',
-    'Fondement : les règles.',
-    'Explication : Demander un code de carte bancaire n’est pas permis ici.',
-    'Pour contester : contact@example.com',
-  ],
-}
-
-describe('NoteList, reporting and removed notes', () => {
-  const notes = [
-    { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.' },
-    { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
-  ]
-
-  it('offers to report each note when asked, and says which one', async () => {
-    const onReport = jest.fn()
-    await renderWithProviders(
-      <NoteList notes={notes} onReport={onReport} reportLabel="Signaler cette note" />,
-    )
-
-    const buttons = screen.getAllByRole('button', { name: 'Signaler cette note' })
-    expect(buttons).toHaveLength(2)
-    // Sur téléphone, l'indice dit laquelle : le début de son texte.
-    expect(buttons[1]).toHaveProp('accessibilityHint', expect.stringContaining('Première version'))
-    const second = buttons[1]
-    if (!second) throw new Error('a report button per note is expected')
-    await fireEvent.press(second)
-
-    expect(onReport).toHaveBeenCalledWith('n1')
-  })
-
-  it('names the report button « Signaler cette note » by default', async () => {
-    await renderWithProviders(<NoteList notes={notes} onReport={jest.fn()} />)
-
-    expect(screen.getAllByRole('button', { name: 'Signaler cette note' })).toHaveLength(2)
-  })
-
-  it('offers no report button without an action', async () => {
-    await renderWithProviders(<NoteList notes={notes} reportLabel="Signaler cette note" />)
-
-    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy() // témoin
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  it('shows the banner of a removed note, for its author, above its text', async () => {
-    await renderWithProviders(
-      <NoteList
-        notes={[
-          { id: 'n2', body: 'v2 : mode hors ligne', when: '14 oct.', removed: removedBanner },
-          { id: 'n1', body: 'Première version en ligne', when: '12 oct.' },
-        ]}
-      />,
-    )
-
-    expect(screen.getAllByText('Retiré par la modération')).toHaveLength(1)
-    for (const line of removedBanner.lines) expect(screen.getByText(line)).toBeTruthy()
-    expect(screen.getByText('v2 : mode hors ligne')).toBeTruthy()
-    expect(screen.getByText('Première version en ligne')).toBeTruthy()
-  })
-})
 
 // Relecture de design globale du 22/10/2026 : une seule notice « session expirée » par page, et la
 // raison d'une lecture manquée dite dans sa ligne.
