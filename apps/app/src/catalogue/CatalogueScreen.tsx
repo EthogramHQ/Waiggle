@@ -66,6 +66,7 @@ import { VisualEditor } from '../ui/VisualEditor'
 import { Wordmark } from '../ui/Wordmark'
 import { ActionMenuSamples } from './actionMenu'
 import { AmbiancesCatalogue } from './ambiances'
+import { BeforeAfterCatalogue } from './avant-apres'
 import { TopBarCatalogue } from './barre-haut'
 import { CardsCatalogue } from './cartes'
 import { InvalidChoicesCatalogue } from './champs-invalides'
@@ -905,6 +906,8 @@ export function CatalogueScreen() {
       <UpdateFamiliesCatalogue />
       {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
       <TestersCatalogue />
+      {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
+      <BeforeAfterCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
       <FluidTopBarCatalogue />
