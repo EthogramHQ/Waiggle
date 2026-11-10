@@ -38,9 +38,7 @@ import { ListGroup, ListRow } from '../ui/ListGroup'
 import { Markdown } from '../ui/Markdown'
 import { MemberHeader } from '../ui/MemberHeader'
 import { NewItemsBanner } from '../ui/NewItemsBanner'
-import { NoteCard } from '../ui/NoteCard'
 import { NoteComposer } from '../ui/NoteComposer'
-import { NoteList } from '../ui/NoteList'
 import { Notice } from '../ui/Notice'
 import { NotificationCard } from '../ui/NotificationCard'
 import { ProjectCard } from '../ui/ProjectCard'
@@ -695,62 +693,6 @@ export function CatalogueScreen() {
       </Section>
 
       <Section title={l.notesSection}>
-        {/* La note dans le fil, à côté d'une carte de projet : avec la couverture du projet, sans
-            couverture (la lumière miel), puis un texte long, coupé après quelques lignes. */}
-        <ProjectGrid empty={l.emptyList}>
-          <NoteCard
-            label={l.noteLabel}
-            project={l.sampleTitle}
-            author={{ name: 'Léa Moreau', avatar: null }}
-            body={l.noteBody}
-            when={l.noteWhen}
-            image={{ source: null, thumbhash: samples.cafe, label: l.samplePhoto }}
-            onPress={() => {}}
-          />
-          <ProjectCard
-            title={l.secondTitle}
-            pitch={l.secondPitch}
-            author={{ name: 'Max Durand', avatar: null }}
-            when={l.now}
-            status={{ label: l.statuses.testable, strong: true }}
-            image={{ source: null, thumbhash: samples.papillon, label: l.samplePhoto }}
-            onPress={() => {}}
-          />
-          <NoteCard
-            label={l.noteLabel}
-            project={l.sampleTitle}
-            author={{ name: 'Léa Moreau', avatar: null }}
-            body={l.noteLong}
-            when={l.noteWhen}
-            onPress={() => {}}
-          />
-        </ProjectGrid>
-        {/* Le journal, vu par l'auteur (un bouton « Supprimer » par note, une adresse longue qui se
-            coupe), puis par un autre membre, puis vide pour l'auteur. Sans note ni message : rien. */}
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList
-            notes={[
-              { id: 'n3', body: l.noteBody, when: l.noteWhen },
-              { id: 'n2', body: l.noteUrl, when: l.noteWhen },
-              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-            ]}
-            onDelete={() => {}}
-            deleteLabel={l.deleteNote}
-          />
-        </Surface>
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList
-            notes={[
-              { id: 'n2', body: l.noteLong, when: l.noteWhen },
-              { id: 'n1', body: l.noteOlder, when: l.noteOlderWhen },
-            ]}
-          />
-        </Surface>
-        <Surface variant="grouped" padding="xl" gap="lg">
-          <NoteList notes={[]} empty={l.journalEmpty} onDelete={() => {}} />
-        </Surface>
-        {/* Après une suppression : une confirmation discrète (role « status »). */}
-        <Notice tone="success" message={l.noteDeleted} polite />
         {/* Écrire une note : fermé, fermé juste après une publication, ouvert (vide, avec un texte,
             en cours d'envoi, texte manquant, envoi refusé). */}
         <NoteComposerSample l={l} open={false} />
