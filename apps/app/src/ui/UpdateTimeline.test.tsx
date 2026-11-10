@@ -191,6 +191,28 @@ describe('UpdateTimeline', () => {
     expect(screen.queryByRole('button', { name: deleteLabel('Le mode nuit') })).toBeNull()
   })
 
+  // Plan R7a, « Précisions de TW-1 » (ajouté par U1d) : un autre membre signale une mise à jour
+  // depuis la frise ; le rappel reçoit celle dont il a touché le drapeau, et il n'a pas de corbeille.
+  it('lets another member report the update they chose', async () => {
+    const onReport = jest.fn()
+    await renderTimeline({ onReport })
+
+    const reports = screen.getAllByRole('button', { name: fr.t(($) => $.report.update) })
+    expect(reports).toHaveLength(three.length)
+    expect(screen.queryByRole('button', { name: deleteLabel('Le mode nuit') })).toBeNull()
+    await fireEvent.press(reports[2] as (typeof reports)[number])
+    expect(onReport).toHaveBeenCalledTimes(1)
+    expect(onReport).toHaveBeenCalledWith(three[2])
+  })
+
+  // L'auteur n'a jamais « Signaler » sur ses propres mises à jour, même si l'écran passe les deux.
+  it('gives the author a trash button rather than « Signaler »', async () => {
+    await renderTimeline({ onDelete: () => {}, onReport: () => {} })
+
+    expect(screen.getByRole('button', { name: deleteLabel('Le mode nuit') })).toBeTruthy() // témoin
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.report.update) })).toBeNull()
+  })
+
   // Scénario : « pendant la suppression, une seconde tape n'envoie rien ».
   it('does not delete again the update being deleted', async () => {
     const onDelete = jest.fn()
