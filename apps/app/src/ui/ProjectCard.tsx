@@ -471,26 +471,16 @@ export function ProjectCard({
   // R7a : la date de la mise à jour, au bout de la rangée du bas (planche R7-MAJ-Fil). Un texte,
   // hors du lien de la carte, lu après lui ; sa version complète se lit au lecteur d'écran.
   const changedAt = change ? <RelativeTime date={change.at} now={now} /> : null
-  // Le bout de la rangée, à droite (marge automatique) : le total, puis la date. Le doigt passe au
-  // travers, vers la carte.
-  const end =
-    total || changedAt ? (
-      <View
-        pointerEvents="none"
-        style={{
-          marginLeft: 'auto',
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          columnGap: space.md,
-          maxWidth: '100%',
-          flexShrink: 1,
-        }}
-      >
-        {total}
-        {changedAt}
-      </View>
-    ) : null
+  // Le bout de la rangée, à droite (marge automatique) : la date seule. Le total des réactions est
+  // rangé avec les pastilles (des-A2) ; le doigt passe au travers, vers la carte.
+  const end = changedAt ? (
+    <View
+      pointerEvents="none"
+      style={{ marginLeft: 'auto', alignItems: 'center', maxWidth: '100%', flexShrink: 1 }}
+    >
+      {changedAt}
+    </View>
+  ) : null
 
   // --- « Tester ↗ » ---------------------------------------------------------------------------
   // La pastille miel commune (`TestLink`), à la hauteur d'une zone à toucher (`compact`) comme sur
@@ -517,14 +507,27 @@ export function ProjectCard({
       {/* Les pastilles ne se touchent pas : le doigt passe au travers, vers la carte. */}
       {/* R7a, `badge` (Découvrir…) : le repère « Mis à jour » vient ici, à côté du statut ; la date
           de publication reste en haut, car Découvrir est rangé par elle (décision du 10/11/2026). */}
-      <View
-        pointerEvents="none"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, flexShrink: 1 }}
-      >
+      {/* R7a, des-A2 : le statut, les repères et le total des réactions sont chacun un enfant de la
+          rangée (et non un groupe qui passe à la ligne d'un bloc) : ils se rangent côte à côte tant
+          qu'il y a de la place, et la rangée ne compte plus trois lignes à 320 px. */}
+      <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
         <StatusPill label={status.label} strong={status.strong} />
-        {badge ? <StatusPill label={badge} /> : null}
-        {updated?.kind === 'badge' ? <StatusPill label={updated.label} /> : null}
       </View>
+      {badge ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={badge} />
+        </View>
+      ) : null}
+      {updated?.kind === 'badge' ? (
+        <View pointerEvents="none" style={{ flexShrink: 1, maxWidth: '100%' }}>
+          <StatusPill label={updated.label} />
+        </View>
+      ) : null}
+      {total ? (
+        <View pointerEvents="none" style={{ flexShrink: 1 }}>
+          {total}
+        </View>
+      ) : null}
       {end}
     </View>
   )
