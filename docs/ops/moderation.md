@@ -1,7 +1,7 @@
 # La modération : signalements, retraits, procédure
 
-Depuis la tranche 7a, un membre peut signaler un projet, une note, un commentaire (ou une réponse)
-ou un profil. Un administrateur lit la file dans l'appli (écran « Modération », visible des seuls
+Depuis la tranche 7a, un membre peut signaler un projet, une mise à jour (une note avant R7a), un
+commentaire (ou une réponse) ou un profil. Un administrateur lit la file dans l'appli (écran « Modération », visible des seuls
 administrateurs), puis retire le contenu ou classe le signalement. Chaque décision est gardée :
 qui, quand, quoi, pourquoi. Ce document dit comment faire, et ce qu'il faut faire dans les cas
 graves. Les commandes se lancent depuis le PC, comme celles de [`serveur.md`](serveur.md).
@@ -43,7 +43,7 @@ Pour chaque cible, trois décisions :
 
 | Décision | Effet |
 | --- | --- |
-| **Retirer** (projet, note, commentaire) | Le contenu n'est plus visible que de son auteur, avec le fondement (la loi, ou les règles de l'appli) et l'explication. L'auteur reçoit une notification ; la personne qui a signalé aussi (« il a été retiré »), sans aucun détail. |
+| **Retirer** (projet, mise à jour, commentaire) | Le contenu n'est plus visible que de son auteur, avec le fondement (la loi, ou les règles de l'appli) et l'explication. L'auteur reçoit une notification ; la personne qui a signalé aussi (« il a été retiré »), sans aucun détail. |
 | **Classer** | Le contenu reste. Les signalements sont clos ; la personne qui a signalé est prévenue (« nous ne l'avons pas retiré »). C'est la seule décision possible sur un profil. |
 | **Rétablir** (onglet « Retirés ») | Le contenu redevient visible comme avant (privé s'il l'était). La notification de retrait disparaît. |
 
@@ -183,8 +183,9 @@ La purge de nuit (`apps/api/src/reports/retention.ts`) applique ces durées :
 ## 8. Les blocages
 
 Un membre peut en bloquer un autre (tranche 7b) : aucun des deux ne voit plus les contenus de
-l'autre (projets, notes, commentaires, réactions, notifications, suggestions après « @ »), et ils
-ne peuvent plus interagir. La personne bloquée n'est pas prévenue. Deux exceptions, à connaître
+l'autre (projets, mises à jour, commentaires, réactions, notifications, suggestions après « @ »), et ils
+ne peuvent plus interagir. Le blocage retire aussi les inscriptions de testeur de l'un sur les
+projets de l'autre (R7a), qui ne reviennent pas au déblocage. La personne bloquée n'est pas prévenue. Deux exceptions, à connaître
 pour répondre juste à un membre :
 
 - **L'auteur d'un projet garde la modération de son espace** (règle 1) : sur son projet, il lit

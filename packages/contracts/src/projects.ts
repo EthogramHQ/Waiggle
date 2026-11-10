@@ -3,7 +3,6 @@
 import { z } from 'zod'
 import { CategoryCode } from './categories'
 import { FollowState } from './follows'
-import { PROJECT_NOTES_SHOWN, ProjectNote } from './notes'
 import { TOOL_MAX_LENGTH } from './profile'
 import { ReactionState } from './reactions'
 import { Removal } from './removal'
@@ -16,7 +15,9 @@ import {
   ToolStatusFilter,
   uniqueTools,
 } from './tools'
+import { ProjectUpdate, UpdateSummary } from './updates'
 import { publicHttpsUrl } from './url'
+import { ProjectVisual, VisualDescription } from './visuals'
 
 export const PROJECT_TITLE_MAX = 80
 export const PROJECT_PITCH_MAX = 140
@@ -36,52 +37,12 @@ export const VISUAL_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 export const ProjectId = z.uuid()
 
 /**
- * Le ThumbHash d'une image : un résumé flou de quelques dizaines d'octets, calculé par le serveur,
- * qui colore la lumière d'ambiance et s'affiche le temps que la vraie image arrive.
- * Il vient de l'API ; l'appli le vérifie quand même (ADR 0002) : du base64, court. Un vrai ThumbHash
- * fait au plus 25 octets (36 caractères) ; 64 laisse de la marge sans rien laisser passer de long.
+ * Où va une photo envoyée : dans la galerie (la première sert de couverture), comme couverture
+ * verticale, affichée sur téléphone, ou (R7a) pour une mise à jour pas encore publiée. Une photo
+ * `update` n'entre jamais dans la galerie, ni dans `VISUALS_MAX`.
  */
-export const Thumbhash = z.base64().min(1).max(64)
-
-/**
- * Où va une photo envoyée : dans la galerie (la première sert de couverture), ou comme couverture
- * verticale, affichée sur téléphone.
- */
-export const VisualSlot = z.enum(['gallery', 'portrait'])
+export const VisualSlot = z.enum(['gallery', 'portrait', 'update'])
 export type VisualSlot = z.infer<typeof VisualSlot>
-
-/**
- * Un visuel d'un projet, tel que l'API le renvoie. `kind` n'a qu'une valeur pour l'instant : la
- * vidéo viendra dans sa propre tranche, et s'ajoutera ici.
- * L'adresse ne s'ouvre que pour un membre connecté qui voit le projet.
- */
-export const ProjectVisual = z
-  .object({
-    id: z.uuid(),
-    kind: z.enum(['image']),
-    url: z.url(),
-    width: z.int().positive(),
-    height: z.int().positive(),
-    thumbhash: Thumbhash,
-    /**
-     * La description de la photo écrite par l'auteur (R6a), lue par les lecteurs d'écran à la place
-     * de « Photo 1 sur 3 ». Du texte brut, jamais du Markdown ; null : pas de description.
-     */
-    description: z.string().nullable(),
-  })
-  .meta({ id: 'ProjectVisual' })
-export type ProjectVisual = z.infer<typeof ProjectVisual>
-
-/** La description d'une photo : 250 caractères au plus (R6a). */
-export const PHOTO_DESCRIPTION_MAX = 250
-
-/**
- * Ce qu'un membre écrit pour décrire une photo. Une case vide (ou faite d'espaces) devient null :
- * effacer la description, c'est vider le champ.
- */
-export const VisualDescription = FreeText(PHOTO_DESCRIPTION_MAX)
-  .nullable()
-  .transform((text) => (text ? text : null))
 
 /** Ce que PATCH /v1/projects/{id}/visuals/{visualId} accepte (R6a) : la description, seule. */
 export const VisualUpdate = z
@@ -260,13 +221,14 @@ const VisualOrder = z
  * La catégorie principale peut changer mais jamais redevenir nulle. La règle « seconde différente
  * de la principale » se vérifie ici quand le corps porte les deux ; l'API la vérifie en plus contre
  * les valeurs déjà enregistrées quand il n'en porte qu'une.
+ * Il s'appelait `ProjectUpdate` jusqu'en R7a ; ce nom désigne depuis une mise à jour (updates.ts).
  */
-export const ProjectUpdate = z
+export const ProjectChanges = z
   .strictObject({ ...fields, visualOrder: VisualOrder })
   .partial()
   .refine(secondDiffers, { ...SAME_CATEGORY, path: ['secondaryCategory'] })
-  .meta({ id: 'ProjectUpdate' })
-export type ProjectUpdate = z.infer<typeof ProjectUpdate>
+  .meta({ id: 'ProjectChanges' })
+export type ProjectChanges = z.infer<typeof ProjectChanges>
 
 // --- Ce que l'API renvoie ---
 
@@ -305,8 +267,23 @@ export const Project = z
     isMine: z.boolean(),
     /** Si le visiteur suit ce projet, et combien de membres le suivent (jamais leurs noms). */
     ...FollowState.shape,
-    /** Le journal : les notes de l'auteur, de la plus récente à la plus ancienne (20 au plus). */
-    notes: z.array(ProjectNote).max(PROJECT_NOTES_SHOWN),
+    /**
+     * R7a : la dernière mise à jour que ce membre peut voir (la section « Les mises à jour »), ou
+     * null. Une mise à jour retirée n'y est que pour l'auteur, avec `removal` ; la frise entière se
+     * lit à part (GET /v1/projects/{id}/updates).
+     */
+    latestUpdate: ProjectUpdate.nullable(),
+    /** Le nombre de mises à jour que ce membre peut voir (« Voir les 3 mises à jour »). */
+    updateCount: z.int().nonnegative(),
+    /**
+     * La version de la dernière mise à jour non retirée qui en a une (« v1.2 », sous le titre) ;
+     * null s'il n'y en a pas. Jamais celle d'une mise à jour retirée, pas même pour l'auteur.
+     */
+    version: z.string().nullable(),
+    /** Vrai si le visiteur s'est inscrit comme testeur de ce projet (R7a). */
+    isTester: z.boolean(),
+    /** Le nombre de testeurs, pour l'auteur seul ; null pour tous les autres (R7a). */
+    testerCount: z.int().nonnegative().nullable(),
     /** Les réactions (tranche 5) : les nombres par type, et celles du membre qui regarde. */
     reactions: ReactionState,
     /**
@@ -320,6 +297,10 @@ export const Project = z
      */
     removal: Removal.nullable(),
     createdAt: z.iso.datetime(),
+    /**
+     * La dernière modification du projet lui-même. Depuis R7a, « Mis à jour » sous le titre ne la
+     * lit plus : il suit `latestUpdate`.
+     */
     updatedAt: z.iso.datetime(),
   })
   .meta({ id: 'Project' })
@@ -355,6 +336,13 @@ export const ProjectSummary = Project.pick({
      * pour un projet privé ou retiré, même pour son auteur (relecture de sécurité sec-A4).
      */
     reactionTotal: z.number().int().min(0),
+    /**
+     * R7a : la dernière mise à jour non retirée (pour tous, auteur compris), en version courte ;
+     * la carte en tire « Mis à jour · v1.2 ». null : aucune.
+     */
+    latestUpdate: UpdateSummary.nullable(),
+    /** La version sous le titre, mêmes règles que `Project.version`. */
+    version: z.string().nullable(),
   })
   .meta({ id: 'ProjectSummary' })
 export type ProjectSummary = z.infer<typeof ProjectSummary>

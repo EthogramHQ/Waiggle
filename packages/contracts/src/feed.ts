@@ -1,11 +1,12 @@
 // Les deux fils de l'accueil (tranche 4) : « Abonnements » (GET /v1/feed/following) et
 // « Découvrir » (GET /v1/feed/discover). Ils se lisent par pages de 20, du plus récent au plus
 // ancien, grâce à un curseur : un marque-page rendu avec chaque page, qu'on renvoie pour obtenir
-// la suivante. Le curseur note la date et l'identifiant du dernier élément (un projet ou une note).
+// la suivante. Le curseur note la date et l'identifiant du dernier élément. Depuis R7a, chaque projet
+// n'y paraît qu'une fois, à son événement le plus récent : sa publication ou sa dernière mise à jour.
 import { z } from 'zod'
 import { CategoryCode } from './categories'
-import { ProjectNote } from './notes'
 import { ProjectSummary } from './projects'
+import { UpdateSummary } from './updates'
 
 /** Le nombre d'éléments par page de fil. */
 export const FEED_PAGE_SIZE = 20
@@ -44,22 +45,23 @@ export const FeedProjectItem = z.object({
 })
 
 /**
- * Une note d'un projet suivi (seulement dans « Abonnements »). `at` est sa date de publication ;
- * `project` dit de quel projet il s'agit (son titre, son auteur, sa couverture).
+ * Un projet qui remonte grâce à une mise à jour (R7a, seulement dans « Abonnements ») : un projet
+ * suivi, ou un projet d'un membre suivi. `at` est la date de la mise à jour ; la carte en tire
+ * « Mis à jour · v1.2 » et la première ligne de « Ce qui a changé ». Remplace la note de 4b.
  */
-export const FeedNoteItem = z.object({
-  kind: z.literal('note'),
+export const FeedUpdateItem = z.object({
+  kind: z.literal('update'),
   at: z.iso.datetime(),
-  note: ProjectNote,
+  update: UpdateSummary,
   project: ProjectSummary,
 })
 
 /**
  * Un élément du fil. Une « union discriminée » : un objet de l'une des formes listées, que le champ
- * `kind` permet de distinguer : un nouveau projet, ou la note d'un projet suivi.
+ * `kind` permet de distinguer : un nouveau projet, ou un projet remonté par sa mise à jour.
  */
 export const FeedItem = z
-  .discriminatedUnion('kind', [FeedProjectItem, FeedNoteItem])
+  .discriminatedUnion('kind', [FeedProjectItem, FeedUpdateItem])
   .meta({ id: 'FeedItem' })
 export type FeedItem = z.infer<typeof FeedItem>
 

@@ -12,6 +12,7 @@ import { removalByLaw } from '../testing/moderation'
 import { projectWithPhotos, recipesProject } from '../testing/projects'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import { rocketUpdate } from '../testing/updates'
 import { CoverTransitionProvider, useCoverSource } from '../ui/coverTransition'
 import { ProjectScreen } from './ProjectScreen'
 import {
@@ -25,7 +26,6 @@ import {
   readingOrder,
   resetProjectScreenMocks,
   seenByOther,
-  v2,
 } from './ProjectScreen.testkit'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -120,7 +120,7 @@ describe('the reading order of the project page on a computer', () => {
   it('reads the gallery, the header, « Suivre » and the reactions before the description', async () => {
     const restore = setDesktopWindow()
     try {
-      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      seenByOther({ ...projectWithPhotos, latestUpdate: rocketUpdate, updateCount: 1 })
       await renderWithProviders(<ProjectScreen id={id} />)
 
       const gallery = await screen.findByLabelText(fr.t(($) => $.gallery.label))
@@ -178,7 +178,7 @@ describe('the reading order of the project page on a computer', () => {
   it('reads the description, the prompt and the journal before the comments, and « Signaler » after them', async () => {
     const restore = setDesktopWindow()
     try {
-      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      seenByOther({ ...projectWithPhotos, latestUpdate: rocketUpdate, updateCount: 1 })
       await renderWithProviders(<ProjectScreen id={id} />)
 
       const prompt = await screen.findByRole('header', { name: 'Le prompt de départ' })
@@ -188,7 +188,7 @@ describe('the reading order of the project page on a computer', () => {
       const [descriptionAt, promptAt, journalAt, reportAt, commentAt] = readingOrder(
         screen.getByRole('header', { name: 'Comment ça marche' }),
         prompt,
-        screen.getByRole('header', { name: 'Journal' }),
+        screen.getByRole('header', { name: 'Les mises à jour' }),
         report,
         commentField(),
       )
@@ -211,17 +211,17 @@ describe('« Signaler ce projet » on a computer', () => {
   it('comes after the comments, as on a phone', async () => {
     const restore = setDesktopWindow()
     try {
-      seenByOther({ ...projectWithPhotos, notes: [v2] })
+      seenByOther({ ...projectWithPhotos, latestUpdate: rocketUpdate, updateCount: 1 })
       await renderWithProviders(<ProjectScreen id={id} />)
 
       // R5b : sur ordinateur, le champ de la colonne remplace le bouton « Écrire un commentaire ».
-      await screen.findByRole('header', { name: 'Journal' })
+      await screen.findByRole('header', { name: 'Les mises à jour' })
       const comment = commentField()
       const report =
         screen.queryByRole('link', { name: 'Signaler ce projet' }) ??
         screen.getByRole('button', { name: 'Signaler ce projet' })
       const [journalAt, commentAt, reportAt] = readingOrder(
-        screen.getByRole('header', { name: 'Journal' }),
+        screen.getByRole('header', { name: 'Les mises à jour' }),
         comment,
         report,
       )
@@ -260,7 +260,12 @@ describe('the comments unrolled on a computer', () => {
   it('keeps the unrolled list and the comment field after the content of the left column', async () => {
     const restore = setDesktopWindow()
     try {
-      seenByOther({ ...projectWithPhotos, notes: [v2], commentCount: 6 })
+      seenByOther({
+        ...projectWithPhotos,
+        latestUpdate: rocketUpdate,
+        updateCount: 1,
+        commentCount: 6,
+      })
       mockComments(sixThreads)
       await renderWithProviders(<ProjectScreen id={id} />)
 
@@ -276,7 +281,7 @@ describe('the comments unrolled on a computer', () => {
         readingOrder(
           screen.getByRole('header', { name: 'Comment ça marche' }),
           screen.getByRole('header', { name: 'Le prompt de départ' }),
-          screen.getByRole('header', { name: 'Journal' }),
+          screen.getByRole('header', { name: 'Les mises à jour' }),
           screen.getByText('Premier fil, le plus récent.'),
           sixth,
           commentField(),

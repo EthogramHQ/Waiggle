@@ -42,6 +42,12 @@ const errorMessages = {
   category_name_taken: 'categoryNameTaken',
   too_many_other_tools: 'tooManyOtherTools',
   own_project: 'ownProject',
+  // Tranche R7a : les mises à jour et les testeurs.
+  invalid_photos: 'invalidPhotos',
+  cannot_test_own: 'cannotTestOwn',
+  not_testable: 'notTestable',
+  testers_full: 'testersFull',
+  update_photos_full: 'updatePhotosFull',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

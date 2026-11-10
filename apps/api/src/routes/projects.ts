@@ -1,7 +1,7 @@
 // Routes des projets : publier, lire, modifier, supprimer. Toutes exigent d'être connecté
 // (« public » veut dire « visible par les membres »). Qui voit quoi : voir projects/load.ts.
 import { createRoute, z } from '@hono/zod-openapi'
-import { Project, ProjectInput, ProjectUpdate } from '@ruche/contracts'
+import { Project, ProjectChanges, ProjectInput } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, eq, sql } from 'drizzle-orm'
 import type { Context } from 'hono'
@@ -71,7 +71,7 @@ const updateProjectRoute = createRoute({
   summary: 'Change my project',
   request: {
     params,
-    body: { required: true, content: { 'application/json': { schema: ProjectUpdate } } },
+    body: { required: true, content: { 'application/json': { schema: ProjectChanges } } },
   },
   responses: {
     200: projectResponse('The changed project.'),

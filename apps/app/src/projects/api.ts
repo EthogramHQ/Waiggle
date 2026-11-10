@@ -1,6 +1,6 @@
 // Ce que l'appli peut faire avec les projets : les lire, les publier, les modifier, les supprimer.
 // Les écrans n'appellent que ces fonctions ; les tests les remplacent par de faux appels.
-import { Project, type ProjectInput, type ProjectUpdate, type VisualSlot } from '@ruche/contracts'
+import { Project, type ProjectChanges, type ProjectInput, type VisualSlot } from '@ruche/contracts'
 import { request, requestWithoutBody } from '../api/client'
 import { ApiError, type ApiResult } from '../api/errors'
 import { appendImage, type PickedImage, pickImage } from '../media/pick'
@@ -25,7 +25,7 @@ export const getProject = async (id: string): Promise<Project> => {
 export const createProject = (input: ProjectInput): Promise<ApiResult<Project>> =>
   request('/v1/projects', json('POST', input), Project)
 
-export const updateProject = (id: string, changes: ProjectUpdate): Promise<ApiResult<Project>> =>
+export const updateProject = (id: string, changes: ProjectChanges): Promise<ApiResult<Project>> =>
   request(projectPath(id), json('PATCH', changes), Project)
 
 export const deleteProject = (id: string): Promise<ApiResult<null>> =>

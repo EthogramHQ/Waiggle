@@ -1,5 +1,5 @@
-// Signaler un contenu, et le traiter (tranche 7a). Un membre signale un projet, une note, un
-// commentaire (ou une réponse) ou un profil, avec un motif ; un administrateur voit la file, puis
+// Signaler un contenu, et le traiter (tranche 7a). Un membre signale un projet, une mise à jour
+// (R7a ; une note avant), un commentaire (ou une réponse) ou un profil, avec un motif ; un administrateur voit la file, puis
 // retire le contenu ou classe le signalement. Chaque décision est gardée : qui, quand, quoi,
 // pourquoi. La personne qui signale n'apparaît dans aucune réponse destinée à l'auteur du contenu.
 import { z } from 'zod'
@@ -7,11 +7,11 @@ import { PASSWORD_MAX_LENGTH } from './accounts'
 import { CommentId } from './comments'
 import { FeedCursor } from './feed'
 import { MemberId } from './members'
-import { ProjectNoteId } from './notes'
 import { ProjectId } from './projects'
 import { REMOVAL_EXPLANATION_MAX, RemovalGround } from './removal'
 import { LiftCause, SuspensionDuration } from './suspension'
 import { FreeText, isClean, VisibleFreeText } from './text'
+import { UpdateId } from './updates'
 
 /** La précision libre d'un signalement : 500 caractères au plus. */
 export const REPORT_DETAILS_MAX = 500
@@ -43,9 +43,11 @@ export const MODERATION_PASSWORD_FAILURES_PER_DAY = 5
 /**
  * Les champs qu'un membre saisit (tranche 7b), nommés comme au registre des entrées
  * (apps/api/src/moderation/inputs.ts) : profil (name, handle, bio, favoriteTools, avatar), projet
- * (title, pitch, description, prompt, tools, demoUrl, cover, photo, photoDescription), note et
- * commentaire (body). `text` : la copie d'un signalement d'avant 7b, un texte seul (il ne se retire
- * pas comme une partie). `photoDescription` (R6a) : la description d'une photo, du texte.
+ * (title, pitch, description, prompt, tools, demoUrl, cover, photo, photoDescription), mise à jour
+ * (R7a : title, version, une `line` par ligne de « Ce qui a changé », puis photo et
+ * photoDescription) et commentaire (body ; la note d'avant R7a aussi). `text` : la copie d'un
+ * signalement d'avant 7b, un texte seul (il ne se retire pas comme une partie). `photoDescription`
+ * (R6a) : la description d'une photo, du texte.
  */
 export const MemberInputField = z.enum([
   'text',
@@ -55,6 +57,8 @@ export const MemberInputField = z.enum([
   'favoriteTools',
   'avatar',
   'title',
+  'version',
+  'line',
   'pitch',
   'description',
   'prompt',
@@ -94,9 +98,19 @@ export const SnapshotImage = z
   .strict()
 export type SnapshotImage = z.infer<typeof SnapshotImage>
 
-/** Ce qu'on peut signaler. Une réponse est un commentaire. */
-export const ReportTargetKind = z.enum(['project', 'note', 'comment', 'member'])
+/** Ce qu'on peut signaler. Une réponse est un commentaire. R7a : `update` remplace `note`. */
+export const ReportTargetKind = z.enum(['project', 'update', 'comment', 'member'])
 export type ReportTargetKind = z.infer<typeof ReportTargetKind>
+
+/**
+ * Ce que la base peut contenir (relecture de sécurité B1, R7a) : les mêmes, plus `note`, pour les
+ * signalements et les décisions d'avant l'effacement des notes. Tout ce qui relit une cible gardée
+ * (export, notification « signalement traité », file, historique) lit avec ce schéma ; seul ce
+ * qu'un membre envoie (`ReportTargetKind`) refuse `note`. Une cible `note` n'existe plus : la file
+ * la traite comme une cible disparue.
+ */
+export const StoredReportTargetKind = z.enum([...ReportTargetKind.options, 'note'])
+export type StoredReportTargetKind = z.infer<typeof StoredReportTargetKind>
 
 /**
  * La cible d'un signalement : sa sorte et son identifiant, validé selon la sorte (un uuid, ou l'id
@@ -106,12 +120,25 @@ export type ReportTargetKind = z.infer<typeof ReportTargetKind>
 export const ReportTarget = z
   .discriminatedUnion('kind', [
     z.object({ kind: z.literal('project'), id: ProjectId }),
-    z.object({ kind: z.literal('note'), id: ProjectNoteId }),
+    z.object({ kind: z.literal('update'), id: UpdateId }),
     z.object({ kind: z.literal('comment'), id: CommentId }),
     z.object({ kind: z.literal('member'), id: MemberId }),
   ])
   .meta({ id: 'ReportTarget' })
 export type ReportTarget = z.infer<typeof ReportTarget>
+
+/**
+ * Une cible relue en base (R7a) : celles d'aujourd'hui, ou la note d'un ancien signalement. Les
+ * réponses de la modération (file, retraits, historique) et ses décisions la lisent ; une décision
+ * sur une note répond comme pour une cible disparue, jamais 500.
+ */
+export const StoredReportTarget = z
+  .discriminatedUnion('kind', [
+    ...ReportTarget.options,
+    z.object({ kind: z.literal('note'), id: z.uuid() }),
+  ])
+  .meta({ id: 'StoredReportTarget' })
+export type StoredReportTarget = z.infer<typeof StoredReportTarget>
 
 /** Les motifs, dans l'ordre où l'appli les propose. */
 export const ReportReason = z.enum([
@@ -165,7 +192,7 @@ export type CreatedReport = z.infer<typeof CreatedReport>
 export const ReportTargetPreview = z
   .object({
     target: ReportTarget,
-    /** Le texte actuel : titre et pitch d'un projet, texte d'une note ou d'un commentaire, nom et pseudo d'un membre. */
+    /** Le texte actuel : titre et pitch d'un projet, titre et lignes d'une mise à jour, texte d'un commentaire, nom et pseudo d'un membre. */
     text: z.string(),
     /** Le projet de la cible, pour revenir à sa page ; null pour un profil. */
     projectId: ProjectId.nullable(),
@@ -201,7 +228,7 @@ export type ReportTargetState = z.infer<typeof ReportTargetState>
  */
 export const ModerationQueueItem = z
   .object({
-    target: ReportTarget,
+    target: StoredReportTarget,
     /** Le projet de la cible, pour le lien « Voir » ; null pour un profil. */
     projectId: ProjectId.nullable(),
     /**
@@ -261,9 +288,9 @@ export type ModerationQueuePage = z.infer<typeof ModerationQueuePage>
 /** Un contenu retiré (GET /v1/moderation/removed), pour pouvoir le rétablir. */
 export const RemovedItem = z
   .object({
-    target: ReportTarget,
+    target: StoredReportTarget,
     projectId: ProjectId.nullable(),
-    /** Son texte actuel (titre et pitch d'un projet, texte d'une note ou d'un commentaire). */
+    /** Son texte actuel (titre et pitch d'un projet, titre et lignes d'une mise à jour, texte d'un commentaire). */
     text: z.string(),
     ground: RemovalGround,
     explanation: z.string(),
@@ -302,13 +329,13 @@ export const ModerationDecisionInput = z
   .discriminatedUnion('action', [
     z.object({
       action: z.literal('remove'),
-      target: ReportTarget,
+      target: StoredReportTarget,
       ground: RemovalGround,
       explanation: RemovalExplanation,
       password: ModerationPassword.optional(),
     }),
-    z.object({ action: z.literal('dismiss'), target: ReportTarget }),
-    z.object({ action: z.literal('restore'), target: ReportTarget }),
+    z.object({ action: z.literal('dismiss'), target: StoredReportTarget }),
+    z.object({ action: z.literal('restore'), target: StoredReportTarget }),
     z.object({
       action: z.literal('suspend'),
       memberId: MemberId,
@@ -365,7 +392,7 @@ export const DecisionHistoryItem = z
     /** L'administrateur qui a décidé ; null si son compte a été supprimé. */
     admin: HistoryMember.nullable(),
     /** La cible : un contenu, ou le membre pour un profil, une suspension ou une levée. */
-    target: ReportTarget,
+    target: StoredReportTarget,
     /** Le projet de la cible, pour le lien ; null pour un membre, ou un contenu supprimé depuis. */
     projectId: ProjectId.nullable(),
     /** Le membre visé (l'auteur du contenu, ou le membre lui-même) ; null si son compte est parti. */
@@ -403,7 +430,7 @@ export type ReportOutcome = z.infer<typeof ReportOutcome>
  * à un autre, et a pu devenir privé), ni l'explication de la décision.
  */
 export const ReportExport = z.object({
-  targetKind: ReportTargetKind,
+  targetKind: StoredReportTargetKind,
   targetId: z.string(),
   reason: ReportReason,
   details: z.string().nullable(),

@@ -20,7 +20,7 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 /** Les blancs de la typographie française (insécables, fines) ramenés à des espaces. */
 const plain = (text: string) => text.replace(/\s+/g, ' ')
 
-type Kind = 'project' | 'note'
+type Kind = 'project' | 'update'
 
 const nora = { name: 'Nora Benali', source: null }
 const sam = { name: 'Sam Petit', source: null }
@@ -53,7 +53,7 @@ const inside = (element: unknown, ancestor: unknown): boolean => {
 }
 
 const projects = (count: number) => plain(fr.t(($) => $.feed.newProjects, { count }))
-const notes = (count: number) => plain(fr.t(($) => $.feed.newNotes, { count }))
+const updates = (count: number) => plain(fr.t(($) => $.feed.newUpdates, { count }))
 const mixed = (count: number) => plain(fr.t(($) => $.feed.newMixed, { count }))
 
 describe('NewItemsBanner, what it says', () => {
@@ -69,22 +69,22 @@ describe('NewItemsBanner, what it says', () => {
     expect(screen.getByRole('button', { name: projects(1) })).toBeTruthy()
   })
 
-  it('says new notes when only notes arrived', async () => {
-    await renderWithProviders(banner({ count: 2, kinds: ['note'] }))
+  it('says « mises à jour » when only updates arrived', async () => {
+    await renderWithProviders(banner({ count: 2, kinds: ['update'] }))
 
-    expect(screen.getByRole('button', { name: notes(2) })).toBeTruthy()
+    expect(screen.getByRole('button', { name: updates(2) })).toBeTruthy()
   })
 
-  it('says nouveautés when projects and notes arrived', async () => {
-    await renderWithProviders(banner({ count: 4, kinds: ['note', 'project'] }))
+  it('says nouveautés when projects and updates arrived', async () => {
+    await renderWithProviders(banner({ count: 4, kinds: ['update', 'project'] }))
 
     expect(screen.getByRole('button', { name: mixed(4) })).toBeTruthy()
   })
 
   it.each([
     [['project'] as Kind[], fr.t(($) => $.feed.newProjectsMany, { max: FEED_PAGE_SIZE })],
-    [['note'] as Kind[], fr.t(($) => $.feed.newNotesMany, { max: FEED_PAGE_SIZE })],
-    [['project', 'note'] as Kind[], fr.t(($) => $.feed.newMixedMany, { max: FEED_PAGE_SIZE })],
+    [['update'] as Kind[], fr.t(($) => $.feed.newUpdatesMany, { max: FEED_PAGE_SIZE })],
+    [['project', 'update'] as Kind[], fr.t(($) => $.feed.newMixedMany, { max: FEED_PAGE_SIZE })],
   ])('says « ou plus » at the cap of the list (%j)', async (kinds, text) => {
     await renderWithProviders(banner({ count: FEED_PAGE_SIZE, more: true, kinds }))
 

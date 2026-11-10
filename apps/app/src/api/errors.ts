@@ -39,6 +39,13 @@ export type ApiErrorKey =
   | 'ownProject'
   // Tranche R6b : le 31e nouvel « autre outil » d'un membre dans la journée (429).
   | 'tooManyOtherTools'
+  // Tranche R7a : une photo d'une mise à jour qui n'est plus en attente (400), tester son projet
+  // (400), un projet qui ne cherche pas ou plus de testeurs (409), 100 photos de mises à jour (409).
+  | 'invalidPhotos'
+  | 'cannotTestOwn'
+  | 'notTestable'
+  | 'testersFull'
+  | 'updatePhotosFull'
   | 'internal'
   | 'network'
 
@@ -108,6 +115,12 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   // Et un 429 : trop de nouveaux « autres outils » aujourd'hui (projets et profil ensemble). Il a
   // son propre message (réessayer demain), comme le 6e changement de pseudo du jour.
   too_many_other_tools: 'tooManyOtherTools',
+  // Tranche R7a : deux 400 et trois 409 de plus.
+  invalid_photos: 'invalidPhotos',
+  cannot_test_own: 'cannotTestOwn',
+  not_testable: 'notTestable',
+  testers_full: 'testersFull',
+  update_photos_full: 'updatePhotosFull',
 }
 
 /**

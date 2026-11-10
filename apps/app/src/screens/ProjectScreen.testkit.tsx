@@ -65,7 +65,9 @@ export const firstVersion: ProjectNote = {
 export const withNotes = { ...recipesProject, notes: [v2, firstVersion] }
 
 /** Le projet de Léa, vu par Max. */
-export const seenByOther = (project = withNotes) => {
+// R7a : typé `Project` (le champ `notes` a quitté le contrat) ; la partie « Journal » de ce kit
+// sera remplacée avec les tests des mises à jour.
+export const seenByOther = (project: Project = withNotes) => {
   mockSession({ user: { id: 'u2', name: 'Max' } })
   jest.mocked(getProject).mockResolvedValue({ ...project, isMine: false })
 }

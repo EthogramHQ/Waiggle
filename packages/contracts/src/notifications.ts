@@ -9,7 +9,8 @@ import { FeedCursor } from './feed'
 import { ProjectAuthor, ProjectId } from './projects'
 import { ReactionCounts } from './reactions'
 import { RemovalGround } from './removal'
-import { ReportTargetKind } from './reports'
+import { StoredReportTargetKind } from './reports'
+import { UpdateId, UpdateLineOut } from './updates'
 
 /** L'écran charge les notifications 20 par 20, de la plus récente à la plus ancienne. */
 export const NOTIFICATION_PAGE_SIZE = 20
@@ -87,6 +88,26 @@ export const CommentNotification = z.object({
   author: ProjectAuthor.extend({ handle: z.string() }),
 })
 
+/**
+ * Une mise à jour d'un projet qu'on suit ou qu'on teste (R7a), une par mise à jour, même pour qui
+ * suit et teste à la fois. Elle ne dit jamais si l'on suit ou si l'on teste (relecture de sécurité
+ * A6). Seules les mises à jour publiées après l'abonnement ou l'inscription comptent ; une mise à
+ * jour supprimée ou retirée, un projet devenu privé ou un blocage la font disparaître.
+ */
+export const ProjectUpdateNotification = z.object({
+  ...Common,
+  kind: z.literal('project_update'),
+  project: NotifiedProject,
+  /** L'auteur du projet : son nom est déjà affiché sur la page du projet. */
+  author: ProjectAuthor,
+  update: z.object({
+    id: UpdateId,
+    title: z.string().nullable(),
+    version: z.string().nullable(),
+    firstLine: UpdateLineOut,
+  }),
+})
+
 /** Son commentaire a été masqué par l'auteur du projet ; démasqué, la notification disparaît. */
 export const HiddenNotification = z.object({
   ...Common,
@@ -104,9 +125,13 @@ export const HiddenNotification = z.object({
 export const RemovedNotification = z.object({
   ...Common,
   kind: z.literal('removed'),
-  targetKind: z.enum(['project', 'note', 'comment']),
+  /** R7a : `update` remplace `note` (les notes ont été effacées avec le Journal). */
+  targetKind: z.enum(['project', 'update', 'comment']),
   project: NotifiedProject,
-  /** L'extrait d'une note ou d'un commentaire retiré ; null pour un projet. */
+  /**
+   * L'extrait d'un commentaire, ou la première ligne d'une mise à jour, retirés ; null pour un
+   * projet.
+   */
   excerpt: z
     .string()
     .max(EXCERPT_MAX + 1)
@@ -154,11 +179,13 @@ export const SuspensionEndedNotification = z.object({
  * Un de ses signalements a été traité (tranche 7a) : la sorte de cible et l'issue, rien d'autre. Ni
  * titre, ni extrait, ni auteur, ni explication : le contenu a pu devenir privé, ou son auteur
  * partir. `link` mène à la cible seulement si elle est encore visible au moment de la lecture.
+ * `targetKind` peut valoir `note` : le signalement d'une note d'avant R7a, sans lien (sa cible
+ * n'existe plus).
  */
 export const ReportHandledNotification = z.object({
   ...Common,
   kind: z.literal('report_handled'),
-  targetKind: ReportTargetKind,
+  targetKind: StoredReportTargetKind,
   outcome: z.enum(['removed', 'dismissed']),
   link: z.object({ projectId: ProjectId.nullable(), memberId: z.string().nullable() }).nullable(),
 })
@@ -178,6 +205,7 @@ export const Notification = z
     ProjectFollowsNotification,
     MemberFollowsNotification,
     CommentNotification,
+    ProjectUpdateNotification,
     HiddenNotification,
     HandleNotification,
     RemovedNotification,

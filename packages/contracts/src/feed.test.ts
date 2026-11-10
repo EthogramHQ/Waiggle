@@ -28,6 +28,8 @@ const summary = {
   createdAt: '2026-10-18T08:30:00.000Z',
   updatedAt: '2026-10-18T08:30:00.000Z',
   reactionTotal: 0,
+  latestUpdate: null,
+  version: null,
 }
 const item = { kind: 'project', at: '2026-10-19T09:00:00.000Z', project: summary }
 
@@ -143,6 +145,20 @@ describe('FeedReadBody', () => {
 describe('FeedItem', () => {
   it('refuses an item of an unknown kind', () => {
     expect(FeedItem.safeParse({ ...item, kind: 'ad' }).success).toBe(false)
+  })
+
+  // R7a : la note du Journal a disparu ; un projet remonte par sa mise à jour, avec sa première ligne.
+  it('raises a project with its update, and no longer knows journal notes', () => {
+    const update = {
+      id: '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7',
+      at: '2026-10-19T09:00:00.000Z',
+      version: 'v1.2',
+      firstLine: { family: 'new', text: 'Un compte à rebours avant chaque question' },
+      lineCount: 3,
+    }
+    const raised = { kind: 'update', at: update.at, update, project: summary }
+    expect(FeedItem.parse(raised)).toEqual(raised)
+    expect(FeedItem.safeParse({ ...item, kind: 'note' }).success).toBe(false)
   })
 })
 

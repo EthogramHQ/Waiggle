@@ -1851,35 +1851,46 @@ Un testeur n'est plus quelqu'un qui a seulement ouvert la démo : c'est un membr
 auprès de l'auteur pour l'aider. En R7a, il reçoit les mises à jour du projet ; en R7b, il aura
 sa place dans **le coin des testeurs**.
 
-**Devenir testeur**
+Amendé au commit du contrat (décisions de Louis du 10/11/2026, après la relecture juridique du
+plan) : les textes ne supposent aucun genre, et ne donnent jamais un nombre de testeurs à un autre
+que l'auteur.
+
+**Rejoindre les testeurs**
 - Étant donné Inès sur la page de Décollage !, un projet « Testable » de Papi Jean, avec une démo
-- Alors sous « Tester la démo », à côté de « Suivre ce projet », un bouton « Devenir testeur »
+- Alors sous « Tester la démo », à côté de « Suivre ce projet », un bouton « Rejoindre les
+  testeurs » (pas en miel : « Tester la démo » l'est)
 - Quand elle le touche
-- Alors une feuille explique : « Tu aides Papi Jean à améliorer Décollage !. Tu recevras ses mises
-  à jour, et bientôt ses appels à tester. Papi Jean verra ton nom dans sa liste de testeurs. »,
-  avec « Devenir testeur » et « Annuler »
+- Alors une feuille « Rejoindre les testeurs » explique : « Tu aides Papi Jean à améliorer
+  « Décollage ! ». Tu recevras ses mises à jour, et bientôt ses appels à tester. Papi Jean verra ton
+  nom dans sa liste de testeurs. », avec « Rejoindre les testeurs » et « Annuler »
 - Quand elle confirme
-- Alors une bulle dit « Tu es testeur de Décollage ! », et le bouton devient « Tu es testeur »
+- Alors une bulle dit « Tu fais partie des testeurs de « Décollage ! ». », et le bouton devient
+  « Tu testes ce projet », qui reçoit le focus
 - Et sur la page de sortie d'une démo venue d'un projet « Testable », un membre qui n'est pas
-  testeur lit « Tu veux aider Papi Jean ? Deviens testeur depuis la page du projet. » ; ouvrir la
-  démo ne rend jamais testeur tout seul
-- Et un projet qui n'est pas « Testable » ne propose pas « Devenir testeur » ; ses testeurs gardent
-  leur place quand le statut change
+  testeur lit « Tu veux aider Papi Jean ? Rejoins les testeurs depuis la page du projet. », la
+  seconde phrase étant un lien vers la page du projet ; ouvrir la démo ne rend jamais testeur tout
+  seul
+- Et un projet qui n'est pas « Testable » ne propose pas « Rejoindre les testeurs » ; ses testeurs
+  gardent leur place quand le statut change, et gardent « Tu testes ce projet » pour pouvoir partir
+- Et un compte suspendu ne voit pas « Rejoindre les testeurs » (il peut toujours quitter)
 - Et l'auteur ne peut pas être testeur de son propre projet ; un membre bloqué par l'auteur, ou qui
   l'a bloqué, ne voit pas le bouton
-- Et un projet compte 200 testeurs au plus ; au-delà, « Devenir testeur » dit « Ce projet a déjà
-  200 testeurs. »
+- Et un projet compte 200 testeurs au plus ; au-delà, la feuille dit « Ce projet ne prend plus de
+  nouveaux testeurs. »
 - Et l'auteur voit « 12 testeurs » à côté de « 12 abonnés » sur la page de son projet (le nombre
   seul en R7a ; la liste en R7b) ; les autres membres ne voient ni le nombre ni les noms
 
 **Quitter**
-- Quand Inès touche « Tu es testeur »
-- Alors une feuille « Tu es testeur de Décollage ! Tu reçois ses mises à jour. » propose « Quitter
-  les testeurs » et « Fermer »
+- Quand Inès touche « Tu testes ce projet »
+- Alors une feuille « Tu testes ce projet » dit « Tu fais partie des testeurs de « Décollage ! ».
+  Tu reçois ses mises à jour. » et propose « Quitter les testeurs » et « Fermer »
 - Quand elle touche « Quitter les testeurs »
-- Alors elle n'est plus testeuse, le bouton redevient « Devenir testeur », et une bulle dit « Tu
-  n'es plus testeur de Décollage !. »
-- Et un blocage, dans un sens ou dans l'autre, retire le testeur
+- Alors elle ne fait plus partie des testeurs, le bouton redevient « Rejoindre les testeurs », et
+  une bulle dit « Tu ne fais plus partie des testeurs de « Décollage ! ». »
+- Et quand elle cesse de suivre un projet qu'elle teste, une bulle dit « Tu fais toujours partie
+  des testeurs : ses mises à jour continueront d'arriver. »
+- Et un blocage, dans un sens ou dans l'autre, retire le testeur ; ses inscriptions ne reviennent
+  pas au déblocage
 - Et un projet supprimé emporte ses testeurs ; un projet retiré, privé, ou dont l'auteur est
   suspendu ne prévient plus ses testeurs
 
@@ -1920,10 +1931,15 @@ sa place dans **le coin des testeurs**.
 - Et une partie « Photos » : « Ajouter » ouvre le choix d'images comme dans la feuille de
   publication, 4 photos au plus, ré-encodées sans métadonnées, chacune avec sa description
   facultative
+- Et un projet garde 100 photos de mises à jour au plus (décision de Louis du 10/11/2026) ;
+  au-delà, « Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour
+  en ajouter. »
 - Et dès deux photos, un interrupteur « Avant / après » : allumé, les deux premières portent les
   étiquettes « Avant » et « Après »
-- Et en bas, « Les abonnés et les testeurs de ce projet seront prévenus. » (pour un projet privé :
-  « Ce projet est privé : personne n'est prévenu. »)
+- Et en bas, « Tous les membres pourront la lire. Les abonnés et les testeurs de ce projet seront
+  prévenus. » (pour un projet privé : « Ce projet est privé : aucun autre membre ne voit cette mise
+  à jour, et personne n'est prévenu. S'il redevient visible des membres, tous la verront, et ses
+  abonnés et testeurs pourront la retrouver dans Activité. » ; textes de la relecture juridique)
 
 **Publier**
 - Quand il touche « Publier » avec au moins une ligne écrite
@@ -1940,10 +1956,10 @@ sa place dans **le coin des testeurs**.
   aujourd'hui. La suivante pourra partir demain. »
 
 **Quitter sans publier** (repris de la liste « À reprendre » : le brouillon d'une note perdu)
-- Quand il touche « Annuler », Échap ou le voile, la feuille modifiée
-- Alors une fenêtre « Abandonner cette mise à jour ? » propose « Continuer » et « Abandonner »
-- Et la feuille sans changement se ferme tout de suite
-- Et le Retour du navigateur quitte la page, comme pour les autres feuilles
+- Quand il touche « Annuler », Échap, le voile ou le Retour du navigateur, la feuille modifiée
+- Alors une fenêtre « Abandonner cette mise à jour ? » propose « Continuer » et « Abandonner » ;
+  « Abandonner » efface aussi les photos déjà envoyées
+- Et la feuille sans changement (ou seulement préremplie par le statut) se ferme tout de suite
 
 **Quand le statut change**
 - Étant donné Papi Jean qui passe son projet en « Testable » dans « Modifier »
@@ -1997,8 +2013,8 @@ sa place dans **le coin des testeurs**.
 - Et sa zone à toucher fait 44 points au moins
 - Et chaque photo garde sa description pour les lecteurs d'écran
 - Et rien ne bouge sans le membre, avec ou sans « Réduire les animations »
-- Quand il touche une photo d'une mise à jour sans avant / après
-- Alors elle s'ouvre en grand, comme celles de la galerie
+- Et les photos d'une mise à jour sans avant / après s'affichent dans un carrousel, comme celles de
+  la galerie (amendé au commit du contrat : l'appli n'a pas encore de vue en grand des photos)
 
 ### Supprimer une mise à jour
 
@@ -2032,14 +2048,16 @@ sa place dans **le coin des testeurs**.
 - Étant donné Inès, abonnée ou testeuse de Décollage !
 - Quand Papi Jean publie une mise à jour
 - Alors la cloche s'allume, et Activité montre « Papi Jean a publié une mise à jour de
-  Décollage ! · v1.2 », avec sa première ligne ; la toucher ouvre la frise
+  « Décollage ! » · v1.2 », avec sa première ligne ; la toucher ouvre la frise
+- Et seules les mises à jour publiées après l'abonnement ou l'inscription la font s'allumer
 - Et Inès n'est prévenue qu'une fois par mise à jour, même abonnée et testeuse
 - Et l'auteur n'est jamais prévenu de sa propre mise à jour
 - Et personne n'est prévenu d'un projet privé, d'un projet qu'il ne peut pas voir, ni par un
   membre qu'il a bloqué ou qui l'a bloqué
 - Et une mise à jour supprimée ou retirée disparaît d'Activité
-- Et le récap du lundi ajoute « Les projets que tu suis » : chaque projet mis à jour dans la
-  semaine, son nombre de mises à jour et un lien, pour qui reçoit le récap
+- Et le récap du lundi ajoute « Les projets que tu suis ou que tu testes » : chaque projet mis à
+  jour dans la semaine, son nombre de mises à jour et un lien, pour qui reçoit le récap ; jamais le
+  texte d'une mise à jour
 
 ### La modération
 
@@ -2075,7 +2093,8 @@ sa place dans **le coin des testeurs**.
 ### Les choix de la session (10/11/2026), validés avec ce scénario
 
 1. **Les testeurs** : on s'inscrit (projet « Testable » seulement, 200 au plus) ; l'auteur voit
-   leur nombre en R7a, leur liste en R7b ; personne d'autre ne voit ni l'un ni l'autre.
+   leur nombre en R7a, leur liste en R7b ; personne d'autre ne voit ni l'un ni l'autre. Les textes
+   (« Rejoindre les testeurs », « Tu testes ce projet ») ne supposent aucun genre.
 2. **Ce que reçoivent abonnés et testeurs** : Activité et le récap du lundi ; pas d'e-mail
    immédiat (R8 réglera chaque type).
 3. **Le fil** : une mise à jour remonte la carte pour les abonnés du projet et de l'auteur, dans
@@ -2108,7 +2127,7 @@ Hors de R7b, et où ça va :
 ### Le coin des testeurs (une page du projet, `/projects/<id>/testers`)
 
 - Étant donné Papi Jean, ou un testeur de Décollage !
-- Quand il touche « Le coin des testeurs » (le bouton « Tu es testeur » le devient, et l'auteur le
+- Quand il touche « Le coin des testeurs » (le bouton « Tu testes ce projet » le devient, et l'auteur le
   trouve sur la page du projet et dans le menu « … »)
 - Alors la page s'ouvre avec Retour, le titre du projet, et deux onglets : « Appels » et
   « Retours »
@@ -2173,7 +2192,7 @@ Hors de R7b, et où ça va :
 
 - Quand Papi Jean retire Inès des testeurs (confirmation « Retirer Inès des testeurs ? Elle ne
   verra plus le coin des testeurs ; ses retours te restent lisibles. »)
-- Alors Inès n'est plus testeuse, sans en être prévenue, et « Devenir testeur » ne lui est plus
+- Alors Inès n'est plus testeuse, sans en être prévenue, et « Rejoindre les testeurs » ne lui est plus
   proposé sur ce projet
 - Quand Inès quitte les testeurs
 - Alors son fil de retours reste lisible par Papi Jean, et redevient le sien si elle se réinscrit

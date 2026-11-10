@@ -34,7 +34,12 @@ export const recipesProject: Project = {
   isMine: true,
   isFollowed: false,
   followerCount: 0,
-  notes: [],
+  // R7a : les mises à jour et les testeurs (aucune ici).
+  latestUpdate: null,
+  updateCount: 0,
+  version: null,
+  isTester: false,
+  testerCount: null,
   reactions: noReactions,
   commentCount: 0,
   removal: null,
@@ -89,6 +94,9 @@ export const summaryOf = ({ visuals, ...project }: Project): ProjectSummary => (
   secondaryCategory: project.secondaryCategory,
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
+  // R7a : la version courte ne garde pas la mise à jour entière ; un test qui en veut une la pose.
+  latestUpdate: null,
+  version: project.version,
 })
 
 /**

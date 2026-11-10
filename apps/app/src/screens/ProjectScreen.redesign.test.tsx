@@ -14,6 +14,7 @@ import { reportsOpened } from '../testing/navigation'
 import { recipesProject } from '../testing/projects'
 import { renderWithProviders, setDesktopWindow } from '../testing/render'
 import { containing, fr } from '../testing/text'
+import { rocketUpdate } from '../testing/updates'
 import { copyText } from '../ui/clipboard'
 import { ToastProvider } from '../ui/theme/toast'
 import { ProjectScreen } from './ProjectScreen'
@@ -122,10 +123,13 @@ describe('the dates under the title', () => {
     expect(screen.queryAllByText(/Mis à jour/)).toHaveLength(0)
   })
 
-  it('adds « Mis à jour » once the project changed after its publication', async () => {
-    jest
-      .mocked(getProject)
-      .mockResolvedValue({ ...recipesProject, updatedAt: '2026-10-14T09:00:00.000Z' })
+  it('adds « Mis à jour » once an update was published, not after a change of the project', async () => {
+    jest.mocked(getProject).mockResolvedValue({
+      ...recipesProject,
+      latestUpdate: rocketUpdate,
+      updateCount: 1,
+      version: 'v1.2',
+    })
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByRole('header', { name: 'Mon agent de recettes' })

@@ -290,8 +290,8 @@ export const fr = {
       profileItem: 'Ton profil et ta photo',
       projectsItem: 'Tes projets',
       projectsDetail:
-        'Avec leur description, leur recette, leurs prompts, leurs photos, leurs notes et leurs commentaires',
-      followsItem: 'Tes abonnements et tes abonnés',
+        'Avec leur description, leur recette, leurs prompts, leurs photos, leurs mises à jour, leurs commentaires et leurs testeurs',
+      followsItem: 'Tes abonnements, tes abonnés et tes inscriptions de testeur',
       handleItem: 'Ton pseudo',
       handleDetail:
         '@{{handle}}, et l’ancien s’il t’est réservé : ils redeviennent libres aussitôt',
@@ -680,6 +680,129 @@ export const fr = {
       deleteError: 'La note n’a pas pu être supprimée. Réessaie.',
       statusPrefill: 'Le projet passe en « {{status}} ».',
     },
+    // R7a : les mises à jour, qui remplacent le Journal (scénario, « Publier une mise à jour »).
+    updates: {
+      title: 'Les mises à jour',
+      add: 'Publier une mise à jour',
+      seeAll_one: 'Voir la mise à jour',
+      seeAll_other: 'Voir les {{count}} mises à jour',
+      // L'état vide, que seul l'auteur voit ; juridique (P5) : une variante pour un projet privé.
+      empty:
+        'Pas encore de mise à jour. Raconte ce qui change : tes abonnés et tes testeurs seront prévenus.',
+      emptyPrivate:
+        'Pas encore de mise à jour. Ce projet est privé : aucun autre membre ne verra ce que tu publies, et personne n’est prévenu.',
+      // La feuille « Nouvelle mise à jour » (planche R7-MAJ-Publier).
+      sheetTitle: 'Nouvelle mise à jour',
+      cancel: 'Annuler',
+      publish: 'Publier',
+      lastVersion: 'Dernière version : {{version}}, {{when}}',
+      lastUpdate: 'Dernière mise à jour : {{when}}',
+      firstUpdate: 'Première mise à jour',
+      titleField: 'Titre, facultatif',
+      titlePlaceholder: 'Par exemple : Le décompte de la fusée',
+      changes: 'Ce qui a changé',
+      counter: '{{count}} / {{max}}',
+      // Le compteur lu (interface A1) : « 2 lignes sur 5 ».
+      counterLabel_one: '{{count}} ligne sur {{max}}',
+      counterLabel_other: '{{count}} lignes sur {{max}}',
+      addLine: 'Ajouter une ligne',
+      removeLine: 'Retirer cette ligne',
+      removeLineLabel: 'Retirer la ligne {{number}}',
+      lineLabel: 'Changement {{number}} sur {{total}}, {{family}}',
+      familyButton: 'Famille : {{family}}',
+      linesHint: 'Une ligne par changement, 5 au plus. Pas besoin de tout dire.',
+      versionField: 'Numéro de version, facultatif',
+      versionPlaceholder: 'v1.3',
+      photos: 'Photos',
+      addPhotos: 'Ajouter',
+      beforeAfterSwitch: 'Avant / après',
+      // juridique (P5), mot pour mot : qui la lira, qui est prévenu.
+      hintPublic:
+        'Tous les membres pourront la lire. Les abonnés et les testeurs de ce projet seront prévenus.',
+      hintPrivate:
+        'Ce projet est privé : aucun autre membre ne voit cette mise à jour, et personne n’est prévenu. S’il redevient visible des membres, tous la verront, et ses abonnés et testeurs pourront la retrouver dans Activité.',
+      // Le statut changé dans « Modifier » préremplit la feuille (comme le Journal avant).
+      statusPrefill: 'Le projet passe en « {{status}} ».',
+      hintAnnounce:
+        'Ton projet est passé en « {{status}} » : annonce-le à tes abonnés et à tes testeurs, ou touche Annuler.',
+      hintAnnouncePrivate:
+        'Ton projet est passé en « {{status}} ». Il est privé : personne ne sera prévenu. Publie cette mise à jour pour la garder, ou touche Annuler.',
+      required: 'Écris au moins un changement avant de publier.',
+      // Interface A6 : « Publier » pendant qu'une photo s'envoie encore.
+      photosUploading: 'Attends la fin de l’envoi des photos.',
+      // Décision de Louis du 10/11/2026 (sécurité A10) : 100 photos de mises à jour par projet.
+      photosFull:
+        'Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour en ajouter.',
+      published: 'Mise à jour publiée.',
+      error: 'La mise à jour n’a pas pu être publiée. Réessaie.',
+      limited: 'Tu as publié 10 mises à jour aujourd’hui. La suivante pourra partir demain.',
+      // « Abandonner » efface aussi les photos déjà envoyées (sécurité A11).
+      discardTitle: 'Abandonner cette mise à jour ?',
+      discardBody: 'Ce que tu as écrit et les photos ajoutées seront perdus.',
+      keepEditing: 'Continuer',
+      discard: 'Abandonner',
+      // Une mise à jour : sans titre, sa version ; sans version non plus, ce mot.
+      untitled: 'Mise à jour',
+      photosLabel: 'Photos de la mise à jour',
+      delete: 'Supprimer la mise à jour « {{title}} »',
+      deleteTitle: 'Supprimer cette mise à jour ?',
+      deleteBody:
+        'Elle disparaîtra de la page du projet, du fil et des notifications, avec ses photos.',
+      // juridique (T4) : une mise à jour retirée par la modération.
+      deleteBodyRemoved:
+        'Elle disparaîtra de la page du projet, du fil et des notifications, avec ses photos. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision.',
+      confirmDelete: 'Supprimer',
+      deleted: 'Mise à jour supprimée.',
+      deleteError: 'La mise à jour n’a pas pu être supprimée. Réessaie.',
+      // La frise (planches R7-MAJ-Projet, R7-MAJ-Desktop).
+      count_one: '{{count}} mise à jour',
+      count_other: '{{count}} mises à jour',
+      firstVersion: 'Première version',
+      more: 'Afficher la suite',
+      moreError: 'La suite des mises à jour n’a pas pu se charger.',
+      loadError: 'Les mises à jour n’ont pas pu se charger.',
+      loading: 'Chargement des mises à jour…',
+      // L'avant / après (F-Pr7) : un curseur pour les lecteurs d'écran, sa valeur en pour cent.
+      compare: 'Comparer avant et après',
+      before: 'Avant',
+      after: 'Après',
+      beforeDescribed: 'Avant : {{description}}',
+      afterDescribed: 'Après : {{description}}',
+      compareValue: '{{value}} %',
+      compareHint: 'Fais glisser la poignée, ou utilise les flèches du clavier, pour comparer.',
+    },
+    // R7a : les testeurs, des membres qui s'inscrivent pour aider l'auteur. Sans genre imposé
+    // (décision de Louis du 10/11/2026, juridique T2) ; jamais le nombre pour un autre que l'auteur.
+    testers: {
+      join: 'Rejoindre les testeurs',
+      joined: 'Tu testes ce projet',
+      joinTitle: 'Rejoindre les testeurs',
+      joinBody:
+        'Tu aides {{name}} à améliorer « {{title}} ». Tu recevras ses mises à jour, et bientôt ses appels à tester. {{name}} verra ton nom dans sa liste de testeurs.',
+      confirm: 'Rejoindre les testeurs',
+      cancel: 'Annuler',
+      joinedToast: 'Tu fais partie des testeurs de « {{title}} ».',
+      memberTitle: 'Tu testes ce projet',
+      memberBody: 'Tu fais partie des testeurs de « {{title}} ». Tu reçois ses mises à jour.',
+      quit: 'Quitter les testeurs',
+      close: 'Fermer',
+      quitToast: 'Tu ne fais plus partie des testeurs de « {{title}} ».',
+      // juridique (T3) : jamais le nombre de testeurs d'un autre.
+      full: 'Ce projet ne prend plus de nouveaux testeurs.',
+      notTestable: 'Ce projet ne cherche plus de testeurs.',
+      // Pour l'auteur seul, à côté du nombre d'abonnés.
+      count_one: '{{count}} testeur',
+      count_other: '{{count}} testeurs',
+      error: 'L’inscription n’a pas pu être enregistrée. Réessaie.',
+      quitError: 'Le départ n’a pas pu être enregistré. Réessaie.',
+      // La page de sortie d'une démo ; la seconde phrase est un lien vers la page du projet
+      // (interface S4).
+      leavingLead: 'Tu veux aider {{name}} ?',
+      leavingLink: 'Rejoins les testeurs depuis la page du projet.',
+      // juridique (T5) : ne plus suivre un projet qu'on teste.
+      stillTester:
+        'Tu fais toujours partie des testeurs : ses mises à jour continueront d’arriver.',
+    },
     reactions: {
       amazing: 'Bluffant',
       inspiring: 'Inspirant',
@@ -855,12 +978,12 @@ export const fr = {
       edit: 'Modifier',
       delete: 'Supprimer',
       deleteTitle: 'Supprimer « {{title}} » ?',
-      // juridique (jur-J9) : « notes » tant que le journal s'appelle ainsi ; R7 dira « mises à jour ».
+      // juridique (jur-J9, puis T1 de R7a) : les mises à jour ont remplacé les notes.
       deleteConfirm:
-        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
+        'Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent tout de suite, avec les commentaires et les réactions des autres membres. Impossible de revenir en arrière.',
       // Un projet retiré par la modération : la décision et la copie du signalement restent un an.
       deleteConfirmRemoved:
-        'Le projet, sa description, ses photos, ses prompts et ses notes disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
+        'Le projet, sa description, ses photos, ses prompts et ses mises à jour disparaissent tout de suite, avec les commentaires et les réactions des autres membres. La décision de la modération et la copie du signalement restent gardées jusqu’à un an après la décision. Impossible de revenir en arrière.',
       deleteConfirmButton: 'Supprimer',
       notFoundTitle: 'Ce projet est introuvable',
       // Le même texte pour tous (R5a jur L3) : il ne dit pas si le projet existe.
@@ -886,16 +1009,30 @@ export const fr = {
         'Certains caractères ne sont pas autorisés (caractères invisibles ou de contrôle).',
     },
   },
+  // R7a : les trois familles d'une ligne de « Ce qui a changé ».
+  update: {
+    family: { new: 'Nouveau', fixed: 'Réparé', polish: 'Plus joli' },
+    // L'exemple de chaque famille, dans le champ vide.
+    example: {
+      new: 'Par exemple : un mode nuit',
+      fixed: 'Par exemple : la lune ne disparaît plus à minuit',
+      polish: 'Par exemple : des étoiles qui scintillent',
+    },
+    // Chaque ligne se lit avec sa famille (interface B4) : « Nouveau : Un compte à rebours… ».
+    lineRead: '{{family}} : {{text}}',
+  },
   report: {
     // Signaler un contenu (tranche 7a). « La modération » : il n'y a qu'une personne derrière.
     title: 'Signaler',
     action: 'Signaler',
     project: 'Signaler ce projet',
     note: 'Signaler cette note',
+    update: 'Signaler cette mise à jour',
     member: 'Signaler ce profil',
     target: {
       project: 'Le projet signalé',
       note: 'La note signalée',
+      update: 'La mise à jour signalée',
       comment: 'Le commentaire signalé',
       member: 'Le profil signalé',
     },
@@ -948,12 +1085,12 @@ export const fr = {
     action: 'Bloquer',
     title: 'Bloquer @{{handle}} ?',
     hidden:
-      'Vous ne verrez plus les projets, les notes et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
+      'Vous ne verrez plus les projets, les mises à jour et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
     // Relecture juridique (R1) : ce qui reste visible malgré le blocage (règles 1 et 2 du plan).
     remains:
       'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, et ceux où tu as écrit son pseudo. Pour les retirer, supprime-les avant de bloquer.',
     follows:
-      'Vos abonnements de l’un à l’autre sont retirés ; ils ne reviendront pas si tu débloques.',
+      'Vos abonnements de l’un à l’autre sont retirés, comme vos inscriptions de testeur sur les projets de l’autre ; rien ne reviendra si tu débloques.',
     notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',
     // Tranche 7c : sans « signale-le », dont le trait d'union se coupait en fin de ligne à 390 px.
     notModeration:
@@ -965,7 +1102,7 @@ export const fr = {
     unblock: 'Débloquer',
     unblockTitle: 'Débloquer @{{handle}} ?',
     unblockMessage:
-      'Vous verrez de nouveau les contenus l’un de l’autre. Les abonnements retirés ne reviennent pas. Les notifications d’avant le blocage peuvent réapparaître, des deux côtés.',
+      'Vous verrez de nouveau les contenus l’un de l’autre. Les abonnements et les inscriptions de testeur retirés ne reviennent pas. Les notifications d’avant le blocage peuvent réapparaître, des deux côtés.',
     unblockConfirm: 'Débloquer',
     unblocked: 'Tu as débloqué @{{handle}}.',
     error: 'Le changement n’a pas pu être enregistré. Réessaie.',
@@ -998,7 +1135,14 @@ export const fr = {
     emptyRemoved: 'Aucun contenu retiré.',
     more: 'Afficher la suite',
     errorTitle: 'La modération n’a pas pu se charger',
-    kinds: { project: 'Projet', note: 'Note', comment: 'Commentaire', member: 'Profil' },
+    // R7a : « Note (ancien journal) » pour les décisions d'avant l'effacement des notes.
+    kinds: {
+      project: 'Projet',
+      update: 'Mise à jour',
+      note: 'Note (ancien journal)',
+      comment: 'Commentaire',
+      member: 'Profil',
+    },
     // Tranche 7b : la copie champ par champ, et ses images (jamais copiées, seulement suivies).
     fields: {
       text: 'Texte',
@@ -1015,6 +1159,9 @@ export const fr = {
       // R6a : la description d'une photo ; la copie dit de quelle photo il s'agit (jur-J13).
       photoDescription: 'Description d’une photo',
       photoDescriptionNumbered: 'Description de la photo {{n}}',
+      // R7a : la version et chaque ligne de « Ce qui a changé » d'une mise à jour.
+      version: 'Version',
+      line: 'Changement',
       body: 'Texte',
     },
     images: {
@@ -1333,7 +1480,7 @@ export const fr = {
     direct: 'Une personne de la modération a décidé de suspendre ton compte.',
     explanation: 'Explication : {{explanation}}',
     canStill:
-      'Tu peux toujours tout lire, supprimer tes projets, notes et commentaires, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir ni suivre.',
+      'Tu peux toujours tout lire, supprimer tes projets, tes mises à jour et tes commentaires, quitter les testeurs d’un projet, exporter tes données, régler ton compte, bloquer et signaler. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
     // Les recours (J3, formulation à faire valider par un professionnel).
     // Suivi de l’adresse, en lien qui ouvre la messagerie (Louis, 27/10/2026).
     contest: 'Pour contester : écris à {{contactEmail}}. Tu peux aussi saisir la justice.',
@@ -1704,6 +1851,13 @@ export const fr = {
       reactions_other: '{{count}} réactions à tes projets',
       follows_one: '{{count}} nouvel abonné',
       follows_other: '{{count}} nouveaux abonnés',
+      // R7a (juridique P4) : chaque projet mis à jour dans la semaine, son nombre et un lien. Jamais
+      // le texte d'une mise à jour (sécurité A9).
+      updatesTitle: 'Les projets que tu suis ou que tu testes',
+      updates_one: '« {{title}} » : {{count}} mise à jour',
+      updates_other: '« {{title}} » : {{count}} mises à jour',
+      updatesMore_one: 'Et {{count}} autre projet',
+      updatesMore_other: 'Et {{count}} autres projets',
       button: 'Voir mes notifications',
       last: 'Ce récap est le dernier pour l’instant : le prochain partira après ta prochaine visite.',
       reason: 'Tu reçois ce récap parce qu’il est activé dans tes réglages {{appName}}.',
@@ -1848,7 +2002,7 @@ export const fr = {
       },
       explanation: 'Explication : {{explanation}}',
       meanwhile:
-        'Pendant la suspension, tu peux tout lire, supprimer tes projets, notes et commentaires, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir ni suivre.',
+        'Pendant la suspension, tu peux tout lire, supprimer tes projets, tes mises à jour et tes commentaires, quitter les testeurs d’un projet, exporter tes données ou supprimer ton compte. Tu ne peux plus publier, commenter, réagir, suivre ni rejoindre les testeurs.',
       contest:
         'Pas d’accord ? Écris-nous à {{contactEmail}} : une personne relira la décision et te répondra. Tu peux aussi saisir la justice.',
       // La salutation, sans le nom : l'e-mail ne cite que la décision (backend-dev 7c).
@@ -1865,7 +2019,7 @@ export const fr = {
     discoverEmpty: 'Aucun projet public pour l’instant.',
     testersEmpty: 'Aucun projet ne cherche de testeurs pour l’instant.',
     followingCaption:
-      'Les nouveaux projets des personnes que tu suis, et les notes des projets suivis.',
+      'Les nouveaux projets des personnes que tu suis, et les mises à jour de leurs projets et des projets que tu suis.',
     discoverCaption: 'Les derniers projets publiés par les membres.',
     testersCaption:
       'Les projets à essayer : les personnes qui les ont publiés attendent tes retours.',
@@ -1884,6 +2038,16 @@ export const fr = {
     newNotes_one: '{{count}} nouvelle note',
     newNotes_other: '{{count}} nouvelles notes',
     newNotesMany: '{{max}} nouvelles notes ou plus',
+    // R7a : « 2 mises à jour » ; « nouveautés » quand il y a aussi de nouveaux projets.
+    newUpdates_one: '{{count}} mise à jour',
+    newUpdates_other: '{{count}} mises à jour',
+    newUpdatesMany: '{{max}} mises à jour ou plus',
+    // R7a : la carte remontée par sa mise à jour (planche R7-MAJ-Fil) ; « Mis à jour » seul sans
+    // version. « et 2 autres changements » ne se coupe jamais (interface A7).
+    updated: 'Mis à jour · {{version}}',
+    updatedPlain: 'Mis à jour',
+    moreChanges_one: 'et {{count}} autre changement',
+    moreChanges_other: 'et {{count}} autres changements',
     newMixed_one: '{{count}} nouveauté',
     newMixed_other: '{{count}} nouveautés',
     newMixedMany: '{{max}} nouveautés ou plus',
@@ -1984,6 +2148,9 @@ export const fr = {
     comment: '{{name}} a commenté « {{title}} »',
     mention: '{{name}} parle de toi dans un commentaire sur « {{title}} »',
     reply: '{{name}} a répondu à ton commentaire sur « {{title}} »',
+    // R7a : une mise à jour d'un projet qu'on suit ou qu'on teste ; sa première ligne en dessous.
+    projectUpdate: '{{name}} a publié une mise à jour de « {{title}} »',
+    projectUpdateVersion: '{{name}} a publié une mise à jour de « {{title}} » · {{version}}',
     memberFollows_one: '{{count}} personne de plus te suit',
     memberFollows_other: '{{count}} personnes de plus te suivent',
     projectFollows_one: '{{count}} personne de plus suit « {{title}} »',
@@ -1994,6 +2161,8 @@ export const fr = {
     removed: {
       project: 'Ton projet « {{title}} » a été retiré par la modération',
       note: 'Ta note sur « {{title}} » a été retirée par la modération',
+      // juridique (T1 de R7a), mot pour mot.
+      update: 'Ta mise à jour de « {{title}} » a été retirée par la modération',
       comment: 'Ton commentaire sur « {{title}} » a été retiré par la modération',
       // Tranche 7b, règle 9 : sur le projet d'un membre qui t'a bloqué, ni titre ni lien.
       commentElsewhere: 'Ton commentaire a été retiré par la modération',
@@ -2007,6 +2176,11 @@ export const fr = {
       note: {
         removed: 'Ton signalement d’une note a été traité : la note a été retirée.',
         dismissed: 'Ton signalement d’une note a été traité : nous ne l’avons pas retirée.',
+      },
+      // R7a : « note » reste pour les signalements d'avant l'effacement des notes.
+      update: {
+        removed: 'Ton signalement d’une mise à jour a été traité : la mise à jour a été retirée.',
+        dismissed: 'Ton signalement d’une mise à jour a été traité : nous ne l’avons pas retirée.',
       },
       comment: {
         removed: 'Ton signalement d’un commentaire a été traité : le commentaire a été retiré.',
@@ -2067,5 +2241,12 @@ export const fr = {
     categoryNameTaken: 'Une catégorie porte déjà ce nom.',
     tooManyOtherTools: 'Tu as ajouté beaucoup d’autres outils aujourd’hui. Réessaie demain.',
     ownProject: 'C’est ton projet : sa catégorie se change depuis sa page.',
+    // Tranche R7a.
+    invalidPhotos: 'Une des photos n’est plus disponible. Retire-la, puis ajoute-la de nouveau.',
+    cannotTestOwn: 'Tu ne peux pas rejoindre les testeurs de ton propre projet.',
+    notTestable: 'Ce projet ne cherche pas de testeurs pour l’instant.',
+    testersFull: 'Ce projet ne prend plus de nouveaux testeurs.',
+    updatePhotosFull:
+      'Ce projet a atteint 100 photos de mises à jour. Supprime une ancienne mise à jour pour en ajouter.',
   },
 } as const

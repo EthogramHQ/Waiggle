@@ -47,6 +47,14 @@ export const ErrorCode = z.enum([
   'category_name_taken',
   'too_many_other_tools',
   'own_project',
+  // Tranche R7a : une photo citée par une mise à jour qui n'est pas une photo en attente de ce projet ;
+  // tester son propre projet ; un projet qui ne cherche pas de testeurs, ou qui en a 200 ; 100 photos
+  // de mises à jour sur un projet.
+  'invalid_photos',
+  'cannot_test_own',
+  'not_testable',
+  'testers_full',
+  'update_photos_full',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>
