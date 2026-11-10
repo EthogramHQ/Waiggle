@@ -107,6 +107,11 @@ type Props = {
   prefix?: string
   /** Une poignée vers la saisie elle-même : pour y remettre le focus (MentionField). */
   inputRef?: Ref<TextInput>
+  /**
+   * Le champ a reçu le focus (en plus de ce que le champ en fait lui-même) : une ligne de mise à
+   * jour (`UpdateLineField`, R7a) se teinte alors tout entière, pastille comprise.
+   */
+  onFocus?: () => void
   /** Le champ a perdu le focus (en plus de ce que le champ en fait lui-même). */
   onBlur?: () => void
   /**
@@ -220,6 +225,7 @@ export function TextField({
   success,
   prefix,
   inputRef,
+  onFocus,
   onBlur,
   combobox,
   secureTextEntry = false,
@@ -435,7 +441,10 @@ export function TextField({
               : null)}
             value={value}
             onChangeText={onChangeText}
-            onFocus={() => setFocused(true)}
+            onFocus={() => {
+              setFocused(true)
+              onFocus?.()
+            }}
             onBlur={() => {
               setFocused(false)
               onBlur?.()
