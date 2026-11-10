@@ -83,6 +83,23 @@ const day = {
   errorBand: '#FEF3F2', // fond du bandeau d'erreur d'un formulaire (plus pâle que dangerSoft)
   errorBorder: '#F2B8B5', // sa bordure
   success: '#12805C', // confirmation ponctuelle (« Copié »)
+
+  // Les trois familles d'une ligne de mise à jour (R7a, ui/UpdateFamilyBadge.tsx) : « Nouveau »
+  // (ambre), « Réparé » (vert), « Plus joli » (encre discrète). Chacune a trois rôles : le fond de
+  // sa pastille ronde (`Surface`), l'icône posée dessus (`Icon`, au moins 3:1 sur ce fond : dans la
+  // frise, c'est la seule marque visible de la famille) et son nom écrit en couleur au-dessus du
+  // champ de la feuille (`Text`, 4,5:1 sur la feuille et sur une carte). L'ambre de l'icône est plus
+  // sombre que `amber`, qui ne ferait que 2,7:1 sur la crème de la pastille.
+  familyNewSurface: '#FFEDC2',
+  familyNewIcon: '#A36800',
+  familyNewText: '#8A5A00',
+  familyFixedSurface: '#DCF2E6',
+  familyFixedIcon: '#12805C',
+  familyFixedText: '#0F7453',
+  familyPolishSurface: '#EEEAE1',
+  familyPolishIcon: '#5E5A51',
+  familyPolishText: '#6B675E',
+
   // La pastille rouge des nouveautés (la cloche des notifications) et son chiffre, en blanc. Un
   // rouge assez sombre pour qu'un chiffre blanc s'y lise (contraste 4,5 : voir contrastPairs).
   badge: '#D1343A',
@@ -170,6 +187,17 @@ const night = {
   errorBand: '#2A1513',
   errorBorder: '#7A2A24',
   success: '#3CCB8E',
+  // La nuit, des fonds sombres teintés (un brun miel, un vert, un gris chaud), à peine plus clairs
+  // que la carte ; l'icône et le nom prennent les teintes vives de l'accent et du succès.
+  familyNewSurface: '#3F3112',
+  familyNewIcon: '#F5B942',
+  familyNewText: '#F5B942',
+  familyFixedSurface: '#143426',
+  familyFixedIcon: '#3CCB8E',
+  familyFixedText: '#3CCB8E',
+  familyPolishSurface: '#2C2821',
+  familyPolishIcon: '#CFC7B5',
+  familyPolishText: '#B3AB99',
   badge: '#D1343A',
   onBadge: '#FFFFFF',
 
@@ -322,6 +350,18 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'amber', on: 'surface', min: 3 },
   { text: 'danger', on: 'surface', min: 3 },
   { text: 'success', on: 'background', min: 4.5 },
+  // R7a (relecture du plan, interface B5) : les familles d'une mise à jour. L'icône sur le fond
+  // opaque de sa pastille (une forme : 3), où qu'elle soit posée ; le nom de la famille, écrit en
+  // couleur sur la feuille « Nouvelle mise à jour » et sur une carte (un texte : 4,5).
+  { text: 'familyNewIcon', on: 'familyNewSurface', min: 3 },
+  { text: 'familyFixedIcon', on: 'familyFixedSurface', min: 3 },
+  { text: 'familyPolishIcon', on: 'familyPolishSurface', min: 3 },
+  { text: 'familyNewText', on: 'sheet', min: 4.5 },
+  { text: 'familyNewText', on: 'surface', min: 4.5 },
+  { text: 'familyFixedText', on: 'sheet', min: 4.5 },
+  { text: 'familyFixedText', on: 'surface', min: 4.5 },
+  { text: 'familyPolishText', on: 'sheet', min: 4.5 },
+  { text: 'familyPolishText', on: 'surface', min: 4.5 },
   { text: 'focusRing', on: 'background', min: 3 },
   // Les contrôles (WCAG 1.4.11) : le bord d'une case ou d'un rond vide, la piste d'un interrupteur
   // éteint, et le liseré du rond ou de la case choisis, sur une carte comme sur la page.
