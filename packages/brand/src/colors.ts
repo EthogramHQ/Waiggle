@@ -362,6 +362,10 @@ export const contrastPairs: readonly ContrastPair[] = [
   { text: 'familyFixedText', on: 'surface', min: 4.5 },
   { text: 'familyPolishText', on: 'sheet', min: 4.5 },
   { text: 'familyPolishText', on: 'surface', min: 4.5 },
+  // R7a (U1c) : la ligne où l'on écrit se teinte de miel doux (UpdateLineField), nom compris.
+  { text: 'familyNewText', on: 'honeySoft', min: 4.5 },
+  { text: 'familyFixedText', on: 'honeySoft', min: 4.5 },
+  { text: 'familyPolishText', on: 'honeySoft', min: 4.5 },
   { text: 'focusRing', on: 'background', min: 3 },
   // Les contrôles (WCAG 1.4.11) : le bord d'une case ou d'un rond vide, la piste d'un interrupteur
   // éteint, et le liseré du rond ou de la case choisis, sur une carte comme sur la page.
