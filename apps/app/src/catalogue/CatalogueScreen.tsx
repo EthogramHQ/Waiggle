@@ -129,6 +129,7 @@ import { SearchCatalogue } from './recherche'
 import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
+import { TestersCatalogue } from './testeurs'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -902,6 +903,8 @@ export function CatalogueScreen() {
       <NotFoundPortalCatalogue />
       {/* Tranche R7a, les mises à jour d'un projet (mises-a-jour*.tsx). */}
       <UpdateFamiliesCatalogue />
+      {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
+      <TestersCatalogue />
       {/* Tranche RF, la fluidité : la barre du haut fixe et sa goutte qui glisse, le fondu des
           pages, la lumière commune à toutes les pages (fluidite-*.tsx). */}
       <FluidTopBarCatalogue />
