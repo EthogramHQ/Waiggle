@@ -254,7 +254,7 @@ describe('reporting an update of the project', () => {
     await renderWithProviders(<ProjectScreen id={id} />)
 
     await screen.findByText(rocketUpdate.title ?? '')
-    // Un bouton direct (le drapeau d'`UpdateEntry`, API fixée en TW-1) ou une entrée de menu, comme
+    // Un bouton direct (le drapeau d'`UpdateEntry`, API fixée en R7a) ou une entrée de menu, comme
     // l'accepte `UpdateEntry.test.tsx`.
     const direct = screen.queryByRole('button', { name: reportUpdate })
     if (direct) {

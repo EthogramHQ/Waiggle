@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (U4) à ceux de PhotoGallery.test.tsx : ce qui se pose sur la galerie
+// Tests ajoutés en U4 à ceux de PhotoGallery.test.tsx : ce qui se pose sur la galerie
 // (`overlay`, les places de ProjectCover.tsx), la galerie sans photo, et le saut d'une photo à
 // l'autre par une flèche, que les positions lues en chemin ne doivent pas défaire.
 import { act, fireEvent, screen } from '@testing-library/react-native'

@@ -1040,7 +1040,7 @@ describe('who is told', () => {
   })
 })
 
-// ─── Questions des test-writer (23/10/2026), règles 29 et 30 du plan ──────────────────────────────
+// ─── Questions posées aux tests (23/10/2026), règles 29 et 30 du plan ──────────────────────────────
 
 // Règle 30 : ajouter une mise à jour (R7a, comme la note d'avant) ou une photo à un projet retiré,
 // c'est le modifier.

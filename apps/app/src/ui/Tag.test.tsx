@@ -23,7 +23,7 @@ const spoken = (label: string, count: number) =>
 
 describe('Tag with a count', () => {
   it('composes the spoken name from the translations (witness)', () => {
-    // R6b (choix 1 de la session) : « projets », plus « projets publics ».
+    // R6b (choix 1 du plan) : « projets », plus « projets publics ».
     expect(spoken('Claude', 41)).toBe('Claude, 41 projets')
     expect(spoken('Claude', 1)).toBe('Claude, 1 projet')
   })

@@ -103,7 +103,7 @@ export const foldWithMap = (text: string): { folded: string; map: number[] } => 
     for (const lowered of char.toLowerCase()) {
       const replaced = SEARCH_FOLD[lowered] ?? lowered
       // Une entrée par unité UTF-16 (et non par caractère) : `folded` se lit avec `slice`, qui
-      // compte en unités ; un emoji en vaut deux (défaut trouvé par les tests de R3, TW-1).
+      // compte en unités ; un emoji en vaut deux (défaut trouvé par les tests de R3).
       for (let unit = 0; unit < replaced.length; unit++) map.push(offset)
       folded += replaced
     }

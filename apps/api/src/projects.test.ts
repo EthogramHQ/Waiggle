@@ -1534,7 +1534,7 @@ describe('the categories of a project are read in the base (R6b)', () => {
   })
 })
 
-// Décision 5 de la session (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
+// Décision 5 du plan (sec-A5, jur-T6) : un « Autre » s'efface dans la transaction qui retire
 // sa dernière référence (projet, profil, compte) ; la purge de nuit n'est qu'un filet.
 describe('an « other » tool lives as long as something cites it (R6b)', () => {
   it('deletes an « other » tool when the last project or profile citing it drops it', async () => {

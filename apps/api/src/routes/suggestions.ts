@@ -105,7 +105,7 @@ export const suggestionRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     const { id } = c.req.valid('param')
     // Les mêmes réponses que « Suivre » (routes/follows.ts), dans le même ordre : un identifiant
     // mal formé ne désigne personne (404 sans interroger la base) ; soi-même, le même refus que
-    // « Suivre » sur soi (décision de la session, R4).
+    // « Suivre » sur soi (décision de R4).
     if (!MemberId.safeParse(id).success) return notFound()
     if (id === viewer.id) return c.json(errorBody(languageOf(c), 'cannot_follow_own'), 400)
     // Seulement un compte vérifié, sans blocage avec moi dans un sens ou dans l'autre : sinon le
@@ -125,7 +125,7 @@ export const suggestionRoutes = ({ db, limiter, publicApiUrl }: Deps) => {
     if (!member) return notFound()
 
     // « on conflict do nothing » : déjà écarté, rien ne change (la date du premier « × » reste,
-    // décision de la session, R4), et la réponse est la même. La date vient de l'horloge de
+    // décision de R4), et la réponse est la même. La date vient de l'horloge de
     // JavaScript (les tests la maîtrisent). Un blocage posé juste après la vérification laisserait
     // une ligne sans effet : un écart n'ouvre aucun droit et ne se montre à personne.
     await db

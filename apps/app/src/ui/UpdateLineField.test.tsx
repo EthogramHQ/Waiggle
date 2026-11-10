@@ -8,9 +8,9 @@
 // error?, inputRef?, index, total })`.
 // - `index` est le rang de la ligne **depuis 0**, comme `onIndexChange` de `PhotoGallery` ; le nom
 //   lu dit le rang depuis 1 : la ligne `index={1}` sur `total={3}` est « Changement 2 sur 3,
-//   Réparé » (`project.updates.lineLabel`). Choix de TW-1, à confirmer par la session.
+//   Réparé » (`project.updates.lineLabel`). Choix faits avec ces tests (R7a).
 // - `onRemove` absent : pas de bouton « Retirer cette ligne » (nom lu « Retirer la ligne 2 »).
-// - Le menu des familles est un `ActionMenu` à choix cochés (`menuitemradio`, interface B1, TW-4).
+// - Le menu des familles est un `ActionMenu` à choix cochés (`menuitemradio`, interface B1).
 import { layout } from '@ruche/brand'
 import type { UpdateFamily } from '@ruche/contracts'
 import { fireEvent, screen } from '@testing-library/react-native'

@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (R7a, U5a), à côté de ceux de TW-3 (ProjectActions.testers.test.tsx) :
+// Tests ajoutés en R7a (U5a), à côté de ceux de ProjectActions.testers.test.tsx :
 // les cas que l'écriture du bouton des testeurs a fait naître.
 // - Après un départ qu'on ne peut plus défaire (projet qui ne cherche plus de testeurs, compte
 //   suspendu), le bouton reste à sa place, inactif : la feuille rend le focus à ce bouton, qui ne

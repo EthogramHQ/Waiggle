@@ -12,7 +12,7 @@
 // L'API fixée au lancement (une union au lieu d'un booléen `badgeOnly`) :
 // `updated?: { kind: 'full'; label; line: { family; text }; more: string | null; at: string }
 //          | { kind: 'badge'; label }`.
-// Les textes viennent tout prêts de `SummaryCard` (TW-3) : la carte ne connaît pas l'API.
+// Les textes viennent tout prêts de `SummaryCard` : la carte ne connaît pas l'API.
 import { act, screen } from '@testing-library/react-native'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'

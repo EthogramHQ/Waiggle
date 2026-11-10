@@ -149,7 +149,7 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
       case 'reactions':
         reactions += notification.total
         break
-      // Les nouveaux abonnés, à son compte et à ses projets (précision de la session du 21/10).
+      // Les nouveaux abonnés, à son compte et à ses projets (précision du 21/10).
       case 'member_follows':
       case 'project_follows':
         follows += notification.count

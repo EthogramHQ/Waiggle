@@ -40,7 +40,7 @@ describe('Button icon', () => {
   })
 })
 
-// R6a (scénario « Modifier » ; relecture du plan ui-B5, TW-3) : « Enregistrer » est grisé tant que
+// R6a (scénario « Modifier » ; relecture du plan ui-B5) : « Enregistrer » est grisé tant que
 // rien n'a changé, avec « Rien à enregistrer pour l'instant. ». Un bouton `disabled` ordinaire sort
 // du parcours au clavier sur le web (react-native-web lui donne tabIndex -1) : on ne pourrait ni
 // l'atteindre, ni entendre pourquoi il ne répond pas. Avec `focusableWhenDisabled`, il reste un arrêt

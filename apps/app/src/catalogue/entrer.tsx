@@ -1,7 +1,7 @@
 // La section « Entrer » du catalogue (tranche R2) : le panneau d'entrée (AuthPanel) dans ses deux
 // présentations, onglets (la carte d'ordinateur) et formulaire seul (téléphone), et le lien qui
 // quitte l'appli (TextLink `external`, « Voir le code »). Fichier à part de CatalogueScreen.tsx,
-// qui l'importe en une ligne : plusieurs agents y travaillent en même temps. Ses exemples (un outil
+// qui l'importe en une ligne : le catalogue est partagé par toute l'interface. Ses exemples (un outil
 // de développement, absent de l'appli publiée) sont écrits ici, en français et en anglais.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'

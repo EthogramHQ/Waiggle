@@ -241,7 +241,7 @@ describe('NavPhotoLink', () => {
 // RF (ui-7) : la goutte qui glisse d'une page à l'autre. Deux barres montées, comme sur le web : la
 // page A (Fil actif) et la page B (Explorer actif), chacune dans son cadre « affichée ou non ».
 //
-// Ce que le test suppose de l'ui-dev (noms choisis au plan des tests) :
+// Ce que le test suppose du composant (noms choisis au plan des tests) :
 // - chaque lien mesure son cadre par son propre `onLayout` (x relatif à la région, comme la goutte) ;
 // - la goutte est une vue animée de la région, `testID="nav-drop"`, muette et intouchable ; sa
 //   place se lit dans son style (`translateX`, ou `left`).

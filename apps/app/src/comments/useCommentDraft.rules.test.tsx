@@ -1,4 +1,4 @@
-// Les règles du brouillon validées par Louis le 5/11/2026, que le fichier de TW-4 ne dit pas :
+// Les règles du brouillon validées par Louis le 5/11/2026, que les autres fichiers de test ne disent pas :
 // annuler une réponse garde le texte tapé et retire la mention préremplie ; répondre à deux
 // personnes de suite remplace la première mention si elle est intacte, sinon la nouvelle s'ajoute.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

@@ -332,7 +332,7 @@ describe('CommentComposer', () => {
     })
 
     it('names its field « Écrire un commentaire », not « Ton commentaire »', async () => {
-      // Décision de la session (R5b) : « Ton commentaire » est déjà le nom lu du fond des siens
+      // Décision (R5b) : « Ton commentaire » est déjà le nom lu du fond des siens
       // (`comments.yours`) ; le champ prend `comments.add`.
       await renderWithProviders(<CommentComposer {...propsOf()} />)
 

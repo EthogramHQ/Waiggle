@@ -1,4 +1,4 @@
-// Tests ajoutés par l'interface (U1c) pour une ligne de « Ce qui a changé » : ce que
+// Tests ajoutés en R7a (U1c) pour une ligne de « Ce qui a changé » : ce que
 // `UpdateLineField.test.tsx` ne couvre pas, ou ne peut pas lire.
 // - L'état « choisi » du menu des familles : RNTL 14 ne sait dire « coché » (`toBeChecked`) que
 //   d'un `checkbox`, d'un `radio` ou d'un `switch`, pas d'un `menuitemradio` ; on lit donc ce que

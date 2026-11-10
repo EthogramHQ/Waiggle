@@ -548,7 +548,7 @@ describe('the erasing of the Journal and of the former tool columns (migration 0
   })
 
   it('voids the open reports on a journal note, with their decision date, and keeps the others as they were', async () => {
-    // Relecture juridique P7, décision de la session : la note n'existe plus, son signalement encore
+    // Relecture juridique P7, décision prise : la note n'existe plus, son signalement encore
     // ouvert est « sans objet » (void), daté (decided_at = now()) pour que la purge l'efface 30
     // jours plus tard. Un signalement déjà décidé garde sa décision ; un signalement ouvert sur un
     // projet reste ouvert.

@@ -3,7 +3,7 @@
 // commentaires, les projets, les notifications, la liste « Membres bloqués »). La liste se lit page
 // par page.
 //
-// L'interface attendue de `src/blocks/api.ts` (écrit par ui-dev, modèle : follows/api.ts) :
+// L'interface attendue de `src/blocks/api.ts` (modèle : follows/api.ts) :
 // - `useBlock()` → `{ block(memberId): Promise<ApiResult<null>> }` (PUT /v1/members/{id}/block) ;
 // - `useUnblock()` → `{ unblock(memberId): Promise<ApiResult<null>> }` (DELETE, même adresse) ;
 // - `useBlockedMembers()` : useInfiniteQuery des pages `BlockedPage` (GET /v1/me/blocks).

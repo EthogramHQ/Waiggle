@@ -1,6 +1,6 @@
 // Tests des couleurs des trois familles d'une mise à jour (R7a) : « Nouveau » (ambre), « Réparé »
 // (vert), « Plus joli » (encre discrète). Chaque famille a trois rôles, de jour et de nuit
-// (décision de la session sur la relecture du plan, interface B5) : le fond de sa pastille
+// (décision prise à la relecture du plan, interface B5) : le fond de sa pastille
 // (`family<X>Surface`), son icône (`family<X>Icon`) et son nom écrit en couleur dans la feuille
 // (`family<X>Text`). Dans la frise, l'icône est la seule marque visible de la famille : elle doit
 // se voir sur son fond (3:1, WCAG 1.4.11) ; le nom est un texte (4,5:1, WCAG 1.4.3). Ces couples
@@ -29,7 +29,7 @@ describe('update family colors', () => {
   )
 
   // Relecture du plan, interface B5 : `it('lists the icon and label of each update family in
-  // contrastPairs')` (noms des rôles selon la décision de la session).
+  // contrastPairs')` (noms des rôles selon cette décision).
   it.each(families)('lists the icon and label of the %s family in contrastPairs', (x) => {
     // L'icône sur le fond de sa pastille : 3:1 au moins.
     expect(declared(`family${x}Icon`, `family${x}Surface`)).toBeGreaterThanOrEqual(3)

@@ -285,7 +285,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
  *   additionne les lignes sans regrouper) n'en compte qu'une. La clé primaire de project_follow
  *   (follower_id, project_id) et celle de project_tester (member_id, project_id) les donnent.
  * - « since », le plus ancien des deux gestes : seules les mises à jour publiées après
- *   l'abonnement ou l'inscription comptent (décision de la session, sécurité S1), jamais celles
+ *   l'abonnement ou l'inscription comptent (décision, sécurité S1), jamais celles
  *   d'avant, qu'il n'a pas demandé à suivre.
  * - Les mises à jour de chaque projet viennent de project_update_project_created_idx
  *   (project_id, created_at desc), qui borne aussi la date (« > since », la fenêtre).

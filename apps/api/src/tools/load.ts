@@ -227,7 +227,7 @@ export const loadToolPage = async (
       siteUrl: found.siteUrl,
       projectCount: counted[0]?.n ?? 0,
     },
-    // Dans l'ordre de la feuille de publication (`category.position`, décision 2 de la session) ;
+    // Dans l'ordre de la feuille de publication (`category.position`, décision 2 du plan) ;
     // `inner join` : un code sans catégorie en base (impossible : clé étrangère) n'apparaîtrait pas.
     categories: rowsOf(CategoryCountRow, categoryRows).map((row) => ({
       code: row.code,

@@ -1,5 +1,5 @@
 // Tests du bandeau d'un contenu retiré par la modération (tranche 7a), et des phrases que l'appli y
-// pose. À part de components.test.tsx, partagé avec l'autre agent de la tranche.
+// pose. Dans son propre fichier plutôt que dans components.test.tsx, partagé par toute l'interface.
 import type { Removal } from '@ruche/contracts'
 import { screen } from '@testing-library/react-native'
 import { removalBanner } from '../reports/removal'

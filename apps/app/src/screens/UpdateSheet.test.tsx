@@ -3,8 +3,8 @@
 // « Ce qui a changé », publier, les photos et l'avant / après, quitter sans publier, et qui peut
 // l'ouvrir.
 //
-// Ce que ces tests supposent de l'écran (plan R7a, « Décisions de la session » et U3a ; à corriger
-// par la session si le code en décide autrement) :
+// Ce que ces tests supposent de l'écran (plan R7a, « Décisions » et U3a ; à corriger si le code
+// en décide autrement) :
 // - `UpdateSheet({ id, announce })`, montée par la route `app/projects/[id]/update.tsx`, qui lit
 //   `?announce=<statut>` et le passe tel quel ; la feuille s'ouvre par `useRouteSheet` et se ferme
 //   par `router.back()` (ou `replace` vers le projet, arrivé par un lien direct) ;

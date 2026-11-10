@@ -1,5 +1,5 @@
-// Tests ajoutés par l'interface de R6a à la galerie de photos (PhotoGallery.test.tsx reste celui du
-// test-writer) : une photo seule décrite n'est jamais lue « photo 1 sur 1 », ni par la galerie ni
+// Tests ajoutés en R6a à la galerie de photos (PhotoGallery.test.tsx reste le fichier
+// d'origine) : une photo seule décrite n'est jamais lue « photo 1 sur 1 », ni par la galerie ni
 // par l'image qu'elle contient (le navigateur expose les deux, vu dans `--explore`) ; une
 // description faite de blancs ne décrit rien.
 import { screen } from '@testing-library/react-native'

@@ -1,4 +1,4 @@
-// Un test ajouté à ceux de Dialog.test.tsx (R6a, ui-dev U3c) : Échap, enfoncée pendant que la
+// Un test ajouté à ceux de Dialog.test.tsx (R6a, U3c) : Échap, enfoncée pendant que la
 // fenêtre est ouverte, est marquée « déjà servie » (`preventDefault`), pour qu'une feuille ouverte
 // dessous (la feuille « Publier », d'où vient « Abandonner ce projet ? ») ne se ferme pas avec elle.
 // La feuille relit ce marquage quand la touche est relâchée (`lastEscape` de Sheet.tsx) ; le Modal
