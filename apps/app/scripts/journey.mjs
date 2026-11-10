@@ -682,6 +682,12 @@ try {
     await pick(lea.page, addUpdatePhoto.first(), image(`maj-${n}`, 1200, 800, color))
     await byRole(lea.page, 'button', `Retirer la photo ${n}`).waitFor()
   }
+  // La vignette paraît dès le choix, avant la fin de l'envoi : « Publier » trop tôt répond
+  // « Attends la fin de l'envoi des photos. ». On attend que plus aucune ne s'envoie.
+  await waitFor('photos de la mise à jour envoyées', async () => {
+    const sending = lea.page.getByRole('progressbar', { name: /^Envoi de la photo/ })
+    return (await sending.count()) === 0
+  })
   await byRole(lea.page, 'switch', 'Avant / après').click()
   await byRole(lea.page, 'button', 'Publier', { exact: true }).last().click()
   await lea.page.getByText('Mise à jour publiée.').waitFor()
