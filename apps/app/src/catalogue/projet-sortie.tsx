@@ -28,6 +28,9 @@ const fr = {
   holding: 'Projet en lecture : place gardée',
   withTesters: 'Projet « Testable » : avec la ligne des testeurs',
   desktop: 'Ordinateur : le portail à gauche de la carte (`hero`)',
+  desktopHolding:
+    'Ordinateur, projet en lecture : la place de la ligne des testeurs gardée sous la carte, invisible (la carte, centrée avec elle, ne remonte pas quand la ligne arrive)',
+  desktopTesters: 'Ordinateur, projet « Testable » : la ligne des testeurs a repris la place',
   day: 'jour',
   night: 'nuit',
   origin: 'La démo de Carnet de cafés, ajoutée par Léa Moreau',
@@ -42,6 +45,9 @@ const en: typeof fr = {
   holding: 'Project being read: place kept',
   withTesters: '“Testable” project: with the testers line',
   desktop: 'Computer: the portal left of the card (`hero`)',
+  desktopHolding:
+    'Computer, project being read: the place of the testers line kept under the card, invisible (the card, centred with it, does not move up when the line comes)',
+  desktopTesters: 'Computer, “Testable” project: the testers line has taken the place',
   day: 'day',
   night: 'night',
   origin: 'The demo of Coffee notebook, added by Léa Moreau',
@@ -148,6 +154,41 @@ export function LeavingCatalogue() {
             </BrandAmbiance>
           </Frame>
         </Example>
+      ) : null}
+      {wide ? (
+        // Correction du 10/11 après R7a : les deux cadres ont la même hauteur (carte et place
+        // gardée, carte et ligne) ; la carte y est donc à la même hauteur.
+        <Stack gap="lg">
+          <Example caption={l.desktopHolding}>
+            <Frame>
+              <BrandAmbiance size="wide" hero={<PortalRings />}>
+                <LeavingSheet
+                  host={host}
+                  href={href}
+                  origin={null}
+                  holdOrigin
+                  onOpen={noop}
+                  onStay={noop}
+                />
+              </BrandAmbiance>
+            </Frame>
+          </Example>
+          <Example caption={l.desktopTesters}>
+            <Frame>
+              <BrandAmbiance size="wide" hero={<PortalRings />}>
+                <LeavingSheet
+                  host={host}
+                  href={href}
+                  origin={origin}
+                  holdOrigin
+                  testers={{ name: 'Léa Moreau', onOpenProject: noop }}
+                  onOpen={noop}
+                  onStay={noop}
+                />
+              </BrandAmbiance>
+            </Frame>
+          </Example>
+        </Stack>
       ) : null}
     </Stack>
   )

@@ -19,12 +19,13 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type LayoutChangeEvent, Platform, View } from 'react-native'
 import { AvatarStack, type StackMember } from './AvatarStack'
+import { useHoldUnderCard } from './BrandAmbiance'
 import { Button } from './Button'
 import { ButtonPair } from './ButtonPair'
 import { Callout } from './Callout'
 import { Stack } from './Stack'
 import { Text } from './Text'
-import { TextLink } from './TextLink'
+import { TextLink, TextLinkShape } from './TextLink'
 import { useTapsAllowed } from './tapGuard'
 
 /** La ligne « La démo de … » : sa phrase toute faite, et l'auteur dont la photo la précède. */
@@ -45,8 +46,9 @@ type Props = {
   /**
    * La ligne des testeurs (R7a) : « Tu veux aider Léa ? », puis le lien « Rejoins les testeurs depuis
    * la page du projet. » qui mène à cette page (`onOpenProject`). `null` ou absente : pas de ligne.
-   * L'écran décide quand elle a lieu d'être. Elle se pose sous les boutons, sans place gardée : sa
-   * venue ne déplace rien de ce qui la précède.
+   * L'écran décide quand elle a lieu d'être. Elle se pose sous les boutons, sans place gardée dans
+   * la feuille : sa venue ne déplace rien de ce qui la précède. Sur ordinateur, où la carte est
+   * centrée en hauteur, sa place est gardée sous la carte tant qu'elle peut venir (`holdOrigin`).
    */
   testers?: LeavingTesters | null
   onOpen: () => void
@@ -80,6 +82,13 @@ export function LeavingSheet({
   // site dans la foulée. « Ouvrir le site » ignore les tapes pendant TAP_GUARD_MS après le montage,
   // comme les boutons d'une fenêtre (Dialog) ; « Rester sur Waiggle » n'a rien de définitif.
   const tapsAllowed = useTapsAllowed(true, true)
+  // Sur ordinateur, la carte est centrée en hauteur : la ligne des testeurs qui arrive sous les
+  // boutons la ferait grandir et se recentrer, et « Ouvrir le site » remonterait de 43 px sous la
+  // souris (mesure de R7a, à 1440 px). Tant qu'elle peut venir (un lien de démo, `holdOrigin`), sa
+  // place est donc gardée sous la carte, sur le miel ; elle y reste si la ligne ne vient pas (la
+  // carte, déjà centrée avec elle, ne redescend pas). Sur téléphone, rien n'est gardé : la feuille
+  // grandit vers le bas sans rien déplacer.
+  useHoldUnderCard(holdOrigin && !testers ? TestersHold : null)
   return (
     <>
       {/* align="stretch" : les textes prennent toute la largeur de la feuille, et un nom de site
@@ -126,7 +135,8 @@ export function LeavingSheet({
       </ButtonPair>
       {/* Sous les boutons, donc après l'avertissement de sécurité (relecture juridique) : ce qui
           arrive avec le projet ne pousse rien de ce qui est au-dessus, « Ouvrir le site » reste où
-          le doigt va le chercher (R7a, des-C2). Aucune place n'est gardée : rien ne la précède. */}
+          le doigt va le chercher (R7a, des-C2). Aucune place n'est gardée dans la feuille : rien ne
+          la précède (sur ordinateur, elle l'est sous la carte : voir useHoldUnderCard plus haut). */}
       {testers ? <TestersLine testers={testers} /> : null}
     </>
   )
@@ -155,20 +165,52 @@ function HeldLine({ children }: { children: ReactNode | null }) {
   )
 }
 
+/**
+ * La forme de la ligne des testeurs : la phrase, puis, dessous et rangé à gauche, le lien. Commune
+ * à la ligne et à son gabarit (`TestersHold`) : la place gardée a ainsi la hauteur exacte de ce qui
+ * la reprend.
+ */
+function TestersShape({ lead, link }: { lead: string; link: ReactNode }) {
+  return (
+    <Stack gap="xxs" align="stretch">
+      <Text variant="callout" tone="secondary">
+        {lead}
+      </Text>
+      <View style={{ alignSelf: 'flex-start' }}>{link}</View>
+    </Stack>
+  )
+}
+
 /** La ligne des testeurs : la phrase, puis le lien vers la page du projet (qui seule inscrit). */
 function TestersLine({ testers }: { testers: LeavingTesters }) {
   const { t } = useTranslation()
   return (
-    <Stack gap="xxs" align="stretch">
-      <Text variant="callout" tone="secondary">
-        {t(($) => $.project.testers.leavingLead, { name: testers.name })}
-      </Text>
-      {/* Un lien et non un bouton : il mène à la page du projet ; ouvrir la démo ne rend jamais
-          testeur, et ce lien non plus (l'inscription se fait depuis la page). */}
-      <View style={{ alignSelf: 'flex-start' }}>
+    <TestersShape
+      lead={t(($) => $.project.testers.leavingLead, { name: testers.name })}
+      // Un lien et non un bouton : il mène à la page du projet ; ouvrir la démo ne rend jamais
+      // testeur, et ce lien non plus (l'inscription se fait depuis la page).
+      link={
         <TextLink label={t(($) => $.project.testers.leavingLink)} onPress={testers.onOpenProject} />
-      </View>
-    </Stack>
+      }
+    />
+  )
+}
+
+/**
+ * Le gabarit de la ligne des testeurs, pour garder sa place sous la carte sur ordinateur (voir
+ * useHoldUnderCard dans ui/BrandAmbiance.tsx) : la même forme, invisible. Le lien n'y est que
+ * dessiné (`TextLinkShape`, l'allure même de `TextLink`) : aucun lien qu'on atteindrait au clavier
+ * dans une place vide. Le nom de l'auteur n'est pas encore connu : une espace insécable le remplace
+ * (un nom très long, qui passerait à la ligne, ferait encore bouger la carte d'une demi-ligne ; les
+ * noms tiennent d'ordinaire sur la ligne).
+ */
+function TestersHold() {
+  const { t } = useTranslation()
+  return (
+    <TestersShape
+      lead={t(($) => $.project.testers.leavingLead, { name: BLANK })}
+      link={<TextLinkShape label={t(($) => $.project.testers.leavingLink)} />}
+    />
   )
 }
 
