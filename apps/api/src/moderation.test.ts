@@ -28,9 +28,13 @@
 // ancien signalement de note, encore en base, est une cible disparue : la file le range « sans
 // objet », une décision sur lui répond comme pour une cible disparue, jamais 500 (relecture de
 // sécurité B1).
+//
+// Tranche R7b (fin du fichier) : un appel à tester et un message d'un fil de testeur, dans la file,
+// retirés, rétablis et dans l'historique ; la modération ne voit jamais le reste du fil.
 import { randomUUID } from 'node:crypto'
 import {
   CommentPage,
+  DecisionHistoryPage,
   ErrorResponse,
   MODERATION_DECISIONS_PER_DAY,
   MODERATION_PASSWORD_FAILURES_PER_DAY,
@@ -45,6 +49,11 @@ import {
   RemovedPage,
   type ReportTarget,
   SUSPENSIONS_BEFORE_PASSWORD,
+  TesterCall,
+  TesterCallPage,
+  TesterMedia,
+  TesterMessage,
+  TesterMessagePage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { and, eq } from 'drizzle-orm'
@@ -1694,6 +1703,440 @@ describe('a broken row in the queue', () => {
       count: 1,
       firstReportedAt: noteAt,
       lastReportedAt: noteAt,
+    })
+  })
+})
+
+// ─── R7b : le coin des testeurs, vu de la modération ────────────────────────────────────────────
+
+// Plan R7b, « Modération et données » ; décision 4 de Louis (11/11/2026, jur-J10, sec-S3) : la
+// modération voit un appel ou un message signalé, et la capture d'un message visé par un signalement
+// ouvert, jamais le reste du fil. Un appel et un message se retirent comme une mise à jour
+// (`removed_at`, `removal_id`) : un appel retiré ne paraît plus que pour l'autrice du projet, un
+// message retiré que pour son expéditeur, chacun avec son retrait. La file, la liste des retirés et
+// l'historique les nomment avec leur projet et le membre concerné (l'autrice pour un appel,
+// l'expéditeur pour un message) ; supprimés par leur auteur, leurs signalements passent « sans
+// objet ». Le service des images elles-mêmes est testé par tester-media.test.ts.
+//
+// Léa est l'autrice du projet testable « Décollage », Max son testeur, Louis l'administrateur.
+describe('the testers corner, seen by the moderation', () => {
+  let corner: Project // le projet testable de Léa
+
+  const TESTABLE = { status: 'testable', demoUrl: 'https://demo.example.com/' }
+  const projectPath = (projectId: string) => `/v1/projects/${encodeURIComponent(projectId)}`
+  const callTarget = (id: string): ReportTarget => ({ kind: 'call', id })
+  const messageTarget = (id: string): ReportTarget => ({ kind: 'message', id })
+  const FEEDBACK_TEXT = 'Le score repart à zéro au niveau 3.'
+  const REPLY_TEXT = 'Merci Max, je regarde ça ce soir.'
+  const OTHER_TEXT = 'Et la musique coupe au niveau 4.'
+
+  const join = async (cookie: string) => {
+    later()
+    expect((await act.send('POST', `${projectPath(corner.id)}/testers`, cookie)).status).toBe(204)
+  }
+
+  /** Envoie une image du coin, « en attente » ; rend son id et sa clé de stockage. */
+  const upload = async (cookie: string, kind: 'call' | 'capture') => {
+    later()
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([new Uint8Array(await jpegImage(800, 600))], 'image.jpg', { type: 'image/jpeg' }),
+    )
+    form.append('kind', kind)
+    const res = await ctx.request(`${projectPath(corner.id)}/testers/media`, {
+      method: 'POST',
+      headers: { cookie },
+      body: form,
+    })
+    expect(res.status).toBe(201)
+    const { id } = TesterMedia.parse(await res.json())
+    const [row] = await ctx.db
+      .select({ key: schema.testerMedia.storageKey })
+      .from(schema.testerMedia)
+      .where(eq(schema.testerMedia.id, id))
+    if (!row) throw new Error(`no tester media ${id}`)
+    return { id, key: row.key }
+  }
+
+  /** Léa lance un appel, avec une photo décrite si on la donne. */
+  const launch = async (text: string, photoId: string | null = null) => {
+    later()
+    const res = await act.send('POST', `${projectPath(corner.id)}/calls`, lea, {
+      text,
+      photoId,
+      photoDescription: photoId === null ? null : 'La fusée sur la rampe',
+    })
+    expect(res.status).toBe(201)
+    return TesterCall.parse(await res.json())
+  }
+
+  const send = async (testerId: string, cookie: string, body: object) => {
+    later()
+    const res = await act.send(
+      'POST',
+      `${projectPath(corner.id)}/threads/${encodeURIComponent(testerId)}/messages`,
+      cookie,
+      body,
+    )
+    expect(res.status).toBe(201)
+    return TesterMessage.parse(await res.json())
+  }
+  const feedback = (text: string, captureId: string | null = null) => ({
+    kind: 'feedback',
+    outcome: 'partly',
+    device: 'phone',
+    text,
+    captureId,
+  })
+  const reply = (text: string) => ({ kind: 'reply', text })
+
+  const readCalls = async (cookie: string) => {
+    const res = await act.send('GET', `${projectPath(corner.id)}/calls`, cookie)
+    expect(res.status).toBe(200)
+    return TesterCallPage.parse(await res.json())
+  }
+  const threadOf = (testerId: string, cookie: string) =>
+    act.send(
+      'GET',
+      `${projectPath(corner.id)}/threads/${encodeURIComponent(testerId)}/messages`,
+      cookie,
+    )
+  const readThread = async (testerId: string, cookie: string) => {
+    const res = await threadOf(testerId, cookie)
+    expect(res.status).toBe(200)
+    return TesterMessagePage.parse(await res.json())
+  }
+
+  /** Ouvre l'adresse d'une image, comme l'appli ; rend le statut. */
+  const imageStatus = async (url: string, cookie: string) =>
+    (await ctx.request(new URL(url).pathname, { headers: { cookie } })).status
+
+  beforeEach(async () => {
+    corner = await act.publish(lea, 'Décollage', {
+      pitch: 'Un quiz de l’espace pour les petits.',
+      ...TESTABLE,
+    })
+    await join(max)
+  })
+
+  describe('the queue', () => {
+    it('shows a reported call with its text and the state of its photo, never its key', async () => {
+      const photo = await upload(lea, 'call')
+      const call = await launch('Testez la fusée sur tablette.', photo.id)
+      await report(max, callTarget(call.id))
+
+      const res = await act.send('GET', '/v1/moderation/reports', louis)
+      const text = await res.clone().text()
+      const [item] = ModerationQueuePage.parse(await res.json()).items
+
+      expect(item).toMatchObject({
+        target: callTarget(call.id),
+        projectId: corner.id,
+        snapshot: [
+          { field: 'body', value: 'Testez la fusée sur tablette.' },
+          { field: 'photoDescription', value: 'La fusée sur la rampe' },
+        ],
+        images: [{ field: 'photo', state: 'present' }],
+        state: 'present',
+        concernsMe: false,
+        count: 1,
+        authorRecord: expect.objectContaining({ memberId: leaId }),
+      })
+      expect(text).not.toContain(photo.key)
+    })
+
+    it('shows a reported message with its text and the state of its capture, its sender as author', async () => {
+      const capture = await upload(max, 'capture')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT, capture.id))
+      await report(lea, messageTarget(sent.id))
+
+      const res = await act.send('GET', '/v1/moderation/reports', louis)
+      const text = await res.clone().text()
+      const [item] = ModerationQueuePage.parse(await res.json()).items
+
+      expect(item).toMatchObject({
+        target: messageTarget(sent.id),
+        projectId: corner.id,
+        snapshot: [{ field: 'body', value: FEEDBACK_TEXT }],
+        images: [{ field: 'photo', state: 'present' }],
+        state: 'present',
+        concernsMe: false,
+        authorRecord: expect.objectContaining({ memberId: maxId }),
+      })
+      expect(text).not.toContain(capture.key)
+      // Le signaleur n'y est pas, même dans un fil à deux.
+      expect(text).not.toContain(leaId)
+    })
+
+    it('never shows the moderation the rest of the thread', async () => {
+      const first = await upload(max, 'capture')
+      const reported = await send(maxId, max, feedback(FEEDBACK_TEXT, first.id))
+      await send(maxId, lea, reply(REPLY_TEXT))
+      const second = await upload(max, 'capture')
+      const other = await send(maxId, max, feedback(OTHER_TEXT, second.id))
+      await report(lea, messageTarget(reported.id))
+
+      // La file : le seul message signalé, ni la réponse de Léa, ni l'autre retour.
+      const queue = await (await act.send('GET', '/v1/moderation/reports', louis)).text()
+      expect(queue).toContain(FEEDBACK_TEXT)
+      expect(queue).not.toContain(REPLY_TEXT)
+      expect(queue).not.toContain(OTHER_TEXT)
+      expect(queue).not.toContain(second.key)
+      // Le fil lui-même, et la liste des fils, restent fermés à l'administrateur.
+      await expectSame(
+        await threadOf(maxId, louis),
+        await threadOf(maxId, zoe),
+        'the thread, for the administrator and for another member',
+      )
+      expect((await threadOf(maxId, louis)).status).toBe(404)
+      expect((await act.send('GET', `${projectPath(corner.id)}/threads`, louis)).status).toBe(404)
+      // Les images : la capture du message signalé seulement (décision 4).
+      const [otherCapture, reportedCapture] = (await readThread(maxId, max)).items
+        .filter((m) => m.id === other.id || m.id === reported.id)
+        .map((m) => m.capture?.url ?? '')
+      expect(await imageStatus(reportedCapture ?? '', louis)).toBe(200)
+      expect(await imageStatus(otherCapture ?? '', louis)).toBe(404)
+
+      // Retiré, il est seul aussi dans la liste des contenus retirés.
+      await remove(messageTarget(reported.id))
+      const removed = await (await act.send('GET', '/v1/moderation/removed', louis)).text()
+      expect(removed).toContain(FEEDBACK_TEXT)
+      expect(removed).not.toContain(REPLY_TEXT)
+      expect(removed).not.toContain(OTHER_TEXT)
+    })
+
+    it('flags a message of the administrator himself, and refuses his decision on it', async () => {
+      await join(louis)
+      const mine = await send(louisId, louis, feedback('Le retour de Louis, testeur.'))
+      await report(lea, messageTarget(mine.id))
+
+      expect((await readQueue()).items.map((item) => item.concernsMe)).toEqual([true])
+      for (const decision of [
+        { action: 'remove', target: messageTarget(mine.id), ground: 'rules', explanation: 'Moi.' },
+        { action: 'dismiss', target: messageTarget(mine.id) },
+      ]) {
+        await expectError(await decideRaw(louis, decision), 422, 'own_content')
+      }
+      expect(await decisionsInBase()).toEqual([])
+    })
+
+    it('closes on its own the reports of a call or a message deleted by its author', async () => {
+      const call = await launch('Un appel bientôt supprimé.')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(max, callTarget(call.id))
+      await report(lea, messageTarget(sent.id))
+      // Témoin : tant qu'ils existent, les deux sont dans la file, présents.
+      expect((await readQueue()).items.map((item) => [item.target.kind, item.state])).toEqual([
+        ['call', 'present'],
+        ['message', 'present'],
+      ])
+
+      later()
+      expect(
+        (await act.send('DELETE', `${projectPath(corner.id)}/calls/${call.id}`, lea)).status,
+      ).toBe(204)
+      later()
+      expect(
+        (await act.send('DELETE', `${projectPath(corner.id)}/messages/${sent.id}`, max)).status,
+      ).toBe(204)
+
+      expect((await readQueue()).items).toEqual([])
+      expect((await reportsInBase()).map((r) => r.status)).toEqual(['void', 'void'])
+    })
+  })
+
+  describe('removing and restoring', () => {
+    it('records the removal of a call, closes its reports, and hides it from the testers only', async () => {
+      const call = await launch('Un appel publicitaire.')
+      await report(max, callTarget(call.id))
+
+      const decision = await remove(callTarget(call.id), 'Publicité.')
+
+      expect((await reportsInBase()).map((r) => [r.status, r.decisionId])).toEqual([
+        ['removed', decision.id],
+      ])
+      expect(
+        (await decisionsInBase()).map((d) => [d.targetKind, d.targetId, d.targetMemberId]),
+      ).toEqual([['call', call.id, leaId]])
+      const [row] = await ctx.db
+        .select({ removedAt: schema.testerCall.removedAt, removalId: schema.testerCall.removalId })
+        .from(schema.testerCall)
+        .where(eq(schema.testerCall.id, call.id))
+      expect(row).toEqual({ removedAt: new Date(Date.now()), removalId: decision.id })
+      expect((await readCalls(max)).items).toEqual([])
+      expect((await readCalls(lea)).items.map((c) => [c.id, c.removal])).toEqual([
+        [call.id, { ground: 'rules', explanation: 'Publicité.', at: nowIso(), afterReport: true }],
+      ])
+      // Le retrait compte dans le relevé de l'autrice, sur la carte d'un signalement suivant.
+      await report(zoe, projectTarget())
+      expect((await cardOf(projectTarget()))?.authorRecord?.removals).toBe(1)
+    })
+
+    it('removes a message: gone for the other person, shown to its sender with the removal', async () => {
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      const answer = await send(maxId, lea, reply(REPLY_TEXT))
+      await report(lea, messageTarget(sent.id))
+      await report(max, messageTarget(answer.id))
+
+      const decision = await remove(messageTarget(sent.id), 'Insultes.')
+      const removedAt = nowIso()
+      await remove(messageTarget(answer.id), 'Insultes aussi.')
+
+      expect(
+        (await decisionsInBase()).map((d) => [d.targetKind, d.targetId, d.targetMemberId]),
+      ).toEqual([
+        ['message', sent.id, maxId],
+        ['message', answer.id, leaId],
+      ])
+      const [row] = await ctx.db
+        .select({
+          removedAt: schema.testerMessage.removedAt,
+          removalId: schema.testerMessage.removalId,
+        })
+        .from(schema.testerMessage)
+        .where(eq(schema.testerMessage.id, sent.id))
+      expect(row).toEqual({ removedAt: new Date(removedAt), removalId: decision.id })
+      // Chacun ne voit plus que son propre message retiré, avec le retrait.
+      const forLea = (await readThread(maxId, lea)).items
+      const forMax = (await readThread(maxId, max)).items
+      expect(forLea.map((m) => [m.id, m.removal?.explanation ?? null])).toEqual([
+        [answer.id, 'Insultes aussi.'],
+      ])
+      expect(forMax.map((m) => [m.id, m.removal?.explanation ?? null])).toEqual([
+        [sent.id, 'Insultes.'],
+      ])
+      expect(forMax[0]?.removal).toEqual({
+        ground: 'rules',
+        explanation: 'Insultes.',
+        at: removedAt,
+        afterReport: true,
+      })
+    })
+
+    it('shows a restored call and message again, and refuses to restore them twice', async () => {
+      const call = await launch('Un appel retiré à tort.')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(max, callTarget(call.id))
+      await report(lea, messageTarget(sent.id))
+      await remove(callTarget(call.id))
+      await remove(messageTarget(sent.id))
+      later()
+
+      await act.decide(louis, { action: 'restore', target: callTarget(call.id) })
+      later()
+      await act.decide(louis, { action: 'restore', target: messageTarget(sent.id) })
+
+      expect((await readCalls(max)).items.map((c) => [c.id, c.removal])).toEqual([[call.id, null]])
+      expect((await readThread(maxId, lea)).items.map((m) => [m.id, m.removal])).toEqual([
+        [sent.id, null],
+      ])
+      expect((await readRemoved()).items).toEqual([])
+      for (const target of [callTarget(call.id), messageTarget(sent.id)]) {
+        await expectError(
+          await decideRaw(louis, { action: 'restore', target }),
+          409,
+          'already_decided',
+        )
+      }
+    })
+
+    it('lists a removed call and a removed message with their text and project, newest first', async () => {
+      const call = await launch('Un appel publicitaire.')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(max, callTarget(call.id))
+      await report(lea, messageTarget(sent.id))
+      await remove(callTarget(call.id), 'Publicité.')
+      const callAt = nowIso()
+      await remove(messageTarget(sent.id), 'Insultes.')
+      const messageAt = nowIso()
+
+      expect((await readRemoved()).items).toEqual([
+        {
+          target: messageTarget(sent.id),
+          projectId: corner.id,
+          text: FEEDBACK_TEXT,
+          ground: 'rules',
+          explanation: 'Insultes.',
+          removedAt: messageAt,
+          concernsMe: false,
+        },
+        {
+          target: callTarget(call.id),
+          projectId: corner.id,
+          text: 'Un appel publicitaire.',
+          ground: 'rules',
+          explanation: 'Publicité.',
+          removedAt: callAt,
+          concernsMe: false,
+        },
+      ])
+    })
+
+    it('dismisses a reported call or message, which stays in place', async () => {
+      const call = await launch('Un appel signalé à tort.')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(max, callTarget(call.id))
+      await report(lea, messageTarget(sent.id))
+
+      later()
+      await act.decide(louis, { action: 'dismiss', target: callTarget(call.id) })
+      later()
+      await act.decide(louis, { action: 'dismiss', target: messageTarget(sent.id) })
+
+      expect((await reportsInBase()).map((r) => r.status)).toEqual(['dismissed', 'dismissed'])
+      expect((await readCalls(max)).items.map((c) => c.id)).toEqual([call.id])
+      expect((await readThread(maxId, lea)).items.map((m) => m.id)).toEqual([sent.id])
+    })
+
+    it('answers 404 to a decision on an unknown or deleted call or message', async () => {
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(lea, messageTarget(sent.id))
+      later()
+      expect(
+        (await act.send('DELETE', `${projectPath(corner.id)}/messages/${sent.id}`, max)).status,
+      ).toBe(204)
+
+      for (const target of [callTarget(UNKNOWN), messageTarget(UNKNOWN), messageTarget(sent.id)]) {
+        await expectError(await decideRaw(louis, { action: 'dismiss', target }), 404, 'not_found')
+      }
+      // Témoin : la même décision sur un appel signalé, toujours là, est acceptée.
+      const call = await launch('Un appel signalé.')
+      await report(max, callTarget(call.id))
+      expect(
+        (await decideRaw(louis, { action: 'dismiss', target: callTarget(call.id) })).status,
+      ).toBe(201)
+    })
+  })
+
+  describe('the history of decisions', () => {
+    it('records the decisions on a call and a message with their project and the member concerned', async () => {
+      const call = await launch('Un appel publicitaire.')
+      const sent = await send(maxId, max, feedback(FEEDBACK_TEXT))
+      await report(max, callTarget(call.id))
+      await report(lea, messageTarget(sent.id))
+      await remove(callTarget(call.id), 'Publicité.')
+      await remove(messageTarget(sent.id), 'Insultes.')
+
+      const res = await act.send('GET', '/v1/moderation/decisions', louis)
+      expect(res.status).toBe(200)
+      const { items } = DecisionHistoryPage.parse(await res.json())
+      expect(
+        items.map((d) => [d.action, d.target, d.projectId, d.member?.id, d.explanation]),
+      ).toEqual([
+        ['remove', messageTarget(sent.id), corner.id, maxId, 'Insultes.'],
+        ['remove', callTarget(call.id), corner.id, leaId, 'Publicité.'],
+      ])
+
+      // Filtré sur Max : la décision sur son message seulement.
+      const forMax = await act.send(
+        'GET',
+        `/v1/moderation/decisions?${new URLSearchParams({ member: maxId })}`,
+        louis,
+      )
+      expect(DecisionHistoryPage.parse(await forMax.json()).items.map((d) => d.target)).toEqual([
+        messageTarget(sent.id),
+      ])
     })
   })
 })

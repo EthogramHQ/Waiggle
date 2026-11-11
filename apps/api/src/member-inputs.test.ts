@@ -20,12 +20,18 @@
 // description) remplace la note du Journal ; la migration 0018 efface `project_note` et les
 // anciennes colonnes des outils (`project.tools`, `project.tool_slugs`, `profile.favorite_tools`),
 // que le registre ne doit plus nommer.
+//
+// Tranche R7b : le coin des testeurs. Inès lance un appel sur son projet (Zoé en est testeuse) et
+// envoie un retour sur « Recettes » de Zoé ; Zoé, l'autre personne de chaque objet, les signale.
 import {
   AccountExport,
   Project,
   ProjectUpdate,
   ProjectVisual,
   ReportSnapshot,
+  TesterCall,
+  TesterMedia,
+  TesterMessage,
 } from '@ruche/contracts'
 import { schema } from '@ruche/db'
 import { and, asc, eq, getTableName, inArray, is, sql } from 'drizzle-orm'
@@ -350,6 +356,100 @@ describe('the register of member inputs', () => {
     expect(media === '*' ? '' : (media?.slot ?? '')).toContain('mise à jour')
   })
 
+  // Tranche R7b (plan, « Modération et données » ; migrations 0019 et 0020) : le coin des testeurs.
+  // Un membre y écrit le texte d'un appel (l'autrice du projet) et celui d'un message de fil (un
+  // retour ou une réponse), joint une photo d'appel décrite ou une capture : au registre, sous les
+  // objets `call` et `message`, comme une mise à jour (le texte sous `body`, l'image sous `photo`,
+  // sa description sous `photoDescription`). Tout le reste est écrit par l'API ou choisi dans une
+  // liste fermée (sorte, issue, appareil) : « pas une saisie », avec sa raison.
+  const SLICE_R7B = {
+    project_tester_removal: ['project_id', 'member_id', 'created_at'],
+    tester_call: ['id', 'project_id', 'text', 'created_at', 'removed_at', 'removal_id'],
+    tester_thread: ['project_id', 'tester_id', 'created_at', 'author_read_at', 'tester_read_at'],
+    tester_message: [
+      'id',
+      'project_id',
+      'tester_id',
+      'sender_id',
+      'kind',
+      'outcome',
+      'device',
+      'text',
+      'created_at',
+      'settled_at',
+      'settled_update_id',
+      'removed_at',
+      'removal_id',
+    ],
+    tester_media: [
+      'id',
+      'project_id',
+      'owner_id',
+      'kind',
+      'call_id',
+      'message_id',
+      'storage_key',
+      'width',
+      'height',
+      'thumbhash',
+      'description',
+      'created_at',
+    ],
+  }
+  /** Les saisies du coin : objet, table, colonne, champ de la copie et sorte. */
+  const R7B_INPUTS = [
+    { object: 'call', table: 'tester_call', column: 'text', field: 'body', kind: 'text' },
+    { object: 'call', table: 'tester_media', column: 'storage_key', field: 'photo', kind: 'image' },
+    {
+      object: 'call',
+      table: 'tester_media',
+      column: 'description',
+      field: 'photoDescription',
+      kind: 'text',
+    },
+    { object: 'message', table: 'tester_message', column: 'text', field: 'body', kind: 'text' },
+    {
+      object: 'message',
+      table: 'tester_media',
+      column: 'storage_key',
+      field: 'photo',
+      kind: 'image',
+    },
+  ] as const
+
+  it('reads the tables and columns of slice R7b', () => {
+    for (const [table, columns] of Object.entries(SLICE_R7B)) {
+      const found = tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? []
+      expect(found, table).toEqual(expect.arrayContaining(columns))
+    }
+  })
+
+  it('classes the text of a call and of a message, the call photo, its description and the capture as inputs', () => {
+    for (const input of R7B_INPUTS) {
+      expect(MEMBER_INPUTS, `${input.object} ${input.table}.${input.column}`).toContainEqual(
+        // Un texte est copié et exporté ; une image est copiée (sa clé seulement).
+        expect.objectContaining({
+          ...input,
+          snapshot: true,
+          ...(input.kind === 'text' && { export: true }),
+        }),
+      )
+    }
+  })
+
+  it('classes the rest of the testers corner as written by the API, with a reason', () => {
+    const isInput = (table: string, column: string) =>
+      R7B_INPUTS.some((input) => input.table === table && input.column === column)
+    const wrong = Object.entries(SLICE_R7B).flatMap(([table, columns]) =>
+      columns
+        .filter((column) => !isInput(table, column))
+        .filter((column) => inRegister(table, column) || !notAnInput(table, column))
+        .map((column) => `${table}.${column}`),
+    )
+
+    expect(wrong).toEqual([])
+  })
+
   // R7a, migration 0018 : le Journal et les anciennes colonnes des outils sont effacés. Le schéma
   // de Drizzle ne les a plus, la base migrée non plus, et le registre ne les nomme plus.
   it('no longer has the journal nor the former tool columns, in the schema, the base or the register', async () => {
@@ -510,6 +610,10 @@ const WITNESSES: Record<string, string> = {
   'update.project_media.description': 'Légende de mise à jour témoin, unique.',
   'comment.project_comment.body': 'Commentaire témoin, unique.',
   'report.content_report.details': 'Précision témoin, unique.',
+  // R7b : le coin des testeurs (un appel et sa photo décrite, un retour de testeur).
+  'call.tester_call.text': 'Appel témoin, unique.',
+  'call.tester_media.description': 'Légende d’appel témoin, unique.',
+  'message.tester_message.text': 'Retour de testeur témoin, unique.',
 }
 const keyOf = (input: MemberInput) => `${input.object}.${input.table}.${input.column}`
 const witnessOf = (input: MemberInput) => {
@@ -519,11 +623,16 @@ const witnessOf = (input: MemberInput) => {
 }
 
 /** L'objet du registre et la sorte de cible signalée qui le porte. */
-const REPORTED_AS: Partial<Record<InputObject, 'member' | 'project' | 'update' | 'comment'>> = {
+const REPORTED_AS: Partial<
+  Record<InputObject, 'member' | 'project' | 'update' | 'comment' | 'call' | 'message'>
+> = {
   member: 'member',
   project: 'project',
   update: 'update',
   comment: 'comment',
+  // R7b : un appel et un message se signalent sous leur propre sorte.
+  call: 'call',
+  message: 'message',
 }
 
 describe('every field of the register', () => {
@@ -540,7 +649,12 @@ describe('every field of the register', () => {
   let updatePhotoKey: string
   let pendingPhotoKey: string
   let commentId: string
-  /** Les signalements de Malik, par sorte de cible. */
+  /** R7b : l'appel d'Inès (et la clé de sa photo), son retour chez Zoé (et la clé de sa capture). */
+  let callId: string
+  let callPhotoKey: string
+  let messageId: string
+  let captureKey: string
+  /** Les signalements de Malik (et de Zoé pour le coin des testeurs), par sorte de cible. */
   const reportIds: Record<string, string> = {}
 
   const SECOND = 1000
@@ -582,6 +696,8 @@ describe('every field of the register', () => {
     })
     expect(avatar.status).toBe(200)
     const project = await act.publish(ines, WITNESSES['project.project.title'] ?? '', {
+      // R7b : testable, pour que le coin des testeurs s'ouvre (le lien de démo est déjà là).
+      status: 'testable',
       pitch: WITNESSES['project.project.pitch'],
       description: WITNESSES['project.project.description'],
       prompts: [WITNESSES['project.project.prompts']],
@@ -643,12 +759,81 @@ describe('every field of the register', () => {
     expect(update.status).toBe(201)
     updateId = ProjectUpdate.parse(await update.json()).id
     // Le commentaire d'Inès est chez Zoé : le blocage le cache dans un fil qui n'est pas le sien.
-    zoeProjectId = (await act.publish(zoe, 'Recettes')).id
+    zoeProjectId = (
+      await act.publish(zoe, 'Recettes', {
+        status: 'testable',
+        demoUrl: 'https://recettes.example.com/',
+      })
+    ).id
     later()
     commentId = (
       await act.comment(zoeProjectId, ines, WITNESSES['comment.project_comment.body'] ?? '')
     ).id
+
+    // R7b : Zoé teste le projet d'Inès, où Inès lance un appel avec une photo décrite ; Inès teste
+    // « Recettes » de Zoé, et y envoie un retour avec une capture. Zoé, l'autre personne de chaque
+    // objet, est seule à pouvoir les signaler.
+    await join(projectId, zoe)
+    const photo = await testerUpload(projectId, ines, 'call')
+    callPhotoKey = photo.key
+    later()
+    const call = await act.send('POST', `/v1/projects/${projectId}/calls`, ines, {
+      text: WITNESSES['call.tester_call.text'],
+      photoId: photo.id,
+      photoDescription: WITNESSES['call.tester_media.description'],
+    })
+    expect(call.status).toBe(201)
+    callId = TesterCall.parse(await call.json()).id
+    await join(zoeProjectId, ines)
+    const capture = await testerUpload(zoeProjectId, ines, 'capture')
+    captureKey = capture.key
+    later()
+    const message = await act.send(
+      'POST',
+      `/v1/projects/${zoeProjectId}/threads/${inesId}/messages`,
+      ines,
+      {
+        kind: 'feedback',
+        outcome: 'partly',
+        device: 'phone',
+        text: WITNESSES['message.tester_message.text'],
+        captureId: capture.id,
+      },
+    )
+    expect(message.status).toBe(201)
+    messageId = TesterMessage.parse(await message.json()).id
   })
+
+  /** Rejoint les testeurs d'un projet. */
+  const join = async (id: string, cookie: string) => {
+    later()
+    expect((await act.send('POST', `/v1/projects/${id}/testers`, cookie)).status).toBe(204)
+  }
+
+  /** Envoie une image du coin (photo d'appel ou capture), « en attente » ; rend son id et sa clé. */
+  const testerUpload = async (id: string, cookie: string, kind: 'call' | 'capture') => {
+    later()
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([new Uint8Array(await jpegImage(800, 600, '#9e7a3b'))], 'image.jpg', {
+        type: 'image/jpeg',
+      }),
+    )
+    form.append('kind', kind)
+    const res = await ctx.request(`/v1/projects/${id}/testers/media`, {
+      method: 'POST',
+      headers: { cookie },
+      body: form,
+    })
+    expect(res.status).toBe(201)
+    const { id: mediaId } = TesterMedia.parse(await res.json())
+    const [row] = await ctx.db
+      .select({ key: schema.testerMedia.storageKey })
+      .from(schema.testerMedia)
+      .where(eq(schema.testerMedia.id, mediaId))
+    return { id: mediaId, key: row?.key ?? '' }
+  }
 
   afterEach(async () => {
     await ctx.close()
@@ -667,6 +852,14 @@ describe('every field of the register', () => {
         kind === 'project' ? WITNESSES['report.content_report.details'] : undefined,
       )
       reportIds[kind] = report.id
+    }
+    // R7b : Zoé, testeuse du projet d'Inès et autrice de « Recettes », signale l'appel et le retour.
+    for (const [kind, id] of [
+      ['call', callId],
+      ['message', messageId],
+    ] as const) {
+      later()
+      reportIds[kind] = (await act.report(zoe, { kind, id })).id
     }
   }
 
@@ -733,6 +926,11 @@ describe('every field of the register', () => {
     // Et celle de la mise à jour, sa photo à elle ; la photo en attente n'est nulle part.
     const update = await snapshotOf('update')
     expect(update.filter((e) => e.field === 'photo').map((e) => e.value)).toEqual([updatePhotoKey])
+    // R7b : la photo de l'appel et la capture du retour, leur clé seulement.
+    const call = await snapshotOf('call')
+    expect(call.filter((e) => e.field === 'photo').map((e) => e.value)).toEqual([callPhotoKey])
+    const message = await snapshotOf('message')
+    expect(message.filter((e) => e.field === 'photo').map((e) => e.value)).toEqual([captureKey])
     for (const copy of [project, update, await snapshotOf('member')]) {
       expect(JSON.stringify(copy)).not.toContain(pendingPhotoKey)
     }
@@ -783,7 +981,15 @@ describe('every field of the register', () => {
       ...(
         await ctx.db.select({ key: schema.projectMedia.storageKey }).from(schema.projectMedia)
       ).map((m) => m.key),
+      // R7b : les images du coin (la photo de l'appel, la capture du retour).
+      ...(await ctx.db.select({ key: schema.testerMedia.storageKey }).from(schema.testerMedia)).map(
+        (m) => m.key,
+      ),
     ]
+    // R7b : Malik teste le projet d'Inès ; témoin, il lit l'appel avant le blocage, qui vaut un départ.
+    await join(projectId, malik)
+    const calls = await (await act.send('GET', `/v1/projects/${projectId}/calls`, malik)).text()
+    expect(calls).toContain(WITNESSES['call.tester_call.text'])
     await act.block((await act.me(malik)).id, ines)
 
     /** Les lectures où chaque objet apparaîtrait. */
@@ -799,6 +1005,10 @@ describe('every field of the register', () => {
         '/v1/feed/discover',
       ],
       comment: [`/v1/projects/${zoeProjectId}/comments`],
+      // R7b : un appel ne se lit que des testeurs actuels ; un message, des deux personnes de son
+      // fil seulement (le fil d'Inès chez Zoé : Malik n'en est pas, blocage ou non).
+      call: [`/v1/projects/${projectId}/calls`],
+      message: [`/v1/projects/${zoeProjectId}/threads/${inesId}/messages`],
     }
     for (const object of new Set(MEMBER_INPUTS.map((i) => i.object))) {
       if (object === 'report') continue
