@@ -5,6 +5,8 @@
 // rien n'est montré au-delà de 90 jours. Ce que le membre a déjà vu (seen_at) et la date de son
 // pseudo sont lus dans notification_state (state.ts). R7a : les mises à jour des projets qu'il suit
 // ou qu'il teste s'y ajoutent, et remplacent les notes du Journal dans les sources de la modération.
+// R7b : le coin des testeurs ajoute trois sortes (un appel à tester, un message d'un fil, un retour
+// réglé), et le retrait d'un appel ou d'un message par la modération.
 import {
   EXCERPT_MAX,
   NOTIFICATION_DAYS,
@@ -25,6 +27,7 @@ import { afterReportSql, toRemoval } from '../removals/load'
 // suspension/load.ts lit aussi `utc` dans ce fichier : les deux modules s'importent l'un l'autre.
 // C'est sans risque ici, car chacun n'utilise l'autre que dans ses fonctions, jamais au chargement.
 import { activeSuspensionSql } from '../suspension/load'
+import { excerptOf as testerExcerptOf } from '../testers/threads'
 import { hasReadableLines, readLines, updateOnCards } from '../updates/load'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -107,10 +110,14 @@ const readable = (me: string) => sql`(c.deleted_at is null and c.removed_at is n
  *  11. les mises à jour des projets qu'il suit ou qu'il teste (R7a) : la clé primaire de
  *      project_follow (follower_id, …) et celle de project_tester (member_id, …), puis
  *      project_update_project_created_idx (project_id, created_at desc), voir projectUpdates.
+ *  12 à 14. le coin des testeurs (R7b) : les appels des projets qu'il teste, les messages de l'autre
+ *      personne d'un fil, ses retours réglés ; voir testerSources.
  * Les sources 7 à 11 ajoutent six colonnes : target_kind (la sorte de contenu), update_id (une mise
  * à jour retirée, ou celle qui est annoncée), decision_id (la décision de retrait, de suspension ou
  * de levée), outcome (l'issue d'un signalement), member_id (le membre visé par un signalement, pour
- * le lien) et suspension_id (la ligne account_suspension) ; null pour les six premières.
+ * le lien) et suspension_id (la ligne account_suspension) ; null pour les six premières. R7b en
+ * ajoute une vingt et unième, item_id : l'appel ou le message dont parle la notification (un
+ * appel ou un message retiré, pour la source 7 ; null partout ailleurs).
  *
  * `now` (tranche 7c) : l'heure de l'API, pour dire si une suspension a pris fin (source 10). C'est
  * la règle unique de suspension/load.ts (activeSuspensionSql, S10), qui compare à cette heure et
@@ -136,18 +143,23 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       ? sql`${sql.raw(column)} > ${after} and ${sql.raw(column)} <= ${upTo}`
       : sql`${sql.raw(column)} > ${after}`
   // Les sources 1 à 6 (tranche 6b) ont quatorze colonnes ; celles de la modération (tranches 7a et
-  // 7c) en ont besoin de six de plus. Plutôt que d'ajouter six « null » à chacune des six, on les
-  // ajoute une fois autour d'elles (« select u.*, null… from (…) u »), et les sources 7 à 10
-  // donnent les vingt colonnes elles-mêmes. PostgreSQL déplie ce « select » : chaque source
-  // garde son index.
+  // 7c) en ont besoin de six de plus, et le coin des testeurs (R7b) d'une septième. Plutôt que
+  // d'ajouter sept « null » à chacune des six, on les ajoute une fois autour d'elles (« select
+  // u.*, null… from (…) u »), et les sources 7 à 14 donnent les vingt et une colonnes elles-mêmes.
+  // PostgreSQL déplie ce « select » : chaque source garde son index.
   return sql`
     select u.*, null::text as target_kind, null::uuid as update_id, null::uuid as decision_id,
-      null::text as outcome, null::text as member_id, null::uuid as suspension_id
+      null::text as outcome, null::text as member_id, null::uuid as suspension_id,
+      null::uuid as item_id
     from (${socialSources(me, during)}) u
 
     union all
 
     ${projectUpdates(me, during)}
+
+    union all
+
+    ${testerSources(me, during, now)}
 
     union all
 
@@ -163,28 +175,52 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     --    Index : ses projets par project_author_created_idx (puis les mises à jour de chacun par
     --    project_update_project_created_idx) ; ses commentaires par project_comment_author_idx. Les
     --    contenus retirés sont rares : ces lectures écartent presque tout aussitôt.
+    --    R7b : ses appels à tester (ses projets, puis tester_call_project_created_idx) et ses
+    --    messages d'un fil de testeur. Un message se cherche par le fil, des deux côtés : ses fils
+    --    de testeur (tester_thread_tester_idx), même après son départ (l'auteur d'un contenu retiré
+    --    est toujours prévenu), sur un projet encore listé comme pour un commentaire ; et les fils
+    --    de ses projets, pour une réponse de l'auteur. Puis tester_message_thread_created_idx.
     select 'removed', 'removed:' || x.removal_id, x.removed_at, x.project_id, x.comment_id,
       null, null, null, null, null, null, null, null, null,
-      x.target_kind, x.update_id, x.removal_id, null, null, null
+      x.target_kind, x.update_id, x.removal_id, null, null, null, x.item_id
     from (
       select 'project' as target_kind, project.id as project_id, null::uuid as comment_id,
-        null::uuid as update_id, project.removal_id, project.removed_at
+        null::uuid as update_id, project.removal_id, project.removed_at, null::uuid as item_id
       from project
       where project.author_id = ${me} and project.removed_at is not null
         and ${during('project.removed_at')}
       union all
-      select 'update', project.id, null, pu.id, pu.removal_id, pu.removed_at
+      select 'update', project.id, null, pu.id, pu.removal_id, pu.removed_at, null
       from project
       join project_update pu on pu.project_id = project.id
       where project.author_id = ${me} and pu.removed_at is not null
         and ${during('pu.removed_at')}
       union all
-      select 'comment', c.project_id, c.id, null, c.removal_id, c.removed_at
+      select 'comment', c.project_id, c.id, null, c.removal_id, c.removed_at, null
       from project_comment c
       join project on project.id = c.project_id
       where c.author_id = ${me} and c.deleted_at is null and c.removed_at is not null
         and ${during('c.removed_at')}
         and (${listedProject()} or project.author_id = ${me})
+      union all
+      select 'call', project.id, null, null, tc.removal_id, tc.removed_at, tc.id
+      from project
+      join tester_call tc on tc.project_id = project.id
+      where project.author_id = ${me} and tc.removed_at is not null
+        and ${during('tc.removed_at')}
+      union all
+      select 'message', project.id, null, null, m.removal_id, m.removed_at, m.id
+      from tester_thread th
+      join tester_message m on m.project_id = th.project_id and m.tester_id = th.tester_id
+      join project on project.id = th.project_id
+      where th.tester_id = ${me} and m.sender_id = ${me} and m.removed_at is not null
+        and ${during('m.removed_at')} and ${listedProject()}
+      union all
+      select 'message', project.id, null, null, m.removal_id, m.removed_at, m.id
+      from project
+      join tester_message m on m.project_id = project.id
+      where project.author_id = ${me} and m.sender_id = ${me} and m.removed_at is not null
+        and ${during('m.removed_at')}
     ) x
     where x.removal_id is not null
 
@@ -223,7 +259,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
       null, null, null, null, null, null, null, null, null, null,
       r.target_kind, null, null, r.status,
       case when r.target_kind = 'member' then (select u.id from "user" u where u.id = r.target_id) end,
-      null
+      null, null
     from content_report r
     where r.reporter_id = ${me} and r.status in ('removed', 'dismissed')
       and ${during('r.decided_at')}
@@ -239,7 +275,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     --    donne ses suspensions dans la fenêtre de dates.
     select 'suspended', 'suspended:' || s.id, s.starts_at,
       null, null, null, null, null, null, null, null, null, null, null,
-      null, null, s.decision_id, null, null, s.id
+      null, null, s.decision_id, null, null, s.id, null
     from account_suspension s
     where s.user_id = ${me} and ${during('s.starts_at')}
 
@@ -253,7 +289,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
     --     la date n'en a pas. Même index que la source 9 (ses suspensions, quelques lignes).
     select 'suspension_ended', 'suspension_ended:' || s.id, coalesce(s.lifted_at, s.ends_at),
       null, null, null, null, null, null, null, null, null, null, null,
-      null, null, s.lift_decision_id, null, null, s.id
+      null, null, s.lift_decision_id, null, null, s.id, null
     from account_suspension s
     where s.user_id = ${me} and not ${activeSuspensionSql('s', now)}
       and ${during('coalesce(s.lifted_at, s.ends_at)')}
@@ -262,7 +298,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
 
 /**
  * La source 11 (R7a) : une ligne par mise à jour d'un projet que `me` suit OU teste, avec les vingt
- * colonnes (kind, key, at, project_id, … update_id …). La clé « project_update:<id> » est la même
+ * et une colonnes (kind, key, at, project_id, … update_id …, item_id). La clé « project_update:<id> » est la même
  * pour qui suit et pour qui teste : la notification ne dit jamais lequel des deux (relecture de
  * sécurité A6).
  *
@@ -308,7 +344,7 @@ const sources = (me: string, since: Date, now: Date, until?: Date): SQL => {
 const projectUpdates = (me: string, during: (column: string) => SQL): SQL => sql`
     select 'project_update', 'project_update:' || project_update.id, project_update.created_at,
       project.id, null, null, project.author_id, null, null, null, null, null, null, null,
-      null, project_update.id, null, null, null, null
+      null, project_update.id, null, null, null, null, null
     from (
       select sub.project_id, min(sub.created_at) as since
       from (
@@ -324,6 +360,98 @@ const projectUpdates = (me: string, during: (column: string) => SQL): SQL => sql
     where ${during('project_update.created_at')}
       and ${updateOnCards()} and ${hasReadableLines()}
       and project.author_id <> ${me} and ${listedProjectFor(me)}`
+
+/**
+ * Les sources 12 à 14 (R7b) : le coin des testeurs, avec les vingt et une colonnes. La colonne
+ * item_id porte l'appel ou le message ; loadDetailedRows le relit par sa clé primaire.
+ *
+ * Ce qui prévient un testeur part toujours de ses inscriptions actuelles (la clé primaire de
+ * project_tester, member_id en tête) : quitter les testeurs, ou en être retiré, efface la ligne, et
+ * la notification disparaît d'elle-même (décision 2 de Louis : un ancien testeur ne reçoit plus
+ * rien du coin). Puis trois conditions du coin ouvert, celles de cornerAccess (testers/access.ts) :
+ * - le projet est listé pour lui (listedProjectFor : public, pas retiré, aucun blocage avec
+ *   l'auteur, dans un sens ou dans l'autre) ;
+ * - l'auteur n'est pas suspendu (décision 1 de Louis : la suspension ferme le coin, même à ce qui
+ *   l'a précédée) : « (select 1 … limit 1) is null », une recherche dans l'index partiel
+ *   account_suspension_open_idx (user_id) where lifted_at is null, puis la fin comparée à l'heure
+ *   de l'API (la règle unique, activeSuspensionSql) ;
+ * - il n'est pas l'auteur du projet (aucune route ne le fait testeur du sien, la condition le redit).
+ *
+ * L'auteur, lui, reste prévenu des messages de ses testeurs même quand son coin est fermé : il le
+ * relit (décision de la session sur TW-A3), et un fil d'un ancien testeur lui reste lisible.
+ *
+ * Jamais le texte d'un message : le fil est privé ; seul l'extrait d'un appel (que tous les
+ * testeurs lisent) est montré. `during` : la fenêtre de dates (voir sources) ; `now` : l'heure de
+ * l'API, pour la suspension.
+ */
+const testerSources = (me: string, during: (column: string) => SQL, now: Date): SQL => {
+  const authorActive = sql`(select 1 from account_suspension author_sus
+      where author_sus.user_id = project.author_id and ${activeSuspensionSql('author_sus', now)}
+      limit 1) is null`
+  return sql`
+    -- 12. Les appels à tester des projets qu'il teste, lancés après son inscription (comme R7a,
+    --     sécurité S1 : il n'a pas demandé à être prévenu de ceux d'avant), ni retirés ni supprimés.
+    --     Index : la clé primaire de project_tester (ses inscriptions), puis
+    --     tester_call_project_created_idx (project_id, created_at desc), qui borne la date.
+    select 'tester_call', 'tester_call:' || tc.id, tc.created_at,
+      project.id, null, null, project.author_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, tc.id
+    from project_tester t
+    join project on project.id = t.project_id
+    join tester_call tc on tc.project_id = t.project_id and tc.created_at > t.created_at
+    where t.member_id = ${me} and tc.removed_at is null and ${during('tc.created_at')}
+      and project.author_id <> ${me} and ${listedProjectFor(me)} and ${authorActive}
+
+    union all
+
+    -- 13. Les messages de l'autre personne d'un fil, non retirés (un retrait ne prévient que son
+    --     expéditeur, source 7). Deux côtés :
+    --     - testeur actuel : les réponses de l'auteur dans son propre fil. Index : ses
+    --       inscriptions, puis tester_message_thread_created_idx (project_id, tester_id,
+    --       created_at desc), qui borne la date ;
+    --     - auteur : les retours et réponses de chaque testeur dans les fils de ses projets
+    --       (expéditeur = le testeur du fil), sauf d'un membre bloqué avec lui (notBlockedWith, par
+    --       les index de member_block). Index : project_author_created_idx (ses projets), puis le
+    --       même index des messages, par project_id.
+    --     author_id porte l'expéditeur : la notification le nomme (« from »).
+    select 'tester_message', 'tester_message:' || m.id, m.created_at,
+      project.id, null, null, m.sender_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, m.id
+    from project_tester t
+    join project on project.id = t.project_id
+    join tester_message m on m.project_id = t.project_id and m.tester_id = t.member_id
+    where t.member_id = ${me} and m.sender_id = project.author_id and m.removed_at is null
+      and ${during('m.created_at')}
+      and project.author_id <> ${me} and ${listedProjectFor(me)} and ${authorActive}
+
+    union all
+
+    select 'tester_message', 'tester_message:' || m.id, m.created_at,
+      project.id, null, null, m.sender_id, null, null, null, null, null, null, null,
+      null, null, null, null, null, null, m.id
+    from project
+    join tester_message m on m.project_id = project.id
+    where project.author_id = ${me} and m.sender_id = m.tester_id and m.sender_id <> ${me}
+      and m.removed_at is null and ${during('m.created_at')}
+      and ${notBlockedWith(me, sql.raw('m.sender_id'))}
+
+    union all
+
+    -- 14. Ses retours réglés, datés du réglage (settled_at) : à la main, ou par une mise à jour
+    --     (settled_update_id, dans la colonne update_id : loadDetailedRows la relit). « Remettre à
+    --     traiter » efface settled_at : la notification disparaît ; réglé de nouveau, elle revient
+    --     à la nouvelle date. Mêmes index que le premier côté de la source 13.
+    select 'feedback_settled', 'feedback_settled:' || m.id, m.settled_at,
+      project.id, null, null, project.author_id, null, null, null, null, null, null, null,
+      null, m.settled_update_id, null, null, null, null, m.id
+    from project_tester t
+    join project on project.id = t.project_id
+    join tester_message m on m.project_id = t.project_id and m.tester_id = t.member_id
+    where t.member_id = ${me} and m.sender_id = ${me} and m.kind = 'feedback'
+      and m.settled_at is not null and m.removed_at is null and ${during('m.settled_at')}
+      and project.author_id <> ${me} and ${listedProjectFor(me)} and ${authorActive}
+  `
+}
 
 /**
  * Les six sources de la tranche 6b (réactions, abonnés, commentaires, masquages, pseudo), avec
@@ -457,9 +585,9 @@ const socialSources = (me: string, during: (column: string) => SQL): SQL => {
   `
 }
 
-/** Les six colonnes des sources 7 à 11, à reprendre dans chaque lecture. */
+/** Les six colonnes des sources 7 à 11, et item_id (R7b), à reprendre dans chaque lecture. */
 const moderationColumns = sql.raw(
-  'target_kind, update_id, decision_id, outcome, member_id, suspension_id',
+  'target_kind, update_id, decision_id, outcome, member_id, suspension_id, item_id',
 )
 
 // ─── Le marque-page ─────────────────────────────────────────────────────────────────────────────
@@ -515,6 +643,9 @@ const ListRow = z.object({
     'suspended',
     'suspension_ended',
     'project_update',
+    'tester_call',
+    'tester_message',
+    'feedback_settled',
   ]),
   key: z.string(),
   at: z.string(),
@@ -555,6 +686,17 @@ const ListRow = z.object({
   project_hidden: z.boolean(),
   ends_at: z.string().nullable(),
   lifted: z.boolean(),
+  // R7b : la mise à jour qui a réglé un retour (sa date, et si elle est retirée) ; l'appel (son
+  // texte, que tous ses testeurs lisent) ; le message (sa sorte et son fil ; son texte seulement
+  // pour la notification de son retrait, que seul son expéditeur reçoit).
+  update_created_at: z.string().nullable(),
+  update_removed: z.boolean(),
+  call_id: z.string().nullable(),
+  call_text: z.string().nullable(),
+  message_id: z.string().nullable(),
+  message_kind: z.enum(['feedback', 'reply']).nullable(),
+  message_tester_id: z.string().nullable(),
+  message_text: z.string().nullable(),
 })
 export type ListRow = z.infer<typeof ListRow>
 
@@ -569,6 +711,16 @@ export const excerptOf = (body: string) => {
   if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1)
   return `${cut.trimEnd()}…`
 }
+
+/**
+ * Le membre nommé par une notification du coin des testeurs (R7b) : son nom et sa photo, déjà
+ * montrés dans le coin. À n'appeler qu'une fois `author_id` et `author_name` vérifiés non nuls.
+ */
+const authorOf = (row: ListRow, publicApiUrl: string) => ({
+  id: row.author_id ?? '',
+  name: row.author_name ?? '',
+  avatarUrl: row.author_avatar_key ? mediaUrl(publicApiUrl, row.author_avatar_key) : null,
+})
 
 /**
  * Une ligne en notification du contrat ; null si ce qu'elle montre a disparu entre-temps (le
@@ -663,6 +815,49 @@ export const present = (
         },
       }
     }
+    // R7b, le coin des testeurs. `author_id` est l'auteur du projet (un appel, un retour réglé) ou
+    // l'expéditeur du message ; son compte supprimé entre-temps : rien n'est montré.
+    case 'tester_call': {
+      // L'appel supprimé entre-temps (la jointure ne le trouve plus) : rien n'est montré.
+      const excerpt = row.call_text === null ? null : testerExcerptOf(row.call_text)
+      if (!project || row.author_id === null || row.author_name === null) return null
+      if (row.call_id === null || excerpt === null) return null
+      const call = { id: row.call_id, excerpt }
+      return { ...common, kind: 'tester_call', project, author: authorOf(row, publicApiUrl), call }
+    }
+    case 'tester_message': {
+      if (!project || row.author_id === null || row.author_name === null) return null
+      if (row.message_id === null || row.message_kind === null || row.message_tester_id === null) {
+        return null
+      }
+      return {
+        ...common,
+        kind: 'tester_message',
+        project,
+        from: authorOf(row, publicApiUrl),
+        // L'expéditeur est le testeur du fil, ou bien l'auteur du projet.
+        role: row.author_id === row.message_tester_id ? 'tester' : 'author',
+        message: { id: row.message_id, kind: row.message_kind, testerId: row.message_tester_id },
+      }
+    }
+    case 'feedback_settled': {
+      if (!project || row.author_id === null || row.author_name === null) return null
+      if (row.message_id === null) return null
+      // Réglé par une mise à jour : sa version et sa date. Réglé à la main, mise à jour supprimée
+      // (la clé étrangère passe à null) ou retirée par la modération (comme dans le fil, relecture
+      // de sécurité A10) : null, la notification dit seulement « réglé ».
+      const update =
+        row.update_id !== null && row.update_created_at !== null && !row.update_removed
+          ? { id: row.update_id, version: row.update_version, createdAt: row.update_created_at }
+          : null
+      return {
+        ...common,
+        kind: 'feedback_settled',
+        project,
+        author: authorOf(row, publicApiUrl),
+        update,
+      }
+    }
     case 'removed': {
       // Le fondement, l'explication et « après un signalement », lus avec la décision ; jamais qui
       // a décidé ni qui a signalé (règle 14).
@@ -679,9 +874,31 @@ export const present = (
       if (
         !project ||
         !removal ||
-        (targetKind !== 'project' && targetKind !== 'update' && targetKind !== 'comment')
+        (targetKind !== 'project' &&
+          targetKind !== 'update' &&
+          targetKind !== 'comment' &&
+          targetKind !== 'call' &&
+          targetKind !== 'message')
       ) {
         return null
+      }
+      // R7b : un appel ou un message retiré. Supprimé entre-temps par son auteur (la jointure ne le
+      // trouve plus) : plus de notification. Un retour sans texte (« Ça a marché ? » suffit) n'a
+      // pas d'extrait : la notification reste, sans extrait.
+      if (targetKind === 'call' || targetKind === 'message') {
+        const text = targetKind === 'call' ? row.call_text : row.message_text
+        if (targetKind === 'call' ? row.call_id === null : row.message_id === null) return null
+        return {
+          ...common,
+          kind: 'removed',
+          targetKind,
+          project,
+          excerpt: text === null ? null : testerExcerptOf(text),
+          ground: removal.ground,
+          explanation: removal.explanation,
+          afterReport: removal.afterReport,
+          projectHidden: row.project_hidden,
+        }
       }
       // L'extrait d'une mise à jour (sa première ligne lisible, R7a) ou d'un commentaire retiré :
       // son texte actuel, que son auteur lit encore. Disparu entre-temps : plus de notification.
@@ -779,7 +996,15 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
           adminId: sql.raw('md.admin_id'),
         })}) end as after_report,
       to_char(sus.ends_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as ends_at,
-      (sus.lift_decision_id is not null) as lifted
+      (sus.lift_decision_id is not null) as lifted,
+      -- R7b : la mise à jour qui a réglé un retour ; l'appel ; le message. Le texte d'un message
+      -- ne sort que pour la notification de son retrait (son expéditeur seul la reçoit) : le fil
+      -- est privé, rien d'autre n'en a besoin.
+      to_char(pu.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as update_created_at,
+      (pu.removed_at is not null) as update_removed,
+      tc.id as call_id, tc.text as call_text,
+      tm.id as message_id, tm.kind as message_kind, tm.tester_id as message_tester_id,
+      case when n.kind = 'removed' then tm.text end as message_text
     from (${chosen}) n
     left join project on project.id = n.project_id
     -- « lateral » : une sous-requête qui lit les colonnes des tables déjà jointes (ici, l'auteur du
@@ -799,6 +1024,12 @@ const loadDetailedRows = async (db: Database, me: string, chosen: SQL) => {
     left join moderation_decision md on md.id = n.decision_id
     -- Tranche 7c : la suspension d'une notification de suspension ou de fin (clé primaire).
     left join account_suspension sus on sus.id = n.suspension_id
+    -- R7b : l'appel ou le message de item_id, par la clé primaire de sa table. La sorte de la
+    -- notification dit dans quelle table chercher.
+    left join tester_call tc on tc.id = n.item_id
+      and (n.kind = 'tester_call' or n.target_kind = 'call')
+    left join tester_message tm on tm.id = n.item_id
+      and (n.kind in ('tester_message', 'feedback_settled') or n.target_kind = 'message')
     order by n.at desc, n.key desc
   `
   return z.object({ rows: z.array(ListRow) }).parse(await db.execute(query)).rows
