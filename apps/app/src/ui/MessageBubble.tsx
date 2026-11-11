@@ -133,7 +133,7 @@ export function MessageBubble({
 
   // Le nom du « … » : le début du texte (plusieurs messages se suivent) ; sans texte, à qui il est.
   const menuLabel = text
-    ? t(($) => $.project.testers.thread.menu, { excerpt: excerpt(text, 40) })
+    ? t(($) => $.project.testers.thread.menu, { excerpt: excerpt(text) })
     : mine
       ? t(($) => $.project.testers.thread.menuMineNoText)
       : t(($) => $.project.testers.thread.menuNoText, { nameOf: nameOf(name) })
@@ -293,7 +293,7 @@ export function MessageBubble({
     >
       {Platform.OS === 'web' ? null : (
         <View style={hiddenFrame} pointerEvents="none">
-          <Text>{spokenName}</Text>
+          <Text accessibilityLabel={spokenName}>{spokenName}</Text>
         </View>
       )}
       {/* La bulle et son « … » : la rangée a la largeur de la colonne, la bulle la sienne (80 % au

@@ -128,14 +128,9 @@ export function ThreadRow({
       >
         <Avatar name={name} source={avatar} label={name} size={AVATAR} />
       </View>
-      {/* Tout ce qui est écrit est dans le nom ou la description du lien : caché aux lecteurs
-          d'écran, qui l'entendraient deux fois. */}
-      <View
-        aria-hidden
-        importantForAccessibility="no-hide-descendants"
-        accessibilityElementsHidden
-        style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xxs }}
-      >
+      {/* Ce qui est écrit : le nom du lien (`accessibilityLabel`, `aria-label`) l'emporte déjà sur
+          son contenu pour les lecteurs d'écran, qui ne l'entendent pas deux fois. */}
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: space.xxs }}>
         {/* Le nom, puis la date à droite ; à texte agrandi, la date passe à la ligne. */}
         <View
           style={{
