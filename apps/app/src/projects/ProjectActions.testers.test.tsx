@@ -1,13 +1,20 @@
-// Tests des testeurs sur la page d'un projet (R7a, ProjectActions et sa feuille TesterSheet) :
-// « Rejoindre les testeurs » à côté de « Suivre ce projet », seulement pour un autre membre sur un
-// projet « Testable » qui a une démo ; la feuille qui explique, la bulle, « Tu testes ce projet » qui
-// reçoit le focus ; la feuille « Tu testes ce projet » et « Quitter les testeurs » ; les refus de
-// l'API dits dans la feuille ; le nombre de testeurs pour l'auteur seul. Textes sans genre
-// (décision de Louis du 10/11/2026).
+// Tests des testeurs sur la page d'un projet (R7a, puis R7b ; ProjectActions et sa feuille
+// TesterSheet) : « Rejoindre les testeurs » à côté de « Suivre ce projet », seulement pour un autre
+// membre sur un projet « Testable » qui a une démo, et que l'auteur n'a pas retiré
+// (`testerJoinable`) ; la feuille qui explique, la bulle, puis, une fois inscrit, « Le coin des
+// testeurs » (R7b), un lien vers la page du coin, au même endroit, qui garde le focus. La feuille
+// « Tu testes ce projet » disparaît : on quitte les testeurs depuis le coin, ou depuis le menu « … »
+// de la page (ProjectScreen.testers.test.tsx). Les refus de l'API dits dans la feuille ; pour
+// l'auteur, « Le coin des testeurs » à côté de « 12 testeurs ». Textes sans genre (décision de
+// Louis du 10/11/2026).
 //
 // Les vrais hooks (`testers/api.ts`) tournent ici, sur un faux réseau (`api/client`) qui joue le
 // serveur : la page lit le projet dans le cache, comme ProjectScreen, et voit donc `isTester` changer
 // au toucher. Le focus passe par une aide de `ui/focus.ts` (Sheet et les écrans s'en servent).
+//
+// Ce que ces tests supposent du code (plan R7b, « Écrans et modules », ui-A10) : « Le coin des
+// testeurs » est un lien (rôle `link`) ou un bouton ; il mène à `/projects/<id>/testers` par le
+// routeur (`push` ou `navigate`, adresse en texte ou `{ pathname: '/projects/[id]/testers' }`).
 import { palettes } from '@ruche/brand'
 import type { Project } from '@ruche/contracts'
 import { useQuery } from '@tanstack/react-query'
@@ -30,9 +37,17 @@ jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
 jest.mock('../profile/api', () => ({ getMe: jest.fn() }))
 jest.mock('../follows/api', () => ({ useFollow: jest.fn() }))
 jest.mock('../api/client', () => ({ request: jest.fn(), requestWithoutBody: jest.fn() }))
+// Le routeur : le même objet à chaque appel, pour que le test lise où « Le coin des testeurs » mène.
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  navigate: jest.fn(),
+  dismissTo: jest.fn(),
+}
 jest.mock('expo-router', () => ({
   usePathname: () => '/projects/p1',
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() }),
+  useRouter: () => mockRouter,
 }))
 // Les aides de focus, telles quelles, mais dont le test lit les appels.
 jest.mock('../ui/focus', () => {
@@ -46,8 +61,9 @@ jest.mock('../ui/focus', () => {
 })
 
 const JOIN = fr.t(($) => $.project.testers.join)
-const JOINED = fr.t(($) => $.project.testers.joined)
-const QUIT = fr.t(($) => $.project.testers.quit)
+const CORNER = fr.t(($) => $.project.testers.corner)
+// Le libellé de R7a, écrit en toutes lettres : sa clé (`joined`) part avec la feuille « membre ».
+const OLD_JOINED = 'Tu testes ce projet'
 const title = recipesProject.title
 
 /** Le projet de Léa, vu par Inès : « Testable », avec une démo, suivi par deux membres. */
@@ -58,7 +74,10 @@ const seenByInes: Project = {
   followerCount: 2,
   isTester: false,
   testerCount: null,
+  testerJoinable: true,
 }
+/** Le même, Inès étant inscrite aux testeurs. */
+const tester: Project = { ...seenByInes, isTester: true }
 
 const mockToggle = jest.fn()
 /** Ce que le faux serveur sait du projet ; la page le relit après chaque geste. */
@@ -97,6 +116,28 @@ const serverAccepts = () =>
     return { ok: true, data: null }
   })
 
+/** « Le coin des testeurs » : un lien, ou un bouton (ui-A10 demande un lien). */
+const queryCorner = () =>
+  screen.queryByRole('link', { name: CORNER }) ?? screen.queryByRole('button', { name: CORNER })
+const findCorner = async () => {
+  await waitFor(() => expect(queryCorner()).not.toBeNull())
+  const found = queryCorner()
+  if (!found) throw new Error('No « Le coin des testeurs »')
+  return found
+}
+
+/** Les adresses où le routeur a mené, en texte (« /projects/<id>/testers »). */
+const visitedPaths = () =>
+  [...mockRouter.push.mock.calls, ...mockRouter.navigate.mock.calls].map(([to]) => {
+    if (typeof to === 'string') return to
+    const { pathname, params } = to as { pathname: string; params?: Record<string, string> }
+    return Object.entries(params ?? {}).reduce(
+      (path, [key, value]) => path.replace(`[${key}]`, value),
+      pathname,
+    )
+  })
+const cornerPath = `/projects/${seenByInes.id}/testers`
+
 /** Ouvre la feuille d'inscription, puis attend la fin de sa garde contre la double tape. */
 const openJoinSheet = async () => {
   const pageButton = screen.getByRole('button', { name: JOIN })
@@ -124,13 +165,16 @@ const backgrounds = (node: Node): unknown[] => {
   return own === undefined ? inner : [own, ...inner]
 }
 
-/** Une aide de focus a-t-elle reçu le bouton « Tu testes ce projet » ? */
-const focusWentToJoined = () =>
+/** Les contrôles de la page (bouton, lien, interrupteur), dans l'ordre de lecture. */
+const controls = () => screen.getAllByRole(/^(button|link|switch)$/)
+
+/** Une aide de focus a-t-elle reçu l'élément nommé ainsi ? */
+const focusWentTo = (name: string) =>
   [
     ...jest.mocked(focusWithoutScroll).mock.calls,
     ...jest.mocked(focusAndReveal).mock.calls,
     ...jest.mocked(moveReaderTo).mock.calls,
-  ].some(([node]) => labelOf(node) === JOINED)
+  ].some(([node]) => labelOf(node) === name)
 
 beforeEach(() => {
   mockSession({ user: { id: 'u3', name: 'Inès' } })
@@ -142,6 +186,7 @@ beforeEach(() => {
     .mockReturnValue({ toggle: mockToggle, error: false, expired: false })
   jest.mocked(requestWithoutBody).mockReset()
   serverAccepts()
+  for (const fn of Object.values(mockRouter)) fn.mockClear()
   jest.mocked(focusWithoutScroll).mockClear()
   jest.mocked(focusAndReveal).mockClear()
   jest.mocked(moveReaderTo).mockClear()
@@ -175,13 +220,24 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
   })
 
+  // R7b (plan validé du 11/11/2026) : l'API refuse la réinscription d'un membre retiré par l'auteur ;
+  // l'appli ne lui propose pas le bouton (`testerJoinable` faux), sans dire pourquoi.
+  it('offers no « Rejoindre les testeurs » to a member the author removed from the testers', async () => {
+    await renderPage({ ...seenByInes, testerJoinable: false })
+
+    // Témoin : le projet cherche des testeurs, et la page est là.
+    expect(screen.getByRole('switch', { name: 'Suivre ce projet' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Tester la démo' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
+    expect(queryCorner()).toBeNull()
+  })
+
   it('never offers « Rejoindre les testeurs » to the author, who sees « 12 testeurs » beside the followers', async () => {
     await renderPage({ ...recipesProject, testerCount: 12, followerCount: 12 })
 
     expect(screen.getByText(fr.t(($) => $.follow.followers, { count: 12 }))).toBeTruthy()
     expect(screen.getByText('12 testeurs')).toBeTruthy()
     expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
-    expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
   })
 
   it('says « 1 testeur » to the author, in the singular', async () => {
@@ -191,7 +247,7 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
   })
 
   it('never shows the number of testers to another member', async () => {
-    await renderPage({ ...seenByInes, isTester: true })
+    await renderPage(tester)
 
     // Témoin : la ligne des abonnés est là.
     expect(screen.getByText(fr.t(($) => $.follow.followers, { count: 2 }))).toBeTruthy()
@@ -232,6 +288,20 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     expect(testerRequests()).toEqual([])
   })
 
+  // Juridique J4 : la feuille dit ce que l'auteur verra (la date d'inscription), le badge que tous
+  // les lecteurs des commentaires verront, et que les retours restent privés. Le texte est celui du
+  // contrat : ce test passe dès lors que la feuille montre `joinBody`.
+  it('names the badge, the inscription date and the private feedback in the join sheet', async () => {
+    await renderPage()
+    await openJoinSheet()
+
+    const body = fr.t(($) => $.project.testers.joinBody, { name: 'Léa', title })
+    expect(screen.getByText(body)).toBeTruthy()
+    expect(body).toMatch(/badge\s«\sTesteur\s»/)
+    expect(body).toMatch(/date d’inscription/)
+    expect(body).toMatch(/aucun autre membre ne lit/)
+  })
+
   it('closes on « Annuler » without joining', async () => {
     await renderPage()
     await openJoinSheet()
@@ -245,7 +315,7 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     expect(screen.getByRole('button', { name: JOIN })).toBeTruthy()
   })
 
-  it('joins on confirmation: one request, a bubble, and the button becomes « Tu testes ce projet »', async () => {
+  it('joins on confirmation: one request, a bubble, and the button becomes « Le coin des testeurs »', async () => {
     await renderPage()
     const pageButton = await openJoinSheet()
 
@@ -255,13 +325,17 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     expect(
       await screen.findByText(fr.t(($) => $.project.testers.joinedToast, { title })),
     ).toBeTruthy()
-    expect(await screen.findByRole('button', { name: JOINED })).toBeTruthy()
+    expect(await findCorner()).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('header', { name: JOIN })).toBeNull())
     expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
+    expect(screen.queryByText(OLD_JOINED)).toBeNull()
   })
 
-  it('puts focus on « Tu testes ce projet » after confirming', async () => {
+  // Interface A10 : un seul élément pour les deux libellés, à la même place (sous « Suivre ce
+  // projet »), et le focus y arrive après la feuille.
+  it('turns « Rejoindre les testeurs » into « Le coin des testeurs » in place, focus kept', async () => {
     await renderPage()
+    const placeBefore = controls().indexOf(screen.getByRole('button', { name: JOIN }))
     const pageButton = await openJoinSheet()
     jest.mocked(focusWithoutScroll).mockClear()
     jest.mocked(focusAndReveal).mockClear()
@@ -269,22 +343,28 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
 
     await fireEvent.press(sheetConfirm(pageButton))
 
-    await screen.findByRole('button', { name: JOINED })
-    await waitFor(() => expect(focusWentToJoined()).toBe(true))
+    const corner = await findCorner()
+    await waitFor(() => expect(screen.queryByRole('header', { name: JOIN })).toBeNull())
+    // À la même place parmi les contrôles de la page : juste après « Suivre ce projet ».
+    expect(controls().indexOf(corner)).toBe(placeBefore)
+    expect(controls().indexOf(corner)).toBe(
+      controls().indexOf(screen.getByRole('switch', { name: 'Suivre ce projet' })) + 1,
+    )
+    await waitFor(() => expect(focusWentTo(CORNER)).toBe(true))
   })
 
-  // ui-C5 : sur téléphone, `focusWithoutScroll` ne fait rien ; le lecteur d'écran est amené sur le
-  // bouton par `moveReaderTo`, sinon il repartirait du haut quand la feuille disparaît.
-  it('moves the screen reader to « Tu testes ce projet » after confirming (phone)', async () => {
+  // ui-C5 (R7a) : sur téléphone, `focusWithoutScroll` ne fait rien ; le lecteur d'écran est amené
+  // sur le lien, sinon il repartirait du haut quand la feuille disparaît.
+  it('moves the screen reader to « Le coin des testeurs » after confirming (phone)', async () => {
     await renderPage()
     const pageButton = await openJoinSheet()
     jest.mocked(moveReaderTo).mockClear()
 
     await fireEvent.press(sheetConfirm(pageButton))
 
-    await screen.findByRole('button', { name: JOINED })
+    await findCorner()
     await waitFor(() =>
-      expect(jest.mocked(moveReaderTo).mock.calls.some(([node]) => labelOf(node) === JOINED)).toBe(
+      expect(jest.mocked(moveReaderTo).mock.calls.some(([node]) => labelOf(node) === CORNER)).toBe(
         true,
       ),
     )
@@ -329,19 +409,25 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
     expect(await screen.findByText(fr.t(($) => $.project.testers.full))).toBeTruthy()
     // La feuille reste ouverte, et la page n'a pas cru l'inscription faite.
     expect(screen.getByRole('header', { name: JOIN })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
+    expect(queryCorner()).toBeNull()
     expect(screen.queryByText(/200/)).toBeNull()
   })
 
-  it('says in the sheet that the project no longer looks for testers (409 not_testable)', async () => {
+  // Juridique J6 : le 409 `not_testable` répond aussi à un membre retiré par l'auteur (qui arrive
+  // sur une page restée ouverte). La phrase reste vraie pour toutes les causes : jamais « ne cherche
+  // plus de testeurs », qui serait faux pour lui. Le texte est celui du contrat.
+  it('shows a removed member a refusal that stays true for every cause', async () => {
     jest.mocked(requestWithoutBody).mockResolvedValue({ ok: false, error: 'notTestable' })
     await renderPage()
     const pageButton = await openJoinSheet()
 
     await fireEvent.press(sheetConfirm(pageButton))
 
-    expect(await screen.findByText(fr.t(($) => $.project.testers.notTestable))).toBeTruthy()
-    expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
+    const refusal = fr.t(($) => $.project.testers.notTestable)
+    expect(await screen.findByText(refusal)).toBeTruthy()
+    expect(refusal).not.toMatch(/cherche plus/)
+    expect(refusal).not.toMatch(/retiré/)
+    expect(queryCorner()).toBeNull()
   })
 
   it('says in the sheet when joining failed for a reason that trying again can fix', async () => {
@@ -357,126 +443,71 @@ describe('« Rejoindre les testeurs » on the page of a project (R7a)', () => {
   })
 })
 
-describe('« Tu testes ce projet » and « Quitter les testeurs » (R7a)', () => {
-  const tester: Project = { ...seenByInes, isTester: true }
-
-  /** Ouvre la feuille « Tu testes ce projet », puis attend la fin de sa garde. */
-  const openMemberSheet = async () => {
-    await fireEvent.press(screen.getByRole('button', { name: JOINED }))
-    expect(await screen.findByRole('header', { name: JOINED })).toBeTruthy()
-    await passTapGuard()
-  }
-
-  it('opens a sheet « Tu testes ce projet » with « Quitter les testeurs » and « Fermer »', async () => {
+describe('« Le coin des testeurs » for a tester (R7b)', () => {
+  it('shows « Le coin des testeurs » under « Suivre ce projet », never « Tu testes ce projet »', async () => {
     await renderPage(tester)
 
-    await openMemberSheet()
-
-    expect(screen.getByText(fr.t(($) => $.project.testers.memberBody, { title }))).toBeTruthy()
-    expect(screen.getByRole('button', { name: QUIT })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Fermer' }).length).toBeGreaterThan(0)
-    expect(testerRequests()).toEqual([])
-  })
-
-  it('quits the testers: one request, a bubble, and the button is « Rejoindre les testeurs » again', async () => {
-    await renderPage(tester)
-    await openMemberSheet()
-
-    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
-
-    expect(testerRequests()).toEqual(['DELETE'])
-    expect(
-      await screen.findByText(fr.t(($) => $.project.testers.quitToast, { title })),
-    ).toBeTruthy()
-    expect(await screen.findByRole('button', { name: JOIN })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
-  })
-
-  it('moves the screen reader to « Rejoindre les testeurs » after quitting (phone)', async () => {
-    await renderPage(tester)
-    await openMemberSheet()
-    jest.mocked(moveReaderTo).mockClear()
-
-    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
-
-    await screen.findByRole('button', { name: JOIN })
-    await waitFor(() =>
-      expect(jest.mocked(moveReaderTo).mock.calls.some(([node]) => labelOf(node) === JOIN)).toBe(
-        true,
-      ),
+    const corner = await findCorner()
+    expect(controls().indexOf(corner)).toBe(
+      controls().indexOf(screen.getByRole('switch', { name: 'Suivre ce projet' })) + 1,
     )
-  })
-
-  it('does not quit on the second tap of a double tap on « Tu testes ce projet »', async () => {
-    await renderPage(tester)
-
-    await fireEvent.press(screen.getByRole('button', { name: JOINED }))
-    await screen.findByRole('header', { name: JOINED })
-    // La seconde tape, 180 ms après la première, tombe sur « Quitter les testeurs ».
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 180)))
-    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
-
-    expect(testerRequests()).toEqual([])
-    expect(screen.getByRole('button', { name: JOINED })).toBeTruthy()
-  })
-
-  it('closes on « Fermer » without quitting', async () => {
-    await renderPage(tester)
-    await openMemberSheet()
-
-    const [close] = screen.getAllByRole('button', { name: 'Fermer' })
-    if (!close) throw new Error('The sheet has no « Fermer »')
-    await fireEvent.press(close)
-
-    await waitFor(() => expect(screen.queryByRole('header', { name: JOINED })).toBeNull())
-    expect(testerRequests()).toEqual([])
-    expect(screen.getByRole('button', { name: JOINED })).toBeTruthy()
-  })
-
-  it('says the departure failed, and keeps « Tu testes ce projet »', async () => {
-    jest.mocked(requestWithoutBody).mockResolvedValue({ ok: false, error: 'network' })
-    await renderPage(tester)
-    await openMemberSheet()
-
-    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
-
-    expect(await screen.findByText(fr.t(($) => $.project.testers.quitError))).toBeTruthy()
+    expect(screen.queryByText(OLD_JOINED)).toBeNull()
     expect(screen.queryByRole('button', { name: JOIN })).toBeNull()
   })
 
-  // Juridique P3, interface A5 : ce qui permet de partir reste quand la condition pour entrer tombe.
+  it('leads to the testers corner of the project, without a sheet and without a request', async () => {
+    await renderPage(tester)
+
+    await fireEvent.press(await findCorner())
+
+    expect(visitedPaths()).toEqual([cornerPath])
+    // La feuille « membre » de R7a n'existe plus : rien ne s'ouvre sur la page.
+    expect(screen.queryByRole('header', { name: OLD_JOINED })).toBeNull()
+    expect(screen.queryByRole('button', { name: fr.t(($) => $.project.testers.quit) })).toBeNull()
+    expect(testerRequests()).toEqual([])
+  })
+
+  it('keeps « Le coin des testeurs » out of honey', async () => {
+    await renderPage(tester)
+
+    const corner = await findCorner()
+    expect(backgrounds(corner as unknown as Node)).not.toContain(palettes.day.honey)
+  })
+
+  // Juridique P3, interface A5 (R7a) : ce qui mène à son fil et au départ reste quand la condition
+  // pour entrer tombe. Un projet en pause ou terminé garde son coin (seuls un retrait, le privé ou la
+  // suspension de l'auteur le ferment).
   it.each(['idea', 'building', 'paused', 'done'] as const)(
-    'keeps « Tu testes ce projet » on a project that is no longer testable (%s)',
+    'keeps « Le coin des testeurs » on a project that is no longer testable (%s)',
     async (status) => {
       await renderPage({ ...tester, status })
 
-      await openMemberSheet()
-      await fireEvent.press(screen.getByRole('button', { name: QUIT }))
+      await fireEvent.press(await findCorner())
 
-      expect(testerRequests()).toEqual(['DELETE'])
+      expect(visitedPaths()).toEqual([cornerPath])
     },
   )
 
-  it('keeps « Tu testes ce projet » on a project whose demo is gone', async () => {
+  it('keeps « Le coin des testeurs » on a project whose demo is gone', async () => {
     await renderPage({ ...tester, demoUrl: null })
 
-    expect(screen.getByRole('button', { name: JOINED })).toBeTruthy()
+    expect(await findCorner()).toBeTruthy()
   })
 
-  it('lets a suspended tester quit', async () => {
+  it('keeps « Le coin des testeurs » for a suspended tester, who can still read it and leave', async () => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
     await renderPage(tester)
     // Le profil se lit après le premier rendu : on attend que la suspension soit connue.
     await waitFor(() => expect(getMe).toHaveBeenCalled())
     await act(async () => {})
 
-    await openMemberSheet()
-    await fireEvent.press(screen.getByRole('button', { name: QUIT }))
-
-    expect(testerRequests()).toEqual(['DELETE'])
+    const corner = await findCorner()
+    expect(corner).not.toBeDisabled()
+    await fireEvent.press(corner)
+    expect(visitedPaths()).toEqual([cornerPath])
   })
 
-  // Juridique T5 : ne plus suivre ne fait pas quitter les testeurs ; la bulle le dit.
+  // Juridique T5 (R7a) : ne plus suivre ne fait pas quitter les testeurs ; la bulle le dit.
   it('says one stays a tester when unfollowing a project one tests', async () => {
     await renderPage({ ...tester, isFollowed: true, followerCount: 3 })
 
@@ -496,5 +527,60 @@ describe('« Tu testes ce projet » and « Quitter les testeurs » (R7a)', () =>
     expect(mockToggle).toHaveBeenCalledWith(true)
     await act(async () => {})
     expect(screen.queryByText(fr.t(($) => $.project.testers.stillTester))).toBeNull()
+  })
+})
+
+describe('« Le coin des testeurs » for the author (R7b, planche validée 2)', () => {
+  const mine: Project = { ...recipesProject, testerCount: 12, followerCount: 12 }
+
+  it('shows the author « Le coin des testeurs » with « 12 testeurs » beside it', async () => {
+    await renderPage(mine)
+
+    expect(await findCorner()).toBeTruthy()
+    expect(screen.getByText('12 testeurs')).toBeTruthy()
+    // Témoin : « Modifier » reste à l'auteur.
+    expect(screen.getByRole('button', { name: fr.t(($) => $.project.page.edit) })).toBeTruthy()
+  })
+
+  it('leads the author to the testers corner of the project', async () => {
+    await renderPage(mine)
+
+    await fireEvent.press(await findCorner())
+
+    expect(visitedPaths()).toEqual([cornerPath])
+  })
+
+  it('offers the corner on a testable project that has no tester yet, beside « 0 testeur »', async () => {
+    await renderPage({ ...mine, testerCount: 0 })
+
+    expect(await findCorner()).toBeTruthy()
+    expect(screen.getByText('0 testeur')).toBeTruthy()
+  })
+
+  it('offers the corner on a paused project that still has testers', async () => {
+    await renderPage({ ...mine, status: 'paused', testerCount: 3 })
+
+    expect(await findCorner()).toBeTruthy()
+  })
+
+  it('offers no corner on a project that never looked for testers', async () => {
+    await renderPage({ ...mine, status: 'idea', testerCount: 0 })
+
+    // Témoin : « Modifier » est là.
+    expect(screen.getByRole('button', { name: fr.t(($) => $.project.page.edit) })).toBeTruthy()
+    expect(queryCorner()).toBeNull()
+  })
+
+  // Plan R7b validé du 11/11/2026 : un coin fermé (auteur suspendu) reste lisible par l'auteur, qui y lit
+  // le bandeau du coin fermé ; il ne peut plus y écrire.
+  it('keeps the corner for a suspended author, who still reads it', async () => {
+    jest.mocked(getMe).mockResolvedValue(suspendedMe)
+    await renderPage(mine)
+    await waitFor(() => expect(getMe).toHaveBeenCalled())
+    await act(async () => {})
+
+    await fireEvent.press(await findCorner())
+
+    expect(visitedPaths()).toEqual([cornerPath])
   })
 })

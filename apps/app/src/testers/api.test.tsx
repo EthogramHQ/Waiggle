@@ -89,7 +89,7 @@ describe('useBecomeTester', () => {
       joining = result.current.join()
     })
 
-    // La réponse n'est pas arrivée : la page dit déjà « Tu testes ce projet ».
+    // La réponse n'est pas arrivée : la page montre déjà « Le coin des testeurs ».
     expect(testerInCache()).toBe(true)
     await waitFor(() => expect(result.current.pending).toBe(true))
     await act(async () => {

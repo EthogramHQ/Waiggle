@@ -2,6 +2,7 @@
 // d'un projet « Testable » d'un autre membre, qui n'en est pas testeur, la page dit « Tu veux aider
 // Léa ? », puis le lien « Rejoins les testeurs depuis la page du projet. » qui mène à la page du
 // projet (interface S4). Ouvrir la démo ne rend jamais testeur tout seul : la page n'envoie rien.
+// R7b (juridique J6) : ni la ligne ni le lien pour un membre que l'auteur a retiré des testeurs.
 import type { Project } from '@ruche/contracts'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Linking } from 'react-native'
@@ -170,6 +171,22 @@ describe('the testers line of the page that leaves for a demo (R7a)', () => {
     ).toBeTruthy()
     expect(screen.queryByText(LEAD)).toBeNull()
     expect(screen.queryByRole('link', { name: LINK })).toBeNull()
+  })
+
+  // R7b, juridique J6 : un membre retiré par l'auteur ne peut plus rejoindre (`testerJoinable`
+  // faux) ; la page ne l'y invite pas, sans rien dire du retrait.
+  it('does not invite a member removed by the author to join the testers on the leaving page', async () => {
+    jest.mocked(getProject).mockResolvedValue({ ...seenByInes, testerJoinable: false })
+    await renderWithProviders(<LeavingScreen url={url} project={id} />)
+
+    await settled()
+    // Témoin : la ligne « La démo de … » est là, le projet a bien été lu.
+    expect(
+      screen.getByText(fr.t(($) => $.leaving.from, { title: seenByInes.title, name: 'Léa' })),
+    ).toBeTruthy()
+    expect(screen.queryByText(LEAD)).toBeNull()
+    expect(screen.queryByRole('link', { name: LINK })).toBeNull()
+    expect(screen.queryByText(/retir/)).toBeNull()
   })
 
   it('says nothing of the testers when the address is not the demo of the project', async () => {

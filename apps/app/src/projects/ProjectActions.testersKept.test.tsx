@@ -1,13 +1,16 @@
-// Tests ajoutés en R7a (U5a), à côté de ceux de ProjectActions.testers.test.tsx :
+// Tests ajoutés en R7a (U5a), à côté de ceux de ProjectActions.testers.test.tsx, et adaptés en R7b :
 // les cas que l'écriture du bouton des testeurs a fait naître.
 // - Après un départ qu'on ne peut plus défaire (projet qui ne cherche plus de testeurs, compte
-//   suspendu), le bouton reste à sa place, inactif : la feuille rend le focus à ce bouton, qui ne
-//   doit pas avoir disparu (comme « Suivre ce projet », tranche 7c).
-// - La session expirée se dit dans la feuille, avec « Me reconnecter ».
+//   suspendu), le bouton reste à sa place, inactif : le focus, rendu à la page, ne doit pas tomber
+//   sur un bouton disparu (comme « Suivre ce projet », tranche 7c). R7b : on ne quitte plus depuis
+//   une feuille de ce bouton (il mène au coin), mais depuis le menu « … » de la page ou le coin ;
+//   le départ arrive donc ici comme un projet relu, `isTester` devenu faux.
+// - La session expirée se dit dans la feuille d'inscription, avec « Me reconnecter ».
 // - L'auteur d'un projet qui ne cherche pas de testeurs ne lit pas « 0 testeur ».
 import type { Project } from '@ruche/contracts'
+import type { QueryClient } from '@tanstack/react-query'
 import { useQuery } from '@tanstack/react-query'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { requestWithoutBody } from '../api/client'
 import { useFollow } from '../follows/api'
 import { getMe } from '../profile/api'
@@ -29,8 +32,7 @@ jest.mock('expo-router', () => ({
 }))
 
 const JOIN = fr.t(($) => $.project.testers.join)
-const JOINED = fr.t(($) => $.project.testers.joined)
-const QUIT = fr.t(($) => $.project.testers.quit)
+const CORNER = fr.t(($) => $.project.testers.corner)
 
 const tester: Project = {
   ...recipesProject,
@@ -39,6 +41,7 @@ const tester: Project = {
   followerCount: 2,
   isTester: true,
   testerCount: null,
+  testerJoinable: true,
 }
 
 let mockServer: Project = tester
@@ -62,12 +65,22 @@ const renderPage = async (project: Project) => {
   )
 }
 
-/** Ouvre la feuille « Tu testes ce projet », attend sa garde, puis touche « Quitter les testeurs ». */
-const quitFromSheet = async () => {
-  await fireEvent.press(screen.getByRole('button', { name: JOINED }))
-  await screen.findByRole('header', { name: JOINED })
-  await passTapGuard()
-  await fireEvent.press(screen.getByRole('button', { name: QUIT }))
+/** « Le coin des testeurs » : un lien, ou un bouton. */
+const queryCorner = () =>
+  screen.queryByRole('link', { name: CORNER }) ?? screen.queryByRole('button', { name: CORNER })
+
+/**
+ * Le départ, fait ailleurs sur la page (menu « … ») : le projet relu dit `isTester: false`, comme
+ * le cache le dit au toucher de « Quitter » (`useQuitTester`).
+ */
+const leaveElsewhere = async (queryClient: QueryClient) => {
+  // Témoin : avant le départ, le lien du coin est là, à la place du bouton.
+  await waitFor(() => expect(queryCorner()).not.toBeNull())
+  await act(async () => {
+    queryClient.setQueryData<Project>(['project', tester.id], (shown) =>
+      shown ? { ...shown, isTester: false } : shown,
+    )
+  })
 }
 
 beforeEach(() => {
@@ -86,31 +99,31 @@ beforeEach(() => {
     })
 })
 
-describe('the testers button after leaving (R7a, U5a)', () => {
+describe('the testers button after leaving (R7a, U5a; R7b: leaving happens elsewhere)', () => {
   it('keeps the button in place, inactive, after leaving a project that no longer looks for testers', async () => {
-    await renderPage({ ...tester, status: 'paused' })
+    const { queryClient } = await renderPage({ ...tester, status: 'paused' })
 
-    await quitFromSheet()
+    await leaveElsewhere(queryClient)
 
     const button = await screen.findByRole('button', { name: JOIN })
     expect(button).toBeDisabled()
-    expect(screen.queryByRole('button', { name: JOINED })).toBeNull()
+    expect(queryCorner()).toBeNull()
   })
 
   it('keeps the button in place, inactive, after a suspended tester leaves', async () => {
     jest.mocked(getMe).mockResolvedValue(suspendedMe)
-    await renderPage(tester)
+    const { queryClient } = await renderPage(tester)
     await waitFor(() => expect(getMe).toHaveBeenCalled())
 
-    await quitFromSheet()
+    await leaveElsewhere(queryClient)
 
     expect(await screen.findByRole('button', { name: JOIN })).toBeDisabled()
   })
 
   it('keeps an active « Rejoindre les testeurs » after leaving a testable project', async () => {
-    await renderPage(tester)
+    const { queryClient } = await renderPage(tester)
 
-    await quitFromSheet()
+    await leaveElsewhere(queryClient)
 
     expect(await screen.findByRole('button', { name: JOIN })).not.toBeDisabled()
   })

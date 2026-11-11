@@ -1,9 +1,9 @@
 // Tests de la garde contre la double tape sur les boutons de la feuille (R7a, relecture du plan,
 // interface B1 et B3). Depuis R2, la feuille ignore les tapes sur son voile pendant TAP_GUARD_MS
-// après l'ouverture : elle s'ouvre souvent sous le doigt qui vient de toucher « Tu testes ce projet »
+// après l'ouverture : elle s'ouvre souvent sous le doigt qui vient de toucher « Rejoindre les testeurs »
 // ou « Publier une mise à jour ». Mais ses boutons, eux, répondaient tout de suite : la seconde tape
-// d'une double tape tombait sur « Quitter les testeurs » (au pied sur téléphone, au centre sur
-// ordinateur) ou sur « Publier », et faisait une action que personne n'avait choisie.
+// d'une double tape tombait sur la confirmation (au pied sur téléphone, au centre sur ordinateur ;
+// « Quitter les testeurs » jusqu'à R7b) ou sur « Publier », et faisait une action que personne n'avait choisie.
 //
 // La règle (« API fixées au lancement », corrigée le 10/11) : avec `guardTaps` (faux par défaut),
 // l'action, « Annuler » et les boutons du pied ignorent toute tape pendant TAP_GUARD_MS (600 ms)
@@ -60,26 +60,31 @@ function GuardedSheet({
   )
 }
 
-const quit = fr.t(($) => $.project.testers.quit)
-const joined = fr.t(($) => $.project.testers.joined)
+// R7b : la feuille « Tu testes ce projet » est partie (on quitte depuis le coin ou le menu « … »).
+// Le même risque demeure sur la feuille d'inscription : son bouton « Rejoindre les testeurs »
+// s'ouvre sous le doigt qui vient de toucher le bouton du même nom, sur la page.
+const join = fr.t(($) => $.project.testers.join)
+const confirm = fr.t(($) => $.project.testers.confirm)
 
 /**
- * La page d'un projet qu'on teste, réduite à ce qui compte ici (interface B3) : « Tu testes ce
- * projet » ouvre la feuille dont le pied porte « Quitter les testeurs ».
+ * La page d'un projet qui cherche des testeurs, réduite à ce qui compte ici (interface B3) :
+ * « Rejoindre les testeurs » ouvre la feuille dont le pied porte la confirmation du même nom.
  */
-function TesterPage({ onQuit }: { onQuit: jest.Mock }) {
+function JoinPage({ onJoin }: { onJoin: jest.Mock }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button label={joined} onPress={() => setOpen(true)} />
+      <Button label={join} onPress={() => setOpen(true)} />
       <Sheet
         open={open}
         guardTaps
-        title={fr.t(($) => $.project.testers.memberTitle)}
+        title={fr.t(($) => $.project.testers.joinTitle)}
         onClose={() => setOpen(false)}
-        footer={<Button label={quit} onPress={onQuit} />}
+        footer={<Button label={confirm} onPress={onJoin} />}
       >
-        <Text>{fr.t(($) => $.project.testers.memberBody, { title: 'Quiz de Léa' })}</Text>
+        <Text>
+          {fr.t(($) => $.project.testers.joinBody, { name: 'Léa', title: 'Quiz de Léa' })}
+        </Text>
       </Sheet>
     </>
   )
@@ -183,20 +188,27 @@ describe('the buttons of a sheet, against a double tap (R7a)', () => {
     expect(onAction).not.toHaveBeenCalled()
   })
 
-  // Interface B3 : la seconde tape d'une double tape sur « Tu testes ce projet » tombe sur
-  // « Quitter les testeurs », dans la feuille qui vient de s'ouvrir. Elle ne doit rien faire.
-  it('does not quit on the second tap of a double tap on « Tu testes ce projet »', async () => {
-    const onQuit = jest.fn()
-    await renderWithProviders(<TesterPage onQuit={onQuit} />)
+  // Interface B3 : la seconde tape d'une double tape sur « Rejoindre les testeurs » tombe sur la
+  // confirmation de la feuille qui vient de s'ouvrir. Elle ne doit rien faire.
+  it('does not join on the second tap of a double tap on « Rejoindre les testeurs »', async () => {
+    const onJoin = jest.fn()
+    await renderWithProviders(<JoinPage onJoin={onJoin} />)
 
-    await fireEvent.press(screen.getByRole('button', { name: joined }))
+    const pageButton = screen.getByRole('button', { name: join })
+    await fireEvent.press(pageButton)
     await wait(180)
-    await fireEvent.press(await screen.findByRole('button', { name: quit }))
-    expect(onQuit).not.toHaveBeenCalled()
+    const inSheet = () => {
+      const found = screen.getAllByRole('button', { name: confirm }).find((b) => b !== pageButton)
+      if (!found) throw new Error('The sheet has no confirmation')
+      return found
+    }
+    await screen.findByRole('header', { name: fr.t(($) => $.project.testers.joinTitle) })
+    await fireEvent.press(inSheet())
+    expect(onJoin).not.toHaveBeenCalled()
 
-    // Témoin : un vrai geste, plus tard, quitte bien les testeurs.
+    // Témoin : un vrai geste, plus tard, inscrit bien.
     await wait(TAP_GUARD_MS)
-    await fireEvent.press(screen.getByRole('button', { name: quit }))
-    expect(onQuit).toHaveBeenCalledTimes(1)
+    await fireEvent.press(inSheet())
+    expect(onJoin).toHaveBeenCalledTimes(1)
   })
 })
