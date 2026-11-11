@@ -8,8 +8,10 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { focusWithoutScroll } from './focus'
-import { Tabs } from './Tabs'
+import { iconPaths } from './icons.generated'
+import { type Tab, Tabs } from './Tabs'
 import { Text } from './Text'
 
 jest.mock('../accounts/api', () => ({ useSession: jest.fn() }))
@@ -119,6 +121,77 @@ describe('Tabs', () => {
     expect(screen.getAllByRole('tab', { selected: true })).toHaveLength(1)
     expect(screen.getByText('Formulaire d’inscription')).toBeTruthy()
     expect(screen.queryByText('Formulaire de connexion')).toBeNull()
+  })
+
+  // R7b, le coin des testeurs (planche validée 9, relecture du plan ui-B3) : « Appels » (mégaphone) et
+  // « Retours » (bulle) portent une icône avant leur libellé. L'icône est un décor : l'onglet reste
+  // nommé par son seul texte, et le lecteur d'écran ne lit rien de plus.
+  describe('with icons (R7b)', () => {
+    type CornerTab = 'calls' | 'feedback'
+    const cornerTabs: readonly Tab<CornerTab>[] = [
+      {
+        key: 'calls',
+        label: fr.t(($) => $.project.testers.tabs.calls),
+        icon: 'megaphone-simple',
+        content: <Text>Les appels</Text>,
+      },
+      {
+        key: 'feedback',
+        label: fr.t(($) => $.project.testers.tabs.feedback),
+        icon: 'chat-circle-dots',
+        content: <Text>Les retours</Text>,
+      },
+    ]
+
+    /** Tous les éléments sous `node`, lui compris, dans l'ordre de lecture (en profondeur). */
+    const inside = (node: Node): Node[] => [
+      node,
+      ...node.children.flatMap((child) => (typeof child === 'string' ? [] : inside(child))),
+    ]
+    /** La place du tracé de cette icône parmi les éléments de l'onglet (-1 : pas dessinée). */
+    const iconAt = (nodes: Node[], icon: keyof typeof iconPaths) =>
+      nodes.findIndex((node) => node.props.d === iconPaths[icon][0])
+    /** La place du texte affiché de l'onglet parmi ses éléments. */
+    const labelAt = (nodes: Node[], label: string) =>
+      nodes.findIndex((node) => node.children.includes(label))
+
+    it('shows an icon before each tab label, the tab still named by its text', async () => {
+      await renderWithProviders(
+        <Tabs
+          label={fr.t(($) => $.project.testers.tabs.label)}
+          tabs={cornerTabs}
+          selected="calls"
+          onSelect={() => {}}
+        />,
+      )
+
+      for (const [label, icon] of [
+        ['Appels', 'megaphone-simple'],
+        ['Retours', 'chat-circle-dots'],
+      ] as const) {
+        // Le nom lu reste le texte seul, mot pour mot (pas « Appels, image »).
+        const tab = screen.getByRole('tab', { name: label })
+        expect(tab.props.accessibilityLabel ?? tab.props['aria-label']).toBe(label)
+        const nodes = inside(tab as unknown as Node)
+        // L'icône est dessinée dans l'onglet, avant son libellé.
+        expect(iconAt(nodes, icon)).toBeGreaterThanOrEqual(0)
+        expect(labelAt(nodes, label)).toBeGreaterThan(iconAt(nodes, icon))
+      }
+      // L'icône est cachée aux lecteurs d'écran : aucune image nommée dans la rangée.
+      expect(screen.queryByRole('img')).toBeNull()
+      expect(screen.queryByRole('image')).toBeNull()
+      // Chaque onglet n'a que son icône : celle de l'autre onglet n'y est pas.
+      const calls = inside(screen.getByRole('tab', { name: 'Appels' }) as unknown as Node)
+      expect(iconAt(calls, 'chat-circle-dots')).toBe(-1)
+    })
+
+    it('draws no icon for a tab that has none (témoin)', async () => {
+      await renderWithProviders(<Sample />)
+
+      const nodes = inside(screen.getByRole('tab', { name: 'Se connecter' }) as unknown as Node)
+      expect(nodes.some((node) => typeof node.props.d === 'string')).toBe(false)
+      expect(labelAt(nodes, 'Se connecter')).toBeGreaterThanOrEqual(0)
+    })
   })
 
   describe('on the web, with the keyboard', () => {

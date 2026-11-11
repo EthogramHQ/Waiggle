@@ -5,6 +5,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { useState } from 'react'
 import { Platform } from 'react-native'
 import { renderWithProviders } from '../testing/render'
+import { fr } from '../testing/text'
 import { Checkbox } from './Checkbox'
 
 // Les outils de test passent par le module des comptes ; on le remplace, comme dans les écrans.
@@ -86,6 +87,68 @@ describe('Checkbox', () => {
 
     expect(screen.getByRole('checkbox', { name: label })).toBeTruthy() // témoin
     expect(screen.getByText('Coche cette case pour continuer.')).toBeTruthy()
+  })
+
+  // R7b (relecture du plan ui-B3) : dans « Retours réglés » de la feuille « Nouvelle mise à jour »,
+  // chaque case dit « Inès Morel · En partie », et une ligne dessous rappelle le retour
+  // (« « Le niveau 3 plante », 2 nov. »). Le nom de la case reste son libellé ; la ligne du dessous
+  // est sa description, lue après le nom : `aria-describedby` sur le web, l'indice sur téléphone.
+  describe('with a detail line (R7b)', () => {
+    const item = 'Inès Morel · En partie'
+    const detail = fr.t(($) => $.project.testers.settledField.detail, {
+      excerpt: 'Le niveau 3 plante',
+      date: '2 nov.',
+    })
+
+    it('describes a checkbox by its detail without hiding its label', async () => {
+      await renderWithProviders(
+        <Checkbox label={item} detail={detail} value={false} onValueChange={() => {}} />,
+      )
+
+      // Le nom reste le libellé seul, mot pour mot, et les deux textes restent affichés.
+      const box = screen.getByRole('checkbox', { name: item, checked: false })
+      expect(box.props.accessibilityLabel).toBe(item)
+      expect(screen.getByText(item)).toBeTruthy()
+      expect(screen.getByText(detail)).toBeTruthy()
+      // Sur téléphone, la description est l'indice de la case.
+      expect(box.props.accessibilityHint).toBe(detail)
+    })
+
+    it('points to its detail with aria-describedby on the web', async () => {
+      jest.replaceProperty(Platform, 'OS', 'web')
+      try {
+        await renderWithProviders(
+          <Checkbox label={item} detail={detail} value onValueChange={() => {}} />,
+        )
+
+        const box = screen.getByRole('checkbox', { name: item, checked: true })
+        const described = String(box.props['aria-describedby'] ?? '')
+        const line = screen.getByText(detail)
+        const lineId = line.props.nativeID ?? line.props.id
+        expect(lineId).toBeTruthy()
+        expect(described.split(' ')).toContain(lineId)
+      } finally {
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('still toggles when its detail line is touched', async () => {
+      // Toute la ligne est la zone à toucher (en tête du composant) : le détail en fait partie.
+      const onValueChange = jest.fn()
+      await renderWithProviders(
+        <Checkbox label={item} detail={detail} value={false} onValueChange={onValueChange} />,
+      )
+
+      await fireEvent.press(screen.getByText(detail))
+
+      expect(onValueChange).toHaveBeenCalledWith(true)
+    })
+
+    it('has no description without a detail (témoin)', async () => {
+      await renderWithProviders(<Sample />)
+
+      expect(screen.getByRole('checkbox', { name: label }).props.accessibilityHint).toBeUndefined()
+    })
   })
 
   describe('on the web, with the keyboard', () => {
