@@ -237,8 +237,9 @@ export const TesterMessagePage = z
 export type TesterMessagePage = z.infer<typeof TesterMessagePage>
 
 /**
- * L'état d'un fil pour l'auteur (décision de Louis 3) : « À traiter » (`open`) s'il a au moins un
- * retour non réglé, « Réglés » (`settled`) sinon. Un fil est toujours dans un seul des deux.
+ * L'état d'un fil pour l'auteur (décision de Louis 3) : « Réglés » (`settled`) s'il a au moins un
+ * retour et que tous ses retours sont réglés ; « À traiter » (`open`) sinon, y compris un fil de
+ * réponses seules. Un fil est toujours dans un seul des deux.
  */
 export const TesterThreadState = z.enum(['open', 'settled'])
 export type TesterThreadState = z.infer<typeof TesterThreadState>
