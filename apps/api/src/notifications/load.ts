@@ -378,7 +378,7 @@ const projectUpdates = (me: string, during: (column: string) => SQL): SQL => sql
  * - il n'est pas l'auteur du projet (aucune route ne le fait testeur du sien, la condition le redit).
  *
  * L'auteur, lui, reste prévenu des messages de ses testeurs même quand son coin est fermé : il le
- * relit (décision de la session sur TW-A3), et un fil d'un ancien testeur lui reste lisible.
+ * relit (R7b, 11/11/2026), et un fil d'un ancien testeur lui reste lisible.
  *
  * Jamais le texte d'un message : le fil est privé ; seul l'extrait d'un appel (que tous les
  * testeurs lisent) est montré. `during` : la fenêtre de dates (voir sources) ; `now` : l'heure de
