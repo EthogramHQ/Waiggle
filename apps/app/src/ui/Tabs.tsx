@@ -15,6 +15,7 @@ import { layout, radii, space } from '@ruche/brand'
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native'
 import { focusWithoutScroll } from './focus'
+import { Icon, type IconName } from './Icon'
 import { spaceToggles } from './keyboard'
 import { Surface, type SurfaceVariant } from './Surface'
 import { Text } from './Text'
@@ -25,7 +26,15 @@ export type Tab<K extends string> = {
   key: K
   label: string
   content: ReactNode
+  /**
+   * Une icône avant le libellé (R7b : « Appels » et son mégaphone, « Retours » et sa bulle).
+   * Décorative : cachée des lecteurs d'écran, l'onglet reste nommé par son seul libellé.
+   */
+  icon?: IconName
 }
+
+/** La taille de l'icône d'un onglet, à l'échelle du texte « callout » qu'elle précède. */
+const ICON_SIZE = 18
 
 type Props<K extends string> = {
   /** Le nom de la rangée d'onglets, lu par les lecteurs d'écran (« Connexion ou inscription »). */
@@ -47,6 +56,22 @@ type Props<K extends string> = {
 }
 
 type KeyEvent = { key: string; preventDefault: () => void }
+
+/**
+ * Le libellé d'un onglet. L'onglet choisi : l'encre sur la goutte, jour et nuit (paire onHoney /
+ * surfaceRaised de packages/brand/src/colors.ts), comme dans Segmented.
+ */
+const labelText = (label: string, chosen: boolean) => (
+  <Text
+    variant="callout"
+    weight={chosen ? 700 : 500}
+    tone={chosen ? 'onHoney' : 'muted'}
+    align="center"
+    selectable={false}
+  >
+    {label}
+  </Text>
+)
 
 export function Tabs<K extends string>({
   label,
@@ -171,22 +196,28 @@ export function Tabs<K extends string>({
                   paddingHorizontal: space.lg,
                   paddingVertical: space.xs,
                   borderRadius: radii.pill,
+                  // Avec une icône : l'icône et le libellé côte à côte, centrés ensemble.
+                  ...(tab.icon ? { flexDirection: 'row' as const, gap: space.xs } : null),
                   ...(chosen
                     ? { backgroundColor: colors.surfaceRaised, boxShadow: shadows.soft }
                     : null),
                 }}
               >
-                {/* L'onglet choisi : l'encre sur la goutte, jour et nuit (paire onHoney /
-                    surfaceRaised de packages/brand/src/colors.ts), comme dans Segmented. */}
-                <Text
-                  variant="callout"
-                  weight={chosen ? 700 : 500}
-                  tone={chosen ? 'onHoney' : 'muted'}
-                  align="center"
-                  selectable={false}
-                >
-                  {tab.label}
-                </Text>
+                {/* L'icône, décorative (Icon est caché des lecteurs d'écran) : de la couleur du
+                    libellé. Dans sa propre vue qui ne rétrécit pas : sur le web, un <svg> seul dans
+                    une rangée se fait écraser par un libellé long, agrandi à 200 %. */}
+                {tab.icon ? (
+                  <View style={{ flexShrink: 0 }}>
+                    <Icon name={tab.icon} size={ICON_SIZE} tone={chosen ? 'onHoney' : 'muted'} />
+                  </View>
+                ) : null}
+                {/* À côté d'une icône, le libellé rétrécit et passe à la ligne plutôt que de
+                    déborder ; sans icône, il est posé tel quel, comme avant R7b. */}
+                {tab.icon ? (
+                  <View style={{ flexShrink: 1, minWidth: 0 }}>{labelText(tab.label, chosen)}</View>
+                ) : (
+                  labelText(tab.label, chosen)
+                )}
               </Pressable>
             )
           })}
