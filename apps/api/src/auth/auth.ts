@@ -281,7 +281,18 @@ export const createAuth = ({
             db,
             projects.map((p) => p.id),
           )
-          filesToDelete.set(user.id, row?.avatarKey ? [row.avatarKey, ...keys] : keys)
+          // R7b : ses images du coin des testeurs sur les projets des autres (ses captures, en
+          // attente comprises) : leurs lignes partent avec lui (owner_id, cascade), pas leurs
+          // fichiers. Celles de ses propres projets sont déjà dans `keys` (mediaKeysOf) : un Set
+          // retire les doublons. Cette lecture par owner_id seul n'a pas d'index (celui de
+          // tester_media a project_id en tête) : elle parcourt la table une fois par suppression de
+          // compte, rare ; un index dédié coûterait à chaque envoi d'image.
+          const ownedImages = await db
+            .select({ storageKey: schema.testerMedia.storageKey })
+            .from(schema.testerMedia)
+            .where(eq(schema.testerMedia.ownerId, user.id))
+          const all = [...new Set([...keys, ...ownedImages.map((image) => image.storageKey)])]
+          filesToDelete.set(user.id, row?.avatarKey ? [row.avatarKey, ...all] : all)
           // Ses commentaires (tranche 5) : effacés, sauf ses racines auxquelles d'autres ont
           // répondu, qui deviennent « Commentaire supprimé » (voir comments/erase.ts). Ici et pas
           // après : une fois le compte parti, on ne saurait plus lesquels étaient les siens.
