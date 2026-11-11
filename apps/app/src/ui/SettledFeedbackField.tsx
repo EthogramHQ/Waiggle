@@ -20,6 +20,7 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Platform, View } from 'react-native'
 import { Checkbox } from './Checkbox'
+import { hiddenFrame } from './HiddenHeading'
 import { Hint } from './Hint'
 import { LiveStatus } from './LiveStatus'
 import { Text } from './Text'
@@ -57,6 +58,9 @@ export function SettledFeedbackField({ items, value, onChange, max, editable = t
   const full = count >= max
   const former = t(($) => $.project.testers.settledField.former)
 
+  const shownCount = t(($) => $.project.testers.settledField.count, { count, total })
+  const spokenCount = t(($) => $.project.testers.settledField.countSpoken, { count, total })
+
   /** Coche ou décoche un retour, en gardant l'ordre des autres. */
   const toggle = (id: string, checked: boolean) => {
     if (!editable) return
@@ -90,18 +94,26 @@ export function SettledFeedbackField({ items, value, onChange, max, editable = t
             {t(($) => $.project.testers.settledField.title)}
           </Text>
         </View>
-        {/* « 2 sur 3 » à l'œil ; « 2 retours cochés sur 3 » au lecteur d'écran. */}
-        <Text
-          variant="caption"
-          tone="muted"
-          tabular
-          accessibilityLabel={t(($) => $.project.testers.settledField.countSpoken, {
-            count,
-            total,
-          })}
-        >
-          {t(($) => $.project.testers.settledField.count, { count, total })}
-        </Text>
+        {/* « 2 sur 3 » à l'œil ; « 2 retours cochés sur 3 » au lecteur d'écran. Sur téléphone, le
+            nom du texte ; sur le web, ce nom posé sur un texte sans rôle n'est pas lu (relecture
+            d'interface A8) : « 2 sur 3 » y est caché au lecteur d'écran et la phrase écrite à
+            côté, cachée à l'œil (comme `OutcomePill`). */}
+        {Platform.OS === 'web' ? (
+          <>
+            <View aria-hidden>
+              <Text variant="caption" tone="muted" tabular>
+                {shownCount}
+              </Text>
+            </View>
+            <View style={hiddenFrame}>
+              <Text>{spokenCount}</Text>
+            </View>
+          </>
+        ) : (
+          <Text variant="caption" tone="muted" tabular accessibilityLabel={spokenCount}>
+            {shownCount}
+          </Text>
+        )}
       </View>
       <View style={{ paddingHorizontal: space.xs }}>
         <Hint icon="info" text={t(($) => $.project.testers.settledField.hint)} />

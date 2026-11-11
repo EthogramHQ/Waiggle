@@ -53,6 +53,7 @@ import { Choices } from '../ui/Choices'
 import { type Focusable, focusAndReveal, focusWithoutScroll, moveReaderTo } from '../ui/focus'
 import { Hint } from '../ui/Hint'
 import type { IconName } from '../ui/Icon'
+import { outcomeIcon } from '../ui/OutcomePill'
 import { type PhotoTile, PhotoTiles, type PhotoTilesLabels } from '../ui/PhotoTiles'
 import { Sheet, type SheetNotice } from '../ui/Sheet'
 import { SheetProjectHead } from '../ui/SheetProjectHead'
@@ -258,13 +259,12 @@ const reopenedDraft = (key: string): FeedbackDraft | undefined => {
   return saved
 }
 
-// Les icônes des choix, comme sur la planche et dans la bulle du fil (`OutcomePill`, `MessageBubble`).
-// Décoratives : le texte de chaque choix dit tout.
-const OUTCOMES: { value: FeedbackOutcome; icon: IconName }[] = [
-  { value: 'yes', icon: 'check' },
-  { value: 'partly', icon: 'circle-half' },
-  { value: 'no', icon: 'x' },
-]
+// Les issues, dans l'ordre de la planche. Leur icône et sa couleur (la coche verte, le demi-cercle
+// ambre, la croix rouge) sont celles de la pastille du fil (`outcomeIcon` d'`OutcomePill`) : la
+// réponse donnée ici et la pastille lue ensuite se ressemblent (correction 5). Décoratives : le
+// texte de chaque choix dit tout.
+const OUTCOMES: FeedbackOutcome[] = ['yes', 'partly', 'no']
+// Les icônes des appareils, comme dans la bulle du fil (`MessageBubble`).
 const DEVICES: { value: FeedbackDevice; icon: IconName }[] = [
   { value: 'phone', icon: 'device-mobile' },
   { value: 'computer', icon: 'desktop' },
@@ -573,9 +573,9 @@ function FeedbackForm({ project, memberId, open, close }: FormProps) {
         />
         <Choices
           label={t(($) => $.project.testers.feedback.outcome)}
-          options={OUTCOMES.map(({ value, icon }) => ({
+          options={OUTCOMES.map((value) => ({
             value,
-            icon,
+            ...outcomeIcon(value),
             label: t(($) => $.project.testers.feedback.outcomes[value]),
           }))}
           value={draft.outcome}
@@ -612,7 +612,8 @@ function FeedbackForm({ project, memberId, open, close }: FormProps) {
               {t(($) => $.project.testers.feedback.capture)}
             </Text>
             <Text variant="caption" tone="muted">
-              {t(($) => $.project.testers.feedback.optional)}
+              {/* « Une capture d'écran facultative » : au féminin, comme la photo d'un appel. */}
+              {t(($) => $.project.testers.calls.optional)}
             </Text>
           </Row>
           <PhotoTiles

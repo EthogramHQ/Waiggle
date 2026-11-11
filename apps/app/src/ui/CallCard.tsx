@@ -23,9 +23,9 @@ import { View } from 'react-native'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
 import { excerpt } from './CommentAction'
 import type { Focusable } from './focus'
-import { Icon } from './Icon'
+import { Icon, SMALL_ICON } from './Icon'
 import type { ImageSource } from './image'
-import { ProjectCover } from './ProjectCover'
+import { OpenableImage } from './OpenableImage'
 import { RelativeTime } from './RelativeTime'
 import { Surface } from './Surface'
 import { Text } from './Text'
@@ -35,8 +35,12 @@ type Props = {
   text: string
   /** La date de l'appel, au format ISO du contrat. */
   at: string
-  /** La photo jointe, avec la description écrite par l'auteur (vide : pas décrite). */
-  photo?: { source: ImageSource; description: string } | null
+  /**
+   * La photo jointe, avec la description écrite par l'auteur (vide : pas décrite). `width` et
+   * `height` : ses dimensions (`TesterMedia` du contrat), pour poser le cadre à ses proportions dès
+   * le premier dessin ; absentes, elles se lisent au chargement de l'image.
+   */
+  photo?: { source: ImageSource; description: string; width?: number; height?: number } | null
   /** L'avis de la modération (un `RemovalNotice`), posé au-dessus du texte. */
   removal?: ReactNode
   /** Les actions du menu « … » ; vide ou absent : pas de bouton du tout. */
@@ -48,8 +52,6 @@ type Props = {
   focusRef?: Ref<Focusable>
 }
 
-/** La hauteur de la photo, celle de la planche : assez grande pour être lue, sans manger l'écran. */
-const PHOTO_HEIGHT = 168
 /**
  * Le début de l'appel qui nomme le menu : assez pour distinguer deux appels, assez court pour que
  * le nom du bouton se lise d'une traite. 80 caractères, comme le menu d'un message du fil
@@ -87,7 +89,7 @@ export function CallCard({ text, at, photo = null, removal, menu = [], focusRef 
             importantForAccessibility="no-hide-descendants"
             style={{ flexShrink: 0 }}
           >
-            <Icon name="megaphone-simple" size={15} tone="muted" />
+            <Icon name="megaphone-simple" size={SMALL_ICON} tone="muted" />
           </View>
           <View style={{ flexShrink: 1 }}>
             <RelativeTime date={at} />
@@ -109,19 +111,16 @@ export function CallCard({ text, at, photo = null, removal, menu = [], focusRef 
       </View>
       {removal ?? null}
       {/* Texte brut, affiché tel quel avec ses sauts de ligne ; sélectionnable pour le recopier. */}
-      <Text selectable {...(focusRef ? { focusRef } : null)}>
+      {/* breakAnywhere : une adresse collée (« Essayez sur https://… ») passe à la ligne au lieu de
+          sortir de la carte à 320 points (relecture d'interface A4), comme la bulle d'un retour. */}
+      <Text selectable breakAnywhere {...(focusRef ? { focusRef } : null)}>
         {text}
       </Text>
       {photo ? (
-        // Une image nommée : sa description, ou « Photo jointe à l'appel ». L'image elle-même n'a
-        // pas de nom à elle (nom vide), sinon le navigateur lirait deux images l'une dans l'autre.
-        <View accessible accessibilityRole="image" accessibilityLabel={photoName}>
-          <ProjectCover
-            height={PHOTO_HEIGHT}
-            radius="small"
-            image={{ source: photo.source, label: '', cachePolicy: 'memory' }}
-          />
-        </View>
+        // Une image nommée : sa description, ou « Photo jointe à l'appel ». Entière, à ses
+        // proportions, sur la largeur de la carte et 240 points de haut au plus ; un appui
+        // l'ouvre en grand (relecture de design B2). En mémoire seulement (sécurité A4).
+        <OpenableImage source={photo.source} label={photoName} size={photo} radius="small" />
       ) : null}
     </Surface>
   )

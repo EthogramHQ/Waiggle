@@ -1650,6 +1650,7 @@ export const en: Translation = {
     count: '{{index}} of {{count}}',
     previous: 'Previous photo',
     next: 'Next photo',
+    enlarge: 'View full size: {{description}}',
   },
   share: {
     action: 'Share',
