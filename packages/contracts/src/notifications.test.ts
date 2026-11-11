@@ -13,6 +13,7 @@ import {
   UNREAD_COUNT_MAX,
   UnreadCount,
 } from './notifications'
+import { TESTER_EXCERPT_MAX } from './testers'
 
 const projectId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const commentId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
@@ -180,6 +181,62 @@ describe('Notification', () => {
     const { isNew: _isNew, ...withoutIsNew } = reactions
     expect(Notification.safeParse(withoutIsNew).success).toBe(false)
     expect(Notification.safeParse({ ...reactions, at: 'hier' }).success).toBe(false)
+  })
+})
+
+// R7b : ce que les notifications du coin des testeurs ne disent jamais. Le fil est privé : une
+// notification de message ne porte ni son texte, ni son issue ; l'extrait d'un appel est court.
+describe('the notifications of the testers corner (R7b)', () => {
+  it('never carries the text, the outcome nor the device of a thread message', () => {
+    const parsed = Notification.parse({
+      ...testerMessage,
+      text: 'Le score repart à zéro',
+      message: { ...testerMessage.message, text: 'Le score', outcome: 'partly', device: 'phone' },
+    })
+    const raw = JSON.stringify(parsed)
+    for (const secret of ['Le score', 'partly', 'phone']) expect(raw).not.toContain(secret)
+    expect(parsed).toEqual(testerMessage)
+  })
+
+  it('cuts the excerpt of a call at 80 characters, plus the ellipsis', () => {
+    const call = (length: number) => ({ ...testerCall.call, excerpt: 'a'.repeat(length) })
+    expect(TESTER_EXCERPT_MAX).toBe(80)
+    expect(Notification.safeParse({ ...testerCall, call: call(81) }).success).toBe(true)
+    expect(Notification.safeParse({ ...testerCall, call: call(82) }).success).toBe(false)
+  })
+
+  it('tells who sent a message by role only: the author or the tester', () => {
+    for (const role of ['author', 'tester']) {
+      expect(Notification.safeParse({ ...testerMessage, role }).success, role).toBe(true)
+    }
+    expect(Notification.safeParse({ ...testerMessage, role: 'admin' }).success).toBe(false)
+  })
+
+  it('settles a feedback by hand without an update', () => {
+    expect(Notification.parse({ ...feedbackSettled, update: null })).toMatchObject({
+      update: null,
+    })
+  })
+
+  it('names a removed call or thread message, and nothing else of the corner', () => {
+    const removed = {
+      id: 'removed:4b1c2d3e-0000-4000-8000-000000000005',
+      at,
+      isNew: true,
+      kind: 'removed',
+      project: meteo,
+      excerpt: 'Un appel publicitaire',
+      ground: 'rules',
+      explanation: 'Publicité déguisée.',
+      afterReport: false,
+      projectHidden: false,
+    }
+    for (const targetKind of ['call', 'message']) {
+      expect(Notification.parse({ ...removed, targetKind }), targetKind).toMatchObject({
+        targetKind,
+      })
+    }
+    expect(Notification.safeParse({ ...removed, targetKind: 'thread' }).success).toBe(false)
   })
 })
 
