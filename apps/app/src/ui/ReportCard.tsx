@@ -33,7 +33,9 @@ import { View } from 'react-native'
 import { Button } from './Button'
 import { ActionDescription } from './CommentAction'
 import { Icon } from './Icon'
+import type { ImageSource } from './image'
 import { Notice } from './Notice'
+import { ProjectCover } from './ProjectCover'
 import { StatusPill } from './StatusPill'
 import { Text } from './Text'
 import { TextLink } from './TextLink'
@@ -41,6 +43,9 @@ import { useTheme } from './theme/ThemeProvider'
 
 /** Un champ de la copie : son libellé (« Pitch ») et sa valeur, telle que le membre l'a écrite. */
 export type SnapshotField = { label: string; value: string }
+
+/** La hauteur de l'image d'un appel ou d'un message (la même que la photo de sa carte). */
+const PICTURE_HEIGHT = 168
 
 /** Le nombre de champs d'une copie montrés avant « Afficher tout ». */
 export const FOLDED_FIELDS = 3
@@ -80,6 +85,12 @@ type Props = {
    * affichée ») : la file ne montre jamais l'image elle-même (règle 15 de la relecture du plan 7b).
    */
   images?: readonly string[]
+  /**
+   * R7b : la capture d'un message ou la photo d'un appel du coin des testeurs, que l'API ne donne
+   * que tant qu'un signalement ouvert les vise. `name` : ce que lit le lecteur d'écran. L'image est
+   * chargée en mémoire seulement (`cachePolicy`), jamais sur le disque de l'appareil de la modération.
+   */
+  pictures?: readonly { name: string; source: ImageSource }[]
   /** Les motifs avec leur nombre (« Arnaque ou spam ×2 »), ou le fondement d'un retrait. */
   reasons?: readonly string[]
   /** Les précisions des membres (ou l'explication d'un retrait), en texte brut. */
@@ -131,6 +142,7 @@ export function ReportCard({
   snapshotLabel,
   snapshotNote,
   images = [],
+  pictures = [],
   reasons = [],
   details = [],
   detailsLabel,
@@ -258,6 +270,23 @@ export function ReportCard({
                 {image}
               </Text>
             </View>
+          </View>
+        ))}
+        {pictures.map(({ name, source }, index) => (
+          // Une image nommée : l'image elle-même a un nom vide, sinon le navigateur lirait deux images
+          // l'une dans l'autre.
+          <View
+            // biome-ignore lint/suspicious/noArrayIndexKey: une image de la copie n'a pas d'autre identité que sa place
+            key={index}
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={name}
+          >
+            <ProjectCover
+              height={PICTURE_HEIGHT}
+              radius="small"
+              image={{ source, label: '', cachePolicy: 'memory' }}
+            />
           </View>
         ))}
       </View>
