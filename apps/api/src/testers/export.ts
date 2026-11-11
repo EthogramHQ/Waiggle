@@ -12,6 +12,7 @@ import type {
 import { FeedbackDevice, FeedbackOutcome, TesterMessageKind } from '@ruche/contracts'
 import { type Database, schema } from '@ruche/db'
 import { and, asc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
+import { blockedWith } from '../blocks/visibility'
 import { currentHandleOf } from '../handles/load'
 import { mediaUrl } from '../profile/me'
 import { listedProjectFor } from '../projects/visibility'
@@ -157,15 +158,21 @@ export const testerCornerExport = async (
     }
   })
 
-  // Les membres qu'il a retirés, par pseudo actuel (comme les blocages), jamais par identifiant.
-  // La clé de project_tester_removal est (project_id, member_id) : les retraits de ses projets
-  // viennent de project_author_created_idx puis de cette clé.
+  // Les membres qu'il a retirés : l'identifiant (le retrait est son geste), le pseudo actuel et la
+  // date. Sous blocage, le pseudo ne sort plus (relecture de sécurité R7b, B2) : si le retiré a
+  // bloqué l'auteur depuis son retrait, ou l'inverse, sa page répond 404 ; l'export ne donne pas par
+  // la fenêtre ce que la porte refuse. L'identifiant et la date restent, sans quoi la ligne
+  // deviendrait anonyme. `blockedWith` : deux `exists`, par la clé primaire de member_block et par
+  // member_block_blocked_idx, une fois par ligne. La clé de project_tester_removal est
+  // (project_id, member_id) : les retraits de ses projets viennent de project_author_created_idx
+  // puis de cette clé.
   const removalRows = await db
     .select({
       projectId: schema.projectTesterRemoval.projectId,
       title: schema.project.title,
       memberId: schema.projectTesterRemoval.memberId,
       handle: schema.memberHandle.handle,
+      blocked: sql<boolean>`${blockedWith(memberId, schema.projectTesterRemoval.memberId)}`,
       at: schema.projectTesterRemoval.createdAt,
     })
     .from(schema.projectTesterRemoval)
@@ -176,7 +183,8 @@ export const testerCornerExport = async (
   const testerRemovals = removalRows.map((row) => ({
     projectId: row.projectId,
     title: row.title,
-    handle: row.handle,
+    memberId: row.memberId,
+    handle: row.blocked ? null : row.handle,
     at: row.at.toISOString(),
   }))
 

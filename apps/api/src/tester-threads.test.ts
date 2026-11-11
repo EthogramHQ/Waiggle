@@ -1372,6 +1372,36 @@ describe('limits against abuse', () => {
     expect((await thread(project.id, inesId, ines)).items).toEqual([])
   })
 
+  it('counts even malformed requests in the quota of thread reads', async () => {
+    const project = await publishProject()
+    await join(project.id, ines)
+    // 300 par heure : il en a déjà fait 298 ; un identifiant mal formé fait la 299e, un projet
+    // inconnu la 300e (comptées avant tout examen), la suivante, bien formée, est refusée.
+    await alreadyUsed(memberCounterKeys(inesId).testerRead, 298)
+    expect((await markRead('pas-un-identifiant', inesId, ines)).status).toBe(404)
+    expect((await markRead(UNKNOWN, inesId, ines)).status).toBe(404)
+
+    const res = await markRead(project.id, inesId, ines)
+    await expectError(res, 429, 'rate_limited')
+    expect(res.headers.get('retry-after')).toBeTruthy()
+    // Une heure plus tard, la fenêtre est finie : il marque son fil lu.
+    later(61)
+    await expectDone(await markRead(project.id, inesId, ines))
+  })
+
+  it('counts even requests on an unknown message in the change quota', async () => {
+    const project = await publishProject()
+    await join(project.id, ines)
+    const message = await sent(project.id, inesId, ines, feedback())
+    // 60 modifications par heure : il en a déjà fait 59 ; un message inconnu fait la 60e.
+    await alreadyUsed(memberCounterKeys(inesId).projectChange, 59)
+    await expectError(await deleteMessage(project.id, UNKNOWN, ines), 404, 'not_found')
+
+    const res = await deleteMessage(project.id, message.id, ines)
+    await expectError(res, 429, 'rate_limited')
+    expect((await thread(project.id, inesId, ines)).items).toHaveLength(1)
+  })
+
   it('refuses a 17 KB message body with 413', async () => {
     const project = await publishProject()
     await join(project.id, ines)

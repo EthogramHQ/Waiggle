@@ -30,6 +30,7 @@ import { eq } from 'drizzle-orm'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nightlyPurge } from './jobs/nightly-purge'
+import { memberCounterKeys } from './rate-limit'
 import { activity } from './testing/activity'
 import { createTestContext, type TestContext } from './testing/context'
 import { jpegImage, photoWithGps } from './testing/images'
@@ -381,6 +382,23 @@ describe('uploading an image of the corner', () => {
     await expectError(await sendImage(project.id, sami, 'capture'), 404, 'not_found')
     await expectError(await sendImage(project.id, malik, 'capture'), 404, 'not_found')
     await expectError(await sendImage(project.id, null, 'capture'), 401, 'unauthorized')
+    expect(testerFiles()).toEqual([])
+  })
+
+  it('counts even malformed uploads of the corner in the upload quota', async () => {
+    const project = await publishProject()
+    // 30 envois par heure : il en a déjà fait 28 ; un projet inconnu fait le 29e, un identifiant mal
+    // formé le 30e (comptés avant tout examen), le suivant, bien formé, est refusé.
+    await ctx.db.insert(schema.apiRateLimit).values({
+      key: memberCounterKeys(jeanId).visualUpload,
+      count: 28,
+      windowStart: Date.now(),
+    })
+    await expectError(await sendImage(crypto.randomUUID(), jean, 'call'), 404, 'not_found')
+    await expectError(await sendImage('pas-un-identifiant', jean, 'call'), 404, 'not_found')
+
+    const res = await sendImage(project.id, jean, 'call')
+    await expectError(res, 429, 'rate_limited')
     expect(testerFiles()).toEqual([])
   })
 
