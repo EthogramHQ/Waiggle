@@ -35,13 +35,7 @@ import { ThreadHeader } from '../ui/ThreadHeader'
 import { useHydrated } from '../ui/theme/hydration'
 import { useLayout } from '../ui/theme/layout'
 import { useNameOf } from '../useNameOf'
-import {
-  LoadErrorScreen,
-  LoadingScreen,
-  NotFoundState,
-  SessionErrorScreen,
-  SignedOutScreen,
-} from './states'
+import { LoadErrorScreen, LoadingScreen, NotFoundState, SessionErrorScreen } from './states'
 // Les deux pages se rendent l'une l'autre (le coin pose ce fil à droite, ce fil rend le coin sur
 // ordinateur) : chacune n'est lue qu'à l'affichage, jamais au chargement du module.
 import { TestersCornerScreen } from './TestersCornerScreen'
@@ -66,7 +60,9 @@ export function TesterThreadScreen({ id, member }: { id: string; member: string 
   if (hydrated && columns) return <TestersCornerScreen id={id} member={member} />
   if (state === 'pending') return <LoadingScreen width="page" />
   if (state === 'error') return <SessionErrorScreen onRetry={retry} width="page" />
-  if (!session) return <SignedOutScreen width="page" />
+  // Un visiteur : la page introuvable, comme pour le coin lui-même (scénario R7b ; L5), et comme sur
+  // ordinateur, où cette adresse affiche le coin.
+  if (!session) return <ThreadNotFound />
   // Les lectures ne partent qu'avec une session : elles vivent dans le composant suivant.
   return <AuthorThread id={id} member={member} memberId={session.user.id} />
 }

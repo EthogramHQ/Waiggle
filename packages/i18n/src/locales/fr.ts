@@ -795,7 +795,7 @@ export const fr = {
       // juridique (J5) : quitter demande une confirmation, qui dit ce qui reste chez l'auteur.
       quitTitle: 'Quitter les testeurs de « {{title}} » ?',
       quitBody:
-        'Tu ne verras plus les appels du coin des testeurs. Tes retours restent lisibles par {{name}} : tant que le projet reste visible, tu pourras relire ton fil et supprimer tes messages depuis le coin.',
+        'Tu ne verras plus les appels du coin des testeurs. Tes retours restent lisibles par {{name}} : tant que le coin est ouvert, tu pourras y relire ton fil et supprimer tes messages. Sinon, écris-nous à {{contactEmail}}.',
       quitConfirm: 'Quitter',
       // juridique (J5) : le retrait est silencieux et définitif ; le nom, jamais « Elle » (ui-B5).
       remove: 'Retirer des testeurs',
@@ -1270,7 +1270,7 @@ export const fr = {
       'Vous ne verrez plus les projets, les mises à jour et les commentaires l’un de l’autre, et vous ne pourrez plus interagir.',
     // Relecture juridique (R1) : ce qui reste visible malgré le blocage (règles 1 et 2 du plan).
     remains:
-      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, ceux où tu as écrit son pseudo, et les retours que tu lui as envoyés comme testeur. Pour les retirer, supprime-les avant de bloquer.',
+      'Les commentaires déjà écrits restent. @{{handle}} lit encore les tiens sur ses propres projets, ceux où tu as écrit son pseudo, et tes messages du coin des testeurs. Pour les retirer, supprime-les avant de bloquer.',
     follows:
       'Vos abonnements de l’un à l’autre sont retirés, comme vos inscriptions de testeur sur les projets de l’autre ; rien ne reviendra si tu débloques.',
     notTold: '@{{handle}} ne reçoit aucun message, mais pourra le remarquer.',

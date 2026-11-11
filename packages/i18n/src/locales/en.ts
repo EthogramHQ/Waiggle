@@ -665,7 +665,7 @@ export const en: Translation = {
       cornerLoadError: 'The testers’ corner could not load.',
       quitTitle: 'Leave the testers of “{{title}}”?',
       quitBody:
-        'You will no longer see the calls in the testers’ corner. Your feedback stays readable by {{name}}: as long as the project stays visible, you can read your thread again and delete your messages from the corner.',
+        'You will no longer see the calls in the testers’ corner. Your feedback stays readable by {{name}}: while the corner is open, you can read your thread again and delete your messages there. Otherwise, write to us at {{contactEmail}}.',
       quitConfirm: 'Leave',
       remove: 'Remove from testers',
       removeTitle: 'Remove {{name}} from your testers?',
@@ -1075,7 +1075,7 @@ export const en: Translation = {
     hidden:
       'You won’t see each other’s projects, updates and comments anymore, and you won’t be able to interact.',
     remains:
-      'Comments already written stay. On their own projects, @{{handle}} still reads yours, those where you wrote their handle, and the feedback you sent them as a tester. To remove them, delete them before blocking.',
+      'Comments already written stay. On their own projects, @{{handle}} still reads yours, those where you wrote their handle, and your messages in the testers’ corner. To remove them, delete them before blocking.',
     follows:
       'Your follows of each other are removed, and so are your tester sign-ups on each other’s projects; nothing will come back if you unblock.',
     notTold: '@{{handle}} gets no message, but may notice.',

@@ -2209,8 +2209,9 @@ Hors de R7b, et où ça va :
   compositeur, ni « Envoyer un retour » (Louis, 11/11/2026)
 - Et un projet supprimé emporte son coin des testeurs ; un projet retiré, privé, ou dont l'auteur
   est suspendu le ferme à tous, testeurs et anciens testeurs compris, sauf à l'auteur pour la
-  lecture ; un testeur peut toujours en supprimer ses messages et quitter les testeurs depuis la
-  page du projet
+  lecture ; un testeur peut toujours quitter les testeurs depuis la page du projet, et faire
+  effacer ses messages d'un coin fermé en écrivant au contact : l'appli ne les lui montre plus
+  (une page « Mes retours envoyés » viendra plus tard ; relecture juridique de R7b, 11/11/2026)
 
 ### Ce que reçoit un testeur, en plus des mises à jour
 

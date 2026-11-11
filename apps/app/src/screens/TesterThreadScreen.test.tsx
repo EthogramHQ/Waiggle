@@ -230,6 +230,16 @@ describe('the thread of a tester', () => {
 
     expect(await screen.findByText(containing(T.notFound))).toBeTruthy()
   })
+
+  // R7b, relecture de l'interface (L5) : sur téléphone comme sur ordinateur, un visiteur reçoit la
+  // page introuvable du coin (scénario), jamais « Réservé aux membres ».
+  it('shows the page not found to a visitor', async () => {
+    mockSession(null)
+    mockServer.corner = null
+    await renderWithProviders(<TesterThreadScreen id={id} member={ines.id} />)
+
+    expect(await screen.findByText(containing(T.notFound))).toBeTruthy()
+  })
 })
 
 // --- Les menus des messages ---
