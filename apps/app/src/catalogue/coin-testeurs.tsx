@@ -217,18 +217,20 @@ function CornerTabs({ l }: { l: Labels }) {
   const [glassTab, setGlassTab] = useState<CornerKey>('calls')
   const [groupedTab, setGroupedTab] = useState<CornerKey>('feedback')
   const label = t(($) => $.project.testers.tabs.label)
-  const tabs = [
+  // Le texte des panneaux : à l'encre sur le miel (de nuit aussi, le miel reste clair), au ton
+  // ordinaire sur une surface pleine.
+  const tabsOn = (tone: 'onHoney' | 'default') => [
     {
       key: 'calls' as const,
       label: t(($) => $.project.testers.tabs.calls),
       icon: 'megaphone-simple' as const,
-      content: <Text>{l.callsBody}</Text>,
+      content: <Text tone={tone}>{l.callsBody}</Text>,
     },
     {
       key: 'feedback' as const,
       label: t(($) => $.project.testers.tabs.feedback),
       icon: 'chat-circle-dots' as const,
-      content: <Text>{l.feedbackBody}</Text>,
+      content: <Text tone={tone}>{l.feedbackBody}</Text>,
     },
   ]
   return (
@@ -238,13 +240,13 @@ function CornerTabs({ l }: { l: Labels }) {
         <View
           style={{ backgroundColor: colors.honey, borderRadius: radii.tile, padding: space.xl }}
         >
-          <Tabs label={label} tabs={tabs} selected={glassTab} onSelect={setGlassTab} />
+          <Tabs label={label} tabs={tabsOn('onHoney')} selected={glassTab} onSelect={setGlassTab} />
         </View>
       </Example>
       <Example caption={l.tabsGrouped}>
         <Tabs
           label={label}
-          tabs={tabs}
+          tabs={tabsOn('default')}
           selected={groupedTab}
           onSelect={setGroupedTab}
           variant="grouped"
