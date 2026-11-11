@@ -70,6 +70,7 @@ import { CardsCatalogue } from './cartes'
 import { InvalidChoicesCatalogue } from './champs-invalides'
 import { LoadingCatalogue } from './chargement'
 import { TestersCornerHeadsCatalogue } from './coin-entetes'
+import { TestersCornerCatalogue } from './coin-testeurs'
 import { CommentCardCatalogue } from './commentaires-carte'
 import { CommentComposerCatalogue } from './commentaires-composer'
 import { CommentThreadCatalogue } from './commentaires-fil'
@@ -860,6 +861,8 @@ export function CatalogueScreen() {
       <TesterBricksCatalogue />
       {/* Tranche R7b, les en-têtes des feuilles et du fil du coin des testeurs (coin-entetes.tsx). */}
       <TestersCornerHeadsCatalogue />
+      {/* Tranche R7b, les onglets, les appels et les retours réglés du coin (coin-testeurs.tsx). */}
+      <TestersCornerCatalogue />
       {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
       <BeforeAfterCatalogue />
       {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}
