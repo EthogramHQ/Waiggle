@@ -733,7 +733,8 @@ const handleOf = {
 }
 const comment = (n, author, body, day, hour, fields = {}) => ({
   id: `5e6f7081-92a3-4b4c-8d5e-${String(n).padStart(12, '0')}`,
-  author: author && { ...author, handle: handleOf[author.id] ?? null },
+  // R7b : isTester est obligatoire dans l'auteur d'un commentaire (badge « Testeur »).
+  author: author && { ...author, handle: handleOf[author.id] ?? null, isTester: false },
   body: author ? body : '',
   createdAt: new Date(Date.UTC(2026, 9, day, hour)).toISOString(),
   editedAt: null,
