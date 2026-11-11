@@ -433,6 +433,8 @@ export const contrastPairs: readonly ContrastPair[] = [
   // Le liseré du point non lu (une forme : 3), sur la carte de la liste et sur une ligne surlignée.
   { text: 'unreadDotRing', on: 'surface', min: 3 },
   { text: 'unreadDotRing', on: 'highlight', min: 3 },
+  // R7b : la ligne du fil choisi passe sur highlightSoft (textMuted y garde son contraste de nuit).
+  { text: 'unreadDotRing', on: 'highlightSoft', min: 3 },
   { text: 'focusRing', on: 'background', min: 3 },
   // Les contrôles (WCAG 1.4.11) : le bord d'une case ou d'un rond vide, la piste d'un interrupteur
   // éteint, et le liseré du rond ou de la case choisis, sur une carte comme sur la page.
