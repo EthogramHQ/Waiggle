@@ -1843,7 +1843,7 @@ describe('the testers corner, seen by the moderation', () => {
         count: 1,
         authorRecord: expect.objectContaining({ memberId: leaId }),
       })
-      expect(text).not.toContain(photo.key)
+      // Décision de Louis 4 (11/11/2026) : la file donne l'adresse de l'image signalée, qui porte sa clé.
     })
 
     it('shows a reported message with its text and the state of its capture, its sender as author', async () => {
@@ -1864,7 +1864,7 @@ describe('the testers corner, seen by the moderation', () => {
         concernsMe: false,
         authorRecord: expect.objectContaining({ memberId: maxId }),
       })
-      expect(text).not.toContain(capture.key)
+      // Décision de Louis 4 (11/11/2026) : la file donne l'adresse de l'image signalée, qui porte sa clé.
       // Le signaleur n'y est pas, même dans un fil à deux.
       expect(text).not.toContain(leaId)
     })
