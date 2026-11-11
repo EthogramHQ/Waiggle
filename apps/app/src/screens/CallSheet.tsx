@@ -401,17 +401,19 @@ function CallForm({ project, memberId, open, close }: FormProps) {
       setDraft(next)
     }
     setMessage(
-      reason === 'limited'
+      reason === 'callsLimited'
         ? t(($) => $.project.testers.calls.limited, { max: CALLS_PER_DAY_PER_PROJECT })
-        : reason === 'expired'
-          ? t(($) => $.errors.unauthorized)
-          : reason === 'invalidPhoto'
-            ? t(($) => $.project.testers.calls.invalidPhoto)
-            : reason === 'closed'
-              ? t(($) => $.errors.cornerClosed)
-              : reason === 'full'
-                ? t(($) => $.errors.testerMediaFull)
-                : t(($) => $.project.testers.calls.error),
+        : reason === 'limited'
+          ? t(($) => $.errors.rateLimited)
+          : reason === 'expired'
+            ? t(($) => $.errors.unauthorized)
+            : reason === 'invalidPhoto'
+              ? t(($) => $.project.testers.calls.invalidPhoto)
+              : reason === 'closed'
+                ? t(($) => $.errors.cornerClosed)
+                : reason === 'full'
+                  ? t(($) => $.errors.testerMediaFull)
+                  : t(($) => $.project.testers.calls.error),
     )
   }, [sendFailed, reason])
 

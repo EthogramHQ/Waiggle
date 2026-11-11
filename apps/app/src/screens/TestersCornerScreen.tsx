@@ -771,7 +771,17 @@ function CallsTab({ project, corner }: { project: Project; corner: TesterCorner 
               key={call.id}
               text={call.text}
               at={call.createdAt}
-              photo={source && photo ? { source, description: photo.description ?? '' } : null}
+              photo={
+                source && photo
+                  ? {
+                      source,
+                      description: photo.description ?? '',
+                      // Ses dimensions (contrat) : le cadre ne bouge pas au chargement de la photo.
+                      width: photo.width,
+                      height: photo.height,
+                    }
+                  : null
+              }
               removal={
                 call.removal ? (
                   <RemovalNotice {...removalBanner(call.removal, t)} compact />

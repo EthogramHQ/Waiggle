@@ -64,6 +64,9 @@ export const ErrorCode = z.enum([
   'invalid_photo',
   'invalid_feedback',
   'tester_media_full',
+  // Tranche R7b : le 6e appel d'un projet dans la journée (429). Le quota du membre (20 appels en
+  // 24 h) garde `rate_limited` : l'appli distingue les deux pour dire lequel est atteint.
+  'project_calls_limited',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

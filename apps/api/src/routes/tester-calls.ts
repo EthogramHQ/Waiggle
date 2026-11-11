@@ -116,9 +116,16 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
   const notFound = (c: Context<AppEnv>) => c.json(errorBody(languageOf(c), 'not_found'), 404)
   const cornerClosed = (c: Context<AppEnv>) =>
     c.json(errorBody(languageOf(c), 'corner_closed'), 409)
-  const tooMany = (c: Context<AppEnv>, retryAfterSeconds: number) => {
+  // Deux quotas, un même 429 : le code dit lequel (R7b). `rate_limited` pour le membre (20 appels en
+  // 24 h, ou 60 modifications par heure), `project_calls_limited` pour le projet (5 appels par jour),
+  // que l'appli traduit par « tu as lancé 5 appels aujourd'hui ».
+  const tooMany = (
+    c: Context<AppEnv>,
+    retryAfterSeconds: number,
+    code: 'rate_limited' | 'project_calls_limited' = 'rate_limited',
+  ) => {
     c.header('Retry-After', String(retryAfterSeconds))
-    return c.json(errorBody(languageOf(c), 'rate_limited'), 429)
+    return c.json(errorBody(languageOf(c), code), 429)
   }
 
   // Lancer : le quota du membre, puis le droit, puis le quota du projet, TOUS avant de lire le corps.
@@ -138,7 +145,7 @@ export const testerCallRoutes = ({ db, storage, limiter, publicApiUrl }: Deps) =
     if (access === 'tester') return forbidden(c)
     if (access === 'author_closed') return cornerClosed(c)
     const project = await limiter.hit(projectCallKey(c.req.param('id')), projectCallRule)
-    if (!project.allowed) return tooMany(c, project.retryAfterSeconds)
+    if (!project.allowed) return tooMany(c, project.retryAfterSeconds, 'project_calls_limited')
     await next()
   })
 

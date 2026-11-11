@@ -189,6 +189,25 @@ describe('the thread of a tester', () => {
     expect(screen.getByLabelText(name)).toBeTruthy()
   })
 
+  it('gives the capture the size the API reports, so the thread does not move when it loads', async () => {
+    // Une capture en hauteur (600 × 1200) : le cadre a ses proportions dès le premier dessin. Sans
+    // les dimensions, il prendrait le rapport par défaut (4/3) puis sauterait au chargement.
+    mockServer.setThread(
+      ines.id,
+      inesThread('author').map((message) =>
+        message.capture
+          ? { ...message, capture: { ...message.capture, width: 600, height: 1200 } }
+          : message,
+      ),
+    )
+    await openThread()
+
+    const opener = screen.getByRole('button', {
+      name: containing(fr.t(($) => $.gallery.enlarge, { description: '' }).trim()),
+    })
+    expect(opener).toHaveStyle({ aspectRatio: 0.5 })
+  })
+
   it('describes each message menu by the message text', async () => {
     await openThread()
 
