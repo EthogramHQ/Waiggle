@@ -5,7 +5,8 @@
 // de 6 jours, moins de 3 récaps de suite sans visite, ou une visite depuis) :
 // 1. calculer ce qui est nouveau pour lui, comme l'écran des notifications (droits, masquage,
 //    projet privé) : ses commentaires, réponses et mentions non vus, ses réactions et ses nouveaux
-//    abonnés, et (R7a) les projets qu'il suit ou teste qui ont été mis à jour, depuis le plus récent
+//    abonnés, (R7a) les projets qu'il suit ou teste qui ont été mis à jour, et (R7b) les projets
+//    dont le coin des testeurs a du nouveau pour lui, depuis le plus récent
 //    de sa dernière visite de l'écran, du dernier récap et d'il y a 7 jours ; sans ce qui est déjà
 //    parti dans un e-mail de mentions ;
 // 2. rien de nouveau : aucun e-mail ;
@@ -131,6 +132,10 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
   // notifications viennent de la plus récente à la plus ancienne, le projet mis à jour le plus
   // récemment est donc le premier. Seuls son titre et le nombre de ses mises à jour sont gardés.
   const updated = new Map<string, { title: string; count: number }>()
+  // R7b : les nouveautés du coin des testeurs, par projet, dans le même ordre (le projet de la plus
+  // récente en tête). Seuls le titre et le nombre sont gardés : jamais le texte d'un appel ni d'un
+  // message (relecture juridique J12 ; une notification de message n'en porte d'ailleurs pas).
+  const cornered = new Map<string, { title: string; count: number }>()
   for (const { notification } of notifications) {
     switch (notification.kind) {
       case 'comment': {
@@ -163,7 +168,20 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
         else updated.set(notification.project.id, { title: notification.project.title, count: 1 })
         break
       }
-      // Un commentaire masqué ou le pseudo reçu : seulement dans l'appli.
+      // R7b : un appel, un message de l'autre personne d'un fil, un retour réglé comptent pour le
+      // coin de leur projet. Comme pour les mises à jour, la source a déjà écarté ce que le membre
+      // ne doit plus voir (coin fermé, départ, retrait, blocage), relu à l'envoi : les 5 projets
+      // et « Et N autres » se comptent après ce filtre.
+      case 'tester_call':
+      case 'tester_message':
+      case 'feedback_settled': {
+        const project = cornered.get(notification.project.id)
+        if (project) project.count++
+        else cornered.set(notification.project.id, { title: notification.project.title, count: 1 })
+        break
+      }
+      // Un commentaire masqué, le pseudo reçu, la modération (un retrait, d'un appel ou d'un
+      // message compris : ce n'est pas une nouveauté du coin) : seulement dans l'appli.
       default:
         break
     }
@@ -175,8 +193,22 @@ const contentOf = async (deps: JobDeps, member: Candidate, now: Date) => {
     count,
     url: new URL(`/projects/${projectId}/updates`, deps.appUrl).toString(),
   }))
-  if (lines.length === 0 && reactions === 0 && follows === 0 && updates.length === 0) return null
-  return { lines, reactions, follows, updates }
+  // Le lien de chaque projet mène à son coin des testeurs, fabriqué de la même façon.
+  const testers = [...cornered].map(([projectId, { title, count }]) => ({
+    title,
+    count,
+    url: new URL(`/projects/${projectId}/testers`, deps.appUrl).toString(),
+  }))
+  if (
+    lines.length === 0 &&
+    reactions === 0 &&
+    follows === 0 &&
+    updates.length === 0 &&
+    testers.length === 0
+  ) {
+    return null
+  }
+  return { lines, reactions, follows, updates, testers }
 }
 
 const Taken = z.object({
@@ -250,7 +282,8 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
     lines.length === 0 &&
     content.reactions === 0 &&
     content.follows === 0 &&
-    content.updates.length === 0
+    content.updates.length === 0 &&
+    content.testers.length === 0
   ) {
     return false
   }
@@ -268,6 +301,9 @@ const recapOne = async (deps: JobDeps, member: Candidate, now: Date) => {
       // 5 projets au plus, comme les lignes (RECAP_MAX_LINES), puis « Et N autres projets ».
       updates: content.updates.slice(0, RECAP_MAX_LINES),
       updatesMore: Math.max(0, content.updates.length - RECAP_MAX_LINES),
+      // R7b : le coin des testeurs, de même.
+      testers: content.testers.slice(0, RECAP_MAX_LINES),
+      testersMore: Math.max(0, content.testers.length - RECAP_MAX_LINES),
       links: linksFor(deps, member.id, 'recap'),
     }),
   })

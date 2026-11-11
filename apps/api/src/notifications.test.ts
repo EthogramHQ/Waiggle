@@ -2374,6 +2374,9 @@ describe('the testers corner (R7b)', () => {
       await join(meteo.id, malik)
       await openScreen(malik)
       await openScreen(ines)
+      // Zoé aussi a déjà ouvert l'écran : sinon sa notification « pseudo » (la première de tout
+      // membre) compterait 1, hors du coin.
+      await openScreen(zoe)
 
       await postCall(meteo.id)
       const sent = await postMessage(meteo.id, malikId, malik, feedback())

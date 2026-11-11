@@ -624,8 +624,46 @@ export type RecapData = {
   updates: { title: string; count: number; url: string }[]
   /** Combien d'autres projets mis à jour ne sont pas montrés (« Et 2 autres projets »). */
   updatesMore: number
+  /**
+   * R7b, « Le coin des testeurs » : 5 projets au plus, celui qui a la nouveauté la plus récente en
+   * tête ; leur titre, le nombre de nouveautés du coin pour ce membre (appels, messages de l'autre
+   * personne d'un fil, retours réglés), et le lien vers le coin, fabriqué par la tâche. Jamais le
+   * texte d'un appel ni d'un message (relecture juridique J12) : le modèle ne le reçoit pas.
+   */
+  testers: { title: string; count: number; url: string }[]
+  /** Combien d'autres projets du coin ne sont pas montrés (« Et 2 autres projets »). */
+  testersMore: number
   links: NotificationLinks
 }
+
+/**
+ * Une partie du récap qui va par projet (R7a, R7b) : un titre, une ligne par projet (« « Météo » :
+ * 3 nouveautés… ») qui mène à sa page, puis « Et N autres projets ». Vide : pas de partie du tout.
+ * Le titre du projet passe par defangLinks (une adresse écrite par un membre devient « [lien] »),
+ * puis par l'échappement de render ; le lien vient de la tâche, jamais d'un champ de membre.
+ */
+const projectSection = (
+  title: string,
+  texts: { one: string; other: string; moreOne: string; moreOther: string },
+  projects: { title: string; count: number; url: string }[],
+  more: number,
+  link: string,
+): Section[] =>
+  projects.length === 0
+    ? []
+    : [
+        {
+          title,
+          items: projects.map((project) => ({
+            line: fill(project.count === 1 ? texts.one : texts.other, {
+              title: defangLinks(project.title, link),
+              count: String(project.count),
+            }),
+            url: project.url,
+          })),
+          after: more > 0 ? [counted(texts.moreOne, texts.moreOther, more)] : [],
+        },
+      ]
 
 /**
  * Le récap de la semaine. Pas d'extrait : seulement qui, quoi, sur quel projet (relecture
@@ -669,33 +707,34 @@ export const recapEmail = (language: Language, data: RecapData): EmailContent =>
             ]
           : []),
       ],
-      // R7a : la partie des projets suivis ou testés, seulement s'il y en a un. Le titre du projet
-      // passe par le même filtre que les lignes (defangLinks), puis par l'échappement de render.
-      sections:
-        data.updates.length === 0
-          ? []
-          : [
-              {
-                title: fill(t.recap.updatesTitle),
-                items: data.updates.map((update) => ({
-                  line: fill(update.count === 1 ? t.recap.updates_one : t.recap.updates_other, {
-                    title: defangLinks(update.title, link),
-                    count: String(update.count),
-                  }),
-                  url: update.url,
-                })),
-                after:
-                  data.updatesMore > 0
-                    ? [
-                        counted(
-                          t.recap.updatesMore_one,
-                          t.recap.updatesMore_other,
-                          data.updatesMore,
-                        ),
-                      ]
-                    : [],
-              },
-            ],
+      // R7a : la partie des projets suivis ou testés ; R7b : celle du coin des testeurs, après.
+      // Chacune seulement si elle a un projet (projectSection).
+      sections: [
+        ...projectSection(
+          fill(t.recap.updatesTitle),
+          {
+            one: t.recap.updates_one,
+            other: t.recap.updates_other,
+            moreOne: t.recap.updatesMore_one,
+            moreOther: t.recap.updatesMore_other,
+          },
+          data.updates,
+          data.updatesMore,
+          link,
+        ),
+        ...projectSection(
+          fill(t.recap.testersTitle),
+          {
+            one: t.recap.testers_one,
+            other: t.recap.testers_other,
+            moreOne: t.recap.testersMore_one,
+            moreOther: t.recap.testersMore_other,
+          },
+          data.testers,
+          data.testersMore,
+          link,
+        ),
+      ],
       button: { label: fill(t.recap.button), url: data.links.button },
       notes: [],
       reason: fill(t.recap.reason),
