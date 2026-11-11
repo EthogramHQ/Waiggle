@@ -942,6 +942,7 @@ export const fr = {
         unread: 'non lu',
         rowName: '{{name}}, non lu',
         former: 'Ne teste plus',
+        filterLabel: 'Filtrer les retours',
         filters: { open: 'À traiter', settled: 'Réglés' },
         filterSpoken_one: '{{label}}, {{count}} fil',
         filterSpoken_other: '{{label}}, {{count}} fils',

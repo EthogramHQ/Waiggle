@@ -798,6 +798,7 @@ export const en: Translation = {
         unread: 'unread',
         rowName: '{{name}}, unread',
         former: 'No longer testing',
+        filterLabel: 'Filter the feedback',
         filters: { open: 'To do', settled: 'Fixed' },
         filterSpoken_one: '{{label}}, {{count}} thread',
         filterSpoken_other: '{{label}}, {{count}} threads',
