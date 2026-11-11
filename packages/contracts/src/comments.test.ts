@@ -14,12 +14,13 @@ import { MENTIONS_MAX } from './mentions'
 
 const rootId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f6'
 const replyId = '0192abcd-ef01-7c2d-9e3f-a1b2c3d4e5f7'
-const lea = { id: 'lea-id', name: 'Léa', handle: 'lea', avatarUrl: null }
+const lea = { id: 'lea-id', name: 'Léa', handle: 'lea', avatarUrl: null, isTester: false }
 const sam = {
   id: 'sam-id',
   name: 'Sam',
   handle: null,
   avatarUrl: 'https://api.example.com/media/avatars/sam.webp',
+  isTester: false,
 }
 
 describe('NewComment', () => {

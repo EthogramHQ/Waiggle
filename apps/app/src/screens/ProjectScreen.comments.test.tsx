@@ -276,7 +276,7 @@ describe('the comments of a project', () => {
     // Tranche 6c : {{nameOf}}, rempli par useNameOf. Depuis R5b, le nom d'un commentaire est lu
     // seul (« Inès, Auteur » pour l'autrice du projet) : seul le lien du haut de la page garde
     // « Voir la page d’Inès ».
-    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
+    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null, isTester: false }
     seenByOther({ ...withUpdates, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Merci !' })])
     await renderPage()
@@ -288,7 +288,7 @@ describe('the comments of a project', () => {
   })
 
   it('writes the possessive and the preview line in English', async () => {
-    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null }
+    const ines = { id: 'u3', name: 'Inès', handle: 'ines', avatarUrl: null, isTester: false }
     seenByOther({ ...withUpdates, author: ines, commentCount: 1 })
     mockComments([commentOf({ id: maxComment.id, author: ines, body: 'Thanks!' })])
     await renderPage('en')

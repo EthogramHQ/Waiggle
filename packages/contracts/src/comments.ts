@@ -82,7 +82,15 @@ export type CommentState = z.infer<typeof CommentState>
  * commentaire est lu malgré un blocage (sécurité B1 : comme la photo, le pseudo est un moyen de
  * joindre la personne, et le blocage les retire tous).
  */
-export const CommentAuthor = ProjectAuthor.extend({ handle: z.string().nullable() }).meta({
+export const CommentAuthor = ProjectAuthor.extend({
+  handle: z.string().nullable(),
+  /**
+   * R7b : vrai si cette personne teste en ce moment le projet du commentaire (badge « Testeur »,
+   * dessiné comme « Auteur »). Jamais pour l'auteur du projet. Tous les testeurs le portent, inscrits
+   * avant R7b compris (décision de Louis du 11/11/2026).
+   */
+  isTester: z.boolean(),
+}).meta({
   id: 'CommentAuthor',
 })
 export type CommentAuthor = z.infer<typeof CommentAuthor>

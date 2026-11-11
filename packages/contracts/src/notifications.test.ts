@@ -66,10 +66,51 @@ const hidden = {
 }
 const handle = { id: 'handle', at, isNew: false, kind: 'handle', handle: 'ines_morel' }
 
-const all = [reactions, projectFollows, memberFollows, comment, hidden, handle]
+// R7b : les trois sortes du coin des testeurs.
+const papiJean = { id: 'jean-id', name: 'Papi Jean', avatarUrl: null }
+const testerCall = {
+  id: 'tester_call:4b1c2d3e-0000-4000-8000-000000000001',
+  at,
+  isNew: true,
+  kind: 'tester_call',
+  project: meteo,
+  author: papiJean,
+  call: { id: '4b1c2d3e-0000-4000-8000-000000000001', excerpt: 'Essayez le niveau 3' },
+}
+const testerMessage = {
+  id: 'tester_message:4b1c2d3e-0000-4000-8000-000000000002',
+  at,
+  isNew: false,
+  kind: 'tester_message',
+  project: meteo,
+  from: papiJean,
+  role: 'author',
+  message: { id: '4b1c2d3e-0000-4000-8000-000000000002', kind: 'reply', testerId: 'ines-id' },
+}
+const feedbackSettled = {
+  id: 'feedback_settled:4b1c2d3e-0000-4000-8000-000000000003',
+  at,
+  isNew: true,
+  kind: 'feedback_settled',
+  project: meteo,
+  author: papiJean,
+  update: { id: '4b1c2d3e-0000-4000-8000-000000000004', version: 'v1.3', createdAt: at },
+}
+
+const all = [
+  reactions,
+  projectFollows,
+  memberFollows,
+  comment,
+  hidden,
+  handle,
+  testerCall,
+  testerMessage,
+  feedbackSettled,
+]
 
 describe('Notification', () => {
-  it('describes each of the six kinds', () => {
+  it('describes each of the nine kinds', () => {
     for (const notification of all) {
       expect(Notification.parse(notification), notification.kind).toEqual(notification)
     }

@@ -46,6 +46,13 @@ export type ApiErrorKey =
   | 'notTestable'
   | 'testersFull'
   | 'updatePhotosFull'
+  // Tranche R7b : le coin des testeurs (coin ou fil fermés, image ou retour qui ne sont plus
+  // disponibles, 100 images).
+  | 'cornerClosed'
+  | 'threadClosed'
+  | 'invalidPhoto'
+  | 'invalidFeedback'
+  | 'testerMediaFull'
   | 'internal'
   | 'network'
 
@@ -121,6 +128,12 @@ const byCode: Partial<Record<ErrorCode, ApiErrorKey>> = {
   not_testable: 'notTestable',
   testers_full: 'testersFull',
   update_photos_full: 'updatePhotosFull',
+  // Tranche R7b : trois 409 et deux 400 de plus.
+  corner_closed: 'cornerClosed',
+  thread_closed: 'threadClosed',
+  invalid_photo: 'invalidPhoto',
+  invalid_feedback: 'invalidFeedback',
+  tester_media_full: 'testerMediaFull',
 }
 
 /**

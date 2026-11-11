@@ -61,6 +61,8 @@ describe('ReportTarget', () => {
       'update',
       'comment',
       'member',
+      'call',
+      'message',
       'note',
     ])
   })

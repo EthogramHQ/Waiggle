@@ -55,6 +55,15 @@ export const ErrorCode = z.enum([
   'not_testable',
   'testers_full',
   'update_photos_full',
+  // Tranche R7b : écrire dans un coin fermé (projet retiré, privé, auteur suspendu) ; répondre dans
+  // un fil fermé (ancien testeur, ou testeur qui n'a jamais écrit) ; une image citée qui n'est pas
+  // une image en attente de ce membre et de ce projet ; un retour cité par une mise à jour qui n'est
+  // plus à traiter ; 100 images sur un fil ou 100 photos d'appel sur un projet.
+  'corner_closed',
+  'thread_closed',
+  'invalid_photo',
+  'invalid_feedback',
+  'tester_media_full',
   'internal',
 ])
 export type ErrorCode = z.infer<typeof ErrorCode>

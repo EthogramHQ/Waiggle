@@ -62,7 +62,7 @@ const held = () => {
 /** Une réponse de Malik, lue malgré un blocage : l'API ne donne ni son pseudo ni sa photo (jur-P5). */
 const malikReply: CommentReply = replyOf({
   id: '6e7f8091-a2b3-4cc4-9dd5-e6f708192a3b',
-  author: { id: 'u7', name: 'Malik', handle: null, avatarUrl: null },
+  author: { id: 'u7', name: 'Malik', handle: null, avatarUrl: null, isTester: false },
   body: 'Je passe par là.',
 })
 

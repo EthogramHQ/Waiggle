@@ -105,8 +105,14 @@ const noop = () => {}
 /** L'heure figée du catalogue : la date relative ne dépend pas du moment de la visite. */
 const NOW = new Date('2026-11-05T12:00:00.000Z')
 const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
-const HUGO = { id: 'hugo', name: 'Hugo Lefèvre', avatarUrl: null, handle: 'hugo_l' }
-const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b' }
+const HUGO = {
+  id: 'hugo',
+  name: 'Hugo Lefèvre',
+  avatarUrl: null,
+  handle: 'hugo_l',
+  isTester: false,
+}
+const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b', isTester: false }
 
 /** Les props communes d'une carte d'exemple : ni menu, ni masquage, rien à ouvrir. */
 const base = {

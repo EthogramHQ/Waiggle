@@ -103,9 +103,21 @@ const noop = () => {}
 const NOW = new Date('2026-11-05T12:00:00.000Z')
 const HOURS_AGO = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
 
-const LEA = { id: 'lea', name: 'Léa Moreau', avatarUrl: null, handle: 'lea_moreau' }
-const HUGO = { id: 'hugo', name: 'Hugo Lefèvre', avatarUrl: null, handle: 'hugo_l' }
-const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b' }
+const LEA = {
+  id: 'lea',
+  name: 'Léa Moreau',
+  avatarUrl: null,
+  handle: 'lea_moreau',
+  isTester: false,
+}
+const HUGO = {
+  id: 'hugo',
+  name: 'Hugo Lefèvre',
+  avatarUrl: null,
+  handle: 'hugo_l',
+  isTester: false,
+}
+const SAM = { id: 'sam', name: 'Sam Bernard', avatarUrl: null, handle: 'sam_b', isTester: false }
 
 /** Un commentaire, tel que l'API le rend : visible par défaut, sans mention ni modification. */
 const sample = (overrides: Partial<CommentReply> & { id: string }): CommentReply => ({

@@ -2161,7 +2161,8 @@ Hors de R7b, et où ça va :
   (Téléphone · Ordinateur · Tablette, facultatif), un texte de 1 000 caractères au plus (« Ce qui a
   marché, ce qui a coincé, ce que tu as aimé »), et une capture d'écran facultative, ré-encodée
   sans métadonnées
-- Et l'aide rappelle « Retire ce qui est personnel de ta capture. »
+- Et l'aide rappelle « Retire de ta capture ce qui est personnel, à toi ou à d’autres : noms,
+  messages, adresses. » (amendé le 11/11/2026, relecture juridique J8)
 - Quand elle touche « Envoyer »
 - Alors le retour apparaît dans son fil, et Papi Jean est prévenu dans Activité
 - Et seuls Inès et Papi Jean voient ce fil ; aucun autre testeur, aucun autre membre

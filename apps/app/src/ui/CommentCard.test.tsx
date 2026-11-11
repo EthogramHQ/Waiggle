@@ -45,12 +45,19 @@ afterEach(() => {
 // --- Les données ---------------------------------------------------------------------------------
 
 /** Léa a publié le projet ; Hugo le commente. */
-const lea: CommentAuthor = { id: 'u1', name: 'Léa Moreau', handle: 'lea_moreau', avatarUrl: null }
+const lea: CommentAuthor = {
+  id: 'u1',
+  name: 'Léa Moreau',
+  handle: 'lea_moreau',
+  avatarUrl: null,
+  isTester: false,
+}
 const hugo: CommentAuthor = {
   id: 'u7',
   name: 'Hugo Lefèvre',
   handle: 'hugo_l',
   avatarUrl: null,
+  isTester: false,
 }
 
 // L'heure de la carte est figée (`now`) : à l'horloge réelle, entre minuit et 3 h, « il y a trois

@@ -17,8 +17,20 @@ export type Host = ReturnType<typeof screen.getByText>
 // --- Des commentaires de plus, pour atteindre 6 (l'aperçu en montre 3 sur téléphone, 5 sur
 // ordinateur) ---
 
-export const inesAuthor = { id: 'u5', name: 'Inès', handle: 'ines', avatarUrl: null }
-export const hugoAuthor = { id: 'u7', name: 'Hugo', handle: 'hugo', avatarUrl: null }
+export const inesAuthor = {
+  id: 'u5',
+  name: 'Inès',
+  handle: 'ines',
+  avatarUrl: null,
+  isTester: false,
+}
+export const hugoAuthor = {
+  id: 'u7',
+  name: 'Hugo',
+  handle: 'hugo',
+  avatarUrl: null,
+  isTester: false,
+}
 
 /** Un fil plus ancien que celui de Zoé : Inès, sans réponse. */
 export const inesComment = commentOf({
@@ -56,7 +68,13 @@ export const sixTexts = [
 export const sixThreads: Comment[] = Array.from({ length: 6 }, (_, index) =>
   commentOf({
     id: `8091a2b3-c4d5-4e6f-8071-8293a4b5c6d${index}`,
-    author: { id: `u${10 + index}`, name: `Membre ${index + 1}`, handle: null, avatarUrl: null },
+    author: {
+      id: `u${10 + index}`,
+      name: `Membre ${index + 1}`,
+      handle: null,
+      avatarUrl: null,
+      isTester: false,
+    },
     body: `Fil numéro ${index + 1}`,
     createdAt: `2026-10-0${9 - index}T09:00:00.000Z`,
   }),

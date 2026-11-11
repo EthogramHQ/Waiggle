@@ -210,7 +210,13 @@ export function ReportSamples() {
           {...card}
           comment={comment({
             id: 'ines',
-            author: { id: 'ines', name: 'Inès Haddad', avatarUrl: null, handle: 'ines_h' },
+            author: {
+              id: 'ines',
+              name: 'Inès Haddad',
+              avatarUrl: null,
+              handle: 'ines_h',
+              isTester: false,
+            },
             body: l.commentBody,
           })}
           menu={[{ label: l.report, icon: 'flag', onPress: () => {} }]}
@@ -219,7 +225,13 @@ export function ReportSamples() {
           {...card}
           comment={comment({
             id: 'max',
-            author: { id: 'max', name: 'Max Durand', avatarUrl: null, handle: 'max_d' },
+            author: {
+              id: 'max',
+              name: 'Max Durand',
+              avatarUrl: null,
+              handle: 'max_d',
+              isTester: false,
+            },
             body: l.removedBody,
             state: 'removed',
             isMine: true,

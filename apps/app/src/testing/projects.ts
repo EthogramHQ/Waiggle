@@ -40,6 +40,8 @@ export const recipesProject: Project = {
   version: null,
   isTester: false,
   testerCount: null,
+  // R7b : « Rejoindre les testeurs » reste proposé.
+  testerJoinable: true,
   reactions: noReactions,
   commentCount: 0,
   removal: null,

@@ -99,7 +99,15 @@ export const SnapshotImage = z
 export type SnapshotImage = z.infer<typeof SnapshotImage>
 
 /** Ce qu'on peut signaler. Une réponse est un commentaire. R7a : `update` remplace `note`. */
-export const ReportTargetKind = z.enum(['project', 'update', 'comment', 'member'])
+/** R7b : un appel à tester (`call`) et un message d'un fil de testeur (`message`), en fin de liste. */
+export const ReportTargetKind = z.enum([
+  'project',
+  'update',
+  'comment',
+  'member',
+  'call',
+  'message',
+])
 export type ReportTargetKind = z.infer<typeof ReportTargetKind>
 
 /**
@@ -123,6 +131,8 @@ export const ReportTarget = z
     z.object({ kind: z.literal('update'), id: UpdateId }),
     z.object({ kind: z.literal('comment'), id: CommentId }),
     z.object({ kind: z.literal('member'), id: MemberId }),
+    z.object({ kind: z.literal('call'), id: z.uuid() }),
+    z.object({ kind: z.literal('message'), id: z.uuid() }),
   ])
   .meta({ id: 'ReportTarget' })
 export type ReportTarget = z.infer<typeof ReportTarget>

@@ -4,9 +4,27 @@
 // chaque auteur a son pseudo actuel (`handle`) et chaque mention le nom actuel du membre (`name`).
 import type { Comment, CommentAuthor, CommentReply, Mention, Mentionable } from '@ruche/contracts'
 
-export const leaAuthor: CommentAuthor = { id: 'u1', name: 'Léa', handle: 'lea', avatarUrl: null }
-export const maxAuthor: CommentAuthor = { id: 'u2', name: 'Max', handle: 'max', avatarUrl: null }
-export const zoeAuthor: CommentAuthor = { id: 'u3', name: 'Zoé', handle: 'zoe', avatarUrl: null }
+export const leaAuthor: CommentAuthor = {
+  id: 'u1',
+  name: 'Léa',
+  handle: 'lea',
+  avatarUrl: null,
+  isTester: false,
+}
+export const maxAuthor: CommentAuthor = {
+  id: 'u2',
+  name: 'Max',
+  handle: 'max',
+  avatarUrl: null,
+  isTester: false,
+}
+export const zoeAuthor: CommentAuthor = {
+  id: 'u3',
+  name: 'Zoé',
+  handle: 'zoe',
+  avatarUrl: null,
+  isTester: false,
+}
 
 /** Une réponse visible de Zoé ; chaque test change ce qui l'intéresse. */
 export const replyOf = (
