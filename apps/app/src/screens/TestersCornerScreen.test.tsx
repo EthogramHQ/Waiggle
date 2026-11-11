@@ -468,6 +468,23 @@ describe('the tab « Appels »', () => {
     expect(await screen.findByLabelText(T.captureNameMine)).toBeTruthy()
   })
 
+  it('gives the call photo the size the API reports, so the list does not move when it loads', async () => {
+    // Une photo en hauteur (600 × 1200) : le cadre a ses proportions dès le premier dessin. Sans les
+    // dimensions, il prendrait le rapport par défaut (4/3) puis sauterait au chargement.
+    mockServer.callPages.set('', {
+      items: calls.map((call) =>
+        call.photo ? { ...call, photo: { ...call.photo, width: 600, height: 1200 } } : call,
+      ),
+      nextCursor: null,
+    })
+    await openCorner()
+
+    const opener = await screen.findByRole('button', {
+      name: containing(fr.t(($) => $.gallery.enlarge, { description: '' }).trim()),
+    })
+    expect(opener).toHaveStyle({ aspectRatio: 0.5 })
+  })
+
   it('deletes a call of the author once confirmed', async () => {
     await openCorner()
     const call = calls[0]

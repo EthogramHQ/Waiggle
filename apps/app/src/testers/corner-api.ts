@@ -40,20 +40,28 @@ import { projectQueryKey } from '../projects/hooks'
 
 /**
  * Pourquoi la dernière demande a échoué, quand réessayer ne servirait à rien :
- * - limited : trop de demandes (429) ;
+ * - limited : trop de demandes (429), dont le quota du membre (20 appels en 24 h) ;
+ * - callsLimited : les 5 appels du jour du projet sont lancés (429 `project_calls_limited`) ;
  * - expired : la session a expiré (401) ;
  * - invalidPhoto : l'image n'est plus en attente (400 `invalid_photo`) ;
  * - closed : le coin ou le fil est fermé (409 `corner_closed` ou `thread_closed`) ;
  * - full : le fil ou le projet garde déjà 100 images (409 `tester_media_full`).
  * Absent : une autre erreur (réseau, serveur), qu'un nouvel essai peut régler.
  */
-export type CornerFailure = 'limited' | 'expired' | 'invalidPhoto' | 'closed' | 'full'
+export type CornerFailure =
+  | 'limited'
+  | 'callsLimited'
+  | 'expired'
+  | 'invalidPhoto'
+  | 'closed'
+  | 'full'
 
 const reasonOf = (error: unknown): CornerFailure | undefined => {
   if (!error) return undefined
   switch (errorKey(error)) {
     case 'rateLimited':
-      return 'limited'
+      // Le même 429 pour deux quotas : celui du projet se lit sur l'indicateur de l'erreur.
+      return error instanceof ApiError && error.projectLimit ? 'callsLimited' : 'limited'
     case 'unauthorized':
       return 'expired'
     case 'invalidPhoto':
@@ -313,7 +321,7 @@ export const useSendCall = (projectId: string) => {
     projectId,
     send: async (call) => {
       const result = await request(`${cornerPath(projectId)}/calls`, json('POST', call), TesterCall)
-      if (!result.ok) throw new ApiError(result.error)
+      if (!result.ok) throw new ApiError(result.error, result.projectLimit === true)
       return result.data
     },
     onSuccess: (queryClient, created) =>

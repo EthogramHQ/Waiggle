@@ -69,6 +69,7 @@ beforeEach(() => {
 // --- Les aides ---
 
 const CALLS = /^\/v1\/projects\/[^/]+\/calls$/
+const RATE_LIMITED = fr.t(($) => $.errors.rateLimited)
 const MEDIA = /^\/v1\/projects\/[^/]+\/testers\/media$/
 const sentCalls = () => mockServer.received('POST', CALLS).map((one) => one.body)
 
@@ -229,14 +230,32 @@ describe('sending a call', () => {
   })
 
   it('says that the five calls of the day are used up, keeping the text', async () => {
-    mockServer.answer('POST', CALLS, () => ({ ok: false, error: 'rateLimited' }))
+    // Le quota du projet : le client lit le code `project_calls_limited` et pose `projectLimit`.
+    mockServer.answer('POST', CALLS, () => ({
+      ok: false,
+      error: 'rateLimited',
+      projectLimit: true,
+    }))
     await openSheet()
     await write('Un sixième appel')
     await send()
 
     await waitFor(() => expect(shown(T.callLimited)).toBe(true))
+    expect(shown(RATE_LIMITED)).toBe(false)
     expect(field()).toHaveDisplayValue('Un sixième appel')
     expect(departures()).toBe(0)
+  })
+
+  it('says « trop de demandes » for the member quota, not the five calls of the project', async () => {
+    // Le quota du membre (20 appels en 24 h) : le même 429, sans `project_calls_limited`.
+    mockServer.answer('POST', CALLS, () => ({ ok: false, error: 'rateLimited' }))
+    await openSheet()
+    await write('Un appel de trop')
+    await send()
+
+    await waitFor(() => expect(shown(RATE_LIMITED)).toBe(true))
+    expect(shown(T.callLimited)).toBe(false)
+    expect(field()).toHaveDisplayValue('Un appel de trop')
   })
 
   it('says the call could not be sent, keeping the text', async () => {

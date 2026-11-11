@@ -256,7 +256,15 @@ export const presentNotification = (
           t(($) => $.removal.contest),
         ].join('\n'),
         quote: excerpt,
-        target: elsewhere ? null : projectRoute(project.id),
+        // R7b : un appel ou un message retiré mène au coin des testeurs, à son onglet (Appels, ou
+        // Retours) ; le reste, à la page du projet.
+        target: elsewhere
+          ? null
+          : targetKind === 'call'
+            ? cornerRoute(project.id, 'calls')
+            : targetKind === 'message'
+              ? cornerRoute(project.id, 'feedback')
+              : projectRoute(project.id),
       }
     }
     case 'report_handled': {

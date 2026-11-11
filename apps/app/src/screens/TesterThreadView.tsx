@@ -316,6 +316,10 @@ export function TesterThreadView({
           capture
             ? {
                 source: capture,
+                // Ses dimensions (contrat) : le cadre a ses proportions dès le premier dessin, le
+                // fil ne bouge pas quand l'image se charge.
+                width: message.capture?.width,
+                height: message.capture?.height,
                 // Un nom lu fixe, jamais une description écrite par le membre (juridique J8).
                 description: message.mine
                   ? t(($) => $.project.testers.feedback.captureNameMine)

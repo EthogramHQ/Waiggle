@@ -54,6 +54,8 @@ const errorMessages = {
   invalid_photo: 'invalidPhoto',
   invalid_feedback: 'invalidFeedback',
   tester_media_full: 'testerMediaFull',
+  // Le quota des appels d'un projet : même texte que « trop de demandes », un code à part.
+  project_calls_limited: 'rateLimited',
   internal: 'internal',
 } as const satisfies Record<ErrorCode, string>
 

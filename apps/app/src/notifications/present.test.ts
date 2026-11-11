@@ -331,6 +331,11 @@ describe('the moderation and the testers corner (R7b)', () => {
     expect(shown.text).toBe(fr.t(($) => $.notifications.removed.message, { title: 'Décollage !' }))
   })
 
+  it('leads a removed call to the « Appels » tab and a removed message to « Retours »', () => {
+    expect(addressOf(present(removed('call')).target)).toBe(`${corner}?tab=calls`)
+    expect(addressOf(present(removed('message')).target)).toBe(`${corner}?tab=feedback`)
+  })
+
   // Un message retiré sans texte (une capture seule) arrive avec `excerpt: null` : rien à citer,
   // mais la phrase, le fondement et la contestation s'écrivent comme d'habitude.
   it('writes the removal of a message without text, with no quote', () => {

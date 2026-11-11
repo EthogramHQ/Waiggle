@@ -336,6 +336,17 @@ describe('calls', () => {
     expect(result.current.error).toBe(true)
   })
 
+  it('tells the quota of the project from the quota of the member when a call is refused', async () => {
+    answers[`POST ${P}/calls`] = { ok: false, error: 'rateLimited', projectLimit: true }
+    const { result } = await renderHook(() => useSendCall(projectId), { wrapper })
+
+    await act(async () => {
+      await result.current.send({ text: 'Un appel', photoId: null, photoDescription: null })
+    })
+
+    await waitFor(() => expect(result.current.reason).toBe('callsLimited'))
+  })
+
   it('removes a call at the touch, before the answer comes', async () => {
     const answer = held({ ok: true, data: null })
     answers[`DELETE ${P}/calls/${call(1).id}`] = answer.answer

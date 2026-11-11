@@ -598,7 +598,7 @@ describe('limits against abuse', () => {
 
     const res = await postCall(project.id, jean)
 
-    await expectError(res, 429, 'rate_limited')
+    await expectError(res, 429, 'project_calls_limited')
     expect(res.headers.get('retry-after')).toBeTruthy()
     expect((await calls(project.id, jean)).items).toHaveLength(5)
     // Le plafond est propre à chaque projet.
@@ -622,7 +622,7 @@ describe('limits against abuse', () => {
       await expectError(await postCall(project.id, jean, {}), 400, 'validation')
     }
 
-    await expectError(await postCall(project.id, jean), 429, 'rate_limited')
+    await expectError(await postCall(project.id, jean), 429, 'project_calls_limited')
     expect((await calls(project.id, jean)).items).toEqual([])
   })
 
@@ -635,8 +635,8 @@ describe('limits against abuse', () => {
       expect((await postCall(written, jean, simple(`Appel ${i + 1}.`))).status).toBe(201)
     }
 
-    await expectError(await postCall(project.id.toUpperCase(), jean), 429, 'rate_limited')
-    await expectError(await postCall(project.id, jean), 429, 'rate_limited')
+    await expectError(await postCall(project.id.toUpperCase(), jean), 429, 'project_calls_limited')
+    await expectError(await postCall(project.id, jean), 429, 'project_calls_limited')
     expect((await calls(project.id, jean)).items).toHaveLength(5)
   })
 
