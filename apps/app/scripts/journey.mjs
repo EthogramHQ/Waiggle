@@ -651,7 +651,8 @@ try {
   await sam.page.getByRole('heading', { name: 'Rejoindre les testeurs', exact: true }).waitFor()
   await sam.page.waitForTimeout(800) // la feuille ignore les tapes de ses 600 premières ms
   await byRole(sam.page.getByRole('dialog'), 'button', 'Rejoindre les testeurs').click()
-  await byRole(sam.page, 'button', 'Tu testes ce projet').waitFor()
+  // R7b : une fois inscrit, le bouton mène au coin des testeurs.
+  await byRole(sam.page, 'button', 'Le coin des testeurs').waitFor()
   await waitFor(
     'inscription aux testeurs enregistrée',
     async () => (await readProject(sam, projectId)).isTester === true,

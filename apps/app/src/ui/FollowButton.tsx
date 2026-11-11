@@ -8,7 +8,7 @@
 // Variante `chip` (refonte, tranche R3) : une pastille de verre posée sur la photo d'une carte
 // d'Explorer, « Suivre Nora » puis « Tu suis Nora ✓ ». Voir FollowChip, plus bas.
 import { borders, layout, pressScale, radii, space } from '@ruche/brand'
-import { useEffect, useRef } from 'react'
+import { type Ref, useEffect, useRef } from 'react'
 import { Pressable, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { Avatar } from './Avatar'
@@ -68,6 +68,11 @@ type Props = {
   icon?: 'user-plus' | 'bell'
   /** La photo de l'auteur, au début de la pastille (variante chip seulement) ; décorative. */
   avatar?: { name: string; source: ImageSource | null }
+  /**
+   * Le bouton lui-même (variante `button` seulement), pour qu'un écran y pose le focus : la page
+   * d'un projet y amène le focus quand « Rejoindre les testeurs » n'est plus proposé (R7b).
+   */
+  ref?: Ref<View>
 }
 
 export function FollowButton({
@@ -84,6 +89,7 @@ export function FollowButton({
   variant = 'button',
   icon = 'user-plus',
   avatar,
+  ref,
 }: Props) {
   if (variant === 'chip') {
     return (
@@ -100,6 +106,7 @@ export function FollowButton({
   const stacked = layout === 'stacked'
   const button = (
     <Button
+      ref={ref}
       label={text}
       spokenLabel={label}
       checked={followed}
