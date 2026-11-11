@@ -134,6 +134,7 @@ import { SettingsCatalogue } from './reglages'
 import { ReportSamples } from './reports'
 import { SuspensionCatalogue } from './suspension'
 import { TestersCatalogue } from './testeurs'
+import { TesterBricksCatalogue } from './testeurs-briques'
 
 // Des résumés flous (ThumbHash) de deux visuels de projet, pour montrer la lumière d'ambiance.
 // Ils ressemblent à des clés secrètes pour l'outil qui cherche les secrets oubliés (gitleaks) :
@@ -854,6 +855,8 @@ export function CatalogueScreen() {
       <UpdateFamiliesCatalogue />
       {/* Tranche R7a, les testeurs d'un projet (testeurs.tsx). */}
       <TestersCatalogue />
+      {/* Tranche R7b, les briques du coin des testeurs (testeurs-briques.tsx). */}
+      <TesterBricksCatalogue />
       {/* Tranche R7a, l'avant / après d'une mise à jour (avant-apres.tsx). */}
       <BeforeAfterCatalogue />
       {/* Tranche R7a, les lignes « Ce qui a changé » d'une mise à jour (mises-a-jour-lignes.tsx). */}

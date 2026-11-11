@@ -75,7 +75,6 @@ const icons = [
   'note-pencil', // écrire une note dans le journal
   // Messages et sécurité
   'check-circle',
-  'x-circle', // R7b : l'issue « Non » d'un retour (ui/OutcomePill.tsx)
   'warning',
   'warning-circle',
   'info',
