@@ -77,12 +77,22 @@ const fr = {
     { label: 'Outils', value: 'Claude Code, Python' },
     { label: 'Lien de démo', value: 'https://faux-avis.example/essai' },
   ],
+  pictureCaption: 'R7b : la capture d’un message du coin des testeurs, signalé',
+  messageKind: 'Message d’un fil de testeur',
+  messageFields: [{ label: 'Texte', value: 'Le bouton ne répond pas sur mon téléphone.' }],
+  pictureName: 'Photo',
+  pictureState: 'Photo : toujours affichée',
   numberedImages: [
     'Couverture : toujours affichée',
     'Photo 1 : toujours affichée',
     'Photo 2 : supprimée ou remplacée depuis',
   ],
 }
+
+/** Une capture d'exemple : un dessin SVG en adresse data: (expo-image le dessine aussi sur le web). */
+const CAPTURE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 104"><rect width="150" height="104" fill="#1F2A44"/><circle cx="112" cy="30" r="14" fill="#FFC21A"/><rect x="16" y="64" width="80" height="10" rx="5" fill="#F7F3EA"/></svg>'
+const capture = { uri: `data:image/svg+xml;utf8,${encodeURIComponent(CAPTURE_SVG)}` }
 
 const en: typeof fr = {
   section: 'Reporting, and what is removed',
@@ -146,6 +156,11 @@ const en: typeof fr = {
     { label: 'Tools', value: 'Claude Code, Python' },
     { label: 'Demo link', value: 'https://fake-reviews.example/trial' },
   ],
+  pictureCaption: 'R7b: the capture of a reported testers’ corner message',
+  messageKind: 'Tester thread message',
+  messageFields: [{ label: 'Text', value: 'The button does not respond on my phone.' }],
+  pictureName: 'Photo',
+  pictureState: 'Photo: still shown',
   numberedImages: [
     'Cover: still shown',
     'Photo 1: still shown',
@@ -290,6 +305,26 @@ export function ReportSamples() {
         snapshot={l.fullFields}
         snapshotLabel={l.copyLabel}
         images={l.numberedImages}
+        reasons={[l.scamReason]}
+        when={l.since}
+        viewLabel={l.view}
+        onView={() => {}}
+        actions={[
+          { label: l.remove, onPress: () => {}, tone: 'danger' },
+          { label: l.dismiss, onPress: () => {} },
+        ]}
+      />
+      {/* R7b : la capture d'un message signalé s'affiche sous sa copie, avec son état. */}
+      <Text variant="caption" tone="muted">
+        {l.pictureCaption}
+      </Text>
+      <ReportCard
+        kind={l.messageKind}
+        count={l.count1}
+        snapshot={l.messageFields}
+        snapshotLabel={l.copyLabel}
+        images={[l.pictureState]}
+        pictures={[{ name: l.pictureName, source: capture }]}
         reasons={[l.scamReason]}
         when={l.since}
         viewLabel={l.view}
